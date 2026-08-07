@@ -8,10 +8,50 @@ import {
   renderOtpEmail,
   sendVerificationOtpEmail,
   sendResetPasswordEmail,
+  isE2EFixtureAddress,
   type AuthEmailCtx,
 } from "../../lib/authEmails";
 
 const modules = import.meta.glob("/convex/**/*.ts");
+
+/**
+ * The deferred sends (welcome ~24h, signup notification ~20min) fire long after
+ * global-teardown removes E2E_TEST_HOOKS, so `captureMode()` cannot suppress
+ * them — this predicate is what stops fixture addresses from hard-bouncing on
+ * our own sending domain.
+ */
+describe("isE2EFixtureAddress", () => {
+  // Mirrors `generateCredentials` (e2e/auth.setup.ts) and `signUpFreshUser`
+  // (e2e/helpers.ts): `e2e-${prefix}-${Date.now()}-${12 hex}@flexling.com`.
+  const generate = (prefix: string) =>
+    `e2e-${prefix}-${Date.now()}-${"a1b2c3d4e5f6"}@flexling.com`;
+
+  it("matches what the Playwright fixture generators actually produce", () => {
+    for (const prefix of ["billing", "overdue", "settings", "free-study"]) {
+      expect(isE2EFixtureAddress(generate(prefix)), prefix).toBe(true);
+    }
+  });
+
+  it("is case- and whitespace-insensitive", () => {
+    expect(
+      isE2EFixtureAddress("  E2E-Billing-1770000000000-A1B2C3D4E5F6@Flexling.com "),
+    ).toBe(true);
+  });
+
+  it("does not swallow a real user who picks an e2e- local part", () => {
+    for (const real of [
+      "e2e@flexling.com",
+      "e2e-tester@flexling.com",
+      "e2e-billing-notanumber-a1b2c3d4e5f6@flexling.com",
+      "e2e-billing-1770000000000-tooshort@flexling.com",
+      // Same shape, different domain — a real address we must still mail.
+      "e2e-billing-1770000000000-a1b2c3d4e5f6@example.com",
+      "someone@flexling.com",
+    ]) {
+      expect(isE2EFixtureAddress(real), real).toBe(false);
+    }
+  });
+});
 
 describe("renderAuthEmail (link emails)", () => {
   const url = "https://flexling.com/api/auth/reset-password/abc123?callbackURL=/auth/reset-password";

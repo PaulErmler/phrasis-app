@@ -50,6 +50,30 @@ describe('shouldShowTranslationAssist', () => {
     // Explicit false matches the default-arg behaviour.
     expect(shouldShowTranslationAssist(undefined, 0, 0, false)).toBe(true);
   });
+
+  // Free play advances neither preReviewCount nor the FSRS reps, so without
+  // its own counter the assist would print the answer above the input on every
+  // pass of the Free Study round-robin, forever.
+  it('retires in Free Study on freeStudyPlayCount alone', () => {
+    // First pass: never played anywhere.
+    expect(shouldShowTranslationAssist(undefined, 0, 0, false, 0)).toBe(true);
+    // Second pass: the advance bumped freeStudyPlayCount, FSRS still frozen.
+    expect(shouldShowTranslationAssist(undefined, 0, 0, false, 1)).toBe(false);
+  });
+
+  it('takes the max of FSRS exposures and free-study plays, not their sum', () => {
+    const settings = { showTranslationOnlyNewReps: 3 };
+    // 2 FSRS exposures + 2 free-study plays must not read as 4 and retire early
+    // — each face retires the assist on its own exposures.
+    expect(shouldShowTranslationAssist(settings, 1, 1, false, 2)).toBe(true);
+    expect(shouldShowTranslationAssist(settings, 1, 2, false, 0)).toBe(false);
+    expect(shouldShowTranslationAssist(settings, 0, 0, false, 3)).toBe(false);
+  });
+
+  it('defaults freeStudyPlayCount to 0 so FSRS-only callers are unchanged', () => {
+    expect(shouldShowTranslationAssist(undefined, 0, 0)).toBe(true);
+    expect(shouldShowTranslationAssist(undefined, 1, 0)).toBe(false);
+  });
 });
 
 /**

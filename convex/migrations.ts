@@ -11,7 +11,7 @@ import {
 } from '../lib/constants/audioPlayback';
 import {
   postProcessTranslation,
-  USER_PROVIDED_TRANSLATION_SOURCE,
+  isProtectedTranslationSource,
 } from '../lib/languages';
 import { buildSearchableTextPatchForCard } from './lib/cardContent';
 import type { Id } from './_generated/dataModel';
@@ -109,7 +109,8 @@ export function stripTrailingUnderscoresPatch(
     'targetLanguage' | 'translatedText' | 'romanizedText' | 'translationSource'
   >,
 ): Partial<Doc<'translations'>> | undefined {
-  if (doc.translationSource === USER_PROVIDED_TRANSLATION_SOURCE) {
+  // Never rewrite human-authored text (user-provided or hand-curated).
+  if (isProtectedTranslationSource(doc.translationSource)) {
     return undefined;
   }
   const patch: Partial<Doc<'translations'>> = {};

@@ -540,12 +540,15 @@ export function LearningMode({
   // "Show translation on new sentences" (writing mode): the answer is shown
   // above the input to copy-type on the card's first N reviews — never in
   // transcribe, where the shown target would BE the answer (gate lives in
-  // the helper).
+  // the helper). freeStudyPlayCount is passed because free play advances
+  // neither preReviewCount nor the FSRS reps, so without it the assist would
+  // never retire in the Free Study face.
   const firstExposure = shouldShowTranslationAssist(
     state.courseSettings,
     state.preReviewCount,
     state.fsrsState?.reps ?? 0,
     isTranscribe,
+    state.freeStudyPlayCount,
   );
 
   const cardContent =

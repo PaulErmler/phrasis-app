@@ -298,7 +298,7 @@ function renderFrame(
       };
     case 'endOfMonthWords':
       return {
-        big: t('wordsBig', { words: approx(frame.words) }),
+        big: t('wordsBig', { words: approx(frame.words, frame.capped) }),
         label: t('endOfMonthLabel', {
           month: format.dateTime(toDate(frame.monthDate), { month: 'long' }),
         }),

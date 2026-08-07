@@ -106,7 +106,7 @@ export interface ProjectionInputs {
 export type ProjectionIndicator =
   | { kind: 'endOfYearWords'; words: number; capped: boolean; year: string }
   | { kind: 'oneYearWords'; words: number; capped: boolean }
-  | { kind: 'endOfMonthWords'; words: number; monthDate: string }
+  | { kind: 'endOfMonthWords'; words: number; capped: boolean; monthDate: string }
   | {
       kind: 'counterfactualWords';
       boostedWords: number;
@@ -295,7 +295,15 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
   }
 
   const indicators: ProjectionIndicator[] = [];
-  const cap = (n: number) => Math.min(PROJECTION_CAP_WORDS, roundFriendly(n));
+  // The ceiling applies to the projected GAIN, not the total. Capping the
+  // total showed anyone who already knows more than PROJECTION_CAP_WORDS a
+  // "target" BELOW their current count (12,000 known → "~10,000 by end of
+  // August"), while the uncapped nextWordMilestone simultaneously promised
+  // 13,000. The cap exists to stop the extrapolation running away, which is a
+  // property of how much is added — not of where the user started.
+  const wordCeiling = currentWords + PROJECTION_CAP_WORDS;
+  const cap = (raw: number) => roundFriendly(Math.min(wordCeiling, raw));
+  const isCapped = (raw: number) => raw >= wordCeiling;
 
   const yearEndDate = endOfYear(today);
   const daysToYearEnd = daysBetween(today, yearEndDate);
@@ -313,7 +321,7 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
       indicators.push({
         kind: 'endOfYearWords',
         words: cap(eoyRaw),
-        capped: eoyRaw >= PROJECTION_CAP_WORDS,
+        capped: isCapped(eoyRaw),
         year,
       });
     }
@@ -323,7 +331,7 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
       indicators.push({
         kind: 'oneYearWords',
         words: cap(oneYearRaw),
-        capped: oneYearRaw >= PROJECTION_CAP_WORDS,
+        capped: isCapped(oneYearRaw),
       });
     }
 
@@ -335,6 +343,7 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
       indicators.push({
         kind: 'endOfMonthWords',
         words: cap(eomRaw),
+        capped: isCapped(eomRaw),
         monthDate: monthEndDate,
       });
     }
@@ -357,7 +366,7 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
         kind: 'counterfactualWords',
         boostedWords: boosted,
         baselineWords: baseline,
-        capped: boostedRaw >= PROJECTION_CAP_WORDS,
+        capped: isCapped(boostedRaw),
         horizonDate,
       });
     }

@@ -27,6 +27,7 @@ import { ConvexError } from 'convex/values';
 import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import { reportError } from '@/lib/report-error';
 import { convexErrorCode } from '@/lib/utils';
+import { shouldAdvanceOnEnter } from './lib/enterToAdvance';
 
 /**
  * One sink for the wizard's swallow points: console + error tracking (the
@@ -676,6 +677,30 @@ function OnboardingWizard({
     stepId === 'word-projection' ||
     stepId === 'feature-tour' ||
     stepId === 'plan-pick';
+
+  // Enter advances the wizard, so a keyboard user can answer the whole flow
+  // without reaching for the mouse. Only on steps that render the shared
+  // Continue button — the rest own their advance and their own CTAs.
+  //
+  // Bubble phase on purpose: Coachmark listens in the CAPTURE phase and
+  // stopPropagation()s, so while a coachmark is up Enter dismisses it and
+  // never reaches this. Radix dialogs likewise handle Enter inside their own
+  // focus trap.
+  const onContinueRef = useRef(onContinue);
+  useLayoutEffect(() => {
+    onContinueRef.current = onContinue;
+  });
+  const continueBlocked = continueDisabled() || isSubmitting;
+  useEffect(() => {
+    if (stepHasOwnAdvance || continueBlocked) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!shouldAdvanceOnEnter(e)) return;
+      e.preventDefault();
+      void onContinueRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [stepHasOwnAdvance, continueBlocked]);
 
   // Passes useCallback values + useState setters into a plain function called
   // during render — `react-hooks/refs` can't tell these aren't refs, so the

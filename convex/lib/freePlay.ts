@@ -1,5 +1,7 @@
 import type { QueryCtx } from '../_generated/server';
 import type { Doc, Id } from '../_generated/dataModel';
+import type { FreePlayFace, StudyContentFilter } from '../types';
+import { originsForFilter } from './collections';
 
 type CardOrigin = 'premade' | 'custom' | 'chat';
 
@@ -154,6 +156,52 @@ export const FREE_PLAY_MODES = {
         : null,
   },
 } as const;
+
+/**
+ * The head of a face's rotation, honouring the study content filter — the
+ * single definition of "which cards free play serves next".
+ *
+ * Both the serving queue (features/scheduling.ts) and the content warmer
+ * (features/decks.ts `getUpcomingCardsForMode`) MUST go through this. They used
+ * to pick their own: the warmer called the unfiltered `fetch` while the queue
+ * routed through `fetchByOrigin`, so for any user on a 'course' or 'custom'
+ * filter the warmed set and the served set were different cards and free play
+ * handed out cards with no pre-generated translation or audio.
+ *
+ * For a filtered read the per-origin index queries are merged in memory and
+ * re-sorted on (counter, orderKey, _creationTime) — the same ordering the
+ * single-index path gets for free — then truncated to `take`. Taking `take`
+ * from EACH origin before the merge is what makes the truncation safe: the
+ * global top-`take` cannot contain a card that wasn't in its own origin's
+ * top-`take`.
+ */
+export async function fetchFreePlayRotation(
+  ctx: QueryCtx,
+  deckId: Id<'decks'>,
+  face: FreePlayFace,
+  filter: StudyContentFilter,
+  take: number,
+): Promise<Doc<'cards'>[]> {
+  const cfg = FREE_PLAY_MODES[face];
+  if (filter === 'both') {
+    return cfg.fetch(ctx, deckId, take);
+  }
+  const allowedOrigins = originsForFilter(filter);
+  const perOrigin = await Promise.all(
+    allowedOrigins.map((origin) => cfg.fetchByOrigin(ctx, deckId, origin, take)),
+  );
+  const merged = perOrigin.flat();
+  merged.sort((a, b) => {
+    const ca = a[cfg.counterField] ?? 0;
+    const cb = b[cfg.counterField] ?? 0;
+    if (ca !== cb) return ca - cb;
+    const oa = a[cfg.orderField] ?? Number.POSITIVE_INFINITY;
+    const ob = b[cfg.orderField] ?? Number.POSITIVE_INFINITY;
+    if (oa !== ob) return oa - ob;
+    return a._creationTime - b._creationTime;
+  });
+  return merged.slice(0, take);
+}
 
 /**
  * A fresh, uniform-random integer used as the free-play (radio / free-study)

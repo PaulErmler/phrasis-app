@@ -2,7 +2,7 @@ import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import {
   ROMANIZATION_LANGUAGES,
-  USER_PROVIDED_TRANSLATION_SOURCE,
+  isProtectedTranslationSource,
   isTranslationVersionStale,
 } from '../../lib/languages';
 import { getLlmClaim, isClaimFresh } from '../features/llmTranslationQueue';
@@ -151,7 +151,7 @@ export async function buildTextContentBatchForLanguages(
       llmClaimedAt: claim?.claimedAt ?? null,
       versionStale:
         row != null &&
-        row.translationSource !== USER_PROVIDED_TRANSLATION_SOURCE &&
+        !isProtectedTranslationSource(row.translationSource) &&
         isTranslationVersionStale(item.lang, row.translationVersion),
     });
   });

@@ -37,6 +37,20 @@ describe('resolveClientToday', () => {
     expect(resolveClientToday('UTC', '')).toBe(serverToday);
   });
 
+  // These pass DATE_RE but canonicalize to an ISO expanded-year string
+  // ("+010007-06"), which makes daysBetween return NaN. A bare `> 1` clamp
+  // let them through, and the first addDays downstream threw
+  // `RangeError: Invalid time value`, failing the whole projections query.
+  it('rejects regex-valid dates that are outside the Date range', () => {
+    for (const bad of ['9999-99-99', '0000-00-00', '9999-12-99']) {
+      const resolved = resolveClientToday('UTC', bad);
+      expect(resolved, `${bad} must clamp to the server date`).toBe(serverToday);
+      // The result must always be a usable day key.
+      expect(resolved).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(() => addDays(resolved, -89)).not.toThrow();
+    }
+  });
+
   it('canonicalizes a well-formed but non-canonical date before use', () => {
     // "…-00" would otherwise leak through as a raw map key that matches no
     // stored row. Only meaningful when the canonical form is in-window.

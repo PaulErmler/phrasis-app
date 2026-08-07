@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import {
@@ -107,6 +107,17 @@ export function LearningControls({
     return () => clearTimeout(id);
   }, [isReviewing]);
 
+  /**
+   * Restart the card's audio from the top. Shared by the `R` shortcut and the
+   * restart-audio button, which the KeyHint labels as `R` — they must not
+   * diverge. Seeking alone leaves a paused card silent at 0:00, so resume too.
+   */
+  const restartAudio = useCallback(() => {
+    if (isMerging || durationSec === 0) return;
+    onSeek(0);
+    if (!isPlaying) onPlay();
+  }, [isMerging, durationSec, onSeek, isPlaying, onPlay]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (shortcutsDisabled) return;
@@ -199,8 +210,7 @@ export function LearningControls({
         } else {
           if (isMerging || durationSec === 0) return;
           e.preventDefault();
-          onSeek(0);
-          if (!isPlaying) onPlay();
+          restartAudio();
         }
         return;
       }
@@ -237,6 +247,7 @@ export function LearningControls({
     onPause,
     onPlay,
     onSeek,
+    restartAudio,
     onBack,
     onRestartCard,
     onReplayTarget,
@@ -354,7 +365,7 @@ export function LearningControls({
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => onSeek(0)}
+                  onClick={restartAudio}
                   disabled={isMerging || durationSec === 0}
                   data-testid="learn-restart-audio"
                   aria-label={t('actions.restartAudio')}

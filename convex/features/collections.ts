@@ -31,7 +31,7 @@ import {
   isPremadeLevelCollection,
 } from '../lib/collections';
 import {
-  USER_PROVIDED_TRANSLATION_SOURCE,
+  isProtectedTranslationSource,
   isTranslationVersionStale,
   resolveCardSpeakerGenders,
 } from '../../lib/languages';
@@ -405,10 +405,10 @@ async function scheduleMissingTranslationsForText(
       // already upgrades its translations to the current version — otherwise
       // the card-add sweep (scheduleMissingContent) deletes exactly what the
       // preview just showed. Same exemptions as that sweep: user-created
-      // texts and user-provided translations are never version-swept.
+      // texts and human-authored translations are never version-swept.
       const isStale =
         !text.userCreated &&
-        existing.translationSource !== USER_PROVIDED_TRANSLATION_SOURCE &&
+        !isProtectedTranslationSource(existing.translationSource) &&
         isTranslationVersionStale(lang, existing.translationVersion);
       if (!isStale) continue;
       // Mirror the sweep's deferrals: never delete under an active TTS claim

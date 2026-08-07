@@ -1130,8 +1130,12 @@ export default defineSchema({
   // reset) and the scheduled welcome email. While the deployment has
   // E2E_TEST_HOOKS=1, lib/authEmails.ts + lib/welcomeEmail.ts write here
   // INSTEAD of sending real mail, so Playwright can follow the links
-  // (features/authEmailTesting.ts) and fake @flexling.com signup addresses
-  // never bounce real sends.
+  // (features/authEmailTesting.ts).
+  //
+  // The flag protects only mail sent DURING the run. The deferred sends
+  // (welcome ~24h, signup notification ~20min) fire after global-teardown has
+  // removed it, so what keeps fake @flexling.com addresses from bouncing real
+  // sends is `isE2EFixtureAddress` in lib/authEmails.ts, not this table.
   testAuthEmails: defineTable({
     email: v.string(), // recipient, lowercase
     kind: v.union(v.literal('verify'), v.literal('reset'), v.literal('welcome')),

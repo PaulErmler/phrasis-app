@@ -29,6 +29,8 @@ type MockDriver = {
   destroy: () => void;
   moveTo: (i: number) => void;
   hasNextStep: () => boolean;
+  /** Test-only: simulate a driver-internal close (`g(true)`). Not part of the real API. */
+  closeFromUi: () => void;
 };
 
 let lastConfig: DriverConfig | null = null;
@@ -37,18 +39,21 @@ let lastDriver: MockDriver | null = null;
 vi.mock('driver.js', () => ({
   driver: (config: DriverConfig) => {
     lastConfig = config;
-    let inHook = false;
     const d: MockDriver = {
       drive: vi.fn(),
-      // Real driver.js: destroy() runs onDestroyStarted when configured; the
-      // hook then calls destroy() again to actually tear down.
-      destroy: vi.fn(() => {
-        if (config.onDestroyStarted && !inHook) {
-          inHook = true;
-          config.onDestroyStarted();
-          inHook = false;
-        }
-      }),
+      // Real driver.js 1.4.0: the public `destroy()` is `g(false)`, which tears
+      // down and deliberately SKIPS `onDestroyStarted` (dist/driver.js.mjs:594-604
+      // — only `g(true)` fires the hook, and it returns early without tearing
+      // down). An earlier version of this mock had destroy() call the hook,
+      // which is the inverse of reality and hid a real bug: completion
+      // bookkeeping hung off the hook never ran for app-initiated teardowns.
+      destroy: vi.fn(),
+      // Driver's own close paths (close button, Esc, overlay click, stepping
+      // past the last step) go through `g(true)`: fire the hook and let it
+      // call destroy() for the real teardown.
+      closeFromUi: () => {
+        config.onDestroyStarted?.();
+      },
       moveTo: vi.fn(),
       hasNextStep: vi.fn(() => false),
     };
@@ -158,12 +163,90 @@ describe('useTutorial — completion semantics', () => {
     expect(completeMutation).not.toHaveBeenCalled();
   });
 
-  it('a normal dismissal (driver destroy without suppress) completes', async () => {
+  it('a normal dismissal (user closes the driver) completes', async () => {
     renderTour({ enabled: true });
     await startTour();
 
     await act(async () => {
-      lastDriver!.destroy();
+      lastDriver!.closeFromUi();
+    });
+
+    expect(completedIds()).toContain(TUTORIAL_IDS.HOME_TOUR);
+    // The hook must perform the real teardown itself — driver.js will not.
+    expect(lastDriver!.destroy).toHaveBeenCalled();
+  });
+
+  it('the CTA click tears the driver down, so no overlay is left behind', async () => {
+    renderTour({ enabled: true });
+    await startTour();
+
+    const steps = lastConfig!.steps;
+    const lastStep = steps[steps.length - 1];
+    const cta = document.createElement('button');
+    document.body.appendChild(cta);
+    act(() => {
+      lastStep.onHighlighted!(cta, lastStep, { driver: lastDriver! });
+    });
+    await act(async () => {
+      cta.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(lastDriver!.destroy).toHaveBeenCalled();
+    cta.remove();
+  });
+
+  it('a completed tour does not relaunch when the host hides and shows again', async () => {
+    const { rerender } = renderTour({ enabled: true });
+    await startTour();
+
+    // User clicks the closing CTA — this both completes the tour and (usually)
+    // navigates away, which hides the host.
+    const steps = lastConfig!.steps;
+    const lastStep = steps[steps.length - 1];
+    const cta = document.createElement('button');
+    document.body.appendChild(cta);
+    act(() => {
+      lastStep.onHighlighted!(cta, lastStep, { driver: lastDriver! });
+    });
+    await act(async () => {
+      cta.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(completedIds()).toContain(TUTORIAL_IDS.HOME_TOUR);
+
+    // HomeView stays mounted and merely toggles `enabled`; coming back must
+    // NOT re-offer the tour ("Dashboard tutorial shows up again").
+    lastConfig = null;
+    await act(async () => {
+      rerender({ enabled: false });
+    });
+    await act(async () => {
+      rerender({ enabled: true });
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(50);
+    });
+
+    expect(lastConfig, 'tour must not relaunch after completion').toBeNull();
+    cta.remove();
+  });
+
+  it('a hide-mid-tour does not suppress the NEXT run’s completion', async () => {
+    const { rerender } = renderTour({ enabled: true });
+    await startTour();
+
+    // Hide mid-tour: does not persist, so the tour is offered again.
+    await act(async () => {
+      rerender({ enabled: false });
+    });
+    expect(completedIds()).not.toContain(TUTORIAL_IDS.HOME_TOUR);
+
+    // Return to Home — the tour relaunches, and this time the user finishes it.
+    await act(async () => {
+      rerender({ enabled: true });
+    });
+    await startTour();
+    await act(async () => {
+      lastDriver!.closeFromUi();
     });
 
     expect(completedIds()).toContain(TUTORIAL_IDS.HOME_TOUR);

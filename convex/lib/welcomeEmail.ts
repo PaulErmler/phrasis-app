@@ -1,6 +1,7 @@
 import { internal } from '../_generated/api';
 import {
   captureMode,
+  isE2EFixtureAddress,
   escapeHtml,
   SUPPORT_EMAIL,
   type AuthEmailCtx,
@@ -71,6 +72,9 @@ export async function sendWelcomeEmail(
   ctx: AuthEmailCtx,
   { to, name }: { to: string; name?: string },
 ): Promise<void> {
+  // Fires ~24h after signup, long after the e2e run (and its E2E_TEST_HOOKS
+  // flag) is gone, so the capture branch below cannot catch fixture users.
+  if (isE2EFixtureAddress(to)) return;
   const { subject, html, text } = renderWelcomeEmail(name);
   if (captureMode()) {
     await ctx.runMutation(internal.features.authEmailTesting.captureAuthEmail, {

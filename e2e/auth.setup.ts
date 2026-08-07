@@ -67,6 +67,9 @@ const CREDENTIALS_DIR = path.resolve(__dirname, ".auth");
 function generateCredentials(prefix: string) {
   const random = crypto.randomBytes(6).toString("hex");
   return {
+    // Shape is load-bearing: `isE2EFixtureAddress` (convex/lib/authEmails.ts)
+    // matches it to suppress the deferred welcome / signup-notification mails,
+    // which fire after E2E_TEST_HOOKS is gone and would otherwise hard-bounce.
     email: `e2e-${prefix}-${Date.now()}-${random}@flexling.com`,
     password: `E2ePass!${random}`,
     name: `E2E ${prefix} ${random}`,

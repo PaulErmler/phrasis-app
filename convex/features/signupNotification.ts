@@ -5,6 +5,7 @@ import {
   buildSignupNotification,
   sendAdminNotificationEmail,
 } from '../lib/adminEmails';
+import { isE2EFixtureAddress } from '../lib/authEmails';
 import { getActiveCourseForUser } from '../db/courses';
 import { getCourseStats } from '../db/courseStats';
 
@@ -33,6 +34,10 @@ export const sendScheduled = internalMutation({
     // the verification state is reported in the body instead.
     const authUser = await authComponent.getAnyUserById(ctx, args.userId);
     if (!authUser) return null;
+    // Scheduled ~20min out, so a suite that finishes faster has already
+    // removed E2E_TEST_HOOKS and the capture branch inside
+    // sendAdminNotificationEmail no longer suppresses these.
+    if (isE2EFixtureAddress(authUser.email)) return null;
 
     // Newest onboarding row: the completed row is the permanent record of
     // the user's answers; an in-progress row tells how far they got.

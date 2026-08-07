@@ -127,7 +127,8 @@ describe('computeIndicators', () => {
     expect(eoy.words).toBe(roundFriendly(1200 + 20 * 151));
   });
 
-  it('caps long projections at 10,000+ words', () => {
+  // The ceiling is on the projected GAIN, so it sits at currentWords + CAP.
+  it('caps the projected gain at 10,000+ words above the current count', () => {
     const { indicators } = computeIndicators(
       baseInputs({ dailyWords: recentDays(200, 30), currentWords: 5000 }),
     );
@@ -135,8 +136,48 @@ describe('computeIndicators', () => {
       words: number;
       capped: boolean;
     };
-    expect(year.words).toBe(PROJECTION_CAP_WORDS);
+    expect(year.words).toBe(5000 + PROJECTION_CAP_WORDS);
     expect(year.capped).toBe(true);
+  });
+
+  // Regression: capping the TOTAL showed a user who already knows more than
+  // the cap a "target" BELOW their current count.
+  it('never projects fewer words than the user already knows', () => {
+    const currentWords = 12_000;
+    const { indicators } = computeIndicators(
+      baseInputs({ currentWords, dailyWords: recentDays(10, 30) }),
+    );
+    for (const kind of [
+      'endOfMonthWords',
+      'endOfYearWords',
+      'oneYearWords',
+    ] as const) {
+      const frame = byKind(indicators, kind) as { words: number } | undefined;
+      if (!frame) continue;
+      expect(frame.words, `${kind} must not regress below currentWords`)
+        .toBeGreaterThanOrEqual(currentWords);
+    }
+  });
+
+  it('flags a clamped end-of-month value so it renders "+" not "~"', () => {
+    const { indicators } = computeIndicators(
+      baseInputs({ dailyWords: recentDays(5000, 30), currentWords: 100 }),
+    );
+    const eom = byKind(indicators, 'endOfMonthWords') as
+      | { words: number; capped: boolean }
+      | undefined;
+    expect(eom).toBeDefined();
+    expect(eom!.words).toBe(100 + PROJECTION_CAP_WORDS);
+    expect(eom!.capped).toBe(true);
+  });
+
+  it('leaves an uncapped end-of-month value unflagged', () => {
+    const { indicators } = computeIndicators(baseInputs());
+    const eom = byKind(indicators, 'endOfMonthWords') as
+      | { capped: boolean }
+      | undefined;
+    expect(eom).toBeDefined();
+    expect(eom!.capped).toBe(false);
   });
 
   it('counterfactual appears only on a strong day and only positively', () => {

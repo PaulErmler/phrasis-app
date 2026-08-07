@@ -174,6 +174,11 @@ interface ReviewingState extends BaseState {
    *  Feeds the "Only new" Practice-Listening limit, which in radio counts
    *  max(active reviews, radio plays). */
   radioPlayCount: number;
+  /** True Free Study play count for this card (0 when never played there).
+   *  The writing face's analogue of radioPlayCount: free play advances neither
+   *  preReviewCount nor the FSRS reps, so this is what retires the
+   *  "show translation on new sentences" copy-typing assist in Free Study. */
+  freeStudyPlayCount: number;
   /** FSRS good/easy ratings collected by this card (0 for pre-field cards).
    *  Feeds the "until rated good" Practice-Listening strategy. */
   goodReviewCount: number;
@@ -1459,6 +1464,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     preReviewCount: displayCard.preReviewCount,
     fsrsState: displayCard.fsrsState,
     radioPlayCount: displayCard.radioPlayCount ?? 0,
+    freeStudyPlayCount: displayCard.freeStudyPlayCount ?? 0,
     goodReviewCount: displayCard.goodReviewCount ?? 0,
     collectionLabel: displayCard.collectionLabel,
     collectionOrigin: displayCard.collectionOrigin,

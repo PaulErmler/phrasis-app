@@ -34,7 +34,14 @@ export function resolveClientToday(timezone: string, clientToday?: string): stri
   // addDays(x, 0) canonicalizes ("2026-08-00" → "2026-07-31") so a
   // non-canonical-but-plausible date can't slip through as a raw map key.
   const canonical = addDays(clientToday, 0);
-  if (Math.abs(daysBetween(serverToday, canonical)) > 1) return serverToday;
+  // Fail CLOSED on a non-finite delta. `DATE_RE` admits out-of-range dates
+  // ("9999-99-99"), which canonicalize to an ISO expanded-year string
+  // ("+010007-06"); `daysBetween` then splits that into two parts and returns
+  // NaN, and `NaN > 1` is false — so a bare `> 1` check would return the
+  // malformed string as "today" and the first `addDays` downstream would throw
+  // `RangeError: Invalid time value`, failing the whole query.
+  const delta = daysBetween(serverToday, canonical);
+  if (!Number.isFinite(delta) || Math.abs(delta) > 1) return serverToday;
   return canonical;
 }
 

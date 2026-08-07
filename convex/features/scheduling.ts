@@ -57,7 +57,11 @@ import {
   originsForFilter,
   settledCount,
 } from '../lib/collections';
-import { FREE_PLAY_MODES, randomOrderKey } from '../lib/freePlay';
+import {
+  FREE_PLAY_MODES,
+  fetchFreePlayRotation,
+  randomOrderKey,
+} from '../lib/freePlay';
 import { getTodayInTimezone } from '../lib/dateUtils';
 import {
   deleteAudioRow,
@@ -153,6 +157,11 @@ const cardResultFields = {
   // "Only new" Practice-Listening limit can count radio plays (which don't bump
   // the FSRS review count). Undefined for cards that predate the field.
   radioPlayCount: v.optional(v.number()),
+  // True count of Free Study plays for this card, the writing face's analogue
+  // of radioPlayCount. Surfaced so the "show translation on new sentences"
+  // copy-typing assist can retire itself in free play, which advances neither
+  // preReviewCount nor the FSRS reps. Undefined for cards that predate it.
+  freeStudyPlayCount: v.optional(v.number()),
   // FSRS good/easy count — the "until rated good" Practice-Listening strategy.
   goodReviewCount: v.optional(v.number()),
   hasMissingContent: v.boolean(),
@@ -194,34 +203,6 @@ const cardResultValidator = v.object(cardResultFields);
  * be re-served dozens of times before it "catches up" to cards the user can
  * never even be shown.
  */
-async function fetchFreePlayRotation(
-  ctx: QueryCtx,
-  deckId: Id<'decks'>,
-  face: FreePlayFace,
-  filter: StudyContentFilter,
-  take: number,
-): Promise<Doc<'cards'>[]> {
-  const cfg = FREE_PLAY_MODES[face];
-  if (filter === 'both') {
-    return cfg.fetch(ctx, deckId, take);
-  }
-  const allowedOrigins = originsForFilter(filter);
-  const perOrigin = await Promise.all(
-    allowedOrigins.map((origin) => cfg.fetchByOrigin(ctx, deckId, origin, take)),
-  );
-  const merged = perOrigin.flat();
-  merged.sort((a, b) => {
-    const ca = a[cfg.counterField] ?? 0;
-    const cb = b[cfg.counterField] ?? 0;
-    if (ca !== cb) return ca - cb;
-    const oa = a[cfg.orderField] ?? Number.POSITIVE_INFINITY;
-    const ob = b[cfg.orderField] ?? Number.POSITIVE_INFINITY;
-    if (oa !== ob) return oa - ob;
-    return a._creationTime - b._creationTime;
-  });
-  return merged.slice(0, take);
-}
-
 async function fetchDueCardsWithFilter(
   ctx: QueryCtx,
   deckId: Id<'decks'>,
@@ -420,6 +401,7 @@ export const getCardForReview = query({
         initialReviewCount,
         fsrsState: card.fsrsState ?? null,
         radioPlayCount: card.radioPlayCount,
+        freeStudyPlayCount: card.freeStudyPlayCount,
         goodReviewCount: card.goodReviewCount,
         hasMissingContent: content.hasMissingContent,
         audioSpeedOverrides: card.audioSpeedOverrides,

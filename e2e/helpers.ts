@@ -557,6 +557,8 @@ export async function signUpFreshUser(
   const path = await import('node:path');
   const random = crypto.randomBytes(6).toString('hex');
   const creds = {
+    // Shape is load-bearing — see `isE2EFixtureAddress` in
+    // convex/lib/authEmails.ts (pinned by convex/tests/lib/authEmails.test.ts).
     email: `e2e-${prefix}-${Date.now()}-${random}@flexling.com`,
     password: `E2ePass!${random}`,
     name: `E2E ${prefix} ${random}`,

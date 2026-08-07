@@ -9,7 +9,7 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id, Doc } from '../_generated/dataModel';
-import { insertCard, patchCard } from '../db/stats/cardAggregates';
+import { insertCard } from '../db/stats/cardAggregates';
 import {
   getVoiceForLanguage,
   getVoiceForLanguageVariant,
@@ -42,7 +42,7 @@ import { getRomanizationSource } from '../lib/localRomanization';
 import {
   GOOGLE_TRANSLATE_SOURCE,
   ROMANIZATION_LANGUAGES,
-  USER_PROVIDED_TRANSLATION_SOURCE,
+  isProtectedTranslationSource,
   DEFAULT_CONTENT_VERSION,
   getCurrentTranslationVersion,
   getCurrentTtsVersion,
@@ -65,6 +65,7 @@ import {
   voiceGenderValidator,
   asVoiceGender,
   type SchedulingMode,
+  type StudyContentFilter,
 } from '../types';
 import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
 import { languageSupportsStt } from '../../lib/languages';
@@ -89,7 +90,7 @@ import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import { consumeQuota, checkQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { MAX_CARDS_PER_BATCH, ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
-import { FREE_PLAY_MODES, randomOrderKey } from '../lib/freePlay';
+import { fetchFreePlayRotation, randomOrderKey } from '../lib/freePlay';
 import { isCollectionAccessible, requireAccessibleText } from './collections';
 import {
   applyMarkCounterDelta,
@@ -439,7 +440,8 @@ export async function scheduleMissingContent(
   const sweptRegionVariants = new Map<string, string>();
   for (const [lang, translation] of translationMap) {
     if (!translation) continue;
-    if (translation.translationSource === USER_PROVIDED_TRANSLATION_SOURCE) continue;
+    // Human-authored rows (user-provided AND hand-curated) are never swept.
+    if (isProtectedTranslationSource(translation.translationSource)) continue;
 
     const isLegacy = translation.speakerGender === undefined;
     const isDrifted = !isLegacy && translation.speakerGender !== audioSpeakerGender;
@@ -1700,13 +1702,18 @@ async function getUpcomingCardsForMode(
   deckId: Id<'decks'>,
   mode: SchedulingMode,
   now: number,
+  filter: StudyContentFilter,
 ): Promise<Doc<'cards'>[]> {
   if (mode === 'radio') {
     // Both faces: the Radio and Free Study rotations advance independently,
     // so their heads can be entirely different cards.
+    //
+    // Must go through `fetchFreePlayRotation` — the same selector the serving
+    // queue uses. Calling the unfiltered `fetch` here warmed a different set
+    // than free play actually serves for anyone on a 'course'/'custom' filter.
     const [radioHead, freeStudyHead] = await Promise.all([
-      FREE_PLAY_MODES.radio.fetch(ctx, deckId, ENSURE_CONTENT_LOOKAHEAD),
-      FREE_PLAY_MODES.freeStudy.fetch(ctx, deckId, ENSURE_CONTENT_LOOKAHEAD),
+      fetchFreePlayRotation(ctx, deckId, 'radio', filter, ENSURE_CONTENT_LOOKAHEAD),
+      fetchFreePlayRotation(ctx, deckId, 'freeStudy', filter, ENSURE_CONTENT_LOOKAHEAD),
     ]);
     const byId = new Map<Id<'cards'>, Doc<'cards'>>();
     for (const card of [...radioHead, ...freeStudyHead]) byId.set(card._id, card);
@@ -1801,6 +1808,7 @@ export const ensureUpcomingCardsContent = mutation({
       deck._id,
       schedulingMode,
       Date.now(),
+      settings?.studyContentFilter ?? 'both',
     );
 
     return scheduleContentForUpcomingCards(ctx, active, cards);
@@ -1837,9 +1845,13 @@ export const ensureUpcomingCardsContentAllModes = mutation({
     if (!deck) return 0;
 
     const now = Date.now();
+    // Free play's rotation head is filter-dependent, so the warmer needs the
+    // same content filter the serving queue reads.
+    const settings = await getCourseSettings(ctx, active.course._id);
+    const filter = settings?.studyContentFilter ?? 'both';
     const cardLists = await Promise.all(
       WARMABLE_SCHEDULING_MODES.map((mode) =>
-        getUpcomingCardsForMode(ctx, deck._id, mode, now),
+        getUpcomingCardsForMode(ctx, deck._id, mode, now, filter),
       ),
     );
 
@@ -2657,7 +2669,16 @@ export const rebuildSearchableTextForText = internalMutation({
     for (const card of page.page) {
       const built = await buildSearchableTextPatchForCard(ctx, card, text, caches);
       if (built) {
-        await patchCard(ctx, card._id, { ...built }, card);
+        // Raw `db.patch`, NOT `patchCard`. None of the four card aggregates
+        // key on `searchableText` / `searchableTextLanguages` (they key on
+        // deckId, dueDate, the state label and collectionOrigin), so
+        // `patchCard`'s unconditional `replaceOrInsert` would do four btree
+        // delete+inserts per card that reproduce a byte-identical entry.
+        // That is not just wasted work: aggregate internal nodes are a write
+        // -contention hotspot, and this job fans out over every card for the
+        // text across every user. `migrations.ts:rebuildCardSearchableText`
+        // bypasses them for the identical write for the same reason.
+        await ctx.db.patch(card._id, built);
       }
     }
 

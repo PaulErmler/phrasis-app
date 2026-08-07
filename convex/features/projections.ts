@@ -50,6 +50,7 @@ const indicatorValidator = v.union(
   v.object({
     kind: v.literal('endOfMonthWords'),
     words: v.number(),
+    capped: v.boolean(),
     monthDate: v.string(),
   }),
   v.object({

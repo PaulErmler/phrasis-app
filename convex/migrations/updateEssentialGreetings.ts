@@ -3,6 +3,7 @@ import { internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { getActiveDataset } from '../db/collections';
 import { deleteAudioRowsForTextLanguage } from '../lib/audio';
+import { CURATED_TRANSLATION_SOURCE } from '../../lib/languages';
 import {
   resolveCardSpeakerGenders,
   getVoiceForLanguage,
@@ -40,9 +41,10 @@ import {
  *   npx convex run migrations/updateEssentialGreetings:run
  */
 
-/** Provenance slug stamped on the curated rows (translationSource) so a
- * future sweep can target them. */
-const CURATED_SOURCE = 'curated-manual';
+/** Provenance slug stamped on the curated rows (translationSource). Shared with
+ * `isProtectedTranslationSource` in lib/languages.ts, which is what keeps a
+ * future `translationVersion` bump from deleting and re-generating them. */
+const CURATED_SOURCE = CURATED_TRANSLATION_SOURCE;
 
 /**
  * Spacing between scheduled translation jobs, to avoid an OCC burst of

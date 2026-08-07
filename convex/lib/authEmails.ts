@@ -165,6 +165,35 @@ export type AuthEmailCtx = RunMutationCtx<DataModel>;
 export const captureMode = () => process.env.E2E_TEST_HOOKS === '1';
 
 /**
+ * Playwright fixture addresses, e.g.
+ * `e2e-billing-1770000000000-a1b2c3d4e5f6@flexling.com`.
+ *
+ * Kept deliberately tight (prefix + epoch ms + 12 hex chars) so a real user who
+ * happens to pick an `e2e-…` local part is never silently dropped. Must stay in
+ * sync with the two generators — `generateCredentials` in e2e/auth.setup.ts and
+ * `signUpFreshUser` in e2e/helpers.ts; convex/tests/lib/authEmails.test.ts pins
+ * the shape.
+ */
+const E2E_FIXTURE_ADDRESS_RE =
+  /^e2e-[a-z0-9-]+-\d+-[0-9a-f]{12}@flexling\.com$/i;
+
+/**
+ * True for a Playwright fixture signup address.
+ *
+ * `captureMode()` cannot cover these on its own: it is evaluated at SEND time,
+ * and the deferred mails (welcome ~24h, signup notification ~20min) fire long
+ * after e2e/global-teardown.ts has removed `E2E_TEST_HOOKS`. Without this
+ * filter Resend would attempt real delivery to a mailbox that does not exist on
+ * our own sending domain — one hard bounce per fixture user per run, degrading
+ * the reputation of the domain that also carries production transactional mail.
+ *
+ * Unlike the env flag, this holds whenever the email fires.
+ */
+export function isE2EFixtureAddress(email: string): boolean {
+  return E2E_FIXTURE_ADDRESS_RE.test(email.trim());
+}
+
+/**
  * Verification code (Better Auth emailOTP plugin). The user types the code
  * into /auth/email-verification, which verifies AND signs them in
  * (autoSignInAfterVerification).

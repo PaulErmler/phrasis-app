@@ -1801,6 +1801,38 @@ export const GOOGLE_TRANSLATE_SOURCE = 'google-translate-v2';
 export const USER_PROVIDED_TRANSLATION_SOURCE = 'user-provided';
 
 /**
+ * Provenance slug for hand-curated translations shipped by a migration
+ * (see convex/migrations/updateEssentialGreetings.ts). Like user-provided
+ * rows, these were authored by a human and must never be regenerated.
+ */
+export const CURATED_TRANSLATION_SOURCE = 'curated-manual';
+
+/**
+ * Translation provenances that no automated pass may overwrite or delete.
+ *
+ * The version-stale regeneration sweep deletes and re-generates any row whose
+ * `translationVersion` is below the language's current one. That is correct for
+ * machine output, but both of these were written by a person: `user-provided`
+ * by the user, `curated-manual` by us. Curated rows in particular live on
+ * PREMADE texts, so the sweep's `!text.userCreated` guard does not cover them —
+ * a `translationVersion` bump would silently undo the curation.
+ *
+ * Use `isProtectedTranslationSource` at every provenance guard rather than
+ * comparing against a single constant, so adding a provenance protects it
+ * everywhere at once.
+ */
+export const PROTECTED_TRANSLATION_SOURCES: readonly string[] = [
+  USER_PROVIDED_TRANSLATION_SOURCE,
+  CURATED_TRANSLATION_SOURCE,
+];
+
+export function isProtectedTranslationSource(
+  source: string | undefined | null,
+): boolean {
+  return source != null && PROTECTED_TRANSLATION_SOURCES.includes(source);
+}
+
+/**
  * Build the `translationSource` string for an LLM translation from the
  * model slug and reasoning level. Persisted on each translation row so a
  * future strategy swap can find + regenerate rows produced by the old
