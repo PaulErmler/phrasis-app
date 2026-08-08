@@ -38,6 +38,7 @@ import { rateLimiter } from "../../rateLimiter";
 import { ttsPool } from "@/convex/lib/workpools";
 import type { WorkId } from "@convex-dev/workpool";
 import { claimTtsIfAvailable } from "../../features/ttsProcessing";
+import { resolveAudioPayload } from "../../lib/audioAssets";
 import { drainSchedulerAfterEach } from "../lib/drainScheduler";
 
 const mockSemantic = vi.mocked(textsMatchSemantic);
@@ -556,18 +557,21 @@ describe("features/ttsProcessing", () => {
       return fetchMock;
     }
 
+    // The pipeline writes thin pointer rows into the shared audioAssets
+    // store — resolve to the payload the row actually plays.
     async function getAudio(
       t: TestConvex<typeof schema>,
       textId: Id<"texts">,
     ) {
-      return t.run(async (ctx) =>
-        ctx.db
+      return t.run(async (ctx) => {
+        const row = await ctx.db
           .query("audioRecordings")
           .withIndex("by_text_and_language", (q) =>
             q.eq("textId", textId).eq("language", "es"),
           )
-          .first(),
-      );
+          .first();
+        return row ? resolveAudioPayload(ctx, row) : null;
+      });
     }
 
     async function getMismatches(
@@ -756,14 +760,15 @@ describe("features/ttsProcessing", () => {
           vi.unstubAllEnvs();
         }
 
-        const audio = await t.run(async (ctx) =>
-          ctx.db
+        const audio = await t.run(async (ctx) => {
+          const row = await ctx.db
             .query("audioRecordings")
             .withIndex("by_text_and_language", (q) =>
               q.eq("textId", zhTextId).eq("language", "zh"),
             )
-            .first(),
-        );
+            .first();
+          return row ? resolveAudioPayload(ctx, row) : null;
+        });
         expect(audio?.ttsQuality).toBe("validated");
         expect(mockSemantic).not.toHaveBeenCalled();
       });

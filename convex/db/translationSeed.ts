@@ -1,6 +1,7 @@
 import { v } from 'convex/values';
 import { internalMutation } from '../_generated/server';
 import { deleteAudioRow } from '../lib/audio';
+import { resolveAudioPayload } from '../lib/audioAssets';
 
 const SPANISH_VOICE_PREFIXES: Record<string, string> = {
   es: 'es-ES',
@@ -183,7 +184,14 @@ export const batchUpsertTranslations = internalMutation({
               q.eq('textId', textId).eq('language', tr.language),
             )
             .first();
-          if (audioForLang && !audioForLang.voiceName.startsWith(expectedPrefix)) {
+          const payloadForLang = audioForLang
+            ? await resolveAudioPayload(ctx, audioForLang)
+            : null;
+          if (
+            audioForLang &&
+            payloadForLang &&
+            !payloadForLang.voiceName.startsWith(expectedPrefix)
+          ) {
             await deleteAudioRow(ctx, audioForLang);
             stats.audioInvalidated++;
           }

@@ -1594,12 +1594,17 @@ export const regenerateCardAudio = mutation({
       await deleteAudioRowsForTextLanguage(ctx, card.textId, lang);
     }
 
+    // forceAudioRegen: bypass the audioAssets cache (a hit would hand back
+    // exactly the audio the user just asked to replace) and synthesize anew.
+    // The completed job patches the shared asset in place, so every other
+    // text with the same sentence also gets the new audio on next load.
     await scheduleMissingContent(
       ctx,
       card.textId,
       text,
       course.baseLanguages,
       course.targetLanguages,
+      { forceAudioRegen: true },
     );
 
     await trackCardAction(ctx, userId, 'regenerate_audio', card);
@@ -1881,6 +1886,16 @@ export const editCard = mutation({
           )
           .take(20);
         for (const row of audioRows) {
+          if (row.assetId !== undefined) {
+            // Pointer row: the copy shares the same asset — staleness (the
+            // asset's ttsVersion stamp) travels with the asset itself.
+            await ctx.db.insert('audioRecordings', {
+              textId: newTextId,
+              language: row.language,
+              assetId: row.assetId,
+            });
+            continue;
+          }
           await ctx.db.insert('audioRecordings', {
             textId: newTextId,
             language: row.language,
