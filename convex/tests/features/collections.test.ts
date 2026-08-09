@@ -11,6 +11,7 @@ import { llmPool, ttsPool } from "../../lib/workpools";
 import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/languages";
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+import { insertAudioFixture } from '../lib/audioFixtures';
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
@@ -622,7 +623,7 @@ describe("features/collections", () => {
           translatedText: "Hola viejo",
           translationVersion: 1,
         });
-        await ctx.db.insert("audioRecordings", {
+        await insertAudioFixture(ctx, {
           textId: enTextId,
           language: "es",
           voiceName: "es-ES-test-voice",
@@ -902,7 +903,7 @@ describe("features/collections", () => {
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array([1, 2, 3])]),
         );
-        await ctx.db.insert("audioRecordings", {
+        await insertAudioFixture(ctx, {
           textId: textIds[0],
           language: "es",
           voiceName: "es-test-voice",

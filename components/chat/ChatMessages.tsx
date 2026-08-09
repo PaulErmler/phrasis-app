@@ -152,6 +152,7 @@ function PlainTextContent({ text }: { text: string }) {
 
 interface ChatMessageRowProps {
   message: ExtendedUIMessage;
+  isLastMessage: boolean;
   toolRenderers?: Record<string, ToolRenderer>;
   messageFooter?: MessageFooterRenderer;
   errorFallback: string;
@@ -198,6 +199,7 @@ function areRowPropsEqual(
     a.role === b.role &&
     (a.content ?? a.text ?? '') === (b.content ?? b.text ?? '') &&
     partsSignature(a) === partsSignature(b) &&
+    prev.isLastMessage === next.isLastMessage &&
     prev.toolRenderers === next.toolRenderers &&
     prev.messageFooter === next.messageFooter &&
     prev.errorFallback === next.errorFallback &&
@@ -208,6 +210,7 @@ function areRowPropsEqual(
 
 const ChatMessageRow = memo(function ChatMessageRow({
   message,
+  isLastMessage,
   toolRenderers,
   messageFooter,
   errorFallback,
@@ -252,7 +255,7 @@ const ChatMessageRow = memo(function ChatMessageRow({
           </Message>
           {messageFooter &&
             message.role === 'assistant' &&
-            messageFooter(message)}
+            messageFooter(message, { isLastMessage })}
         </MessageErrorBoundary>
       </MessageBranchContent>
     </MessageBranch>
@@ -271,6 +274,7 @@ export type ToolRenderer = (
 
 export type MessageFooterRenderer = (
   message: ExtendedUIMessage,
+  meta: { isLastMessage: boolean },
 ) => ReactNode | null;
 
 interface ChatMessagesProps {
@@ -280,6 +284,8 @@ interface ChatMessagesProps {
   toolRenderers?: Record<string, ToolRenderer>;
   messageFooter?: MessageFooterRenderer;
   contentClassName?: string;
+  /** Rendered inside the empty state, below the intro bullets (e.g. quick-action tiles). */
+  emptyStateExtra?: ReactNode;
 }
 
 /**
@@ -293,6 +299,7 @@ export function ChatMessages({
   toolRenderers,
   messageFooter,
   contentClassName,
+  emptyStateExtra,
 }: ChatMessagesProps) {
   const t = useTranslations('Chat');
 
@@ -305,10 +312,11 @@ export function ChatMessages({
         <ConversationContent className={`px-4 ${contentClassName ?? ''}`}>
           {displayMessages.length > 0 ? (
             <>
-              {displayMessages.map((message: ExtendedUIMessage) => (
+              {displayMessages.map((message: ExtendedUIMessage, index: number) => (
                 <ChatMessageRow
                   key={message.key ?? message.id}
                   message={message}
+                  isLastMessage={index === displayMessages.length - 1}
                   toolRenderers={toolRenderers}
                   messageFooter={messageFooter}
                   errorFallback={t('messageError.title')}
@@ -318,19 +326,12 @@ export function ChatMessages({
               ))}
             </>
           ) : !isLoading ? (
-            <ConversationEmptyState title={t('emptyTitle')}>
+            <ConversationEmptyState>
               <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
                 <BotIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" />
                 <span>{t('aiNotice')}</span>
               </div>
-              <ul className="text-muted-foreground text-sm space-y-1.5 text-left list-none">
-                {(['emptyBullet1', 'emptyBullet2', 'emptyBullet3'] as const).map((key) => (
-                  <li key={key} className="flex items-start gap-2">
-                    <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-muted-foreground/60 shrink-0" />
-                    {t(key)}
-                  </li>
-                ))}
-              </ul>
+              {emptyStateExtra}
               <p className="text-xs text-muted-foreground/80 text-left">
                 {t('emptyCreditsNote')}
               </p>

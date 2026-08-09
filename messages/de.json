@@ -698,11 +698,7 @@
     "explainWord": "Erkläre mir dieses Wort: {word}",
     "askAboutWord": "Zu {word} fragen",
     "thinking": "Denkt nach...",
-    "emptyTitle": "Dein Sprachtutor",
     "aiNotice": "Du chattest mit einem KI-Assistenten. Er kann Fehler machen – überprüfe wichtige Informationen immer.",
-    "emptyBullet1": "Stelle Fragen zu Vokabeln, Grammatik oder beliebigen Sätzen.",
-    "emptyBullet2": "Der Chat kennt den Satz, den du gerade lernst.",
-    "emptyBullet3": "Er kann Sätze für dich erstellen — du bestätigst sie einfach.",
     "emptyCreditsNote": "Eine Nachricht kostet je nach Länge 1–2 Credits. Je länger die Unterhaltung wird, desto mehr Credits kostet eine Nachricht.",
     "input": {
       "placeholder": "Was möchtest du sagen?",
@@ -719,6 +715,56 @@
       "grammar": "Erkläre mir die Grammatik dieses Satzes Wort für Wort.",
       "simpler": "Wie kann ich das einfacher sagen?",
       "moreCards": "Erstelle mehr Sätze mit diesen Verben."
+    },
+    "quickActions": {
+      "grammar": {
+        "label": "Grammatik",
+        "message": "Erkläre mir die Grammatik dieses Satzes im Detail.",
+        "messageWithLanguage": "Erkläre mir die Grammatik dieses Satzes ({language}) im Detail."
+      },
+      "conjugation": {
+        "label": "Konjugation",
+        "message": "Zeig mir, wie die Verben in diesem Satz konjugiert werden, mit Beispielen.",
+        "messageWithLanguage": "Zeig mir, wie die Verben in diesem Satz ({language}) konjugiert werden, mit Beispielen."
+      },
+      "tenses": {
+        "label": "Zeitformen",
+        "message": "Wie sage ich das in der Vergangenheit und Zukunft?",
+        "messageWithLanguage": "Wie sage ich das auf {language} in der Vergangenheit und Zukunft?"
+      },
+      "paraphrase": {
+        "label": "Anders sagen",
+        "message": "Wie kann ich dasselbe anders sagen?",
+        "messageWithLanguage": "Wie kann ich dasselbe auf {language} anders sagen?"
+      },
+      "formal": {
+        "label": "Förmlicher",
+        "message": "Wie sage ich das förmlicher und höflicher?",
+        "messageWithLanguage": "Wie sage ich das auf {language} förmlicher und höflicher?"
+      },
+      "simpler": {
+        "label": "Einfacher",
+        "message": "Wie kann ich das einfacher sagen?",
+        "messageWithLanguage": "Wie kann ich das auf {language} einfacher sagen?"
+      }
+    },
+    "wordActions": {
+      "explain": {
+        "label": "Erklären",
+        "message": "Erkläre: {word}"
+      },
+      "synonyms": {
+        "label": "Synonyme",
+        "message": "Synonyme von {word}"
+      },
+      "antonyms": {
+        "label": "Antonyme",
+        "message": "Antonyme von {word}"
+      }
+    },
+    "discuss": {
+      "label": "Auch richtig?",
+      "message": "Ist das auch richtig: \"{attempt}\"?"
     },
     "voice": {
       "startRecording": "Aufnahme starten",

@@ -10,6 +10,7 @@ import {
   getPremadeLevelCollections,
   getCollectionProgressForCourse,
 } from '../db/collections';
+import { effectiveTextCount } from '../lib/collections';
 import { isValidTimezone, resolveClientToday } from '../lib/dateUtils';
 import { normalizeLanguageCode } from '../../lib/languages';
 import {
@@ -238,12 +239,11 @@ export const getProjections = query({
     );
     const levels: LevelInfo[] = levelCollections.map((c) => {
       const progress = progressByCollection.get(c._id);
-      const carry = progress?.legacyCarryAdded ?? 0;
       return {
         // Difficulty label ("A1.2"), not the internal dataset code ("L02") —
         // matches the level rail's chips.
         code: c.displayName ?? c.code ?? c.name,
-        totalTexts: c.textCount + carry,
+        totalTexts: effectiveTextCount(c.textCount, progress),
         cardsAdded: progress?.cardsAdded ?? 0,
         ignoredCount: progress?.ignoredCount ?? 0,
       };

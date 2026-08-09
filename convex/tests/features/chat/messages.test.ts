@@ -83,6 +83,11 @@ describe("features/chat/messages", () => {
   // `t.registerComponent` against the agent package (flagged fragile in
   // project notes) or a production-side seam. Out of scope for this pass.
   it.skip("sendMessage: happy path via agent component", () => {});
+  // Quick actions need no skipped case: steering-before-label ordering is
+  // structural (one `saveMessages` call whose array is [system, user]), the
+  // payload length guards are covered by assertQuickActionWithinLimits tests,
+  // and the expansion itself by expandQuickAction tests — both in
+  // quickActions.test.ts.
   it.skip("generateResponse: LLM path", () => {});
   it.skip("generateThreadTitle: LLM path", () => {});
 });

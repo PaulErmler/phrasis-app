@@ -571,11 +571,11 @@ export const onTtsJobComplete = internalMutation({
  * behind a (textId, language) — the mid-retry write of the validate loop.
  * No-ops if the row does not exist.
  *
- * Asset-backed rows: the patch targets the shared `audioAssets` row, and ONLY
- * while that asset is still mid-flight (`ttsQuality === 'unknown'`, i.e. this
- * job created it at attempt 0 and owns it). An asset already carrying
- * completed audio is shared by other texts and is never churned by retries —
- * the job's final write (`storeAudioRecording`) is what replaces it.
+ * The patch targets the shared `audioAssets` row, and ONLY while that asset
+ * is still mid-flight (`ttsQuality === 'unknown'`, i.e. this job created it
+ * at attempt 0 and owns it). An asset already carrying completed audio is
+ * shared by other texts and is never churned by retries — the job's final
+ * write (`storeAudioRecording`) is what replaces it.
  */
 export const updateAudioRecordingQuality = internalMutation({
   args: {
@@ -595,52 +595,30 @@ export const updateAudioRecordingQuality = internalMutation({
       .first();
     if (!record) return null;
 
-    if (record.assetId !== undefined) {
-      const asset = await ctx.db.get(record.assetId);
-      if (!asset || asset.ttsQuality !== 'unknown') return null;
-      if (args.storageId && args.storageId !== asset.storageId) {
-        const previousStorageId = asset.storageId;
-        await ctx.db.patch(asset._id, {
-          ttsQuality: args.ttsQuality,
-          storageId: args.storageId,
-        });
-        if (!args.preserveOldStorage) {
-          await deleteStorageBlobIfUnreferenced(ctx, previousStorageId);
-        }
-      } else {
-        await ctx.db.patch(asset._id, { ttsQuality: args.ttsQuality });
-      }
-      return null;
-    }
-
-    // Legacy payload row (pre-audioAssets backfill).
-    const patch: { ttsQuality: typeof args.ttsQuality; storageId?: Id<'_storage'> } = {
-      ttsQuality: args.ttsQuality,
-    };
-
-    if (args.storageId && args.storageId !== record.storageId) {
-      const previousStorageId = record.storageId;
-      patch.storageId = args.storageId;
-      await ctx.db.patch(record._id, patch);
-      if (previousStorageId !== undefined && !args.preserveOldStorage) {
-        // Reference-aware: drop the old blob only if no other row (e.g. an
-        // `editCard` copy on another text) still references it.
+    const asset = await ctx.db.get(record.assetId);
+    if (!asset || asset.ttsQuality !== 'unknown') return null;
+    if (args.storageId && args.storageId !== asset.storageId) {
+      const previousStorageId = asset.storageId;
+      await ctx.db.patch(asset._id, {
+        ttsQuality: args.ttsQuality,
+        storageId: args.storageId,
+      });
+      if (!args.preserveOldStorage) {
         await deleteStorageBlobIfUnreferenced(ctx, previousStorageId);
       }
     } else {
-      await ctx.db.patch(record._id, patch);
+      await ctx.db.patch(asset._id, { ttsQuality: args.ttsQuality });
     }
-
     return null;
   },
 });
 
 /**
  * Delayed reference-checked blob delete, scheduled whenever a blob is
- * superseded (asset in-place swap, legacy-row repoint, backfill dedupe). The
- * delay gives clients holding a just-issued signed URL a grace window; the
- * job re-checks both `by_storageId` indexes at fire time, so a blob that is
- * still (or again) referenced simply survives.
+ * superseded (asset in-place swap, orphaned-asset cleanup). The delay gives
+ * clients holding a just-issued signed URL a grace window; the job re-checks
+ * `audioAssets.by_storageId` at fire time, so a blob that is still (or
+ * again) referenced simply survives.
  */
 export const deleteBlobIfUnreferencedJob = internalMutation({
   args: { storageId: v.id('_storage') },
@@ -748,10 +726,10 @@ export const backfillWordTimings = internalAction({
 
 /**
  * Persist word timings produced by `backfillWordTimings`. Guards against
- * storage swaps: if the audio's current `storageId` differs from the one we
+ * storage swaps: if the asset's current `storageId` differs from the one we
  * transcribed, the timings belong to a now-stale blob and are discarded.
- * Asset-backed rows patch the shared asset — identical audio means the
- * timings are correct for every text pointing at it.
+ * The patch lands on the shared asset — identical audio means the timings
+ * are correct for every text pointing at it.
  */
 export const persistBackfilledWordTimings = internalMutation({
   args: {
@@ -775,14 +753,9 @@ export const persistBackfilledWordTimings = internalMutation({
       )
       .first();
     if (!record) return null;
-    if (record.assetId !== undefined) {
-      const asset = await ctx.db.get(record.assetId);
-      if (!asset || asset.storageId !== args.storageId) return null;
-      await ctx.db.patch(asset._id, { wordTimings: args.wordTimings });
-      return null;
-    }
-    if (record.storageId !== args.storageId) return null;
-    await ctx.db.patch(record._id, { wordTimings: args.wordTimings });
+    const asset = await ctx.db.get(record.assetId);
+    if (!asset || asset.storageId !== args.storageId) return null;
+    await ctx.db.patch(asset._id, { wordTimings: args.wordTimings });
     return null;
   },
 });

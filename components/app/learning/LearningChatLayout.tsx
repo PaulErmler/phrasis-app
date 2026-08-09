@@ -12,11 +12,14 @@ import {
 import { MessageCircle, ChevronRight } from 'lucide-react';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
+import type { QuickAction } from '@/convex/features/chat/quickActions';
 
 // -- Context to share chat toggle state with the header ----------------------
 
 interface PendingPrompt {
   text: string;
+  /** When set, the send goes out as this quick action; `text` is only the visible bubble label. */
+  quickAction?: QuickAction;
   nonce: number;
 }
 
@@ -27,6 +30,7 @@ interface LearningChatContextValue {
   toggleChat: () => void;
   pendingPrompt: PendingPrompt | null;
   openChatWithPrompt: (text: string) => void;
+  openChatWithAction: (action: QuickAction, displayText: string) => void;
   /**
    * Returns true only for the first caller of a given nonce. Defends against
    * React Strict Mode's double-effect behaviour in dev so a prompt is only
@@ -117,6 +121,19 @@ export function LearningChatLayout({
     [onChatOpen],
   );
 
+  const openChatWithAction = useCallback(
+    (action: QuickAction, displayText: string) => {
+      setPendingPrompt((prev) => ({
+        text: displayText,
+        quickAction: action,
+        nonce: (prev?.nonce ?? 0) + 1,
+      }));
+      setIsChatOpen(true);
+      onChatOpen?.();
+    },
+    [onChatOpen],
+  );
+
   const claimPrompt = useCallback((nonce: number) => {
     if (claimedNonceRef.current === nonce) return false;
     claimedNonceRef.current = nonce;
@@ -132,6 +149,7 @@ export function LearningChatLayout({
         toggleChat,
         pendingPrompt,
         openChatWithPrompt,
+        openChatWithAction,
         claimPrompt,
       }}
     >

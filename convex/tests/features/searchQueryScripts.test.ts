@@ -84,7 +84,7 @@ const SCRIPT_CLASSES: ScriptClass[] = [
   },
   {
     name: "Cyrillic",
-    codes: ["ru", "uk"],
+    codes: ["ru", "uk", "bg"],
     query: "Я завтра пойду в школу и встречусь с друзьями",
     triggersLegacyBug: false,
   },

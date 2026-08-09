@@ -1,10 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { LearningMode } from '@/components/app/LearningMode';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, MessageSquarePlus } from 'lucide-react';
 import {
   LearningChatLayout,
   useLearningChatToggle,
@@ -15,6 +15,15 @@ import {
   useLearningAudio,
 } from '@/components/app/learning';
 import { ChatPanel } from '@/components/chat/ChatPanel';
+import type { MessageFooterRenderer } from '@/components/chat/ChatMessages';
+import {
+  QuickActionsGrid,
+  QuickActionsRow,
+  quickActionMessage,
+} from '@/components/chat/QuickActionsRow';
+import { useCourseLanguages } from '@/hooks/use-course-languages';
+import { getLocalizedLanguageNameByCode } from '@/lib/languages';
+import type { SentenceQuickActionKind } from '@/convex/features/chat/quickActions';
 import { createCardToolRenderer } from '@/components/chat/tools/CardToolRenderer';
 import { useCardApprovals } from '@/hooks/use-card-approvals';
 import { useScreenWakeLock } from '@/hooks/use-screen-wake-lock';
@@ -33,16 +42,18 @@ function WrappedChatPanel({
   threadId,
   cardId,
   onMessageSent,
+  onNewChat,
 }: {
   threadId: string;
   cardId?: Id<'cards'>;
   onMessageSent?: () => void;
+  onNewChat?: () => void;
 }) {
   const chatContext = useLearningChatToggle();
   if (!chatContext) {
     throw new Error('WrappedChatPanel must be rendered inside LearningChatLayout');
   }
-  const { closeChat, pendingPrompt, claimPrompt } = chatContext;
+  const { closeChat, pendingPrompt, claimPrompt, openChatWithAction } = chatContext;
   const {
     approvalsByToolCallId,
     processingApprovals,
@@ -51,14 +62,45 @@ function WrappedChatPanel({
     isLoaded: approvalsLoaded,
   } = useCardApprovals(threadId);
   const t = useTranslations('Chat');
+  const tQuick = useTranslations('Chat.quickActions');
+  const locale = useLocale();
+  const { targetLanguages } = useCourseLanguages();
 
-  const suggestions = useMemo(
-    () => [
-      t('suggestions.grammar'),
-      t('suggestions.simpler'),
-      t('suggestions.moreCards'),
-    ],
-    [t],
+  // Naming the target language in the prompt ("…this Romanian sentence…")
+  // removes the ambiguity that made the tutor analyze the base-language
+  // rendering of the card. Only for single-target courses — with several
+  // targets there is no single name to insert, and the server-side steering
+  // still lists every target sentence explicitly.
+  const targetLanguageLabel = useMemo(
+    () =>
+      targetLanguages.length === 1
+        ? getLocalizedLanguageNameByCode(targetLanguages[0], locale)
+        : undefined,
+    [targetLanguages, locale],
+  );
+
+  const handleQuickAction = useCallback(
+    (kind: SentenceQuickActionKind) => {
+      openChatWithAction(
+        { kind },
+        quickActionMessage(tQuick, kind, targetLanguageLabel),
+      );
+    },
+    [openChatWithAction, tQuick, targetLanguageLabel],
+  );
+
+  // Identity-stable (ChatMessageRow's memo comparator checks messageFooter
+  // by reference). Rendered only under the latest, fully-generated assistant
+  // message, and only in learning mode (cardId present).
+  const messageFooter = useCallback<MessageFooterRenderer>(
+    (message, { isLastMessage }) =>
+      isLastMessage && message.status === 'success' && cardId ? (
+        <QuickActionsRow
+          onAction={handleQuickAction}
+          languageLabel={targetLanguageLabel}
+        />
+      ) : null,
+    [cardId, handleQuickAction, targetLanguageLabel],
   );
 
   const toolRenderers = useMemo(
@@ -78,14 +120,40 @@ function WrappedChatPanel({
     <ChatPanel
       threadId={threadId}
       toolRenderers={toolRenderers}
+      messageFooter={messageFooter}
       cardId={cardId}
       onMessageSent={onMessageSent}
-      suggestions={suggestions}
-      showSuggestions
+      onNewChat={onNewChat}
+      emptyStateExtra={
+        cardId ? (
+          <QuickActionsGrid
+            onAction={handleQuickAction}
+            languageLabel={targetLanguageLabel}
+          />
+        ) : undefined
+      }
+      header={
+        onNewChat ? (
+          <div className="flex items-center justify-end gap-2 border-b px-4 py-1.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="shrink-0 gap-1.5 text-xs"
+              onClick={onNewChat}
+              data-testid="learn-chat-new"
+            >
+              <MessageSquarePlus className="h-4 w-4" />
+              {t('sidebar.newChat')}
+            </Button>
+          </div>
+        ) : undefined
+      }
       autoFocus={false}
       approvalsLoading={!approvalsLoaded}
       noBottomPadding
       initialText={pendingPrompt?.text}
+      initialQuickAction={pendingPrompt?.quickAction}
       initialTextNonce={pendingPrompt?.nonce}
       claimInitialText={claimPrompt}
       aboveFooterAction={
@@ -352,6 +420,15 @@ function LearnViewInner({
     threadHasMessagesRef.current = true;
   }, [audio]);
 
+  // getOrCreateEmptyThread returns the current thread when it is still
+  // empty, so mashing the button can't spam empty threads.
+  const handleNewChat = useCallback(() => {
+    threadHasMessagesRef.current = false;
+    getOrCreateEmptyThread().catch((err) =>
+      console.error('Failed to start a new chat:', err),
+    );
+  }, [getOrCreateEmptyThread]);
+
   const handleChatOpen = useCallback(() => {
     audio.pause();
   }, [audio]);
@@ -363,6 +440,7 @@ function LearnViewInner({
       threadId={threadId}
       cardId={cardId}
       onMessageSent={handleMessageSent}
+      onNewChat={handleNewChat}
     />
   ) : isThreadLoading ? (
     <div className="flex-1 flex items-center justify-center">

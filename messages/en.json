@@ -698,11 +698,7 @@
     "explainWord": "Explain me this word: {word}",
     "askAboutWord": "Ask about {word}",
     "thinking": "Thinking...",
-    "emptyTitle": "Your language tutor",
     "aiNotice": "You are chatting with an AI assistant. It can make mistakes — always verify important information.",
-    "emptyBullet1": "Ask about vocabulary, grammar, or any sentence.",
-    "emptyBullet2": "The chat knows the sentence you are currently learning.",
-    "emptyBullet3": "It can create sentences for you — you just confirm them.",
     "emptyCreditsNote": "A message uses 1–2 credits depending on its length. The longer the conversation gets, the more credits a message uses.",
     "input": {
       "placeholder": "What would you like to say?",
@@ -719,6 +715,56 @@
       "grammar": "Explain me the grammar of this sentence word by word.",
       "simpler": "How can I say this simpler?",
       "moreCards": "Create more sentences using these verbs."
+    },
+    "quickActions": {
+      "grammar": {
+        "label": "Grammar",
+        "message": "Explain the grammar of this sentence in detail.",
+        "messageWithLanguage": "Explain the grammar of this {language} sentence in detail."
+      },
+      "conjugation": {
+        "label": "Conjugation",
+        "message": "Show me how the verbs in this sentence are conjugated, with examples.",
+        "messageWithLanguage": "Show me how the verbs in this {language} sentence are conjugated, with examples."
+      },
+      "tenses": {
+        "label": "Tenses",
+        "message": "How do I say this in the past and future?",
+        "messageWithLanguage": "How do I say this {language} sentence in the past and future?"
+      },
+      "paraphrase": {
+        "label": "Say it differently",
+        "message": "How can I say the same thing differently?",
+        "messageWithLanguage": "How can I say the same thing differently in {language}?"
+      },
+      "formal": {
+        "label": "More formal",
+        "message": "How do I say this more formally and politely?",
+        "messageWithLanguage": "How do I say this more formally and politely in {language}?"
+      },
+      "simpler": {
+        "label": "Simpler",
+        "message": "How can I say this in a simpler way?",
+        "messageWithLanguage": "How can I say this in a simpler way in {language}?"
+      }
+    },
+    "wordActions": {
+      "explain": {
+        "label": "Explain",
+        "message": "Explain: {word}"
+      },
+      "synonyms": {
+        "label": "Synonyms",
+        "message": "Synonyms of {word}"
+      },
+      "antonyms": {
+        "label": "Antonyms",
+        "message": "Antonyms of {word}"
+      }
+    },
+    "discuss": {
+      "label": "Also correct?",
+      "message": "Is this also correct: \"{attempt}\"?"
     },
     "voice": {
       "startRecording": "Start recording",

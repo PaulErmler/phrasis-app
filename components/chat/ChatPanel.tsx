@@ -18,6 +18,7 @@ import { FeatureBadge } from '@/components/feature_tracking/FeatureBadge';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import { THREAD_MESSAGE_LIMIT } from '@/convex/features/chat/constants';
+import type { QuickAction } from '@/convex/features/chat/quickActions';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +37,8 @@ interface ChatPanelProps {
   suggestionsAction?: ReactNode;
   /** Renders above the footer (mobile only), e.g. back button matching open-chat style */
   aboveFooterAction?: ReactNode;
+  /** Rendered inside the empty-thread state (e.g. quick-action tiles). */
+  emptyStateExtra?: ReactNode;
   /** When true, delays showing messages until approvals have loaded */
   approvalsLoading?: boolean;
   /** When false, prevents the chat input from auto-focusing on mount */
@@ -44,6 +47,12 @@ interface ChatPanelProps {
   noBottomPadding?: boolean;
   /** External text to auto-submit. Fires whenever initialTextNonce changes. */
   initialText?: string;
+  /**
+   * When set alongside initialText, the auto-submit goes out as this quick
+   * action (server-expanded steering prompt); initialText is only the
+   * visible bubble label.
+   */
+  initialQuickAction?: QuickAction;
   /** Monotonic counter — each new value re-fires the auto-submit, even if the text is identical. */
   initialTextNonce?: number;
   /**
@@ -72,10 +81,12 @@ export function ChatPanel({
   footerAction,
   suggestionsAction,
   aboveFooterAction,
+  emptyStateExtra,
   approvalsLoading = false,
   autoFocus,
   noBottomPadding = false,
   initialText,
+  initialQuickAction,
   initialTextNonce,
   claimInitialText,
 }: ChatPanelProps) {
@@ -147,12 +158,29 @@ export function ChatPanel({
 
   // Auto-submit externally-supplied initial text (e.g. from a word bubble in
   // learning mode). Keyed on the nonce so the same prompt fires again when the
-  // user clicks the same word. Goes through handleSubmit so paywall + thread
-  // limit guards apply exactly like a normal send. claimInitialText dedups
-  // across concurrent ChatPanel mounts (see prop doc).
+  // user clicks the same word. Applies the same paywall + thread limit guards
+  // as a normal send (quick actions bypass handleSubmit only to attach the
+  // action payload). claimInitialText dedups across concurrent ChatPanel
+  // mounts (see prop doc).
   useEffect(() => {
     if (initialTextNonce == null || initialText == null) return;
     if (claimInitialText && !claimInitialText(initialTextNonce)) return;
+    if (initialQuickAction) {
+      if (isThreadLimitReached) return;
+      if (!isAvailable) {
+        setPaywallOpen(true);
+        return;
+      }
+      void (async () => {
+        try {
+          await chat.sendQuickAction(initialQuickAction, initialText);
+          onMessageSent?.();
+        } catch {
+          // Already toasted/reported inside useSendMessage.
+        }
+      })();
+      return;
+    }
     void handleSubmit({ text: initialText, files: [] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialTextNonce]);
@@ -175,7 +203,8 @@ export function ChatPanel({
             threadId={threadId}
             toolRenderers={toolRenderers}
             messageFooter={messageFooter}
-            contentClassName={aboveFooterAction ? 'pb-12 lg:pb-0' : undefined}
+            contentClassName={aboveFooterAction ? 'pb-12 lg:pb-6' : 'pb-6'}
+            emptyStateExtra={emptyStateExtra}
           />
           {aboveFooterAction && (
             <div className="absolute bottom-3 left-4 lg:hidden z-10">
@@ -213,9 +242,7 @@ export function ChatPanel({
                 autoFocus={autoFocus}
                 inputTestId="chat-input"
                 submitTestId="chat-submit"
-                showSuggestions={
-                  !chat.isLoading && (showSuggestions ?? chat.messages.length === 0)
-                }
+                showSuggestions={!chat.isLoading && (showSuggestions ?? false)}
                 footerAction={
                   <>
                     {footerAction}

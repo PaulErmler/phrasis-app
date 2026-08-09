@@ -160,15 +160,11 @@ export async function buildTextContentBatchForLanguages(
     });
   });
 
-  // Resolve each audio row's payload through its shared `audioAssets` doc
-  // (legacy rows fall back to their own fields). One deduped point-read per
-  // unique asset per batch — decks repeat sentences, so the dedup matters.
+  // Resolve each audio row's payload through its shared `audioAssets` doc.
+  // One deduped point-read per unique asset per batch — decks repeat
+  // sentences, so the dedup matters.
   const assetIds = [
-    ...new Set(
-      audioResults.flatMap((row) =>
-        row?.assetId !== undefined ? [row.assetId] : [],
-      ),
-    ),
+    ...new Set(audioResults.flatMap((row) => (row ? [row.assetId] : []))),
   ];
   const assetDocs = await Promise.all(assetIds.map((id) => ctx.db.get(id)));
   const assetById = new Map(assetIds.map((id, i) => [id, assetDocs[i]]));
@@ -176,11 +172,11 @@ export async function buildTextContentBatchForLanguages(
   const payloadByKeyAndLang = new Map<string, ResolvedAudioPayload | null>();
   audioFetches.forEach((item, idx) => {
     const row = audioResults[idx];
-    const asset =
-      row?.assetId !== undefined ? (assetById.get(row.assetId) ?? null) : null;
     payloadByKeyAndLang.set(
       `${item.key}:${item.lang}`,
-      row ? audioPayloadFromRowAndAsset(row, asset) : null,
+      row
+        ? audioPayloadFromRowAndAsset(assetById.get(row.assetId) ?? null)
+        : null,
     );
   });
 

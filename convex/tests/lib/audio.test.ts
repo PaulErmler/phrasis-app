@@ -6,17 +6,19 @@ import {
   deleteAudioRow,
   deleteStorageBlobIfUnreferenced,
 } from "../../lib/audio";
+import { insertAudioFixture } from "./audioFixtures";
 
 const modules = import.meta.glob("../../**/*.ts");
 
 /**
- * `deleteAudioRow` must delete the storage blob ONLY when it is the last
- * audioRecordings row referencing it. Blobs are shared across texts because
- * `editCard` copies audio by reusing `storageId`, so dropping a blob while
- * another row still points at it would corrupt that text's audio.
+ * `deleteAudioRow` deletes the shared `audioAssets` row (and its blob) ONLY
+ * when the deleted pointer row was the last one referencing it. Assets are
+ * shared across texts (same spoken string, `editCard` copies), so dropping
+ * the asset while another row still points at it would corrupt that text's
+ * audio.
  */
-describe("deleteAudioRow — reference-aware blob cleanup", () => {
-  async function seedTwoRowsSharingOneBlob(t: TestConvex<typeof schema>) {
+describe("deleteAudioRow — reference-aware asset cleanup", () => {
+  async function seedTwoRowsSharingOneAsset(t: TestConvex<typeof schema>) {
     return t.run(async (ctx) => {
       const collectionId = await ctx.db.insert("collections", {
         name: "c",
@@ -32,53 +34,55 @@ describe("deleteAudioRow — reference-aware blob cleanup", () => {
         });
       const textA = await mkText("uno");
       const textB = await mkText("dos");
-      // One shared blob, referenced by both texts' audio rows (the editCard
-      // copy shape).
       const storageId = await ctx.storage.store(
         new Blob([new Uint8Array([1, 2, 3])]),
       );
-      const mkAudio = (textId: typeof textA) =>
-        ctx.db.insert("audioRecordings", {
-          textId,
-          language: "es",
-          voiceName: "es-test-voice",
-          storageId,
-          voiceGender: "female",
-        });
-      const rowA = await mkAudio(textA);
-      const rowB = await mkAudio(textB);
-      return { storageId, rowA, rowB };
+      // One shared asset, pointed at by both texts' rows.
+      const { assetId, rowId: rowA } = await insertAudioFixture(ctx, {
+        textId: textA,
+        language: "es",
+        storageId,
+      });
+      const { rowId: rowB } = await insertAudioFixture(ctx, {
+        textId: textB,
+        language: "es",
+        storageId,
+        assetId,
+      });
+      return { storageId, assetId, rowA, rowB };
     });
   }
 
-  it("keeps the shared blob until the LAST referencing row is deleted", async () => {
+  it("keeps the shared asset and blob until the LAST pointer row is deleted", async () => {
     const t = convexTest(schema, modules);
-    const { storageId, rowA, rowB } = await seedTwoRowsSharingOneBlob(t);
+    const { storageId, assetId, rowA, rowB } =
+      await seedTwoRowsSharingOneAsset(t);
 
-    // Delete the first row — blob must survive (rowB still references it).
+    // Delete the first row — asset + blob must survive (rowB still points).
     await t.run(async (ctx) => {
       await deleteAudioRow(ctx, (await ctx.db.get(rowA))!);
     });
     await t.run(async (ctx) => {
       expect(await ctx.db.get(rowA)).toBeNull();
       expect(await ctx.db.get(rowB)).not.toBeNull();
-      // Blob still present → getUrl resolves.
+      expect(await ctx.db.get(assetId)).not.toBeNull();
       expect(await ctx.storage.getUrl(storageId)).not.toBeNull();
     });
 
-    // Delete the last row — blob is now unreferenced and must be removed.
+    // Delete the last row — asset and blob are now unreferenced and go.
     await t.run(async (ctx) => {
       await deleteAudioRow(ctx, (await ctx.db.get(rowB))!);
     });
     await t.run(async (ctx) => {
       expect(await ctx.db.get(rowB)).toBeNull();
+      expect(await ctx.db.get(assetId)).toBeNull();
       expect(await ctx.storage.getUrl(storageId)).toBeNull();
     });
   });
 
-  it("deletes the blob immediately when the row is the only reference", async () => {
+  it("deletes asset and blob immediately when the row is the only pointer", async () => {
     const t = convexTest(schema, modules);
-    const { row, storageId } = await t.run(async (ctx) => {
+    const { row, assetId, storageId } = await t.run(async (ctx) => {
       const collectionId = await ctx.db.insert("collections", {
         name: "c",
         textCount: 0,
@@ -93,14 +97,12 @@ describe("deleteAudioRow — reference-aware blob cleanup", () => {
       const storageId = await ctx.storage.store(
         new Blob([new Uint8Array([9])]),
       );
-      const row = await ctx.db.insert("audioRecordings", {
+      const { assetId, rowId: row } = await insertAudioFixture(ctx, {
         textId,
         language: "es",
-        voiceName: "es-test-voice",
         storageId,
-        voiceGender: "female",
       });
-      return { row, storageId };
+      return { row, assetId, storageId };
     });
 
     await t.run(async (ctx) => {
@@ -108,6 +110,7 @@ describe("deleteAudioRow — reference-aware blob cleanup", () => {
     });
     await t.run(async (ctx) => {
       expect(await ctx.db.get(row)).toBeNull();
+      expect(await ctx.db.get(assetId)).toBeNull();
       expect(await ctx.storage.getUrl(storageId)).toBeNull();
     });
   });
@@ -115,69 +118,56 @@ describe("deleteAudioRow — reference-aware blob cleanup", () => {
 
 /**
  * `deleteStorageBlobIfUnreferenced` drops a blob by storageId only when no
- * audioRecordings row still references it. Used by `storeAudioRecording` /
- * `updateAudioRecordingQuality` after a row was already patched to a NEW blob —
- * so the OLD blob must not be dropped while another text (an editCard copy)
- * still points at it.
+ * `audioAssets` row still references it. Used after an asset was patched to
+ * a NEW blob (and by the delayed swap-delete job) — the OLD blob must not be
+ * dropped while another asset still owns it.
  */
 describe("deleteStorageBlobIfUnreferenced — reference-aware blob cleanup", () => {
-  it("keeps a blob still referenced by another row after one row is repointed", async () => {
+  it("keeps a blob still referenced by an asset; drops it once unreferenced", async () => {
     const t = convexTest(schema, modules);
-    const { rowA, blobX, blobY } = await t.run(async (ctx) => {
+    const { assetId, blobX, blobY } = await t.run(async (ctx) => {
       const collectionId = await ctx.db.insert("collections", {
         name: "c",
         textCount: 0,
       });
-      const mkText = (text: string) =>
-        ctx.db.insert("texts", {
-          text,
-          language: "es",
-          userCreated: true,
-          collectionId,
-          collectionRank: 1,
-        });
-      const textA = await mkText("uno");
-      const textB = await mkText("dos");
+      const textId = await ctx.db.insert("texts", {
+        text: "uno",
+        language: "es",
+        userCreated: true,
+        collectionId,
+        collectionRank: 1,
+      });
       const blobX = await ctx.storage.store(
         new Blob([new Uint8Array([1, 2, 3])]),
       );
-      const mkAudio = (textId: typeof textA) =>
-        ctx.db.insert("audioRecordings", {
-          textId,
-          language: "es",
-          voiceName: "es-test-voice",
-          storageId: blobX,
-          voiceGender: "female",
-        });
-      const rowA = await mkAudio(textA);
-      await mkAudio(textB); // rowB also references blobX
+      const { assetId } = await insertAudioFixture(ctx, {
+        textId,
+        language: "es",
+        storageId: blobX,
+      });
       const blobY = await ctx.storage.store(
         new Blob([new Uint8Array([4, 5, 6])]),
       );
-      return { rowA, blobX, blobY };
+      return { assetId, blobX, blobY };
     });
 
-    // Repoint rowA to a new blob Y (the storeAudioRecording shape), then ask to
-    // drop the OLD blob X — it must survive because rowB still references it.
+    // While the asset still owns X, asking to drop X must be a no-op.
     await t.run(async (ctx) => {
-      await ctx.db.patch(rowA, { storageId: blobY });
       await deleteStorageBlobIfUnreferenced(ctx, blobX);
     });
     await t.run(async (ctx) => {
       expect(await ctx.storage.getUrl(blobX)).not.toBeNull();
     });
 
-    // Repoint rowB off X too, then X is unreferenced → it must be removed.
+    // Swap the asset to Y (the in-place replace shape) — X is unreferenced
+    // and must now be removed.
     await t.run(async (ctx) => {
-      const rowB = await ctx.db
-        .query("audioRecordings")
-        .withIndex("by_storageId", (q) => q.eq("storageId", blobX))
-        .first();
-      await ctx.db.patch(rowB!._id, { storageId: blobY });
+      await ctx.db.patch(assetId, { storageId: blobY });
       await deleteStorageBlobIfUnreferenced(ctx, blobX);
     });
     await t.run(async (ctx) => {
       expect(await ctx.storage.getUrl(blobX)).toBeNull();
+      expect(await ctx.storage.getUrl(blobY)).not.toBeNull();
     });
   });
 });

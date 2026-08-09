@@ -71,6 +71,7 @@ const EXPECTED_GEMINI: Record<string, string> = {
   sl: 'sl-SI',
   uk: 'uk-UA',
   sr: 'sr-RS',
+  bg: 'bg-BG',
   lt: 'lt-LT',
   lv: 'lv-LV',
   et: 'et-EE',

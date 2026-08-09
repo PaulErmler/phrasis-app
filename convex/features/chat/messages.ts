@@ -8,7 +8,7 @@ import {
 } from '../../_generated/server';
 import { paginationOptsValidator } from 'convex/server';
 import { internal, components } from '../../_generated/api';
-import { saveMessage, listUIMessages, syncStreams } from '@convex-dev/agent';
+import { saveMessages, listUIMessages, syncStreams } from '@convex-dev/agent';
 import { requireAuthUserId, getAuthUserId, getUserSettings } from '../../db/users';
 import { getActiveCourseForUser } from '../../db/courses';
 import { consumeQuota } from '../../usage/helpers';
@@ -31,7 +31,13 @@ import {
   OPENROUTER_MODELS,
   OPENROUTER_USAGE_ACCOUNTING,
 } from '../../config/aiModels';
-import { getLanguageByCode } from '../../../lib/languages';
+import { buildCardContextSection, buildLanguageSection } from './promptSections';
+import {
+  assertQuickActionWithinLimits,
+  expandQuickAction,
+  vQuickAction,
+  type QuickAction,
+} from './quickActions';
 
 const agentComponent = components.agent;
 
@@ -116,46 +122,21 @@ async function resolveCardContext(
   };
 }
 
-function buildCardContextSection(opts: {
-  sourceText: string;
-  sourceLanguage: string;
-  translations: { language: string; text: string }[];
-}): string {
-  const lines = [`Original (${opts.sourceLanguage}): "${opts.sourceText}"`];
-  for (const t of opts.translations) {
-    lines.push(`${t.language}: "${t.text}"`);
-  }
-  return `The user is currently reviewing this card:\n${lines.join('\n')}`;
-}
-
-function buildLanguageSection(courseLanguages: {
-  baseLanguages: string[];
-  targetLanguages: string[];
-}): string {
-  const allLangs = [
-    ...new Set([...courseLanguages.baseLanguages, ...courseLanguages.targetLanguages]),
-  ];
-
-  const namedLines = allLangs
-    .map((code) => `- ${code}: ${getLanguageByCode(code)?.name ?? code}`)
-    .join('\n');
-
-  const firstName = getLanguageByCode(allLangs[0])?.name ?? allLangs[0];
-  const secondCode = allLangs[1] ?? allLangs[0];
-  const secondName = getLanguageByCode(secondCode)?.name ?? secondCode;
-
-  const schematic = allLangs
-    .map((code) => {
-      const name = getLanguageByCode(code)?.name ?? code;
-      return `{"language":"${code}","text":"<${name} sentence>"}`;
-    })
-    .join(',');
-
-  return `Course language configuration (required order; one translation per code per card):
-${namedLines}
-
-Each createCard call must pass exactly these entries, in this order. The "text" for each entry must be written in the language named above — e.g. the "${allLangs[0]}" text must be ${firstName}, the "${secondCode}" text must be ${secondName}. Never copy one entry's text into another.
-Schematic: [${schematic}]`;
+/**
+ * Expand a quick action into its steering prompt, resolving the language
+ * context from the reviewed card when present, else from the active course.
+ */
+function buildQuickActionSteering(
+  quickAction: QuickAction,
+  cardData: Awaited<ReturnType<typeof resolveCardContext>>,
+  active: Awaited<ReturnType<typeof getActiveCourseForUser>>,
+): string {
+  return expandQuickAction(quickAction, {
+    card: cardData,
+    baseLanguages: cardData?.baseLanguages ?? active?.course.baseLanguages ?? [],
+    targetLanguages:
+      cardData?.targetLanguages ?? active?.course.targetLanguages ?? [],
+  });
 }
 
 /**
@@ -166,6 +147,7 @@ export const sendMessage = mutation({
     threadId: v.string(),
     prompt: v.string(),
     cardId: v.optional(v.id('cards')),
+    quickAction: v.optional(vQuickAction),
   },
   returns: v.string(),
   handler: async (ctx, args) => {
@@ -176,6 +158,10 @@ export const sendMessage = mutation({
         code: 'MESSAGE_TOO_LONG',
         message: `Message exceeds the ${MAX_MESSAGE_LENGTH} character limit`,
       });
+    }
+
+    if (args.quickAction) {
+      assertQuickActionWithinLimits(args.quickAction);
     }
 
     await consumeQuota(ctx, userId, FEATURE_IDS.CHAT_MESSAGES, 1);
@@ -190,7 +176,7 @@ export const sendMessage = mutation({
 
     const existingMessages = await ctx.runQuery(
       agentComponent.messages.listMessagesByThreadId,
-      { threadId: args.threadId, order: 'asc', paginationOpts: { cursor: null, numItems: 200 } },
+      { threadId: args.threadId, order: 'asc', paginationOpts: { cursor: null, numItems: 300 } },
     );
     const userMessageCount = existingMessages.page.filter(
       (m) => m.message?.role === 'user',
@@ -199,20 +185,34 @@ export const sendMessage = mutation({
       throw new ConvexError({ code: 'THREAD_MESSAGE_LIMIT', message: 'Thread message limit reached' });
     }
 
-    const { messageId } = await saveMessage(ctx, agentComponent, {
-      threadId: args.threadId,
-      prompt: args.prompt,
-    });
+    const cardData = args.cardId
+      ? await resolveCardContext(ctx, args.cardId, userId)
+      : null;
+    const active = await getActiveCourseForUser(ctx, userId);
 
-    let cardContextSection: string | undefined;
-    let languageSection: string | undefined;
-    if (args.cardId) {
-      const cardData = await resolveCardContext(ctx, args.cardId, userId);
-      if (cardData) {
-        cardContextSection = buildCardContextSection(cardData);
-        languageSection = buildLanguageSection(cardData);
-      }
-    }
+    const steering = args.quickAction
+      ? buildQuickActionSteering(args.quickAction, cardData, active)
+      : undefined;
+
+    // One save; the array order persists the steering as a hidden system
+    // message immediately BEFORE the visible label, so the model reads the
+    // detailed request in place on this and every later turn while the UI
+    // (which filters system messages) shows only the short label bubble.
+    const { messages: savedMessages } = await saveMessages(ctx, agentComponent, {
+      threadId: args.threadId,
+      messages: [
+        ...(steering !== undefined
+          ? [{ role: 'system' as const, content: steering }]
+          : []),
+        { role: 'user' as const, content: args.prompt },
+      ],
+    });
+    const messageId = savedMessages[savedMessages.length - 1]._id;
+
+    const cardContextSection = cardData
+      ? buildCardContextSection(cardData)
+      : undefined;
+    const languageSection = cardData ? buildLanguageSection(cardData) : undefined;
 
     if (userMessageCount === 0) {
       await ctx.runMutation(agentComponent.threads.updateThread, {
@@ -250,7 +250,6 @@ export const sendMessage = mutation({
     );
 
     // Track chat message event
-    const active = await getActiveCourseForUser(ctx, userId);
     if (active) {
       await trackEvent(ctx, { userId, courseId: active.course._id, field: 'chatMessagesSent' });
     }
@@ -263,6 +262,7 @@ export const sendMessage = mutation({
       thread_message_index: userMessageCount,
       message_chars: args.prompt.length,
       has_card_context: args.cardId !== undefined,
+      quick_action: args.quickAction?.kind,
       base_languages: active?.course.baseLanguages,
       target_languages: active?.course.targetLanguages,
     });

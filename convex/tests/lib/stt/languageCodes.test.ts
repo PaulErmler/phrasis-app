@@ -71,6 +71,8 @@ const EXPECTED_AZURE: Record<string, string> = {
   sl: 'sl-SI',
   uk: 'uk-UA',
   sr: 'sr-RS',
+  // Symmetric default (no explicit azureSttLocale).
+  bg: 'bg-BG',
   lt: 'lt-LT',
   lv: 'lv-LV',
   et: 'et-EE',

@@ -153,6 +153,11 @@ export const ESSENTIAL_GREETING_TRANSLATIONS: Record<
     howAreYou: { text: 'Како си?' },
     helloHowAreYou: { text: 'Здраво. Како си?' },
   },
+  bg: {
+    hello: { text: 'Здравей.' },
+    howAreYou: { text: 'Как си?' },
+    helloHowAreYou: { text: 'Здравей. Как си?' },
+  },
   lt: {
     hello: { text: 'Labas.' },
     howAreYou: { text: 'Kaip sekasi?' },

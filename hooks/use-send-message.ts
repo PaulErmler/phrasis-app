@@ -10,6 +10,7 @@ import { FEATURE_IDS } from '@/convex/features/featureIds';
 import type { ChatStatus } from '@/lib/types/chat';
 import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import { reportError } from '@/lib/report-error';
+import type { QuickAction } from '@/convex/features/chat/quickActions';
 
 interface UseSendMessageProps {
   threadId: string;
@@ -24,6 +25,8 @@ interface UseSendMessageProps {
 
 interface SendMessageOptions {
   prompt: string;
+  /** Server-expanded steering action; `prompt` is then only the visible label. */
+  quickAction?: QuickAction;
   clearInput?: () => void;
 }
 
@@ -47,7 +50,7 @@ export function useSendMessage({
   );
 
   const sendMessage = useCallback(
-    async ({ prompt, clearInput }: SendMessageOptions) => {
+    async ({ prompt, quickAction, clearInput }: SendMessageOptions) => {
       if (!prompt.trim()) {
         return;
       }
@@ -62,6 +65,7 @@ export function useSendMessage({
           threadId,
           prompt,
           cardId,
+          quickAction,
         });
 
         // Clear input if callback provided
@@ -83,6 +87,7 @@ export function useSendMessage({
             code: code ?? 'UNKNOWN',
             message_chars: prompt.length,
             has_card_context: cardId !== undefined,
+            quick_action: quickAction?.kind,
           });
 
           switch (code) {
