@@ -474,5 +474,91 @@ describe("features/sentenceMetadata", () => {
       const after2 = await t.run(async (ctx) => ctx.db.get(textId));
       expect(after2?.addresseeGender).toBe(first);
     });
+
+    // Chat approval and custom-text creation insert their translations before
+    // any gender exists, leaving them unstamped — indistinguishable from the
+    // pre-field "legacy" rows the gender-drift sweep treats as suspect. The
+    // metadata step now finishes the record.
+    it("stamps the resolved gender onto translations inserted before it ran", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const translationId = await t.run(async (ctx) =>
+        ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "en",
+          translatedText: "Hello",
+          translationSource: "openai/gpt-5-chat-none",
+        }),
+      );
+
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: {
+            register: "neutral",
+            addresseeNumber: "singular",
+            speakerGender: "female",
+            addresseeGender: "neutral",
+          },
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        },
+      );
+
+      const row = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(row?.speakerGender).toBe("female");
+    });
+
+    // The retrier's second call can land a definitive gender that overturns
+    // the first call's coin flip. Text and translations must move together —
+    // otherwise the stamp would turn a "legacy" row into a "drifted" one.
+    it("re-stamps translations when a later definitive gender overturns the coin flip", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const translationId = await t.run(async (ctx) =>
+        ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "en",
+          translatedText: "Hello",
+          translationSource: "openai/gpt-5-chat-none",
+        }),
+      );
+
+      // Call 1: the unblock pass, no metadata → coin-flipped gender.
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: undefined,
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        },
+      );
+
+      // Call 2: metadata lands a definitive gender.
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: {
+            register: "neutral",
+            addresseeNumber: "singular",
+            speakerGender: "male",
+            addresseeGender: "neutral",
+          },
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        },
+      );
+
+      const text = await t.run(async (ctx) => ctx.db.get(textId));
+      const row = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(text?.audioSpeakerGender).toBe("male");
+      expect(row?.speakerGender).toBe("male");
+    });
   });
 });

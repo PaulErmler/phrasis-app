@@ -352,7 +352,8 @@ export const fetchSentenceMetadata = internalAction({
 
 /**
  * Patch the texts row with linguistic metadata, resolve audioSpeakerGender,
- * and (optionally) schedule prepareCardContent so audio is regenerated to match.
+ * stamp that gender onto the text's translations, and (optionally) schedule
+ * prepareCardContent so audio is regenerated to match.
  *
  * Idempotent: safe to call twice (once with `metadata: undefined` to unblock,
  * then again with real metadata after a retry success). The audioSpeakerGender
@@ -456,6 +457,34 @@ export const applyMetadataAndPrepareCard = internalMutation({
       audioSpeakerGender,
       ...metadataPatch,
     });
+
+    // Finish the record this step owns: stamp the resolved gender onto the
+    // translations that were inserted alongside the text.
+    //
+    // Chat approval and custom-text creation write their translation rows
+    // BEFORE any gender exists, so they landed unstamped — "legacy" to every
+    // consumer of `translations.speakerGender`. That is not what legacy means:
+    // these rows are current, and their gender is precisely the one resolved
+    // here (for chat cards the metadata LLM *infers* the gender by reading
+    // these very translations). Leaving them unstamped is what let the
+    // gender-drift sweep treat them as suspect.
+    //
+    // Re-stamped on every call, so the retry that lands a definitive gender
+    // keeps text and translations in agreement instead of turning "legacy"
+    // rows into "drifted" ones. Only rows that disagree are patched, so the
+    // common re-run writes nothing. Every caller of this mutation creates
+    // user-created cards (chat / manual / bulk import), whose wording is never
+    // regenerated — so the stamp records the card's gender rather than
+    // licensing a rewrite.
+    const translations = await ctx.db
+      .query('translations')
+      .withIndex('by_textId', (q) => q.eq('textId', args.textId))
+      .collect();
+    for (const translation of translations) {
+      if (translation.speakerGender !== audioSpeakerGender) {
+        await ctx.db.patch(translation._id, { speakerGender: audioSpeakerGender });
+      }
+    }
 
     if (args.schedulePrepareCard) {
       await ctx.scheduler.runAfter(
