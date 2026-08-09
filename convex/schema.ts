@@ -438,8 +438,10 @@ export default defineSchema({
     // a missing stamp is NEVER treated as stale (only a number strictly < the
     // current version is), so un-backfilled rows don't mass-regenerate. Rows
     // predating the versioning system were stamped to the baseline (v1) by a
-    // one-time backfill, so a later bump correctly marks them stale. User-provided / userCreated translations are
-    // skipped by the regen sweep regardless.
+    // one-time backfill, so a later bump correctly marks them stale. Rows that
+    // `mayRegenerateTranslation` (lib/translationProvenance.ts) protects —
+    // every row on a userCreated text, plus user-provided / curated-manual
+    // rows anywhere — are skipped by the sweep regardless of their stamp.
     translationVersion: v.optional(v.number()),
   })
     .index('by_textId', ['textId'])

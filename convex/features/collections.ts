@@ -31,10 +31,10 @@ import {
   isPremadeLevelCollection,
 } from '../lib/collections';
 import {
-  isProtectedTranslationSource,
   isTranslationVersionStale,
   resolveCardSpeakerGenders,
 } from '../../lib/languages';
+import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { deleteAudioRow } from '../lib/audio';
 import { hasActiveTtsClaim } from './ttsProcessing';
 import { getLlmClaim, isClaimFresh } from './llmTranslationQueue';
@@ -239,6 +239,7 @@ export const browseCollectionTexts = query({
       sourceText: row.text.text,
       sourceLanguage: row.text.language,
       sourceRomanization: row.text.romanizedText ?? undefined,
+      userCreated: row.text.userCreated,
     }));
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
@@ -250,18 +251,19 @@ export const browseCollectionTexts = query({
 
     const page = rows.map((row, i) => {
       const content = contentMap.get(String(i))!;
-      // Version-stale rows count as missing too (except on user-created
-      // texts, which are never version-swept): the client then routes them
+      // Version-stale rows count as missing too: the client then routes them
       // through requestPreviewTranslations, which regenerates them — so
       // browsing already upgrades translations to the current version
       // instead of deferring the delete+regen to the card-add sweep. The
       // stale text still ships in `translations` for display until the
-      // regenerated row lands.
+      // regenerated row lands. `versionStale` already carries the full
+      // `mayRegenerateTranslation` gate (user-created texts never report
+      // stale), so there is nothing to re-check here.
       const missingTranslationLanguages = content.translations
         .filter(
           (tr) =>
             tr.language !== row.text.language &&
-            (!tr.text || (!row.text.userCreated && tr.versionStale === true)),
+            (!tr.text || tr.versionStale === true),
         )
         .map((tr) => tr.language);
       return {
@@ -404,11 +406,10 @@ async function scheduleMissingTranslationsForText(
       // Version-stale rows regenerate here too, so browsing a collection
       // already upgrades its translations to the current version — otherwise
       // the card-add sweep (scheduleMissingContent) deletes exactly what the
-      // preview just showed. Same exemptions as that sweep: user-created
-      // texts and human-authored translations are never version-swept.
+      // preview just showed. Shares that sweep's provenance gate so the two
+      // can't disagree about what is regenerable.
       const isStale =
-        !text.userCreated &&
-        !isProtectedTranslationSource(existing.translationSource) &&
+        mayRegenerateTranslation(text, existing) &&
         isTranslationVersionStale(lang, existing.translationVersion);
       if (!isStale) continue;
       // Mirror the sweep's deferrals: never delete under an active TTS claim

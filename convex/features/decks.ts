@@ -40,9 +40,7 @@ import { EVENTS, track } from '../analytics';
 import { costForCharacters } from '../config/aiCosts';
 import { getRomanizationSource } from '../lib/localRomanization';
 import {
-  GOOGLE_TRANSLATE_SOURCE,
   ROMANIZATION_LANGUAGES,
-  isProtectedTranslationSource,
   DEFAULT_CONTENT_VERSION,
   getCurrentTranslationVersion,
   getCurrentTtsVersion,
@@ -50,6 +48,11 @@ import {
   isTranslationVersionStale,
   postProcessTranslation,
 } from '../../lib/languages';
+import {
+  GOOGLE_TRANSLATE_SOURCE,
+  isUserCreatedText,
+  mayRegenerateTranslation,
+} from '../../lib/translationProvenance';
 import { soundsSame } from '../lib/textComparison';
 import {
   deleteAudioRow,
@@ -491,8 +494,12 @@ export async function scheduleMissingContent(
   // evidence they're wrong, and a blanket invalidation would cause a regen
   // storm across the database.
   //
-  // User-provided translations are skipped unconditionally — the user picked
-  // the wording (and implicitly the gender) themselves.
+  // Content we may not touch is skipped unconditionally — see
+  // `mayRegenerateTranslation` (lib/translationProvenance.ts) for the rule:
+  // user-created cards in full, plus human-authored rows on premade texts.
+  // Note this gates the TEXT only; the audio validity loop above still runs
+  // for those cards, so a user-created card whose speaker gender changed gets
+  // a matching voice while keeping the wording the user chose.
   //
   // Skip when TTS is in flight: deleting now would race the pending write
   // and leave an audio row pointing at no translation. Defer to the next
@@ -504,19 +511,22 @@ export async function scheduleMissingContent(
   const sweptRegionVariants = new Map<string, string>();
   for (const [lang, translation] of translationMap) {
     if (!translation) continue;
-    // Human-authored rows (user-provided AND hand-curated) are never swept.
-    if (isProtectedTranslationSource(translation.translationSource)) continue;
+    // The one provenance gate for all three triggers below. Covers
+    // user-created (custom/chat) cards and human-authored rows alike — every
+    // regeneration site shares this predicate so none of them can drift out of
+    // agreement with the others.
+    if (!mayRegenerateTranslation(text, translation)) continue;
 
     const isLegacy = translation.speakerGender === undefined;
     const isDrifted = !isLegacy && translation.speakerGender !== audioSpeakerGender;
     const isLegacyAlongsideDriftedAudio = isLegacy && langsWithAudioGenderDrift.has(lang);
     // Version-stale translation: the language's `translationVersion` config was
-    // bumped above this row's stamp (a new model/prompt). Regenerate — but NEVER
-    // for user-created (custom/chat) texts, whose translations are user-owned.
+    // bumped above this row's stamp (a new model/prompt). Regenerate.
     // `isTranslationVersionStale` encodes the "undefined === current" rule.
-    const isVersionStale =
-      !text.userCreated &&
-      isTranslationVersionStale(lang, translation.translationVersion);
+    const isVersionStale = isTranslationVersionStale(
+      lang,
+      translation.translationVersion,
+    );
 
     if (!isDrifted && !isLegacyAlongsideDriftedAudio && !isVersionStale) continue;
     if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
@@ -737,6 +747,7 @@ export const getDeckCards = query({
           sourceText: text.text,
           sourceLanguage: text.language,
           sourceRomanization: text.romanizedText ?? undefined,
+          userCreated: text.userCreated,
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -2301,7 +2312,8 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     // translation row (and schedule orphan TTS) against a now-deleted text.
     // The LLM claim (if any) is released by the pool job's onComplete.
     // No-op in normal flow (text always exists).
-    if ((await ctx.db.get(args.textId)) === null) {
+    const text = await ctx.db.get(args.textId);
+    if (text === null) {
       return null;
     }
 
@@ -2323,6 +2335,19 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
       )
       .first();
+
+    // Backstop at the write choke point: no job may overwrite existing wording
+    // on a user-created card, whatever enqueued it. Callers already refuse to
+    // ask (`flagTranslation` short-circuits on user-created texts, and
+    // `updateEssentialGreetings` only targets premade rows), so this is
+    // defence in depth against a future caller.
+    //
+    // Deliberately scoped to the OVERWRITE: with no row on file the insert
+    // below still runs, because adding a language to a course must be able to
+    // fill a missing translation on a custom card.
+    if (existing && args.replaceExisting && isUserCreatedText(text)) {
+      return null;
+    }
 
     // Choke-point post-processing (idempotent — LLM/Google producers already
     // apply it upstream; this catches any path that didn't). The empty-string
