@@ -170,10 +170,7 @@ export async function upsertAudioAsset(
 }
 
 /**
- * Upsert the (textId, language) pointer row → `assetId`. When the row being
- * patched is a legacy payload row, its payload fields are cleared and its old
- * blob is scheduled for a delayed reference-checked delete (clients holding a
- * just-issued signed URL keep working through the grace window). When it was
+ * Upsert the (textId, language) pointer row → `assetId`. When the row was
  * pointing at a DIFFERENT asset (racing jobs under different keys), the old
  * asset is cleaned up if this row was its last pointer — nothing else
  * garbage-collects a pointerless asset.
@@ -194,45 +191,27 @@ export async function upsertAudioPointer(
     await ctx.db.insert('audioRecordings', { textId, language, assetId });
     return;
   }
-  const legacyStorageId = existing.storageId;
-  const previousAssetId =
-    existing.assetId !== assetId ? existing.assetId : undefined;
-  if (existing.assetId !== assetId || legacyStorageId !== undefined) {
-    await ctx.db.patch(existing._id, {
-      assetId,
-      voiceName: undefined,
-      storageId: undefined,
-      ttsQuality: undefined,
-      ttsProvider: undefined,
-      voiceGender: undefined,
-      speed: undefined,
-      wordTimings: undefined,
-      ttsVersion: undefined,
-    });
-  }
-  if (legacyStorageId !== undefined) {
-    await scheduleBlobSwapDelete(ctx, legacyStorageId);
-  }
-  if (previousAssetId !== undefined) {
-    const stillPointed = await ctx.db
-      .query('audioRecordings')
-      .withIndex('by_assetId', (q) => q.eq('assetId', previousAssetId))
-      .first();
-    if (!stillPointed) {
-      const previousAsset = await ctx.db.get(previousAssetId);
-      if (previousAsset) {
-        await ctx.db.delete(previousAsset._id);
-        await scheduleBlobSwapDelete(ctx, previousAsset.storageId);
-      }
+  if (existing.assetId === assetId) return;
+  const previousAssetId = existing.assetId;
+  await ctx.db.patch(existing._id, { assetId });
+  const stillPointed = await ctx.db
+    .query('audioRecordings')
+    .withIndex('by_assetId', (q) => q.eq('assetId', previousAssetId))
+    .first();
+  if (!stillPointed) {
+    const previousAsset = await ctx.db.get(previousAssetId);
+    if (previousAsset) {
+      await ctx.db.delete(previousAsset._id);
+      await scheduleBlobSwapDelete(ctx, previousAsset.storageId);
     }
   }
 }
 
 /**
  * Schedule the delayed reference-checked delete for a blob that was just
- * superseded (asset in-place swap, legacy row repoint, deduped migration
- * loser). The job checks both `by_storageId` indexes at fire time, so a blob
- * that is still referenced anywhere simply survives.
+ * superseded (asset in-place swap, orphaned-asset cleanup). The job re-checks
+ * `audioAssets.by_storageId` at fire time, so a blob that is still (or again)
+ * referenced simply survives.
  */
 export async function scheduleBlobSwapDelete(
   ctx: MutationCtx,
@@ -246,22 +225,21 @@ export async function scheduleBlobSwapDelete(
 }
 
 /**
- * The audio a row actually plays, whether it is a pointer row (asset payload)
- * or a legacy payload row. `null` means the row carries no usable audio (a
- * dangling pointer or malformed legacy row) — callers should treat the row as
- * missing audio and let the sweep heal it.
+ * The audio a row actually plays — its asset's payload. `null` means the row
+ * carries no usable audio (a dangling pointer whose asset is gone) — callers
+ * should treat the row as missing audio and let the sweep heal it.
  */
 export interface ResolvedAudioPayload {
   storageId: Id<'_storage'>;
   voiceName: string;
   ttsQuality: 'unknown' | 'validated' | 'unvalidated' | undefined;
   ttsProvider: TtsProvider | undefined;
-  voiceGender: VoiceGender | undefined;
-  speed: number | undefined;
+  voiceGender: VoiceGender;
+  speed: number;
   wordTimings: { word: string; start: number; end: number }[] | undefined;
   ttsVersion: number | undefined;
-  /** The backing asset, when the row is a pointer row. */
-  asset: Doc<'audioAssets'> | null;
+  /** The backing asset. */
+  asset: Doc<'audioAssets'>;
 }
 
 /**
@@ -269,43 +247,26 @@ export interface ResolvedAudioPayload {
  * assets themselves (one deduped `db.get` round per batch).
  */
 export function audioPayloadFromRowAndAsset(
-  row: Doc<'audioRecordings'>,
   asset: Doc<'audioAssets'> | null,
 ): ResolvedAudioPayload | null {
-  if (row.assetId !== undefined) {
-    if (!asset) return null;
-    return {
-      storageId: asset.storageId,
-      voiceName: asset.voiceName,
-      ttsQuality: asset.ttsQuality,
-      ttsProvider: asset.ttsProvider,
-      voiceGender: asset.voiceGender,
-      speed: asset.speed,
-      wordTimings: asset.wordTimings,
-      ttsVersion: asset.ttsVersion,
-      asset,
-    };
-  }
-  if (row.storageId === undefined || row.voiceName === undefined) return null;
+  if (!asset) return null;
   return {
-    storageId: row.storageId,
-    voiceName: row.voiceName,
-    ttsQuality: row.ttsQuality,
-    ttsProvider: row.ttsProvider,
-    voiceGender: row.voiceGender,
-    speed: row.speed,
-    wordTimings: row.wordTimings,
-    ttsVersion: row.ttsVersion,
-    asset: null,
+    storageId: asset.storageId,
+    voiceName: asset.voiceName,
+    ttsQuality: asset.ttsQuality,
+    ttsProvider: asset.ttsProvider,
+    voiceGender: asset.voiceGender,
+    speed: asset.speed,
+    wordTimings: asset.wordTimings,
+    ttsVersion: asset.ttsVersion,
+    asset,
   };
 }
 
-/** Resolve one row's audio payload, fetching its asset if needed. */
+/** Resolve one row's audio payload, fetching its asset. */
 export async function resolveAudioPayload(
   ctx: QueryCtx,
   row: Doc<'audioRecordings'>,
 ): Promise<ResolvedAudioPayload | null> {
-  const asset =
-    row.assetId !== undefined ? await ctx.db.get(row.assetId) : null;
-  return audioPayloadFromRowAndAsset(row, asset);
+  return audioPayloadFromRowAndAsset(await ctx.db.get(row.assetId));
 }

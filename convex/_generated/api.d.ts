@@ -53,6 +53,8 @@ import type * as features_chat_agent from "../features/chat/agent.js";
 import type * as features_chat_cardApprovals from "../features/chat/cardApprovals.js";
 import type * as features_chat_constants from "../features/chat/constants.js";
 import type * as features_chat_messages from "../features/chat/messages.js";
+import type * as features_chat_promptSections from "../features/chat/promptSections.js";
+import type * as features_chat_quickActions from "../features/chat/quickActions.js";
 import type * as features_chat_threads from "../features/chat/threads.js";
 import type * as features_chat_transcribe from "../features/chat/transcribe.js";
 import type * as features_collections from "../features/collections.js";
@@ -114,6 +116,7 @@ import type * as migrations_updateEssentialGreetings from "../migrations/updateE
 import type * as posthog from "../posthog.js";
 import type * as rateLimiter from "../rateLimiter.js";
 import type * as retrier from "../retrier.js";
+import type * as tests_lib_audioFixtures from "../tests/lib/audioFixtures.js";
 import type * as tests_lib_drainScheduler from "../tests/lib/drainScheduler.js";
 import type * as types from "../types.js";
 import type * as usage_actions from "../usage/actions.js";
@@ -175,6 +178,8 @@ declare const fullApi: ApiFromModules<{
   "features/chat/cardApprovals": typeof features_chat_cardApprovals;
   "features/chat/constants": typeof features_chat_constants;
   "features/chat/messages": typeof features_chat_messages;
+  "features/chat/promptSections": typeof features_chat_promptSections;
+  "features/chat/quickActions": typeof features_chat_quickActions;
   "features/chat/threads": typeof features_chat_threads;
   "features/chat/transcribe": typeof features_chat_transcribe;
   "features/collections": typeof features_collections;
@@ -236,6 +241,7 @@ declare const fullApi: ApiFromModules<{
   posthog: typeof posthog;
   rateLimiter: typeof rateLimiter;
   retrier: typeof retrier;
+  "tests/lib/audioFixtures": typeof tests_lib_audioFixtures;
   "tests/lib/drainScheduler": typeof tests_lib_drainScheduler;
   types: typeof types;
   "usage/actions": typeof usage_actions;

@@ -53,6 +53,23 @@ describe("useSendMessage", () => {
     expect(onSuccess).toHaveBeenCalled();
   });
 
+  it("forwards quickAction to the mutation", async () => {
+    mutationMock.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useSendMessage({ threadId: "t1" }));
+    await act(async () => {
+      await result.current.sendMessage({
+        prompt: "Grammar",
+        quickAction: { kind: "grammar" },
+      });
+    });
+    expect(mutationMock).toHaveBeenCalledWith({
+      threadId: "t1",
+      prompt: "Grammar",
+      cardId: undefined,
+      quickAction: { kind: "grammar" },
+    });
+  });
+
   it("handles USAGE_LIMIT ConvexError", async () => {
     mutationMock.mockRejectedValue(
       new ConvexError({ code: "USAGE_LIMIT", featureId: "chat" }),

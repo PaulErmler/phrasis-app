@@ -8,8 +8,10 @@ import type { Id } from "../../_generated/dataModel";
 import { PROGRESS_DISPLAY_INTERVAL } from "../../../lib/constants/learning";
 import { llmPool } from "@/convex/lib/workpools";
 import { CLAIM_STALE_MS } from "../../features/llmTranslationQueue";
+import { resolveAudioPayload } from "../../lib/audioAssets";
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+import { insertAudioFixture } from '../lib/audioFixtures';
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
@@ -289,15 +291,17 @@ describe("features/scheduling", () => {
           const storageId = await ctx.storage.store(
             new Blob([new Uint8Array([1, 2, 3])]),
           );
-          audioIds[lang] = await ctx.db.insert("audioRecordings", {
-            textId,
-            language: lang,
-            voiceName: `${lang}-voice`,
-            storageId,
-            ttsQuality: "validated",
-            ttsProvider: "google",
-            voiceGender: "female",
-          });
+          audioIds[lang] = (
+            await insertAudioFixture(ctx, {
+              textId,
+              language: lang,
+              voiceName: `${lang}-voice`,
+              storageId,
+              ttsQuality: "validated",
+              ttsProvider: "google",
+              voiceGender: "female",
+            })
+          ).rowId;
         }
         const cardId = await ctx.db.insert("cards", {
           deckId,
@@ -739,13 +743,14 @@ describe("features/scheduling", () => {
           const sharedBlob = await ctx.storage.store(
             new Blob([new Uint8Array([1, 2, 3])]),
           );
-          const audioId = await ctx.db.insert("audioRecordings", {
-            textId,
-            language: "es",
-            voiceName: "es-test-voice",
-            storageId: sharedBlob,
-            voiceGender: "female",
-          });
+          const { assetId: sharedAssetId, rowId: audioId } =
+            await insertAudioFixture(ctx, {
+              textId,
+              language: "es",
+              voiceName: "es-test-voice",
+              storageId: sharedBlob,
+              voiceGender: "female",
+            });
           // Second text + card sharing the same blob.
           const otherTextId = await ctx.db.insert("texts", {
             text: "Hola dos",
@@ -765,12 +770,12 @@ describe("features/scheduling", () => {
             schedulingPhase: "preReview",
             preReviewCount: 0,
           });
-          const otherAudioId = await ctx.db.insert("audioRecordings", {
+          // Second text shares the same ASSET (the post-narrow sharing shape).
+          const { rowId: otherAudioId } = await insertAudioFixture(ctx, {
             textId: otherTextId,
             language: "es",
-            voiceName: "es-test-voice",
             storageId: sharedBlob,
-            voiceGender: "female",
+            assetId: sharedAssetId,
           });
           return { trId, audioId, sharedBlob, otherTextId, otherAudioId };
         });
@@ -853,15 +858,15 @@ describe("features/scheduling", () => {
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array([1, 2, 3])]),
         );
-        const audioId = await ctx.db.insert("audioRecordings", {
+        const { rowId: audioId } = await insertAudioFixture(ctx, {
           textId,
           language: "sv",
           // Use the current Swedish provider (Gemini) so the row survives the
           // precedence sweep on the copied textId — `gemini` sits at the top of
           // lib/ttsPrecedence.ts (it overrides google/azure/elevenlabs and
           // nothing overrides it), so a google/azure row here would be deleted
-          // and regenerated. The test's intent is to verify copy preserves all
-          // fields, not the regen logic.
+          // and regenerated. The test's intent is to verify the copy shares
+          // the asset (payload travels with it), not the regen logic.
           voiceName: "Kore",
           storageId,
           ttsQuality: "validated",
@@ -920,15 +925,16 @@ describe("features/scheduling", () => {
       const replacement = allCards.find((c) => c.textId !== oldTextId);
       expect(replacement, "a replacement card should exist").toBeTruthy();
       const newTextId = replacement!.textId;
-      const audio = await t.run(async (ctx) =>
-        ctx.db
+      const audio = await t.run(async (ctx) => {
+        const row = await ctx.db
           .query("audioRecordings")
           .withIndex("by_text_and_language", (q) =>
             q.eq("textId", newTextId).eq("language", "sv"),
           )
-          .first(),
-      );
-      // Every field from the source row must be preserved on the copy.
+          .first();
+        return row ? resolveAudioPayload(ctx, row) : null;
+      });
+      // The copy shares the asset, so the resolved payload is identical.
       expect(audio, "audio row was not copied for unchanged language").toBeTruthy();
       expect(audio?.voiceName).toBe("Kore");
       expect(audio?.ttsQuality).toBe("validated");
@@ -998,14 +1004,15 @@ describe("features/scheduling", () => {
       const newText = await t.run(async (ctx) => ctx.db.get(newTextId));
       expect(newText?.text).toBe("Hej!");
 
-      const svAudio = await t.run(async (ctx) =>
-        ctx.db
+      const svAudio = await t.run(async (ctx) => {
+        const row = await ctx.db
           .query("audioRecordings")
           .withIndex("by_text_and_language", (q) =>
             q.eq("textId", newTextId).eq("language", "sv"),
           )
-          .first(),
-      );
+          .first();
+        return row ? resolveAudioPayload(ctx, row) : null;
+      });
       expect(
         svAudio,
         "punctuation-only sv edit must keep (copy) its audio",
@@ -1209,7 +1216,7 @@ describe("features/scheduling", () => {
           romanizationSource: "google-v3",
           translationSource: "google/gemini-3.1-flash-lite-preview-none",
         });
-        const svAudioId = await ctx.db.insert("audioRecordings", {
+        const { rowId: svAudioId } = await insertAudioFixture(ctx, {
           textId,
           language: "sv",
           voiceName: "Kore",
@@ -1222,7 +1229,7 @@ describe("features/scheduling", () => {
           speed: 0.9,
           wordTimings: [{ word: "Hej", start: 0, end: 0.5 }],
         });
-        const enAudioId = await ctx.db.insert("audioRecordings", {
+        const { rowId: enAudioId } = await insertAudioFixture(ctx, {
           textId,
           language: "en",
           voiceName: "Leda",
@@ -1309,10 +1316,11 @@ describe("features/scheduling", () => {
         expect(tr?.speakerGender).toBe("female");
 
         // Audio: the audibly-changed en row is deleted in place; the
-        // untouched sv row keeps its _id and every field.
+        // untouched sv row keeps its _id and its asset payload.
         expect(await ctx.db.get(enAudioId)).toBeNull();
-        const sv = await ctx.db.get(svAudioId);
-        expect(sv).not.toBeNull();
+        const svRow = await ctx.db.get(svAudioId);
+        expect(svRow).not.toBeNull();
+        const sv = await resolveAudioPayload(ctx, svRow!);
         expect(sv?.voiceName).toBe("Kore");
         expect(sv?.speed).toBe(0.9);
         expect(sv?.wordTimings).toEqual([{ word: "Hej", start: 0, end: 0.5 }]);
@@ -1361,8 +1369,9 @@ describe("features/scheduling", () => {
 
         // Audio: the audibly-changed sv row is deleted; en keeps its row.
         expect(await ctx.db.get(svAudioId)).toBeNull();
-        const en = await ctx.db.get(enAudioId);
-        expect(en).not.toBeNull();
+        const enRow = await ctx.db.get(enAudioId);
+        expect(enRow).not.toBeNull();
+        const en = await resolveAudioPayload(ctx, enRow!);
         expect(en?.voiceName).toBe("Leda");
       });
     });
@@ -2500,7 +2509,7 @@ describe("features/scheduling", () => {
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array([1, 2, 3])]),
         );
-        const audioId = await ctx.db.insert("audioRecordings", {
+        const { rowId: audioId } = await insertAudioFixture(ctx, {
           textId,
           language: "en",
           voiceName: "en-US-test",
@@ -2862,15 +2871,17 @@ describe("features/scheduling", () => {
           const storageId = await ctx.storage.store(
             new Blob([new Uint8Array([1, 2, 3])]),
           );
-          audioIds[lang] = await ctx.db.insert("audioRecordings", {
-            textId,
-            language: lang,
-            voiceName: `${lang}-test`,
-            storageId,
-            ttsQuality: "validated",
-            ttsProvider: "google",
-            voiceGender: "female",
-          });
+          audioIds[lang] = (
+            await insertAudioFixture(ctx, {
+              textId,
+              language: lang,
+              voiceName: `${lang}-test`,
+              storageId,
+              ttsQuality: "validated",
+              ttsProvider: "google",
+              voiceGender: "female",
+            })
+          ).rowId;
         }
         const cardId = await ctx.db.insert("cards", {
           deckId,

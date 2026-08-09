@@ -4,6 +4,7 @@ import { useSendMessage } from '@/hooks/use-send-message';
 import { useVoiceRecording } from '@/hooks/use-voice-recording';
 import type { ChatStatus, ExtendedUIMessage } from '@/lib/types/chat';
 import type { Id } from '@/convex/_generated/dataModel';
+import type { QuickAction } from '@/convex/features/chat/quickActions';
 
 interface UseChatOptions {
   threadId: string;
@@ -19,6 +20,7 @@ interface UseChatReturn {
   text: string;
   setText: (text: string) => void;
   sendMessage: (prompt?: string) => Promise<void>;
+  sendQuickAction: (action: QuickAction, label: string) => Promise<void>;
   voice: {
     isRecording: boolean;
     isTranscribing: boolean;
@@ -62,6 +64,14 @@ export function useChat({ threadId, cardId, onUsageLimit, onThreadLimit }: UseCh
     [text, sendMessageRaw],
   );
 
+  const sendQuickAction = useCallback(
+    async (action: QuickAction, label: string) => {
+      if (!label.trim()) return;
+      await sendMessageRaw({ prompt: label, quickAction: action });
+    },
+    [sendMessageRaw],
+  );
+
   return {
     messages,
     status,
@@ -69,6 +79,7 @@ export function useChat({ threadId, cardId, onUsageLimit, onThreadLimit }: UseCh
     text,
     setText,
     sendMessage,
+    sendQuickAction,
     voice: {
       isRecording,
       isTranscribing,

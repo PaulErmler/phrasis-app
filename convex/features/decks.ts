@@ -90,8 +90,9 @@ import {
 import {
   LEGACY_LEVEL_ORDER,
   collectionRemaining,
+  effectiveTextCount,
+  isCollectionComplete,
   isPremadeLevelCollection,
-  settledCount,
 } from '../lib/collections';
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import { consumeQuota, checkQuota } from '../usage/helpers';
@@ -401,10 +402,10 @@ export async function scheduleMissingContent(
 
   // Validate audio rows — delete stale ones (missing blob, gender drift,
   // superseded provider, bumped ttsVersion). All checks read the row's
-  // RESOLVED payload (the shared `audioAssets` row for pointer rows, own
-  // fields for legacy rows). Deleting a pointer row leaves a still-shared
-  // asset untouched; the re-synthesis a stale asset triggers patches that
-  // asset in place, healing every other text sharing the string at once.
+  // RESOLVED payload (the shared `audioAssets` row). Deleting a pointer row
+  // leaves a still-shared asset untouched; the re-synthesis a stale asset
+  // triggers patches that asset in place, healing every other text sharing
+  // the string at once.
   // Do not delete while TTS is in flight: `processTTSForCard` may have
   // attached a row whose URL is not yet resolvable, or concurrent cleanup
   // would remove the row while later validation updates expect it to exist
@@ -417,8 +418,8 @@ export async function scheduleMissingContent(
     if (!audio) continue;
     const payload = await resolveAudioPayload(ctx, audio);
     if (!payload) {
-      // Dangling pointer or malformed legacy row — no usable audio behind
-      // this row. Remove it so the enqueue loop below refills the language.
+      // Dangling pointer (asset gone) — no usable audio behind this row.
+      // Remove it so the enqueue loop below refills the language.
       if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
       await deleteAudioRow(ctx, audio, { blobAlreadyGone: true });
       audioMap.set(lang, null);
@@ -434,17 +435,10 @@ export async function scheduleMissingContent(
       await deleteAudioRow(ctx, audio, { blobAlreadyGone: true });
       audioMap.set(lang, null);
     } else {
-      // Prefer the persisted gender; fall back to curated-list lookup for
-      // legacy rows written before voiceGender existed.
-      const storedGender =
-        payload.voiceGender ?? getVoiceGenderByApiCode(payload.voiceName);
-      // Unknown gender is itself a regenerate trigger — we can't trust the
-      // audio to match the card's speakerGender, so rebuild it.
       const genderMismatch =
-        storedGender === undefined ||
-        ((audioSpeakerGender === 'male' || audioSpeakerGender === 'female') &&
-          storedGender !== audioSpeakerGender);
-      // Rows predating this field are legacy Google audio; treat as 'google'.
+        (audioSpeakerGender === 'male' || audioSpeakerGender === 'female') &&
+        payload.voiceGender !== audioSpeakerGender;
+      // Assets carried over from pre-provider-field audio are legacy Google.
       const existingProvider = payload.ttsProvider ?? 'google';
       const currentProvider = getTtsProviderForLanguage(lang);
       // Provider regen is now gated by lib/ttsPrecedence.ts — only the
@@ -828,7 +822,10 @@ export const getCollectionProgress = query({
           cardsAdded: progress?.cardsAdded ?? 0,
           ignoredCount: progress?.ignoredCount ?? 0,
           prioritizedCount: progress?.prioritizedCount ?? 0,
-          totalTexts: collection.textCount,
+          // Carry-widened, exactly like getHomeSummary: `cardsAdded` already
+          // contains the cutover credit, so the raw textCount would make
+          // `collectionRemaining` read 0 on a level that still has texts.
+          totalTexts: effectiveTextCount(collection.textCount, progress),
           order: collection.order,
         };
       }),
@@ -931,18 +928,26 @@ export const setActiveCollection = mutation({
     const collection = await ctx.db.get(args.collectionId);
     if (!collection) throw new ConvexError('Collection not found');
 
+    const courseSettings = await getCourseSettings(ctx, courseId);
+
     const isLevelCollection = isPremadeLevelCollection(collection);
     if (!isLevelCollection) {
-      const courseSettings = await getCourseSettings(ctx, courseId);
       const isChatCollection =
-        courseSettings?.chatCollectionId?.toString() === args.collectionId.toString();
-      const isCustomCollection = (courseSettings?.activeCustomCollectionIds ?? []).some(
-        (id) => id.toString() === args.collectionId.toString(),
-      );
+        courseSettings?.chatCollectionId === args.collectionId;
+      const isCustomCollection = (
+        courseSettings?.activeCustomCollectionIds ?? []
+      ).includes(args.collectionId);
       if (!isChatCollection && !isCustomCollection) {
         throw new ConvexError('Collection not accessible');
       }
     }
+
+    // Re-selecting the collection that's already active is a no-op, not an
+    // error: `setCollectionTextMark` can complete a collection (via
+    // `ignoredCount`) without running auto-advance, leaving it complete AND
+    // still active — the guard below would then reject a click that changes
+    // nothing.
+    if (courseSettings?.activeCollectionId === args.collectionId) return null;
 
     const progress = await getCollectionProgressHelper(
       ctx,
@@ -951,8 +956,15 @@ export const setActiveCollection = mutation({
       args.collectionId,
     );
 
-    // Complete = every text either added or deliberately ignored.
-    if (progress && settledCount(progress) >= collection.textCount) {
+    // Complete = every text either added or deliberately ignored, counted
+    // against the carry-widened total so this matches the predicate the UI
+    // uses to decide whether to offer the button at all (empty collections
+    // included — there's nothing to finish, so selecting one isn't an error).
+    if (
+      progress &&
+      effectiveTextCount(collection.textCount, progress) > 0 &&
+      isCollectionComplete(collection.textCount, progress)
+    ) {
       throw new ConvexError('This collection is already complete');
     }
 
@@ -1393,7 +1405,7 @@ async function maybeAutoAdvanceActiveCollection(
     courseId,
     collectionId,
   );
-  if (settledCount(progress) < collection.textCount) return;
+  if (!isCollectionComplete(collection.textCount, progress)) return;
   const latestSettings = await getCourseSettings(ctx, courseId);
   if (
     latestSettings?.activeCollectionId?.toString() !== collectionId.toString()
@@ -1500,8 +1512,13 @@ export const addCardsFromCollection = mutation({
         const prog = await getCollectionProgressHelper(ctx, userId, courseId, collId);
         const lastRank = prog?.lastRankProcessed ?? 0;
         // Ignored texts are deliberately excluded from auto-add, so they
-        // don't count as pending.
-        const pending = collectionRemaining(coll.textCount, prog);
+        // don't count as pending. (Custom collections never carry cutover
+        // credit, so widening here is a no-op — it just keeps every
+        // `collectionRemaining` call on the effective total.)
+        const pending = collectionRemaining(
+          effectiveTextCount(coll.textCount, prog),
+          prog,
+        );
         if (pending > 0) {
           collectionsWithPending.push({
             id: collId,

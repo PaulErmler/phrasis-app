@@ -52,6 +52,12 @@ function cleanWord(display: string): string {
 interface AskAboutWordProps {
   /** The sentence word the popover asks about (punctuation is stripped). */
   word: string;
+  /**
+   * BCP-47 code of the word's language. Sent with the quick action so the
+   * tutor knows whether the clicked word is base or target language (a
+   * base-language word gets explained via its target-language equivalents).
+   */
+  language: string;
   className?: string;
   children: ReactNode;
   /** Controlled open state — pass both to share open-state across words
@@ -72,6 +78,7 @@ interface AskAboutWordProps {
  */
 export function AskAboutWord({
   word,
+  language,
   className,
   children,
   open: openProp,
@@ -120,20 +127,53 @@ export function AskAboutWord({
       <PopoverContent
         className="w-auto p-1"
         side="top"
-        align="center"
+        align="start"
         sideOffset={6}
       >
-        <Button
-          size="sm"
-          variant="secondary"
-          data-testid="ask-ai-button"
-          onClick={() => {
-            chatContext.openChatWithPrompt(t('explainWord', { word: cleaned }));
-            setOpen(false);
-          }}
-        >
-          {t('askAI')}
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="secondary"
+            data-testid="ask-ai-button"
+            onClick={() => {
+              chatContext.openChatWithAction(
+                { kind: 'explainWord', word: cleaned, language },
+                t('wordActions.explain.message', { word: cleaned }),
+              );
+              setOpen(false);
+            }}
+          >
+            {t('wordActions.explain.label')}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="word-synonyms-button"
+            onClick={() => {
+              chatContext.openChatWithAction(
+                { kind: 'synonyms', word: cleaned, language },
+                t('wordActions.synonyms.message', { word: cleaned }),
+              );
+              setOpen(false);
+            }}
+          >
+            {t('wordActions.synonyms.label')}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="word-antonyms-button"
+            onClick={() => {
+              chatContext.openChatWithAction(
+                { kind: 'antonyms', word: cleaned, language },
+                t('wordActions.antonyms.message', { word: cleaned }),
+              );
+              setOpen(false);
+            }}
+          >
+            {t('wordActions.antonyms.label')}
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -244,6 +284,7 @@ export function ClickableWords({
           {w.leading}
           <AskAboutWord
             word={w.display}
+            language={language}
             open={openIndex === i}
             onOpenChange={(open) => setOpenIndex(open ? i : null)}
             coachmarkAnchor={

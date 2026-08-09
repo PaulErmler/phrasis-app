@@ -15,6 +15,19 @@ export const isAuthError = (error: unknown) => {
 };
 
 /**
+ * The human-readable text a `ConvexError` carries in a plain-string `data`
+ * payload. Prefer this over `error.message` when toasting a server error:
+ * `message` arrives on the client wrapped as
+ * `"[Request ID: …] Server Error\nUncaught ConvexError: …"`. Returns
+ * `undefined` for anything else, so call sites can fall back to their own
+ * localized copy.
+ */
+export const convexErrorMessage = (error: unknown): string | undefined =>
+  error instanceof ConvexError && typeof error.data === 'string'
+    ? error.data
+    : undefined;
+
+/**
  * Extracts the `code` field from a `ConvexError`'s structured data payload.
  * Returns `undefined` for non-ConvexErrors and for ConvexErrors whose data
  * is a plain string (or otherwise lacks a `code` field).

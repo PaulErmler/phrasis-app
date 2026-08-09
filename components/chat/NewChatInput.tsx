@@ -40,7 +40,7 @@ interface NewChatInputProps {
  */
 export function NewChatInput({
   className,
-  showSuggestions = true,
+  showSuggestions = false,
   autoFocus = false,
   onChatCreated,
 }: NewChatInputProps) {

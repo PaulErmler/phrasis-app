@@ -54,8 +54,8 @@ import {
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
 import {
   cardOriginPillFields,
+  isCollectionComplete,
   originsForFilter,
-  settledCount,
 } from '../lib/collections';
 import {
   FREE_PLAY_MODES,
@@ -487,7 +487,7 @@ async function hasPendingCustomCardsToAdd(
     if (!coll) continue;
     const prog = await getCollectionProgress(ctx, userId, courseId, collId);
     // Ignored texts are excluded from auto-add, so they aren't pending.
-    if (coll.textCount > settledCount(prog)) return true;
+    if (!isCollectionComplete(coll.textCount, prog)) return true;
   }
   return false;
 }
@@ -1886,33 +1886,12 @@ export const editCard = mutation({
           )
           .take(20);
         for (const row of audioRows) {
-          if (row.assetId !== undefined) {
-            // Pointer row: the copy shares the same asset — staleness (the
-            // asset's ttsVersion stamp) travels with the asset itself.
-            await ctx.db.insert('audioRecordings', {
-              textId: newTextId,
-              language: row.language,
-              assetId: row.assetId,
-            });
-            continue;
-          }
+          // The copy shares the same asset — staleness (the asset's
+          // ttsVersion stamp) travels with the asset itself.
           await ctx.db.insert('audioRecordings', {
             textId: newTextId,
             language: row.language,
-            voiceName: row.voiceName,
-            storageId: row.storageId,
-            ttsQuality: row.ttsQuality,
-            ttsProvider: row.ttsProvider,
-            voiceGender: row.voiceGender,
-            speed: row.speed,
-            wordTimings: row.wordTimings,
-            // Carry the SOURCE row's ttsVersion stamp on the copy. Without it the
-            // copy lands undefined ("=== current, never stale") and permanently
-            // escapes the version sweep — so genuinely-stale source audio (e.g. a
-            // pt_pt row stamped below the bumped ttsVersion) would be laundered
-            // onto the new text and never regenerate. Copying the source stamp
-            // (not the current version) preserves staleness so it regenerates.
-            ...(row.ttsVersion !== undefined ? { ttsVersion: row.ttsVersion } : {}),
+            assetId: row.assetId,
           });
         }
       }

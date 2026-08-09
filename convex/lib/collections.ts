@@ -77,12 +77,52 @@ export function settledCount(
  * "complete" checks deliberately differ between UI and backend — UI requires
  * `totalTexts > 0`, backend treats an empty collection as complete — so
  * completeness stays expressed at the call sites via `settledCount`/this.
+ *
+ * `totalTexts` must already be the EFFECTIVE total (see
+ * `effectiveTextCount`); callers holding a raw `collections.textCount` have
+ * to widen it first, or a cutover user's carry credit makes this read 0 while
+ * texts remain.
  */
 export function collectionRemaining(
   totalTexts: number,
   progress?: { cardsAdded?: number; ignoredCount?: number } | null,
 ): number {
   return Math.max(0, totalTexts - settledCount(progress));
+}
+
+/**
+ * Texts a user must settle to finish a collection: the collection's own texts
+ * plus the legacy credit rolled forward at OGTE cutover, which
+ * `datasetMigration_cutoverUser` bakes into `cardsAdded` (and mirrors into
+ * `legacyCarryAdded`) so the user doesn't restart each tier from zero.
+ *
+ * Every completeness check — backend guards and UI denominators alike — must
+ * use this instead of the raw `collections.textCount`. Comparing a carried
+ * `settledCount` against the raw count declares a level complete
+ * `legacyCarryAdded` texts too early, which is exactly how the home view
+ * (widened denominator) and `setActiveCollection` (raw denominator) came to
+ * disagree about whether a level was finished.
+ */
+export function effectiveTextCount(
+  textCount: number,
+  progress?: { legacyCarryAdded?: number } | null,
+): number {
+  return textCount + (progress?.legacyCarryAdded ?? 0);
+}
+
+/**
+ * Backend completeness: every text either added or deliberately ignored,
+ * measured against the carry-widened total. An empty collection counts as
+ * complete so auto-advance skips it — the UI's own predicate additionally
+ * requires `totalTexts > 0`, see the note on `collectionRemaining`.
+ */
+export function isCollectionComplete(
+  textCount: number,
+  progress?:
+    | { cardsAdded?: number; ignoredCount?: number; legacyCarryAdded?: number }
+    | null,
+): boolean {
+  return settledCount(progress) >= effectiveTextCount(textCount, progress);
 }
 
 /**
