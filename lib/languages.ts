@@ -721,6 +721,27 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationVersion: 2,
   },
   {
+    code: 'bg',
+    displayCode: 'bg',
+    regionLabel: 'Bulgaria',
+    geminiBcp47: 'bg-BG',
+    // No `azureSttLocale`: the symmetric default resolves to `bg-BG`, which is
+    // in Azure Fast Transcription's supported list. Worth a live probe before
+    // the language ships — the docs table has been wrong before (see sw_tz).
+    romanizationBackend: 'google-v3',
+    name: 'Bulgarian',
+    nativeName: 'Български',
+    flag: '🇧🇬',
+    category: 'slavic',
+    llmSupportTier: 'tier2',
+    ttsProvider: 'gemini',
+    needsRomanization: true,
+    // Cyrillic — karaoke off (non-Latin script policy, matches ru/uk/sr).
+    supportsKaraoke: false,
+    supportsStt: true,
+    experimental: true,
+  },
+  {
     code: 'lt',
     displayCode: 'lt',
     regionLabel: 'Lithuania',

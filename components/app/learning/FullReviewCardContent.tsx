@@ -21,6 +21,7 @@ import {
 import { DiffDisplay } from './DiffDisplay';
 import { computeAccuracyPair, type AccuracyPair } from '@/lib/textCompare';
 import { ClickableWords } from './ClickableWords';
+import { useLearningChatToggle } from './LearningChatLayout';
 import {
   getLanguageByCode,
   getLocalizedLanguageNameByCode,
@@ -812,6 +813,10 @@ function TargetLanguageInput({
 }: TargetLanguageInputProps) {
   const isActive = activeClip?.language === translation.language;
   const t = useTranslations('LearningMode');
+  const tChat = useTranslations('Chat');
+  // Nullable — absent outside learning mode (e.g. landing demo); the Discuss
+  // button simply doesn't render then.
+  const chatContext = useLearningChatToggle();
   const { compositionProps, isComposingEvent } = useImeSafeEnter();
   const [showClean, setShowClean] = useState(false);
   const autoPlayAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -939,6 +944,38 @@ function TargetLanguageInput({
 
   const hasUserText = !!state.userText.trim();
 
+  const handleDiscuss = useCallback(() => {
+    if (!chatContext) return;
+    const attempt = state.userText.trim();
+    // Full attempt goes in the payload; the visible bubble label is truncated
+    // so it can never trip the message length limit.
+    const attemptLabel =
+      attempt.length > 120 ? `${attempt.slice(0, 120)}…` : attempt;
+    chatContext.openChatWithAction(
+      {
+        kind: 'discussAnswer',
+        userAnswer: attempt,
+        expected: translation.text,
+        language: translation.language,
+      },
+      tChat('discuss.message', { attempt: attemptLabel }),
+    );
+  }, [chatContext, state.userText, translation.text, translation.language, tChat]);
+
+  const discussButton =
+    hasUserText && chatContext ? (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-auto px-2 py-1 text-xs text-primary"
+        data-testid="discuss-answer-button"
+        onClick={handleDiscuss}
+      >
+        {tChat('discuss.label')}
+      </Button>
+    ) : null;
+
   if (allRevealed && !state.submitted) {
     return (
       <div
@@ -971,13 +1008,14 @@ function TargetLanguageInput({
                 ignorePunctuation={ignorePunctuation}
               />
             </div>
-            <div className="flex shrink-0 gap-2 pt-0.5">
+            <div className="flex shrink-0 flex-col items-end gap-2 pt-0.5">
               <ShowCleanToggle
                 showClean={showClean}
                 onToggle={() => setShowClean((v) => !v)}
                 showCorrectionsLabel={t('showCorrections')}
                 showSentenceLabel={t('showSentence')}
               />
+              {discussButton}
             </div>
           </div>
         ) : (
@@ -1045,29 +1083,32 @@ function TargetLanguageInput({
               />
             )}
           </div>
-          <div className="flex shrink-0 gap-2 pt-0.5">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={onRevert}
-                  className="h-9 w-9 shrink-0"
-                  aria-label={revertLabel}
-                >
-                  <Undo2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">{revertTooltip}</TooltipContent>
-            </Tooltip>
-            {hasUserText && (
-              <ShowCleanToggle
-                showClean={showClean}
-                onToggle={() => setShowClean((v) => !v)}
-                showCorrectionsLabel={t('showCorrections')}
-                showSentenceLabel={t('showSentence')}
-              />
-            )}
+          <div className="flex shrink-0 flex-col items-end gap-2 pt-0.5">
+            <div className="flex gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={onRevert}
+                    className="h-9 w-9 shrink-0"
+                    aria-label={revertLabel}
+                  >
+                    <Undo2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{revertTooltip}</TooltipContent>
+              </Tooltip>
+              {hasUserText && (
+                <ShowCleanToggle
+                  showClean={showClean}
+                  onToggle={() => setShowClean((v) => !v)}
+                  showCorrectionsLabel={t('showCorrections')}
+                  showSentenceLabel={t('showSentence')}
+                />
+              )}
+            </div>
+            {discussButton}
           </div>
         </div>
         {showRomanization && translation.romanization && (

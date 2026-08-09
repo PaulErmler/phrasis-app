@@ -9,7 +9,10 @@ import {
   scheduleMissingContent,
   scheduleAudioForLanguage,
 } from "../../features/decks";
-import { getActiveDataset } from "../../db/collections";
+import {
+  findNextIncompleteCollection,
+  getActiveDataset,
+} from "../../db/collections";
 import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/languages";
 // The workpools are module-mocked globally (tests/convexTestSetup.ts):
 // `enqueueAction` is a vi.fn() resolving to unique fake workIds
@@ -17,6 +20,7 @@ import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/languages";
 import { ttsPool } from "../../lib/workpools";
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+import { insertAudioFixture } from '../lib/audioFixtures';
 
 // Partial module mock: every real language's voice pickers only ever return
 // curated apiCodes, so `scheduleAudioForLanguage`'s "not in the curated voice
@@ -137,6 +141,31 @@ describe("features/decks", () => {
       expect(res.map((c) => c.collectionName)).toContain("A1");
       expect(res.every((c) => c.collectionName !== "custom-xyz")).toBe(true);
     });
+
+    it("widens totalTexts by the cutover carry", async () => {
+      // The carry credit is baked into cardsAdded (numerator), so the
+      // denominator must widen by the same amount or the UI reads the level
+      // as complete while its own texts are unstudied.
+      const t = convexTest(schema, modules);
+      const { collA1, courseId } = await seedCourse(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("collectionProgress", {
+          userId: "user_A",
+          courseId,
+          collectionId: collA1,
+          cardsAdded: 4,
+          legacyCarryAdded: 4,
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(
+        api.features.decks.getCollectionProgress,
+        {},
+      );
+      const a1 = res.find((c) => c.collectionName === "A1");
+      expect(a1?.totalTexts).toBe(3 + 4); // textCount + legacyCarryAdded
+      expect(a1?.cardsAdded).toBe(4);
+    });
   });
 
   describe("getNextTextsFromCollection", () => {
@@ -180,6 +209,149 @@ describe("features/decks", () => {
           collectionId: collId,
         }),
       ).rejects.toThrow();
+    });
+
+    it("rejects a genuinely complete collection", async () => {
+      const t = convexTest(schema, modules);
+      const { collA1, courseId } = await seedCourse(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("collectionProgress", {
+          userId: "user_A",
+          courseId,
+          collectionId: collA1,
+          cardsAdded: 2,
+          ignoredCount: 1, // 2 + 1 === textCount 3
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await expect(
+        asUser.mutation(api.features.decks.setActiveCollection, {
+          collectionId: collA1,
+        }),
+      ).rejects.toThrow(/complete/i);
+    });
+
+    it("allows a collection whose cardsAdded is inflated by cutover carry", async () => {
+      // Regression: `legacyCarryAdded` is baked into `cardsAdded`, so the raw
+      // textCount comparison called this complete while the home view (which
+      // widens the denominator by the carry) still offered the Select button.
+      const t = convexTest(schema, modules);
+      const { collA1, courseId } = await seedCourse(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("collectionProgress", {
+          userId: "user_A",
+          courseId,
+          collectionId: collA1,
+          cardsAdded: 4, // all carry — none of this collection's 3 texts added
+          legacyCarryAdded: 4,
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.decks.setActiveCollection, {
+        collectionId: collA1,
+      });
+      const settings = await t.run(async (ctx) =>
+        ctx.db
+          .query("courseSettings")
+          .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+          .first(),
+      );
+      expect(settings?.activeCollectionId).toBe(collA1);
+    });
+
+    it("no-ops when the collection is already active, even if complete", async () => {
+      // Ignoring texts completes a collection without running auto-advance,
+      // so the active collection can be complete — re-selecting it changes
+      // nothing and must not error.
+      const t = convexTest(schema, modules);
+      const { collA1, courseId } = await seedCourse(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 3,
+          activeCollectionId: collA1,
+        });
+        await ctx.db.insert("collectionProgress", {
+          userId: "user_A",
+          courseId,
+          collectionId: collA1,
+          cardsAdded: 0,
+          ignoredCount: 3, // every text ignored → complete
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await expect(
+        asUser.mutation(api.features.decks.setActiveCollection, {
+          collectionId: collA1,
+        }),
+      ).resolves.toBeNull();
+    });
+
+    it("accepts non-level collections referenced by the course settings, rejects others", async () => {
+      // The accessibility gate compares document ids directly (chat
+      // collection ===, custom collections .includes) — cover both accept
+      // paths and the reject path.
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedCourse(t);
+      const { chatColl, customColl, foreignColl } = await t.run(async (ctx) => {
+        const chatColl = await ctx.db.insert("collections", {
+          name: "chat-abc",
+          textCount: 2,
+        });
+        const customColl = await ctx.db.insert("collections", {
+          name: "custom-def",
+          textCount: 2,
+        });
+        const foreignColl = await ctx.db.insert("collections", {
+          name: "custom-other",
+          textCount: 2,
+        });
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 3,
+          chatCollectionId: chatColl,
+          activeCustomCollectionIds: [customColl],
+        });
+        return { chatColl, customColl, foreignColl };
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await expect(
+        asUser.mutation(api.features.decks.setActiveCollection, {
+          collectionId: chatColl,
+        }),
+      ).resolves.toBeNull();
+      await expect(
+        asUser.mutation(api.features.decks.setActiveCollection, {
+          collectionId: customColl,
+        }),
+      ).resolves.toBeNull();
+      await expect(
+        asUser.mutation(api.features.decks.setActiveCollection, {
+          collectionId: foreignColl,
+        }),
+      ).rejects.toThrow(/not accessible/i);
+    });
+  });
+
+  describe("findNextIncompleteCollection", () => {
+    it("does not skip a level whose progress is all cutover carry", async () => {
+      const t = convexTest(schema, modules);
+      const { collA1, courseId } = await seedCourse(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("collectionProgress", {
+          userId: "user_A",
+          courseId,
+          collectionId: collA1,
+          cardsAdded: 4,
+          legacyCarryAdded: 4,
+        });
+      });
+      const next = await t.run(async (ctx) => {
+        const collection = (await ctx.db.get(collA1))!;
+        return findNextIncompleteCollection(ctx, collection, "user_A", courseId);
+      });
+      expect(next?._id).toBe(collA1);
     });
   });
 
@@ -332,7 +504,7 @@ describe("features/decks", () => {
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array([1, 2, 3])]),
         );
-        await ctx.db.insert("audioRecordings", {
+        await insertAudioFixture(ctx, {
           textId,
           language: "es",
           voiceName: TEST_VOICE,
@@ -438,7 +610,7 @@ describe("features/decks", () => {
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array([1, 2, 3])]),
         );
-        const audioId = await ctx.db.insert("audioRecordings", {
+        const { rowId: audioId } = await insertAudioFixture(ctx, {
           textId,
           language: "de",
           voiceName: TEST_VOICE,
@@ -504,7 +676,7 @@ describe("features/decks", () => {
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array([1, 2, 3])]),
         );
-        const audioId = await ctx.db.insert("audioRecordings", {
+        const { rowId: audioId } = await insertAudioFixture(ctx, {
           textId,
           language: "ar_lev",
           voiceName: TEST_VOICE,
@@ -611,7 +783,7 @@ describe("features/decks", () => {
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array([1, 2, 3])]),
         );
-        await ctx.db.insert("audioRecordings", {
+        await insertAudioFixture(ctx, {
           textId,
           language: "es",
           voiceName: TEST_VOICE,
@@ -799,7 +971,7 @@ describe("features/decks", () => {
           const storageId = await ctx.storage.store(
             new Blob([new Uint8Array([1, 2, 3])]),
           );
-          await ctx.db.insert("audioRecordings", {
+          await insertAudioFixture(ctx, {
             textId,
             language: "es",
             voiceName: "es-test-voice",
@@ -903,14 +1075,14 @@ describe("features/decks", () => {
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array([1, 2, 3])]),
         );
-        await ctx.db.insert("audioRecordings", {
+        await insertAudioFixture(ctx, {
           textId,
           language: "pt_pt",
           voiceName: "Leda",
           storageId,
           ttsProvider: "gemini", // matches current → no provider-mismatch regen
           voiceGender: "female", // matches card → no gender-drift regen
-          ...(ttsVersion !== undefined ? { ttsVersion } : {}),
+          ttsVersion,
         });
         return { textId };
       });
@@ -997,7 +1169,7 @@ describe("features/decks", () => {
           speakerGender: "female", // matches audioSpeakerGender → no drift
           translationVersion: 0, // strictly below current (1) → stale
         });
-        const audioId = await ctx.db.insert("audioRecordings", {
+        const { rowId: audioId } = await insertAudioFixture(ctx, {
           textId,
           language: "es",
           voiceName: "es-test-voice",
@@ -1296,7 +1468,7 @@ describe("features/decks", () => {
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array([1, 2, 3])]),
         );
-        await ctx.db.insert("audioRecordings", {
+        await insertAudioFixture(ctx, {
           textId,
           language: "es",
           voiceName,

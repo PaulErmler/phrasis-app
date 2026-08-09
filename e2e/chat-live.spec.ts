@@ -29,7 +29,7 @@ import { dismissTour } from "./helpers";
  * Test 3 — the word-explain exchange (learning mode → "Ask AI" popover):
  *  10. ClickableWords trigger → popover opens next to a clicked word
  *  11. openChatWithPrompt + auto-submit → user bubble shows
- *      "Explain me this word: <word>" without the user pressing send
+ *      "Explain: <word>" without the user pressing send
  *  12. generateResponse  → assistant reply arrives in the in-learn chat
  *  13. quota decrement   → another message is counted against the quota
  *
@@ -291,7 +291,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
   });
 
   test(
-    "word-explain flow: click a word on a learning card → Ask AI auto-submits 'Explain me this word: <word>'",
+    "word-explain flow: click a word on a learning card → Explain auto-submits 'Explain: <word>'",
     async ({ page }) => {
       // The assistant reply can take up to a minute; add headroom for the
       // navigation + word-click setup on top of that. Playwright's 30s
@@ -420,11 +420,11 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       const escaped = cleanedWord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const userBubble = page
         .getByTestId("chat-user-message")
-        .filter({ hasText: new RegExp(`Explain me this word:\\s*${escaped}`) })
+        .filter({ hasText: new RegExp(`Explain:\\s*${escaped}`) })
         .first();
       await expect(
         userBubble,
-        'User bubble should show "Explain me this word: <word>" after Ask AI is clicked',
+        'User bubble should show "Explain: <word>" after Explain is clicked',
       ).toBeVisible({ timeout: 15_000 });
 
       // (8) Assistant reply arrives in the in-learn chat. Use .first()

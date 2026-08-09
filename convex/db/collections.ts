@@ -3,7 +3,11 @@ import { Id, Doc } from '../_generated/dataModel';
 import { getCourseSettings } from './courseSettings';
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import { ogteLevelToCollectionCode } from '../../lib/constants/onboarding';
-import { LEGACY_LEVEL_ORDER, LEVEL_TO_COLLECTION, settledCount } from '../lib/collections';
+import {
+  LEGACY_LEVEL_ORDER,
+  LEVEL_TO_COLLECTION,
+  isCollectionComplete,
+} from '../lib/collections';
 
 /**
  * Get the globally active dataset, or null if none is active (i.e. before the
@@ -135,7 +139,9 @@ export async function getNextCollection(
 /**
  * Walk forward from `current` (inclusive) and return the first collection
  * that is not yet complete for the given user/course — complete meaning every
- * text either added (`cardsAdded`) or deliberately ignored (`ignoredCount`).
+ * text either added (`cardsAdded`) or deliberately ignored (`ignoredCount`),
+ * measured against the carry-widened total so a cutover user's levels aren't
+ * skipped before they've studied them (see `isCollectionComplete`).
  * Used by auto-advance to pick the next level after the active one finishes.
  */
 export async function findNextIncompleteCollection(
@@ -152,7 +158,7 @@ export async function findNextIncompleteCollection(
         q.eq('userId', userId).eq('courseId', courseId).eq('collectionId', cursor!._id),
       )
       .first();
-    if (settledCount(progress) < cursor.textCount) return cursor;
+    if (!isCollectionComplete(cursor.textCount, progress)) return cursor;
     cursor = await getNextCollection(ctx, cursor);
   }
   return null;

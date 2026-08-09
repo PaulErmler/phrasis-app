@@ -18,7 +18,7 @@ import {
   PopoverAnchor,
   PopoverContent,
 } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { cn, convexErrorMessage } from '@/lib/utils';
 import { CollectionDetailDialog } from '@/components/app/CollectionDetailDialog';
 import {
   InlineCollectionDetail,
@@ -192,7 +192,7 @@ function PremadeTab({ summary }: { summary: HomeSummary }) {
         await setActiveCollection({ collectionId });
       } catch (error) {
         console.error('Error setting active collection:', error);
-        toast.error(error instanceof Error ? error.message : t('failedToSelect'));
+        toast.error(convexErrorMessage(error) ?? t('failedToSelect'));
       } finally {
         setOptimisticActiveId(null);
       }

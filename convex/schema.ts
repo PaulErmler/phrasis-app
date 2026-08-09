@@ -513,55 +513,24 @@ export default defineSchema({
       'spokenTextHash',
       'voiceName',
     ])
-    // Reverse lookup for reference-aware blob deletes (a blob can transiently
-    // be shared between an asset and un-migrated legacy audioRecordings rows).
+    // Reverse lookup for reference-aware blob deletes (the delayed
+    // post-swap delete re-checks this index at fire time).
     .index('by_storageId', ['storageId']),
 
   // Audio pointer table: one row per (textId, language), pointing at the
-  // shared `audioAssets` row that owns the actual audio. The legacy payload
-  // fields below are only populated on rows written before the audioAssets
-  // backfill (`migrations:backfillAudioAssets`); new rows are thin pointers
-  // and the fields will be dropped once the backfill has completed in prod.
-  // Transition scaffolding + the planned narrow-phase commit are documented
-  // in docs/migrations/audio-assets-transition.md.
+  // shared `audioAssets` row that owns the actual audio (blob + payload).
+  // Deliberately payload-free — everything about the audio itself lives on
+  // the asset so an in-place asset swap reaches every pointing text at once.
   audioRecordings: defineTable({
     textId: v.id('texts'),
     language: v.string(), // Base language code (e.g., "en", "es", "de")
-    // Pointer into `audioAssets`. Always set on new rows; missing only on
-    // legacy rows still carrying their own payload.
-    assetId: v.optional(v.id('audioAssets')),
-    // ---- legacy payload (pre-audioAssets rows only) ----
-    voiceName: v.optional(v.string()), // Full voice identifier (e.g., "en-US-Chirp3-HD-Leda")
-    storageId: v.optional(v.id('_storage')), // Convex file storage reference
-    ttsQuality: v.optional(ttsQualityValidator), // TTS validation status
-    ttsProvider: v.optional(ttsProviderValidator), // TTS provider used (missing = legacy google)
-    voiceGender: v.optional(voiceGenderValidator), // Gender of the synthesized voice (missing = legacy row; falls back to curated-list lookup on read)
-    speed: v.optional(v.number()), // Playback speed used at synthesis time (missing = legacy row, assume 0.9)
-    wordTimings: v.optional(
-      v.array(
-        v.object({
-          word: v.string(),
-          start: v.number(),
-          end: v.number(),
-        }),
-      ),
-    ),
-    ttsVersion: v.optional(v.number()),
+    assetId: v.id('audioAssets'),
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'language'])
-    .index('by_text_and_language_and_voiceName', [
-      'textId',
-      'language',
-      'voiceName',
-    ])
     // Reference counting for shared assets: an asset (and its blob) is deleted
     // only when no row points at it any more.
-    .index('by_assetId', ['assetId'])
-    // Reverse lookup from a storage blob to the LEGACY rows that reference it.
-    // Kept until the backfill completes — blobs can be shared across legacy
-    // rows because `editCard` used to copy audio by reusing `storageId`.
-    .index('by_storageId', ['storageId']),
+    .index('by_assetId', ['assetId']),
 
   // Placement-test sentence index. The actual English source text lives in
   // `texts` (so it gets translations/audio from the standard pipelines); this

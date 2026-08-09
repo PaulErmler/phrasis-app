@@ -3,21 +3,17 @@ import { Doc, Id } from '../_generated/dataModel';
 import { resolveAudioPayload } from './audioAssets';
 
 /**
- * Delete an `audioRecordings` row and clean up what it referenced:
- *
- *  - Pointer rows (`assetId` set): when the row was the LAST pointer at its
- *    asset, the asset is deleted too, and the asset's blob is dropped unless
- *    something else still references it. Assets shared by other texts survive
- *    untouched — deleting one text's audio never affects the others.
- *  - Legacy payload rows: the blob is dropped only when no other legacy row
- *    (an `editCard`-era `storageId` copy) and no asset still references it.
+ * Delete an `audioRecordings` pointer row; when it was the LAST pointer at
+ * its asset, the asset is deleted too, and the asset's blob is dropped unless
+ * another asset still references it. Assets shared by other texts survive
+ * untouched — deleting one text's audio never affects the others.
  *
  * This is the safe audio-delete path — route `audioRecordings` deletions
  * through it (reconcile invalidation, regen, retranslation, manual regenerate,
  * and orphan cascade) so no blob is ever dropped while still in use.
  *
- * `opts.blobAlreadyGone` skips the storage delete for rows whose blob is
- * already known to be missing (`storage.getUrl` returned null), as in
+ * `opts.blobAlreadyGone` skips the storage delete when the blob is already
+ * known to be missing (`storage.getUrl` returned null), as in
  * `scheduleMissingContent`'s stale-file cleanup — row/asset bookkeeping still
  * runs, but there is no blob left to delete.
  */
@@ -28,26 +24,16 @@ export async function deleteAudioRow(
 ): Promise<void> {
   await ctx.db.delete(row._id);
 
-  const assetId = row.assetId;
-  if (assetId !== undefined) {
-    const stillPointed = await ctx.db
-      .query('audioRecordings')
-      .withIndex('by_assetId', (q) => q.eq('assetId', assetId))
-      .first();
-    if (!stillPointed) {
-      const asset = await ctx.db.get(assetId);
-      if (asset) {
-        await ctx.db.delete(asset._id);
-        if (!opts?.blobAlreadyGone) {
-          await deleteStorageBlobIfUnreferenced(ctx, asset.storageId);
-        }
-      }
-    }
-    return;
-  }
-
-  if (row.storageId !== undefined && !opts?.blobAlreadyGone) {
-    await deleteStorageBlobIfUnreferenced(ctx, row.storageId);
+  const stillPointed = await ctx.db
+    .query('audioRecordings')
+    .withIndex('by_assetId', (q) => q.eq('assetId', row.assetId))
+    .first();
+  if (stillPointed) return;
+  const asset = await ctx.db.get(row.assetId);
+  if (!asset) return;
+  await ctx.db.delete(asset._id);
+  if (!opts?.blobAlreadyGone) {
+    await deleteStorageBlobIfUnreferenced(ctx, asset.storageId);
   }
 }
 
@@ -74,18 +60,13 @@ export async function deleteAudioRowsForTextLanguage(
 
 /**
  * Reference-aware blob delete by `storageId` for callers that no longer hold
- * a referencing document. The blob is deleted only when neither a legacy
- * `audioRecordings` row nor an `audioAssets` row references it any more.
+ * a referencing document. The blob is deleted only when no `audioAssets` row
+ * references it any more.
  */
 export async function deleteStorageBlobIfUnreferenced(
   ctx: MutationCtx,
   storageId: Id<'_storage'>,
 ): Promise<void> {
-  const referencedByLegacyRow = await ctx.db
-    .query('audioRecordings')
-    .withIndex('by_storageId', (q) => q.eq('storageId', storageId))
-    .first();
-  if (referencedByLegacyRow) return;
   const referencedByAsset = await ctx.db
     .query('audioAssets')
     .withIndex('by_storageId', (q) => q.eq('storageId', storageId))

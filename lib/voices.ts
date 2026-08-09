@@ -240,6 +240,8 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   sl: [...GEMINI_CORE],
   uk: [...GEMINI_CORE],
   sr: [...GEMINI_CORE],
+  // Bulgarian (Aug 2026) — same shape: Gemini-only, locale pinned by `bg-BG`.
+  bg: [...GEMINI_CORE],
   lt: [...GEMINI_CORE],
   lv: [...GEMINI_CORE],
   et: [...GEMINI_CORE],

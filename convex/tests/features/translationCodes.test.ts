@@ -66,6 +66,7 @@ const EXPECTED_GOOGLE: Record<string, string> = {
   sl: 'sl',
   uk: 'uk',
   sr: 'sr',
+  bg: 'bg',
   lt: 'lt',
   lv: 'lv',
   et: 'et',

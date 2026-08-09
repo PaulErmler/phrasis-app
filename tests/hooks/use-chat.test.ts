@@ -58,4 +58,29 @@ describe("useChat", () => {
     });
     expect(sendMutation).toHaveBeenCalled();
   });
+
+  it("sendQuickAction sends the label as prompt with the action attached", async () => {
+    sendMutation.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useChat({ threadId: "tX" }));
+    await act(async () => {
+      await result.current.sendQuickAction(
+        { kind: "synonyms", word: "Hund", language: "de" },
+        "Synonyms of Hund",
+      );
+    });
+    expect(sendMutation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: "Synonyms of Hund",
+        quickAction: { kind: "synonyms", word: "Hund", language: "de" },
+      }),
+    );
+  });
+
+  it("sendQuickAction no-ops on an empty label", async () => {
+    const { result } = renderHook(() => useChat({ threadId: "tX" }));
+    await act(async () => {
+      await result.current.sendQuickAction({ kind: "grammar" }, "  ");
+    });
+    expect(sendMutation).not.toHaveBeenCalled();
+  });
 });

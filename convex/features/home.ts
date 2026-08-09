@@ -8,7 +8,10 @@ import {
   getPremadeLevelCollections,
   getCollectionProgressForCourse,
 } from '../db/collections';
-import { deriveLegacyCefrTierForLevel } from '../lib/collections';
+import {
+  deriveLegacyCefrTierForLevel,
+  effectiveTextCount,
+} from '../lib/collections';
 
 /**
  * Single-shot query for the new segmented home view. Returns all premade
@@ -92,12 +95,6 @@ export const getHomeSummary = query({
 
     const levels = levelCollections.map((collection) => {
       const progress = progressByCollection.get(collection._id);
-      // `legacyCarryAdded` is the cardsAdded amount rolled forward from the
-      // mapped legacy CEFR collection at cutover. It's already baked into
-      // `progress.cardsAdded` (numerator); widening `totalTexts` keeps the
-      // displayed ratio coherent — e.g. legacy 100/295 lands on L02 as
-      // 100/(L02.textCount + 100), not 100/L02.textCount.
-      const carry = progress?.legacyCarryAdded ?? 0;
       return {
         collectionId: collection._id,
         code: collection.code ?? collection.name,
@@ -108,7 +105,12 @@ export const getHomeSummary = query({
           collection.cefrTier ?? deriveLegacyCefrTierForLevel(collection.name),
         order: collection.order ?? 0,
         displayName: collection.displayName ?? collection.name,
-        totalTexts: collection.textCount + carry,
+        // Carry-widened: the cutover credit is already baked into
+        // `cardsAdded` (numerator), so widening the denominator keeps the
+        // displayed ratio coherent — legacy 100/295 lands on L02 as
+        // 100/(L02.textCount + 100), not 100/L02.textCount — and keeps this
+        // in step with the backend completeness guards.
+        totalTexts: effectiveTextCount(collection.textCount, progress),
         cardsAdded: progress?.cardsAdded ?? 0,
         ignoredCount: progress?.ignoredCount ?? 0,
         prioritizedCount: progress?.prioritizedCount ?? 0,

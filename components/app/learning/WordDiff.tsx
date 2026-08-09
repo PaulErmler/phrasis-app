@@ -300,6 +300,7 @@ export function WordDiff({
           <AskAboutWord
             key={`${i}-${w.tag}-${w.expected ?? ''}-${w.actual ?? ''}`}
             word={w.expected}
+            language={language}
           >
             <WordChip
               word={w}

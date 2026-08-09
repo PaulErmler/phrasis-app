@@ -39,6 +39,7 @@ import { ttsPool } from "@/convex/lib/workpools";
 import type { WorkId } from "@convex-dev/workpool";
 import { claimTtsIfAvailable } from "../../features/ttsProcessing";
 import { resolveAudioPayload } from "../../lib/audioAssets";
+import { insertAudioFixture } from "../lib/audioFixtures";
 import { drainSchedulerAfterEach } from "../lib/drainScheduler";
 
 const mockSemantic = vi.mocked(textsMatchSemantic);
@@ -257,14 +258,14 @@ describe("features/ttsProcessing", () => {
       expect(res).toBeNull();
     });
 
-    it("updates quality on an existing audio row", async () => {
+    it("updates quality on an existing in-flight asset", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
       const storageId = await t.run(async (ctx) =>
         ctx.storage.store(new Blob([new Uint8Array([1, 2, 3])])),
       );
-      await t.run(async (ctx) =>
-        ctx.db.insert("audioRecordings", {
+      const { assetId } = await t.run(async (ctx) =>
+        insertAudioFixture(ctx, {
           textId,
           language: "es",
           voiceName: "es-ES-Chirp3-HD-Leda",
@@ -276,14 +277,7 @@ describe("features/ttsProcessing", () => {
         internal.features.ttsProcessing.updateAudioRecordingQuality,
         { textId, language: "es", ttsQuality: "validated" },
       );
-      const updated = await t.run(async (ctx) =>
-        ctx.db
-          .query("audioRecordings")
-          .withIndex("by_text_and_language", (q) =>
-            q.eq("textId", textId).eq("language", "es"),
-          )
-          .first(),
-      );
+      const updated = await t.run(async (ctx) => ctx.db.get(assetId));
       expect(updated?.ttsQuality).toBe("validated");
     });
   });
@@ -916,8 +910,8 @@ describe("features/ttsProcessing", () => {
       const storageId = await t.run(async (ctx) =>
         ctx.storage.store(new Blob([new Uint8Array([1, 2, 3])])),
       );
-      const audioId = await t.run(async (ctx) =>
-        ctx.db.insert("audioRecordings", {
+      const { rowId: audioId } = await t.run(async (ctx) =>
+        insertAudioFixture(ctx, {
           textId,
           language: "sw",
           voiceName: "RILOU7YmBhvwJGDGjNmP", // ElevenLabs voice id (Jane)
@@ -952,8 +946,8 @@ describe("features/ttsProcessing", () => {
       const storageId = await t.run(async (ctx) =>
         ctx.storage.store(new Blob([new Uint8Array([1, 2, 3])])),
       );
-      const audioId = await t.run(async (ctx) =>
-        ctx.db.insert("audioRecordings", {
+      const { rowId: audioId } = await t.run(async (ctx) =>
+        insertAudioFixture(ctx, {
           textId,
           language: "yue",
           voiceName: "Leda",
@@ -975,7 +969,7 @@ describe("features/ttsProcessing", () => {
       expect(left).not.toBeNull();
     });
 
-    it("deletes a legacy row whose gender can't be determined (no voiceGender + voice not in curated list)", async () => {
+    it("deletes a dangling pointer row whose asset is gone", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
       await t.run(async (ctx) =>
@@ -984,17 +978,17 @@ describe("features/ttsProcessing", () => {
       const storageId = await t.run(async (ctx) =>
         ctx.storage.store(new Blob([new Uint8Array([1, 2, 3])])),
       );
-      const audioId = await t.run(async (ctx) =>
-        ctx.db.insert("audioRecordings", {
+      const audioId = await t.run(async (ctx) => {
+        const { assetId, rowId } = await insertAudioFixture(ctx, {
           textId,
           language: "es",
-          voiceName: "unknown-voice-id-removed-from-list",
           storageId,
           ttsQuality: "validated",
-          // Intentionally omit voiceGender and ttsProvider to simulate a
-          // legacy row for a voice that's been removed from the curated list.
-        }),
-      );
+        });
+        // Simulate a dangling pointer (asset vanished out from under the row).
+        await ctx.db.delete(assetId);
+        return rowId;
+      });
 
       await t.mutation(internal.features.decks.prepareCardContent, {
         textId,
@@ -1035,8 +1029,8 @@ describe("features/ttsProcessing", () => {
       const staleStorageId = await t.run(async (ctx) =>
         ctx.storage.store(new Blob([new Uint8Array([2])])),
       );
-      await t.run(async (ctx) =>
-        ctx.db.insert("audioRecordings", {
+      const { assetId } = await t.run(async (ctx) =>
+        insertAudioFixture(ctx, {
           textId,
           language: "es",
           voiceName: "es-ES-Chirp3-HD-Leda",
@@ -1049,18 +1043,11 @@ describe("features/ttsProcessing", () => {
         {
           textId,
           language: "es",
-          storageId: staleStorageId, // doesn't match the live row
+          storageId: staleStorageId, // doesn't match the live asset
           wordTimings: [{ word: "hola", start: 0, end: 0.5 }],
         },
       );
-      const after = await t.run(async (ctx) =>
-        ctx.db
-          .query("audioRecordings")
-          .withIndex("by_text_and_language", (q) =>
-            q.eq("textId", textId).eq("language", "es"),
-          )
-          .first(),
-      );
+      const after = await t.run(async (ctx) => ctx.db.get(assetId));
       expect(after?.wordTimings).toBeUndefined();
     });
 
@@ -1070,8 +1057,8 @@ describe("features/ttsProcessing", () => {
       const storageId = await t.run(async (ctx) =>
         ctx.storage.store(new Blob([new Uint8Array([1])])),
       );
-      await t.run(async (ctx) =>
-        ctx.db.insert("audioRecordings", {
+      const { assetId } = await t.run(async (ctx) =>
+        insertAudioFixture(ctx, {
           textId,
           language: "es",
           voiceName: "es-ES-Chirp3-HD-Leda",
@@ -1089,14 +1076,7 @@ describe("features/ttsProcessing", () => {
         internal.features.ttsProcessing.persistBackfilledWordTimings,
         { textId, language: "es", storageId, wordTimings },
       );
-      const after = await t.run(async (ctx) =>
-        ctx.db
-          .query("audioRecordings")
-          .withIndex("by_text_and_language", (q) =>
-            q.eq("textId", textId).eq("language", "es"),
-          )
-          .first(),
-      );
+      const after = await t.run(async (ctx) => ctx.db.get(assetId));
       expect(after?.wordTimings).toEqual(wordTimings);
       expect(after?.voiceName).toBe("es-ES-Chirp3-HD-Leda");
       expect(after?.voiceGender).toBe("female");
@@ -1113,7 +1093,7 @@ describe("features/ttsProcessing", () => {
         ctx.storage.store(new Blob([new Uint8Array([1, 2, 3])])),
       );
       await t.run(async (ctx) => {
-        await ctx.db.insert("audioRecordings", {
+        await insertAudioFixture(ctx, {
           textId,
           language: "es",
           voiceName: "es-ES-Chirp3-HD-Leda",
@@ -1133,14 +1113,15 @@ describe("features/ttsProcessing", () => {
       t: TestConvex<typeof schema>,
       textId: Id<"texts">,
     ) {
-      return t.run(async (ctx) =>
-        ctx.db
+      return t.run(async (ctx) => {
+        const row = await ctx.db
           .query("audioRecordings")
           .withIndex("by_text_and_language", (q) =>
             q.eq("textId", textId).eq("language", "es"),
           )
-          .first(),
-      );
+          .first();
+        return row ? resolveAudioPayload(ctx, row) : null;
+      });
     }
 
     it("persists timings on success and releases the TTS claim", async () => {
