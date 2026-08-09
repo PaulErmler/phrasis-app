@@ -338,7 +338,16 @@ export default defineSchema({
     datasetId: v.optional(v.id('datasets')), // Premade-dataset texts only; null for user-created and legacy
     text: v.string(),
     language: v.string(), // e.g., "en" for English
-    romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
+    // Latin transliteration for non-Latin scripts. THREE states, not two:
+    //   undefined — never attempted; a scheduler should enqueue romanization.
+    //   ''        — attempted and failed (`romanizeText` exhausted its retries);
+    //               the sentinel exists so nothing re-enqueues it. Re-attempt by
+    //               bumping the method's `romanizationSource` identifier and
+    //               migrating rows tagged with the old one.
+    //   non-empty — done.
+    // Test with `=== undefined`, never `!x` — collapsing '' into "missing" makes
+    // callers ask forever for work that is deliberately never scheduled.
+    romanizedText: v.optional(v.string()),
     // Identifier of which romanizer produced `romanizedText` (e.g.
     // "arabic-transliterate-v1", "google-v3"). Stored so a future strategy
     // swap can find + invalidate rows produced by the old method via a
@@ -393,7 +402,9 @@ export default defineSchema({
     textId: v.id('texts'),
     targetLanguage: v.string(), // e.g., "es" for Spanish
     translatedText: v.string(),
-    romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
+    // Latin transliteration for non-Latin scripts. Same undefined / '' /
+    // non-empty tri-state as `texts.romanizedText` — see the note there.
+    romanizedText: v.optional(v.string()),
     // Same purpose as on `texts` — identifier of the romanizer that produced
     // `romanizedText` (or attempted to and persisted the empty-string
     // sentinel). See the texts table for the migration pattern.

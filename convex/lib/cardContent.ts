@@ -3,6 +3,7 @@ import { MutationCtx, QueryCtx } from '../_generated/server';
 import {
   ROMANIZATION_LANGUAGES,
   isTranslationVersionStale,
+  languageSupportsStt,
 } from '../../lib/languages';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { getLlmClaim, isClaimFresh } from '../features/llmTranslationQueue';
@@ -274,14 +275,32 @@ export async function buildTextContentBatchForLanguages(
       (tr) => tr.language !== input.sourceLanguage && !tr.text,
     );
     const hasMissingAudio = audioRecordings.some((audio) => !audio.url);
-    const hasMissingRomanization = translations.some(
-      (tr) => ROMANIZATION_LANGUAGES.has(tr.language) && !tr.romanization,
-    );
+    // Read the STORED romanization, not the projected `tr.romanization`: that
+    // one is a display value, already blanked for languages the caller didn't
+    // ask about. `=== undefined` (not `!stored`) mirrors the schedulers in
+    // decks.ts, which honour the empty-string "tried, failed, leave empty"
+    // sentinel and never re-enqueue those rows. A truthiness test here would
+    // report the card as missing content forever while nothing is willing to
+    // fill it — see `romanizedText` in convex/schema.ts for the tri-state.
+    const hasMissingRomanization = allLanguages.some((lang) => {
+      if (!ROMANIZATION_LANGUAGES.has(lang)) return false;
+      const stored =
+        lang === input.sourceLanguage
+          ? input.sourceRomanization
+          : translationMap.get(`${input.key}:${lang}`)?.romanization;
+      return stored === undefined;
+    });
     // Legacy audio (generated before Scribe integration) has a URL but no
     // wordTimings. Flag it as missing so useEnsureContent → scheduleMissingContent
-    // triggers a backfill transcription.
+    // triggers a backfill transcription — but only where a backfill can
+    // actually run. `scheduleTimingsBackfillIfNeeded` skips languages our STT
+    // backend can't transcribe, so without this gate those cards would ask for
+    // work that is deliberately never done.
     const hasMissingWordTimings = audioRecordings.some(
-      (audio) => audio.url !== null && audio.wordTimings === null,
+      (audio) =>
+        audio.url !== null &&
+        audio.wordTimings === null &&
+        languageSupportsStt(audio.language),
     );
 
     result.set(input.key, {
