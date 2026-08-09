@@ -2,9 +2,9 @@ import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import {
   ROMANIZATION_LANGUAGES,
-  isProtectedTranslationSource,
   isTranslationVersionStale,
 } from '../../lib/languages';
+import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { getLlmClaim, isClaimFresh } from '../features/llmTranslationQueue';
 import { appendSearchSegments } from '../../lib/wordTokenize';
 import {
@@ -28,11 +28,11 @@ export interface CardTranslationContent {
    */
   retranslating?: boolean;
   /**
-   * True iff the stored row's `translationVersion` is below the language's
-   * current config version (and the row isn't user-provided) — i.e. the
-   * card-add sweep in `scheduleMissingContent` would delete + regenerate it.
-   * Only populated when the caller opts in via `markVersionStale`; the
-   * caller applies its own `text.userCreated` exemption on top.
+   * True iff the card-add sweep in `scheduleMissingContent` would delete +
+   * regenerate this row: its `translationVersion` is below the language's
+   * current config version AND `mayRegenerateTranslation` allows the rewrite.
+   * Only populated when the caller opts in via `markVersionStale`. The full
+   * predicate is applied here — callers must NOT re-derive any part of it.
    */
   versionStale?: boolean;
 }
@@ -64,6 +64,12 @@ interface TextContentInput {
   sourceText: string;
   sourceLanguage: string;
   sourceRomanization?: string;
+  /**
+   * `texts.userCreated` for this row. Required so `versionStale` can apply the
+   * whole `mayRegenerateTranslation` rule here instead of leaving half of it
+   * to each caller.
+   */
+  userCreated: boolean;
 }
 
 export function getCourseLanguages(
@@ -95,13 +101,23 @@ export async function buildTextContentBatchForLanguages(
   },
 ): Promise<Map<string, TextContentResult>> {
   const allLanguages = getCourseLanguages(baseLanguages, targetLanguages);
-  const translationFetches: Array<{ key: string; lang: string; textId: Id<'texts'> }> = [];
+  const translationFetches: Array<{
+    key: string;
+    lang: string;
+    textId: Id<'texts'>;
+    userCreated: boolean;
+  }> = [];
   const audioFetches: Array<{ key: string; lang: string; textId: Id<'texts'> }> = [];
 
   for (const input of inputs) {
     for (const lang of allLanguages) {
       if (lang !== input.sourceLanguage) {
-        translationFetches.push({ key: input.key, lang, textId: input.textId });
+        translationFetches.push({
+          key: input.key,
+          lang,
+          textId: input.textId,
+          userCreated: input.userCreated,
+        });
       }
       audioFetches.push({ key: input.key, lang, textId: input.textId });
     }
@@ -155,7 +171,7 @@ export async function buildTextContentBatchForLanguages(
       llmClaimedAt: claim?.claimedAt ?? null,
       versionStale:
         row != null &&
-        !isProtectedTranslationSource(row.translationSource) &&
+        mayRegenerateTranslation({ userCreated: item.userCreated }, row) &&
         isTranslationVersionStale(item.lang, row.translationVersion),
     });
   });

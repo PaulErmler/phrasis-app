@@ -68,10 +68,11 @@ import {
   deleteAudioRowsForTextLanguage,
 } from '../lib/audio';
 import { soundsSame } from '../lib/textComparison';
+import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
 import {
+  isUserCreatedText,
   USER_PROVIDED_TRANSLATION_SOURCE,
-  FLAG_AUTO_RETRANSLATION_MAX,
-} from '../../lib/languages';
+} from '../../lib/translationProvenance';
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { scheduleMissingContent } from './decks';
@@ -365,6 +366,7 @@ export const getCardForReview = query({
               sourceText: text.text,
               sourceLanguage: text.language,
               sourceRomanization: text.romanizedText ?? undefined,
+              userCreated: text.userCreated,
             },
           ]
         : [];
@@ -1478,7 +1480,7 @@ export const flagTranslation = mutation({
     // second-guessing the user's own content. Flagging surfaces them in the
     // "Flagged" UI pill for the user and admin triage; that's the full
     // workflow. No quota charge, no audio invalidation, no enqueue.
-    if (text.userCreated) {
+    if (isUserCreatedText(text)) {
       return { retranslated: false };
     }
 

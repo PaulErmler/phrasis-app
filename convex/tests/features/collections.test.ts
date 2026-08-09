@@ -8,7 +8,7 @@ import type { Id } from "../../_generated/dataModel";
 // Mocked globally in tests/convexTestSetup.ts — imported here to assert on
 // the enqueue boundary (the pools never run jobs under convex-test).
 import { llmPool, ttsPool } from "../../lib/workpools";
-import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/languages";
+import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/translationProvenance";
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
