@@ -7,6 +7,10 @@ import {
 } from '../../lib/languages';
 import { getLlmClaim, isClaimFresh } from '../features/llmTranslationQueue';
 import { appendSearchSegments } from '../../lib/wordTokenize';
+import {
+  audioPayloadFromRowAndAsset,
+  type ResolvedAudioPayload,
+} from './audioAssets';
 
 type ContentCtx = QueryCtx | MutationCtx;
 
@@ -156,22 +160,43 @@ export async function buildTextContentBatchForLanguages(
     });
   });
 
-  const audioByKeyAndLang = new Map<string, (typeof audioResults)[number]>();
+  // Resolve each audio row's payload through its shared `audioAssets` doc
+  // (legacy rows fall back to their own fields). One deduped point-read per
+  // unique asset per batch — decks repeat sentences, so the dedup matters.
+  const assetIds = [
+    ...new Set(
+      audioResults.flatMap((row) =>
+        row?.assetId !== undefined ? [row.assetId] : [],
+      ),
+    ),
+  ];
+  const assetDocs = await Promise.all(assetIds.map((id) => ctx.db.get(id)));
+  const assetById = new Map(assetIds.map((id, i) => [id, assetDocs[i]]));
+
+  const payloadByKeyAndLang = new Map<string, ResolvedAudioPayload | null>();
   audioFetches.forEach((item, idx) => {
-    audioByKeyAndLang.set(`${item.key}:${item.lang}`, audioResults[idx]);
+    const row = audioResults[idx];
+    const asset =
+      row?.assetId !== undefined ? (assetById.get(row.assetId) ?? null) : null;
+    payloadByKeyAndLang.set(
+      `${item.key}:${item.lang}`,
+      row ? audioPayloadFromRowAndAsset(row, asset) : null,
+    );
   });
 
   const audioWithStorage = audioFetches
     .map((item, idx) => ({
       key: `${item.key}:${item.lang}`,
-      audio: audioResults[idx],
+      payload: payloadByKeyAndLang.get(`${item.key}:${item.lang}`) ?? null,
+      idx,
     }))
-    .filter((item): item is { key: string; audio: NonNullable<(typeof audioResults)[number]> } =>
-      item.audio?.storageId != null,
+    .filter(
+      (item): item is { key: string; payload: ResolvedAudioPayload; idx: number } =>
+        item.payload !== null,
     );
 
   const storageUrls = await Promise.all(
-    audioWithStorage.map((item) => ctx.storage.getUrl(item.audio.storageId)),
+    audioWithStorage.map((item) => ctx.storage.getUrl(item.payload.storageId)),
   );
   const urlMap = new Map<string, string | null>();
   audioWithStorage.forEach((item, idx) => {
@@ -181,13 +206,13 @@ export async function buildTextContentBatchForLanguages(
   const result = new Map<string, TextContentResult>();
   for (const input of inputs) {
     const audioRecordings = allLanguages.map((lang) => {
-      const audio = audioByKeyAndLang.get(`${input.key}:${lang}`);
+      const payload = payloadByKeyAndLang.get(`${input.key}:${lang}`) ?? null;
       return {
         language: lang,
-        voiceName: audio?.voiceName ?? null,
+        voiceName: payload?.voiceName ?? null,
         url: urlMap.get(`${input.key}:${lang}`) ?? null,
-        wordTimings: audio?.wordTimings ?? null,
-        ttsQuality: audio?.ttsQuality ?? null,
+        wordTimings: payload?.wordTimings ?? null,
+        ttsQuality: payload?.ttsQuality ?? null,
       };
     });
 

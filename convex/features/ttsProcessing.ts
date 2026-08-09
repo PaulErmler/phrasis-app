@@ -171,6 +171,14 @@ async function synthesizeAndValidate(
      * for non-mixed languages.
      */
     regionVariant?: string;
+    /**
+     * Forced regeneration (regenerateCardAudio). Skips the attempt-0 early
+     * write: the shared `audioAssets` row for this string already carries
+     * completed audio, and it must keep playing untouched until the final
+     * write swaps it — mid-flight 'unknown' churn on shared audio would
+     * degrade every other text pointing at the asset.
+     */
+    forceRegen?: boolean;
   },
   maxAttempts: number,
 ): Promise<{
@@ -226,7 +234,7 @@ async function synthesizeAndValidate(
     const storageId: Id<'_storage'> = await ctx.storage.store(blob);
     lastStorageId = storageId;
 
-    if (attempt === 0) {
+    if (attempt === 0 && !args.forceRegen) {
       await ctx.runMutation(internal.features.decks.storeAudioRecording, {
         textId: args.textId,
         language: args.language,
@@ -236,8 +244,10 @@ async function synthesizeAndValidate(
         ttsProvider: args.provider,
         voiceGender: args.voiceGender,
         speed: args.speed,
+        spokenText: args.text,
+        regionVariant: args.regionVariant,
       });
-    } else {
+    } else if (attempt > 0) {
       await ctx.runMutation(
         internal.features.ttsProcessing.updateAudioRecordingQuality,
         {
@@ -374,6 +384,10 @@ const ttsJobArgsValidator = v.object({
   // STT call uses the same locale the voice was synthesized in. Plumbed
   // through enqueueTtsJob from `storeTranslationAndScheduleTTS`.
   regionVariant: v.optional(v.string()),
+  // Forced regeneration (regenerateCardAudio): the worker skips the attempt-0
+  // early write so the shared audio asset keeps its current audio until the
+  // final write swaps it in place.
+  forceRegen: v.optional(v.boolean()),
 });
 
 type TtsJobArgs = Infer<typeof ttsJobArgsValidator>;
@@ -433,6 +447,8 @@ export const processTTSForCard = internalAction({
         // Only persist timings alongside validated audio — mismatched
         // transcriptions point to the wrong words.
         wordTimings: validated && wordTimings ? wordTimings : undefined,
+        spokenText: args.text,
+        regionVariant: args.regionVariant,
       });
     } else {
       console.error('[ttsProcess] No storageId produced, audio will be missing', {
@@ -492,6 +508,7 @@ export const enqueueTtsJob = internalMutation({
         voiceGender: args.voiceGender,
         speed: args.speed,
         regionVariant: args.regionVariant,
+        forceRegen: args.forceRegen,
         provider,
       },
       {
@@ -550,8 +567,15 @@ export const onTtsJobComplete = internalMutation({
 });
 
 /**
- * Update TTS quality and optionally swap the storage blob on an
- * existing audioRecording row. No-ops if the row does not exist.
+ * Update TTS quality and optionally swap the storage blob for the audio
+ * behind a (textId, language) — the mid-retry write of the validate loop.
+ * No-ops if the row does not exist.
+ *
+ * Asset-backed rows: the patch targets the shared `audioAssets` row, and ONLY
+ * while that asset is still mid-flight (`ttsQuality === 'unknown'`, i.e. this
+ * job created it at attempt 0 and owns it). An asset already carrying
+ * completed audio is shared by other texts and is never churned by retries —
+ * the job's final write (`storeAudioRecording`) is what replaces it.
  */
 export const updateAudioRecordingQuality = internalMutation({
   args: {
@@ -571,6 +595,25 @@ export const updateAudioRecordingQuality = internalMutation({
       .first();
     if (!record) return null;
 
+    if (record.assetId !== undefined) {
+      const asset = await ctx.db.get(record.assetId);
+      if (!asset || asset.ttsQuality !== 'unknown') return null;
+      if (args.storageId && args.storageId !== asset.storageId) {
+        const previousStorageId = asset.storageId;
+        await ctx.db.patch(asset._id, {
+          ttsQuality: args.ttsQuality,
+          storageId: args.storageId,
+        });
+        if (!args.preserveOldStorage) {
+          await deleteStorageBlobIfUnreferenced(ctx, previousStorageId);
+        }
+      } else {
+        await ctx.db.patch(asset._id, { ttsQuality: args.ttsQuality });
+      }
+      return null;
+    }
+
+    // Legacy payload row (pre-audioAssets backfill).
     const patch: { ttsQuality: typeof args.ttsQuality; storageId?: Id<'_storage'> } = {
       ttsQuality: args.ttsQuality,
     };
@@ -579,7 +622,7 @@ export const updateAudioRecordingQuality = internalMutation({
       const previousStorageId = record.storageId;
       patch.storageId = args.storageId;
       await ctx.db.patch(record._id, patch);
-      if (!args.preserveOldStorage) {
+      if (previousStorageId !== undefined && !args.preserveOldStorage) {
         // Reference-aware: drop the old blob only if no other row (e.g. an
         // `editCard` copy on another text) still references it.
         await deleteStorageBlobIfUnreferenced(ctx, previousStorageId);
@@ -588,6 +631,22 @@ export const updateAudioRecordingQuality = internalMutation({
       await ctx.db.patch(record._id, patch);
     }
 
+    return null;
+  },
+});
+
+/**
+ * Delayed reference-checked blob delete, scheduled whenever a blob is
+ * superseded (asset in-place swap, legacy-row repoint, backfill dedupe). The
+ * delay gives clients holding a just-issued signed URL a grace window; the
+ * job re-checks both `by_storageId` indexes at fire time, so a blob that is
+ * still (or again) referenced simply survives.
+ */
+export const deleteBlobIfUnreferencedJob = internalMutation({
+  args: { storageId: v.id('_storage') },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await deleteStorageBlobIfUnreferenced(ctx, args.storageId);
     return null;
   },
 });
@@ -689,8 +748,10 @@ export const backfillWordTimings = internalAction({
 
 /**
  * Persist word timings produced by `backfillWordTimings`. Guards against
- * storage swaps: if the row's current `storageId` differs from the one we
+ * storage swaps: if the audio's current `storageId` differs from the one we
  * transcribed, the timings belong to a now-stale blob and are discarded.
+ * Asset-backed rows patch the shared asset — identical audio means the
+ * timings are correct for every text pointing at it.
  */
 export const persistBackfilledWordTimings = internalMutation({
   args: {
@@ -714,6 +775,12 @@ export const persistBackfilledWordTimings = internalMutation({
       )
       .first();
     if (!record) return null;
+    if (record.assetId !== undefined) {
+      const asset = await ctx.db.get(record.assetId);
+      if (!asset || asset.storageId !== args.storageId) return null;
+      await ctx.db.patch(asset._id, { wordTimings: args.wordTimings });
+      return null;
+    }
     if (record.storageId !== args.storageId) return null;
     await ctx.db.patch(record._id, { wordTimings: args.wordTimings });
     return null;

@@ -401,7 +401,7 @@
       "oneYearLabel": "one year from today",
       "endOfMonthLabel": "by end of {month}",
       "counterfactualLabel": "if every day were like today",
-      "sessionYieldBig": "on average +{words} new words",
+      "sessionYieldBig": "about +{words} new words",
       "sessionYieldLabel": "per {goal}-min session",
       "perStudyHourLabel": "per study-hour",
       "nextLevelBig": "{code} in ~{days, plural, one {# day} other {# days}}",
@@ -415,7 +415,7 @@
       "aroundDateLabel": "around {date}",
       "cycleHint": "Tap for the next stat",
       "empty": "Continue studying to unlock projections",
-      "avgSentencesBig": "on average ~{rate} new sentences"
+      "avgSentencesBig": "~{rate} new sentences"
     },
     "customContent": "Add Cards",
     "stats": {

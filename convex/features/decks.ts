@@ -56,6 +56,13 @@ import {
   deleteAudioRowsForTextLanguage,
   deleteStorageBlobIfUnreferenced,
 } from '../lib/audio';
+import {
+  findReusableAudioAsset,
+  resolveAudioPayload,
+  scheduleBlobSwapDelete,
+  upsertAudioAsset,
+  upsertAudioPointer,
+} from '../lib/audioAssets';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
   translationValidator,
@@ -183,12 +190,14 @@ async function enqueueTtsForVoice(
     language,
     voiceName,
     regionVariant,
+    forceRegen,
   }: {
     textId: Id<'texts'>;
     text: string;
     language: string;
     voiceName: string;
     regionVariant: string | undefined;
+    forceRegen?: boolean;
   },
 ): Promise<void> {
   const voiceGender = getVoiceGenderByApiCode(voiceName);
@@ -207,18 +216,29 @@ async function enqueueTtsForVoice(
       voiceGender,
       speed: 1,
       regionVariant,
+      forceRegen,
     },
   });
 }
 
 /**
- * Claim + enqueue a TTS job for (text, language) — the enqueue slice shared
- * by `scheduleMissingContent`, `storeTranslationAndScheduleTTS`'s siblings,
+ * Fill audio for (text, language) — the slice shared by
+ * `scheduleMissingContent`, `storeTranslationAndScheduleTTS`'s siblings,
  * and the preview audio-icon click (`requestPreviewAudio`). For the text's
  * own language the source text is synthesized; for any other language the
  * caller must pass the stored translation row (synthesis text + variant
- * pin). Returns true iff a job was enqueued (false when a fresh TTS claim
- * already owns the slot, or the translation is missing).
+ * pin).
+ *
+ * Checks the content-addressed `audioAssets` store first: when a fresh asset
+ * already exists for this exact (language, gender, dialect, string), the
+ * text's pointer row is attached to it and NO job is enqueued — no claim, no
+ * synthesis cost, audio is available immediately. On a miss (or with
+ * `opts.forceRegen`, the regenerate-audio path, which must synthesize anew)
+ * the claim + enqueue flow runs; the job's completion upserts the asset by
+ * the same key.
+ *
+ * Returns true iff audio was filled or a job was enqueued (false when a
+ * fresh TTS claim already owns the slot, or the translation is missing).
  */
 export async function scheduleAudioForLanguage(
   ctx: MutationCtx,
@@ -226,11 +246,10 @@ export async function scheduleAudioForLanguage(
   language: string,
   audioSpeakerGender: string | undefined,
   translation: Doc<'translations'> | null,
+  opts?: { forceRegen?: boolean },
 ): Promise<boolean> {
   const isSource = language === text.language;
   if (!isSource && !translation) return false;
-  const claimed = await claimTtsIfAvailable(ctx, text._id, language);
-  if (!claimed) return false;
   // For mixed-dialect rows, prefer a voice in the same locale that was
   // picked at translation time and forward the variant to TTS so the
   // validation roundtrip uses the matching STT locale.
@@ -238,12 +257,33 @@ export async function scheduleAudioForLanguage(
   const voiceName = regionVariant
     ? getVoiceForLanguageVariant(language, regionVariant, audioSpeakerGender)
     : getVoiceForLanguage(language, audioSpeakerGender);
+  const spokenText = isSource ? text.text : translation!.translatedText;
+
+  if (!opts?.forceRegen) {
+    const voiceGender = getVoiceGenderByApiCode(voiceName);
+    if (voiceGender !== undefined) {
+      const asset = await findReusableAudioAsset(ctx, {
+        language,
+        voiceGender,
+        regionVariant,
+        spokenText,
+      });
+      if (asset) {
+        await upsertAudioPointer(ctx, text._id, language, asset._id);
+        return true;
+      }
+    }
+  }
+
+  const claimed = await claimTtsIfAvailable(ctx, text._id, language);
+  if (!claimed) return false;
   await enqueueTtsForVoice(ctx, {
     textId: text._id,
-    text: isSource ? text.text : translation!.translatedText,
+    text: spokenText,
     language,
     voiceName,
     regionVariant,
+    forceRegen: opts?.forceRegen,
   });
   return true;
 }
@@ -260,6 +300,14 @@ export async function scheduleMissingContent(
   text: Doc<'texts'>,
   baseLanguages: string[],
   targetLanguages: string[],
+  opts?: {
+    /**
+     * Forced regeneration (regenerateCardAudio): audio enqueues bypass the
+     * `audioAssets` cache (a hit would make the regenerate button a no-op)
+     * and the synthesis job replaces the shared asset in place on completion.
+     */
+    forceAudioRegen?: boolean;
+  },
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   const sourceLanguage = text.language;
 
@@ -351,55 +399,77 @@ export async function scheduleMissingContent(
   // the now-stale audio. See the sweep comment for full rationale.
   const langsWithAudioGenderDrift = new Set<string>();
 
-  // Validate storage files — delete stale rows where the file was removed.
-  // Do not delete while TTS is in flight: `processTTSForCard` may have inserted
-  // a row whose URL is not yet resolvable, or concurrent cleanup would remove
-  // the row while later validation updates expect it to exist (silent no-op).
+  // Validate audio rows — delete stale ones (missing blob, gender drift,
+  // superseded provider, bumped ttsVersion). All checks read the row's
+  // RESOLVED payload (the shared `audioAssets` row for pointer rows, own
+  // fields for legacy rows). Deleting a pointer row leaves a still-shared
+  // asset untouched; the re-synthesis a stale asset triggers patches that
+  // asset in place, healing every other text sharing the string at once.
+  // Do not delete while TTS is in flight: `processTTSForCard` may have
+  // attached a row whose URL is not yet resolvable, or concurrent cleanup
+  // would remove the row while later validation updates expect it to exist
+  // (silent no-op).
+  const audioPayloadMap = new Map<
+    string,
+    NonNullable<Awaited<ReturnType<typeof resolveAudioPayload>>>
+  >();
   for (const [lang, audio] of audioMap) {
-    if (audio?.storageId) {
-      const url = await ctx.storage.getUrl(audio.storageId);
-      if (url === null) {
-        if (await hasActiveTtsClaim(ctx, textId, lang)) {
-          continue;
-        }
-        await ctx.db.delete(audio._id);
+    if (!audio) continue;
+    const payload = await resolveAudioPayload(ctx, audio);
+    if (!payload) {
+      // Dangling pointer or malformed legacy row — no usable audio behind
+      // this row. Remove it so the enqueue loop below refills the language.
+      if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
+      await deleteAudioRow(ctx, audio, { blobAlreadyGone: true });
+      audioMap.set(lang, null);
+      continue;
+    }
+    const url = await ctx.storage.getUrl(payload.storageId);
+    if (url === null) {
+      if (await hasActiveTtsClaim(ctx, textId, lang)) {
+        continue;
+      }
+      // The blob is gone — nothing left to reference-protect; row (and, for
+      // a last-pointer row, its dead asset) bookkeeping still runs.
+      await deleteAudioRow(ctx, audio, { blobAlreadyGone: true });
+      audioMap.set(lang, null);
+    } else {
+      // Prefer the persisted gender; fall back to curated-list lookup for
+      // legacy rows written before voiceGender existed.
+      const storedGender =
+        payload.voiceGender ?? getVoiceGenderByApiCode(payload.voiceName);
+      // Unknown gender is itself a regenerate trigger — we can't trust the
+      // audio to match the card's speakerGender, so rebuild it.
+      const genderMismatch =
+        storedGender === undefined ||
+        ((audioSpeakerGender === 'male' || audioSpeakerGender === 'female') &&
+          storedGender !== audioSpeakerGender);
+      // Rows predating this field are legacy Google audio; treat as 'google'.
+      const existingProvider = payload.ttsProvider ?? 'google';
+      const currentProvider = getTtsProviderForLanguage(lang);
+      // Provider regen is now gated by lib/ttsPrecedence.ts — only the
+      // (current, existing) matchups listed there force a delete + re-synth
+      // (e.g. google now overwrites azure, to migrate the Arabic dialects
+      // off Azure). Unlisted pairs keep the existing audio.
+      const providerMismatch = shouldOverwriteProvider(
+        currentProvider,
+        existingProvider,
+      );
+      // Version-stale audio: the language's `ttsVersion` config was bumped
+      // above what this audio was stamped with (a new voice pool / Gemini prompt
+      // / provider). Regenerate. `isTtsVersionStale` encodes the "undefined ===
+      // current" rule so un-backfilled rows never storm.
+      const versionMismatch = isTtsVersionStale(lang, payload.ttsVersion);
+      if (genderMismatch) {
+        langsWithAudioGenderDrift.add(lang);
+      }
+      if (genderMismatch || providerMismatch || versionMismatch) {
+        // Reference-aware delete: a shared asset (or an `editCard`-copied
+        // legacy blob) survives while anything else still points at it.
+        await deleteAudioRow(ctx, audio);
         audioMap.set(lang, null);
       } else {
-        // Prefer the persisted gender; fall back to curated-list lookup for
-        // legacy rows written before voiceGender existed.
-        const storedGender =
-          audio.voiceGender ?? getVoiceGenderByApiCode(audio.voiceName);
-        // Unknown gender is itself a regenerate trigger — we can't trust the
-        // audio to match the card's speakerGender, so rebuild it.
-        const genderMismatch =
-          storedGender === undefined ||
-          ((audioSpeakerGender === 'male' || audioSpeakerGender === 'female') &&
-            storedGender !== audioSpeakerGender);
-        // Rows predating this field are legacy Google audio; treat as 'google'.
-        const existingProvider = audio.ttsProvider ?? 'google';
-        const currentProvider = getTtsProviderForLanguage(lang);
-        // Provider regen is now gated by lib/ttsPrecedence.ts — only the
-        // (current, existing) matchups listed there force a delete + re-synth
-        // (e.g. google now overwrites azure, to migrate the Arabic dialects
-        // off Azure). Unlisted pairs keep the existing audio.
-        const providerMismatch = shouldOverwriteProvider(
-          currentProvider,
-          existingProvider,
-        );
-        // Version-stale audio: the language's `ttsVersion` config was bumped
-        // above what this row was stamped with (a new voice pool / Gemini prompt
-        // / provider). Regenerate. `isTtsVersionStale` encodes the "undefined ===
-        // current" rule so un-backfilled rows never storm.
-        const versionMismatch = isTtsVersionStale(lang, audio.ttsVersion);
-        if (genderMismatch) {
-          langsWithAudioGenderDrift.add(lang);
-        }
-        if (genderMismatch || providerMismatch || versionMismatch) {
-          // Reference-aware delete: drops the blob only if no other row (e.g. an
-          // `editCard` copy on another text) still points at it.
-          await deleteAudioRow(ctx, audio);
-          audioMap.set(lang, null);
-        }
+        audioPayloadMap.set(lang, payload);
       }
     }
   }
@@ -484,7 +554,11 @@ export async function scheduleMissingContent(
   /** Schedule a Scribe backfill for an existing audio row that lacks timings. */
   const scheduleTimingsBackfillIfNeeded = async (lang: string) => {
     const audio = audioMap.get(lang);
-    if (!audio || !audio.storageId || audio.wordTimings) return;
+    // Payload was resolved (and the row survived) in the validity loop above;
+    // shared-asset timings serve every pointing text, so an asset that already
+    // has them needs no backfill.
+    const payload = audioPayloadMap.get(lang);
+    if (!audio || !payload || payload.wordTimings) return;
     // Languages without STT support (e.g. `el` — Azure Fast Transcription
     // can't transcribe `el-GR`) will never get word timings, so don't waste
     // a claim on a backfill that's guaranteed to no-op.
@@ -498,7 +572,7 @@ export async function scheduleMissingContent(
     await ctx.scheduler.runAfter(
       0,
       internal.features.ttsProcessing.backfillWordTimings,
-      { textId, language: lang, storageId: audio.storageId, regionVariant },
+      { textId, language: lang, storageId: payload.storageId, regionVariant },
     );
   };
 
@@ -526,7 +600,14 @@ export async function scheduleMissingContent(
       // Source language — no translation needed, maybe TTS
       if (!hasAudio) {
         if (
-          await scheduleAudioForLanguage(ctx, text, lang, audioSpeakerGender, null)
+          await scheduleAudioForLanguage(
+            ctx,
+            text,
+            lang,
+            audioSpeakerGender,
+            null,
+            { forceRegen: opts?.forceAudioRegen },
+          )
         ) {
           audioScheduled++;
         }
@@ -587,6 +668,7 @@ export async function scheduleMissingContent(
               lang,
               audioSpeakerGender,
               translation,
+              { forceRegen: opts?.forceAudioRegen },
             )
           ) {
             audioScheduled++;
@@ -2392,34 +2474,54 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       await scheduleSearchableTextRebuild(ctx, args.textId);
     }
 
-    // `audioUnchangedBySound`: the retained audio may live under a different
-    // voiceName than the current pick (e.g. a gender fix changed the voice),
-    // so the per-voice guard below would wrongly enqueue a duplicate — skip
-    // outright.
+    // `audioUnchangedBySound`: the retained audio row already serves this
+    // (text, language) — skip outright.
     if (args.skipTts || audioUnchangedBySound) {
       return null;
     }
 
-    const existingAudioForVoice = await ctx.db
+    const existingAudio = await ctx.db
       .query('audioRecordings')
-      .withIndex('by_text_and_language_and_voiceName', (q) =>
-        q
-          .eq('textId', args.textId)
-          .eq('language', args.targetLanguage)
-          .eq('voiceName', args.voiceName),
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('language', args.targetLanguage),
       )
       .first();
 
-    if (!existingAudioForVoice) {
-      const claimed = await claimTtsIfAvailable(ctx, args.textId, args.targetLanguage);
-      if (claimed) {
-        await enqueueTtsForVoice(ctx, {
-          textId: args.textId,
-          text: translatedText,
-          language: args.targetLanguage,
-          voiceName: args.voiceName,
-          regionVariant: args.regionVariant,
-        });
+    if (!existingAudio) {
+      // A translation just landed — check the content-addressed store before
+      // spending synthesis: another text with this exact string (same
+      // language, gender, dialect) may already have fresh audio, in which
+      // case attaching the pointer is all that's needed. Any drift the
+      // existing-audio skip above leaves behind (e.g. a stale gender) is the
+      // sweep's job, which reads through the same asset payload.
+      const voiceGender = getVoiceGenderByApiCode(args.voiceName);
+      const asset =
+        voiceGender !== undefined
+          ? await findReusableAudioAsset(ctx, {
+            language: args.targetLanguage,
+            voiceGender,
+            regionVariant: args.regionVariant,
+            spokenText: translatedText,
+          })
+          : null;
+      if (asset) {
+        await upsertAudioPointer(
+          ctx,
+          args.textId,
+          args.targetLanguage,
+          asset._id,
+        );
+      } else {
+        const claimed = await claimTtsIfAvailable(ctx, args.textId, args.targetLanguage);
+        if (claimed) {
+          await enqueueTtsForVoice(ctx, {
+            textId: args.textId,
+            text: translatedText,
+            language: args.targetLanguage,
+            voiceName: args.voiceName,
+            regionVariant: args.regionVariant,
+          });
+        }
       }
     }
 
@@ -2694,7 +2796,13 @@ export const rebuildSearchableTextForText = internalMutation({
 });
 
 /**
- * Internal mutation to store an audio recording.
+ * Internal mutation to store freshly synthesized audio: upserts the shared
+ * content-addressed `audioAssets` row for (language, voiceGender,
+ * regionVariant, spokenText) and points this text's `audioRecordings` row at
+ * it. When the asset already exists, a completed synthesis replaces its audio
+ * IN PLACE — every text sharing the string gets the new audio on its next
+ * query refresh — while a mid-flight attempt-0 write against completed audio
+ * only attaches the pointer and drops its own blob (see `upsertAudioAsset`).
  */
 export const storeAudioRecording = internalMutation({
   args: {
@@ -2717,6 +2825,11 @@ export const storeAudioRecording = internalMutation({
         }),
       ),
     ),
+    // The RAW string this audio speaks (asset key material) — `text.text` for
+    // source-language audio, the translation's `translatedText` otherwise.
+    spokenText: v.string(),
+    // Dialect pin for mixed-language rows; part of the asset key.
+    regionVariant: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -2729,58 +2842,37 @@ export const storeAudioRecording = internalMutation({
       await deleteStorageBlobIfUnreferenced(ctx, args.storageId);
       return null;
     }
-    const existingForVoice = await ctx.db
-      .query('audioRecordings')
-      .withIndex('by_text_and_language_and_voiceName', (q) =>
-        q
-          .eq('textId', args.textId)
-          .eq('language', args.language)
-          .eq('voiceName', args.voiceName),
-      )
-      .first();
-    const existingAnyVoice = await ctx.db
-      .query('audioRecordings')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('language', args.language),
-      )
-      .first();
-    // Freshly synthesized audio is always produced under the language's CURRENT
-    // TTS setup, so stamp the current ttsVersion unconditionally.
-    const ttsVersion = getCurrentTtsVersion(args.language);
-    if (!existingForVoice && !existingAnyVoice) {
-      await ctx.db.insert('audioRecordings', {
-        textId: args.textId,
+
+    const result = await upsertAudioAsset(
+      ctx,
+      {
         language: args.language,
-        voiceName: args.voiceName,
-        storageId: args.storageId,
-        ttsQuality: args.ttsQuality,
-        ttsProvider: args.ttsProvider,
         voiceGender: args.voiceGender,
+        regionVariant: args.regionVariant,
+        spokenText: args.spokenText,
+      },
+      {
+        storageId: args.storageId,
+        voiceName: args.voiceName,
+        ttsProvider: args.ttsProvider,
+        ttsQuality: args.ttsQuality,
         speed: args.speed,
         wordTimings: args.wordTimings,
-        ttsVersion,
-      });
-      return null;
-    }
+        // Freshly synthesized audio is always produced under the language's
+        // CURRENT TTS setup, so stamp the current ttsVersion unconditionally.
+        ttsVersion: getCurrentTtsVersion(args.language),
+      },
+    );
+    await upsertAudioPointer(ctx, args.textId, args.language, result.assetId);
 
-    const recordToUpdate = existingForVoice ?? existingAnyVoice;
-    if (!recordToUpdate) return null;
-
-    const previousStorageId = recordToUpdate.storageId;
-    await ctx.db.patch(recordToUpdate._id, {
-      voiceName: args.voiceName,
-      storageId: args.storageId,
-      ttsQuality: args.ttsQuality,
-      ttsProvider: args.ttsProvider,
-      voiceGender: args.voiceGender,
-      speed: args.speed,
-      wordTimings: args.wordTimings,
-      ttsVersion,
-    });
-    if (previousStorageId !== args.storageId) {
-      // Reference-aware: drop the old blob only if no other row (e.g. an
-      // `editCard` copy on another text) still points at it.
-      await deleteStorageBlobIfUnreferenced(ctx, previousStorageId);
+    if (result.outcome === 'kept') {
+      // The asset already carries completed audio and this was a mid-flight
+      // 'unknown' write — the incoming blob is unused. Reference-safe drop.
+      await deleteStorageBlobIfUnreferenced(ctx, args.storageId);
+    } else if (result.replacedStorageId !== null) {
+      // In-place swap: the old blob stays downloadable for a grace window so
+      // clients holding a just-issued signed URL don't 404 mid-listen.
+      await scheduleBlobSwapDelete(ctx, result.replacedStorageId);
     }
     return null;
   },

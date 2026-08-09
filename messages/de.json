@@ -401,7 +401,7 @@
       "oneYearLabel": "in einem Jahr",
       "endOfMonthLabel": "bis Ende {month}",
       "counterfactualLabel": "wenn jeder Tag wie heute wäre",
-      "sessionYieldBig": "im Schnitt +{words} neue Wörter",
+      "sessionYieldBig": "etwa +{words} neue Wörter",
       "sessionYieldLabel": "pro {goal}-Min.-Einheit",
       "perStudyHourLabel": "pro Lernstunde",
       "nextLevelBig": "{code} in ~{days, plural, one {# Tag} other {# Tagen}}",
@@ -415,7 +415,7 @@
       "aroundDateLabel": "um den {date}",
       "cycleHint": "Tippen für die nächste Statistik",
       "empty": "Lerne weiter, um Prognosen freizuschalten",
-      "avgSentencesBig": "im Schnitt ~{rate} neue Sätze"
+      "avgSentencesBig": "~{rate} neue Sätze"
     },
     "customContent": "Karten hinzufügen",
     "stats": {
