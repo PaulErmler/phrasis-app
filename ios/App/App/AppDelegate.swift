@@ -52,4 +52,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+    // MARK: - Push notifications
+    //
+    // @capacitor/push-notifications requires both callbacks to be forwarded to
+    // the plugin: PushNotifications.register() asks iOS to register, and iOS
+    // answers here. Without these the JS 'registration' event never fires and
+    // the device is never recorded, so the daily reminder silently never
+    // arrives on iOS (see hooks/use-push-registration.ts, which waits on that
+    // event). Paired with the remote-notification background mode in
+    // Info.plist and the aps-environment entitlement in App.entitlements.
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+    }
+
 }

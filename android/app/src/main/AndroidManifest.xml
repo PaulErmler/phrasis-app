@@ -32,6 +32,14 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Daily reminder pushes. A runtime permission since API 33, and
+         targetSdk is 36 — without it Android silently drops every
+         notification. Requested from JS by @capacitor/push-notifications'
+         requestPermissions() (see hooks/use-push-registration.ts).
+         NOTE: no default_notification_icon meta-data is set, so Android falls
+         back to the launcher icon. A proper monochrome small icon is a
+         follow-up — see docs/store/push-notifications-setup.md. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Voice recording (chat voice input & pronunciation practice). The
          Capacitor WebChromeClient bridges getUserMedia permission requests
          to this Android permission automatically. -->

@@ -85,6 +85,31 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: HOUR,
     capacity: 20,
   },
+  // Daily reminder pushes (features/notifications.ts). Keyed per user. The
+  // sweep already guarantees one send per local day by advancing
+  // `reminderNextSendAt` before dispatch, so this is not the primary guard —
+  // it bounds the damage if that claim ever regresses, and it absorbs the
+  // "send test" button, which is user-triggered and unmetered otherwise.
+  // Capacity 3 leaves room for a scheduled send plus a couple of tests.
+  dailyReminder: {
+    kind: 'token bucket',
+    rate: 3,
+    period: HOUR,
+    capacity: 3,
+  },
+  // Global (unkeyed) backstop over the same sends, mirroring
+  // authEmail/authEmailGlobal: the per-user bucket says nothing about
+  // aggregate volume, and a bug in the sweep's claim logic could otherwise
+  // fan out unboundedly against FCM and the browser push services, whose
+  // quotas and sender reputation are shared across the whole app. Sized far
+  // above legitimate traffic (one send per user per day).
+  dailyReminderGlobal: {
+    kind: 'token bucket',
+    rate: 5_000,
+    period: HOUR,
+    capacity: 5_000,
+    shards: 4,
+  },
 });
 
 // Partial because 'azure' and 'elevenlabs' linger in `TtsProvider` only as

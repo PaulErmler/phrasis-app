@@ -47,3 +47,23 @@ export const ttsPool = new Workpool(components.ttsPool, {
   retryActionsByDefault: true,
   defaultRetryBehavior: { maxAttempts: 5, initialBackoffMs: 2_000, base: 3 },
 });
+
+/**
+ * Daily reminder push fan-out (features/notifications.ts).
+ *
+ * `retryActionsByDefault: false` is the deliberate odd one out. A reminder
+ * worker sends to every device a user owns, so a retry after a partial success
+ * would re-push to the devices that already received it — and a duplicate
+ * notification on a lock screen is a worse outcome than a missed one. The
+ * worker therefore absorbs per-device failures itself (recording
+ * `failureCount`, pruning permanently-dead tokens) and never throws for a
+ * delivery problem, which leaves nothing for a retry to fix.
+ *
+ * Parallelism is generous because the work is one small HTTPS request per
+ * device with no provider quota worth pacing; the shared `dailyReminder` /
+ * `dailyReminderGlobal` buckets are the real ceiling.
+ */
+export const reminderPool = new Workpool(components.reminderPool, {
+  maxParallelism: 20,
+  retryActionsByDefault: false,
+});

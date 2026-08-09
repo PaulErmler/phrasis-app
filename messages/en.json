@@ -137,6 +137,27 @@
         "success": "Password changed.",
         "error": "Could not change the password. Please check your current password."
       },
+      "notifications": {
+        "label": "Daily reminder",
+        "toggleLabel": "Remind me to practise",
+        "description": "One notification a day, at a time you choose.",
+        "timeLabel": "Reminder time",
+        "timeHint": "Reminders are sent within 15 minutes of the time you pick.",
+        "timezoneLabel": "Time zone",
+        "timezoneSearch": "Search time zones…",
+        "timezoneEmpty": "No matching time zone.",
+        "timezoneHint": "Detected automatically ({zone}). Change it if you are set up elsewhere.",
+        "sendTest": "Send a test notification",
+        "unsupported": "This browser cannot receive notifications. On iPhone or iPad, add Flexling to your Home Screen first, then turn reminders on from there.",
+        "denied": "Notifications are blocked. Allow them for Flexling in your browser or device settings, then try again.",
+        "deniedToast": "Notifications are blocked in your settings.",
+        "permissionFailed": "Could not turn on notifications.",
+        "enabledToast": "Daily reminders are on.",
+        "disabledToast": "Daily reminders are off.",
+        "savedToast": "Reminder updated.",
+        "testSentToast": "Test notification sent.",
+        "error": "Something went wrong. Please try again."
+      },
       "language": "App Language",
       "contactPrompt": {
         "title": "Need anything?",

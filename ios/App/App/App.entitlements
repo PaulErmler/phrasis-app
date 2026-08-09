@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Push Notifications capability, for the daily reminder (see
+	  convex/features/notificationDelivery.ts — FCM relays to APNs).
+
+	  `development` is the correct checked-in value: it is what Xcode writes when
+	  the capability is added, and an App Store archive is re-signed against the
+	  distribution provisioning profile, which substitutes `production`. Setting
+	  it to production here would break debug builds on a device.
+
+	  Referenced from CODE_SIGN_ENTITLEMENTS in project.pbxproj (both the Debug
+	  and Release configurations).
+	-->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

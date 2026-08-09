@@ -30,6 +30,10 @@ app.use(rateLimiter);
 // instances because each pool needs its own parallelism cap.
 app.use(workpool, { name: 'llmPool' });
 app.use(workpool, { name: 'ttsPool' });
+// Daily reminder push fan-out (features/notifications.ts). Separate pool so a
+// backlog of content generation can't delay time-sensitive reminders, and so
+// its no-retry policy stays isolated from the content pools' aggressive one.
+app.use(workpool, { name: 'reminderPool' });
 // Batched, resumable data migrations. Chained after every deploy via
 // `npx convex run migrations:runAll --prod` (completed ones are skipped).
 app.use(migrations);

@@ -16,6 +16,7 @@ import PricingTable from '@/components/autumn/pricing-table';
 import { useIsNativeApp } from '@/hooks/use-native-app';
 import { DeleteAccountSection } from '@/components/app/DeleteAccountSection';
 import { ChangePasswordSection } from '@/components/app/ChangePasswordSection';
+import { NotificationsSection } from '@/components/app/NotificationsSection';
 
 const SUPPORT_EMAIL = 'support@flexling.com';
 
@@ -73,6 +74,10 @@ export function SettingsView({ activeView }: { activeView: View }) {
                 )}
                 <ChangePasswordSection email={userEmail} />
               </div>
+
+              <Separator />
+
+              <NotificationsSection />
             </CardContent>
           </Card>
 

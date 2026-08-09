@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 import {
   learningStyleValidator,
+  pushPlatformValidator,
   currentLevelValidator,
   reviewModeValidator,
   cardApprovalStatusValidator,
@@ -570,7 +571,74 @@ export default defineSchema({
     // undefined = never synced, treated as declined. Account-scoped where the
     // browser choice is device-scoped, so the last device to sync wins.
     analyticsConsent: v.optional(v.boolean()),
-  }).index('by_userId', ['userId']),
+
+    // ---- Daily reminder notification (features/notifications.ts) ----
+    //
+    // Account-scoped, like the reminder itself: one nudge per person per day,
+    // not one per course or per device.
+    //
+    // `reminderTimeZone` is the first server-readable per-user timezone in the
+    // app. Everything else takes `timezone` as a client argument, which a cron
+    // has no way to supply — see the sweep in features/notifications.ts.
+    // Refreshed opportunistically by the client on load (travel, DST rule
+    // changes), so a user who never reopens the app keeps firing at their old
+    // local time until they do.
+    reminderEnabled: v.optional(v.boolean()),
+    reminderMinuteLocal: v.optional(v.number()), // 0..1439, minutes past local midnight, multiple of REMINDER_STEP_MINUTES
+    reminderTimeZone: v.optional(v.string()), // IANA, validated with isValidTimezone
+    reminderLocale: v.optional(v.string()), // 'en' | 'de' — the push is localized, unlike outbound email
+    // The claim key. Precomputed UTC instant of the next send, so the sweep is
+    // an indexed range read over users who are actually due rather than a scan
+    // of every user. Recomputed after each send, which is what keeps it
+    // DST-correct (see lib/reminderSchedule.ts).
+    reminderNextSendAt: v.optional(v.number()),
+    // The local day the sweep last CLAIMED this row — not proof a notification
+    // reached a device. Delivery happens after the claim and may still decide
+    // to skip (the user studied in the meantime) or fail per-device. Named for
+    // what it actually records so nothing downstream mistakes it for a receipt.
+    reminderLastClaimedDate: v.optional(v.string()), // "YYYY-MM-DD" in the user's zone
+  })
+    .index('by_userId', ['userId'])
+    // Drives the sweep. `reminderEnabled` leads so a disabled row costs
+    // nothing to skip; Convex requires index fields be queried in definition
+    // order, and this is only ever read as (enabled = true, nextSendAt <= now).
+    .index('by_reminderEnabled_and_reminderNextSendAt', [
+      'reminderEnabled',
+      'reminderNextSendAt',
+    ]),
+
+  /**
+   * Push delivery targets — one row per device, many per user.
+   *
+   * Two transports share this table because the schedule does not care which
+   * one a device uses:
+   *   - `web`: a Web Push subscription. `token` is the endpoint URL and `keys`
+   *     holds the ECDH/auth pair needed for RFC 8291 payload encryption.
+   *   - `ios` / `android`: an FCM registration token from
+   *     @capacitor/push-notifications. No `keys` — FCM relays to APNs itself.
+   *
+   * Web Push cannot serve the store apps: the Capacitor shell points
+   * `server.url` at the live site, and service workers are unavailable in an
+   * iOS WKWebView, so an installed store app has no push path except FCM/APNs.
+   *
+   * Rows are pruned on a permanent delivery rejection (HTTP 410/404, or FCM
+   * UNREGISTERED) rather than expired on a timer — subscriptions die silently
+   * and the send is the only place that finds out.
+   */
+  pushDevices: defineTable({
+    userId: v.string(), // Better Auth user._id === identity.subject
+    platform: pushPlatformValidator,
+    token: v.string(), // web: endpoint URL; native: FCM registration token
+    keys: v.optional(
+      v.object({ p256dh: v.string(), auth: v.string() }), // web only
+    ),
+    createdAt: v.number(),
+    lastSeenAt: v.number(), // refreshed by the client's mount-time re-sync
+    failureCount: v.number(), // transient failures only; permanent ones delete the row
+  })
+    .index('by_userId', ['userId'])
+    // Upsert on re-registration and prune by the value the transport reports.
+    .index('by_token', ['token']),
 
   // Onboarding progress table — stores the user's onboarding answers.
   //
@@ -1176,6 +1244,18 @@ export default defineSchema({
   // (welcome ~24h, signup notification ~20min) fire after global-teardown has
   // removed it, so what keeps fake @flexling.com addresses from bouncing real
   // sends is `isE2EFixtureAddress` in lib/authEmails.ts, not this table.
+  /**
+   * E2E capture of daily reminder pushes (features/notificationTesting.ts).
+   * Written only while `E2E_TEST_HOOKS=1`, in place of a real push send.
+   */
+  testPushMessages: defineTable({
+    userId: v.string(),
+    title: v.string(),
+    body: v.string(),
+    deviceCount: v.number(), // how many devices the send would have fanned out to
+    capturedAt: v.number(),
+  }).index('by_userId', ['userId']),
+
   testAuthEmails: defineTable({
     email: v.string(), // recipient, lowercase
     kind: v.union(v.literal('verify'), v.literal('reset'), v.literal('welcome')),

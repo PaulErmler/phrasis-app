@@ -137,6 +137,27 @@
         "success": "Passwort geändert.",
         "error": "Das Passwort konnte nicht geändert werden. Bitte prüfe dein aktuelles Passwort."
       },
+      "notifications": {
+        "label": "Tägliche Erinnerung",
+        "toggleLabel": "Erinnere mich ans Üben",
+        "description": "Eine Benachrichtigung pro Tag, zu einer Zeit deiner Wahl.",
+        "timeLabel": "Uhrzeit der Erinnerung",
+        "timeHint": "Erinnerungen kommen innerhalb von 15 Minuten nach der gewählten Zeit.",
+        "timezoneLabel": "Zeitzone",
+        "timezoneSearch": "Zeitzonen durchsuchen…",
+        "timezoneEmpty": "Keine passende Zeitzone.",
+        "timezoneHint": "Automatisch erkannt ({zone}). Ändere sie, wenn du woanders bist.",
+        "sendTest": "Testbenachrichtigung senden",
+        "unsupported": "Dieser Browser kann keine Benachrichtigungen empfangen. Füge Flexling auf dem iPhone oder iPad zuerst zum Home-Bildschirm hinzu und aktiviere die Erinnerungen dann dort.",
+        "denied": "Benachrichtigungen sind blockiert. Erlaube sie für Flexling in den Browser- oder Geräteeinstellungen und versuche es erneut.",
+        "deniedToast": "Benachrichtigungen sind in deinen Einstellungen blockiert.",
+        "permissionFailed": "Benachrichtigungen konnten nicht aktiviert werden.",
+        "enabledToast": "Tägliche Erinnerungen sind aktiv.",
+        "disabledToast": "Tägliche Erinnerungen sind deaktiviert.",
+        "savedToast": "Erinnerung aktualisiert.",
+        "testSentToast": "Testbenachrichtigung gesendet.",
+        "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+      },
       "language": "App-Sprache",
       "contactPrompt": {
         "title": "Brauchst du noch etwas?",

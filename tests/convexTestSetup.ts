@@ -27,6 +27,15 @@ vi.mock('@/convex/lib/workpools', () => ({
     cancel: vi.fn(async () => undefined),
     status: vi.fn(async () => ({ state: 'pending', previousAttempts: 0 })),
   },
+  // Daily reminder fan-out. Mocked for the same reason as the pools above, and
+  // additionally so a reminder test can assert WHO the sweep enqueued
+  // (`vi.mocked(reminderPool.enqueueAction).mock.calls`) without running the
+  // Node-runtime delivery action, which convex-test cannot execute.
+  reminderPool: {
+    enqueueAction: vi.fn(async () => `test-reminder-work-${nextWorkId++}`),
+    cancel: vi.fn(async () => undefined),
+    status: vi.fn(async () => ({ state: 'pending', previousAttempts: 0 })),
+  },
 }));
 
 /**

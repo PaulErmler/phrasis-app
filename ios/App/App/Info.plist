@@ -45,6 +45,10 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
+		<!-- Daily reminder pushes. Required for APNs to hand a notification to
+		     the app while it is backgrounded or suspended; without it
+		     registerForRemoteNotifications is rejected at runtime. -->
+		<string>remote-notification</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

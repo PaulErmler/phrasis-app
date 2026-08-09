@@ -270,7 +270,33 @@ export const sourcedTranslationEntriesValidator = v.array(
   }),
 );
 
+/**
+ * Where a push notification is delivered.
+ *
+ * 'web' is a Web Push subscription (browser or installed PWA); 'ios'/'android'
+ * are FCM registration tokens from the Capacitor store apps. The distinction is
+ * load-bearing at send time — the two transports need different credentials and
+ * report dead tokens differently — so it is stored, not inferred from the token
+ * shape.
+ */
+export const pushPlatformValidator = v.union(
+  v.literal('web'),
+  v.literal('ios'),
+  v.literal('android'),
+);
+
+/** `deriveStreakDisplay`'s state, as a validator for function boundaries. */
+export const streakStateValidator = v.union(
+  v.literal('active'),
+  v.literal('pending'),
+  v.literal('frozen'),
+  v.literal('broken'),
+  v.literal('none'),
+);
+
 export type LearningStyle = Infer<typeof learningStyleValidator>;
+export type PushPlatform = Infer<typeof pushPlatformValidator>;
+export type StreakState = Infer<typeof streakStateValidator>;
 export type StudyContentFilter = Infer<typeof studyContentFilterValidator>;
 export type ReviewRating = Infer<typeof reviewRatingValidator>;
 export type CurrentLevel = Infer<typeof currentLevelValidator>;

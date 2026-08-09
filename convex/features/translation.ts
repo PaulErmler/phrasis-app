@@ -13,7 +13,7 @@
  */
 
 import { romanizeLocal } from '../lib/localRomanization';
-import { SignJWT, importPKCS8 } from 'jose';
+import { getServiceAccountAccessToken } from '../lib/googleServiceAccount';
 import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 
 /**
@@ -53,56 +53,17 @@ interface GoogleRomanizeResponse {
   }>;
 }
 
-interface ServiceAccountCredentials {
-  client_email: string;
-  private_key: string;
-  project_id: string;
-}
-
-function getServiceAccountCredentials(): ServiceAccountCredentials {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY not configured');
-  const json = raw.trimStart().startsWith('{') ? raw : atob(raw);
-  return JSON.parse(json);
-}
-
-let cachedToken: { token: string; projectId: string; expiresAt: number } | null = null;
-
+/**
+ * Cloud Translation v3 needs an OAuth2 access token rather than an API key.
+ * The JWT-bearer exchange lives in lib/googleServiceAccount.ts, shared with FCM
+ * push delivery — same flow, different project and scope.
+ */
 async function getGoogleAccessToken(): Promise<{ token: string; projectId: string }> {
-  if (cachedToken && Date.now() < cachedToken.expiresAt) {
-    return { token: cachedToken.token, projectId: cachedToken.projectId };
-  }
-
-  const creds = getServiceAccountCredentials();
-  const privateKey = await importPKCS8(creds.private_key, 'RS256');
-  const jwt = await new SignJWT({
+  return getServiceAccountAccessToken({
+    raw: process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
+    envName: 'GOOGLE_SERVICE_ACCOUNT_KEY',
     scope: 'https://www.googleapis.com/auth/cloud-translation',
-  })
-    .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
-    .setIssuer(creds.client_email)
-    .setAudience('https://oauth2.googleapis.com/token')
-    .setIssuedAt()
-    .setExpirationTime('5m')
-    .sign(privateKey);
-
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')}&assertion=${jwt}`,
   });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Service account token exchange failed: ${response.status} - ${text}`);
-  }
-  const data = (await response.json()) as { access_token: string };
-
-  cachedToken = {
-    token: data.access_token,
-    projectId: creds.project_id,
-    expiresAt: Date.now() + 4 * 60 * 1000,
-  };
-
-  return { token: data.access_token, projectId: creds.project_id };
 }
 
 /**

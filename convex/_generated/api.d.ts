@@ -66,6 +66,9 @@ import type * as features_featureIds from "../features/featureIds.js";
 import type * as features_home from "../features/home.js";
 import type * as features_library from "../features/library.js";
 import type * as features_llmTranslationQueue from "../features/llmTranslationQueue.js";
+import type * as features_notificationDelivery from "../features/notificationDelivery.js";
+import type * as features_notificationTesting from "../features/notificationTesting.js";
+import type * as features_notifications from "../features/notifications.js";
 import type * as features_onboarding from "../features/onboarding.js";
 import type * as features_placementTest from "../features/placementTest.js";
 import type * as features_projections from "../features/projections.js";
@@ -191,6 +194,9 @@ declare const fullApi: ApiFromModules<{
   "features/home": typeof features_home;
   "features/library": typeof features_library;
   "features/llmTranslationQueue": typeof features_llmTranslationQueue;
+  "features/notificationDelivery": typeof features_notificationDelivery;
+  "features/notificationTesting": typeof features_notificationTesting;
+  "features/notifications": typeof features_notifications;
   "features/onboarding": typeof features_onboarding;
   "features/placementTest": typeof features_placementTest;
   "features/projections": typeof features_projections;
@@ -290,6 +296,7 @@ export declare const components: {
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
   llmPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"llmPool">;
   ttsPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"ttsPool">;
+  reminderPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"reminderPool">;
   migrations: import("@convex-dev/migrations/_generated/component.js").ComponentApi<"migrations">;
   resend: import("@convex-dev/resend/_generated/component.js").ComponentApi<"resend">;
   posthog: import("@posthog/convex/_generated/component.js").ComponentApi<"posthog">;
