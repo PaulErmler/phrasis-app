@@ -12,6 +12,7 @@ import {
   openrouterGenerationId,
 } from '../lib/posthogAi';
 import { getLanguageByCode, resolveAudioSpeakerGender } from '../../lib/languages';
+import { isUserCreatedText } from '../../lib/translationProvenance';
 import { retrier } from '../retrier';
 
 const METADATA_SYSTEM_PROMPT = `You analyze a sentence and return strict linguistic metadata as JSON.
@@ -204,7 +205,9 @@ const metadataJobArgs = v.object({
 });
 
 /**
- * Entry point used by manual custom-text creation, post-chat-approval, and the migration.
+ * Entry point used by manual custom-text creation, bulk import, and
+ * post-chat-approval. All three insert `userCreated: true` texts — see the
+ * stamping block in `applyMetadataAndPrepareCard`, which depends on that.
  *
  * Two-step orchestration:
  *   1. Immediately call `applyMetadataAndPrepareCard` with `metadata: undefined` so the
@@ -472,17 +475,29 @@ export const applyMetadataAndPrepareCard = internalMutation({
     // Re-stamped on every call, so the retry that lands a definitive gender
     // keeps text and translations in agreement instead of turning "legacy"
     // rows into "drifted" ones. Only rows that disagree are patched, so the
-    // common re-run writes nothing. Every caller of this mutation creates
-    // user-created cards (chat / manual / bulk import), whose wording is never
-    // regenerated — so the stamp records the card's gender rather than
-    // licensing a rewrite.
-    const translations = await ctx.db
-      .query('translations')
-      .withIndex('by_textId', (q) => q.eq('textId', args.textId))
-      .collect();
-    for (const translation of translations) {
-      if (translation.speakerGender !== audioSpeakerGender) {
-        await ctx.db.patch(translation._id, { speakerGender: audioSpeakerGender });
+    // common re-run writes nothing.
+    //
+    // Restricted to user-created cards, whose wording is never regenerated —
+    // there the stamp records the card's gender rather than licensing a
+    // rewrite. On a PREMADE text the same stamp would be actively harmful: it
+    // clears both `isLegacy` and `isDrifted` for rows that really were written
+    // under the old gender, suppressing the `isLegacyAlongsideDriftedAudio`
+    // heal path in `scheduleMissingContent` — the audio gets re-voiced while
+    // the wrong-grammar text survives, which is the exact failure that branch
+    // exists to prevent. Every caller creates user-created cards today, so
+    // this is a guard on an invariant rather than a live branch; it is here so
+    // a future premade caller fails safe instead of silently mislabelling.
+    if (isUserCreatedText(text)) {
+      const translations = await ctx.db
+        .query('translations')
+        .withIndex('by_textId', (q) => q.eq('textId', args.textId))
+        .collect();
+      for (const translation of translations) {
+        if (translation.speakerGender !== audioSpeakerGender) {
+          await ctx.db.patch(translation._id, {
+            speakerGender: audioSpeakerGender,
+          });
+        }
       }
     }
 

@@ -560,5 +560,62 @@ describe("features/sentenceMetadata", () => {
       expect(text?.audioSpeakerGender).toBe("male");
       expect(row?.speakerGender).toBe("male");
     });
+
+    // Every caller of this mutation creates user-created cards, so the premade
+    // case is unreachable today — but stamping there would be silently wrong,
+    // not merely useless. An unstamped row on a premade text is genuinely
+    // "legacy" (written before the field existed, plausibly under the other
+    // gender); marking it as agreeing with the newly-resolved gender clears
+    // both `isLegacy` and `isDrifted`, which suppresses the
+    // `isLegacyAlongsideDriftedAudio` heal path in `scheduleMissingContent`
+    // and leaves wrong-grammar text paired with re-voiced audio.
+    it("leaves translations on a premade text unstamped", async () => {
+      const t = convexTest(schema, modules);
+      const { textId, translationId } = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 1,
+        });
+        const premadeTextId = await ctx.db.insert("texts", {
+          text: "Hola",
+          language: "es",
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+        });
+        return {
+          textId: premadeTextId,
+          translationId: await ctx.db.insert("translations", {
+            textId: premadeTextId,
+            targetLanguage: "en",
+            translatedText: "Hello",
+            translationSource: "google/gemini-3.1-flash-lite-high",
+          }),
+        };
+      });
+
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: {
+            register: "neutral",
+            addresseeNumber: "singular",
+            speakerGender: "female",
+            addresseeGender: "neutral",
+          },
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        },
+      );
+
+      const text = await t.run(async (ctx) => ctx.db.get(textId));
+      const row = await t.run(async (ctx) => ctx.db.get(translationId));
+      // The text still records the resolved gender — only the translation
+      // stamp is withheld.
+      expect(text?.audioSpeakerGender).toBe("female");
+      expect(row?.speakerGender).toBeUndefined();
+    });
   });
 });

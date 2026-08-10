@@ -64,6 +64,13 @@ interface TextContentInput {
   textId: Id<'texts'>;
   sourceText: string;
   sourceLanguage: string;
+  /**
+   * `texts.romanizedText` for this row. Pass it as `text.romanizedText ??
+   * undefined` — never `|| undefined`, which collapses the empty-string
+   * "tried, failed" sentinel into "never attempted" and makes
+   * `hasMissingContent` ask forever for work no scheduler will do. See the
+   * tri-state note on `romanizedText` in convex/schema.ts.
+   */
   sourceRomanization?: string;
   /**
    * `texts.userCreated` for this row. Required so `versionStale` can apply the

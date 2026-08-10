@@ -2339,12 +2339,16 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     // Backstop at the write choke point: no job may overwrite existing wording
     // on a user-created card, whatever enqueued it. Callers already refuse to
     // ask (`flagTranslation` short-circuits on user-created texts, and
-    // `updateEssentialGreetings` only targets premade rows), so this is
-    // defence in depth against a future caller.
+    // `updateEssentialGreetings` only targets premade rows), so no live path
+    // reaches this today — it is defence in depth against a future caller.
     //
-    // Deliberately scoped to the OVERWRITE: with no row on file the insert
-    // below still runs, because adding a language to a course must be able to
-    // fill a missing translation on a custom card.
+    // Deliberately scoped to the OVERWRITE. The `existing &&` is load-bearing,
+    // and NOT for the fill-a-missing-language path: that one never sets
+    // `replaceExisting` (see `scheduleTranslationForLanguage`), so the guard is
+    // inert there either way. It matters for `onGoogleFallbackComplete`, which
+    // forwards the original job's `replaceExisting: true` into a re-enqueue —
+    // by the time that lands, the row it meant to replace may have been swept,
+    // and refusing then would leave the card with no translation at all.
     if (existing && args.replaceExisting && isUserCreatedText(text)) {
       return null;
     }
