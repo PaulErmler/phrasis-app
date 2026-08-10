@@ -4,7 +4,34 @@ import {
   resolveActiveCuePosition,
   mergedTimeForCuePosition,
 } from '@/lib/audio/activeClip';
-import type { LanguageCue } from '@/lib/audio/mergeAudio';
+import { audibleCues, type LanguageCue } from '@/lib/audio/mergeAudio';
+
+describe('audibleCues', () => {
+  // Every clip-position consumer routes through this, so the filter itself is
+  // pinned here rather than only implied by its callers' behaviour.
+  it('keeps order and drops only the silent placeholders', () => {
+    const cues: LanguageCue[] = [
+      { language: 'en', startSec: 0 },
+      { language: 'fr', startSec: 2, silent: true },
+      { language: 'es', startSec: 2 },
+      { language: 'en', startSec: 5, silent: false },
+    ];
+    expect(audibleCues(cues)).toEqual([
+      { language: 'en', startSec: 0 },
+      { language: 'es', startSec: 2 },
+      { language: 'en', startSec: 5, silent: false },
+    ]);
+  });
+
+  it('returns an empty list when every cue is silent', () => {
+    expect(
+      audibleCues([
+        { language: 'en', startSec: 0, silent: true },
+        { language: 'es', startSec: 5, silent: true },
+      ]),
+    ).toEqual([]);
+  });
+});
 
 describe('resolveActiveClip', () => {
   it('returns null for an empty cue array', () => {

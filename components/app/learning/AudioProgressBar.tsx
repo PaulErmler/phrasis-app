@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import { updateMediaSessionPosition } from '@/lib/audio/mediaSession';
-import type { LanguageCue } from '@/lib/audio/mergeAudio';
+import { audibleCues, type LanguageCue } from '@/lib/audio/mergeAudio';
 
 export const AudioProgressBar = memo(function AudioProgressBar({
   audioRef,
@@ -85,14 +85,15 @@ export const AudioProgressBar = memo(function AudioProgressBar({
   // blocked mid-merge via `disabled` below.
   const noAudio = durationSec <= 0;
 
-  // Cue boundaries to render as thin separator ticks on hover. Drop the
-  // leading 0s cue (it lines up with the bar's left edge), silent cues (a
-  // zero-repetition language has no clip, so there is no boundary there), and
-  // any cue past duration (shouldn't happen, but defensive).
+  // Cue boundaries to render as thin separator ticks on hover. Only audible
+  // cues are clip boundaries (a zero-repetition language has no clip, so there
+  // is nothing to separate there); of those, drop the leading 0s cue (it lines
+  // up with the bar's left edge) and any cue past duration (shouldn't happen,
+  // but defensive).
   const cueMarks =
     !noAudio && languageCues
-      ? languageCues
-        .filter((c) => !c.silent && c.startSec > 0 && c.startSec < durationSec)
+      ? audibleCues(languageCues)
+        .filter((c) => c.startSec > 0 && c.startSec < durationSec)
         .map((c) => (c.startSec / durationSec) * 100)
       : [];
 

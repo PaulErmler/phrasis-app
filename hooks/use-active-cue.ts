@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { LanguageCue } from '@/lib/audio/mergeAudio';
+import { audibleCues, type LanguageCue } from '@/lib/audio/mergeAudio';
 import type { PlaybackClock } from '@/lib/audio/playbackClock';
 
 /** Merged-audio playback surface passed down from useAudioPlayer. */
@@ -38,19 +38,23 @@ export function useActiveCue(
 
   const [cueIndex, setCueIndex] = useState(-1);
 
+  // Reveal-only placeholders for zero-repetition languages have no clip to
+  // highlight, so they are dropped once here rather than skipped inside the
+  // per-tick scan — `cueIndex` therefore indexes this list, not `languageCues`.
+  const cues = useMemo(
+    () => (languageCues ? audibleCues(languageCues) : []),
+    [languageCues],
+  );
+
   useEffect(() => {
-    if (!isPlaying || !clock || !languageCues || languageCues.length === 0) {
+    if (!isPlaying || !clock || cues.length === 0) {
       setCueIndex(-1);
       return;
     }
     const compute = (timeSec: number) => {
       let idx = -1;
-      for (let i = languageCues.length - 1; i >= 0; i--) {
-        // Silent cues are reveal-only placeholders for zero-repetition
-        // languages — there is no clip to highlight, so keep scanning back to
-        // the language that is actually sounding.
-        if (languageCues[i].silent) continue;
-        if (languageCues[i].startSec <= timeSec) {
+      for (let i = cues.length - 1; i >= 0; i--) {
+        if (cues[i].startSec <= timeSec) {
           idx = i;
           break;
         }
@@ -59,11 +63,11 @@ export function useActiveCue(
     };
     compute(clock.getTime());
     return clock.subscribe(compute);
-  }, [isPlaying, clock, languageCues]);
+  }, [isPlaying, clock, cues]);
 
   return useMemo(() => {
     if (!isPlaying || !mergedPlayback || cueIndex < 0) return null;
-    const cue = mergedPlayback.languageCues[cueIndex];
+    const cue = cues[cueIndex];
     if (!cue) return null;
     return {
       language: cue.language,
@@ -71,5 +75,5 @@ export function useActiveCue(
       speed: cue.speed ?? mergedPlayback.speedByLanguage[cue.language] ?? 1,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, cueIndex, mergedPlayback?.languageCues, mergedPlayback?.speedByLanguage]);
+  }, [isPlaying, cueIndex, cues, mergedPlayback?.speedByLanguage]);
 }

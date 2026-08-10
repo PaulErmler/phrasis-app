@@ -1,4 +1,4 @@
-import type { LanguageCue } from './mergeAudio';
+import { audibleCues, type LanguageCue } from './mergeAudio';
 
 /**
  * Translate a position on the merged-audio timeline into the currently
@@ -8,6 +8,9 @@ import type { LanguageCue } from './mergeAudio';
  * resets to 0 at each repetition — no special casing required by callers.
  * Returns null when `currentTime` is before the first cue (typically 0 at card
  * load, before playback begins).
+ *
+ * Silent placeholders are dropped up front (see `audibleCues`), so a
+ * zero-repetition language is never reported as the active clip.
  *
  * Clips are time-stretched at merge time, so the returned `localTime` is
  * rescaled to the original (1×) timeline that word timings live on — otherwise
@@ -21,12 +24,12 @@ export function resolveActiveClip(
   currentTime: number,
   speedByLanguage?: Record<string, number>,
 ): { language: string; localTime: number } | null {
-  for (let i = cues.length - 1; i >= 0; i--) {
-    if (cues[i].silent) continue; // placeholder — no clip behind it
-    if (cues[i].startSec <= currentTime) {
-      const language = cues[i].language;
-      const mergedLocal = currentTime - cues[i].startSec;
-      const speed = cues[i].speed ?? speedByLanguage?.[language] ?? 1;
+  const audible = audibleCues(cues);
+  for (let i = audible.length - 1; i >= 0; i--) {
+    if (audible[i].startSec <= currentTime) {
+      const language = audible[i].language;
+      const mergedLocal = currentTime - audible[i].startSec;
+      const speed = audible[i].speed ?? speedByLanguage?.[language] ?? 1;
       return {
         language,
         localTime: mergedLocal * speed,
@@ -46,7 +49,11 @@ export function resolveActiveClip(
  */
 export interface ActiveCuePosition {
   language: string;
-  /** 0-based occurrence of `language` among all cues with the same language. */
+  /**
+   * 0-based occurrence of `language` among the audible cues with the same
+   * language — silent placeholders are not repetitions, so both this and
+   * `mergedTimeForCuePosition` count the same set.
+   */
   repIndex: number;
   /** In the original (1×) frame — same units as word timings. */
   localTimeOriginal: number;
@@ -57,16 +64,16 @@ export function resolveActiveCuePosition(
   currentTime: number,
   speedByLanguage?: Record<string, number>,
 ): ActiveCuePosition | null {
-  for (let i = cues.length - 1; i >= 0; i--) {
-    if (cues[i].silent) continue; // placeholder — no clip behind it
-    if (cues[i].startSec <= currentTime) {
-      const language = cues[i].language;
+  const audible = audibleCues(cues);
+  for (let i = audible.length - 1; i >= 0; i--) {
+    if (audible[i].startSec <= currentTime) {
+      const language = audible[i].language;
       let repIndex = 0;
       for (let j = 0; j < i; j++) {
-        if (cues[j].language === language && !cues[j].silent) repIndex++;
+        if (audible[j].language === language) repIndex++;
       }
-      const speed = cues[i].speed ?? speedByLanguage?.[language] ?? 1;
-      const localTimeOriginal = (currentTime - cues[i].startSec) * speed;
+      const speed = audible[i].speed ?? speedByLanguage?.[language] ?? 1;
+      const localTimeOriginal = (currentTime - audible[i].startSec) * speed;
       return { language, repIndex, localTimeOriginal };
     }
   }
@@ -86,12 +93,13 @@ export function mergedTimeForCuePosition(
   newSpeedByLanguage: Record<string, number>,
   pos: ActiveCuePosition,
 ): number | null {
+  const audible = audibleCues(newCues);
   let seen = 0;
-  for (let i = 0; i < newCues.length; i++) {
-    if (newCues[i].language !== pos.language || newCues[i].silent) continue;
+  for (let i = 0; i < audible.length; i++) {
+    if (audible[i].language !== pos.language) continue;
     if (seen === pos.repIndex) {
-      const newSpeed = newCues[i].speed ?? newSpeedByLanguage[pos.language] ?? 1;
-      return newCues[i].startSec + pos.localTimeOriginal / newSpeed;
+      const newSpeed = audible[i].speed ?? newSpeedByLanguage[pos.language] ?? 1;
+      return audible[i].startSec + pos.localTimeOriginal / newSpeed;
     }
     seen++;
   }

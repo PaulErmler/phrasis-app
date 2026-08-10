@@ -246,9 +246,30 @@ export interface LanguageCue {
    * set to 0. It marks the point on the timeline where the clip *would* have
    * started, so auto-reveal still un-blurs the text on schedule, but there is no
    * audio behind it and it occupies no time. Consumers that resolve a *clip
-   * position* (word highlighting) must skip it; the reveal path must not.
+   * position* (word highlighting, progress ticks, seek targets) must skip it —
+   * call `audibleCues` rather than testing the flag by hand; the reveal path
+   * must not skip it.
    */
   silent?: boolean;
+}
+
+/** A cue with real audio behind it — see `audibleCues`. */
+export type AudibleCue = LanguageCue & { silent?: false };
+
+/**
+ * Drop the silent placeholders, leaving only cues that have a clip behind them.
+ *
+ * Every consumer that maps a timeline position onto a *clip* (word highlighting,
+ * progress-bar ticks, resume-position capture) must start here: a silent cue
+ * marks where a zero-repetition language would have played, so resolving a
+ * position against it latches onto a language that made no sound. Centralised so
+ * a new consumer inherits the rule instead of having to remember it. The reveal
+ * path deliberately does not use this — silent cues exist to un-blur text.
+ */
+export function audibleCues(
+  cues: ReadonlyArray<LanguageCue>,
+): AudibleCue[] {
+  return cues.filter((c): c is AudibleCue => !c.silent);
 }
 
 export interface MergeResult {
