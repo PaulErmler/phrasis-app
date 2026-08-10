@@ -548,6 +548,7 @@ export const getSentencesForWord = query({
           sourceText: text.text,
           sourceLanguage: text.language,
           sourceRomanization: text.romanizedText ?? undefined,
+          userCreated: text.userCreated,
           card: cardDocs[i] ?? null,
         };
       })

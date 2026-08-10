@@ -343,6 +343,7 @@ export const getLibraryCards = query({
           sourceText: text.text,
           sourceLanguage: text.language,
           sourceRomanization: text.romanizedText ?? undefined,
+          userCreated: text.userCreated,
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);

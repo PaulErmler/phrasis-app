@@ -17,8 +17,8 @@ import { trackEvent } from '../../db/stats/dailyStats';
 import {
   getTranslationSource,
   postProcessTranslation,
-  USER_PROVIDED_TRANSLATION_SOURCE,
 } from '../../../lib/languages';
+import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
 import { OPENROUTER_CHAT_REASONING, OPENROUTER_MODELS } from '../../config/aiModels';
 
 /**

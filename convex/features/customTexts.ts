@@ -15,8 +15,8 @@ import {
   LUNA_BO3,
   postProcessTranslation,
   resolveMixedVariant,
-  USER_PROVIDED_TRANSLATION_SOURCE,
 } from '../../lib/languages';
+import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../lib/translationProvenance';
 import { trackEvent } from '../db/stats/dailyStats';
 import { isValidTimezone } from '../lib/dateUtils';
 import { generateText } from 'ai';
@@ -515,9 +515,14 @@ export const createCustomText = mutation({
         targetLanguage: entry.language,
         translatedText: entry.text,
         ...(entry.regionVariant ? { regionVariant: entry.regionVariant } : {}),
-        ...(entry.translationSource
-          ? { translationSource: entry.translationSource }
-          : {}),
+        // The client tags autofilled entries with the model slug and
+        // everything else as user-provided (EnterTextsView). Default here
+        // rather than trusting that: an entry with no tag reached us from a
+        // form the user typed into, so `user-provided` is the honest
+        // provenance — and an untagged row would otherwise read as machine
+        // output to every provenance guard.
+        translationSource:
+          entry.translationSource ?? USER_PROVIDED_TRANSLATION_SOURCE,
       });
     }
 
