@@ -1,6 +1,6 @@
 ---
 title: 'Impressum'
-lastUpdated: '2026-03-21'
+lastUpdated: '2026-08-09'
 ---
 
 ## Angaben gemäß § 5 TMG
@@ -17,7 +17,9 @@ E-Mail: support@flexling.com
 
 ## Umsatzsteuer
 
-Gemäß § 19 UStG wird keine Umsatzsteuer erhoben (Kleinunternehmerregelung).
+Auf die eigenen Umsätze von Flexling wird gemäß § 19 UStG keine Umsatzsteuer erhoben (Kleinunternehmerregelung) und diese wird daher auch nicht gesondert ausgewiesen.
+
+Hiervon ausgenommen sind kostenpflichtige Abonnements: Diese werden über Stripe als Verkäufer im eigenen Namen (Merchant of Record) verkauft. Eine bei der Bezahlung oder auf dem Beleg ausgewiesene Umsatz- bzw. Verkaufssteuer wird für diese Transaktionen von Stripe ermittelt, erhoben und abgeführt – nicht von Flexling. Die als Merchant of Record auftretende Stripe-Gesellschaft wird auf der Bezahlseite und auf dem Beleg genannt.
 
 ## Redaktionell verantwortlich
 

@@ -961,6 +961,17 @@ export default defineSchema({
     // VERBATIM and tagged user-provided — machine post-processing
     // (postProcessTranslation) must never touch user-typed text.
     userEditedLanguages: v.optional(v.array(v.string())),
+    // In-flight synthesis marker per language (requestApprovalAudio): a
+    // repeat click for the same line while one synthesis is pending must not
+    // pay a TTS provider twice. Keyed by exact text so an edited line
+    // re-requests immediately; a stale marker (failed/crashed synthesis)
+    // unblocks after a fixed window.
+    audioRequests: v.optional(
+      v.record(
+        v.string(),
+        v.object({ requestedAt: v.number(), text: v.string() }),
+      ),
+    ),
   })
     .index('by_thread_and_user', ['threadId', 'userId']),
 

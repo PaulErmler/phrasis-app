@@ -90,9 +90,13 @@ export function getTrialState(
  *   running trial; leaving the preview untouched here is safe because the
  *   dialog overrides copy and amounts for trialing users.
  * - Everyone else (paying now, or trialed/paid in the past) gets
- *   `freeTrial: false`, which Autumn's `/checkout` and `/attach` both
- *   honor — the preview then shows real charges instead of a phantom
- *   cross-plan trial.
+ *   `freeTrial: false`. On `/checkout` previews this still works (probed
+ *   2026-08-09). On the legacy `/attach` it no longer does — Autumn's
+ *   v1.2→v2 translation silently loses the boolean and `null` fails its
+ *   schema, so the server routes these attaches through v2
+ *   `/billing.attach` with `customize.free_trial: null` instead (see
+ *   attachViaV2NoTrial in convex/autumn.ts). The flag here doubles as that
+ *   routing signal.
  */
 export function checkoutTrialParams(state: TrialState): { freeTrial?: false } {
   return !state.trialEligible && !state.onTrial ? { freeTrial: false } : {};

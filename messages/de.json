@@ -953,6 +953,7 @@
     "billedAnnually": "{price} jährlich abgerechnet",
     "annualSaveHint": "25 % sparen",
     "mostPopular": "Am beliebtesten",
+    "taxNote": "Alle Preise verstehen sich inkl. gegebenenfalls anfallender Umsatzsteuer. Kostenpflichtige Tarife werden von Stripe als Merchant of Record verkauft.",
     "priorityFeatureAccess": "Bevorzugter Zugang zu neuen Funktionen",
     "prioritySupport": "Bevorzugter Support",
     "planDescriptions": {

@@ -21,6 +21,11 @@ import { isCreditBackedFeature } from "@/convex/features/featureIds";
 import { useFeatureQuota } from "@/components/feature_tracking/useFeatureQuota";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import { useIsNativeApp } from "@/hooks/use-native-app";
+import { useNewPlanCheckout } from "@/hooks/use-new-plan-checkout";
+import {
+  throwOnCheckoutError,
+  useCheckoutErrorToast,
+} from "@/hooks/use-checkout-error";
 
 export interface LowQuotaDialogProps {
   open: boolean;
@@ -40,6 +45,8 @@ export default function LowQuotaDialog({
   const { checkout, customer } = useCustomer({ expand: ["trials_used"] });
   const trialState = getTrialState(customer);
   const { products } = usePricingTable();
+  const { isFirstPurchase, startNewPlanCheckout } = useNewPlanCheckout();
+  const showCheckoutError = useCheckoutErrorToast();
   const [upgrading, setUpgrading] = useState(false);
 
   const { included } = useFeatureQuota(featureId);
@@ -66,14 +73,25 @@ export default function LowQuotaDialog({
     if (!upgradeProduct) return;
     setUpgrading(true);
     try {
-      await checkout({
-        productId: upgradeProduct.id,
-        dialog: CheckoutDialog,
-        ...checkoutTrialParams(trialState),
-      });
+      // First purchases must never reach checkout(): its preview would build
+      // the session on the legacy path, which can't carry Managed Payments.
+      // The v2 route always confirms on Stripe's hosted page instead.
+      if (isFirstPurchase(trialState)) {
+        await startNewPlanCheckout(upgradeProduct.id, trialState);
+      } else {
+        // autumn-js reports failures as an `{ error }` container, not a
+        // throw — without the check this closed silently on failure.
+        throwOnCheckoutError(
+          await checkout({
+            productId: upgradeProduct.id,
+            dialog: CheckoutDialog,
+            ...checkoutTrialParams(trialState),
+          }),
+        );
+      }
       setOpen(false);
     } catch (e) {
-      console.error("Checkout failed:", e);
+      showCheckoutError(e, "lowQuota.upgrade");
     } finally {
       setUpgrading(false);
     }

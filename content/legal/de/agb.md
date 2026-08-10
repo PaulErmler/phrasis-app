@@ -1,6 +1,6 @@
 ---
 title: 'Allgemeine Geschäftsbedingungen'
-lastUpdated: '2026-03-21'
+lastUpdated: '2026-08-09'
 ---
 
 # Allgemeine Geschäftsbedingungen (AGB)
@@ -16,6 +16,8 @@ Gültig ab: März 2026
 1.3 Maßgeblich ist die zum Zeitpunkt des Vertragsabschlusses gültige Fassung dieser AGB. Entgegenstehende oder abweichende AGB des Nutzers werden nicht anerkannt.
 
 1.4 Die Vertragssprache ist Deutsch.
+
+1.5 Kostenpflichtige Abonnements werden über Stripe als Verkäufer im eigenen Namen (Merchant of Record) verkauft. Stripe ist damit Ihr Vertragspartner für den Zahlungsvorgang: Stripe zieht den Preis einschließlich etwaiger Steuern ein, stellt den Beleg aus und leistet Support für die Transaktion selbst. Der Nutzungsvertrag über die Dienste kommt weiterhin nach diesen AGB mit Flexling zustande.
 
 ## 2. Leistungsbeschreibung
 
@@ -60,6 +62,8 @@ Zur Wahrung der Widerrufsfrist reicht es aus, dass Sie die Mitteilung über die 
 **Folgen des Widerrufs**
 
 Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die wir von Ihnen erhalten haben, unverzüglich und spätestens binnen vierzehn Tagen ab dem Tag zurückzuzahlen, an dem die Mitteilung über Ihren Widerruf bei uns eingegangen ist. Für diese Rückzahlung verwenden wir dasselbe Zahlungsmittel, das Sie bei der ursprünglichen Transaktion eingesetzt haben; in keinem Fall werden Ihnen wegen dieser Rückzahlung Entgelte berechnet.
+
+**Hinweis zu über Stripe abgewickelten Zahlungen:** Kostenpflichtige Abonnements werden über Stripe als Merchant of Record verkauft (Ziffer 1.5). Sie können Ihren Widerruf jederzeit unter den oben genannten Kontaktdaten an uns richten; die Rückzahlung wird anschließend von Stripe über das von Ihnen verwendete Zahlungsmittel ausgeführt. Ihr gesetzliches Widerrufsrecht wird dadurch weder verkürzt noch eingeschränkt.
 
 ### MUSTER-WIDERRUFSFORMULAR
 
@@ -142,7 +146,7 @@ Für den kostenlosen Tarif ist keine Zahlungsmethode erforderlich.
 
 Kostenpflichtige Tarife werden als Abonnements (monatlich oder jährlich) angeboten. Die aktuellen Preise sind auf flexling.com/pricing einsehbar. Alle Preise verstehen sich in Euro.
 
-**Hinweis zur Umsatzsteuer:** Gemäß § 19 UStG (Kleinunternehmerregelung) wird keine Umsatzsteuer erhoben und daher nicht gesondert ausgewiesen.
+**Hinweis zur Umsatzsteuer:** Die angegebenen Preise sind Bruttopreise und enthalten bereits die für Ihren Rechnungsstandort geltende Umsatz- bzw. Verkaufssteuer – der angezeigte Betrag ist der Betrag, den Sie zahlen. Da kostenpflichtige Abonnements über Stripe als Merchant of Record verkauft werden (Ziffer 1.5), ermittelt, erhebt und führt Stripe diese Steuer ab; sie wird bei der Bezahlung und auf dem Beleg gesondert ausgewiesen. Für die eigenen Umsätze von Flexling gilt weiterhin die Kleinunternehmerregelung nach § 19 UStG.
 
 ### 9.3 Abonnementverlängerung und Kündigung
 
@@ -152,9 +156,11 @@ Abonnements verlängern sich automatisch um den jeweils gebuchten Zeitraum (mona
 
 Das gesetzliche Widerrufsrecht nach § 4 dieser AGB bleibt unberührt. Darüber hinaus bestehen keine weitergehenden Kulanzansprüche auf Rückerstattung. Rückerstattungen im Rahmen des Widerrufsrechts werden über das ursprünglich verwendete Zahlungsmittel abgewickelt.
 
+Bei Abonnements, die über Stripe als Merchant of Record verkauft werden (Ziffer 1.5), führt Stripe die Rückerstattung aus. Stripe kann darüber hinaus innerhalb von 60 Tagen nach dem Kauf von sich aus eine Rückerstattung vornehmen und wendet gesetzliche Widerrufs- bzw. Rücktrittsfristen an, soweit diese in Ihrem Land vorgeschrieben sind. Eine solche Rückerstattung erfolgt zu Ihren Gunsten und schränkt Ihre Rechte nach dieser Ziffer oder nach § 4 nicht ein.
+
 ### 9.5 Zahlungsverzug
 
-Bei Zahlungsverzug behält sich Flexling vor, den Zugang zu kostenpflichtigen Funktionen zu sperren, bis der ausstehende Betrag beglichen ist.
+Bei Zahlungsverzug behält sich Flexling vor, den Zugang zu kostenpflichtigen Funktionen zu sperren, bis der ausstehende Betrag beglichen ist. Bei Abonnements, die über Stripe als Merchant of Record verkauft werden (Ziffer 1.5), werden die Zahlungswiederholungen, Zahlungserinnerungen und die Bezahlseite für eine offene Rechnung von Stripe bereitgestellt.
 
 ## 10. Verfügbarkeit und Wartung
 

@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useMutation, useQuery } from 'convex/react';
 import { Lock, Pencil } from 'lucide-react';
+import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
+import { AudioButton } from '@/components/app/learning/AudioButton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Shimmer } from '@/components/ai-elements/shimmer';
@@ -43,31 +46,61 @@ function Lang({ code }: { code: string }) {
   );
 }
 
+interface EntryAudio {
+  /** language → playback URL (null = generatable but not synthesized yet). */
+  urlByLanguage: Map<string, string | null>;
+  onRequestAudio: (language: string) => Promise<unknown>;
+}
+
 function EntryLines({
   baseEntries,
   targetEntries,
   className,
+  audio,
 }: {
   baseEntries: { language: string; text: string }[];
   targetEntries: { language: string; text: string }[];
   className?: string;
+  /** When set, each line gets a play icon (click-to-generate, like collection previews). */
+  audio?: EntryAudio;
 }) {
+  const renderLine = (
+    entry: { language: string; text: string },
+    key: string,
+    textClass: string,
+  ) => {
+    const line = (
+      <p key={audio ? undefined : key} className={textClass}>
+        <Lang code={entry.language} />{' '}
+        {/* Own dir-scoped span: the Latin language label shares this <p>,
+            so the sentence needs its own bidi context for RTL languages. */}
+        <span dir={getTextDirection(entry.language)}>{entry.text}</span>
+      </p>
+    );
+    if (!audio) return line;
+    return (
+      <div key={key} className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">{line}</div>
+        <AudioButton
+          url={audio.urlByLanguage.get(entry.language) ?? null}
+          language={entry.language}
+          onRequestGenerate={
+            entry.text.length > 0
+              ? () => audio.onRequestAudio(entry.language)
+              : undefined
+          }
+        />
+      </div>
+    );
+  };
   return (
     <div className={cn('space-y-1.5 text-sm', className)}>
-      {baseEntries.map((entry, i) => (
-        <p key={`base-${i}`} className="text-sm text-muted-foreground">
-          <Lang code={entry.language} />{' '}
-          {/* Own dir-scoped span: the Latin language label shares this <p>,
-              so the sentence needs its own bidi context for RTL languages. */}
-          <span dir={getTextDirection(entry.language)}>{entry.text}</span>
-        </p>
-      ))}
-      {targetEntries.map((entry, i) => (
-        <p key={`target-${i}`} className="text-base font-semibold">
-          <Lang code={entry.language} />{' '}
-          <span dir={getTextDirection(entry.language)}>{entry.text}</span>
-        </p>
-      ))}
+      {baseEntries.map((entry, i) =>
+        renderLine(entry, `base-${i}`, 'text-sm text-muted-foreground'),
+      )}
+      {targetEntries.map((entry, i) =>
+        renderLine(entry, `target-${i}`, 'text-base font-semibold'),
+      )}
     </div>
   );
 }
@@ -103,6 +136,26 @@ export function CardApproval({
       : (toolPart.input?.translations ?? []);
   const approvalId = approval?._id ?? null;
   const approvalState = optimisticState ?? approval?.status ?? 'pending';
+
+  // Per-line playback for the proposal (same UX as collection previews):
+  // cached asset → instant URL; otherwise the play click synthesizes into the
+  // shared audioAssets store and the reactive query delivers the URL.
+  const approvalAudioLines = useQuery(
+    api.features.chat.approvalAudio.getApprovalAudio,
+    approvalId ? { approvalId } : 'skip',
+  );
+  const requestApprovalAudio = useMutation(
+    api.features.chat.approvalAudio.requestApprovalAudio,
+  );
+  const entryAudio: EntryAudio | undefined = approvalId
+    ? {
+        urlByLanguage: new Map(
+          (approvalAudioLines ?? []).map((l) => [l.language, l.url]),
+        ),
+        onRequestAudio: (language) =>
+          requestApprovalAudio({ approvalId, language }),
+      }
+    : undefined;
   const isToolComplete =
     toolState === 'output-available' || toolState === 'output-error';
   const isError =
@@ -192,6 +245,7 @@ export function CardApproval({
             baseEntries={baseEntries}
             targetEntries={targetEntries}
             className="opacity-60"
+            audio={entryAudio}
           />
           <div className="mt-3">
             <Shimmer duration={1.5}>{t('creatingApproval')}</Shimmer>
@@ -214,7 +268,11 @@ export function CardApproval({
       )}
     >
       <AlertDescription>
-        <EntryLines baseEntries={baseEntries} targetEntries={targetEntries} />
+        <EntryLines
+          baseEntries={baseEntries}
+          targetEntries={targetEntries}
+          audio={entryAudio}
+        />
       </AlertDescription>
       <div className="flex w-full items-center gap-2 h-8">
         {isPending && <FeatureBadge featureId="custom_sentences" />}

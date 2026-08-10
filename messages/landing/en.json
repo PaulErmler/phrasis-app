@@ -269,6 +269,7 @@
     "title": "Flexible",
     "titleHighlight": "Pricing",
     "mostPopular": "Most Popular",
+    "taxNote": "All prices include VAT where applicable. Paid plans are sold by Stripe as merchant of record.",
     "everythingFrom": "Everything from {planName}, plus:",
     "billing": {
       "monthly": "Monthly",

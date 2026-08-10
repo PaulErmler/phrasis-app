@@ -50,6 +50,7 @@ import type * as db_users from "../db/users.js";
 import type * as features_accountDeletion from "../features/accountDeletion.js";
 import type * as features_authEmailTesting from "../features/authEmailTesting.js";
 import type * as features_chat_agent from "../features/chat/agent.js";
+import type * as features_chat_approvalAudio from "../features/chat/approvalAudio.js";
 import type * as features_chat_cardApprovals from "../features/chat/cardApprovals.js";
 import type * as features_chat_constants from "../features/chat/constants.js";
 import type * as features_chat_messages from "../features/chat/messages.js";
@@ -175,6 +176,7 @@ declare const fullApi: ApiFromModules<{
   "features/accountDeletion": typeof features_accountDeletion;
   "features/authEmailTesting": typeof features_authEmailTesting;
   "features/chat/agent": typeof features_chat_agent;
+  "features/chat/approvalAudio": typeof features_chat_approvalAudio;
   "features/chat/cardApprovals": typeof features_chat_cardApprovals;
   "features/chat/constants": typeof features_chat_constants;
   "features/chat/messages": typeof features_chat_messages;

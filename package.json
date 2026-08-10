@@ -21,6 +21,7 @@
     "test:app": "vitest run --project=app",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:billing": "playwright test --project billing-live --project payment-overdue --project billing-clock --no-deps",
     "lint": "eslint .",
     "lint:fix": "prettier --write . && eslint . --fix",
     "format": "prettier --write .",

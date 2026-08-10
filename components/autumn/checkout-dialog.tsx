@@ -37,6 +37,7 @@ import {
   findCurrentPaidProduct,
   getTrialState,
 } from "@/lib/autumn/trial-eligibility";
+import { throwOnCheckoutError } from "@/hooks/use-checkout-error";
 
 export interface CheckoutDialogProps {
 	open: boolean;
@@ -206,12 +207,18 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
                     product_id: checkoutResult.product.id,
                     flow: trialState.trialEligible ? 'trial_start' : 'purchase',
                   });
-                  await attach({
-                    productId: checkoutResult.product.id,
-                    ...(params.checkoutParams || {}),
-                    ...checkoutTrialParams(trialState),
-                    options,
-                  });
+                  // Failures come back as an `{ error }` container, not a
+                  // throw (both the component path and the server's v2
+                  // no-trial branch) — without this, a failed confirm would
+                  // close the dialog as if it had succeeded.
+                  throwOnCheckoutError(
+                    await attach({
+                      productId: checkoutResult.product.id,
+                      ...(params.checkoutParams || {}),
+                      ...checkoutTrialParams(trialState),
+                      options,
+                    }),
+                  );
                 }
                 setOpen(false);
               } catch (e) {

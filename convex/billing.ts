@@ -8,39 +8,9 @@ import {
   type AutumnInvoiceEntry,
 } from './usage/tracking';
 import { normalizePlans, type AutumnPlan } from '../lib/autumn/customer-shape';
-import { AUTUMN_API, getSecretKey } from './usage/autumnClient';
-
-async function autumnFetch<T>(
-  method: 'GET' | 'POST',
-  path: string,
-  body: unknown,
-  apiVersion: string,
-): Promise<T> {
-  const res = await fetch(`${AUTUMN_API}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${getSecretKey()}`,
-      'Content-Type': 'application/json',
-      'x-api-version': apiVersion,
-    },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
-  const text = await res.text();
-  let json: unknown;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    json = text;
-  }
-  if (!res.ok) {
-    console.error(`Autumn ${method} ${path} failed (${res.status}): ${text}`);
-    const err = json as { message?: string; code?: string } | null;
-    throw new Error(
-      `Autumn request failed: ${err?.message ?? err?.code ?? res.status}`,
-    );
-  }
-  return json as T;
-}
+import { getTrialState } from '../lib/autumn/trial-eligibility';
+import { MANAGED_PAYMENTS_SESSION_PARAMS } from '../lib/autumn/managed-payments';
+import { autumnFetch } from './usage/autumnClient';
 
 /**
  * Switch a currently-trialing customer to another paid plan without
@@ -179,6 +149,14 @@ export const switchPlanDuringTrial = action({
               card_required: true,
             },
           },
+          // Merchant-of-record mode, when enabled. Snake_case here because
+          // this body is hand-written for the REST API — unlike the Convex
+          // component's args, nothing case-converts it. Usually inert: the
+          // card is already on file so this branch rarely produces a
+          // checkout session at all (see the payment_url note below).
+          ...(process.env.AUTUMN_MANAGED_PAYMENTS === 'true'
+            ? { checkout_session_params: MANAGED_PAYMENTS_SESSION_PARAMS }
+            : {}),
         },
         '2.1.0',
       );
@@ -195,6 +173,112 @@ export const switchPlanDuringTrial = action({
     await syncQuotasForUser(ctx, customerId);
 
     return { mode, trialEndsAt, paymentUrl };
+  },
+});
+
+/**
+ * First-time paid purchase, routed through Autumn's v2 endpoint.
+ *
+ * Why this exists at all: Stripe Managed Payments (merchant of record) can only
+ * be enabled on the Checkout Session, and the *only* flow in this app that
+ * creates one is a customer with no paid plan buying their first subscription.
+ * autumn-js's `checkout()` handles that today, but it sends
+ * `x-api-version: 1.2`, which routes to Autumn's legacy handler and a Stripe
+ * client pinned to `2025-02-24.acacia` — and Stripe refuses Managed Payments on
+ * anything before `2025-03-31.basil`. There is no configuration seam: the Convex
+ * component takes no API-version option. `POST /billing.attach` (v2.1.0) builds
+ * its Stripe client without that pin, so it is the only reachable path.
+ *
+ * Deliberately scoped to first purchases, and nothing else:
+ *
+ * - Upgrades/downgrades for an existing payer never create a Checkout Session
+ *   (Autumn updates the subscription directly), so they cannot carry Managed
+ *   Payments anyway — Stripe cannot convert an existing subscription. They stay
+ *   on the legacy path, which keeps `product.scenario` driving the dialog copy
+ *   and the pricing-table CTA labels. v2 has no `scenario`; its `attach_action`
+ *   collapses renew/active/scheduled and has no `cancel`.
+ * - Trialing customers are rejected here and must go through
+ *   `switchPlanDuringTrial`, exactly as the `attach` gate in convex/autumn.ts
+ *   requires. Its `/checkout` preview is safe on the legacy path precisely
+ *   because a trialing customer has a card on file, so Autumn classifies the
+ *   call as an upgrade/downgrade and builds no session.
+ *
+ * Trial policy is re-derived here rather than trusted from the client, mirroring
+ * `gateTrialArgs`: eligible customers get the plan's configured trial (pass
+ * nothing and Autumn applies it), everyone else gets `customize.free_trial:
+ * null` — the v2 spelling of v1.2's `free_trial: false`, which is what stops the
+ * cross-plan trial-hopping the gate exists to prevent.
+ */
+export const attachNewPlan = action({
+  args: { productId: v.string() },
+  returns: v.object({ paymentUrl: v.union(v.string(), v.null()) }),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Not authenticated');
+    const customerId = identity.subject;
+
+    // 404 = customer not created in Autumn yet. A brand-new user's very
+    // first checkout can run before their Autumn customer exists, and that
+    // first purchase is exactly the flow this action owns — so a missing
+    // customer means "no plans, no trial history", the same reading
+    // gateTrialArgs uses, never an error.
+    const customer = await autumnFetch<{
+      products?: unknown;
+      trials_used?: unknown;
+    }>(
+      'GET',
+      `/customers/${encodeURIComponent(customerId)}?expand=trials_used`,
+      undefined,
+      '1.2',
+      { nullOn404: true },
+    );
+    const state = getTrialState(customer);
+    if (state.onTrial) {
+      throw new Error(
+        'Plan switches during a trial must go through switchPlanDuringTrial',
+      );
+    }
+    // A customer who already pays would take Autumn's in-place subscription
+    // update, which this action's redirect handling isn't built for — and which
+    // can't be a Managed Payments sale regardless. Someone who cancelled back to
+    // Free has no paid plan and is welcome here, whether or not a card
+    // survived (see the redirect_mode note below).
+    if (state.hasPaidPlan) {
+      throw new Error('Already on a paid plan — use the regular checkout flow');
+    }
+
+    const result = await autumnFetch<{ payment_url?: string | null }>(
+      'POST',
+      '/billing.attach',
+      {
+        customer_id: customerId,
+        plan_id: args.productId,
+        // 'always', never 'if_required': 'if_required' bills a saved card
+        // directly, WITHOUT a Checkout Session — so a lapsed subscriber
+        // whose card survived would be charged on button click with no
+        // confirmation step, and (since Managed Payments exists only on the
+        // session) would silently buy a non-MoR subscription. 'always'
+        // forces every first purchase through Stripe's hosted page (Autumn's
+        // setupAttachCheckoutMode: 'always' + paid recurring + no existing
+        // subscription → stripe_checkout even with a card on file), which is
+        // both the merchant-of-record carrier and the explicit price+tax
+        // confirmation.
+        redirect_mode: 'always',
+        ...(state.trialEligible ? {} : { customize: { free_trial: null } }),
+        ...(process.env.AUTUMN_MANAGED_PAYMENTS === 'true'
+          ? { checkout_session_params: MANAGED_PAYMENTS_SESSION_PARAMS }
+          : {}),
+      },
+      '2.1.0',
+    );
+
+    // With redirect_mode 'always' the subscription doesn't exist until the
+    // customer returns from Stripe, so this is normally a no-op refresh —
+    // kept because it is harmless and heals the mirror if Autumn ever
+    // settles a call inline anyway.
+    await syncQuotasForUser(ctx, customerId);
+
+    return { paymentUrl: result?.payment_url ?? null };
   },
 });
 

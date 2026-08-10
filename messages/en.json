@@ -953,6 +953,7 @@
     "billedAnnually": "{price} billed annually",
     "annualSaveHint": "Save 25%",
     "mostPopular": "Most Popular",
+    "taxNote": "All prices include VAT where applicable. Paid plans are sold by Stripe as merchant of record.",
     "priorityFeatureAccess": "Priority access to new features",
     "prioritySupport": "Priority support",
     "planDescriptions": {

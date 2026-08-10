@@ -2,6 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+// CardApproval reads per-line proposal audio via convex/react (no provider in
+// this jsdom render): useQuery → loading (undefined), useMutation → inert fn.
+vi.mock("convex/react", () => ({
+  useQuery: () => undefined,
+  useMutation: () => vi.fn(async () => ({ scheduled: false })),
+}));
 vi.mock("@/components/feature_tracking/useFeatureQuota", () => ({
   useFeatureQuota: () => ({ isAvailable: true, isLoading: false }),
 }));

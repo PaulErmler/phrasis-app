@@ -29,6 +29,11 @@ import {
 } from "@/components/ui/carousel";
 import { CarouselDots } from "@/components/ui/carousel-dots";
 import { useIsNativeApp } from "@/hooks/use-native-app";
+import { useNewPlanCheckout } from "@/hooks/use-new-plan-checkout";
+import {
+  throwOnCheckoutError,
+  useCheckoutErrorToast,
+} from "@/hooks/use-checkout-error";
 
 /** Sort key for plan cards: Free first, then paid plans by ascending price. */
 function productSortPrice(product: Product): number {
@@ -175,6 +180,8 @@ function PricingTableInner({
     expand: ["trials_used"],
   });
   const trialState = getTrialState(customer);
+  const { isFirstPurchase, startNewPlanCheckout } = useNewPlanCheckout();
+  const showCheckoutError = useCheckoutErrorToast();
 
   // NOTE: passing `productDetails` to usePricingTable FILTERS the table to
   // only the listed products — don't use it for display tweaks.
@@ -335,20 +342,40 @@ function PricingTableInner({
                       trial_eligible: trialState.trialEligible,
                       on_trial: trialState.onTrial,
                     });
-                    if (product.id && customer) {
-                      await checkout({
-                        productId: product.id,
-                        dialog: CheckoutDialog,
-                        // Autumn only dedupes trials per-plan; this passes
-                        // `freeTrial: false` for everyone who ever trialed
-                        // or pays (closing the cross-plan hole), and nothing
-                        // for trial-eligible or currently-trialing users —
-                        // the dialog routes trialing switches through
-                        // convex/billing.ts to keep the running trial.
-                        ...checkoutTrialParams(trialState),
-                      });
-                    } else if (product.display?.button_url) {
-                      window.open(product.display?.button_url, "_blank");
+                    try {
+                      if (
+                        product.id &&
+                        customer &&
+                        !product.properties?.is_free &&
+                        isFirstPurchase(trialState)
+                      ) {
+                        // First purchases must never reach checkout(): its
+                        // preview would build the session on the legacy path,
+                        // which can't carry Managed Payments. The v2 route
+                        // always confirms on Stripe's hosted page instead.
+                        await startNewPlanCheckout(product.id, trialState);
+                      } else if (product.id && customer) {
+                        // autumn-js reports failures as an `{ error }`
+                        // container, not a throw — without the check a
+                        // failed preview was an invisible no-op.
+                        throwOnCheckoutError(
+                          await checkout({
+                            productId: product.id,
+                            dialog: CheckoutDialog,
+                            // Autumn only dedupes trials per-plan; this passes
+                            // `freeTrial: false` for everyone who ever trialed
+                            // or pays (closing the cross-plan hole), and nothing
+                            // for trial-eligible or currently-trialing users —
+                            // the dialog routes trialing switches through
+                            // convex/billing.ts to keep the running trial.
+                            ...checkoutTrialParams(trialState),
+                          }),
+                        );
+                      } else if (product.display?.button_url) {
+                        window.open(product.display?.button_url, "_blank");
+                      }
+                    } catch (e) {
+                      showCheckoutError(e, "pricingTable.select");
                     }
                   },
                 }}
@@ -356,6 +383,15 @@ function PricingTableInner({
             );
           })}
         </PricingTableContainer>
+      )}
+      {/* Paid plans are sold with Stripe as merchant of record, so the price
+          on the card is the gross amount — VAT is carved out of it rather
+          than added at checkout. Suppressed when the table is showing only
+          the free plan, where there is no tax to speak of. */}
+      {visibleProducts.some((p) => !p.properties?.is_free) && (
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          {t("taxNote")}
+        </p>
       )}
     </div>
   );

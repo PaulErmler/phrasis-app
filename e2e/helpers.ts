@@ -728,7 +728,13 @@ export async function completeStripeTestCheckout(
     email,
   }: { cardNumber?: string; email?: string } = {},
 ) {
-  await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
+  // "commit", not the default "load": Stripe's checkout page can hold the
+  // load event open on a slow connection; the element waits below cover
+  // actual readiness.
+  await page.waitForURL(/checkout\.stripe\.com/, {
+    timeout: 30_000,
+    waitUntil: 'commit',
+  });
 
   const emailField = page.locator('input#email');
   if (
@@ -799,12 +805,27 @@ export async function completeStripeTestCheckout(
     await postal.fill('10115');
   }
 
-  await page
-    .locator('button.SubmitButton, button[type=submit]')
-    .first()
-    .click();
-
-  await page.waitForURL((url) => !/checkout\.stripe\.com/.test(url.href), {
-    timeout: 90_000,
-  });
+  // Submit — retried until the page actually leaves Stripe. The hosted page
+  // has variants (classic, Link, and the Managed Payments layout with its
+  // "Subscribe with obligation to pay" button) that mount or re-render the
+  // pay button late, so a single early `.first()` click can land on the
+  // wrong submit (or on nothing) while the form silently stays put — which
+  // is exactly how the MoR variant made this helper time out. Prefer the
+  // button by its pay wording, fall back to the classic locator, re-click
+  // until the redirect happens.
+  const offStripe = () => !/checkout\.stripe\.com/.test(page.url());
+  await expect(async () => {
+    if (offStripe()) return;
+    const byText = page
+      .locator('button.SubmitButton, button[type=submit]')
+      .filter({ hasText: /subscribe|obligation to pay|pay now|start trial/i })
+      .first();
+    const target = (await byText.count())
+      ? byText
+      : page.locator('button.SubmitButton, button[type=submit]').first();
+    await target.click({ timeout: 5_000 }).catch(() => {});
+    await page.waitForURL((url) => !/checkout\.stripe\.com/.test(url.href), {
+      timeout: 20_000,
+    });
+  }).toPass({ timeout: 150_000, intervals: [1_000] });
 }
