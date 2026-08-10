@@ -21,6 +21,17 @@ Object.defineProperty(window.HTMLMediaElement.prototype, 'readyState', {
   get: () => 1,
 });
 
+// jsdom pins currentTime at 0 and ignores writes; back it with a real field so
+// tests can drive the timeline that the reveal logic reads.
+let mediaCurrentTime = 0;
+Object.defineProperty(window.HTMLMediaElement.prototype, 'currentTime', {
+  configurable: true,
+  get: () => mediaCurrentTime,
+  set: (v: number) => {
+    mediaCurrentTime = v;
+  },
+});
+
 let objectUrlSeq = 0;
 const createObjectURLMock = vi.fn(() => `blob:mock-${++objectUrlSeq}`);
 const revokeObjectURLMock = vi.fn();
@@ -122,6 +133,7 @@ describe('useAudioPlayer', () => {
   beforeEach(() => {
     pendingMerges = [];
     objectUrlSeq = 0;
+    mediaCurrentTime = 0;
     mergeCardAudioMock.mockReset();
     mergeCardAudioMock.mockImplementation(
       (recordings: CardAudioRecording[], _b, _t, _s, signal: AbortSignal) =>
@@ -436,4 +448,83 @@ describe('useAudioPlayer', () => {
       expect(revokeCallsFor(r1.blobUrl)).toBe(1);
     });
   });
+
+  describe('auto-reveal from language cues', () => {
+    /** Drive the element to `t` and fire the event the browser would fire. */
+    const tick = (audio: HTMLAudioElement, t: number) =>
+      act(() => {
+        audio.currentTime = t;
+        audio.dispatchEvent(new Event('timeupdate'));
+      });
+
+    it('reveals a silent cue when playback passes it', async () => {
+      // A zero-repetition language has no audio, only a placeholder cue — the
+      // reveal must still fire when the timeline reaches it.
+      const { result } = renderPlayer();
+      await resolveMerge(
+        0,
+        makeResult({
+          durationSec: 8,
+          languageCues: [
+            { language: 'en', startSec: 0, speed: 1, reveals: true },
+            { language: 'es', startSec: 6, speed: 1, reveals: true, silent: true },
+          ],
+        }),
+      );
+      const audio = result.current.audioRef.current!;
+
+      tick(audio, 1);
+      expect([...result.current.revealedLanguages]).toEqual(['en']);
+
+      tick(audio, 6);
+      expect([...result.current.revealedLanguages].sort()).toEqual(['en', 'es']);
+    });
+
+    it('reveals a cue sitting exactly at the end when `ended` fires', async () => {
+      // The last slot can land on the final instant of the timeline, where
+      // timeupdate is not guaranteed to fire. `ended` sweeps the remainder.
+      const { result } = renderPlayer();
+      await resolveMerge(
+        0,
+        makeResult({
+          durationSec: 6,
+          languageCues: [
+            { language: 'es', startSec: 0, speed: 1, reveals: true },
+            { language: 'en', startSec: 6, speed: 1, reveals: true, silent: true },
+          ],
+        }),
+      );
+      const audio = result.current.audioRef.current!;
+
+      tick(audio, 5.9);
+      expect([...result.current.revealedLanguages]).toEqual(['es']);
+
+      act(() => {
+        audio.dispatchEvent(new Event('ended'));
+      });
+      expect([...result.current.revealedLanguages].sort()).toEqual(['en', 'es']);
+    });
+
+    it('still honours reveals:false on `ended`', async () => {
+      // A before-base cue defers its reveal to the after-base slot; ending the
+      // card must not override that.
+      const { result } = renderPlayer();
+      await resolveMerge(
+        0,
+        makeResult({
+          durationSec: 4,
+          languageCues: [
+            { language: 'es', startSec: 0, speed: 1, reveals: false },
+          ],
+        }),
+      );
+      const audio = result.current.audioRef.current!;
+
+      act(() => {
+        audio.dispatchEvent(new Event('ended'));
+      });
+      expect([...result.current.revealedLanguages]).toEqual([]);
+    });
+  });
+
 });

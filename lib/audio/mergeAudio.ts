@@ -241,6 +241,14 @@ export interface LanguageCue {
    * the blurred target text. Omitted (undefined) is treated as revealing.
    */
   reveals?: boolean;
+  /**
+   * True for a placeholder cue standing in for a language whose repetitions are
+   * set to 0. It marks the point on the timeline where the clip *would* have
+   * started, so auto-reveal still un-blurs the text on schedule, but there is no
+   * audio behind it and it occupies no time. Consumers that resolve a *clip
+   * position* (word highlighting) must skip it; the reveal path must not.
+   */
+  silent?: boolean;
 }
 
 export interface MergeResult {
@@ -274,7 +282,16 @@ export async function mergeCardAudio(
 
   try {
     // --- 1. Collect entries with their resolved repetition counts ---
-    type Entry = { language: string; url: string; reps: number; speed: number };
+    type AudibleEntry = { language: string; url: string; reps: number; speed: number; silent?: false };
+    /**
+     * A language the user muted by setting its repetitions to 0. It keeps its
+     * slot in the sequence but schedules no clip: the auto-reveal ("Hide target
+     * / base languages") is driven entirely by cues, so dropping the language
+     * outright would leave its text blurred for the whole card with no way back
+     * except tapping it.
+     */
+    type SilentEntry = { language: string; url: null; reps: 0; speed: number; silent: true };
+    type Entry = AudibleEntry | SilentEntry;
 
     const baseEntries: Entry[] = [];
     // Target language(s) can play before base ("Practice Listening") and/or
@@ -287,34 +304,55 @@ export async function mergeCardAudio(
     const beforeSpeedFor = (lang: string) =>
       settings.beforeSpeeds[lang] ?? DEFAULT_PLAYBACK_SPEED;
 
+    // Repetitions at 0 keep their slot as a silent entry (see SilentEntry); a
+    // language with no playable recording is still dropped entirely, as before.
+    const collect = (out: Entry[], language: string, reps: number, speed: number) => {
+      if (reps <= 0) {
+        out.push({ language, url: null, reps: 0, speed, silent: true });
+        return;
+      }
+      const url = audioRecordings.find((a) => a.language === language)?.url;
+      if (url) out.push({ language, url, reps, speed });
+    };
+
     for (const lang of orderedBase) {
-      const reps = settings.reps[lang] ?? DEFAULT_REPETITIONS_BASE;
-      if (reps <= 0) continue;
-      const rec = audioRecordings.find((a) => a.language === lang);
-      if (rec?.url) baseEntries.push({ language: lang, url: rec.url, reps, speed: speedFor(lang) });
+      collect(baseEntries, lang, settings.reps[lang] ?? DEFAULT_REPETITIONS_BASE, speedFor(lang));
     }
     if (settings.playTargetBefore) {
       for (const lang of orderedTarget) {
-        const reps = settings.beforeReps[lang] ?? DEFAULT_REPETITIONS_TARGET_BEFORE;
-        if (reps <= 0) continue;
-        const rec = audioRecordings.find((a) => a.language === lang);
-        if (rec?.url) beforeTargetEntries.push({ language: lang, url: rec.url, reps, speed: beforeSpeedFor(lang) });
+        collect(
+          beforeTargetEntries,
+          lang,
+          settings.beforeReps[lang] ?? DEFAULT_REPETITIONS_TARGET_BEFORE,
+          beforeSpeedFor(lang),
+        );
       }
     }
     if (settings.playTargetAfter) {
       for (const lang of orderedTarget) {
-        const reps = settings.reps[lang] ?? settings.defaultTargetReps;
-        if (reps <= 0) continue;
-        const rec = audioRecordings.find((a) => a.language === lang);
-        if (rec?.url) afterTargetEntries.push({ language: lang, url: rec.url, reps, speed: speedFor(lang) });
+        collect(
+          afterTargetEntries,
+          lang,
+          settings.reps[lang] ?? settings.defaultTargetReps,
+          speedFor(lang),
+        );
       }
     }
+
+    // Languages that play after base. A before-base cue for one of these does
+    // NOT reveal the blurred text — only the later, after-base play does. Silent
+    // after-base entries count: when the user zeroes the after-base reps the
+    // reveal still belongs at the after-base slot, preserving the
+    // listen-then-guess-then-see flow of "Practice Listening".
+    const afterLangs = new Set(afterTargetEntries.map((e) => e.language));
 
     const allEntries = [...beforeTargetEntries, ...baseEntries, ...afterTargetEntries];
     if (allEntries.length === 0) return null;
 
     // --- 2. Fetch & decode unique URLs in parallel ---
-    const uniqueUrls = [...new Set(allEntries.map((e) => e.url))];
+    // Silent entries have no clip to fetch, decode or stretch.
+    const audibleEntries = allEntries.filter((e): e is AudibleEntry => !e.silent);
+    const uniqueUrls = [...new Set(audibleEntries.map((e) => e.url))];
     const decoded = new Map<string, AudioBuffer>();
 
     await Promise.all(
@@ -341,7 +379,7 @@ export async function mergeCardAudio(
       `${url}|${speed.toFixed(3)}`;
     const stretched = new Map<StretchKey, AudioBuffer>();
     const uniqueCombos = new Map<StretchKey, { url: string; speed: number }>();
-    for (const e of allEntries) uniqueCombos.set(stretchKey(e.url, e.speed), { url: e.url, speed: e.speed });
+    for (const e of audibleEntries) uniqueCombos.set(stretchKey(e.url, e.speed), { url: e.url, speed: e.speed });
 
     await Promise.all(
       [...uniqueCombos.values()].map(async ({ url, speed }) => {
@@ -366,10 +404,6 @@ export async function mergeCardAudio(
     const speedByLanguage: Record<string, number> = {};
     let cursor = 0; // seconds
 
-    // Languages that play after base. A before-base cue for one of these does
-    // NOT reveal the blurred text — only the later, after-base play does.
-    const afterLangs = new Set(afterTargetEntries.map((e) => e.language));
-
     const scheduleGroup = (
       entries: Entry[],
       pauseBetweenLanguages: number,
@@ -378,22 +412,33 @@ export async function mergeCardAudio(
     ) => {
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i];
-        const originalBuffer = decoded.get(entry.url);
-        const buffer = stretched.get(stretchKey(entry.url, entry.speed));
-        if (!buffer || !originalBuffer) continue;
-        // Gain is computed from the original buffer — time-stretching preserves
-        // amplitude envelope but we key the peak cache on the source URL anyway.
-        const peak = computePeakFromBuffer(originalBuffer, entry.url);
-        const gain = computeGain(peak);
-        speedByLanguage[entry.language] = entry.speed;
         const reveals = revealsFor(entry.language);
 
-        for (let r = 0; r < entry.reps; r++) {
-          languageCues.push({ language: entry.language, startSec: cursor, speed: entry.speed, reveals });
-          clips.push({ buffer, startSec: cursor, gain });
-          cursor += buffer.duration;
-          if (r < entry.reps - 1) {
-            cursor += repPauseFor(entry.language);
+        if (entry.silent) {
+          // One cue at the moment the first repetition would have begun, so the
+          // text un-blurs on schedule, then straight on to the next language. No
+          // clip, no rep pauses (0 repetitions have no gaps between them), and
+          // deliberately no `speedByLanguage` entry — nothing was stretched for
+          // this language, and a phantom one would shadow the real per-cue speed
+          // of a language that also plays in the other group.
+          languageCues.push({ language: entry.language, startSec: cursor, speed: entry.speed, reveals, silent: true });
+        } else {
+          const originalBuffer = decoded.get(entry.url);
+          const buffer = stretched.get(stretchKey(entry.url, entry.speed));
+          if (!buffer || !originalBuffer) continue;
+          // Gain is computed from the original buffer — time-stretching preserves
+          // amplitude envelope but we key the peak cache on the source URL anyway.
+          const peak = computePeakFromBuffer(originalBuffer, entry.url);
+          const gain = computeGain(peak);
+          speedByLanguage[entry.language] = entry.speed;
+
+          for (let r = 0; r < entry.reps; r++) {
+            languageCues.push({ language: entry.language, startSec: cursor, speed: entry.speed, reveals });
+            clips.push({ buffer, startSec: cursor, gain });
+            cursor += buffer.duration;
+            if (r < entry.reps - 1) {
+              cursor += repPauseFor(entry.language);
+            }
           }
         }
 
@@ -403,13 +448,13 @@ export async function mergeCardAudio(
       }
     };
 
-    // Base group with all reps zeroed (or no playable recordings) while base
-    // languages are still part of the composition: the group is silent, but it
+    // Base is part of the composition whenever base languages are ordered, even
+    // if none of them plays (reps zeroed, or no playable recordings): the group
     // keeps its place in the sequence so the pauses around it — which the user
     // still sees in settings — play as silence instead of vanishing. orderedBase
     // is empty only when base is deliberately excluded (e.g. transcribe mode);
     // there, no phantom pauses are added.
-    const baseSilenced = baseEntries.length === 0 && orderedBase.length > 0;
+    const baseInComposition = orderedBase.length > 0;
 
     // Sequence: [before-target] → base → [after-target]. The pause-before-advance
     // is always appended last (after whatever final group exists), so auto-advance
@@ -423,7 +468,7 @@ export async function mergeCardAudio(
         beforeRepPause,
         (lang) => !afterLangs.has(lang),
       );
-      if (baseEntries.length > 0 || baseSilenced) {
+      if (baseInComposition) {
         cursor += settings.pauseT2B;
       } else if (afterTargetEntries.length > 0) {
         // No base in the composition between the two target groups — separate
@@ -435,7 +480,7 @@ export async function mergeCardAudio(
 
     scheduleGroup(baseEntries, settings.pauseB2B, repPause);
 
-    if ((baseEntries.length > 0 || baseSilenced) && afterTargetEntries.length > 0) {
+    if (baseInComposition && afterTargetEntries.length > 0) {
       cursor += settings.pauseB2T;
     }
 
@@ -446,10 +491,17 @@ export async function mergeCardAudio(
     }
 
     const totalDuration = cursor;
-    if (totalDuration <= 0 || clips.length === 0) return null;
+    // A composition with nothing audible is still a real timeline: the pauses
+    // play as silence and the placeholder cues fire their auto-reveals at the
+    // offsets the clips would have occupied, so the silence is worth rendering.
+    // Only a genuinely empty timeline — nothing audible AND no pauses — has
+    // nothing to play and nothing to reveal along.
+    if (totalDuration <= 0) return null;
 
     // --- 4. Render with OfflineAudioContext ---
-    const sampleRate = decoded.values().next().value!.sampleRate;
+    // Match the decoded clips' rate; a fully silent render decodes nothing and
+    // has no rate to match, so fall back to the shared decode context's.
+    const sampleRate = decoded.values().next().value?.sampleRate ?? ctx.sampleRate;
     const totalSamples = Math.ceil(totalDuration * sampleRate);
     const offline = new OfflineAudioContext(1, totalSamples, sampleRate);
 

@@ -86,12 +86,13 @@ export const AudioProgressBar = memo(function AudioProgressBar({
   const noAudio = durationSec <= 0;
 
   // Cue boundaries to render as thin separator ticks on hover. Drop the
-  // leading 0s cue (it lines up with the bar's left edge) and any cue past
-  // duration (shouldn't happen, but defensive).
+  // leading 0s cue (it lines up with the bar's left edge), silent cues (a
+  // zero-repetition language has no clip, so there is no boundary there), and
+  // any cue past duration (shouldn't happen, but defensive).
   const cueMarks =
     !noAudio && languageCues
       ? languageCues
-        .filter((c) => c.startSec > 0 && c.startSec < durationSec)
+        .filter((c) => !c.silent && c.startSec > 0 && c.startSec < durationSec)
         .map((c) => (c.startSec / durationSec) * 100)
       : [];
 

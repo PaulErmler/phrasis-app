@@ -46,6 +46,10 @@ export function useActiveCue(
     const compute = (timeSec: number) => {
       let idx = -1;
       for (let i = languageCues.length - 1; i >= 0; i--) {
+        // Silent cues are reveal-only placeholders for zero-repetition
+        // languages — there is no clip to highlight, so keep scanning back to
+        // the language that is actually sounding.
+        if (languageCues[i].silent) continue;
         if (languageCues[i].startSec <= timeSec) {
           idx = i;
           break;

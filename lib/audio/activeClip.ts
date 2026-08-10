@@ -22,6 +22,7 @@ export function resolveActiveClip(
   speedByLanguage?: Record<string, number>,
 ): { language: string; localTime: number } | null {
   for (let i = cues.length - 1; i >= 0; i--) {
+    if (cues[i].silent) continue; // placeholder — no clip behind it
     if (cues[i].startSec <= currentTime) {
       const language = cues[i].language;
       const mergedLocal = currentTime - cues[i].startSec;
@@ -57,11 +58,12 @@ export function resolveActiveCuePosition(
   speedByLanguage?: Record<string, number>,
 ): ActiveCuePosition | null {
   for (let i = cues.length - 1; i >= 0; i--) {
+    if (cues[i].silent) continue; // placeholder — no clip behind it
     if (cues[i].startSec <= currentTime) {
       const language = cues[i].language;
       let repIndex = 0;
       for (let j = 0; j < i; j++) {
-        if (cues[j].language === language) repIndex++;
+        if (cues[j].language === language && !cues[j].silent) repIndex++;
       }
       const speed = cues[i].speed ?? speedByLanguage?.[language] ?? 1;
       const localTimeOriginal = (currentTime - cues[i].startSec) * speed;
@@ -86,7 +88,7 @@ export function mergedTimeForCuePosition(
 ): number | null {
   let seen = 0;
   for (let i = 0; i < newCues.length; i++) {
-    if (newCues[i].language !== pos.language) continue;
+    if (newCues[i].language !== pos.language || newCues[i].silent) continue;
     if (seen === pos.repIndex) {
       const newSpeed = newCues[i].speed ?? newSpeedByLanguage[pos.language] ?? 1;
       return newCues[i].startSec + pos.localTimeOriginal / newSpeed;
