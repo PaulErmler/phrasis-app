@@ -474,10 +474,15 @@ export const processLlmTranslationForCard = internalAction({
         // silently bill thinking tokens (observed on Luna's Azure endpoints
         // during the Aug 2026 eval).
         const bo = await translateBestOfN({ ...promptArgs, stage });
-        for (const t of bo.telemetryList) {
+        // Capture outside the closure: the `stage.samples` narrowing from
+        // the enclosing if doesn't survive into the callback.
+        const sampleTotal = stage.samples.total;
+        // Independent captures — fire together instead of serializing up to
+        // N+1 awaited PostHog writes.
+        await Promise.all(bo.telemetryList.map(async (t) => {
           const visibleTokenEstimate =
-            t.role === 'candidate' && bo.result.ok
-              ? Math.max(16, Math.ceil(bo.result.text.length / 2))
+            t.visibleTextLength !== undefined
+              ? Math.max(16, Math.ceil(t.visibleTextLength / 2))
               : undefined;
           await captureGeneration(ctx, {
             feature: 'translation',
@@ -493,7 +498,7 @@ export const processLlmTranslationForCard = internalAction({
             sharedContent: true,
             extra: {
               ...stageExtra,
-              strategy: `bo${stage.samples.total}`,
+              strategy: `bo${sampleTotal}`,
               role: t.role,
               candidate_index: t.candidateIndex,
               judge_attempt: t.judgeAttempt,
@@ -504,7 +509,7 @@ export const processLlmTranslationForCard = internalAction({
                 t.outputTokens > 4 * visibleTokenEstimate,
             },
           });
-        }
+        }));
         result = bo.result;
       } else {
         result = await translateTextWithLLM({

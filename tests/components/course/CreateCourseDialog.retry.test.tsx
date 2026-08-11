@@ -23,6 +23,7 @@ beforeAll(() => {
 });
 
 const createCourse = vi.fn();
+const archiveCourse = vi.fn();
 const setActiveCourse = vi.fn();
 const updateCourseSettings = vi.fn();
 
@@ -30,6 +31,7 @@ vi.mock('convex/react', () => ({
   useMutation: (ref: unknown) => {
     const name = String((ref as { toString(): string })?.toString?.() ?? '');
     if (name.includes('createCourse')) return createCourse;
+    if (name.includes('archiveCourse')) return archiveCourse;
     if (name.includes('setActiveCourse')) return setActiveCourse;
     return updateCourseSettings;
   },
@@ -42,6 +44,7 @@ vi.mock('@/convex/_generated/api', () => ({
     features: {
       courses: {
         createCourse: 'features/courses:createCourse',
+        archiveCourse: 'features/courses:archiveCourse',
         setActiveCourse: 'features/courses:setActiveCourse',
         updateCourseSettings: 'features/courses:updateCourseSettings',
       },
@@ -100,9 +103,11 @@ async function goBackAndSwitchTarget(
 describe('CreateCourseDialog — retry after a partial failure', () => {
   beforeEach(() => {
     createCourse.mockReset();
+    archiveCourse.mockReset();
     setActiveCourse.mockReset();
     updateCourseSettings.mockReset();
     createCourse.mockResolvedValue({ courseId: 'course_es' });
+    archiveCourse.mockResolvedValue(null);
     setActiveCourse.mockResolvedValue(undefined);
   });
 
@@ -156,6 +161,9 @@ describe('CreateCourseDialog — retry after a partial failure', () => {
     expect(updateCourseSettings).toHaveBeenLastCalledWith(
       expect.objectContaining({ courseId: 'course_fr' }),
     );
+    // The abandoned Spanish course releases its slot — on the single-course
+    // free tier the second create would otherwise die on USAGE_LIMIT.
+    expect(archiveCourse).toHaveBeenCalledWith({ courseId: 'course_es' });
   });
 
   it('activates the course on every attempt so a goal-only retry still lands', async () => {

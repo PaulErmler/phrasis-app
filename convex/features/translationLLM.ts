@@ -332,11 +332,24 @@ type LlmCallConfig = {
  * caller can fall back to Google Translate on truncation/empty/HTTP failure
  * without losing the user's translation.
  */
+/**
+ * OpenRouter client with usage accounting on (this is the highest-volume
+ * LLM path in the app and was previously the largest unmeasured line on
+ * the bill), or null when the key is missing — every caller must degrade
+ * to its structured-failure path instead of letting the SDK throw an
+ * opaque error mid-call.
+ */
+function openrouterClient(): ReturnType<typeof createOpenRouter> | null {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) return null;
+  return createOpenRouter({ apiKey, extraBody: OPENROUTER_USAGE_ACCOUNTING });
+}
+
 export async function translateTextWithLLM(
   args: TranslationPromptArgs & LlmCallConfig,
 ): Promise<LlmTranslationResult> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
+  const openrouter = openrouterClient();
+  if (!openrouter) {
     return {
       ok: false,
       reason: 'http_error',
@@ -349,13 +362,6 @@ export async function translateTextWithLLM(
   // verbatim — no length-based hybrid in this layer.
   const effort = args.reasoning;
   const maxOutputTokens = args.maxOutputTokens ?? MAX_OUTPUT_TOKENS;
-
-  // Usage accounting on: this is the highest-volume LLM path in the app and was
-  // previously the largest unmeasured line on the bill.
-  const openrouter = createOpenRouter({
-    apiKey,
-    extraBody: OPENROUTER_USAGE_ACCOUNTING,
-  });
 
   const startedAt = Date.now();
   const providerOptions = openrouterCallOptions(effort, args.provider);
@@ -479,6 +485,13 @@ export type BestOfNTelemetry = LlmCallTelemetry & {
   judgeAttempt?: number;
   /** Set when this call failed; the stage may still have succeeded. */
   error?: string;
+  /**
+   * Length of THIS call's own visible output (successful candidates only).
+   * The hidden-reasoning heuristic must compare each call's token count
+   * against its own text — the winner's length says nothing about a losing
+   * candidate's.
+   */
+  visibleTextLength?: number;
 };
 
 export type BestOfNResult = {
@@ -579,7 +592,9 @@ export async function translateBestOfN(
           ...res.telemetry,
           role: 'candidate',
           candidateIndex: index,
-          ...(res.ok ? {} : { error: res.reason }),
+          ...(res.ok
+            ? { visibleTextLength: res.text.length }
+            : { error: res.reason }),
         });
       }
       return { index, res };
@@ -635,12 +650,13 @@ export async function translateBestOfN(
   const maxAttempts = 1 + (judge.maxRetries ?? 2);
   const judgeProviderOptions = openrouterCallOptions(judge.reasoning, judge.provider);
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const openrouter = createOpenRouter({ apiKey, extraBody: OPENROUTER_USAGE_ACCOUNTING });
+  // Null is unreachable in practice — a missing key already failed every
+  // candidate above — but degrade to the anchor pick instead of an SDK crash.
+  const openrouter = openrouterClient();
 
   let pickedText: string | null = null;
-  let judgeFallback = false;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  let judgeFallback = openrouter === null;
+  for (let attempt = 1; openrouter !== null && attempt <= maxAttempts; attempt++) {
     const startedAt = Date.now();
     try {
       const judgeResult = await generateText({

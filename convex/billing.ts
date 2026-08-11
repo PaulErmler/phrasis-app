@@ -7,9 +7,13 @@ import {
   syncQuotasForUser,
   type AutumnInvoiceEntry,
 } from './usage/tracking';
-import { normalizePlans, type AutumnPlan } from '../lib/autumn/customer-shape';
+import {
+  currentPlans,
+  normalizePlans,
+  type AutumnPlan,
+} from '../lib/autumn/customer-shape';
 import { getTrialState } from '../lib/autumn/trial-eligibility';
-import { MANAGED_PAYMENTS_SESSION_PARAMS } from '../lib/autumn/managed-payments';
+import { managedPaymentsCheckoutParams } from '../lib/autumn/managed-payments';
 import { autumnFetch } from './usage/autumnClient';
 
 /**
@@ -59,9 +63,11 @@ export const switchPlanDuringTrial = action({
       undefined,
       '1.2',
     );
-    const trialing: AutumnPlan | undefined = normalizePlans(customer).find(
-      (p) => !p.isDefault && !p.isAddOn && p.isTrialing,
-    );
+    // currentPlans: an early-cancelled trial leaves an `expired` entry with
+    // trial_ends_at still in the future — it must not read as trialing.
+    const trialing: AutumnPlan | undefined = currentPlans(
+      normalizePlans(customer),
+    ).find((p) => !p.isDefault && !p.isAddOn && p.isTrialing);
     if (!trialing) {
       throw new Error('No active trial — use the regular checkout flow');
     }
@@ -149,14 +155,10 @@ export const switchPlanDuringTrial = action({
               card_required: true,
             },
           },
-          // Merchant-of-record mode, when enabled. Snake_case here because
-          // this body is hand-written for the REST API — unlike the Convex
-          // component's args, nothing case-converts it. Usually inert: the
+          // Merchant-of-record mode, when enabled. Usually inert: the
           // card is already on file so this branch rarely produces a
           // checkout session at all (see the payment_url note below).
-          ...(process.env.AUTUMN_MANAGED_PAYMENTS === 'true'
-            ? { checkout_session_params: MANAGED_PAYMENTS_SESSION_PARAMS }
-            : {}),
+          ...managedPaymentsCheckoutParams(),
         },
         '2.1.0',
       );
@@ -265,9 +267,7 @@ export const attachNewPlan = action({
         // confirmation.
         redirect_mode: 'always',
         ...(state.trialEligible ? {} : { customize: { free_trial: null } }),
-        ...(process.env.AUTUMN_MANAGED_PAYMENTS === 'true'
-          ? { checkout_session_params: MANAGED_PAYMENTS_SESSION_PARAMS }
-          : {}),
+        ...managedPaymentsCheckoutParams(),
       },
       '2.1.0',
     );

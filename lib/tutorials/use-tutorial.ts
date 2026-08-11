@@ -119,6 +119,13 @@ interface UseTutorialOptions {
   onComplete?: () => void;
   /** When the user clicks the highlighted element on this step (0-based index), complete the tutorial and close the driver. */
   stepCompleteOnClickIndex?: number;
+  /**
+   * Whether clicking the last step's highlighted element completes the tour
+   * (default true — closing steps are usually CTAs that navigate away). Pass
+   * false for tours whose last step highlights an element purely to explain
+   * it: a curiosity click there must not mark the tour finished.
+   */
+  lastStepCompleteOnClick?: boolean;
   /** Runtime context forwarded to the tour factory (e.g. reviewMode so the
    *  home tour anchors the Radio vs Free Study button). */
   context?: TutorialContext;
@@ -132,6 +139,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     onInteractiveStep,
     onComplete,
     stepCompleteOnClickIndex,
+    lastStepCompleteOnClick = true,
     context,
   } = options;
   const driverRef = useRef<Driver | null>(null);
@@ -304,13 +312,14 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     ) {
       completeOnClickIndices.add(stepCompleteOnClickIndex);
     }
-    // The closing step of a tour is a call-to-action that highlights the
-    // element the user is invited to click. That click must count as
+    // The closing step of a tour is usually a call-to-action that highlights
+    // the element the user is invited to click. That click must count as
     // finishing the tour: it often navigates away (e.g. the home tour's
     // Learn + Review CTA opens the learn view), which hides the host and
     // would otherwise hit the suppress-complete path below — leaving the
-    // tour unfinished and re-running it on every visit.
-    if (resolvedSteps.length > 0) {
+    // tour unfinished and re-running it on every visit. Tours whose last
+    // step is explanatory opt out via `lastStepCompleteOnClick: false`.
+    if (lastStepCompleteOnClick && resolvedSteps.length > 0) {
       completeOnClickIndices.add(resolvedSteps.length - 1);
     }
     for (const index of completeOnClickIndices) {
@@ -367,7 +376,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     driverRef.current = d;
     setIsActive(true);
     d.drive();
-  }, [tutorial, tutorialId, stepCompleteOnClickIndex]);
+  }, [tutorial, tutorialId, stepCompleteOnClickIndex, lastStepCompleteOnClick]);
 
   const launchDriverRef = useRef(launchDriver);
   useLayoutEffect(() => {

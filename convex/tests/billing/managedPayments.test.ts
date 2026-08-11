@@ -10,9 +10,10 @@ const modules = import.meta.glob("/convex/**/*.ts");
 // env is stubbed BEFORE the (deliberately dynamic) import — same pattern as
 // trialGate.test.ts.
 vi.stubEnv("AUTUMN_SECRET_KEY", "am_sk_test_stub");
-const { rejectLegacySessionUnderManagedPayments } = await import(
-  "../../autumn"
-);
+const {
+  rejectLegacySessionUnderManagedPayments,
+  stripLegacySessionUnderManagedPayments,
+} = await import("../../autumn");
 
 /**
  * Stripe Managed Payments (merchant of record) is activated by one opaque
@@ -394,6 +395,33 @@ describe("legacy-path guard under Managed Payments", () => {
     ).toHaveLength(0);
   });
 
+  it("an EXPIRED entry matching the target is not a renew — still reroutes to v2", async () => {
+    // A payer returning to a plan they once held (the old entry lingers as
+    // `expired` in the payload) is a cross-plan switch: reading it as a
+    // renew would keep the attach on the legacy path, where "no trial" is
+    // silently lost — the 2026-08-09 incident class.
+    stubAutumn({
+      "/customers/": {
+        products: [
+          paidProduct,
+          { id: "basic", status: "expired", is_default: false, is_add_on: false },
+        ],
+        trials_used: [{ product_id: "basic" }],
+      },
+      "/products/basic": {
+        id: "basic",
+        is_default: false,
+        properties: { is_free: false },
+      },
+      "/billing.attach": { payment_url: null },
+    });
+    const t = convexTest(schema, modules);
+    await asUser(t).action(api.autumn.attach, { productId: "basic" });
+    const body = attachBody();
+    expect(body.plan_id).toBe("basic");
+    expect(body.customize).toEqual({ free_trial: null });
+  });
+
   it("does not guard a trialing customer's checkout preview while the flag is on", async () => {
     vi.stubEnv("AUTUMN_MANAGED_PAYMENTS", "true");
     stubAutumn({
@@ -527,6 +555,45 @@ describe("attach routing for trial-suppressed switches", () => {
   });
 });
 
+describe("grandfathered free attachments (is_default:false)", () => {
+  // Old customers' free-plan rows carry NO default flag on v1.2 (live
+  // payload, 2026-08-11). They must still route as FIRST purchases: the
+  // 2026-08-11 incident was exactly this — the flag-less free plan read as
+  // a paid plan, the customer was sent down the legacy path, and the
+  // cardless preview minted a session the MoR backstop then blocked.
+  const grandfatheredFree = {
+    id: "free",
+    status: "active",
+    is_default: false,
+    is_add_on: false,
+  };
+
+  it("attachNewPlan accepts them as a first purchase", async () => {
+    vi.stubEnv("AUTUMN_MANAGED_PAYMENTS", "true");
+    stubAutumn({
+      "/customers/": { products: [grandfatheredFree], trials_used: [] },
+      "/billing.attach": { payment_url: "https://checkout.stripe.com/c/pay/z" },
+    });
+    const t = convexTest(schema, modules);
+    const res = await asUser(t).action(api.billing.attachNewPlan, {
+      productId: "pro",
+    });
+    expect(res.paymentUrl).toBe("https://checkout.stripe.com/c/pay/z");
+    expect(attachBody().redirect_mode).toBe("always");
+  });
+
+  it("the legacy guard still blocks their first purchase while the flag is on", async () => {
+    vi.stubEnv("AUTUMN_MANAGED_PAYMENTS", "true");
+    stubAutumn({
+      "/customers/": { products: [grandfatheredFree], trials_used: [] },
+    });
+    const t = convexTest(schema, modules);
+    await expect(
+      asUser(t).action(api.autumn.checkout, { productId: "pro" }),
+    ).rejects.toThrow(/refresh the page/i);
+  });
+});
+
 describe("attachNewPlan before the Autumn customer exists", () => {
   it("treats a 404 customer fetch as a brand-new, trial-eligible customer", async () => {
     // A brand-new user's very first checkout can run before any Autumn
@@ -550,14 +617,22 @@ describe("attachNewPlan before the Autumn customer exists", () => {
 });
 
 /**
- * The cardless-payer backstop. `guardFirstPurchaseOffLegacyPath` exempts
- * payers because their calls normally never create sessions — but a payer
- * whose card is gone gets a session from the v1.2 preview (and autumn-js
- * redirects on `data.url`/`checkout_url`), completing a sale without
- * merchant of record. The result guard refuses exactly that.
+ * The legacy-session backstops behind `guardFirstPurchaseOffLegacyPath`.
+ * Autumn's v1.2 endpoints build a Checkout Session whenever they deem the
+ * customer cardless — which includes customers whose card was collected on
+ * a MANAGED PAYMENTS session (the trial-start flow): the MoR payment method
+ * is not a usable default for new legacy sessions, so even a brand-new
+ * trialing customer's next plan click comes back with a session URL that
+ * autumn-js would redirect into (a non-MoR sale — live incident,
+ * 2026-08-11).
+ *
+ * The PREVIEW strips the url — the session-bearing response still carries
+ * the full dialog payload (probed live 2026-08-11), and the dialog's
+ * confirm paths produce MoR-capable sessions. The ATTACH result has no
+ * dialog to fall back to, so it refuses instead.
  */
-describe("rejectLegacySessionUnderManagedPayments", () => {
-  it("refuses a legacy result carrying a session URL while the flag is on", () => {
+describe("rejectLegacySessionUnderManagedPayments (attach results)", () => {
+  it("refuses a legacy attach result carrying a session URL while the flag is on", () => {
     vi.stubEnv("AUTUMN_MANAGED_PAYMENTS", "true");
     for (const data of [
       { url: "https://checkout.stripe.com/c/pay/x" },
@@ -589,5 +664,57 @@ describe("rejectLegacySessionUnderManagedPayments", () => {
         error: null,
       }),
     ).not.toThrow();
+  });
+});
+
+describe("stripLegacySessionUnderManagedPayments (checkout previews)", () => {
+  it("removes the session url but keeps the dialog payload while the flag is on", () => {
+    vi.stubEnv("AUTUMN_MANAGED_PAYMENTS", "true");
+    const consoleWarn = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+    try {
+      const result = {
+        data: {
+          url: "https://checkout.stripe.com/c/pay/x",
+          product: { scenario: "upgrade", properties: { is_free: false } },
+          lines: [{ amount: 100 }],
+          total: 100,
+          next_cycle: { starts_at: 1 },
+        },
+        error: null,
+      };
+      stripLegacySessionUnderManagedPayments(result);
+      // No url → autumn-js falls through to opening CheckoutDialog with
+      // this same data; its confirm goes through switchPlanDuringTrial or
+      // the v2 attach reroute, both MoR-capable.
+      expect(result.data).not.toHaveProperty("url");
+      expect(result.data.product.scenario).toBe("upgrade");
+      expect(result.data.total).toBe(100);
+    } finally {
+      consoleWarn.mockRestore();
+    }
+  });
+
+  it("leaves session-free previews and error containers untouched", () => {
+    vi.stubEnv("AUTUMN_MANAGED_PAYMENTS", "true");
+    const preview = {
+      data: { product: { scenario: "downgrade" } },
+      error: null,
+    };
+    stripLegacySessionUnderManagedPayments(preview);
+    expect(preview.data).toEqual({ product: { scenario: "downgrade" } });
+    expect(() =>
+      stripLegacySessionUnderManagedPayments({ data: null, error: {} }),
+    ).not.toThrow();
+  });
+
+  it("is inert while the flag is off — the url is the legitimate legacy redirect", () => {
+    const result = {
+      data: { url: "https://checkout.stripe.com/c/pay/x" },
+      error: null,
+    };
+    stripLegacySessionUnderManagedPayments(result);
+    expect(result.data.url).toBe("https://checkout.stripe.com/c/pay/x");
   });
 });

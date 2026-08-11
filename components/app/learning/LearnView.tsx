@@ -314,6 +314,9 @@ function LearnViewInner({
       !state.settingsOpen &&
       !isFreePlay,
     onComplete: () => playAfterTutorialRef.current(),
+    // Both review tours END on the chat button purely to explain it — a
+    // curiosity click there must not mark the tour completed.
+    lastStepCompleteOnClick: false,
   });
   // `progressDisplayActive` lives on BaseState so it persists across status
   // transitions (e.g. milestone hit on the last card → noCardsDue mid-cele).

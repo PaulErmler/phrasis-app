@@ -3,8 +3,11 @@ import { components, internal } from "./_generated/api";
 import { action, type ActionCtx } from "./_generated/server";
 import { Autumn } from "@useautumn/convex";
 import { getTrialState, type TrialState } from "../lib/autumn/trial-eligibility";
-import { normalizePlans } from "../lib/autumn/customer-shape";
-import { MANAGED_PAYMENTS_SESSION_PARAMS } from "../lib/autumn/managed-payments";
+import { currentPlans, normalizePlans } from "../lib/autumn/customer-shape";
+import {
+  managedPaymentsCheckoutParams,
+  managedPaymentsEnabled,
+} from "../lib/autumn/managed-payments";
 import { autumnFetchRaw } from "./usage/autumnClient";
 
 const secretKey = (() => {
@@ -13,25 +16,15 @@ const secretKey = (() => {
   return key;
 })();
 
-/**
- * Kill switch for Stripe Managed Payments (merchant of record) — see
- * lib/autumn/managed-payments.ts for what it does and the constraints.
- *
- * Read per call rather than at module load so `npx convex env set/unset
- * AUTUMN_MANAGED_PAYMENTS` takes effect without waiting on isolate
- * recycling. Managed Payments params ride only on v2 `/billing.attach`
- * calls — convex/billing.ts (attachNewPlan, switchPlanDuringTrial) and
- * `attachViaV2NoTrial` below: the legacy path these actions otherwise call
- * (autumn-js pins `x-api-version: 1.2`) builds its Stripe client on
- * 2025-02-24.acacia, and Stripe rejects `managed_payments` before
- * 2025-03-31.basil — so injecting it there could never work. In this file
- * the flag drives `guardFirstPurchaseOffLegacyPath` (keeping first
- * purchases from slipping past MoR onto the legacy path) and the session
- * params on `attachViaV2NoTrial`.
- */
-function managedPaymentsEnabled(): boolean {
-  return process.env.AUTUMN_MANAGED_PAYMENTS === 'true';
-}
+// Managed Payments params ride only on v2 `/billing.attach` calls —
+// convex/billing.ts (attachNewPlan, switchPlanDuringTrial) and
+// `attachViaV2NoTrial` below: the legacy path these actions otherwise call
+// (autumn-js pins `x-api-version: 1.2`) builds its Stripe client on
+// 2025-02-24.acacia, and Stripe rejects `managed_payments` before
+// 2025-03-31.basil — so injecting it there could never work. In this file
+// the flag drives `guardFirstPurchaseOffLegacyPath` (keeping first
+// purchases from slipping past MoR onto the legacy path), the legacy-result
+// backstops, and the session params on `attachViaV2NoTrial`.
 
 export const autumn = new Autumn(components.autumn, {
   secretKey,
@@ -239,6 +232,10 @@ function guardFirstPurchaseOffLegacyPath(state: TrialState | null): void {
     !state.hasPaidPlan &&
     !state.onTrial
   ) {
+    // The state that got here is the whole diagnosis (the 2026-08-11
+    // incident was opaque without it) — the error string alone says nothing
+    // about WHY the customer was classified this way.
+    console.warn('Blocked a first purchase off the legacy path', { state });
     throw new Error('Checkout has been updated — please refresh the page');
   }
 }
@@ -283,9 +280,7 @@ async function attachViaV2NoTrial(
         : {}),
       // Defensive: a payer switch never creates a Checkout Session, but if
       // Autumn ever does on this path, it must carry merchant of record.
-      ...(managedPaymentsEnabled()
-        ? { checkout_session_params: MANAGED_PAYMENTS_SESSION_PARAMS }
-        : {}),
+      ...managedPaymentsCheckoutParams(),
     },
     '2.1.0',
   );
@@ -371,16 +366,18 @@ function rejectArgsUnsupportedOnV2(args: Record<string, unknown>): void {
 }
 
 /**
- * Backstop behind `guardFirstPurchaseOffLegacyPath` for the one case that
- * guard exempts: a payer whose card is gone. Their legacy preview/attach
- * DOES build a Checkout Session (the same cardless mechanism the guard doc
- * describes) and autumn-js redirects to it on `data.url` / `checkout_url` —
- * a session the legacy path can never make merchant-of-record. Refuse the
- * redirect instead of completing a sale whose tax liability lands on us.
- * Trialing customers and card-holding payers never get a session here, so
- * they are unaffected.
+ * Backstop behind `guardFirstPurchaseOffLegacyPath` for the legacy ATTACH
+ * result: the reachable legacy attaches (renew, cancel-to-Free) never need
+ * payment, so a `checkout_url` here means Autumn built a session the legacy
+ * path can never make merchant-of-record, and autumn-js would redirect
+ * straight into it. No dialog exists to fall back to on this path — refuse
+ * the redirect instead of completing a sale whose tax liability lands on
+ * us. (The checkout PREVIEW gets the softer treatment below.)
  */
-export function rejectLegacySessionUnderManagedPayments(result: unknown): void {
+export function rejectLegacySessionUnderManagedPayments(
+  result: unknown,
+  state?: TrialState | null,
+): void {
   if (!managedPaymentsEnabled()) return;
   const data = (
     result as { data?: { url?: unknown; checkout_url?: unknown } | null } | null
@@ -389,6 +386,10 @@ export function rejectLegacySessionUnderManagedPayments(result: unknown): void {
     typeof data?.url === 'string' ||
     typeof data?.checkout_url === 'string'
   ) {
+    console.warn(
+      'Refused a legacy attach that returned a checkout session under Managed Payments',
+      { state },
+    );
     throw new Error(
       'No usable payment method on file — please update your payment details in the billing portal, then try again',
     );
@@ -406,9 +407,12 @@ export const attach = action({
     // switch) and cancel-to-Free stay on the legacy path, whose scheduling
     // semantics they depend on; free has no trial to suppress, and a payer
     // never HOLDS free, so the target is asked of Autumn's product record,
-    // not of `targetIsHeld`.
+    // not of `targetIsHeld`. currentPlans: an EXPIRED entry matching the
+    // target (a payer returning to a plan they once held) is not a renew —
+    // reading it as one would keep the switch on the legacy path, where
+    // "no trial" is silently lost.
     if (gated.freeTrial === false && gated.productId) {
-      const targetIsHeld = normalizePlans(customer).some(
+      const targetIsHeld = currentPlans(normalizePlans(customer)).some(
         (p) => p.planId === gated.productId,
       );
       if (!targetIsHeld && !(await isFreeProduct(gated.productId))) {
@@ -417,10 +421,45 @@ export const attach = action({
       }
     }
     const result = await autumn.attach(ctx, gated);
-    rejectLegacySessionUnderManagedPayments(result);
+    rejectLegacySessionUnderManagedPayments(result, state);
     return result;
   },
 });
+
+/**
+ * The checkout PREVIEW's counterpart to the reject above. Autumn's v1.2
+ * preview builds a Checkout Session whenever it deems the customer
+ * cardless — and that includes customers whose card was collected on a
+ * MANAGED PAYMENTS session (the trial-start flow!): the MoR payment method
+ * is not a usable default for new legacy sessions, so a brand-new trialing
+ * customer's very next plan click came back with `url` and autumn-js would
+ * have redirected into a non-MoR sale (live incident, 2026-08-11).
+ *
+ * The session-bearing preview still carries the full dialog payload
+ * (product/scenario, lines, total, next_cycle — probed live 2026-08-11),
+ * so the fix is to STRIP the url: autumn-js then opens CheckoutDialog with
+ * the preview, and the dialog's confirm paths already produce MoR-capable
+ * sessions when payment is really needed (switchPlanDuringTrial and the v2
+ * attach reroute both send `checkout_session_params` and surface
+ * `payment_url`/`checkout_url` redirects).
+ */
+export function stripLegacySessionUnderManagedPayments(
+  result: unknown,
+  state?: TrialState | null,
+): void {
+  if (!managedPaymentsEnabled()) return;
+  const data = (result as { data?: Record<string, unknown> | null } | null)
+    ?.data;
+  if (!data) return;
+  if (typeof data.url === 'string' || typeof data.checkout_url === 'string') {
+    console.warn(
+      'Stripped a legacy checkout-session URL from a preview under Managed Payments — confirm proceeds via the dialog',
+      { state },
+    );
+    delete data.url;
+    delete data.checkout_url;
+  }
+}
 
 export const checkout = action({
   args: checkoutSharedArgs,
@@ -430,7 +469,7 @@ export const checkout = action({
     // Previews stay legacy: `freeTrial: false` still works on /checkout
     // (probed 2026-08-09), and the dialog needs the v1.2 `scenario`.
     const result = await autumn.checkout(ctx, gated);
-    rejectLegacySessionUnderManagedPayments(result);
+    stripLegacySessionUnderManagedPayments(result, state);
     return result;
   },
 });

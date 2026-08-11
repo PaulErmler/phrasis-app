@@ -27,9 +27,7 @@ import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLocale, useTranslations } from "next-intl";
 import { CLIENT_EVENTS, capture } from "@/lib/posthog/events";
-import { reportError } from "@/lib/report-error";
 import { usePathname } from "next/navigation";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getCheckoutContent } from "@/lib/autumn/checkout-content";
 import {
@@ -37,7 +35,10 @@ import {
   findCurrentPaidProduct,
   getTrialState,
 } from "@/lib/autumn/trial-eligibility";
-import { throwOnCheckoutError } from "@/hooks/use-checkout-error";
+import {
+  throwOnCheckoutError,
+  useCheckoutErrorToast,
+} from "@/hooks/use-checkout-error";
 
 export interface CheckoutDialogProps {
 	open: boolean;
@@ -64,6 +65,7 @@ const formatCurrency = ({
 export default function CheckoutDialog(params: CheckoutDialogProps) {
   const t = useTranslations("Checkout");
   const locale = useLocale();
+  const showCheckoutError = useCheckoutErrorToast();
   const { attach, customer, refetch } = useCustomer({
     expand: ["trials_used"],
   });
@@ -228,8 +230,7 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
                   product_id: checkoutResult.product.id,
                   is_trial_switch: isTrialSwitch,
                 });
-                reportError(e, { op: 'checkout.confirm' });
-                toast.error(t("confirmError"));
+                showCheckoutError(e, 'checkout.confirm');
               } finally {
                 setLoading(false);
               }

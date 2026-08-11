@@ -1,9 +1,14 @@
 "use client";
 
+import type { ElementType } from "react";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { CLIENT_EVENTS, capture } from "@/lib/posthog/events";
-import type { TrialState } from "@/lib/autumn/trial-eligibility";
+import {
+  checkoutTrialParams,
+  type TrialState,
+} from "@/lib/autumn/trial-eligibility";
+import { throwOnCheckoutError } from "@/hooks/use-checkout-error";
 
 /**
  * Routes a first paid purchase through Autumn's v2 endpoint
@@ -65,5 +70,49 @@ export function useNewPlanCheckout() {
     return { redirected: false as const };
   };
 
-  return { isFirstPurchase, startNewPlanCheckout };
+  /**
+   * The one purchase entry point shared by the pricing table and the
+   * paywall/low-quota dialogs. First purchases go to the v2 hosted
+   * checkout — never `checkout()`, whose legacy preview can't carry
+   * Managed Payments; everyone else opens CheckoutDialog via `checkout()`,
+   * with autumn-js's `{ error }` containers surfaced as throws (a plain
+   * await "succeeds" silently on failure).
+   */
+  const purchasePlan = async ({
+    productId,
+    trialState,
+    checkout,
+    dialog,
+    freeTarget = false,
+  }: {
+    productId: string;
+    trialState: TrialState;
+    /** The caller's `useCustomer().checkout`. */
+    checkout: (params: {
+      productId: string;
+      dialog?: ElementType;
+      freeTrial?: false;
+    }) => Promise<unknown>;
+    dialog: ElementType;
+    /**
+     * True when the clicked product is the Free plan — a cancel/downgrade,
+     * never a purchase, so it always goes through `checkout()` + the dialog
+     * (the v2 route only sells paid plans).
+     */
+    freeTarget?: boolean;
+  }) => {
+    if (!freeTarget && isFirstPurchase(trialState)) {
+      await startNewPlanCheckout(productId, trialState);
+    } else {
+      throwOnCheckoutError(
+        await checkout({
+          productId,
+          dialog,
+          ...checkoutTrialParams(trialState),
+        }),
+      );
+    }
+  };
+
+  return { isFirstPurchase, startNewPlanCheckout, purchasePlan };
 }

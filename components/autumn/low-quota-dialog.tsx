@@ -15,17 +15,14 @@ import {
   findCurrentIntervalGroup,
   findUpgradeProductFromPricingTable,
 } from "@/lib/autumn/find-upgrade-product";
-import { checkoutTrialParams, getTrialState } from "@/lib/autumn/trial-eligibility";
+import { getTrialState } from "@/lib/autumn/trial-eligibility";
 import { getFeatureI18nKey, isFeatureConsumable } from "@/lib/features/feature-meta";
 import { isCreditBackedFeature } from "@/convex/features/featureIds";
 import { useFeatureQuota } from "@/components/feature_tracking/useFeatureQuota";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import { useIsNativeApp } from "@/hooks/use-native-app";
 import { useNewPlanCheckout } from "@/hooks/use-new-plan-checkout";
-import {
-  throwOnCheckoutError,
-  useCheckoutErrorToast,
-} from "@/hooks/use-checkout-error";
+import { useCheckoutErrorToast } from "@/hooks/use-checkout-error";
 
 export interface LowQuotaDialogProps {
   open: boolean;
@@ -45,7 +42,7 @@ export default function LowQuotaDialog({
   const { checkout, customer } = useCustomer({ expand: ["trials_used"] });
   const trialState = getTrialState(customer);
   const { products } = usePricingTable();
-  const { isFirstPurchase, startNewPlanCheckout } = useNewPlanCheckout();
+  const { purchasePlan } = useNewPlanCheckout();
   const showCheckoutError = useCheckoutErrorToast();
   const [upgrading, setUpgrading] = useState(false);
 
@@ -73,22 +70,12 @@ export default function LowQuotaDialog({
     if (!upgradeProduct) return;
     setUpgrading(true);
     try {
-      // First purchases must never reach checkout(): its preview would build
-      // the session on the legacy path, which can't carry Managed Payments.
-      // The v2 route always confirms on Stripe's hosted page instead.
-      if (isFirstPurchase(trialState)) {
-        await startNewPlanCheckout(upgradeProduct.id, trialState);
-      } else {
-        // autumn-js reports failures as an `{ error }` container, not a
-        // throw — without the check this closed silently on failure.
-        throwOnCheckoutError(
-          await checkout({
-            productId: upgradeProduct.id,
-            dialog: CheckoutDialog,
-            ...checkoutTrialParams(trialState),
-          }),
-        );
-      }
+      await purchasePlan({
+        productId: upgradeProduct.id,
+        trialState,
+        checkout,
+        dialog: CheckoutDialog,
+      });
       setOpen(false);
     } catch (e) {
       showCheckoutError(e, "lowQuota.upgrade");

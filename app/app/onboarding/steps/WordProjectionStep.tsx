@@ -19,7 +19,7 @@ import {
   DAILY_TIME_CUSTOM_MIN,
   DAILY_TIME_CUSTOM_MAX,
 } from '../types';
-import { parseCustomGoal } from '@/lib/constants/dailyGoal';
+import { isPresetGoal, parseCustomGoal } from '@/lib/constants/dailyGoal';
 import { GoalPresetTile } from '@/components/app/stats/GoalPresetTile';
 import type { OnboardingSessionSummary } from '../components/OnboardingFirstLesson';
 
@@ -279,9 +279,7 @@ function GoalPresetPicker({
   onChange: (minutes: number) => void;
 }) {
   const t = useTranslations('Onboarding.wordProjection');
-  const isPreset = (DAILY_TIME_PRESETS as readonly number[]).includes(
-    activeGoal,
-  );
+  const isPreset = isPresetGoal(activeGoal);
   // Custom stays open once the user opts into it (or arrived with a
   // non-preset goal), so applying a value doesn't collapse the input.
   const [customOpen, setCustomOpen] = useState(!isPreset);

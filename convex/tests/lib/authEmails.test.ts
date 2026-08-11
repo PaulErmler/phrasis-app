@@ -84,6 +84,8 @@ describe("renderAuthEmail (link emails)", () => {
 });
 
 describe("renderOtpEmail (verification code)", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   it("renders the code as plain selectable text", () => {
     const copy = AUTH_EMAIL_COPY.verify;
     const { html, text } = renderOtpEmail(copy, "123456");
@@ -96,6 +98,12 @@ describe("renderOtpEmail (verification code)", () => {
     expect(text).toContain("123456");
     expect(html).toContain("icon-192x192.png");
     expect(html).toContain("support@flexling.com");
+  });
+
+  it("shows an EMAIL_ENV banner in the branded shell when not production", () => {
+    vi.stubEnv("EMAIL_ENV", "staging");
+    const { html } = renderOtpEmail(AUTH_EMAIL_COPY.verify, "123456");
+    expect(html).toContain("[Staging]");
   });
 });
 
@@ -138,5 +146,25 @@ describe("capture mode (E2E_TEST_HOOKS=1)", () => {
         subject: AUTH_EMAIL_COPY.reset.subject,
       },
     ]);
+  });
+
+  it("prefixes captured subjects when EMAIL_ENV is set", async () => {
+    vi.stubEnv("E2E_TEST_HOOKS", "1");
+    vi.stubEnv("EMAIL_ENV", "test");
+    const t = convexTest(schema, modules);
+
+    await t.run(async (ctx) => {
+      await sendVerificationOtpEmail(ctx as unknown as AuthEmailCtx, {
+        to: "user@flexling.com",
+        otp: "111111",
+      });
+    });
+
+    const rows = await t.run((ctx) =>
+      ctx.db.query("testAuthEmails").collect(),
+    );
+    expect(rows[0]?.subject).toBe(
+      `[Test] ${AUTH_EMAIL_COPY.verify.subject}: 111111`,
+    );
   });
 });

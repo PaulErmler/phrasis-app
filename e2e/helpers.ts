@@ -87,13 +87,13 @@ export async function completeOnboardingFresh(
     });
   };
 
-  // 1. Language pair — source first, then target. The selector hides + re-
-  //    reveals between picks, so we re-query each time.
+  // 1. Language pair — target (learn) first, then source (already speak).
+  //    The selector hides + re-reveals between picks, so we re-query each time.
   await expect(page.getByTestId('onboarding-step-language-pair')).toBeVisible({
     timeout: 30_000,
   });
-  await page.getByTestId(`language-option-${source}`).first().click();
   await page.getByTestId(`language-option-${target}`).first().click();
+  await page.getByTestId(`language-option-${source}`).first().click();
   await advance(null, 'onboarding-step-acquisition');
 
   // 2. Acquisition source.

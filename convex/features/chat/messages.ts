@@ -174,13 +174,27 @@ export const sendMessage = mutation({
       throw new ConvexError('Thread not found or access denied');
     }
 
-    const existingMessages = await ctx.runQuery(
-      agentComponent.messages.listMessagesByThreadId,
-      { threadId: args.threadId, order: 'asc', paginationOpts: { cursor: null, numItems: 300 } },
-    );
-    const userMessageCount = existingMessages.page.filter(
-      (m) => m.message?.role === 'user',
-    ).length;
+    // Count across ALL pages: a single tool-call-heavy turn stores many
+    // assistant/tool messages, so a one-page count freezes (and stops
+    // enforcing) once the thread outgrows the page. Stops early when the
+    // limit is already proven reached.
+    let userMessageCount = 0;
+    let cursor: string | null = null;
+    do {
+      // Annotated to break the inference cycle (result → cursor → query args).
+      const existingMessages: {
+        page: { message?: { role?: string } }[];
+        isDone: boolean;
+        continueCursor: string;
+      } = await ctx.runQuery(
+        agentComponent.messages.listMessagesByThreadId,
+        { threadId: args.threadId, order: 'asc', paginationOpts: { cursor, numItems: 300 } },
+      );
+      userMessageCount += existingMessages.page.filter(
+        (m) => m.message?.role === 'user',
+      ).length;
+      cursor = existingMessages.isDone ? null : existingMessages.continueCursor;
+    } while (cursor !== null && userMessageCount < THREAD_MESSAGE_LIMIT);
     if (userMessageCount >= THREAD_MESSAGE_LIMIT) {
       throw new ConvexError({ code: 'THREAD_MESSAGE_LIMIT', message: 'Thread message limit reached' });
     }

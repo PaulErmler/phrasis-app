@@ -16,7 +16,7 @@ import {
   findUpgradeProductFromPricingTable,
   preferIntervalGroup,
 } from "@/lib/autumn/find-upgrade-product";
-import { checkoutTrialParams, getTrialState } from "@/lib/autumn/trial-eligibility";
+import { getTrialState } from "@/lib/autumn/trial-eligibility";
 import { getPaywallTitle, getPaywallMessage, filterProductsByFeatureIncrease } from "@/lib/autumn/paywall-content";
 import { getFeatureI18nKey, isFeatureConsumable, getFeaturePaywallKey } from "@/lib/features/feature-meta";
 import { isCreditBackedFeature } from "@/convex/features/featureIds";
@@ -27,10 +27,7 @@ import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import UsageLimitDialog from "@/components/autumn/usage-limit-dialog";
 import { useIsNativeApp } from "@/hooks/use-native-app";
 import { useNewPlanCheckout } from "@/hooks/use-new-plan-checkout";
-import {
-  throwOnCheckoutError,
-  useCheckoutErrorToast,
-} from "@/hooks/use-checkout-error";
+import { useCheckoutErrorToast } from "@/hooks/use-checkout-error";
 
 export interface PaywallDialogProps {
   open: boolean;
@@ -68,7 +65,7 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
   const { products: pricingTableProducts } = usePricingTable();
   const { checkout, customer } = useCustomer({ expand: ["trials_used"] });
   const trialState = getTrialState(customer);
-  const { isFirstPurchase, startNewPlanCheckout } = useNewPlanCheckout();
+  const { purchasePlan } = useNewPlanCheckout();
   const showCheckoutError = useCheckoutErrorToast();
   const [upgrading, setUpgrading] = useState(false);
   const filterFeatureId = params?.featureId ?? "";
@@ -191,22 +188,12 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
     if (!nextProduct) return;
     setUpgrading(true);
     try {
-      // First purchases must never reach checkout(): its preview would build
-      // the session on the legacy path, which can't carry Managed Payments.
-      // The v2 route always confirms on Stripe's hosted page instead.
-      if (isFirstPurchase(trialState)) {
-        await startNewPlanCheckout(nextProduct.id, trialState);
-      } else {
-        // autumn-js reports failures as an `{ error }` container, not a
-        // throw — without the check this closed silently on failure.
-        throwOnCheckoutError(
-          await checkout({
-            productId: nextProduct.id,
-            dialog: CheckoutDialog,
-            ...checkoutTrialParams(trialState),
-          }),
-        );
-      }
+      await purchasePlan({
+        productId: nextProduct.id,
+        trialState,
+        checkout,
+        dialog: CheckoutDialog,
+      });
       setOpen(false);
     } catch (e) {
       showCheckoutError(e, "paywall.upgrade");

@@ -9,10 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import { getPricingTableContent } from "@/lib/autumn/pricing-table-content";
-import {
-  checkoutTrialParams,
-  getTrialState,
-} from "@/lib/autumn/trial-eligibility";
+import { getTrialState } from "@/lib/autumn/trial-eligibility";
 import {
   findCurrentPaidPlan,
   normalizePlans,
@@ -30,10 +27,7 @@ import {
 import { CarouselDots } from "@/components/ui/carousel-dots";
 import { useIsNativeApp } from "@/hooks/use-native-app";
 import { useNewPlanCheckout } from "@/hooks/use-new-plan-checkout";
-import {
-  throwOnCheckoutError,
-  useCheckoutErrorToast,
-} from "@/hooks/use-checkout-error";
+import { useCheckoutErrorToast } from "@/hooks/use-checkout-error";
 
 /** Sort key for plan cards: Free first, then paid plans by ascending price. */
 function productSortPrice(product: Product): number {
@@ -180,7 +174,7 @@ function PricingTableInner({
     expand: ["trials_used"],
   });
   const trialState = getTrialState(customer);
-  const { isFirstPurchase, startNewPlanCheckout } = useNewPlanCheckout();
+  const { purchasePlan } = useNewPlanCheckout();
   const showCheckoutError = useCheckoutErrorToast();
 
   // NOTE: passing `productDetails` to usePricingTable FILTERS the table to
@@ -343,34 +337,14 @@ function PricingTableInner({
                       on_trial: trialState.onTrial,
                     });
                     try {
-                      if (
-                        product.id &&
-                        customer &&
-                        !product.properties?.is_free &&
-                        isFirstPurchase(trialState)
-                      ) {
-                        // First purchases must never reach checkout(): its
-                        // preview would build the session on the legacy path,
-                        // which can't carry Managed Payments. The v2 route
-                        // always confirms on Stripe's hosted page instead.
-                        await startNewPlanCheckout(product.id, trialState);
-                      } else if (product.id && customer) {
-                        // autumn-js reports failures as an `{ error }`
-                        // container, not a throw — without the check a
-                        // failed preview was an invisible no-op.
-                        throwOnCheckoutError(
-                          await checkout({
-                            productId: product.id,
-                            dialog: CheckoutDialog,
-                            // Autumn only dedupes trials per-plan; this passes
-                            // `freeTrial: false` for everyone who ever trialed
-                            // or pays (closing the cross-plan hole), and nothing
-                            // for trial-eligible or currently-trialing users —
-                            // the dialog routes trialing switches through
-                            // convex/billing.ts to keep the running trial.
-                            ...checkoutTrialParams(trialState),
-                          }),
-                        );
+                      if (product.id && customer) {
+                        await purchasePlan({
+                          productId: product.id,
+                          trialState,
+                          checkout,
+                          dialog: CheckoutDialog,
+                          freeTarget: product.properties?.is_free === true,
+                        });
                       } else if (product.display?.button_url) {
                         window.open(product.display?.button_url, "_blank");
                       }

@@ -42,3 +42,26 @@
 export const MANAGED_PAYMENTS_SESSION_PARAMS = {
   managed_payments: { enabled: true },
 } as const;
+
+/**
+ * Whether the Managed Payments rollout flag is on for this deployment.
+ * Read per call rather than at module load so `npx convex env set/unset
+ * AUTUMN_MANAGED_PAYMENTS` takes effect without waiting on isolate
+ * recycling. Server-only (convex/) — the env var is not a NEXT_PUBLIC one.
+ */
+export function managedPaymentsEnabled(): boolean {
+  return process.env.AUTUMN_MANAGED_PAYMENTS === 'true';
+}
+
+/**
+ * The `checkout_session_params` spread for every v2 attach body. One shared
+ * helper so a future call site cannot forget the flag check and silently
+ * sell without merchant of record.
+ */
+export function managedPaymentsCheckoutParams():
+  | { checkout_session_params: typeof MANAGED_PAYMENTS_SESSION_PARAMS }
+  | Record<string, never> {
+  return managedPaymentsEnabled()
+    ? { checkout_session_params: MANAGED_PAYMENTS_SESSION_PARAMS }
+    : {};
+}

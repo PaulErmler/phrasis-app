@@ -8,6 +8,7 @@ import { getUserSettings } from '../db/users';
 import { featureStateValidator, type FeatureState } from '../types';
 import { EVENTS, identifyUser, track } from '../analytics';
 import { sendAdminNotificationEmail } from '../lib/adminEmails';
+import { FREE_PLAN_ID } from '../../lib/autumn/customer-shape';
 
 /**
  * Thrown by `assertBillingCurrent` while a payment is past due. Same
@@ -560,8 +561,6 @@ type PlanIdentity = {
   plan_status?: string;
 };
 
-// The auto-attached default plan — see FREE_PLAN_ID in usage/tracking.ts.
-const FREE_PLAN_ID = 'free';
 
 function planLabel(p: PlanIdentity): string {
   if (p.plan_id === undefined) return 'none';

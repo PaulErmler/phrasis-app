@@ -1,4 +1,5 @@
 import {
+  currentPlans,
   findCurrentPaidPlan,
   normalizePlans,
   type AutumnCustomerLike,
@@ -59,7 +60,13 @@ export function findCurrentPaidProduct(
 export function getTrialState(
   customer: (AutumnCustomerLike & { trials_used?: unknown }) | null | undefined,
 ): TrialState {
-  const plans = normalizePlans(customer);
+  // Only plans held RIGHT NOW: an `expired` entry (a lapsed trial or a
+  // fully executed cancel can leave one in the payload) must not read as a
+  // paid plan — that misrouted lapsed customers off the first-purchase
+  // path — and a trial cancelled early leaves an expired entry whose
+  // trial_ends_at is still in the future, which must not read as onTrial.
+  // A `scheduled` entry is a pending change, not a held plan.
+  const plans = currentPlans(normalizePlans(customer));
   const trialsUsed = (customer?.trials_used ?? []) as TrialUsedLite[];
 
   const trialing = plans.find(

@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import { useTranslations, useFormatter } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import { useCachedQuery } from '@/hooks/use-cached-query';
+import { useNowMinute } from '@/hooks/use-now-minute';
 import { getUserTimezone } from '@/lib/timezone';
 import { dateInTimezone } from '@/lib/dateStrings';
 import { cn } from '@/lib/utils';
@@ -22,7 +23,11 @@ function useProjections(skip: boolean, cacheSuffix: string) {
   // getUserTimezone falls back to 'UTC' when the browser reports an empty
   // zone — matching the rest of the app instead of sending '' to the query.
   const timezone = getUserTimezone();
-  const today = dateInTimezone(Date.now(), timezone);
+  // useNowMinute (not Date.now at render): when the rotation isn't running
+  // (reduced motion, or a single frame), nothing else re-renders this
+  // component, and `today` would stay pinned to yesterday across midnight.
+  const now = useNowMinute();
+  const today = dateInTimezone(now, timezone);
   const data = useCachedQuery(
     api.features.projections.getProjections,
     skip ? ('skip' as const) : { timezone, today },

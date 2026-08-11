@@ -88,6 +88,7 @@ import type * as lib_authEmails from "../lib/authEmails.js";
 import type * as lib_cardContent from "../lib/cardContent.js";
 import type * as lib_collections from "../lib/collections.js";
 import type * as lib_dateUtils from "../lib/dateUtils.js";
+import type * as lib_emailEnv from "../lib/emailEnv.js";
 import type * as lib_freePlay from "../lib/freePlay.js";
 import type * as lib_fsrsStates from "../lib/fsrsStates.js";
 import type * as lib_localRomanization from "../lib/localRomanization.js";
@@ -214,6 +215,7 @@ declare const fullApi: ApiFromModules<{
   "lib/cardContent": typeof lib_cardContent;
   "lib/collections": typeof lib_collections;
   "lib/dateUtils": typeof lib_dateUtils;
+  "lib/emailEnv": typeof lib_emailEnv;
   "lib/freePlay": typeof lib_freePlay;
   "lib/fsrsStates": typeof lib_fsrsStates;
   "lib/localRomanization": typeof lib_localRomanization;
