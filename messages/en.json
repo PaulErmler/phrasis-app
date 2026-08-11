@@ -576,6 +576,7 @@
       "initialReviews": "Initial reviews",
       "initialReviewsDescription": "Number of initial reviews for new sentences",
       "audioPlayback": "Audio Playback",
+      "audioPlaybackPreview": "Audio Playback Preview",
       "highlightWords": "Highlight words",
       "highlightWordsDescription": "Highlight words when playing audio (not supported for all languages)",
       "autoPlay": "Auto-play audio",

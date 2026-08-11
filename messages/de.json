@@ -576,6 +576,7 @@
       "initialReviews": "Anfängliche Wiederholungen",
       "initialReviewsDescription": "Anzahl der anfänglichen Wiederholungen für neue Sätze",
       "audioPlayback": "Audio-Wiedergabe",
+      "audioPlaybackPreview": "Audio-Wiedergabevorschau",
       "highlightWords": "Wörter hervorheben",
       "highlightWordsDescription": "Wörter während der Audiowiedergabe hervorheben (nicht für alle Sprachen unterstützt)",
       "autoPlay": "Audio automatisch abspielen",
