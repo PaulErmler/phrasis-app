@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { stripTrailingUnderscoresPatch } from '../../migrations';
-import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/languages';
+import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
 
 describe('stripTrailingUnderscoresPatch (backfill migrateOne logic)', () => {
   it('patches both translatedText and romanizedText when they carry trailing underscores', () => {

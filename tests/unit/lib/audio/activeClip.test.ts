@@ -4,7 +4,34 @@ import {
   resolveActiveCuePosition,
   mergedTimeForCuePosition,
 } from '@/lib/audio/activeClip';
-import type { LanguageCue } from '@/lib/audio/mergeAudio';
+import { audibleCues, type LanguageCue } from '@/lib/audio/mergeAudio';
+
+describe('audibleCues', () => {
+  // Every clip-position consumer routes through this, so the filter itself is
+  // pinned here rather than only implied by its callers' behaviour.
+  it('keeps order and drops only the silent placeholders', () => {
+    const cues: LanguageCue[] = [
+      { language: 'en', startSec: 0 },
+      { language: 'fr', startSec: 2, silent: true },
+      { language: 'es', startSec: 2 },
+      { language: 'en', startSec: 5, silent: false },
+    ];
+    expect(audibleCues(cues)).toEqual([
+      { language: 'en', startSec: 0 },
+      { language: 'es', startSec: 2 },
+      { language: 'en', startSec: 5, silent: false },
+    ]);
+  });
+
+  it('returns an empty list when every cue is silent', () => {
+    expect(
+      audibleCues([
+        { language: 'en', startSec: 0, silent: true },
+        { language: 'es', startSec: 5, silent: true },
+      ]),
+    ).toEqual([]);
+  });
+});
 
 describe('resolveActiveClip', () => {
   it('returns null for an empty cue array', () => {
@@ -262,6 +289,70 @@ describe('mergedTimeForCuePosition', () => {
     ];
     const speeds = { en: 0.8, es: 1.2 };
     for (const t of [0.1, 1.9, 2.0, 2.5, 4.99, 5.0, 7.25]) {
+      const pos = resolveActiveCuePosition(cues, t, speeds)!;
+      expect(mergedTimeForCuePosition(cues, speeds, pos)).toBeCloseTo(t, 10);
+    }
+  });
+});
+
+describe('silent cues (zero-repetition placeholders)', () => {
+  it('resolveActiveClip never returns a silent cue', () => {
+    // The damaging case: a group ending in a silent slot. Without the skip the
+    // word highlight would jump to a language that played nothing.
+    const cues: LanguageCue[] = [
+      { language: 'en', startSec: 0 },
+      { language: 'es', startSec: 5, silent: true },
+    ];
+    expect(resolveActiveClip(cues, 6)).toEqual({ language: 'en', localTime: 6 });
+  });
+
+  it('prefers the real cue when a silent cue shares its startSec', () => {
+    const cues: LanguageCue[] = [
+      { language: 'es', startSec: 2, silent: true },
+      { language: 'en', startSec: 2 },
+    ];
+    expect(resolveActiveClip(cues, 2.5)).toEqual({ language: 'en', localTime: 0.5 });
+  });
+
+  it('returns null when only silent cues precede currentTime', () => {
+    const cues: LanguageCue[] = [
+      { language: 'en', startSec: 0, silent: true },
+      { language: 'es', startSec: 9 },
+    ];
+    expect(resolveActiveClip(cues, 3)).toBeNull();
+  });
+
+  it('resolveActiveCuePosition counts audible repetitions only', () => {
+    const cues: LanguageCue[] = [
+      { language: 'es', startSec: 0, silent: true },
+      { language: 'en', startSec: 2 },
+      { language: 'es', startSec: 5 },
+    ];
+    expect(resolveActiveCuePosition(cues, 5.5)).toEqual({
+      language: 'es',
+      repIndex: 0, // the silent slot is not a repetition
+      localTimeOriginal: 0.5,
+    });
+  });
+
+  it('mergedTimeForCuePosition skips a silent cue of the same language', () => {
+    const pos = { language: 'es', repIndex: 0, localTimeOriginal: 0.5 };
+    const newCues: LanguageCue[] = [
+      { language: 'es', startSec: 0, silent: true },
+      { language: 'es', startSec: 4 },
+    ];
+    expect(mergedTimeForCuePosition(newCues, { es: 1 }, pos)).toBe(4.5);
+  });
+
+  it('round-trips through resolve+map with silent cues interleaved', () => {
+    const cues: LanguageCue[] = [
+      { language: 'en', startSec: 0 },
+      { language: 'fr', startSec: 2, silent: true },
+      { language: 'es', startSec: 2 },
+      { language: 'en', startSec: 5 },
+    ];
+    const speeds = { en: 0.8, es: 1.2, fr: 1 };
+    for (const t of [0.1, 2.0, 3.5, 5.0, 7.25]) {
       const pos = resolveActiveCuePosition(cues, t, speeds)!;
       expect(mergedTimeForCuePosition(cues, speeds, pos)).toBeCloseTo(t, 10);
     }

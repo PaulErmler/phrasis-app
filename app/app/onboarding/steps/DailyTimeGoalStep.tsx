@@ -11,15 +11,11 @@ import {
   DAILY_TIME_CUSTOM_MAX,
   type DailyTimeGoalMinutes,
 } from '../types';
+import { isPresetGoal as isPreset } from '@/lib/constants/dailyGoal';
 
 interface Props {
   selected: DailyTimeGoalMinutes | null;
   onSelect: (mins: DailyTimeGoalMinutes) => void;
-}
-
-function isPreset(value: number | null): boolean {
-  if (value === null) return false;
-  return (DAILY_TIME_PRESETS as readonly number[]).includes(value);
 }
 
 export function DailyTimeGoalStep({ selected, onSelect }: Props) {

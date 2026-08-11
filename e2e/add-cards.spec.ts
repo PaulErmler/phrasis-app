@@ -11,6 +11,10 @@ import { dismissTour } from "./helpers";
  */
 test.describe("add cards", () => {
   test("add-cards form renders and rejects empty submit", async ({ page }) => {
+    // Slow under parallel load: course languages hydrate after mount, and
+    // the default 30s test budget can expire before the inputs appear.
+    test.setTimeout(60_000);
+
     // Generic stub for card-generation endpoints.
     await page.route(/\/api\/(generate|cards|enrich)/i, async (route) => {
       await route.fulfill({
@@ -30,7 +34,7 @@ test.describe("add cards", () => {
     const editor = page
       .getByRole("textbox", { name: /english|spanish|french|german|italian|portuguese|russian|hindi|chinese|japanese|korean|target|source/i })
       .first();
-    await expect(editor).toBeVisible({ timeout: 20_000 });
+    await expect(editor).toBeVisible({ timeout: 30_000 });
 
     const submit = page
       .getByRole("button", { name: /^(save|add|create|generate|hinzufügen|erstellen)$/i })

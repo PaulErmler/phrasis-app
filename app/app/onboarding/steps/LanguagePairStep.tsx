@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowLeftRight, Pencil, Search } from 'lucide-react';
+import { ArrowLeftRight, ChevronLeft, Pencil, Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import {
@@ -16,10 +16,11 @@ import { cn } from '@/lib/utils';
 /**
  * Language pair step — Variant A.
  *
- * One big question at a time (speak → learn), then a ready confirmation with
- * swap. All pickable languages are always in the scrollable grid (search
- * filters; no “browse all” toggle). Names wrap so long labels stay fully
- * visible.
+ * One big question at a time (learn → speak), then a ready confirmation with
+ * swap. Target is asked first because that’s the question users usually have
+ * in mind; base language second, with an in-step back to change the target.
+ * All pickable languages are always in the scrollable grid (search filters;
+ * no “browse all” toggle). Names wrap so long labels stay fully visible.
  *
  * Scroll containment: outer `h-full overflow-hidden`; header `shrink-0`;
  * grid `flex-1 min-h-0 overflow-y-auto`.
@@ -64,13 +65,14 @@ export function LanguagePairStep({ source, target, onSource, onTarget }: Props) 
   const locale = useLocale();
   const [query, setQuery] = useState('');
 
-  const phase: 'source' | 'target' | 'ready' = !source
-    ? 'source'
-    : !target
-      ? 'target'
+  // Target (learn) first, then source (already speak), then ready.
+  const phase: 'target' | 'source' | 'ready' = !target
+    ? 'target'
+    : !source
+      ? 'source'
       : 'ready';
 
-  const exclude = phase === 'source' ? target : source;
+  const exclude = phase === 'target' ? source : target;
 
   const { popular, grouped } = useMemo(() => {
     const available = PICKABLE.filter((l) => l.code !== exclude);
@@ -115,13 +117,18 @@ export function LanguagePairStep({ source, target, onSource, onTarget }: Props) 
   }, [exclude, query, locale]);
 
   const pick = (code: string) => {
-    if (phase === 'source') {
-      onSource(code);
-      setQuery('');
-    } else if (phase === 'target') {
+    if (phase === 'target') {
       onTarget(code);
       setQuery('');
+    } else if (phase === 'source') {
+      onSource(code);
+      setQuery('');
     }
+  };
+
+  const backToTarget = () => {
+    onTarget('');
+    setQuery('');
   };
 
   const sourceLang = source ? getLanguageByCode(source) : null;
@@ -143,19 +150,32 @@ export function LanguagePairStep({ source, target, onSource, onTarget }: Props) 
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {phase === 'ready'
               ? t('stepReady')
-              : t('stepOf', { current: phase === 'source' ? 1 : 2 })}
+              : t('stepOf', { current: phase === 'target' ? 1 : 2 })}
           </p>
           <h2 className="text-2xl font-bold tracking-tight sm:text-[1.7rem] sm:leading-tight">
-            {phase === 'source' && t('speakTitle')}
             {phase === 'target' && t('learnTitle')}
+            {phase === 'source' && t('speakTitle')}
             {phase === 'ready' && t('readyTitle')}
           </h2>
-          {phase === 'source' && (
-            <p className="text-base text-muted-foreground">{t('speakHint')}</p>
-          )}
           {phase === 'target' && (
             <p className="text-base text-muted-foreground">{t('learnHint')}</p>
           )}
+          {phase === 'source' && (
+            <p className="text-base text-muted-foreground">{t('speakHint')}</p>
+          )}
+          {phase === 'source' && targetLang ? (
+            <button
+              type="button"
+              onClick={backToTarget}
+              data-testid="language-pair-back"
+              className="inline-flex items-center gap-1.5 pt-0.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              {t('backToLearn', {
+                language: getLocalizedLanguageNameByCode(targetLang.code, locale),
+              })}
+            </button>
+          ) : null}
         </div>
 
         {phase !== 'ready' ? (

@@ -269,6 +269,7 @@
     "title": "Flexible",
     "titleHighlight": "Preise",
     "mostPopular": "Am beliebtesten",
+    "taxNote": "Alle Preise verstehen sich inkl. gegebenenfalls anfallender Umsatzsteuer. Kostenpflichtige Tarife werden von Stripe als Merchant of Record verkauft.",
     "everythingFrom": "Alles aus {planName}, plus:",
     "billing": {
       "monthly": "Monatlich",

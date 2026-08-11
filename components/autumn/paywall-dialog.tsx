@@ -16,7 +16,7 @@ import {
   findUpgradeProductFromPricingTable,
   preferIntervalGroup,
 } from "@/lib/autumn/find-upgrade-product";
-import { checkoutTrialParams, getTrialState } from "@/lib/autumn/trial-eligibility";
+import { getTrialState } from "@/lib/autumn/trial-eligibility";
 import { getPaywallTitle, getPaywallMessage, filterProductsByFeatureIncrease } from "@/lib/autumn/paywall-content";
 import { getFeatureI18nKey, isFeatureConsumable, getFeaturePaywallKey } from "@/lib/features/feature-meta";
 import { isCreditBackedFeature } from "@/convex/features/featureIds";
@@ -26,6 +26,8 @@ import { cn } from "@/lib/utils";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import UsageLimitDialog from "@/components/autumn/usage-limit-dialog";
 import { useIsNativeApp } from "@/hooks/use-native-app";
+import { useNewPlanCheckout } from "@/hooks/use-new-plan-checkout";
+import { useCheckoutErrorToast } from "@/hooks/use-checkout-error";
 
 export interface PaywallDialogProps {
   open: boolean;
@@ -63,6 +65,8 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
   const { products: pricingTableProducts } = usePricingTable();
   const { checkout, customer } = useCustomer({ expand: ["trials_used"] });
   const trialState = getTrialState(customer);
+  const { purchasePlan } = useNewPlanCheckout();
+  const showCheckoutError = useCheckoutErrorToast();
   const [upgrading, setUpgrading] = useState(false);
   const filterFeatureId = params?.featureId ?? "";
   const consumable = isFeatureConsumable(filterFeatureId);
@@ -184,14 +188,15 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
     if (!nextProduct) return;
     setUpgrading(true);
     try {
-      await checkout({
+      await purchasePlan({
         productId: nextProduct.id,
+        trialState,
+        checkout,
         dialog: CheckoutDialog,
-        ...checkoutTrialParams(trialState),
       });
       setOpen(false);
     } catch (e) {
-      console.error("Checkout failed:", e);
+      showCheckoutError(e, "paywall.upgrade");
     } finally {
       setUpgrading(false);
     }

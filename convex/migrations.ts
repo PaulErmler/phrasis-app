@@ -9,10 +9,8 @@ import {
   DEFAULT_PAUSE_BASE_TO_TARGET,
   DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
 } from '../lib/constants/audioPlayback';
-import {
-  postProcessTranslation,
-  isProtectedTranslationSource,
-} from '../lib/languages';
+import { postProcessTranslation } from '../lib/languages';
+import { isProtectedTranslationSource } from '../lib/translationProvenance';
 import { buildSearchableTextPatchForCard } from './lib/cardContent';
 import type { Id } from './_generated/dataModel';
 import { isPremadeLevelCollection } from './lib/collections';
@@ -97,6 +95,14 @@ export const perModeSettingsBackfill = migrations.define({
  *
  * User-provided rows are skipped — the step only ever applies to machine
  * output, mirroring the write paths.
+ *
+ * Note this is the one provenance guard that can NOT use the full
+ * `mayRegenerateTranslation` rule: `migrateOne` sees the translation row
+ * alone, with no `texts` doc to test `userCreated` against. Machine-sourced
+ * rows on user-created cards are therefore still normalized here. That is
+ * acceptable because the step is punctuation-only — it strips trailing '_'
+ * runs and never changes wording — but a migration that rewrites CONTENT must
+ * load the text and go through `mayRegenerateTranslation`.
  *
  * Deliberately does NOT touch audio: a trailing-underscore diff is
  * punctuation-only, so existing audio stays valid (the same `soundsSame`

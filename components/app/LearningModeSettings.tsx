@@ -1349,6 +1349,16 @@ export function LearningModeSettings({
             </div>
           )}
 
+          <Separator />
+
+          {/* ================================================================
+              AUDIO PLAYBACK PREVIEW
+              ================================================================ */}
+
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+            {t('audioPlaybackPreview')}
+          </p>
+
           <div className="flex flex-col items-center gap-0 py-1">
             {/* Before-base target languages ("Practice Listening") — shown above
                 base when the toggle is on. Reps/pauses/speed are independent of

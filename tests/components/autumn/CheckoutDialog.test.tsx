@@ -269,6 +269,75 @@ describe('CheckoutDialog', () => {
     expect(screen.getByTestId('checkout-dialog-confirm')).toBeEnabled();
   });
 
+  it('surfaces an attach {error} container instead of silently closing', async () => {
+    // autumn-js wraps SDK/action failures into a RESOLVED `{ error }`
+    // container (wrapSdkCall) — and the server's v2 no-trial branch mirrors
+    // that shape. Before throwOnCheckoutError, this closed the dialog as if
+    // the plan had changed while nothing happened.
+    attachMock.mockResolvedValue({
+      data: null,
+      error: { message: 'Autumn attach failed (500)', code: 'attach_failed' },
+    });
+    const { setOpen } = renderDialog(checkoutResult());
+    await confirm();
+
+    await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('confirmError'));
+    expect(setOpen).not.toHaveBeenCalled();
+    expect(screen.getByTestId('checkout-dialog-confirm')).toBeEnabled();
+  });
+
+  it('cancelling to Free confirms, attaches the free plan, and closes', async () => {
+    const { setOpen } = renderDialog(
+      checkoutResult({
+        id: 'free',
+        name: 'Free',
+        scenario: 'cancel',
+        properties: {
+          is_free: true,
+          is_one_off: false,
+          has_trial: false,
+          updateable: false,
+        },
+      }),
+    );
+    await confirm();
+
+    await waitFor(() => expect(setOpen).toHaveBeenCalledWith(false));
+    expect(attachMock).toHaveBeenCalledWith(
+      expect.objectContaining({ productId: 'free', freeTrial: false }),
+    );
+    expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('a failed cancel keeps the dialog open and shows the error toast', async () => {
+    // What the user sees when a cancellation fails: the standard
+    // "your plan was not changed" toast, the dialog still open, and an
+    // enabled confirm to retry — never a silent close.
+    attachMock.mockResolvedValue({
+      data: null,
+      error: { message: 'cancel failed upstream' },
+    });
+    const { setOpen } = renderDialog(
+      checkoutResult({
+        id: 'free',
+        name: 'Free',
+        scenario: 'cancel',
+        properties: {
+          is_free: true,
+          is_one_off: false,
+          has_trial: false,
+          updateable: false,
+        },
+      }),
+    );
+    await confirm();
+
+    await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('confirmError'));
+    expect(setOpen).not.toHaveBeenCalled();
+    expect(screen.getByTestId('checkout-dialog-title')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-dialog-confirm')).toBeEnabled();
+  });
+
   it('surfaces a trial-switch rejection the same way', async () => {
     currentCustomer = trialingCustomer();
     switchPlanMock.mockRejectedValue(new Error('scenario not applicable'));

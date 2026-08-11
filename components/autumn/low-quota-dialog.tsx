@@ -15,12 +15,14 @@ import {
   findCurrentIntervalGroup,
   findUpgradeProductFromPricingTable,
 } from "@/lib/autumn/find-upgrade-product";
-import { checkoutTrialParams, getTrialState } from "@/lib/autumn/trial-eligibility";
+import { getTrialState } from "@/lib/autumn/trial-eligibility";
 import { getFeatureI18nKey, isFeatureConsumable } from "@/lib/features/feature-meta";
 import { isCreditBackedFeature } from "@/convex/features/featureIds";
 import { useFeatureQuota } from "@/components/feature_tracking/useFeatureQuota";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import { useIsNativeApp } from "@/hooks/use-native-app";
+import { useNewPlanCheckout } from "@/hooks/use-new-plan-checkout";
+import { useCheckoutErrorToast } from "@/hooks/use-checkout-error";
 
 export interface LowQuotaDialogProps {
   open: boolean;
@@ -40,6 +42,8 @@ export default function LowQuotaDialog({
   const { checkout, customer } = useCustomer({ expand: ["trials_used"] });
   const trialState = getTrialState(customer);
   const { products } = usePricingTable();
+  const { purchasePlan } = useNewPlanCheckout();
+  const showCheckoutError = useCheckoutErrorToast();
   const [upgrading, setUpgrading] = useState(false);
 
   const { included } = useFeatureQuota(featureId);
@@ -66,14 +70,15 @@ export default function LowQuotaDialog({
     if (!upgradeProduct) return;
     setUpgrading(true);
     try {
-      await checkout({
+      await purchasePlan({
         productId: upgradeProduct.id,
+        trialState,
+        checkout,
         dialog: CheckoutDialog,
-        ...checkoutTrialParams(trialState),
       });
       setOpen(false);
     } catch (e) {
-      console.error("Checkout failed:", e);
+      showCheckoutError(e, "lowQuota.upgrade");
     } finally {
       setUpgrading(false);
     }

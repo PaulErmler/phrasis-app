@@ -251,6 +251,10 @@ test.describe("learning settings", () => {
   });
 
   test("toggle an auto-play or instant-proceed switch", async ({ page }) => {
+    // /app/learn can take >30s for the full `load` event under serial-suite
+    // load even though the overlay is already interactive.
+    test.setTimeout(60_000);
+
     await page.goto("/app/learn");
     await page.waitForLoadState("domcontentloaded");
     await dismissTour(page, "audio_review_intro", 500);

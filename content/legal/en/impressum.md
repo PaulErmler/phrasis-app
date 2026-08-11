@@ -1,6 +1,6 @@
 ---
 title: 'Imprint'
-lastUpdated: '2026-03-21'
+lastUpdated: '2026-08-09'
 ---
 
 ## Legal Disclosure
@@ -19,7 +19,9 @@ Email: support@flexling.com
 
 ## VAT
 
-In accordance with § 19 UStG, no VAT is charged (small business regulation).
+In accordance with § 19 UStG, no VAT is charged on Flexling's own turnover (small business regulation), and none is shown separately.
+
+Paid subscriptions are an exception: they are sold through Stripe as merchant of record. Any VAT or sales tax shown at checkout and on your receipt for those transactions is determined, charged, and remitted by Stripe — not by Flexling. The Stripe entity acting as merchant of record is named on the checkout page and on your receipt.
 
 ## Editorial Responsibility
 

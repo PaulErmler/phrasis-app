@@ -148,13 +148,18 @@ export default defineConfig({
     },
     {
       // Self-contained @live dunning journey (fresh user, Stripe checkout,
-      // billing override hooks). Chained AFTER everything else so its
-      // signup + onboarding walk never runs concurrently with another
-      // spec's — see the phase comment above. The spec sets its own
-      // storageState via test.use.
+      // billing override hooks). The billing projects are independent of the
+      // shared-user chain (own users, own Autumn/Stripe state), so they run
+      // as their OWN chain — billing-live → payment-overdue → billing-clock —
+      // in parallel with chromium-serial → settings-serial →
+      // course-management → email-auth. Serialized among THEMSELVES so at
+      // most one signup+onboarding warmup fan-out runs at a time (backend
+      // load, not correctness). Auth-email rate limits are safe: the
+      // per-address bucket email-auth asserts is untouched by other users,
+      // and the global backstop (50 tokens/h) dwarfs a few signups' sends.
       name: "payment-overdue",
       testMatch: /payment-overdue\.spec\.ts/,
-      dependencies: ["course-management"],
+      dependencies: ["billing-live"],
       fullyParallel: false,
       use: {
         ...devices["Desktop Chrome"],
@@ -171,6 +176,22 @@ export default defineConfig({
       testMatch: /email-auth\.spec\.ts/,
       dependencies: ["course-management"],
       fullyParallel: false,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      // Stripe-test-clock billing journeys (trial conversion, real
+      // past_due, legacy customer, lapsed repurchase) — fresh users, some
+      // on clocked Stripe customers. Self-skips unless a Stripe test key is
+      // available (env or .env.local). Last link of the billing chain (see
+      // payment-overdue's comment); runs in parallel with the shared-user
+      // chain. Manages its own contexts.
+      name: "billing-clock",
+      testMatch: /billing-clock\.spec\.ts/,
+      dependencies: ["payment-overdue"],
+      fullyParallel: false,
+      workers: 1,
       use: {
         ...devices["Desktop Chrome"],
       },
