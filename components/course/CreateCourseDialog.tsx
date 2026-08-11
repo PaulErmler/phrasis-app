@@ -56,6 +56,7 @@ export function CreateCourseDialog({
   } | null>(null);
 
   const createCourse = useMutation(api.features.courses.createCourse);
+  const archiveCourse = useMutation(api.features.courses.archiveCourse);
   const setActiveCourse = useMutation(api.features.courses.setActiveCourse);
   const updateCourseSettings = useMutation(
     api.features.courses.updateCourseSettings,
@@ -143,6 +144,19 @@ export function CreateCourseDialog({
           ? remembered.courseId
           : null;
       if (courseId === null) {
+        if (remembered) {
+          // The half-created course from the previous attempt no longer
+          // matches the form — archive it to release its course slot, or
+          // the retry dead-ends on USAGE_LIMIT on the single-course free
+          // tier. Best-effort: on failure createCourse below surfaces the
+          // quota error exactly as before.
+          try {
+            await archiveCourse({ courseId: remembered.courseId });
+          } catch (archiveError) {
+            console.error('Error archiving orphaned course:', archiveError);
+          }
+          createdCourseRef.current = null;
+        }
         const result = await createCourse({
           targetLanguages: [targetLanguage],
           baseLanguages: [baseLanguage],

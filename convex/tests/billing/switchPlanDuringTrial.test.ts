@@ -186,6 +186,22 @@ describe("switchPlanDuringTrial", () => {
     ).rejects.toThrow(/no active trial/i);
   });
 
+  it("does not mistake an early-cancelled trial (expired, future trial end) for an active one", async () => {
+    // Cancelling a trial can leave the plan in the payload with status
+    // 'expired' while its trial_ends_at is still in the future. Treating
+    // that as trialing would drive a switch off a trial that no longer
+    // exists — the currentPlans filter must exclude it.
+    stubAutumn({
+      "/customers/": {
+        products: [freeProduct, trialingProduct({ status: "expired" })],
+      },
+    });
+    const t = convexTest(schema, modules);
+    await expect(
+      asUser(t).action(api.billing.switchPlanDuringTrial, { productId: "pro" }),
+    ).rejects.toThrow(/no active trial/i);
+  });
+
   it("reads the trial end from current_period_end (v1.2 leaves trial_ends_at null)", async () => {
     stubAutumn({
       "/customers/": { products: [trialingProduct()] },

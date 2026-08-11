@@ -266,6 +266,14 @@ export function PricingSection() {
           })}
         </div>
 
+        {/* Paid plans are sold with Stripe as merchant of record, so the
+            listed price is the gross amount and any VAT is carved out of it
+            rather than added at checkout. Stated once under the grid rather
+            than per card — it applies to every paid plan equally. */}
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          {t('taxNote')}
+        </p>
+
         {/* Comparison block */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}

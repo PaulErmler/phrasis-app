@@ -338,7 +338,16 @@ export default defineSchema({
     datasetId: v.optional(v.id('datasets')), // Premade-dataset texts only; null for user-created and legacy
     text: v.string(),
     language: v.string(), // e.g., "en" for English
-    romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
+    // Latin transliteration for non-Latin scripts. THREE states, not two:
+    //   undefined — never attempted; a scheduler should enqueue romanization.
+    //   ''        — attempted and failed (`romanizeText` exhausted its retries);
+    //               the sentinel exists so nothing re-enqueues it. Re-attempt by
+    //               bumping the method's `romanizationSource` identifier and
+    //               migrating rows tagged with the old one.
+    //   non-empty — done.
+    // Test with `=== undefined`, never `!x` — collapsing '' into "missing" makes
+    // callers ask forever for work that is deliberately never scheduled.
+    romanizedText: v.optional(v.string()),
     // Identifier of which romanizer produced `romanizedText` (e.g.
     // "arabic-transliterate-v1", "google-v3"). Stored so a future strategy
     // swap can find + invalidate rows produced by the old method via a
@@ -393,7 +402,9 @@ export default defineSchema({
     textId: v.id('texts'),
     targetLanguage: v.string(), // e.g., "es" for Spanish
     translatedText: v.string(),
-    romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
+    // Latin transliteration for non-Latin scripts. Same undefined / '' /
+    // non-empty tri-state as `texts.romanizedText` — see the note there.
+    romanizedText: v.optional(v.string()),
     // Same purpose as on `texts` — identifier of the romanizer that produced
     // `romanizedText` (or attempted to and persisted the empty-string
     // sentinel). See the texts table for the migration pattern.
@@ -438,8 +449,10 @@ export default defineSchema({
     // a missing stamp is NEVER treated as stale (only a number strictly < the
     // current version is), so un-backfilled rows don't mass-regenerate. Rows
     // predating the versioning system were stamped to the baseline (v1) by a
-    // one-time backfill, so a later bump correctly marks them stale. User-provided / userCreated translations are
-    // skipped by the regen sweep regardless.
+    // one-time backfill, so a later bump correctly marks them stale. Rows that
+    // `mayRegenerateTranslation` (lib/translationProvenance.ts) protects —
+    // every row on a userCreated text, plus user-provided / curated-manual
+    // rows anywhere — are skipped by the sweep regardless of their stamp.
     translationVersion: v.optional(v.number()),
   })
     .index('by_textId', ['textId'])
@@ -961,6 +974,17 @@ export default defineSchema({
     // VERBATIM and tagged user-provided — machine post-processing
     // (postProcessTranslation) must never touch user-typed text.
     userEditedLanguages: v.optional(v.array(v.string())),
+    // In-flight synthesis marker per language (requestApprovalAudio): a
+    // repeat click for the same line while one synthesis is pending must not
+    // pay a TTS provider twice. Keyed by exact text so an edited line
+    // re-requests immediately; a stale marker (failed/crashed synthesis)
+    // unblocks after a fixed window.
+    audioRequests: v.optional(
+      v.record(
+        v.string(),
+        v.object({ requestedAt: v.number(), text: v.string() }),
+      ),
+    ),
   })
     .index('by_thread_and_user', ['threadId', 'userId']),
 

@@ -9,6 +9,7 @@ import { PROGRESS_DISPLAY_INTERVAL } from "../../../lib/constants/learning";
 import { llmPool } from "@/convex/lib/workpools";
 import { CLAIM_STALE_MS } from "../../features/llmTranslationQueue";
 import { resolveAudioPayload } from "../../lib/audioAssets";
+import { scheduleMissingContent } from "../../features/decks";
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
@@ -1165,6 +1166,153 @@ describe("features/scheduling", () => {
       expect(replacement, "a replacement card should exist").toBeTruthy();
       expect(replacement?.radioPlayCount).toBe(12);
       expect(replacement?.radioRoundCounter).toBe(3);
+    });
+
+    /**
+     * Editing ONE language of a premade card hands the user a user-owned copy
+     * whose OTHER languages keep the machine `translationSource` they were
+     * generated with. That copy is a custom card by every definition, so a
+     * later speaker-gender resolution must not rewrite the languages the user
+     * didn't touch — which is what the provenance guard now prevents.
+     *
+     * The gender is patched directly rather than by re-running the metadata
+     * step: `resolveCardSpeakerGenders` seeds its coin flip from the textId,
+     * which is random per run, so inducing real drift would make this flaky.
+     */
+    it("protects machine-sourced languages carried onto the user-owned copy", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId: oldTextId } = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["sv"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        const deckId = await ctx.db.insert("decks", {
+          courseId,
+          name: "d",
+          cardCount: 1,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hej",
+          language: "sv",
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+        });
+        // Machine-translated, unstamped — the shape the sweep used to delete.
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "en",
+          translatedText: "Hello",
+          translationSource: "google/gemini-3.1-flash-lite-high",
+        });
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        await insertAudioFixture(ctx, {
+          textId,
+          language: "en",
+          voiceName: "Kore",
+          storageId,
+          ttsQuality: "validated",
+          ttsProvider: "gemini",
+          voiceGender: "male",
+          wordTimings: [{ word: "Hello", start: 0, end: 0.5 }],
+        });
+        const cardId = await ctx.db.insert("cards", {
+          deckId,
+          textId,
+          collectionId,
+          dueDate: Date.now() - 1000,
+          isMastered: false,
+          isHidden: false,
+          schedulingPhase: "preReview",
+          preReviewCount: 0,
+        });
+        await ctx.db.insert("usageQuotas", {
+          userId: "user_A",
+          features: {
+            card_edits: { balance: 100, included: 100, used: 0, unlimited: false },
+          },
+          lastSyncedAt: Date.now(),
+        });
+        return { cardId, textId };
+      });
+
+      // Edit only the Swedish source → the English translation is carried over
+      // untouched onto the new user-owned text.
+      await t.withIdentity({ subject: "user_A" }).mutation(
+        api.features.scheduling.editCard,
+        {
+          cardId,
+          translations: [
+            { language: "sv", text: "Hejsan" },
+            { language: "en", text: "Hello" },
+          ],
+          timezone: "UTC",
+        },
+      );
+
+      const newTextId = await t.run(async (ctx) => {
+        const texts = await ctx.db.query("texts").collect();
+        return texts.find((x) => x._id !== oldTextId)!._id;
+      });
+
+      // The exposure: a user-owned card carrying machine provenance.
+      const carried = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", newTextId).eq("targetLanguage", "en"),
+          )
+          .first(),
+      );
+      expect(carried?.translationSource).toBe(
+        "google/gemini-3.1-flash-lite-high",
+      );
+      expect(
+        await t.run(async (ctx) => (await ctx.db.get(newTextId))!.userCreated),
+      ).toBe(true);
+
+      // A later gender resolution disagrees with the copied audio's voice.
+      await t.run(async (ctx) => {
+        await ctx.db.patch(newTextId, {
+          speakerGender: "female",
+          audioSpeakerGender: "female",
+        });
+      });
+
+      const after = await t.run(async (ctx) => {
+        const text = (await ctx.db.get(newTextId))!;
+        await scheduleMissingContent(ctx, newTextId, text, ["en"], ["sv"]);
+        return {
+          translation: await ctx.db
+            .query("translations")
+            .withIndex("by_text_and_language", (q) =>
+              q.eq("textId", newTextId).eq("targetLanguage", "en"),
+            )
+            .first(),
+          audio: await ctx.db
+            .query("audioRecordings")
+            .withIndex("by_text_and_language", (q) =>
+              q.eq("textId", newTextId).eq("language", "en"),
+            )
+            .first(),
+        };
+      });
+
+      // Wording kept; the wrong-gender voice still dropped for re-synthesis.
+      expect(after.translation?.translatedText).toBe("Hello");
+      expect(after.audio).toBeNull();
     });
   });
 

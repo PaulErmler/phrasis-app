@@ -142,6 +142,21 @@ describe('normalizePlans — the two wire families agree after normalization', (
     expect(only(normalizePlans({ subscriptions: [V2_FREE] }, NOW)).isDefault).toBe(true);
   });
 
+  it('a GRANDFATHERED free attachment with NO default flag is still isDefault', () => {
+    // Free attachments created under old product versions report
+    // is_default:false on v1.2 (live payload, 2026-08-11) — the plan id is
+    // the only reliable signal, and misreading it as non-default made every
+    // consumer treat those customers as paying.
+    expect(
+      only(
+        normalizePlans(
+          { products: [{ id: 'free', status: 'active', is_default: false, is_add_on: false }] },
+          NOW,
+        ),
+      ).isDefault,
+    ).toBe(true);
+  });
+
   it('reads the product id from plan_id on v2, never the cus_prod_ row id', () => {
     const v2 = only(normalizePlans({ subscriptions: [V2_TRIALING] }, NOW));
     expect(v2.planId).toBe('basic_annual');

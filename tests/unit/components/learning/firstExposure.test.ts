@@ -123,6 +123,7 @@ describe('auto-rating suppression on copy-through cards', () => {
     },
     preReviewCount: number,
     fsrsReps: number,
+    freeStudyPlayCount = 0,
   ) =>
     (settings?.reviewMode ?? 'audio') === 'full' &&
     (settings?.autoRateFromAccuracy ?? true) &&
@@ -131,6 +132,7 @@ describe('auto-rating suppression on copy-through cards', () => {
       preReviewCount,
       fsrsReps,
       isTranscribeMode(settings),
+      freeStudyPlayCount,
     );
 
   it('is suppressed on a brand-new writing card (the assist is showing)', () => {
@@ -162,5 +164,13 @@ describe('auto-rating suppression on copy-through cards', () => {
     expect(autoRateEnabled(s, 0, 0)).toBe(false);
     expect(autoRateEnabled(s, 2, 0)).toBe(false);
     expect(autoRateEnabled(s, 3, 0)).toBe(true);
+  });
+
+  it('resumes for a card retired by Free Study plays alone — the render path hides the assist for it, so the answer is real recall', () => {
+    // preReviewCount and FSRS reps are both 0 (free play advances neither),
+    // but freeStudyPlayCount already exhausted the assist window; the gate
+    // must agree with the visible assist, not re-suppress.
+    expect(autoRateEnabled({ reviewMode: 'full' }, 0, 0, 1)).toBe(true);
+    expect(autoRateEnabled({ reviewMode: 'full' }, 0, 0, 0)).toBe(false);
   });
 });

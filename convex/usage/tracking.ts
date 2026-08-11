@@ -6,6 +6,7 @@ import { internal } from '../_generated/api';
 import { type FeatureState } from './helpers';
 import {
   currentPlans,
+  FREE_PLAN_ID,
   normalizePlans,
   type AutumnPlan,
 } from '../../lib/autumn/customer-shape';
@@ -114,8 +115,6 @@ function humanizePlanId(planId: string): string {
     .join(' ');
 }
 
-/** The auto-attached default plan (`autoEnable` in autumn.config.ts). */
-const FREE_PLAN_ID = 'free';
 
 export type DerivedBilling = {
   /** Undefined only when Autumn reported no usable (non-expired) plan. */

@@ -40,3 +40,14 @@ export function clampDailyGoal(value: number | undefined): number | undefined {
     Math.min(DAILY_TIME_CUSTOM_MAX, Math.round(value)),
   );
 }
+
+/**
+ * True when the goal is one of the preset tiles (null-safe). Shared by the
+ * onboarding goal step and the word-projection editor so preset membership
+ * can't drift from `DAILY_TIME_PRESETS`.
+ */
+export function isPresetGoal(value: number | null | undefined): boolean {
+  return (
+    value != null && (DAILY_TIME_PRESETS as readonly number[]).includes(value)
+  );
+}

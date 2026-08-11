@@ -95,8 +95,9 @@ describe("gateTrialArgs", () => {
 
     // Same object, no freeTrial injected — injecting `freeTrial: false` here
     // would silently deny every legitimate first trial.
-    expect(result).toBe(args);
-    expect("freeTrial" in result).toBe(false);
+    expect(result.gated).toBe(args);
+    expect("freeTrial" in result.gated).toBe(false);
+    expect(result.state?.trialEligible).toBe(true);
 
     // Eligibility must be derived from the durable trials_used record, on
     // the v1.2 shape the parsing expects — a version drift here would make
@@ -112,9 +113,12 @@ describe("gateTrialArgs", () => {
     const args: GateArgs = { productId: "basic" };
     // A brand-new user's very first checkout happens before any Autumn
     // customer exists; blocking on 404 would break every first purchase.
-    await expect(
-      gateTrialArgs(ctxAs({ subject: USER }), "checkout", args),
-    ).resolves.toBe(args);
+    const result = await gateTrialArgs(ctxAs({ subject: USER }), "checkout", args);
+    expect(result.gated).toBe(args);
+    // History-free ⇒ the state must read as a first purchase, so the
+    // managed-payments guard in `attach` still sees it correctly.
+    expect(result.state?.hasPaidPlan).toBe(false);
+    expect(result.state?.onTrial).toBe(false);
   });
 
   it("rejects attach while trialing — plan switches must go through switchPlanDuringTrial", async () => {
@@ -138,8 +142,11 @@ describe("gateTrialArgs", () => {
     const result = await gateTrialArgs(ctxAs({ subject: USER }), "checkout", args);
 
     // The dialog needs the preview, but no checkout session that could
-    // complete into a SECOND trial may ever be created.
-    expect(result).toEqual({ productId: "pro", freeTrial: false });
+    // complete into a SECOND trial may ever be created. `false` is correct
+    // here: v1.2 /checkout still honors it (probed 2026-08-09; `null` is
+    // rejected by its schema). Attach-side suppression is handled by the
+    // v2 routing in the attach action, not by this flag.
+    expect(result.gated).toEqual({ productId: "pro", freeTrial: false });
     // Caller's args stay unmutated — they may be reused for a later retry.
     expect("freeTrial" in args).toBe(false);
   });
@@ -157,7 +164,10 @@ describe("gateTrialArgs", () => {
       productId: "basic_annual",
       freeTrial: true,
     });
-    expect(result).toEqual({ productId: "basic_annual", freeTrial: false });
+    expect(result.gated).toEqual({
+      productId: "basic_annual",
+      freeTrial: false,
+    });
   });
 
   it("fails closed when eligibility cannot be verified (non-404 error)", async () => {
@@ -184,9 +194,9 @@ describe("gateTrialArgs", () => {
     // No identity means no customer id to gate on; the component's
     // identify() throws before any Autumn call executes, so a lookup here
     // would only leak requests for a caller that can never attach anything.
-    await expect(gateTrialArgs(ctxAs(null), "checkout", args)).resolves.toBe(
-      args,
-    );
+    const result = await gateTrialArgs(ctxAs(null), "checkout", args);
+    expect(result.gated).toBe(args);
+    expect(result.state).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

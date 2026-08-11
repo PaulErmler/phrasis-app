@@ -9,10 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import { getPricingTableContent } from "@/lib/autumn/pricing-table-content";
-import {
-  checkoutTrialParams,
-  getTrialState,
-} from "@/lib/autumn/trial-eligibility";
+import { getTrialState } from "@/lib/autumn/trial-eligibility";
 import {
   findCurrentPaidPlan,
   normalizePlans,
@@ -29,6 +26,8 @@ import {
 } from "@/components/ui/carousel";
 import { CarouselDots } from "@/components/ui/carousel-dots";
 import { useIsNativeApp } from "@/hooks/use-native-app";
+import { useNewPlanCheckout } from "@/hooks/use-new-plan-checkout";
+import { useCheckoutErrorToast } from "@/hooks/use-checkout-error";
 
 /** Sort key for plan cards: Free first, then paid plans by ascending price. */
 function productSortPrice(product: Product): number {
@@ -175,6 +174,8 @@ function PricingTableInner({
     expand: ["trials_used"],
   });
   const trialState = getTrialState(customer);
+  const { purchasePlan } = useNewPlanCheckout();
+  const showCheckoutError = useCheckoutErrorToast();
 
   // NOTE: passing `productDetails` to usePricingTable FILTERS the table to
   // only the listed products — don't use it for display tweaks.
@@ -335,20 +336,20 @@ function PricingTableInner({
                       trial_eligible: trialState.trialEligible,
                       on_trial: trialState.onTrial,
                     });
-                    if (product.id && customer) {
-                      await checkout({
-                        productId: product.id,
-                        dialog: CheckoutDialog,
-                        // Autumn only dedupes trials per-plan; this passes
-                        // `freeTrial: false` for everyone who ever trialed
-                        // or pays (closing the cross-plan hole), and nothing
-                        // for trial-eligible or currently-trialing users —
-                        // the dialog routes trialing switches through
-                        // convex/billing.ts to keep the running trial.
-                        ...checkoutTrialParams(trialState),
-                      });
-                    } else if (product.display?.button_url) {
-                      window.open(product.display?.button_url, "_blank");
+                    try {
+                      if (product.id && customer) {
+                        await purchasePlan({
+                          productId: product.id,
+                          trialState,
+                          checkout,
+                          dialog: CheckoutDialog,
+                          freeTarget: product.properties?.is_free === true,
+                        });
+                      } else if (product.display?.button_url) {
+                        window.open(product.display?.button_url, "_blank");
+                      }
+                    } catch (e) {
+                      showCheckoutError(e, "pricingTable.select");
                     }
                   },
                 }}
@@ -356,6 +357,15 @@ function PricingTableInner({
             );
           })}
         </PricingTableContainer>
+      )}
+      {/* Paid plans are sold with Stripe as merchant of record, so the price
+          on the card is the gross amount — VAT is carved out of it rather
+          than added at checkout. Suppressed when the table is showing only
+          the free plan, where there is no tax to speak of. */}
+      {visibleProducts.some((p) => !p.properties?.is_free) && (
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          {t("taxNote")}
+        </p>
       )}
     </div>
   );

@@ -24,6 +24,7 @@ import { captureGeneration } from '../lib/posthogAi';
 import { costForAudioMs, costForCharacters } from '../config/aiCosts';
 import { OPENROUTER_MODELS } from '../config/aiModels';
 import { deleteStorageBlobIfUnreferenced } from '../lib/audio';
+import { BLOB_SWAP_DELETE_DELAY_MS } from '../lib/audioAssets';
 import { TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
 import { reserveRateLimitToken } from '../lib/rateLimitReserve';
 import { ttsPool } from '../lib/workpools';
@@ -361,6 +362,17 @@ async function synthesizeAndValidate(
         transcriptionErr,
       );
       if (attempt + 1 < maxAttempts) {
+        // The retry will supersede this attempt's blob, and — unlike a
+        // mismatch, whose blob the ttsMismatches record keeps for review —
+        // an errored transcription references it nowhere, so it would leak.
+        // Delayed + reference-checked: if the retry fails to store and the
+        // asset ends up keeping this blob, the job sees the reference and
+        // spares it.
+        await ctx.scheduler.runAfter(
+          BLOB_SWAP_DELETE_DELAY_MS,
+          internal.features.ttsProcessing.deleteBlobIfUnreferencedJob,
+          { storageId },
+        );
         await new Promise((resolve) =>
           setTimeout(resolve, 500 + Math.random() * 250),
         );

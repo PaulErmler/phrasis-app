@@ -1807,51 +1807,11 @@ export type ModelStage = {
   };
 };
 
-/**
- * Stable identifier for the legacy Google Translate v2 path. Used as the
- * `translationSource` on rows produced by `processTranslationForCard` —
- * the fallback path the LLM queue schedules when every model stage fails.
- */
-export const GOOGLE_TRANSLATE_SOURCE = 'google-translate-v2';
-
-/**
- * Stable identifier for translations the user typed manually (no model
- * involved). Used on `createCustomText` insertions when the corresponding
- * entry didn't come from autofill.
- */
-export const USER_PROVIDED_TRANSLATION_SOURCE = 'user-provided';
-
-/**
- * Provenance slug for hand-curated translations shipped by a migration
- * (see convex/migrations/updateEssentialGreetings.ts). Like user-provided
- * rows, these were authored by a human and must never be regenerated.
- */
-export const CURATED_TRANSLATION_SOURCE = 'curated-manual';
-
-/**
- * Translation provenances that no automated pass may overwrite or delete.
- *
- * The version-stale regeneration sweep deletes and re-generates any row whose
- * `translationVersion` is below the language's current one. That is correct for
- * machine output, but both of these were written by a person: `user-provided`
- * by the user, `curated-manual` by us. Curated rows in particular live on
- * PREMADE texts, so the sweep's `!text.userCreated` guard does not cover them —
- * a `translationVersion` bump would silently undo the curation.
- *
- * Use `isProtectedTranslationSource` at every provenance guard rather than
- * comparing against a single constant, so adding a provenance protects it
- * everywhere at once.
- */
-export const PROTECTED_TRANSLATION_SOURCES: readonly string[] = [
-  USER_PROVIDED_TRANSLATION_SOURCE,
-  CURATED_TRANSLATION_SOURCE,
-];
-
-export function isProtectedTranslationSource(
-  source: string | undefined | null,
-): boolean {
-  return source != null && PROTECTED_TRANSLATION_SOURCES.includes(source);
-}
+// Translation provenance — the source slugs (`google-translate-v2`,
+// `user-provided`, `curated-manual`) and the guards that decide whether an
+// automated pass may touch a row — lives in `lib/translationProvenance.ts`.
+// Import from there, not from here. Only the tag *format* below stays with the
+// model config.
 
 /**
  * Build the `translationSource` string for an LLM translation from the

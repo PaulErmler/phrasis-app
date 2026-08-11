@@ -12,9 +12,10 @@ import PricingTable from '@/components/autumn/pricing-table';
  * All plans are shown, including the auto-enabled Free plan.
  *
  * The 7-day free trial is configured in autumn.config.ts for Basic + Pro
- * (and their annual variants); the client just calls `checkout({productId})`.
- * If the user closes the checkout dialog without purchasing, "Maybe later"
- * leaves them on the auto-enabled Free plan.
+ * (and their annual variants); the pricing table routes these first
+ * purchases through `billing.attachNewPlan` to Stripe's hosted checkout
+ * (see hooks/use-new-plan-checkout.ts). Abandoning that checkout ("Maybe
+ * later") leaves the user on the auto-enabled Free plan.
  */
 interface Props {
   onContinue: () => void;

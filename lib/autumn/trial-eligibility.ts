@@ -1,4 +1,5 @@
 import {
+  currentPlans,
   findCurrentPaidPlan,
   normalizePlans,
   type AutumnCustomerLike,
@@ -59,7 +60,13 @@ export function findCurrentPaidProduct(
 export function getTrialState(
   customer: (AutumnCustomerLike & { trials_used?: unknown }) | null | undefined,
 ): TrialState {
-  const plans = normalizePlans(customer);
+  // Only plans held RIGHT NOW: an `expired` entry (a lapsed trial or a
+  // fully executed cancel can leave one in the payload) must not read as a
+  // paid plan — that misrouted lapsed customers off the first-purchase
+  // path — and a trial cancelled early leaves an expired entry whose
+  // trial_ends_at is still in the future, which must not read as onTrial.
+  // A `scheduled` entry is a pending change, not a held plan.
+  const plans = currentPlans(normalizePlans(customer));
   const trialsUsed = (customer?.trials_used ?? []) as TrialUsedLite[];
 
   const trialing = plans.find(
@@ -90,9 +97,13 @@ export function getTrialState(
  *   running trial; leaving the preview untouched here is safe because the
  *   dialog overrides copy and amounts for trialing users.
  * - Everyone else (paying now, or trialed/paid in the past) gets
- *   `freeTrial: false`, which Autumn's `/checkout` and `/attach` both
- *   honor — the preview then shows real charges instead of a phantom
- *   cross-plan trial.
+ *   `freeTrial: false`. On `/checkout` previews this still works (probed
+ *   2026-08-09). On the legacy `/attach` it no longer does — Autumn's
+ *   v1.2→v2 translation silently loses the boolean and `null` fails its
+ *   schema, so the server routes these attaches through v2
+ *   `/billing.attach` with `customize.free_trial: null` instead (see
+ *   attachViaV2NoTrial in convex/autumn.ts). The flag here doubles as that
+ *   routing signal.
  */
 export function checkoutTrialParams(state: TrialState): { freeTrial?: false } {
   return !state.trialEligible && !state.onTrial ? { freeTrial: false } : {};

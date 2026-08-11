@@ -3,7 +3,7 @@ import { internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { getActiveDataset } from '../db/collections';
 import { deleteAudioRowsForTextLanguage } from '../lib/audio';
-import { CURATED_TRANSLATION_SOURCE } from '../../lib/languages';
+import { CURATED_TRANSLATION_SOURCE } from '../../lib/translationProvenance';
 import {
   resolveCardSpeakerGenders,
   getVoiceForLanguage,
@@ -42,8 +42,9 @@ import {
  */
 
 /** Provenance slug stamped on the curated rows (translationSource). Shared with
- * `isProtectedTranslationSource` in lib/languages.ts, which is what keeps a
- * future `translationVersion` bump from deleting and re-generating them. */
+ * `isProtectedTranslationSource` in lib/translationProvenance.ts, which is what
+ * keeps a future `translationVersion` bump from deleting and re-generating
+ * them. */
 const CURATED_SOURCE = CURATED_TRANSLATION_SOURCE;
 
 /**

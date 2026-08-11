@@ -31,7 +31,8 @@ const h = vi.hoisted(() => {
 
 vi.mock('@/lib/audio/peakCache', () => ({
   // Decoded source clips are all 1.0s; gain/peak are inert.
-  getDecodeContext: () => ({ decodeAudioData: async () => h.fakeBuffer(1.0) }),
+  // `sampleRate` is read only when nothing was decoded (a fully silent merge).
+  getDecodeContext: () => ({ decodeAudioData: async () => h.fakeBuffer(1.0), sampleRate: 48000 }),
   computePeakFromBuffer: () => 0.7,
   computeGain: () => 1,
 }));
@@ -117,6 +118,18 @@ const cue = (
   speed: number,
   reveals: boolean,
 ): LanguageCue => ({ language, startSec, speed, reveals });
+
+/**
+ * Placeholder cue for a language whose repetitions are 0: it marks where the
+ * clip would have started so auto-reveal still fires, but schedules no audio
+ * and consumes no time.
+ */
+const silentCue = (
+  language: string,
+  startSec: number,
+  speed: number,
+  reveals: boolean,
+): LanguageCue => ({ language, startSec, speed, reveals, silent: true });
 
 // --- tests -----------------------------------------------------------------
 
@@ -205,6 +218,7 @@ describe('mergeCardAudio — sequencing', () => {
     );
     expect(r!.languageCues).toEqual([
       cue('es', 0, 1, false), // before play (es also plays after → no reveal)
+      silentCue('en', 5, 1, true), // base would have started here → un-blurs the base text
       cue('es', 10, 1, true), // 1.0s before + 4s pauseT2B + silent base + 5s pauseB2T
     ]);
     expect(r!.durationSec).toBe(11);
@@ -223,6 +237,7 @@ describe('mergeCardAudio — sequencing', () => {
       }),
     );
     expect(r!.languageCues).toEqual([
+      silentCue('en', 0, 1, true), // base would have started here → un-blurs the base text
       cue('es', 5, 1, true), // 5s leading silence (pauseB2T), then the target
     ]);
     expect(r!.durationSec).toBe(6);
@@ -241,7 +256,12 @@ describe('mergeCardAudio — sequencing', () => {
         pauseT2B: 5,
       }),
     );
-    expect(r!.languageCues).toEqual([cue('es', 0, 1, true)]);
+    expect(r!.languageCues).toEqual([
+      cue('es', 0, 1, true),
+      // The base slot lands on the very last instant of the timeline. The
+      // player's `ended` sweep is what guarantees this reveal actually fires.
+      silentCue('en', 6, 1, true),
+    ]);
     expect(r!.durationSec).toBe(6); // 1.0s before clip + 5s pauseT2B silence
   });
 
@@ -325,7 +345,10 @@ describe('mergeCardAudio — sequencing', () => {
     expect(r!.durationSec).toBe(3); // 1.0s clip + 2s pauseBeforeAdvance
   });
 
-  it('returns null when every group filters out (no playable entries)', async () => {
+  it('returns null when nothing is audible and no pause fills the timeline', async () => {
+    // The one genuinely empty case: a silent base slot, both target groups off
+    // and no pauses around it. There is no timeline to reveal along, so there
+    // is nothing worth rendering.
     const r = await mergeCardAudio(
       recs(['en', 'es']),
       ['en'],
@@ -339,7 +362,7 @@ describe('mergeCardAudio — sequencing', () => {
     expect(r).toBeNull();
   });
 
-  it('mixed split: es plays before-only, fr after-only (per-language group filtering)', async () => {
+  it('mixed split: es plays before-only, fr after-only (silent slots keep their place)', async () => {
     const r = await mergeCardAudio(
       recs(['en', 'es', 'fr']),
       ['en'],
@@ -347,18 +370,27 @@ describe('mergeCardAudio — sequencing', () => {
       settings({
         playTargetBefore: true,
         playTargetAfter: true,
-        reps: { en: 1, es: 0, fr: 1 }, // after group: fr only (es filtered out)
-        beforeReps: { es: 1, fr: 0 }, // before group: es only (fr filtered out)
+        reps: { en: 1, es: 0, fr: 1 }, // after group: fr audible, es silent
+        beforeReps: { es: 1, fr: 0 }, // before group: es audible, fr silent
         pauseT2B: 4,
         pauseB2T: 5,
       }),
     );
+    // Each zeroed language keeps its slot — and its share of the surrounding
+    // pauses — so its reveal fires where the clip would have been, not at a
+    // neighbour's edge.
     expect(r!.languageCues).toEqual([
-      cue('es', 0, 1, true), // before-only es reveals (never replayed after base)
-      cue('en', 5, 1, true), // 1.0s es + 4s pauseT2B
-      cue('fr', 11, 1, true), // 5 + 1.0s en + 5s pauseB2T
+      // es also plays after base (silently), so the after-base slot owns its
+      // reveal — the learner still gets the guess-then-see flow.
+      cue('es', 0, 1, false),
+      silentCue('fr', 4, 1, false), // fr is replayed after base → no reveal here
+      cue('en', 8, 1, true), // 1.0s es + 3s pauseT2T + silent fr + 4s pauseT2B
+      silentCue('es', 14, 1, true), // 8 + 1.0s en + 5s pauseB2T → un-blurs es
+      cue('fr', 17, 1, true), // + 3s pauseT2T
     ]);
-    expect(r!.durationSec).toBe(12);
+    expect(r!.durationSec).toBe(18);
+    // es and fr are each audible in exactly one group, so both still land a
+    // speed — the silent slots deliberately write none.
     expect(r!.speedByLanguage).toEqual({ es: 1, en: 1, fr: 1 });
   });
 
@@ -377,5 +409,96 @@ describe('mergeCardAudio — sequencing', () => {
     );
     expect(r!.languageCues).toEqual([cue('en', 0, 1, true)]);
     expect(r!.durationSec).toBe(1);
+  });
+});
+
+describe('mergeCardAudio — zero repetitions still reveal', () => {
+  it('un-blurs a zero-rep target where its audio would have played', async () => {
+    // The reported bug: repetitions 0 + "auto un-blur when the audio plays"
+    // used to drop the language from the merge entirely, so its text stayed
+    // blurred for the whole card.
+    const r = await mergeCardAudio(
+      recs(['en', 'es']),
+      ['en'],
+      ['es'],
+      settings({ reps: { en: 1, es: 0 }, pauseB2T: 5 }),
+    );
+    expect(r).not.toBeNull();
+    expect(r!.languageCues).toEqual([
+      cue('en', 0, 1, true),
+      silentCue('es', 6, 1, true), // 1.0s base + 5s pauseB2T — where es would have started
+    ]);
+    expect(r!.durationSec).toBe(6);
+    // Nothing was stretched for es, so it writes no speed.
+    expect(r!.speedByLanguage).toEqual({ en: 1 });
+  });
+
+  it('keeps the reveal at the after-base slot when Practice Listening is on', async () => {
+    // es is heard before base and zeroed after it. The reveal still belongs to
+    // the after-base slot, so the learner gets the full guessing window.
+    const r = await mergeCardAudio(
+      recs(['en', 'es']),
+      ['en'],
+      ['es'],
+      settings({
+        playTargetBefore: true,
+        playTargetAfter: true,
+        reps: { en: 1, es: 0 },
+        beforeReps: { es: 1 },
+        pauseT2B: 4,
+        pauseB2T: 5,
+      }),
+    );
+    expect(r!.languageCues).toEqual([
+      cue('es', 0, 1, false), // audible, but deliberately does not reveal
+      cue('en', 5, 1, true),
+      silentCue('es', 11, 1, true), // the reveal
+    ]);
+    expect(r!.durationSec).toBe(11);
+  });
+
+  it('never fetches or stretches a silent language', async () => {
+    await mergeCardAudio(
+      recs(['en', 'es']),
+      ['en'],
+      ['es'],
+      settings({ reps: { en: 1, es: 0 } }),
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith('u-en');
+  });
+
+  it('renders the pauses as silence when nothing at all is audible', async () => {
+    // Every language muted, but the configured pauses still describe a real
+    // timeline — so it plays as silence and each line un-blurs on schedule.
+    const r = await mergeCardAudio(
+      recs(['en', 'es']),
+      ['en'],
+      ['es'],
+      settings({ reps: { en: 0, es: 0 }, pauseB2T: 5 }),
+    );
+    expect(r).not.toBeNull();
+    expect(r!.languageCues).toEqual([
+      silentCue('en', 0, 1, true),
+      silentCue('es', 5, 1, true),
+    ]);
+    expect(r!.durationSec).toBe(5);
+    expect(r!.speedByLanguage).toEqual({});
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('reveals a zero-rep language that has no recording at all', async () => {
+    // Zeroed repetitions are the user's choice regardless of whether audio was
+    // ever generated for that language.
+    const r = await mergeCardAudio(
+      recs(['en']),
+      ['en'],
+      ['es'],
+      settings({ reps: { en: 1, es: 0 }, pauseB2T: 5 }),
+    );
+    expect(r!.languageCues).toEqual([
+      cue('en', 0, 1, true),
+      silentCue('es', 6, 1, true),
+    ]);
   });
 });

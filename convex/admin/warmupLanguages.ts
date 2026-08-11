@@ -3,6 +3,7 @@ import { internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
 import type { Id } from '../_generated/dataModel';
 import { scheduleMissingContent } from '../features/decks';
+import { isUserCreatedText } from '../../lib/translationProvenance';
 
 /**
  * Proactive content warmup for the high-traffic languages (the Jul 2026 usage
@@ -81,7 +82,7 @@ export const warmupChartLanguages = internalMutation({
     const warmText = async (textId: Id<'texts'>) => {
       const text = await ctx.db.get(textId);
       // Premade content only — custom/user texts stay on the lazy path.
-      if (!text || text.userCreated) return;
+      if (!text || isUserCreatedText(text)) return;
       const scheduled = await scheduleMissingContent(
         ctx,
         textId,

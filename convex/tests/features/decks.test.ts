@@ -13,7 +13,7 @@ import {
   findNextIncompleteCollection,
   getActiveDataset,
 } from "../../db/collections";
-import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/languages";
+import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/translationProvenance";
 // The workpools are module-mocked globally (tests/convexTestSetup.ts):
 // `enqueueAction` is a vi.fn() resolving to unique fake workIds
 // ('test-tts-work-N'), so tests can assert the enqueue payload directly.
@@ -651,6 +651,95 @@ describe("features/decks", () => {
       expect(await t.run(async (ctx) => ctx.db.get(audioId))).toBeNull();
     });
 
+    // Backstop at the write choke point: whatever enqueued the job, no
+    // retranslation may land on a card the user created.
+    it("with replaceExisting=true refuses to overwrite a translation on a user-created text", async () => {
+      const t = convexTest(schema, modules);
+      const { textId, translationId } = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "Custom",
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "She's over there",
+          language: "en",
+          userCreated: true,
+          userId: "user-1",
+          collectionId,
+          collectionRank: 1,
+        });
+        const translationId = await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "de",
+          translatedText: "Sie ist dort drüben",
+          // Chat-model output: NOT `user-provided`, so the protected-source
+          // check alone would let this through.
+          translationSource: "openai/gpt-5-chat-none",
+        });
+        return { textId, translationId };
+      });
+
+      await t.mutation(
+        internal.features.decks.storeTranslationAndScheduleTTS,
+        {
+          textId,
+          targetLanguage: "de",
+          translatedText: "Sie ist da drüben",
+          voiceName: TEST_VOICE,
+          translationSource: "google/gemini-3-flash-preview-high",
+          replaceExisting: true,
+          skipTts: true,
+        },
+      );
+
+      const row = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(row?.translatedText).toBe("Sie ist dort drüben");
+      expect(row?.translationSource).toBe("openai/gpt-5-chat-none");
+    });
+
+    // …but a language the card doesn't have yet must still be fillable, e.g.
+    // after the user adds a target language to the course.
+    it("still inserts a missing translation on a user-created text", async () => {
+      const t = convexTest(schema, modules);
+      const textId = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "Custom",
+          textCount: 0,
+        });
+        return ctx.db.insert("texts", {
+          text: "She's over there",
+          language: "en",
+          userCreated: true,
+          userId: "user-1",
+          collectionId,
+          collectionRank: 1,
+        });
+      });
+
+      await t.mutation(
+        internal.features.decks.storeTranslationAndScheduleTTS,
+        {
+          textId,
+          targetLanguage: "de",
+          translatedText: "Sie ist da drüben",
+          voiceName: TEST_VOICE,
+          translationSource: "google/gemini-3-flash-preview-high",
+          replaceExisting: true,
+          skipTts: true,
+        },
+      );
+
+      const row = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("targetLanguage", "de"),
+          )
+          .first(),
+      );
+      expect(row?.translatedText).toBe("Sie ist da drüben");
+    });
+
     it("with replaceExisting=true keeps audio and skips TTS when the change is punctuation-only", async () => {
       const t = convexTest(schema, modules);
       const { textId, translationId, audioId } = await t.run(async (ctx) => {
@@ -932,6 +1021,10 @@ describe("features/decks", () => {
     // `speakerGender` and `audioSpeakerGender` are 'female', so the gender
     // resolution at the top of scheduleMissingContent is a no-op and the
     // resolved voice gender the sweep compares against is 'female'.
+    //
+    // `userCreated` defaults to false (premade content): the sweep only ever
+    // rewrites machine output on premade texts, so that is the case these
+    // deletion tests must exercise. Pass true for the user-owned cases.
     async function seedTextWithSpanish(
       t: TestConvex<typeof schema>,
       args: {
@@ -940,6 +1033,7 @@ describe("features/decks", () => {
           translationSource?: string;
         };
         audio?: { voiceGender: "male" | "female" };
+        userCreated?: boolean;
       },
     ) {
       return t.run(async (ctx) => {
@@ -950,7 +1044,7 @@ describe("features/decks", () => {
         const textId = await ctx.db.insert("texts", {
           text: "Hello",
           language: "en",
-          userCreated: true,
+          userCreated: args.userCreated ?? false,
           speakerGender: "female",
           audioSpeakerGender: "female",
           collectionId,
@@ -1046,6 +1140,55 @@ describe("features/decks", () => {
         },
       });
       expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
+    });
+
+    // The reporter's bug: a chat-created card carries the CHAT MODEL's slug as
+    // its translationSource, not `user-provided`, so the protected-source check
+    // alone let the gender sweep delete it and re-translate from the stored
+    // source rendering — losing the wording the user approved.
+    it("keeps a machine-sourced translation on a user-created card when the gender drifts", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextWithSpanish(t, {
+        userCreated: true,
+        translation: {
+          speakerGender: "male",
+          translationSource: "openai/gpt-5-chat-none",
+        },
+      });
+      expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
+    });
+
+    it("keeps a legacy translation on a user-created card when its audio drifted gender", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextWithSpanish(t, {
+        userCreated: true,
+        translation: { translationSource: "google-translate-v2" },
+        audio: { voiceGender: "male" },
+      });
+      expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
+    });
+
+    // The text is the user's; the voice is ours. Drifted audio on a
+    // user-created card must still be dropped so it can be re-synthesized at
+    // the card's current gender — the guard covers translations only.
+    it("still deletes drifted audio on a user-created card", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextWithSpanish(t, {
+        userCreated: true,
+        translation: { translationSource: "google-translate-v2" },
+        audio: { voiceGender: "male" },
+      });
+      const audio = await t.run(async (ctx) => {
+        const text = (await ctx.db.get(textId))!;
+        await scheduleMissingContent(ctx, textId, text, ["en"], ["es"]);
+        return ctx.db
+          .query("audioRecordings")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("language", "es"),
+          )
+          .first();
+      });
+      expect(audio).toBeNull();
     });
   });
 

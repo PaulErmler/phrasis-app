@@ -269,6 +269,7 @@ export function LearningMode({
       state.preReviewCount,
       state.fsrsState?.reps ?? 0,
       isTranscribeMode(state.courseSettings),
+      state.freeStudyPlayCount,
     );
   const autoRateEnabled =
     (settingsForAutoRate?.reviewMode ?? 'audio') === 'full' &&

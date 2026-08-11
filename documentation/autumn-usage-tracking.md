@@ -13,11 +13,12 @@ This document describes how feature gating, usage quotas, and the Autumn billing
 5. [Backend – Autumn Component](#backend--autumn-component)
 6. [Quota Sync Lifecycle](#quota-sync-lifecycle)
 7. [Backend Enforcement (Mutations)](#backend-enforcement-mutations)
-8. [Frontend – Quota Hook](#frontend--quota-hook)
-9. [Frontend – UI Components](#frontend--ui-components)
-10. [Frontend – Error Handling](#frontend--error-handling)
-11. [Adding a New Gated Feature](#adding-a-new-gated-feature)
-12. [Common Pitfalls](#common-pitfalls)
+8. [Stripe Managed Payments (merchant of record)](#stripe-managed-payments-merchant-of-record)
+9. [Frontend – Quota Hook](#frontend--quota-hook)
+10. [Frontend – UI Components](#frontend--ui-components)
+11. [Frontend – Error Handling](#frontend--error-handling)
+12. [Adding a New Gated Feature](#adding-a-new-gated-feature)
+13. [Common Pitfalls](#common-pitfalls)
 
 ---
 
@@ -347,6 +348,289 @@ When Autumn reports a plan as past due, `syncAllFeatures` stamps `pastDueSince` 
 **Course auto-archive is deferred while past due.** The auto-archive in `syncAllFeatures` is deliberately suppressed during the past-due window; it runs in the follow-on sync after a cancel, once the plan really has shrunk to Free. That is the archival the cancel confirmation warns about.
 
 E2E coverage: `e2e/payment-overdue.spec.ts` forces the synced past-due state via the `E2E_TEST_HOOKS`-gated helpers in `convex/usage/testing.ts`.
+
+---
+
+## Stripe Managed Payments (merchant of record)
+
+Managed Payments makes **Stripe** the seller of record for paid subscriptions:
+Stripe calculates, charges, and remits indirect tax in 80+ countries, and owns
+fraud, disputes, and transaction-level support. Autumn has no first-class support
+for it — the only activation path is to forward Stripe's `managed_payments` field
+onto the Checkout Session Autumn creates.
+
+**Kill switch:** the Convex env var `AUTUMN_MANAGED_PAYMENTS`. Only the literal
+string `'true'` enables it; `npx convex env unset AUTUMN_MANAGED_PAYMENTS` reverts
+checkout to the previous behaviour on the next call. Read per call (not at module
+load) so the switch doesn't wait on isolate recycling.
+
+**Where it is injected.** One file — `convex/billing.ts` — deliberately
+server-side only, so the browser can neither enable nor suppress it:
+
+- `attachNewPlan` (the first-purchase path, the only flow that can actually be
+  MoR — see below) adds `checkout_session_params` while the flag is on, and
+  always sends `redirect_mode: 'always'` (flag or no flag): `'if_required'`
+  would bill a lapsed subscriber's surviving card directly, creating a
+  subscription with no Checkout Session — charged on button click without any
+  confirmation step, and (with the flag on) silently **not**
+  merchant-of-record. With `'always'`, Stripe's hosted page is both the MoR
+  carrier and the explicit price+tax confirmation for every first purchase.
+- `switchPlanDuringTrial` adds `checkout_session_params` to its
+  `/billing.attach` body too (usually inert — a trialing customer has a card on
+  file, so that branch rarely produces a session).
+
+The legacy `attach`/`checkout` actions in `convex/autumn.ts` inject **nothing**:
+their path cannot carry MoR (API version, below), so injecting there could only
+produce Stripe 400s. Instead BOTH carry a guard
+(`guardFirstPurchaseOffLegacyPath`) — while the flag is on, a first purchase
+(no paid plan, no running trial) is rejected with a "please refresh" error, so
+a stale client can never complete a first purchase without merchant of record.
+`checkout` is guarded too because for a card-less customer the v1.2 preview
+*itself* creates the Stripe session and autumn-js redirects straight to it
+(dialog never opens) — the sandbox findings below show the MoR error surfacing
+from `autumn:checkout` for exactly this reason. Trialing customers and payers
+pass the guard: their calls never create sessions, and the dialog needs the
+preview. The public actions also no longer accept `checkoutSessionParams` from
+the client at all: the component would forward it verbatim onto the Stripe
+session, letting any authenticated user pass
+`managed_payments: {enabled: false}` and shift the sale's tax liability onto
+us.
+
+**Casing is load-bearing and looks wrong.** The `/billing.attach` bodies in
+`convex/billing.ts` are hand-written snake_case for the raw REST API — nothing
+case-converts them, and the children of `checkout_session_params` are forwarded
+to Stripe verbatim. `MANAGED_PAYMENTS_SESSION_PARAMS`
+(`lib/autumn/managed-payments.ts`) must stay snake_case; a "consistency"
+refactor to camelCase silently breaks MoR (or turns it into a Stripe 400).
+
+**Autumn's own session params win the merge.** Server-side Autumn does
+`{...checkoutSessionParams, ...params}`. It never sets `managed_payments`, so ours
+survives — but when the Autumn org has **automatic tax enabled**, Autumn bakes in
+`automatic_tax`, `tax_id_collection`, and `customer_update`, all of which are
+*forbidden* under Managed Payments and cannot be overridden from our side. Autumn's
+automatic tax must therefore stay **off**, which is correct anyway: Stripe now does
+the tax.
+
+**Dashboard prerequisites** (none of these live in the repo):
+
+1. Managed Payments terms of service accepted at `dashboard.stripe.com/settings/managed-payments`.
+2. The Autumn↔Stripe link must be a **secret-key** connection — Managed Payments
+   does not support platform-controlled/Connect accounts.
+3. An eligible `tax_code` set on every Stripe product Autumn created, in **both**
+   test and live mode. `txcd_10103000` (*SaaS – personal use*) fits our plans —
+   personal-use rather than business-use because AGB §1.2/§2.3 restrict the
+   Services to consumers. Dashboard → Product catalog → ⋯ → Edit product →
+   Product tax code; eligible codes are labelled `Eligible for Managed Payments`.
+
+   > ⚠️ **Recurring footgun.** Autumn never sets `tax_code` when it creates
+   > Stripe products — it only reads the field for tax previews. So *every new
+   > paid plan added to `autumn.config.ts` needs its tax code set by hand in
+   > Stripe*, or checkout for that plan fails with:
+   > `Invalid line_items[0]: the product tax code is missing.`
+   > Add it to the checklist whenever a plan is added.
+4. Stripe → Tax settings → **"Include tax in prices" = Automatic**
+   (`defaults.tax_behavior: inferred_by_currency`). Automatic infers *exclusive*
+   for USD/CAD and *inclusive* for every other currency, which is the local
+   convention in each market. Autumn never sets `tax_behavior` on the prices it
+   creates, so this dashboard default is what actually governs.
+
+   **It keys off the Price's currency, not the customer's country.** Stripe:
+   *"if your price is in USD and you use the inferred setting, the behavior is
+   determined by your USD configuration, even if the customer pays in EUR."*
+   Adaptive Pricing (always on under Managed Payments) only changes the
+   presentment currency, not the tax behaviour. So with EUR-only plans every
+   customer gets tax-inclusive, including US ones — US sales tax then comes out
+   of margin. Genuinely exclusive US pricing requires a USD price on the plan
+   via `additional_currencies` in `autumn.config.ts`.
+
+   Note `tax_behavior` **cannot be changed** once a Price is created as inclusive
+   or exclusive, so get this right before live-mode prices exist.
+
+**Scope limit — new Checkout purchases only.** Stripe cannot convert existing
+subscriptions, and Autumn skips Checkout entirely when the customer already has a
+usable card (upgrades and downgrades become direct Stripe subscription updates). A
+permanently mixed estate of MoR and non-MoR subscriptions is the expected steady
+state, not a bug.
+
+**Immediate cancels on MoR subscriptions fail in Autumn** (live-verified
+2026-08-10): Autumn's `cancel_immediately` means "cancel with prorated refund",
+and creating that refund invoice is forbidden under Managed Payments —
+`(Stripe Error) Invoices cannot be created for Subscriptions with Managed
+Payments enabled` (400). Production is unaffected today: the only immediate
+cancel in the app, `cancelOverdueSubscription`, acts on past-due subscriptions
+where Stripe VOIDS the existing invoice instead of creating one (proven live by
+the billing-clock dunning journey). But never add an immediate-cancel feature
+for active MoR subscriptions on Autumn's `/cancel` — a Stripe-side DELETE
+(which invoices nothing) is the working alternative, and end-of-cycle cancels
+are unaffected.
+
+**Sandbox findings (2026-08-09), first run with the flag on:**
+
+```
+[CONVEX A(autumn:checkout)] [LOG] 'ERROR' '[Autumn] (Stripe Error)
+You specified a Stripe-Account header, but Managed Payments cannot be used with Connect.'
+```
+
+Two things follow from that one line:
+
+- **The blocker is the Connect link, not the API version.** Autumn's
+  `createStripeCli` prefers a stored secret key and otherwise falls back to a
+  Connect account ID sent as the `Stripe-Account` header. That header is present,
+  so the org is linked to Stripe through the Connect/OAuth flow — which Managed
+  Payments does not support at all. Fix in the Autumn dashboard
+  (`app.useautumn.com/sandbox/dev?tab=stripe`): connect the Stripe **secret key**
+  instead. Until then no amount of parameter plumbing helps.
+- **The passthrough itself works.** Stripe recognised `managed_payments` at every
+  stage, so the params survive every hop (component → autumn-js → Autumn →
+  Stripe). Nothing in *our* code needs to change.
+- Note it surfaced from `autumn:checkout`, i.e. the preview *does* reach Stripe.
+  (At the time the flag was injected on the legacy `checkout`/`attach` actions
+  too; that injection was later removed — the legacy path can never carry MoR,
+  so it could only ever produce this class of error.)
+
+Clearing the Connect link and setting product tax codes then surfaced the
+**blocking** error:
+
+```
+'[Autumn] (Stripe Error) Managed Payments is not supported on API version
+2025-02-24.acacia. Update your API version, or set the API Version of this
+request to 2025-03-31.basil or greater.'
+```
+
+**This is upstream in Autumn and has no configuration seam on our side.** The
+chain: `@useautumn/convex` builds `new AutumnSDK({ secretKey, url })` — no
+version option — so autumn-js sends its `LATEST_API_VERSION = "1.2"`, which
+routes to Autumn's legacy `handleCreateCheckout.ts`, which calls
+`createStripeCli({ org, env, legacyVersion: true })`, pinning
+`2025-02-24.acacia`. Managed Payments requires `2025-03-31.basil`+.
+
+**How we work around it: `billing.attachNewPlan`.** Only the *first* paid
+purchase makes Autumn build a Checkout Session (`redirect_mode: 'always'`
+guarantees it even when a saved card survived — see above). So exactly that one
+flow is routed to `POST /billing.attach` at api version `2.1.0`, whose Stripe
+client carries no `legacyVersion` pin. Everything else stays on the legacy
+path.
+
+That split is deliberate, not laziness:
+
+- **Upgrades/downgrades can't be MoR anyway.** Stripe cannot convert an existing
+  subscription, and Autumn updates those in place without a Checkout Session.
+- **v2 has no `scenario`.** The v1.2 `/checkout` preview's `product.scenario`
+  (`upgrade | downgrade | renew | cancel | new | active | scheduled`) drives the
+  dialog copy, the pricing-table CTA labels, and every branch of
+  `switchPlanDuringTrial`. v2 offers only `attach_action`
+  (`activate | upgrade | downgrade | none | purchase`), which collapses
+  renew/active/scheduled and has no `cancel` — the exact distinctions
+  `e2e/billing.spec.ts` steps 4–6 exist to protect. Keeping the legacy preview
+  keeps that classifier.
+- **`switchPlanDuringTrial`'s preview is safe on the legacy path** precisely
+  because a trialing customer has a card on file, so Autumn classifies the call
+  as an upgrade/downgrade and builds no session. That is why it never hit this
+  error.
+
+Client routing lives in `hooks/use-new-plan-checkout.ts`, used by the pricing
+table and the paywall/low-quota dialogs: a first purchase
+(`!hasPaidPlan && !onTrial`, paid product) calls `billing.attachNewPlan` and
+redirects to the returned `payment_url`; everything else calls `checkout()` +
+CheckoutDialog as before. Routing *before* `checkout()` is mandatory, not
+style: for card-less customers the preview would itself create the (legacy,
+non-MoR-capable) session and redirect — the dialog never opens, so a
+dialog-side branch could not intercept it. The routing needs no server flag —
+it is deterministic from the customer's own trial state (nothing to race), and
+first purchases always take v2, which behaves identically with MoR off (the
+env flag only controls the session params server-side). It is a hint only:
+`attachNewPlan` re-derives everything server-side and rejects trialing
+customers and existing payers outright, and the legacy-path guard (above)
+catches stale clients.
+
+> ⚠️ **`customize: { free_trial: null }`** is our reading of v2's
+> `object | null` type as the equivalent of v1.2's `free_trial: false` — it is
+> what stops a repeat trial on this path. A wrong reading either grants a
+> second trial (the hole `gateTrialArgs` exists to close) or wrongly denies a
+> first one. `e2e/billing-clock.spec.ts` ("lapsed repurchase … grants no
+> second trial") verifies it against live Stripe: the repurchased
+> subscription must come back `active` with `trial_end: null`.
+
+> 🚨 **Upstream regression: the legacy `/attach` can no longer suppress a
+> trial at all** (found 2026-08-09 by the billing-clock e2e, journey C;
+> probed live the same day). The exact behavior matrix on v1.2:
+>
+> - `/checkout` (preview): `free_trial: false` still **works** — the preview
+>   suppresses the plan's trial. `null` → 400 "free_trial: Invalid input".
+> - `/attach`: `false` passes validation but is **silently lost** in
+>   Autumn's v1.2→v2 translation (`freeTrialParamsV0ToV1` handles
+>   undefined/null/object — a boolean falls through), so the plan's
+>   configured trial applies anyway. `null` → the same 400. Live effect: a
+>   PAYING customer upgrading Basic→Pro got a full "unused Basic Annual"
+>   credit note **plus Pro's 7-day free trial**, €0 due — the cross-plan
+>   trial hole `gateTrialArgs` closes, reopened upstream, with a refund
+>   attached.
+> - v2 `/billing.attach` with `customize.free_trial: null` works (what
+>   attachNewPlan and switchPlanDuringTrial already use).
+>
+> Our fix (convex/autumn.ts): previews keep `freeTrial: false` on the legacy
+> path; the `attach` action routes trial-suppressed **cross-plan switches to
+> a paid target** (target not currently held AND not the free plan) through
+> v2 via `attachViaV2NoTrial` — upgrades stay immediate-with-proration,
+> downgrades stay scheduled-at-period-end, and the response is wrapped in
+> the component's `{data, error}` container so autumn-js's redirect/refetch
+> handling is unchanged. Renew (re-attaching a held plan) and cancel-to-Free
+> stay fully legacy — v2's `attach_action` has no cancel, and free has no
+> trial to suppress. NOTE the free target cannot be detected via "is it
+> held": a paying customer does not hold `free` (see the starter-credits
+> section above), so `attach` asks Autumn's product record
+> (`GET /products/:id` → `is_default`/`properties.is_free`) and fails closed
+> if it can't be read. Pinned by convex/tests/billing/trialGate.test.ts +
+> managedPayments.test.ts (incl. "keeps cancel-to-Free on the legacy path
+> for a real payer", whose fixture holds ONLY the paid plan), and live by
+> journey C's "upgrade … in place" e2e (post-upgrade status must be
+> `active`, not `trialing`).
+
+The time-driven states around all of this — trial conversion, the scheduled
+Free executing at period end, the lapsed-customer repurchase, a REAL
+`past_due` from a failed renewal — are covered by `e2e/billing-clock.spec.ts`
+on genuine Stripe **test clocks**: the spec pre-creates the clocked Stripe
+customer and hands it to Autumn via `usage/testing:relinkStripeCustomer`
+before the first purchase (needs a Stripe test-mode secret key —
+`STRIPE_TEST_SECRET_KEY` in the env, or auto-picked-up from `.env.local`;
+self-skips without one, refuses live keys).
+
+**Test clocks accelerate Stripe only.** Hosted Autumn ingests event-driven
+changes from clocked customers (payment failures → `past_due`, invoice.paid,
+API cancels), but its `trialing`/`scheduled` statuses derive from its stored
+**real-world** dates — a clock-driven trial end or scheduled-plan start does
+not flip Autumn's state until the real date arrives. The spec therefore
+asserts Stripe-side effects after clock advances and produces Autumn-side
+transitions via Autumn's API (`usage/testing:cancelPlanNow`, immediate
+cancel) or real payment events. Its journey C additionally
+reconstructs a
+**grandfathered legacy customer** — subscription created via Autumn's v1.2
+`/attach` with a card on file (`usage/testing:legacyAttachPlan`), so non-MoR
+by construction — and proves the mixed estate works with the flag on:
+in-place upgrade (same subscription id, still non-MoR), scheduled
+downgrade + renew, the annual renewal charging the saved card, and cancel to
+Free at period end.
+
+> ⚠️ **Autumn does not ingest Stripe-side deletions of Managed Payments
+> subscriptions** (probed live twice, 2026-08-10: a trialing MoR
+> subscription DELETEd at Stripe left Autumn reporting `trialing` 40+
+> minutes later, with `customer.subscription.deleted` fired and fully
+> delivered). Test-side this rules out Stripe-side deletes as a lapse
+> mechanism (journey D uses `cancelPlanNow` instead). Product-side it means
+> an MoR subscription cancelled at Stripe outside Autumn (support action,
+> fraud/dispute cancellation) leaves the customer with paid access in
+> Autumn — and therefore in our quota mirror — indefinitely. Worth raising
+> with Autumn alongside the legacyVersion report below. Two spellings of
+> Stripe cancellation state, while we're at it: Autumn's scheduled
+> cancel-to-Free sets `cancel_at` (= period end) on the subscription, NOT
+> `cancel_at_period_end` — check both when asserting.
+
+**The upstream fix would make all of this unnecessary:** Autumn dropping
+`legacyVersion: true` in
+`server/src/internal/customers/add-product/handleCreateCheckout.ts`, or exposing
+an API-version option on the Convex component. Report drafted; if they ship it,
+delete `attachNewPlan`, `hooks/use-new-plan-checkout.ts`, and the legacy-path
+guard, and go back to plain `checkout()` + `attach()`.
 
 ---
 
