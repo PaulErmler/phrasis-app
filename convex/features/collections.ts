@@ -33,6 +33,7 @@ import {
 import {
   isTranslationVersionStale,
   resolveCardSpeakerGenders,
+  ROMANIZATION_LANGUAGES,
 } from '../../lib/languages';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { deleteAudioRow } from '../lib/audio';
@@ -393,6 +394,20 @@ async function scheduleMissingTranslationsForText(
   if (Object.keys(genderPatch).length > 0) {
     await ctx.db.patch(text._id, genderPatch);
   }
+  // Backfill romanization for the source text. Same `=== undefined` test as
+  // the card sweep — the empty-string sentinel means "tried and failed", and
+  // re-running it would burn the retries again on every page reveal.
+  if (
+    ROMANIZATION_LANGUAGES.has(text.language) &&
+    text.romanizedText === undefined
+  ) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.decks.processRomanizationForSourceText,
+      { textId: text._id, text: text.text, language: text.language },
+    );
+  }
+
   let scheduled = 0;
   for (const lang of languages) {
     if (lang === text.language) continue;
@@ -412,7 +427,30 @@ async function scheduleMissingTranslationsForText(
       const isStale =
         mayRegenerateTranslation(text, existing) &&
         isTranslationVersionStale(lang, existing.translationVersion);
-      if (!isStale) continue;
+      if (!isStale) {
+        // The translation is current, but its romanization may not exist —
+        // a row can reach that state through a romanizer swap, which resets
+        // `romanizedText` to `undefined` so the new implementation refills
+        // it. The only backfill was in `scheduleMissingContent`, which the
+        // preview never runs (preview rows are usually not cards), so those
+        // rows rendered with a bare transliteration gap until the text was
+        // added to a deck. Mirrors that sweep's check in decks.ts.
+        if (
+          ROMANIZATION_LANGUAGES.has(lang) &&
+          existing.romanizedText === undefined
+        ) {
+          await ctx.scheduler.runAfter(
+            0,
+            internal.features.decks.processRomanizationForTranslation,
+            {
+              textId: text._id,
+              translatedText: existing.translatedText,
+              language: lang,
+            },
+          );
+        }
+        continue;
+      }
       // Mirror the sweep's deferrals: never delete under an active TTS claim
       // (races the pending audio write) or a fresh LLM claim (the in-flight
       // retranslation overwrites the row anyway).

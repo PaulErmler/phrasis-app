@@ -696,6 +696,114 @@ describe("features/collections", () => {
       expect(again.translationsScheduled).toBe(0);
     });
 
+    // A romanizer swap resets `romanizedText` to undefined so the new
+    // implementation refills it. That backfill only existed in
+    // `scheduleMissingContent`, which the preview never runs, so preview rows
+    // sat with a bare transliteration gap until the text became a card.
+    it("backfills romanization for a current translation that is missing it", async () => {
+      const t = convexTest(schema, modules);
+      const { collId, textId } = await t.run(async (ctx) => {
+        const collId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 1,
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["el"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hello",
+          language: "en",
+          userCreated: false,
+          collectionId: collId,
+          collectionRank: 1,
+        });
+        // Current-version translation, but no romanization.
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "el",
+          translatedText: "Καλημέρα",
+        });
+        return { collId, textId };
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.mutation(
+        api.features.collections.requestPreviewTranslations,
+        { collectionId: collId, textIds: [textId] },
+      );
+      // Nothing to (re)translate — the row is current.
+      expect(res.translationsScheduled).toBe(0);
+
+      const jobs = await t.run(async (ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      );
+      const romanizationJobs = jobs.filter((j) =>
+        j.name.includes("processRomanizationForTranslation"),
+      );
+      expect(romanizationJobs).toHaveLength(1);
+      expect(romanizationJobs[0].args[0]).toMatchObject({
+        textId,
+        translatedText: "Καλημέρα",
+        language: "el",
+      });
+    });
+
+    it("does not re-attempt romanization that already failed (empty sentinel)", async () => {
+      const t = convexTest(schema, modules);
+      const { collId, textId } = await t.run(async (ctx) => {
+        const collId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 1,
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["el"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hello",
+          language: "en",
+          userCreated: false,
+          collectionId: collId,
+          collectionRank: 1,
+        });
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "el",
+          translatedText: "Καλημέρα",
+          // '' = tried and failed; re-running would burn the retries again
+          // on every page reveal.
+          romanizedText: "",
+        });
+        return { collId, textId };
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(
+        api.features.collections.requestPreviewTranslations,
+        { collectionId: collId, textIds: [textId] },
+      );
+
+      const jobs = await t.run(async (ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      );
+      expect(
+        jobs.filter((j) => j.name.includes("processRomanizationForTranslation")),
+      ).toHaveLength(0);
+    });
+
     it("is a no-op for texts outside the given collection", async () => {
       const t = convexTest(schema, modules);
       const { textIds } = await seedCourseWithTexts(t, 1);
