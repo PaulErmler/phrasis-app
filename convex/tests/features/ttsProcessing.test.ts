@@ -934,10 +934,12 @@ describe("features/ttsProcessing", () => {
     });
 
     it("keeps an existing row when the language's active provider doesn't override its provider", async () => {
-      // yue is on Google, and Google's override list never includes Gemini —
-      // so a stray Gemini row for a Google-routed language must be kept as-is.
-      // (Since bn / zh_traditional / sw_tz moved to Gemini there is no active
-      // Azure language left, so this is the remaining cross-provider keep case.)
+      // yue is on MiniMax, whose override list never includes Gemini — so a
+      // stray Gemini row for a MiniMax-routed language must be kept as-is.
+      // (The fixture carries no ttsVersion stamp, so the "undefined ===
+      // current" rule keeps it out of the version-stale sweep too; since bn /
+      // zh_traditional / sw_tz moved to Gemini there is no active Azure
+      // language left, so this is the remaining cross-provider keep case.)
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
       await t.run(async (ctx) =>

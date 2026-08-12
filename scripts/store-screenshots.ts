@@ -60,7 +60,7 @@ interface ScreenSpec {
 const SCREENS: ScreenSpec[] = [
   {
     slug: 'home',
-    headline: 'Fluency on autopilot.',
+    headline: 'Vocabulary building made easy.',
     subline: '20,000 sentences sorted by difficulty — the 10,000 most common words, learned in order.',
     theme: 'dark',
   },
@@ -358,7 +358,7 @@ function featureGraphicHtml(logoDataUri: string): string {
   <div class="logo"><img src="${logoDataUri}" /></div>
   <div>
     <h1>Flexling</h1>
-    <p>Put fluency on <span class="accent">autopilot</span> —<br/>audio flashcards, spaced repetition &amp; AI tutor.</p>
+    <p>Vocabulary building made <span class="accent">easy</span> —<br/>audio flashcards, big sentence library &amp; AI.</p>
   </div>
 </body></html>`;
 }

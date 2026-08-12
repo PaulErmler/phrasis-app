@@ -33,9 +33,11 @@ import {
 import {
   isTranslationVersionStale,
   resolveCardSpeakerGenders,
+  ROMANIZATION_LANGUAGES,
 } from '../../lib/languages';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { deleteAudioRow } from '../lib/audio';
+import { resolveAudioPayload } from '../lib/audioAssets';
 import { hasActiveTtsClaim } from './ttsProcessing';
 import { getLlmClaim, isClaimFresh } from './llmTranslationQueue';
 import { getCourseSettings } from '../db/courseSettings';
@@ -392,6 +394,20 @@ async function scheduleMissingTranslationsForText(
   if (Object.keys(genderPatch).length > 0) {
     await ctx.db.patch(text._id, genderPatch);
   }
+  // Backfill romanization for the source text. Same `=== undefined` test as
+  // the card sweep — the empty-string sentinel means "tried and failed", and
+  // re-running it would burn the retries again on every page reveal.
+  if (
+    ROMANIZATION_LANGUAGES.has(text.language) &&
+    text.romanizedText === undefined
+  ) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.decks.processRomanizationForSourceText,
+      { textId: text._id, text: text.text, language: text.language },
+    );
+  }
+
   let scheduled = 0;
   for (const lang of languages) {
     if (lang === text.language) continue;
@@ -411,7 +427,30 @@ async function scheduleMissingTranslationsForText(
       const isStale =
         mayRegenerateTranslation(text, existing) &&
         isTranslationVersionStale(lang, existing.translationVersion);
-      if (!isStale) continue;
+      if (!isStale) {
+        // The translation is current, but its romanization may not exist —
+        // a row can reach that state through a romanizer swap, which resets
+        // `romanizedText` to `undefined` so the new implementation refills
+        // it. The only backfill was in `scheduleMissingContent`, which the
+        // preview never runs (preview rows are usually not cards), so those
+        // rows rendered with a bare transliteration gap until the text was
+        // added to a deck. Mirrors that sweep's check in decks.ts.
+        if (
+          ROMANIZATION_LANGUAGES.has(lang) &&
+          existing.romanizedText === undefined
+        ) {
+          await ctx.scheduler.runAfter(
+            0,
+            internal.features.decks.processRomanizationForTranslation,
+            {
+              textId: text._id,
+              translatedText: existing.translatedText,
+              language: lang,
+            },
+          );
+        }
+        continue;
+      }
       // Mirror the sweep's deferrals: never delete under an active TTS claim
       // (races the pending audio write) or a fresh LLM claim (the in-flight
       // retranslation overwrites the row anyway).
@@ -591,7 +630,31 @@ export const requestPreviewAudio = mutation({
         q.eq('textId', args.textId).eq('language', args.language),
       )
       .first();
-    if (existingAudio) return { scheduled: false };
+    if (existingAudio) {
+      // A row only counts as "audio exists" if it still resolves to a
+      // playable blob. A dangling pointer — asset row deleted, or asset
+      // present but its blob gone — otherwise wedges the preview
+      // permanently: this mutation would return `scheduled: false` forever
+      // while `buildTextContentBatchForLanguages` hands the client a null
+      // url, so the button can neither play nor regenerate. The card sweep
+      // (`scheduleMissingContent`) is the only other place that clears these,
+      // and the preview never runs it — preview rows are usually not cards.
+      // Mirrors that sweep's checks in convex/features/decks.ts.
+      const payload = await resolveAudioPayload(ctx, existingAudio);
+      const url = payload
+        ? await ctx.storage.getUrl(payload.storageId)
+        : null;
+      if (url !== null) return { scheduled: false };
+      // Don't race an in-flight job: `processTTSForCard` attaches its row
+      // before the blob is necessarily resolvable, and deleting it here
+      // would make the completing job patch a row that no longer exists.
+      if (await hasActiveTtsClaim(ctx, args.textId, args.language)) {
+        return { scheduled: false };
+      }
+      // Reference-aware: a shared asset survives while other texts point at
+      // it. `blobAlreadyGone` skips the storage delete we already know failed.
+      await deleteAudioRow(ctx, existingAudio, { blobAlreadyGone: true });
+    }
 
     const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
       text,

@@ -98,11 +98,22 @@ interface Pair {
 // no-audio strings.
 // ---------------------------------------------------------------------------
 
-interface MultiCard {
+interface DemoCard {
   base?: string;
-  hi?: string;
   es?: string;
   fr?: string;
+}
+
+/** One conversation part: either assistant prose (no audio) or a card. */
+interface DemoPart {
+  text?: string;
+  card?: DemoCard;
+}
+
+interface DemoScenario {
+  userMessage?: string;
+  simple?: DemoPart[];
+  multi?: DemoPart[];
 }
 
 interface LandingBundle {
@@ -110,22 +121,8 @@ interface LandingBundle {
     mock?: { base?: string; hi?: string; es?: string; fr?: string };
   };
   chatDemo?: {
-    grammar?: {
-      card1Base?: string;
-      card1Target?: string;
-      card2Base?: string;
-      card2Target?: string;
-      multiCard1?: MultiCard;
-      multiCard2?: MultiCard;
-    };
-    threeCards?: {
-      simple?: Partial<Record<`${'card1' | 'card2' | 'card3'}${'Base' | 'Target'}`, string>>;
-      multi?: Partial<Record<'card1' | 'card2' | 'card3', MultiCard>>;
-    };
-    curiosity?: {
-      simple?: Partial<Record<`${'card1' | 'card2'}${'Base' | 'Target'}`, string>>;
-      multi?: Partial<Record<'card1' | 'card2', MultiCard>>;
-    };
+    contextCard?: DemoCard;
+    scenarios?: Partial<Record<'grammar' | 'simpler' | 'restaurant', DemoScenario>>;
   };
 }
 
@@ -134,9 +131,8 @@ function pushPair(out: Pair[], text: string | undefined, lang: keyof typeof LAND
   out.push({ text, lang });
 }
 
-function pushMulti(out: Pair[], card: MultiCard, baseLang: 'en' | 'de') {
+function pushCard(out: Pair[], card: DemoCard, baseLang: 'en' | 'de') {
   pushPair(out, card.base, baseLang);
-  pushPair(out, card.hi, 'hi');
   pushPair(out, card.es, 'es');
   pushPair(out, card.fr, 'fr');
 }
@@ -155,36 +151,13 @@ function extractFromBundle(json: LandingBundle, baseLang: 'en' | 'de'): Pair[] {
 
   const chat = json.chatDemo;
   if (chat) {
-    // Grammar
-    pushPair(out, chat.grammar?.card1Base, baseLang);
-    pushPair(out, chat.grammar?.card1Target, 'es');
-    pushPair(out, chat.grammar?.card2Base, baseLang);
-    pushPair(out, chat.grammar?.card2Target, 'es');
-    if (chat.grammar?.multiCard1) pushMulti(out, chat.grammar.multiCard1, baseLang);
-    if (chat.grammar?.multiCard2) pushMulti(out, chat.grammar.multiCard2, baseLang);
-
-    // threeCards
-    const tcSimple = chat.threeCards?.simple;
-    for (const k of ['card1', 'card2', 'card3'] as const) {
-      pushPair(out, tcSimple?.[`${k}Base`], baseLang);
-      pushPair(out, tcSimple?.[`${k}Target`], 'es');
-    }
-    const tcMulti = chat.threeCards?.multi;
-    for (const k of ['card1', 'card2', 'card3'] as const) {
-      const card = tcMulti?.[k];
-      if (card) pushMulti(out, card, baseLang);
-    }
-
-    // Curiosity
-    const curSimple = chat.curiosity?.simple;
-    for (const k of ['card1', 'card2'] as const) {
-      pushPair(out, curSimple?.[`${k}Base`], baseLang);
-      pushPair(out, curSimple?.[`${k}Target`], 'es');
-    }
-    const curMulti = chat.curiosity?.multi;
-    for (const k of ['card1', 'card2'] as const) {
-      const card = curMulti?.[k];
-      if (card) pushMulti(out, card, baseLang);
+    if (chat.contextCard) pushCard(out, chat.contextCard, baseLang);
+    for (const scenario of Object.values(chat.scenarios ?? {})) {
+      for (const variant of ['simple', 'multi'] as const) {
+        for (const part of scenario[variant] ?? []) {
+          if (part.card) pushCard(out, part.card, baseLang);
+        }
+      }
     }
   }
 

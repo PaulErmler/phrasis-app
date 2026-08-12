@@ -30,7 +30,7 @@
  * not remove either from this array without first migrating any stored rows
  * that use it.
  */
-export const TTS_PROVIDERS = ['google', 'elevenlabs', 'azure', 'gemini'] as const;
+export const TTS_PROVIDERS = ['google', 'elevenlabs', 'azure', 'gemini', 'minimax'] as const;
 export type TtsProvider = (typeof TTS_PROVIDERS)[number];
 
 /** Identifier for which translation backend a target language currently uses. */
@@ -1111,14 +1111,16 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇭🇰',
     category: 'asian-east',
     llmSupportTier: 'tier2',
-    // Stays on Google Chirp3: Cantonese (`yue`) is not in Gemini 3.1 Flash
-    // TTS's supported-language list (only Mandarin `cmn` is).
-    ttsProvider: 'google',
-    // Romanization disabled — the cantonese-romanisation (LSHK / Jyutping)
-    // lookup table is traditional-script oriented, so simplified Cantonese
-    // surfaces too many gaps to ship reliably. Traditional Cantonese
-    // (`yue_traditional`) keeps romanization on.
-    needsRomanization: false,
+    // MiniMax Speech 2.8 Turbo via OpenRouter — native Cantonese system
+    // voices (Gemini has none; Chirp3-HD misread 唔). See
+    // convex/lib/tts/minimax.ts.
+    ttsProvider: 'minimax',
+    // v2: Chirp3 → MiniMax switch — regenerate all existing Cantonese audio
+    // (the asset cache key contains neither provider nor voice).
+    ttsVersion: 2,
+    // Jyutping via to-jyutping (rime-cantonese data), which covers simplified
+    // script as well as traditional — see convex/lib/localRomanization.ts.
+    needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
     // Pins BOTH the register (spoken vernacular — 係/唔/嘅, not Standard
@@ -1145,9 +1147,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇭🇰',
     category: 'asian-east',
     llmSupportTier: 'tier2',
-    // Stays on Google Chirp3: Cantonese (`yue`) is not in Gemini 3.1 Flash
-    // TTS's supported-language list (only Mandarin `cmn` is).
-    ttsProvider: 'google',
+    // MiniMax Speech 2.8 Turbo via OpenRouter — native Cantonese system
+    // voices (Gemini has none; Chirp3-HD misread 唔). See
+    // convex/lib/tts/minimax.ts.
+    ttsProvider: 'minimax',
+    // v2: Chirp3 → MiniMax switch — regenerate all existing Cantonese audio
+    // (the asset cache key contains neither provider nor voice).
+    ttsVersion: 2,
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,

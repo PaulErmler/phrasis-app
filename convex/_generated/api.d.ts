@@ -104,6 +104,7 @@ import type * as lib_tts_gemini from "../lib/tts/gemini.js";
 import type * as lib_tts_google from "../lib/tts/google.js";
 import type * as lib_tts_index from "../lib/tts/index.js";
 import type * as lib_tts_languageCodes from "../lib/tts/languageCodes.js";
+import type * as lib_tts_minimax from "../lib/tts/minimax.js";
 import type * as lib_tts_tailTrim from "../lib/tts/tailTrim.js";
 import type * as lib_tts_types from "../lib/tts/types.js";
 import type * as lib_ttsSemanticValidation from "../lib/ttsSemanticValidation.js";
@@ -231,6 +232,7 @@ declare const fullApi: ApiFromModules<{
   "lib/tts/google": typeof lib_tts_google;
   "lib/tts/index": typeof lib_tts_index;
   "lib/tts/languageCodes": typeof lib_tts_languageCodes;
+  "lib/tts/minimax": typeof lib_tts_minimax;
   "lib/tts/tailTrim": typeof lib_tts_tailTrim;
   "lib/tts/types": typeof lib_tts_types;
   "lib/ttsSemanticValidation": typeof lib_ttsSemanticValidation;

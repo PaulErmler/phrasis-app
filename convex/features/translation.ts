@@ -8,7 +8,7 @@
  * Uses Google Cloud Translation API v2 (API key) for translations,
  * v3 (service account OAuth2) for romanization of ru/hi/ja,
  * chinese-to-pinyin for Chinese romanization,
- * hangul-romanization for Korean (Revised Romanization),
+ * es-hangul for Korean (Revised Romanization),
  * and greek-utils for Greek phonetic Latin.
  */
 
@@ -284,9 +284,10 @@ async function romanizeViaGoogleV3Once(
 /**
  * Romanize non-Latin script text.
  *
- *   - Chinese / Cantonese: local chinese-to-pinyin + cantonese-romanisation
+ *   - Chinese: local chinese-to-pinyin (traditional is converted to simplified
+ *     first via opencc-js so polyphones resolve); Cantonese: to-jyutping
  *   - Greek: greek-utils phonetic Latin
- *   - Korean: hangul-romanization (Revised Romanization)
+ *   - Korean: es-hangul (Revised Romanization, pronunciation-based)
  *   - Hebrew: hebrew-transliteration (SBL Academic)
  *   - Arabic (incl. ar_sa / ar_eg / ar_iq / ar_lev): arabic-transliterate (IJMES)
  *   - everything else in `ROMANIZATION_LANGUAGES`: Google Cloud Translation
