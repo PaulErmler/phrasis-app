@@ -67,7 +67,7 @@ overrides:
   postcss@<=8.5.17: '>=8.5.18'
   brace-expansion@>=5.0.0 <=5.0.7: '>=5.0.8'
   brace-expansion@<1.1.17: '>=1.1.17'
-  undici@>=7.0.0 <7.29.0: '>=7.29.0'
+  undici@>=7.0.0 <7.29.0: '>=7.29.0 <8.0.0'
   fast-uri@>=4.0.0 <4.1.2: '>=4.1.2'
   brace-expansion@>=4.0.0 <5.0.9: '>=5.0.9'
   brace-expansion@<1.1.18: '>=1.1.18'
@@ -287,9 +287,6 @@ importers:
       better-auth:
         specifier: ~1.6.23
         version: 1.6.23(@opentelemetry/api@1.9.0)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.0)(kysely@0.28.17))(mongodb@6.21.0)(next@16.2.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.0)(@playwright/test@1.61.0)(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vitest@4.1.9)
-      cantonese-romanisation:
-        specifier: ^1.0.7
-        version: 1.0.7
       chinese-to-pinyin:
         specifier: ^1.3.1
         version: 1.3.1
@@ -326,15 +323,15 @@ importers:
       embla-carousel-react:
         specifier: ^8.6.0
         version: 8.6.0(react@19.2.4)
+      es-hangul:
+        specifier: ^2.4.0
+        version: 2.4.0
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3
       greek-utils:
         specifier: ^1.3.0
         version: 1.3.0
-      hangul-romanization:
-        specifier: ^1.0.1
-        version: 1.0.1
       hebrew-transliteration:
         specifier: ^2.10.1
         version: 2.10.1
@@ -371,6 +368,9 @@ importers:
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      opencc-js:
+        specifier: ^1.4.1
+        version: 1.4.1
       papaparse:
         specifier: ^5.5.3
         version: 5.5.3
@@ -425,6 +425,9 @@ importers:
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
+      to-jyutping:
+        specifier: ^3.1.1
+        version: 3.1.1
       tokenlens:
         specifier: ^1.3.1
         version: 1.3.1
@@ -4390,9 +4393,6 @@ packages:
   caniuse-lite@1.0.30001799:
     resolution: {integrity: sha512-hG1bReV+OUU+MOqK4t/ZWI0tZOyz3rqS9XuhOUz1cIcbwBKjOyJEJuw9ER5JuNyqxNk8u/JUVbGibBOL1yrjFw==}
 
-  cantonese-romanisation@1.0.7:
-    resolution: {integrity: sha512-1uh6HuI1ILR983S3+OBdZeQEkvbCFdfcbHOYyykU39QkP2Qh6A/d2xX428HkLMUPk06VKbB+NfCR0C6rzAa2Xw==}
-
   canvas-confetti@1.9.4:
     resolution: {integrity: sha512-yxQbJkAVrFXWNbTUjPqjF7G+g6pDotOUHGbkZq2NELZUMDpiJ85rIEazVb8GTaAptNW2miJAXbs1BtioA251Pw==}
 
@@ -5148,6 +5148,9 @@ packages:
     resolution: {integrity: sha512-Zf5H2Kxt2xjTvbJvP2ZWLEICxA6j+hAmMzIlypy4xcBg1vKVnx89Wy0GbS+kf5cwCVFFzdCFh2XSCFNULS6csw==}
     engines: {node: '>= 0.4'}
 
+  es-hangul@2.4.0:
+    resolution: {integrity: sha512-9ouVct+rsUw7d5+JeyEV+Lf4PAytSK4cWnLGHM4FJDyG9BS5d3iSPnEmH/rVgmSyxyps5cWZ+NeDAlJyq8eKaw==}
+
   es-iterator-helpers@1.3.3:
     resolution: {integrity: sha512-0PuBxFi+4uPanB97iDxCLWuHeYud2FALrw5HFZGtAF38UpJDbDC8frwp2cnDyae692CQ0dou60UwWfhgsa4U/g==}
     engines: {node: '>= 0.4'}
@@ -5607,9 +5610,6 @@ packages:
 
   hachure-fill@0.5.2:
     resolution: {integrity: sha512-3GKBOn+m2LX9iq+JC1064cSFprJY4jL1jCXTcpnfER5HYE2l/4EfWSGzkPa/ZDBmYI0ZOEj5VHV/eKnPGkHuOg==}
-
-  hangul-romanization@1.0.1:
-    resolution: {integrity: sha512-Nh67VGRK0Zet2JRDWII4/RW004XSZyWVySSurM9PEAR1p+7/5Kr8OrrcSYQcQhyGCcBEKyQm98xd+rRnyO0uXg==}
 
   has-bigints@1.1.0:
     resolution: {integrity: sha512-R3pbpkcIqv2Pm3dUwgjclDRVmWpTJW2DcMzcIhEXEx1oh/CEMObMm3KLmRJOdvhM7o4uQBnwr8pzRK2sJWIqfg==}
@@ -6928,6 +6928,9 @@ packages:
     resolution: {integrity: sha512-7x81NCL719oNbsq/3mh+hVrAWmFuEYUqrq/Iw3kUzH8ReypT9QQ0BLoJS7/G9k6N81XjW4qHWtjWwe/9eLy1EQ==}
     engines: {node: '>=12'}
 
+  opencc-js@1.4.1:
+    resolution: {integrity: sha512-2lPLcrg7cnh1ATSduOxhnk/jq6KlR6w+5Ihl4wF7Z5e5Rva4vxTyugV5rZ7EiUCOZl+EDOLetIix+BhgYDCC+A==}
+
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
     engines: {node: '>= 0.8.0'}
@@ -7860,6 +7863,9 @@ packages:
     resolution: {integrity: sha512-A3BDQBeeukYPzB4QdQ1DtdlUmp4x2OCH8n5UVhEWbyANxNep8GavottKzd1xYKFJKjUgMyPT7EzOfnBO55s8Sg==}
     hasBin: true
 
+  to-jyutping@3.1.1:
+    resolution: {integrity: sha512-8dqSOTbYC5pBs1DQtC9olmFLhf/pzKqxMfQLRUYu1BXXtWgqyS8dSFy9mHuF0cHjgjtX86pCBvGIvKzzlVM6lw==}
+
   to-regex-range@5.0.1:
     resolution: {integrity: sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==}
     engines: {node: '>=8.0'}
@@ -7991,9 +7997,9 @@ packages:
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
-  undici@8.10.0:
-    resolution: {integrity: sha512-HvltHd7avK13QIw/oLe4qoOLyoVSoafqJ2jYOrtMRBkbYT31eiBQ8O0ehRKZiEZCMEyLFQNIADpgCWC5fALvYQ==}
-    engines: {node: '>=22.19.0'}
+  undici@7.29.0:
+    resolution: {integrity: sha512-IDxfleLmmbSskfWSUATiN1nfn2rDuvnMOqb5CWR92iIfojA0Ud+ulOAAEQ57LPr9rWmsreUyf5lwyao+7GNNVw==}
+    engines: {node: '>=20.18.1'}
 
   unicorn-magic@0.3.0:
     resolution: {integrity: sha512-+QBBXBCvifc56fsbuxZQ6Sic3wqqc3WWaqxs58gvJrcOuN83HGTCwz3oS5phzU9LthRNE9VrJCFCLUgHeeFnfA==}
@@ -12200,8 +12206,6 @@ snapshots:
 
   caniuse-lite@1.0.30001799: {}
 
-  cantonese-romanisation@1.0.7: {}
-
   canvas-confetti@1.9.4: {}
 
   ccount@2.0.1: {}
@@ -12875,6 +12879,8 @@ snapshots:
 
   es-errors@1.3.0: {}
 
+  es-hangul@2.4.0: {}
+
   es-iterator-helpers@1.3.3:
     dependencies:
       call-bind: 1.0.9
@@ -13469,8 +13475,6 @@ snapshots:
   greek-utils@1.3.0: {}
 
   hachure-fill@0.5.2: {}
-
-  hangul-romanization@1.0.1: {}
 
   has-bigints@1.1.0: {}
 
@@ -14104,7 +14108,7 @@ snapshots:
       saxes: 6.0.0
       symbol-tree: 3.2.4
       tough-cookie: 6.0.1
-      undici: 8.10.0
+      undici: 7.29.0
       w3c-xmlserializer: 5.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
@@ -15044,6 +15048,8 @@ snapshots:
       define-lazy-prop: 2.0.0
       is-docker: 2.2.1
       is-wsl: 2.2.0
+
+  opencc-js@1.4.1: {}
 
   optionator@0.9.4:
     dependencies:
@@ -16173,6 +16179,8 @@ snapshots:
     dependencies:
       tldts-core: 7.4.3
 
+  to-jyutping@3.1.1: {}
+
   to-regex-range@5.0.1:
     dependencies:
       is-number: 7.0.0
@@ -16309,7 +16317,7 @@ snapshots:
 
   undici-types@6.21.0: {}
 
-  undici@8.10.0: {}
+  undici@7.29.0: {}
 
   unicorn-magic@0.3.0: {}
 

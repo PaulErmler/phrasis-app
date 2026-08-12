@@ -2,7 +2,10 @@
 
 import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
-import { ChatFlashcardDemo } from '@/components/landing/chat-flashcard-demo';
+import {
+  ChatFlashcardDemo,
+  ChatDemoContextCard,
+} from '@/components/landing/chat-flashcard-demo';
 
 export function ChatFlashcardSection() {
   const t = useTranslations('LandingPage.chatDemo');
@@ -29,6 +32,15 @@ export function ChatFlashcardSection() {
             <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
               {t('subtitle')}
             </p>
+            <div className="space-y-3 pt-2">
+              <p className="text-sm font-medium text-muted-foreground">
+                {t('contextTitle')}
+              </p>
+              <ChatDemoContextCard />
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {t('contextNote')}
+              </p>
+            </div>
           </motion.div>
 
           {/* Demo column */}

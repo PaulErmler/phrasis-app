@@ -152,6 +152,14 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
     // (https://better-auth.com/docs/authentication/apple).
     trustedOrigins: ['https://appleid.apple.com'],
     database: authComponent.adapter(ctx),
+    session: {
+      // 30 days instead of the 7-day default — a daily-habit app shouldn't
+      // log people out over a vacation. Sliding: updateAge stays at the
+      // 1-day default, so any visit >1 day after the last refresh pushes
+      // expiry back to now + 30 days. Only affects sessions refreshed after
+      // this deploys; existing ones pick it up on their next refresh.
+      expiresIn: 60 * 60 * 24 * 30,
+    },
     emailAndPassword: {
       enabled: true,
       // Unverified accounts cannot sign in (403 EMAIL_NOT_VERIFIED, handled

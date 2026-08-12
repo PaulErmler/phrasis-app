@@ -18,9 +18,8 @@
     "themeSystem": "System"
   },
   "hero": {
-    "sectionLabel": "Vom ersten Tag an sprechen",
-    "tagline": "Flüssig sprechen — auf <highlight>Autopilot</highlight>.",
-    "subtitle": "Flexling plant jeden Satz genau für den Moment, in dem du ihn dir merken musst — du hörst nur zu, sprichst nach und siehst zu, wie du flüssiger wirst.",
+    "tagline": "Wortschatzaufbau <highlight>leicht gemacht</highlight>.",
+    "subtitle": "Flexling ist eine audio-basierte Flashcard-App mit einer großen Datenbank an Sätzen. Lade deine eigenen hoch oder lass die KI neue Flashcards für dich erstellen — konzentriere dich aufs Lernen statt auf die Vorbereitung.",
     "cta": {
       "start": "Kostenlos starten",
       "howItWorks": "So funktioniert's",
@@ -47,7 +46,7 @@
       },
       "practical": {
         "title": "Praktisch statt theoretisch",
-        "body": "Lerne die Sätze, die du wirklich sagen wirst. Jede Karte ist für echte Kommunikation gemacht, nicht für Grammatik-Arbeitsblätter."
+        "body": "Lerne die Sätze, die du wirklich sagen wirst. Jede Karte ist für echte Kommunikation gemacht."
       },
       "customisation": {
         "title": "Mach es zu deinem",
@@ -77,8 +76,8 @@
     "radioBody": "Lass Sätze und ihre Übersetzungen den ganzen Tag laufen — passives Hören, das dir die Sprache ins Ohr bringt, ohne deinen Spaced-Repetition-Plan zu beeinflussen.",
     "freeStudyTitle": "Freies Üben",
     "freeStudyBody": "Soll eine Session deinen Spaced-Repetition-Plan nicht beeinflussen? Freies Üben mischt endlos durch alle deine Sätze, sodass du in deinem Tempo tippen kannst — nichts wird eingeplant, nichts zählt auf deine Wiederholungen.",
-    "missingTitle": "Fehlt dir eine Lernart?",
-    "missingBody": "Sag uns Bescheid und wir versuchen unser Bestes, Flexling an deine Bedürfnisse anzupassen.",
+    "missingTitle": "Fehlt dir eine Funktion?",
+    "missingBody": "Sag uns Bescheid und wir versuchen unser Bestes, Flexling an deine Bedürfnisse anzupassen. Schließlich geht es genau darum: sich anzupassen und flexibel zu sein.",
     "missingCta": "Lernart vorschlagen",
     "emailSubjects": {
       "requestMode": "Vorschlag für Lernmodus"
@@ -99,95 +98,229 @@
     "title": "Stell jede Frage.",
     "titleHighlight": "Behalte die Antwort.",
     "subtitle": "Du verstehst ein Wort nicht? Nicht ganz sicher, warum der Satz so formuliert ist? Frag einfach und erhalte sofortige Antworten von hochmodernen Sprachmodellen. Wir erstellen automatisch Lernkarten, damit du dir genau die Konzepte merkst, mit denen du gerade kämpfst.",
+    "contextTitle": "Du wiederholst gerade diese Karte:",
+    "contextNote": "Der Tutor sieht automatisch die Karte, die du gerade lernst — frag nach „diesem Satz“ und er weiß genau, was du meinst.",
     "scenarioGrammar": "Grammatik",
+    "scenarioSimpler": "Einfacher",
     "scenarioCards": "Neue Karten",
-    "scenarioCuriosity": "Neugier",
     "approve": "Karte hinzufügen",
     "reject": "Ablehnen",
     "approved": "Karte hinzugefügt!",
     "replay": "Erneut abspielen",
-    "grammar": {
-      "userMessage": "Wie konjugiere ich estar für ich und sie (mehrere Personen) auf Spanisch?",
-      "assistantMessage": "Für yo (ich) heißt estar estoy — z. B. Estoy bien. Für ellos oder ellas (sie, Plural) heißt es están; die zweite Karte zeigt das in einer Begrüßung: Buenos días ¿cómo están? Die erste Karte nutzt está mit usted, der höflichen Einzelperson (gleiche Endung wie él/ella). Tippe auf Karte hinzufügen, wenn du einen der Sätze speichern willst.",
-      "card1Base": "Guten Morgen, wie geht es Ihnen?",
-      "card1Target": "Buenos días ¿cómo está usted?",
-      "card2Base": "Guten Morgen zusammen, wie geht es euch?",
-      "card2Target": "Buenos días ¿cómo están?",
-      "multiCard1": {
-        "base": "Guten Morgen, wie geht es Ihnen?",
-        "hi": "सुप्रभात, आप कैसे हैं?",
-        "hiRoman": "suprabhaat, aap kaise hain?",
-        "es": "Buenos días ¿cómo está usted?",
-        "fr": "Bonjour, comment allez-vous ?"
-      },
-      "multiCard2": {
-        "base": "Guten Morgen zusammen, wie geht es euch?",
-        "hi": "सुप्रभात, आप सब कैसे हैं?",
-        "hiRoman": "suprabhaat, aap sab kaise hain?",
-        "es": "Buenos días ¿cómo están?",
-        "fr": "Bonjour à tous, comment allez-vous ?"
-      }
+    "contextCard": {
+      "base": "Guten Morgen, wie geht es Ihnen?",
+      "es": "Buenos días ¿cómo está?",
+      "fr": "Bonjour, comment allez-vous ?"
     },
-    "threeCards": {
-      "userMessage": "Bitte leg mir drei Karten an: Ich hätte gern einen Tisch für zwei, könnten wir die Speisekarte sehen, und die Rechnung bitte — für ein Restaurantbesuch demnächst.",
-      "assistantMessage": "Hier sind drei Karten im gleichen Aufbau wie dein Deck — eine Zeile pro Sprache. Tippe auf Karte hinzufügen, wenn du speichern willst.",
-      "assistantMessageMulti": "Drei Vorschläge mit allen aktiven Sprachzeilen. Bestätige jede Karte, wenn sie passt.",
-      "simple": {
-        "card1Base": "Ich hätte gern einen Tisch für zwei.",
-        "card1Target": "Quisiera una mesa para dos.",
-        "card2Base": "Könnten wir die Speisekarte sehen?",
-        "card2Target": "¿Podemos ver el menú?",
-        "card3Base": "Die Rechnung, bitte.",
-        "card3Target": "La cuenta, por favor."
+    "scenarios": {
+      "grammar": {
+        "userMessage": "Erkläre mir die Grammatik dieses Satzes.",
+        "simple": [
+          {
+            "text": "Der spanische Satz ist eine höfliche Begrüßung. Seine wichtigsten Bestandteile:\n\n- „Buenos días“ ist die Begrüßung „Guten Morgen“. „Buenos“ richtet sich im Maskulinum Plural nach „días“.\n- „Cómo“ trägt einen Akzent, weil es ein Fragewort ist und „wie“ bedeutet.\n- „Está“ kommt von „estar“ und ist die Form der dritten Person Singular, die mit dem höflichen Subjekt „usted“ verwendet wird. Spanisch lässt „usted“ oft weg, weil die Verbform die gemeinte Höflichkeit deutlich macht.\n- Die informelle Entsprechung verwendet „estás“ und spricht das Gegenüber mit „tú“ an.\n- Nach der spanischen Zeichensetzung stehen ein Komma nach der Begrüßung und ein umgekehrtes Fragezeichen vor der Frage."
+          },
+          {
+            "card": {
+              "base": "Guten Morgen, wie geht es Ihnen?",
+              "es": "Buenos días, ¿cómo está usted?"
+            }
+          },
+          {
+            "text": "In einer informellen Situation verwendest du die Form der zweiten Person Singular „estás“ statt des formellen „está“."
+          },
+          {
+            "card": {
+              "base": "Guten Morgen, wie fühlst du dich heute?",
+              "es": "Buenos días, ¿cómo estás hoy?"
+            }
+          },
+          {
+            "text": "„Está“ ist nicht nur eine Anredeform. Es kann auch beschreiben, wie es einer anderen einzelnen Person geht, mit ausdrücklich genanntem Subjekt."
+          },
+          {
+            "card": {
+              "base": "Wie geht es deiner Mutter?",
+              "es": "¿Cómo está tu madre?"
+            }
+          },
+          {
+            "text": "Kann ich dir sonst noch bei etwas helfen?"
+          }
+        ],
+        "multi": [
+          {
+            "text": "Im spanischen Satz ist **„Buenos días“** eine feste Begrüßung. **Buenos** richtet sich nach dem maskulinen Plural **días**. Das Komma nach der Begrüßung wird im Spanischen normalerweise mitgeschrieben: **„Buenos días, ¿cómo está?“**\n\n**„Cómo“** trägt einen Akzent, weil es eine direkte Frage einleitet. **„Está“** kommt von **estar**, „sein“ für einen vorübergehenden Zustand. Die Form steht in der dritten Person Singular, bezieht sich hier aber auf das weggelassene höfliche Subjekt **usted**, also „Sie“. Spanisch lässt das Subjektpronomen oft weg, weil Verbform und Kontext genügen.\n\nFür die informelle Frage verwendet Spanisch **estás**, die **tú**-Form:"
+          },
+          {
+            "card": {
+              "base": "Guten Morgen, wie geht es dir heute?",
+              "es": "Buenos días, ¿cómo estás hoy?",
+              "fr": "Bonjour, comment vas-tu aujourd'hui ?"
+            }
+          },
+          {
+            "text": "Im französischen Satz ist **„Bonjour“** eine feste Begrüßung. **„Comment“** bedeutet „wie“ und leitet die Frage ein.\n\n**„Allez-vous“** kommt von **aller**, „gehen“ — **comment allez-vous ?** ist aber die übliche französische Art, nach dem Befinden zu fragen. Französisch bildet diese Frage mit Inversion von Subjekt und Verb: Das Verb **allez** steht vor **vous**, verbunden durch einen Bindestrich. **Vous** kann eine Person höflich oder mehrere Personen ansprechen.\n\nDer spanische Satz drückt das Befinden mit **estar** aus, der französische mit **aller**. Beide sind Standardformulierungen, ihre Verben sind aber keine wörtlichen Entsprechungen. Hier ein formellerer Kontext:"
+          },
+          {
+            "card": {
+              "base": "Guten Morgen, wie geht es Ihnen heute, Herr Martin?",
+              "es": "Buenos días, ¿cómo está hoy, señor Martín?",
+              "fr": "Bonjour, comment allez-vous aujourd'hui, monsieur Martin ?"
+            }
+          },
+          {
+            "text": "Kurz gesagt: Spanisch verwendet **estar** und lässt das Subjekt meist weg, während Französisch **aller** verwendet und das Subjekt in dieser Frageform hinter das Verb stellt.\n\nKann ich dir sonst noch bei etwas helfen?"
+          }
+        ]
       },
-      "multi": {
-        "card1": {
-          "base": "Ich hätte gern einen Tisch für zwei.",
-          "hi": "मुझे दो लोगों के लिए मेज़ चाहिए।",
-          "hiRoman": "mujhe do logon ke liye mez chahiye.",
-          "es": "Quisiera una mesa para dos.",
-          "fr": "Une table pour deux, s'il vous plaît."
-        },
-        "card2": {
-          "base": "Könnten wir die Speisekarte sehen?",
-          "hi": "क्या हम मेनू देख सकते हैं?",
-          "hiRoman": "kya hum menu dekh sakte hain?",
-          "es": "¿Podemos ver el menú?",
-          "fr": "Pourrions-nous voir le menu ?"
-        },
-        "card3": {
-          "base": "Die Rechnung, bitte.",
-          "hi": "बिल दीजिए, कृपया।",
-          "hiRoman": "bil dijiye, kripya.",
-          "es": "La cuenta, por favor.",
-          "fr": "L'addition, s'il vous plaît."
-        }
-      }
-    },
-    "curiosity": {
-      "userMessage": "Gibt es spanische Wörter, die im Englischen fehlen?",
-      "assistantMessage": "Eine Menge! Spanisch hat oft ein einziges kompaktes Wort, wo Englisch einen ganzen Satz braucht. Sobremesa ist der gemütliche Plausch nach dem Essen; estrenar bedeutet, etwas zum ersten Mal zu benutzen oder zu tragen. Beides kommt im Alltag oft vor. Tippe auf Karte hinzufügen, wenn du sie behalten willst.",
-      "simple": {
-        "card1Base": "Lass uns nach dem Essen noch ein bisschen quatschen.",
-        "card1Target": "Hagamos sobremesa.",
-        "card2Base": "Ich trage diese Schuhe zum ersten Mal.",
-        "card2Target": "Estoy estrenando estos zapatos."
+      "simpler": {
+        "userMessage": "Wie kann ich das einfacher sagen?",
+        "simple": [
+          {
+            "text": "Eine kürzere, sehr gebräuchliche Möglichkeit ist **„Hola, ¿qué tal?“** Sie ersetzt die tageszeitgebundene Begrüßung durch das einfache **„hola“** und verwendet die kurze, häufige Frage **„¿qué tal?“** für „Wie läuft's?“"
+          },
+          {
+            "card": {
+              "base": "Hallo, wie läuft's?",
+              "es": "Hola, ¿qué tal?"
+            }
+          },
+          {
+            "text": "Du kannst auch **„Hola, ¿cómo estás?“** sagen. Das ist einfach und natürlich, aber informell: Verwende es mit Freunden, Familie, Kindern oder Menschen, die du mit **tú** ansprichst."
+          },
+          {
+            "card": {
+              "base": "Hallo, wie geht es dir?",
+              "es": "Hola, ¿cómo estás?"
+            }
+          },
+          {
+            "text": "Für ein schnelles, freundliches Nachfragen eignet sich **„Hola, ¿todo bien?“** Es ist kürzer als das Original und fragt wörtlich, ob alles in Ordnung ist."
+          },
+          {
+            "card": {
+              "base": "Hallo, alles gut?",
+              "es": "Hola, ¿todo bien?"
+            }
+          },
+          {
+            "text": "Die einfachsten Alltagsvarianten sind:\n\n- **„Hola, ¿qué tal?“** — kurz und neutral.\n- **„Hola, ¿cómo estás?“** — einfach und informell.\n- **„Hola, ¿todo bien?“** — ein schnelles, freundliches Nachfragen.\n\nKann ich dir sonst noch bei etwas helfen?"
+          }
+        ],
+        "multi": [
+          {
+            "text": "Im Spanischen kannst du die Begrüßung mit kürzeren, sehr gebräuchlichen Ausdrücken vereinfachen:\n\n- „Qué tal“ ist eine kompakte, natürliche Art zu fragen, wie es jemandem geht.\n- „Hola“ ist kürzer als „Buenos días“, und „estás“ ist informell — für Freunde, Familie oder Menschen, die du locker ansprichst."
+          },
+          {
+            "card": {
+              "base": "Guten Morgen, wie läuft's?",
+              "es": "Buenos días, ¿qué tal?",
+              "fr": "Bonjour, ça va ?"
+            }
+          },
+          {
+            "card": {
+              "base": "Hallo, wie geht es dir?",
+              "es": "Hola, ¿cómo estás?",
+              "fr": "Salut, comment vas-tu ?"
+            }
+          },
+          {
+            "text": "Im Französischen ist der einfachste Alltagsersatz die feste Wendung „ça va ?“ Sie vermeidet die formelle Inversionsstruktur und ist äußerst gebräuchlich. Mit „salut“ wird die Begrüßung informeller — verwende sie also mit Freunden oder Menschen, die du locker ansprichst."
+          },
+          {
+            "card": {
+              "base": "Hallo, wie läuft's?",
+              "es": "Hola, ¿qué tal?",
+              "fr": "Salut, ça va ?"
+            }
+          },
+          {
+            "text": "Für eine höfliche Alltagsbegrüßung nimm die Varianten mit **Buenos días** oder **Bonjour**. Für Freunde oder informelle Situationen **Hola** oder **Salut**.\n\nDie einfachsten natürlichen Muster sind **qué tal** im Spanischen und **ça va** im Französischen.\n\nKann ich dir sonst noch bei etwas helfen?"
+          }
+        ]
       },
-      "multi": {
-        "card1": {
-          "base": "Lass uns nach dem Essen noch ein bisschen quatschen.",
-          "hi": "रात के खाने के बाद थोड़ी और बातें करते हैं।",
-          "hiRoman": "raat ke khaane ke baad thodi aur baatein karte hain.",
-          "es": "Hagamos sobremesa.",
-          "fr": "Restons discuter après le dîner."
-        },
-        "card2": {
-          "base": "Ich trage diese Schuhe zum ersten Mal.",
-          "hi": "मैं पहली बार ये जूते पहन रहा हूँ।",
-          "hiRoman": "main pehli baar ye joote pehen raha hoon.",
-          "es": "Estoy estrenando estos zapatos.",
-          "fr": "J'étrenne ces chaussures."
-        }
+      "restaurant": {
+        "userMessage": "Erstelle mir Karten zum Thema: Restaurantbesuch",
+        "simple": [
+          {
+            "text": "Ich erstelle dir vier praktische Karten zu Sitzplatz, Empfehlungen, Bestellen und Rechnung."
+          },
+          {
+            "card": {
+              "base": "Könnten wir bitte einen Tisch für zwei bekommen?",
+              "es": "¿Podríamos tener una mesa para dos, por favor?"
+            }
+          },
+          {
+            "card": {
+              "base": "Was empfehlen Sie uns von der Karte?",
+              "es": "¿Qué nos recomienda de la carta?"
+            }
+          },
+          {
+            "card": {
+              "base": "Ich hätte gern den gegrillten Fisch und ein Glas Wasser.",
+              "es": "Quisiera el pescado a la parrilla y un vaso de agua."
+            }
+          },
+          {
+            "card": {
+              "base": "Könnten wir bitte die Rechnung bekommen?",
+              "es": "¿Nos trae la cuenta, por favor?"
+            }
+          },
+          {
+            "text": "Die vier Karten für den Restaurantbesuch sind angelegt. Kann ich dir sonst noch bei etwas helfen?"
+          }
+        ],
+        "multi": [
+          {
+            "card": {
+              "base": "Wir haben eine Reservierung für zwei Personen um acht Uhr.",
+              "es": "Tenemos una reserva para dos personas a las ocho.",
+              "fr": "Nous avons une réservation pour deux personnes à huit heures."
+            }
+          },
+          {
+            "card": {
+              "base": "Könnten wir bitte einen Tisch am Fenster bekommen?",
+              "es": "¿Podríamos tener una mesa junto a la ventana, por favor?",
+              "fr": "Pourrions-nous avoir une table près de la fenêtre, s’il vous plaît ?"
+            }
+          },
+          {
+            "card": {
+              "base": "Könnten wir bitte die Speisekarte sehen?",
+              "es": "¿Podríamos ver la carta, por favor?",
+              "fr": "Pourrions-nous voir la carte, s’il vous plaît ?"
+            }
+          },
+          {
+            "card": {
+              "base": "Was würden Sie uns als Hauptgericht empfehlen?",
+              "es": "¿Qué nos recomendaría como plato principal?",
+              "fr": "Que nous recommandez-vous comme plat principal ?"
+            }
+          },
+          {
+            "card": {
+              "base": "Enthält dieses Gericht Nüsse?",
+              "es": "¿Este plato lleva frutos secos?",
+              "fr": "Est-ce que ce plat contient des fruits à coque ?"
+            }
+          },
+          {
+            "card": {
+              "base": "Könnten wir bitte die Rechnung bekommen?",
+              "es": "¿Nos trae la cuenta, por favor?",
+              "fr": "L’addition, s’il vous plaît."
+            }
+          },
+          {
+            "text": "Ich habe sechs Karten zu Reservierung, Sitzplatz, Speisekarte, Empfehlungen, Allergien und Rechnung erstellt. Kann ich dir sonst noch bei etwas helfen?"
+          }
+        ]
       }
     }
   },
@@ -202,7 +335,7 @@
     "activityBody": "Sieh deine Lerngewohnheit auf einen Blick. Jeder Tag, an dem du übst, erscheint im Kalender — beobachte, wie deine Serie wächst und bleibe motiviert.",
     "wordCloudHint": "Klicke auf ein Wort, um die Sätze zu sehen, mit denen du es gelernt hast",
     "insightsTitle": "Sitzungsübersicht",
-    "insightsBody": "Nach jeder Wiederholung siehst du genau, was du geschafft hast: Dein Tagesziel-Ring füllt sich beim Lernen, Badges zeigen, was auf dich wartet, und eine rotierende Prognose zeigt, wohin dich dein Tempo bringt.",
+    "insightsBody": "Nach jeder Wiederholung siehst du genau, was du geschafft hast: Dein Tagesziel-Ring füllt sich beim Lernen, Badges zeigen, was auf dich wartet, und eine Prognose zeigt, wohin dich dein Tempo bringt.",
     "projectionLabel": "Deine Prognose",
     "projectionFacts": {
       "wordsByYearEnd": "~2.400 Wörter bis Ende 2026",

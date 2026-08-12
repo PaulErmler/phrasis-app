@@ -172,8 +172,9 @@ export const ttsQualityValidator = v.union(
 // Single source of truth for the provider list is `TTS_PROVIDERS` in
 // lib/languages.ts; this validator (for stored `audioRecordings.ttsProvider`)
 // is built from it so the two can't drift. Indexed access keeps the exact
-// string-literal union for `Infer`. 'gemini' = Gemini 3.1 Flash TTS via
-// OpenRouter's /audio/speech endpoint (distinct from 'google' = Cloud Chirp3).
+// string-literal union for `Infer`. 'gemini' = Gemini 3.1 Flash TTS and
+// 'minimax' = MiniMax Speech 2.8 Turbo, both via OpenRouter's /audio/speech
+// endpoint (distinct from 'google' = Cloud Chirp3).
 // 'elevenlabs' (index 1) and 'azure' (index 2) are retired providers retained
 // only so historical stored values still validate — neither is dispatchable
 // (Azure Speech remains in use for STT only; see convex/lib/stt).
@@ -182,6 +183,7 @@ export const ttsProviderValidator = v.union(
   v.literal(TTS_PROVIDERS[1]),
   v.literal(TTS_PROVIDERS[2]),
   v.literal(TTS_PROVIDERS[3]),
+  v.literal(TTS_PROVIDERS[4]),
 );
 
 export const voiceGenderValidator = v.union(

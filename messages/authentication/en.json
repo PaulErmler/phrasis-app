@@ -4,6 +4,7 @@
     "SIGN_IN_WITH_GOOGLE": "Continue with Google",
     "SIGN_IN_WITH_APPLE": "Continue with Apple",
     "SOCIAL_SIGN_IN_FAILED": "Sign-in failed. Please try again.",
+    "REQUEST_FAILED": "Request failed. Please try again.",
     "SIGN_IN_DESCRIPTION": "",
     "SIGN_UP_DESCRIPTION": "",
     "OR_CONTINUE_WITH": "or enter an email and password",
