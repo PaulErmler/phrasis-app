@@ -35,12 +35,26 @@ const GENERATE_TIMEOUT_MS = 30_000;
  */
 let currentlyPlaying: HTMLAudioElement | null = null;
 
-/** Claim the audible slot for `next`, pausing whoever held it. */
+/**
+ * Claim the audible slot for `next`, stopping whoever held it.
+ *
+ * The interrupted clip is rewound, not just paused: a paused element resumes
+ * from the middle on its next play, so interrupting clip A to hear B and then
+ * pressing A again would drop the listener into the middle of A. Every button
+ * press should start its clip from the beginning.
+ */
 function claimPlayback(next: HTMLAudioElement): void {
-  if (currentlyPlaying && currentlyPlaying !== next) {
-    currentlyPlaying.pause();
-  }
+  const previous = currentlyPlaying;
+  // Hand the slot over BEFORE pausing. `pause()` can dispatch its event
+  // synchronously, which re-enters `releasePlayback` via the previous
+  // button's stop handler; if the slot still named `previous` at that moment
+  // it would be cleared to null underneath us, and the rest of this function
+  // would then be operating on nothing.
   currentlyPlaying = next;
+  if (previous && previous !== next) {
+    previous.pause();
+    previous.currentTime = 0;
+  }
 }
 
 /** Release the slot, but only if `audio` is the one still holding it. */
@@ -275,6 +289,12 @@ export function AudioButton({
       };
       el.webkitPreservesPitch = true;
       audioRef.current.playbackRate = speed;
+      // Claim the audible slot BEFORE the peak measurement, not after. That
+      // measurement fetches and decodes the clip, so for anything not already
+      // cached it takes long enough that the previously playing clip would
+      // keep going for a noticeable beat after the user pressed a different
+      // button — reading as "it didn't switch".
+      claimPlayback(audioRef.current);
       // Capture the element before awaiting. If another handlePlay swaps
       // audioRef.current (different URL) while getPeak is in-flight, we'd
       // otherwise apply this clip's attenuation to the wrong element.
@@ -287,17 +307,12 @@ export function AudioButton({
       } catch (peakErr) {
         console.warn('Peak measurement failed; playing at native volume', peakErr);
       }
-      // Reusing a completed audio element: explicitly rewind so consecutive
-      // replays actually play (and so the first onTimeUpdate broadcasts 0,
-      // not the previous run's final position).
-      if (audioRef.current.ended) {
-        audioRef.current.currentTime = 0;
-      }
-      // Only one clip may be audible at a time. Claiming immediately before
-      // play() keeps the window where two elements are unpaused as small as
-      // possible; pausing the previous one fires its onpause, which is what
-      // drops that button out of the playing state.
-      claimPlayback(audioRef.current);
+      // Always start from the beginning. Rewinding only when `ended` left the
+      // interrupted case broken: an element paused mid-clip (by the toggle, by
+      // `stopPlayback`, or by another button claiming the slot) resumed from
+      // wherever it stopped. It also keeps the first onTimeUpdate broadcasting
+      // 0 rather than the previous run's position.
+      audioRef.current.currentTime = 0;
       await audioRef.current.play();
       isPlayingRef.current = true;
       setIsPlaying(true);

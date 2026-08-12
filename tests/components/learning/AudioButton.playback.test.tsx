@@ -52,9 +52,14 @@ class FakeAudio {
   }
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   FakeAudio.instances = [];
   vi.stubGlobal('Audio', FakeAudio as unknown as typeof Audio);
+  // Reset the shared getPeak mock: `mockReturnValueOnce` queues outlive the
+  // test that set them and would leak into the next one.
+  const { getPeak } = await import('@/lib/audio/peakCache');
+  vi.mocked(getPeak).mockReset();
+  vi.mocked(getPeak).mockResolvedValue(1);
 });
 
 afterEach(() => {
@@ -92,6 +97,78 @@ describe('AudioButton playback state', () => {
     act(() => FakeAudio.instances[0].pause());
 
     await waitFor(() => expect(onStop).toHaveBeenCalledWith('en'));
+  });
+
+  it('rewinds the interrupted clip so replaying it starts from the beginning', async () => {
+    // Pausing without rewinding meant interrupting clip A to hear B, then
+    // pressing A again, resumed A from the middle.
+    const user = userEvent.setup();
+    render(
+      <>
+        <AudioButton url="https://x/a.mp3" language="en" />
+        <AudioButton url="https://x/b.mp3" language="es" />
+      </>,
+    );
+    const [first, second] = screen.getAllByRole('button');
+
+    await user.click(first);
+    await waitFor(() => expect(FakeAudio.instances).toHaveLength(1));
+    FakeAudio.instances[0].currentTime = 4.2; // partway through
+
+    await user.click(second);
+    await waitFor(() => expect(FakeAudio.instances[0].paused).toBe(true));
+    expect(FakeAudio.instances[0].currentTime).toBe(0);
+  });
+
+  it('restarts a clip from the beginning rather than resuming it', async () => {
+    const user = userEvent.setup();
+    render(<AudioButton url="https://x/a.mp3" language="en" />);
+
+    await user.click(playingButton());
+    await waitFor(() => expect(FakeAudio.instances).toHaveLength(1));
+    const el = FakeAudio.instances[0];
+
+    // Stop partway, then play again.
+    el.currentTime = 3.5;
+    await user.click(playingButton());
+    await waitFor(() => expect(el.paused).toBe(true));
+
+    el.currentTime = 3.5; // as if the pause had left it mid-clip
+    await user.click(playingButton());
+    await waitFor(() => expect(el.play).toHaveBeenCalledTimes(2));
+    expect(el.currentTime).toBe(0);
+  });
+
+  it('stops the previous clip before the slow peak measurement, not after', async () => {
+    // getPeak fetches and decodes; claiming the slot after it meant the old
+    // clip kept playing for a noticeable beat after the user pressed another
+    // button — reading as "it didn't switch".
+    const { getPeak } = await import('@/lib/audio/peakCache');
+    let releasePeak!: (v: number) => void;
+    vi.mocked(getPeak).mockReturnValueOnce(Promise.resolve(1)).mockReturnValueOnce(
+      new Promise<number>((resolve) => {
+        releasePeak = resolve;
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(
+      <>
+        <AudioButton url="https://x/a.mp3" language="en" />
+        <AudioButton url="https://x/b.mp3" language="es" />
+      </>,
+    );
+    const [first, second] = screen.getAllByRole('button');
+
+    await user.click(first);
+    await waitFor(() => expect(FakeAudio.instances[0]?.paused).toBe(false));
+
+    // Second button clicked; its peak measurement has NOT resolved yet.
+    await user.click(second);
+    await waitFor(() => expect(FakeAudio.instances[0].paused).toBe(true));
+
+    releasePeak(1);
+    await waitFor(() => expect(FakeAudio.instances[1]?.play).toHaveBeenCalled());
   });
 
   it('only lets one clip play at a time across separate buttons', async () => {
