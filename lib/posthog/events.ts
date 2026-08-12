@@ -27,6 +27,24 @@ export const CLIENT_EVENTS = {
 
   CHAT_MESSAGE_FAILED: 'chat_message_failed',
 
+  /**
+   * A Better Auth request came back non-2xx. Carries status, path, method and
+   * `error_code`; filter to `error_code = null` to isolate the transport-level
+   * failures (unmatched route, redirect-mangled method) from ordinary user
+   * errors like a mistyped password.
+   */
+  AUTH_REQUEST_FAILED: 'auth_request_failed',
+
+  /**
+   * The app-level auth boundary saw "unauthenticated" and ran its
+   * confirm-then-redirect check. `confirmed: true` means a real sign-out (the
+   * user was sent to the login page); `confirmed: false` means the bounce was
+   * spurious (`reason`: 'still-signed-in' | 'unreachable') and was suppressed.
+   * The false-rate is the measure of how many logins we used to force for
+   * nothing.
+   */
+  AUTH_BOUNCE: 'auth_bounce',
+
   QUOTA_EXHAUSTED: 'quota_exhausted',
   PAYWALL_SHOWN: 'paywall_shown',
   PLAN_CTA_CLICKED: 'plan_cta_clicked',

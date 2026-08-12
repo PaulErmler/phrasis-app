@@ -26,6 +26,11 @@ export const TTS_PROVIDER_OVERRIDES: Record<TtsProvider, readonly TtsProvider[]>
   // Nothing lists 'gemini' as overridable, so Gemini audio is never clobbered by
   // google/azure/elevenlabs.
   gemini: ['google', 'azure', 'elevenlabs'],
+  // MiniMax (Cantonese) sits at the same rank as Gemini: switching a language
+  // to it regenerates any prior google/azure/elevenlabs audio, and nothing
+  // lists 'minimax' as overridable. Gemini and MiniMax never route the same
+  // language, so neither needs to override the other.
+  minimax: ['google', 'azure', 'elevenlabs'],
 };
 
 export function shouldOverwriteProvider(

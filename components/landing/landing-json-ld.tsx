@@ -45,7 +45,7 @@ export async function LandingJsonLd({ siteUrl }: LandingJsonLdProps) {
       applicationCategory: 'EducationalApplication',
       operatingSystem: 'Web, iOS, Android',
       description:
-        'Learn languages by shadowing real sentences, writing them, and passive listening — with spaced repetition and a built-in AI tutor. Bring your own content and build fluency fast.',
+        'An audio-based flashcard app with a large database of sentences. Upload your own or ask AI to create flashcards — focus on learning instead of preparing cards.',
       offers: [
         {
           '@type': 'Offer',

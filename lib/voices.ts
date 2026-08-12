@@ -133,6 +133,32 @@ const CHIRP3_STANDARD_MALES = [
 const CHIRP3_CORE_FEMALES = CHIRP3_STANDARD_FEMALES.slice(0, 4);
 const CHIRP3_CORE_MALES = CHIRP3_STANDARD_MALES.slice(0, 4);
 
+/**
+ * MiniMax Speech 2.8 Turbo voices (via OpenRouter — see
+ * convex/lib/tts/minimax.ts). The apiCode is the raw MiniMax system voice id;
+ * language + dialect are baked into the voice itself (no locale steering).
+ * NOTE the ids use a FULLWIDTH opening paren + ASCII closing paren — the
+ * all-ASCII form errors upstream (verified live). MiniMax's other Cantonese
+ * presets (GentleLady, PlayfulMan, CuteGirl, KindWoman) were skipped as
+ * character-flavored; the ProfessionalHost pair are the neutral narrators.
+ */
+const MINIMAX_CANTONESE: Voice[] = [
+  {
+    provider: 'minimax',
+    name: 'HostF',
+    displayName: 'Professional Host (Female) - MiniMax Cantonese',
+    apiCode: 'Cantonese_ProfessionalHost（F)',
+    gender: 'female',
+  },
+  {
+    provider: 'minimax',
+    name: 'HostM',
+    displayName: 'Professional Host (Male) - MiniMax Cantonese',
+    apiCode: 'Cantonese_ProfessionalHost（M)',
+    gender: 'male',
+  },
+];
+
 function buildChirp3Pool(
   locale: string,
   accentLabel: string,
@@ -210,8 +236,12 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   // reinforced by `ttsPromptName: 'Taiwanese Mandarin'`). Azure TTS is retired
   // and Google ships no Chirp3-HD voices for cmn-TW, so Gemini is the only pool.
   zh_traditional: [...GEMINI_CORE],
-  yue: [...buildChirp3Pool('yue-HK', 'Hong Kong')],
-  yue_traditional: [...buildChirp3Pool('yue-HK', 'Hong Kong')],
+  // Cantonese runs on MiniMax (native Cantonese system voices — Gemini has
+  // none, and Chirp3-HD misread 唔; see convex/lib/tts/minimax.ts). The
+  // Chirp3 yue-HK pool stays listed dormant for a one-line revert. Both
+  // script variants share the same audio.
+  yue: [...MINIMAX_CANTONESE, ...buildChirp3Pool('yue-HK', 'Hong Kong')],
+  yue_traditional: [...MINIMAX_CANTONESE, ...buildChirp3Pool('yue-HK', 'Hong Kong')],
   ja: [...buildChirp3Pool('ja-JP', 'Japan'), ...GEMINI_CORE],
   ko: [...buildChirp3Pool('ko-KR', 'Korea'), ...GEMINI_CORE],
   vi: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...GEMINI_CORE],

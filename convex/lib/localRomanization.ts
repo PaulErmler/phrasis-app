@@ -8,13 +8,16 @@
  * Returns `null` for languages that require Google Cloud romanization.
  */
 
-import { convert as romanizeHangul } from 'hangul-romanization';
+import { romanize as romanizeHangul } from 'es-hangul';
 // @ts-expect-error no type declarations for chinese-to-pinyin
 import pinyin from 'chinese-to-pinyin';
+// Traditional→simplified only (the `t2cn` subpath is ~104 KB; the full build
+// is ~1.1 MB and carries the simplified→traditional tables we never use).
+import * as OpenCC from 'opencc-js/t2cn';
 // @ts-expect-error no type declarations for greek-utils
 import greekUtils from 'greek-utils';
 import { transliterate as transliterateHebrew } from 'hebrew-transliteration';
-import { getLshk } from 'cantonese-romanisation';
+import { getJyutpingList } from 'to-jyutping';
 // @ts-expect-error no type declarations for arabic-transliterate (pure JS, ~74KB, zero deps)
 import arabictransliterate from 'arabic-transliterate';
 import transliterate from '@sindresorhus/transliterate';
@@ -49,11 +52,13 @@ export function hasLocalRomanization(code: string): boolean {
  * its configuration in a way that should invalidate existing rows.
  */
 export const ROMANIZATION_SOURCES = {
-  chineseToPinyin: 'chinese-to-pinyin-v1',
+  // v2: segment-based (punctuation/Latin/digits preserved) + traditional→
+  // simplified pre-conversion so the segmenter resolves polyphones.
+  chineseToPinyin: 'chinese-to-pinyin-v2',
   greekUtils: 'greek-utils-v1',
-  hangulRomanization: 'hangul-romanization-v1',
+  esHangul: 'es-hangul-v1',
   hebrewTransliteration: 'hebrew-transliteration-v1',
-  cantoneseRomanisation: 'cantonese-romanisation-v1',
+  toJyutping: 'to-jyutping-v1',
   arabicTransliterate: 'arabic-transliterate-v1',
   sindresorhusTransliterate: 'sindresorhus-transliterate-v1',
   googleV3: 'google-v3-v1',
@@ -73,10 +78,10 @@ export function getRomanizationSource(language: string): RomanizationSource {
     return ROMANIZATION_SOURCES.chineseToPinyin;
   }
   if (language === 'el') return ROMANIZATION_SOURCES.greekUtils;
-  if (language === 'ko') return ROMANIZATION_SOURCES.hangulRomanization;
+  if (language === 'ko') return ROMANIZATION_SOURCES.esHangul;
   if (language === 'he') return ROMANIZATION_SOURCES.hebrewTransliteration;
   if (language === 'yue' || language === 'yue_traditional') {
-    return ROMANIZATION_SOURCES.cantoneseRomanisation;
+    return ROMANIZATION_SOURCES.toJyutping;
   }
   if (
     language === 'ar' ||
@@ -116,7 +121,7 @@ export function shouldRomanizeForTtsMatch(code: string): boolean {
  */
 export function romanizeLocal(text: string, language: string): string | null {
   if (language === 'zh' || language === 'zh_traditional') {
-    return pinyin(text) as string;
+    return romanizeChinese(text, language === 'zh_traditional');
   }
   if (language === 'el') return greekUtils.toPhoneticLatin(text);
   if (language === 'ko') return romanizeHangul(text);
@@ -154,31 +159,96 @@ export function romanizeLocal(text: string, language: string): string | null {
 }
 
 /**
- * Convert a Cantonese string to LSHK / Jyutping notation. The
- * `cantonese-romanisation` library returns one array of candidate readings
- * per input codepoint (e.g. `[["ng4"], ["oi2", "ngoi2"], ["ji4"]]`). We pick
- * the first reading per codepoint and pass non-Han characters (punctuation,
- * spaces, Latin) through unchanged so the result reads like prose.
+ * Traditional→simplified converter, built ONCE on first use: `OpenCC.Converter`
+ * compiles a lookup trie, far too expensive to rebuild per sentence — but also
+ * too expensive to build at import time, since every Convex isolate importing
+ * this module (translations, migrations, TTS matching) would pay it on cold
+ * start whether or not it ever romanizes zh_traditional.
+ */
+let t2cn: ((text: string) => string) | undefined;
+const traditionalToSimplified = (text: string): string =>
+  (t2cn ??= OpenCC.Converter({ from: 'tw', to: 'cn' }))(text);
+
+/** Runs of Han characters — the only spans `chinese-to-pinyin` should see. */
+const HAN_RUN = /\p{Script=Han}+/gu;
+
+/**
+ * Join romanized segments with spaces, then re-attach punctuation (ASCII and
+ * fullwidth) to the preceding syllable and collapse the leftover whitespace.
+ * Shared tail of `romanizeChinese` and `romanizeCantonese`.
+ */
+function joinRomanizedSegments(segments: string[]): string {
+  return segments
+    .join(' ')
+    .replace(/\s+([,.!?;:、，。！？；：])/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Convert a Chinese string to pinyin (tone diacritics).
  *
- * Consecutive non-Han codepoints are coalesced into a single segment so
- * Latin runs and digits keep their internal spacing (e.g. "你好abc 123" →
+ * Two things the bare `pinyin(text)` call got wrong:
+ *
+ * 1. It DELETED everything non-Han. The library defaults to `keepRest: false`,
+ *    so punctuation, Latin words and digits silently vanished ("我有2个苹果。"
+ *    → "wǒ yǒu gè píng guǒ"). We romanize each Han run separately and pass the
+ *    gaps through verbatim instead — `keepRest: true` would keep them but glue
+ *    them onto the neighbouring syllable ("wǒ yǒu2gè"). Splitting on non-Han
+ *    boundaries never splits a word, so segmentation quality is unaffected.
+ *
+ * 2. Traditional script got context-blind readings. The library's
+ *    word-segmentation dictionary is simplified-oriented, so traditional text
+ *    fell back to per-character lookup and produced the wrong reading for
+ *    polyphones (銀行 → "yín xíng", 音樂 → "yīn lè", 睡覺 → "shuì jué").
+ *    Converting to simplified first hands the segmenter a dictionary it can
+ *    match; pinyin is script-independent, so the output is identical for text
+ *    that was already unambiguous. Known residual: 很長 still reads "zhǎng"
+ *    rather than "cháng" — that one fails on simplified too, i.e. a library
+ *    limit rather than a script problem.
+ *
+ * Mirrors `romanizeCantonese`'s buffer-and-join shape below.
+ */
+function romanizeChinese(text: string, traditional: boolean): string {
+  const source = traditional ? traditionalToSimplified(text) : text;
+
+  const segments: string[] = [];
+  let lastIndex = 0;
+  // `matchAll` over a fresh iterator — HAN_RUN carries /g, so never rely on
+  // its mutable lastIndex across calls.
+  for (const match of source.matchAll(HAN_RUN)) {
+    const start = match.index;
+    // Gap since the previous Han run (punctuation, Latin, digits) — verbatim.
+    if (start > lastIndex) segments.push(source.slice(lastIndex, start));
+    segments.push(pinyin(match[0]) as string);
+    lastIndex = start + match[0].length;
+  }
+  if (lastIndex < source.length) segments.push(source.slice(lastIndex));
+
+  return joinRomanizedSegments(segments);
+}
+
+/**
+ * Convert a Cantonese string to LSHK / Jyutping notation via `to-jyutping`
+ * (rime-cantonese data with word-level segmentation, so polyphonic characters
+ * get their in-context reading — 食 → sik6, 可以 → ho2 ji5 — and vernacular
+ * particles like 嘅/㗎/哋/嘢/咗 all resolve; both traditional AND simplified
+ * script are covered). We use `getJyutpingList` — one `[char, reading|null]`
+ * pair per codepoint — instead of `getJyutpingText`, because the latter
+ * collapses non-Han runs (Latin, digits) into a literal "[…]".
+ *
+ * Characters with a `null` reading (punctuation, spaces, Latin, digits) pass
+ * through unchanged, and consecutive ones are coalesced into a single segment
+ * so Latin runs keep their internal spacing (e.g. "你好abc 123" →
  * "nei5 hou2 abc 123", not "nei5 hou2 a b c 1 2 3").
- *
- * The library's lookup table is traditional-character oriented; simplified
- * Cantonese (`yue`) will hit gaps and fall through to the raw character. For
- * traditional Cantonese (`yue_traditional`) coverage is good.
  */
 function romanizeCantonese(text: string): string {
-  // Treat the string as an array of Unicode codepoints (handles surrogate
-  // pairs correctly for rare characters).
-  const codepoints = Array.from(text);
-  const readings = getLshk(text) as string[][];
+  const pairs = getJyutpingList(text);
 
   const segments: string[] = [];
   let buffer = '';
-  for (let i = 0; i < codepoints.length; i++) {
-    const reading = readings[i]?.[0];
-    if (reading && reading.length > 0) {
+  for (const [char, reading] of pairs) {
+    if (reading !== null && reading.length > 0) {
       // Flush any pending non-Han run before emitting the Jyutping syllable.
       if (buffer.length > 0) {
         segments.push(buffer);
@@ -186,16 +256,12 @@ function romanizeCantonese(text: string): string {
       }
       segments.push(reading);
     } else {
-      // Empty array → no Jyutping known for this codepoint; buffer it so
-      // adjacent non-Han codepoints stay glued together.
-      buffer += codepoints[i];
+      // No Jyutping for this codepoint; buffer it so adjacent non-Han
+      // codepoints stay glued together.
+      buffer += char;
     }
   }
   if (buffer.length > 0) segments.push(buffer);
 
-  return segments
-    .join(' ')
-    .replace(/\s+([,.!?;:、。！？；：])/g, '$1')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return joinRomanizedSegments(segments);
 }

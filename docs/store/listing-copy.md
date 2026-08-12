@@ -9,12 +9,12 @@ Character limits are noted per field; all texts below fit.
 **Title** (≤30): `Flexling: Language Learning` (27)
 
 **Short description** (≤80):
-`Audio flashcards, spaced repetition & an AI tutor. Put fluency on autopilot.` (77)
+`Vocabulary building made easy. Audio flashcards & AI cards.` (59)
 
 **Full description** (≤4000):
 
 ```
-Put fluency on autopilot. Flexling schedules every sentence at the perfect moment to remember it — you just listen, speak, and watch your fluency grow.
+Vocabulary building made easy. Flexling is an audio-based flashcard app with a large database of sentences. Upload your own or ask AI to create new flashcards for you — focus on learning instead of preparing flashcards.
 
 LEARN HANDS-FREE, ANYWHERE
 Flexling's audio mode plays your flashcards like a podcast: first a sentence in a language you know, a pause to think, then the sentence in the language you're learning. Practice while commuting, cooking, or working out — no screen required.
@@ -41,7 +41,7 @@ WHAT LEARNERS SAY
 "I've always wanted a hands-free way to get comprehensible input. Flexling far exceeds it." — Reddit user
 "I think that its UI is a work of genius." — Reddit user
 
-Track your streak, words learned, listening time, and accuracy — and watch your fluency grow, day by day.
+Track your streak, words learned, listening time, and accuracy — day by day.
 ```
 
 ---
@@ -51,12 +51,12 @@ Track your streak, words learned, listening time, and accuracy — and watch you
 **Title**: `Flexling: Sprachen lernen` (25)
 
 **Short description** (≤80):
-`Audio-Karteikarten, Spaced Repetition & KI-Tutor. Flüssig sprechen im Alltag.` (77)
+`Wortschatzaufbau leicht gemacht. Audio-Karteikarten & KI.` (57)
 
 **Full description**:
 
 ```
-Bring dein Sprachenlernen auf Autopilot. Flexling plant jeden Satz genau dann ein, wenn du ihn wiederholen musst, um ihn zu behalten — du hörst zu, sprichst nach und wirst von Tag zu Tag flüssiger.
+Wortschatzaufbau leicht gemacht. Flexling ist eine audio-basierte Flashcard-App mit einer großen Datenbank an Sätzen. Lade deine eigenen hoch oder lass die KI neue Flashcards für dich erstellen — konzentriere dich aufs Lernen statt auf die Vorbereitung.
 
 FREIHÄNDIG LERNEN, ÜBERALL
 Der Audio-Modus spielt deine Karteikarten wie einen Podcast: erst ein Satz in einer Sprache, die du kennst, dann eine Denkpause, dann der Satz in deiner Zielsprache. Perfekt beim Pendeln, Kochen oder Sport — ganz ohne Bildschirm.
@@ -78,7 +78,7 @@ Starte mit kuratierten CEFR-Kursen (A1 bis C2), tippe eigene Sätze, importiere 
 ÜBER 40 SPRACHEN
 Spanisch, Französisch, Englisch, Italienisch, Portugiesisch, Japanisch, Koreanisch, Chinesisch, Hindi, Arabisch, Türkisch und viele mehr — mit natürlicher Sprachausgabe und Umschrift-Unterstützung.
 
-Verfolge Streak, gelernte Wörter, Hörzeit und Genauigkeit — und sieh zu, wie deine Sprachkenntnisse wachsen.
+Verfolge Streak, gelernte Wörter, Hörzeit und Genauigkeit — Tag für Tag.
 ```
 
 ---
@@ -92,7 +92,7 @@ Verfolge Streak, gelernte Wörter, Hörzeit und Genauigkeit — und sieh zu, wie
 `language,learn,flashcards,spaced repetition,anki,glossika,audio,shadowing,speak,srs,arabic,levantine,clozemaster` (98)
 
 **Promotional text** (≤170):
-`Learn hands-free with audio flashcards, master grammar with an AI tutor that turns answers into flash cards, and let spaced repetition do the remembering.` (162)
+`Vocabulary building made easy. Audio flashcards with a large sentence library — upload your own or ask AI to create cards. Focus on learning, not prep.` (154)
 
 **Description**: use the Play full description above (fits well under 4000).
 
@@ -102,7 +102,7 @@ Verfolge Streak, gelernte Wörter, Hörzeit und Genauigkeit — und sieh zu, wie
 **Subtitle** (≤30): `Audio-Karten & KI-Tutor` (23)
 **Keywords**: `sprachen,lernen,spanisch,französisch,karteikarten,anki,glossika,audio,shadowing,sprechen,srs` (92)
 **Promotional text** (≤170):
-`Freihändig lernen mit Audio-Karteikarten, Grammatik meistern mit dem KI-Tutor — und Spaced Repetition merkt sich alles für dich. Kostenlos starten.` (146)
+`Wortschatzaufbau leicht gemacht. Audio-Karteikarten mit großer Satzdatenbank — eigene hochladen oder von der KI erstellen lassen. Kostenlos starten.` (148)
 **Beschreibung**: deutsche Play-Beschreibung oben verwenden.
 
 ---
@@ -117,6 +117,6 @@ Verfolge Streak, gelernte Wörter, Hörzeit und Genauigkeit — und sieh zu, wie
 | Play icon | `store-assets/common/play-icon-512.png` | 512×512 |
 | Play feature graphic | `store-assets/common/play-feature-graphic-1024x500.png` | 1024×500 |
 
-Screenshot order: 1 Home ("Put fluency on autopilot"), 2 Shadowing review, 3 AI chat, 4 Stats, 5 Testimonials.
+Screenshot order: 1 Home ("Vocabulary building made easy"), 2 Shadowing review, 3 AI chat, 4 Stats, 5 Testimonials.
 
 ⚠️ Note on the testimonials screenshot: Apple occasionally flags ratings/testimonial imagery (Guideline 2.3.7) since the stars could be read as App Store ratings. It's last in the set — drop it from the iOS listing if review objects; it's fine on Play.

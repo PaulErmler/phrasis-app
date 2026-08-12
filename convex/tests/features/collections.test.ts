@@ -917,5 +917,109 @@ describe("features/collections", () => {
       );
       expect(res.scheduled).toBe(false);
     });
+
+    // A pointer row whose audio is gone used to wedge the preview forever:
+    // the mutation saw "a row exists" and returned scheduled:false, while the
+    // browse query handed the client a null url. Only the card sweep clears
+    // these, and preview rows are usually not cards, so nothing ever healed
+    // them. These two cases cover both ways a row can dangle.
+    it("clears a pointer whose asset row is gone and re-schedules", async () => {
+      const t = convexTest(schema, modules);
+      const { textIds } = await seedCourseWithTexts(t, 1);
+      vi.mocked(ttsPool.enqueueAction).mockClear();
+
+      const { rowId } = await t.run(async (ctx) => {
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        const fixture = await insertAudioFixture(ctx, {
+          textId: textIds[0],
+          language: "es",
+          voiceName: "es-test-voice",
+          storageId,
+        });
+        // Asset deleted out from under the pointer.
+        await ctx.db.delete(fixture.assetId);
+        return fixture;
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.mutation(
+        api.features.collections.requestPreviewAudio,
+        { textId: textIds[0], language: "es" },
+      );
+
+      expect(res.scheduled).toBe(true);
+      expect(await t.run(async (ctx) => ctx.db.get(rowId))).toBeNull();
+      expect(vi.mocked(ttsPool.enqueueAction)).toHaveBeenCalledTimes(1);
+    });
+
+    it("clears a pointer whose blob is gone and re-schedules", async () => {
+      const t = convexTest(schema, modules);
+      const { textIds } = await seedCourseWithTexts(t, 1);
+      vi.mocked(ttsPool.enqueueAction).mockClear();
+
+      const { rowId } = await t.run(async (ctx) => {
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        const fixture = await insertAudioFixture(ctx, {
+          textId: textIds[0],
+          language: "es",
+          voiceName: "es-test-voice",
+          storageId,
+        });
+        // Asset row survives, but the blob behind it does not.
+        await ctx.storage.delete(storageId);
+        return fixture;
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.mutation(
+        api.features.collections.requestPreviewAudio,
+        { textId: textIds[0], language: "es" },
+      );
+
+      expect(res.scheduled).toBe(true);
+      expect(await t.run(async (ctx) => ctx.db.get(rowId))).toBeNull();
+      expect(vi.mocked(ttsPool.enqueueAction)).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves a dangling pointer alone while its TTS job is still in flight", async () => {
+      // `processTTSForCard` attaches its row before the blob is necessarily
+      // resolvable; deleting it here would make the completing job patch a
+      // row that no longer exists.
+      const t = convexTest(schema, modules);
+      const { textIds } = await seedCourseWithTexts(t, 1);
+
+      // First click takes the claim and enqueues the job.
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.collections.requestPreviewAudio, {
+        textId: textIds[0],
+        language: "es",
+      });
+
+      const { rowId } = await t.run(async (ctx) => {
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        const fixture = await insertAudioFixture(ctx, {
+          textId: textIds[0],
+          language: "es",
+          voiceName: "es-test-voice",
+          storageId,
+        });
+        await ctx.db.delete(fixture.assetId);
+        return fixture;
+      });
+
+      const res = await asUser.mutation(
+        api.features.collections.requestPreviewAudio,
+        { textId: textIds[0], language: "es" },
+      );
+
+      expect(res.scheduled).toBe(false);
+      expect(await t.run(async (ctx) => ctx.db.get(rowId))).not.toBeNull();
+    });
   });
 });
