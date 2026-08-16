@@ -122,7 +122,7 @@ export interface Language {
    * Named pipeline that decides which OpenRouter model(s) + reasoning levels
    * the translation worker uses for this language, with optional fallbacks
    * on truncation. Defined in TRANSLATION_RULES below. Unset →
-   * `gemini_35_flash_nitro_minimal` (Gemini 3.6 Flash Nitro, minimal
+   * `gemini_35_flash_nitro_minimal` (Gemini 3.7 Flash Nitro, minimal
    * reasoning, one same-config retry). No language currently pins a rule —
    * set one here only to route a language off the default.
    */
@@ -1768,6 +1768,12 @@ export type StageReasoning =
  */
 export type StageProviderConstraints = {
   max_price?: { completion: number };
+  /**
+   * OpenRouter `provider.order` — try these slugs first. With the default
+   * `allow_fallbacks: true`, later endpoints still serve if the preferred
+   * ones are down or don't support the request.
+   */
+  order?: string[];
 };
 
 /** One leg of a translation rule — an OpenRouter model + optional reasoning. */
@@ -1899,7 +1905,7 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
   reasoning: 'medium',
   maxOutputTokens: 8_000,
 };
-// Gemini 3.6 Flash via OpenRouter Nitro routing with `minimal` reasoning —
+// Gemini 3.7 Flash via OpenRouter Nitro routing with `minimal` reasoning —
 // the translation workhorse: primary + retry for
 // `gemini_35_flash_nitro_minimal`, the default rule for every language.
 // Nitro prioritizes throughput/latency; minimal thinking keeps quality on
@@ -1908,21 +1914,29 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
 // convex/features/customTexts.ts) stays on the same model + effort as the
 // single-sentence pipeline by construction rather than by comment.
 export const GEMINI_35_FLASH_NITRO_MINIMAL: ModelStage = {
-  model: 'google/gemini-3.6-flash:nitro',
+  model: 'google/gemini-3.7-flash:nitro',
   reasoning: 'minimal',
   maxOutputTokens: 4_000,
 };
 
 /**
- * OpenRouter routing cap shared by every Luna call in the app (translation,
- * autofill, chat): never route to an endpoint charging more than $2 per
- * million output tokens. Keeps OpenAI's own endpoints ($0.30–1.20/M out),
- * excludes the Azure variants ($6.00–6.60/M) — the endpoints that were
- * observed silently burning ~1k hidden reasoning tokens per call during the
- * Aug 2026 eval.
+ * OpenRouter routing shared by every Luna call in the app (translation,
+ * autofill, chat).
+ *
+ * `order` prefers Amazon Bedrock us-east-1 (OpenRouter slug
+ * `amazon-bedrock/us-east-1`; supports tools + reasoning_effort, $1.32/M
+ * out as of 2026-08-15). Fallbacks stay on so a Bedrock outage degrades to
+ * other endpoints under the price cap rather than failing the request.
+ *
+ * `max_price.completion` never routes to an endpoint charging more than $2
+ * per million output tokens. Originally added to exclude Azure variants
+ * that were $6.00–6.60/M and silently burning ~1k hidden reasoning tokens
+ * per call during the Aug 2026 eval; kept as a ceiling if those prices
+ * return.
  */
 export const LUNA_PROVIDER_CONSTRAINTS: StageProviderConstraints = {
   max_price: { completion: 2 },
+  order: ['amazon-bedrock/us-east-1'],
 };
 
 // GPT-5.6 Luna best-of-3 — the translation workhorse since Aug 2026.
@@ -1977,7 +1991,7 @@ export const TRANSLATION_RULES = {
    */
   luna_bo3: {
     id: 'luna_bo3',
-    label: 'Luna best-of-3 (no thinking, judge) → Gemini 3.6 Flash Nitro (minimal) → Google',
+    label: 'Luna best-of-3 (no thinking, judge) → Gemini 3.7 Flash Nitro (minimal) → Google',
     branches: [
       {
         maxChars: Infinity,
@@ -1993,7 +2007,7 @@ export const TRANSLATION_RULES = {
    */
   gemini_35_flash_nitro_minimal: {
     id: 'gemini_35_flash_nitro_minimal',
-    label: 'Gemini 3.6 Flash Nitro (minimal) → Gemini 3.6 Flash Nitro (minimal, retry) → Google',
+    label: 'Gemini 3.7 Flash Nitro (minimal) → Gemini 3.7 Flash Nitro (minimal, retry) → Google',
     branches: [
       {
         maxChars: Infinity,

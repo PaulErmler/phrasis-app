@@ -3,12 +3,12 @@
  * OpenRouter strings are deployment slugs as documented by OpenRouter.
  */
 
-import { LUNA_BO3 } from '../../lib/languages';
+import { LUNA_BO3, LUNA_PROVIDER_CONSTRAINTS } from '../../lib/languages';
 
 /** OpenRouter model IDs by agent or task */
 export const OPENROUTER_MODELS = {
   /** Main language-tutor chat (tools, streaming) — Luna nitro, adaptive
-   *  high thinking (see OPENROUTER_CHAT_REASONING). */
+   *  max thinking (see OPENROUTER_CHAT_REASONING). */
   languageTeacher: 'openai/gpt-5.6-luna:nitro',
   /** Bulk translation JSON for custom card auto-fill. Reuses the
    *  single-sentence pipeline's stage (`LUNA_BO3`) so model + no-thinking
@@ -48,13 +48,14 @@ export const OPENROUTER_MODELS = {
 
 /**
  * Reasoning effort for the language-tutor chat agent. GPT-5.6 Luna reasons
- * ADAPTIVELY in its (default) standard mode: trivial prompts get 0 reasoning
- * tokens regardless of effort, substantive tutoring questions think under
- * `high` (~300-500 reasoning tokens, ~7 s median — measured 2026-08-04). Do
- * NOT switch to `reasoning.mode: 'pro'` for chat: it forces heavy reasoning
- * on every reply (28–60 s at high effort), unusable interactively.
+ * ADAPTIVELY in its (default) standard mode: trivial prompts still get 0
+ * reasoning tokens regardless of effort; substantive tutoring questions
+ * think under `max` (OpenAI's highest single-pass effort, below `pro`
+ * mode). Do NOT switch to `reasoning.mode: 'pro'` for chat: Bedrock
+ * silently ignores it, and on OpenAI/Azure it forces heavy multi-pass
+ * reasoning on every reply (28–60 s at high effort), unusable interactively.
  */
-export const OPENROUTER_CHAT_REASONING = 'high' as const;
+export const OPENROUTER_CHAT_REASONING = 'max' as const;
 
 /**
  * Per-model OpenRouter settings for the chat agent. Sequential tool calls
@@ -71,26 +72,23 @@ export const OPENROUTER_CHAT_MODEL_SETTINGS = {
 /** Extra OpenRouter body for the chat agent.
  *  `usage.include` makes OpenRouter report the actual USD cost of each
  *  request (providerMetadata.openrouter.usage.cost), which drives the
- *  per-message credit charge in chat. `sort: "throughput"` picks the
- *  fastest endpoint first (same as the `:nitro` model suffix).
- *  `max_price.completion` still caps routing at $2/M output tokens.
+ *  per-message credit charge in chat. `sort: "throughput"` ranks remaining
+ *  endpoints after `order` (same as the `:nitro` model suffix).
+ *  Luna routing (`order` + `max_price`) is shared with translation via
+ *  `LUNA_PROVIDER_CONSTRAINTS` — Bedrock us-east-1 first, $2/M-out ceiling.
  *  preferred_* deprioritize endpoints slower than 2s p50 / under 50 tok/s.
  *
  *  Do NOT set `require_parameters: true` here — verified 2026-08-04 that it
  *  404s ("No endpoints found that can handle the requested parameters") for
- *  gpt-5.6-luna with tools even WITHOUT a reasoning field. The old guard's
- *  job (never route to a provider without tool support) is covered in
- *  practice by `max_price` + `sort: throughput`, which keep routing on
- *  OpenAI's own endpoints. Sequential tool calls are enforced separately
- *  via OPENROUTER_CHAT_MODEL_SETTINGS.parallelToolCalls. */
+ *  gpt-5.6-luna with tools even WITHOUT a reasoning field. Sequential tool
+ *  calls are enforced separately via
+ *  OPENROUTER_CHAT_MODEL_SETTINGS.parallelToolCalls. */
 export const OPENROUTER_CHAT_EXTRA_BODY = {
   usage: { include: true },
   provider: {
     sort: 'throughput',
     allow_fallbacks: true,
-    max_price: {
-      completion: 2,
-    },
+    ...LUNA_PROVIDER_CONSTRAINTS,
     preferred_max_latency: 2,
     preferred_min_throughput: 50,
   },
