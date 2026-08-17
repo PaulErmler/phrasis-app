@@ -19,7 +19,11 @@ import { isProtectedTranslationSource } from '../lib/translationProvenance';
 import { buildSearchableTextPatchForCard } from './lib/cardContent';
 import type { Id } from './_generated/dataModel';
 import { isPremadeLevelCollection } from './lib/collections';
-import { cardsByOriginStateAndDueDate } from './db/stats/cardAggregates';
+import {
+  cardsByOriginStateAndDueDate,
+  cardsByOriginWritingStateAndDueDate,
+  hasWritingTrack,
+} from './db/stats/cardAggregates';
 
 // App-wide migrations via @convex-dev/migrations: batched, resumable, with
 // state tracking so completed migrations are skipped on re-run. `runAll` is
@@ -198,16 +202,25 @@ export async function cardCollectionBackfillOne(
   const patch = cardCollectionBackfillPatch(doc, collectionId, collection);
   if (!patch) return undefined;
 
-  // `collectionOrigin` is part of `cardsByOriginStateAndDueDate`'s namespace,
-  // so the entry has to move with the doc. Only cards aggregated live during
-  // the deploy→backfill window actually have one (they land under origin
-  // 'none'); for everything else `replaceOrInsert` just inserts under the
-  // final origin, which `cardOriginAggregateBackfill` then no-ops over.
+  // `collectionOrigin` is part of the namespace of BOTH origin-keyed
+  // aggregates (`cardsByOriginStateAndDueDate` and its writing-track mirror),
+  // so their entries have to move with the doc. Only cards aggregated live
+  // during the deploy→backfill window actually have one (they land under
+  // origin 'none'); for everything else `replaceOrInsert` just inserts under
+  // the final origin, which `cardOriginAggregateBackfill` then no-ops over.
+  // The writing mirror only holds cards with a seeded writing track — same
+  // membership gate `patchCard` uses.
   if (patch.collectionOrigin !== undefined) {
     await cardsByOriginStateAndDueDate.replaceOrInsert(ctx, doc, {
       ...doc,
       ...patch,
     });
+    if (hasWritingTrack(doc)) {
+      await cardsByOriginWritingStateAndDueDate.replaceOrInsert(ctx, doc, {
+        ...doc,
+        ...patch,
+      });
+    }
   }
   return patch;
 }

@@ -47,3 +47,24 @@ export const ttsPool = new Workpool(components.ttsPool, {
   retryActionsByDefault: true,
   defaultRetryBehavior: { maxAttempts: 5, initialBackoffMs: 2_000, base: 3 },
 });
+
+/**
+ * Background data-sweep pool — currently only the separateModeTracking
+ * writing-track seed (convex/migrations/seedWritingTrack.ts).
+ *
+ * Deliberately NO retry config: the pool does not retry mutations (Convex
+ * already retries them on OCC and transient failures, and they're
+ * deterministic so external retries buy nothing). What this pool is here for
+ * is the GUARANTEED onComplete callback — it runs in its own transaction, so
+ * it still fires when the batch mutation throws. That is what turns a
+ * self-scheduling chain, which dies silently the moment one hop fails, into
+ * one that is supervised: the handler decides whether to re-enqueue or give up
+ * and report.
+ *
+ * Low parallelism on purpose — bulk backfill must never queue ahead of the
+ * user-facing llmPool/ttsPool work, and the seed is sequential per course
+ * anyway (each batch enqueues its own successor).
+ */
+export const seedPool = new Workpool(components.seedPool, {
+  maxParallelism: 4,
+});

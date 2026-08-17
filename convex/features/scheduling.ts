@@ -47,7 +47,9 @@ import {
   reviewModeValidator,
   asVoiceGender,
   freePlayFace,
+  schedulingTrackFromSettings,
   type SchedulingMode,
+  type SchedulingTrack,
   type StudyContentFilter,
   type FreePlayFace,
 } from '../types';
@@ -76,6 +78,11 @@ import {
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { scheduleMissingContent } from './decks';
+import {
+  maybeScheduleWritingSeed,
+  writingSeedPatch,
+} from '../migrations/seedWritingTrack';
+import { fetchTrackDueCards } from '../lib/dueQueue';
 import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
 import {
@@ -86,7 +93,9 @@ import {
 
 /**
  * Authenticate the user and verify ownership of a card via deck → course.
- * Throws ConvexError on failure.
+ * Throws ConvexError on failure. Every card-mutating entry point shares this
+ * ONE ownership rule instead of re-implementing the card → deck → course walk
+ * — the chat "also correct" replace inherits it through `applyCardEdit`.
  */
 async function authorizeCardAccess(ctx: MutationCtx, cardId: Id<'cards'>) {
   const userId = await requireAuthUserId(ctx);
@@ -183,26 +192,13 @@ const cardResultFields = {
 const cardResultValidator = v.object(cardResultFields);
 
 /**
- * Fetch the top-K due cards for a scheduling mode, honoring the
- * content-source filter. Filter semantics:
- *   - 'both' / undefined : existing indexes, no origin filtering.
- *   - 'course'           : single origin-keyed query with origin='premade'.
- *   - 'custom'           : two origin-keyed queries (origin='custom' and
- *                          origin='chat') merged by the mode's sort key.
- *
- * Cards inserted before the origin backfill won't match the new indexes;
- * they're handled by the fallback unfiltered query in the 'both' branch.
- */
-/**
- * The free-play rotation exactly as the client is served it: unfiltered for
- * 'both', otherwise one origin-keyed query per allowed origin merged by the
- * face's (counter, order key, _creationTime) sort. Shared by the serving path
- * (`fetchDueCardsWithFilter`) and the advance's catch-up floor
- * (`advanceFreePlayCardImpl`) so the floor is always computed over the same
- * population the queue draws from — an unfiltered floor can sit far below the
- * filtered queue (a filtered-out card stuck at counter 0), letting a new card
- * be re-served dozens of times before it "catches up" to cards the user can
- * never even be shown.
+ * Fetch the top-K cards the current study surface serves: the free-play
+ * rotation when a face is active, otherwise the active track's due queue
+ * (see `fetchTrackDueCards` in convex/lib/dueQueue.ts — one selector for
+ * both tracks, shared with the content warmer in decks.ts). Both shared
+ * selectors exist for the same reason: the serving path and its consumers
+ * (catch-up floor, warmer, probes) must always draw from the same
+ * population.
  */
 async function fetchDueCardsWithFilter(
   ctx: QueryCtx,
@@ -210,83 +206,14 @@ async function fetchDueCardsWithFilter(
   schedulingMode: SchedulingMode,
   face: FreePlayFace | null,
   filter: StudyContentFilter,
+  track: SchedulingTrack,
   now: number,
   take: number,
 ): Promise<Doc<'cards'>[]> {
   if (face) {
     return fetchFreePlayRotation(ctx, deckId, face, filter, take);
   }
-  if (filter === 'both') {
-    if (schedulingMode === 'learn_new') {
-      return ctx.db
-        .query('cards')
-        .withIndex('by_deck_hidden_mastered_graduated_due', (q) =>
-          q
-            .eq('deckId', deckId)
-            .eq('isHidden', false)
-            .eq('isMastered', false)
-            .eq('isGraduated', false)
-            .lte('dueDate', now),
-        )
-        .order('asc')
-        .take(take);
-    }
-    return ctx.db
-      .query('cards')
-      .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
-        q
-          .eq('deckId', deckId)
-          .eq('isHidden', false)
-          .eq('isMastered', false)
-          .lte('dueDate', now),
-      )
-      .order('asc')
-      .take(take);
-  }
-
-  // Filtered path: run one query per allowed origin and merge results.
-  const allowedOrigins = originsForFilter(filter);
-  const perOriginResults = await Promise.all(
-    allowedOrigins.map((origin) => {
-      if (schedulingMode === 'learn_new') {
-        return ctx.db
-          .query('cards')
-          .withIndex('by_deck_hidden_mastered_origin_graduated_due', (q) =>
-            q
-              .eq('deckId', deckId)
-              .eq('isHidden', false)
-              .eq('isMastered', false)
-              .eq('collectionOrigin', origin)
-              .eq('isGraduated', false)
-              .lte('dueDate', now),
-          )
-          .order('asc')
-          .take(take);
-      }
-      return ctx.db
-        .query('cards')
-        .withIndex('by_deck_hidden_mastered_origin_dueDate', (q) =>
-          q
-            .eq('deckId', deckId)
-            .eq('isHidden', false)
-            .eq('isMastered', false)
-            .eq('collectionOrigin', origin)
-            .lte('dueDate', now),
-        )
-        .order('asc')
-        .take(take);
-    }),
-  );
-
-  // Merge by dueDate, tiebreak by _creationTime to mirror Convex's default
-  // index ordering. (Free play never reaches here — it exits early through
-  // fetchFreePlayRotation, which merges by the face's counter+order key.)
-  const merged = perOriginResults.flat();
-  merged.sort((a, b) => {
-    if (a.dueDate !== b.dueDate) return a.dueDate - b.dueDate;
-    return a._creationTime - b._creationTime;
-  });
-  return merged.slice(0, take);
+  return fetchTrackDueCards(ctx, deckId, schedulingMode, filter, track, now, take);
 }
 
 export const getCardForReview = query({
@@ -340,6 +267,7 @@ export const getCardForReview = query({
       schedulingMode,
       studyContext.face,
       studyContentFilter,
+      studyContext.track,
       now,
       2,
     );
@@ -386,6 +314,20 @@ export const getCardForReview = query({
 
       const collection = collections[index];
 
+      // Under separateModeTracking + Writing mode the writing track IS the
+      // card's schedule as far as this session is concerned, so surface its
+      // state in the shared-named fields the client already consumes (rating
+      // interval previews read fsrsState; the writing track has no pre-review
+      // phase, hence phase 'review' / count 0).
+      //
+      // DUE-QUEUE SERVING ONLY (`face === null`): in Free Study the track is
+      // also 'writing' (same settings combination) but cards come from the
+      // rotation — masking their real preReviewCount/fsrsState there made
+      // long-known cards look brand new to the client (translation assist
+      // reappeared, first-exposure auto-rating kicked in).
+      const writingTrack =
+        studyContext.track === 'writing' && studyContext.face === null;
+
       return {
         _id: card._id,
         _creationTime: card._creationTime,
@@ -394,14 +336,14 @@ export const getCardForReview = query({
         sourceLanguage: text.language,
         translations: content.translations,
         audioRecordings: content.audioRecordings,
-        dueDate: card.dueDate,
+        dueDate: writingTrack ? card.writingDueDate ?? card.dueDate : card.dueDate,
         isMastered: card.isMastered,
         isHidden: card.isHidden,
         isFavorite: card.isFavorite ?? false,
-        schedulingPhase: card.schedulingPhase,
-        preReviewCount: card.preReviewCount,
+        schedulingPhase: writingTrack ? ('review' as const) : card.schedulingPhase,
+        preReviewCount: writingTrack ? 0 : card.preReviewCount,
         initialReviewCount,
-        fsrsState: card.fsrsState ?? null,
+        fsrsState: (writingTrack ? card.writingFsrsState : card.fsrsState) ?? null,
         radioPlayCount: card.radioPlayCount,
         freeStudyPlayCount: card.freeStudyPlayCount,
         goodReviewCount: card.goodReviewCount,
@@ -510,6 +452,10 @@ export const getCardForReviewEmptyReason = query({
       reason: v.literal('all_caught_up'),
       customCardsPendingAdd: v.boolean(),
     }),
+    // separateModeTracking: the enable-time writing seed is still in flight
+    // (or stalled and awaiting a re-kick), so an empty writing queue says
+    // nothing about the user's actual due state.
+    v.object({ reason: v.literal('preparing_writing') }),
   ),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
@@ -522,7 +468,7 @@ export const getCardForReviewEmptyReason = query({
     if (!deck) return { reason: 'no_session' as const };
 
     const settings = await getCourseSettings(ctx, active.course._id);
-    const { schedulingMode, studyContentFilter, face } =
+    const { schedulingMode, studyContentFilter, face, track } =
       studyContextFromSettings(settings);
     const now = Date.now();
 
@@ -537,6 +483,25 @@ export const getCardForReviewEmptyReason = query({
       )
       .first();
     if (!anyCard) return { reason: 'no_cards' as const };
+
+    // Writing queue while the enable-time seed is incomplete: unseeded cards
+    // are deliberately excluded from every writing due query, so neither
+    // "all caught up" nor the filtered-out analysis would be truthful yet.
+    // (`track === 'writing'` already implies separateModeTracking is on.)
+    //
+    // `face === null` is load-bearing, exactly as in getCardForReview's
+    // writing-track mask: schedulingTrackFromSettings ignores schedulingMode,
+    // so Free Study (radio + Writing) also resolves to track 'writing' — but
+    // free play serves from the rotation and never reads the writing queue, so
+    // reporting a seed-in-progress there would hide the real reason its
+    // rotation is empty behind a spinner it can never clear.
+    if (
+      face === null &&
+      track === 'writing' &&
+      settings?.writingSeedDone !== true
+    ) {
+      return { reason: 'preparing_writing' as const };
+    }
 
     const customCardsPendingAdd = await hasPendingCustomCardsToAdd(
       ctx,
@@ -583,6 +548,7 @@ export const getCardForReviewEmptyReason = query({
       schedulingMode,
       face,
       otherFilter,
+      track,
       now,
       1,
     );
@@ -641,9 +607,44 @@ export const reviewCard = mutation({
     const reviewSettings = await getCourseSettings(ctx, deck.courseId);
     const initialReviewCount = reviewSettings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
 
+    // Which per-card schedule this review writes: the writing track iff the
+    // course has separateModeTracking on AND the review happened in Writing
+    // mode. Derived from args.reviewMode (what the user actually did), not
+    // settings.reviewMode — the two only diverge on a settings-update race.
+    const track: SchedulingTrack = schedulingTrackFromSettings({
+      separateModeTracking: reviewSettings?.separateModeTracking,
+      reviewMode: args.reviewMode,
+    });
+
+    // Lazy seed: a writing-track review of a card the enable-time backfill
+    // hasn't reached yet (or one created while the split was off) starts from
+    // a copy of the shared schedule — exactly what the backfill would have
+    // written. The undo snapshot below still records the true prior (unset)
+    // writing fields, so undoing returns the card to its unseeded state.
+    const writingUnseeded =
+      track === 'writing' && card.writingDueDate === undefined;
+    // An unseeded card reaching a writing review means the enable-time sweep
+    // hasn't finished (or died mid-chain) — re-kick it. Debounced inside the
+    // helper, and the sweep fast-skips already-seeded cards, so this is cheap
+    // and only fires during the (normally short) backfill window.
+    if (writingUnseeded && reviewSettings) {
+      await maybeScheduleWritingSeed(ctx, reviewSettings);
+    }
+    // The baseline this review schedules FROM: for an unseeded card, exactly
+    // the patch the backfill sweep would have written — the same helper, so
+    // the two seeding paths share one formula and cannot diverge.
+    const writingBaseline = writingUnseeded ? writingSeedPatch(card) : card;
+    const priorWritingFsrsState = writingBaseline.writingFsrsState;
+    const priorWritingGraduated = writingBaseline.writingIsGraduated ?? false;
+    const priorWritingGoodCount = writingBaseline.writingGoodReviewCount ?? 0;
+
     // When forceReviewPhase is true (full review mode), treat the card as
     // being in the 'review' phase so FSRS ratings are accepted directly.
-    const phase = args.forceReviewPhase ? 'review' as const : card.schedulingPhase;
+    // The writing track has no pre-review phase at all.
+    const phase =
+      args.forceReviewPhase || track === 'writing'
+        ? ('review' as const)
+        : card.schedulingPhase;
     const validRatings = getValidRatings(phase);
     if (!validRatings.includes(args.rating)) {
       throw new ConvexError(
@@ -660,13 +661,21 @@ export const reviewCard = mutation({
     assertAccuracy(args.accuracyStrict, 'accuracyStrict');
     assertAccuracy(args.accuracyLenient, 'accuracyLenient');
 
-    // Build current scheduling state
-    const cardState: CardSchedulingState = {
-      schedulingPhase: phase,
-      preReviewCount: card.preReviewCount,
-      dueDate: card.dueDate,
-      fsrsState: card.fsrsState ?? null,
-    };
+    // Build current scheduling state from the reviewed track
+    const cardState: CardSchedulingState =
+      track === 'writing'
+        ? {
+            schedulingPhase: 'review',
+            preReviewCount: 0,
+            dueDate: writingBaseline.writingDueDate ?? card.dueDate,
+            fsrsState: priorWritingFsrsState ?? null,
+          }
+        : {
+            schedulingPhase: phase,
+            preReviewCount: card.preReviewCount,
+            dueDate: card.dueDate,
+            fsrsState: card.fsrsState ?? null,
+          };
 
     // Run the shared scheduling algorithm
     const result = scheduleCard(cardState, args.rating, initialReviewCount);
@@ -738,6 +747,14 @@ export const reviewCard = mutation({
       timezone: args.timezone,
       timeSpentMs: args.timeSpentMs,
       reviewMode: args.reviewMode,
+      track,
+      // The state this review was scheduled FROM — on the writing track's
+      // lazy-seed path that's the copied shared state, not the (still unset)
+      // raw writingFsrsState.
+      priorFsrsState:
+        track === 'writing'
+          ? priorWritingFsrsState ?? null
+          : card.fsrsState ?? null,
       rating: args.rating,
       accuracy: args.accuracy,
       accuracyStrict: args.accuracyStrict,
@@ -748,29 +765,78 @@ export const reviewCard = mutation({
     });
 
     // Patch the card (via aggregate-aware helper). We pass `card` as oldDoc so
-    // patchCard can skip both the pre- and post-patch reads.
-    await patchCard(
-      ctx,
-      args.cardId,
-      {
-        schedulingPhase: result.schedulingPhase,
-        preReviewCount: result.preReviewCount,
-        dueDate: dueDateWithJitter,
-        lastReviewedAt: Date.now(),
-        // Only FSRS good/easy count (never pre-review "understood") — drives
-        // the "until rated good" Practice-Listening strategy.
-        ...(args.rating === 'good' || args.rating === 'easy'
-          ? { goodReviewCount: (card.goodReviewCount ?? 0) + 1 }
-          : {}),
-        ...searchableTextPatch,
-        ...(result.fsrsState && { fsrsState: result.fsrsState }),
-        ...isGraduatedPatch,
-        ...(newWordsTrackedLanguages
-          ? { wordsTrackedLanguages: newWordsTrackedLanguages }
-          : {}),
+    // patchCard can skip both the pre- and post-patch reads. Only the reviewed
+    // track's scheduling fields are written — under separateModeTracking the
+    // other track's schedule is untouched.
+    // Per-mode review counter — keyed by what the user actually did
+    // (args.reviewMode), independent of the track the review wrote, so it
+    // counts correctly with the split on or off. Same 'audio' default as
+    // statsReversal.reviewModeForStats; decremented symmetrically on undo.
+    const prevModeCounts = card.reviewCountByMode ?? { audio: 0, full: 0 };
+    const reviewModeKey = args.reviewMode ?? 'audio';
+    const nonSchedulingPatch = {
+      ...searchableTextPatch,
+      ...(newWordsTrackedLanguages
+        ? { wordsTrackedLanguages: newWordsTrackedLanguages }
+        : {}),
+      reviewCountByMode: {
+        ...prevModeCounts,
+        [reviewModeKey]: prevModeCounts[reviewModeKey] + 1,
       },
-      card,
-    );
+    };
+    if (track === 'writing') {
+      await patchCard(
+        ctx,
+        args.cardId,
+        {
+          writingDueDate: dueDateWithJitter,
+          writingLastReviewedAt: Date.now(),
+          // `lastReviewedAt` is the track-agnostic activity timestamp (the
+          // Library sorts and displays it; even free-play stamps it), so a
+          // writing review updates it too. Like free play, undo does not
+          // restore it — prevWriting snapshots only the writing schedule.
+          lastReviewedAt: Date.now(),
+          // Writing-track counterpart of goodReviewCount. On a lazy seed the
+          // copied baseline is persisted even for non-good ratings, so the
+          // review is indistinguishable from backfill-then-review.
+          ...(args.rating === 'good' || args.rating === 'easy'
+            ? { writingGoodReviewCount: priorWritingGoodCount + 1 }
+            : writingUnseeded && card.goodReviewCount !== undefined
+              ? { writingGoodReviewCount: priorWritingGoodCount }
+              : {}),
+          ...(result.fsrsState && { writingFsrsState: result.fsrsState }),
+          // Always write the flag (never leave it undefined): the learn_new
+          // writing index matches on eq(writingIsGraduated, false), which an
+          // undefined field would silently fall out of. One-way like
+          // isGraduated.
+          writingIsGraduated:
+            priorWritingGraduated ||
+            (result.fsrsState !== null && result.fsrsState.state >= 2),
+          ...nonSchedulingPatch,
+        },
+        card,
+      );
+    } else {
+      await patchCard(
+        ctx,
+        args.cardId,
+        {
+          schedulingPhase: result.schedulingPhase,
+          preReviewCount: result.preReviewCount,
+          dueDate: dueDateWithJitter,
+          lastReviewedAt: Date.now(),
+          // Only FSRS good/easy count (never pre-review "understood") — drives
+          // the "until rated good" Practice-Listening strategy.
+          ...(args.rating === 'good' || args.rating === 'easy'
+            ? { goodReviewCount: (card.goodReviewCount ?? 0) + 1 }
+            : {}),
+          ...(result.fsrsState && { fsrsState: result.fsrsState }),
+          ...isGraduatedPatch,
+          ...nonSchedulingPatch,
+        },
+        card,
+      );
+    }
 
     // Log the review for the learn-mode undo stack: the pre-patch card
     // snapshot plus the keys `reverseReviewStats` needs to decrement the
@@ -786,15 +852,30 @@ export const reviewCard = mutation({
       date: todayDate,
       schedulingMode: reviewSettings?.schedulingMode ?? 'learnAndReview',
       studyContentFilter: reviewSettings?.studyContentFilter ?? 'both',
-      prevCard: {
-        dueDate: card.dueDate,
-        schedulingPhase: card.schedulingPhase,
-        preReviewCount: card.preReviewCount,
-        fsrsState: card.fsrsState,
-        isGraduated: card.isGraduated,
-        lastReviewedAt: card.lastReviewedAt,
-        goodReviewCount: card.goodReviewCount,
-      },
+      track,
+      // Snapshot the reviewed track's TRUE prior fields (for a lazy seed
+      // that's all-undefined), so undo restores exactly what was overwritten.
+      ...(track === 'writing'
+        ? {
+            prevWriting: {
+              writingDueDate: card.writingDueDate,
+              writingFsrsState: card.writingFsrsState,
+              writingIsGraduated: card.writingIsGraduated,
+              writingLastReviewedAt: card.writingLastReviewedAt,
+              writingGoodReviewCount: card.writingGoodReviewCount,
+            },
+          }
+        : {
+            prevCard: {
+              dueDate: card.dueDate,
+              schedulingPhase: card.schedulingPhase,
+              preReviewCount: card.preReviewCount,
+              fsrsState: card.fsrsState,
+              isGraduated: card.isGraduated,
+              lastReviewedAt: card.lastReviewedAt,
+              goodReviewCount: card.goodReviewCount,
+            },
+          }),
       statsReversal: {
         hourOfDay,
         rating: args.rating,
@@ -811,10 +892,23 @@ export const reviewCard = mutation({
               accuracyLenient: args.accuracyLenient,
             }
           : {}),
+        // Must mirror recordReviewStats' formula per track — including the
+        // lazy-seed resolution (priorWritingFsrsState, not the raw card).
         reviewDepth:
           args.accuracy != null
-            ? card.preReviewCount + (card.fsrsState?.reps ?? 0) + 1
+            ? track === 'writing'
+              ? (priorWritingFsrsState?.reps ?? 0) + 1
+              : card.preReviewCount + (card.fsrsState?.reps ?? 0) + 1
             : undefined,
+        // Same rule, same reason, for the reviewsByCardState bucket: stamp the
+        // state the review was scheduled FROM. `prevWriting` below snapshots
+        // the card's true (on a lazy seed, unset) writing fields because undo
+        // must restore them — so it is NOT a valid source for the stat bucket,
+        // and re-deriving from it would decrement 'new' for a review counted
+        // under the copied shared state.
+        cardState:
+          (track === 'writing' ? priorWritingFsrsState : card.fsrsState)
+            ?.state ?? 0,
         languages,
         collectionId: card.collectionId,
       },
@@ -875,6 +969,28 @@ export const reviewCard = mutation({
  * skipped. Returns `nothing_to_undo` instead of throwing when the stack is
  * empty: two devices racing over the same stack is expected, not an error.
  */
+/**
+ * Reverse `reviewCard`'s per-mode counter bump for one undone review entry.
+ * Keyed by the entry's recorded raw mode with the same 'audio' default the
+ * increment used. Cards whose counter predates the field (undefined) have
+ * nothing to reverse; the floor guards a counter that was reset/migrated
+ * between review and undo.
+ */
+function reviewCountUndoPatch(
+  card: Doc<'cards'>,
+  log: Doc<'reviewLogs'>,
+): Partial<Doc<'cards'>> {
+  const counts = card.reviewCountByMode;
+  if (!counts) return {};
+  const mode = log.statsReversal?.reviewModeRaw ?? 'audio';
+  return {
+    reviewCountByMode: {
+      ...counts,
+      [mode]: Math.max(0, counts[mode] - 1),
+    },
+  };
+}
+
 export const undoLastReview = mutation({
   args: { timezone: v.string() },
   returns: v.union(
@@ -908,7 +1024,35 @@ export const undoLastReview = mutation({
         continue;
       }
 
-      if (log.kind === 'review' && log.prevCard) {
+      if (
+        log.kind === 'review' &&
+        (log.track ?? 'shared') === 'writing' &&
+        log.prevWriting
+      ) {
+        // Writing-track review: restore only the writing fields. Explicit
+        // per-field patch so snapshot values that were `undefined` (the
+        // lazy-seed case, where the track didn't exist yet) unset the fields
+        // again, returning the card to its unseeded state — and dropping it
+        // from the writing aggregates via patchCard.
+        await patchCard(
+          ctx,
+          log.cardId,
+          {
+            writingDueDate: log.prevWriting.writingDueDate,
+            writingFsrsState: log.prevWriting.writingFsrsState,
+            writingIsGraduated: log.prevWriting.writingIsGraduated,
+            writingLastReviewedAt: log.prevWriting.writingLastReviewedAt,
+            writingGoodReviewCount: log.prevWriting.writingGoodReviewCount,
+            ...reviewCountUndoPatch(card, log),
+          },
+          card,
+        );
+        await reverseReviewStats(ctx, { userId, courseId: course._id, log });
+      } else if (
+        log.kind === 'review' &&
+        (log.track ?? 'shared') === 'shared' &&
+        log.prevCard
+      ) {
         // `undefined` snapshot values (e.g. fsrsState before the card entered
         // FSRS) correctly unset the field again via patchCard → ctx.db.patch.
         await patchCard(
@@ -922,6 +1066,7 @@ export const undoLastReview = mutation({
             isGraduated: log.prevCard.isGraduated,
             lastReviewedAt: log.prevCard.lastReviewedAt,
             goodReviewCount: log.prevCard.goodReviewCount,
+            ...reviewCountUndoPatch(card, log),
           },
           card,
         );
@@ -1616,26 +1761,50 @@ export const regenerateCardAudio = mutation({
 });
 
 /**
- * Edit the translations of a card.
+ * Core of `editCard`, shared with the chat "also correct" replace path
+ * (convex/features/chat/cardApprovals.ts).
  *
  * Creates a replacement card with identical scheduling stats but updated text.
  * Two paths:
  *   A) User-owned text — patches rows in place, reuses textId.
  *   B) Shared/dataset text — creates new textId, copies unchanged content.
+ *
+ * Options beyond the editCard args:
+ *   - ensureUserOwnedText: run Path B even when no text changed, so the
+ *     returned textId is always user-owned. The also-correct replace path
+ *     patches metadata (speaker gender, register, …) onto the row afterwards,
+ *     which must never hit a shared/dataset text other users reference.
+ *   - skipQuota: caller owns CARD_EDITS billing (bills once itself).
+ *
+ * Returns the resolved textId and whether anything was written; a no-op diff
+ * without ensureUserOwnedText returns `changed: false` and consumes nothing.
  */
-export const editCard = mutation({
+export async function applyCardEdit(
+  ctx: MutationCtx,
   args: {
-    cardId: v.id('cards'),
-    translations: v.array(
-      v.object({
-        language: v.string(),
-        text: v.string(),
-      }),
-    ),
-    timezone: v.string(),
+    cardId: Id<'cards'>;
+    translations: { language: string; text: string }[];
+    timezone: string;
+    ensureUserOwnedText?: boolean;
+    skipQuota?: boolean;
+    /** Definitive speaker gender proposed alongside the edit (the chat
+     * "also correct" replace). Applied to the text row BEFORE this edit's
+     * `scheduleMissingContent` pass: the TTS enqueue resolves its voice from
+     * the row and takes a per-(text, language) claim, so a gender patched
+     * only afterwards (applyTextMetadata) would come too late — the claim
+     * blocks the follow-up pass and the wrong-gender synthesis wins. */
+    proposedAudioSpeakerGender?: 'male' | 'female';
   },
-  returns: v.null(),
-  handler: async (ctx, args) => {
+): Promise<{
+  textId: Id<'texts'>;
+  /** The card after the edit — same id on Path A, a NEW id on Path B. */
+  cardId: Id<'cards'>;
+  changed: boolean;
+  /** The card's course, from the one authorizeCardAccess walk this edit
+   * already performs — returned so callers needing course languages (the
+   * also-correct replace) don't repeat the card → deck → course reads. */
+  course: Doc<'courses'>;
+}> {
     const { userId, card, course } = await authorizeCardAccess(ctx, args.cardId);
 
     const text = await ctx.db.get(card.textId);
@@ -1644,8 +1813,11 @@ export const editCard = mutation({
     // Narrow the card's resolved voice gender once for stamping onto the
     // translation rows below. `texts.audioSpeakerGender` is typed as a loose
     // string but is always 'male' | 'female' in practice; the stamped
-    // `translations.speakerGender` field is strict.
-    const audioGenderStamp = asVoiceGender(text.audioSpeakerGender);
+    // `translations.speakerGender` field is strict. A proposed gender wins —
+    // the re-stamped rows must agree with the voice the edit enqueues.
+    const audioGenderStamp = asVoiceGender(
+      args.proposedAudioSpeakerGender ?? text.audioSpeakerGender,
+    );
 
     const sourceLanguage = text.language;
     const allLanguages = [
@@ -1692,7 +1864,16 @@ export const editCard = mutation({
       }
     }
 
-    if (changedLanguages.size === 0) return null;
+    const isUserOwned = text.userCreated && text.userId === userId;
+    // Path B must also run for a no-text-change call that requires ownership
+    // (metadata-only "also correct" replace on a shared text): the pure
+    // logical copy gives the caller a user-owned row to patch.
+    const needsCopy =
+      !isUserOwned &&
+      (changedLanguages.size > 0 || args.ensureUserOwnedText === true);
+    if (changedLanguages.size === 0 && !needsCopy) {
+      return { textId: card.textId, cardId: args.cardId, changed: false, course };
+    }
 
     // Audio-relevant subset of the diff: an edit that only touches
     // punctuation/'_' (`soundsSame`) sounds identical spoken aloud, so the
@@ -1724,12 +1905,13 @@ export const editCard = mutation({
     }
 
     // Consume quota before making changes
-    await consumeQuota(ctx, userId, FEATURE_IDS.CARD_EDITS);
+    if (!args.skipQuota) {
+      await consumeQuota(ctx, userId, FEATURE_IDS.CARD_EDITS);
+    }
 
     // Track card edit event
     await trackEvent(ctx, { userId, courseId: course._id, timezone: args.timezone, field: 'cardsEdited' });
 
-    const isUserOwned = text.userCreated && text.userId === userId;
     let resolvedTextId: Id<'texts'>;
 
     if (isUserOwned) {
@@ -1782,10 +1964,15 @@ export const editCard = mutation({
         }
       }
 
-      // Delete audio recordings for audibly-changed languages only —
-      // punctuation-only edits keep their audio.
+      // Detach audio pointers for audibly-changed languages only —
+      // punctuation-only edits keep their audio. keepAsset: the old audio is
+      // still correct for the old sentence, so it stays in the audioAssets
+      // cache (only the regenerate button and TTS-system migrations fully
+      // delete audio).
       for (const lang of audioChangedLanguages) {
-        await deleteAudioRowsForTextLanguage(ctx, card.textId, lang);
+        await deleteAudioRowsForTextLanguage(ctx, card.textId, lang, {
+          keepAsset: true,
+        });
       }
     } else {
       // Path B: create new textId, copy unchanged content
@@ -1899,6 +2086,20 @@ export const editCard = mutation({
       }
     }
 
+    // Metadata-before-scheduling: land the proposed gender on the resolved
+    // text row now, so `scheduleMissingContent` below (which resolves the
+    // voice from this row and claims the synthesis) already speaks with the
+    // right voice. See the arg's doc comment for why afterwards is too late.
+    // Both fields: `resolveCardSpeakerGenders` gives the definitive
+    // linguistic `speakerGender` precedence over `audioSpeakerGender` and
+    // would flip a lone audio-gender patch straight back.
+    if (args.proposedAudioSpeakerGender !== undefined) {
+      await ctx.db.patch(resolvedTextId, {
+        speakerGender: args.proposedAudioSpeakerGender,
+        audioSpeakerGender: args.proposedAudioSpeakerGender,
+      });
+    }
+
     // Build searchable text for the new card
     const resolvedText = await ctx.db.get(resolvedTextId);
     if (!resolvedText) throw new ConvexError('Resolved text not found');
@@ -1906,6 +2107,12 @@ export const editCard = mutation({
     const courseLanguages = [...course.baseLanguages, ...course.targetLanguages];
     const { searchableText, searchableTextLanguages } =
       await buildCardSearchableText(ctx, resolvedTextId, resolvedText.text, courseLanguages);
+
+    // The card this edit leaves behind: unchanged on Path A (patched in
+    // place), a brand-new document on Path B (insert + delete). Callers need
+    // to know which — the chat replace path retargets its sibling approvals
+    // and the learn view suppresses its thread rotation off this identity.
+    let resolvedCardId: Id<'cards'> = args.cardId;
 
     if (isUserOwned) {
       // Path A edits the existing text row, so the card still points at the
@@ -1936,7 +2143,7 @@ export const editCard = mutation({
       // uses _creationTime as the tiebreaker within equal index values, and the
       // new doc would otherwise sort last, causing a different card to be
       // returned by getCardForReview).
-      await insertCard(ctx, {
+      resolvedCardId = await insertCard(ctx, {
         deckId: card.deckId,
         textId: resolvedTextId,
         collectionId: card.collectionId,
@@ -1965,6 +2172,21 @@ export const editCard = mutation({
         freeStudyOrderKey: card.freeStudyOrderKey ?? randomOrderKey(),
         fsrsState: card.fsrsState,
         lastReviewedAt: card.lastReviewedAt,
+        // Preserve the writing track (separateModeTracking) so an edit doesn't
+        // reset the card's writing schedule; same -1ms queue-position trick as
+        // dueDate above. Undefined (no track) stays undefined.
+        writingDueDate:
+          card.writingDueDate !== undefined ? card.writingDueDate - 1 : undefined,
+        writingFsrsState: card.writingFsrsState,
+        writingIsGraduated: card.writingIsGraduated,
+        writingLastReviewedAt: card.writingLastReviewedAt,
+        writingGoodReviewCount: card.writingGoodReviewCount,
+        // Per-mode review history, same rationale as goodReviewCount and the
+        // play counters above: an edit must not reset it. There is no backfill
+        // for these counters, so a drop here is unrecoverable — and it would
+        // also silently disable undo's decrement, which no-ops when the field
+        // is undefined.
+        reviewCountByMode: card.reviewCountByMode,
         wordsTrackedLanguages: card.wordsTrackedLanguages,
         searchableText,
         searchableTextLanguages,
@@ -2007,6 +2229,27 @@ export const editCard = mutation({
       changed_languages: [...changedLanguages],
     });
 
+    return { textId: resolvedTextId, cardId: resolvedCardId, changed: true, course };
+}
+
+/**
+ * Edit the translations of a card. Thin wrapper over `applyCardEdit` — see
+ * its doc comment for the Path A/B mechanics.
+ */
+export const editCard = mutation({
+  args: {
+    cardId: v.id('cards'),
+    translations: v.array(
+      v.object({
+        language: v.string(),
+        text: v.string(),
+      }),
+    ),
+    timezone: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await applyCardEdit(ctx, args);
     return null;
   },
 });

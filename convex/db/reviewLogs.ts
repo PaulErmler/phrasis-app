@@ -3,8 +3,10 @@ import { Doc, Id } from '../_generated/dataModel';
 import { UNDO_DEPTH } from '../../lib/constants/learning';
 import {
   freePlayFace,
+  schedulingTrackFromSettings,
   type FreePlayFace,
   type SchedulingMode,
+  type SchedulingTrack,
   type StudyContentFilter,
 } from '../types';
 
@@ -65,6 +67,12 @@ export type StudyContext = {
   schedulingMode: SchedulingMode;
   face: FreePlayFace | null;
   studyContentFilter: StudyContentFilter;
+  /** Which per-card schedule 'review' entries currently target — 'writing'
+   * iff separateModeTracking is on and the course is in Writing mode. Scopes
+   * undo the same way `face` does for free play: undoing a shared-track
+   * review while looking at the writing queue would not change what's on
+   * screen. Ignored for free-play entries. */
+  track: SchedulingTrack;
 };
 
 /** Resolve the undo/queue scope from course settings, defaults included. The
@@ -79,6 +87,10 @@ export function studyContextFromSettings(
     schedulingMode,
     face: freePlayFace(schedulingMode, settings?.reviewMode ?? 'audio'),
     studyContentFilter: settings?.studyContentFilter ?? 'both',
+    track: schedulingTrackFromSettings({
+      separateModeTracking: settings?.separateModeTracking,
+      reviewMode: settings?.reviewMode,
+    }),
   };
 }
 
@@ -109,8 +121,10 @@ export async function takeUndoableLogs(
       entry.schedulingMode !== current.schedulingMode ||
       entry.studyContentFilter !== current.studyContentFilter ||
       // `kind` IS the free-play face ('radio' | 'freeStudy'); 'review' entries
-      // belong to the FSRS modes and are scoped by schedulingMode alone.
-      (entry.kind !== 'review' && entry.kind !== current.face)
+      // belong to the FSRS modes and are scoped by schedulingMode + track.
+      (entry.kind !== 'review' && entry.kind !== current.face) ||
+      // Entries from before the track field existed are all shared-track.
+      (entry.kind === 'review' && (entry.track ?? 'shared') !== current.track)
     ) {
       break;
     }

@@ -27,6 +27,31 @@ vi.mock('@/convex/lib/workpools', () => ({
     cancel: vi.fn(async () => undefined),
     status: vi.fn(async () => ({ state: 'pending', previousAttempts: 0 })),
   },
+  // The seed pool enqueues MUTATIONS, and unlike the content pools its jobs
+  // must actually run for a test to observe anything (the writing-track sweep
+  // chains batch → batch until the course is seeded). Route each job through
+  // `ctx.scheduler` so the existing `drainScheduler` helper drives the chain
+  // exactly as it did when the sweep self-scheduled.
+  //
+  // The `onComplete` supervisor is deliberately NOT invoked here: modelling
+  // "the batch threw but its onComplete still ran" needs a separate
+  // transaction, which convex-test's scheduler can't express. Tests that
+  // exercise the failure path call `onSeedBatchComplete` directly with a
+  // `{ kind: 'failed' }` result.
+  seedPool: {
+    enqueueMutation: vi.fn(
+      async (
+        ctx: { scheduler: { runAfter: (d: number, fn: unknown, a: unknown) => Promise<unknown> } },
+        fn: unknown,
+        args: unknown,
+      ) => {
+        await ctx.scheduler.runAfter(0, fn, args);
+        return `test-seed-work-${nextWorkId++}`;
+      },
+    ),
+    cancel: vi.fn(async () => undefined),
+    status: vi.fn(async () => ({ state: 'pending', previousAttempts: 0 })),
+  },
 }));
 
 /**

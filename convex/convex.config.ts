@@ -24,12 +24,22 @@ app.use(aggregate, { name: 'cardsByState' });
 app.use(aggregate, { name: 'cardsByDueDate' });
 app.use(aggregate, { name: 'cardsByStateAndDueDate' });
 app.use(aggregate, { name: 'cardsByOriginStateAndDueDate' });
+// Writing-track mirrors of the two due-count aggregates, keyed on
+// cards.writingDueDate. Only cards with a seeded writing track (courses with
+// separateModeTracking on) are inserted, so courses without the split pay no
+// extra aggregate writes.
+app.use(aggregate, { name: 'cardsByWritingStateAndDueDate' });
+app.use(aggregate, { name: 'cardsByOriginWritingStateAndDueDate' });
 app.use(actionRetrier);
 app.use(rateLimiter);
 // Content-generation pools (LLM translation / TTS synthesis). Separate
 // instances because each pool needs its own parallelism cap.
 app.use(workpool, { name: 'llmPool' });
 app.use(workpool, { name: 'ttsPool' });
+// Background data sweeps (currently the separateModeTracking writing-track
+// seed). Its own instance so bulk backfill can never queue ahead of, or steal
+// slots from, the user-facing content pools.
+app.use(workpool, { name: 'seedPool' });
 // Batched, resumable data migrations. Chained after every deploy via
 // `npx convex run migrations:runAll --prod` (completed ones are skipped).
 app.use(migrations);

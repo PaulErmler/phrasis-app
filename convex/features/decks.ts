@@ -74,7 +74,9 @@ import {
   ttsProviderValidator,
   voiceGenderValidator,
   asVoiceGender,
+  schedulingTrackFromSettings,
   type SchedulingMode,
+  type SchedulingTrack,
   type StudyContentFilter,
 } from '../types';
 import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
@@ -102,6 +104,7 @@ import { consumeQuota, checkQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { MAX_CARDS_PER_BATCH, ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
 import { fetchFreePlayRotation, randomOrderKey } from '../lib/freePlay';
+import { fetchTrackDueCards } from '../lib/dueQueue';
 import { isCollectionAccessible, requireAccessibleText } from './collections';
 import {
   applyMarkCounterDelta,
@@ -463,7 +466,15 @@ export async function scheduleMissingContent(
       if (genderMismatch || providerMismatch || versionMismatch) {
         // Reference-aware delete: a shared asset (or an `editCard`-copied
         // legacy blob) survives while anything else still points at it.
-        await deleteAudioRow(ctx, audio);
+        // Gender drift additionally keeps the asset+blob even as the last
+        // pointer: that audio is still CORRECT for this string+voice — it
+        // stays in the content-addressed cache so flipping the gender back
+        // (or any other text with the same sentence) reuses it for free.
+        // Provider/ttsVersion migrations are true obsolescence (a new TTS
+        // system) and keep the full garbage collection.
+        await deleteAudioRow(ctx, audio, {
+          keepAsset: genderMismatch && !providerMismatch && !versionMismatch,
+        });
         audioMap.set(lang, null);
       } else {
         audioPayloadMap.set(lang, payload);
@@ -547,7 +558,11 @@ export async function scheduleMissingContent(
     // delete so a blob shared via an `editCard` copy isn't dropped.
     const staleAudio = audioMap.get(lang);
     if (staleAudio) {
-      await deleteAudioRow(ctx, staleAudio);
+      // keepAsset: every trigger here is a CONTENT change (gender drift /
+      // translation-version bump regenerating the text) — the recording
+      // itself is still valid audio of the old string, so it stays in the
+      // audioAssets cache instead of being garbage-collected.
+      await deleteAudioRow(ctx, staleAudio, { keepAsset: true });
       audioMap.set(lang, null);
     }
   }
@@ -1070,6 +1085,14 @@ export async function createCardsFromTexts(
     collection?.origin
     ?? (collection && isPremadeLevelCollection(collection) ? 'premade' : undefined);
 
+  // With separateModeTracking on, seed the writing track at creation (a new
+  // card's writing schedule is identical to its shared one) so the card is
+  // immediately visible to the writing-due indexes without a backfill. While
+  // it's off, cards stay unseeded — the enable-time seedWritingTrack backfill
+  // copies the then-current shared state instead.
+  const settingsForSeed = await getCourseSettings(ctx, course._id);
+  const seedWritingTrack = settingsForSeed?.separateModeTracking === true;
+
   for (const text of texts) {
     if (text.collectionRank > newLastRank) {
       newLastRank = text.collectionRank;
@@ -1094,6 +1117,9 @@ export async function createCardsFromTexts(
         isGraduated: false,
         schedulingPhase: 'preReview' as const,
         preReviewCount: 0,
+        ...(seedWritingTrack
+          ? { writingDueDate: now + cardsInserted, writingIsGraduated: false }
+          : {}),
         radioRoundCounter: 0,
         radioPlayCount: 0,
         // Random tiebreaks so that even brand-new cards inserted in a single
@@ -1813,6 +1839,7 @@ async function getUpcomingCardsForMode(
   mode: SchedulingMode,
   now: number,
   filter: StudyContentFilter,
+  track: SchedulingTrack,
 ): Promise<Doc<'cards'>[]> {
   if (mode === 'radio') {
     // Both faces: the Radio and Free Study rotations advance independently,
@@ -1829,31 +1856,20 @@ async function getUpcomingCardsForMode(
     for (const card of [...radioHead, ...freeStudyHead]) byId.set(card._id, card);
     return [...byId.values()];
   }
-  if (mode === 'learn_new') {
-    return ctx.db
-      .query('cards')
-      .withIndex('by_deck_hidden_mastered_graduated_due', (q) =>
-        q
-          .eq('deckId', deckId)
-          .eq('isHidden', false)
-          .eq('isMastered', false)
-          .eq('isGraduated', false)
-          .lte('dueDate', now),
-      )
-      .order('asc')
-      .take(ENSURE_CONTENT_LOOKAHEAD);
-  }
-  return ctx.db
-    .query('cards')
-    .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
-      q
-        .eq('deckId', deckId)
-        .eq('isHidden', false)
-        .eq('isMastered', false)
-        .lte('dueDate', now),
-    )
-    .order('asc')
-    .take(ENSURE_CONTENT_LOOKAHEAD);
+  // Due queues: warm exactly what the serving path (`fetchTrackDueCards`)
+  // will read — same track (shared vs writing schedule), same content-source
+  // filter. Warming an unfiltered/other-track superset here looked harmless
+  // but warmed a different set than the queue actually serves — the same
+  // trap the free-play comment above describes.
+  return fetchTrackDueCards(
+    ctx,
+    deckId,
+    mode,
+    filter,
+    track,
+    now,
+    ENSURE_CONTENT_LOOKAHEAD,
+  );
 }
 
 /**
@@ -1919,6 +1935,10 @@ export const ensureUpcomingCardsContent = mutation({
       schedulingMode,
       Date.now(),
       settings?.studyContentFilter ?? 'both',
+      schedulingTrackFromSettings({
+        separateModeTracking: settings?.separateModeTracking,
+        reviewMode: settings?.reviewMode,
+      }),
     );
 
     return scheduleContentForUpcomingCards(ctx, active, cards);
@@ -1959,9 +1979,17 @@ export const ensureUpcomingCardsContentAllModes = mutation({
     // same content filter the serving queue reads.
     const settings = await getCourseSettings(ctx, active.course._id);
     const filter = settings?.studyContentFilter ?? 'both';
+    // With separateModeTracking on, the home-screen mode toggle switches
+    // between two different due queues — warm both tracks so either choice
+    // starts instantly. (Free play ignores the track; it's warmed once.)
+    const tracks: SchedulingTrack[] = settings?.separateModeTracking
+      ? ['shared', 'writing']
+      : ['shared'];
     const cardLists = await Promise.all(
-      WARMABLE_SCHEDULING_MODES.map((mode) =>
-        getUpcomingCardsForMode(ctx, deck._id, mode, now, filter),
+      WARMABLE_SCHEDULING_MODES.flatMap((mode) =>
+        (mode === 'radio' ? (['shared'] as SchedulingTrack[]) : tracks).map(
+          (track) => getUpcomingCardsForMode(ctx, deck._id, mode, now, filter, track),
+        ),
       ),
     );
 
@@ -2408,10 +2436,13 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       // the language's audio rows (all voices, reference-aware).
       audioUnchangedBySound = soundsSame(existing.translatedText, translatedText);
       if (!audioUnchangedBySound) {
+        // keepAsset: a retranslation is a content change — the old recording
+        // is still correct audio of the old sentence and stays cached.
         await deleteAudioRowsForTextLanguage(
           ctx,
           args.textId,
           args.targetLanguage,
+          { keepAsset: true },
         );
       }
 

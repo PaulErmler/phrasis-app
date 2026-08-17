@@ -531,6 +531,10 @@
         "includeCustom": "Eigene Inhalte einbeziehen",
         "createChatCards": "Im Chat erstellen",
         "createCustomCards": "Eigene Karten hinzufügen"
+      },
+      "preparingWriting": {
+        "title": "Dein Schreib-Fortschritt wird vorbereitet…",
+        "subtitle": "Wir richten gerade einen eigenen Lernplan für den Schreibmodus ein. Das dauert normalerweise nur einen Moment — deine Sätze erscheinen gleich hier."
       }
     },
     "progressDisplay": {
@@ -628,6 +632,8 @@
       "reviewModeFull": "Schreiben",
       "reviewModeAudioDescription": "Hör zu, übersetze im Kopf und sprich dann jeden Satz laut nach, um deine Aussprache zu üben. Freihändig — perfekt zum Lernen beim Spazieren, Pendeln oder Entspannen.",
       "reviewModeFullDescription": "Tippe die Übersetzungen ein und sieh einen zeichengenauen Vergleich mit der richtigen Antwort. Ideal für aktives Üben — fördert Erinnerung und Rechtschreibung.",
+      "separateModeTracking": "Getrennter Fortschritt pro Modus",
+      "separateModeTrackingDescription": "Shadowing und Schreiben führen für jeden Satz einen eigenen Wiederholungsplan",
       "fullReviewTargetAudio": "Zielsprache automatisch abspielen",
       "fullReviewTargetAudioDescription": "Wann soll das Audio der Zielsprache abgespielt werden",
       "fullReviewTargetAudio_always": "Nach Basis-Audio",
@@ -660,7 +666,7 @@
       "agb": "AGB",
       "privacy": "Datenschutz"
     },
-    "tagline": "Wortschatzaufbau leicht gemacht.",
+    "tagline": "Lerne eine Sprache so, wie du deine erste gelernt hast.",
     "columnProduct": "Produkt",
     "columnLegal": "Rechtliches",
     "columnSettings": "Einstellungen"
@@ -790,6 +796,38 @@
       "loading": "Lädt...",
       "creatingApproval": "Satz wird erstellt...",
       "failed": "Satzerstellung fehlgeschlagen"
+    },
+    "alsoCorrect": {
+      "header": "Deine Version ist auch richtig",
+      "addButton": "Als neue Karte",
+      "addHint": "Die Originalkarte bleibt — du übst beide Versionen",
+      "replaceButton": "Karte ersetzen",
+      "replaceHint": "Die Karte zeigt ab jetzt deine Formulierung",
+      "dismissButton": "Verwerfen",
+      "added": "Als neue Karte zum Deck hinzugefügt",
+      "replaced": "Karte auf deine Formulierung aktualisiert",
+      "dismissed": "Verworfen — die Karte bleibt unverändert",
+      "loading": "Lädt...",
+      "failed": "Deine Version konnte nicht gespeichert werden",
+      "metadataFields": {
+        "speakerGender": "Stimme",
+        "register": "Register",
+        "addresseeGender": "Angesprochene Person",
+        "addresseeNumber": "Anzahl Angesprochener",
+        "addressesSomeone": "Spricht jemanden an"
+      },
+      "metadataValues": {
+        "male": "männlich",
+        "female": "weiblich",
+        "neutral": "neutral",
+        "formal": "formell",
+        "informal": "informell",
+        "singular": "Einzahl",
+        "plural": "Mehrzahl",
+        "not_applicable": "k. A.",
+        "true": "ja",
+        "false": "nein"
+      }
     },
     "threadLimit": {
       "reached": "Du hast das Nachrichtenlimit für diese Konversation erreicht.",

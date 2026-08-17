@@ -1,5 +1,6 @@
 import { v } from 'convex/values';
-import { internalAction, internalMutation } from '../_generated/server';
+import { internalAction, internalMutation, MutationCtx } from '../_generated/server';
+import { Id } from '../_generated/dataModel';
 import { internal } from '../_generated/api';
 import { sourcedTranslationEntriesValidator } from '../types';
 import { trackException } from '../analytics';
@@ -361,25 +362,29 @@ export const fetchSentenceMetadata = internalAction({
  * Idempotent: safe to call twice (once with `metadata: undefined` to unblock,
  * then again with real metadata after a retry success). The audioSpeakerGender
  * precedence rule below ensures the coin flip never re-rolls.
+ *
+ * Exported as a plain helper (not only the internalMutation below) so the
+ * chat "also correct" replace path (cardApprovals.ts) can apply model-proposed
+ * metadata inside its own transaction. The prepareCardContent pass this
+ * schedules is what re-voices audio after a speaker-gender change (payload
+ * voiceGender mismatch check in decks.ts).
  */
-export const applyMetadataAndPrepareCard = internalMutation({
+export async function applyTextMetadata(
+  ctx: MutationCtx,
   args: {
-    textId: v.id('texts'),
-    metadata: v.optional(
-      v.object({
-        register: v.optional(v.string()),
-        addresseeNumber: v.optional(v.string()),
-        speakerGender: v.optional(v.string()),
-        addresseeGender: v.optional(v.string()),
-        addressesSomeone: v.optional(v.boolean()),
-      }),
-    ),
-    schedulePrepareCard: v.boolean(),
-    baseLanguages: v.array(v.string()),
-    targetLanguages: v.array(v.string()),
+    textId: Id<'texts'>;
+    metadata?: {
+      register?: string;
+      addresseeNumber?: string;
+      speakerGender?: string;
+      addresseeGender?: string;
+      addressesSomeone?: boolean;
+    };
+    schedulePrepareCard: boolean;
+    baseLanguages: string[];
+    targetLanguages: string[];
   },
-  returns: v.null(),
-  handler: async (ctx, args) => {
+): Promise<null> {
     const text = await ctx.db.get(args.textId);
     if (!text) return null;
 
@@ -514,5 +519,24 @@ export const applyMetadataAndPrepareCard = internalMutation({
     }
 
     return null;
+}
+
+export const applyMetadataAndPrepareCard = internalMutation({
+  args: {
+    textId: v.id('texts'),
+    metadata: v.optional(
+      v.object({
+        register: v.optional(v.string()),
+        addresseeNumber: v.optional(v.string()),
+        speakerGender: v.optional(v.string()),
+        addresseeGender: v.optional(v.string()),
+        addressesSomeone: v.optional(v.boolean()),
+      }),
+    ),
+    schedulePrepareCard: v.boolean(),
+    baseLanguages: v.array(v.string()),
+    targetLanguages: v.array(v.string()),
   },
+  returns: v.null(),
+  handler: applyTextMetadata,
 });

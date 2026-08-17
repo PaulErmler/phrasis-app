@@ -124,6 +124,73 @@ the pending backfill migration) in `docs/migrations/per-mode-settings-backfill.m
 
 Cards skip the pre-review phase entirely. All cards are rated using FSRS ratings (Again, Hard, Good, Easy) regardless of how many times they've been seen. The `reviewCard` mutation accepts a `forceReviewPhase` flag to support this.
 
+## Split scheduling (`separateModeTracking`)
+
+By default both modes share one per-card schedule (`dueDate` / `fsrsState` /
+`schedulingPhase`), so reviewing a card in one mode postpones it in the other.
+The **Separate progress per mode** toggle (`courseSettings.separateModeTracking`,
+default off; rendered inside the mode-description card in the settings sheet,
+right after the Shadowing/Writing blurbs) gives Writing its own independent
+per-card FSRS track:
+
+- **Data model** — five optional `writing*` fields on `cards`
+  (`writingDueDate`, `writingFsrsState`, `writingIsGraduated`,
+  `writingLastReviewedAt`, `writingGoodReviewCount`; see
+  `cardWritingSchedulingFields` in `convex/types.ts`). The writing track has no
+  pre-review phase — it is always FSRS, matching Writing's `forceReviewPhase`
+  behavior. The pre-existing fields remain the *shared* track, which Shadowing
+  keeps using (and which both modes use while the split is off).
+- **Routing** — `schedulingTrackFromSettings` (convex/types.ts) resolves
+  `'writing'` iff the split is on AND the mode is `'full'`. `reviewCard`,
+  the shared due-queue selector (`fetchTrackDueCards` in
+  convex/lib/dueQueue.ts — one implementation parameterized by track, used by
+  serving, probes, and the content warmer), the due-count aggregates
+  (`cardsByWritingStateAndDueDate` + origin variant) and the undo stack
+  (`reviewLogs.track` / `prevWriting`) are all track-aware. In free play the
+  track still resolves to `'writing'` (it scopes undo), but
+  `getCardForReview` only surfaces writing-track state for due-queue serving
+  (`face === null`) — rotation cards keep their real shared fields.
+- **Enable** — `updateCourseSettings` enqueues
+  `convex/migrations/seedWritingTrack.ts`, a batched, idempotent copy of each
+  card's shared schedule into the writing fields (nothing becomes newly due —
+  the copy happens at enable time, so both tracks start from the current
+  state). Hidden and mastered cards are seeded too: they can be unhidden or
+  demastered later, and the track has to exist by then.
+
+  The sweep carries **no state between batches**. Each batch relocates its own
+  remaining work through the `by_deck_writingDue` index, where an unset
+  `writingDueDate` sorts before every number — so there is no cursor to lose,
+  any kick resumes exactly where the last one stopped, and overlapping sweeps
+  simply find nothing to do. A batch re-enqueues itself whenever it seeded
+  anything; a pass that finds no unseeded card in any deck is what flips
+  `courseSettings.writingSeedDone`.
+
+  Batches run on the `seedPool` workpool rather than the scheduler, for the
+  **guaranteed onComplete**: it runs in its own transaction, so it still fires
+  when a batch throws (the pool does not retry mutations — Convex already
+  retries them on OCC). `onSeedBatchComplete` re-enqueues on failure, counting
+  attempts in `writingSeedAttempts`, and after five consecutive failures gives
+  up and reports via `trackException` instead of looping silently. Settings
+  saves and `reviewCard`'s lazy seed also kick the sweep (debounced via
+  `writingSeedStartedAt`), but those are conveniences — the supervisor is the
+  recovery path.
+
+  While `writingSeedDone` is unset, `getCardForReviewEmptyReason` reports
+  `preparing_writing` instead of a false "all caught up", and
+  `getFilteredCardCounts` flags its counts `preparingWriting` so the home pills
+  don't render a partial prefix as a settled zero. Both are gated on
+  `face === null` / the writing track actually being served — free play
+  resolves to track `'writing'` too but never reads the writing queue.
+
+  `reviewCard` lazy-seeds any card the sweep hasn't reached; the writing due
+  queries exclude unseeded cards via a `.gte('writingDueDate', 0)` bound. New
+  cards created while the split is on are seeded at insert; there is
+  deliberately NO global deploy-time backfill — unseeded cards cost nothing and
+  users who never enable the split never get writing fields.
+- **Disable** — freeze-and-keep: the boolean flips and both modes route back
+  to the shared track. The writing fields stay dormant on the cards, and a
+  re-enable resumes them (the seeder skips already-seeded cards).
+
 ## Common Settings (both modes)
 
 | Setting | Description |

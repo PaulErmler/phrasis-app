@@ -41,7 +41,7 @@ export function LandingFooter() {
             <ul className="space-y-2.5 text-sm">
               <li>
                 <a
-                  href="#philosophy"
+                  href="#how"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {tHeader('nav.howItWorks')}

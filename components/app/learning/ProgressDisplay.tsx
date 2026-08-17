@@ -24,7 +24,15 @@ import {
 } from '@/lib/audio/mediaSession';
 import type { SchedulingMode } from '@/convex/types';
 
-type CardCounts = { new: number; learning: number; relearning: number; review: number };
+type CardCounts = {
+  new: number;
+  learning: number;
+  relearning: number;
+  review: number;
+  /** Writing-seed still filling the writing aggregates — counts are a partial
+   * prefix, not settled numbers. See countDueCardsByState in stats.ts. */
+  preparingWriting?: boolean;
+};
 
 type LearnedWord = { language: string; display: string };
 
@@ -205,11 +213,22 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
   const lastWordsRef = useRef<
     { session: LearnedWord[]; today: LearnedWord[] } | undefined
   >(undefined);
-  if (cardCountsQuery !== undefined) lastCardCountsRef.current = cardCountsQuery;
+  // Provisional counts (separateModeTracking writing seed still sweeping —
+  // `preparingWriting`) are a partial prefix of the writing queue, so showing
+  // them would read as a confident "nothing left". Same handling as
+  // DueCountsPills: never cache them, and fall back to the last settled counts
+  // — or collapse the pills slot (null) if none ever settled.
+  const isProvisional = cardCountsQuery?.preparingWriting === true;
+  if (cardCountsQuery !== undefined && !isProvisional)
+    lastCardCountsRef.current = cardCountsQuery;
   if (celebrationWordsQuery !== undefined) lastWordsRef.current = celebrationWordsQuery;
 
   const effectiveCardCounts =
-    cardCountsQuery !== undefined ? cardCountsQuery : lastCardCountsRef.current;
+    cardCountsQuery !== undefined
+      ? isProvisional
+        ? lastCardCountsRef.current ?? null
+        : cardCountsQuery
+      : lastCardCountsRef.current;
   const effectiveWords =
     celebrationWordsQuery !== undefined
       ? celebrationWordsQuery

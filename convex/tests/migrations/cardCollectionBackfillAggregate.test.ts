@@ -53,6 +53,7 @@ type SeedOpts = {
   withCollectionId?: boolean;
   collectionName?: string;
   collectionOriginField?: Doc<'collections'>['origin'];
+  withWritingTrack?: boolean;
 };
 
 async function seedCard(t: TestConvex<typeof schema>, opts: SeedOpts = {}) {
@@ -93,6 +94,11 @@ async function seedCard(t: TestConvex<typeof schema>, opts: SeedOpts = {}) {
       ...(opts.collectionOrigin
         ? { collectionOrigin: opts.collectionOrigin }
         : {}),
+      // Seeded writing track (separateModeTracking) — membership marker for
+      // the writing origin aggregate is `writingDueDate !== undefined`.
+      ...(opts.withWritingTrack
+        ? { writingDueDate: 0, writingIsGraduated: false }
+        : {}),
     });
     return { cardId, deckId, collectionId };
   });
@@ -126,6 +132,36 @@ describe('cardCollectionBackfill — origin-aggregate consistency', () => {
         from: `${deckId}:none:new`,
         to: `${deckId}:premade:new`,
       },
+    ]);
+  });
+
+  it('moves the WRITING origin-aggregate entry too when the card has a writing track', async () => {
+    const t = convexTest(schema, modules);
+    const { cardId, deckId } = await seedCard(t, { withWritingTrack: true });
+
+    await runOne(t, cardId);
+
+    // Both origin-keyed aggregates namespace on collectionOrigin, so both
+    // entries must move. Without the second move the writing entry is
+    // stranded under ':none:' forever (patchCard/deleteCard address the new
+    // origin from then on) and filtered Writing due counts stay wrong.
+    expect(replaceCalls).toEqual([
+      { from: `${deckId}:none:new`, to: `${deckId}:premade:new` },
+      { from: `${deckId}:none:new`, to: `${deckId}:premade:new` },
+    ]);
+  });
+
+  it('does not touch the writing aggregate for cards without a writing track', async () => {
+    const t = convexTest(schema, modules);
+    const { cardId, deckId } = await seedCard(t);
+
+    await runOne(t, cardId);
+
+    // Exactly one move — the shared origin aggregate. A second call would
+    // insert a phantom entry into the writing aggregate for a card that is
+    // not a member of it.
+    expect(replaceCalls).toEqual([
+      { from: `${deckId}:none:new`, to: `${deckId}:premade:new` },
     ]);
   });
 

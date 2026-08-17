@@ -9,9 +9,17 @@ import {
   cardsByDueDate,
   cardsByStateAndDueDate,
   cardsByOriginStateAndDueDate,
+  cardsByWritingStateAndDueDate,
+  cardsByOriginWritingStateAndDueDate,
 } from '../db/stats/cardAggregates';
 import { originsForFilter } from '../lib/collections';
-import { studyContentFilterValidator, type StudyContentFilter } from '../types';
+import {
+  studyContentFilterValidator,
+  schedulingTrackFromSettings,
+  reviewModeValidator,
+  type ReviewMode,
+  type StudyContentFilter,
+} from '../types';
 import {
   getCourseStats as dbGetCourseStats,
   getTodayInTimezone,
@@ -853,11 +861,13 @@ async function countDueCardsByState(
   ctx: QueryCtx,
   filter: StudyContentFilter,
   now: number,
+  reviewModeOverride?: ReviewMode,
 ): Promise<{
   new: number;
   learning: number;
   relearning: number;
   review: number;
+  preparingWriting?: boolean;
 } | null> {
   const userId = await getAuthUserId(ctx);
   if (!userId) return null;
@@ -866,11 +876,31 @@ async function countDueCardsByState(
   const deck = await getDeckByCourseId(ctx, active.course._id);
   if (!deck) return null;
 
+  // With separateModeTracking on and the course in Writing mode, the due
+  // queue is the writing track — count from the matching aggregates so the
+  // home pills and the celebration counts describe the queue the user will
+  // actually be served. The caller may pass its optimistically-updated
+  // reviewMode (same rationale as the explicit `filter` arg: the counts then
+  // flip in the same frame as the Shadowing↔Writing toggle instead of
+  // lagging the settings round-trip); separateModeTracking itself is
+  // server-owned and always read from settings.
+  const settings = await getCourseSettings(ctx, active.course._id);
+  const track = schedulingTrackFromSettings({
+    separateModeTracking: settings?.separateModeTracking,
+    reviewMode: reviewModeOverride ?? settings?.reviewMode,
+  });
+  const stateAggregate =
+    track === 'writing' ? cardsByWritingStateAndDueDate : cardsByStateAndDueDate;
+  const originStateAggregate =
+    track === 'writing'
+      ? cardsByOriginWritingStateAndDueDate
+      : cardsByOriginStateAndDueDate;
+
   const dueBounds = { upper: { key: now, inclusive: true } };
 
   const countState = async (state: string): Promise<number> => {
     if (filter === 'both') {
-      return cardsByStateAndDueDate.count(ctx, {
+      return stateAggregate.count(ctx, {
         namespace: `${deck._id}:${state}`,
         bounds: dueBounds,
       });
@@ -878,7 +908,7 @@ async function countDueCardsByState(
     const origins = originsForFilter(filter);
     const counts = await Promise.all(
       origins.map((origin) =>
-        cardsByOriginStateAndDueDate.count(ctx, {
+        originStateAggregate.count(ctx, {
           namespace: `${deck._id}:${origin}:${state}`,
           bounds: dueBounds,
         }),
@@ -899,6 +929,15 @@ async function countDueCardsByState(
     learning: learningCount,
     relearning: relearningCount,
     review: reviewCount,
+    // The writing aggregates are filled by the asynchronous enable-time seed,
+    // so until it finishes these counts describe only the already-seeded
+    // prefix — near-zero at the start on a large deck. Flag that rather than
+    // report a confident 0/0/0/0, which reads as "nothing to study" when the
+    // queue is merely still being built. (getCardForReviewEmptyReason reports
+    // the same state as 'preparing_writing'.)
+    ...(track === 'writing' && settings?.writingSeedDone !== true
+      ? { preparingWriting: true }
+      : {}),
   };
 }
 
@@ -918,6 +957,10 @@ export const getCardCounts = query({
       learning: v.number(),
       relearning: v.number(),
       review: v.number(),
+      // Set while the separateModeTracking writing seed is still filling the
+      // writing aggregates — the counts above are a partial prefix, not a
+      // settled zero. See countDueCardsByState.
+      preparingWriting: v.optional(v.boolean()),
     }),
     v.null(),
   ),
@@ -945,6 +988,10 @@ export const getFilteredCardCounts = query({
   args: {
     filter: v.optional(studyContentFilterValidator),
     now: v.number(),
+    // Optimistic client value, same contract as `filter` — see
+    // countDueCardsByState. Optional for back-compat (older bundles omit it
+    // and get the settings-derived track).
+    reviewMode: v.optional(reviewModeValidator),
   },
   returns: v.union(
     v.object({
@@ -952,11 +999,20 @@ export const getFilteredCardCounts = query({
       learning: v.number(),
       relearning: v.number(),
       review: v.number(),
+      // Set while the separateModeTracking writing seed is still filling the
+      // writing aggregates — the counts above are a partial prefix, not a
+      // settled zero. See countDueCardsByState.
+      preparingWriting: v.optional(v.boolean()),
     }),
     v.null(),
   ),
   handler: async (ctx, args) => {
-    return countDueCardsByState(ctx, args.filter ?? 'both', args.now);
+    return countDueCardsByState(
+      ctx,
+      args.filter ?? 'both',
+      args.now,
+      args.reviewMode,
+    );
   },
 });
 

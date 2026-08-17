@@ -531,6 +531,10 @@
         "includeCustom": "Include custom content",
         "createChatCards": "Create in chat",
         "createCustomCards": "Add custom cards"
+      },
+      "preparingWriting": {
+        "title": "Preparing your writing progress…",
+        "subtitle": "We're setting up a separate schedule for Writing mode. This usually takes a moment — your sentences will appear here shortly."
       }
     },
     "progressDisplay": {
@@ -628,6 +632,8 @@
       "reviewModeFull": "Writing",
       "reviewModeAudioDescription": "Listen, translate in your head, then say each sentence aloud to practice your pronunciation. Hands-free — perfect for learning while walking, commuting, or relaxing.",
       "reviewModeFullDescription": "Type the translations and see a character-level comparison with the correct answer. Best for active practice — engages recall and spelling.",
+      "separateModeTracking": "Separate progress per mode",
+      "separateModeTrackingDescription": "Shadowing and Writing each keep their own review schedule for every sentence",
       "fullReviewTargetAudio": "Auto-play target audio",
       "fullReviewTargetAudioDescription": "When to play target language audio",
       "fullReviewTargetAudio_always": "After base audio",
@@ -660,7 +666,7 @@
       "agb": "Terms & Conditions",
       "privacy": "Privacy Policy"
     },
-    "tagline": "Vocabulary building made easy.",
+    "tagline": "Learn a language the way you learned your first.",
     "columnProduct": "Product",
     "columnLegal": "Legal",
     "columnSettings": "Settings"
@@ -790,6 +796,38 @@
       "loading": "Loading...",
       "creatingApproval": "Creating sentence...",
       "failed": "Sentence creation failed"
+    },
+    "alsoCorrect": {
+      "header": "Your version is also correct",
+      "addButton": "Add as new card",
+      "addHint": "Keep the original card and practice both versions",
+      "replaceButton": "Replace card",
+      "replaceHint": "The card will show your phrasing from now on",
+      "dismissButton": "Dismiss",
+      "added": "Added to your deck as a new card",
+      "replaced": "Card updated to your phrasing",
+      "dismissed": "Dismissed — the card stays as it is",
+      "loading": "Loading...",
+      "failed": "Could not save your version",
+      "metadataFields": {
+        "speakerGender": "Voice",
+        "register": "Register",
+        "addresseeGender": "Addressee",
+        "addresseeNumber": "Addressee number",
+        "addressesSomeone": "Addresses someone"
+      },
+      "metadataValues": {
+        "male": "male",
+        "female": "female",
+        "neutral": "neutral",
+        "formal": "formal",
+        "informal": "informal",
+        "singular": "singular",
+        "plural": "plural",
+        "not_applicable": "n/a",
+        "true": "yes",
+        "false": "no"
+      }
     },
     "threadLimit": {
       "reached": "You've reached the message limit for this conversation.",

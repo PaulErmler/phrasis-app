@@ -4,6 +4,7 @@ import { MutationCtx } from '../../_generated/server';
 import { TableAggregate } from '@convex-dev/aggregate';
 import { Doc, Id } from '../../_generated/dataModel';
 import { LEGACY_TO_NEW_CODE } from '../../lib/collections';
+import type { SchedulingTrack } from '../../types';
 
 // ============================================================================
 // State label helpers
@@ -20,6 +21,27 @@ export function getCardStateLabel(doc: Doc<'cards'>): string {
   if (doc.isMastered) return 'mastered';
   if (doc.schedulingPhase === 'preReview') return 'new';
   return FSRS_STATE_LABELS[doc.fsrsState?.state ?? 0] ?? 'new';
+}
+
+/**
+ * Writing-track counterpart of `getCardStateLabel`, derived from
+ * `writingFsrsState`. The writing track has no pre-review phase, so an
+ * unreviewed (or freshly-seeded-from-preReview) track is simply 'new'.
+ * Only meaningful for cards where `hasWritingTrack` is true.
+ */
+export function getCardWritingStateLabel(doc: Doc<'cards'>): string {
+  if (doc.isHidden) return 'hidden';
+  if (doc.isMastered) return 'mastered';
+  return FSRS_STATE_LABELS[doc.writingFsrsState?.state ?? 0] ?? 'new';
+}
+
+/**
+ * Whether the card has a seeded writing track (separateModeTracking courses).
+ * Gates every write to the writing aggregates — cards without the track are
+ * simply absent from them.
+ */
+export function hasWritingTrack(doc: Doc<'cards'>): boolean {
+  return doc.writingDueDate !== undefined;
 }
 
 /**
@@ -89,6 +111,36 @@ export const cardsByOriginStateAndDueDate = new TableAggregate<{
 });
 
 /**
+ * Writing-track mirror of `cardsByStateAndDueDate`: [deckId:writingStateLabel],
+ * sorted by writingDueDate. Powers due counts while a separateModeTracking
+ * course is in Writing mode. Cards without a writing track are never inserted.
+ */
+export const cardsByWritingStateAndDueDate = new TableAggregate<{
+  Namespace: string; // `${deckId}:${writingStateLabel}`
+  Key: number; // writingDueDate
+  DataModel: DataModel;
+  TableName: 'cards';
+}>(components.cardsByWritingStateAndDueDate, {
+  namespace: (doc) => `${doc.deckId}:${getCardWritingStateLabel(doc)}`,
+  sortKey: (doc) => doc.writingDueDate ?? 0,
+});
+
+/**
+ * Writing-track mirror of `cardsByOriginStateAndDueDate`:
+ * [deckId:originBucket:writingStateLabel], sorted by writingDueDate.
+ */
+export const cardsByOriginWritingStateAndDueDate = new TableAggregate<{
+  Namespace: string; // `${deckId}:${originBucket}:${writingStateLabel}`
+  Key: number; // writingDueDate
+  DataModel: DataModel;
+  TableName: 'cards';
+}>(components.cardsByOriginWritingStateAndDueDate, {
+  namespace: (doc) =>
+    `${doc.deckId}:${getCardOriginBucket(doc)}:${getCardWritingStateLabel(doc)}`,
+  sortKey: (doc) => doc.writingDueDate ?? 0,
+});
+
+/**
  * Cards sorted by [deckId, dueDate].
  * Enables O(log n) count of due cards: count where dueDate <= now.
  */
@@ -119,8 +171,49 @@ export async function insertCard(
   await cardsByDueDate.insertIfDoesNotExist(ctx, doc);
   await cardsByStateAndDueDate.insertIfDoesNotExist(ctx, doc);
   await cardsByOriginStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+  if (hasWritingTrack(doc)) {
+    await cardsByWritingStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+    await cardsByOriginWritingStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+  }
   return id;
 }
+
+// The card fields each aggregate family derives its namespace/sortKey from.
+// A patch that touches NONE of a family's fields cannot move or re-key any of
+// that family's entries, so its `replaceOrInsert`s are skipped entirely —
+// each one is a multi-read/write component subtransaction, and dropping the
+// no-op ones matters on hot paths (a shared-track review of a split-course
+// card would otherwise pay for two writing-aggregate writes; a
+// seedWritingTrack batch would pay for four shared ones per card, the exact
+// cost class that has blown mutation limits before). Key-presence is checked,
+// not value-equality, so the skip is conservative: a key listed in the patch
+// always counts as touched.
+//
+// One property this deliberately gives up: `replaceOrInsert` INSERTS when the
+// entry is missing, so before the skip existed every card patch incidentally
+// repaired a card that had fallen out of an aggregate (see the drift warning
+// on `cardsByOriginStateAndDueDate` above). Patches touching none of these
+// fields — `toggleFavoriteCard`, `setAudioSpeedOverride`, the free-play
+// counter advance — no longer do that, so drift no longer self-heals. It is
+// repaired only by `migrations/recalcUserCardAggregates`, which is where to
+// look first if due counts read low for one deck.
+const SHARED_AGGREGATE_FIELDS = new Set<string>([
+  'deckId',
+  'dueDate',
+  'isHidden',
+  'isMastered',
+  'schedulingPhase',
+  'fsrsState',
+  'collectionOrigin',
+]);
+const WRITING_AGGREGATE_FIELDS = new Set<string>([
+  'deckId',
+  'writingDueDate',
+  'writingFsrsState',
+  'isHidden',
+  'isMastered',
+  'collectionOrigin',
+]);
 
 /**
  * Patch a card and update both aggregates.
@@ -129,7 +222,7 @@ export async function insertCard(
  * on the hot path. The post-patch doc is computed in memory instead of being
  * re-read; the aggregates only key on fields that are deterministic from
  * `oldDoc + patch` (deckId, dueDate, isHidden, isMastered, schedulingPhase,
- * fsrsState).
+ * fsrsState, and their writing-track counterparts).
  *
  * Also bumps `collectionProgress.cardsMastered` on the false → true mastery
  * transition. The counter is strictly monotonic — true → false (demaster) is
@@ -145,10 +238,33 @@ export async function patchCard(
   if (!resolvedOld) return;
   await ctx.db.patch(cardId, patch);
   const newDoc: Doc<'cards'> = { ...resolvedOld, ...patch };
-  await cardsByState.replaceOrInsert(ctx, resolvedOld, newDoc);
-  await cardsByDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
-  await cardsByStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
-  await cardsByOriginStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
+  const patchKeys = Object.keys(patch);
+  const touchesShared = patchKeys.some((k) => SHARED_AGGREGATE_FIELDS.has(k));
+  const touchesWriting = patchKeys.some((k) => WRITING_AGGREGATE_FIELDS.has(k));
+
+  if (touchesShared) {
+    await cardsByState.replaceOrInsert(ctx, resolvedOld, newDoc);
+    await cardsByDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
+    await cardsByStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
+    await cardsByOriginStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
+  }
+  // Writing-track aggregates: membership is gated on the track existing, so a
+  // patch can move a card in (seeding), out (never in practice — nothing
+  // unsets the track), or within them. Membership changes always come from a
+  // `writingDueDate` write, so the untouched-skip can only apply to the
+  // stayed-a-member branch.
+  if (hasWritingTrack(newDoc)) {
+    if (!hasWritingTrack(resolvedOld)) {
+      await cardsByWritingStateAndDueDate.insertIfDoesNotExist(ctx, newDoc);
+      await cardsByOriginWritingStateAndDueDate.insertIfDoesNotExist(ctx, newDoc);
+    } else if (touchesWriting) {
+      await cardsByWritingStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
+      await cardsByOriginWritingStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
+    }
+  } else if (hasWritingTrack(resolvedOld)) {
+    await cardsByWritingStateAndDueDate.deleteIfExists(ctx, resolvedOld);
+    await cardsByOriginWritingStateAndDueDate.deleteIfExists(ctx, resolvedOld);
+  }
 
   if (!resolvedOld.isMastered && newDoc.isMastered && newDoc.collectionId) {
     await bumpCardsMastered(ctx, newDoc.deckId, newDoc.collectionId);
@@ -245,8 +361,16 @@ async function resolveProgressTargetCollectionId(
 }
 
 /**
- * Clear all three card aggregates for a single deck. For `cardsByStateAndDueDate`
- * the namespace is `${deckId}:${state}`, so we clear every possible state label.
+ * Clear one TRACK's card aggregates for a single deck, so the caller can spend
+ * two transactions instead of one. Namespaces are `${deckId}:${state}` (and
+ * `${deckId}:${origin}:${state}`), so every possible label has to be cleared.
+ *
+ * Each track costs `EXTENDED_STATE_LABELS × (1 + ORIGIN_BUCKETS)` component
+ * subtransactions — 30 today — plus the two deck-level namespaces on the
+ * shared track, so 32 shared + 30 writing. Doing both in one mutation was 62,
+ * double what the recalc migration was sized for; it splits them across
+ * scheduled steps for exactly that reason (see
+ * migrations/recalcUserCardAggregates).
  *
  * Used by the global backfill and the per-user recalc migrations before they
  * re-insert from the cards table.
@@ -254,13 +378,26 @@ async function resolveProgressTargetCollectionId(
 export async function clearAggregatesForDeck(
   ctx: MutationCtx,
   deckId: Id<'decks'>,
+  track: SchedulingTrack = 'shared',
 ): Promise<void> {
-  await cardsByState.clear(ctx, { namespace: deckId });
-  await cardsByDueDate.clear(ctx, { namespace: deckId });
+  // One track-selection up front — the loops below then use identical
+  // namespaces for both tracks, so a label or namespace-format change cannot
+  // land on one track's branch and miss its twin.
+  const stateAggregate =
+    track === 'shared' ? cardsByStateAndDueDate : cardsByWritingStateAndDueDate;
+  const originStateAggregate =
+    track === 'shared'
+      ? cardsByOriginStateAndDueDate
+      : cardsByOriginWritingStateAndDueDate;
+
+  if (track === 'shared') {
+    await cardsByState.clear(ctx, { namespace: deckId });
+    await cardsByDueDate.clear(ctx, { namespace: deckId });
+  }
   for (const state of EXTENDED_STATE_LABELS) {
-    await cardsByStateAndDueDate.clear(ctx, { namespace: `${deckId}:${state}` });
+    await stateAggregate.clear(ctx, { namespace: `${deckId}:${state}` });
     for (const origin of ORIGIN_BUCKETS) {
-      await cardsByOriginStateAndDueDate.clear(ctx, {
+      await originStateAggregate.clear(ctx, {
         namespace: `${deckId}:${origin}:${state}`,
       });
     }
@@ -280,5 +417,9 @@ export async function deleteCard(
   await cardsByDueDate.deleteIfExists(ctx, oldDoc);
   await cardsByStateAndDueDate.deleteIfExists(ctx, oldDoc);
   await cardsByOriginStateAndDueDate.deleteIfExists(ctx, oldDoc);
+  if (hasWritingTrack(oldDoc)) {
+    await cardsByWritingStateAndDueDate.deleteIfExists(ctx, oldDoc);
+    await cardsByOriginWritingStateAndDueDate.deleteIfExists(ctx, oldDoc);
+  }
   await ctx.db.delete(cardId);
 }

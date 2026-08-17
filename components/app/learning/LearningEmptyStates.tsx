@@ -78,6 +78,13 @@ interface NoCardsDueStateProps {
    * doesn't see a misleading paywall.
    */
   customCardsPendingAdd?: boolean;
+  /**
+   * True while the enable-time writing-track seed is still running (reason
+   * 'preparing_writing'): the queue only looks empty because cards aren't
+   * seeded yet, so render a transient preparing state instead of "all caught
+   * up" / add-cards CTAs.
+   */
+  isPreparingWriting?: boolean;
   /** Called when the user opts to include the other source (set filter to 'both'). */
   onIncludeOtherSource?: () => void;
   /**
@@ -102,12 +109,29 @@ export function NoCardsDueState({
   currentSourceHasAnyCards,
   filterUnblockAvailable,
   customCardsPendingAdd,
+  isPreparingWriting,
   onIncludeOtherSource,
   onCreateChatCards,
   onCreateCustomCards,
 }: NoCardsDueStateProps) {
   const t = useTranslations('LearningMode');
   const tFeature = useTranslations('FeatureTracking');
+
+  if (isPreparingWriting) {
+    return (
+      <main className="flex-1 flex flex-col items-center justify-center gap-4 px-4">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="space-y-2 text-center">
+          <h2 className="body-large font-medium">
+            {t('empty.preparingWriting.title')}
+          </h2>
+          <p className="text-muted-sm">
+            {t('empty.preparingWriting.subtitle')}
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   // The upgrade button suppresses the auto-add CTA when sentences quota
   // hits zero — but only when the user actually needs the quota. Phase 1

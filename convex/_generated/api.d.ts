@@ -52,6 +52,7 @@ import type * as features_authEmailTesting from "../features/authEmailTesting.js
 import type * as features_chat_agent from "../features/chat/agent.js";
 import type * as features_chat_approvalAudio from "../features/chat/approvalAudio.js";
 import type * as features_chat_cardApprovals from "../features/chat/cardApprovals.js";
+import type * as features_chat_cardContext from "../features/chat/cardContext.js";
 import type * as features_chat_constants from "../features/chat/constants.js";
 import type * as features_chat_messages from "../features/chat/messages.js";
 import type * as features_chat_promptSections from "../features/chat/promptSections.js";
@@ -88,6 +89,7 @@ import type * as lib_authEmails from "../lib/authEmails.js";
 import type * as lib_cardContent from "../lib/cardContent.js";
 import type * as lib_collections from "../lib/collections.js";
 import type * as lib_dateUtils from "../lib/dateUtils.js";
+import type * as lib_dueQueue from "../lib/dueQueue.js";
 import type * as lib_emailEnv from "../lib/emailEnv.js";
 import type * as lib_freePlay from "../lib/freePlay.js";
 import type * as lib_fsrsStates from "../lib/fsrsStates.js";
@@ -115,6 +117,7 @@ import type * as migrations_data_essentialGreetingTranslations from "../migratio
 import type * as migrations_datasetMigration_cutoverUser from "../migrations/datasetMigration_cutoverUser.js";
 import type * as migrations_recalcUserCardAggregates from "../migrations/recalcUserCardAggregates.js";
 import type * as migrations_seedPlacementTestSentences from "../migrations/seedPlacementTestSentences.js";
+import type * as migrations_seedWritingTrack from "../migrations/seedWritingTrack.js";
 import type * as migrations_updateEssentialGreetings from "../migrations/updateEssentialGreetings.js";
 import type * as posthog from "../posthog.js";
 import type * as rateLimiter from "../rateLimiter.js";
@@ -180,6 +183,7 @@ declare const fullApi: ApiFromModules<{
   "features/chat/agent": typeof features_chat_agent;
   "features/chat/approvalAudio": typeof features_chat_approvalAudio;
   "features/chat/cardApprovals": typeof features_chat_cardApprovals;
+  "features/chat/cardContext": typeof features_chat_cardContext;
   "features/chat/constants": typeof features_chat_constants;
   "features/chat/messages": typeof features_chat_messages;
   "features/chat/promptSections": typeof features_chat_promptSections;
@@ -216,6 +220,7 @@ declare const fullApi: ApiFromModules<{
   "lib/cardContent": typeof lib_cardContent;
   "lib/collections": typeof lib_collections;
   "lib/dateUtils": typeof lib_dateUtils;
+  "lib/dueQueue": typeof lib_dueQueue;
   "lib/emailEnv": typeof lib_emailEnv;
   "lib/freePlay": typeof lib_freePlay;
   "lib/fsrsStates": typeof lib_fsrsStates;
@@ -243,6 +248,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/datasetMigration_cutoverUser": typeof migrations_datasetMigration_cutoverUser;
   "migrations/recalcUserCardAggregates": typeof migrations_recalcUserCardAggregates;
   "migrations/seedPlacementTestSentences": typeof migrations_seedPlacementTestSentences;
+  "migrations/seedWritingTrack": typeof migrations_seedWritingTrack;
   "migrations/updateEssentialGreetings": typeof migrations_updateEssentialGreetings;
   posthog: typeof posthog;
   rateLimiter: typeof rateLimiter;
@@ -292,10 +298,13 @@ export declare const components: {
   cardsByDueDate: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"cardsByDueDate">;
   cardsByStateAndDueDate: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"cardsByStateAndDueDate">;
   cardsByOriginStateAndDueDate: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"cardsByOriginStateAndDueDate">;
+  cardsByWritingStateAndDueDate: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"cardsByWritingStateAndDueDate">;
+  cardsByOriginWritingStateAndDueDate: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"cardsByOriginWritingStateAndDueDate">;
   actionRetrier: import("@convex-dev/action-retrier/_generated/component.js").ComponentApi<"actionRetrier">;
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
   llmPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"llmPool">;
   ttsPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"ttsPool">;
+  seedPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"seedPool">;
   migrations: import("@convex-dev/migrations/_generated/component.js").ComponentApi<"migrations">;
   resend: import("@convex-dev/resend/_generated/component.js").ComponentApi<"resend">;
   posthog: import("@posthog/convex/_generated/component.js").ComponentApi<"posthog">;

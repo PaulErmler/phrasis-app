@@ -875,7 +875,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
-    experimental: true,
     // Bumped 1 → 2 with the Aug 2026 switch to the Luna best-of-3 pipeline:
     // native-speaker feedback flagged systematic errors in the existing
     // Icelandic rows (archaic register, wrong imperatives), so Icelandic —

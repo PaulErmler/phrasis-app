@@ -13,7 +13,7 @@ import { requireAuthUserId, getAuthUserId, getUserSettings } from '../../db/user
 import { getActiveCourseForUser } from '../../db/courses';
 import { consumeQuota } from '../../usage/helpers';
 import { CHAT_CREDIT_USD_STEP, CREDIT_COSTS, FEATURE_IDS } from '../featureIds';
-import { agent } from './agent';
+import { agent, AGENT_TOOLS, createMarkAlsoCorrectTool } from './agent';
 import type { Id } from '../../_generated/dataModel';
 import { THREAD_MESSAGE_LIMIT, MAX_MESSAGE_LENGTH } from './constants';
 import { trackEvent } from '../../db/stats/dailyStats';
@@ -32,6 +32,7 @@ import {
   OPENROUTER_USAGE_ACCOUNTING,
 } from '../../config/aiModels';
 import { buildCardContextSection, buildLanguageSection } from './promptSections';
+import { resolveCardContext } from './cardContext';
 import {
   assertQuickActionWithinLimits,
   expandQuickAction,
@@ -64,63 +65,6 @@ export const getCourseLanguagesForUser = internalQuery({
   },
 });
 
-/**
- * Look up a card's source text, course-scoped translations, and course
- * languages via card → deck → course. Only fetches translations whose
- * targetLanguage is in the course's language set (uses the compound
- * by_text_and_language index for each language).
- */
-async function resolveCardContext(
-  ctx: MutationCtx,
-  cardId: Id<'cards'>,
-  userId: string,
-): Promise<{
-  sourceText: string;
-  sourceLanguage: string;
-  translations: { language: string; text: string }[];
-  baseLanguages: string[];
-  targetLanguages: string[];
-} | null> {
-  const card = await ctx.db.get(cardId);
-  if (!card) return null;
-
-  const deck = await ctx.db.get(card.deckId);
-  if (!deck) return null;
-
-  const course = await ctx.db.get(deck.courseId);
-  if (!course) return null;
-
-  if (course.userId !== userId) return null;
-
-  const text = await ctx.db.get(card.textId);
-  if (!text) return null;
-
-  const courseLangs = new Set([...course.baseLanguages, ...course.targetLanguages]);
-  courseLangs.delete(text.language);
-
-  const translations = (
-    await Promise.all(
-      [...courseLangs].map((lang) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('targetLanguage', lang),
-          )
-          .unique(),
-      ),
-    )
-  )
-    .filter((t): t is NonNullable<typeof t> => t !== null)
-    .map((t) => ({ language: t.targetLanguage, text: t.translatedText }));
-
-  return {
-    sourceText: text.text,
-    sourceLanguage: text.language,
-    translations,
-    baseLanguages: course.baseLanguages,
-    targetLanguages: course.targetLanguages,
-  };
-}
 
 /**
  * Expand a quick action into its steering prompt, resolving the language
@@ -260,6 +204,9 @@ export const sendMessage = mutation({
         languageSection,
         prompt: args.prompt,
         includeAiContent,
+        // Only forwarded when the card context resolved (ownership verified
+        // above) — gates the markAlsoCorrect tool for this turn.
+        cardId: cardData ? args.cardId : undefined,
       },
     );
 
@@ -370,6 +317,10 @@ export const generateResponse = internalAction({
     // latency are captured either way (legitimate-interest telemetry); the
     // *content* is consent-gated. Resolved in sendMessage, which has db access.
     includeAiContent: v.optional(v.boolean()),
+    // The reviewed card, when this turn has card context (ownership already
+    // verified by sendMessage's resolveCardContext). Presence registers the
+    // markAlsoCorrect tool for this turn, closed over this id.
+    cardId: v.optional(v.id('cards')),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -484,6 +435,24 @@ export const generateResponse = internalAction({
 
             return { messages: [...prefix, ...messages] };
           },
+          // Card-context turns additionally get markAlsoCorrect, closed over
+          // the reviewed card's id. A per-call `tools` REPLACES the
+          // agent-level set, so that set is spread back in (AGENT_TOOLS —
+          // the single source of truth; a tool added there is automatically
+          // available here too). Registered on every card turn (not just
+          // discussAnswer): the user can free-text ask "is X also correct?",
+          // and persisted steering from an earlier quick action is re-read
+          // on later turns.
+          ...(args.cardId
+            ? {
+                tools: {
+                  ...AGENT_TOOLS,
+                  markAlsoCorrect: createMarkAlsoCorrectTool({
+                    cardId: args.cardId,
+                  }),
+                },
+              }
+            : {}),
         },
         {
           saveStreamDeltas: { chunking: "word", throttleMs: 500 },

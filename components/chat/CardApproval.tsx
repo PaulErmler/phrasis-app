@@ -2,25 +2,37 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useMutation, useQuery } from 'convex/react';
 import { Lock, Pencil } from 'lucide-react';
-import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { AudioButton } from '@/components/app/learning/AudioButton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Shimmer } from '@/components/ai-elements/shimmer';
 import { getLanguageShortLabel, getTextDirection } from '@/lib/languages';
-import type { CreateCardToolPart } from '@/lib/types/tool-parts';
+import {
+  CREATE_CARD_SUCCESS,
+  type CreateCardToolPart,
+} from '@/lib/types/tool-parts';
 import type { CardApprovalStatus } from '@/convex/types';
+import type { ApprovalActionResult } from '@/hooks/use-card-approvals';
 import { FeatureBadge } from '@/components/feature_tracking/FeatureBadge';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { useCourseLanguages } from '@/hooks/use-course-languages';
 import { cn } from '@/lib/utils';
 import { EditApprovalDialog } from './EditApprovalDialog';
+import {
+  ApprovalErrorAlert,
+  ApprovalStreamingSkeleton,
+  deriveApprovalToolState,
+  useApprovalAudio,
+  useOptimisticApprovalAction,
+  type EntryAudio,
+} from './approvalCommon';
 
-const TOOL_SUCCESS = "Card has been created.";
+// Re-exported for existing importers; the definition lives with the other
+// shared approval pieces.
+export type { EntryAudio } from './approvalCommon';
 
 export interface CardApprovalProps {
   toolPart: CreateCardToolPart;
@@ -33,12 +45,12 @@ export interface CardApprovalProps {
       status: CardApprovalStatus;
     }
   >;
-  onApprove: (approvalId: Id<'cardApprovals'>) => Promise<void>;
-  onReject: (approvalId: Id<'cardApprovals'>) => Promise<void>;
+  onApprove: (approvalId: Id<'cardApprovals'>) => Promise<ApprovalActionResult>;
+  onReject: (approvalId: Id<'cardApprovals'>) => Promise<ApprovalActionResult>;
   processingApprovals: Set<string>;
 }
 
-function Lang({ code }: { code: string }) {
+export function Lang({ code }: { code: string }) {
   return (
     <span className="font-medium text-muted-foreground uppercase text-xs">
       {getLanguageShortLabel(code)}
@@ -46,13 +58,13 @@ function Lang({ code }: { code: string }) {
   );
 }
 
-interface EntryAudio {
-  /** language → playback URL (null = generatable but not synthesized yet). */
-  urlByLanguage: Map<string, string | null>;
-  onRequestAudio: (language: string) => Promise<unknown>;
-}
-
-function EntryLines({
+/**
+ * Sentence lines for an approval box. `baseEntries` render muted/small,
+ * `targetEntries` bold — CardApproval maps base/target languages onto the
+ * slots; AlsoCorrectApproval maps unchanged/changed entries instead (the
+ * split is purely presentational).
+ */
+export function EntryLines({
   baseEntries,
   targetEntries,
   className,
@@ -114,10 +126,12 @@ export function CardApproval({
 }: CardApprovalProps) {
   const { targetLanguages } = useCourseLanguages();
   const t = useTranslations('Chat.cardApproval');
-  const [optimisticState, setOptimisticState] = useState<
-    'approved' | 'rejected' | null
-  >(null);
-  const [paywallOpen, setPaywallOpen] = useState(false);
+  // Optimistic-with-rollback + paywall machine, shared with
+  // AlsoCorrectApproval (approvalCommon.tsx). This box bills exactly one
+  // quota, so `paywallFeature` reduces to an open flag.
+  const { optimisticState, paywallFeature, setPaywallFeature, runAction } =
+    useOptimisticApprovalAction<'approved' | 'rejected', 'custom_sentences'>();
+  const paywallOpen = paywallFeature !== null;
   const [editOpen, setEditOpen] = useState(false);
   const { isAvailable } = useFeatureQuota('custom_sentences');
 
@@ -137,75 +151,30 @@ export function CardApproval({
   const approvalId = approval?._id ?? null;
   const approvalState = optimisticState ?? approval?.status ?? 'pending';
 
-  // Per-line playback for the proposal (same UX as collection previews):
-  // cached asset → instant URL; otherwise the play click synthesizes into the
-  // shared audioAssets store and the reactive query delivers the URL.
-  const approvalAudioLines = useQuery(
-    api.features.chat.approvalAudio.getApprovalAudio,
-    approvalId ? { approvalId } : 'skip',
+  // Per-line playback + streaming-state machine, shared with
+  // AlsoCorrectApproval (approvalCommon.tsx).
+  const entryAudio: EntryAudio | undefined = useApprovalAudio(approvalId);
+  const { isToolComplete, isError } = deriveApprovalToolState(
+    { state: toolState, output: toolOutput },
+    CREATE_CARD_SUCCESS,
   );
-  const requestApprovalAudio = useMutation(
-    api.features.chat.approvalAudio.requestApprovalAudio,
-  );
-  const entryAudio: EntryAudio | undefined = approvalId
-    ? {
-        urlByLanguage: new Map(
-          (approvalAudioLines ?? []).map((l) => [l.language, l.url]),
-        ),
-        onRequestAudio: (language) =>
-          requestApprovalAudio({ approvalId, language }),
-      }
-    : undefined;
-  const isToolComplete =
-    toolState === 'output-available' || toolState === 'output-error';
-  const isError =
-    toolState === 'output-error' ||
-    (isToolComplete &&
-      toolOutput !== undefined &&
-      toolOutput !== TOOL_SUCCESS);
   const isWaiting = !approval || entries.length === 0;
   const isProcessing = approvalId ? processingApprovals.has(approvalId) : false;
 
-  const handleApprove = async () => {
-    if (!approvalId) return;
-    if (!isAvailable) {
-      setPaywallOpen(true);
-      return;
-    }
-    setOptimisticState('approved');
-    await onApprove(approvalId);
-  };
+  const handleApprove = () =>
+    runAction(approvalId, 'approved', onApprove, {
+      paywall: 'custom_sentences',
+      available: isAvailable,
+    });
 
-  const handleReject = async () => {
-    if (!approvalId) return;
-    setOptimisticState('rejected');
-    await onReject(approvalId);
-  };
+  const handleReject = () => runAction(approvalId, 'rejected', onReject);
 
   if (isError) {
-    return (
-      <Alert className="my-3 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-        <AlertDescription className="text-red-700 dark:text-red-300">
-          {t('failed')}
-        </AlertDescription>
-      </Alert>
-    );
+    return <ApprovalErrorAlert label={t('failed')} />;
   }
 
   if (isWaiting && !isToolComplete) {
-    return (
-      <Alert className="my-3 border-muted animate-pulse">
-        <AlertDescription>
-          <div className="space-y-2">
-            <div className="h-4 w-3/4 rounded bg-muted" />
-            <div className="h-5 w-5/6 rounded bg-muted" />
-          </div>
-          <div className="mt-3">
-            <Shimmer duration={1.5}>{t('creatingApproval')}</Shimmer>
-          </div>
-        </AlertDescription>
-      </Alert>
-    );
+    return <ApprovalStreamingSkeleton label={t('creatingApproval')} />;
   }
 
   const targetEntries = entries.filter((e) => targetLanguages.includes(e.language));
@@ -292,7 +261,7 @@ export function CardApproval({
           !isAvailable ? (
             <Button
               key="approve-upgrade"
-              onClick={() => setPaywallOpen(true)}
+              onClick={() => setPaywallFeature('custom_sentences')}
               size="sm"
               className="h-8 px-3 text-sm gap-1.5"
               data-testid="card-approve"
@@ -352,7 +321,9 @@ export function CardApproval({
       {paywallOpen && (
         <PaywallDialog
           open={paywallOpen}
-          setOpen={setPaywallOpen}
+          setOpen={(open: boolean) => {
+            if (!open) setPaywallFeature(null);
+          }}
           featureId="custom_sentences"
         />
       )}

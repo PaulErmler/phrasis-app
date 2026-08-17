@@ -25,10 +25,15 @@ import { useCourseLanguages } from '@/hooks/use-course-languages';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import type { SentenceQuickActionKind } from '@/convex/features/chat/quickActions';
 import { createCardToolRenderer } from '@/components/chat/tools/CardToolRenderer';
-import { useCardApprovals } from '@/hooks/use-card-approvals';
+import { createAlsoCorrectToolRenderer } from '@/components/chat/tools/AlsoCorrectToolRenderer';
+import {
+  useCardApprovals,
+  type ApprovalActionResult,
+} from '@/hooks/use-card-approvals';
 import { useScreenWakeLock } from '@/hooks/use-screen-wake-lock';
 import { useReloadBlock } from '@/components/app/AppUpdateGate';
 import { useThread } from '@/hooks/use-thread';
+import { useCardThreadRotation } from '@/hooks/use-card-thread-rotation';
 import { Loader } from '@/components/ai-elements/loader';
 import { useTutorial } from '@/lib/tutorials/use-tutorial';
 import { TUTORIAL_IDS } from '@/lib/tutorials/registry';
@@ -43,11 +48,20 @@ function WrappedChatPanel({
   cardId,
   onMessageSent,
   onNewChat,
+  onCardReplaced,
 }: {
   threadId: string;
   cardId?: Id<'cards'>;
   onMessageSent?: () => void;
   onNewChat?: () => void;
+  /**
+   * Called after a successful "replace" with the id of the card the edit left
+   * behind (Path B deletes and re-inserts the card doc, so `getCardForReview`
+   * starts returning a new `_id`). Tells LearnView's card-change effect that
+   * this ONE upcoming change is the replace, not a real advance, so accepting
+   * doesn't wipe the conversation it came from.
+   */
+  onCardReplaced?: (cardId: Id<'cards'>) => void;
 }) {
   const chatContext = useLearningChatToggle();
   if (!chatContext) {
@@ -59,6 +73,7 @@ function WrappedChatPanel({
     processingApprovals,
     handleApprove,
     handleReject,
+    handleReplace,
     isLoaded: approvalsLoaded,
   } = useCardApprovals(threadId);
   const t = useTranslations('Chat');
@@ -103,6 +118,23 @@ function WrappedChatPanel({
     [cardId, handleQuickAction, targetLanguageLabel],
   );
 
+  // Replace is the only approval action that rewrites the card document, so
+  // it is the only one that needs the rotation suppression — and it reports
+  // exactly which card it produced, so the suppression can be keyed to that id
+  // rather than to a time window. `handleApprove` is passed through untouched:
+  // approving only appends a text to the chat collection, never changing the
+  // served card.
+  const replaceKeepingThread = useCallback(
+    async (id: Id<'cardApprovals'>): Promise<ApprovalActionResult> => {
+      const { result, cardId: replacementId } = await handleReplace(id);
+      if (result === 'success' && replacementId) {
+        onCardReplaced?.(replacementId);
+      }
+      return result;
+    },
+    [handleReplace, onCardReplaced],
+  );
+
   const toolRenderers = useMemo(
     () => ({
       createCard: createCardToolRenderer({
@@ -112,8 +144,16 @@ function WrappedChatPanel({
         handleReject,
         isLoaded: approvalsLoaded,
       }),
+      markAlsoCorrect: createAlsoCorrectToolRenderer({
+        approvalsByToolCallId,
+        processingApprovals,
+        handleApprove,
+        handleReplace: replaceKeepingThread,
+        handleReject,
+        isLoaded: approvalsLoaded,
+      }),
     }),
-    [approvalsByToolCallId, processingApprovals, handleApprove, handleReject, approvalsLoaded],
+    [approvalsByToolCallId, processingApprovals, handleApprove, handleReject, replaceKeepingThread, approvalsLoaded],
   );
 
   return (
@@ -396,41 +436,26 @@ function LearnViewInner({
     autoCreate: !prefetchedThreadId,
   });
 
-  const threadHasMessagesRef = useRef(false);
-  const prevCardIdRef = useRef<string | null>(null);
   const currentCardId = state.status === 'reviewing' ? state.cardId : null;
 
-  useEffect(() => {
-    if (!currentCardId) return;
-    if (prevCardIdRef.current === null) {
-      prevCardIdRef.current = currentCardId;
-      return;
-    }
-    if (prevCardIdRef.current === currentCardId) return;
-
-    prevCardIdRef.current = currentCardId;
-
-    if (threadHasMessagesRef.current) {
-      threadHasMessagesRef.current = false;
-      getOrCreateEmptyThread().catch((err) =>
-        console.error('Failed to create new thread on card change:', err),
-      );
-    }
-  }, [currentCardId, getOrCreateEmptyThread]);
+  // Thread rotation on card change, and its one exception: the card change a
+  // chat "replace" itself caused (see the hook for the full rationale).
+  const { markThreadHasMessages, resetThreadMessages, handleCardReplaced } =
+    useCardThreadRotation(currentCardId, getOrCreateEmptyThread);
 
   const handleMessageSent = useCallback(() => {
     audio.pause();
-    threadHasMessagesRef.current = true;
-  }, [audio]);
+    markThreadHasMessages();
+  }, [audio, markThreadHasMessages]);
 
   // getOrCreateEmptyThread returns the current thread when it is still
   // empty, so mashing the button can't spam empty threads.
   const handleNewChat = useCallback(() => {
-    threadHasMessagesRef.current = false;
+    resetThreadMessages();
     getOrCreateEmptyThread().catch((err) =>
       console.error('Failed to start a new chat:', err),
     );
-  }, [getOrCreateEmptyThread]);
+  }, [getOrCreateEmptyThread, resetThreadMessages]);
 
   const handleChatOpen = useCallback(() => {
     audio.pause();
@@ -444,6 +469,7 @@ function LearnViewInner({
       cardId={cardId}
       onMessageSent={handleMessageSent}
       onNewChat={handleNewChat}
+      onCardReplaced={handleCardReplaced}
     />
   ) : isThreadLoading ? (
     <div className="flex-1 flex items-center justify-center">

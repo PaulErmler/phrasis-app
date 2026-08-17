@@ -13,12 +13,35 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const countsByStateSuffix: Record<string, number> = {};
 const countCalls: Array<{
   namespace: string;
+  /** Which scheduling track's aggregate instance served this count. */
+  track: "shared" | "writing";
   bounds?: { upper?: { key: number; inclusive: boolean } };
 }> = [];
 
 vi.mock("@convex-dev/aggregate", () => {
   class TableAggregate {
-    constructor(_component: unknown, _opts: unknown) {}
+    private readonly track: "shared" | "writing";
+
+    constructor(
+      _component: unknown,
+      opts?: { sortKey?: (doc: unknown) => unknown },
+    ) {
+      // Label the instance by which due date its sortKey reads — the only
+      // structural difference between a writing-track aggregate and its
+      // shared twin (their NAMESPACE strings are identical, so namespace
+      // alone can't tell the separate-mode tests which aggregate was hit).
+      let probed: unknown;
+      try {
+        probed = opts?.sortKey?.({
+          dueDate: "shared",
+          writingDueDate: "writing",
+        });
+      } catch {
+        probed = undefined;
+      }
+      this.track = probed === "writing" ? "writing" : "shared";
+    }
+
     async insertIfDoesNotExist(): Promise<void> {}
     async replaceOrInsert(): Promise<void> {}
     async deleteIfExists(): Promise<void> {}
@@ -29,7 +52,11 @@ vi.mock("@convex-dev/aggregate", () => {
         bounds?: { upper?: { key: number; inclusive: boolean } };
       },
     ): Promise<number> {
-      countCalls.push({ namespace: opts.namespace, bounds: opts.bounds });
+      countCalls.push({
+        namespace: opts.namespace,
+        track: this.track,
+        bounds: opts.bounds,
+      });
       const parts = opts.namespace.split(":");
       const tail2 = parts.slice(-2).join(":");
       const tail1 = parts[parts.length - 1] ?? "";
@@ -350,6 +377,178 @@ describe("features/stats", () => {
       for (const call of countCalls) {
         expect(call.bounds?.upper?.key).toBe(NOW);
         expect(call.bounds?.upper?.inclusive).toBe(true);
+      }
+    });
+  });
+
+  describe("due counts — separate mode tracking (writing track)", () => {
+    const NOW = 1_754_000_000_000;
+
+    async function seedWithSettings(
+      t: TestConvex<typeof schema>,
+      settings: Record<string, unknown>,
+    ) {
+      const ids = await seedActiveCourse(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("courseSettings", {
+          courseId: ids.courseId,
+          initialReviewCount: 5,
+          ...settings,
+        });
+      });
+      return ids;
+    }
+
+    it("Writing mode on a split course counts the WRITING aggregates", async () => {
+      const t = convexTest(schema, modules);
+      await seedWithSettings(t, {
+        separateModeTracking: true,
+        reviewMode: "full",
+        writingSeedDone: true,
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(api.features.stats.getFilteredCardCounts, {
+        filter: "both",
+        now: NOW,
+      });
+      // Seed finished → settled counts, no provisional flag.
+      expect(res).toEqual({ new: 0, learning: 0, relearning: 0, review: 0 });
+      expect(countCalls).toHaveLength(4);
+      for (const call of countCalls) {
+        expect(call.track).toBe("writing");
+      }
+    });
+
+    it("audio mode on a split course (and Writing with the split off) stays on the SHARED aggregates", async () => {
+      const t = convexTest(schema, modules);
+      await seedWithSettings(t, {
+        separateModeTracking: true,
+        reviewMode: "audio",
+        writingSeedDone: true,
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.query(api.features.stats.getFilteredCardCounts, {
+        filter: "both",
+        now: NOW,
+      });
+      expect(countCalls).toHaveLength(4);
+      for (const call of countCalls) {
+        expect(call.track).toBe("shared");
+      }
+
+      // Split off: Writing mode still counts the shared track.
+      const t2 = convexTest(schema, modules);
+      countCalls.length = 0;
+      await seedWithSettings(t2, { reviewMode: "full" });
+      const asUser2 = t2.withIdentity({ subject: "user_A" });
+      await asUser2.query(api.features.stats.getFilteredCardCounts, {
+        filter: "both",
+        now: NOW,
+      });
+      expect(countCalls).toHaveLength(4);
+      for (const call of countCalls) {
+        expect(call.track).toBe("shared");
+      }
+    });
+
+    it("the client's optimistic reviewMode override wins over settings (both directions)", async () => {
+      const t = convexTest(schema, modules);
+      await seedWithSettings(t, {
+        separateModeTracking: true,
+        reviewMode: "audio",
+        writingSeedDone: true,
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.query(api.features.stats.getFilteredCardCounts, {
+        filter: "both",
+        now: NOW,
+        reviewMode: "full",
+      });
+      expect(countCalls.map((c) => c.track)).toEqual(
+        Array(4).fill("writing"),
+      );
+
+      countCalls.length = 0;
+      await asUser.query(api.features.stats.getFilteredCardCounts, {
+        filter: "both",
+        now: NOW,
+        reviewMode: "audio",
+      });
+      expect(countCalls.map((c) => c.track)).toEqual(Array(4).fill("shared"));
+    });
+
+    it("the origin-filtered path also selects the writing aggregates", async () => {
+      const t = convexTest(schema, modules);
+      const { deckId } = await seedWithSettings(t, {
+        separateModeTracking: true,
+        reviewMode: "full",
+        writingSeedDone: true,
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.query(api.features.stats.getFilteredCardCounts, {
+        filter: "custom",
+        now: NOW,
+      });
+      expect(countCalls).toHaveLength(8);
+      for (const call of countCalls) {
+        expect(call.track).toBe("writing");
+      }
+      expect(countCalls.map((c) => c.namespace)).toContain(
+        `${deckId}:custom:new`,
+      );
+    });
+
+    it("flags preparingWriting while the seed is unfinished — writing track only", async () => {
+      const t = convexTest(schema, modules);
+      await seedWithSettings(t, {
+        separateModeTracking: true,
+        reviewMode: "full",
+        // writingSeedDone deliberately absent: the enable-time sweep hasn't
+        // finished, so the writing aggregates hold only a partial prefix.
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(api.features.stats.getFilteredCardCounts, {
+        filter: "both",
+        now: NOW,
+      });
+      expect(res).toEqual({
+        new: 0,
+        learning: 0,
+        relearning: 0,
+        review: 0,
+        preparingWriting: true,
+      });
+
+      // The shared track's counts are always settled — no flag, even with the
+      // seed unfinished on the same course.
+      const shared = await asUser.query(
+        api.features.stats.getFilteredCardCounts,
+        { filter: "both", now: NOW, reviewMode: "audio" },
+      );
+      expect(shared).toEqual({ new: 0, learning: 0, relearning: 0, review: 0 });
+    });
+
+    it("getCardCounts derives the track from settings and flags the unfinished seed too", async () => {
+      const t = convexTest(schema, modules);
+      await seedWithSettings(t, {
+        separateModeTracking: true,
+        reviewMode: "full",
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(api.features.stats.getCardCounts, {
+        now: NOW,
+      });
+      expect(res).toEqual({
+        new: 0,
+        learning: 0,
+        relearning: 0,
+        review: 0,
+        preparingWriting: true,
+      });
+      expect(countCalls).toHaveLength(4);
+      for (const call of countCalls) {
+        expect(call.track).toBe("writing");
       }
     });
   });

@@ -912,6 +912,9 @@ function NoCardsDueWithFilter({
     emptyReason?.reason === 'all_caught_up'
       ? emptyReason.customCardsPendingAdd
       : false;
+  // separateModeTracking enable-time seed still running — the writing queue
+  // is empty only because cards aren't seeded yet.
+  const isPreparingWriting = emptyReason?.reason === 'preparing_writing';
 
   const handleIncludeOtherSource = useCallback(() => {
     updateSettings({ courseId, studyContentFilter: 'both' });
@@ -930,6 +933,7 @@ function NoCardsDueWithFilter({
       currentSourceHasAnyCards={currentSourceHasAnyCards}
       filterUnblockAvailable={filterUnblockAvailable}
       customCardsPendingAdd={customCardsPendingAdd}
+      isPreparingWriting={isPreparingWriting}
       onIncludeOtherSource={handleIncludeOtherSource}
       onCreateChatCards={onNavigateToChat}
       onCreateCustomCards={onNavigateToAddCustomCards}

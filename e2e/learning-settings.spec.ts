@@ -649,4 +649,186 @@ test.describe("learning settings", () => {
     await ensureAudioMode(page);
     await page.keyboard.press("Escape").catch(() => {});
   });
+
+  test("separate progress per mode toggle renders in the mode card and persists", async ({
+    page,
+  }) => {
+    await page.goto("/app/learn");
+    await page.waitForLoadState("domcontentloaded");
+    await dismissTour(page, "audio_review_intro", 500);
+    await dismissTour(page, "full_review_intro", 500);
+
+    await openSettingsSheet(page);
+
+    // The switch lives inside the Shadowing/Writing description card and is
+    // mode-independent — it must render in BOTH modes (unlike e.g. the
+    // writing-style sub-toggle).
+    await ensureAudioMode(page);
+    await expect(switchById(page, "separateModeTracking")).toBeVisible({
+      timeout: 8_000,
+    });
+    await ensureFullMode(page);
+    await expect(switchById(page, "separateModeTracking")).toBeVisible({
+      timeout: 8_000,
+    });
+
+    // Normalize OFF first — the shared e2e user may carry state from a
+    // previously failed run.
+    await setSwitchById(page, "separateModeTracking", false);
+
+    // Toggle ON and confirm it survives a sheet close/reopen (i.e. the value
+    // persisted via updateCourseSettings, not just the optimistic cache).
+    await setSwitchById(page, "separateModeTracking", true);
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.waitForTimeout(400);
+    await openSettingsSheet(page);
+    await expect
+      .poll(() => isSwitchOnById(page, "separateModeTracking"), {
+        timeout: 8_000,
+      })
+      .toBe(true);
+
+    // With the split on, the learn view must still serve a reviewable card in
+    // Writing mode: enabling the toggle schedules the seedWritingTrack
+    // backfill, which copies each card's shared schedule into the writing
+    // fields within a scheduler hop or two — the input's 15s wait below
+    // comfortably covers it. Recover from a filter-blocked deck the same way
+    // learning-journey.spec.ts does.
+    await ensureFullMode(page);
+    await page.keyboard.press("Escape").catch(() => {});
+    await page
+      .getByTestId("learning-settings-sheet")
+      .first()
+      .waitFor({ state: "hidden", timeout: 5_000 })
+      .catch(() => {});
+    await dismissTour(page, "full_review_intro", 1_000);
+
+    const input = page.getByTestId("learn-translation-input").first();
+    const includeOther = page
+      .getByTestId("filter-blocked-include-other")
+      .first();
+    const waitForInput = () =>
+      input
+        .waitFor({ state: "visible", timeout: 15_000 })
+        .then(() => true)
+        .catch(() => false);
+    let inputVisible = await waitForInput();
+    if (!inputVisible && (await includeOther.isVisible().catch(() => false))) {
+      await includeOther.click().catch(() => {});
+      inputVisible = await waitForInput();
+    }
+    expect(
+      inputVisible,
+      "Writing card should mount from the writing-track due queue with the split enabled",
+    ).toBe(true);
+
+    // Restore: split off, audio mode, so later specs start clean.
+    await openSettingsSheet(page);
+    await setSwitchById(page, "separateModeTracking", false);
+    await ensureAudioMode(page);
+    await page.keyboard.press("Escape").catch(() => {});
+  });
+
+  /**
+   * The promise of separate progress, end to end: a Writing review advances
+   * ONLY the writing schedule, so the same card is still waiting on the
+   * Shadowing side — and the home due-count pills, which read whichever
+   * track's aggregates the mode selects, keep rendering across the flip.
+   *
+   * Tagged @live: rating a card mutates the shared e2e user's review state
+   * (same reasoning as learning-undo.spec.ts).
+   */
+  test(
+    "separate progress: a Writing review leaves the Shadowing queue untouched",
+    { tag: "@live" },
+    async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.goto("/app/learn");
+      await page.waitForLoadState("domcontentloaded");
+      await dismissTour(page, "audio_review_intro", 500);
+      await dismissTour(page, "full_review_intro", 500);
+
+      await openSettingsSheet(page);
+      // Normalize from whatever a previous run left behind, then enable.
+      await setSwitchById(page, "separateModeTracking", false);
+      await setSwitchById(page, "separateModeTracking", true);
+      await ensureFullMode(page);
+      await page.keyboard.press("Escape").catch(() => {});
+      await page
+        .getByTestId("learning-settings-sheet")
+        .first()
+        .waitFor({ state: "hidden", timeout: 5_000 })
+        .catch(() => {});
+      await dismissTour(page, "full_review_intro", 1_000);
+
+      // --- Writing review: identify the served card, then rate it ---------
+      const flashcard = page.locator('[data-tutorial="card-flashcard"]').first();
+      await expect(
+        flashcard,
+        "a writing-track card should be served once the seed lands",
+      ).toBeVisible({ timeout: 20_000 });
+      const writingCardText = (await flashcard.innerText()).trim();
+
+      const input = page.getByTestId("learn-translation-input").first();
+      await input.waitFor({ state: "visible", timeout: 15_000 });
+      await input.fill("skip", { timeout: 5_000 });
+      await input.press("Enter", { timeout: 5_000 });
+
+      // instantProceedFull defaults to true, so a rating click commits and
+      // advances in one step.
+      const ratings = page.locator(
+        '[data-testid="learn-rating-good"], [data-testid="learn-rating-easy"], [data-testid="learn-rating-hard"], [data-testid="learn-rating-again"]',
+      );
+      await ratings.first().waitFor({ state: "visible", timeout: 15_000 });
+      await ratings.first().click({ timeout: 5_000 });
+      // Let the review mutation commit before reading the other track.
+      await page.waitForTimeout(1_500);
+
+      // --- Flip to Shadowing: the shared schedule never saw that review ----
+      await openSettingsSheet(page);
+      await ensureAudioMode(page);
+      await page.keyboard.press("Escape").catch(() => {});
+      await page
+        .getByTestId("learning-settings-sheet")
+        .first()
+        .waitFor({ state: "hidden", timeout: 5_000 })
+        .catch(() => {});
+      await dismissTour(page, "audio_review_intro", 1_000);
+
+      await expect(
+        flashcard,
+        "the shared track still serves a card after a writing-only review",
+      ).toBeVisible({ timeout: 20_000 });
+      // The just-reviewed card is still due on the shared track — it is the
+      // head of that queue, so it is exactly what Shadowing serves. (With the
+      // tracks wrongly coupled, the review would have pushed it out and some
+      // other card, or an empty state, would show here.)
+      expect(
+        (await flashcard.innerText()).trim(),
+        "the writing review must not have advanced the shared schedule",
+      ).toContain(writingCardText.split("\n")[0]?.trim() ?? "");
+
+      // --- Home pills survive the track flip ------------------------------
+      await page.goto("/app");
+      await page.waitForLoadState("domcontentloaded");
+      const pills = page.getByTestId("due-counts-pills");
+      await expect(pills).toBeVisible({ timeout: 15_000 });
+      // Flip the home Shadowing/Writing toggle: the counts re-query against
+      // the other track's aggregates and the row must stay rendered (never
+      // collapse to a bare "nothing to study").
+      const writingToggle = page
+        .locator('[data-tutorial="review-mode-toggle"] button')
+        .nth(1);
+      await writingToggle.click({ timeout: 5_000 }).catch(() => {});
+      await expect(pills).toBeVisible({ timeout: 15_000 });
+
+      // Restore: split off, audio mode, so later specs start clean.
+      await page.goto("/app/learn");
+      await page.waitForLoadState("domcontentloaded");
+      await openSettingsSheet(page);
+      await setSwitchById(page, "separateModeTracking", false);
+      await ensureAudioMode(page);
+      await page.keyboard.press("Escape").catch(() => {});
+    },
+  );
 });

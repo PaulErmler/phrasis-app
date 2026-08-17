@@ -51,6 +51,7 @@ import {
 import { validateAutoRateThresholds } from '../../lib/autoRating';
 import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
 import { clampDailyGoal } from '../../lib/constants/dailyGoal';
+import { maybeScheduleWritingSeed } from '../migrations/seedWritingTrack';
 import {
   ONBOARDING_INITIAL_SEED_CARDS,
   ONBOARDING_CARDS_BATCH_SIZE,
@@ -1093,7 +1094,12 @@ export const updateCourseSettings = mutation({
 
     // Build patch object with only provided fields
     const existing = await dbGetCourseSettings(ctx, args.courseId);
-    const patch: Partial<CoursePatchableSettings> = {};
+    // Patchable-settings shape plus the server-managed seed bookkeeping the
+    // enable transition resets below (deliberately NOT user-patchable).
+    const patch: Partial<CoursePatchableSettings> & {
+      writingSeedDone?: boolean;
+      writingSeedStartedAt?: number;
+    } = {};
     for (const key of PATCHABLE_KEYS) {
       let value = args[key];
       // NaN/±Infinity survive Math.max/min/round/floor and Convex stores
@@ -1168,6 +1174,18 @@ export const updateCourseSettings = mutation({
       }
     }
 
+    // Enable transition for separateModeTracking: reset the seed bookkeeping
+    // so the sweep below starts (or restarts, after a disable) from scratch —
+    // cards created while the split was off get seeded, previously-seeded
+    // cards are skipped by the sweep itself (freeze-and-keep).
+    const seedTransition =
+      args.separateModeTracking === true &&
+      existing?.separateModeTracking !== true;
+    if (seedTransition) {
+      patch.writingSeedDone = false;
+      patch.writingSeedStartedAt = undefined;
+    }
+
     if (existing) {
       await ctx.db.patch(existing._id, patch);
     } else {
@@ -1181,6 +1199,18 @@ export const updateCourseSettings = mutation({
         initialReviewCount:
           args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
       });
+    }
+
+    // Turning separateModeTracking ON seeds every card's writing track with a
+    // copy of its shared schedule (batched + scheduled — decks can hold
+    // thousands of cards). Beyond the transition, EVERY save while the split
+    // is on re-kicks an unfinished sweep (debounced): a scheduler chain that
+    // died mid-seed would otherwise strand the unseeded remainder outside the
+    // writing queue forever. Turning it OFF needs no work — the writing
+    // fields stay dormant.
+    const fresh = await dbGetCourseSettings(ctx, args.courseId);
+    if (fresh) {
+      await maybeScheduleWritingSeed(ctx, fresh, { force: seedTransition });
     }
 
     return null;

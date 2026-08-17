@@ -32,13 +32,17 @@ vi.mock("@/components/chat/EditApprovalDialog", () => ({
 }));
 
 import { CardApproval } from "@/components/chat/CardApproval";
+// The REAL string the server tool returns — imported, not re-typed, so a
+// server-side rewording fails here instead of silently rendering every
+// successful call as an error box.
+import { CREATE_CARD_SUCCESS } from "@/lib/types/tool-parts";
 
 function makeToolPart(extra: Partial<any> = {}) {
   return {
     type: "tool-createCard",
     toolCallId: "tc-1",
     state: "output-available",
-    output: "Card has been created.",
+    output: CREATE_CARD_SUCCESS,
     input: {
       translations: [
         { language: "en", text: "hello" },

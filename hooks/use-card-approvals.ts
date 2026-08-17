@@ -4,20 +4,70 @@ import { convexErrorCode, isPaymentPastDueError } from '@/lib/utils';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 
-import type { CardApprovalStatus } from '@/convex/types';
+import type {
+  CardApprovalKind,
+  CardApprovalResolution,
+  CardApprovalStatus,
+  ProposedCardMetadata,
+} from '@/convex/types';
+import { getUserTimezone } from '@/lib/timezone';
 
 export type ApprovalData = {
   _id: Id<'cardApprovals'>;
   toolCallId: string;
   translations: { language: string; text: string }[];
   status: CardApprovalStatus;
+  // Absent = 'createCard' (rows predate the field).
+  kind?: CardApprovalKind;
+  cardId?: Id<'cards'>;
+  resolution?: CardApprovalResolution;
+  changedLanguages?: string[];
+  proposedMetadata?: ProposedCardMetadata;
+  /** Card was missing a course language when proposed — replace is allowed,
+   * add-as-new-card is not (it would produce a card with a blank line). */
+  replaceOnly?: boolean;
 };
+
+/**
+ * How an approval action ended, for the caller's optimistic UI:
+ *   'success'       — the mutation committed; keep the optimistic state.
+ *   'usage_limit'   — quota exhausted (USAGE_LIMIT); roll back and paywall.
+ *   'card_replaced' — the card this proposal targets no longer exists (it was
+ *                     replaced from another thread or device); roll back and
+ *                     say so, rather than leaving an inert button.
+ *   'error'         — anything else, incl. payment-past-due (whose canonical
+ *                     surface is the reactive overdue dialog); roll back.
+ */
+export type ApprovalActionResult =
+  | 'success'
+  | 'usage_limit'
+  | 'card_replaced'
+  | 'error';
+
+/**
+ * Replace also reports WHICH card the edit left behind: Path B deletes and
+ * re-inserts the card document, so the served card's `_id` changes. The learn
+ * view needs that exact id to suppress its thread rotation for precisely that
+ * card change and nothing else. Absent unless `result === 'success'`.
+ */
+export interface ApprovalReplaceOutcome {
+  result: ApprovalActionResult;
+  cardId?: Id<'cards'>;
+}
 
 export interface UseCardApprovalsReturn {
   approvalsByToolCallId: Map<string, ApprovalData>;
   processingApprovals: Set<string>;
-  handleApprove: (approvalId: Id<'cardApprovals'>) => Promise<void>;
-  handleReject: (approvalId: Id<'cardApprovals'>) => Promise<void>;
+  handleApprove: (
+    approvalId: Id<'cardApprovals'>,
+  ) => Promise<ApprovalActionResult>;
+  handleReject: (
+    approvalId: Id<'cardApprovals'>,
+  ) => Promise<ApprovalActionResult>;
+  /** Accept an also-correct proposal by replacing the discussed card's text. */
+  handleReplace: (
+    approvalId: Id<'cardApprovals'>,
+  ) => Promise<ApprovalReplaceOutcome>;
   usageLimitHit: boolean;
   isLoaded: boolean;
 }
@@ -33,6 +83,9 @@ export function useCardApprovals(
   );
   const rejectCard = useMutation(
     api.features.chat.cardApprovals.rejectCard,
+  );
+  const replaceCardFromApproval = useMutation(
+    api.features.chat.cardApprovals.replaceCardFromApproval,
   );
   const [processingApprovals, setProcessingApprovals] = useState<Set<string>>(
     new Set(),
@@ -66,23 +119,36 @@ export function useCardApprovals(
     return byToolCallId;
   }, [threadApprovals, isTransitioning]);
 
-  const handleApprove = useCallback(
-    async (approvalId: Id<'cardApprovals'>) => {
+  // One processing-set + error-taxonomy wrapper for every approval action —
+  // the taxonomy was previously copy-pasted per handler and had already
+  // drifted (reject silently lacked it). The result value is the caller's
+  // contract for rolling back optimistic UI (see ApprovalActionResult).
+  const runApprovalAction = useCallback(
+    async <T,>(
+      approvalId: Id<'cardApprovals'>,
+      label: string,
+      fn: () => Promise<T>,
+    ): Promise<{ result: ApprovalActionResult; value?: T }> => {
       setProcessingApprovals((prev) => new Set(prev).add(approvalId));
       try {
-        await approveCard({ approvalId });
+        const value = await fn();
         setUsageLimitHit(false);
+        return { result: 'success', value };
       } catch (error) {
         // Silent: the reactive payment-overdue dialog is the canonical
         // surface for this state (see isPaymentPastDueError).
         if (isPaymentPastDueError(error)) {
-          return;
+          return { result: 'error' };
         }
         if (convexErrorCode(error) === 'USAGE_LIMIT') {
           setUsageLimitHit(true);
-          return;
+          return { result: 'usage_limit' };
         }
-        console.error('Failed to approve card:', error);
+        if (convexErrorCode(error) === 'CARD_REPLACED') {
+          return { result: 'card_replaced' };
+        }
+        console.error(`Failed to ${label}:`, error);
+        return { result: 'error' };
       } finally {
         setProcessingApprovals((prev) => {
           const next = new Set(prev);
@@ -91,25 +157,41 @@ export function useCardApprovals(
         });
       }
     },
-    [approveCard],
+    [],
+  );
+
+  const handleApprove = useCallback(
+    async (approvalId: Id<'cardApprovals'>) =>
+      (
+        await runApprovalAction(approvalId, 'approve card', () =>
+          approveCard({ approvalId }),
+        )
+      ).result,
+    [runApprovalAction, approveCard],
   );
 
   const handleReject = useCallback(
+    async (approvalId: Id<'cardApprovals'>) =>
+      (
+        await runApprovalAction(approvalId, 'reject card', () =>
+          rejectCard({ approvalId }),
+        )
+      ).result,
+    [runApprovalAction, rejectCard],
+  );
+
+  // Surfaces the replacement card id (see ApprovalReplaceOutcome) — the only
+  // action whose caller needs to know which card the edit left behind.
+  const handleReplace = useCallback(
     async (approvalId: Id<'cardApprovals'>) => {
-      setProcessingApprovals((prev) => new Set(prev).add(approvalId));
-      try {
-        await rejectCard({ approvalId });
-      } catch (error) {
-        console.error('Failed to reject card:', error);
-      } finally {
-        setProcessingApprovals((prev) => {
-          const next = new Set(prev);
-          next.delete(approvalId);
-          return next;
-        });
-      }
+      const { result, value } = await runApprovalAction(
+        approvalId,
+        'replace card',
+        () => replaceCardFromApproval({ approvalId, timezone: getUserTimezone() }),
+      );
+      return { result, cardId: value?.cardId };
     },
-    [rejectCard],
+    [runApprovalAction, replaceCardFromApproval],
   );
 
   return {
@@ -117,6 +199,7 @@ export function useCardApprovals(
     processingApprovals,
     handleApprove,
     handleReject,
+    handleReplace,
     usageLimitHit,
     isLoaded: !isTransitioning && threadApprovals !== undefined,
   };

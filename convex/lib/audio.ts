@@ -12,6 +12,15 @@ import { resolveAudioPayload } from './audioAssets';
  * through it (reconcile invalidation, regen, retranslation, manual regenerate,
  * and orphan cascade) so no blob is ever dropped while still in use.
  *
+ * `opts.keepAsset` detaches the pointer but PRESERVES the asset + blob even
+ * when this was the last pointer. Use it whenever the audio itself is still
+ * correct and only this text stops needing it — card edits, retranslations,
+ * and speaker-gender re-voicing — so the content-addressed `audioAssets`
+ * cache keeps serving the string for other texts and future re-creation.
+ * Full garbage collection (the default) is reserved for audio that is
+ * OBSOLETE as audio: the manual regenerate button and TTS-system migrations
+ * (provider/ttsVersion changes).
+ *
  * `opts.blobAlreadyGone` skips the storage delete when the blob is already
  * known to be missing (`storage.getUrl` returned null), as in
  * `scheduleMissingContent`'s stale-file cleanup — row/asset bookkeeping still
@@ -20,9 +29,10 @@ import { resolveAudioPayload } from './audioAssets';
 export async function deleteAudioRow(
   ctx: MutationCtx,
   row: Doc<'audioRecordings'>,
-  opts?: { blobAlreadyGone?: boolean },
+  opts?: { blobAlreadyGone?: boolean; keepAsset?: boolean },
 ): Promise<void> {
   await ctx.db.delete(row._id);
+  if (opts?.keepAsset) return;
 
   const stillPointed = await ctx.db
     .query('audioRecordings')
@@ -46,6 +56,7 @@ export async function deleteAudioRowsForTextLanguage(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   language: string,
+  opts?: { keepAsset?: boolean },
 ): Promise<void> {
   const rows = await ctx.db
     .query('audioRecordings')
@@ -54,7 +65,7 @@ export async function deleteAudioRowsForTextLanguage(
     )
     .take(10);
   for (const row of rows) {
-    await deleteAudioRow(ctx, row);
+    await deleteAudioRow(ctx, row, opts);
   }
 }
 

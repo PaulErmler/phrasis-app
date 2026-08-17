@@ -2,7 +2,7 @@
   "id": "/app",
   "name": "Flexling - Language Learning",
   "short_name": "Flexling",
-  "description": "Vocabulary building made easy. Audio flashcards with a large sentence library — upload your own or ask AI to create cards.",
+  "description": "Learn a language the way you learned your first. Absorb words in sentences that actually matter to you.",
   "lang": "en",
   "start_url": "/app",
   "scope": "/",

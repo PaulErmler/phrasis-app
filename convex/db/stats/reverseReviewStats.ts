@@ -195,7 +195,20 @@ export async function reverseReviewStats(
       ratingCounts = { ...daily.ratingCounts, [rating]: dec(daily.ratingCounts[rating]) };
     }
 
-    const cardStateKey = FSRS_STATE_LABELS[log.prevCard?.fsrsState?.state ?? 0] ?? 'new';
+    // Prefer the bucket stamped at review time: it is the only value that
+    // survives the writing track's lazy-seed path, where the review was
+    // scheduled from a COPY of the shared fsrsState but `prevWriting` records
+    // the true (unset) writing fields that undo has to restore. Re-deriving
+    // there decrements 'new' while the increment landed elsewhere, skewing the
+    // day permanently. The derivation below is the fallback for logs written
+    // before `cardState` existed.
+    const derivedFsrsState =
+      (log.track ?? 'shared') === 'writing'
+        ? log.prevWriting?.writingFsrsState
+        : log.prevCard?.fsrsState;
+    const cardStateIndex =
+      log.statsReversal?.cardState ?? derivedFsrsState?.state ?? 0;
+    const cardStateKey = FSRS_STATE_LABELS[cardStateIndex] ?? 'new';
     const reviewsByCardState = daily.reviewsByCardState
       ? { ...daily.reviewsByCardState, [cardStateKey]: dec(daily.reviewsByCardState[cardStateKey]) }
       : undefined;
