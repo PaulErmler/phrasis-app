@@ -14,10 +14,13 @@ test.describe("content filter — tab badges on home", () => {
 
     // SegmentedHomeSection only renders the "Off" pill for an excluded
     // source. Default filter = 'both' → no Off badges anywhere.
-    // Wait for the tab list to mount before asserting count.
+    // Wait for the tab list to mount before asserting count. 20s (not 10s):
+    // this is the first test in the file, so it pays the cold Next-dev
+    // compile of /app plus the preloaded-query round trip, and under
+    // parallel workers that has overrun 10s.
     await expect(
       page.getByRole("tab", { name: /Course|Kurs/ }).first(),
-    ).toBeVisible({ timeout: 10_000 });
+    ).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("source-badge-off")).toHaveCount(0);
   });
 });

@@ -31,11 +31,13 @@ import {
   isPremadeLevelCollection,
 } from '../lib/collections';
 import {
-  isProtectedTranslationSource,
   isTranslationVersionStale,
   resolveCardSpeakerGenders,
+  ROMANIZATION_LANGUAGES,
 } from '../../lib/languages';
+import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { deleteAudioRow } from '../lib/audio';
+import { resolveAudioPayload } from '../lib/audioAssets';
 import { hasActiveTtsClaim } from './ttsProcessing';
 import { getLlmClaim, isClaimFresh } from './llmTranslationQueue';
 import { getCourseSettings } from '../db/courseSettings';
@@ -239,6 +241,7 @@ export const browseCollectionTexts = query({
       sourceText: row.text.text,
       sourceLanguage: row.text.language,
       sourceRomanization: row.text.romanizedText ?? undefined,
+      userCreated: row.text.userCreated,
     }));
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
@@ -250,18 +253,19 @@ export const browseCollectionTexts = query({
 
     const page = rows.map((row, i) => {
       const content = contentMap.get(String(i))!;
-      // Version-stale rows count as missing too (except on user-created
-      // texts, which are never version-swept): the client then routes them
+      // Version-stale rows count as missing too: the client then routes them
       // through requestPreviewTranslations, which regenerates them — so
       // browsing already upgrades translations to the current version
       // instead of deferring the delete+regen to the card-add sweep. The
       // stale text still ships in `translations` for display until the
-      // regenerated row lands.
+      // regenerated row lands. `versionStale` already carries the full
+      // `mayRegenerateTranslation` gate (user-created texts never report
+      // stale), so there is nothing to re-check here.
       const missingTranslationLanguages = content.translations
         .filter(
           (tr) =>
             tr.language !== row.text.language &&
-            (!tr.text || (!row.text.userCreated && tr.versionStale === true)),
+            (!tr.text || tr.versionStale === true),
         )
         .map((tr) => tr.language);
       return {
@@ -378,7 +382,7 @@ export const setCollectionTextMark = mutation({
  * these rows the moment audio is generated. Shared by the on-reveal and
  * prewarm preview-generation mutations.
  */
-async function scheduleMissingTranslationsForText(
+export async function scheduleMissingTranslationsForText(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   languages: string[],
@@ -390,6 +394,20 @@ async function scheduleMissingTranslationsForText(
   if (Object.keys(genderPatch).length > 0) {
     await ctx.db.patch(text._id, genderPatch);
   }
+  // Backfill romanization for the source text. Same `=== undefined` test as
+  // the card sweep — the empty-string sentinel means "tried and failed", and
+  // re-running it would burn the retries again on every page reveal.
+  if (
+    ROMANIZATION_LANGUAGES.has(text.language) &&
+    text.romanizedText === undefined
+  ) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.decks.processRomanizationForSourceText,
+      { textId: text._id, text: text.text, language: text.language },
+    );
+  }
+
   let scheduled = 0;
   for (const lang of languages) {
     if (lang === text.language) continue;
@@ -404,13 +422,35 @@ async function scheduleMissingTranslationsForText(
       // Version-stale rows regenerate here too, so browsing a collection
       // already upgrades its translations to the current version — otherwise
       // the card-add sweep (scheduleMissingContent) deletes exactly what the
-      // preview just showed. Same exemptions as that sweep: user-created
-      // texts and human-authored translations are never version-swept.
+      // preview just showed. Shares that sweep's provenance gate so the two
+      // can't disagree about what is regenerable.
       const isStale =
-        !text.userCreated &&
-        !isProtectedTranslationSource(existing.translationSource) &&
+        mayRegenerateTranslation(text, existing) &&
         isTranslationVersionStale(lang, existing.translationVersion);
-      if (!isStale) continue;
+      if (!isStale) {
+        // The translation is current, but its romanization may not exist —
+        // a row can reach that state through a romanizer swap, which resets
+        // `romanizedText` to `undefined` so the new implementation refills
+        // it. The only backfill was in `scheduleMissingContent`, which the
+        // preview never runs (preview rows are usually not cards), so those
+        // rows rendered with a bare transliteration gap until the text was
+        // added to a deck. Mirrors that sweep's check in decks.ts.
+        if (
+          ROMANIZATION_LANGUAGES.has(lang) &&
+          existing.romanizedText === undefined
+        ) {
+          await ctx.scheduler.runAfter(
+            0,
+            internal.features.decks.processRomanizationForTranslation,
+            {
+              textId: text._id,
+              translatedText: existing.translatedText,
+              language: lang,
+            },
+          );
+        }
+        continue;
+      }
       // Mirror the sweep's deferrals: never delete under an active TTS claim
       // (races the pending audio write) or a fresh LLM claim (the in-flight
       // retranslation overwrites the row anyway).
@@ -590,7 +630,31 @@ export const requestPreviewAudio = mutation({
         q.eq('textId', args.textId).eq('language', args.language),
       )
       .first();
-    if (existingAudio) return { scheduled: false };
+    if (existingAudio) {
+      // A row only counts as "audio exists" if it still resolves to a
+      // playable blob. A dangling pointer — asset row deleted, or asset
+      // present but its blob gone — otherwise wedges the preview
+      // permanently: this mutation would return `scheduled: false` forever
+      // while `buildTextContentBatchForLanguages` hands the client a null
+      // url, so the button can neither play nor regenerate. The card sweep
+      // (`scheduleMissingContent`) is the only other place that clears these,
+      // and the preview never runs it — preview rows are usually not cards.
+      // Mirrors that sweep's checks in convex/features/decks.ts.
+      const payload = await resolveAudioPayload(ctx, existingAudio);
+      const url = payload
+        ? await ctx.storage.getUrl(payload.storageId)
+        : null;
+      if (url !== null) return { scheduled: false };
+      // Don't race an in-flight job: `processTTSForCard` attaches its row
+      // before the blob is necessarily resolvable, and deleting it here
+      // would make the completing job patch a row that no longer exists.
+      if (await hasActiveTtsClaim(ctx, args.textId, args.language)) {
+        return { scheduled: false };
+      }
+      // Reference-aware: a shared asset survives while other texts point at
+      // it. `blobAlreadyGone` skips the storage delete we already know failed.
+      await deleteAudioRow(ctx, existingAudio, { blobAlreadyGone: true });
+    }
 
     const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
       text,

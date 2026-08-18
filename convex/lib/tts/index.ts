@@ -7,6 +7,7 @@ import type { TtsProvider } from '../../types';
 import type { TTSProvider } from './types';
 import { googleTts } from './google';
 import { geminiTts } from './gemini';
+import { minimaxTts } from './minimax';
 
 // 'azure' and 'elevenlabs' are retired: they linger in `TtsProvider` only as
 // stored-value tombstones (historical `audioRecordings.ttsProvider` rows) and
@@ -14,6 +15,7 @@ import { geminiTts } from './gemini';
 const providers: Partial<Record<TtsProvider, TTSProvider>> = {
   google: googleTts,
   gemini: geminiTts,
+  minimax: minimaxTts,
 };
 
 export function getTtsProvider(id: TtsProvider): TTSProvider {

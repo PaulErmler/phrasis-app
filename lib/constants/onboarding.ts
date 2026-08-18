@@ -73,6 +73,15 @@ export const PLACEMENT_BATCH_MAX_ATTEMPTS = 3;
  */
 export const PLACEMENT_BATCH_RETRY_BACKOFF_MS = 10_000;
 
+/**
+ * Cap on (text × language) pairs handled by one `warmupTranslationsBatch`
+ * transaction. Each pair costs one indexed translation read plus, when the
+ * translation is missing/stale, claim checks and a scheduler enqueue
+ * (~2–6 system ops) — 100 pairs lands in the same comfortable range as
+ * `PLACEMENT_CONTENT_BATCH_SIZE`'s ~250 ops per transaction.
+ */
+export const WARMUP_TRANSLATIONS_MAX_PAIRS_PER_BATCH = 100;
+
 /** Inclusive bounds of the OGTE difficulty scale (levels L01..L20). */
 export const OGTE_MIN_LEVEL = 1;
 export const OGTE_MAX_LEVEL = 20;

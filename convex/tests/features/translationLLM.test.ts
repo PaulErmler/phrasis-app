@@ -28,7 +28,7 @@ import {
 
 describe("features/translationLLM", () => {
   describe("translation rules", () => {
-    it("default rule: Luna best-of-3 primary, Gemini 3.6 Flash Nitro fallback", () => {
+    it("default rule: Luna best-of-3 primary, Gemini 3.7 Flash Nitro fallback", () => {
       // No language sets `translationRule` → all default to `luna_bo3`
       // (Aug 2026 eval winner). The Gemini stage stays as the fallback so a
       // Luna outage degrades to the previous production config before the
@@ -44,12 +44,18 @@ describe("features/translationLLM", () => {
         model: "openai/gpt-5.6-luna:nitro",
         reasoning: "none",
         maxOutputTokens: 4_000,
-        provider: { max_price: { completion: 2 } },
+        provider: {
+          max_price: { completion: 2 },
+          order: ["amazon-bedrock/us-east-1"],
+        },
         samples: { total: 3, extraTemperature: 1 },
         judge: {
           model: "openai/gpt-5.6-luna:nitro",
           reasoning: "none",
-          provider: { max_price: { completion: 2 } },
+          provider: {
+            max_price: { completion: 2 },
+            order: ["amazon-bedrock/us-east-1"],
+          },
           maxRetries: 2,
         },
       });
@@ -107,7 +113,7 @@ describe("features/translationLLM", () => {
       expect(stages.length).toBe(2);
       expect(stages[0].model).toBe("openai/gpt-5.6-luna:nitro");
       expect(stages[0].samples).toEqual({ total: 3, extraTemperature: 1 });
-      expect(stages[1].model).toBe("google/gemini-3.6-flash:nitro");
+      expect(stages[1].model).toBe("google/gemini-3.7-flash:nitro");
       expect(stages[1].reasoning).toBe("minimal");
     });
 
@@ -115,7 +121,7 @@ describe("features/translationLLM", () => {
       const stages = resolveTranslationStages("zz", 100);
       expect(stages.length).toBe(2);
       expect(stages[0].model).toBe("openai/gpt-5.6-luna:nitro");
-      expect(stages[1].model).toBe("google/gemini-3.6-flash:nitro");
+      expect(stages[1].model).toBe("google/gemini-3.7-flash:nitro");
     });
   });
 

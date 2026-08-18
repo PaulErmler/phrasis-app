@@ -4,6 +4,7 @@ import {
   SUPPORT_EMAIL,
   type AuthEmailCtx,
 } from './authEmails';
+import { withEmailEnvSubject } from './emailEnv';
 import { resend } from './resendClient';
 import { rateLimiter } from '../rateLimiter';
 import { getLanguageByCode } from '../../lib/languages';
@@ -41,10 +42,11 @@ export async function sendAdminNotificationEmail(
     // is fine — these are best-effort heads-ups, not records.
     const { ok } = await rateLimiter.limit(ctx, 'adminEmail');
     if (!ok) return;
+    const labeledSubject = withEmailEnvSubject(subject);
     await resend.sendEmail(ctx, {
       from: FROM,
       to: SUPPORT_EMAIL,
-      subject,
+      subject: labeledSubject,
       html,
       text,
     });

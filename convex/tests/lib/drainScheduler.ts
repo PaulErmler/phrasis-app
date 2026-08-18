@@ -15,9 +15,16 @@ import { afterEach } from 'vitest';
  * of any test file whose tests enqueue TTS/LLM queue work.
  */
 export function drainSchedulerAfterEach(rounds = 20): void {
-  afterEach(async () => {
-    for (let i = 0; i < rounds; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-  });
+  afterEach(() => drainScheduler(rounds));
+}
+
+/**
+ * Same macrotask-per-hop drain, callable inside a test body — for tests that
+ * need a scheduled chain (e.g. the seedWritingTrack sweep) to complete
+ * before asserting.
+ */
+export async function drainScheduler(rounds = 20): Promise<void> {
+  for (let i = 0; i < rounds; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
 }

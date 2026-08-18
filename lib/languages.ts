@@ -30,7 +30,7 @@
  * not remove either from this array without first migrating any stored rows
  * that use it.
  */
-export const TTS_PROVIDERS = ['google', 'elevenlabs', 'azure', 'gemini'] as const;
+export const TTS_PROVIDERS = ['google', 'elevenlabs', 'azure', 'gemini', 'minimax'] as const;
 export type TtsProvider = (typeof TTS_PROVIDERS)[number];
 
 /** Identifier for which translation backend a target language currently uses. */
@@ -122,7 +122,7 @@ export interface Language {
    * Named pipeline that decides which OpenRouter model(s) + reasoning levels
    * the translation worker uses for this language, with optional fallbacks
    * on truncation. Defined in TRANSLATION_RULES below. Unset →
-   * `gemini_35_flash_nitro_minimal` (Gemini 3.6 Flash Nitro, minimal
+   * `gemini_35_flash_nitro_minimal` (Gemini 3.7 Flash Nitro, minimal
    * reasoning, one same-config retry). No language currently pins a rule —
    * set one here only to route a language off the default.
    */
@@ -875,7 +875,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
-    experimental: true,
     // Bumped 1 → 2 with the Aug 2026 switch to the Luna best-of-3 pipeline:
     // native-speaker feedback flagged systematic errors in the existing
     // Icelandic rows (archaic register, wrong imperatives), so Icelandic —
@@ -1111,14 +1110,16 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇭🇰',
     category: 'asian-east',
     llmSupportTier: 'tier2',
-    // Stays on Google Chirp3: Cantonese (`yue`) is not in Gemini 3.1 Flash
-    // TTS's supported-language list (only Mandarin `cmn` is).
-    ttsProvider: 'google',
-    // Romanization disabled — the cantonese-romanisation (LSHK / Jyutping)
-    // lookup table is traditional-script oriented, so simplified Cantonese
-    // surfaces too many gaps to ship reliably. Traditional Cantonese
-    // (`yue_traditional`) keeps romanization on.
-    needsRomanization: false,
+    // MiniMax Speech 2.8 Turbo via OpenRouter — native Cantonese system
+    // voices (Gemini has none; Chirp3-HD misread 唔). See
+    // convex/lib/tts/minimax.ts.
+    ttsProvider: 'minimax',
+    // v2: Chirp3 → MiniMax switch — regenerate all existing Cantonese audio
+    // (the asset cache key contains neither provider nor voice).
+    ttsVersion: 2,
+    // Jyutping via to-jyutping (rime-cantonese data), which covers simplified
+    // script as well as traditional — see convex/lib/localRomanization.ts.
+    needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
     // Pins BOTH the register (spoken vernacular — 係/唔/嘅, not Standard
@@ -1145,9 +1146,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇭🇰',
     category: 'asian-east',
     llmSupportTier: 'tier2',
-    // Stays on Google Chirp3: Cantonese (`yue`) is not in Gemini 3.1 Flash
-    // TTS's supported-language list (only Mandarin `cmn` is).
-    ttsProvider: 'google',
+    // MiniMax Speech 2.8 Turbo via OpenRouter — native Cantonese system
+    // voices (Gemini has none; Chirp3-HD misread 唔). See
+    // convex/lib/tts/minimax.ts.
+    ttsProvider: 'minimax',
+    // v2: Chirp3 → MiniMax switch — regenerate all existing Cantonese audio
+    // (the asset cache key contains neither provider nor voice).
+    ttsVersion: 2,
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
@@ -1762,6 +1767,12 @@ export type StageReasoning =
  */
 export type StageProviderConstraints = {
   max_price?: { completion: number };
+  /**
+   * OpenRouter `provider.order` — try these slugs first. With the default
+   * `allow_fallbacks: true`, later endpoints still serve if the preferred
+   * ones are down or don't support the request.
+   */
+  order?: string[];
 };
 
 /** One leg of a translation rule — an OpenRouter model + optional reasoning. */
@@ -1807,51 +1818,11 @@ export type ModelStage = {
   };
 };
 
-/**
- * Stable identifier for the legacy Google Translate v2 path. Used as the
- * `translationSource` on rows produced by `processTranslationForCard` —
- * the fallback path the LLM queue schedules when every model stage fails.
- */
-export const GOOGLE_TRANSLATE_SOURCE = 'google-translate-v2';
-
-/**
- * Stable identifier for translations the user typed manually (no model
- * involved). Used on `createCustomText` insertions when the corresponding
- * entry didn't come from autofill.
- */
-export const USER_PROVIDED_TRANSLATION_SOURCE = 'user-provided';
-
-/**
- * Provenance slug for hand-curated translations shipped by a migration
- * (see convex/migrations/updateEssentialGreetings.ts). Like user-provided
- * rows, these were authored by a human and must never be regenerated.
- */
-export const CURATED_TRANSLATION_SOURCE = 'curated-manual';
-
-/**
- * Translation provenances that no automated pass may overwrite or delete.
- *
- * The version-stale regeneration sweep deletes and re-generates any row whose
- * `translationVersion` is below the language's current one. That is correct for
- * machine output, but both of these were written by a person: `user-provided`
- * by the user, `curated-manual` by us. Curated rows in particular live on
- * PREMADE texts, so the sweep's `!text.userCreated` guard does not cover them —
- * a `translationVersion` bump would silently undo the curation.
- *
- * Use `isProtectedTranslationSource` at every provenance guard rather than
- * comparing against a single constant, so adding a provenance protects it
- * everywhere at once.
- */
-export const PROTECTED_TRANSLATION_SOURCES: readonly string[] = [
-  USER_PROVIDED_TRANSLATION_SOURCE,
-  CURATED_TRANSLATION_SOURCE,
-];
-
-export function isProtectedTranslationSource(
-  source: string | undefined | null,
-): boolean {
-  return source != null && PROTECTED_TRANSLATION_SOURCES.includes(source);
-}
+// Translation provenance — the source slugs (`google-translate-v2`,
+// `user-provided`, `curated-manual`) and the guards that decide whether an
+// automated pass may touch a row — lives in `lib/translationProvenance.ts`.
+// Import from there, not from here. Only the tag *format* below stays with the
+// model config.
 
 /**
  * Build the `translationSource` string for an LLM translation from the
@@ -1933,7 +1904,7 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
   reasoning: 'medium',
   maxOutputTokens: 8_000,
 };
-// Gemini 3.6 Flash via OpenRouter Nitro routing with `minimal` reasoning —
+// Gemini 3.7 Flash via OpenRouter Nitro routing with `minimal` reasoning —
 // the translation workhorse: primary + retry for
 // `gemini_35_flash_nitro_minimal`, the default rule for every language.
 // Nitro prioritizes throughput/latency; minimal thinking keeps quality on
@@ -1942,21 +1913,29 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
 // convex/features/customTexts.ts) stays on the same model + effort as the
 // single-sentence pipeline by construction rather than by comment.
 export const GEMINI_35_FLASH_NITRO_MINIMAL: ModelStage = {
-  model: 'google/gemini-3.6-flash:nitro',
+  model: 'google/gemini-3.7-flash:nitro',
   reasoning: 'minimal',
   maxOutputTokens: 4_000,
 };
 
 /**
- * OpenRouter routing cap shared by every Luna call in the app (translation,
- * autofill, chat): never route to an endpoint charging more than $2 per
- * million output tokens. Keeps OpenAI's own endpoints ($0.30–1.20/M out),
- * excludes the Azure variants ($6.00–6.60/M) — the endpoints that were
- * observed silently burning ~1k hidden reasoning tokens per call during the
- * Aug 2026 eval.
+ * OpenRouter routing shared by every Luna call in the app (translation,
+ * autofill, chat).
+ *
+ * `order` prefers Amazon Bedrock us-east-1 (OpenRouter slug
+ * `amazon-bedrock/us-east-1`; supports tools + reasoning_effort, $1.32/M
+ * out as of 2026-08-15). Fallbacks stay on so a Bedrock outage degrades to
+ * other endpoints under the price cap rather than failing the request.
+ *
+ * `max_price.completion` never routes to an endpoint charging more than $2
+ * per million output tokens. Originally added to exclude Azure variants
+ * that were $6.00–6.60/M and silently burning ~1k hidden reasoning tokens
+ * per call during the Aug 2026 eval; kept as a ceiling if those prices
+ * return.
  */
 export const LUNA_PROVIDER_CONSTRAINTS: StageProviderConstraints = {
   max_price: { completion: 2 },
+  order: ['amazon-bedrock/us-east-1'],
 };
 
 // GPT-5.6 Luna best-of-3 — the translation workhorse since Aug 2026.
@@ -2011,7 +1990,7 @@ export const TRANSLATION_RULES = {
    */
   luna_bo3: {
     id: 'luna_bo3',
-    label: 'Luna best-of-3 (no thinking, judge) → Gemini 3.6 Flash Nitro (minimal) → Google',
+    label: 'Luna best-of-3 (no thinking, judge) → Gemini 3.7 Flash Nitro (minimal) → Google',
     branches: [
       {
         maxChars: Infinity,
@@ -2027,7 +2006,7 @@ export const TRANSLATION_RULES = {
    */
   gemini_35_flash_nitro_minimal: {
     id: 'gemini_35_flash_nitro_minimal',
-    label: 'Gemini 3.6 Flash Nitro (minimal) → Gemini 3.6 Flash Nitro (minimal, retry) → Google',
+    label: 'Gemini 3.7 Flash Nitro (minimal) → Gemini 3.7 Flash Nitro (minimal, retry) → Google',
     branches: [
       {
         maxChars: Infinity,

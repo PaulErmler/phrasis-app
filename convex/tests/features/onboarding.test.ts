@@ -3,7 +3,7 @@ import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 
 import schema from "../../schema";
-import { api } from "../../_generated/api";
+import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import {
   ONBOARDING_INITIAL_SEED_CARDS,
@@ -629,12 +629,12 @@ describe("saveOnboardingProgress — free-text length guard", () => {
 });
 
 describe("finalizeOnboarding", () => {
-  it("flips hasCompletedOnboarding, freezes progress with completedAt, and pre-marks in-lesson tutorials", async () => {
+  it("flips hasCompletedOnboarding, freezes progress with completedAt, and pre-marks NO tutorials", async () => {
     const t = convexTest(schema, modules);
     const asUser = t.withIdentity({ subject: "user_A" });
 
     await asUser.mutation(api.features.courses.saveOnboardingProgress, {
-      step: 12,
+      step: 7,
       targetLanguages: ["es"],
       baseLanguages: ["en"],
       currentLevel: "beginner",
@@ -648,10 +648,10 @@ describe("finalizeOnboarding", () => {
 
     const settings = await asUser.query(api.features.courses.getUserSettings, {});
     expect(settings?.hasCompletedOnboarding).toBe(true);
-    expect(settings?.completedTutorials).toContain("full_review_intro");
-    expect(settings?.completedTutorials).toContain("audio_review_intro");
-    // home_tour is intentionally NOT pre-marked.
-    expect(settings?.completedTutorials).not.toContain("home_tour");
+    // The wizard no longer embeds a tutorial lesson, so nothing may be
+    // pre-marked — the home tour and every learning-mode tip must stay
+    // armed for the fresh user (they teach in the real app now).
+    expect(settings?.completedTutorials ?? []).toEqual([]);
 
     // Helper-mediated query hides frozen rows from the wizard.
     const progress = await asUser.query(
@@ -768,12 +768,12 @@ describe("finalizeOnboarding", () => {
     expect(settings?.hasCompletedOnboarding).toBe(true);
   });
 
-  it("is idempotent — a second call reports alreadyFinalized, does not duplicate tutorial entries, and does not re-stamp completedAt", async () => {
+  it("is idempotent — a second call reports alreadyFinalized and does not re-stamp completedAt", async () => {
     const t = convexTest(schema, modules);
     const asUser = t.withIdentity({ subject: "user_A" });
 
     await asUser.mutation(api.features.courses.saveOnboardingProgress, {
-      step: 12,
+      step: 7,
       targetLanguages: ["es"],
       baseLanguages: ["en"],
       currentLevel: "beginner",
@@ -795,15 +795,6 @@ describe("finalizeOnboarding", () => {
     );
     expect(second.alreadyFinalized).toBe(true);
 
-    const settings = await asUser.query(api.features.courses.getUserSettings, {});
-    const completed = settings?.completedTutorials ?? [];
-    expect(
-      completed.filter((id) => id === "full_review_intro").length,
-    ).toBe(1);
-    expect(
-      completed.filter((id) => id === "audio_review_intro").length,
-    ).toBe(1);
-
     const secondCompletedAt = await t.run(async (ctx) => {
       const row = await ctx.db
         .query("onboardingProgress")
@@ -812,6 +803,265 @@ describe("finalizeOnboarding", () => {
       return row?.completedAt;
     });
     expect(secondCompletedAt).toBe(firstCompletedAt);
+  });
+
+  it("re-syncs a review-mode pick made after course creation onto courseSettings (old-flow resume)", async () => {
+    const t = convexTest(schema, modules);
+    await seedEssentialCollection(t);
+    await seedQuota(t, "user_A");
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    // Old-flow shape: the course was created while the progress row still
+    // said audio (or nothing) …
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 6,
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      currentLevel: "beginner",
+      reviewMode: "audio",
+    });
+    const { courseId } = await asUser.mutation(
+      api.features.courses.completeOnboarding,
+      {},
+    );
+    await drainScheduled(t);
+
+    // … and the user then picked Writing/Transcribe on the review-mode step.
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 7,
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      currentLevel: "beginner",
+      reviewMode: "full",
+      writingInputMode: "transcribe",
+    });
+
+    await asUser.mutation(api.features.onboarding.finalizeOnboarding, {});
+
+    const courseSettings = await t.run(async (ctx) =>
+      ctx.db
+        .query("courseSettings")
+        .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+        .first(),
+    );
+    expect(courseSettings?.reviewMode).toBe("full");
+    expect(courseSettings?.writingInputMode).toBe("transcribe");
+  });
+  it("clears a previously saved writing style when the user switches to Shadowing", async () => {
+    // Regression: the wizard sends `writingInputMode: null` for Shadowing,
+    // but null used to collapse to `undefined` on the way out — and the
+    // Convex client strips undefined args, so the patch left 'transcribe' on
+    // the progress row. completeOnboarding then copied it onto courseSettings
+    // and the user silently landed in Transcribe the first time they opened
+    // Writing mode.
+    const t = convexTest(schema, modules);
+    await seedEssentialCollection(t);
+    await seedQuota(t, "user_A");
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 7,
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      currentLevel: "beginner",
+      reviewMode: "full",
+      writingInputMode: "transcribe",
+    });
+    // The user backs up and picks Shadowing instead.
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 7,
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      currentLevel: "beginner",
+      reviewMode: "audio",
+      writingInputMode: null,
+    });
+
+    const progress = await t.run(async (ctx) =>
+      ctx.db
+        .query("onboardingProgress")
+        .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+        .first(),
+    );
+    expect(progress?.writingInputMode).toBeUndefined();
+
+    const { courseId } = await asUser.mutation(
+      api.features.courses.completeOnboarding,
+      {},
+    );
+    await drainScheduled(t);
+
+    const courseSettings = await t.run(async (ctx) =>
+      ctx.db
+        .query("courseSettings")
+        .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+        .first(),
+    );
+    expect(courseSettings?.reviewMode).toBe("audio");
+    expect(courseSettings?.writingInputMode).toBeUndefined();
+  });
+
+  it("clears an EXISTING course's writing style on a Shadowing pick (old-flow resume)", async () => {
+    // The mirror of the re-sync test above: finalizeOnboarding must treat an
+    // absent writingInputMode as "Shadowing, no writing style" rather than
+    // "user didn't answer", or a course that already carries 'transcribe'
+    // keeps it forever.
+    const t = convexTest(schema, modules);
+    await seedEssentialCollection(t);
+    await seedQuota(t, "user_A");
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 6,
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      currentLevel: "beginner",
+      reviewMode: "full",
+      writingInputMode: "transcribe",
+    });
+    const { courseId } = await asUser.mutation(
+      api.features.courses.completeOnboarding,
+      {},
+    );
+    await drainScheduled(t);
+
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 7,
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      currentLevel: "beginner",
+      reviewMode: "audio",
+      writingInputMode: null,
+    });
+    await asUser.mutation(api.features.onboarding.finalizeOnboarding, {});
+
+    const courseSettings = await t.run(async (ctx) =>
+      ctx.db
+        .query("courseSettings")
+        .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+        .first(),
+    );
+    expect(courseSettings?.reviewMode).toBe("audio");
+    expect(courseSettings?.writingInputMode).toBeUndefined();
+  });
+});
+
+describe("warmupOnboardingTranslations", () => {
+  async function seedPlacementSentences(
+    t: TestConvex<typeof schema>,
+    count: number,
+  ) {
+    await t.run(async (ctx) => {
+      const collectionId = await ctx.db.insert("collections", {
+        name: "Placement",
+        textCount: count,
+        origin: "premade",
+      });
+      for (let i = 0; i < count; i++) {
+        const textId = await ctx.db.insert("texts", {
+          text: `placement ${i}`,
+          language: "en",
+          userCreated: false,
+          collectionId,
+          collectionRank: i,
+        });
+        await ctx.db.insert("placementTestSentences", {
+          level: 1 + (i % 20),
+          position: i % 5,
+          textId,
+        });
+      }
+    });
+  }
+
+  it("rejects unknown language codes", async () => {
+    const t = convexTest(schema, modules);
+    await expect(
+      t.mutation(internal.features.onboarding.warmupOnboardingTranslations, {
+        languages: ["xx_not_a_language"],
+      }),
+    ).rejects.toThrow(/Unknown language code/);
+  });
+
+  it("is a no-op for an empty languages list", async () => {
+    const t = convexTest(schema, modules);
+    await seedPlacementSentences(t, 3);
+    const result = await t.mutation(
+      internal.features.onboarding.warmupOnboardingTranslations,
+      { languages: [] },
+    );
+    expect(result).toEqual({ languages: 0, texts: 0, batches: 0 });
+  });
+
+  it("fans out placement sentences + the first texts of each level collection for a single language", async () => {
+    const t = convexTest(schema, modules);
+    await seedPlacementSentences(t, 7);
+    // Two level collections with 6 curriculum texts each → first 5 of each.
+    await seedActiveDataset(t, [1, 2]);
+
+    const result = await t.mutation(
+      internal.features.onboarding.warmupOnboardingTranslations,
+      { languages: ["fr"] },
+    );
+    expect(result.languages).toBe(1);
+    // 7 placement texts + 2 collections × first 5 texts (no overlap).
+    expect(result.texts).toBe(17);
+    // One language → up to 100 texts per batch → a single batch.
+    expect(result.batches).toBe(1);
+  });
+
+  it("splits batches so texts × languages stays bounded", async () => {
+    const t = convexTest(schema, modules);
+    await seedPlacementSentences(t, 60);
+
+    const result = await t.mutation(
+      internal.features.onboarding.warmupOnboardingTranslations,
+      { languages: ["fr", "de", "es"] },
+    );
+    // 3 languages → 33 texts per batch → 60 texts need 2 batches.
+    expect(result.texts).toBe(60);
+    expect(result.batches).toBe(2);
+  });
+  it("skips user forks so they can't consume the per-collection window", async () => {
+    // Regression: the per-collection query used `by_collection_and_rank`
+    // without the `userCreated: false` filter every other premade-level read
+    // applies. A user fork sitting at a low rank ate one of the five slots —
+    // paying for a private fork's translations while a curriculum text that
+    // the placement flow actually shows stayed cold.
+    const t = convexTest(schema, modules);
+    const byCode = await seedActiveDataset(t, [1]);
+    await t.run(async (ctx) => {
+      // Two forks ranked ahead of the curriculum texts (rank 0..5).
+      for (let i = 0; i < 2; i++) {
+        await ctx.db.insert("texts", {
+          text: `fork ${i}`,
+          language: "en",
+          userCreated: true,
+          userId: "user_A",
+          collectionId: Object.values(byCode)[0],
+          collectionRank: -10 + i,
+        });
+      }
+    });
+
+    await t.mutation(
+      internal.features.onboarding.warmupOnboardingTranslations,
+      { languages: ["fr"] },
+    );
+
+    // The COUNT alone can't tell the two behaviours apart (take(5) returns
+    // five rows either way) — assert on which texts were actually fanned out.
+    const scheduledTextIds = await t.run(async (ctx) => {
+      const jobs = await ctx.db.system.query("_scheduled_functions").collect();
+      return jobs.flatMap(
+        (job) => (job.args[0] as { textIds: Id<"texts">[] }).textIds,
+      );
+    });
+    const texts = await t.run(async (ctx) =>
+      Promise.all(scheduledTextIds.map((id) => ctx.db.get(id))),
+    );
+    expect(texts).toHaveLength(5);
+    expect(texts.every((text) => text?.userCreated === false)).toBe(true);
   });
 });
 

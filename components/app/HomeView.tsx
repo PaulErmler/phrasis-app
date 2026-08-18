@@ -55,9 +55,20 @@ export function HomeView({
     // Home stays mounted across tabs (KeepMountedView). Only auto-start
     // when home is actually visible so the overlay doesn't pop over
     // Settings / Library / Learn.
-    enabled: !isHidden,
+    //
+    // Two more gates, both about not burning this one-time tour on a screen
+    // that can't support it — a dismissal marks it complete forever:
+    //   - `hasActiveCourse`: without a course HomeView renders only the
+    //     empty state, so every anchor the tour highlights is absent.
+    //   - `courseSettings != null`: the free-play step is anchored from
+    //     `reviewMode` below, and `usePreloadedQuery` can serve a stale null
+    //     immediately after the onboarding soft nav (see AppDataProvider) —
+    //     starting then would show a Writing user the Radio step and
+    //     highlight a button that isn't on screen.
+    enabled: !isHidden && hasActiveCourse && courseSettings != null,
     // Anchors the free-play step to the button that actually renders:
-    // Radio (Shadowing) vs Free Study (Writing).
+    // Radio (Shadowing) vs Free Study (Writing). Matches the face chosen in
+    // StartLearningButton, which sets `data-tutorial` from the same field.
     context: { reviewMode: courseSettings?.reviewMode ?? 'audio' },
   });
 

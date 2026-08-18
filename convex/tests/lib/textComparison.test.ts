@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { soundsSame } from '../../lib/textComparison';
+import { soundsSame, textsMatchForLanguage } from '../../lib/textComparison';
 
 describe('soundsSame', () => {
   it('treats inaudible punctuation-only differences as identical', () => {
@@ -71,5 +71,56 @@ describe('soundsSame', () => {
 
   it('keeps symbols — "€" is pronounced', () => {
     expect(soundsSame('5 €', '5')).toBe(false);
+  });
+});
+
+/**
+ * TTS validation romanizes both sides for zh / zh_traditional / ko before
+ * comparing, so Scribe returning a homophone character still matches. These
+ * guard that path against romanizer changes — notably the switch to
+ * segment-based pinyin (which stopped deleting punctuation and digits) and to
+ * pronunciation-based Korean romanization.
+ */
+describe('textsMatchForLanguage', () => {
+  it('accepts a hanzi homophone swap that romanizes identically', () => {
+    // 在 vs 再 — the whole reason this comparison romanizes first.
+    expect(textsMatchForLanguage('我在这里', '我再这里', 'zh')).toBe(true);
+  });
+
+  it('still rejects a genuinely different Chinese sentence', () => {
+    expect(textsMatchForLanguage('我有三个苹果', '他喜欢喝茶', 'zh')).toBe(false);
+  });
+
+  it('ignores punctuation differences even though romanization now keeps them', () => {
+    // normalizeForComparison strips \p{P}\p{S}, so restoring punctuation in the
+    // romanizer must not make STT output (typically unpunctuated) stop matching.
+    expect(textsMatchForLanguage('你好，世界！', '你好世界', 'zh')).toBe(true);
+  });
+
+  it('matches numerals against themselves now that digits survive romanization', () => {
+    // Digits are NOT stripped by normalizeForComparison, so they reach the
+    // comparison for the first time. Identical text must still match.
+    expect(textsMatchForLanguage('我有2个苹果。', '我有2个苹果', 'zh')).toBe(true);
+  });
+
+  it('matches equivalent traditional text after the simplified pre-conversion', () => {
+    expect(
+      textsMatchForLanguage('我去銀行了。', '我去銀行了', 'zh_traditional'),
+    ).toBe(true);
+  });
+
+  it('matches Korean against itself under pronunciation-based romanization', () => {
+    expect(textsMatchForLanguage('한국말', '한국말', 'ko')).toBe(true);
+  });
+
+  it('accepts a Korean spelling difference that sounds identical', () => {
+    // 신라 and 실라 are spelled differently but both pronounced "silla" —
+    // exactly the case pronunciation-based romanization is meant to absorb.
+    expect(textsMatchForLanguage('신라', '실라', 'ko')).toBe(true);
+  });
+
+  it('falls back to character comparison for languages with no local romanizer', () => {
+    expect(textsMatchForLanguage('Hola', 'Hola', 'es')).toBe(true);
+    expect(textsMatchForLanguage('Hola', 'Adiós', 'es')).toBe(false);
   });
 });

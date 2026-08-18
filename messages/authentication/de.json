@@ -9,6 +9,7 @@
     "SIGN_IN_WITH_GOOGLE": "Mit Google fortfahren",
     "SIGN_IN_WITH_APPLE": "Mit Apple fortfahren",
     "SOCIAL_SIGN_IN_FAILED": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
+    "REQUEST_FAILED": "Anfrage fehlgeschlagen. Bitte versuche es erneut.",
 
     "EMAIL": "E-Mail",
     "EMAIL_PLACEHOLDER": "du@beispiel.de",

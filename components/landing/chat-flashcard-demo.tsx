@@ -16,28 +16,29 @@ import { Message, MessageContent } from '@/components/ai-elements/message';
 import { MessageResponse } from '@/components/ai-elements/message';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LandingAudioButton } from '@/components/landing/LandingAudioButton';
 import { getLandingAudioUrl } from '@/lib/landing/audio';
 import { getLanguageShortLabel } from '@/lib/languages';
 import { useLandingDemo } from '@/components/landing/landing-demo-context';
-import { MousePointer2 } from 'lucide-react';
+import { MousePointer2, Pencil, RotateCcw } from 'lucide-react';
 
-type Scenario = 'grammar' | 'threeCards' | 'curiosity';
+type Scenario = 'grammar' | 'simpler' | 'restaurant';
 
-type Phase =
-  | 'userTyping'
-  | 'assistantTyping'
-  | 'cardsVisible'
-  | 'cursorMoving'
-  | 'cursorPressing'
-  | 'highlightApproved';
+type Phase = 'userTyping' | 'streaming' | 'cursorMoving' | 'cursorPressing' | 'done';
 
-type ProposalLine = { code: string; text: string; romanization?: string };
+type ProposalLine = { code: string; text: string };
 
-type DemoCard = { lines: ProposalLine[] };
+type DemoPart =
+  | { type: 'text'; text: string }
+  | { type: 'card'; lines: ProposalLine[] };
 
-type MultiCardFields = { base: string; hi: string; hiRoman: string; es: string; fr: string };
+/** Raw i18n shape of one conversation part (scenarios.*.simple / .multi). */
+type RawPart = {
+  text?: string;
+  card?: { base?: string; es?: string; fr?: string };
+};
 
 function LangChip({ code }: { code: string }) {
   return (
@@ -45,17 +46,6 @@ function LangChip({ code }: { code: string }) {
       {getLanguageShortLabel(code)}
     </span>
   );
-}
-
-function readMultiCard(raw: unknown): MultiCardFields {
-  const o = raw as Record<string, string>;
-  return {
-    base: o.base ?? '',
-    hi: o.hi ?? '',
-    hiRoman: o.hiRoman ?? '',
-    es: o.es ?? '',
-    fr: o.fr ?? '',
-  };
 }
 
 function LandingChatScrollBinder({
@@ -70,11 +60,18 @@ function LandingChatScrollBinder({
     if (!root) return;
     const el = root.querySelector('[role="log"]');
     if (!el || !(el instanceof HTMLElement)) return;
+    // Follow the stream only while the viewer is near the bottom — once they
+    // scroll up to re-read, stop yanking the log down (like a real chat). The
+    // threshold must absorb the height jump of a card revealing all at once,
+    // or the follow silently stops mid-conversation.
+    const nearBottom = () =>
+      el.scrollHeight - el.scrollTop - el.clientHeight < 400;
+    if (!nearBottom()) return;
     const t1 = window.setTimeout(() => {
       el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     }, 60);
     const t2 = window.setTimeout(() => {
-      el.scrollTop = el.scrollHeight;
+      if (nearBottom()) el.scrollTop = el.scrollHeight;
     }, 320);
     return () => {
       clearTimeout(t1);
@@ -96,9 +93,9 @@ function usePrefersReducedMotion() {
   return reduced;
 }
 
+/** Base lines muted, target lines bold — same hierarchy as the in-app CardApproval. */
 function lineTextClass(code: string) {
   if (code === 'es' || code === 'fr') return 'text-base font-semibold';
-  if (code === 'hi') return 'text-sm text-foreground';
   return 'text-sm text-muted-foreground';
 }
 
@@ -121,13 +118,10 @@ function CourseProposalCard({
     <div className="space-y-1.5 text-sm">
       {lines.map((line, i) => (
         <div key={`${line.code}-${i}`} className="flex items-start gap-2">
-          <div className="flex-1 space-y-0.5">
+          <div className="min-w-0 flex-1">
             <p className={lineTextClass(line.code)}>
               <LangChip code={line.code} /> {line.text}
             </p>
-            {line.romanization ? (
-              <p className="ps-6 text-xs text-muted-foreground">{line.romanization}</p>
-            ) : null}
           </div>
           <LandingAudioButton
             url={getLandingAudioUrl(line.text, line.code)}
@@ -138,25 +132,28 @@ function CourseProposalCard({
     </div>
   );
 
-  const shellClass = 'my-1 flex flex-col gap-2';
-
   if (approved) {
     return (
-      <Alert
-        className={`${shellClass} border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950`}
-      >
+      <Alert className="my-3 flex flex-col gap-3 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
         <AlertDescription className="p-0 m-0 [&_p]:mb-0">{cardInner}</AlertDescription>
-        <div className="flex h-8 shrink-0 items-center justify-end gap-2">
-          <p className="text-xs font-medium text-success">{approvedLabel}</p>
+        <div className="flex h-8 w-full items-center gap-2">
+          <Button
+            disabled
+            variant="ghost"
+            size="sm"
+            className="h-8 px-3 text-xs font-medium text-success hover:bg-transparent disabled:opacity-100"
+          >
+            {approvedLabel}
+          </Button>
         </div>
       </Alert>
     );
   }
 
   return (
-    <Alert className={`${shellClass}`}>
+    <Alert className="my-3 flex flex-col gap-3">
       <AlertDescription className="p-0 m-0 [&_p]:mb-0">{cardInner}</AlertDescription>
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+      <div className="flex h-8 w-full items-center gap-2">
         <Button type="button" variant="outline" size="sm" className="h-8 px-3 text-sm" disabled>
           {rejectLabel}
         </Button>
@@ -169,153 +166,110 @@ function CourseProposalCard({
         >
           {approveLabel}
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="ml-auto h-8 w-8"
+          disabled
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
       </div>
     </Alert>
   );
 }
 
+/**
+ * The card "currently being reviewed" — shown in the section's text column so
+ * visitors see the context the tutor already knows about. Same card as the
+ * review-modes demo, so the whole landing page tells one story.
+ */
+export function ChatDemoContextCard() {
+  const t = useTranslations('LandingPage.chatDemo');
+  const locale = useLocale();
+  const { multiCourse } = useLandingDemo();
+  const baseLangCode = locale.startsWith('de') ? 'de' : 'en';
+  const base = t('contextCard.base');
+  const targets: ProposalLine[] = [
+    { code: 'es', text: t('contextCard.es') },
+    ...(multiCourse ? [{ code: 'fr', text: t('contextCard.fr') }] : []),
+  ];
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm space-y-3">
+      <div className="flex items-start gap-2">
+        <p className="flex-1 text-base font-medium">{base}</p>
+        <LandingAudioButton
+          url={getLandingAudioUrl(base, baseLangCode)}
+          language={getLanguageShortLabel(baseLangCode)}
+        />
+      </div>
+      <Separator />
+      <div className="space-y-1.5">
+        {targets.map((line) => (
+          <div key={line.code} className="flex items-start gap-2">
+            <p className="flex-1 text-base font-semibold">{line.text}</p>
+            <LandingAudioButton
+              url={getLandingAudioUrl(line.text, line.code)}
+              language={getLanguageShortLabel(line.code)}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const USER_TYPE_MS = 18;
+const ASSISTANT_TYPE_MS = 6;
+
 export function ChatFlashcardDemo() {
   const t = useTranslations('LandingPage.chatDemo');
   const locale = useLocale();
+  const baseLangCode = locale.startsWith('de') ? 'de' : 'en';
   const { multiCourse } = useLandingDemo();
   const reducedMotion = usePrefersReducedMotion();
   const [scenario, setScenario] = useState<Scenario>('grammar');
   const [runKey, setRunKey] = useState(0);
   const [phase, setPhase] = useState<Phase>('userTyping');
   const [userShown, setUserShown] = useState('');
-  const [assistantShown, setAssistantShown] = useState('');
+  const [donePartCount, setDonePartCount] = useState(0);
+  const [streamText, setStreamText] = useState('');
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [cursorPath, setCursorPath] = useState<{
     from: { x: number; y: number };
     to: { x: number; y: number };
   } | null>(null);
-  const [revealedCardCount, setRevealedCardCount] = useState(0);
   const [pressPos, setPressPos] = useState<{ x: number; y: number } | null>(null);
   const cursorMoveAdvanceRef = useRef(false);
   const cursorPressAdvanceRef = useRef(false);
+  // Scenarios whose animation already ran to completion: revisiting their tab
+  // shows the finished conversation instead of replaying it.
+  const completedRef = useRef<Set<Scenario>>(new Set());
 
-  const baseLangCode = locale.startsWith('de') ? 'de' : 'en';
-
-  const { userFull, assistantFull, cards, highlightCardIndex } = useMemo(() => {
-    const simpleLine = (base: string, target: string): ProposalLine[] => [
-      { code: baseLangCode, text: base },
-      { code: 'es', text: target },
-    ];
-    // Multi-language card: 1 base + 2 targets (es + fr). The MultiCardFields
-    // type still carries `hi` / `hiRoman` from the i18n source for back-
-    // compat, but they're no longer rendered — matches the Pro plan's
-    // "up to 3 languages per course" cap.
-    const multiLines = (m: MultiCardFields): ProposalLine[] => [
-      { code: baseLangCode, text: m.base },
-      { code: 'es', text: m.es },
-      { code: 'fr', text: m.fr },
-    ];
-
-    switch (scenario) {
-    case 'grammar': {
-      const user = t('grammar.userMessage');
-      const assistant = t('grammar.assistantMessage');
-      if (!multiCourse) {
-        return {
-          userFull: user,
-          assistantFull: assistant,
-          cards: [
-            { lines: simpleLine(t('grammar.card1Base'), t('grammar.card1Target')) },
-            { lines: simpleLine(t('grammar.card2Base'), t('grammar.card2Target')) },
-          ] satisfies DemoCard[],
-          highlightCardIndex: 1,
-        };
-      }
-      const m1 = readMultiCard(t.raw('grammar.multiCard1'));
-      const m2 = readMultiCard(t.raw('grammar.multiCard2'));
-      return {
-        userFull: user,
-        assistantFull: assistant,
-        cards: [{ lines: multiLines(m1) }, { lines: multiLines(m2) }],
-        highlightCardIndex: 1,
-      };
-    }
-    case 'threeCards': {
-      const user = t('threeCards.userMessage');
-      const assistant = multiCourse
-        ? t('threeCards.assistantMessageMulti')
-        : t('threeCards.assistantMessage');
-      if (!multiCourse) {
-        return {
-          userFull: user,
-          assistantFull: assistant,
-          cards: [
-            {
-              lines: simpleLine(
-                t('threeCards.simple.card1Base'),
-                t('threeCards.simple.card1Target'),
-              ),
-            },
-            {
-              lines: simpleLine(
-                t('threeCards.simple.card2Base'),
-                t('threeCards.simple.card2Target'),
-              ),
-            },
-            {
-              lines: simpleLine(
-                t('threeCards.simple.card3Base'),
-                t('threeCards.simple.card3Target'),
-              ),
-            },
-          ],
-          highlightCardIndex: 2,
-        };
-      }
-      const c1 = readMultiCard(t.raw('threeCards.multi.card1'));
-      const c2 = readMultiCard(t.raw('threeCards.multi.card2'));
-      const c3 = readMultiCard(t.raw('threeCards.multi.card3'));
-      return {
-        userFull: user,
-        assistantFull: assistant,
-        cards: [
-          { lines: multiLines(c1) },
-          { lines: multiLines(c2) },
-          { lines: multiLines(c3) },
-        ],
-        highlightCardIndex: 2,
-      };
-    }
-    case 'curiosity': {
-      const user = t('curiosity.userMessage');
-      const assistant = t('curiosity.assistantMessage');
-      if (!multiCourse) {
-        return {
-          userFull: user,
-          assistantFull: assistant,
-          cards: [
-            {
-              lines: simpleLine(
-                t('curiosity.simple.card1Base'),
-                t('curiosity.simple.card1Target'),
-              ),
-            },
-            {
-              lines: simpleLine(
-                t('curiosity.simple.card2Base'),
-                t('curiosity.simple.card2Target'),
-              ),
-            },
-          ],
-          highlightCardIndex: 1,
-        };
-      }
-      const c1 = readMultiCard(t.raw('curiosity.multi.card1'));
-      const c2 = readMultiCard(t.raw('curiosity.multi.card2'));
-      return {
-        userFull: user,
-        assistantFull: assistant,
-        cards: [{ lines: multiLines(c1) }, { lines: multiLines(c2) }],
-        highlightCardIndex: 1,
-      };
-    }
-    }
+  const { userFull, parts, highlightCardIndex } = useMemo(() => {
+    const userFull = t(`scenarios.${scenario}.userMessage`);
+    const raw = t.raw(
+      `scenarios.${scenario}.${multiCourse ? 'multi' : 'simple'}`,
+    ) as RawPart[];
+    const parts: DemoPart[] = raw.map((p) => {
+      if (typeof p.text === 'string') return { type: 'text', text: p.text };
+      const card = p.card ?? {};
+      const lines: ProposalLine[] = [
+        { code: baseLangCode, text: card.base ?? '' },
+        ...(card.es ? [{ code: 'es', text: card.es }] : []),
+        ...(multiCourse && card.fr ? [{ code: 'fr', text: card.fr }] : []),
+      ];
+      return { type: 'card', lines };
+    });
+    // The fake cursor approves the conversation's last proposed card.
+    let highlightCardIndex = -1;
+    parts.forEach((p, i) => {
+      if (p.type === 'card') highlightCardIndex = i;
+    });
+    return { userFull, parts, highlightCardIndex };
   }, [scenario, t, multiCourse, baseLangCode]);
 
   const clearTimers = useCallback(() => {
@@ -331,43 +285,62 @@ export function ChatFlashcardDemo() {
     clearTimers();
     setPhase('userTyping');
     setUserShown('');
-    setAssistantShown('');
+    setDonePartCount(0);
+    setStreamText('');
     setCursorPath(null);
     setPressPos(null);
     cursorMoveAdvanceRef.current = false;
     cursorPressAdvanceRef.current = false;
     let cancelled = false;
 
-    if (reducedMotion) {
+    if (reducedMotion || completedRef.current.has(scenario)) {
       setUserShown(userFull);
-      setAssistantShown(assistantFull);
-      setPhase('cardsVisible');
-      after(400, () => {
-        if (!cancelled) setPhase('highlightApproved');
-      });
+      setDonePartCount(parts.length);
+      setPhase('done');
       return () => {
         cancelled = true;
         clearTimers();
       };
     }
 
-    const startAssistant = () => {
+    const startCursor = () => {
       if (cancelled) return;
-      setPhase('assistantTyping');
+      if (highlightCardIndex === -1) {
+        setPhase('done');
+        return;
+      }
+      setPhase('cursorMoving');
+    };
+
+    const processPart = (index: number) => {
+      if (cancelled) return;
+      if (index >= parts.length) {
+        after(650, startCursor);
+        return;
+      }
+      const part = parts[index];
+      if (part.type === 'card') {
+        setDonePartCount(index + 1);
+        after(550, () => processPart(index + 1));
+        return;
+      }
       let j = 0;
-      const stepAsst = () => {
+      const step = () => {
         if (cancelled) return;
         j += 1;
-        setAssistantShown(assistantFull.slice(0, j));
-        if (j < assistantFull.length) {
-          after(10, stepAsst);
+        setStreamText(part.text.slice(0, j));
+        if (j < part.text.length) {
+          after(ASSISTANT_TYPE_MS, step);
         } else {
-          after(280, () => {
-            if (!cancelled) setPhase('cardsVisible');
+          after(350, () => {
+            if (cancelled) return;
+            setDonePartCount(index + 1);
+            setStreamText('');
+            processPart(index + 1);
           });
         }
       };
-      stepAsst();
+      step();
     };
 
     after(220, () => {
@@ -378,9 +351,13 @@ export function ChatFlashcardDemo() {
         i += 1;
         setUserShown(userFull.slice(0, i));
         if (i < userFull.length) {
-          after(18, stepUser);
+          after(USER_TYPE_MS, stepUser);
         } else {
-          after(260, startAssistant);
+          after(280, () => {
+            if (cancelled) return;
+            setPhase('streaming');
+            processPart(0);
+          });
         }
       };
       stepUser();
@@ -390,44 +367,7 @@ export function ChatFlashcardDemo() {
       cancelled = true;
       clearTimers();
     };
-  }, [runKey, scenario, reducedMotion, userFull, assistantFull, after, clearTimers]);
-
-  const showAssistantBubble =
-    assistantShown.length > 0 || (reducedMotion && phase !== 'userTyping');
-
-  const assistantComplete =
-    reducedMotion || assistantShown.length === assistantFull.length;
-
-  const showCards = assistantComplete && phase !== 'userTyping' && phase !== 'assistantTyping';
-
-  useEffect(() => {
-    if (!showCards) {
-      setRevealedCardCount(0);
-      return;
-    }
-    if (reducedMotion) {
-      setRevealedCardCount(cards.length);
-      return;
-    }
-    setRevealedCardCount(0);
-    const staggerMs = 540;
-    const leadMs = 400;
-    const ids: ReturnType<typeof setTimeout>[] = [];
-    for (let i = 0; i < cards.length; i++) {
-      ids.push(
-        setTimeout(() => {
-          setRevealedCardCount(i + 1);
-        }, leadMs + i * staggerMs),
-      );
-    }
-    return () => ids.forEach(clearTimeout);
-  }, [showCards, cards.length, runKey, scenario, reducedMotion]);
-
-  useEffect(() => {
-    if (phase !== 'cardsVisible' || reducedMotion || revealedCardCount < cards.length) return;
-    const id = window.setTimeout(() => setPhase('cursorMoving'), 720);
-    return () => clearTimeout(id);
-  }, [phase, reducedMotion, revealedCardCount, cards.length]);
+  }, [runKey, scenario, reducedMotion, userFull, parts, highlightCardIndex, after, clearTimers]);
 
   useLayoutEffect(() => {
     if (phase !== 'cursorMoving') {
@@ -446,39 +386,65 @@ export function ChatFlashcardDemo() {
         y: br.top - wr.top + br.height / 2 - 4,
       },
     });
-  }, [phase, cards, highlightCardIndex]);
+  }, [phase, parts, highlightCardIndex]);
 
   const prevMulti = useRef(multiCourse);
   useEffect(() => {
     if (prevMulti.current !== multiCourse) {
+      // The toggle swaps the conversation content, so finished runs no
+      // longer apply — replay everything from scratch.
+      completedRef.current.clear();
       clearTimers();
       setRunKey((k) => k + 1);
     }
     prevMulti.current = multiCourse;
   }, [multiCourse, clearTimers]);
 
-  const highlightDone = phase === 'highlightApproved';
+  const done = phase === 'done';
 
   useEffect(() => {
-    if (!highlightDone) return;
-    const id = window.setTimeout(() => {
-      clearTimers();
-      setRunKey((k) => k + 1);
-    }, 6000);
-    return () => clearTimeout(id);
-  }, [highlightDone, clearTimers]);
+    if (done) completedRef.current.add(scenario);
+  }, [done, scenario]);
 
+  const replay = () => {
+    completedRef.current.delete(scenario);
+    clearTimers();
+    setRunKey((k) => k + 1);
+  };
+
+  const streamingPart =
+    phase === 'streaming' && donePartCount < parts.length
+      ? parts[donePartCount]
+      : null;
+
+  // No tick for the cursor phases: the view is already at the bottom when the
+  // cursor starts, and scrolling after the pointer path is measured would
+  // move the approve button out from under it.
   const scrollTick =
     userShown.length +
-    assistantShown.length * 1000 +
-    (showCards ? 50000 : 0) +
-    revealedCardCount * 12000 +
-    (phase === 'cursorMoving' ? 3000 : 0) +
-    (phase === 'cursorPressing' ? 5000 : 0) +
-    (highlightDone ? 100000 : 0) +
-    (scenario === 'grammar' ? 1 : scenario === 'threeCards' ? 2 : 3) * 7 +
-    (multiCourse ? 13 : 0) +
-    cards.length * 3;
+    streamText.length +
+    donePartCount * 5000 +
+    (done ? 200000 : 0);
+
+  const renderCard = (part: Extract<DemoPart, { type: 'card' }>, index: number) => (
+    <motion.div
+      key={`${runKey}-${scenario}-card-${index}`}
+      initial={reducedMotion ? false : { opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.38, ease: [0.25, 0.1, 0.25, 1] }}
+    >
+      <CourseProposalCard
+        lines={part.lines}
+        approved={done && index === highlightCardIndex}
+        approveLabel={t('approve')}
+        rejectLabel={t('reject')}
+        approvedLabel={t('approved')}
+        approveTarget={index === highlightCardIndex}
+      />
+    </motion.div>
+  );
+
+  const showAssistant = donePartCount > 0 || streamingPart !== null;
 
   return (
     <div className="flex w-full max-w-lg flex-col gap-3 mx-auto lg:mx-0">
@@ -495,21 +461,21 @@ export function ChatFlashcardDemo() {
           <TabsTrigger value="grammar" className="px-2 py-2.5 text-xs sm:text-sm">
             {t('scenarioGrammar')}
           </TabsTrigger>
-          <TabsTrigger value="threeCards" className="px-2 py-2.5 text-xs sm:text-sm">
-            {t('scenarioCards')}
+          <TabsTrigger value="simpler" className="px-2 py-2.5 text-xs sm:text-sm">
+            {t('scenarioSimpler')}
           </TabsTrigger>
-          <TabsTrigger value="curiosity" className="px-2 py-2.5 text-xs sm:text-sm">
-            {t('scenarioCuriosity')}
+          <TabsTrigger value="restaurant" className="px-2 py-2.5 text-xs sm:text-sm">
+            {t('scenarioCards')}
           </TabsTrigger>
         </TabsList>
       </Tabs>
 
-      <div className="flex h-[min(24rem,62vh)] sm:h-[26rem] flex-col overflow-hidden rounded-2xl border border-border/50 bg-card/50">
+      <div className="flex h-[min(28rem,70vh)] sm:h-[30rem] flex-col overflow-hidden rounded-2xl border border-border/50 bg-card/50">
         <div
           ref={wrapRef}
           className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden"
         >
-          <Conversation className="h-full min-h-0 flex-1 overflow-y-hidden">
+          <Conversation className="h-full min-h-0 flex-1 overflow-y-auto">
             <LandingChatScrollBinder tick={scrollTick} rootRef={wrapRef} />
             <ConversationContent className="gap-4 px-4 py-4">
               {userShown.length > 0 && (
@@ -520,39 +486,52 @@ export function ChatFlashcardDemo() {
                 </Message>
               )}
 
-              {showAssistantBubble && (
+              {showAssistant && (
                 <Message from="assistant">
                   <MessageContent>
-                    <MessageResponse>
-                      {reducedMotion ? assistantFull : assistantShown}
-                    </MessageResponse>
+                    {parts.slice(0, donePartCount).map((part, index) =>
+                      part.type === 'text' ? (
+                        <MessageResponse
+                          key={`${runKey}-${scenario}-text-${index}`}
+                          mode="static"
+                        >
+                          {part.text}
+                        </MessageResponse>
+                      ) : (
+                        renderCard(part, index)
+                      ),
+                    )}
+                    {streamingPart?.type === 'text' && streamText.length > 0 && (
+                      <MessageResponse mode="streaming">{streamText}</MessageResponse>
+                    )}
                   </MessageContent>
                 </Message>
               )}
-
-              {showCards && revealedCardCount > 0 && (
-                <div className="space-y-3 pt-1">
-                  {cards.slice(0, revealedCardCount).map((card, index) => (
-                    <motion.div
-                      key={`${runKey}-${scenario}-${index}`}
-                      initial={reducedMotion ? false : { opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.38, ease: [0.25, 0.1, 0.25, 1] }}
-                    >
-                      <CourseProposalCard
-                        lines={card.lines}
-                        approved={highlightDone && index === highlightCardIndex}
-                        approveLabel={t('approve')}
-                        rejectLabel={t('reject')}
-                        approvedLabel={t('approved')}
-                        approveTarget={index === highlightCardIndex}
-                      />
-                    </motion.div>
-                  ))}
-                </div>
-              )}
             </ConversationContent>
           </Conversation>
+
+          <AnimatePresence>
+            {done && !reducedMotion && (
+              <motion.div
+                key="demo-replay"
+                className="absolute left-3 top-3 z-30"
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 gap-1.5 px-3 text-xs shadow-sm"
+                  onClick={replay}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  {t('replay')}
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <AnimatePresence mode="wait">
             {phase === 'cursorMoving' && cursorPath && !reducedMotion && (
@@ -601,7 +580,7 @@ export function ChatFlashcardDemo() {
                 onAnimationComplete={() => {
                   if (cursorPressAdvanceRef.current) return;
                   cursorPressAdvanceRef.current = true;
-                  setPhase('highlightApproved');
+                  setPhase('done');
                 }}
               >
                 <MousePointer2 className="h-9 w-9 fill-primary text-primary drop-shadow-lg" />

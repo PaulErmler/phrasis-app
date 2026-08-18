@@ -34,15 +34,27 @@ export function DueCountsPills({ skip }: { skip?: boolean }) {
   const t = useTranslations('AppPage.dueCounts');
 
   const filter = settings?.studyContentFilter ?? 'both';
+  // Passed explicitly for the same reason as `filter`: this settings cache is
+  // the one the adjacent Shadowing/Writing toggle optimistically writes, so
+  // with separateModeTracking on the counts flip tracks in the same frame.
+  const reviewMode = settings?.reviewMode;
   const now = useNowMinute(skip);
   const counts = useQuery(
     api.features.stats.getFilteredCardCounts,
-    skip || !settings ? 'skip' : { filter, now },
+    skip || !settings ? 'skip' : { filter, now, reviewMode },
   );
 
+  // While the separateModeTracking writing seed is still running, the writing
+  // aggregates hold only the already-seeded prefix, so the server flags the
+  // counts as provisional rather than letting a confident 0/0/0/0 read as
+  // "nothing to study". Treat them exactly like an in-flight refetch: keep the
+  // last known numbers (or stay hidden if there are none yet) until the seed
+  // finishes and real counts arrive.
+  const isProvisional = counts?.preparingWriting === true;
+
   const lastCountsRef = React.useRef<Counts | null>(null);
-  if (counts != null) lastCountsRef.current = counts;
-  const display = counts ?? lastCountsRef.current;
+  if (counts != null && !isProvisional) lastCountsRef.current = counts;
+  const display = (isProvisional ? null : counts) ?? lastCountsRef.current;
 
   const learning = display
     ? display.learning + display.relearning

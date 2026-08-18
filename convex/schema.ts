@@ -6,13 +6,18 @@ import {
   currentLevelValidator,
   reviewModeValidator,
   cardApprovalStatusValidator,
+  cardApprovalKindValidator,
+  cardApprovalResolutionValidator,
+  proposedCardMetadataValidator,
   schedulingModeValidator,
   studyContentFilterValidator,
   autoRateThresholdsValidator,
   reviewRatingValidator,
   cardSchedulingSnapshotFields,
+  cardWritingSchedulingFields,
   cardRadioSnapshotFields,
   cardFreeStudySnapshotFields,
+  schedulingTrackValidator,
   ttsQualityValidator,
   ttsProviderValidator,
   voiceGenderValidator,
@@ -138,6 +143,29 @@ export const courseSettingsFields = {
   instantProceedFull: v.optional(v.boolean()), // auto-advance when rating is clicked (full mode, default true)
   // Review mode
   reviewMode: v.optional(reviewModeValidator), // 'audio' (default) or 'full'
+  // Split scheduling: give Writing mode its own per-card FSRS schedule
+  // (cards.writing* fields) instead of sharing one schedule with Shadowing.
+  // Unset/false = off (both modes share the legacy fields). Turning it on
+  // triggers a one-time seed of the writing track from the shared state
+  // (see convex/migrations/seedWritingTrack.ts); turning it off freezes the
+  // writing track in place — nothing is deleted, re-enabling resumes it.
+  separateModeTracking: v.optional(v.boolean()),
+  // Bookkeeping for the enable-time writing-track seed (server-managed, not
+  // user-patchable). `writingSeedDone` flips true when the sequential
+  // per-deck sweep finishes; while the split is on and this is not true,
+  // `updateCourseSettings` saves and `reviewCard` lazy seeds re-schedule the
+  // sweep (a resume is a cheap rescan — already-seeded cards are skipped), so
+  // a dead scheduler chain can never permanently strand cards, and
+  // `getCardForReviewEmptyReason` reports 'preparing_writing' instead of a
+  // false "all caught up". `writingSeedStartedAt` debounces those re-kicks so
+  // overlapping sweeps don't pile up.
+  writingSeedDone: v.optional(v.boolean()),
+  writingSeedStartedAt: v.optional(v.number()),
+  // Consecutive failed seed batches, bumped by the workpool's onComplete
+  // handler and cleared on any successful batch. Bounds the retry loop and
+  // makes a genuinely stuck seed visible (the handler reports it once the cap
+  // is hit) instead of failing silently forever.
+  writingSeedAttempts: v.optional(v.number()),
   // Daily study-time goal in minutes. Seeded from the user's onboarding
   // answer when the course is created by `completeOnboarding`. Lives
   // here rather than `userSettings` because the goal is per-course
@@ -213,6 +241,9 @@ export const coursePatchableSettingsValidator = v
     'activeCustomCollectionIds',
     'reconciledDatasetId',
     'currentSessionId',
+    'writingSeedDone',
+    'writingSeedStartedAt',
+    'writingSeedAttempts',
   )
   .partial();
 
@@ -224,6 +255,12 @@ export const onboardingProgressFields = {
   userId: v.string(), // Links to auth user
   step: v.number(), // Current step number in the new flow
   reviewMode: v.optional(reviewModeValidator),
+  // Writing-mode input style picked on the review-mode step ('translate' |
+  // 'transcribe'). Copied onto `courseSettings.writingInputMode` by
+  // `completeOnboarding`; only meaningful when `reviewMode === 'full'`.
+  writingInputMode: v.optional(
+    v.union(v.literal('translate'), v.literal('transcribe')),
+  ),
   currentLevel: v.optional(currentLevelValidator),
   targetLanguages: v.optional(v.array(v.string())),
   baseLanguages: v.optional(v.array(v.string())),
@@ -339,7 +376,16 @@ export default defineSchema({
     datasetId: v.optional(v.id('datasets')), // Premade-dataset texts only; null for user-created and legacy
     text: v.string(),
     language: v.string(), // e.g., "en" for English
-    romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
+    // Latin transliteration for non-Latin scripts. THREE states, not two:
+    //   undefined — never attempted; a scheduler should enqueue romanization.
+    //   ''        — attempted and failed (`romanizeText` exhausted its retries);
+    //               the sentinel exists so nothing re-enqueues it. Re-attempt by
+    //               bumping the method's `romanizationSource` identifier and
+    //               migrating rows tagged with the old one.
+    //   non-empty — done.
+    // Test with `=== undefined`, never `!x` — collapsing '' into "missing" makes
+    // callers ask forever for work that is deliberately never scheduled.
+    romanizedText: v.optional(v.string()),
     // Identifier of which romanizer produced `romanizedText` (e.g.
     // "arabic-transliterate-v1", "google-v3"). Stored so a future strategy
     // swap can find + invalidate rows produced by the old method via a
@@ -394,7 +440,9 @@ export default defineSchema({
     textId: v.id('texts'),
     targetLanguage: v.string(), // e.g., "es" for Spanish
     translatedText: v.string(),
-    romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
+    // Latin transliteration for non-Latin scripts. Same undefined / '' /
+    // non-empty tri-state as `texts.romanizedText` — see the note there.
+    romanizedText: v.optional(v.string()),
     // Same purpose as on `texts` — identifier of the romanizer that produced
     // `romanizedText` (or attempted to and persisted the empty-string
     // sentinel). See the texts table for the migration pattern.
@@ -439,8 +487,10 @@ export default defineSchema({
     // a missing stamp is NEVER treated as stale (only a number strictly < the
     // current version is), so un-backfilled rows don't mass-regenerate. Rows
     // predating the versioning system were stamped to the baseline (v1) by a
-    // one-time backfill, so a later bump correctly marks them stale. User-provided / userCreated translations are
-    // skipped by the regen sweep regardless.
+    // one-time backfill, so a later bump correctly marks them stale. Rows that
+    // `mayRegenerateTranslation` (lib/translationProvenance.ts) protects —
+    // every row on a userCreated text, plus user-provided / curated-manual
+    // rows anywhere — are skipped by the sweep regardless of their stamp.
     translationVersion: v.optional(v.number()),
   })
     .index('by_textId', ['textId'])
@@ -698,6 +748,20 @@ export default defineSchema({
     // advanceFreePlayCard (one rotation per face). Shared with the `reviewLogs`
     // undo snapshots — definitions and field comments live in convex/types.ts.
     ...cardSchedulingSnapshotFields,
+    // Writing-track schedule, only populated for courses with
+    // `separateModeTracking` on (seeded from the shared fields on enable).
+    ...cardWritingSchedulingFields,
+    // How many times this card was reviewed in each review MODE ('audio' =
+    // Shadowing, 'full' = Writing) — counted from the review's actual mode,
+    // independent of which schedule (track) it wrote, so the counts stay
+    // truthful whether the split is on or off. Undefined = never counted;
+    // there is deliberately no backfill (per-mode attribution of historical
+    // reviews is unrecoverable — reviewLogs is a capped undo stack), so the
+    // counters are accurate from their introduction onward. Decremented on
+    // undo.
+    reviewCountByMode: v.optional(
+      v.object({ audio: v.number(), full: v.number() }),
+    ),
     ...cardRadioSnapshotFields,
     ...cardFreeStudySnapshotFields,
     isMastered: v.boolean(), // Whether the card has been mastered
@@ -757,6 +821,47 @@ export default defineSchema({
       'collectionOrigin',
       'isGraduated',
       'dueDate',
+    ])
+    // Writing-track mirrors of the four due-queue indexes above, used when a
+    // course has separateModeTracking on and reviewMode 'full'. Cards without
+    // a writing track have writingDueDate undefined, which sorts FIRST in the
+    // index — writing-track due queries must therefore always add a
+    // `.gte('writingDueDate', 0)` lower bound to exclude them.
+    // Seeding-only companion to the four writing due-queue indexes below.
+    // Deliberately has NOTHING between deckId and writingDueDate: the seed
+    // sweep must reach hidden and mastered cards too (they can be unhidden or
+    // demastered later), and it needs `undefined` — which sorts FIRST — to be
+    // directly reachable so each batch can locate the remaining unseeded cards
+    // itself instead of threading a pagination cursor through the chain.
+    // See convex/migrations/seedWritingTrack.ts.
+    .index('by_deck_writingDue', ['deckId', 'writingDueDate'])
+    .index('by_deck_hidden_mastered_writingDue', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'writingDueDate',
+    ])
+    .index('by_deck_hidden_mastered_writingGraduated_writingDue', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'writingIsGraduated',
+      'writingDueDate',
+    ])
+    .index('by_deck_hidden_mastered_origin_writingDue', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'collectionOrigin',
+      'writingDueDate',
+    ])
+    .index('by_deck_hidden_mastered_origin_writingGraduated_writingDue', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'collectionOrigin',
+      'writingIsGraduated',
+      'writingDueDate',
     ])
     .index('by_deck_hidden_mastered_origin_radioCounter_radioOrder', [
       'deckId',
@@ -903,10 +1008,20 @@ export default defineSchema({
     // mode/face/filter block everything older beneath them.
     schedulingMode: schedulingModeValidator,
     studyContentFilter: studyContentFilterValidator,
+    // kind === 'review': which per-card schedule the review wrote — 'shared'
+    // (legacy fields; also every log from before this field existed, hence
+    // optional with undefined ≡ 'shared') or 'writing' (cards.writing*, only
+    // under separateModeTracking). Part of the undo stack's match key so a
+    // toggle/mode flip fences off older entries, and selector for which
+    // snapshot below to restore.
+    track: v.optional(schedulingTrackValidator),
 
-    // kind === 'review': pre-review card scheduling state (shared field set
-    // with the cards table — see convex/types.ts). undefined = field was absent.
+    // kind === 'review', track 'shared': pre-review card scheduling state
+    // (shared field set with the cards table — see convex/types.ts).
+    // undefined = field was absent.
     prevCard: v.optional(v.object(cardSchedulingSnapshotFields)),
+    // kind === 'review', track 'writing': pre-review writing-track state.
+    prevWriting: v.optional(v.object(cardWritingSchedulingFields)),
     // kind === 'review': stat increments to reverse, keyed as computed at
     // review time (hour bucket, resolved mode, languages) since they are not
     // recomputable later.
@@ -922,6 +1037,15 @@ export default defineSchema({
         accuracyStrict: v.optional(v.number()), // present iff the dual trio was written
         accuracyLenient: v.optional(v.number()),
         reviewDepth: v.optional(v.number()), // reviewDepthAccuracy bucket, only when accuracy present
+        // dailyStats.reviewsByCardState bucket (FSRS state 0-3) as RESOLVED at
+        // review time. Must be stamped, never re-derived on undo: on the
+        // writing track's lazy-seed path the review is scheduled from a COPY of
+        // the shared fsrsState, while the undo snapshot necessarily records the
+        // true (unset) writingFsrsState — so re-deriving decrements 'new' while
+        // the increment landed on e.g. 'review', leaving that day permanently
+        // skewed with no way to repair it. Optional for logs written before
+        // this field existed.
+        cardState: v.optional(v.number()),
         languages: v.array(v.string()), // course languages whose per-language stats were incremented
         collectionId: v.optional(v.id('collections')),
       }),
@@ -1021,6 +1145,26 @@ export default defineSchema({
     translations: translationEntriesValidator,
     userId: v.string(),
     status: cardApprovalStatusValidator,
+    // Absent = 'createCard' (rows predate the field). 'alsoCorrect' rows are
+    // markAlsoCorrect proposals: an alternative phrasing of the card at
+    // `cardId` the user may add as a new card or replace the card text with.
+    kind: v.optional(cardApprovalKindValidator),
+    // Which accept path resolved an 'alsoCorrect' row ('newCard'/'replaced').
+    resolution: v.optional(cardApprovalResolutionValidator),
+    // Metadata changes (speaker gender, register, addressee) proposed by the
+    // model for the new phrasing — applied only on the replace path.
+    proposedMetadata: v.optional(proposedCardMetadataValidator),
+    // Languages whose text the model actually changed vs. the card.
+    // `translations` stores the merged course-language set (so processApproval
+    // works unchanged); this drives UI emphasis and, on the replace path, is
+    // the authoritative list of languages to write.
+    changedLanguages: v.optional(v.array(v.string())),
+    // The card was missing text for at least one course language when the
+    // proposal was made, so `translations` covers only a subset. Replacing is
+    // still valid (applyCardEdit only touches the languages it is given) but
+    // adding as a new card would produce a card with a blank line — both the
+    // UI and `approveCard` refuse that path for these rows.
+    replaceOnly: v.optional(v.boolean()),
     processedAt: v.optional(v.number()),
     textId: v.optional(v.id('texts')),
     cardId: v.optional(v.id('cards')),
@@ -1029,6 +1173,17 @@ export default defineSchema({
     // VERBATIM and tagged user-provided — machine post-processing
     // (postProcessTranslation) must never touch user-typed text.
     userEditedLanguages: v.optional(v.array(v.string())),
+    // In-flight synthesis marker per language (requestApprovalAudio): a
+    // repeat click for the same line while one synthesis is pending must not
+    // pay a TTS provider twice. Keyed by exact text so an edited line
+    // re-requests immediately; a stale marker (failed/crashed synthesis)
+    // unblocks after a fixed window.
+    audioRequests: v.optional(
+      v.record(
+        v.string(),
+        v.object({ requestedAt: v.number(), text: v.string() }),
+      ),
+    ),
   })
     .index('by_thread_and_user', ['threadId', 'userId']),
 

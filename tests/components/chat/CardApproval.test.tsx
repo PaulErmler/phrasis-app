@@ -2,6 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+// CardApproval reads per-line proposal audio via convex/react (no provider in
+// this jsdom render): useQuery → loading (undefined), useMutation → inert fn.
+vi.mock("convex/react", () => ({
+  useQuery: () => undefined,
+  useMutation: () => vi.fn(async () => ({ scheduled: false })),
+}));
 vi.mock("@/components/feature_tracking/useFeatureQuota", () => ({
   useFeatureQuota: () => ({ isAvailable: true, isLoading: false }),
 }));
@@ -26,13 +32,17 @@ vi.mock("@/components/chat/EditApprovalDialog", () => ({
 }));
 
 import { CardApproval } from "@/components/chat/CardApproval";
+// The REAL string the server tool returns — imported, not re-typed, so a
+// server-side rewording fails here instead of silently rendering every
+// successful call as an error box.
+import { CREATE_CARD_SUCCESS } from "@/lib/types/tool-parts";
 
 function makeToolPart(extra: Partial<any> = {}) {
   return {
     type: "tool-createCard",
     toolCallId: "tc-1",
     state: "output-available",
-    output: "Card has been created.",
+    output: CREATE_CARD_SUCCESS,
     input: {
       translations: [
         { language: "en", text: "hello" },

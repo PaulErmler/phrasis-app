@@ -6,12 +6,26 @@ This document describes the implemented tutorial system, how it works, how to mo
 
 ## Overview
 
-The tutorial system uses [driver.js](https://driverjs.com/) to guide users through the app after onboarding. Tutorials are:
+The teaching layer uses [driver.js](https://driverjs.com/) and has two parts
+(since 2026-08, when the onboarding wizard stopped embedding a tutorial
+lesson):
 
-- **Declarative** — each tutorial is a list of `DriveStep` objects in its own file
-- **Persistent** — completion state is stored in `userSettings.completedTutorials` (Convex) and cached in localStorage (`phrasis_completed_tutorials`) to avoid a database call on every load once tutorials have run
-- **Prerequisite-aware** — a tutorial can require another to be completed first
-- **Auto-triggered** — the `useTutorial` hook starts a tutorial automatically when conditions are met
+1. **Tours** (`useTutorial`) — multi-step walkthroughs registered in
+   `registry.ts`. Only `home_tour` remains; the review-mode tours were
+   retired in favour of the tips below.
+2. **Learning-mode tips** (`useMilestoneTips`) — one-time popovers inside
+   the real learning session: an intro walkthrough on the first card
+   (persisted PER CONCEPT so switching review modes never re-explains
+   shared concepts) and milestone tips gated on lifetime reviews
+   (card actions @2, chat @5, word tap @8, try-the-other-mode @11,
+   settings @15). A veteran guard silently retires all tips for users whose
+   lifetime review count is already far past the thresholds.
+
+Shared traits:
+
+- **Persistent** — completion state is stored in `userSettings.completedTutorials` (Convex) and cached in localStorage (`phrasis_completed_tutorials`) to avoid a database call on every load once tutorials have run (shared plumbing: `useCompletedTutorials` in `use-tutorial.ts`)
+- **Prerequisite-aware** — a tour can require another to be completed first
+- **Auto-triggered** — the hooks start automatically when conditions are met
 
 ---
 
@@ -21,11 +35,10 @@ The tutorial system uses [driver.js](https://driverjs.com/) to guide users throu
 lib/tutorials/
 ├── types.ts               — TutorialDefinition / TutorialFactory / TranslateFn types
 ├── tour-step.ts           — tourStep() helper: builds a DriveStep from an i18n key prefix
-├── registry.ts            — Central registry; re-exports TUTORIAL_IDS from convex/features/tutorialIds.ts
-├── use-tutorial.ts        — React hook that manages lifecycle
-├── home-tour.ts           — Home screen overview tour
-├── audio-review-tour.ts   — Audio review learning mode tour
-└── full-review-tour.ts    — Full review learning mode tour
+├── registry.ts            — Central registry (tours only); re-exports TUTORIAL_IDS
+├── use-tutorial.ts        — Tour lifecycle hook + shared useCompletedTutorials
+├── use-milestone-tips.ts  — One-time learning-mode tips (intro concepts + milestones)
+└── home-tour.ts           — Home screen overview tour
 ```
 
 ---
@@ -56,8 +69,9 @@ All tutorial factories live in a static `tutorialFactories` record (tutorial ID 
 // convex/features/tutorialIds.ts (re-exported by lib/tutorials/registry.ts)
 export const TUTORIAL_IDS = {
   HOME_TOUR: 'home_tour',
-  AUDIO_REVIEW_INTRO: 'audio_review_intro',
-  FULL_REVIEW_INTRO: 'full_review_intro',
+  // retired tour ids kept valid for historical rows, plus the tip_* ids
+  // used by useMilestoneTips — see the file for the full list
+  ...
 } as const;
 ```
 
@@ -144,37 +158,36 @@ completedTutorials: v.optional(v.array(v.string()))
 
 **Integration:** `components/app/HomeView.tsx` calls `useTutorial(TUTORIAL_IDS.HOME_TOUR)`.
 
-### Audio Review Tour (`audio-review-tour.ts`)
+### Learning-mode tips (`use-milestone-tips.ts`)
 
-**ID:** `audio_review_intro`
-**Prerequisite:** `home_tour`
-**Trigger:** Auto-starts in `LearnView` when `reviewMode === 'audio'` and `state.status === 'reviewing'`.
+**IDs:** `tip_concept_*` (intro concepts) and `tip_card_actions` / `tip_chat`
+/ `tip_word_tap` / `tip_mode_switch` / `tip_settings` (milestones).
+**Trigger:** `LearnView` calls `useMilestoneTips({ enabled, reviewMode, transcribe, … })`
+with `enabled` gated on `state.status === 'reviewing' && !settingsOpen && !isFreePlay`.
 
-| Step | Element | Description |
-|------|---------|-------------|
-| 1 | *(none — centered popover)* | Welcome to Audio Review |
-| 2 | `[data-tutorial="card-content"]` | The card: base and target, optional blur |
-| 3 | `[data-tutorial="target-text-audio"]` | First target text: click to unblur |
-| 4 | `[data-tutorial="rating-buttons"]` | Initial reviews, "Understood" skips them; then Again / Hard / Good / Easy |
-| 5 | `[data-tutorial="settings-button"]` | Audio mode settings (speed, order, auto-advance, blur, etc.) |
-| 6 | `[data-tutorial="chat-button"]` | Chat: grammar, explanations, create cards |
-
-### Full Review Tour (`full-review-tour.ts`)
-
-**ID:** `full_review_intro`
-**Prerequisite:** `home_tour`
-**Trigger:** Auto-starts in `LearnView` when `reviewMode === 'full'` and `state.status === 'reviewing'`.
-
-| Step | Element | Description |
-|------|---------|-------------|
-| 1 | *(none — centered popover)* | Welcome to Full Review |
-| 2 | `[data-tutorial="card-content-full"]` | The card: type translation, get feedback |
-| 3 | `[data-tutorial="base-languages"]` | Base language sentence(s) |
-| 4 | `[data-tutorial="target-input-full"]` | First target input: enter translation |
-| 5 | `[data-tutorial="submit-answer"]` | Submit to get feedback (diff, accuracy) |
-| 6 | `[data-tutorial="rating-buttons"]` | Rate answer: Again, Hard, Good, Easy |
-| 7 | `[data-tutorial="settings-button"]` | Full review settings (target audio, instant proceed, mode switch) |
-| 8 | `[data-tutorial="chat-button"]` | Chat: grammar, explanations, create cards |
+- The **intro walkthrough** fires on the first card of a mode and shows only
+  concepts not yet persisted: shared concepts (`tip_concept_card`,
+  `tip_concept_autoadd`) appear once ever, mode-specific ones
+  (reveal/audio-controls/rating for Shadowing; shown-translation/input/rating
+  for Writing) per mode. Switching modes later shows a "Switched to …"
+  welcome plus only the new mode's concepts. Concepts can opt out of the
+  Transcribe writing style via `skipWhenTranscribe` (the shown-translation
+  step does — skipped, not persisted, so it still appears if the user later
+  switches to Translate).
+- **Milestone tips** are single popovers gated on
+  `api.features.courses.getLifetimeReviewCount` (the active course's
+  `courseStats.totalRepetitions`, reactive) — at most one per card
+  transition, lowest threshold first.
+- **Veteran guard:** if a tip becomes eligible while the lifetime count is
+  already `> 50`, every unseen tip is marked completed silently (no
+  popover, no analytics event) — this is what keeps existing users from
+  seeing beginner tips, with no data migration.
+- Popover CSS classes are `phrasis-tip-<id>` (`phrasis-tip-intro_audio` /
+  `phrasis-tip-intro_full` for the intro walkthroughs) — e2e helpers map
+  legacy tour ids onto these.
+- Copy lives in the `Tips` namespace of `messages/en.json` / `de.json`.
+- The learn header's Help dialog "restart tutorial" action calls the hook's
+  `restartIntro` (replays the current mode's full intro).
 
 ---
 

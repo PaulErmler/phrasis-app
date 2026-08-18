@@ -21,20 +21,11 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Text column */}
           <div className="space-y-8 text-center lg:text-left">
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, ease: 'easeOut' }}
-              className="ent-section-label"
-            >
-              {t('sectionLabel')}
-            </motion.p>
-
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' }}
-              className="text-[2.5rem] md:text-[3.5rem] lg:text-[5rem] font-semibold tracking-tight leading-[1.08]"
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+              className="text-[2rem] md:text-[2.5rem] lg:text-[3.25rem] font-semibold tracking-tight leading-[1.15]"
             >
               {t.rich('tagline', {
                 highlight: (chunks) => <span className="text-primary">{chunks}</span>,
@@ -44,7 +35,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2, ease: 'easeOut' }}
+              transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' }}
               className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-xl mx-auto lg:mx-0"
             >
               {t('subtitle')}
@@ -53,7 +44,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3, ease: 'easeOut' }}
+              transition={{ duration: 0.6, delay: 0.2, ease: 'easeOut' }}
               className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 lg:justify-start justify-center"
             >
               {isAuthenticated ? (
@@ -88,6 +79,16 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
                 {t('cta.install')}
               </PwaInstallTrigger>
             </motion.div>
+            {!isAuthenticated && (
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.3, ease: 'easeOut' }}
+                className="text-sm text-muted-foreground"
+              >
+                {t('cta.friction')}
+              </motion.p>
+            )}
           </div>
 
           {/* App icon column */}

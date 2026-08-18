@@ -1,6 +1,6 @@
 ---
 title: 'Privacy Policy'
-lastUpdated: '2026-07-28'
+lastUpdated: '2026-08-09'
 ---
 
 # Privacy Policy
@@ -115,8 +115,8 @@ Third-country transfer: Secured by SCCs pursuant to Art. 46(2)(c) GDPR.
 Privacy policy: [https://www.convex.dev/privacy](https://www.convex.dev/privacy)
 
 **Stripe & Autumn** (Stripe Inc., USA / Autumn, USA)
-Purpose: Payment processing and subscription management. Autumn (useautumn.com) serves as a billing layer and forwards payment transactions to Stripe.
-Data: Name, email address, payment data, billing address, transaction data.
+Purpose: Sale of paid subscriptions, payment processing, and subscription management. For paid subscriptions Stripe acts as merchant of record, i.e. as the seller in its own name, and is therefore an independent controller for that transaction — it determines and collects the applicable tax, issues the receipt, and handles refunds, chargebacks, and transaction support. Autumn (useautumn.com) serves as a billing layer and forwards payment transactions to Stripe.
+Data: Name, email address, payment data, billing address, transaction data. A name and billing address are required at checkout because Stripe needs them to determine the applicable tax.
 Legal basis: Art. 6(1)(b) GDPR (performance of a contract). These providers receive your data only when you make a purchase.
 Third-country transfer: Stripe is certified under the EU-U.S. Data Privacy Framework (Art. 45 GDPR).
 Stripe privacy policy: [https://stripe.com/privacy](https://stripe.com/privacy)
@@ -132,7 +132,7 @@ Privacy policy: [https://resend.com/legal/privacy-policy](https://resend.com/leg
 | Provider       | Purpose                          | Data                                   | Location   |
 |----------------|----------------------------------|----------------------------------------|------------|
 | Convex         | Database                         | All user data                          | USA (SCCs) |
-| Stripe/Autumn  | Payment Processing               | Name, email, payment/billing data      | USA (DPF)  |
+| Stripe/Autumn  | Sale of subscriptions (Stripe as merchant of record), payment processing | Name, email, payment/billing data      | USA (DPF)  |
 | Resend         | Transactional Emails             | Email address                          | USA (SCCs) |
 
 ### C) Analytics and Optional Services

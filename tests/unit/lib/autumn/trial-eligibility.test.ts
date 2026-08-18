@@ -89,6 +89,60 @@ describe('getTrialState', () => {
     expect(state.trialEligible).toBe(false);
   });
 
+  it('treats a GRANDFATHERED free plan (is_default:false) as free, not paid', () => {
+    // Free attachments created under old product versions carry NO default
+    // flag on v1.2 (live payload, 2026-08-11: a May-2026 customer's only
+    // product was free/active/is_default:false). Reading that as a paid
+    // plan sent the customer down the legacy checkout path — cardless →
+    // Autumn minted a non-MoR session → the Managed Payments backstop
+    // threw on their very first purchase attempt.
+    const grandfatheredFree = {
+      id: 'free',
+      status: 'active',
+      is_default: false,
+      is_add_on: false,
+    };
+    const state = getTrialState({
+      products: [grandfatheredFree],
+      trials_used: [],
+    });
+    expect(state.hasPaidPlan).toBe(false);
+    expect(state.trialEligible).toBe(true);
+  });
+
+  it('ignores expired entries — a lapsed customer is a first purchase again', () => {
+    // A lapsed trial / executed cancel can leave the old plan in the
+    // payload with status 'expired'; it is not a held plan.
+    const state = getTrialState({
+      products: [freePlan, paid({ status: 'expired' })],
+      trials_used: [{ product_id: 'basic_annual' }],
+    });
+    expect(state.hasPaidPlan).toBe(false);
+    expect(state.onTrial).toBe(false);
+    // The durable trials_used record still blocks a second trial.
+    expect(state.trialEligible).toBe(false);
+  });
+
+  it('an early-cancelled trial (expired, trial_ends_at still future) is not onTrial', () => {
+    const state = getTrialState({
+      products: [
+        freePlan,
+        paid({ status: 'expired', trial_ends_at: Date.now() + 86_400_000 }),
+      ],
+      trials_used: [{ product_id: 'basic_annual' }],
+    });
+    expect(state.onTrial).toBe(false);
+    expect(state.hasPaidPlan).toBe(false);
+  });
+
+  it('a scheduled entry is a pending change, not a held plan', () => {
+    const state = getTrialState({
+      products: [freePlan, paid({ status: 'scheduled' })],
+      trials_used: [],
+    });
+    expect(state.hasPaidPlan).toBe(false);
+  });
+
   it('ignores the free plan and add-ons when deciding hasPaidPlan', () => {
     expect(
       getTrialState({ products: [freePlan, addOn], trials_used: [] }).hasPaidPlan,

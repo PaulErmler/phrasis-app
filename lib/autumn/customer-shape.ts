@@ -71,6 +71,16 @@ export type AutumnPlan = {
   currentPeriodEnd?: number;
 };
 
+/**
+ * The auto-enabled free plan's id (autumn.config.ts). Needed here because
+ * the wire flags alone cannot identify it on GRANDFATHERED customers:
+ * free-plan attachments created under old product versions report
+ * `is_default: false` on v1.2 (verified live 2026-08-11 — a May-2026
+ * customer's only product was `free`/active/`is_default: false`), which
+ * made every default-flag consumer misclassify those customers as paying.
+ */
+export const FREE_PLAN_ID = 'free';
+
 function asArray(value: unknown): AutumnRawPlan[] {
   return Array.isArray(value) ? (value as AutumnRawPlan[]) : [];
 }
@@ -81,12 +91,19 @@ function normalizeOne(raw: AutumnRawPlan, now: number): AutumnPlan {
   // trial_ends_at null; v2 populates trial_ends_at directly.
   const trialEndsAt = raw.trial_ends_at ?? raw.current_period_end ?? undefined;
 
+  // v2's `id` is the customer-product row id (`cus_prod_…`), NOT the plan.
+  const planId = raw.plan_id ?? raw.id ?? '';
+
   return {
-    // v2's `id` is the customer-product row id (`cus_prod_…`), NOT the plan.
-    planId: raw.plan_id ?? raw.id ?? '',
+    planId,
     rawStatus: status,
     isAddOn: raw.add_on === true || raw.is_add_on === true,
-    isDefault: raw.auto_enable === true || raw.is_default === true,
+    isDefault:
+      raw.auto_enable === true ||
+      raw.is_default === true ||
+      // Grandfathered free attachments carry NO default flag — see
+      // FREE_PLAN_ID above.
+      planId === FREE_PLAN_ID,
     isPastDue: raw.past_due === true || status === 'past_due',
     // On v2 a trialing plan reports status 'active', so the timestamp is the
     // only signal. Guard on it still being in the future, otherwise every

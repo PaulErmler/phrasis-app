@@ -51,6 +51,7 @@ import {
 import { validateAutoRateThresholds } from '../../lib/autoRating';
 import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
 import { clampDailyGoal } from '../../lib/constants/dailyGoal';
+import { maybeScheduleWritingSeed } from '../migrations/seedWritingTrack';
 import {
   ONBOARDING_INITIAL_SEED_CARDS,
   ONBOARDING_CARDS_BATCH_SIZE,
@@ -636,7 +637,18 @@ const saveOnboardingProgressArgs = v
   .omit('userId', 'completedAt');
 
 export const saveOnboardingProgress = mutation({
-  args: saveOnboardingProgressArgs.fields,
+  args: {
+    ...saveOnboardingProgressArgs.fields,
+    // Widened over the schema field so the wizard can CLEAR the stored
+    // style when the user switches to Shadowing. Plain `undefined` can't do
+    // that — the Convex client strips undefined args, so the field would
+    // silently keep a previously saved 'transcribe' and `completeOnboarding`
+    // would copy it onto courseSettings. `null` is normalised away below;
+    // it is never stored.
+    writingInputMode: v.optional(
+      v.union(v.literal('translate'), v.literal('transcribe'), v.null()),
+    ),
+  },
   // The returned Doc also carries `userId` and `completedAt`, so the
   // validator must accept them. `completedAt` is always undefined on rows
   // reachable by this mutation because `dbGetOnboardingProgress` filters
@@ -675,15 +687,26 @@ export const saveOnboardingProgress = mutation({
       else args.dailyTimeGoalMinutes = clamped;
     }
 
+    // `null` → `undefined`, which on a patch REMOVES the field (and on an
+    // insert simply omits it). Both are the "no writing style picked" state
+    // the schema models; null itself is not a storable value.
+    const { writingInputMode, ...restArgs } = args;
+    const fields = {
+      ...restArgs,
+      ...(writingInputMode !== undefined
+        ? { writingInputMode: writingInputMode ?? undefined }
+        : {}),
+    };
+
     const existingProgress = await dbGetOnboardingProgress(ctx, userId);
     let progressId;
     if (existingProgress) {
-      await ctx.db.patch(existingProgress._id, args);
+      await ctx.db.patch(existingProgress._id, fields);
       progressId = existingProgress._id;
     } else {
       progressId = await ctx.db.insert('onboardingProgress', {
         userId,
-        ...args,
+        ...fields,
       });
     }
 
@@ -851,6 +874,7 @@ export const completeOnboarding = mutation({
       initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
       activeCollectionId: collection?._id,
       reviewMode: progress.reviewMode,
+      writingInputMode: progress.writingInputMode,
       autoAddCards: true,
       // Match the onboarding seed batch so the auto-add fired mid-first-lesson
       // pulls the same number of cards the initial seed did. See
@@ -1093,7 +1117,12 @@ export const updateCourseSettings = mutation({
 
     // Build patch object with only provided fields
     const existing = await dbGetCourseSettings(ctx, args.courseId);
-    const patch: Partial<CoursePatchableSettings> = {};
+    // Patchable-settings shape plus the server-managed seed bookkeeping the
+    // enable transition resets below (deliberately NOT user-patchable).
+    const patch: Partial<CoursePatchableSettings> & {
+      writingSeedDone?: boolean;
+      writingSeedStartedAt?: number;
+    } = {};
     for (const key of PATCHABLE_KEYS) {
       let value = args[key];
       // NaN/±Infinity survive Math.max/min/round/floor and Convex stores
@@ -1168,6 +1197,18 @@ export const updateCourseSettings = mutation({
       }
     }
 
+    // Enable transition for separateModeTracking: reset the seed bookkeeping
+    // so the sweep below starts (or restarts, after a disable) from scratch —
+    // cards created while the split was off get seeded, previously-seeded
+    // cards are skipped by the sweep itself (freeze-and-keep).
+    const seedTransition =
+      args.separateModeTracking === true &&
+      existing?.separateModeTracking !== true;
+    if (seedTransition) {
+      patch.writingSeedDone = false;
+      patch.writingSeedStartedAt = undefined;
+    }
+
     if (existing) {
       await ctx.db.patch(existing._id, patch);
     } else {
@@ -1181,6 +1222,18 @@ export const updateCourseSettings = mutation({
         initialReviewCount:
           args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
       });
+    }
+
+    // Turning separateModeTracking ON seeds every card's writing track with a
+    // copy of its shared schedule (batched + scheduled — decks can hold
+    // thousands of cards). Beyond the transition, EVERY save while the split
+    // is on re-kicks an unfinished sweep (debounced): a scheduler chain that
+    // died mid-seed would otherwise strand the unseeded remainder outside the
+    // writing queue forever. Turning it OFF needs no work — the writing
+    // fields stay dormant.
+    const fresh = await dbGetCourseSettings(ctx, args.courseId);
+    if (fresh) {
+      await maybeScheduleWritingSeed(ctx, fresh, { force: seedTransition });
     }
 
     return null;
@@ -1205,6 +1258,30 @@ export const getCompletedTutorials = query({
       return settings?.completedTutorials ?? [];
     } catch {
       return [];
+    }
+  },
+});
+
+/**
+ * Lifetime review count for the active course — the gate for the one-time
+ * learning-mode tips (`useMilestoneTips`): thresholds compare against this,
+ * and counts far past a tip's threshold suppress it silently (veteran
+ * guard). Deliberately tiny (two indexed reads) so the learn view can stay
+ * subscribed to it while tips are still pending.
+ */
+export const getLifetimeReviewCount = query({
+  args: {},
+  returns: v.union(v.number(), v.null()),
+  handler: async (ctx) => {
+    try {
+      const userId = await getAuthUserId(ctx);
+      if (!userId) return null;
+      const active = await getActiveCourseForUser(ctx, userId);
+      if (!active) return null;
+      const stats = await dbGetCourseStats(ctx, userId, active.course._id);
+      return stats?.totalRepetitions ?? 0;
+    } catch {
+      return null;
     }
   },
 });

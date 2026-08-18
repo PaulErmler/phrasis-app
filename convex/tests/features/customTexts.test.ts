@@ -28,6 +28,7 @@ import { describe, it, expect } from "vitest";
 import { generateText } from "ai";
 import schema from "../../schema";
 import { api, internal } from "../../_generated/api";
+import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/translationProvenance";
 import { MAX_CARD_TEXT_LENGTH } from "../../../lib/constants/learning";
 import { DEFAULT_INITIAL_REVIEW_COUNT } from "../../../lib/scheduling";
 
@@ -162,8 +163,8 @@ describe("features/customTexts", () => {
               text: "Hola",
               translationSource: "openrouter/some-model-none",
             },
-            // fr deliberately omits translationSource — the row should land
-            // with the field unset (null in Convex), not be rejected.
+            // fr deliberately omits translationSource — accepted, and the
+            // server fills in the honest provenance (see below).
             { language: "fr", text: "Bonjour" },
           ],
           timezone: "UTC",
@@ -179,10 +180,11 @@ describe("features/customTexts", () => {
         translations.map((tr) => [tr.targetLanguage, tr.translationSource]),
       );
       expect(byLang.es).toBe("openrouter/some-model-none");
-      // `fr` omitted a source → row lands with the field unset. Convex's
-      // serialization through `.collect()` for unset optionals can surface
-      // as either `null` or `undefined`; either means "no tag".
-      expect(byLang.fr ?? null).toBeNull();
+      // `fr` omitted a source → the server defaults it to `user-provided`
+      // rather than storing an untagged row. The entry reached us from a form
+      // the user typed into, and an untagged row reads as machine output to
+      // every provenance guard.
+      expect(byLang.fr).toBe(USER_PROVIDED_TRANSLATION_SOURCE);
     });
 
     it("pure-manual save schedules a metadata job that the job validator accepts (regression)", async () => {

@@ -1,6 +1,6 @@
 ---
 title: 'Terms & Conditions'
-lastUpdated: '2026-03-21'
+lastUpdated: '2026-08-09'
 ---
 
 > **This is a translation of the German Terms of Service for informational purposes only. The German version is the sole legally binding version. In case of any discrepancy, the German version prevails.** The German version is available at [flexling.com/de/legal/terms](https://flexling.com/de/legal/terms).
@@ -18,6 +18,8 @@ Effective: March 2026
 1.3 The version of these Terms valid at the time of contract conclusion shall apply. Conflicting or deviating terms of the User are not accepted.
 
 1.4 The contract language is German.
+
+1.5 Paid subscriptions are sold through Stripe as merchant of record. Stripe is therefore your counterparty for the payment transaction: it collects the price including any applicable taxes, issues the receipt, and provides support for the transaction itself. The usage agreement for the Services remains concluded with Flexling under these Terms.
 
 ## 2. Description of Services
 
@@ -62,6 +64,8 @@ To meet the withdrawal deadline, it is sufficient for you to send the notice of 
 **Consequences of Withdrawal**
 
 If you withdraw from this contract, we shall reimburse all payments we have received from you without undue delay and no later than fourteen days from the day on which we received the notice of your withdrawal. We will use the same means of payment that you used for the original transaction; in no case will you be charged any fees for this reimbursement.
+
+**Note on payments handled by Stripe:** Paid subscriptions are sold through Stripe as merchant of record (Section 1.5). You may always address your withdrawal to us using the details above; the reimbursement is then executed by Stripe via the payment method you used. This does not shorten or restrict your statutory right of withdrawal in any way.
 
 ### MODEL WITHDRAWAL FORM
 
@@ -144,7 +148,7 @@ No payment method is required for the free plan.
 
 Paid plans are offered as subscriptions (monthly or annually). Current prices are available at flexling.com/pricing. All prices are quoted in Euros.
 
-**Note on VAT:** Pursuant to Section 19 of the German VAT Act (UStG) (small business regulation), no VAT is charged and therefore not separately shown.
+**Note on VAT:** The prices shown are gross prices and already include any VAT or sales tax applicable to your billing location — the amount displayed is the amount you pay. Because paid subscriptions are sold through Stripe as merchant of record (Section 1.5), Stripe determines, charges, and remits that tax; it is itemised at checkout and on your receipt. Flexling's own turnover remains subject to the small business regulation under Section 19 of the German VAT Act (UStG).
 
 ### 9.3 Subscription Renewal and Cancellation
 
@@ -154,9 +158,11 @@ Subscriptions automatically renew for the respective booked period (monthly or a
 
 The statutory right of withdrawal under Section 4 of these Terms remains unaffected. Beyond that, there are no further goodwill claims for refunds. Refunds under the right of withdrawal are processed via the originally used payment method.
 
+For subscriptions sold through Stripe as merchant of record (Section 1.5), refunds are executed by Stripe. Stripe may additionally issue a refund on its own initiative within 60 days of purchase, and applies statutory cooling-off periods where these are prescribed in your country. Any such refund is to your benefit and does not limit your rights under this Section or Section 4.
+
 ### 9.5 Late Payment
 
-In the event of late payment, Flexling reserves the right to suspend access to paid features until the outstanding amount has been settled.
+In the event of late payment, Flexling reserves the right to suspend access to paid features until the outstanding amount has been settled. For subscriptions sold through Stripe as merchant of record (Section 1.5), the payment retries, payment reminders, and the hosted payment page for an outstanding invoice are provided by Stripe.
 
 ## 10. Availability and Maintenance
 

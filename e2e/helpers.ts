@@ -35,26 +35,21 @@ export interface OnboardingWalkOptions {
   // `placementMaxQuestions` to bail if something goes wrong.
   placementAnswer?: 'knew' | 'didnt'; // applied to every question
   placementMaxQuestions?: number;
-  // First lesson — default skips (faster, doesn't depend on TTS readiness).
-  // Set `mode` to drive a real lesson via Audio or Full Review.
-  firstLesson?:
-    | 'skip'
-    | { mode: 'audio' | 'translate' | 'transcribe'; cardsToRate?: number };
-  // Plan pick — default uses the "Maybe later" link (stays on Free).
-  planPick?: 'skip';
+  // Final step: review-mode pick. Shadowing (audio) is the default;
+  // translate/transcribe both land in the writing mode with that input style.
+  reviewMode?: 'audio' | 'translate' | 'transcribe';
 }
 
 /**
- * Walk the new onboarding wizard end-to-end using ONLY data-testid
- * selectors (no copy or role matching), then wait for the post-wizard
- * redirect to /app. Used by both the auth.setup.ts fixture (for the
- * shared session) and the dedicated onboarding spec (one per branch).
+ * Walk the onboarding wizard end-to-end using ONLY data-testid selectors
+ * (no copy or role matching), then wait for the wizard's handoff into the
+ * real learning mode at /app/learn. Used by both the auth.setup.ts fixture
+ * (for the shared session) and the dedicated onboarding spec.
  *
  * Step path (see app/app/onboarding/page.tsx for the canonical order):
  *   language-pair → acquisition → goal → daily-time → proficiency →
  *   (cefr-pick | placement-test + result | none) →
- *   customizing (auto) → first-lesson → stats-recap → word-projection →
- *   feature-tour → plan-pick → /app.
+ *   review-mode → Start learning → /app/learn.
  */
 export async function completeOnboardingFresh(
   page: Page,
@@ -71,8 +66,7 @@ export async function completeOnboardingFresh(
     proficiency = 'new',
     placementAnswer = 'didnt',
     placementMaxQuestions = 15,
-    firstLesson = 'skip',
-    planPick = 'skip',
+    reviewMode = 'audio',
   } = opts;
 
   // Helper: click a testid and assert the wizard's next step rendered.
@@ -87,13 +81,13 @@ export async function completeOnboardingFresh(
     });
   };
 
-  // 1. Language pair — source first, then target. The selector hides + re-
-  //    reveals between picks, so we re-query each time.
+  // 1. Language pair — target (learn) first, then source (already speak).
+  //    The selector hides + re-reveals between picks, so we re-query each time.
   await expect(page.getByTestId('onboarding-step-language-pair')).toBeVisible({
     timeout: 30_000,
   });
-  await page.getByTestId(`language-option-${source}`).first().click();
   await page.getByTestId(`language-option-${target}`).first().click();
+  await page.getByTestId(`language-option-${source}`).first().click();
   await advance(null, 'onboarding-step-acquisition');
 
   // 2. Acquisition source.
@@ -165,110 +159,100 @@ export async function completeOnboardingFresh(
     await page.getByTestId('placement-result-continue').click();
   }
 
-  // 6. Customizing — auto-advances after the bar + completeOnboarding
-  // mutation. Under @live load a transient backend error can crash the
-  // wizard into the view error boundary mid-transition (seen when failing
-  // OpenRouter/TTS actions saturate the local dev backend); retry through
-  // it — wizard progress is server-persisted, so a remount resumes where it
-  // left off. Accept first-lesson-intro directly in the first poll in case
-  // customizing auto-advanced before we sampled it.
+  // 6. Review mode — the final step. Continue ("Start learning") runs
+  // completeOnboarding (course + deck + seeded cards) inline behind a
+  // spinner, then finalizeOnboarding, then hands off to /app/learn. Under
+  // @live load a transient backend error can crash the wizard into the view
+  // error boundary mid-transition; retry through it — wizard progress is
+  // server-persisted, so a remount resumes where it left off.
   await expect
     .poll(
       async () => {
         await dismissErrorBoundary(page);
-        if (
-          await page
-            .getByTestId('onboarding-step-first-lesson-intro')
-            .isVisible()
-            .catch(() => false)
-        ) {
-          return true;
-        }
         return page
-          .getByTestId('onboarding-step-customizing')
+          .getByTestId('onboarding-step-review-mode')
           .isVisible()
           .catch(() => false);
       },
       { timeout: 30_000 },
     )
     .toBe(true);
-  await expect
-    .poll(
-      async () => {
-        await dismissErrorBoundary(page);
-        return page
-          .getByTestId('onboarding-step-first-lesson-intro')
-          .isVisible()
-          .catch(() => false);
-      },
-      { timeout: 60_000 },
-    )
-    .toBe(true);
+  await page.getByTestId(`review-mode-${reviewMode}`).click();
+  await page.getByTestId('onboarding-continue').click();
 
-  // 7. First lesson intro (mode picker → Start or Skip).
-  // Skip jumps straight to feature-tour (stats-recap + word-projection are
-  // only shown when the user actually rated cards — see
-  // app/app/onboarding/page.tsx onSkipLesson).
-  if (firstLesson === 'skip') {
-    await page.getByTestId('first-lesson-skip').click();
-  } else {
-    await page.getByTestId(`first-lesson-mode-${firstLesson.mode}`).click();
-    await page.getByTestId('first-lesson-start').click();
-    // Driving real cards is opt-in — leave that to the dedicated spec.
-    // If the caller asked for it, rate the requested number of cards then
-    // wait for the stats-recap.
-    const cardsToRate = firstLesson.cardsToRate ?? 0;
-    for (let i = 0; i < cardsToRate; i++) {
-      // Dismiss whichever onboarding tutorial popover is on screen first.
-      await dismissTour(page).catch(() => {});
-      // Hit the audio "Next" / rating "Good" — best-effort, since this
-      // depends on real card content being ready, which is brittle for
-      // the auth fixture. Suites that drive real cards should manage
-      // their own per-card flow.
-      const next = page.getByRole('button', { name: /^next$|^good$/i }).first();
-      await next.click({ timeout: 10_000 }).catch(() => {});
-    }
-
-    // 8. Stats recap.
-    await expect(page.getByTestId('onboarding-step-stats-recap')).toBeVisible({
-      timeout: 30_000,
-    });
-    await page.getByTestId('progress-display-continue').click();
-
-    // 9. Word projection.
-    await expect(
-      page.getByTestId('onboarding-step-word-projection'),
-    ).toBeVisible({ timeout: 20_000 });
-    await page.getByTestId('word-projection-continue').click();
-  }
-
-  // 10. Feature tour — click Next until the Done button appears, then Done.
-  await expect(page.getByTestId('onboarding-step-feature-tour')).toBeVisible({
-    timeout: 20_000,
-  });
-  for (let i = 0; i < 10; i++) {
-    const done = page.getByTestId('feature-tour-done');
-    if (await done.isVisible().catch(() => false)) {
-      await done.click();
-      break;
-    }
-    await page.getByTestId('feature-tour-next').click();
-  }
-
-  // 11. Plan pick — skip onto Free.
-  await expect(page.getByTestId('onboarding-step-plan-pick')).toBeVisible({
-    timeout: 20_000,
-  });
-  if (planPick === 'skip') {
-    await page.getByTestId('plan-pick-skip').click();
-  }
-
-  // 12. Wait for the post-wizard redirect to /app.
+  // 7. Wait for the handoff into the real learning mode.
   await page.waitForURL(
     (url) =>
       /\/app(\/|$)/.test(url.pathname) && !/onboarding/.test(url.pathname),
-    { timeout: 30_000 },
+    { timeout: 60_000 },
   );
+
+  // The first real session greets a fresh user with the intro tip
+  // walkthrough (use-milestone-tips). Dismiss it so the saved storageState
+  // starts sessions clean; the completion is persisted to localStorage
+  // synchronously, so it travels with the storage state even if the Convex
+  // write hasn't landed yet.
+  await dismissTour(page, undefined, 6_000).catch(() => {});
+
+  // Retire the REST of the one-time learning-mode UI for this fixture user:
+  // milestone tips fire mid-session at 2/5/8/11/15 lifetime reviews and the
+  // difficulty check intercepts the first auto-add — each would block
+  // clicks at an unpredictable point of whichever spec happens to cross the
+  // threshold (seen 2026-08-17: learning-undo blocked by the chat tip,
+  // course-settings-sweep by the card-options tip). Their behavior is
+  // covered by unit/convex tests; e2e fixture users skip them. Written into
+  // the per-user localStorage cache, which the saved storageState carries
+  // into every spec context. `home_tour` is deliberately NOT marked —
+  // tutorial.spec depends on it being armed for a fresh user.
+  // Keep the id list in sync with convex/features/tutorialIds.ts.
+  const RETIRED_ONE_TIME_UI_IDS = [
+    'tip_concept_card',
+    'tip_concept_reveal',
+    'tip_concept_rating_audio',
+    'tip_concept_rating_full',
+    'tip_concept_audio_controls',
+    'tip_concept_shown_translation',
+    'tip_concept_input',
+    'tip_concept_autoadd',
+    'tip_card_actions',
+    'tip_chat',
+    'tip_word_tap',
+    'tip_mode_switch',
+    'tip_settings',
+    'difficulty_check',
+  ];
+  // The per-user key (`phrasis_completed_tutorials_<userId>`) is created by
+  // the intro-tip dismissal above; poll briefly for it and fall back to the
+  // pre-auth key so the write never lands nowhere.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          Object.keys(localStorage).some((k) =>
+            k.startsWith('phrasis_completed_tutorials_'),
+          ),
+        ),
+      { timeout: 5_000, intervals: [250, 500, 1_000] },
+    )
+    .toBe(true)
+    .catch(() => {});
+  await page.evaluate((ids) => {
+    const PREFIX = 'phrasis_completed_tutorials';
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith(PREFIX));
+    if (keys.length === 0) keys.push(PREFIX);
+    for (const key of keys) {
+      let current: string[];
+      try {
+        current = JSON.parse(localStorage.getItem(key) ?? '[]');
+      } catch {
+        current = [];
+      }
+      localStorage.setItem(
+        key,
+        JSON.stringify(Array.from(new Set([...current, ...ids]))),
+      );
+    }
+  }, RETIRED_ONE_TIME_UI_IDS);
 
   // 13. Confirm the server actually committed finalizeOnboarding before
   // returning. The redirect above is driven by the mutation's OPTIMISTIC
@@ -308,17 +292,38 @@ export function onboardingStep(page: Page, testId: string): Locator {
 }
 
 /**
- * Known tutorial identifiers, matching convex/features/tutorialIds.ts plus
- * the two ad-hoc driver instances launched from use-tutorial.ts.
- * Each value maps 1:1 to the `popoverClass` set in `launchDriver` /
- * `showChatStep` / `showCompletionStep` (prefixed with `phrasis-tutorial-`).
+ * Known tutorial/tip identifiers. Tours (`useTutorial`) set
+ * `popoverClass="phrasis-tutorial-<id>"`; the learning-mode tips
+ * (`useMilestoneTips`) set `popoverClass="phrasis-tip-<id>"`. The legacy
+ * `audio_review_intro`/`full_review_intro` names are kept as aliases for the
+ * intro tip walkthroughs that replaced those tours, so existing spec calls
+ * keep dismissing the equivalent popover.
  */
 export type TourId =
   | 'home_tour'
   | 'audio_review_intro'
   | 'full_review_intro'
   | 'chat'
-  | 'completion';
+  | 'completion'
+  | 'tip_card_actions'
+  | 'tip_chat'
+  | 'tip_word_tap'
+  | 'tip_mode_switch'
+  | 'tip_settings';
+
+/** CSS classes (without the leading dot) a TourId may appear under. */
+const TOUR_POPOVER_CLASSES: Record<TourId, string[]> = {
+  home_tour: ['phrasis-tutorial-home_tour'],
+  audio_review_intro: ['phrasis-tip-intro_audio'],
+  full_review_intro: ['phrasis-tip-intro_full'],
+  chat: ['phrasis-tutorial-chat', 'phrasis-tip-tip_chat'],
+  completion: ['phrasis-tutorial-completion'],
+  tip_card_actions: ['phrasis-tip-tip_card_actions'],
+  tip_chat: ['phrasis-tip-tip_chat'],
+  tip_word_tap: ['phrasis-tip-tip_word_tap'],
+  tip_mode_switch: ['phrasis-tip-tip_mode_switch'],
+  tip_settings: ['phrasis-tip-tip_settings'],
+};
 
 /**
  * Best-effort recovery from the per-segment view error boundary
@@ -356,6 +361,34 @@ export async function expectSignedIn(page: Page): Promise<void> {
 }
 
 /**
+ * Navigate to an authed `/app` route and wait for `ready` to appear.
+ * Under parallel-suite load the Next loading splash (layout preloads /
+ * AuthBoundary) can sit until Convex warms; one reload picks up the
+ * compiled path. Used by billing/settings specs that otherwise time out
+ * on the Flexling splash with no pricing table or heading in the DOM.
+ */
+export async function gotoAuthedApp(
+  page: Page,
+  appPath: string,
+  ready: Locator,
+  timeoutMs = 30_000,
+): Promise<void> {
+  const go = async () => {
+    await page.goto(appPath);
+    await page.waitForURL(`**${appPath}`, { timeout: 20_000 });
+    await expectSignedIn(page);
+  };
+  await go();
+  try {
+    await expect(ready).toBeVisible({ timeout: Math.min(8_000, timeoutMs) });
+  } catch {
+    await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+    await expectSignedIn(page);
+    await expect(ready).toBeVisible({ timeout: timeoutMs });
+  }
+}
+
+/**
  * Best-effort dismissal of the cookie-consent banner. The banner is fixed,
  * bottom-anchored and z-100, so while visible it intercepts clicks on any
  * bottom-of-viewport control (the import wizard's Next/Submit, the learn
@@ -373,13 +406,31 @@ export async function dismissConsent(page: Page): Promise<void> {
 }
 
 /**
+ * Confirm-away the one-time difficulty-check dialog (fires the first time
+ * new cards are auto-added for a fresh user) by clicking its keep/confirm
+ * button. Safe no-op when the dialog isn't up. Folded into `dismissTour`
+ * so every card-rating loop that already clears popovers also clears this.
+ */
+export async function dismissDifficultyCheck(page: Page): Promise<void> {
+  const confirm = page.getByTestId('difficulty-check-confirm').first();
+  if (await confirm.isVisible().catch(() => false)) {
+    await confirm.click().catch(() => {});
+    await page
+      .getByTestId('difficulty-check-dialog')
+      .waitFor({ state: 'hidden', timeout: 5_000 })
+      .catch(() => {});
+  }
+}
+
+/**
  * Dismiss a driver.js onboarding popover. When `id` is provided, only the
  * matching tour (by `popoverClass="phrasis-tutorial-<id>"`) is targeted;
  * otherwise any `.driver-popover` is dismissed. Always strips any lingering
  * `.driver-overlay` SVG so the backdrop never intercepts subsequent clicks.
  * Also clears the consent banner (see `dismissConsent`) — every spec that
  * needs overlays gone calls this helper, and the tour wait doubles as time
- * for the PostHog SDK to boot and mount the banner.
+ * for the PostHog SDK to boot and mount the banner. The one-time
+ * difficulty-check dialog is cleared on both paths too.
  */
 export async function dismissTour(
   page: Page,
@@ -387,7 +438,9 @@ export async function dismissTour(
   waitMs = 2500,
 ): Promise<void> {
   const selector = id
-    ? `.driver-popover.phrasis-tutorial-${id}`
+    ? TOUR_POPOVER_CLASSES[id]
+      .map((cls) => `.driver-popover.${cls}`)
+      .join(', ')
     : '.driver-popover';
 
   const nukeOverlays = () =>
@@ -407,6 +460,7 @@ export async function dismissTour(
     await nukeOverlays();
     await dismissConsent(page);
     await dismissErrorBoundary(page);
+    await dismissDifficultyCheck(page);
     return;
   }
 
@@ -425,6 +479,7 @@ export async function dismissTour(
     .catch(nukeOverlays);
   await dismissConsent(page);
   await dismissErrorBoundary(page);
+  await dismissDifficultyCheck(page);
 }
 
 /**
@@ -442,12 +497,18 @@ export async function openCardImport(page: Page): Promise<void> {
   await dismissTour(page);
   const individualTab = page.getByTestId('add-cards-mode-individual');
   try {
-    await expect(individualTab).toBeVisible({ timeout: 20_000 });
+    // Short first probe so a compile stall retries inside the default 30s
+    // test budget. The retry below is the one that actually waits.
+    await expect(individualTab).toBeVisible({ timeout: 8_000 });
   } catch {
     // One retry: in Next dev, the first hit of a route can stall on
     // on-demand compilation under parallel worker load. A hard reload picks
-    // up the now-compiled bundle instantly.
-    await page.reload();
+    // up the now-compiled bundle instantly. 'domcontentloaded', not the
+    // default 'load': when the local Convex backend is struggling, pending
+    // requests hold the load event open past the test timeout, turning a
+    // recoverable stall into a guaranteed one (seen 2026-08-17, backend
+    // saturation run).
+    await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
     await page.waitForURL('**/app/content/add-cards', { timeout: 20_000 });
     await dismissTour(page);
     await expect(individualTab).toBeVisible({ timeout: 20_000 });
@@ -728,7 +789,13 @@ export async function completeStripeTestCheckout(
     email,
   }: { cardNumber?: string; email?: string } = {},
 ) {
-  await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
+  // "commit", not the default "load": Stripe's checkout page can hold the
+  // load event open on a slow connection; the element waits below cover
+  // actual readiness.
+  await page.waitForURL(/checkout\.stripe\.com/, {
+    timeout: 30_000,
+    waitUntil: 'commit',
+  });
 
   const emailField = page.locator('input#email');
   if (
@@ -799,12 +866,27 @@ export async function completeStripeTestCheckout(
     await postal.fill('10115');
   }
 
-  await page
-    .locator('button.SubmitButton, button[type=submit]')
-    .first()
-    .click();
-
-  await page.waitForURL((url) => !/checkout\.stripe\.com/.test(url.href), {
-    timeout: 90_000,
-  });
+  // Submit — retried until the page actually leaves Stripe. The hosted page
+  // has variants (classic, Link, and the Managed Payments layout with its
+  // "Subscribe with obligation to pay" button) that mount or re-render the
+  // pay button late, so a single early `.first()` click can land on the
+  // wrong submit (or on nothing) while the form silently stays put — which
+  // is exactly how the MoR variant made this helper time out. Prefer the
+  // button by its pay wording, fall back to the classic locator, re-click
+  // until the redirect happens.
+  const offStripe = () => !/checkout\.stripe\.com/.test(page.url());
+  await expect(async () => {
+    if (offStripe()) return;
+    const byText = page
+      .locator('button.SubmitButton, button[type=submit]')
+      .filter({ hasText: /subscribe|obligation to pay|pay now|start trial/i })
+      .first();
+    const target = (await byText.count())
+      ? byText
+      : page.locator('button.SubmitButton, button[type=submit]').first();
+    await target.click({ timeout: 5_000 }).catch(() => {});
+    await page.waitForURL((url) => !/checkout\.stripe\.com/.test(url.href), {
+      timeout: 20_000,
+    });
+  }).toPass({ timeout: 150_000, intervals: [1_000] });
 }

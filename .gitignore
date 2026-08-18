@@ -113,6 +113,9 @@ native/shell/app-url.js
 # Cursor editor state / debug artifacts — never commit
 /.cursor/
 
+# User-feedback response packages (email drafts + voice samples) — never commit
+/feedback/
+
 # Kanban board — symlink into Paul's Obsidian vault (machine-specific path,
 # see CLAUDE.md). Recreate with:
 # ln -s "$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/PaulsVault/projects/Flexling" board

@@ -677,6 +677,16 @@ export function LearningModeSettings({
     });
   };
 
+  // Split scheduling: each mode keeps its own per-card review schedule.
+  // Enabling triggers a server-side seed of the writing track (copy of the
+  // current schedule); disabling just freezes it — nothing is deleted.
+  const handleSeparateModeTrackingChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      separateModeTracking: checked,
+    });
+  };
+
   const handleFullReviewTargetAudioModeChange = async (
     mode: 'always' | 'afterSubmit' | 'never',
   ) => {
@@ -974,6 +984,16 @@ export function LearningModeSettings({
                 </p>
               </div>
             </div>
+            {/* Split scheduling: on = each mode keeps its own per-card
+                spaced-repetition schedule; off = both modes share one
+                schedule (the historical behavior). */}
+            <SettingSwitchRow
+              id="separateModeTracking"
+              label={t('separateModeTracking')}
+              description={t('separateModeTrackingDescription')}
+              checked={courseSettings.separateModeTracking === true}
+              onCheckedChange={handleSeparateModeTrackingChange}
+            />
           </div>
 
           {/* Writing style — sub-switcher shown when Writing is selected:
@@ -1348,6 +1368,16 @@ export function LearningModeSettings({
               )}
             </div>
           )}
+
+          <Separator />
+
+          {/* ================================================================
+              AUDIO PLAYBACK PREVIEW
+              ================================================================ */}
+
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+            {t('audioPlaybackPreview')}
+          </p>
 
           <div className="flex flex-col items-center gap-0 py-1">
             {/* Before-base target languages ("Practice Listening") — shown above

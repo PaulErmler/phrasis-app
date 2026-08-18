@@ -4,7 +4,7 @@ import {
   MessageCircle,
   Layers,
   Brain,
-  Globe,
+  Sprout,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -23,5 +23,5 @@ export const landingFeatureConfig: {
   { key: 'instantFeedback', icon: MessageCircle },
   { key: 'allInOne', icon: Layers },
   { key: 'spacedRepetition', icon: Brain },
-  { key: 'languageIntelligence', icon: Globe },
+  { key: 'languageIntelligence', icon: Sprout },
 ];

@@ -330,7 +330,27 @@ export function useAudioPlayer(
       releaseWebLockDelayed();
     };
 
+    /** Un-blur every revealing language whose cue is at or before `timeSec`. */
+    const revealThrough = (timeSec: number) => {
+      const cues = languageCuesRef.current;
+      if (cues.length === 0) return;
+      setRevealedLanguages((prev) => {
+        const toReveal = cues.filter(
+          (c) => c.reveals !== false && c.startSec <= timeSec && !prev.has(c.language),
+        );
+        if (toReveal.length === 0) return prev;
+        const next = new Set(prev);
+        for (const c of toReveal) next.add(c.language);
+        return next;
+      });
+    };
+
     const handleEnded = () => {
+      // Playback reached the end, so every revealing cue is behind us. The last
+      // cue can sit exactly at the blob duration — a silent placeholder for a
+      // zero-repetition language in the final group — and `timeupdate` is not
+      // guaranteed to fire on that last sample, so sweep the remainder here.
+      revealThrough(Infinity);
       setIsPlaying(false);
       setMediaSessionPlaybackState('paused');
       releaseWebLockDelayed();
@@ -343,20 +363,7 @@ export function useAudioPlayer(
       }
     };
 
-    const handleTimeUpdate = () => {
-      const cues = languageCuesRef.current;
-      if (cues.length === 0) return;
-      const currentTime = audio.currentTime;
-      setRevealedLanguages((prev) => {
-        const toReveal = cues.filter(
-          (c) => c.reveals !== false && c.startSec <= currentTime && !prev.has(c.language),
-        );
-        if (toReveal.length === 0) return prev;
-        const next = new Set(prev);
-        for (const c of toReveal) next.add(c.language);
-        return next;
-      });
-    };
+    const handleTimeUpdate = () => revealThrough(audio.currentTime);
 
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);

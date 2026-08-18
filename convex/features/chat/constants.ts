@@ -2,11 +2,11 @@
  * Max user messages (excluding tool responses) allowed per thread.
  * Shared between backend (Convex) and frontend (Next.js).
  *
- * Counted against a single 300-item page in `sendMessage`; a quick action
- * stores one extra (hidden) system message per use, so keep the page size
- * comfortably above the worst-case stored-message count per thread.
+ * `sendMessage` counts across ALL of the thread's pages — tool-call-heavy
+ * turns can store a dozen-plus assistant/tool messages each, so any
+ * single-page count would freeze once the thread outgrows the page.
  */
-export const THREAD_MESSAGE_LIMIT = 20;
+export const THREAD_MESSAGE_LIMIT = 15;
 
 /**
  * Max characters allowed in a single chat message.

@@ -30,6 +30,19 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 180,
     shards: 32,
   },
+  // MiniMax Speech 2.8 Turbo via OpenRouter (/audio/speech) — Cantonese only.
+  // Same reasoning as geminiTts: the binding constraint is the azureStt
+  // validation budget it converts into, not OpenRouter's ceiling. Sized well
+  // below geminiTts because it serves two languages rather than most of the
+  // catalogue; without its own bucket it falls back to `googleTts` and spends
+  // Google's budget instead.
+  minimaxTts: {
+    kind: 'token bucket',
+    rate: 60,
+    period: MINUTE,
+    capacity: 60,
+    shards: 8,
+  },
   // Azure Speech-to-Text Fast Transcription S0 tier. Hit by TTS validation
   // (synthesizeAndValidate), word-timing backfill, and chat voice
   // transcription. 100 per 10s matches Microsoft's documented S0 cap of
@@ -117,8 +130,9 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
 // rate-limit bucket (Azure Speech keeps its separate `azureStt` bucket). The
 // dispatch lookup falls back to 'googleTts' for any unmapped provider.
 export const TTS_RATE_LIMIT_BY_PROVIDER: Partial<
-  Record<TtsProvider, 'googleTts' | 'geminiTts'>
+  Record<TtsProvider, 'googleTts' | 'geminiTts' | 'minimaxTts'>
 > = {
   google: 'googleTts',
   gemini: 'geminiTts',
+  minimax: 'minimaxTts',
 };

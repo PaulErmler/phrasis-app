@@ -1,6 +1,7 @@
 import type { RunMutationCtx } from '@convex-dev/better-auth/utils';
 import { internal } from '../_generated/api';
 import type { DataModel } from '../_generated/dataModel';
+import { emailEnvLabel, formatEmailEnvLabel, withEmailEnvSubject } from './emailEnv';
 import { resend } from './resendClient';
 
 /**
@@ -76,11 +77,23 @@ const buttonStyle =
   `background:${BRAND_COLOR};border-radius:8px;color:#ffffff;display:inline-block;` +
   'font-size:14px;font-weight:600;padding:12px 24px;text-decoration:none;';
 
+function emailEnvBanner(): string {
+  const label = emailEnvLabel();
+  if (!label) return '';
+  const display = formatEmailEnvLabel(label);
+  return (
+    `<p style="background:#fef3c7;border-radius:8px;color:#92400e;font-size:12px;` +
+    `font-weight:600;letter-spacing:0.02em;margin:0 0 20px;padding:8px 12px;` +
+    `text-align:center;">[${escapeHtml(display)}]</p>`
+  );
+}
+
 function emailShell(content: string): string {
   return `
 <div style="background:#f3f4f6;margin:0;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <div style="background:#ffffff;border-radius:12px;margin:0 auto;max-width:480px;padding:32px;">
     <img src="${LOGO_URL}" width="48" height="48" alt="Flexling" style="border-radius:10px;display:block;margin:0 0 24px;">
+    ${emailEnvBanner()}
     ${content}
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0;">
     <p style="color:#9ca3af;font-size:12px;margin:0;">
@@ -204,7 +217,8 @@ export async function sendVerificationOtpEmail(
 ): Promise<void> {
   const copy = AUTH_EMAIL_COPY.verify;
   // Code in the subject → copiable from the inbox list / notification.
-  const subject = `${copy.subject}: ${otp}`;
+  // Non-prod deployments prefix with [Staging] / [Test] via EMAIL_ENV.
+  const subject = withEmailEnvSubject(`${copy.subject}: ${otp}`);
   if (captureMode()) {
     await ctx.runMutation(internal.features.authEmailTesting.captureAuthEmail, {
       email: to.toLowerCase(),
@@ -223,15 +237,16 @@ export async function sendResetPasswordEmail(
   { to, url }: { to: string; url: string },
 ): Promise<void> {
   const copy = AUTH_EMAIL_COPY.reset;
+  const subject = withEmailEnvSubject(copy.subject);
   if (captureMode()) {
     await ctx.runMutation(internal.features.authEmailTesting.captureAuthEmail, {
       email: to.toLowerCase(),
       kind: 'reset',
       url,
-      subject: copy.subject,
+      subject,
     });
     return;
   }
   const { html, text } = renderAuthEmail(copy, url);
-  await resend.sendEmail(ctx, { from: FROM, to, subject: copy.subject, html, text });
+  await resend.sendEmail(ctx, { from: FROM, to, subject, html, text });
 }

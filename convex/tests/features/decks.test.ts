@@ -13,7 +13,7 @@ import {
   findNextIncompleteCollection,
   getActiveDataset,
 } from "../../db/collections";
-import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/languages";
+import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/translationProvenance";
 // The workpools are module-mocked globally (tests/convexTestSetup.ts):
 // `enqueueAction` is a vi.fn() resolving to unique fake workIds
 // ('test-tts-work-N'), so tests can assert the enqueue payload directly.
@@ -334,6 +334,225 @@ describe("features/decks", () => {
     });
   });
 
+  describe("setActiveCollectionByLevel / getActiveDifficultyLevel", () => {
+    /** Active dataset with L05 + L07 level collections (2 texts each). */
+    async function seedDatasetLevels(
+      t: TestConvex<typeof schema>,
+    ): Promise<Record<string, Id<"collections">>> {
+      return t.run(async (ctx) => {
+        const datasetId = await ctx.db.insert("datasets", {
+          slug: "ogte-test",
+          version: "1.0.0",
+          publishedAt: Date.now(),
+          isActive: true,
+        });
+        const byCode: Record<string, Id<"collections">> = {};
+        for (const code of ["L05", "L07"]) {
+          byCode[code] = await ctx.db.insert("collections", {
+            name: code,
+            code,
+            datasetId,
+            order: Number(code.slice(1)),
+            textCount: 2,
+            origin: "premade",
+          });
+        }
+        return byCode;
+      });
+    }
+
+    it("switches the active collection to the dataset level for the slid OGTE level", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId, collA1 } = await seedCourse(t);
+      const levels = await seedDatasetLevels(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 3,
+          activeCollectionId: collA1,
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.decks.setActiveCollectionByLevel, {
+        ogteLevel: 7,
+      });
+
+      const settings = await t.run(async (ctx) =>
+        ctx.db
+          .query("courseSettings")
+          .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+          .first(),
+      );
+      expect(settings?.activeCollectionId).toBe(levels.L07);
+
+      // The difficulty query now reads the level back off the collection code.
+      const level = await asUser.query(
+        api.features.decks.getActiveDifficultyLevel,
+        {},
+      );
+      expect(level).toBe(7);
+    });
+
+    it("rejects an out-of-range level and a level with no collection", async () => {
+      const t = convexTest(schema, modules);
+      await seedCourse(t);
+      await seedDatasetLevels(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await expect(
+        asUser.mutation(api.features.decks.setActiveCollectionByLevel, {
+          ogteLevel: 42,
+        }),
+      ).rejects.toThrow(/invalid level/i);
+      await expect(
+        asUser.mutation(api.features.decks.setActiveCollectionByLevel, {
+          ogteLevel: 9, // L09 not seeded
+        }),
+      ).rejects.toThrow(/not found/i);
+    });
+
+    it("refuses a level the user already completed, no-ops on the active one", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedCourse(t);
+      const levels = await seedDatasetLevels(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 3,
+          activeCollectionId: levels.L05,
+        });
+        await ctx.db.insert("collectionProgress", {
+          userId: "user_A",
+          courseId,
+          collectionId: levels.L07,
+          cardsAdded: 2, // === textCount → complete
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await expect(
+        asUser.mutation(api.features.decks.setActiveCollectionByLevel, {
+          ogteLevel: 7,
+        }),
+      ).rejects.toThrow(/complete/i);
+      await expect(
+        asUser.mutation(api.features.decks.setActiveCollectionByLevel, {
+          ogteLevel: 5,
+        }),
+      ).resolves.toBeNull();
+    });
+
+    it("getUpcomingSentencesForLevel starts past the user's frontier and resolves target translations", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedCourse(t);
+      const levels = await seedDatasetLevels(t);
+      await t.run(async (ctx) => {
+        for (let rank = 1; rank <= 4; rank++) {
+          const textId = await ctx.db.insert("texts", {
+            text: `level five ${rank}`,
+            language: "en",
+            userCreated: false,
+            collectionId: levels.L05,
+            collectionRank: rank,
+          });
+          // Only rank 3 has a target translation — rank 4's row must still
+          // appear, with the target side absent (still generating).
+          if (rank === 3) {
+            await ctx.db.insert("translations", {
+              textId,
+              targetLanguage: "es",
+              translatedText: `nivel cinco ${rank}`,
+            });
+          }
+        }
+        // Keep textCount honest with the 4 texts just inserted — the
+        // switchable check compares progress against it, so a stale 2 would
+        // read this level as already complete.
+        await ctx.db.patch(levels.L05, { textCount: 4 });
+        // The user already consumed ranks 1-2 of this level.
+        await ctx.db.insert("collectionProgress", {
+          userId: "user_A",
+          courseId,
+          collectionId: levels.L05,
+          cardsAdded: 2,
+          lastRankProcessed: 2,
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const page = await asUser.query(
+        api.features.decks.getUpcomingSentencesForLevel,
+        { ogteLevel: 5 },
+      );
+      expect(page.exists).toBe(true);
+      expect(page.switchable).toBe(true);
+      expect(page.sentences.map((r) => r.sourceText)).toEqual([
+        "level five 3",
+        "level five 4",
+      ]);
+      expect(page.sentences[0].targetText).toBe("nivel cinco 3");
+      expect(page.sentences[1].targetText).toBeUndefined();
+    });
+
+    it("getUpcomingSentencesForLevel reports a missing level and an already-completed one as not switchable", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedCourse(t);
+      const levels = await seedDatasetLevels(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 3,
+          activeCollectionId: levels.L05,
+        });
+        // L07 fully consumed → the switch mutation would reject it, so the
+        // pager must be able to disable that step instead of dead-ending.
+        await ctx.db.insert("collectionProgress", {
+          userId: "user_A",
+          courseId,
+          collectionId: levels.L07,
+          cardsAdded: 2, // === textCount
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const complete = await asUser.query(
+        api.features.decks.getUpcomingSentencesForLevel,
+        { ogteLevel: 7 },
+      );
+      expect(complete.exists).toBe(true);
+      expect(complete.switchable).toBe(false);
+
+      const missing = await asUser.query(
+        api.features.decks.getUpcomingSentencesForLevel,
+        { ogteLevel: 9 }, // L09 not seeded
+      );
+      expect(missing).toEqual({
+        exists: false,
+        switchable: false,
+        sentences: [],
+      });
+    });
+
+    it("getActiveDifficultyLevel returns null for non-level active collections", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId, collA1 } = await seedCourse(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 3,
+          activeCollectionId: collA1, // legacy "A1" — no L-code
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const level = await asUser.query(
+        api.features.decks.getActiveDifficultyLevel,
+        {},
+      );
+      expect(level).toBeNull();
+    });
+  });
+
   describe("findNextIncompleteCollection", () => {
     it("does not skip a level whose progress is all cutover carry", async () => {
       const t = convexTest(schema, modules);
@@ -651,6 +870,95 @@ describe("features/decks", () => {
       expect(await t.run(async (ctx) => ctx.db.get(audioId))).toBeNull();
     });
 
+    // Backstop at the write choke point: whatever enqueued the job, no
+    // retranslation may land on a card the user created.
+    it("with replaceExisting=true refuses to overwrite a translation on a user-created text", async () => {
+      const t = convexTest(schema, modules);
+      const { textId, translationId } = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "Custom",
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "She's over there",
+          language: "en",
+          userCreated: true,
+          userId: "user-1",
+          collectionId,
+          collectionRank: 1,
+        });
+        const translationId = await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "de",
+          translatedText: "Sie ist dort drüben",
+          // Chat-model output: NOT `user-provided`, so the protected-source
+          // check alone would let this through.
+          translationSource: "openai/gpt-5-chat-none",
+        });
+        return { textId, translationId };
+      });
+
+      await t.mutation(
+        internal.features.decks.storeTranslationAndScheduleTTS,
+        {
+          textId,
+          targetLanguage: "de",
+          translatedText: "Sie ist da drüben",
+          voiceName: TEST_VOICE,
+          translationSource: "google/gemini-3-flash-preview-high",
+          replaceExisting: true,
+          skipTts: true,
+        },
+      );
+
+      const row = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(row?.translatedText).toBe("Sie ist dort drüben");
+      expect(row?.translationSource).toBe("openai/gpt-5-chat-none");
+    });
+
+    // …but a language the card doesn't have yet must still be fillable, e.g.
+    // after the user adds a target language to the course.
+    it("still inserts a missing translation on a user-created text", async () => {
+      const t = convexTest(schema, modules);
+      const textId = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "Custom",
+          textCount: 0,
+        });
+        return ctx.db.insert("texts", {
+          text: "She's over there",
+          language: "en",
+          userCreated: true,
+          userId: "user-1",
+          collectionId,
+          collectionRank: 1,
+        });
+      });
+
+      await t.mutation(
+        internal.features.decks.storeTranslationAndScheduleTTS,
+        {
+          textId,
+          targetLanguage: "de",
+          translatedText: "Sie ist da drüben",
+          voiceName: TEST_VOICE,
+          translationSource: "google/gemini-3-flash-preview-high",
+          replaceExisting: true,
+          skipTts: true,
+        },
+      );
+
+      const row = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("targetLanguage", "de"),
+          )
+          .first(),
+      );
+      expect(row?.translatedText).toBe("Sie ist da drüben");
+    });
+
     it("with replaceExisting=true keeps audio and skips TTS when the change is punctuation-only", async () => {
       const t = convexTest(schema, modules);
       const { textId, translationId, audioId } = await t.run(async (ctx) => {
@@ -932,6 +1240,10 @@ describe("features/decks", () => {
     // `speakerGender` and `audioSpeakerGender` are 'female', so the gender
     // resolution at the top of scheduleMissingContent is a no-op and the
     // resolved voice gender the sweep compares against is 'female'.
+    //
+    // `userCreated` defaults to false (premade content): the sweep only ever
+    // rewrites machine output on premade texts, so that is the case these
+    // deletion tests must exercise. Pass true for the user-owned cases.
     async function seedTextWithSpanish(
       t: TestConvex<typeof schema>,
       args: {
@@ -940,6 +1252,7 @@ describe("features/decks", () => {
           translationSource?: string;
         };
         audio?: { voiceGender: "male" | "female" };
+        userCreated?: boolean;
       },
     ) {
       return t.run(async (ctx) => {
@@ -950,7 +1263,7 @@ describe("features/decks", () => {
         const textId = await ctx.db.insert("texts", {
           text: "Hello",
           language: "en",
-          userCreated: true,
+          userCreated: args.userCreated ?? false,
           speakerGender: "female",
           audioSpeakerGender: "female",
           collectionId,
@@ -1046,6 +1359,55 @@ describe("features/decks", () => {
         },
       });
       expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
+    });
+
+    // The reporter's bug: a chat-created card carries the CHAT MODEL's slug as
+    // its translationSource, not `user-provided`, so the protected-source check
+    // alone let the gender sweep delete it and re-translate from the stored
+    // source rendering — losing the wording the user approved.
+    it("keeps a machine-sourced translation on a user-created card when the gender drifts", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextWithSpanish(t, {
+        userCreated: true,
+        translation: {
+          speakerGender: "male",
+          translationSource: "openai/gpt-5-chat-none",
+        },
+      });
+      expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
+    });
+
+    it("keeps a legacy translation on a user-created card when its audio drifted gender", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextWithSpanish(t, {
+        userCreated: true,
+        translation: { translationSource: "google-translate-v2" },
+        audio: { voiceGender: "male" },
+      });
+      expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
+    });
+
+    // The text is the user's; the voice is ours. Drifted audio on a
+    // user-created card must still be dropped so it can be re-synthesized at
+    // the card's current gender — the guard covers translations only.
+    it("still deletes drifted audio on a user-created card", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextWithSpanish(t, {
+        userCreated: true,
+        translation: { translationSource: "google-translate-v2" },
+        audio: { voiceGender: "male" },
+      });
+      const audio = await t.run(async (ctx) => {
+        const text = (await ctx.db.get(textId))!;
+        await scheduleMissingContent(ctx, textId, text, ["en"], ["es"]);
+        return ctx.db
+          .query("audioRecordings")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("language", "es"),
+          )
+          .first();
+      });
+      expect(audio).toBeNull();
     });
   });
 

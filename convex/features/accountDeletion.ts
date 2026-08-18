@@ -2,8 +2,9 @@ import { ConvexError } from 'convex/values';
 import { mutation } from '../_generated/server';
 import { authComponent } from '../auth';
 import { rateLimiter } from '../rateLimiter';
-import { resend } from '../lib/resendClient';
 import { SUPPORT_EMAIL } from '../lib/authEmails';
+import { withEmailEnvSubject } from '../lib/emailEnv';
+import { resend } from '../lib/resendClient';
 
 /**
  * Account deletion works as a REQUEST: the user asks in-app (App Store
@@ -29,7 +30,9 @@ export const requestAccountDeletion = mutation({
     await resend.sendEmail(ctx, {
       from: `Flexling <${SUPPORT_EMAIL}>`,
       to: SUPPORT_EMAIL,
-      subject: `Account deletion request: ${user.email}`,
+      subject: withEmailEnvSubject(
+        `Account deletion request: ${user.email}`,
+      ),
       text: [
         'A user requested account deletion from the app.',
         '',

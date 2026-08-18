@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     template: '%s | Flexling',
   },
   description:
-    'The language learning app that grows with you and adapts to your needs.',
+    'Learn a language the way you learned your first. Absorb words in sentences that actually matter to you — type them, import them, or ask AI to create cards.',
   metadataBase: new URL(siteUrl),
   manifest: '/manifest.json',
   icons: {
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Flexling',
     description:
-      'Get fluent by shadowing real sentences, writing them, and listening all day — with spaced repetition and a built-in AI tutor. Free to start.',
+      'Learn a language the way you learned your first. Absorb words in sentences that actually matter to you. Free to start.',
     url: siteUrl,
     siteName: 'Flexling',
     type: 'website',
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     card: 'summary',
     title: 'Flexling',
     description:
-      'Get fluent by shadowing real sentences, writing them, and listening all day — with spaced repetition and a built-in AI tutor. Free to start.',
+      'Learn a language the way you learned your first. Absorb words in sentences that actually matter to you. Free to start.',
   },
   appleWebApp: {
     capable: true,

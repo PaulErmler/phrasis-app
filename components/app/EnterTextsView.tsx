@@ -15,8 +15,8 @@ import { toast } from 'sonner';
 import {
   getLocalizedLanguageNameByCode,
   getTextDirection,
-  USER_PROVIDED_TRANSLATION_SOURCE,
 } from '@/lib/languages';
+import { USER_PROVIDED_TRANSLATION_SOURCE } from '@/lib/translationProvenance';
 import {
   MAX_CARD_TEXT_LENGTH,
   CARD_TEXT_SHOW_COUNT_REMAINING_THRESHOLD,

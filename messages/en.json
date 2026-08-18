@@ -447,7 +447,9 @@
       "time": "Time",
       "today": "today",
       "new": "new"
-    }
+    },
+    "freePlan": "Free plan",
+    "upgrade": "Upgrade"
   },
   "LearningMode": {
     "title": "Learning",
@@ -552,6 +554,10 @@
         "includeCustom": "Include custom content",
         "createChatCards": "Create in chat",
         "createCustomCards": "Add custom cards"
+      },
+      "preparingWriting": {
+        "title": "Preparing your writing progress…",
+        "subtitle": "We're setting up a separate schedule for Writing mode. This usually takes a moment — your sentences will appear here shortly."
       }
     },
     "progressDisplay": {
@@ -597,6 +603,7 @@
       "initialReviews": "Initial reviews",
       "initialReviewsDescription": "Number of initial reviews for new sentences",
       "audioPlayback": "Audio Playback",
+      "audioPlaybackPreview": "Audio Playback Preview",
       "highlightWords": "Highlight words",
       "highlightWordsDescription": "Highlight words when playing audio (not supported for all languages)",
       "autoPlay": "Auto-play audio",
@@ -648,6 +655,8 @@
       "reviewModeFull": "Writing",
       "reviewModeAudioDescription": "Listen, translate in your head, then say each sentence aloud to practice your pronunciation. Hands-free — perfect for learning while walking, commuting, or relaxing.",
       "reviewModeFullDescription": "Type the translations and see a character-level comparison with the correct answer. Best for active practice — engages recall and spelling.",
+      "separateModeTracking": "Separate progress per mode",
+      "separateModeTrackingDescription": "Shadowing and Writing each keep their own review schedule for every sentence",
       "fullReviewTargetAudio": "Auto-play target audio",
       "fullReviewTargetAudioDescription": "When to play target language audio",
       "fullReviewTargetAudio_always": "After base audio",
@@ -680,7 +689,7 @@
       "agb": "Terms & Conditions",
       "privacy": "Privacy Policy"
     },
-    "tagline": "The language app that grows with you.",
+    "tagline": "Learn a language the way you learned your first.",
     "columnProduct": "Product",
     "columnLegal": "Legal",
     "columnSettings": "Settings"
@@ -810,6 +819,38 @@
       "loading": "Loading...",
       "creatingApproval": "Creating sentence...",
       "failed": "Sentence creation failed"
+    },
+    "alsoCorrect": {
+      "header": "Your version is also correct",
+      "addButton": "Add as new card",
+      "addHint": "Keep the original card and practice both versions",
+      "replaceButton": "Replace card",
+      "replaceHint": "The card will show your phrasing from now on",
+      "dismissButton": "Dismiss",
+      "added": "Added to your deck as a new card",
+      "replaced": "Card updated to your phrasing",
+      "dismissed": "Dismissed — the card stays as it is",
+      "loading": "Loading...",
+      "failed": "Could not save your version",
+      "metadataFields": {
+        "speakerGender": "Voice",
+        "register": "Register",
+        "addresseeGender": "Addressee",
+        "addresseeNumber": "Addressee number",
+        "addressesSomeone": "Addresses someone"
+      },
+      "metadataValues": {
+        "male": "male",
+        "female": "female",
+        "neutral": "neutral",
+        "formal": "formal",
+        "informal": "informal",
+        "singular": "singular",
+        "plural": "plural",
+        "not_applicable": "n/a",
+        "true": "yes",
+        "false": "no"
+      }
     },
     "threadLimit": {
       "reached": "You've reached the message limit for this conversation.",
@@ -953,7 +994,6 @@
     "planScheduled": "Plan Scheduled",
     "updatePlan": "Update Plan",
     "currentPlan": "Current Plan",
-    "continueWithFree": "Continue with Free",
     "purchase": "Purchase",
     "getStarted": "Get started",
     "renew": "Renew",
@@ -974,6 +1014,7 @@
     "billedAnnually": "{price} billed annually",
     "annualSaveHint": "Save 25%",
     "mostPopular": "Most Popular",
+    "taxNote": "All prices include VAT where applicable. Paid plans are sold by Stripe as merchant of record.",
     "priorityFeatureAccess": "Priority access to new features",
     "prioritySupport": "Priority support",
     "planDescriptions": {
@@ -1034,13 +1075,15 @@
       "loading": "Loading…",
       "errors": {
         "completeFailed": "Could not finish setup. Please try again."
-      }
+      },
+      "startLearning": "Start learning"
     },
     "languagePair": {
       "speakTitle": "What language do you already speak?",
       "learnTitle": "Which language do you want to learn?",
       "speakHint": "This will be your base language",
       "learnHint": "The language you’re studying — not the one you already know.",
+      "backToLearn": "Change {language}",
       "stepOf": "Step {current} of 2",
       "stepReady": "Ready",
       "readyTitle": "Looking good.",
@@ -1190,21 +1233,9 @@
         "continue": "Continue"
       }
     },
-    "customizing": {
-      "title": "Customizing your first lesson…",
-      "beats": {
-        "0": "Customizing your course…",
-        "1": "Tailoring content to your level…",
-        "2": "Picking your first sentences…",
-        "3": "Personalizing your lesson…",
-        "4": "Almost ready…"
-      }
-    },
-    "firstLesson": {
-      "intro": {
-        "title": "Your first lesson is ready!",
-        "subtitle": "Pick a mode and we'll walk you through how everything works."
-      },
+    "reviewMode": {
+      "title": "How do you want to learn?",
+      "subtitle": "Pick a mode for your first lesson — you can switch anytime while learning.",
       "modes": {
         "audio": {
           "title": "Shadowing",
@@ -1219,97 +1250,7 @@
           "title": "Transcribe",
           "description": "Hear only the target language, type what you hear — with instant, character-level spelling feedback."
         }
-      },
-      "duration": "About 10 minutes",
-      "start": "Start lesson",
-      "skip": "Skip for now",
-      "abort": "Abort lesson",
-      "abortAria": "Abort lesson",
-      "errorBoundary": {
-        "message": "We hit a snag preparing your first lesson. You can skip it for now and pick up from your home screen.",
-        "skip": "Skip lesson"
       }
-    },
-    "statsRecap": {
-      "heroLabel": "new words this session",
-      "stats": {
-        "reviews": "reviews",
-        "time": "time",
-        "new": "new"
-      },
-      "wordsHeading": "Words you just learned",
-      "projection": {
-        "title": "At this pace, you'll know",
-        "subtitle": "{minutes} min/day · linear projection",
-        "milestones": {
-          "1mo": "1 month",
-          "6mo": "6 months",
-          "1y": "1 year"
-        },
-        "wordsUnit": "words"
-      },
-      "ready": {
-        "title": "Day 1 done",
-        "subtitle": "Keep this streak alive — come back tomorrow for {minutes} more minutes."
-      },
-      "back": "Back",
-      "next": "Next",
-      "continue": "Continue"
-    },
-    "wordProjection": {
-      "summary": "Right now you learned {words, plural, =1 {1 word} other {# words}} in {minutes, plural, =1 {1 minute} other {# minutes}}.",
-      "headline": "At this pace, you'll know",
-      "perDay": "{minutes} min/day",
-      "timelineToday": "Today",
-      "timelineTodaySub": "your first session",
-      "timelineIn30Days": "In 30 days",
-      "timelineIn30DaysSub": "a month at your daily goal",
-      "timelineYearEndSub": "{days} days from now",
-      "adjustLabel": "Tune your daily goal",
-      "wordsUnit": "words",
-      "continue": "Continue",
-      "custom": "Custom",
-      "customPlaceholder": "Minutes",
-      "minutesUnit": "min",
-      "set": "Set"
-    },
-    "featureTour": {
-      "title": "A few more things",
-      "subtitle": "Quick tour of features you'll want to know about.",
-      "slides": {
-        "audioMode": {
-          "title": "How to use shadowing?",
-          "body": "Shadowing is the heart of Flexling — listen, translate, then say it aloud. You can also do this while taking a walk. This is my absolute favorite way to learn a language and I really recommend giving it a try!"
-        },
-        "custom": {
-          "title": "Add custom cards",
-          "body": "Add any sentence you want to learn — we generate the audio and translations for you in seconds."
-        },
-        "import": {
-          "title": "Bulk import from CSV",
-          "body": "Drag in a list of sentences and we'll fan them out into translations and audio for every language in your course."
-        },
-        "radio": {
-          "title": "Radio for passive listening",
-          "body": "Set it and forget it — your sentences play on loop in the background, without affecting your spaced-repetition schedule."
-        },
-        "stats": {
-          "title": "Detailed stats track everything",
-          "body": "Streak, words learned, time spent, and a calendar heatmap so you can see your habit forming."
-        },
-        "multilang": {
-          "title": "Multiple languages",
-          "body": "On Pro you can also add a third language to your flashcards — handy if you want to learn multiple languages at once, or keep refreshing two languages you already know at the same time."
-        }
-      },
-      "back": "Back",
-      "next": "Next",
-      "done": "Done"
-    },
-    "planPick": {
-      "title": "Thank you for joining",
-      "subtitle": "Try Basic, Pro or Ultra free for 7 days — no commitment. You can change or cancel anytime.",
-      "skip": "Maybe later — continue free"
     },
     "difficulty": {
       "title": "How much do you already know?",
@@ -1345,79 +1286,6 @@
       }
     }
   },
-  "OnboardingTutorial": {
-    "core": {
-      "welcomeAudio": {
-        "title": "Welcome to Shadowing",
-        "description": "In this mode you can review sentences hands-off. The texts are read aloud automatically. Let's walk through how it works."
-      },
-      "welcomeFull": {
-        "title": "Welcome to Writing",
-        "description": "In this mode you actively practise writing and get instant feedback. Let's walk through how it works."
-      },
-      "card": {
-        "title": "The card",
-        "descriptionAudio": "Each card shows a sentence in the languages you're learning. The target language is hidden until you reveal it.",
-        "descriptionFull": "Each card shows a sentence in the languages you're learning. You'll type the translation and check yourself.",
-        "descriptionFullTranscribe": "Each card plays a sentence in your target language. You'll type what you hear and check yourself."
-      },
-      "reveal": {
-        "title": "Reveal the translation",
-        "description": "The target translation is hidden by default. Tap it to reveal, or just listen — it reveals automatically once the target plays after the base. New cards play the target once at the start; when it's your turn to answer, try to recall it from memory."
-      },
-      "input": {
-        "title": "Type your translation",
-        "description": "Type the target-language translation here and hit submit. New sentences show the translation the first time — just type it out to learn it; later reviews test you without it. You’ll get instant feedback on each word."
-      },
-      "inputTranscribe": {
-        "title": "Type what you hear",
-        "description": "Type exactly what you hear in the target language and hit submit. New sentences show the text the first time — just type it out to learn it; later reviews test you without it. You’ll get instant feedback on each word."
-      },
-      "audioControls": {
-        "title": "Audio plays automatically",
-        "description": "When a card is new, the target language plays once at the beginning so you hear what you're aiming for. Then the base language plays, pauses for you to think, and the target follows. Restart, play / pause, or skip to the next card here. The undo button on the far left takes back your last rating and brings the previous card back."
-      },
-      "audioPlay": {
-        "title": "Audio starts when you close this",
-        "description": "Audio is paused while we walk you through the lesson. As soon as you close this, the first sentence plays automatically — use these controls to pause or replay it anytime."
-      },
-      "rating": {
-        "title": "Rate how well you knew it",
-        "descriptionAudio": "Each card is repeated a few times before it enters spaced repetition. <strong>Still learning</strong> keeps it in the warm-up rotation. <strong>Understood</strong> means you know it — skip the warm-up and start spaced repetition right away. After a few reviews you'll see Again / Hard / Good / Easy.",
-        "descriptionFull": "After every answer, rate how well you knew it. <strong>Again</strong> means you didn't know it — the card comes back quickly. <strong>Hard</strong>, <strong>Good</strong>, and <strong>Easy</strong> push the next review further out. Be honest — over-rating a card you didn't really know will haunt you later."
-      },
-      "autoAdd": {
-        "title": "Adding cards",
-        "description": "By default new cards are added automatically as the ones you have run out — everything is optimised for you using spaced repetition. This avoids cramming and takes care of pacing for you. You do not need to worry about when to add new cards."
-      }
-    },
-    "modeSwitch": {
-      "audio": {
-        "welcome": {
-          "title": "Switched to Shadowing",
-          "description": "You'll listen first and reveal the translation after. Here's what changes."
-        }
-      },
-      "full": {
-        "welcome": {
-          "title": "Switched to Writing",
-          "description": "You'll type the translation yourself and get instant feedback. Here's what changes."
-        }
-      }
-    },
-    "cardActions": {
-      "title": "Card options",
-      "description": "Star a card to favourite it, mark it as mastered (it stops appearing in review), hide it from your deck, or edit/delete it. Use these whenever a card is too easy, too hard, or just wrong for you. You can also flag a wrong translation, or regenerate the audio."
-    },
-    "wordTap": {
-      "title": "Tap any word",
-      "description": "Tap a word in the target sentence to ask the chat what it means. The chat can also create a new flashcard for it on the spot."
-    },
-    "chat": {
-      "title": "Your AI language tutor",
-      "description": "The chat is a tutor that knows the language you're learning. Ask why a sentence is phrased a certain way, get grammar explained at your level, request examples, or have the chat turn an idea into a new flashcard — translation and audio are generated automatically so the card is ready to study."
-    }
-  },
   "Tutorial": {
     "home": {
       "welcome": {
@@ -1434,7 +1302,7 @@
       },
       "radioMode": {
         "title": "Radio",
-        "description": "Audio-only background playback — your cards loop hands-free without affecting their spaced-repetition schedule. Only available in Shadowing."
+        "description": "Audio-only background playback — your cards loop hands-free without affecting their spaced-repetition schedule."
       },
       "freeStudyMode": {
         "title": "Free Study",
@@ -1465,66 +1333,103 @@
         "description": ""
       }
     },
-    "audioReview": {
-      "welcome": {
-        "title": "Welcome to Shadowing",
-        "description": "In this mode you can review sentences hands-off. The texts are read aloud automatically and it proceeds to the next sentence automatically. You can adjust the timing in the settings."
-      },
-      "card": {
-        "title": "The Sentence",
-        "description": "This sentence shows the texts in the languages you are learning. You can add more languages to the course later if you want."
-      },
-      "targetText": {
-        "title": "Target Text and Audio",
-        "description": "The target translation is hidden by default. It will be unblurred automatically or if you click on it. You can also play audio by clicking on the audio button."
-      },
-      "rating": {
-        "title": "Rate Your Recall",
-        "description": "Each sentence is shown an initial number of times before spaced repetition starts. \"Understood\" skips the rest of those initial reviews. After that, you'll see more detailed ratings: Again, Hard, Good, Easy. Above the buttons you can see roughly when the sentence will be shown again."
-      },
-      "audioControls": {
-        "title": "Audio Playing",
-        "description": "By default the audio is played automatically. On new sentences the target audio plays once at the beginning to train your listening. Then the base audio plays, there is a pause for you to think, and the target audio follows before automatically proceeding to the next sentence."
-      },
-      "undoRestart": {
-        "title": "Undo & Restart",
-        "description": "The left button takes back your last rating and brings the previous sentence back — useful after a mis-tap. The restart button next to it replays the current sentence's audio from the beginning. Your listening time is always kept."
-      },
-      "settings": {
-        "title": "Settings",
-        "description": "Here you can change playback speed, language order, auto-advance, whether to hide or blur the target text, how many initial reviews each sentence gets and more."
-      }
-    },
-    "fullReview": {
-      "welcome": {
-        "title": "Welcome to Writing",
-        "description": "In this mode you actively practice writing and get instant feedback."
-      },
-      "card": {
-        "title": "The Sentence",
-        "description": "The sentence in this mode shows the target and base languages and allows you to type in the translations."
-      },
-      "input": {
-        "title": "Enter Your Translation",
-        "description": "Here you enter the translation. On a new sentence the translation is shown once so you can type it out — from the next review you translate on your own. You can also listen to the target-language audio before typing."
-      },
-      "rating": {
-        "title": "Rate Your Answer",
-        "description": "After viewing the feedback, rate how well you recalled: Again, Hard, Good, or Easy. This drives the spaced repetition schedule."
-      },
-      "undoRestart": {
-        "title": "Undo & Restart",
-        "description": "The left button takes back your last rating and brings the previous sentence back — useful after a mis-tap. The restart button next to it replays the sentence audio from the beginning. Your practice time is always kept."
-      },
-      "settings": {
-        "title": "Settings",
-        "description": "Here you can customize your settings. You can switch between review modes and adjust audio settings."
-      }
-    },
     "chat": {
       "title": "Chat Assistant",
       "description": "Use the chat to ask about grammar, get explanations, or create new sentences. The AI assistant is here to help you learn!"
     }
+  },
+  "Tips": {
+    "welcome": {
+      "audio": {
+        "title": "Welcome to Shadowing",
+        "description": "In this mode you can review sentences hands-off. The texts are read aloud automatically. Let's walk through how it works."
+      },
+      "full": {
+        "title": "Welcome to Writing",
+        "description": "In this mode you actively practise writing and get instant feedback. Let's walk through how it works."
+      },
+      "switchedAudio": {
+        "title": "Switched to Shadowing",
+        "description": "You'll listen first and reveal the translation after. Here's what changes."
+      },
+      "switchedFull": {
+        "title": "Switched to Writing",
+        "description": "You'll type the translation yourself and get instant feedback. Here's what changes."
+      }
+    },
+    "concept": {
+      "card": {
+        "title": "The card",
+        "descriptionAudio": "Each card shows a sentence in the languages you're learning. The target language is hidden until you reveal it.",
+        "descriptionFull": "Each card shows a sentence in the languages you're learning. You'll type the translation and check yourself.",
+        "descriptionFullTranscribe": "Each card plays a sentence in your target language. You'll type what you hear and check yourself."
+      },
+      "shownTranslation": {
+        "title": "Shown the first time",
+        "description": "On a brand-new sentence the translation is shown here so you can learn it by typing it out. On later reviews it stays hidden — you'll translate from memory."
+      },
+      "reveal": {
+        "title": "Reveal the translation",
+        "description": "The target translation is hidden by default. Tap it to reveal, or just listen — it reveals automatically once the target plays after the base. New cards play the target once at the start; when it's your turn to answer, try to recall it from memory."
+      },
+      "input": {
+        "title": "Type your translation",
+        "description": "Type the target-language translation here and hit submit. New sentences show the translation the first time — just type it out to learn it; later reviews test you without it. You’ll get instant feedback on each word."
+      },
+      "inputTranscribe": {
+        "title": "Type what you hear",
+        "description": "Type exactly what you hear in the target language and hit submit. New sentences show the text the first time — just type it out to learn it; later reviews test you without it. You’ll get instant feedback on each word."
+      },
+      "audioControls": {
+        "title": "Audio plays automatically",
+        "description": "When a card is new, the target language plays once at the beginning so you hear what you're aiming for. Then the base language plays, pauses for you to think, and the target follows. Restart, play / pause, or skip to the next card here. The undo button on the far left takes back your last rating and brings the previous card back."
+      },
+      "ratingAudio": {
+        "title": "Rate how well you knew it",
+        "description": "Each card is repeated a few times before it enters spaced repetition. <strong>Still learning</strong> keeps it in the warm-up rotation. <strong>Understood</strong> means you know it — skip the warm-up and start spaced repetition right away. After a few reviews you'll see Again / Hard / Good / Easy."
+      },
+      "ratingFull": {
+        "title": "Rate how well you knew it",
+        "description": "After every answer, rate how well you knew it. <strong>Again</strong> means you didn't know it — the card comes back quickly. <strong>Hard</strong>, <strong>Good</strong>, and <strong>Easy</strong> push the next review further out. Be honest — over-rating a card you didn't really know will haunt you later."
+      },
+      "autoAdd": {
+        "title": "Adding cards",
+        "description": "By default new cards are added automatically as the ones you have run out — everything is optimised for you using spaced repetition. This avoids cramming and takes care of pacing for you. You do not need to worry about when to add new cards."
+      }
+    },
+    "cardActions": {
+      "title": "Card options",
+      "description": "Star a card to favourite it, mark it as mastered (it stops appearing in review), hide it from your deck, or edit/delete it. Use these whenever a card is too easy, too hard, or just wrong for you. You can also flag a wrong translation, or regenerate the audio."
+    },
+    "wordTap": {
+      "title": "Tap any word",
+      "description": "Tap a word in the target sentence to ask the chat what it means. The chat can also create a new flashcard for it on the spot."
+    },
+    "chat": {
+      "title": "Your AI language tutor",
+      "description": "The chat is a tutor that knows the language you're learning. Ask why a sentence is phrased a certain way, get grammar explained at your level, request examples, or have the chat turn an idea into a new flashcard — translation and audio are generated automatically so the card is ready to study."
+    },
+    "modeSwitch": {
+      "title": "Try the other mode",
+      "descriptionAudio": "You've been learning in Shadowing mode. There's also Writing, where you type the translation and get instant word-by-word feedback. You can switch between the two anytime in the settings up here.",
+      "descriptionFull": "You've been learning in Writing mode. There's also Shadowing, where sentences are read aloud and you review hands-free. You can switch between the two anytime in the settings up here."
+    },
+    "settings": {
+      "title": "Make it yours",
+      "description": "There's a lot you can customize in the settings — playback speed, language order, auto-advance, how many new cards are added, daily goals and more. Take a look when you're curious."
+    }
+  },
+  "DifficultyCheck": {
+    "title": "Does the difficulty feel right?",
+    "subtitle": "Before we add new sentences, check the level. Step left for easier, right for harder — you can change this anytime from the home screen.",
+    "upcomingHeading": "Next sentences at level {level}",
+    "easier": "Easier",
+    "harder": "Harder",
+    "levelUnavailable": "This level isn't available yet.",
+    "keep": "Feels right — keep going",
+    "switchTo": "Switch to level {level}",
+    "switching": "Switching…",
+    "switchFailed": "Could not switch the level. Please try again."
   },
   "ErrorPage": {
     "title": "Something went wrong",

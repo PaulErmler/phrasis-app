@@ -8,7 +8,7 @@ import type { Id } from "../../_generated/dataModel";
 // Mocked globally in tests/convexTestSetup.ts — imported here to assert on
 // the enqueue boundary (the pools never run jobs under convex-test).
 import { llmPool, ttsPool } from "../../lib/workpools";
-import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/languages";
+import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/translationProvenance";
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
@@ -696,6 +696,114 @@ describe("features/collections", () => {
       expect(again.translationsScheduled).toBe(0);
     });
 
+    // A romanizer swap resets `romanizedText` to undefined so the new
+    // implementation refills it. That backfill only existed in
+    // `scheduleMissingContent`, which the preview never runs, so preview rows
+    // sat with a bare transliteration gap until the text became a card.
+    it("backfills romanization for a current translation that is missing it", async () => {
+      const t = convexTest(schema, modules);
+      const { collId, textId } = await t.run(async (ctx) => {
+        const collId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 1,
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["el"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hello",
+          language: "en",
+          userCreated: false,
+          collectionId: collId,
+          collectionRank: 1,
+        });
+        // Current-version translation, but no romanization.
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "el",
+          translatedText: "Καλημέρα",
+        });
+        return { collId, textId };
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.mutation(
+        api.features.collections.requestPreviewTranslations,
+        { collectionId: collId, textIds: [textId] },
+      );
+      // Nothing to (re)translate — the row is current.
+      expect(res.translationsScheduled).toBe(0);
+
+      const jobs = await t.run(async (ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      );
+      const romanizationJobs = jobs.filter((j) =>
+        j.name.includes("processRomanizationForTranslation"),
+      );
+      expect(romanizationJobs).toHaveLength(1);
+      expect(romanizationJobs[0].args[0]).toMatchObject({
+        textId,
+        translatedText: "Καλημέρα",
+        language: "el",
+      });
+    });
+
+    it("does not re-attempt romanization that already failed (empty sentinel)", async () => {
+      const t = convexTest(schema, modules);
+      const { collId, textId } = await t.run(async (ctx) => {
+        const collId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 1,
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["el"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hello",
+          language: "en",
+          userCreated: false,
+          collectionId: collId,
+          collectionRank: 1,
+        });
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "el",
+          translatedText: "Καλημέρα",
+          // '' = tried and failed; re-running would burn the retries again
+          // on every page reveal.
+          romanizedText: "",
+        });
+        return { collId, textId };
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(
+        api.features.collections.requestPreviewTranslations,
+        { collectionId: collId, textIds: [textId] },
+      );
+
+      const jobs = await t.run(async (ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      );
+      expect(
+        jobs.filter((j) => j.name.includes("processRomanizationForTranslation")),
+      ).toHaveLength(0);
+    });
+
     it("is a no-op for texts outside the given collection", async () => {
       const t = convexTest(schema, modules);
       const { textIds } = await seedCourseWithTexts(t, 1);
@@ -916,6 +1024,110 @@ describe("features/collections", () => {
         { textId: textIds[0], language: "es" },
       );
       expect(res.scheduled).toBe(false);
+    });
+
+    // A pointer row whose audio is gone used to wedge the preview forever:
+    // the mutation saw "a row exists" and returned scheduled:false, while the
+    // browse query handed the client a null url. Only the card sweep clears
+    // these, and preview rows are usually not cards, so nothing ever healed
+    // them. These two cases cover both ways a row can dangle.
+    it("clears a pointer whose asset row is gone and re-schedules", async () => {
+      const t = convexTest(schema, modules);
+      const { textIds } = await seedCourseWithTexts(t, 1);
+      vi.mocked(ttsPool.enqueueAction).mockClear();
+
+      const { rowId } = await t.run(async (ctx) => {
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        const fixture = await insertAudioFixture(ctx, {
+          textId: textIds[0],
+          language: "es",
+          voiceName: "es-test-voice",
+          storageId,
+        });
+        // Asset deleted out from under the pointer.
+        await ctx.db.delete(fixture.assetId);
+        return fixture;
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.mutation(
+        api.features.collections.requestPreviewAudio,
+        { textId: textIds[0], language: "es" },
+      );
+
+      expect(res.scheduled).toBe(true);
+      expect(await t.run(async (ctx) => ctx.db.get(rowId))).toBeNull();
+      expect(vi.mocked(ttsPool.enqueueAction)).toHaveBeenCalledTimes(1);
+    });
+
+    it("clears a pointer whose blob is gone and re-schedules", async () => {
+      const t = convexTest(schema, modules);
+      const { textIds } = await seedCourseWithTexts(t, 1);
+      vi.mocked(ttsPool.enqueueAction).mockClear();
+
+      const { rowId } = await t.run(async (ctx) => {
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        const fixture = await insertAudioFixture(ctx, {
+          textId: textIds[0],
+          language: "es",
+          voiceName: "es-test-voice",
+          storageId,
+        });
+        // Asset row survives, but the blob behind it does not.
+        await ctx.storage.delete(storageId);
+        return fixture;
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.mutation(
+        api.features.collections.requestPreviewAudio,
+        { textId: textIds[0], language: "es" },
+      );
+
+      expect(res.scheduled).toBe(true);
+      expect(await t.run(async (ctx) => ctx.db.get(rowId))).toBeNull();
+      expect(vi.mocked(ttsPool.enqueueAction)).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves a dangling pointer alone while its TTS job is still in flight", async () => {
+      // `processTTSForCard` attaches its row before the blob is necessarily
+      // resolvable; deleting it here would make the completing job patch a
+      // row that no longer exists.
+      const t = convexTest(schema, modules);
+      const { textIds } = await seedCourseWithTexts(t, 1);
+
+      // First click takes the claim and enqueues the job.
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.collections.requestPreviewAudio, {
+        textId: textIds[0],
+        language: "es",
+      });
+
+      const { rowId } = await t.run(async (ctx) => {
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        const fixture = await insertAudioFixture(ctx, {
+          textId: textIds[0],
+          language: "es",
+          voiceName: "es-test-voice",
+          storageId,
+        });
+        await ctx.db.delete(fixture.assetId);
+        return fixture;
+      });
+
+      const res = await asUser.mutation(
+        api.features.collections.requestPreviewAudio,
+        { textId: textIds[0], language: "es" },
+      );
+
+      expect(res.scheduled).toBe(false);
+      expect(await t.run(async (ctx) => ctx.db.get(rowId))).not.toBeNull();
     });
   });
 });

@@ -7,13 +7,19 @@ import {
   cardsByDueDate,
   cardsByStateAndDueDate,
   cardsByOriginStateAndDueDate,
+  cardsByWritingStateAndDueDate,
+  cardsByOriginWritingStateAndDueDate,
+  hasWritingTrack,
   clearAggregatesForDeck,
 } from '../db/stats/cardAggregates';
 
-const BATCH_SIZE = 100;
+// 100 cards x 4 aggregate inserts was the old ceiling; the writing-track
+// mirrors take a split-course deck to 6 per card, so the batch is trimmed to
+// keep the per-mutation write count in the same band.
+const BATCH_SIZE = 75;
 
 /**
- * Entry point: rebuild all four card aggregates for every card under every
+ * Entry point: rebuild all card aggregates for every card under every
  * deck the given user owns. Only enumerates the decks here — clearing and
  * re-inserting happens one deck per scheduled mutation, because a single
  * deck's clear is 32 aggregate namespace calls (states × origin buckets) and
@@ -53,17 +59,26 @@ export const run = internalMutation({
 });
 
 /**
- * Self-continuing worker. For each deck: first invocation (no `cleared`
- * flag) only clears that deck's aggregate namespaces and reschedules;
- * subsequent invocations page through the deck's cards and re-insert, then
- * advance to the next deck (which starts with its own clear-only step).
+ * Self-continuing worker. For each deck the clear runs as TWO scheduled
+ * steps — shared-track namespaces, then writing-track — before paging through
+ * the deck's cards to re-insert, then advancing to the next deck (which starts
+ * with its own clear steps).
+ *
+ * The clear is split because doing both tracks at once is 62 component
+ * subtransactions in one mutation, double the 32 this one-deck-per-mutation
+ * design was sized for (see `run` above). Blowing the limit mid-clear would
+ * leave a deck's aggregates half-wiped with no re-insert pass, so every due
+ * count for it reads low until the migration is run again by hand.
+ *
+ * `clearPhase` is absent on the first invocation, 'writing' on the second, and
+ * 'done' once the deck is ready for re-inserts.
  */
 export const processBatch = internalMutation({
   args: {
     deckIds: v.array(v.id('decks')),
     deckIdx: v.number(),
     cursor: v.optional(v.string()),
-    cleared: v.optional(v.boolean()),
+    clearPhase: v.optional(v.union(v.literal('writing'), v.literal('done'))),
   },
   handler: async (ctx, args) => {
     if (args.deckIdx >= args.deckIds.length) {
@@ -71,12 +86,18 @@ export const processBatch = internalMutation({
     }
     const deckId = args.deckIds[args.deckIdx];
 
-    if (!args.cleared) {
-      await clearAggregatesForDeck(ctx, deckId);
+    if (args.clearPhase !== 'done') {
+      const track = args.clearPhase === 'writing' ? 'writing' : 'shared';
+      await clearAggregatesForDeck(ctx, deckId, track);
       await ctx.scheduler.runAfter(
         0,
         internal.migrations.recalcUserCardAggregates.processBatch,
-        { deckIds: args.deckIds, deckIdx: args.deckIdx, cleared: true },
+        {
+          deckIds: args.deckIds,
+          deckIdx: args.deckIdx,
+          clearPhase:
+            track === 'shared' ? ('writing' as const) : ('done' as const),
+        },
       );
       return { processed: 0, isDone: false };
     }
@@ -91,6 +112,10 @@ export const processBatch = internalMutation({
       await cardsByDueDate.insertIfDoesNotExist(ctx, doc);
       await cardsByStateAndDueDate.insertIfDoesNotExist(ctx, doc);
       await cardsByOriginStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+      if (hasWritingTrack(doc)) {
+        await cardsByWritingStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+        await cardsByOriginWritingStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+      }
     }
 
     const advanceDeck = result.isDone;
@@ -105,7 +130,7 @@ export const processBatch = internalMutation({
             deckIds: args.deckIds,
             deckIdx: nextDeckIdx,
             cursor: result.continueCursor,
-            cleared: true,
+            clearPhase: 'done' as const,
           },
       );
     }

@@ -4,10 +4,12 @@ import { AuthUIProvider } from '@daveyplate/better-auth-ui';
 import { ThemeProvider } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useCallback, useMemo, type ReactNode } from 'react';
 import { NextIntlClientProvider } from 'next-intl';
+import { toast } from 'sonner';
 
 import { authClient } from '@/lib/auth-client';
+import { isTransportErrorMessage } from '@/lib/auth-errors';
 import { useIsNativeApp } from '@/hooks/use-native-app';
 import { AutumnProvider } from "autumn-js/react";
 import { api } from "../convex/_generated/api";
@@ -36,7 +38,33 @@ export function AutumnWrapper({ children }: { children: React.ReactNode }) {
 export function Providers({ children, locale, messages, timeZone }: Props) {
   const router = useRouter();
   const isNative = useIsNativeApp();
-  const authLocalization = (messages.Auth as AuthMessages) || {};
+  // Memoized so `authToast` below keeps a stable identity (see its comment).
+  const authLocalization = useMemo(() => (messages.Auth as AuthMessages) || {}, [messages]);
+
+  /**
+   * better-auth-ui renders error toasts from the raw fetch error, which for a
+   * bodiless response is just the status number — users were seeing a toast
+   * reading "404". Swap those for real copy; everything else (wrong password,
+   * unverified email, success messages) is already localized and passes
+   * through untouched.
+   *
+   * Memoized: the library keeps this function in the dependency list of the
+   * effect behind useAuthData, so a fresh identity per render would refetch in
+   * a loop.
+   */
+  const authToast = useCallback(
+    ({ variant = 'default', message }: { variant?: 'default' | 'success' | 'error' | 'info' | 'warning'; message?: string }) => {
+      const text = isTransportErrorMessage(message)
+        ? authLocalization.REQUEST_FAILED || 'Request failed. Please try again.'
+        : message;
+      if (variant === 'default') {
+        toast(text);
+      } else {
+        toast[variant](text);
+      }
+    },
+    [authLocalization],
+  );
 
   return (
     <NextIntlClientProvider
@@ -70,6 +98,7 @@ export function Providers({ children, locale, messages, timeZone }: Props) {
           }}
           Link={Link}
           localization={authLocalization}
+          toast={authToast}
           // Code-based email verification: after sign-up (or an unverified
           // sign-in) the UI navigates to /auth/email-verification, where
           // entering the emailed 6-digit code verifies AND signs the user

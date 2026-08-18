@@ -45,7 +45,7 @@ export async function LandingJsonLd({ siteUrl }: LandingJsonLdProps) {
       applicationCategory: 'EducationalApplication',
       operatingSystem: 'Web, iOS, Android',
       description:
-        'Learn languages by shadowing real sentences, writing them, and passive listening — with spaced repetition and a built-in AI tutor. Bring your own content and build fluency fast.',
+        'Learn a language the way you learned your first. Absorb words in sentences that actually matter to you — type them, import them, or ask AI to create cards.',
       offers: [
         {
           '@type': 'Offer',

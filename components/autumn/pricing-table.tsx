@@ -9,10 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import { getPricingTableContent } from "@/lib/autumn/pricing-table-content";
-import {
-  checkoutTrialParams,
-  getTrialState,
-} from "@/lib/autumn/trial-eligibility";
+import { getTrialState } from "@/lib/autumn/trial-eligibility";
 import {
   findCurrentPaidPlan,
   normalizePlans,
@@ -29,6 +26,8 @@ import {
 } from "@/components/ui/carousel";
 import { CarouselDots } from "@/components/ui/carousel-dots";
 import { useIsNativeApp } from "@/hooks/use-native-app";
+import { useNewPlanCheckout } from "@/hooks/use-new-plan-checkout";
+import { useCheckoutErrorToast } from "@/hooks/use-checkout-error";
 
 /** Sort key for plan cards: Free first, then paid plans by ascending price. */
 function productSortPrice(product: Product): number {
@@ -76,8 +75,7 @@ function paidTierRank(product: Product, products: Product[]): number {
 /**
  * The tier this card builds on: the next cheaper paid plan in the same
  * billing interval, or Free for the entry tier. Undefined when there is
- * nothing below it on the table — the free card itself, and every card in the
- * onboarding picker's entry row, where `excludeFreePlan` removes the base.
+ * nothing below it on the table (the free card itself).
  */
 export function previousTier(
   product: Product,
@@ -145,29 +143,13 @@ export default function PricingTable(
 
 function PricingTableInner({
   productDetails,
-  excludeFreePlan = false,
-  recommendedProductIds,
   carouselItemClassName,
-  onFreePlanSelect,
 }: {
   productDetails?: ProductDetails[];
-  /** When true, drop products whose `properties.is_free` is set. Used by the
-   *  onboarding flow where the user must commit to a paid tier to finish. */
-  excludeFreePlan?: boolean;
-  /** Product ids to mark with the localized "Most Popular" badge (e.g. the
-   *  onboarding plan picker highlights Pro). Injected after the fetch —
-   *  `productDetails` cannot be used for this because passing it FILTERS
-   *  the table to only the listed products. */
-  recommendedProductIds?: string[];
   /** Overrides the per-card carousel basis classes (how many cards are
-   *  visible side by side at each breakpoint). */
+   *  visible side by side at each breakpoint). The home-header upgrade
+   *  dialog narrows the cards so all three tiers fit on large screens. */
   carouselItemClassName?: string;
-  /** When set, the Free card's button stays clickable (labelled
-   *  "Continue with Free") and calls this instead of checkout — used by
-   *  onboarding, where picking Free just finishes the wizard on the
-   *  auto-enabled free tier. Without it the Free card shows the default
-   *  disabled "Current Plan" state. */
-  onFreePlanSelect?: () => void;
 }) {
   const t = useTranslations("Pricing");
   const { customer, checkout, isLoading: isCustomerLoading } = useCustomer({
@@ -175,6 +157,8 @@ function PricingTableInner({
     expand: ["trials_used"],
   });
   const trialState = getTrialState(customer);
+  const { purchasePlan } = useNewPlanCheckout();
+  const showCheckoutError = useCheckoutErrorToast();
 
   // NOTE: passing `productDetails` to usePricingTable FILTERS the table to
   // only the listed products — don't use it for display tweaks.
@@ -184,12 +168,7 @@ function PricingTableInner({
   // Autumn returns products in dashboard order, which is not guaranteed
   // to be Free → Basic → Pro.
   const products = rawProducts
-    ?.filter((p) => !excludeFreePlan || !p.properties?.is_free)
-    .map((p) =>
-      recommendedProductIds?.includes(p.id) && !p.display?.recommend_text
-        ? { ...p, display: { ...p.display, recommend_text: t("mostPopular") } }
-        : p,
-    )
+    ?.slice()
     .sort((a, b) => productSortPrice(a) - productSortPrice(b));
 
   // The interval toggle defaults to the billing interval of the plan the
@@ -303,18 +282,8 @@ function PricingTableInner({
           multiInterval={multiInterval}
           startIndex={startIndex}
           itemClassName={carouselItemClassName}
-        >
+>
           {visibleProducts.map((product, index) => {
-            if (product.properties?.is_free && onFreePlanSelect) {
-              return (
-                <PricingCard
-                  key={index}
-                  productId={product.id}
-                  buttonTextOverride={t("continueWithFree")}
-                  buttonProps={{ onClick: onFreePlanSelect }}
-                />
-              );
-            }
             return (
               <PricingCard
                 key={index}
@@ -335,20 +304,20 @@ function PricingTableInner({
                       trial_eligible: trialState.trialEligible,
                       on_trial: trialState.onTrial,
                     });
-                    if (product.id && customer) {
-                      await checkout({
-                        productId: product.id,
-                        dialog: CheckoutDialog,
-                        // Autumn only dedupes trials per-plan; this passes
-                        // `freeTrial: false` for everyone who ever trialed
-                        // or pays (closing the cross-plan hole), and nothing
-                        // for trial-eligible or currently-trialing users —
-                        // the dialog routes trialing switches through
-                        // convex/billing.ts to keep the running trial.
-                        ...checkoutTrialParams(trialState),
-                      });
-                    } else if (product.display?.button_url) {
-                      window.open(product.display?.button_url, "_blank");
+                    try {
+                      if (product.id && customer) {
+                        await purchasePlan({
+                          productId: product.id,
+                          trialState,
+                          checkout,
+                          dialog: CheckoutDialog,
+                          freeTarget: product.properties?.is_free === true,
+                        });
+                      } else if (product.display?.button_url) {
+                        window.open(product.display?.button_url, "_blank");
+                      }
+                    } catch (e) {
+                      showCheckoutError(e, "pricingTable.select");
                     }
                   },
                 }}
@@ -356,6 +325,15 @@ function PricingTableInner({
             );
           })}
         </PricingTableContainer>
+      )}
+      {/* Paid plans are sold with Stripe as merchant of record, so the price
+          on the card is the gross amount — VAT is carved out of it rather
+          than added at checkout. Suppressed when the table is showing only
+          the free plan, where there is no tax to speak of. */}
+      {visibleProducts.some((p) => !p.properties?.is_free) && (
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          {t("taxNote")}
+        </p>
       )}
     </div>
   );
@@ -474,15 +452,12 @@ interface PricingCardProps {
   className?: string;
   onButtonClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
   buttonProps?: React.ComponentProps<"button">;
-  /** Replaces the scenario-derived button label (e.g. "Current Plan"). */
-  buttonTextOverride?: string;
 }
 
 export const PricingCard = ({
   productId,
   className,
   buttonProps,
-  buttonTextOverride,
 }: PricingCardProps) => {
   const t = useTranslations("Pricing");
   const tFeatures = useTranslations("Features");
@@ -679,7 +654,7 @@ export const PricingCard = ({
             recommended={productDisplay?.recommend_text ? true : false}
             {...buttonProps}
           >
-            {buttonTextOverride ?? (productDisplay?.button_text || finalButtonText)}
+            {productDisplay?.button_text || finalButtonText}
           </PricingCardButton>
         </div>
       </div>

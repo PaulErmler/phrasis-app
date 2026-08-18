@@ -182,7 +182,15 @@ function PremadeTab({ summary }: { summary: HomeSummary }) {
     isAdding,
     handleAddCards,
     sentencesRemaining,
+    usageLimitHit,
   } = useCollectionDetail({ collections: items });
+
+  // An add-cards attempt ran into the sentences quota — surface the paywall
+  // instead of failing silently. `handleAddCards` resets the flag on every
+  // new attempt, so re-tries after dismissing re-open it.
+  React.useEffect(() => {
+    if (usageLimitHit) setPaywallOpen(true);
+  }, [usageLimitHit]);
 
   const handleSelect = React.useCallback(
     async (collectionId: Id<'collections'>) => {
@@ -543,7 +551,16 @@ function CustomTab({
     browse,
     isAdding,
     handleAddCards,
+    usageLimitHit,
   } = useCollectionDetail({ collections: items });
+
+  // Same silent-quota fix as the premade tab: adding from a custom/chat
+  // collection consumes the sentences quota too, and previously a free user
+  // at the limit got no feedback at all here.
+  const [paywallOpen, setPaywallOpen] = React.useState(false);
+  React.useEffect(() => {
+    if (usageLimitHit) setPaywallOpen(true);
+  }, [usageLimitHit]);
 
   const handleToggleCollection = React.useCallback(
     async (collectionId: string) => {
@@ -670,6 +687,10 @@ function CustomTab({
         onAddCards={() => handleAddCards()}
         showToggleWhenComplete
       />
+
+      {paywallOpen && (
+        <PaywallDialog open={paywallOpen} setOpen={setPaywallOpen} featureId={FEATURE_IDS.SENTENCES} />
+      )}
     </div>
   );
 }

@@ -26,10 +26,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import type { LearningState } from '@/components/app/learning/useLearningMode';
-import {
-  buildSessionSnapshot,
-  type SessionSnapshot,
-} from '@/components/app/learning/sessionSnapshot';
 import type { ReviewRating } from '@/lib/scheduling';
 import { autoRating } from '@/lib/autoRating';
 import type {
@@ -62,28 +58,6 @@ interface LearningModeProps {
   onNavigateToChat: () => void;
   /** Navigate to the custom-card creation page (same condition). */
   onNavigateToAddCustomCards: () => void;
-  /**
-   * Render mode. In `'onboarding'`, the LearningModeSettings sheet is
-   * suppressed so the user can't slip into deep settings during their guided
-   * first lesson. Other behaviour (chat, FSRS, audio) is unchanged.
-   */
-  mode?: 'normal' | 'onboarding';
-  /**
-   * Fires after the user rates a card and the FSRS update is in flight.
-   * Receives the rating + a snapshot of the session counters so the
-   * onboarding wizard can advance / surface stats without spinning up its
-   * own counter logic.
-   */
-  onCardRated?: (
-    rating: ReviewRating | undefined,
-    snapshot: SessionSnapshot,
-  ) => void;
-  /**
-   * Fires after an undo actually reverted a review — the mirror image of
-   * `onCardRated`, so the onboarding wizard can decrement its rated-card
-   * counter and keep the lesson progress accurate.
-   */
-  onCardUndone?: (snapshot: SessionSnapshot) => void;
 }
 
 /**
@@ -96,9 +70,6 @@ export function LearningMode({
   onGoHome,
   onNavigateToChat,
   onNavigateToAddCustomCards,
-  mode = 'normal',
-  onCardRated,
-  onCardUndone,
 }: LearningModeProps) {
   const t = useTranslations('LearningMode');
   const chatContext = useLearningChatToggle();
@@ -269,6 +240,7 @@ export function LearningMode({
       state.preReviewCount,
       state.fsrsState?.reps ?? 0,
       isTranscribeMode(state.courseSettings),
+      state.freeStudyPlayCount,
     );
   const autoRateEnabled =
     (settingsForAutoRate?.reviewMode ?? 'audio') === 'full' &&
@@ -289,9 +261,7 @@ export function LearningMode({
     );
   }, [autoRateEnabled, autoRateAccuracy, autoRateThresholds, setAutoRating]);
 
-  // Wrap handleNext to include accuracy from full review mode + notify the
-  // onboarding container (if any) that a card was just rated, along with a
-  // session-state snapshot so the wizard can show the celebration screen.
+  // Wrap handleNext to include accuracy from full review mode.
   const handleNextWithAccuracy = useCallback(
     (ratingOverride?: ReviewRating) => {
       if (state.status !== 'reviewing') return;
@@ -315,17 +285,13 @@ export function LearningMode({
           }
           : undefined;
       state.handleNext(ratingOverride, accuracy);
-      onCardRated?.(ratingOverride, buildSessionSnapshot(state));
     },
-    [state, writingAccuracy, autoRateFirstExposure, onCardRated],
+    [state, writingAccuracy, autoRateFirstExposure],
   );
-  // Mirror of handleNextWithAccuracy for the undo direction — only notifies
-  // when a review was actually reverted (empty stack / races resolve false).
   const handleUndoWithNotify = useCallback(async () => {
     if (state.status !== 'reviewing') return;
-    const undone = await state.handleUndo();
-    if (undone) onCardUndone?.(buildSessionSnapshot(state));
-  }, [state, onCardUndone]);
+    await state.handleUndo();
+  }, [state]);
   const handleRevealAllAudioTargets = useCallback(() => {
     setAudioRevealNonce((n) => n + 1);
   }, []);
@@ -445,15 +411,13 @@ export function LearningMode({
     return (
       <div className="flex flex-col h-full">
         <NoCollectionState onGoHome={onGoHome} />
-        {mode === 'onboarding' ? null : (
-          <LearningModeSettings
-            open={state.settingsOpen}
-            onOpenChange={state.setSettingsOpen}
-            courseSettings={state.courseSettings}
-            baseLanguages={state.baseLanguages}
-            targetLanguages={state.targetLanguages}
-          />
-        )}
+        <LearningModeSettings
+          open={state.settingsOpen}
+          onOpenChange={state.setSettingsOpen}
+          courseSettings={state.courseSettings}
+          baseLanguages={state.baseLanguages}
+          targetLanguages={state.targetLanguages}
+        />
       </div>
     );
   }
@@ -472,15 +436,13 @@ export function LearningMode({
           onNavigateToChat={onNavigateToChat}
           onNavigateToAddCustomCards={onNavigateToAddCustomCards}
         />
-        {mode === 'onboarding' ? null : (
-          <LearningModeSettings
-            open={state.settingsOpen}
-            onOpenChange={state.setSettingsOpen}
-            courseSettings={state.courseSettings}
-            baseLanguages={state.baseLanguages}
-            targetLanguages={state.targetLanguages}
-          />
-        )}
+        <LearningModeSettings
+          open={state.settingsOpen}
+          onOpenChange={state.setSettingsOpen}
+          courseSettings={state.courseSettings}
+          baseLanguages={state.baseLanguages}
+          targetLanguages={state.targetLanguages}
+        />
         {paywallOpen && (
           <PaywallDialog
             open={paywallOpen}
@@ -705,18 +667,14 @@ export function LearningMode({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Normal mode: bar tracks `dailyReviewsToday` (audio + full, server-
-          persisted, hydrated on mount) so the fill level always matches when
-          the milestone celebration will fire, even after a reload or a break
-          mid-day. Onboarding keeps its in-memory session counter (0/10 lesson
-          progress). Free play never shows the bar in either face, since plays
+      {/* The bar tracks `dailyReviewsToday` (audio + full, server-persisted,
+          hydrated on mount) so the fill level always matches when the
+          milestone celebration will fire, even after a reload or a break
+          mid-day. Free play never shows the bar in either face, since plays
           don't count toward the milestone. */}
       {!isFreePlay &&
         state.courseSettings.progressDisplayEnabled !== false && (
-        <SessionProgressBar
-          current={mode === 'onboarding' ? state.sessionCardCount : state.dailyReviewsToday}
-          max={mode === 'onboarding' ? 10 : undefined}
-        />
+        <SessionProgressBar current={state.dailyReviewsToday} />
       )}
       <div className="flex-1 min-h-0 relative">
         <AnimatePresence mode="wait" initial={false}>
@@ -790,15 +748,13 @@ export function LearningMode({
         onRevealAllAudioTargets={handleRevealAllAudioTargets}
       />
 
-      {mode === 'onboarding' ? null : (
-        <LearningModeSettings
-          open={state.settingsOpen}
-          onOpenChange={state.setSettingsOpen}
-          courseSettings={state.courseSettings}
-          baseLanguages={state.baseLanguages}
-          targetLanguages={state.targetLanguages}
-        />
-      )}
+      <LearningModeSettings
+        open={state.settingsOpen}
+        onOpenChange={state.setSettingsOpen}
+        courseSettings={state.courseSettings}
+        baseLanguages={state.baseLanguages}
+        targetLanguages={state.targetLanguages}
+      />
 
       <EditCardDialog
         open={editDialogOpen}
@@ -911,6 +867,9 @@ function NoCardsDueWithFilter({
     emptyReason?.reason === 'all_caught_up'
       ? emptyReason.customCardsPendingAdd
       : false;
+  // separateModeTracking enable-time seed still running — the writing queue
+  // is empty only because cards aren't seeded yet.
+  const isPreparingWriting = emptyReason?.reason === 'preparing_writing';
 
   const handleIncludeOtherSource = useCallback(() => {
     updateSettings({ courseId, studyContentFilter: 'both' });
@@ -929,6 +888,7 @@ function NoCardsDueWithFilter({
       currentSourceHasAnyCards={currentSourceHasAnyCards}
       filterUnblockAvailable={filterUnblockAvailable}
       customCardsPendingAdd={customCardsPendingAdd}
+      isPreparingWriting={isPreparingWriting}
       onIncludeOtherSource={handleIncludeOtherSource}
       onCreateChatCards={onNavigateToChat}
       onCreateCustomCards={onNavigateToAddCustomCards}

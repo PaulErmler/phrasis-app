@@ -27,8 +27,10 @@ import {
 import { getAuthUserId, requireAuthUserId, getUserSettings } from '../db/users';
 import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
+import { ogteLevelToCollectionCode } from '../../lib/constants/onboarding';
 import {
   findNextIncompleteCollection,
+  getActiveDataset,
   getCollectionProgress as getCollectionProgressHelper,
   getNextCollection,
   getNextTextsFromRank,
@@ -40,9 +42,7 @@ import { EVENTS, track } from '../analytics';
 import { costForCharacters } from '../config/aiCosts';
 import { getRomanizationSource } from '../lib/localRomanization';
 import {
-  GOOGLE_TRANSLATE_SOURCE,
   ROMANIZATION_LANGUAGES,
-  isProtectedTranslationSource,
   DEFAULT_CONTENT_VERSION,
   getCurrentTranslationVersion,
   getCurrentTtsVersion,
@@ -50,6 +50,11 @@ import {
   isTranslationVersionStale,
   postProcessTranslation,
 } from '../../lib/languages';
+import {
+  GOOGLE_TRANSLATE_SOURCE,
+  isUserCreatedText,
+  mayRegenerateTranslation,
+} from '../../lib/translationProvenance';
 import { soundsSame } from '../lib/textComparison';
 import {
   deleteAudioRow,
@@ -71,7 +76,9 @@ import {
   ttsProviderValidator,
   voiceGenderValidator,
   asVoiceGender,
+  schedulingTrackFromSettings,
   type SchedulingMode,
+  type SchedulingTrack,
   type StudyContentFilter,
 } from '../types';
 import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
@@ -99,6 +106,7 @@ import { consumeQuota, checkQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { MAX_CARDS_PER_BATCH, ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
 import { fetchFreePlayRotation, randomOrderKey } from '../lib/freePlay';
+import { fetchTrackDueCards } from '../lib/dueQueue';
 import { isCollectionAccessible, requireAccessibleText } from './collections';
 import {
   applyMarkCounterDelta,
@@ -460,7 +468,15 @@ export async function scheduleMissingContent(
       if (genderMismatch || providerMismatch || versionMismatch) {
         // Reference-aware delete: a shared asset (or an `editCard`-copied
         // legacy blob) survives while anything else still points at it.
-        await deleteAudioRow(ctx, audio);
+        // Gender drift additionally keeps the asset+blob even as the last
+        // pointer: that audio is still CORRECT for this string+voice — it
+        // stays in the content-addressed cache so flipping the gender back
+        // (or any other text with the same sentence) reuses it for free.
+        // Provider/ttsVersion migrations are true obsolescence (a new TTS
+        // system) and keep the full garbage collection.
+        await deleteAudioRow(ctx, audio, {
+          keepAsset: genderMismatch && !providerMismatch && !versionMismatch,
+        });
         audioMap.set(lang, null);
       } else {
         audioPayloadMap.set(lang, payload);
@@ -491,8 +507,12 @@ export async function scheduleMissingContent(
   // evidence they're wrong, and a blanket invalidation would cause a regen
   // storm across the database.
   //
-  // User-provided translations are skipped unconditionally — the user picked
-  // the wording (and implicitly the gender) themselves.
+  // Content we may not touch is skipped unconditionally — see
+  // `mayRegenerateTranslation` (lib/translationProvenance.ts) for the rule:
+  // user-created cards in full, plus human-authored rows on premade texts.
+  // Note this gates the TEXT only; the audio validity loop above still runs
+  // for those cards, so a user-created card whose speaker gender changed gets
+  // a matching voice while keeping the wording the user chose.
   //
   // Skip when TTS is in flight: deleting now would race the pending write
   // and leave an audio row pointing at no translation. Defer to the next
@@ -504,19 +524,22 @@ export async function scheduleMissingContent(
   const sweptRegionVariants = new Map<string, string>();
   for (const [lang, translation] of translationMap) {
     if (!translation) continue;
-    // Human-authored rows (user-provided AND hand-curated) are never swept.
-    if (isProtectedTranslationSource(translation.translationSource)) continue;
+    // The one provenance gate for all three triggers below. Covers
+    // user-created (custom/chat) cards and human-authored rows alike — every
+    // regeneration site shares this predicate so none of them can drift out of
+    // agreement with the others.
+    if (!mayRegenerateTranslation(text, translation)) continue;
 
     const isLegacy = translation.speakerGender === undefined;
     const isDrifted = !isLegacy && translation.speakerGender !== audioSpeakerGender;
     const isLegacyAlongsideDriftedAudio = isLegacy && langsWithAudioGenderDrift.has(lang);
     // Version-stale translation: the language's `translationVersion` config was
-    // bumped above this row's stamp (a new model/prompt). Regenerate — but NEVER
-    // for user-created (custom/chat) texts, whose translations are user-owned.
+    // bumped above this row's stamp (a new model/prompt). Regenerate.
     // `isTranslationVersionStale` encodes the "undefined === current" rule.
-    const isVersionStale =
-      !text.userCreated &&
-      isTranslationVersionStale(lang, translation.translationVersion);
+    const isVersionStale = isTranslationVersionStale(
+      lang,
+      translation.translationVersion,
+    );
 
     if (!isDrifted && !isLegacyAlongsideDriftedAudio && !isVersionStale) continue;
     if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
@@ -537,7 +560,11 @@ export async function scheduleMissingContent(
     // delete so a blob shared via an `editCard` copy isn't dropped.
     const staleAudio = audioMap.get(lang);
     if (staleAudio) {
-      await deleteAudioRow(ctx, staleAudio);
+      // keepAsset: every trigger here is a CONTENT change (gender drift /
+      // translation-version bump regenerating the text) — the recording
+      // itself is still valid audio of the old string, so it stays in the
+      // audioAssets cache instead of being garbage-collected.
+      await deleteAudioRow(ctx, staleAudio, { keepAsset: true });
       audioMap.set(lang, null);
     }
   }
@@ -737,6 +764,7 @@ export const getDeckCards = query({
           sourceText: text.text,
           sourceLanguage: text.language,
           sourceRomanization: text.romanizedText ?? undefined,
+          userCreated: text.userCreated,
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -974,6 +1002,200 @@ export const setActiveCollection = mutation({
 });
 
 /**
+ * OGTE level (1..20) of the course's active collection, or null when the
+ * active collection isn't a coded dataset level (custom/chat/legacy CEFR).
+ * Read by the one-time difficulty check in the learn view to seed its
+ * slider at the level the user is actually on.
+ */
+export const getActiveDifficultyLevel = query({
+  args: {},
+  returns: v.union(v.number(), v.null()),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return null;
+    const settings = await getCourseSettings(ctx, active.course._id);
+    if (!settings?.activeCollectionId) return null;
+    const collection = await ctx.db.get(settings.activeCollectionId);
+    const code = collection?.code;
+    const match = code ? /^L(\d{2})$/.exec(code) : null;
+    return match ? Number(match[1]) : null;
+  },
+});
+
+/**
+ * The next sentences that would actually be added for THIS user from the
+ * dataset level `ogteLevel` — the difficulty-check dialog's preview, so the
+ * user judges the level on the exact material coming up next, not generic
+ * samples. Starts past the user's frontier (`lastRankProcessed`) like the
+ * add-cards flow; the source side renders in the base language once its
+ * translation exists, the target side is optional (still generating →
+ * the row falls back to the source text).
+ */
+export const getUpcomingSentencesForLevel = query({
+  args: {
+    ogteLevel: v.number(),
+    count: v.optional(v.number()),
+  },
+  returns: v.object({
+    /** The level exists in the active dataset. */
+    exists: v.boolean(),
+    /**
+     * The course can move to this level — it exists and the user hasn't
+     * already completed it (`setActiveCollectionByLevel` would throw).
+     * Lets the pager disable a step instead of dead-ending on an error
+     * toast. Always true for the level that is already active.
+     */
+    switchable: v.boolean(),
+    sentences: v.array(
+      v.object({
+        position: v.number(),
+        sourceText: v.string(),
+        targetText: v.optional(v.string()),
+        targetRomanization: v.optional(v.string()),
+      }),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const MISSING = { exists: false, switchable: false, sentences: [] };
+
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return MISSING;
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return MISSING;
+    const course = active.course;
+
+    const code = ogteLevelToCollectionCode(args.ogteLevel);
+    if (!code) return MISSING;
+    const activeDataset = await getActiveDataset(ctx);
+    if (!activeDataset) return MISSING;
+    const collection = await ctx.db
+      .query('collections')
+      .withIndex('by_datasetId_and_code', (q) =>
+        q.eq('datasetId', activeDataset._id).eq('code', code),
+      )
+      .first();
+    if (!collection) return MISSING;
+
+    const progress = await getCollectionProgressHelper(
+      ctx,
+      userId,
+      course._id,
+      collection._id,
+    );
+
+    // Mirror `setActiveCollectionByLevel`'s guard so the UI can't offer a
+    // step the mutation would reject. The already-active level stays
+    // switchable — selecting it is a no-op there, not an error.
+    const courseSettings = await getCourseSettings(ctx, course._id);
+    const isActiveLevel = courseSettings?.activeCollectionId === collection._id;
+    const isComplete =
+      progress != null &&
+      effectiveTextCount(collection.textCount, progress) > 0 &&
+      isCollectionComplete(collection.textCount, progress);
+    const switchable = isActiveLevel || !isComplete;
+
+    const frontier = progress?.lastRankProcessed ?? 0;
+    const count = Math.min(Math.max(args.count ?? 5, 1), 10);
+    const texts = await getNextTextsFromRank(ctx, collection._id, frontier, count, {
+      onlyCurriculum: true,
+    });
+
+    const sourceLanguage = course.baseLanguages[0];
+    const targetLanguage = course.targetLanguages[0];
+    const sentences = await Promise.all(
+      texts.map(async (text, position) => {
+        let sourceText = text.text;
+        if (sourceLanguage && sourceLanguage !== text.language) {
+          const sourceTranslation = await ctx.db
+            .query('translations')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', text._id).eq('targetLanguage', sourceLanguage),
+            )
+            .first();
+          if (sourceTranslation) sourceText = sourceTranslation.translatedText;
+        }
+
+        let targetText: string | undefined;
+        let targetRomanization: string | undefined;
+        if (targetLanguage && targetLanguage !== text.language) {
+          const targetTranslation = await ctx.db
+            .query('translations')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', text._id).eq('targetLanguage', targetLanguage),
+            )
+            .first();
+          if (targetTranslation) {
+            targetText = targetTranslation.translatedText;
+            // Empty string is the "tried and failed" romanization sentinel.
+            targetRomanization = targetTranslation.romanizedText || undefined;
+          }
+        } else if (targetLanguage && targetLanguage === text.language) {
+          targetText = text.text;
+          targetRomanization = text.romanizedText || undefined;
+        }
+
+        return { position, sourceText, targetText, targetRomanization };
+      }),
+    );
+
+    return { exists: true, switchable, sentences };
+  },
+});
+
+/**
+ * Switch the active collection to the dataset level for `ogteLevel` —
+ * the difficulty-check dialog's "switch level" action, which only knows the
+ * slider's level, not a collection id. Same safety rails as
+ * `setActiveCollection`: no-ops when the level is already active, refuses a
+ * collection the user has already completed.
+ */
+export const setActiveCollectionByLevel = mutation({
+  args: {
+    ogteLevel: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { userId, course } = await requireActiveCourse(ctx);
+    const courseId = course._id;
+
+    const code = ogteLevelToCollectionCode(args.ogteLevel);
+    if (!code) throw new ConvexError('Invalid level');
+
+    const activeDataset = await getActiveDataset(ctx);
+    if (!activeDataset) throw new ConvexError('No active dataset');
+    const collection = await ctx.db
+      .query('collections')
+      .withIndex('by_datasetId_and_code', (q) =>
+        q.eq('datasetId', activeDataset._id).eq('code', code),
+      )
+      .first();
+    if (!collection) throw new ConvexError('Collection not found');
+
+    const courseSettings = await getCourseSettings(ctx, courseId);
+    if (courseSettings?.activeCollectionId === collection._id) return null;
+
+    const progress = await getCollectionProgressHelper(
+      ctx,
+      userId,
+      courseId,
+      collection._id,
+    );
+    if (
+      progress &&
+      effectiveTextCount(collection.textCount, progress) > 0 &&
+      isCollectionComplete(collection.textCount, progress)
+    ) {
+      throw new ConvexError('This collection is already complete');
+    }
+
+    await setActiveCollectionOnSettings(ctx, courseId, collection._id);
+    return null;
+  },
+});
+
+/**
  * Toggle a custom collection's selection for automatic card inclusion.
  */
 export const toggleCustomCollection = mutation({
@@ -1059,6 +1281,14 @@ export async function createCardsFromTexts(
     collection?.origin
     ?? (collection && isPremadeLevelCollection(collection) ? 'premade' : undefined);
 
+  // With separateModeTracking on, seed the writing track at creation (a new
+  // card's writing schedule is identical to its shared one) so the card is
+  // immediately visible to the writing-due indexes without a backfill. While
+  // it's off, cards stay unseeded — the enable-time seedWritingTrack backfill
+  // copies the then-current shared state instead.
+  const settingsForSeed = await getCourseSettings(ctx, course._id);
+  const seedWritingTrack = settingsForSeed?.separateModeTracking === true;
+
   for (const text of texts) {
     if (text.collectionRank > newLastRank) {
       newLastRank = text.collectionRank;
@@ -1083,6 +1313,9 @@ export async function createCardsFromTexts(
         isGraduated: false,
         schedulingPhase: 'preReview' as const,
         preReviewCount: 0,
+        ...(seedWritingTrack
+          ? { writingDueDate: now + cardsInserted, writingIsGraduated: false }
+          : {}),
         radioRoundCounter: 0,
         radioPlayCount: 0,
         // Random tiebreaks so that even brand-new cards inserted in a single
@@ -1802,6 +2035,7 @@ async function getUpcomingCardsForMode(
   mode: SchedulingMode,
   now: number,
   filter: StudyContentFilter,
+  track: SchedulingTrack,
 ): Promise<Doc<'cards'>[]> {
   if (mode === 'radio') {
     // Both faces: the Radio and Free Study rotations advance independently,
@@ -1818,31 +2052,20 @@ async function getUpcomingCardsForMode(
     for (const card of [...radioHead, ...freeStudyHead]) byId.set(card._id, card);
     return [...byId.values()];
   }
-  if (mode === 'learn_new') {
-    return ctx.db
-      .query('cards')
-      .withIndex('by_deck_hidden_mastered_graduated_due', (q) =>
-        q
-          .eq('deckId', deckId)
-          .eq('isHidden', false)
-          .eq('isMastered', false)
-          .eq('isGraduated', false)
-          .lte('dueDate', now),
-      )
-      .order('asc')
-      .take(ENSURE_CONTENT_LOOKAHEAD);
-  }
-  return ctx.db
-    .query('cards')
-    .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
-      q
-        .eq('deckId', deckId)
-        .eq('isHidden', false)
-        .eq('isMastered', false)
-        .lte('dueDate', now),
-    )
-    .order('asc')
-    .take(ENSURE_CONTENT_LOOKAHEAD);
+  // Due queues: warm exactly what the serving path (`fetchTrackDueCards`)
+  // will read — same track (shared vs writing schedule), same content-source
+  // filter. Warming an unfiltered/other-track superset here looked harmless
+  // but warmed a different set than the queue actually serves — the same
+  // trap the free-play comment above describes.
+  return fetchTrackDueCards(
+    ctx,
+    deckId,
+    mode,
+    filter,
+    track,
+    now,
+    ENSURE_CONTENT_LOOKAHEAD,
+  );
 }
 
 /**
@@ -1908,6 +2131,10 @@ export const ensureUpcomingCardsContent = mutation({
       schedulingMode,
       Date.now(),
       settings?.studyContentFilter ?? 'both',
+      schedulingTrackFromSettings({
+        separateModeTracking: settings?.separateModeTracking,
+        reviewMode: settings?.reviewMode,
+      }),
     );
 
     return scheduleContentForUpcomingCards(ctx, active, cards);
@@ -1948,9 +2175,17 @@ export const ensureUpcomingCardsContentAllModes = mutation({
     // same content filter the serving queue reads.
     const settings = await getCourseSettings(ctx, active.course._id);
     const filter = settings?.studyContentFilter ?? 'both';
+    // With separateModeTracking on, the home-screen mode toggle switches
+    // between two different due queues — warm both tracks so either choice
+    // starts instantly. (Free play ignores the track; it's warmed once.)
+    const tracks: SchedulingTrack[] = settings?.separateModeTracking
+      ? ['shared', 'writing']
+      : ['shared'];
     const cardLists = await Promise.all(
-      WARMABLE_SCHEDULING_MODES.map((mode) =>
-        getUpcomingCardsForMode(ctx, deck._id, mode, now, filter),
+      WARMABLE_SCHEDULING_MODES.flatMap((mode) =>
+        (mode === 'radio' ? (['shared'] as SchedulingTrack[]) : tracks).map(
+          (track) => getUpcomingCardsForMode(ctx, deck._id, mode, now, filter, track),
+        ),
       ),
     );
 
@@ -2301,7 +2536,8 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     // translation row (and schedule orphan TTS) against a now-deleted text.
     // The LLM claim (if any) is released by the pool job's onComplete.
     // No-op in normal flow (text always exists).
-    if ((await ctx.db.get(args.textId)) === null) {
+    const text = await ctx.db.get(args.textId);
+    if (text === null) {
       return null;
     }
 
@@ -2323,6 +2559,23 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
       )
       .first();
+
+    // Backstop at the write choke point: no job may overwrite existing wording
+    // on a user-created card, whatever enqueued it. Callers already refuse to
+    // ask (`flagTranslation` short-circuits on user-created texts, and
+    // `updateEssentialGreetings` only targets premade rows), so no live path
+    // reaches this today — it is defence in depth against a future caller.
+    //
+    // Deliberately scoped to the OVERWRITE. The `existing &&` is load-bearing,
+    // and NOT for the fill-a-missing-language path: that one never sets
+    // `replaceExisting` (see `scheduleTranslationForLanguage`), so the guard is
+    // inert there either way. It matters for `onGoogleFallbackComplete`, which
+    // forwards the original job's `replaceExisting: true` into a re-enqueue —
+    // by the time that lands, the row it meant to replace may have been swept,
+    // and refusing then would leave the card with no translation at all.
+    if (existing && args.replaceExisting && isUserCreatedText(text)) {
+      return null;
+    }
 
     // Choke-point post-processing (idempotent — LLM/Google producers already
     // apply it upstream; this catches any path that didn't). The empty-string
@@ -2379,10 +2632,13 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       // the language's audio rows (all voices, reference-aware).
       audioUnchangedBySound = soundsSame(existing.translatedText, translatedText);
       if (!audioUnchangedBySound) {
+        // keepAsset: a retranslation is a content change — the old recording
+        // is still correct audio of the old sentence and stays cached.
         await deleteAudioRowsForTextLanguage(
           ctx,
           args.textId,
           args.targetLanguage,
+          { keepAsset: true },
         );
       }
 

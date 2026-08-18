@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
-import { usePreloadedQuery, useQuery, useMutation } from 'convex/react';
+import { usePreloadedQuery, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { BottomNav, type View } from '@/components/app/BottomNav';
@@ -14,9 +14,10 @@ import { ChevronLeft, MessageSquarePlus, PanelLeft } from 'lucide-react';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { getUserTimezone } from '@/lib/timezone';
-import { reportError } from '@/lib/report-error';
+import { usePrefetchedThread } from '@/hooks/use-prefetched-thread';
 import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import { HomeView } from '@/components/app/HomeView';
+import { FreePlanUpgradeBadge } from '@/components/app/FreePlanUpgradeBadge';
 import { AddCardsView } from '@/components/app/AddCardsView';
 import { LibraryView } from '@/components/app/LibraryView';
 import { StatsView } from '@/components/app/stats/StatsView';
@@ -145,28 +146,11 @@ export default function MainLayout({
   );
 
   // Pre-create a chat thread so LearnView can use it immediately
-  const getOrCreateEmptyThread = useMutation(
-    api.features.chat.threads.getOrCreateEmptyThread,
-  );
-  const [prefetchedThreadId, setPrefetchedThreadId] = useState<string | null>(
-    null,
-  );
-  const refreshPrefetchedThread = useCallback(() => {
-    getOrCreateEmptyThread({})
-      .then(setPrefetchedThreadId)
-      // Non-fatal: LearnView creates a thread on demand if this never lands.
-      // Reported rather than swallowed, because a persistent failure here is
-      // invisible to the user and shows up only as chat feeling slow.
-      .catch((err) => reportError(err, { op: 'prefetchEmptyThread' }));
-  }, [getOrCreateEmptyThread]);
-
-  const didPrefetchThread = useRef(false);
-
-  useEffect(() => {
-    if (didPrefetchThread.current) return;
-    didPrefetchThread.current = true;
-    refreshPrefetchedThread();
-  }, [refreshPrefetchedThread]);
+  const {
+    prefetchedThreadId,
+    refreshPrefetchedThread,
+    getOrCreateEmptyThread,
+  } = usePrefetchedThread();
 
   // Quota syncing lives in BillingGate (mounted in the /app layout) so that
   // routes outside this group — notably the standalone /app/learn page — are
@@ -364,6 +348,7 @@ export default function MainLayout({
               </h1>
             )}
             <div className="flex items-center gap-1 -mr-2 shrink-0">
+              {activeView === 'home' && <FreePlanUpgradeBadge />}
               {(activeView === 'home' ||
                 activeView === 'library' ||
                 activeView === 'stats' ||
@@ -412,10 +397,12 @@ export default function MainLayout({
         </KeepMountedView>
         {isAddCardsRoute && (
           <KeepMountedView visible={!isLearnOpen}>
-            <AddCardsView onBack={() => {
-              setActiveView('home');
-              router.push('/app');
-            }} />
+            <ViewErrorBoundary>
+              <AddCardsView onBack={() => {
+                setActiveView('home');
+                router.push('/app');
+              }} />
+            </ViewErrorBoundary>
           </KeepMountedView>
         )}
         {hasVisitedLibrary && (

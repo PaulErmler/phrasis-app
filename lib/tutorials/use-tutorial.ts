@@ -67,6 +67,16 @@ function getSnapshot(): string[] {
   return cachedSnapshot;
 }
 
+/**
+ * Live read of the completed-tutorial set (localStorage-backed module
+ * store). For effect-time decisions that must not act on a stale render
+ * closure — e.g. `useMilestoneTips` checks this right before scheduling a
+ * tip, after the DB backfill may have merged new completions mid-commit.
+ */
+export function getCompletedTutorialsSnapshot(): string[] {
+  return getSnapshot();
+}
+
 function getServerSnapshot(): string[] {
   return EMPTY;
 }
@@ -111,36 +121,18 @@ const TEARDOWN_PERSISTS_COMPLETION: Record<TeardownReason, boolean> = {
   hidden: false,
 };
 
-interface UseTutorialOptions {
-  enabled?: boolean;
-  delayMs?: number;
-  extraSteps?: DriveStep[];
-  onInteractiveStep?: () => void;
-  onComplete?: () => void;
-  /** When the user clicks the highlighted element on this step (0-based index), complete the tutorial and close the driver. */
-  stepCompleteOnClickIndex?: number;
-  /** Runtime context forwarded to the tour factory (e.g. reviewMode so the
-   *  home tour anchors the Radio vs Free Study button). */
-  context?: TutorialContext;
-}
-
-export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions = {}) {
-  const {
-    enabled = true,
-    delayMs = 800,
-    extraSteps,
-    onInteractiveStep,
-    onComplete,
-    stepCompleteOnClickIndex,
-    context,
-  } = options;
-  const driverRef = useRef<Driver | null>(null);
-  // Guards the re-entrancy of teardown → driver.destroy() → onDestroyStarted
-  // → teardown on driver's internal close paths.
-  const isTearingDownRef = useRef(false);
-  const [isActive, setIsActive] = useState(false);
-  const t = useTranslations('Tutorial');
-
+/**
+ * Shared access to the user's completed-tutorial set: localStorage-first
+ * (per-user key, `useSyncExternalStore` snapshot) with a one-time DB
+ * backfill, plus the persist path (localStorage + Convex mutation +
+ * analytics). Used by `useTutorial` (tours) and `useMilestoneTips` (one-time
+ * learning tips).
+ *
+ * `requiredIds` — the ids this caller cares about. The Convex
+ * `getCompletedTutorials` query stays subscribed only while at least one of
+ * them is missing from localStorage, so fully-synced clients do no reads.
+ */
+export function useCompletedTutorials(requiredIds: readonly string[]) {
   // ---- bind localStorage to the current authenticated user ----
   const authUser = useQuery(api.auth.getAuthUser);
   const authSubject =
@@ -151,31 +143,20 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       : null;
   const userId =
     authSubject != null && authSubject !== '' ? String(authSubject) : null;
-  const prevUserIdRef = useRef(userId);
 
   useEffect(() => {
     setTutorialUser(userId);
-    prevUserIdRef.current = userId;
   }, [userId]);
 
   // ---- localStorage is the primary source of truth for UI decisions ----
   const completed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const isCompleted = completed.includes(tutorialId);
 
-  const tutorial = getTutorial(tutorialId, t, context);
-  const prerequisiteMet = tutorial?.prerequisite
-    ? completed.includes(tutorial.prerequisite)
-    : true;
-
-  const shouldStart = enabled && !isCompleted && prerequisiteMet;
-
-  // ---- Convex: persist completions & one-time sync from DB ----
   const completeMutation = useMutation(api.features.courses.completeTutorial);
 
-  // Only subscribe to the Convex query when localStorage says this tutorial
-  // (or its prerequisite) is NOT yet completed. Once localStorage has the
-  // data we need, skip the query to avoid unnecessary reads.
-  const needsDbSync = !isCompleted || (tutorial?.prerequisite && !prerequisiteMet);
+  // Only subscribe to the Convex query while localStorage is missing an id
+  // the caller cares about. Once localStorage has the data we need, skip the
+  // query to avoid unnecessary reads.
+  const needsDbSync = requiredIds.some((id) => !completed.includes(id));
   const dbCompleted = useQuery(
     api.features.courses.getCompletedTutorials,
     needsDbSync ? {} : 'skip',
@@ -202,6 +183,95 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     }
   }, [dbCompleted, userId]);
 
+  // False while the auth user hasn't resolved OR a needed DB backfill
+  // hasn't answered yet. Gate show-once UI on this so (a) a fresh device
+  // doesn't replay tutorials the user finished elsewhere just because
+  // localStorage started empty, and (b) nothing is evaluated or persisted
+  // against the un-namespaced fallback localStorage key before
+  // `setTutorialUser` has bound the per-user key — completion state is
+  // per USER (Convex `userSettings.completedTutorials` is the source of
+  // truth; localStorage is only that user's device cache).
+  const isLoaded =
+    authUser !== undefined && (!needsDbSync || dbCompleted !== undefined);
+
+  /**
+   * Persist a completion everywhere: localStorage (immediately, so the UI
+   * can't re-offer it), Convex (fire-and-forget), and PostHog — unless
+   * `captureEvent: false` (silent pre-marking, e.g. the veteran guard) or
+   * the id was already completed (re-runs must not inflate completion
+   * counts).
+   */
+  const markCompleted = useCallback(
+    (tutorialId: TutorialId, opts?: { captureEvent?: boolean }) => {
+      const prev = getSnapshot();
+      if (!prev.includes(tutorialId)) {
+        writeCompleted([...prev, tutorialId]);
+        if (opts?.captureEvent !== false) {
+          capture(CLIENT_EVENTS.TUTORIAL_COMPLETED, { tutorial_id: tutorialId });
+        }
+      }
+      completeMutation({ tutorialId }).catch((e) =>
+        reportError(e, { op: 'tutorial.persistCompletion', tutorialId }),
+      );
+    },
+    [completeMutation],
+  );
+
+  return { completed, markCompleted, isLoaded };
+}
+
+interface UseTutorialOptions {
+  enabled?: boolean;
+  delayMs?: number;
+  extraSteps?: DriveStep[];
+  onInteractiveStep?: () => void;
+  onComplete?: () => void;
+  /** When the user clicks the highlighted element on this step (0-based index), complete the tutorial and close the driver. */
+  stepCompleteOnClickIndex?: number;
+  /**
+   * Whether clicking the last step's highlighted element completes the tour
+   * (default true — closing steps are usually CTAs that navigate away). Pass
+   * false for tours whose last step highlights an element purely to explain
+   * it: a curiosity click there must not mark the tour finished.
+   */
+  lastStepCompleteOnClick?: boolean;
+  /** Runtime context forwarded to the tour factory (e.g. reviewMode so the
+   *  home tour anchors the Radio vs Free Study button). */
+  context?: TutorialContext;
+}
+
+export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions = {}) {
+  const {
+    enabled = true,
+    delayMs = 800,
+    extraSteps,
+    onInteractiveStep,
+    onComplete,
+    stepCompleteOnClickIndex,
+    lastStepCompleteOnClick = true,
+    context,
+  } = options;
+  const driverRef = useRef<Driver | null>(null);
+  // Guards the re-entrancy of teardown → driver.destroy() → onDestroyStarted
+  // → teardown on driver's internal close paths.
+  const isTearingDownRef = useRef(false);
+  const [isActive, setIsActive] = useState(false);
+  const t = useTranslations('Tutorial');
+
+  const tutorial = getTutorial(tutorialId, t, context);
+
+  const requiredIds = tutorial?.prerequisite
+    ? [tutorialId, tutorial.prerequisite]
+    : [tutorialId];
+  const { completed, markCompleted } = useCompletedTutorials(requiredIds);
+
+  const isCompleted = completed.includes(tutorialId);
+  const prerequisiteMet = tutorial?.prerequisite
+    ? completed.includes(tutorial.prerequisite)
+    : true;
+
+  const shouldStart = enabled && !isCompleted && prerequisiteMet;
+
   // ---- callbacks ----
   const onInteractiveStepRef = useRef(onInteractiveStep);
   const onCompleteRef = useRef(onComplete);
@@ -213,17 +283,8 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   });
 
   const completeTutorial = useCallback(() => {
-    const prev = getSnapshot();
-    if (!prev.includes(tutorialId)) {
-      // Only on the first completion — re-running a tutorial should not count
-      // again, or the completion rate can exceed its own start count.
-      writeCompleted([...prev, tutorialId]);
-      capture(CLIENT_EVENTS.TUTORIAL_COMPLETED, { tutorial_id: tutorialId });
-    }
-    completeMutation({ tutorialId }).catch((e) =>
-      reportError(e, { op: 'tutorial.persistCompletion', tutorialId }),
-    );
-  }, [tutorialId, completeMutation]);
+    markCompleted(tutorialId);
+  }, [tutorialId, markCompleted]);
 
   /**
    * Why every teardown goes through one helper.
@@ -304,13 +365,14 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     ) {
       completeOnClickIndices.add(stepCompleteOnClickIndex);
     }
-    // The closing step of a tour is a call-to-action that highlights the
-    // element the user is invited to click. That click must count as
+    // The closing step of a tour is usually a call-to-action that highlights
+    // the element the user is invited to click. That click must count as
     // finishing the tour: it often navigates away (e.g. the home tour's
     // Learn + Review CTA opens the learn view), which hides the host and
     // would otherwise hit the suppress-complete path below — leaving the
-    // tour unfinished and re-running it on every visit.
-    if (resolvedSteps.length > 0) {
+    // tour unfinished and re-running it on every visit. Tours whose last
+    // step is explanatory opt out via `lastStepCompleteOnClick: false`.
+    if (lastStepCompleteOnClick && resolvedSteps.length > 0) {
       completeOnClickIndices.add(resolvedSteps.length - 1);
     }
     for (const index of completeOnClickIndices) {
@@ -367,7 +429,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     driverRef.current = d;
     setIsActive(true);
     d.drive();
-  }, [tutorial, tutorialId, stepCompleteOnClickIndex]);
+  }, [tutorial, tutorialId, stepCompleteOnClickIndex, lastStepCompleteOnClick]);
 
   const launchDriverRef = useRef(launchDriver);
   useLayoutEffect(() => {

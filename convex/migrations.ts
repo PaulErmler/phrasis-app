@@ -9,14 +9,21 @@ import {
   DEFAULT_PAUSE_BASE_TO_TARGET,
   DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
 } from '../lib/constants/audioPlayback';
+import { postProcessTranslation } from '../lib/languages';
 import {
-  postProcessTranslation,
-  isProtectedTranslationSource,
-} from '../lib/languages';
+  getRomanizationSource,
+  romanizeLocal,
+  ROMANIZATION_SOURCES,
+} from './lib/localRomanization';
+import { isProtectedTranslationSource } from '../lib/translationProvenance';
 import { buildSearchableTextPatchForCard } from './lib/cardContent';
 import type { Id } from './_generated/dataModel';
 import { isPremadeLevelCollection } from './lib/collections';
-import { cardsByOriginStateAndDueDate } from './db/stats/cardAggregates';
+import {
+  cardsByOriginStateAndDueDate,
+  cardsByOriginWritingStateAndDueDate,
+  hasWritingTrack,
+} from './db/stats/cardAggregates';
 
 // App-wide migrations via @convex-dev/migrations: batched, resumable, with
 // state tracking so completed migrations are skipped on re-run. `runAll` is
@@ -97,6 +104,14 @@ export const perModeSettingsBackfill = migrations.define({
  *
  * User-provided rows are skipped — the step only ever applies to machine
  * output, mirroring the write paths.
+ *
+ * Note this is the one provenance guard that can NOT use the full
+ * `mayRegenerateTranslation` rule: `migrateOne` sees the translation row
+ * alone, with no `texts` doc to test `userCreated` against. Machine-sourced
+ * rows on user-created cards are therefore still normalized here. That is
+ * acceptable because the step is punctuation-only — it strips trailing '_'
+ * runs and never changes wording — but a migration that rewrites CONTENT must
+ * load the text and go through `mayRegenerateTranslation`.
  *
  * Deliberately does NOT touch audio: a trailing-underscore diff is
  * punctuation-only, so existing audio stays valid (the same `soundsSame`
@@ -187,16 +202,25 @@ export async function cardCollectionBackfillOne(
   const patch = cardCollectionBackfillPatch(doc, collectionId, collection);
   if (!patch) return undefined;
 
-  // `collectionOrigin` is part of `cardsByOriginStateAndDueDate`'s namespace,
-  // so the entry has to move with the doc. Only cards aggregated live during
-  // the deploy→backfill window actually have one (they land under origin
-  // 'none'); for everything else `replaceOrInsert` just inserts under the
-  // final origin, which `cardOriginAggregateBackfill` then no-ops over.
+  // `collectionOrigin` is part of the namespace of BOTH origin-keyed
+  // aggregates (`cardsByOriginStateAndDueDate` and its writing-track mirror),
+  // so their entries have to move with the doc. Only cards aggregated live
+  // during the deploy→backfill window actually have one (they land under
+  // origin 'none'); for everything else `replaceOrInsert` just inserts under
+  // the final origin, which `cardOriginAggregateBackfill` then no-ops over.
+  // The writing mirror only holds cards with a seeded writing track — same
+  // membership gate `patchCard` uses.
   if (patch.collectionOrigin !== undefined) {
     await cardsByOriginStateAndDueDate.replaceOrInsert(ctx, doc, {
       ...doc,
       ...patch,
     });
+    if (hasWritingTrack(doc)) {
+      await cardsByOriginWritingStateAndDueDate.replaceOrInsert(ctx, doc, {
+        ...doc,
+        ...patch,
+      });
+    }
   }
   return patch;
 }
@@ -265,6 +289,136 @@ export const cardOriginAggregateBackfill = migrations.define({
 });
 
 /**
+ * Reset Cantonese romanizations produced by the retired `cantonese-romanisation`
+ * library (source tag "cantonese-romanisation-v1"). Its dictionary mapped the
+ * core vernacular particles (嘅/哋/咗/嘢…) to empty strings — leaking raw Han
+ * characters into the Jyutping line — and picked the first candidate reading
+ * with no context, yielding wrong tones (可 → hak1, 去 → heoi2). Clearing
+ * `romanizedText` back to the `undefined` "never attempted" state lets the
+ * lazy content pipeline regenerate rows on next view via `to-jyutping`.
+ *
+ * Keyed on LANGUAGE rather than on the retired tag alone: the old library
+ * shipped one commit before `romanizationSource` existed (87c6ce9 →
+ * 85cd2d5), so rows romanized in that window carry no tag at all and a
+ * tag-only filter would skip them forever (the same trap
+ * `recomputeRomanizationPatch` documents below). Any Cantonese row whose
+ * romanization was NOT produced by the current `to-jyutping` source is
+ * cleared — untagged pre-schema rows, retired-tag rows, and the
+ * empty-string "tried, failed" sentinel alike. Rows the lazy pipeline has
+ * already regenerated (tagged with the current source, e.g. between deploy
+ * and this migration running) are left untouched, as are rows never
+ * attempted (`romanizedText === undefined`) — simplified Cantonese (`yue`)
+ * had romanization disabled, so those all fall in that bucket and the lazy
+ * pipeline backfills them now that `needsRomanization` is on.
+ */
+const RETIRED_CANTONESE_SOURCE = 'cantonese-romanisation-v1';
+const CANTONESE_CODES = new Set(['yue', 'yue_traditional']);
+
+export function resetStaleCantoneseRomanizationPatch(doc: {
+  language: string;
+  romanizedText?: string;
+  romanizationSource?: string;
+}):
+  | { romanizedText: undefined; romanizationSource: undefined }
+  | undefined {
+  const isRetiredSource = doc.romanizationSource === RETIRED_CANTONESE_SOURCE;
+  const isStaleCantonese =
+    CANTONESE_CODES.has(doc.language) &&
+    doc.romanizedText !== undefined &&
+    doc.romanizationSource !== ROMANIZATION_SOURCES.toJyutping;
+  if (!isRetiredSource && !isStaleCantonese) return undefined;
+  // Patching to undefined unsets both fields → back to "never attempted".
+  return { romanizedText: undefined, romanizationSource: undefined };
+}
+
+export const resetStaleCantoneseTextRomanization = migrations.define({
+  table: 'texts',
+  migrateOne: (_ctx, doc) => resetStaleCantoneseRomanizationPatch(doc),
+});
+
+export const resetStaleCantoneseTranslationRomanization = migrations.define({
+  table: 'translations',
+  migrateOne: (_ctx, doc) =>
+    resetStaleCantoneseRomanizationPatch({
+      language: doc.targetLanguage,
+      romanizedText: doc.romanizedText,
+      romanizationSource: doc.romanizationSource,
+    }),
+});
+
+export const recomputeTextRomanization = migrations.define({
+  table: 'texts',
+  migrateOne: (_ctx, doc) =>
+    recomputeRomanizationPatch(doc.language, doc.text, doc.romanizedText),
+});
+
+export const recomputeTranslationRomanization = migrations.define({
+  table: 'translations',
+  migrateOne: (_ctx, doc) =>
+    recomputeRomanizationPatch(
+      doc.targetLanguage,
+      doc.translatedText,
+      doc.romanizedText,
+    ),
+});
+
+/**
+ * Recompute Chinese and Korean romanizations in place.
+ *
+ * All three languages changed romanizer behavior in the same release (see
+ * convex/lib/localRomanization.ts):
+ *   - `zh` / `zh_traditional`: punctuation, Latin runs and digits were being
+ *     silently deleted, and traditional script got context-blind polyphone
+ *     readings (銀行 → "yín xíng" rather than "yín háng").
+ *   - `ko`: romanized spelling rather than pronunciation (한국말 →
+ *     "hangukmal" rather than the standard "hangungmal").
+ *
+ * Unlike the Cantonese reset above, this RECOMPUTES rather than clearing to
+ * `undefined`: `romanizeLocal` is pure, synchronous and network-free, so the
+ * corrected value can be written here directly — no scheduler fan-out, no
+ * regeneration storm, and every row is correct the moment the migration ends.
+ *
+ * Deliberately keyed on LANGUAGE, not on `romanizationSource`: rows written
+ * before the source field existed carry no tag at all, and a tag-only filter
+ * would skip them forever. Recomputing is cheap enough that re-deriving every
+ * row in these three languages costs less than reasoning about which are
+ * stale. Only rows whose value actually changes are patched, so re-running is
+ * a no-op.
+ *
+ * Scoped to exactly these three codes so it cannot interact with
+ * `resetStaleCantonese*Romanization`, which is clearing yue rows in the same
+ * `runAll` pass.
+ */
+const RECOMPUTE_ROMANIZATION_CODES = new Set(['zh', 'zh_traditional', 'ko']);
+
+/**
+ * @param sourceText the text the romanization is derived FROM — `texts.text`
+ *   for source rows, `translations.translatedText` for translation rows.
+ */
+export function recomputeRomanizationPatch(
+  language: string,
+  sourceText: string,
+  romanizedText: string | undefined,
+): { romanizedText: string; romanizationSource: string } | undefined {
+  if (!RECOMPUTE_ROMANIZATION_CODES.has(language)) return undefined;
+  // Tri-state contract (schema.ts): `undefined` = never attempted, so leave it
+  // for the scheduler to enqueue; `''` = attempted and failed, a sentinel this
+  // migration has no new information about. Only rewrite real romanizations.
+  if (romanizedText === undefined || romanizedText === '') return undefined;
+
+  const recomputed = romanizeLocal(sourceText, language);
+  // `romanizeLocal` returns null only for languages with no local romanizer —
+  // impossible for these three, but never persist a null/empty over good data.
+  if (recomputed === null || recomputed === '') return undefined;
+  if (recomputed === romanizedText) return undefined;
+
+  return {
+    romanizedText: recomputed,
+    romanizationSource: getRomanizationSource(language),
+  };
+}
+
+/**
  * Everything a deploy needs, in order. Completed migrations are skipped.
  *
  * Ordering rationale:
@@ -289,4 +443,8 @@ export const runAll = migrations.runner([
   internal.migrations.cardCollectionBackfill,
   internal.migrations.cardOriginAggregateBackfill,
   internal.migrations.rebuildCardSearchableText,
+  internal.migrations.resetStaleCantoneseTextRomanization,
+  internal.migrations.resetStaleCantoneseTranslationRomanization,
+  internal.migrations.recomputeTextRomanization,
+  internal.migrations.recomputeTranslationRomanization,
 ]);

@@ -1,6 +1,6 @@
 ---
 title: 'Datenschutzerklärung'
-lastUpdated: '2026-07-28'
+lastUpdated: '2026-08-09'
 ---
 
 # Datenschutzerklärung
@@ -113,8 +113,8 @@ Drittlandtransfer: Absicherung durch SCCs gemäß Art. 46 Abs. 2 lit. c DSGVO.
 Datenschutzerklärung: [https://www.convex.dev/privacy](https://www.convex.dev/privacy)
 
 **Stripe & Autumn** (Stripe Inc., USA / Autumn, USA)
-Zweck: Zahlungsabwicklung und Abonnementverwaltung. Autumn (useautumn.com) dient als Billing-Schicht und leitet Zahlungsvorgänge an Stripe weiter.
-Daten: Name, E-Mail-Adresse, Zahlungsdaten, Rechnungsadresse, Transaktionsdaten.
+Zweck: Verkauf kostenpflichtiger Abonnements, Zahlungsabwicklung und Abonnementverwaltung. Bei kostenpflichtigen Abonnements tritt Stripe als Merchant of Record auf, verkauft also im eigenen Namen, und ist für diesen Vorgang eigenständig Verantwortlicher: Stripe ermittelt und erhebt die anfallende Steuer, stellt den Beleg aus und wickelt Rückerstattungen, Rückbuchungen und den Transaktions-Support ab. Autumn (useautumn.com) dient als Billing-Schicht und leitet Zahlungsvorgänge an Stripe weiter.
+Daten: Name, E-Mail-Adresse, Zahlungsdaten, Rechnungsadresse, Transaktionsdaten. Name und Rechnungsadresse sind bei der Bezahlung erforderlich, weil Stripe sie zur Ermittlung der anfallenden Steuer benötigt.
 Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Diese Anbieter erhalten Ihre Daten erst, wenn Sie einen Account erstellen. 
 Drittlandtransfer: Stripe ist nach dem EU-U.S. Data Privacy Framework zertifiziert (Art. 45 DSGVO).
 Datenschutzerklärung Stripe: [https://stripe.com/de/privacy](https://stripe.com/de/privacy)
@@ -130,7 +130,7 @@ Datenschutzerklärung: [https://resend.com/legal/privacy-policy](https://resend.
 | Anbieter       | Zweck                          | Daten                                  | Standort   |
 |----------------|--------------------------------|----------------------------------------|------------|
 | Convex         | Datenbank                      | Alle Nutzerdaten                       | USA (SCCs) |
-| Stripe/Autumn  | Zahlungsabwicklung             | Name, E-Mail, Zahlungs-/Rechnungsdaten | USA (DPF)  |
+| Stripe/Autumn  | Verkauf von Abonnements (Stripe als Merchant of Record), Zahlungsabwicklung | Name, E-Mail, Zahlungs-/Rechnungsdaten | USA (DPF)  |
 | Resend         | Transaktionale E-Mails         | E-Mail-Adresse                         | USA (SCCs) |
 
 ### C) Analyse und optionale Dienste

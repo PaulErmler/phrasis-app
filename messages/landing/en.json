@@ -18,51 +18,62 @@
     "themeSystem": "System"
   },
   "hero": {
-    "sectionLabel": "Speak from day one",
-    "tagline": "Put fluency on <highlight>autopilot</highlight>.",
-    "subtitle": "Flexling schedules every sentence at the perfect moment to remember it — you just listen, speak, and watch your fluency grow.",
+    "tagline": "Learn a language the way you learned your <highlight>first</highlight>.",
+    "subtitle": "You didn’t learn your first language from vocabulary lists. Absorb words in sentences that actually matter to you.",
     "cta": {
       "start": "Start Learning Free",
       "howItWorks": "See How It Works",
       "goToApp": "Go to App",
-      "install": "Install App"
+      "install": "Install App",
+      "friction": "Free to start · No credit card required"
     }
   },
   "philosophy": {
-    "title": "Built on what",
-    "titleHighlight": "actually works.",
-    "lead": "Active recall, shadowing, and spaced repetition are proven to make languages stick — Flexling is built entirely around them.",
+    "title": "Built around",
+    "titleHighlight": "you.",
+    "lead": "The content, the practice, and the long game — all tuned to how you actually live and learn.",
     "cards": {
-      "activeRecall": {
-        "title": "Active Recall",
-        "body": "Translate real sentences from your language, check yourself, and repeat until it sticks. Spaced repetition — the same algorithm as Anki — brings each sentence back right before you'd forget it."
+      "practice": {
+        "title": "Practice for every moment",
+        "body": "Speak on a walk, write at a desk, or let sentences play while you cook. Same cards, a mode for every circumstance."
       },
-      "grammar": {
-        "title": "Grammar without the grind",
-        "body": "Skip the rules and worksheets. By speaking and writing real sentences, you pick up grammar the way you learned your first language — by using it."
+      "content": {
+        "title": "Content that is actually yours",
+        "body": "Practical sentences you will say — not a textbook curriculum. Bring your own, ask AI, or start from a large library."
       },
-      "daily": {
-        "title": "Just 15 minutes a day",
-        "body": "Consistent daily practice beats marathon sessions. Flexling schedules exactly what you need to review today — no planning required."
-      },
-      "practical": {
-        "title": "Practical, not theoretical",
-        "body": "Learn the sentences you'll actually say. Every card is built for real-world communication, not grammar worksheets."
-      },
-      "customisation": {
-        "title": "Make it yours",
-        "body": "Bring your own sentences, import a spreadsheet, or let AI generate them. Content that is relevant to you increases retention."
-      },
-      "feedback": {
-        "title": "Instant feedback",
-        "body": "Get immediate spelling and recall feedback on every sentence — plus an AI tutor that answers any question and turns it into a flashcard."
+      "path": {
+        "title": "A path you can see",
+        "body": "Stats, a review plan, and a projection of where you are headed. Motivation that lasts years, not weeks."
       }
     }
   },
+  "howWeAchieve": {
+    "title": "How do we",
+    "titleHighlight": "achieve this?",
+    "lead": "Three pieces, working together."
+  },
   "reviewModes": {
-    "title": "Three ways to",
-    "titleHighlight": "use Flexling.",
-    "subtitle": "The same sentences, three kinds of practice. Shadow them out loud, write them from memory, or let them play in the background — switch anytime.",
+    "title": "Practice that",
+    "titleHighlight": "fits the moment.",
+    "subtitle": "Want to speak? Shadow. Want to write? Type. Want input while you cook? Turn on Radio. Settings let you tune every mode to how you learn.",
+    "jobs": {
+      "speak": {
+        "title": "Practice speaking and listening",
+        "mode": "Shadowing",
+        "body": "Hear it, translate it in your head, say it aloud. Hands-free on a walk or with the screen in front of you."
+      },
+      "write": {
+        "title": "Practice writing",
+        "mode": "Writing",
+        "body": "Type the sentence and get instant, character-level feedback. Translate from your language, or transcribe what you hear."
+      },
+      "radio": {
+        "title": "Passive comprehensible input",
+        "mode": "Radio",
+        "body": "Let sentences and translations play in the background. The language gets into your ear without touching your review schedule."
+      }
+    },
+    "settingsNote": "Every mode is tunable — what you hear first, how much help you get, how long you go. Flexling adapts to you, not the other way around.",
     "audioTitle": "Shadowing",
     "audioBody": "The heart of Flexling. Listen to a sentence, translate it in your head, then say it aloud to practice your pronunciation — start speaking from day one, hands-free or hands-on. Each target line starts blurred and eases into focus, just like it does after playback in the app.",
     "fullTitle": "Writing",
@@ -77,12 +88,6 @@
     "radioBody": "Let sentences and their translations play all day — passive listening that gets the language into your ear, without touching your spaced-repetition schedule.",
     "freeStudyTitle": "Free Study",
     "freeStudyBody": "Don't want a session to touch your spaced-repetition schedule? Free Study shuffles endlessly through all your sentences so you can practice typing at your own pace — nothing gets scheduled, nothing counts against your reviews.",
-    "missingTitle": "Missing a way to learn?",
-    "missingBody": "Let us know and we'll try our best to adapt Flexling to your needs.",
-    "missingCta": "Suggest a way to learn",
-    "emailSubjects": {
-      "requestMode": "Learning Mode Suggestion"
-    },
     "multiLabel": "Multiple Language",
     "replay": "Replay demo",
     "mock": {
@@ -96,113 +101,261 @@
     }
   },
   "chatDemo": {
-    "title": "Ask any question.",
-    "titleHighlight": "Remember the answer.",
-    "subtitle": "Don't understand a word? Not quite sure why the sentence is written this way? Just ask and get instant answers from state-of-the-art language models. We will automatically create flashcards for you to remember the specific concepts you are struggling with.",
+    "title": "Add cards that",
+    "titleHighlight": "are actually yours.",
+    "subtitle": "The sentences you care about are the ones that stick. Three ways to get them in:",
+    "paths": {
+      "type": {
+        "title": "Type them",
+        "body": "Add a sentence whenever you meet one you want to keep."
+      },
+      "import": {
+        "title": "Import a spreadsheet",
+        "body": "Drop in a CSV, TSV, or Excel/Sheets file; audio is generated for you."
+      },
+      "ask": {
+        "title": "Ask the tutor",
+        "body": "Describe a situation — or a word you are stuck on — and it creates the cards to practice precisely the words that are hardest for you."
+      }
+    },
+    "contextTitle": "You're reviewing this card:",
+    "contextNote": "The tutor automatically sees the card you're studying — ask about “this sentence” and it knows exactly what you mean.",
     "scenarioGrammar": "Grammar",
+    "scenarioSimpler": "Simpler",
     "scenarioCards": "New cards",
-    "scenarioCuriosity": "Curiosity",
     "approve": "Add Card",
     "reject": "Reject",
     "approved": "Card added!",
     "replay": "Replay",
-    "grammar": {
-      "userMessage": "How do I conjugate estar for I and they in Spanish?",
-      "assistantMessage": "For yo (I), estar is estoy — e.g. Estoy bien. For ellos or ellas (they), it is están; the second card shows that in a greeting: Buenos días ¿cómo están? The first card uses está with usted, the formal one-person form (same ending as él/ella). Tap Add Card when you want either line in your deck.",
-      "card1Base": "Good morning, how are you?",
-      "card1Target": "Buenos días ¿cómo está usted?",
-      "card2Base": "Good morning everyone, how are you all?",
-      "card2Target": "Buenos días ¿cómo están?",
-      "multiCard1": {
-        "base": "Good morning, how are you?",
-        "hi": "सुप्रभात, आप कैसे हैं?",
-        "hiRoman": "suprabhaat, aap kaise hain?",
-        "es": "Buenos días ¿cómo está usted?",
-        "fr": "Bonjour, comment allez-vous ?"
-      },
-      "multiCard2": {
-        "base": "Good morning everyone, how are you all?",
-        "hi": "सुप्रभात, आप सब कैसे हैं?",
-        "hiRoman": "suprabhaat, aap sab kaise hain?",
-        "es": "Buenos días ¿cómo están?",
-        "fr": "Bonjour à tous, comment allez-vous ?"
-      }
+    "contextCard": {
+      "base": "Good morning, how are you?",
+      "es": "Buenos días ¿cómo está?",
+      "fr": "Bonjour, comment allez-vous ?"
     },
-    "threeCards": {
-      "userMessage": "Please add three flashcards for me: I would like a table for two, could we see the menu, and the bill please — for an upcoming restaurant trip.",
-      "assistantMessage": "Here are three cards in the same shape as your deck — one line per language you are studying. Tap Add Card on each when you are ready to save them.",
-      "assistantMessageMulti": "Three proposals with every active language line. Confirm each when it looks right.",
-      "simple": {
-        "card1Base": "I would like a table for two.",
-        "card1Target": "Quisiera una mesa para dos.",
-        "card2Base": "Could we see the menu?",
-        "card2Target": "¿Podemos ver el menú?",
-        "card3Base": "The bill, please.",
-        "card3Target": "La cuenta, por favor."
+    "scenarios": {
+      "grammar": {
+        "userMessage": "Explain me the grammar of this sentence.",
+        "simple": [
+          {
+            "text": "The Spanish sentence is a polite greeting. Its main parts are:\n\n- “Buenos días” is the greeting “good morning.” “Buenos” agrees with “días” in masculine plural.\n- “Cómo” has an accent because it is an interrogative word meaning “how.”\n- “Está” comes from “estar” and is the third-person singular form used with the formal subject “usted.” Spanish often leaves “usted” unstated because the verb form makes the intended politeness clear.\n- The informal equivalent uses “estás,” which addresses someone with “tú.”\n- In standard Spanish punctuation, put a comma after the greeting and an opening question mark before the question."
+          },
+          {
+            "card": {
+              "base": "Good morning, how are you?",
+              "es": "Buenos días, ¿cómo está usted?"
+            }
+          },
+          {
+            "text": "For an informal situation, use the second-person singular form “estás” instead of the formal “está.”"
+          },
+          {
+            "card": {
+              "base": "Good morning, how are you feeling today?",
+              "es": "Buenos días, ¿cómo estás hoy?"
+            }
+          },
+          {
+            "text": "“Está” is not exclusively a form of address. It can also describe how another singular person is, with the subject stated explicitly."
+          },
+          {
+            "card": {
+              "base": "How is your mother?",
+              "es": "¿Cómo está tu madre?"
+            }
+          },
+          {
+            "text": "Can I help you with anything else?"
+          }
+        ],
+        "multi": [
+          {
+            "text": "In the Spanish sentence, **“Buenos días”** is a fixed greeting. **Buenos** agrees with the masculine plural noun **días**. The comma after the greeting is normally written in Spanish: **“Buenos días, ¿cómo está?”**\n\n**“Cómo”** has an accent because it introduces a direct question. **“Está”** comes from **estar**, “to be” for a temporary state or condition. Its form is third-person singular, but here it refers to the omitted formal subject **usted**, meaning “you” in a polite context. Spanish often omits the subject pronoun because the verb form and context are enough.\n\nFor an informal question, Spanish uses **estás**, the **tú** form:"
+          },
+          {
+            "card": {
+              "base": "Good morning, how are you today?",
+              "es": "Buenos días, ¿cómo estás hoy?",
+              "fr": "Bonjour, comment vas-tu aujourd'hui ?"
+            }
+          },
+          {
+            "text": "In the French sentence, **“Bonjour”** is a fixed greeting. **“Comment”** means “how” and introduces the question.\n\n**“Allez-vous”** comes from **aller**, “to go,” but **comment aller-vous ?** is the normal French expression for asking about someone’s wellbeing. French forms this question with subject–verb inversion: the verb **allez** comes before **vous**, joined by a hyphen. **Vous** can refer to one person formally or to several people.\n\nThe Spanish sentence expresses wellbeing with **estar**, while the French sentence uses **aller**. Both are standard expressions, but their verbs are not literal equivalents. Here is a more formal context:"
+          },
+          {
+            "card": {
+              "base": "Good morning, how are you today, Mr. Martin?",
+              "es": "Buenos días, ¿cómo está hoy, señor Martín?",
+              "fr": "Bonjour, comment allez-vous aujourd'hui, monsieur Martin ?"
+            }
+          },
+          {
+            "text": "In short, Spanish uses **estar** and usually omits the subject, while French uses **aller** and places the subject after the verb in this question form.\n\nCan I help with anything else?"
+          }
+        ]
       },
-      "multi": {
-        "card1": {
-          "base": "I would like a table for two.",
-          "hi": "मुझे दो लोगों के लिए मेज़ चाहिए।",
-          "hiRoman": "mujhe do logon ke liye mez chahiye.",
-          "es": "Quisiera una mesa para dos.",
-          "fr": "Une table pour deux, s'il vous plaît."
-        },
-        "card2": {
-          "base": "Could we see the menu?",
-          "hi": "क्या हम मेनू देख सकते हैं?",
-          "hiRoman": "kya hum menu dekh sakte hain?",
-          "es": "¿Podemos ver el menú?",
-          "fr": "Pourrions-nous voir le menu ?"
-        },
-        "card3": {
-          "base": "The bill, please.",
-          "hi": "बिल दीजिए, कृपया।",
-          "hiRoman": "bil dijiye, kripya.",
-          "es": "La cuenta, por favor.",
-          "fr": "L'addition, s'il vous plaît."
-        }
-      }
-    },
-    "curiosity": {
-      "userMessage": "Are there Spanish words English doesn't have?",
-      "assistantMessage": "Lots! Spanish often has a single compact word where English needs a whole phrase. Sobremesa is the leisurely chat after a meal; estrenar means to use or wear something for the first time. Both come up in everyday conversation. Tap Add Card on either to keep them.",
-      "simple": {
-        "card1Base": "Let's stay and chat after dinner.",
-        "card1Target": "Hagamos sobremesa.",
-        "card2Base": "I'm wearing these shoes for the first time.",
-        "card2Target": "Estoy estrenando estos zapatos."
+      "simpler": {
+        "userMessage": "How can I say this in a simpler way?",
+        "simple": [
+          {
+            "text": "A shorter, very common option is **“Hola, ¿qué tal?”** It replaces the time-specific greeting with the simple greeting **“hola”** and uses the short, frequent question **“¿qué tal?”** for “How are things?”"
+          },
+          {
+            "card": {
+              "base": "Hi, how are things?",
+              "es": "Hola, ¿qué tal?"
+            }
+          },
+          {
+            "text": "You can also say **“Hola, ¿cómo estás?”** This is simple and natural, but it is informal: use it with friends, family, children, or people you address with **tú**."
+          },
+          {
+            "card": {
+              "base": "Hi, how are you?",
+              "es": "Hola, ¿cómo estás?"
+            }
+          },
+          {
+            "text": "For a quick, friendly check-in, use **“Hola, ¿todo bien?”** It is shorter than the original and literally asks whether everything is okay."
+          },
+          {
+            "card": {
+              "base": "Hi, is everything okay?",
+              "es": "Hola, ¿todo bien?"
+            }
+          },
+          {
+            "text": "The easiest everyday choices are:\n\n- **“Hola, ¿qué tal?”** — short and neutral.\n- **“Hola, ¿cómo estás?”** — simple and informal.\n- **“Hola, ¿todo bien?”** — a quick, friendly check-in.\n\nCan I help with anything else?"
+          }
+        ],
+        "multi": [
+          {
+            "text": "In Spanish, you can simplify the greeting by using shorter, very common expressions:\n\n- “Qué tal” is a compact, natural way to ask how someone is.\n- “Hola” is shorter than “Buenos días,” and “estás” is informal, used with friends, family, or people you address casually."
+          },
+          {
+            "card": {
+              "base": "Good morning, how’s it going?",
+              "es": "Buenos días, ¿qué tal?",
+              "fr": "Bonjour, ça va ?"
+            }
+          },
+          {
+            "card": {
+              "base": "Hi, how are you?",
+              "es": "Hola, ¿cómo estás?",
+              "fr": "Salut, comment vas-tu ?"
+            }
+          },
+          {
+            "text": "In French, the easiest everyday replacement is the fixed expression “ça va ?” It avoids the formal inverted structure and is extremely common. Adding “salut” makes the greeting more informal, so use it with friends or people you address casually."
+          },
+          {
+            "card": {
+              "base": "Hi, how’s it going?",
+              "es": "Hola, ¿qué tal?",
+              "fr": "Salut, ça va ?"
+            }
+          },
+          {
+            "text": "For a polite everyday greeting, use the versions with **Buenos días** or **Bonjour**. For friends or informal situations, use **Hola** or **Salut**.\n\nThe simplest natural patterns are **qué tal** in Spanish and **ça va** in French.\n\nCan I help with anything else?"
+          }
+        ]
       },
-      "multi": {
-        "card1": {
-          "base": "Let's stay and chat after dinner.",
-          "hi": "रात के खाने के बाद थोड़ी और बातें करते हैं।",
-          "hiRoman": "raat ke khaane ke baad thodi aur baatein karte hain.",
-          "es": "Hagamos sobremesa.",
-          "fr": "Restons discuter après le dîner."
-        },
-        "card2": {
-          "base": "I'm wearing these shoes for the first time.",
-          "hi": "मैं पहली बार ये जूते पहन रहा हूँ।",
-          "hiRoman": "main pehli baar ye joote pehen raha hoon.",
-          "es": "Estoy estrenando estos zapatos.",
-          "fr": "J'étrenne ces chaussures."
-        }
+      "restaurant": {
+        "userMessage": "Create me cards on the topic: a restaurant visit",
+        "simple": [
+          {
+            "text": "I’ll create four practical cards covering seating, recommendations, ordering, and asking for the bill."
+          },
+          {
+            "card": {
+              "base": "Could we have a table for two, please?",
+              "es": "¿Podríamos tener una mesa para dos, por favor?"
+            }
+          },
+          {
+            "card": {
+              "base": "What do you recommend from the menu?",
+              "es": "¿Qué nos recomienda de la carta?"
+            }
+          },
+          {
+            "card": {
+              "base": "I would like the grilled fish and a glass of water.",
+              "es": "Quisiera el pescado a la parrilla y un vaso de agua."
+            }
+          },
+          {
+            "card": {
+              "base": "Could we have the bill, please?",
+              "es": "¿Nos trae la cuenta, por favor?"
+            }
+          },
+          {
+            "text": "The four restaurant-visit cards have been created. Can I help with anything else?"
+          }
+        ],
+        "multi": [
+          {
+            "card": {
+              "base": "We have a reservation for two people at eight o’clock.",
+              "es": "Tenemos una reserva para dos personas a las ocho.",
+              "fr": "Nous avons une réservation pour deux personnes à huit heures."
+            }
+          },
+          {
+            "card": {
+              "base": "Could we have a table by the window, please?",
+              "es": "¿Podríamos tener una mesa junto a la ventana, por favor?",
+              "fr": "Pourrions-nous avoir une table près de la fenêtre, s’il vous plaît ?"
+            }
+          },
+          {
+            "card": {
+              "base": "Could we see the menu, please?",
+              "es": "¿Podríamos ver la carta, por favor?",
+              "fr": "Pourrions-nous voir la carte, s’il vous plaît ?"
+            }
+          },
+          {
+            "card": {
+              "base": "What would you recommend as a main course?",
+              "es": "¿Qué nos recomendaría como plato principal?",
+              "fr": "Que nous recommandez-vous comme plat principal ?"
+            }
+          },
+          {
+            "card": {
+              "base": "Does this dish contain nuts?",
+              "es": "¿Este plato lleva frutos secos?",
+              "fr": "Est-ce que ce plat contient des fruits à coque ?"
+            }
+          },
+          {
+            "card": {
+              "base": "Could we have the bill, please?",
+              "es": "¿Nos trae la cuenta, por favor?",
+              "fr": "L’addition, s’il vous plaît."
+            }
+          },
+          {
+            "text": "I’ve created six cards covering reservations, seating, menus, recommendations, allergies, and asking for the bill. Can I help with anything else?"
+          }
+        ]
       }
     }
   },
   "analytics": {
     "label": "Track Your Progress",
-    "title": "Watch your skills",
-    "titleHighlight": "grow over time.",
-    "lead": "See exactly how your vocabulary expands week by week. Detailed analytics show your streak, words learned per language, and study habits — so you always know how far you've come.",
+    "title": "Stay motivated",
+    "titleHighlight": "in the long run.",
+    "lead": "A streak counts days. Seeing your vocabulary take shape is what keeps you coming back for years.",
     "progressTitle": "Know What You Know",
     "progressBody": "Track precisely which words you already know and how much progress you have made over days, weeks and months — broken down by language if you study more than one.",
     "activityTitle": "Feel Your Progress",
     "activityBody": "See exactly what words you learned recently and stay motivated as your vocabulary expands.",
     "wordCloudHint": "Click any word to see the sentences you learned with that word",
-    "insightsTitle": "Session Snapshot",
-    "insightsBody": "After every review, see exactly what you accomplished: your daily-goal ring fills as you study, badges show what's waiting, and a rotating forecast projects where your pace is taking you.",
+    "insightsTitle": "Know where you are going",
+    "insightsBody": "After every review, see exactly what you accomplished and where you are headed. How many words will you have learned by the end of the year?",
     "projectionLabel": "Your forecast",
     "projectionFacts": {
       "wordsByYearEnd": "~2,400 words by end of 2026",
@@ -248,8 +401,8 @@
         "description": "Remember up to 10x more with scientifically-proven algorithms that show you cards exactly when you need them."
       },
       "languageIntelligence": {
-        "title": "Comprehensible Input",
-        "description": "Every sentence is anchored in a language you already know. You stretch toward the translation, keeping difficulty challenging but never frustrating."
+        "title": "Grammar without the grind",
+        "description": "Skip the rules and worksheets. By speaking and writing real sentences, you pick up grammar the way you learned your first language — by using it."
       }
     }
   },
@@ -269,6 +422,7 @@
     "title": "Flexible",
     "titleHighlight": "Pricing",
     "mostPopular": "Most Popular",
+    "taxNote": "All prices include VAT where applicable. Paid plans are sold by Stripe as merchant of record.",
     "everythingFrom": "Everything from {planName}, plus:",
     "billing": {
       "monthly": "Monthly",

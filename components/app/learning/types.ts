@@ -124,6 +124,9 @@ export interface CourseSettings {
   instantProceedFull?: boolean;
   // Review mode
   reviewMode?: 'audio' | 'full';
+  /** Split scheduling: Writing keeps its own per-card spaced-repetition
+   * schedule instead of sharing one with Shadowing. Default false (shared). */
+  separateModeTracking?: boolean;
   fullReviewTargetAudioMode?: 'always' | 'afterSubmit' | 'never';
   writingInputMode?: 'translate' | 'transcribe';
   /** Writing mode: exclude punctuation from the accuracy score. Default false. */

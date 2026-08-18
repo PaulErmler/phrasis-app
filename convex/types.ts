@@ -142,6 +142,44 @@ export const cardSchedulingSnapshotFields = {
   goodReviewCount: v.optional(v.number()), // # of FSRS good/easy ratings (pre-review "understood" excluded). Drives the "until rated good" Practice-Listening strategy. Undefined = 0 for pre-field cards.
 } as const;
 
+// The writing-track counterpart of the scheduling fields above, active only
+// while a course has `separateModeTracking` enabled. When the split is on,
+// Writing-mode reviews read/write ONLY these fields and Shadowing keeps using
+// the shared set above; when it is off (default) both modes use the shared
+// set and these lie dormant. The writing track has no pre-review phase
+// (Writing mode always forces FSRS via `forceReviewPhase`), hence no
+// schedulingPhase/preReviewCount here. Shared by the `cards` table and the
+// `reviewLogs.prevWriting` undo snapshot. All optional: unset means "never
+// seeded" — writing-track due queries must exclude undefined `writingDueDate`
+// via a `.gte('writingDueDate', 0)` lower bound.
+export const cardWritingSchedulingFields = {
+  writingDueDate: v.optional(v.number()),
+  writingFsrsState: v.optional(fsrsStateValidator),
+  writingIsGraduated: v.optional(v.boolean()), // One-way flag, same semantics as isGraduated (FSRS state >= Review)
+  writingLastReviewedAt: v.optional(v.number()),
+  writingGoodReviewCount: v.optional(v.number()),
+} as const;
+
+// Which per-card schedule a review reads/writes: the shared (audio/legacy)
+// fields or the writing-track fields. Derived, never stored on courseSettings:
+// 'writing' iff `separateModeTracking` is on AND `reviewMode === 'full'`.
+export const schedulingTrackValidator = v.union(
+  v.literal('shared'),
+  v.literal('writing'),
+);
+export type SchedulingTrack = Infer<typeof schedulingTrackValidator>;
+
+/** The schedule a review touches, given the course's settings. */
+export function schedulingTrackFromSettings(settings: {
+  separateModeTracking?: boolean;
+  reviewMode?: ReviewMode;
+}): SchedulingTrack {
+  return settings.separateModeTracking === true &&
+    (settings.reviewMode ?? 'audio') === 'full'
+    ? 'writing'
+    : 'shared';
+}
+
 // The card fields free play mutates in its LISTENING face (minus
 // `lastReviewedAt`, which lives in the scheduling set above). Shared by the
 // `cards` table and the `reviewLogs.prevRadio` undo snapshot.
@@ -172,8 +210,9 @@ export const ttsQualityValidator = v.union(
 // Single source of truth for the provider list is `TTS_PROVIDERS` in
 // lib/languages.ts; this validator (for stored `audioRecordings.ttsProvider`)
 // is built from it so the two can't drift. Indexed access keeps the exact
-// string-literal union for `Infer`. 'gemini' = Gemini 3.1 Flash TTS via
-// OpenRouter's /audio/speech endpoint (distinct from 'google' = Cloud Chirp3).
+// string-literal union for `Infer`. 'gemini' = Gemini 3.1 Flash TTS and
+// 'minimax' = MiniMax Speech 2.8 Turbo, both via OpenRouter's /audio/speech
+// endpoint (distinct from 'google' = Cloud Chirp3).
 // 'elevenlabs' (index 1) and 'azure' (index 2) are retired providers retained
 // only so historical stored values still validate — neither is dispatchable
 // (Azure Speech remains in use for STT only; see convex/lib/stt).
@@ -182,6 +221,7 @@ export const ttsProviderValidator = v.union(
   v.literal(TTS_PROVIDERS[1]),
   v.literal(TTS_PROVIDERS[2]),
   v.literal(TTS_PROVIDERS[3]),
+  v.literal(TTS_PROVIDERS[4]),
 );
 
 export const voiceGenderValidator = v.union(
@@ -206,6 +246,35 @@ export const cardApprovalStatusValidator = v.union(
   v.literal('approved'),
   v.literal('rejected'),
 );
+
+// What the approval row proposes. Absent = 'createCard' (rows predate the
+// field). 'alsoCorrect' rows reference an existing card via `cardId` and
+// offer two accept paths (new card / replace) instead of one.
+export const cardApprovalKindValidator = v.union(
+  v.literal('createCard'),
+  v.literal('alsoCorrect'),
+);
+
+// Which accept path resolved an 'alsoCorrect' approval. Stored alongside
+// status 'approved' ('rejected' rows never carry one).
+export const cardApprovalResolutionValidator = v.union(
+  v.literal('newCard'),
+  v.literal('replaced'),
+);
+
+// Metadata changes the chat model proposes with markAlsoCorrect — only the
+// fields the new phrasing actually changes are present. Applied on the
+// replace path via the applyMetadataAndPrepareCard mechanism (so a speaker
+// gender change re-voices audio); the new-card path re-infers metadata.
+// Loose strings by design: values are validated where they are applied,
+// matching the `texts` columns they patch.
+export const proposedCardMetadataValidator = v.object({
+  speakerGender: v.optional(v.string()),
+  register: v.optional(v.string()),
+  addresseeGender: v.optional(v.string()),
+  addresseeNumber: v.optional(v.string()),
+  addressesSomeone: v.optional(v.boolean()),
+});
 
 // Per-feature quota snapshot mirrored from Autumn (usageQuotas.features
 // values). Lives here (not in usage/helpers.ts, which re-exports it) so
@@ -307,6 +376,9 @@ export type TtsQuality = Infer<typeof ttsQualityValidator>;
 export type TtsProvider = Infer<typeof ttsProviderValidator>;
 export type VoiceGender = Infer<typeof voiceGenderValidator>;
 export type CardApprovalStatus = Infer<typeof cardApprovalStatusValidator>;
+export type CardApprovalKind = Infer<typeof cardApprovalKindValidator>;
+export type CardApprovalResolution = Infer<typeof cardApprovalResolutionValidator>;
+export type ProposedCardMetadata = Infer<typeof proposedCardMetadataValidator>;
 
 /**
  * Free play ('radio') is ONE scheduling mode with two faces, chosen by the

@@ -3,6 +3,7 @@ import { authViewPaths } from '@daveyplate/better-auth-ui/server';
 import { getMessages } from 'next-intl/server';
 import Link from 'next/link';
 import { NativeSocialButtons } from '@/components/auth/NativeSocialButtons';
+import { SignedInRedirect } from '@/components/auth/SignedInRedirect';
 
 export const dynamicParams = false;
 
@@ -39,6 +40,10 @@ export default async function AuthPage({
 
   return (
     <main className="min-h-screen flex items-center justify-center p-4 pt-[calc(1rem+var(--safe-top))] pb-[calc(1rem+var(--safe-bottom))]">
+      {/* Sign-in/up only: reset-password and email-verification must stay
+          reachable with a live session (verification signs the user in
+          mid-flow, before its own redirect). */}
+      {isSignInOrUp && <SignedInRedirect />}
       <div className="w-full max-w-md mx-auto flex flex-col items-center">
         {/* Brand header */}
         <div className="mb-6 flex items-center gap-3">

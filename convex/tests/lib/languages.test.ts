@@ -195,9 +195,9 @@ describe("lib/languages — resolveTranslationStages", () => {
     expect(stages[0].model).toBe("openai/gpt-5.6-luna:nitro");
     expect(stages[0].reasoning).toBe("none");
     expect(stages[0].samples).toEqual({ total: 3, extraTemperature: 1 });
-    // The fallback is the pre-Aug-2026 production config, before the Google
+    // The fallback is Gemini 3.7 Flash Nitro (minimal), before the Google
     // safety net.
-    expect(stages[1].model).toBe("google/gemini-3.6-flash:nitro");
+    expect(stages[1].model).toBe("google/gemini-3.7-flash:nitro");
     expect(stages[1].reasoning).toBe("minimal");
   });
 
@@ -214,7 +214,7 @@ describe("lib/languages — resolveTranslationStages", () => {
       expect(stages[0].model).toBe("openai/gpt-5.6-luna:nitro");
       expect(stages[0].judge?.model).toBe("openai/gpt-5.6-luna:nitro");
       expect(stages[1]).toEqual({
-        model: "google/gemini-3.6-flash:nitro",
+        model: "google/gemini-3.7-flash:nitro",
         reasoning: "minimal",
         maxOutputTokens: 4_000,
       });
