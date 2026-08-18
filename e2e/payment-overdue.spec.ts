@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import {
   completeStripeTestCheckout,
+  gotoAuthedApp,
   neutralizeTours,
   signUpFreshUser,
 } from "./helpers";
@@ -113,8 +114,7 @@ test.describe("payment overdue dunning (live)", { tag: "@live" }, () => {
     page,
   }) => {
     test.setTimeout(240_000);
-    await page.goto("/app/settings");
-    await expect(planCta(page, BASIC_ANNUAL)).toBeVisible({ timeout: 30_000 });
+    await gotoAuthedApp(page, "/app/settings", planCta(page, BASIC_ANNUAL));
 
     await planCta(page, BASIC_ANNUAL).click();
     await completeStripeTestCheckout(page, { email });

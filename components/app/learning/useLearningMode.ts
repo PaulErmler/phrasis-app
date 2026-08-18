@@ -129,6 +129,13 @@ interface BaseState {
    * "no opinion" and falls through to the phase default.
    */
   setAutoRating: (rating: ReviewRating | null) => void;
+  /**
+   * True while auto-add wants to fire but is parked behind the caller's
+   * `holdAutoAdd` gate (the one-time difficulty check). The host uses it to
+   * open the difficulty dialog exactly when new cards are about to be added
+   * — not on session start.
+   */
+  autoAddHeld: boolean;
 }
 
 interface LoadingState extends BaseState {
@@ -291,26 +298,20 @@ export type LearningState =
 // back if the server disagrees), and the `dailyReviewsToday` hydration
 // timing. Don't split incrementally — land a full refactor with
 // end-to-end coverage in one go, or leave the current shape alone.
-export interface UseLearningModeOptions {
-  /** Seed the session id instead of minting fresh — used by onboarding
-   *  to keep the same session across a mid-lesson reload so
-   *  `getNewWordsForCelebration` returns the same hero number. */
-  initialSessionId?: string;
-  /** Seed the in-session card counter — used by onboarding so the
-   *  X/N progress bar resumes at the right value after a reload. */
-  initialSessionCardCount?: number;
-  /** Override the auto-add batch size, taking precedence over the
-   *  per-course `cardsToAddBatchSize`. Used by the onboarding wrapper to
-   *  add fewer cards at once during the first lesson WITHOUT mutating
-   *  the persisted setting — the user resumes the regular default the
-   *  moment they leave onboarding. */
-  batchSizeOverride?: number;
-}
-
-export function useLearningMode(options: UseLearningModeOptions = {}): LearningState {
+export function useLearningMode(
+  options: {
+    /**
+     * While true, the auto-add effect parks instead of adding cards (and
+     * reports via `autoAddHeld`). Used by the one-time difficulty check:
+     * the user confirms/changes their level BEFORE the first new cards are
+     * pulled from a collection.
+     */
+    holdAutoAdd?: boolean;
+  } = {},
+): LearningState {
+  const { holdAutoAdd = false } = options;
   const t = useTranslations('LearningMode');
   const { isAuthenticated } = useConvexAuth();
-  const { initialSessionId, initialSessionCardCount, batchSizeOverride } = options;
 
   // `timezone` lets this query also return today's active review count, which
   // drives the in-learn progress bar. Reusing this subscription means the bar
@@ -534,7 +535,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   // Without this, the first render computed `sessionId = ''`, the empty
   // string flowed into `trackNewWords`, and `wordTracking.ts` silently
   // dropped the sessionId field — orphaning that row from its session bucket.
-  const [localSessionId] = useState(() => initialSessionId ?? mintSessionId());
+  const [localSessionId] = useState(() => mintSessionId());
 
   // The server-backed id; falls back to `localSessionId` until the seed
   // mutation's optimistic update lands, so the fallback is never empty.
@@ -590,14 +591,14 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   const [dailyReviewsToday, setDailyReviewsToday] = useState(0);
   const [dailyTimeMsToday, setDailyTimeMsToday] = useState(0);
   const [dailyNewWordsToday, setDailyNewWordsToday] = useState(0);
-  // Per-session card counter — onboarding's 10-card lesson progress bar.
-  // Reset on course change so a switched course starts a fresh "session" UI.
-  const [sessionCardCount, setSessionCardCount] = useState(initialSessionCardCount ?? 0);
+  // Per-session card counter — reset on course change so a switched course
+  // starts a fresh "session" UI.
+  const [sessionCardCount, setSessionCardCount] = useState(0);
   const sessionCardCountCourseRef = useRef<string | null>(null);
   const activeCourseIdForSession = activeCourseQuery?._id ?? null;
   if (sessionCardCountCourseRef.current !== activeCourseIdForSession) {
     sessionCardCountCourseRef.current = activeCourseIdForSession;
-    setSessionCardCount(initialSessionCardCount ?? 0);
+    setSessionCardCount(0);
   }
 
   // ─── Celebration / progress display ───────────────────────────────────
@@ -714,9 +715,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     if (!courseSettings?.activeCollectionId || isAddingCards) return;
     const collectionId = courseSettings.activeCollectionId;
     const configuredBatch =
-      batchSizeOverride ??
-      courseSettings.cardsToAddBatchSize ??
-      DEFAULT_BATCH_SIZE;
+      courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE;
     const effectiveBatch = sentencesQuota.unlimited
       ? configuredBatch
       : Math.min(configuredBatch, Math.max(1, sentencesQuota.balance));
@@ -755,7 +754,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     } finally {
       setIsAddingCards(false);
     }
-  }, [courseSettings, isAddingCards, addCardsMutation, sentencesQuota, batchSizeOverride]);
+  }, [courseSettings, isAddingCards, addCardsMutation, sentencesQuota]);
 
   // Un-stick the quota latch the moment the reactive balance shows headroom
   // again. Runs before the auto-add effect below (definition order), so the
@@ -774,20 +773,25 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   // guard (set on drained and on error) and the quota latch (set on
   // quota-empty, cleared on refill) are what keep this from looping on a
   // drained collection, a persistently failing mutation, or an empty balance.
+  const [autoAddHeld, setAutoAddHeld] = useState(false);
   useEffect(() => {
     // Auto-add default is `true` — only opt out when explicitly false.
     const autoAddEnabled = courseSettings?.autoAddCards !== false;
     const activeCollectionId = courseSettings?.activeCollectionId;
-    if (
+    const wantsAutoAdd =
       cardForReview === null &&
       autoAddEnabled &&
-      activeCollectionId &&
+      !!activeCollectionId &&
       courseSettings?.studyContentFilter !== 'custom' &&
       !isAddingCards &&
       !settingsOpen &&
       !autoAddQuotaEmptyRef.current &&
-      autoAddExhaustedForRef.current !== activeCollectionId.toString()
-    ) {
+      autoAddExhaustedForRef.current !== activeCollectionId.toString();
+    // Parked behind the difficulty check: surface the intent (opens the
+    // dialog) and try again when the hold releases — this effect re-runs on
+    // `holdAutoAdd` changes.
+    setAutoAddHeld(wantsAutoAdd && holdAutoAdd);
+    if (wantsAutoAdd && !holdAutoAdd) {
       handleAddCards();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -798,6 +802,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     courseSettings?.studyContentFilter,
     isAddingCards,
     settingsOpen,
+    holdAutoAdd,
     sentencesQuota.unlimited,
     sentencesQuota.balance,
   ]);
@@ -1310,6 +1315,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     reviewMode: (courseSettings?.reviewMode ?? 'audio') as 'audio' | 'full',
     autoAdvance: courseSettings?.autoAdvance ?? DEFAULT_AUTO_ADVANCE,
     setAutoRating,
+    autoAddHeld,
   };
 
   // Loading
@@ -1387,9 +1393,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
         handleAddCards,
         isAddingCards,
         batchSize:
-          batchSizeOverride ??
-          courseSettings.cardsToAddBatchSize ??
-          DEFAULT_BATCH_SIZE,
+          courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
         sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
         remainingInCollection,
         handleSchedulingModeChange,

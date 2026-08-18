@@ -1,5 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { dismissTour } from "./helpers";
+import {
+  dismissErrorBoundary,
+  dismissTour,
+  gotoAuthedApp,
+  neutralizeTours,
+} from "./helpers";
 
 /**
  * Live end-to-end test for the manual "enter texts" save flow
@@ -38,14 +43,21 @@ test.describe("add cards — manual entry (live)", { tag: "@live" }, () => {
     test.setTimeout(120_000);
     const marker = `e2eManual${Date.now().toString(36)}`;
 
+    // This spec asserts nothing about tours, and the home tour can mount
+    // LATE (localStorage lacks the DB-side completion until the backfill
+    // query lands; under load that loses the race against the tour's 1.2s
+    // delay) — a one-shot dismissTour then misses it and the overlay blocks
+    // the collection-dialog clicks. CSS-neutralize all tours for every
+    // document this page loads instead (seen 2026-08-17).
+    await neutralizeTours(page);
+
     // --- 1. Save a manually-entered text -------------------------------
-    await page.goto("/app/content/add-cards");
-    await page.waitForLoadState("domcontentloaded");
+    const english = page.locator("#enter-en");
+    await gotoAuthedApp(page, "/app/content/add-cards", english);
     await dismissTour(page);
 
     // One input per course language (en base + es target for the shared
     // e2e user), rendered with stable `enter-<lang>` ids by EnterTextsView.
-    const english = page.locator("#enter-en");
     const spanish = page.locator("#enter-es");
     await expect(english).toBeVisible({ timeout: 20_000 });
     await english.fill(`${marker} the sun rises early.`);
@@ -56,7 +68,10 @@ test.describe("add cards — manual entry (live)", { tag: "@live" }, () => {
     await save.click();
 
     // On success the form resets to empty fields — more reliable than
-    // catching the auto-dismissing sonner success toast.
+    // catching the auto-dismissing sonner success toast. A Convex query
+    // error under suite load can replace the view with the error boundary
+    // mid-wait; retry remounts it (empty if the save landed).
+    await dismissErrorBoundary(page);
     await expect(english).toHaveValue("", { timeout: 30_000 });
 
     // --- 2. The text is in the Custom collection ------------------------

@@ -334,6 +334,225 @@ describe("features/decks", () => {
     });
   });
 
+  describe("setActiveCollectionByLevel / getActiveDifficultyLevel", () => {
+    /** Active dataset with L05 + L07 level collections (2 texts each). */
+    async function seedDatasetLevels(
+      t: TestConvex<typeof schema>,
+    ): Promise<Record<string, Id<"collections">>> {
+      return t.run(async (ctx) => {
+        const datasetId = await ctx.db.insert("datasets", {
+          slug: "ogte-test",
+          version: "1.0.0",
+          publishedAt: Date.now(),
+          isActive: true,
+        });
+        const byCode: Record<string, Id<"collections">> = {};
+        for (const code of ["L05", "L07"]) {
+          byCode[code] = await ctx.db.insert("collections", {
+            name: code,
+            code,
+            datasetId,
+            order: Number(code.slice(1)),
+            textCount: 2,
+            origin: "premade",
+          });
+        }
+        return byCode;
+      });
+    }
+
+    it("switches the active collection to the dataset level for the slid OGTE level", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId, collA1 } = await seedCourse(t);
+      const levels = await seedDatasetLevels(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 3,
+          activeCollectionId: collA1,
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.decks.setActiveCollectionByLevel, {
+        ogteLevel: 7,
+      });
+
+      const settings = await t.run(async (ctx) =>
+        ctx.db
+          .query("courseSettings")
+          .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+          .first(),
+      );
+      expect(settings?.activeCollectionId).toBe(levels.L07);
+
+      // The difficulty query now reads the level back off the collection code.
+      const level = await asUser.query(
+        api.features.decks.getActiveDifficultyLevel,
+        {},
+      );
+      expect(level).toBe(7);
+    });
+
+    it("rejects an out-of-range level and a level with no collection", async () => {
+      const t = convexTest(schema, modules);
+      await seedCourse(t);
+      await seedDatasetLevels(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await expect(
+        asUser.mutation(api.features.decks.setActiveCollectionByLevel, {
+          ogteLevel: 42,
+        }),
+      ).rejects.toThrow(/invalid level/i);
+      await expect(
+        asUser.mutation(api.features.decks.setActiveCollectionByLevel, {
+          ogteLevel: 9, // L09 not seeded
+        }),
+      ).rejects.toThrow(/not found/i);
+    });
+
+    it("refuses a level the user already completed, no-ops on the active one", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedCourse(t);
+      const levels = await seedDatasetLevels(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 3,
+          activeCollectionId: levels.L05,
+        });
+        await ctx.db.insert("collectionProgress", {
+          userId: "user_A",
+          courseId,
+          collectionId: levels.L07,
+          cardsAdded: 2, // === textCount → complete
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await expect(
+        asUser.mutation(api.features.decks.setActiveCollectionByLevel, {
+          ogteLevel: 7,
+        }),
+      ).rejects.toThrow(/complete/i);
+      await expect(
+        asUser.mutation(api.features.decks.setActiveCollectionByLevel, {
+          ogteLevel: 5,
+        }),
+      ).resolves.toBeNull();
+    });
+
+    it("getUpcomingSentencesForLevel starts past the user's frontier and resolves target translations", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedCourse(t);
+      const levels = await seedDatasetLevels(t);
+      await t.run(async (ctx) => {
+        for (let rank = 1; rank <= 4; rank++) {
+          const textId = await ctx.db.insert("texts", {
+            text: `level five ${rank}`,
+            language: "en",
+            userCreated: false,
+            collectionId: levels.L05,
+            collectionRank: rank,
+          });
+          // Only rank 3 has a target translation — rank 4's row must still
+          // appear, with the target side absent (still generating).
+          if (rank === 3) {
+            await ctx.db.insert("translations", {
+              textId,
+              targetLanguage: "es",
+              translatedText: `nivel cinco ${rank}`,
+            });
+          }
+        }
+        // Keep textCount honest with the 4 texts just inserted — the
+        // switchable check compares progress against it, so a stale 2 would
+        // read this level as already complete.
+        await ctx.db.patch(levels.L05, { textCount: 4 });
+        // The user already consumed ranks 1-2 of this level.
+        await ctx.db.insert("collectionProgress", {
+          userId: "user_A",
+          courseId,
+          collectionId: levels.L05,
+          cardsAdded: 2,
+          lastRankProcessed: 2,
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const page = await asUser.query(
+        api.features.decks.getUpcomingSentencesForLevel,
+        { ogteLevel: 5 },
+      );
+      expect(page.exists).toBe(true);
+      expect(page.switchable).toBe(true);
+      expect(page.sentences.map((r) => r.sourceText)).toEqual([
+        "level five 3",
+        "level five 4",
+      ]);
+      expect(page.sentences[0].targetText).toBe("nivel cinco 3");
+      expect(page.sentences[1].targetText).toBeUndefined();
+    });
+
+    it("getUpcomingSentencesForLevel reports a missing level and an already-completed one as not switchable", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedCourse(t);
+      const levels = await seedDatasetLevels(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 3,
+          activeCollectionId: levels.L05,
+        });
+        // L07 fully consumed → the switch mutation would reject it, so the
+        // pager must be able to disable that step instead of dead-ending.
+        await ctx.db.insert("collectionProgress", {
+          userId: "user_A",
+          courseId,
+          collectionId: levels.L07,
+          cardsAdded: 2, // === textCount
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const complete = await asUser.query(
+        api.features.decks.getUpcomingSentencesForLevel,
+        { ogteLevel: 7 },
+      );
+      expect(complete.exists).toBe(true);
+      expect(complete.switchable).toBe(false);
+
+      const missing = await asUser.query(
+        api.features.decks.getUpcomingSentencesForLevel,
+        { ogteLevel: 9 }, // L09 not seeded
+      );
+      expect(missing).toEqual({
+        exists: false,
+        switchable: false,
+        sentences: [],
+      });
+    });
+
+    it("getActiveDifficultyLevel returns null for non-level active collections", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId, collA1 } = await seedCourse(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 3,
+          activeCollectionId: collA1, // legacy "A1" — no L-code
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const level = await asUser.query(
+        api.features.decks.getActiveDifficultyLevel,
+        {},
+      );
+      expect(level).toBeNull();
+    });
+  });
+
   describe("findNextIncompleteCollection", () => {
     it("does not skip a level whose progress is all cutover carry", async () => {
       const t = convexTest(schema, modules);

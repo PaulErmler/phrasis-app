@@ -98,6 +98,13 @@ interface CardShellProps {
   manuallyRevealedLanguages?: ReadonlySet<string>;
   /** Reveal a language on tap (shared with the parent's target-reveal state). */
   onRevealLanguage?: (language: string) => void;
+  /** When set, tag the longest word of the FIRST base-language row with this
+   *  `data-coachmark-anchor` so the word-tap tip has something to point at.
+   *  Writing mode renders no target-language `ClickableWords` before submit,
+   *  so the base row is the only clickable sentence on screen; audio mode
+   *  anchors its target row instead (see LearningCardContent). Skipped while
+   *  the row is blurred — a hidden word is not a tap target. */
+  baseCoachmarkAnchorForLongestWord?: string;
   children: (ctx: {
     baseTranslations: CardTranslation[];
     targetTranslations: CardTranslation[];
@@ -151,6 +158,7 @@ export function CardShell({
   revealedLanguages,
   manuallyRevealedLanguages,
   onRevealLanguage,
+  baseCoachmarkAnchorForLongestWord,
   children,
 }: CardShellProps) {
   const t = useTranslations('LearningMode');
@@ -240,7 +248,7 @@ export function CardShell({
       <div className={compact ? 'px-4 pb-4 space-y-3' : 'px-6 pb-6 space-y-4'}>
         {/* Base language texts */}
         <div className="space-y-2" data-tutorial="base-languages">
-          {baseTranslations.map((translation) => {
+          {baseTranslations.map((translation, index) => {
             const audio = audioRecordings.find(
               (a) => a.language === translation.language,
             );
@@ -289,6 +297,11 @@ export function CardShell({
                     enabled={highlightEnabled}
                     interactive={!isBlurred}
                     className={`${baseTextClass} ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
+                    coachmarkAnchorForLongestWord={
+                      index === 0 && !isBlurred
+                        ? baseCoachmarkAnchorForLongestWord
+                        : undefined
+                    }
                   />
                   {showRomanization && translation.romanization && (
                     <p

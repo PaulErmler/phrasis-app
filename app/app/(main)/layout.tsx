@@ -17,6 +17,7 @@ import { getUserTimezone } from '@/lib/timezone';
 import { usePrefetchedThread } from '@/hooks/use-prefetched-thread';
 import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import { HomeView } from '@/components/app/HomeView';
+import { FreePlanUpgradeBadge } from '@/components/app/FreePlanUpgradeBadge';
 import { AddCardsView } from '@/components/app/AddCardsView';
 import { LibraryView } from '@/components/app/LibraryView';
 import { StatsView } from '@/components/app/stats/StatsView';
@@ -347,6 +348,7 @@ export default function MainLayout({
               </h1>
             )}
             <div className="flex items-center gap-1 -mr-2 shrink-0">
+              {activeView === 'home' && <FreePlanUpgradeBadge />}
               {(activeView === 'home' ||
                 activeView === 'library' ||
                 activeView === 'stats' ||
@@ -395,10 +397,12 @@ export default function MainLayout({
         </KeepMountedView>
         {isAddCardsRoute && (
           <KeepMountedView visible={!isLearnOpen}>
-            <AddCardsView onBack={() => {
-              setActiveView('home');
-              router.push('/app');
-            }} />
+            <ViewErrorBoundary>
+              <AddCardsView onBack={() => {
+                setActiveView('home');
+                router.push('/app');
+              }} />
+            </ViewErrorBoundary>
           </KeepMountedView>
         )}
         {hasVisitedLibrary && (

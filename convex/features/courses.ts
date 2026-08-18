@@ -637,7 +637,18 @@ const saveOnboardingProgressArgs = v
   .omit('userId', 'completedAt');
 
 export const saveOnboardingProgress = mutation({
-  args: saveOnboardingProgressArgs.fields,
+  args: {
+    ...saveOnboardingProgressArgs.fields,
+    // Widened over the schema field so the wizard can CLEAR the stored
+    // style when the user switches to Shadowing. Plain `undefined` can't do
+    // that — the Convex client strips undefined args, so the field would
+    // silently keep a previously saved 'transcribe' and `completeOnboarding`
+    // would copy it onto courseSettings. `null` is normalised away below;
+    // it is never stored.
+    writingInputMode: v.optional(
+      v.union(v.literal('translate'), v.literal('transcribe'), v.null()),
+    ),
+  },
   // The returned Doc also carries `userId` and `completedAt`, so the
   // validator must accept them. `completedAt` is always undefined on rows
   // reachable by this mutation because `dbGetOnboardingProgress` filters
@@ -676,15 +687,26 @@ export const saveOnboardingProgress = mutation({
       else args.dailyTimeGoalMinutes = clamped;
     }
 
+    // `null` → `undefined`, which on a patch REMOVES the field (and on an
+    // insert simply omits it). Both are the "no writing style picked" state
+    // the schema models; null itself is not a storable value.
+    const { writingInputMode, ...restArgs } = args;
+    const fields = {
+      ...restArgs,
+      ...(writingInputMode !== undefined
+        ? { writingInputMode: writingInputMode ?? undefined }
+        : {}),
+    };
+
     const existingProgress = await dbGetOnboardingProgress(ctx, userId);
     let progressId;
     if (existingProgress) {
-      await ctx.db.patch(existingProgress._id, args);
+      await ctx.db.patch(existingProgress._id, fields);
       progressId = existingProgress._id;
     } else {
       progressId = await ctx.db.insert('onboardingProgress', {
         userId,
-        ...args,
+        ...fields,
       });
     }
 
@@ -852,6 +874,7 @@ export const completeOnboarding = mutation({
       initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
       activeCollectionId: collection?._id,
       reviewMode: progress.reviewMode,
+      writingInputMode: progress.writingInputMode,
       autoAddCards: true,
       // Match the onboarding seed batch so the auto-add fired mid-first-lesson
       // pulls the same number of cards the initial seed did. See
@@ -1235,6 +1258,30 @@ export const getCompletedTutorials = query({
       return settings?.completedTutorials ?? [];
     } catch {
       return [];
+    }
+  },
+});
+
+/**
+ * Lifetime review count for the active course — the gate for the one-time
+ * learning-mode tips (`useMilestoneTips`): thresholds compare against this,
+ * and counts far past a tip's threshold suppress it silently (veteran
+ * guard). Deliberately tiny (two indexed reads) so the learn view can stay
+ * subscribed to it while tips are still pending.
+ */
+export const getLifetimeReviewCount = query({
+  args: {},
+  returns: v.union(v.number(), v.null()),
+  handler: async (ctx) => {
+    try {
+      const userId = await getAuthUserId(ctx);
+      if (!userId) return null;
+      const active = await getActiveCourseForUser(ctx, userId);
+      if (!active) return null;
+      const stats = await dbGetCourseStats(ctx, userId, active.course._id);
+      return stats?.totalRepetitions ?? 0;
+    } catch {
+      return null;
     }
   },
 });

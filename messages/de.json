@@ -426,7 +426,9 @@
       "time": "Zeit",
       "today": "heute",
       "new": "neu"
-    }
+    },
+    "freePlan": "Gratis-Plan",
+    "upgrade": "Upgrade"
   },
   "LearningMode": {
     "title": "Lernen",
@@ -971,7 +973,6 @@
     "planScheduled": "Plan geplant",
     "updatePlan": "Plan aktualisieren",
     "currentPlan": "Aktueller Plan",
-    "continueWithFree": "Weiter mit Free",
     "purchase": "Kaufen",
     "getStarted": "Loslegen",
     "renew": "Erneuern",
@@ -1053,7 +1054,8 @@
       "loading": "Lädt…",
       "errors": {
         "completeFailed": "Einrichtung konnte nicht abgeschlossen werden. Bitte versuche es erneut."
-      }
+      },
+      "startLearning": "Lernen starten"
     },
     "languagePair": {
       "speakTitle": "Welche Sprache sprichst du schon?",
@@ -1210,21 +1212,9 @@
         "continue": "Weiter"
       }
     },
-    "customizing": {
-      "title": "Wir richten deine erste Lektion ein…",
-      "beats": {
-        "0": "Wir passen deinen Kurs an…",
-        "1": "Wir schneiden Inhalte auf dein Niveau zu…",
-        "2": "Wir wählen deine ersten Sätze aus…",
-        "3": "Wir personalisieren deine Lektion…",
-        "4": "Fast fertig…"
-      }
-    },
-    "firstLesson": {
-      "intro": {
-        "title": "Deine erste Lektion ist bereit!",
-        "subtitle": "Wähle einen Modus und wir zeigen dir, wie alles funktioniert."
-      },
+    "reviewMode": {
+      "title": "Wie möchtest du lernen?",
+      "subtitle": "Wähle einen Modus für deine erste Lektion — du kannst beim Lernen jederzeit wechseln.",
       "modes": {
         "audio": {
           "title": "Shadowing",
@@ -1239,97 +1229,7 @@
           "title": "Transkribieren",
           "description": "Höre nur die Zielsprache und tippe ein, was du hörst — mit sofortigem, zeichengenauem Feedback zur Rechtschreibung."
         }
-      },
-      "duration": "Etwa 10 Minuten",
-      "start": "Lektion starten",
-      "skip": "Erstmal überspringen",
-      "abort": "Lektion abbrechen",
-      "abortAria": "Lektion abbrechen",
-      "errorBoundary": {
-        "message": "Es gab ein Problem beim Vorbereiten deiner ersten Lektion. Du kannst sie überspringen und auf deinem Startbildschirm weitermachen.",
-        "skip": "Lektion überspringen"
       }
-    },
-    "statsRecap": {
-      "heroLabel": "neue Wörter in dieser Sitzung",
-      "stats": {
-        "reviews": "Reviews",
-        "time": "Zeit",
-        "new": "neu"
-      },
-      "wordsHeading": "Wörter, die du gerade gelernt hast",
-      "projection": {
-        "title": "In diesem Tempo wirst du können",
-        "subtitle": "{minutes} Min./Tag · lineare Prognose",
-        "milestones": {
-          "1mo": "1 Monat",
-          "6mo": "6 Monate",
-          "1y": "1 Jahr"
-        },
-        "wordsUnit": "Wörter"
-      },
-      "ready": {
-        "title": "Tag 1 geschafft",
-        "subtitle": "Halte deine Serie am Leben — komm morgen für weitere {minutes} Minuten zurück."
-      },
-      "back": "Zurück",
-      "next": "Weiter",
-      "continue": "Weiter"
-    },
-    "wordProjection": {
-      "summary": "Du hast gerade {words, plural, =1 {1 Wort} other {# Wörter}} in {minutes, plural, =1 {1 Minute} other {# Minuten}} gelernt.",
-      "headline": "In diesem Tempo wirst du können",
-      "perDay": "{minutes} Min./Tag",
-      "timelineToday": "Heute",
-      "timelineTodaySub": "deine erste Lerneinheit",
-      "timelineIn30Days": "In 30 Tagen",
-      "timelineIn30DaysSub": "ein Monat mit deinem Tagesziel",
-      "timelineYearEndSub": "in {days} Tagen",
-      "adjustLabel": "Tägliches Ziel anpassen",
-      "wordsUnit": "Wörter",
-      "continue": "Weiter",
-      "custom": "Eigenes",
-      "customPlaceholder": "Minuten",
-      "minutesUnit": "Min.",
-      "set": "Übernehmen"
-    },
-    "featureTour": {
-      "title": "Noch ein paar Dinge",
-      "subtitle": "Eine kurze Tour durch Funktionen, die du kennen solltest.",
-      "slides": {
-        "audioMode": {
-          "title": "Wie nutzt du Shadowing?",
-          "body": "Shadowing ist das Herzstück von Flexling — hören, übersetzen und dann laut nachsprechen. Das geht auch wunderbar beim Spazierengehen. Das ist meine absolute Lieblingsmethode, eine Sprache zu lernen, und ich kann dir wirklich empfehlen, es auszuprobieren!"
-        },
-        "custom": {
-          "title": "Eigene Karten hinzufügen",
-          "body": "Füge beliebige Sätze hinzu, die du lernen möchtest — Audio und Übersetzungen erzeugen wir in Sekunden für dich."
-        },
-        "import": {
-          "title": "Massenimport aus CSV",
-          "body": "Zieh eine Liste von Sätzen rein und wir erzeugen Übersetzungen und Audio für jede Sprache in deinem Kurs."
-        },
-        "radio": {
-          "title": "Radio zum passiven Hören",
-          "body": "Einmal aktivieren und vergessen — deine Sätze laufen im Hintergrund in Schleife, ohne deinen Spaced-Repetition-Plan zu stören."
-        },
-        "stats": {
-          "title": "Detaillierte Statistiken behalten alles im Blick",
-          "body": "Serie, gelernte Wörter, verbrachte Zeit und eine Kalender-Heatmap — du siehst, wie deine Gewohnheit wächst."
-        },
-        "multilang": {
-          "title": "Mehrere Sprachen",
-          "body": "Mit Pro kannst du eine dritte Sprache zu deinen Karteikarten hinzufügen — praktisch, wenn du mehrere Sprachen gleichzeitig lernen möchtest oder zwei Sprachen, die du schon kennst, parallel frisch halten willst."
-        }
-      },
-      "back": "Zurück",
-      "next": "Weiter",
-      "done": "Fertig"
-    },
-    "planPick": {
-      "title": "Danke, dass du dabei bist",
-      "subtitle": "Probiere Basic, Pro oder Ultra 7 Tage kostenlos — ohne Verpflichtung. Du kannst jederzeit wechseln oder kündigen.",
-      "skip": "Vielleicht später — kostenlos weiter"
     },
     "difficulty": {
       "title": "Wie viel kannst du schon?",
@@ -1365,79 +1265,6 @@
       }
     }
   },
-  "OnboardingTutorial": {
-    "core": {
-      "welcomeAudio": {
-        "title": "Willkommen beim Shadowing",
-        "description": "In diesem Modus kannst du Sätze ohne Bildschirmkontakt wiederholen. Die Texte werden automatisch vorgelesen. Lass uns durchgehen, wie es funktioniert."
-      },
-      "welcomeFull": {
-        "title": "Willkommen beim Schreiben",
-        "description": "In diesem Modus übst du aktiv das Schreiben und bekommst sofortiges Feedback. Lass uns durchgehen, wie es funktioniert."
-      },
-      "card": {
-        "title": "Die Karte",
-        "descriptionAudio": "Jede Karte zeigt einen Satz in den Sprachen, die du lernst. Die Zielsprache ist verdeckt, bis du sie aufdeckst.",
-        "descriptionFull": "Jede Karte zeigt einen Satz in den Sprachen, die du lernst. Du tippst die Übersetzung ein und kontrollierst dich selbst.",
-        "descriptionFullTranscribe": "Jede Karte spielt einen Satz in deiner Zielsprache ab. Du tippst ein, was du hörst, und kontrollierst dich selbst."
-      },
-      "reveal": {
-        "title": "Übersetzung aufdecken",
-        "description": "Die Übersetzung ist standardmäßig verdeckt. Tippe darauf, um sie aufzudecken, oder höre einfach zu — sie wird automatisch aufgedeckt, sobald die Zielsprache nach der Basissprache spielt. Bei neuen Karten spielt die Zielsprache einmal am Anfang; wenn du an der Reihe bist, versuch sie aus dem Gedächtnis abzurufen."
-      },
-      "input": {
-        "title": "Übersetzung eintippen",
-        "description": "Tippe die Übersetzung in der Zielsprache hier ein und drücke Senden. Bei neuen Sätzen wird die Übersetzung beim ersten Mal angezeigt — tippe sie einfach ab, um sie zu lernen; spätere Wiederholungen testen dich ohne sie. Du bekommst sofortiges Feedback zu jedem Wort."
-      },
-      "inputTranscribe": {
-        "title": "Tippe ein, was du hörst",
-        "description": "Tippe genau ein, was du in der Zielsprache hörst, und drücke Senden. Bei neuen Sätzen wird der Text beim ersten Mal angezeigt — tippe ihn einfach ab, um ihn zu lernen; spätere Wiederholungen testen dich ohne ihn. Du bekommst sofortiges Feedback zu jedem Wort."
-      },
-      "audioControls": {
-        "title": "Audio läuft automatisch",
-        "description": "Bei einer neuen Karte wird die Zielsprache einmal am Anfang abgespielt, damit du hörst, worauf du hinarbeitest. Danach spielt die Basissprache, pausiert zum Nachdenken, und die Zielsprache folgt. Hier kannst du neu starten, abspielen / pausieren oder zur nächsten Karte springen. Die Rückgängig-Taste ganz links nimmt deine letzte Bewertung zurück und holt die vorherige Karte zurück."
-      },
-      "audioPlay": {
-        "title": "Audio startet, wenn du das schließt",
-        "description": "Audio ist pausiert, während wir dich durch die Lektion führen. Sobald du dieses Fenster schließt, wird der erste Satz automatisch abgespielt — mit diesen Reglern kannst du jederzeit pausieren oder neu starten."
-      },
-      "rating": {
-        "title": "Bewerte, wie gut du es wusstest",
-        "descriptionAudio": "Jede Karte wird ein paar Mal wiederholt, bevor sie in den Spaced-Repetition-Plan kommt. <strong>Noch am Lernen</strong> behält sie in der Aufwärmrotation. <strong>Verstanden</strong> heißt, du kennst sie — überspringe die Aufwärmphase und starte sofort mit Spaced Repetition. Nach ein paar Reviews siehst du Erneut / Schwer / Gut / Leicht.",
-        "descriptionFull": "Nach jeder Antwort bewertest du, wie gut du es wusstest. <strong>Erneut</strong> heißt: du wusstest es nicht — die Karte kommt schnell zurück. <strong>Schwer</strong>, <strong>Gut</strong> und <strong>Leicht</strong> verschieben die nächste Wiederholung weiter nach hinten. Sei ehrlich — wenn du eine Karte zu hoch bewertest, wirst du sie später spüren."
-      },
-      "autoAdd": {
-        "title": "Neue Karten",
-        "description": "Standardmäßig werden neue Karten automatisch hinzugefügt, sobald deine ausgehen — alles ist mit Spaced Repetition für dich optimiert. So vermeidest du Bulimie-Lernen, und die Geschwindigkeit passt sich an. Du musst dich nicht darum kümmern, wann neue Karten dazukommen."
-      }
-    },
-    "modeSwitch": {
-      "audio": {
-        "welcome": {
-          "title": "Zu Shadowing gewechselt",
-          "description": "Du hörst zuerst und deckst die Übersetzung danach auf. Das ändert sich:"
-        }
-      },
-      "full": {
-        "welcome": {
-          "title": "Zu Schreiben gewechselt",
-          "description": "Du tippst die Übersetzung selbst ein und bekommst sofortiges Feedback. Das ändert sich:"
-        }
-      }
-    },
-    "cardActions": {
-      "title": "Kartenoptionen",
-      "description": "Markiere eine Karte als Favorit, setze sie auf gemeistert (sie erscheint nicht mehr im Review), blende sie aus oder bearbeite/lösche sie. Nutze diese Optionen, wenn eine Karte zu leicht, zu schwer oder einfach nicht passend ist. Du kannst außerdem eine falsche Übersetzung melden oder die Audio neu generieren."
-    },
-    "wordTap": {
-      "title": "Tippe ein beliebiges Wort an",
-      "description": "Tippe in der Zielsatz auf ein Wort, um den Chat zu fragen, was es bedeutet. Der Chat kann dafür auch sofort eine neue Karteikarte anlegen."
-    },
-    "chat": {
-      "title": "Dein KI-Sprachtutor",
-      "description": "Der Chat ist ein Tutor, der die Sprache kennt, die du lernst. Frag, warum ein Satz so formuliert ist, lass dir Grammatik auf deinem Niveau erklären, fordere Beispiele an oder lass aus einer Idee eine neue Karteikarte machen — Übersetzung und Audio werden automatisch erzeugt, damit die Karte direkt lernbereit ist."
-    }
-  },
   "Tutorial": {
     "home": {
       "welcome": {
@@ -1454,7 +1281,7 @@
       },
       "radioMode": {
         "title": "Radio",
-        "description": "Audio-only Hintergrund-Wiedergabe – deine Karten laufen freihändig in Schleife und beeinflussen den Wiederholungsplan nicht. Nur beim Shadowing verfügbar."
+        "description": "Audio-only Hintergrund-Wiedergabe – deine Karten laufen freihändig in Schleife und beeinflussen den Wiederholungsplan nicht."
       },
       "freeStudyMode": {
         "title": "Freies Lernen",
@@ -1485,66 +1312,103 @@
         "description": ""
       }
     },
-    "audioReview": {
-      "welcome": {
-        "title": "Willkommen beim Shadowing",
-        "description": "In diesem Modus kannst du Sätze freihändig wiederholen. Die Texte werden automatisch vorgelesen und es geht automatisch zum nächsten Satz weiter. Du kannst das Timing in den Einstellungen anpassen."
-      },
-      "card": {
-        "title": "Der Satz",
-        "description": "Dieser Satz zeigt die Texte in den Sprachen, die du lernst. Du kannst später weitere Sprachen zum Kurs hinzufügen."
-      },
-      "targetText": {
-        "title": "Zieltext und Audio",
-        "description": "Die Zielübersetzung ist standardmäßig ausgeblendet. Sie wird automatisch eingeblendet oder wenn du darauf klickst. Du kannst auch Audio abspielen, indem du auf den Audio-Button klickst."
-      },
-      "rating": {
-        "title": "Bewerte dein Erinnern",
-        "description": "Jeder Satz wird anfangs mehrmals angezeigt, bevor die Wiederholung mit Abständen beginnt. \"Verstanden\" überspringt den Rest dieser anfänglichen Wiederholungen. Danach siehst du detailliertere Bewertungen: Nochmal, Schwer, Gut, Leicht. Über den Schaltflächen siehst du ungefähr, wann der Satz wieder angezeigt wird."
-      },
-      "audioControls": {
-        "title": "Audio-Wiedergabe",
-        "description": "Standardmäßig wird das Audio automatisch abgespielt. Bei neuen Sätzen spielt die Zielsprache einmal am Anfang, um dein Hörverständnis zu trainieren. Danach spielt die Ausgangssprache, dann eine Pause zum Nachdenken, dann die Zielsprache, bevor automatisch zum nächsten Satz gewechselt wird."
-      },
-      "undoRestart": {
-        "title": "Rückgängig & Neu starten",
-        "description": "Die linke Taste nimmt deine letzte Bewertung zurück und holt den vorherigen Satz zurück — praktisch nach einem Vertipper. Die Taste daneben spielt das Audio des aktuellen Satzes von vorne ab. Deine Lernzeit bleibt immer erhalten."
-      },
-      "settings": {
-        "title": "Einstellungen",
-        "description": "Hier kannst du Wiedergabegeschwindigkeit, Sprachreihenfolge, automatisches Weiterschalten, Ausblenden des Zieltextes, die Anzahl der anfänglichen Wiederholungen und mehr ändern."
-      }
-    },
-    "fullReview": {
-      "welcome": {
-        "title": "Willkommen beim Schreiben",
-        "description": "In diesem Modus übst du aktiv das Schreiben und bekommst sofort Feedback."
-      },
-      "card": {
-        "title": "Der Satz",
-        "description": "Der Satz zeigt in diesem Modus die Ziel- und Ausgangssprachen an und ermöglicht dir, die Übersetzungen einzutippen."
-      },
-      "input": {
-        "title": "Übersetzung eingeben",
-        "description": "Hier gibst du die Übersetzung ein. Bei einem neuen Satz wird die Übersetzung einmal angezeigt, damit du sie abtippen kannst — ab der nächsten Wiederholung übersetzt du selbst. Du kannst auch das Audio der Zielsprache anhören, bevor du tippst."
-      },
-      "rating": {
-        "title": "Bewerte deine Antwort",
-        "description": "Nach dem Feedback bewerte, wie gut du dich erinnert hast: Nochmal, Schwer, Gut oder Leicht. Dies steuert den Wiederholungsplan."
-      },
-      "undoRestart": {
-        "title": "Rückgängig & Neu starten",
-        "description": "Die linke Taste nimmt deine letzte Bewertung zurück und holt den vorherigen Satz zurück — praktisch nach einem Vertipper. Die Taste daneben spielt das Satz-Audio von vorne ab. Deine Übungszeit bleibt immer erhalten."
-      },
-      "settings": {
-        "title": "Einstellungen",
-        "description": "Hier kannst du deine Einstellungen anpassen. Du kannst zwischen Übungsmodi wechseln und Audio-Einstellungen ändern."
-      }
-    },
     "chat": {
       "title": "Chat-Assistent",
       "description": "Nutze den Chat, um nach Grammatik zu fragen, Erklärungen zu erhalten oder neue Sätze zu erstellen. Der KI-Assistent hilft dir beim Lernen!"
     }
+  },
+  "Tips": {
+    "welcome": {
+      "audio": {
+        "title": "Willkommen beim Shadowing",
+        "description": "In diesem Modus kannst du Sätze ohne Bildschirmkontakt wiederholen. Die Texte werden automatisch vorgelesen. Lass uns durchgehen, wie es funktioniert."
+      },
+      "full": {
+        "title": "Willkommen beim Schreiben",
+        "description": "In diesem Modus übst du aktiv das Schreiben und bekommst sofortiges Feedback. Lass uns durchgehen, wie es funktioniert."
+      },
+      "switchedAudio": {
+        "title": "Zu Shadowing gewechselt",
+        "description": "Du hörst zuerst und deckst die Übersetzung danach auf. Das ändert sich:"
+      },
+      "switchedFull": {
+        "title": "Zu Schreiben gewechselt",
+        "description": "Du tippst die Übersetzung selbst ein und bekommst sofortiges Feedback. Das ändert sich:"
+      }
+    },
+    "concept": {
+      "card": {
+        "title": "Die Karte",
+        "descriptionAudio": "Jede Karte zeigt einen Satz in den Sprachen, die du lernst. Die Zielsprache ist verdeckt, bis du sie aufdeckst.",
+        "descriptionFull": "Jede Karte zeigt einen Satz in den Sprachen, die du lernst. Du tippst die Übersetzung ein und kontrollierst dich selbst.",
+        "descriptionFullTranscribe": "Jede Karte spielt einen Satz in deiner Zielsprache ab. Du tippst ein, was du hörst, und kontrollierst dich selbst."
+      },
+      "shownTranslation": {
+        "title": "Beim ersten Mal sichtbar",
+        "description": "Bei einem neuen Satz wird die Übersetzung hier angezeigt, damit du sie durch Abtippen lernst. Bei späteren Wiederholungen bleibt sie verborgen — dann übersetzt du aus dem Gedächtnis."
+      },
+      "reveal": {
+        "title": "Übersetzung aufdecken",
+        "description": "Die Übersetzung ist standardmäßig verdeckt. Tippe darauf, um sie aufzudecken, oder höre einfach zu — sie wird automatisch aufgedeckt, sobald die Zielsprache nach der Basissprache spielt. Bei neuen Karten spielt die Zielsprache einmal am Anfang; wenn du an der Reihe bist, versuch sie aus dem Gedächtnis abzurufen."
+      },
+      "input": {
+        "title": "Übersetzung eintippen",
+        "description": "Tippe die Übersetzung in der Zielsprache hier ein und drücke Senden. Bei neuen Sätzen wird die Übersetzung beim ersten Mal angezeigt — tippe sie einfach ab, um sie zu lernen; spätere Wiederholungen testen dich ohne sie. Du bekommst sofortiges Feedback zu jedem Wort."
+      },
+      "inputTranscribe": {
+        "title": "Tippe ein, was du hörst",
+        "description": "Tippe genau ein, was du in der Zielsprache hörst, und drücke Senden. Bei neuen Sätzen wird der Text beim ersten Mal angezeigt — tippe ihn einfach ab, um ihn zu lernen; spätere Wiederholungen testen dich ohne ihn. Du bekommst sofortiges Feedback zu jedem Wort."
+      },
+      "audioControls": {
+        "title": "Audio läuft automatisch",
+        "description": "Bei einer neuen Karte wird die Zielsprache einmal am Anfang abgespielt, damit du hörst, worauf du hinarbeitest. Danach spielt die Basissprache, pausiert zum Nachdenken, und die Zielsprache folgt. Hier kannst du neu starten, abspielen / pausieren oder zur nächsten Karte springen. Die Rückgängig-Taste ganz links nimmt deine letzte Bewertung zurück und holt die vorherige Karte zurück."
+      },
+      "ratingAudio": {
+        "title": "Bewerte, wie gut du es wusstest",
+        "description": "Jede Karte wird ein paar Mal wiederholt, bevor sie in den Spaced-Repetition-Plan kommt. <strong>Noch am Lernen</strong> behält sie in der Aufwärmrotation. <strong>Verstanden</strong> heißt, du kennst sie — überspringe die Aufwärmphase und starte sofort mit Spaced Repetition. Nach ein paar Reviews siehst du Erneut / Schwer / Gut / Leicht."
+      },
+      "ratingFull": {
+        "title": "Bewerte, wie gut du es wusstest",
+        "description": "Nach jeder Antwort bewertest du, wie gut du es wusstest. <strong>Erneut</strong> heißt: du wusstest es nicht — die Karte kommt schnell zurück. <strong>Schwer</strong>, <strong>Gut</strong> und <strong>Leicht</strong> verschieben die nächste Wiederholung weiter nach hinten. Sei ehrlich — wenn du eine Karte zu hoch bewertest, wirst du sie später spüren."
+      },
+      "autoAdd": {
+        "title": "Neue Karten",
+        "description": "Standardmäßig werden neue Karten automatisch hinzugefügt, sobald deine ausgehen — alles ist mit Spaced Repetition für dich optimiert. So vermeidest du Bulimie-Lernen, und die Geschwindigkeit passt sich an. Du musst dich nicht darum kümmern, wann neue Karten dazukommen."
+      }
+    },
+    "cardActions": {
+      "title": "Kartenoptionen",
+      "description": "Markiere eine Karte als Favorit, setze sie auf gemeistert (sie erscheint nicht mehr im Review), blende sie aus oder bearbeite/lösche sie. Nutze diese Optionen, wenn eine Karte zu leicht, zu schwer oder einfach nicht passend ist. Du kannst außerdem eine falsche Übersetzung melden oder die Audio neu generieren."
+    },
+    "wordTap": {
+      "title": "Tippe ein beliebiges Wort an",
+      "description": "Tippe in der Zielsatz auf ein Wort, um den Chat zu fragen, was es bedeutet. Der Chat kann dafür auch sofort eine neue Karteikarte anlegen."
+    },
+    "chat": {
+      "title": "Dein KI-Sprachtutor",
+      "description": "Der Chat ist ein Tutor, der die Sprache kennt, die du lernst. Frag, warum ein Satz so formuliert ist, lass dir Grammatik auf deinem Niveau erklären, fordere Beispiele an oder lass aus einer Idee eine neue Karteikarte machen — Übersetzung und Audio werden automatisch erzeugt, damit die Karte direkt lernbereit ist."
+    },
+    "modeSwitch": {
+      "title": "Probier den anderen Modus",
+      "descriptionAudio": "Du lernst gerade im Shadowing-Modus. Es gibt auch den Schreibmodus, in dem du die Übersetzung eintippst und sofort Feedback zu jedem Wort bekommst. In den Einstellungen hier oben kannst du jederzeit wechseln.",
+      "descriptionFull": "Du lernst gerade im Schreibmodus. Es gibt auch Shadowing, bei dem Sätze automatisch vorgelesen werden und du ganz ohne Tippen wiederholst. In den Einstellungen hier oben kannst du jederzeit wechseln."
+    },
+    "settings": {
+      "title": "Alles anpassbar",
+      "description": "In den Einstellungen kannst du vieles anpassen — Abspielgeschwindigkeit, Sprachreihenfolge, Auto-Weiter, wie viele neue Karten dazukommen, Tagesziele und mehr. Schau rein, wenn du neugierig bist."
+    }
+  },
+  "DifficultyCheck": {
+    "title": "Passt der Schwierigkeitsgrad?",
+    "subtitle": "Bevor wir neue Sätze hinzufügen: Prüfe kurz dein Level. Nach links wird es leichter, nach rechts schwerer — du kannst das später jederzeit auf dem Startbildschirm ändern.",
+    "upcomingHeading": "Nächste Sätze auf Level {level}",
+    "easier": "Leichter",
+    "harder": "Schwerer",
+    "levelUnavailable": "Dieses Level ist noch nicht verfügbar.",
+    "keep": "Passt — weiter so",
+    "switchTo": "Zu Level {level} wechseln",
+    "switching": "Wechsle…",
+    "switchFailed": "Level konnte nicht gewechselt werden. Bitte versuche es erneut."
   },
   "ErrorPage": {
     "title": "Etwas ist schiefgelaufen",

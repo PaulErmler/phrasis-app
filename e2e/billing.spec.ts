@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   completeStripeTestCheckout,
+  gotoAuthedApp,
   neutralizeTours,
   signUpFreshUser,
 } from "./helpers";
@@ -73,9 +74,7 @@ function planCta(page: Page, productId: string) {
  * the annual plan cards are the ones rendered).
  */
 async function openPricingTable(page: Page) {
-  await page.goto("/app/settings");
-  await page.waitForURL("**/app/settings", { timeout: 20_000 });
-  await expect(planCta(page, BASIC_ANNUAL)).toBeVisible({ timeout: 30_000 });
+  await gotoAuthedApp(page, "/app/settings", planCta(page, BASIC_ANNUAL));
 }
 
 /**

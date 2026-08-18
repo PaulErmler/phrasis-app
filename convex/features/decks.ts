@@ -27,8 +27,10 @@ import {
 import { getAuthUserId, requireAuthUserId, getUserSettings } from '../db/users';
 import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
+import { ogteLevelToCollectionCode } from '../../lib/constants/onboarding';
 import {
   findNextIncompleteCollection,
+  getActiveDataset,
   getCollectionProgress as getCollectionProgressHelper,
   getNextCollection,
   getNextTextsFromRank,
@@ -995,6 +997,200 @@ export const setActiveCollection = mutation({
     }
 
     await setActiveCollectionOnSettings(ctx, courseId, args.collectionId);
+    return null;
+  },
+});
+
+/**
+ * OGTE level (1..20) of the course's active collection, or null when the
+ * active collection isn't a coded dataset level (custom/chat/legacy CEFR).
+ * Read by the one-time difficulty check in the learn view to seed its
+ * slider at the level the user is actually on.
+ */
+export const getActiveDifficultyLevel = query({
+  args: {},
+  returns: v.union(v.number(), v.null()),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return null;
+    const settings = await getCourseSettings(ctx, active.course._id);
+    if (!settings?.activeCollectionId) return null;
+    const collection = await ctx.db.get(settings.activeCollectionId);
+    const code = collection?.code;
+    const match = code ? /^L(\d{2})$/.exec(code) : null;
+    return match ? Number(match[1]) : null;
+  },
+});
+
+/**
+ * The next sentences that would actually be added for THIS user from the
+ * dataset level `ogteLevel` — the difficulty-check dialog's preview, so the
+ * user judges the level on the exact material coming up next, not generic
+ * samples. Starts past the user's frontier (`lastRankProcessed`) like the
+ * add-cards flow; the source side renders in the base language once its
+ * translation exists, the target side is optional (still generating →
+ * the row falls back to the source text).
+ */
+export const getUpcomingSentencesForLevel = query({
+  args: {
+    ogteLevel: v.number(),
+    count: v.optional(v.number()),
+  },
+  returns: v.object({
+    /** The level exists in the active dataset. */
+    exists: v.boolean(),
+    /**
+     * The course can move to this level — it exists and the user hasn't
+     * already completed it (`setActiveCollectionByLevel` would throw).
+     * Lets the pager disable a step instead of dead-ending on an error
+     * toast. Always true for the level that is already active.
+     */
+    switchable: v.boolean(),
+    sentences: v.array(
+      v.object({
+        position: v.number(),
+        sourceText: v.string(),
+        targetText: v.optional(v.string()),
+        targetRomanization: v.optional(v.string()),
+      }),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const MISSING = { exists: false, switchable: false, sentences: [] };
+
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return MISSING;
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return MISSING;
+    const course = active.course;
+
+    const code = ogteLevelToCollectionCode(args.ogteLevel);
+    if (!code) return MISSING;
+    const activeDataset = await getActiveDataset(ctx);
+    if (!activeDataset) return MISSING;
+    const collection = await ctx.db
+      .query('collections')
+      .withIndex('by_datasetId_and_code', (q) =>
+        q.eq('datasetId', activeDataset._id).eq('code', code),
+      )
+      .first();
+    if (!collection) return MISSING;
+
+    const progress = await getCollectionProgressHelper(
+      ctx,
+      userId,
+      course._id,
+      collection._id,
+    );
+
+    // Mirror `setActiveCollectionByLevel`'s guard so the UI can't offer a
+    // step the mutation would reject. The already-active level stays
+    // switchable — selecting it is a no-op there, not an error.
+    const courseSettings = await getCourseSettings(ctx, course._id);
+    const isActiveLevel = courseSettings?.activeCollectionId === collection._id;
+    const isComplete =
+      progress != null &&
+      effectiveTextCount(collection.textCount, progress) > 0 &&
+      isCollectionComplete(collection.textCount, progress);
+    const switchable = isActiveLevel || !isComplete;
+
+    const frontier = progress?.lastRankProcessed ?? 0;
+    const count = Math.min(Math.max(args.count ?? 5, 1), 10);
+    const texts = await getNextTextsFromRank(ctx, collection._id, frontier, count, {
+      onlyCurriculum: true,
+    });
+
+    const sourceLanguage = course.baseLanguages[0];
+    const targetLanguage = course.targetLanguages[0];
+    const sentences = await Promise.all(
+      texts.map(async (text, position) => {
+        let sourceText = text.text;
+        if (sourceLanguage && sourceLanguage !== text.language) {
+          const sourceTranslation = await ctx.db
+            .query('translations')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', text._id).eq('targetLanguage', sourceLanguage),
+            )
+            .first();
+          if (sourceTranslation) sourceText = sourceTranslation.translatedText;
+        }
+
+        let targetText: string | undefined;
+        let targetRomanization: string | undefined;
+        if (targetLanguage && targetLanguage !== text.language) {
+          const targetTranslation = await ctx.db
+            .query('translations')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', text._id).eq('targetLanguage', targetLanguage),
+            )
+            .first();
+          if (targetTranslation) {
+            targetText = targetTranslation.translatedText;
+            // Empty string is the "tried and failed" romanization sentinel.
+            targetRomanization = targetTranslation.romanizedText || undefined;
+          }
+        } else if (targetLanguage && targetLanguage === text.language) {
+          targetText = text.text;
+          targetRomanization = text.romanizedText || undefined;
+        }
+
+        return { position, sourceText, targetText, targetRomanization };
+      }),
+    );
+
+    return { exists: true, switchable, sentences };
+  },
+});
+
+/**
+ * Switch the active collection to the dataset level for `ogteLevel` —
+ * the difficulty-check dialog's "switch level" action, which only knows the
+ * slider's level, not a collection id. Same safety rails as
+ * `setActiveCollection`: no-ops when the level is already active, refuses a
+ * collection the user has already completed.
+ */
+export const setActiveCollectionByLevel = mutation({
+  args: {
+    ogteLevel: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { userId, course } = await requireActiveCourse(ctx);
+    const courseId = course._id;
+
+    const code = ogteLevelToCollectionCode(args.ogteLevel);
+    if (!code) throw new ConvexError('Invalid level');
+
+    const activeDataset = await getActiveDataset(ctx);
+    if (!activeDataset) throw new ConvexError('No active dataset');
+    const collection = await ctx.db
+      .query('collections')
+      .withIndex('by_datasetId_and_code', (q) =>
+        q.eq('datasetId', activeDataset._id).eq('code', code),
+      )
+      .first();
+    if (!collection) throw new ConvexError('Collection not found');
+
+    const courseSettings = await getCourseSettings(ctx, courseId);
+    if (courseSettings?.activeCollectionId === collection._id) return null;
+
+    const progress = await getCollectionProgressHelper(
+      ctx,
+      userId,
+      courseId,
+      collection._id,
+    );
+    if (
+      progress &&
+      effectiveTextCount(collection.textCount, progress) > 0 &&
+      isCollectionComplete(collection.textCount, progress)
+    ) {
+      throw new ConvexError('This collection is already complete');
+    }
+
+    await setActiveCollectionOnSettings(ctx, courseId, collection._id);
     return null;
   },
 });

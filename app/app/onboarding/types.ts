@@ -1,6 +1,7 @@
-import type { SessionSnapshot } from '@/components/app/learning/sessionSnapshot';
-
 export type ReviewMode = 'audio' | 'full';
+
+/** Writing-mode input style — mirrors `courseSettings.writingInputMode`. */
+export type WritingInputMode = 'translate' | 'transcribe';
 
 export type CurrentLevel =
   | 'beginner'
@@ -48,25 +49,20 @@ export interface PlacementTestState {
   finalLevel?: number;
 }
 
-/** Snapshot of the embedded first-lesson session, persisted on
- *  `onboardingProgress.firstLessonSummary` so the stats-recap +
- *  word-projection screens have their data even after a mid-flow reload. */
-export interface FirstLessonSummary extends SessionSnapshot {
-  cardsRated: number;
-}
-
 /**
  * Wizard-context shape. Mirrors `convex/schema.ts` `onboardingProgress` exactly
  * so saving progress is a flat copy.
  */
 export interface OnboardingData {
-  // Existing legacy fields (kept for compatibility with `completeOnboarding`)
   reviewMode: ReviewMode | null;
+  /** Writing style picked on the review-mode step; only meaningful when
+   *  `reviewMode === 'full'`. */
+  writingInputMode: WritingInputMode | null;
   targetLanguages: string[];
   baseLanguages: string[];
   currentLevel: CurrentLevel | null;
 
-  // New onboarding fields
+  // Survey answers.
   acquisitionSource: AcquisitionSource | null;
   acquisitionSourceFreeText: string | null;
   /** Multi-select learning reasons. Empty array until the user picks at
@@ -76,18 +72,6 @@ export interface OnboardingData {
   learningGoalFreeText: string | null;
   dailyTimeGoalMinutes: DailyTimeGoalMinutes | null;
   placementTest: PlacementTestState | null;
-  /** Cards already rated in the embedded first lesson — persisted so a reload
-   *  mid-lesson resumes the right count and skips already-fired tutorials. */
-  firstLessonCardsRated: number;
-  /** Persisted session id for the embedded first lesson — captured on the
-   *  first card rated and forwarded back into `useLearningMode` on the next
-   *  mount so the in-session progress bar (X/N) and the +N new-words hero
-   *  on the stats-recap screen stay continuous across a mid-flow reload. */
-  firstLessonSessionId: string | null;
-  /** Persisted lesson session snapshot — set when the first lesson completes
-   *  (or null if the user skipped). Lets the stats-recap + word-projection
-   *  screens survive a mid-flow reload. */
-  firstLessonSummary: FirstLessonSummary | null;
 
   // Branch state — never persisted, only used by the wizard
   proficiencyBranch: 'new' | 'self-pick' | 'test' | null;
@@ -95,6 +79,7 @@ export interface OnboardingData {
 
 export const EMPTY_ONBOARDING_DATA: OnboardingData = {
   reviewMode: null,
+  writingInputMode: null,
   targetLanguages: [],
   baseLanguages: [],
   currentLevel: null,
@@ -104,8 +89,5 @@ export const EMPTY_ONBOARDING_DATA: OnboardingData = {
   learningGoalFreeText: null,
   dailyTimeGoalMinutes: null,
   placementTest: null,
-  firstLessonCardsRated: 0,
-  firstLessonSessionId: null,
-  firstLessonSummary: null,
   proficiencyBranch: null,
 };

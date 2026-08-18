@@ -26,6 +26,7 @@ export async function upsertCourseSettings(
     initialReviewCount: number;
     activeCollectionId?: Id<'collections'>;
     reviewMode?: 'audio' | 'full';
+    writingInputMode?: 'translate' | 'transcribe';
     autoAddCards?: boolean;
     cardsToAddBatchSize?: number;
     dailyTimeGoalMinutes?: number;

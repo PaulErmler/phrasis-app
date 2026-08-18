@@ -19,7 +19,11 @@ import {
   DEFAULT_PLAYBACK_SPEED,
 } from '@/lib/constants/audioPlayback';
 import { DiffDisplay } from './DiffDisplay';
-import { computeAccuracyPair, type AccuracyPair } from '@/lib/textCompare';
+import {
+  computeAccuracy,
+  computeAccuracyPair,
+  type AccuracyPair,
+} from '@/lib/textCompare';
 import { ClickableWords } from './ClickableWords';
 import { useLearningChatToggle } from './LearningChatLayout';
 import {
@@ -641,6 +645,11 @@ export function FullReviewCardContent({
         revealedLanguages={revealedBaseLanguages}
         manuallyRevealedLanguages={manuallyRevealedBase}
         onRevealLanguage={handleRevealBase}
+        // Writing mode's word-tap tip anchor. Audio mode tags its target row
+        // instead (LearningCardContent); here the target row is the answer
+        // and isn't on screen before submit, so the base sentence is the
+        // clickable text the tip is actually about.
+        baseCoachmarkAnchorForLongestWord="word-tap"
       >
         {({ targetTranslations: targets }) => (
           <div className="space-y-4">
@@ -962,8 +971,22 @@ function TargetLanguageInput({
     );
   }, [chatContext, state.userText, translation.text, translation.language, tChat]);
 
+  // "Also correct?" exists to dispute an answer the diff marked wrong — at a
+  // displayed 100% there is nothing to dispute, so the button is noise.
+  // `computeAccuracy` is the same rounded score the accuracy footer shows
+  // (including the ignore-punctuation setting), so button and label can't
+  // disagree.
+  const isPerfectAnswer =
+    hasUserText &&
+    computeAccuracy(
+      translation.text,
+      state.userText,
+      translation.language,
+      ignorePunctuation,
+    ) >= 100;
+
   const discussButton =
-    hasUserText && chatContext ? (
+    hasUserText && chatContext && !isPerfectAnswer ? (
       <Button
         type="button"
         variant="ghost"

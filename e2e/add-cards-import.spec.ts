@@ -38,6 +38,11 @@ async function pickSelectOption(
 }
 
 test.describe("add cards — import", () => {
+  // Same route as add-cards.spec.ts: under parallel load the layout's
+  // auth preloads + on-demand compile can eat the default 30s before
+  // openCardImport's reload retry finishes (the helper waits 8s, reloads,
+  // then 20s — that does not fit in 30s).
+  test.describe.configure({ timeout: 60_000 });
   test.describe("mode switcher", () => {
     test("defaults to individual mode and can switch to import", async ({
       page,

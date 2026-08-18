@@ -67,6 +67,16 @@ function getSnapshot(): string[] {
   return cachedSnapshot;
 }
 
+/**
+ * Live read of the completed-tutorial set (localStorage-backed module
+ * store). For effect-time decisions that must not act on a stale render
+ * closure — e.g. `useMilestoneTips` checks this right before scheduling a
+ * tip, after the DB backfill may have merged new completions mid-commit.
+ */
+export function getCompletedTutorialsSnapshot(): string[] {
+  return getSnapshot();
+}
+
 function getServerSnapshot(): string[] {
   return EMPTY;
 }
@@ -111,6 +121,105 @@ const TEARDOWN_PERSISTS_COMPLETION: Record<TeardownReason, boolean> = {
   hidden: false,
 };
 
+/**
+ * Shared access to the user's completed-tutorial set: localStorage-first
+ * (per-user key, `useSyncExternalStore` snapshot) with a one-time DB
+ * backfill, plus the persist path (localStorage + Convex mutation +
+ * analytics). Used by `useTutorial` (tours) and `useMilestoneTips` (one-time
+ * learning tips).
+ *
+ * `requiredIds` — the ids this caller cares about. The Convex
+ * `getCompletedTutorials` query stays subscribed only while at least one of
+ * them is missing from localStorage, so fully-synced clients do no reads.
+ */
+export function useCompletedTutorials(requiredIds: readonly string[]) {
+  // ---- bind localStorage to the current authenticated user ----
+  const authUser = useQuery(api.auth.getAuthUser);
+  const authSubject =
+    authUser != null
+      ? authUser.userId != null && authUser.userId !== ''
+        ? authUser.userId
+        : authUser._id
+      : null;
+  const userId =
+    authSubject != null && authSubject !== '' ? String(authSubject) : null;
+
+  useEffect(() => {
+    setTutorialUser(userId);
+  }, [userId]);
+
+  // ---- localStorage is the primary source of truth for UI decisions ----
+  const completed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+
+  const completeMutation = useMutation(api.features.courses.completeTutorial);
+
+  // Only subscribe to the Convex query while localStorage is missing an id
+  // the caller cares about. Once localStorage has the data we need, skip the
+  // query to avoid unnecessary reads.
+  const needsDbSync = requiredIds.some((id) => !completed.includes(id));
+  const dbCompleted = useQuery(
+    api.features.courses.getCompletedTutorials,
+    needsDbSync ? {} : 'skip',
+  );
+
+  // One-time backfill: if the DB knows about completions that localStorage
+  // doesn't, merge them into localStorage so the user doesn't re-see tutorials
+  // they already finished on another device.
+  const didSyncRef = useRef(false);
+  const syncedForUserRef = useRef(userId);
+
+  useEffect(() => {
+    if (userId !== syncedForUserRef.current) {
+      didSyncRef.current = false;
+      syncedForUserRef.current = userId;
+    }
+    if (!dbCompleted || didSyncRef.current) return;
+    didSyncRef.current = true;
+
+    const local = getSnapshot();
+    const missing = dbCompleted.filter((id) => !local.includes(id));
+    if (missing.length > 0) {
+      writeCompleted([...local, ...missing]);
+    }
+  }, [dbCompleted, userId]);
+
+  // False while the auth user hasn't resolved OR a needed DB backfill
+  // hasn't answered yet. Gate show-once UI on this so (a) a fresh device
+  // doesn't replay tutorials the user finished elsewhere just because
+  // localStorage started empty, and (b) nothing is evaluated or persisted
+  // against the un-namespaced fallback localStorage key before
+  // `setTutorialUser` has bound the per-user key — completion state is
+  // per USER (Convex `userSettings.completedTutorials` is the source of
+  // truth; localStorage is only that user's device cache).
+  const isLoaded =
+    authUser !== undefined && (!needsDbSync || dbCompleted !== undefined);
+
+  /**
+   * Persist a completion everywhere: localStorage (immediately, so the UI
+   * can't re-offer it), Convex (fire-and-forget), and PostHog — unless
+   * `captureEvent: false` (silent pre-marking, e.g. the veteran guard) or
+   * the id was already completed (re-runs must not inflate completion
+   * counts).
+   */
+  const markCompleted = useCallback(
+    (tutorialId: TutorialId, opts?: { captureEvent?: boolean }) => {
+      const prev = getSnapshot();
+      if (!prev.includes(tutorialId)) {
+        writeCompleted([...prev, tutorialId]);
+        if (opts?.captureEvent !== false) {
+          capture(CLIENT_EVENTS.TUTORIAL_COMPLETED, { tutorial_id: tutorialId });
+        }
+      }
+      completeMutation({ tutorialId }).catch((e) =>
+        reportError(e, { op: 'tutorial.persistCompletion', tutorialId }),
+      );
+    },
+    [completeMutation],
+  );
+
+  return { completed, markCompleted, isLoaded };
+}
+
 interface UseTutorialOptions {
   enabled?: boolean;
   delayMs?: number;
@@ -149,66 +258,19 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   const [isActive, setIsActive] = useState(false);
   const t = useTranslations('Tutorial');
 
-  // ---- bind localStorage to the current authenticated user ----
-  const authUser = useQuery(api.auth.getAuthUser);
-  const authSubject =
-    authUser != null
-      ? authUser.userId != null && authUser.userId !== ''
-        ? authUser.userId
-        : authUser._id
-      : null;
-  const userId =
-    authSubject != null && authSubject !== '' ? String(authSubject) : null;
-  const prevUserIdRef = useRef(userId);
-
-  useEffect(() => {
-    setTutorialUser(userId);
-    prevUserIdRef.current = userId;
-  }, [userId]);
-
-  // ---- localStorage is the primary source of truth for UI decisions ----
-  const completed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const isCompleted = completed.includes(tutorialId);
-
   const tutorial = getTutorial(tutorialId, t, context);
+
+  const requiredIds = tutorial?.prerequisite
+    ? [tutorialId, tutorial.prerequisite]
+    : [tutorialId];
+  const { completed, markCompleted } = useCompletedTutorials(requiredIds);
+
+  const isCompleted = completed.includes(tutorialId);
   const prerequisiteMet = tutorial?.prerequisite
     ? completed.includes(tutorial.prerequisite)
     : true;
 
   const shouldStart = enabled && !isCompleted && prerequisiteMet;
-
-  // ---- Convex: persist completions & one-time sync from DB ----
-  const completeMutation = useMutation(api.features.courses.completeTutorial);
-
-  // Only subscribe to the Convex query when localStorage says this tutorial
-  // (or its prerequisite) is NOT yet completed. Once localStorage has the
-  // data we need, skip the query to avoid unnecessary reads.
-  const needsDbSync = !isCompleted || (tutorial?.prerequisite && !prerequisiteMet);
-  const dbCompleted = useQuery(
-    api.features.courses.getCompletedTutorials,
-    needsDbSync ? {} : 'skip',
-  );
-
-  // One-time backfill: if the DB knows about completions that localStorage
-  // doesn't, merge them into localStorage so the user doesn't re-see tutorials
-  // they already finished on another device.
-  const didSyncRef = useRef(false);
-  const syncedForUserRef = useRef(userId);
-
-  useEffect(() => {
-    if (userId !== syncedForUserRef.current) {
-      didSyncRef.current = false;
-      syncedForUserRef.current = userId;
-    }
-    if (!dbCompleted || didSyncRef.current) return;
-    didSyncRef.current = true;
-
-    const local = getSnapshot();
-    const missing = dbCompleted.filter((id) => !local.includes(id));
-    if (missing.length > 0) {
-      writeCompleted([...local, ...missing]);
-    }
-  }, [dbCompleted, userId]);
 
   // ---- callbacks ----
   const onInteractiveStepRef = useRef(onInteractiveStep);
@@ -221,17 +283,8 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   });
 
   const completeTutorial = useCallback(() => {
-    const prev = getSnapshot();
-    if (!prev.includes(tutorialId)) {
-      // Only on the first completion — re-running a tutorial should not count
-      // again, or the completion rate can exceed its own start count.
-      writeCompleted([...prev, tutorialId]);
-      capture(CLIENT_EVENTS.TUTORIAL_COMPLETED, { tutorial_id: tutorialId });
-    }
-    completeMutation({ tutorialId }).catch((e) =>
-      reportError(e, { op: 'tutorial.persistCompletion', tutorialId }),
-    );
-  }, [tutorialId, completeMutation]);
+    markCompleted(tutorialId);
+  }, [tutorialId, markCompleted]);
 
   /**
    * Why every teardown goes through one helper.

@@ -15,7 +15,8 @@ import {
  */
 
 const FULL_DATA: OnboardingData = {
-  reviewMode: 'audio',
+  reviewMode: 'full',
+  writingInputMode: 'transcribe',
   targetLanguages: ['ja'],
   baseLanguages: ['en', 'de'],
   currentLevel: 'intermediate',
@@ -33,15 +34,6 @@ const FULL_DATA: OnboardingData = {
     ],
     finalLevel: 10,
   },
-  firstLessonCardsRated: 4,
-  firstLessonSessionId: 'session_1',
-  firstLessonSummary: {
-    cardsRated: 4,
-    sessionId: 'session_1',
-    dailyReviewsToday: 4,
-    dailyTimeMsToday: 60_000,
-    dailyNewWordsToday: 7,
-  },
   proficiencyBranch: 'test',
 };
 
@@ -50,6 +42,9 @@ describe('buildProgressPayload', () => {
     expect(buildProgressPayload(EMPTY_ONBOARDING_DATA, 1)).toEqual({
       step: 1,
       reviewMode: undefined,
+      // The one field that stays null rather than collapsing — null is what
+      // CLEARS a previously saved writing style on the server.
+      writingInputMode: null,
       targetLanguages: undefined,
       baseLanguages: undefined,
       currentLevel: undefined,
@@ -59,16 +54,14 @@ describe('buildProgressPayload', () => {
       learningGoalFreeText: undefined,
       dailyTimeGoalMinutes: undefined,
       placementTest: undefined,
-      firstLessonCardsRated: undefined,
-      firstLessonSessionId: undefined,
-      firstLessonSummary: undefined,
     });
   });
 
   it('passes fully-populated wizard data through field-by-field', () => {
-    expect(buildProgressPayload(FULL_DATA, 8)).toEqual({
-      step: 8,
-      reviewMode: 'audio',
+    expect(buildProgressPayload(FULL_DATA, 7)).toEqual({
+      step: 7,
+      reviewMode: 'full',
+      writingInputMode: 'transcribe',
       targetLanguages: ['ja'],
       baseLanguages: ['en', 'de'],
       currentLevel: 'intermediate',
@@ -78,9 +71,6 @@ describe('buildProgressPayload', () => {
       learningGoalFreeText: 'business trips',
       dailyTimeGoalMinutes: 20,
       placementTest: FULL_DATA.placementTest,
-      firstLessonCardsRated: 4,
-      firstLessonSessionId: 'session_1',
-      firstLessonSummary: FULL_DATA.firstLessonSummary,
     });
   });
 
@@ -100,15 +90,18 @@ describe('buildProgressPayload', () => {
     expect(payload.learningGoals).toBeUndefined();
   });
 
-  it('drops firstLessonCardsRated when 0 but keeps positive counts', () => {
+  it('keeps a null writingInputMode (audio pick) as an explicit null', () => {
+    // Regression: this used to collapse to `undefined`, which the Convex
+    // client strips from the args — so a previously saved 'transcribe' was
+    // never cleared, `completeOnboarding` copied it onto courseSettings, and
+    // the user landed in Transcribe the first time they opened Writing mode.
+    // `null` is the wire signal that clears the stored style.
     expect(
-      buildProgressPayload({ ...FULL_DATA, firstLessonCardsRated: 0 }, 8)
-        .firstLessonCardsRated,
-    ).toBeUndefined();
-    expect(
-      buildProgressPayload({ ...FULL_DATA, firstLessonCardsRated: 1 }, 8)
-        .firstLessonCardsRated,
-    ).toBe(1);
+      buildProgressPayload(
+        { ...FULL_DATA, reviewMode: 'audio', writingInputMode: null },
+        7,
+      ).writingInputMode,
+    ).toBeNull();
   });
 
   it('passes the step through unclamped', () => {

@@ -1,6 +1,9 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
 import {
+  dismissDifficultyCheck,
+  dismissErrorBoundary,
   dismissTour,
+  gotoAuthedApp,
   isSelectedTestId,
   waitForInViewport,
 } from "./helpers";
@@ -18,6 +21,13 @@ import {
  */
 
 async function openSettingsSheet(page: Page): Promise<void> {
+  // A Convex query error under @live suite load replaces LearnView with the
+  // view error boundary ("Something went wrong") — the settings gear is gone
+  // until retry remounts the subtree. The difficulty-check dialog also
+  // aria-hides the header. Clear both before looking for the trigger.
+  await dismissErrorBoundary(page);
+  await dismissDifficultyCheck(page);
+
   const trigger = page.getByTestId("learn-settings").first();
   await expect(
     trigger,
@@ -221,8 +231,17 @@ async function setSwitch(
 
 test.describe("learning settings", () => {
   test("toggle review mode between audio and full", async ({ page }) => {
-    await page.goto("/app/learn");
-    await page.waitForLoadState("domcontentloaded");
+    // `gotoAuthedApp`, not a bare goto: under serial-suite load the
+    // authed layout's preloads can leave the Next splash ("Flexling"
+    // logo, no shell) up past the 10s trigger wait, failing with
+    // "learn-settings trigger should render" (seen 2026-08-18). One
+    // reload picks up the warmed route — same helper the other learn
+    // specs already use.
+    await gotoAuthedApp(
+      page,
+      "/app/learn",
+      page.getByTestId("learn-settings").first(),
+    );
     await dismissTour(page, "audio_review_intro", 500);
     await dismissTour(page, "full_review_intro", 500);
 
@@ -255,8 +274,17 @@ test.describe("learning settings", () => {
     // load even though the overlay is already interactive.
     test.setTimeout(60_000);
 
-    await page.goto("/app/learn");
-    await page.waitForLoadState("domcontentloaded");
+    // `gotoAuthedApp`, not a bare goto: under serial-suite load the
+    // authed layout's preloads can leave the Next splash ("Flexling"
+    // logo, no shell) up past the 10s trigger wait, failing with
+    // "learn-settings trigger should render" (seen 2026-08-18). One
+    // reload picks up the warmed route — same helper the other learn
+    // specs already use.
+    await gotoAuthedApp(
+      page,
+      "/app/learn",
+      page.getByTestId("learn-settings").first(),
+    );
     await dismissTour(page, "audio_review_intro", 500);
     await dismissTour(page, "full_review_intro", 500);
 
@@ -288,8 +316,17 @@ test.describe("learning settings", () => {
   test("Practice Listening / Speaking toggles render and persist", async ({
     page,
   }) => {
-    await page.goto("/app/learn");
-    await page.waitForLoadState("domcontentloaded");
+    // `gotoAuthedApp`, not a bare goto: under serial-suite load the
+    // authed layout's preloads can leave the Next splash ("Flexling"
+    // logo, no shell) up past the 10s trigger wait, failing with
+    // "learn-settings trigger should render" (seen 2026-08-18). One
+    // reload picks up the warmed route — same helper the other learn
+    // specs already use.
+    await gotoAuthedApp(
+      page,
+      "/app/learn",
+      page.getByTestId("learn-settings").first(),
+    );
     await dismissTour(page, "audio_review_intro", 500);
     await dismissTour(page, "full_review_intro", 500);
 
@@ -325,8 +362,17 @@ test.describe("learning settings", () => {
   test("Practice toggles keep at least one enabled (mutual exclusion)", async ({
     page,
   }) => {
-    await page.goto("/app/learn");
-    await page.waitForLoadState("domcontentloaded");
+    // `gotoAuthedApp`, not a bare goto: under serial-suite load the
+    // authed layout's preloads can leave the Next splash ("Flexling"
+    // logo, no shell) up past the 10s trigger wait, failing with
+    // "learn-settings trigger should render" (seen 2026-08-18). One
+    // reload picks up the warmed route — same helper the other learn
+    // specs already use.
+    await gotoAuthedApp(
+      page,
+      "/app/learn",
+      page.getByTestId("learn-settings").first(),
+    );
     await dismissTour(page, "audio_review_intro", 500);
     await dismissTour(page, "full_review_intro", 500);
 
@@ -360,8 +406,17 @@ test.describe("learning settings", () => {
   test("writing style sub-toggle renders in Writing mode and persists", async ({
     page,
   }) => {
-    await page.goto("/app/learn");
-    await page.waitForLoadState("domcontentloaded");
+    // `gotoAuthedApp`, not a bare goto: under serial-suite load the
+    // authed layout's preloads can leave the Next splash ("Flexling"
+    // logo, no shell) up past the 10s trigger wait, failing with
+    // "learn-settings trigger should render" (seen 2026-08-18). One
+    // reload picks up the warmed route — same helper the other learn
+    // specs already use.
+    await gotoAuthedApp(
+      page,
+      "/app/learn",
+      page.getByTestId("learn-settings").first(),
+    );
     await dismissTour(page, "audio_review_intro", 500);
     await dismissTour(page, "full_review_intro", 500);
 
@@ -445,8 +500,17 @@ test.describe("learning settings", () => {
   test("playback settings are independent between Shadowing and Writing", async ({
     page,
   }) => {
-    await page.goto("/app/learn");
-    await page.waitForLoadState("domcontentloaded");
+    // `gotoAuthedApp`, not a bare goto: under serial-suite load the
+    // authed layout's preloads can leave the Next splash ("Flexling"
+    // logo, no shell) up past the 10s trigger wait, failing with
+    // "learn-settings trigger should render" (seen 2026-08-18). One
+    // reload picks up the warmed route — same helper the other learn
+    // specs already use.
+    await gotoAuthedApp(
+      page,
+      "/app/learn",
+      page.getByTestId("learn-settings").first(),
+    );
     await dismissTour(page, "audio_review_intro", 500);
     await dismissTour(page, "full_review_intro", 500);
 
@@ -523,8 +587,17 @@ test.describe("learning settings", () => {
   test("transcribe style drives the writing card: prompt, hidden base, reveal on submit", async ({
     page,
   }) => {
-    await page.goto("/app/learn");
-    await page.waitForLoadState("domcontentloaded");
+    // `gotoAuthedApp`, not a bare goto: under serial-suite load the
+    // authed layout's preloads can leave the Next splash ("Flexling"
+    // logo, no shell) up past the 10s trigger wait, failing with
+    // "learn-settings trigger should render" (seen 2026-08-18). One
+    // reload picks up the warmed route — same helper the other learn
+    // specs already use.
+    await gotoAuthedApp(
+      page,
+      "/app/learn",
+      page.getByTestId("learn-settings").first(),
+    );
     await dismissTour(page, "audio_review_intro", 500);
     await dismissTour(page, "full_review_intro", 500);
 
@@ -613,8 +686,17 @@ test.describe("learning settings", () => {
   test("writing-mode hide base languages with reveal-on-submit sub-setting", async ({
     page,
   }) => {
-    await page.goto("/app/learn");
-    await page.waitForLoadState("domcontentloaded");
+    // `gotoAuthedApp`, not a bare goto: under serial-suite load the
+    // authed layout's preloads can leave the Next splash ("Flexling"
+    // logo, no shell) up past the 10s trigger wait, failing with
+    // "learn-settings trigger should render" (seen 2026-08-18). One
+    // reload picks up the warmed route — same helper the other learn
+    // specs already use.
+    await gotoAuthedApp(
+      page,
+      "/app/learn",
+      page.getByTestId("learn-settings").first(),
+    );
     await dismissTour(page, "audio_review_intro", 500);
     await dismissTour(page, "full_review_intro", 500);
 
@@ -653,8 +735,17 @@ test.describe("learning settings", () => {
   test("separate progress per mode toggle renders in the mode card and persists", async ({
     page,
   }) => {
-    await page.goto("/app/learn");
-    await page.waitForLoadState("domcontentloaded");
+    // `gotoAuthedApp`, not a bare goto: under serial-suite load the
+    // authed layout's preloads can leave the Next splash ("Flexling"
+    // logo, no shell) up past the 10s trigger wait, failing with
+    // "learn-settings trigger should render" (seen 2026-08-18). One
+    // reload picks up the warmed route — same helper the other learn
+    // specs already use.
+    await gotoAuthedApp(
+      page,
+      "/app/learn",
+      page.getByTestId("learn-settings").first(),
+    );
     await dismissTour(page, "audio_review_intro", 500);
     await dismissTour(page, "full_review_intro", 500);
 
@@ -743,8 +834,17 @@ test.describe("learning settings", () => {
     { tag: "@live" },
     async ({ page }) => {
       test.setTimeout(120_000);
-      await page.goto("/app/learn");
-      await page.waitForLoadState("domcontentloaded");
+      // `gotoAuthedApp`, not a bare goto: under serial-suite load the
+      // authed layout's preloads can leave the Next splash ("Flexling"
+      // logo, no shell) up past the 10s trigger wait, failing with
+      // "learn-settings trigger should render" (seen 2026-08-18). One
+      // reload picks up the warmed route — same helper the other learn
+      // specs already use.
+      await gotoAuthedApp(
+        page,
+        "/app/learn",
+        page.getByTestId("learn-settings").first(),
+      );
       await dismissTour(page, "audio_review_intro", 500);
       await dismissTour(page, "full_review_intro", 500);
 
@@ -823,8 +923,17 @@ test.describe("learning settings", () => {
       await expect(pills).toBeVisible({ timeout: 15_000 });
 
       // Restore: split off, audio mode, so later specs start clean.
-      await page.goto("/app/learn");
-      await page.waitForLoadState("domcontentloaded");
+      // `gotoAuthedApp`, not a bare goto: under serial-suite load the
+      // authed layout's preloads can leave the Next splash ("Flexling"
+      // logo, no shell) up past the 10s trigger wait, failing with
+      // "learn-settings trigger should render" (seen 2026-08-18). One
+      // reload picks up the warmed route — same helper the other learn
+      // specs already use.
+      await gotoAuthedApp(
+        page,
+        "/app/learn",
+        page.getByTestId("learn-settings").first(),
+      );
       await openSettingsSheet(page);
       await setSwitchById(page, "separateModeTracking", false);
       await ensureAudioMode(page);

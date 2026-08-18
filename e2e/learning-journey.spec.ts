@@ -1,6 +1,9 @@
 import { test, expect } from "@playwright/test";
 import {
+  dismissDifficultyCheck,
+  dismissErrorBoundary,
   dismissTour,
+  gotoAuthedApp,
   isSelectedTestId,
   neutralizeTours,
   waitForInViewport,
@@ -71,12 +74,52 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     // breaks the loop early rather than silently consuming the budget.
     test.setTimeout(90_000);
 
-    await page.goto("/app/learn");
-    await page.waitForLoadState("domcontentloaded");
-    // Review mode can be audio OR full depending on prior test state — try
-    // both. Each call is a no-op if the popover isn't showing.
+    // Drive the overlay the same way the user (and the next test in this
+    // file) does: land on /app and click Learn & Review. A direct
+    // `page.goto("/app/learn")` can sit on the Next splash under suite load,
+    // or leave `isLearnOpen` false so LearningHeader never mounts. Free-study
+    // (the previous serial spec) can also leave schedulingMode as `radio`
+    // — the home CTA writes `learnAndReview` before opening the session.
+    await gotoAuthedApp(
+      page,
+      "/app",
+      page.locator('[data-tutorial="learn-and-review"]').first(),
+    );
+    await dismissTour(page, "home_tour", 500);
+
+    // A prior @live test (`content-filter-live`) can leave Source: Custom
+    // only — with no custom cards, the deck looks empty and ratings never
+    // mount. Reset to Both before opening learn.
+    const sourceTrigger = page.getByTestId("content-filter-trigger").first();
+    const sourceTriggerVisible = await sourceTrigger
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (sourceTriggerVisible) {
+      const label = (await sourceTrigger.innerText().catch(() => "")).trim();
+      if (!/both/i.test(label)) {
+        await sourceTrigger.click().catch(() => {});
+        await page
+          .getByTestId("content-filter-option-both")
+          .first()
+          .click({ timeout: 5_000 })
+          .catch(() => {});
+      }
+    }
+
+    const learnAndReviewBtn = page
+      .locator('[data-tutorial="learn-and-review"]')
+      .first();
+    await expect(
+      learnAndReviewBtn,
+      "Learn & Review button should render on the home view",
+    ).toBeVisible({ timeout: 15_000 });
+    await learnAndReviewBtn.click();
+
     await dismissTour(page, "audio_review_intro", 500);
     await dismissTour(page, "full_review_intro", 500);
+    await dismissErrorBoundary(page);
+    await dismissDifficultyCheck(page);
 
     const ratingBtn = page
       .locator(

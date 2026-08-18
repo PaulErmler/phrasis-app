@@ -254,6 +254,12 @@ export const onboardingProgressFields = {
   userId: v.string(), // Links to auth user
   step: v.number(), // Current step number in the new flow
   reviewMode: v.optional(reviewModeValidator),
+  // Writing-mode input style picked on the review-mode step ('translate' |
+  // 'transcribe'). Copied onto `courseSettings.writingInputMode` by
+  // `completeOnboarding`; only meaningful when `reviewMode === 'full'`.
+  writingInputMode: v.optional(
+    v.union(v.literal('translate'), v.literal('transcribe')),
+  ),
   currentLevel: v.optional(currentLevelValidator),
   targetLanguages: v.optional(v.array(v.string())),
   baseLanguages: v.optional(v.array(v.string())),

@@ -1,5 +1,14 @@
 import { test, expect, type Page } from '@playwright/test';
-import { dismissConsent, dismissTour, expectSignedIn } from './helpers';
+import {
+  dismissConsent,
+  dismissDifficultyCheck,
+  dismissErrorBoundary,
+  dismissTour,
+  expectSignedIn,
+  gotoAuthedApp,
+  neutralizeTours,
+  waitForInViewport,
+} from './helpers';
 
 /**
  * Course-settings sweep: flip every reachable control in the learning
@@ -32,29 +41,60 @@ function collectErrors(page: Page) {
   return errors;
 }
 
+async function expectSheetOpen(page: Page, when: string): Promise<void> {
+  await expect(
+    page.getByTestId('learning-settings-sheet'),
+    `learning settings sheet closed ${when}`,
+  ).toBeVisible({ timeout: 5_000 });
+}
+
 async function openSession(page: Page): Promise<void> {
-  await page.goto('/app/learn');
+  await neutralizeTours(page);
+  await gotoAuthedApp(
+    page,
+    '/app/learn',
+    page.getByTestId('learn-settings').first(),
+  );
   await expectSignedIn(page);
   await dismissConsent(page);
+  await dismissErrorBoundary(page);
+  await dismissDifficultyCheck(page);
   await dismissTour(page, 'audio_review_intro', 500);
   await dismissTour(page, 'full_review_intro', 500);
   await dismissTour(page, undefined, 500);
 }
 
 async function openSheet(page: Page): Promise<void> {
+  await dismissErrorBoundary(page);
+  await dismissDifficultyCheck(page);
   const trigger = page.getByTestId('learn-settings').first();
   await expect(trigger).toBeVisible({ timeout: 15_000 });
   await trigger.click();
-  await expect(page.getByTestId('learning-settings-sheet')).toBeVisible({
-    timeout: 8_000,
-  });
+  await expectSheetOpen(page, 'after clicking learn-settings');
   await page.waitForTimeout(550); // slide-in animation
+}
+
+async function clickInSheet(
+  page: Page,
+  locator: ReturnType<Page['locator']>,
+  when: string,
+): Promise<void> {
+  await expectSheetOpen(page, `before ${when}`);
+  await waitForInViewport(page, locator);
+  // Real mouse clicks (even `force: true`) use viewport coordinates. When
+  // a sheet control is clipped, mid-transform, or the inner scroll jumps
+  // after a Convex re-render, those coordinates land on the overlay and
+  // Radix dismisses the sheet — the learn card underneath then receives
+  // the click (rating buttons). Activate the control via the DOM instead:
+  // Radix Switch / Radio / Button all honor `HTMLElement.click()`, and
+  // there is no pointer event for the overlay to treat as "outside".
+  await locator.evaluate((el) => (el as HTMLElement).click());
+  await expectSheetOpen(page, `after ${when}`);
 }
 
 async function setMode(page: Page, mode: 'audio' | 'full'): Promise<void> {
   const btn = page.getByTestId(`settings-mode-${mode}`).first();
-  await btn.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-  await btn.click({ force: true });
+  await clickInSheet(page, btn, `switching review mode to ${mode}`);
   await page.waitForTimeout(700); // optimistic write + settle
 }
 
@@ -63,8 +103,7 @@ async function setWritingStyle(
   style: 'translate' | 'transcribe',
 ): Promise<void> {
   const btn = page.getByTestId(`settings-writing-${style}`).first();
-  await btn.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-  await btn.click({ force: true });
+  await clickInSheet(page, btn, `switching writing style to ${style}`);
   await page.waitForTimeout(700);
 }
 
@@ -82,12 +121,16 @@ async function flipEverySwitchTwice(page: Page, phase: string): Promise<void> {
     .evaluateAll((els) => els.map((el) => el.id));
   for (const id of ids) {
     for (let i = 0; i < 2; i++) {
-      // `CSS.escape` is a browser global, absent in the Node test runner —
-      // a quoted attribute selector is the Node-safe equivalent.
-      const sw = page.locator(`[id=${JSON.stringify(id)}]`);
+      // Quoted attribute selector: CSS.escape is a browser global, absent
+      // in the Node runner. Scoped to the sheet so a clipped force-click
+      // cannot hit the learn view and dismiss the sheet.
+      const sw = sheet.locator(`[id=${JSON.stringify(id)}]`);
       if (!(await sw.isVisible().catch(() => false))) break; // mutual-exclusion pairs can hide
-      await sw.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-      await sw.click({ force: true }).catch((e) => {
+      await clickInSheet(
+        page,
+        sw,
+        `[${phase}] switch #${id} click ${i + 1}`,
+      ).catch((e) => {
         throw new Error(`[${phase}] switch #${id} click ${i + 1} failed: ${e}`);
       });
       await page.waitForTimeout(350); // let the write land before the next
@@ -107,14 +150,12 @@ async function cycleListeningStrategies(page: Page): Promise<void> {
   );
   for (let i = 0; i < count; i++) {
     const row = rows.nth(i);
-    await row.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-    await row.click({ force: true });
+    await clickInSheet(page, row, `listening strategy ${i}`);
     await page.waitForTimeout(400);
   }
   if (original >= 0) {
     const row = rows.nth(original);
-    await row.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-    await row.click({ force: true });
+    await clickInSheet(page, row, 'listening strategy restore');
     await page.waitForTimeout(400);
   }
 }

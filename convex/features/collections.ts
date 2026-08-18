@@ -382,7 +382,7 @@ export const setCollectionTextMark = mutation({
  * these rows the moment audio is generated. Shared by the on-reveal and
  * prewarm preview-generation mutations.
  */
-async function scheduleMissingTranslationsForText(
+export async function scheduleMissingTranslationsForText(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   languages: string[],
