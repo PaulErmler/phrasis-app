@@ -126,3 +126,38 @@ createCard order (one entry per code, exactly this order): ${allLangs.join(', ')
 Each entry's "text" must be written in the language named above — ${perCodeTextRule}. Never copy one entry's text into another slot.
 Schematic: [${schematic}]`;
 }
+
+export type LearnerDifficulty = {
+  /** Sublevel or collection shorthand shown to the user, e.g. "A1.2" or "B1". */
+  label: string;
+  /** CEFR band: "Pre-A1" | "A1" | … | "C2". */
+  cefrTier: string;
+};
+
+/** What example sentences at this CEFR band should sound like. */
+const CEFR_EXAMPLE_GUIDANCE: Record<string, string> = {
+  'Pre-A1':
+    'very short, high-frequency survival sentences (greetings, names, basic needs)',
+  A1: 'basic everyday phrases, simple questions and answers, mainly present tense',
+  A2: 'common everyday situations with simple connected sentences',
+  B1: 'plans, opinions, and familiar topics, including past and future',
+  B2: 'more complex topics and discussion; natural spoken vocabulary, not rare or literary',
+  C1: 'nuanced, idiomatic phrasing; sophisticated but still spoken-register',
+  C2: 'near-native subtlety; rare or literary phrasing is acceptable',
+};
+
+/**
+ * Injected with the course languages so the tutor pitches example cards at
+ * the level the user is actually studying, not textbook-C2 prose.
+ */
+export function buildDifficultySection(difficulty: LearnerDifficulty): string {
+  const guidance =
+    CEFR_EXAMPLE_GUIDANCE[difficulty.cefrTier] ??
+    'everyday sentences typical of this CEFR band';
+  const sublevel =
+    difficulty.label !== difficulty.cefrTier ? ` (${difficulty.label})` : '';
+
+  return `Learner difficulty:
+The user is currently learning at CEFR ${difficulty.cefrTier}${sublevel}.
+When you create flashcards (createCard), write example sentences at roughly this difficulty: ${guidance}. Stay close to this level — not much simpler (unless the user asks, e.g. a "simpler" request) and not much harder. If the user explicitly asks for easier or harder examples, follow that.`;
+}

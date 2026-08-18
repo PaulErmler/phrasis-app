@@ -4,17 +4,18 @@ import {
   internalQuery,
   mutation,
   query,
-  type MutationCtx,
+  type QueryCtx,
 } from '../../_generated/server';
 import { paginationOptsValidator } from 'convex/server';
 import { internal, components } from '../../_generated/api';
 import { saveMessages, listUIMessages, syncStreams } from '@convex-dev/agent';
 import { requireAuthUserId, getAuthUserId, getUserSettings } from '../../db/users';
 import { getActiveCourseForUser } from '../../db/courses';
+import { getCourseSettings } from '../../db/courseSettings';
 import { consumeQuota } from '../../usage/helpers';
 import { CHAT_CREDIT_USD_STEP, CREDIT_COSTS, FEATURE_IDS } from '../featureIds';
 import { agent, AGENT_TOOLS, createMarkAlsoCorrectTool } from './agent';
-import type { Id } from '../../_generated/dataModel';
+import type { Doc, Id } from '../../_generated/dataModel';
 import { THREAD_MESSAGE_LIMIT, MAX_MESSAGE_LENGTH } from './constants';
 import { trackEvent } from '../../db/stats/dailyStats';
 import { EVENTS, track, trackException } from '../../analytics';
@@ -31,7 +32,17 @@ import {
   OPENROUTER_MODELS,
   OPENROUTER_USAGE_ACCOUNTING,
 } from '../../config/aiModels';
-import { buildCardContextSection, buildLanguageSection } from './promptSections';
+import {
+  buildCardContextSection,
+  buildDifficultySection,
+  buildLanguageSection,
+  type LearnerDifficulty,
+} from './promptSections';
+import {
+  deriveLegacyCefrTier,
+  isPremadeLevelCollection,
+  LEVEL_TO_COLLECTION,
+} from '../../lib/collections';
 import { resolveCardContext } from './cardContext';
 import {
   assertQuickActionWithinLimits,
@@ -42,8 +53,57 @@ import {
 
 const agentComponent = components.agent;
 
+const learnerDifficultyValidator = v.object({
+  label: v.string(),
+  cefrTier: v.string(),
+});
+
+function difficultyFromCurrentLevel(level: string): LearnerDifficulty | null {
+  const mapping = LEVEL_TO_COLLECTION[level];
+  if (!mapping) return null;
+  const cefrTier = deriveLegacyCefrTier(mapping.legacyName);
+  if (!cefrTier) return null;
+  return { label: cefrTier, cefrTier };
+}
+
+function difficultyFromCollection(
+  collection: Doc<'collections'>,
+): LearnerDifficulty | null {
+  if (!isPremadeLevelCollection(collection)) return null;
+  const cefrTier =
+    collection.cefrTier ?? deriveLegacyCefrTier(collection.name);
+  if (!cefrTier) return null;
+  return {
+    label: collection.displayName ?? collection.name,
+    cefrTier,
+  };
+}
+
 /**
- * Internal query to get course languages by userId.
+ * The level the user is currently studying at: the active curriculum
+ * collection when there is one, else the course's 6-bucket `currentLevel`.
+ */
+async function resolveLearnerDifficulty(
+  ctx: QueryCtx,
+  course: Doc<'courses'> | undefined,
+): Promise<LearnerDifficulty | null> {
+  if (!course) return null;
+  const settings = await getCourseSettings(ctx, course._id);
+  if (settings?.activeCollectionId) {
+    const collection = await ctx.db.get(settings.activeCollectionId);
+    if (collection) {
+      const fromCollection = difficultyFromCollection(collection);
+      if (fromCollection) return fromCollection;
+    }
+  }
+  if (course.currentLevel) {
+    return difficultyFromCurrentLevel(course.currentLevel);
+  }
+  return null;
+}
+
+/**
+ * Internal query to get course languages (and learner difficulty) by userId.
  * Works without auth identity — used by scheduled actions and tool handlers.
  */
 export const getCourseLanguagesForUser = internalQuery({
@@ -52,6 +112,7 @@ export const getCourseLanguagesForUser = internalQuery({
     v.object({
       baseLanguages: v.array(v.string()),
       targetLanguages: v.array(v.string()),
+      difficulty: v.union(learnerDifficultyValidator, v.null()),
     }),
     v.null(),
   ),
@@ -61,6 +122,7 @@ export const getCourseLanguagesForUser = internalQuery({
     return {
       baseLanguages: active.course.baseLanguages,
       targetLanguages: active.course.targetLanguages,
+      difficulty: await resolveLearnerDifficulty(ctx, active.course),
     };
   },
 });
@@ -171,6 +233,10 @@ export const sendMessage = mutation({
       ? buildCardContextSection(cardData)
       : undefined;
     const languageSection = cardData ? buildLanguageSection(cardData) : undefined;
+    const difficulty = await resolveLearnerDifficulty(ctx, active?.course);
+    const difficultySection = difficulty
+      ? buildDifficultySection(difficulty)
+      : undefined;
 
     if (userMessageCount === 0) {
       await ctx.runMutation(agentComponent.threads.updateThread, {
@@ -202,6 +268,7 @@ export const sendMessage = mutation({
         promptMessageId: messageId,
         cardContextSection,
         languageSection,
+        difficultySection,
         prompt: args.prompt,
         includeAiContent,
         // Only forwarded when the card context resolved (ownership verified
@@ -308,6 +375,7 @@ export const generateResponse = internalAction({
     promptMessageId: v.string(),
     cardContextSection: v.optional(v.string()),
     languageSection: v.optional(v.string()),
+    difficultySection: v.optional(v.string()),
     // Passed through from sendMessage purely so the cost event can carry the
     // prompt as `$ai_input`. Re-reading it from the agent component here would
     // cost an extra query for data the caller already had in hand.
@@ -326,7 +394,8 @@ export const generateResponse = internalAction({
   handler: async (ctx, args) => {
     try {
       let languageSection = args.languageSection;
-      if (!languageSection) {
+      let difficultySection = args.difficultySection;
+      if (!languageSection || !difficultySection) {
         const thread = await ctx.runQuery(agentComponent.threads.getThread, {
           threadId: args.threadId,
         });
@@ -337,7 +406,10 @@ export const generateResponse = internalAction({
           )
           : null;
         if (courseLanguages) {
-          languageSection = buildLanguageSection(courseLanguages);
+          languageSection ??= buildLanguageSection(courseLanguages);
+          if (!difficultySection && courseLanguages.difficulty) {
+            difficultySection = buildDifficultySection(courseLanguages.difficulty);
+          }
         }
       }
 
@@ -345,6 +417,9 @@ export const generateResponse = internalAction({
       const dynamicContextParts: string[] = [];
       if (languageSection) {
         dynamicContextParts.push(languageSection);
+      }
+      if (difficultySection) {
+        dynamicContextParts.push(difficultySection);
       }
       if (args.cardContextSection) {
         dynamicContextParts.push(args.cardContextSection);

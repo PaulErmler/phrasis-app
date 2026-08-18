@@ -38,7 +38,113 @@ describe("features/chat/messages", () => {
       expect(res).toEqual({
         baseLanguages: ["en"],
         targetLanguages: ["es", "fr"],
+        difficulty: null,
       });
+    });
+
+    it("returns difficulty from the active curriculum collection", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        const datasetId = await ctx.db.insert("datasets", {
+          slug: "ogte-test",
+          version: "1.0.0",
+          publishedAt: Date.now(),
+          isActive: true,
+        });
+        const collectionId = await ctx.db.insert("collections", {
+          name: "L03",
+          code: "L03",
+          datasetId,
+          cefrTier: "A1",
+          displayName: "A1.2",
+          order: 3,
+          textCount: 10,
+          origin: "premade",
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+          currentLevel: "intermediate",
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 3,
+          activeCollectionId: collectionId,
+        });
+      });
+      const res = await t.query(
+        internal.features.chat.messages.getCourseLanguagesForUser,
+        { userId: "user_A" },
+      );
+      expect(res?.difficulty).toEqual({ label: "A1.2", cefrTier: "A1" });
+    });
+
+    it("falls back to course currentLevel when the active collection is not a curriculum level", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        const customId = await ctx.db.insert("collections", {
+          name: "Custom",
+          textCount: 2,
+          origin: "custom",
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["de"],
+          currentLevel: "beginner",
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 3,
+          activeCollectionId: customId,
+        });
+      });
+      const res = await t.query(
+        internal.features.chat.messages.getCourseLanguagesForUser,
+        { userId: "user_A" },
+      );
+      expect(res?.difficulty).toEqual({ label: "Pre-A1", cefrTier: "Pre-A1" });
+    });
+
+    it("uses a legacy CEFR collection name when cefrTier is unset", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "B1",
+          textCount: 5,
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 3,
+          activeCollectionId: collectionId,
+        });
+      });
+      const res = await t.query(
+        internal.features.chat.messages.getCourseLanguagesForUser,
+        { userId: "user_A" },
+      );
+      expect(res?.difficulty).toEqual({ label: "B1", cefrTier: "B1" });
     });
   });
 
