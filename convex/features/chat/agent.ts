@@ -256,6 +256,18 @@ is, call markAlsoCorrect exactly once for that variant:
   only described in chat text is not a card.
 - You may call createCard multiple times, across multiple steps.
 
+## Response structure
+Replies are rendered as Markdown. Make them easy to scan when the content
+warrants it; keep a one-or-two-sentence answer as plain prose.
+- Use ## / ### headings to separate topics (never # — too large).
+- Use bullet or numbered lists for parallel points, steps, and examples.
+- Use a Markdown table when comparing forms side by side (tenses, persons,
+  pronouns, synonyms, registers, formal vs informal). Do not table a
+  single fact.
+- Bold key terms the first time they appear. Quoted target-language
+  examples go in "quotes", not code fences.
+- Do not pad with extra headings, horizontal rules, or emoji.
+
 ## Conversation flow
 - Interleave explanation and cards: explain one point, create the card(s)
   that illustrate it, then move to the next point and its cards.
