@@ -326,6 +326,60 @@ export const onboardingProgressDocValidator = v.object({
   ...onboardingProgressFields,
 });
 
+// Field validators for the `userSettings` table. Extracted so queries
+// returning a full `userSettings` document share the shape with the schema
+// and avoid drift (ReturnsValidationError when reminder fields are set).
+export const userSettingsFields = {
+  userId: v.string(), // Links to auth user
+  hasCompletedOnboarding: v.boolean(),
+  learningStyle: v.optional(learningStyleValidator),
+  activeCourseId: v.optional(v.id('courses')), // Active course for the user
+  completedTutorials: v.optional(v.array(v.string())), // IDs of completed tutorials (e.g. "home_tour", "audio_review_intro")
+  // Ordered list of card-action keys the user has surfaced on the card.
+  // Whitelist + max enforced by `normalizePinnedCardActions` in
+  // `lib/cardActions.ts`. Empty or undefined = use DEFAULT_PINNED_CARD_ACTIONS.
+  pinnedCardActions: v.optional(v.array(v.string())),
+  // Mirror of the browser's analytics-consent choice, synced by
+  // `features/consent.setAnalyticsConsent`. Gates whether AI chat *content*
+  // may be attached to PostHog cost events (see chat/messages.ts) — the
+  // privacy policy promises "if you decline, no AI content is transmitted".
+  // undefined = never synced, treated as declined. Account-scoped where the
+  // browser choice is device-scoped, so the last device to sync wins.
+  analyticsConsent: v.optional(v.boolean()),
+
+  // ---- Daily reminder notification (features/notifications.ts) ----
+  //
+  // Account-scoped, like the reminder itself: one nudge per person per day,
+  // not one per course or per device.
+  //
+  // `reminderTimeZone` is the first server-readable per-user timezone in the
+  // app. Everything else takes `timezone` as a client argument, which a cron
+  // has no way to supply — see the sweep in features/notifications.ts.
+  // Refreshed opportunistically by the client on load (travel, DST rule
+  // changes), so a user who never reopens the app keeps firing at their old
+  // local time until they do.
+  reminderEnabled: v.optional(v.boolean()),
+  reminderMinuteLocal: v.optional(v.number()), // 0..1439, minutes past local midnight, multiple of REMINDER_STEP_MINUTES
+  reminderTimeZone: v.optional(v.string()), // IANA, validated with isValidTimezone
+  reminderLocale: v.optional(v.string()), // 'en' | 'de' — the push is localized, unlike outbound email
+  // The claim key. Precomputed UTC instant of the next send, so the sweep is
+  // an indexed range read over users who are actually due rather than a scan
+  // of every user. Recomputed after each send, which is what keeps it
+  // DST-correct (see lib/reminderSchedule.ts).
+  reminderNextSendAt: v.optional(v.number()),
+  // The local day the sweep last CLAIMED this row — not proof a notification
+  // reached a device. Delivery happens after the claim and may still decide
+  // to skip (the user studied in the meantime) or fail per-device. Named for
+  // what it actually records so nothing downstream mistakes it for a receipt.
+  reminderLastClaimedDate: v.optional(v.string()), // "YYYY-MM-DD" in the user's zone
+} as const;
+
+export const userSettingsDocValidator = v.object({
+  _id: v.id('userSettings'),
+  _creationTime: v.number(),
+  ...userSettingsFields,
+});
+
 export default defineSchema({
   // Datasets table - versioned premade content sets. A dataset is a corpus of
   // texts (whose own language lives on `texts.language`) fanned out to every
@@ -604,50 +658,7 @@ export default defineSchema({
     .index('by_textId', ['textId']),
 
   // User settings table - stores user preferences and onboarding status
-  userSettings: defineTable({
-    userId: v.string(), // Links to auth user
-    hasCompletedOnboarding: v.boolean(),
-    learningStyle: v.optional(learningStyleValidator),
-    activeCourseId: v.optional(v.id('courses')), // Active course for the user
-    completedTutorials: v.optional(v.array(v.string())), // IDs of completed tutorials (e.g. "home_tour", "audio_review_intro")
-    // Ordered list of card-action keys the user has surfaced on the card.
-    // Whitelist + max enforced by `normalizePinnedCardActions` in
-    // `lib/cardActions.ts`. Empty or undefined = use DEFAULT_PINNED_CARD_ACTIONS.
-    pinnedCardActions: v.optional(v.array(v.string())),
-    // Mirror of the browser's analytics-consent choice, synced by
-    // `features/consent.setAnalyticsConsent`. Gates whether AI chat *content*
-    // may be attached to PostHog cost events (see chat/messages.ts) — the
-    // privacy policy promises "if you decline, no AI content is transmitted".
-    // undefined = never synced, treated as declined. Account-scoped where the
-    // browser choice is device-scoped, so the last device to sync wins.
-    analyticsConsent: v.optional(v.boolean()),
-
-    // ---- Daily reminder notification (features/notifications.ts) ----
-    //
-    // Account-scoped, like the reminder itself: one nudge per person per day,
-    // not one per course or per device.
-    //
-    // `reminderTimeZone` is the first server-readable per-user timezone in the
-    // app. Everything else takes `timezone` as a client argument, which a cron
-    // has no way to supply — see the sweep in features/notifications.ts.
-    // Refreshed opportunistically by the client on load (travel, DST rule
-    // changes), so a user who never reopens the app keeps firing at their old
-    // local time until they do.
-    reminderEnabled: v.optional(v.boolean()),
-    reminderMinuteLocal: v.optional(v.number()), // 0..1439, minutes past local midnight, multiple of REMINDER_STEP_MINUTES
-    reminderTimeZone: v.optional(v.string()), // IANA, validated with isValidTimezone
-    reminderLocale: v.optional(v.string()), // 'en' | 'de' — the push is localized, unlike outbound email
-    // The claim key. Precomputed UTC instant of the next send, so the sweep is
-    // an indexed range read over users who are actually due rather than a scan
-    // of every user. Recomputed after each send, which is what keeps it
-    // DST-correct (see lib/reminderSchedule.ts).
-    reminderNextSendAt: v.optional(v.number()),
-    // The local day the sweep last CLAIMED this row — not proof a notification
-    // reached a device. Delivery happens after the claim and may still decide
-    // to skip (the user studied in the meantime) or fail per-device. Named for
-    // what it actually records so nothing downstream mistakes it for a receipt.
-    reminderLastClaimedDate: v.optional(v.string()), // "YYYY-MM-DD" in the user's zone
-  })
+  userSettings: defineTable(userSettingsFields)
     .index('by_userId', ['userId'])
     // Drives the sweep. `reminderEnabled` leads so a disabled row costs
     // nothing to skip; Convex requires index fields be queried in definition

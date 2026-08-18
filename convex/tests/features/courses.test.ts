@@ -82,6 +82,32 @@ describe("features/courses", () => {
       expect(res?.userId).toBe("user_A");
       expect(res?.hasCompletedOnboarding).toBe(true);
     });
+
+    // Reminder fields live on the same row. A stale returns validator that
+    // omitted them threw ReturnsValidationError for anyone who had enabled
+    // daily reminders, which broke OnboardingGuard on every load.
+    it("returns settings that include reminder fields", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) =>
+        ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          reminderEnabled: true,
+          reminderLocale: "en",
+          reminderMinuteLocal: 540,
+          reminderNextSendAt: Date.now() + 86_400_000,
+          reminderTimeZone: "Europe/Stockholm",
+          reminderLastClaimedDate: "2026-08-18",
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(api.features.courses.getUserSettings, {});
+      expect(res?.reminderEnabled).toBe(true);
+      expect(res?.reminderLocale).toBe("en");
+      expect(res?.reminderMinuteLocal).toBe(540);
+      expect(res?.reminderTimeZone).toBe("Europe/Stockholm");
+      expect(res?.reminderLastClaimedDate).toBe("2026-08-18");
+    });
   });
 
   describe("getUserCourses", () => {

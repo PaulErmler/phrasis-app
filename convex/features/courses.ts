@@ -9,7 +9,6 @@ import { mutation, query, MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
 import {
-  learningStyleValidator,
   currentLevelValidator,
   reviewsByModeValidator,
 } from '../types';
@@ -67,6 +66,7 @@ import {
   coursePatchableSettingsValidator,
   onboardingProgressFields,
   onboardingProgressDocValidator,
+  userSettingsDocValidator,
 } from '../schema';
 import { normalizePinnedCardActions } from '../../lib/cardActions';
 
@@ -144,20 +144,7 @@ async function enforceCourseHardCap(ctx: MutationCtx, userId: string) {
  */
 export const getUserSettings = query({
   args: {},
-  returns: v.union(
-    v.object({
-      _id: v.id('userSettings'),
-      _creationTime: v.number(),
-      userId: v.string(),
-      hasCompletedOnboarding: v.boolean(),
-      learningStyle: v.optional(learningStyleValidator),
-      activeCourseId: v.optional(v.id('courses')),
-      completedTutorials: v.optional(v.array(v.string())),
-      pinnedCardActions: v.optional(v.array(v.string())),
-      analyticsConsent: v.optional(v.boolean()),
-    }),
-    v.null(),
-  ),
+  returns: v.union(userSettingsDocValidator, v.null()),
   handler: async (ctx) => {
     try {
       const userId = await getAuthUserId(ctx);
