@@ -3,13 +3,13 @@
  * OpenRouter strings are deployment slugs as documented by OpenRouter.
  */
 
-import { LUNA_BO3, LUNA_PROVIDER_CONSTRAINTS } from '../../lib/languages';
+import { LUNA_BO3 } from '../../lib/languages';
 
 /** OpenRouter model IDs by agent or task */
 export const OPENROUTER_MODELS = {
-  /** Main language-tutor chat (tools, streaming) — Luna nitro, adaptive
-   *  max thinking (see OPENROUTER_CHAT_REASONING). */
-  languageTeacher: 'openai/gpt-5.6-luna:nitro',
+  /** Main language-tutor chat (tools, streaming) — Gemini 3.7 Flash nitro
+   *  (throughput routing via the `:nitro` suffix; see OPENROUTER_CHAT_REASONING). */
+  languageTeacher: 'google/gemini-3.7-flash:nitro',
   /** Bulk translation JSON for custom card auto-fill. Reuses the
    *  single-sentence pipeline's stage (`LUNA_BO3`) so model + no-thinking
    *  reasoning can't drift apart; autofill is a SINGLE call (no sampling,
@@ -47,23 +47,17 @@ export const OPENROUTER_MODELS = {
 } as const;
 
 /**
- * Reasoning effort for the language-tutor chat agent. GPT-5.6 Luna reasons
- * ADAPTIVELY in its (default) standard mode: trivial prompts still get 0
- * reasoning tokens regardless of effort; substantive tutoring questions
- * think under `max` (OpenAI's highest single-pass effort, below `pro`
- * mode). Do NOT switch to `reasoning.mode: 'pro'` for chat: Bedrock
- * silently ignores it, and on OpenAI/Azure it forces heavy multi-pass
- * reasoning on every reply (28–60 s at high effort), unusable interactively.
+ * Reasoning effort for the language-tutor chat agent. Gemini 3.7 Flash
+ * thinking levels are minimal / low / medium / high — chat uses `low`
+ * for latency.
  */
-export const OPENROUTER_CHAT_REASONING = 'max' as const;
+export const OPENROUTER_CHAT_REASONING = 'low' as const;
 
 /**
  * Per-model OpenRouter settings for the chat agent. Sequential tool calls
  * are a product requirement, not a workaround: the tutor prompt interleaves
  * prose explanation between createCard calls (explain → card → explain →
  * card), which only works when cards are emitted one step at a time.
- * (Historically this also dodged a Gemini-3 thought_signature bug with
- * parallel functionCalls; that model is gone but the setting stays.)
  */
 export const OPENROUTER_CHAT_MODEL_SETTINGS = {
   parallelToolCalls: false,
@@ -72,26 +66,12 @@ export const OPENROUTER_CHAT_MODEL_SETTINGS = {
 /** Extra OpenRouter body for the chat agent.
  *  `usage.include` makes OpenRouter report the actual USD cost of each
  *  request (providerMetadata.openrouter.usage.cost), which drives the
- *  per-message credit charge in chat. `sort: "throughput"` ranks remaining
- *  endpoints after `order` (same as the `:nitro` model suffix).
- *  Luna routing (`order` + `max_price`) is shared with translation via
- *  `LUNA_PROVIDER_CONSTRAINTS` — Bedrock us-east-1 first, $2/M-out ceiling.
- *  preferred_* deprioritize endpoints slower than 2s p50 / under 50 tok/s.
- *
- *  Do NOT set `require_parameters: true` here — verified 2026-08-04 that it
- *  404s ("No endpoints found that can handle the requested parameters") for
- *  gpt-5.6-luna with tools even WITHOUT a reasoning field. Sequential tool
- *  calls are enforced separately via
+ *  per-message credit charge in chat. Throughput routing is the `:nitro`
+ *  model suffix — no `provider` pin (no Bedrock `order` / `max_price`).
+ *  Sequential tool calls are enforced separately via
  *  OPENROUTER_CHAT_MODEL_SETTINGS.parallelToolCalls. */
 export const OPENROUTER_CHAT_EXTRA_BODY = {
   usage: { include: true },
-  provider: {
-    sort: 'throughput',
-    allow_fallbacks: true,
-    ...LUNA_PROVIDER_CONSTRAINTS,
-    preferred_max_latency: 2,
-    preferred_min_throughput: 50,
-  },
 } as const;
 
 /**
@@ -99,17 +79,19 @@ export const OPENROUTER_CHAT_EXTRA_BODY = {
  *
  * Every non-chat OpenRouter call spreads this in so its real USD cost lands on
  * `providerMetadata.openrouter.usage.cost` and can be reported to PostHog. Chat
- * uses `OPENROUTER_CHAT_EXTRA_BODY` above, which already includes it alongside
- * the routing constraints chat specifically needs.
+ * uses `OPENROUTER_CHAT_EXTRA_BODY` above, which already includes it.
  */
 export const OPENROUTER_USAGE_ACCOUNTING = {
   usage: { include: true },
 } as const;
 
-/** Default OpenRouter provider options for the chat agent. */
+/** Default OpenRouter provider options for the chat agent.
+ *  `exclude: true` keeps thinking in the billed/hidden channel and out of
+ *  the assistant text — without it, Gemini tool-loop steps can leak a
+ *  stray reasoning token into the visible reply. */
 export const OPENROUTER_CHAT_PROVIDER_OPTIONS = {
   openrouter: {
-    reasoning: { effort: OPENROUTER_CHAT_REASONING },
+    reasoning: { effort: OPENROUTER_CHAT_REASONING, exclude: true },
   },
 } as const;
 
@@ -120,12 +102,9 @@ export const OPENROUTER_CHAT_PROVIDER_OPTIONS = {
  * `role: 'system'` messages (the provider emits message-level cache_control
  * there); content-block-level is only required for user/assistant roles.
  *
- * NOTE: for the current OpenAI-family chat model this marker is inert —
- * OpenAI prefix caching is automatic for stable ≥1k-token prefixes and
- * ignores cache_control. It's kept so a future swap back to an
- * Anthropic/Gemini chat model keeps its caching without anyone remembering
- * to re-add the annotation; the real work on OpenAI is done by prefix
- * stability + the `session_id` sticky-routing key in messages.ts.
+ * NOTE: Gemini honors this annotation for explicit prefix caching. Keep it
+ * on the static system block in messages.ts; `session_id` sticky routing
+ * still helps the cache hit across the multi-step tool loop.
  */
 export const OPENROUTER_INPUT_CACHE_CONTROL = {
   type: 'ephemeral',
