@@ -27,6 +27,7 @@ import {
 import { generateText, type ModelMessage } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import {
+  OPENROUTER_CHAT_MAX_OUTPUT_TOKENS,
   OPENROUTER_CHAT_PROVIDER_OPTIONS,
   OPENROUTER_INPUT_CACHE_CONTROL,
   OPENROUTER_MODELS,
@@ -471,6 +472,7 @@ export const generateResponse = internalAction({
           // provider rejects it.
           system: '',
           allowSystemInMessages: true,
+          maxOutputTokens: OPENROUTER_CHAT_MAX_OUTPUT_TOKENS,
           providerOptions: {
             openrouter: {
               ...OPENROUTER_CHAT_PROVIDER_OPTIONS.openrouter,

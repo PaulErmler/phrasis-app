@@ -7,9 +7,11 @@ import { LUNA_BO3 } from '../../lib/languages';
 
 /** OpenRouter model IDs by agent or task */
 export const OPENROUTER_MODELS = {
-  /** Main language-tutor chat (tools, streaming) — Gemini 3.7 Flash nitro
-   *  (throughput routing via the `:nitro` suffix; see OPENROUTER_CHAT_REASONING). */
-  languageTeacher: 'google/gemini-3.7-flash:nitro',
+  /** Main language-tutor chat (tools, streaming) — Gemini 3.7 Flash.
+   *  No `:nitro` suffix: nitro re-ranks endpoints each step, and Gemini 3
+   *  thought signatures are not portable across Google backends (see
+   *  OPENROUTER_CHAT_EXTRA_BODY). */
+  languageTeacher: 'google/gemini-3.7-flash',
   /** Bulk translation JSON for custom card auto-fill. Reuses the
    *  single-sentence pipeline's stage (`LUNA_BO3`) so model + no-thinking
    *  reasoning can't drift apart; autofill is a SINGLE call (no sampling,
@@ -48,10 +50,14 @@ export const OPENROUTER_MODELS = {
 
 /**
  * Reasoning effort for the language-tutor chat agent. Gemini 3.7 Flash
- * thinking levels are minimal / low / medium / high — chat uses `low`
- * for latency.
+ * thinking levels are minimal / low / medium / high — chat uses `medium`.
  */
-export const OPENROUTER_CHAT_REASONING = 'low' as const;
+export const OPENROUTER_CHAT_REASONING = 'medium' as const;
+
+/** Headroom for medium thinking + a multi-card tutor reply (explanation
+ *  prose, several createCard calls). Thinking tokens count against this
+ *  cap; too low and the model finishes its thoughts with no visible reply. */
+export const OPENROUTER_CHAT_MAX_OUTPUT_TOKENS = 16_384;
 
 /**
  * Per-model OpenRouter settings for the chat agent. Sequential tool calls
@@ -66,12 +72,22 @@ export const OPENROUTER_CHAT_MODEL_SETTINGS = {
 /** Extra OpenRouter body for the chat agent.
  *  `usage.include` makes OpenRouter report the actual USD cost of each
  *  request (providerMetadata.openrouter.usage.cost), which drives the
- *  per-message credit charge in chat. Throughput routing is the `:nitro`
- *  model suffix — no `provider` pin (no Bedrock `order` / `max_price`).
- *  Sequential tool calls are enforced separately via
- *  OPENROUTER_CHAT_MODEL_SETTINGS.parallelToolCalls. */
+ *  per-message credit charge in chat.
+ *
+ *  Provider routing is load-bearing for Gemini 3 tool loops: each
+ *  createCard step echoes an encrypted thought signature that is only
+ *  valid on the Google backend that issued it. `:nitro` / fallbacks
+ *  hop Studio ↔ Vertex after a 429 and Google then 400s with
+ *  "Invalid thought signature." `sort: 'throughput'` still prefers a
+ *  fast endpoint on the first step; `allow_fallbacks: false` plus
+ *  `session_id` (set per-thread in messages.ts) keep later steps there.
+ *  A 429 then fails retryably instead of corrupting the loop. */
 export const OPENROUTER_CHAT_EXTRA_BODY = {
   usage: { include: true },
+  provider: {
+    sort: 'throughput' as const,
+    allow_fallbacks: false,
+  },
 } as const;
 
 /**
@@ -86,12 +102,12 @@ export const OPENROUTER_USAGE_ACCOUNTING = {
 } as const;
 
 /** Default OpenRouter provider options for the chat agent.
- *  `exclude: true` keeps thinking in the billed/hidden channel and out of
- *  the assistant text — without it, Gemini tool-loop steps can leak a
- *  stray reasoning token into the visible reply. */
+ *  Reasoning is streamed (exclude: false) so Gemini thought signatures
+ *  survive the tool loop; the chat UI never renders those tokens — it
+ *  only shows a Thinking indicator until visible reply text arrives. */
 export const OPENROUTER_CHAT_PROVIDER_OPTIONS = {
   openrouter: {
-    reasoning: { effort: OPENROUTER_CHAT_REASONING, exclude: true },
+    reasoning: { effort: OPENROUTER_CHAT_REASONING, exclude: false },
   },
 } as const;
 

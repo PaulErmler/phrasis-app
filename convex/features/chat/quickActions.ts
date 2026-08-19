@@ -173,8 +173,8 @@ function wordSteering(
 
   if (kind === 'explainWord') {
     return isTarget
-      ? `The user clicked the ${name} word "${word}" (a TARGET language). Explain this word: meaning(s), part of speech, essential grammar (e.g. gender, plural, conjugation class, governed prepositions — as relevant), register, common collocations, and typical pitfalls for learners. Create 2-4 flashcards (createCard) with varied example sentences that use the word in different everyday contexts.`
-      : `The user clicked the word "${word}" in a BASE-language (${name}) rendering. Do NOT explain this base-language word itself. Instead give its translation(s)/equivalent(s) ${forEachTarget}: explain the differences between those equivalents (nuance, register, when to use which) and the essential grammar of each, and create 2-4 flashcards (createCard) with example sentences using them.`;
+      ? `The user clicked the ${name} word "${word}" (a TARGET language). Explain this word: meaning(s), part of speech, essential grammar (e.g. gender, plural, conjugation class, governed prepositions — as relevant), register, common collocations, and typical pitfalls for learners. Create 2-4 flashcards (createCard) with varied example sentences. Each card MUST use a DIFFERENT grammatical form of "${word}" (other persons, tenses, number, case, comparison — whichever the part of speech allows). Do not put the same surface form on every card.`
+      : `The user clicked the word "${word}" in a BASE-language (${name}) rendering. Do NOT explain this base-language word itself. Instead give its translation(s)/equivalent(s) ${forEachTarget}: explain the differences between those equivalents (nuance, register, when to use which) and the essential grammar of each, and create 2-4 flashcards (createCard) with example sentences. Spread the cards across DIFFERENT grammatical forms of those equivalents — not the same form repeated.`;
   }
 
   const relation = kind === 'synonyms' ? 'synonyms' : 'antonyms (opposites)';

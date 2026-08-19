@@ -121,6 +121,7 @@ describe('features/chat/quickActions', () => {
       );
       expect(out).toContain('German word "Hund"');
       expect(out).toContain('TARGET language');
+      expect(out).toContain('DIFFERENT grammatical form');
       expect(out).not.toContain('Do NOT explain');
     });
 
@@ -132,6 +133,7 @@ describe('features/chat/quickActions', () => {
       expect(out).toContain('BASE-language (English)');
       expect(out).toContain('Do NOT explain this base-language word');
       expect(out).toContain('translation(s)/equivalent(s) in German');
+      expect(out).toContain('DIFFERENT grammatical forms');
     });
 
     it('keeps synonyms in the clicked word\'s own language', () => {
