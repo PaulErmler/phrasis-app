@@ -261,7 +261,7 @@ describe("features/decks", () => {
 
     it("no-ops when the collection is already active, even if complete", async () => {
       // Ignoring texts completes a collection without running auto-advance,
-      // so the active collection can be complete — re-selecting it changes
+      // so the active collection can be complete. Re-selecting it changes
       // nothing and must not error.
       const t = convexTest(schema, modules);
       const { collA1, courseId } = await seedCourse(t);
@@ -289,7 +289,7 @@ describe("features/decks", () => {
 
     it("accepts non-level collections referenced by the course settings, rejects others", async () => {
       // The accessibility gate compares document ids directly (chat
-      // collection ===, custom collections .includes) — cover both accept
+      // collection ===, custom collections .includes), cover both accept
       // paths and the reject path.
       const t = convexTest(schema, modules);
       const { courseId } = await seedCourse(t);
@@ -456,7 +456,7 @@ describe("features/decks", () => {
             collectionId: levels.L05,
             collectionRank: rank,
           });
-          // Only rank 3 has a target translation — rank 4's row must still
+          // Only rank 3 has a target translation. Rank 4's row must still
           // appear, with the target side absent (still generating).
           if (rank === 3) {
             await ctx.db.insert("translations", {
@@ -466,7 +466,7 @@ describe("features/decks", () => {
             });
           }
         }
-        // Keep textCount honest with the 4 texts just inserted — the
+        // Keep textCount honest with the 4 texts just inserted. The
         // switchable check compares progress against it, so a stale 2 would
         // read this level as already complete.
         await ctx.db.patch(levels.L05, { textCount: 4 });
@@ -600,7 +600,7 @@ describe("features/decks", () => {
       // setTimeout firings hitting a null db state. Fake timers keep those
       // setTimeouts from firing mid-mutation; `finishAllScheduledFunctions`
       // pumps them at a controlled point. Stub every host the chain can
-      // reach — unknown hosts throw so the test fails loudly if the chain
+      // reach. Unknown hosts throw so the test fails loudly if the chain
       // wanders into unmocked territory.
       vi.useFakeTimers();
       vi.stubEnv("GOOGLE_TTS_API_KEY", "dummy");
@@ -663,7 +663,7 @@ describe("features/decks", () => {
         // Drain the scheduled chain (prepareCardContent + fan-out) so that
         // setTimeout callbacks don't fire after the test returns and hit a
         // torn-down db. `finishAllScheduledFunctions` needs a way to advance
-        // time — pass vi.runAllTimers since we installed fake timers above.
+        // time. Pass vi.runAllTimers since we installed fake timers above.
         await t.finishAllScheduledFunctions(vi.runAllTimers);
 
         expect(res.cardsAdded).toBeGreaterThan(0);
@@ -683,12 +683,12 @@ describe("features/decks", () => {
     });
   });
 
-  describe("storeTranslationAndScheduleTTS — translationSource semantics", () => {
+  describe("storeTranslationAndScheduleTTS: translationSource semantics", () => {
     /**
      * Seed a single text + an existing translation row whose
      * `translationSource` is already set (LLM-produced). The
      * "existing row" branch of storeTranslationAndScheduleTTS must
-     * never overwrite a present source — `processTranslationForCard`
+     * never overwrite a present source. `processTranslationForCard`
      * (the Google-fallback path) always passes `GOOGLE_TRANSLATE_SOURCE`,
      * and the row was originally tagged by the LLM queue worker.
      */
@@ -719,7 +719,7 @@ describe("features/decks", () => {
         // Pre-seed an audio row for this (textId, lang, voice) so the
         // mutation's `!existingAudioForVoice` guard short-circuits and we
         // don't traverse the TTS enqueue path (which validates the voice
-        // against the curated voice list — not the point of these tests).
+        // against the curated voice list, not the point of these tests).
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array([1, 2, 3])]),
         );
@@ -764,7 +764,7 @@ describe("features/decks", () => {
       const { textId } = await seedTextWithTaggedTranslation(t, {
         existingSource: "openrouter/gemini-flash-lite-low",
       });
-      // Replace the seeded row with one that has no source — simulates a
+      // Replace the seeded row with one that has no source. Simulates a
       // legacy row that the backfill hasn't yet reached.
       const legacyId = await t.run(async (ctx) => {
         const rows = await ctx.db
@@ -824,7 +824,7 @@ describe("features/decks", () => {
           romanizationSource: "old-romanizer",
           translationSource: "google/gemini-3.1-flash-lite-preview-high",
         });
-        // Seed audio for the OLD text — the audibly-different retranslation
+        // Seed audio for the OLD text. The audibly-different retranslation
         // below must delete it (the replace branch now owns that decision).
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array([1, 2, 3])]),
@@ -854,7 +854,7 @@ describe("features/decks", () => {
           replaceExisting: true,
           // The audible change deletes the seeded audio, so without this the
           // mutation would fall through to the TTS enqueue and reject the
-          // non-curated TEST_VOICE — enqueueing isn't what this test checks.
+          // non-curated TEST_VOICE, enqueueing isn't what this test checks.
           skipTts: true,
         },
       );
@@ -998,7 +998,7 @@ describe("features/decks", () => {
 
       // Deliberately NOT passing skipTts: if the punctuation-only skip failed,
       // the mutation would delete the audio, hit the enqueue path, and throw
-      // on the non-curated TEST_VOICE — so completing at all proves the skip.
+      // on the non-curated TEST_VOICE, so completing at all proves the skip.
       await t.mutation(
         internal.features.decks.storeTranslationAndScheduleTTS,
         {
@@ -1065,7 +1065,7 @@ describe("features/decks", () => {
       // For non-romanized languages the worker passes `romanizedText:
       // undefined`. On replace, the old romanization (which referred to the
       // OLD translatedText) must be cleared so a later ensureContent pass
-      // can recompute it against the new text — otherwise we'd display a
+      // can recompute it against the new text, otherwise we'd display a
       // romanization that doesn't match the displayed translation.
       const t = convexTest(schema, modules);
       const { textId, translationId } = await t.run(async (ctx) => {
@@ -1110,7 +1110,7 @@ describe("features/decks", () => {
           targetLanguage: "es",
           translatedText: "Hola new",
           voiceName: TEST_VOICE,
-          // No romanizedText — caller didn't compute one for this language.
+          // No romanizedText. Caller didn't compute one for this language.
           translationSource: "new-source",
           replaceExisting: true,
           // Audible change deletes the seeded audio; skip the enqueue so the
@@ -1234,7 +1234,7 @@ describe("features/decks", () => {
     });
   });
 
-  describe("scheduleMissingContent — gender-drift translation sweep", () => {
+  describe("scheduleMissingContent: gender-drift translation sweep", () => {
     // Seed a definitive-gender source text (female) plus one Spanish
     // translation row, and optionally a Spanish audio row. Both
     // `speakerGender` and `audioSpeakerGender` are 'female', so the gender
@@ -1300,7 +1300,7 @@ describe("features/decks", () => {
 
     // Run the sweep and return the surviving Spanish translation row (or null
     // if deleted). The query runs inside the same transaction as the sweep so
-    // scheduled re-translation functions haven't fired yet — we observe the
+    // scheduled re-translation functions haven't fired yet. We observe the
     // exact post-sweep state.
     async function runSweepAndGetSpanish(
       t: TestConvex<typeof schema>,
@@ -1364,7 +1364,7 @@ describe("features/decks", () => {
     // The reporter's bug: a chat-created card carries the CHAT MODEL's slug as
     // its translationSource, not `user-provided`, so the protected-source check
     // alone let the gender sweep delete it and re-translate from the stored
-    // source rendering — losing the wording the user approved.
+    // source rendering. Losing the wording the user approved.
     it("keeps a machine-sourced translation on a user-created card when the gender drifts", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedTextWithSpanish(t, {
@@ -1389,7 +1389,7 @@ describe("features/decks", () => {
 
     // The text is the user's; the voice is ours. Drifted audio on a
     // user-created card must still be dropped so it can be re-synthesized at
-    // the card's current gender — the guard covers translations only.
+    // the card's current gender. The guard covers translations only.
     it("still deletes drifted audio on a user-created card", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedTextWithSpanish(t, {
@@ -1411,10 +1411,10 @@ describe("features/decks", () => {
     });
   });
 
-  describe("scheduleMissingContent — TTS version regen", () => {
+  describe("scheduleMissingContent: TTS version regen", () => {
     // `pt_pt` is bumped to ttsVersion 2 in lib/languages.ts (the European
     // Portuguese prompt fix). Audio stamped below that should be deleted +
-    // re-synthesized; audio stamped at/above current — or unstamped — survives.
+    // re-synthesized; audio stamped at/above current, or unstamped. Survives.
     // Provider + gender are kept matching so ONLY the version check can fire.
     async function seedPtPtAudio(
       t: TestConvex<typeof schema>,
@@ -1490,14 +1490,14 @@ describe("features/decks", () => {
       expect((await getPtPtAudio(t, textId)).audio).toBeTruthy();
     });
 
-    it("keeps unstamped (undefined) audio — undefined === current, no storm", async () => {
+    it("keeps unstamped (undefined) audio, undefined === current, no storm", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedPtPtAudio(t, undefined);
       expect((await getPtPtAudio(t, textId)).audio).toBeTruthy();
     });
   });
 
-  describe("scheduleMissingContent — translation version regen", () => {
+  describe("scheduleMissingContent: translation version regen", () => {
     // No language sets `translationVersion` today, so a row stamped at 0 (strictly
     // below the default current version 1) is the only way to exercise the stale
     // branch. `speakerGender` matches `audioSpeakerGender` so ONLY the version
@@ -1593,7 +1593,7 @@ describe("features/decks", () => {
 
   describe("scheduleAudioForLanguage", () => {
     beforeEach(() => {
-      // Clear calls only — the setup-file implementation (unique fake
+      // Clear calls only. The setup-file implementation (unique fake
       // workIds) must stay installed.
       mockEnqueueTts.mockClear();
     });
@@ -1626,7 +1626,7 @@ describe("features/decks", () => {
         return scheduleAudioForLanguage(ctx, text, "es", "female", null);
       });
       expect(res).toBe(false);
-      // Early return fires BEFORE the claim attempt — no claim row either.
+      // Early return fires BEFORE the claim attempt, no claim row either.
       expect(await getClaims(t)).toEqual([]);
       expect(mockEnqueueTts).not.toHaveBeenCalled();
     });
@@ -1799,7 +1799,7 @@ describe("features/decks", () => {
     });
   });
 
-  describe("storeTranslationAndScheduleTTS — TTS enqueue path", () => {
+  describe("storeTranslationAndScheduleTTS: TTS enqueue path", () => {
     beforeEach(() => {
       mockEnqueueTts.mockClear();
     });
@@ -1884,7 +1884,7 @@ describe("features/decks", () => {
       });
 
       expect(mockEnqueueTts).not.toHaveBeenCalled();
-      // The per-voice guard short-circuits BEFORE claiming — no claim row.
+      // The per-voice guard short-circuits BEFORE claiming, no claim row.
       const claims = await t.run(async (ctx) =>
         ctx.db.query("ttsGenerationClaims").collect(),
       );
@@ -1893,7 +1893,7 @@ describe("features/decks", () => {
 
     it("skips the enqueue when audio already exists under a different voice (drift is the sweep's job)", async () => {
       // Pre-audioAssets, the per-voice guard would re-enqueue here. Now any
-      // existing (text, language) row skips TTS — a wrong-voice/gender row is
+      // existing (text, language) row skips TTS. A wrong-voice/gender row is
       // detected and regenerated by the ensure sweep, which reads through the
       // shared asset payload, instead of duplicating synthesis on every
       // translation landing.
@@ -1923,7 +1923,7 @@ describe("features/decks", () => {
       });
       // Second landing (e.g. Google fallback racing the LLM path): the audio
       // row hasn't been written yet (the worker is mocked), so the per-voice
-      // guard passes — the fresh claim from the first call blocks the enqueue.
+      // guard passes. The fresh claim from the first call blocks the enqueue.
       await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
         textId,
         targetLanguage: "es",
@@ -1935,7 +1935,7 @@ describe("features/decks", () => {
     });
   });
 
-  describe("getCollectionProgress — active dataset branch", () => {
+  describe("getCollectionProgress: active dataset branch", () => {
     it("returns the active dataset's collections with progress values, excluding legacy by-name rows", async () => {
       const t = convexTest(schema, modules);
       const { courseId } = await seedCourse(t); // seeds legacy "A1" (no datasetId)
@@ -1978,7 +1978,7 @@ describe("features/decks", () => {
         {},
       );
 
-      // Dataset branch replaces the legacy by-name scan entirely — the "A1"
+      // Dataset branch replaces the legacy by-name scan entirely. The "A1"
       // row from seedCourse is absent.
       expect(res.map((c) => c.collectionName)).toEqual(["L01", "L02"]);
       expect(res[0]).toMatchObject({

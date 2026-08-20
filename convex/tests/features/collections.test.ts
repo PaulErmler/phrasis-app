@@ -5,7 +5,7 @@ import schema from "../../schema";
 import { api } from "../../_generated/api";
 import { MARK_READ_LIMIT } from "../../db/collectionTextMarks";
 import type { Id } from "../../_generated/dataModel";
-// Mocked globally in tests/convexTestSetup.ts — imported here to assert on
+// Mocked globally in tests/convexTestSetup.ts. Imported here to assert on
 // the enqueue boundary (the pools never run jobs under convex-test).
 import { llmPool, ttsPool } from "../../lib/workpools";
 import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/translationProvenance";
@@ -64,7 +64,7 @@ async function seedCourseWithTexts(
 
 /**
  * Per-user CUSTOM collection for user_A (registered in courseSettings), with
- * `count` owned texts plus one FOREIGN text (user_B) sharing the collection —
+ * `count` owned texts plus one FOREIGN text (user_B) sharing the collection,
  * which must never surface for user_A.
  */
 async function seedCustomCollection(
@@ -232,7 +232,7 @@ describe("features/collections", () => {
           paginationOpts: firstPage,
         },
       );
-      // The row is NOT filtered out — a just-added sentence stays in the list
+      // The row is NOT filtered out. A just-added sentence stays in the list
       // (the client flips it green in place).
       expect(res.page.map((r) => [r.collectionRank, r.status])).toEqual([
         [1, "none"],
@@ -297,7 +297,7 @@ describe("features/collections", () => {
       const t = convexTest(schema, modules);
       const total = MARK_READ_LIMIT + 20;
       const { collId, courseId, textIds } = await seedCourseWithTexts(t, total);
-      // Every text below the anchor is ignored — an unbounded injection would
+      // Every text below the anchor is ignored. An unbounded injection would
       // return all of them (and, at real scale, blow the query's read limit).
       await t.run(async (ctx) => {
         await ctx.db.insert("collectionProgress", {
@@ -430,7 +430,7 @@ describe("features/collections", () => {
       expect(marks[0].textId).toBe(textIds[1]);
     });
 
-    it("flips a below-frontier mark to 'readd' on clear — frontier untouched, counters decremented", async () => {
+    it("flips a below-frontier mark to 'readd' on clear, frontier untouched, counters decremented", async () => {
       const t = convexTest(schema, modules);
       const { collId, courseId, textIds } = await seedCourseWithTexts(t, 3);
       const asUser = t.withIdentity({ subject: "user_A" });
@@ -536,7 +536,7 @@ describe("features/collections", () => {
       const marks = await t.run(async (ctx) =>
         ctx.db.query("collectionTextMarks").collect(),
       );
-      // Above the frontier the sequential scan reaches the text naturally —
+      // Above the frontier the sequential scan reaches the text naturally,
       // no tracking row needed.
       expect(marks).toHaveLength(0);
     });
@@ -570,7 +570,7 @@ describe("features/collections", () => {
     it("enqueues translation jobs with skipTts and never touches the TTS pool", async () => {
       const t = convexTest(schema, modules);
       const { collId, textIds } = await seedCourseWithTexts(t, 2);
-      // The workpools are mocked globally (tests/convexTestSetup.ts) — the
+      // The workpools are mocked globally (tests/convexTestSetup.ts), the
       // enqueue boundary is what we assert on.
       vi.mocked(llmPool.enqueueAction).mockClear();
       vi.mocked(ttsPool.enqueueAction).mockClear();
@@ -687,7 +687,7 @@ describe("features/collections", () => {
         translations.find((tr) => tr.textId === userTextId)?.translatedText,
       ).toBe("Hola de nuevo");
 
-      // Re-requesting while the regen claim is in flight is a no-op — the
+      // Re-requesting while the regen claim is in flight is a no-op. The
       // row is gone but the LLM claim gates a duplicate enqueue.
       const again = await asUser.mutation(
         api.features.collections.requestPreviewTranslations,
@@ -738,7 +738,7 @@ describe("features/collections", () => {
         api.features.collections.requestPreviewTranslations,
         { collectionId: collId, textIds: [textId] },
       );
-      // Nothing to (re)translate — the row is current.
+      // Nothing to (re)translate. The row is current.
       expect(res.translationsScheduled).toBe(0);
 
       const jobs = await t.run(async (ctx) =>

@@ -5,7 +5,7 @@ import { Headphones, Languages, Ear } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
- * Final wizard step: "How do you want to learn?" — a flat three-card mode
+ * Final wizard step: "How do you want to learn?". A flat three-card mode
  * selector (Shadowing preselected in spirit, but nothing is chosen until the
  * user taps). Translate and Transcribe are first-class options rather than
  * sub-choices behind a "Writing" card; both map to the 'full' review mode
@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
  * The pick is persisted to `onboardingProgress` and copied onto the new
  * course's settings by `completeOnboarding`, which the shared Continue
  * button fires directly after this step (there is no separate
- * "customizing" screen anymore — Continue creates the course and drops the
+ * "customizing" screen anymore. Continue creates the course and drops the
  * user straight into their first real lesson).
  */
 

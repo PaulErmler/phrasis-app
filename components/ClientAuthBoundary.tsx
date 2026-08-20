@@ -43,7 +43,7 @@ export function ClientAuthBoundary({ children }: PropsWithChildren) {
   // a time is enough.
   const confirmingRef = useRef(false);
 
-  // AuthBoundary's ErrorBoundary never clears a caught error — before
+  // AuthBoundary's ErrorBoundary never clears a caught error, before
   // `handleUnauth` learned to suppress redirects, navigating to the login
   // page was the only thing that ever unmounted it. So whenever a bounce is
   // suppressed while the fallback splash is showing, the boundary has to be
@@ -64,7 +64,7 @@ export function ClientAuthBoundary({ children }: PropsWithChildren) {
       setBoundaryKey((key) => key + 1);
     }
     // If the fallback never rendered (the bounce came from AuthBoundary's
-    // effect while children stayed mounted), recovery needs no remount —
+    // effect while children stayed mounted), recovery needs no remount,
     // just disarm.
   }, [isAuthenticated, remountWhenAuthed, fallbackShown]);
 
@@ -72,17 +72,17 @@ export function ClientAuthBoundary({ children }: PropsWithChildren) {
 
   /**
    * Confirm-then-redirect. `useConvexAuth()` reads unauthenticated after ANY
-   * failed token mint — the Convex JWT lasts 15 minutes and the fetch that
-   * renews it swallows every error — so an offline launch or a flaky
+   * failed token mint. The Convex JWT lasts 15 minutes and the fetch that
+   * renews it swallows every error, so an offline launch or a flaky
    * connection used to bounce users with a perfectly valid session cookie to
    * the login page. Only redirect once the server has definitively said
-   * "no session"; on network errors, stay put — useSession's focus refetch
+   * "no session"; on network errors, stay put. useSession's focus refetch
    * and the Convex client's token refresh recover on their own once the
    * network returns.
    *
    * NOTE: AuthBoundary itself awaits an un-guarded `authClient.getSession()`
    * right before invoking this callback (a duplicate of our first confirm
-   * attempt — don't "deduplicate" by removing ours, the library discards its
+   * attempt. Don't "deduplicate" by removing ours, the library discards its
    * result). When fully offline that library call rejects before we ever run.
    */
   const handleUnauth = useCallback(async () => {
@@ -105,7 +105,7 @@ export function ClientAuthBoundary({ children }: PropsWithChildren) {
           unreachable = true;
         }
         if (hasSession) {
-          // The cookie session is fine — the bounce was a transient token
+          // The cookie session is fine. The bounce was a transient token
           // failure. Suppress the redirect and remount once auth recovers.
           capture(CLIENT_EVENTS.AUTH_BOUNCE, { confirmed: false, reason: 'still-signed-in' });
           setRemountWhenAuthed(true);

@@ -29,14 +29,14 @@ import { OGTE_MIN_LEVEL, OGTE_MAX_LEVEL } from '@/lib/constants/onboarding';
  * One-time dialog shown the first time new cards are about to be added:
  * "Does the difficulty feel right?"
  *
- * Level pager, not a slider — the dialog interrupts a learning session on a
+ * Level pager, not a slider. The dialog interrupts a learning session on a
  * phone, so stepping is two big chevrons flanking the card (easier left,
  * harder right) with a dot rail for position on the 1..20 scale. Each page
  * previews the sentences that would ACTUALLY be added next at that level.
  *
  * Both neighbours (level ±1) stay subscribed while the dialog is open, so a
  * step renders from the Convex client cache immediately and the new
- * neighbour loads behind it — no loading flash between pages.
+ * neighbour loads behind it, no loading flash between pages.
  *
  * Closing the dialog by any path counts as "keep my level" (`onDone`), so
  * the held auto-add always resumes; re-offering a dismissed check would
@@ -49,7 +49,7 @@ export function DifficultyCheckDialog({
 }: {
   open: boolean;
   /** The course's current OGTE level, already resolved by
-   *  `useDifficultyCheck` — which is also what gates `open`, so a course
+   *  `useDifficultyCheck`, which is also what gates `open`, so a course
    *  with no level collection never reaches this dialog. Passing it in
    *  (rather than subscribing here) keeps the first render on the real
    *  level instead of a placeholder. */
@@ -96,7 +96,7 @@ export function DifficultyCheckDialog({
 
   // A neighbour is steppable unless we already know it doesn't exist or the
   // user has completed it (`setActiveCollectionByLevel` would throw). While
-  // its query is still loading, allow the step — the page itself reports the
+  // its query is still loading, allow the step. The page itself reports the
   // truth on arrival, which beats a chevron that flickers disabled.
   const canGoEasier =
     level > OGTE_MIN_LEVEL && (prevPage === undefined || prevPage.switchable);
@@ -120,7 +120,7 @@ export function DifficultyCheckDialog({
       try {
         await setActiveCollectionByLevel({ ogteLevel: level });
       } catch (error) {
-        // Completed target level etc. — keep the dialog open so the user
+        // Completed target level etc. Keep the dialog open so the user
         // can page to another level (or keep the current one).
         toast.error(convexErrorMessage(error) ?? t('switchFailed'));
         setIsSwitching(false);
@@ -137,7 +137,7 @@ export function DifficultyCheckDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        // Any close counts as "keep" — never re-ask, never block adds.
+        // Any close counts as "keep", never re-ask, never block adds.
         if (!next && !isSwitching) onDone();
       }}
     >
@@ -236,7 +236,7 @@ export function DifficultyCheckDialog({
   );
 }
 
-/** Edge chevron. 44px-wide target spanning most of the card height — the
+/** Edge chevron. 44px-wide target spanning most of the card height. The
  *  whole strip is tappable, not just the glyph. */
 function PagerButton({
   side,
@@ -274,7 +274,7 @@ function PagerButton({
   );
 }
 
-/** Position on the 1..20 scale. Decorative — the level number above is the
+/** Position on the 1..20 scale. Decorative. The level number above is the
  *  accessible source of truth, so this is hidden from screen readers. */
 function LevelDots({
   level,

@@ -16,12 +16,12 @@ const secretKey = (() => {
   return key;
 })();
 
-// Managed Payments params ride only on v2 `/billing.attach` calls —
+// Managed Payments params ride only on v2 `/billing.attach` calls, namely
 // convex/billing.ts (attachNewPlan, switchPlanDuringTrial) and
-// `attachViaV2NoTrial` below: the legacy path these actions otherwise call
+// `attachViaV2NoTrial` below. The legacy path these actions otherwise call
 // (autumn-js pins `x-api-version: 1.2`) builds its Stripe client on
 // 2025-02-24.acacia, and Stripe rejects `managed_payments` before
-// 2025-03-31.basil — so injecting it there could never work. In this file
+// 2025-03-31.basil, so injecting it there could never work. In this file
 // the flag drives `guardFirstPurchaseOffLegacyPath` (keeping first
 // purchases from slipping past MoR onto the legacy path), the legacy-result
 // backstops, and the session params on `attachViaV2NoTrial`.
@@ -45,14 +45,14 @@ export const autumn = new Autumn(components.autumn, {
 });
 
 /**
- * Public actions required by our autumn-js react hooks — and ONLY those.
+ * Public actions required by our autumn-js react hooks, and ONLY those.
  *
  * `autumn.api()` offers the component's full surface (track, cancel, usage,
  * setupPayment, entities, referrals, ...), but every one of these is a
  * PUBLIC action scoped to the caller's own Autumn customer. `track` in
- * particular accepts an unbounded `value: number` — and Autumn credits
+ * particular accepts an unbounded `value: number`, and Autumn credits
  * negative values (our own refund path relies on that: releaseQuota tracks
- * `-amount`) — so exporting it let any authenticated user grant themselves
+ * `-amount`), so exporting it let any authenticated user grant themselves
  * usage from the browser console. No client code ever called the removed
  * ones (the hooks use exactly the four below plus attach/checkout further
  * down; all real usage tracking is server-side via
@@ -66,7 +66,7 @@ export const { createCustomer, listProducts, billingPortal } = autumn.api();
  * Server-side trial gate for `attach` / `checkout`.
  *
  * Autumn's built-in trial dedup is per-plan only, and the anti-hopping
- * policy (one trial ever, across all plans — see
+ * policy (one trial ever, across all plans, see
  * lib/autumn/trial-eligibility.ts) used to live purely in the client via
  * `checkoutTrialParams()`. Anyone invoking these public actions directly
  * could therefore collect a fresh trial on every plan. The gate re-derives
@@ -75,7 +75,7 @@ export const { createCustomer, listProducts, billingPortal } = autumn.api();
  *
  * - trial-eligible (never trialed, no paid plan): args pass through and
  *   Autumn starts the plan's configured trial.
- * - currently trialing: `attach` is rejected — plan switches (including
+ * - currently trialing: `attach` is rejected. Plan switches (including
  *   dropping to the Free plan, which is scheduled at trial end) must go
  *   through `switchPlanDuringTrial` (convex/billing.ts), which carries the
  *   running trial over instead of granting a fresh one. `checkout` (the
@@ -85,16 +85,16 @@ export const { createCustomer, listProducts, billingPortal } = autumn.api();
  * - everyone else: `freeTrial: false` is forced, mirroring what the
  *   well-behaved client already sends.
  *
- * How that "no trial" intent actually reaches Autumn — an
+ * How that "no trial" intent actually reaches Autumn, an
  * upstream-regression workaround, probed live on 2026-08-09:
  *
- * - v1.2 `/checkout` (the preview): `free_trial: false` still WORKS — the
+ * - v1.2 `/checkout` (the preview): `free_trial: false` still WORKS. The
  *   preview suppresses the plan's trial. `null` is rejected
  *   ("free_trial: Invalid input").
  * - v1.2 `/attach` (the money call): `false` passes validation but is
  *   silently LOST in Autumn's v1.2→v2 translation (`freeTrialParamsV0ToV1`
- *   has no boolean branch), so the plan's configured trial applies anyway —
- *   a paying upgrader got a full "unused plan" credit note plus a fresh
+ *   has no boolean branch), so the plan's configured trial applies anyway.
+ *   A paying upgrader got a full "unused plan" credit note plus a fresh
  *   7-day trial. `null` is rejected by the same request schema. The legacy
  *   attach therefore CANNOT express "no trial" at all.
  * - v2 `/billing.attach` with `customize: { free_trial: null }` works
@@ -124,7 +124,7 @@ export async function gateTrialArgs<T extends { freeTrial?: boolean }>(
     undefined,
     '1.2',
   );
-  // Unknown customer — nothing attached yet, so no trial history either.
+  // Unknown customer, nothing attached yet, so no trial history either.
   if (res.status === 404) {
     return { gated: args, state: getTrialState(null), customer: null };
   }
@@ -165,7 +165,7 @@ const customerDataValidator = v.object({
 export const check = action({
   args: {
     // Mirrors the component's CheckArgs (not exported by the package),
-    // minus nothing — sendEvent is accepted but ignored.
+    // minus nothing. sendEvent is accepted but ignored.
     productId: v.optional(v.string()),
     featureId: v.optional(v.string()),
     requiredBalance: v.optional(v.number()),
@@ -186,10 +186,10 @@ export const check = action({
  *
  * - `checkoutSessionParams` (raw Stripe Checkout Session params, forwarded
  *   verbatim): on a public action it would let any authenticated user inject
- *   session params — including `managed_payments: {enabled: false}`, which
+ *   session params: including `managed_payments: {enabled: false}`, which
  *   would put the tax liability for that sale on us instead of Stripe.
  * - `productIds` (multi-product attach): nothing in the app sends it, and the
- *   trial gate's v2 reroute keys on `productId` — an attach via `productIds`
+ *   trial gate's v2 reroute keys on `productId`: an attach via `productIds`
  *   would fall through to the legacy path, where "no trial" is silently lost
  *   (the exact live incident of 2026-08-09).
  * - `forceCheckout`: nothing in the app sends it, and it would let any caller
@@ -213,16 +213,16 @@ const checkoutSharedArgs = {
 /**
  * Stale-client guard, applied to BOTH legacy actions while Managed Payments
  * is on. A first purchase (no paid plan, no running trial) is the only flow
- * that makes Autumn create a Stripe Checkout Session on this path — and the
+ * that makes Autumn create a Stripe Checkout Session on this path, and the
  * legacy path cannot make that session merchant-of-record (see
  * managedPaymentsEnabled above). It isn't just `attach`: for a customer
  * without a usable card, the v1.2 `/checkout` PREVIEW itself creates the
- * session and autumn-js redirects straight to it (verified in the sandbox —
- * the MoR error surfaced from `autumn:checkout`). The client therefore
+ * session and autumn-js redirects straight to it (verified in the sandbox.
+ * The MoR error surfaced from `autumn:checkout`). The client therefore
  * routes first purchases to `billing.attachNewPlan` before ever calling
  * these (hooks/use-new-plan-checkout.ts); anything still landing here is a
  * stale bundle, and letting it through would sell without merchant of
- * record. Trialing customers and existing payers pass — their calls never
+ * record. Trialing customers and existing payers pass. Their calls never
  * create sessions, and the dialog needs the preview.
  */
 function guardFirstPurchaseOffLegacyPath(state: TrialState | null): void {
@@ -233,7 +233,7 @@ function guardFirstPurchaseOffLegacyPath(state: TrialState | null): void {
     !state.onTrial
   ) {
     // The state that got here is the whole diagnosis (the 2026-08-11
-    // incident was opaque without it) — the error string alone says nothing
+    // incident was opaque without it), the error string alone says nothing
     // about WHY the customer was classified this way.
     console.warn('Blocked a first purchase off the legacy path', { state });
     throw new Error('Checkout has been updated — please refresh the page');
@@ -241,7 +241,7 @@ function guardFirstPurchaseOffLegacyPath(state: TrialState | null): void {
 }
 
 /**
- * Attach with the trial suppressed, via v2 `/billing.attach` — the ONLY
+ * Attach with the trial suppressed, via v2 `/billing.attach`. The ONLY
  * endpoint that can still express "no trial" (see the gateTrialArgs doc):
  * `customize.free_trial: null`. Used for cross-plan switches by non-eligible
  * customers, where the legacy attach would wrongly grant the target plan's
@@ -299,7 +299,7 @@ async function attachViaV2NoTrial(
     };
   }
   // Refresh the quota mirror so the switch's new allowances apply without
-  // waiting for the next mount-time sync — the common entry point here is
+  // waiting for the next mount-time sync. The common entry point here is
   // the low-quota dialog, where stale quotas would keep the feature locked.
   // Scheduled rather than awaited: the confirm shouldn't block on it, and
   // the sync lives in the node runtime.
@@ -316,8 +316,8 @@ async function attachViaV2NoTrial(
 /**
  * Is `productId` the free (default) plan? Asked of Autumn, not the customer
  * payload: a paying customer's `products` does NOT contain the free plan
- * (verified in the sandbox — see documentation/autumn-usage-tracking.md), so
- * "is the target held" can never identify a cancel-to-Free. Fails closed —
+ * (verified in the sandbox, see documentation/autumn-usage-tracking.md), so
+ * "is the target held" can never identify a cancel-to-Free. Fails closed,
  * with an unreachable product record the attach cannot be routed safely.
  */
 async function isFreeProduct(productId: string): Promise<boolean> {
@@ -339,7 +339,7 @@ async function isFreeProduct(productId: string): Promise<boolean> {
 }
 
 /**
- * The v2 reroute forwards only `productId` and `options` — the rest of the
+ * The v2 reroute forwards only `productId` and `options`. The rest of the
  * validator's surface has no verified v2 equivalent. Nothing in the app
  * sends these on an attach; refuse them loudly rather than silently
  * dropping e.g. a referral reward.
@@ -370,7 +370,7 @@ function rejectArgsUnsupportedOnV2(args: Record<string, unknown>): void {
  * result: the reachable legacy attaches (renew, cancel-to-Free) never need
  * payment, so a `checkout_url` here means Autumn built a session the legacy
  * path can never make merchant-of-record, and autumn-js would redirect
- * straight into it. No dialog exists to fall back to on this path — refuse
+ * straight into it. No dialog exists to fall back to on this path. Refuse
  * the redirect instead of completing a sale whose tax liability lands on
  * us. (The checkout PREVIEW gets the softer treatment below.)
  */
@@ -401,15 +401,15 @@ export const attach = action({
   handler: async (ctx, args) => {
     const { gated, state, customer } = await gateTrialArgs(ctx, 'attach', args);
     guardFirstPurchaseOffLegacyPath(state);
-    // Trial-suppressed CROSS-PLAN switches to a PAID target must go to v2 —
-    // the legacy attach can no longer suppress the target's configured
+    // Trial-suppressed CROSS-PLAN switches to a PAID target must go to v2.
+    // The legacy attach can no longer suppress the target's configured
     // trial. Renew (re-attaching a held plan to un-schedule a pending
     // switch) and cancel-to-Free stay on the legacy path, whose scheduling
     // semantics they depend on; free has no trial to suppress, and a payer
     // never HOLDS free, so the target is asked of Autumn's product record,
     // not of `targetIsHeld`. currentPlans: an EXPIRED entry matching the
-    // target (a payer returning to a plan they once held) is not a renew —
-    // reading it as one would keep the switch on the legacy path, where
+    // target (a payer returning to a plan they once held) is not a renew.
+    // Reading it as one would keep the switch on the legacy path, where
     // "no trial" is silently lost.
     if (gated.freeTrial === false && gated.productId) {
       const targetIsHeld = currentPlans(normalizePlans(customer)).some(
@@ -429,14 +429,14 @@ export const attach = action({
 /**
  * The checkout PREVIEW's counterpart to the reject above. Autumn's v1.2
  * preview builds a Checkout Session whenever it deems the customer
- * cardless — and that includes customers whose card was collected on a
+ * cardless, and that includes customers whose card was collected on a
  * MANAGED PAYMENTS session (the trial-start flow!): the MoR payment method
  * is not a usable default for new legacy sessions, so a brand-new trialing
  * customer's very next plan click came back with `url` and autumn-js would
  * have redirected into a non-MoR sale (live incident, 2026-08-11).
  *
  * The session-bearing preview still carries the full dialog payload
- * (product/scenario, lines, total, next_cycle — probed live 2026-08-11),
+ * (product/scenario, lines, total, next_cycle, probed live 2026-08-11),
  * so the fix is to STRIP the url: autumn-js then opens CheckoutDialog with
  * the preview, and the dialog's confirm paths already produce MoR-capable
  * sessions when payment is really needed (switchPlanDuringTrial and the v2

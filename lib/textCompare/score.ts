@@ -2,7 +2,7 @@ import type { WordAlignResult } from './wordAlign';
 
 const WEIGHT_EQUAL = 1;
 const WEIGHT_TYPO = 0.7;
-// Punctuation contributes a quarter of a word to the accuracy score — it
+// Punctuation contributes a quarter of a word to the accuracy score. It
 // matters (so users see a small dent for missing commas / periods) but doesn't
 // dominate the percentage the way a wrong word does.
 const PUNCT_WEIGHT = 0.25;
@@ -14,9 +14,9 @@ export interface ScoreOptions {
 }
 
 /** 0–1 word-weighted accuracy. Typos get partial credit; missing/extra/wrong = 0.
- * Punctuation tokens contribute at PUNCT_WEIGHT — equal punct gives that
+ * Punctuation tokens contribute at PUNCT_WEIGHT. Equal punct gives that
  * weight in full, any other tag gives zero credit but still adds to the
- * denominator — or at 0 when `ignorePunctuation` is set, which removes them
+ * denominator, or at 0 when `ignorePunctuation` is set, which removes them
  * from the score entirely while leaving them in the diff for display. */
 export function scoreWordAlignment(
   result: WordAlignResult,

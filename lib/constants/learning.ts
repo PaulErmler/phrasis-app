@@ -8,7 +8,7 @@ export const MAX_CARDS_PER_BATCH = 15;
 
 /** How many upcoming due cards to pre-generate content for during review.
  * Sized to stay ahead of LLM translation latency (queued OpenRouter call per
- * non-source language) — matches MAX_CARDS_PER_BATCH so a fresh add-batch is
+ * non-source language), matches MAX_CARDS_PER_BATCH so a fresh add-batch is
  * fully primed before the learner can outrun it. */
 export const ENSURE_CONTENT_LOOKAHEAD = 15;
 

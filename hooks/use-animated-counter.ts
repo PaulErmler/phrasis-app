@@ -12,7 +12,7 @@ const LINEAR = (t: number) => t;
  * Animate a number from `from` to `target` over `durationMs`.
  *
  * `easing` defaults to `'easeOut'` (cubic) for a satisfying "fast-then-settle"
- * feel — good for solo counters and for supporting cells that should settle
+ * feel. Good for solo counters and for supporting cells that should settle
  * early. Use `'linear'` when integer ticks must land uniformly across the
  * full duration: ease-out compresses most value change into the first half,
  * so a small-target counter hits its final integer at ~54 % and sits idle.
@@ -36,7 +36,7 @@ export function useAnimatedCounter(
   const prevFromRef = useRef(from);
 
   // Layout effect (not passive) so a `from` that only becomes known after
-  // mount — e.g. a localStorage snapshot read in another layout effect —
+  // mount, e.g. a localStorage snapshot read in another layout effect,
   // is painted as the animation's starting value rather than flashing the
   // mount-time value for `delay` ms first.
   useBrowserLayoutEffect(() => {
@@ -48,8 +48,8 @@ export function useAnimatedCounter(
 
     // A fresh animation starts at `from` after `delay`; that covers the
     // first run and any run where `from` itself changed (the late-known
-    // snapshot case above). Everything else — typically `target` moving
-    // because live stats landed mid-sweep — continues from the currently
+    // snapshot case above). Everything else, typically `target` moving
+    // because live stats landed mid-sweep. Continues from the currently
     // displayed value with no delay, so the counter never visibly resets.
     const isFresh = !hasRunRef.current || from !== prevFromRef.current;
     hasRunRef.current = true;

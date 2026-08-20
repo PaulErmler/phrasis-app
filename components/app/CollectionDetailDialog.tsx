@@ -49,13 +49,13 @@ import type {
 interface CollectionDetailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Raw collection name — used as the description-lookup key. */
+  /** Raw collection name. Used as the description-lookup key. */
   collectionName: string | null;
   /** Localized title to render. Defaults to `collectionName` when omitted. */
   displayName?: string | null;
   totalTexts: number;
   cardsAdded: number;
-  /** Texts the user ignored — excluded from remaining/auto-add. */
+  /** Texts the user ignored. Excluded from remaining/auto-add. */
   ignoredCount: number;
   /** Texts the user marked as prioritized in the collection preview. */
   prioritizedCount: number;
@@ -78,7 +78,7 @@ interface CollectionDetailDialogProps {
 
 // Bounds the STORED fallback ids when a long run of rows is toggleable
 // (e.g. the "Manually Added" collection, where hiding added rows empties the
-// list anyway) — one "Show more" page plus slack. The capture keeps scanning
+// list anyway), one "Show more" page plus slack. The capture keeps scanning
 // past the cap until it finds a survivor row, so the cap never costs the
 // guarantee, only how many hidden-run ids we remember.
 const MAX_ANCHOR_CANDIDATES = 30;
@@ -115,12 +115,12 @@ export function CollectionDetailDialog({
   // (and where), then after every commit scroll by however far that row
   // moved. Unlike compensating only for the earlier-history block, this
   // keeps the visible cards pinned no matter what appears or collapses above
-  // them — the added-history feed, its "show earlier" button, or previously
+  // them. The added-history feed, its "show earlier" button, or previously
   // hidden added/ignored rows revealed mid-stream by the toggles.
   //
   // The anchor row itself can unmount (a visibility toggle hiding the very
   // rows the user is looking at), so the capture keeps the CONSECUTIVE rows
-  // below it as fallback ids — continuing until it has one row that no toggle
+  // below it as fallback ids, continuing until it has one row that no toggle
   // can hide (status other than added/ignored), so even a long run of
   // contiguous added rows can't leave the list without a survivor. Only the
   // first row's offset is stored: the restore pins whichever row survives to
@@ -138,7 +138,7 @@ export function CollectionDetailDialog({
       for (const row of container.querySelectorAll<HTMLElement>('[data-row-id]')) {
         if (anchor === null) {
           // Skip rows fully above the viewport; the first row whose bottom
-          // edge is inside it becomes the anchor — and the only row that
+          // edge is inside it becomes the anchor, and the only row that
           // needs measuring.
           const top = rowTopInContainer(row, containerTop);
           if (top + row.offsetHeight <= 0) continue;
@@ -146,7 +146,7 @@ export function CollectionDetailDialog({
         } else if (anchor.ids.length < MAX_ANCHOR_CANDIDATES) {
           anchor.ids.push(row.dataset.rowId!);
         }
-        // A row the toggles can't hide is a guaranteed survivor — the
+        // A row the toggles can't hide is a guaranteed survivor. The
         // fallback chain is complete (in the common case the very first
         // row qualifies, so the capture stays a single measurement). Rows
         // past the id cap aren't stored but are still scanned so the chain
@@ -190,7 +190,7 @@ export function CollectionDetailDialog({
     captureScrollAnchor();
   });
 
-  // Paging is deliberately button-only — nothing loads from scrolling alone.
+  // Paging is deliberately button-only, nothing loads from scrolling alone.
   // "Show earlier" (top) and "Show more" (bottom) are the sole fetch triggers.
   const canLoadEarlier = browse.showAdded && browse.earlierStatus === 'CanLoadMore';
 
@@ -497,7 +497,7 @@ function PreviewTextRow({
     );
     const isActiveLine =
       buttonPlayback.active?.language === translation.language;
-    // Audio can only be generated once there is text to synthesize — for a
+    // Audio can only be generated once there is text to synthesize, for a
     // still-translating line the button stays in the passive spinner state.
     const hasText = translation.text.length > 0;
     return (

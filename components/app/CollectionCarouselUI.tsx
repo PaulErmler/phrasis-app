@@ -26,7 +26,7 @@ export interface CollectionProgressItem {
   collectionId: string;
   /**
    * Stable identifier used for description-i18n lookup (e.g. "Custom", "A1.1").
-   * Always the raw collection name — never localized — so callers can rely on
+   * Always the raw collection name, never localized, so callers can rely on
    * it as a key into `descriptions.*` and other lookup maps.
    */
   collectionName: string;
@@ -63,9 +63,9 @@ export interface CollectionAction {
  *
  * Each sublevel ("A1.1", "C2.4", ...) has its own translation entry, so the
  * primary path is an exact lookup. The display name has a dot ("A1.1") but
- * next-intl treats dots as namespace separators in keys — so we normalize
+ * next-intl treats dots as namespace separators in keys, so we normalize
  * dots to underscores at lookup time ("A1.1" → "A1_1"). The sublevel-to-tier
- * fallback exists only as a defensive net — if a new dataset display name is
+ * fallback exists only as a defensive net, if a new dataset display name is
  * added without a matching i18n key, we fall back to the parent CEFR band's
  * description rather than throwing MISSING_MESSAGE in the UI.
  */
@@ -129,7 +129,7 @@ export function InlineCollectionDetail({
     <div
       className="rounded-xl border-2 bg-card overflow-hidden"
       // Raw (unlocalized) collection name so e2e specs can target a specific
-      // tile — e.g. `collection-tile-Custom` — regardless of display locale.
+      // tile, e.g. `collection-tile-Custom`. Regardless of display locale.
       data-testid={`collection-tile-${collection.collectionName}`}
     >
       {/* Progress accent bar */}

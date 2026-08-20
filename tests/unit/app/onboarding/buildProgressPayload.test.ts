@@ -7,7 +7,7 @@ import {
 
 /**
  * `buildProgressPayload` is the single source of truth for the
- * `saveOnboardingProgress` payload — all three wizard call sites (debounced
+ * `saveOnboardingProgress` payload. All three wizard call sites (debounced
  * `persist`, immediate `advance`, immediate `back`) route through it. These
  * tests pin the empty-vs-populated field mapping so a refactor can't silently
  * start persisting empty arrays / nulls (the Convex validator expects
@@ -42,7 +42,7 @@ describe('buildProgressPayload', () => {
     expect(buildProgressPayload(EMPTY_ONBOARDING_DATA, 1)).toEqual({
       step: 1,
       reviewMode: undefined,
-      // The one field that stays null rather than collapsing — null is what
+      // The one field that stays null rather than collapsing. Null is what
       // CLEARS a previously saved writing style on the server.
       writingInputMode: null,
       targetLanguages: undefined,
@@ -92,7 +92,7 @@ describe('buildProgressPayload', () => {
 
   it('keeps a null writingInputMode (audio pick) as an explicit null', () => {
     // Regression: this used to collapse to `undefined`, which the Convex
-    // client strips from the args — so a previously saved 'transcribe' was
+    // client strips from the args, so a previously saved 'transcribe' was
     // never cleared, `completeOnboarding` copied it onto courseSettings, and
     // the user landed in Transcribe the first time they opened Writing mode.
     // `null` is the wire signal that clears the stored style.

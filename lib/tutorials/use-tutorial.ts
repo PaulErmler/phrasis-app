@@ -63,7 +63,7 @@ function getSnapshot(): string[] {
 /**
  * Live read of the completed-tutorial set (localStorage-backed module
  * store). For effect-time decisions that must not act on a stale render
- * closure — e.g. `useMilestoneTips` checks this right before scheduling a
+ * closure, e.g. `useMilestoneTips` checks this right before scheduling a
  * tip, after the DB backfill may have merged new completions mid-commit.
  */
 export function getCompletedTutorialsSnapshot(): string[] {
@@ -98,11 +98,11 @@ function writeCompleted(ids: string[]) {
 /**
  * Why a tour is being torn down. Only the reason decides whether the tour
  * counts as finished:
- *  - `completed` — reached the end, or the user clicked the closing CTA.
- *  - `dismissed` — the user closed it (X / Esc / overlay click). Counts as
+ *  - `completed`: reached the end, or the user clicked the closing CTA.
+ *  - `dismissed`: the user closed it (X / Esc / overlay click). Counts as
  *    finished: re-offering a tour someone deliberately closed is worse than
  *    dropping it.
- *  - `hidden` — the host view disabled the tour mid-flight, or we are stepping
+ *  - `hidden`: the host view disabled the tour mid-flight, or we are stepping
  *    aside for an interactive step / restart / unmount. Does NOT persist, so
  *    the tour can be offered again.
  */
@@ -121,7 +121,7 @@ const TEARDOWN_PERSISTS_COMPLETION: Record<TeardownReason, boolean> = {
  * analytics). Used by `useTutorial` (tours) and `useMilestoneTips` (one-time
  * learning tips).
  *
- * `requiredIds` — the ids this caller cares about. The Convex
+ * `requiredIds`. The ids this caller cares about. The Convex
  * `getCompletedTutorials` query stays subscribed only while at least one of
  * them is missing from localStorage, so fully-synced clients do no reads.
  */
@@ -181,7 +181,7 @@ export function useCompletedTutorials(requiredIds: readonly string[]) {
   // doesn't replay tutorials the user finished elsewhere just because
   // localStorage started empty, and (b) nothing is evaluated or persisted
   // against the un-namespaced fallback localStorage key before
-  // `setTutorialUser` has bound the per-user key — completion state is
+  // `setTutorialUser` has bound the per-user key. Completion state is
   // per USER (Convex `userSettings.completedTutorials` is the source of
   // truth; localStorage is only that user's device cache).
   const isLoaded =
@@ -189,7 +189,7 @@ export function useCompletedTutorials(requiredIds: readonly string[]) {
 
   /**
    * Persist a completion everywhere: localStorage (immediately, so the UI
-   * can't re-offer it), Convex (fire-and-forget), and PostHog — unless
+   * can't re-offer it), Convex (fire-and-forget), and PostHog, unless
    * `captureEvent: false` (silent pre-marking, e.g. the veteran guard) or
    * the id was already completed (re-runs must not inflate completion
    * counts).
@@ -223,7 +223,7 @@ interface UseTutorialOptions {
   stepCompleteOnClickIndex?: number;
   /**
    * Whether clicking the last step's highlighted element completes the tour
-   * (default true — closing steps are usually CTAs that navigate away). Pass
+   * (default true, closing steps are usually CTAs that navigate away). Pass
    * false for tours whose last step highlights an element purely to explain
    * it: a curiosity click there must not mark the tour finished.
    */
@@ -283,14 +283,14 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
    * Why every teardown goes through one helper.
    *
    * driver.js's public `destroy()` is `g(false)`, which deliberately SKIPS
-   * `onDestroyStarted` (driver.js 1.4.0, dist/driver.js.mjs:594-604 — `g(true)`
+   * `onDestroyStarted` (driver.js 1.4.0, dist/driver.js.mjs:594-604, `g(true)`
    * fires the hook and returns early; `g(false)` does the real teardown). Only
    * driver's own close paths (close button, Esc, overlay click, stepping past
    * the last step) go through `g(true)`.
    *
    * So anything WE call `destroy()` on never runs the hook. Hanging
    * completion-persistence or state cleanup off `onDestroyStarted` therefore
-   * silently no-ops for every teardown the app initiates — which is exactly
+   * silently no-ops for every teardown the app initiates, which is exactly
    * how the home tour ended up never marking itself complete and re-running on
    * every return to Home. `teardown` owns that bookkeeping instead, and
    * `onDestroyStarted` merely delegates to it.
@@ -346,7 +346,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     // the element the user is invited to click. That click must count as
     // finishing the tour: it often navigates away (e.g. the home tour's
     // Learn + Review CTA opens the learn view), which hides the host and
-    // would otherwise hit the suppress-complete path below — leaving the
+    // would otherwise hit the suppress-complete path below, leaving the
     // tour unfinished and re-running it on every visit. Tours whose last
     // step is explanatory opt out via `lastStepCompleteOnClick: false`.
     if (lastStepCompleteOnClick && resolvedSteps.length > 0) {
@@ -384,7 +384,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       popoverClass: `phrasis-tutorial-${tutorialId}`,
       steps: resolvedSteps,
       // Fires only on driver's own close paths (close button, Esc, overlay
-      // click, stepping past the last step) — never on our own destroy()
+      // click, stepping past the last step), never on our own destroy()
       // calls. `d` is passed explicitly so the real teardown still runs even
       // if driverRef was already cleared.
       onDestroyStarted: () => {
@@ -426,7 +426,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   }, [enabled]);
 
   // Never leave an orphaned full-screen overlay behind if the host unmounts
-  // mid-tour. Does not persist completion — the user never finished it.
+  // mid-tour. Does not persist completion. The user never finished it.
   useEffect(
     () => () => {
       teardownRef.current('hidden');

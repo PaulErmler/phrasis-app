@@ -13,7 +13,7 @@ let client: PostHog | null = null;
  * hear about.
  *
  * Returns null when unconfigured so callers degrade to console-only rather than
- * throwing inside an error handler — the one place a second failure is worst.
+ * throwing inside an error handler. The one place a second failure is worst.
  */
 export function getPostHogServer(): PostHog | null {
   if (!POSTHOG_KEY) return null;

@@ -40,7 +40,7 @@ describe("useAnimatedCounter", () => {
         vi.advanceTimersByTime(16);
       }
     });
-    // Without real raf, result may remain 0 — just ensure hook didn't crash
+    // Without real raf, result may remain 0, just ensure hook didn't crash
     expect(typeof result.current).toBe("number");
   });
 

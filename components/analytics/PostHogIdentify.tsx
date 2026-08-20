@@ -10,7 +10,7 @@ import { resetPreservingConsent } from '@/lib/posthog/consent';
 /**
  * Ties the browser's PostHog identity to the signed-in user.
  *
- * The distinct id is the Better Auth user id — the same string Convex reads as
+ * The distinct id is the Better Auth user id. The same string Convex reads as
  * `identity.subject` (see `requireAuthUserId` in `convex/db/users.ts`) and the
  * same one Autumn uses as its customer id. Using anything else here would split
  * a single person into a frontend ghost and a backend ghost that never meet.
@@ -36,7 +36,7 @@ export function PostHogIdentify() {
       return;
     }
 
-    // Only reset on a real sign-out — a transition from "we had someone" to
+    // Only reset on a real sign-out. A transition from "we had someone" to
     // "we don't". `useQuery` returns undefined while loading, and resetting on
     // that would hand every page load a brand-new anonymous id.
     if (user === null && identifiedIdRef.current !== null) {

@@ -52,7 +52,7 @@ function isValidYearString(s: string): boolean {
 // ============================================================================
 
 /**
- * Query 1: Small summary data — courseStats, todayStats, hourly distribution, monthly stats.
+ * Query 1: small summary data (courseStats, todayStats, hourly distribution, monthly stats).
  * Loads fast, powers the numbers row, app usage, hourly chart, and line chart (year view).
  */
 export const getStatsPageData = query({
@@ -204,7 +204,7 @@ export const getStatsPageData = query({
 });
 
 /**
- * Query 2: Heavier daily data — heatmap entries + per-language daily stats.
+ * Query 2: Heavier daily data. Heatmap entries + per-language daily stats.
  * Powers the heatmap, line chart (week/month views), and per-language words chart.
  */
 export const getStatsPageDailyData = query({
@@ -514,7 +514,7 @@ export const getSentencesForWord = query({
 
     // The frontend passes a normalized language (e.g. "es"), but userWordTexts
     // stores the raw code from the course (e.g. "es_latam"). Resolve it from
-    // the course's targetLanguages — no extra DB query needed.
+    // the course's targetLanguages, no extra DB query needed.
     const allLangs = [...baseLanguages, ...targetLanguages];
     const lang = allLangs.find(
       (l) => l === args.language || normalizeLanguageCode(l) === args.language,
@@ -592,7 +592,7 @@ export const getSentencesForWord = query({
 });
 
 // ============================================================================
-// INTERNAL QUERIES — currently unused by the UI but retained for future use
+// INTERNAL QUERIES, currently unused by the UI but retained for future use
 // (e.g. expanded stats views, admin dashboards, data exports).
 // These are internal so they don't pollute the public API surface.
 // ============================================================================
@@ -874,7 +874,7 @@ async function countDueCardsByState(
   if (!deck) return null;
 
   // With separateModeTracking on and the course in Writing mode, the due
-  // queue is the writing track — count from the matching aggregates so the
+  // queue is the writing track. Count from the matching aggregates so the
   // home pills and the celebration counts describe the queue the user will
   // actually be served. The caller may pass its optimistically-updated
   // reviewMode (same rationale as the explicit `filter` arg: the counts then
@@ -926,14 +926,14 @@ async function countDueCardsByState(
     review: reviewCount,
     // The writing aggregates are filled by the asynchronous enable-time seed,
     // so until it finishes these counts describe only the already-seeded
-    // prefix — near-zero at the start on a large deck. Flag that rather than
+    // prefix. Near-zero at the start on a large deck. Flag that rather than
     // report a confident 0/0/0/0, which reads as "nothing to study" when the
     // queue is merely still being built. (getCardForReviewEmptyReason reports
     // the same state as 'preparing_writing'.)
     //
     // `face === null` is load-bearing, exactly as in that query's gate:
     // schedulingTrackFromSettings ignores schedulingMode, so Free Study
-    // (radio + Writing) also resolves to track 'writing' — but free play
+    // (radio + Writing) also resolves to track 'writing', but free play
     // serves from the rotation and never reads the writing queue, so flagging
     // its counts provisional would grey out the pills for a queue the user is
     // never served.
@@ -962,7 +962,7 @@ export const getCardCounts = query({
       relearning: v.number(),
       review: v.number(),
       // Set while the separateModeTracking writing seed is still filling the
-      // writing aggregates — the counts above are a partial prefix, not a
+      // writing aggregates. The counts above are a partial prefix, not a
       // settled zero. See countDueCardsByState.
       preparingWriting: v.optional(v.boolean()),
     }),
@@ -982,7 +982,7 @@ export const getCardCounts = query({
  * can pass its optimistically-updated filter value and the counts flip in the
  * same frame as the dropdown. `now` is client-supplied per the no-wall-clock
  * query guideline (a stable, minute-quantized value also keeps the query
- * cacheable). A skewed `now` only shifts the caller's own counts — harmless.
+ * cacheable). A skewed `now` only shifts the caller's own counts. Harmless.
  *
  * Semantics mirror `fetchDueCardsWithFilter` (scheduling.ts): 'both' counts
  * everything (including legacy cards without a resolved origin), 'course'
@@ -992,7 +992,7 @@ export const getFilteredCardCounts = query({
   args: {
     filter: v.optional(studyContentFilterValidator),
     now: v.number(),
-    // Optimistic client value, same contract as `filter` — see
+    // Optimistic client value, same contract as `filter`. See
     // countDueCardsByState. Optional for back-compat (older bundles omit it
     // and get the settings-derived track).
     reviewMode: v.optional(reviewModeValidator),
@@ -1004,7 +1004,7 @@ export const getFilteredCardCounts = query({
       relearning: v.number(),
       review: v.number(),
       // Set while the separateModeTracking writing seed is still filling the
-      // writing aggregates — the counts above are a partial prefix, not a
+      // writing aggregates. The counts above are a partial prefix, not a
       // settled zero. See countDueCardsByState.
       preparingWriting: v.optional(v.boolean()),
     }),
@@ -1036,13 +1036,13 @@ function getDateFormatter(timeZone: string): Intl.DateTimeFormat {
 /**
  * Returns the actual word lists for the celebration screen, partitioned into
  * "this session" (highlighted) and "earlier today" (subdued). Words are
- * filtered to the active course's target languages — base languages are the
+ * filtered to the active course's target languages. Base languages are the
  * user's known languages, so they aren't celebrated as new vocabulary.
  *
  * Deduplication: a word is identified by (language, normalized form). If the
  * same word appears multiple times across rows, only the first occurrence is
  * kept. If it appears in both the current session and earlier today, the
- * session bucket wins — earlier-today only ever shows words the session does
+ * session bucket wins. Earlier-today only ever shows words the session does
  * not also contain.
  *
  * Bounded scan: we walk the most-recent userWords for the active course in
@@ -1066,7 +1066,7 @@ export const getNewWordsForCelebration = query({
 
     // userWords' only userId+courseId-scoped indexes also key on language, so
     // iterate the target languages explicitly. Each per-language scan is
-    // bounded — far more than enough to cover a single day at any realistic
+    // bounded. Far more than enough to cover a single day at any realistic
     // pace, with rows older than today being skipped in the dedup loop below.
     const PER_LANG_CAP = 250;
     const perLangRows = await Promise.all(
@@ -1092,7 +1092,7 @@ export const getNewWordsForCelebration = query({
     for (const row of rows) {
       if (!targetLanguages.has(row.language)) continue;
       // Drop anything not from "today" in the user's timezone. Rows are in
-      // desc creation order, but we don't break early — DST edge-cases mean a
+      // desc creation order, but we don't break early. DST edge-cases mean a
       // few stragglers can sit between today and yesterday in row order.
       if (dtf.format(new Date(row._creationTime)) !== todayStr) continue;
       const key = `${row.language}:${row.word}`;
@@ -1105,7 +1105,7 @@ export const getNewWordsForCelebration = query({
           bucket: isSession ? 'session' : 'today',
         });
       } else if (existing.bucket === 'today' && isSession) {
-        // Same word seen later as a session row — promote to session bucket.
+        // Same word seen later as a session row. Promote to session bucket.
         existing.bucket = 'session';
       }
     }

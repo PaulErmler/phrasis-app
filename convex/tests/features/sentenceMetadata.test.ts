@@ -216,7 +216,7 @@ describe("features/sentenceMetadata", () => {
 
     it("rethrows LLM infrastructure failures so the retrier still sees them", async () => {
       // The exception-attribution wrapper must capture-and-rethrow, not
-      // swallow — a swallowed error would defeat retrier backoff.
+      // swallow. A swallowed error would defeat retrier backoff.
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
       vi.mocked(generateText).mockRejectedValueOnce(new Error("network down"));
@@ -270,7 +270,7 @@ describe("features/sentenceMetadata", () => {
       // Producers (`createCustomText`, chat approval) forward entries that
       // can carry `translationSource` / `regionVariant`. The job validator
       // used to allow only `{language, text}` and threw an
-      // ArgumentValidationError at execution time — silently, since the
+      // ArgumentValidationError at execution time. Silently, since the
       // scheduling mutation had already returned success.
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
@@ -365,7 +365,7 @@ describe("features/sentenceMetadata", () => {
       );
       const after1 = await t.run(async (ctx) => ctx.db.get(textId));
       const firstReferent = after1?.referentGender;
-      // Run again — must not change.
+      // Run again. Must not change.
       await t.mutation(
         internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
         {
@@ -454,7 +454,7 @@ describe("features/sentenceMetadata", () => {
       const first = after1?.addresseeGender;
       expect(["male", "female"]).toContain(first);
 
-      // Second call with the same neutral incoming value — must NOT re-roll.
+      // Second call with the same neutral incoming value. Must NOT re-roll.
       await t.mutation(
         internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
         {
@@ -476,7 +476,7 @@ describe("features/sentenceMetadata", () => {
     });
 
     // Chat approval and custom-text creation insert their translations before
-    // any gender exists, leaving them unstamped — indistinguishable from the
+    // any gender exists, leaving them unstamped. Indistinguishable from the
     // pre-field "legacy" rows the gender-drift sweep treats as suspect. The
     // metadata step now finishes the record.
     it("stamps the resolved gender onto translations inserted before it ran", async () => {
@@ -512,7 +512,7 @@ describe("features/sentenceMetadata", () => {
     });
 
     // The retrier's second call can land a definitive gender that overturns
-    // the first call's coin flip. Text and translations must move together —
+    // the first call's coin flip. Text and translations must move together,
     // otherwise the stamp would turn a "legacy" row into a "drifted" one.
     it("re-stamps translations when a later definitive gender overturns the coin flip", async () => {
       const t = convexTest(schema, modules);
@@ -562,7 +562,7 @@ describe("features/sentenceMetadata", () => {
     });
 
     // Every caller of this mutation creates user-created cards, so the premade
-    // case is unreachable today — but stamping there would be silently wrong,
+    // case is unreachable today, but stamping there would be silently wrong,
     // not merely useless. An unstamped row on a premade text is genuinely
     // "legacy" (written before the field existed, plausibly under the other
     // gender); marking it as agreeing with the newly-resolved gender clears
@@ -612,7 +612,7 @@ describe("features/sentenceMetadata", () => {
 
       const text = await t.run(async (ctx) => ctx.db.get(textId));
       const row = await t.run(async (ctx) => ctx.db.get(translationId));
-      // The text still records the resolved gender — only the translation
+      // The text still records the resolved gender, only the translation
       // stamp is withheld.
       expect(text?.audioSpeakerGender).toBe("female");
       expect(row?.speakerGender).toBeUndefined();

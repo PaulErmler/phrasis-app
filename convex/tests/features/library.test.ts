@@ -78,8 +78,8 @@ async function seedLibrary(
 // One card per (origin × state) cell, with strictly increasing lastReviewedAt
 // in seed order so index/merge descending order is fully determined:
 // premade 1-4, custom 5-8, chat 9-12 (plain, mastered, favorite, hidden).
-// Every card gets a searchableText containing the shared token "lexeme" —
-// convex-test evaluates the search filter against every row in the table, so
+// Every card gets a searchableText containing the shared token "lexeme".
+// Convex-test evaluates the search filter against every row in the table, so
 // the field must be present on all of them.
 function matrixSeeds(): CardSeed[] {
   const origins: readonly Origin[] = ["premade", "custom", "chat"];
@@ -320,7 +320,7 @@ describe("features/library", () => {
   });
 
   // convex-test evaluates search indexes as word-prefix matching over the
-  // search field and returns matches in insertion order — it does not model
+  // search field and returns matches in insertion order. It does not model
   // relevance ranking. Single-bucket search branches therefore pin membership
   // only (sorted), while the source='custom' branch re-sorts by lastReviewedAt
   // server-side so its order IS asserted.
@@ -449,7 +449,7 @@ describe("features/library", () => {
     it("truncates to LIBRARY_LIMIT after merging, not per bucket", async () => {
       // 70 custom cards (even lastReviewedAt 0..138) + 70 chat cards (odd
       // 1..139). Each bucket is under the per-bucket take(100), so a correct
-      // post-merge slice keeps the global top 100 (139 down to 40) — a
+      // post-merge slice keeps the global top 100 (139 down to 40), a
       // per-bucket truncation or an unsliced concat would return a different
       // set/length.
       const seeds: CardSeed[] = [];
@@ -604,9 +604,9 @@ describe("CJK search (no-word-boundary languages)", () => {
     expect(res.map((c) => c.sourceText)).toEqual(["你真的体贴"]);
   });
 
-  describe("augmentSearchQuery — 16-term budget", () => {
+  describe("augmentSearchQuery: 16-term budget", () => {
     // Convex tokenizes the query on punctuation as well as whitespace, so the
-    // budget must count terms the same way — exceeding 16 terms makes the
+    // budget must count terms the same way, exceeding 16 terms makes the
     // real search index throw instead of returning results.
     //
     // Enumerates the SEPARATORS rather than the keepers, on purpose: this
@@ -620,7 +620,7 @@ describe("CJK search (no-word-boundary languages)", () => {
       const query = "私は日本語を勉強しています、友達と毎日話します。";
       const augmented = augmentSearchQuery(query, ["en", "ja"]);
       expect(termCount(augmented)).toBeLessThanOrEqual(16);
-      // Still actually augmented — segments were appended.
+      // Still actually augmented. Segments were appended.
       expect(termCount(augmented)).toBeGreaterThan(termCount(query));
     });
 
@@ -639,7 +639,7 @@ describe("CJK search (no-word-boundary languages)", () => {
 
     it("truncates a base query that itself exceeds 16 terms", () => {
       // The regression this exists for: the budget only capped the APPENDED
-      // segments — a pasted 20-word sentence sailed through unchanged and
+      // segments. A pasted 20-word sentence sailed through unchanged and
       // made the search throw instead of returning partial results.
       const twentyWords = Array.from({ length: 20 }, (_, i) => `word${i}`).join(
         " ",

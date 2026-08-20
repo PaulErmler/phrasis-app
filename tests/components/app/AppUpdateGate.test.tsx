@@ -4,15 +4,15 @@ import { AppUpdateGate, useReloadBlock } from '@/components/app/AppUpdateGate';
 
 /**
  * AppUpdateGate is the only thing that gets a long-lived /app session off a
- * stale bundle, and it does so by reloading the page out from under the user —
+ * stale bundle, and it does so by reloading the page out from under the user,
  * so both directions are costly. Reloading too eagerly destroys an in-progress
  * review, a half-typed card, or a streaming chat response (all of which live in
  * component state only). Not reloading at all leaves an installed PWA running
  * week-old JS against a moved-on Convex backend.
  *
- * The cases below pin the four conditions that gate the silent reload — a real
+ * The cases below pin the four conditions that gate the silent reload. A real
  * mismatch, a long enough absence, no registered blocker, and no recent failed
- * attempt — plus the escalation and chunk-error fallbacks.
+ * attempt, plus the escalation and chunk-error fallbacks.
  */
 
 const reloadMock = vi.fn();
@@ -117,7 +117,7 @@ describe('AppUpdateGate', () => {
     );
 
     await renderGate();
-    // The mount-time check finds the update but must not act on it — the user
+    // The mount-time check finds the update but must not act on it. The user
     // is right there, looking at the page.
     expect(reloadMock).not.toHaveBeenCalled();
 
@@ -242,7 +242,7 @@ describe('AppUpdateGate', () => {
   });
 
   it('stops auto-reloading if an attempt at the same build did not stick', async () => {
-    // Simulates coming back from a reload still running the old bundle — the
+    // Simulates coming back from a reload still running the old bundle. The
     // signal that something upstream is serving a stale document. Reloading
     // again would loop, and no amount of elapsed time makes a retry sensible,
     // so the guard is one-shot per build rather than time-windowed.
@@ -282,7 +282,7 @@ describe('AppUpdateGate', () => {
 
   it('checks again when connectivity returns, without reloading the visible tab', async () => {
     // Mount happens offline, so the gate learns nothing. Coming back online is
-    // the retry signal — but the user never left, so hiddenForMs is 0 and the
+    // the retry signal, but the user never left, so hiddenForMs is 0 and the
     // update may only arm the toast, never yank the page.
     const fetchMock = vi
       .fn()
@@ -310,8 +310,8 @@ describe('AppUpdateGate', () => {
 
   it('goes fully quiet after unmount', async () => {
     // The gate wraps the /app shell, which can unmount on sign-out. Its
-    // document/window listeners and the escalation timer must die with it —
-    // a reload or toast fired by a dead gate would hit whatever replaced it.
+    // document/window listeners and the escalation timer must die with it.
+    // A reload or toast fired by a dead gate would hit whatever replaced it.
     const fetchMock = vi
       .fn()
       .mockResolvedValue(mockVersionResponse(NEWER_BUILD));

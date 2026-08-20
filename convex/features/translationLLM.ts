@@ -16,7 +16,7 @@
  * sent.
  *
  * Truncation handling: if OpenRouter returns finishReason === 'length' (the
- * call hit MAX_OUTPUT_TOKENS — typically because reasoning ate the whole
+ * call hit MAX_OUTPUT_TOKENS, typically because reasoning ate the whole
  * budget) or the visible content is empty after stripping reasoning, the
  * function returns `{ ok: false, reason }` instead of throwing. Callers use
  * that signal to fall back to Google Translate so the user still gets a
@@ -46,7 +46,7 @@ export const MAX_OUTPUT_TOKENS = 5_000;
  * OpenRouter's documented reasoning-effort levels. The
  * `@openrouter/ai-sdk-provider@1.5.4` types only enumerate
  * `'high' | 'medium' | 'low'`, but OpenRouter itself accepts `'minimal'`
- * (and `'none'` / `'xhigh'`) at runtime — for Gemini 3 / 3.1 it maps
+ * (and `'none'` / `'xhigh'`) at runtime, for Gemini 3 / 3.1 it maps
  * `effort: 'minimal'` to Google's `thinkingLevel: 'minimal'`, which is
  * strictly lower than `'low'`. We allow `'minimal'` here and cast at the
  * SDK boundary in `translateTextWithLLM` below.
@@ -57,7 +57,7 @@ export type ReasoningEffort =
 /**
  * What the call cost and how long it took, regardless of outcome.
  *
- * Carried on every result branch — including failures — because a stage that
+ * Carried on every result branch, including failures, because a stage that
  * truncates still burned tokens, and a cost dashboard that only counts
  * successes understates the bill exactly where it hurts most.
  *
@@ -92,12 +92,12 @@ export type LlmTranslationResult =
   | LlmTranslationFailure;
 
 /**
- * Prompt B (XML-structured) — extended with a <referent_gender> tag.
+ * Prompt B (XML-structured), extended with a <referent_gender> tag.
  *
  * Conditional rendering (handled in `buildPrompt` below):
- *   - `<speaker_gender>`   — always emitted; falls back to 'unspecified'.
- *   - `<referent_gender>`  — always emitted; 'male' or 'female'.
- *   - `<addressee_gender>` and `<register>` — only emitted when
+ *   - `<speaker_gender>`: always emitted; falls back to 'unspecified'.
+ *   - `<referent_gender>`: always emitted; 'male' or 'female'.
+ *   - `<addressee_gender>` and `<register>`: only emitted when
  *     `addressesSomeone === true`. Descriptive sentences omit them entirely.
  *
  * 'neutral' register is intentionally treated as informal in the instructions
@@ -141,7 +141,7 @@ export type TranslationPromptArgs = {
    * Previous (flagged) translation, when this call is a retranslation
    * triggered by `flagTranslation`. Surfaced to the model so it can see
    * what the user rejected. The prompt is careful to note the previous
-   * translation might still be correct — we want the model to reconsider
+   * translation might still be correct. We want the model to reconsider
    * rather than feel pressured to differ.
    */
   previousTranslation?: string;
@@ -149,7 +149,7 @@ export type TranslationPromptArgs = {
 
 /**
  * The `<context>` block lines shared by the translation prompt and the
- * best-of-N judge prompt — the judge must see exactly the constraints the
+ * best-of-N judge prompt. The judge must see exactly the constraints the
  * candidates were generated under.
  */
 function buildContextLines(args: TranslationPromptArgs): string[] {
@@ -201,7 +201,7 @@ export function buildPrompt(args: TranslationPromptArgs): string {
       : [];
 
   // Optional previous-translation block. Surfaces what the user flagged so
-  // the model can reconsider — explicitly leaving open that the prior was
+  // the model can reconsider. Explicitly leaving open that the prior was
   // correct, so the model isn't forced to change its answer just to look
   // different from a translation that might already be right.
   const prevBlock = args.previousTranslation
@@ -234,8 +234,8 @@ export function buildPrompt(args: TranslationPromptArgs): string {
 
 /**
  * Build the judge prompt for a best-of-N stage. Ported from the Aug 2026
- * eval harness (data_preparation/translation_eval, `build_judge_prompt`) —
- * the configuration that blind raters preferred ~2.2:1 over single-call
+ * eval harness (data_preparation/translation_eval, `build_judge_prompt`).
+ * The configuration that blind raters preferred ~2.2:1 over single-call
  * output. The candidate list MUST already be shuffled by the caller so
  * position never encodes which temperature produced a candidate.
  */
@@ -280,7 +280,7 @@ function stripWrappingQuotes(s: string): string {
  * Map a reasoning value + optional provider-routing constraints to the
  * per-call `providerOptions.openrouter` body.
  *
- * `'none'` MUST be sent as `reasoning: { enabled: false }` — merely omitting
+ * `'none'` MUST be sent as `reasoning: { enabled: false }`. Merely omitting
  * the field is not equivalent for models like GPT-5.6 Luna, which reason
  * adaptively (and bill the hidden tokens) unless thinking is explicitly
  * disabled. Other efforts pass through as `{ effort }`; the SDK's typed enum
@@ -316,7 +316,7 @@ type LlmCallConfig = {
    */
   maxOutputTokens?: number;
   /**
-   * Sampling temperature. Defaults to 0 (deterministic) — only best-of-N
+   * Sampling temperature. Defaults to 0 (deterministic), only best-of-N
    * candidate calls pass a non-zero value.
    */
   temperature?: number;
@@ -335,7 +335,7 @@ type LlmCallConfig = {
 /**
  * OpenRouter client with usage accounting on (this is the highest-volume
  * LLM path in the app and was previously the largest unmeasured line on
- * the bill), or null when the key is missing — every caller must degrade
+ * the bill), or null when the key is missing. Every caller must degrade
  * to its structured-failure path instead of letting the SDK throw an
  * opaque error mid-call.
  */
@@ -359,7 +359,7 @@ export async function translateTextWithLLM(
 
   const prompt = buildPrompt(args);
   // Reasoning is decided by the caller (translation rule). Pass through
-  // verbatim — no length-based hybrid in this layer.
+  // verbatim, no length-based hybrid in this layer.
   const effort = args.reasoning;
   const maxOutputTokens = args.maxOutputTokens ?? MAX_OUTPUT_TOKENS;
 
@@ -387,8 +387,8 @@ export async function translateTextWithLLM(
       ok: false,
       reason: 'http_error',
       detail: detail.slice(0, 200),
-      // No usage figures exist — the request never produced a billable
-      // generation — but the latency and model are still worth charting.
+      // No usage figures exist. The request never produced a billable
+      // generation, but the latency and model are still worth charting.
       telemetry: {
         model: args.model,
         latencyMs: Date.now() - startedAt,
@@ -418,7 +418,7 @@ export async function translateTextWithLLM(
   };
 
   // Truncation: the model hit maxOutputTokens. Visible content may or may
-  // not be present, but we don't trust it — for reasoning-on calls, hitting
+  // not be present, but we don't trust it, for reasoning-on calls, hitting
   // the cap usually means thinking ate the budget. Fall back to Google.
   if (finishReason === 'length') {
     console.warn('[translationLLM] truncated by max_tokens', {
@@ -488,7 +488,7 @@ export type BestOfNTelemetry = LlmCallTelemetry & {
   /**
    * Length of THIS call's own visible output (successful candidates only).
    * The hidden-reasoning heuristic must compare each call's token count
-   * against its own text — the winner's length says nothing about a losing
+   * against its own text. The winner's length says nothing about a losing
    * candidate's.
    */
   visibleTextLength?: number;
@@ -499,7 +499,7 @@ export type BestOfNResult = {
    * Same contract as `translateTextWithLLM`'s result: `ok: true` carries the
    * judge-picked text; failures use the existing reason vocabulary so the
    * queue's fallback handling is unchanged. The `telemetry` on this result is
-   * the WINNING candidate's — the full per-call list is `telemetryList`.
+   * the WINNING candidate's. The full per-call list is `telemetryList`.
    */
   result: LlmTranslationResult;
   telemetryList: BestOfNTelemetry[];
@@ -535,7 +535,7 @@ function seededShuffle<T>(items: T[], seed: string): T[] {
   return arr;
 }
 
-/** Cap for judge responses — the verdict is a single number. */
+/** Cap for judge responses. The verdict is a single number. */
 const JUDGE_MAX_OUTPUT_TOKENS = 200;
 
 /**
@@ -558,7 +558,7 @@ function parseJudgeVerdict(text: string, candidateCount: number): number | null 
  *  - Candidate calls fail independently; one usable candidate is enough.
  *  - The judge is retried up to `stage.judge.maxRetries` extra times on
  *    transport errors; an exhausted or unparseable judge falls back to the
- *    temp-0 anchor — the stage still succeeds.
+ *    temp-0 anchor: the stage still succeeds.
  *  - Only a full candidate wipe-out returns `ok: false`, advancing the rule
  *    to its next fallback stage.
  */
@@ -650,8 +650,8 @@ export async function translateBestOfN(
   const maxAttempts = 1 + (judge.maxRetries ?? 2);
   const judgeProviderOptions = openrouterCallOptions(judge.reasoning, judge.provider);
 
-  // Null is unreachable in practice — a missing key already failed every
-  // candidate above — but degrade to the anchor pick instead of an SDK crash.
+  // Null is unreachable in practice. A missing key already failed every
+  // candidate above, but degrade to the anchor pick instead of an SDK crash.
   const openrouter = openrouterClient();
 
   let pickedText: string | null = null;
@@ -678,7 +678,7 @@ export async function translateBestOfN(
       });
       const verdict = parseJudgeVerdict(judgeResult.text, shuffled.length);
       if (verdict === null) {
-        // Unparseable verdicts are a model-behavior problem, not transport —
+        // Unparseable verdicts are a model-behavior problem, not transport,
         // retrying the identical prompt rarely helps. Fall back to the anchor.
         judgeFallback = true;
         console.warn('[translationLLM] bo3 judge verdict unparseable', {

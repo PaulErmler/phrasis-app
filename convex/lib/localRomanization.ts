@@ -30,7 +30,7 @@ import { SUPPORTED_LANGUAGES } from '../../lib/languages';
  *
  * Arabic was moved here off the Google v3 path after a regression where the
  * romanizeText endpoint started returning `{"romanizations":[{}]}` for short
- * Arabic strings (200 OK, empty entry — the Vyshantha/arabic-transliterate
+ * Arabic strings (200 OK, empty entry, the Vyshantha/arabic-transliterate
  * library produces a deterministic IJMES romanization with zero deps, fine
  * for the Convex V8 runtime).
  */
@@ -94,7 +94,7 @@ export function getRomanizationSource(language: string): RomanizationSource {
   }
   if (language === 'fa') return ROMANIZATION_SOURCES.sindresorhusTransliterate;
   // Everything else in ROMANIZATION_LANGUAGES (ru, hi, ja, bn) routes
-  // through Google v3 — see `romanizeText` in convex/features/translation.ts.
+  // through Google v3. See `romanizeText` in convex/features/translation.ts.
   return ROMANIZATION_SOURCES.googleV3;
 }
 
@@ -103,7 +103,7 @@ export function getRomanizationSource(language: string): RomanizationSource {
  * TTS comparison is worthwhile. Chinese (Simplified + Traditional) and Korean
  * benefit because Scribe often returns a homophone character with
  * identical/near-identical romanization; Greek is excluded because the
- * hanzi/hangul ambiguity doesn't apply — Greek orthography is already closely
+ * hanzi/hangul ambiguity doesn't apply. Greek orthography is already closely
  * phonetic.
  */
 export const TTS_ROMANIZATION_LANGUAGES = new Set([
@@ -116,7 +116,7 @@ export function shouldRomanizeForTtsMatch(code: string): boolean {
 
 /**
  * Romanize `text` in `language` using a local library.
- * Returns `null` when the language has no local romanizer — the caller must
+ * Returns `null` when the language has no local romanizer. The caller must
  * fall back to a remote romanization API.
  */
 export function romanizeLocal(text: string, language: string): string | null {
@@ -149,7 +149,7 @@ export function romanizeLocal(text: string, language: string): string | null {
     // don't appear. The library passes a few combining marks through unchanged,
     // so strip them post-transliteration or they leak as invisible/garbled
     // chars: U+200C zero-width non-joiner (between word parts), U+0654 hamza
-    // above (the ezafe hamza on -e/-eh words — very common), and U+0670
+    // above (the ezafe hamza on -e/-eh words, very common), and U+0670
     // superscript alef.
     // Alternation (not a character class) avoids no-misleading-character-class,
     // which flags combining marks like U+0654/U+0670 inside `[...]`.
@@ -160,7 +160,7 @@ export function romanizeLocal(text: string, language: string): string | null {
 
 /**
  * Traditional→simplified converter, built ONCE on first use: `OpenCC.Converter`
- * compiles a lookup trie, far too expensive to rebuild per sentence — but also
+ * compiles a lookup trie, far too expensive to rebuild per sentence, but also
  * too expensive to build at import time, since every Convex isolate importing
  * this module (translations, migrations, TTS matching) would pay it on cold
  * start whether or not it ever romanizes zh_traditional.
@@ -169,7 +169,7 @@ let t2cn: ((text: string) => string) | undefined;
 const traditionalToSimplified = (text: string): string =>
   (t2cn ??= OpenCC.Converter({ from: 'tw', to: 'cn' }))(text);
 
-/** Runs of Han characters — the only spans `chinese-to-pinyin` should see. */
+/** Runs of Han characters. The only spans `chinese-to-pinyin` should see. */
 const HAN_RUN = /\p{Script=Han}+/gu;
 
 /**
@@ -193,7 +193,7 @@ function joinRomanizedSegments(segments: string[]): string {
  * 1. It DELETED everything non-Han. The library defaults to `keepRest: false`,
  *    so punctuation, Latin words and digits silently vanished ("我有2个苹果。"
  *    → "wǒ yǒu gè píng guǒ"). We romanize each Han run separately and pass the
- *    gaps through verbatim instead — `keepRest: true` would keep them but glue
+ *    gaps through verbatim instead: `keepRest: true` would keep them but glue
  *    them onto the neighbouring syllable ("wǒ yǒu2gè"). Splitting on non-Han
  *    boundaries never splits a word, so segmentation quality is unaffected.
  *
@@ -204,7 +204,7 @@ function joinRomanizedSegments(segments: string[]): string {
  *    Converting to simplified first hands the segmenter a dictionary it can
  *    match; pinyin is script-independent, so the output is identical for text
  *    that was already unambiguous. Known residual: 很長 still reads "zhǎng"
- *    rather than "cháng" — that one fails on simplified too, i.e. a library
+ *    rather than "cháng": that one fails on simplified too, i.e. a library
  *    limit rather than a script problem.
  *
  * Mirrors `romanizeCantonese`'s buffer-and-join shape below.
@@ -214,11 +214,11 @@ function romanizeChinese(text: string, traditional: boolean): string {
 
   const segments: string[] = [];
   let lastIndex = 0;
-  // `matchAll` over a fresh iterator — HAN_RUN carries /g, so never rely on
+  // `matchAll` over a fresh iterator. HAN_RUN carries /g, so never rely on
   // its mutable lastIndex across calls.
   for (const match of source.matchAll(HAN_RUN)) {
     const start = match.index;
-    // Gap since the previous Han run (punctuation, Latin, digits) — verbatim.
+    // Gap since the previous Han run (punctuation, Latin, digits), verbatim.
     if (start > lastIndex) segments.push(source.slice(lastIndex, start));
     segments.push(pinyin(match[0]) as string);
     lastIndex = start + match[0].length;
@@ -231,10 +231,10 @@ function romanizeChinese(text: string, traditional: boolean): string {
 /**
  * Convert a Cantonese string to LSHK / Jyutping notation via `to-jyutping`
  * (rime-cantonese data with word-level segmentation, so polyphonic characters
- * get their in-context reading — 食 → sik6, 可以 → ho2 ji5 — and vernacular
+ * get their in-context reading. 食 → sik6, 可以 → ho2 ji5, and vernacular
  * particles like 嘅/㗎/哋/嘢/咗 all resolve; both traditional AND simplified
- * script are covered). We use `getJyutpingList` — one `[char, reading|null]`
- * pair per codepoint — instead of `getJyutpingText`, because the latter
+ * script are covered). We use `getJyutpingList`. One `[char, reading|null]`
+ * pair per codepoint, instead of `getJyutpingText`, because the latter
  * collapses non-Han runs (Latin, digits) into a literal "[…]".
  *
  * Characters with a `null` reading (punctuation, spaces, Latin, digits) pass

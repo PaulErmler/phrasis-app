@@ -114,7 +114,7 @@ async function blobExists(
 
 describe("audioAssets content-addressed cache", () => {
   describe("cache reuse at scheduleAudioForLanguage", () => {
-    it("second text with the identical string attaches to the asset — no claim, no TTS job", async () => {
+    it("second text with the identical string attaches to the asset, no claim, no TTS job", async () => {
       const t = convexTest(schema, modules);
       const textA = await seedText(t, "Hola");
       const blob = await storeBlob(t, 1);
@@ -137,7 +137,7 @@ describe("audioAssets content-addressed cache", () => {
       expect((await getAllAssets(t)).length).toBe(1);
     });
 
-    it("a different gender is a different key — no reuse, job enqueued", async () => {
+    it("a different gender is a different key, no reuse, job enqueued", async () => {
       const t = convexTest(schema, modules);
       const textA = await seedText(t, "Hola");
       await storeFinal(t, {
@@ -156,7 +156,7 @@ describe("audioAssets content-addressed cache", () => {
       expect(await getClaim(t, textB)).not.toBeNull();
     });
 
-    it("a whitespace variant is a different key — the raw string is never normalized", async () => {
+    it("a whitespace variant is a different key, the raw string is never normalized", async () => {
       const t = convexTest(schema, modules);
       const textA = await seedText(t, "Hola");
       await storeFinal(t, {
@@ -198,7 +198,7 @@ describe("audioAssets content-addressed cache", () => {
       expect(await getClaim(t, textB)).not.toBeNull();
     });
 
-    it("a version-stale asset is not reused — and the re-synthesis patches it in place for every sharer", async () => {
+    it("a version-stale asset is not reused, and the re-synthesis patches it in place for every sharer", async () => {
       const t = convexTest(schema, modules);
       const textA = await seedText(t, "Hola");
       const oldBlob = await storeBlob(t, 1);
@@ -233,7 +233,7 @@ describe("audioAssets content-addressed cache", () => {
       expect(assets.length).toBe(1);
       expect(assets[0].storageId).toBe(newBlob);
       expect(assets[0].ttsVersion).toBe(getCurrentTtsVersion("es"));
-      // Text A shares the healed asset — no sweep needed on its side.
+      // Text A shares the healed asset, no sweep needed on its side.
       const rowA = await getRow(t, textA);
       expect(rowA?.assetId).toBe(assets[0]._id);
       // The replaced blob is deleted on a delay, not immediately.
@@ -259,7 +259,7 @@ describe("audioAssets content-addressed cache", () => {
       expect((await getRow(t, textA))?.assetId).toBe(assets[0]._id);
     });
 
-    it("a mid-flight 'unknown' write never clobbers completed audio — pointer only, incoming blob dropped", async () => {
+    it("a mid-flight 'unknown' write never clobbers completed audio, pointer only, incoming blob dropped", async () => {
       const t = convexTest(schema, modules);
       const textA = await seedText(t, "Hola");
       const goodBlob = await storeBlob(t, 1);
@@ -286,7 +286,7 @@ describe("audioAssets content-addressed cache", () => {
       expect(await blobExists(t, incomingBlob)).toBe(false);
     });
 
-    it("a completed 'unvalidated' write replaces 'validated' audio — a regeneration always lands", async () => {
+    it("a completed 'unvalidated' write replaces 'validated' audio, a regeneration always lands", async () => {
       const t = convexTest(schema, modules);
       const textA = await seedText(t, "Hola");
       const blob1 = await storeBlob(t, 1);
@@ -360,7 +360,7 @@ describe("audioAssets content-addressed cache", () => {
 
       // A racing job under the male gender key completes for the same
       // (text, language): the row repoints to the new asset, and the female
-      // asset — now pointerless — must not leak.
+      // asset. Now pointerless. Must not leak.
       const maleBlob = await storeBlob(t, 2);
       await storeFinal(t, {
         textId: textA,

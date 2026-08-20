@@ -29,7 +29,7 @@ import { api, internal } from "../../../_generated/api";
 import type { Id } from "../../../_generated/dataModel";
 import type { ProposedCardMetadata } from "../../../types";
 import { insertAudioFixture } from "../../lib/audioFixtures";
-// Module-mocked globally (tests/convexTestSetup.ts) — used to assert on the
+// Module-mocked globally (tests/convexTestSetup.ts), used to assert on the
 // voice the replace path enqueues.
 import { ttsPool } from "../../../lib/workpools";
 
@@ -108,7 +108,7 @@ async function seedOwnedCard(
   });
 }
 
-/** Raw result — `{ status: 'created', approvalId }` or `{ status: 'identical' }`. */
+/** Raw result. `{ status: 'created', approvalId }` or `{ status: 'identical' }`. */
 async function createApprovalResult(
   t: TestConvex<typeof schema>,
   cardId: Id<"cards">,
@@ -174,7 +174,7 @@ describe("features/chat/alsoCorrect", () => {
     // The single most common Writing-mode case: the user typed the sentence
     // correctly (or missed a diacritic), so the model's "keep their wording,
     // fix punctuation/diacritics" output IS the card. That must be a silent
-    // no-op — throwing rendered a red "Could not save your version" box on a
+    // no-op, throwing rendered a red "Could not save your version" box on a
     // right answer.
     it("reports a no-op (not an error) for a proposal identical to the card", async () => {
       const t = convexTest(schema, modules);
@@ -363,7 +363,7 @@ describe("features/chat/alsoCorrect", () => {
     });
 
     // Path B deletes the old card document, so a second pending proposal for
-    // the same card would dead-end on "Card not found" — the button silently
+    // the same card would dead-end on "Card not found". The button silently
     // doing nothing on every retry. Same-thread siblings are retargeted.
     it("retargets other pending proposals in the thread after a Path B replace", async () => {
       const t = convexTest(schema, modules);
@@ -401,7 +401,7 @@ describe("features/chat/alsoCorrect", () => {
 
     // Path B rebuilds the card document field by field. Every counter it
     // carries is history that an edit must not reset, and none of them have a
-    // backfill — a drop is unrecoverable.
+    // backfill. A drop is unrecoverable.
     it("Path B preserves reviewCountByMode across the card replacement", async () => {
       const t = convexTest(schema, modules);
       const { cardId, deckId } = await seedOwnedCard(t, { userCreated: false });
@@ -497,7 +497,7 @@ describe("features/chat/alsoCorrect", () => {
         ),
       );
       expect(cards).toHaveLength(1);
-      // The shared row must never be patched — metadata landed on the copy.
+      // The shared row must never be patched. Metadata landed on the copy.
       expect(cards[0].textId).not.toBe(textId);
       const newText = await t.run(async (ctx) => ctx.db.get(cards[0].textId));
       expect(newText?.userCreated).toBe(true);
@@ -545,7 +545,7 @@ describe("features/chat/alsoCorrect", () => {
       );
 
       // The replace deletes the stale es audio and enqueues the re-synthesis
-      // inside applyCardEdit — that synthesis must already use the proposed
+      // inside applyCardEdit. That synthesis must already use the proposed
       // male voice: the later prepareCardContent pass is blocked by the TTS
       // claim this enqueue just took, so it cannot correct a wrong voice.
       const esJobs = vi
@@ -626,7 +626,7 @@ describe("features/chat/alsoCorrect", () => {
 
       // …and running it hits the payload-mismatch branch: the female-voiced
       // audio POINTER for es is detached so it regenerates with the male
-      // voice — while the asset + blob stay in the audioAssets cache (the
+      // voice, while the asset + blob stay in the audioAssets cache (the
       // recording is still correct for this string+voice; only the
       // regenerate button and TTS-system migrations fully delete audio).
       await t.mutation(internal.features.decks.prepareCardContent, {

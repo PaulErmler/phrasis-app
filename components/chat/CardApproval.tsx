@@ -60,7 +60,7 @@ export function Lang({ code }: { code: string }) {
 
 /**
  * Sentence lines for an approval box. `baseEntries` render muted/small,
- * `targetEntries` bold — CardApproval maps base/target languages onto the
+ * `targetEntries` bold. CardApproval maps base/target languages onto the
  * slots; AlsoCorrectApproval maps unchanged/changed entries instead (the
  * split is purely presentational).
  */

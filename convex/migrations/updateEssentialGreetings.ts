@@ -15,9 +15,9 @@ import {
 } from './data/essentialGreetingTranslations';
 
 /**
- * One-off migration: replace the first three L01 ("Essential") sentences —
+ * One-off migration: replace the first three L01 ("Essential") sentences.
  * "Hi." / "Hello!" / "Hi! How are you?" → "Hello." / "How are you?" /
- * "Hello. How are you?" — and upload the hand-curated translations from
+ * "Hello. How are you?", and upload the hand-curated translations from
  * ./data/essentialGreetingTranslations for every supported language.
  *
  * Motivation: "Hi." and "Hello!" translate to the same word in many
@@ -25,10 +25,10 @@ import {
  *
  * What it does per sentence (idempotent, safe to re-run):
  *   1. Patches `texts.text` in the ACTIVE dataset (matched by externalId) and
- *      deletes the English audio rows — the text changed audibly and
+ *      deletes the English audio rows: the text changed audibly and
  *      `audioRecordings` stores no source text, so nothing else would notice.
  *   2. Schedules one `storeTranslationAndScheduleTTS` job per curated
- *      language with `replaceExisting: true` — the choke point handles the
+ *      language with `replaceExisting: true`: the choke point handles the
  *      soundsSame audio decision, version stamping, and the searchableText
  *      rebuild fan-out. `skipTts: true`: audio regenerates lazily via the
  *      ensure-content sweep on next view, like any other content self-heal.

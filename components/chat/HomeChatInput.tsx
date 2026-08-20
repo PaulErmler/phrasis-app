@@ -33,7 +33,7 @@ import { cn, convexErrorCode, isPaymentPastDueError } from '@/lib/utils';
  *
  * Deliberately simpler than {@link NewChatInput} (no suggestions, no
  * multi-line textarea, no character counter) because the home-view input is
- * a quick-start shortcut — full chat composition happens after navigation.
+ * a quick-start shortcut. Full chat composition happens after navigation.
  */
 
 const LOW_BALANCE_THRESHOLD = 5;
@@ -155,7 +155,7 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
             placeholder={t('placeholder')}
             disabled={isProcessing}
             data-testid="chat-new-input"
-            // Learners often type in the target language — dir="auto" makes
+            // Learners often type in the target language. dir="auto" makes
             // RTL input read right-to-left while typing.
             dir="auto"
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:opacity-60"

@@ -183,7 +183,7 @@ describe('features/chat/quickActions', () => {
         'in the target languages Romanian and Spanish (Spain)',
       );
       expect(out).toContain('Cover EACH of them in this reply');
-      // Plural phrasing — no stray "the target language" singular.
+      // Plural phrasing, no stray "the target language" singular.
       expect(out).not.toContain('— the target language.');
     });
 

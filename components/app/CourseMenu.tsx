@@ -304,7 +304,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
           </div>
 
           {/* Rendered INSIDE SheetContent so its portal events bubble through
-              this Sheet's React tree — Radix then treats interactions with
+              this Sheet's React tree. Radix then treats interactions with
               (and focus inside) the nested settings Sheet as "inside" and
               won't dismiss this Sheet when the nested one opens or closes. */}
           <CourseLanguageSettings

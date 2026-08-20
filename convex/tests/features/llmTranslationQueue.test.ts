@@ -14,7 +14,7 @@ import { generateText } from "ai";
 import schema from "../../schema";
 import { internal } from "../../_generated/api";
 import { Id } from "../../_generated/dataModel";
-// The workpools are module-mocked globally (tests/convexTestSetup.ts — outside convex/ on purpose, see vitest.config.ts):
+// The workpools are module-mocked globally (tests/convexTestSetup.ts, outside convex/ on purpose, see vitest.config.ts):
 // `enqueueAction` is a vi.fn() resolving to unique fake workIds
 // ('test-llm-work-N'), so tests can assert claim→workId stamping and drive
 // the onComplete handlers by hand.
@@ -26,12 +26,12 @@ const mockEnqueue = vi.mocked(llmPool.enqueueAction);
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
-// Some flows (storeTranslationAndScheduleTTS) still run 0ms scheduled work —
-// drain it inside the test context so its logs don't race vitest teardown.
+// Some flows (storeTranslationAndScheduleTTS) still run 0ms scheduled work.
+// Drain it inside the test context so its logs don't race vitest teardown.
 drainSchedulerAfterEach();
 
 beforeEach(() => {
-  // Clear calls only — the setup-file implementation (unique fake workIds)
+  // Clear calls only. The setup-file implementation (unique fake workIds)
   // must stay installed.
   mockEnqueue.mockClear();
 });
@@ -160,8 +160,8 @@ describe("features/llmTranslationQueue", () => {
         { args: baseArgs(textId) },
       );
 
-      // No duplicate job, and the live owner keeps its claim untouched —
-      // this guard stops an enqueue that doesn't re-claim from hijacking an
+      // No duplicate job, and the live owner keeps its claim untouched.
+      // This guard stops an enqueue that doesn't re-claim from hijacking an
       // in-flight job's claim.
       expect(mockEnqueue).not.toHaveBeenCalled();
       const claim = await getClaim(t, textId);
@@ -501,7 +501,7 @@ describe("features/llmTranslationQueue", () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
 
-      // The claim belongs to the pool job — the worker must not touch it.
+      // The claim belongs to the pool job. The worker must not touch it.
       await t.run(async (ctx) => {
         await ctx.db.insert("llmTranslationClaims", {
           textId,
@@ -518,7 +518,7 @@ describe("features/llmTranslationQueue", () => {
         baseArgs(textId),
       );
 
-      // Translations row created (first stage won — 3 identical bo3
+      // Translations row created (first stage won, 3 identical bo3
       // candidates, judge skipped).
       const translations = await t.run(async (ctx) =>
         ctx.db
@@ -534,7 +534,7 @@ describe("features/llmTranslationQueue", () => {
       );
       expect(vi.mocked(generateText)).toHaveBeenCalledTimes(3);
 
-      // Claim untouched — release is onLlmTranslationComplete's job.
+      // Claim untouched. Release is onLlmTranslationComplete's job.
       const claim = await getClaim(t, textId);
       expect(claim).not.toBeNull();
       expect(claim?.workId).toBe("pool-w-1");
@@ -557,7 +557,7 @@ describe("features/llmTranslationQueue", () => {
       expect(vi.mocked(generateText)).not.toHaveBeenCalled();
     });
 
-    it("on truncation (finishReason=length) on every stage: THROWS — the pool owns retries", async () => {
+    it("on truncation (finishReason=length) on every stage: THROWS, the pool owns retries", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
 
@@ -575,12 +575,12 @@ describe("features/llmTranslationQueue", () => {
       ).rejects.toThrow(/stage chain failed/);
 
       // 'de' resolves to the luna_bo3 chain: 3 parallel bo3 candidates
-      // (all truncated → no judge) + the single-call Gemini fallback — all
+      // (all truncated → no judge) + the single-call Gemini fallback. All
       // tried before the worker gives up and throws.
       expect(vi.mocked(generateText)).toHaveBeenCalledTimes(4);
 
       // No translation written, and the worker did NOT enqueue the Google
-      // fallback itself — that belongs to onLlmTranslationComplete after the
+      // fallback itself. That belongs to onLlmTranslationComplete after the
       // pool's retry budget is spent.
       const translations = await t.run(async (ctx) =>
         ctx.db
@@ -698,7 +698,7 @@ describe("features/llmTranslationQueue", () => {
 
     it("omits <addressee_gender> and <register> from the prompt when addressesSomeone=false", async () => {
       const t = convexTest(schema, modules);
-      // Seed a descriptive sentence — addressesSomeone=false.
+      // Seed a descriptive sentence, addressesSomeone=false.
       const { textId } = await t.run(async (ctx) => {
         const collectionId = await ctx.db.insert("collections", {
           name: "A1",

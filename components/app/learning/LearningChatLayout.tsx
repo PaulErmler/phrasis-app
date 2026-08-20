@@ -68,7 +68,7 @@ interface LearningChatLayoutProps {
  * React tree position; the viewport flip only swaps Tailwind classes on
  * their wrapper divs. The DOM never moves on resize, so `LearningMode`,
  * `ProgressDisplay`, and any in-flight audio/timers stay alive across the
- * `isDesktop` boundary — a mid-celebration window resize no longer restarts
+ * `isDesktop` boundary. A mid-celebration window resize no longer restarts
  * the success sound or the counter animations.
  *
  * The chat slide (mobile) and width animation (desktop) use CSS transitions
@@ -94,7 +94,7 @@ export function LearningChatLayout({
   useEffect(() => {
     if (hideChatToggle) setIsChatOpen(false);
   }, [hideChatToggle]);
-  // Defensive — covers the single frame between `hideChatToggle` flipping
+  // Defensive. Covers the single frame between `hideChatToggle` flipping
   // true and the effect's `setIsChatOpen(false)` landing.
   const effectiveChatOpen = isChatOpen && !hideChatToggle;
 
@@ -162,7 +162,7 @@ export function LearningChatLayout({
             isDesktop ? 'flex flex-row' : 'overflow-clip',
           )}
         >
-          {/* Body — fixed React tree position. Desktop: flex item. Mobile:
+          {/* Body. Fixed React tree position. Desktop: flex item. Mobile:
               absolute-positioned overlay that slides left when chat opens. */}
           <div
             className={cn(
@@ -185,7 +185,7 @@ export function LearningChatLayout({
             </div>
           </div>
 
-          {/* Toggle bar — desktop only, suppressed during the celebration. */}
+          {/* Toggle bar. Desktop only, suppressed during the celebration. */}
           {isDesktop && !hideChatToggle && (
             <div
               className="flex flex-col justify-center items-center w-8 shrink-0 border-l bg-muted/10 hover:bg-muted/30 cursor-pointer transition-colors z-20"
@@ -201,14 +201,14 @@ export function LearningChatLayout({
             </div>
           )}
 
-          {/* Chat — fixed React tree position. Desktop: collapsible sidebar
+          {/* Chat. Fixed React tree position. Desktop: collapsible sidebar
               (width 0 ↔ open). Mobile: shown when open, fully hidden
               (display:none) when closed so the wrapper can't run any
               transform transition on viewport flip (the prior approach with
               `translate-x-full` would animate from no-transform to off-screen
               when going from desktop-closed to mobile-closed, briefly
               flashing the chat into view). Trade-off: no slide-in/out
-              animation on mobile toggle — the chat snaps in/out. */}
+              animation on mobile toggle. The chat snaps in/out. */}
           <div
             className={cn(
               'min-w-0 min-h-0 bg-background overflow-hidden',

@@ -29,7 +29,7 @@ vi.mock("@/hooks/use-course-languages", () => ({
 import { AlsoCorrectApproval } from "@/components/chat/AlsoCorrectApproval";
 // The REAL result strings the server tool returns. Importing them (rather than
 // re-typing the literals) is what makes this suite fail if the two sides ever
-// drift — the failure mode being pinned is silent: a reworded success string
+// drift. The failure mode being pinned is silent: a reworded success string
 // classifies every successful call as an error.
 import {
   MARK_ALSO_CORRECT_NOOP,
@@ -96,7 +96,7 @@ describe("AlsoCorrectApproval", () => {
   });
 
   describe("tool-result classification (server↔client string contract)", () => {
-    it("renders NOTHING for the no-op result — not an error, not a spinner", () => {
+    it("renders NOTHING for the no-op result, not an error, not a spinner", () => {
       renderBox({
         toolPart: makeToolPart({ output: MARK_ALSO_CORRECT_NOOP }),
         approvalsByToolCallId: new Map(),
@@ -170,7 +170,7 @@ describe("AlsoCorrectApproval", () => {
       const user = userEvent.setup();
       renderBox({ onReplace: vi.fn(async () => "card_replaced" as const) });
       await user.click(screen.getByTestId("also-correct-replace"));
-      // Still actionable — never a green "updated" for a write that failed.
+      // Still actionable, never a green "updated" for a write that failed.
       await waitFor(() =>
         expect(screen.getByTestId("also-correct-replace")).toBeInTheDocument(),
       );

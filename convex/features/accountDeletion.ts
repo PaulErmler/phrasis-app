@@ -20,7 +20,7 @@ export const requestAccountDeletion = mutation({
     const user = await authComponent.safeGetAuthUser(ctx);
     if (!user) throw new ConvexError('Unauthenticated');
 
-    // Each request emails support@ for real — cap per user so the public
+    // Each request emails support@ for real. Cap per user so the public
     // mutation can't be scripted into an inbox flood.
     await rateLimiter.limit(ctx, 'accountDeletionRequest', {
       key: user._id,

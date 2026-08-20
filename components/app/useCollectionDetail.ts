@@ -112,7 +112,7 @@ function optimisticallyAdjustCollectionCounters(
 }
 
 export interface CollectionBrowse {
-  /** Main stream (ranks > anchor), ascending — reveal-gated after "show more". */
+  /** Main stream (ranks > anchor), ascending. Reveal-gated after "show more". */
   rows: BrowseTextRow[];
   status: PaginationStatus;
   loadMore: () => void;
@@ -128,7 +128,7 @@ export interface CollectionBrowse {
   setShowIgnored: (value: boolean) => void;
   /**
    * Visibility filter: hides 'added'/'ignored' rows behind their toggles,
-   * EXCEPT rows the user acted on this session — those stay visible (green /
+   * EXCEPT rows the user acted on this session. Those stay visible (green /
    * grey) until the dialog is closed and reopened.
    */
   isRowVisible: (row: BrowseTextRow) => boolean;
@@ -163,14 +163,14 @@ export function useCollectionDetail({
   const [pendingAddTextIds, setPendingAddTextIds] = useState<Set<string>>(
     () => new Set(),
   );
-  // Rows the user acted on this session (added/ignored, incl. batch adds) —
-  // exempt from the visibility toggles until the dialog reopens.
+  // Rows the user acted on this session (added/ignored, incl. batch adds).
+  // Exempt from the visibility toggles until the dialog reopens.
   const [sessionActedIds, setSessionActedIds] = useState<Set<string>>(
     () => new Set(),
   );
   const sessionStatusRef = useRef<Map<string, BrowseTextRow['status']>>(new Map());
   // Below-anchor rows are only in the forward feed because their mark row is
-  // injected into page 1 — adding one deletes that mark in-transaction, so
+  // injected into page 1. Adding one deletes that mark in-transaction, so
   // the reactive re-run drops the row entirely instead of flipping it to
   // 'added' in place like above-anchor rows. Keep a snapshot of every row
   // seen, plus the resurrected copies of rows that vanished, so acted rows
@@ -279,7 +279,7 @@ export function useCollectionDetail({
       : 'skip',
     { initialNumItems: MAX_PREVIEW_PAGE_SIZE },
   );
-  // Added-history feed above the anchor — only mounted while "show added" is
+  // Added-history feed above the anchor, only mounted while "show added" is
   // on (toggling it off unmounts; toggling back on refetches page 1).
   const earlier = usePaginatedQuery(
     api.features.collections.browseCollectionTexts,
@@ -360,7 +360,7 @@ export function useCollectionDetail({
 
   // Generate missing translations for every fetched non-added row (page 1 on
   // open, each revealed page, and the earlier feed's stragglers). Audio is
-  // NEVER generated here — that's the per-row audio-icon click. The ref
+  // NEVER generated here. That's the per-row audio-icon click. The ref
   // dedups per mount; the backend claim tables dedup across sessions/users.
   const requestedTranslationsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -419,7 +419,7 @@ export function useCollectionDetail({
     if (hidden.length === 0) {
       // An exactly-full page reports isDone=false, so "Show more" can load an
       // EMPTY page (status flips straight to Exhausted). That's not "still
-      // loading" — clear the gate or the button spins for the full timeout.
+      // loading". Clear the gate or the button spins for the full timeout.
       if (forward.status === 'Exhausted') {
         setRevealBoundary(null);
         if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current);
@@ -477,7 +477,7 @@ export function useCollectionDetail({
 
       if (result.cardsAdded === 0) {
         if (result.quotaLimited) {
-          // Out of sentences, not out of collection — "nothing left to add"
+          // Out of sentences, not out of collection, "nothing left to add"
           // would be wrong. Surface the same quota dialog as a thrown
           // USAGE_LIMIT does.
           setUsageLimitHit(true);
@@ -587,7 +587,7 @@ export function useCollectionDetail({
     // Below-anchor marked texts exist in BOTH feeds: injected into the
     // forward first page (or resurrected above) and returned by the 'upTo'
     // history query (which has no status filter). The forward copy is the
-    // actionable one — drop the history duplicate so the same sentence never
+    // actionable one. Drop the history duplicate so the same sentence never
     // renders twice.
     const mainIds = new Set([...forwardIds, ...resurrectedRows.keys()]);
     return {

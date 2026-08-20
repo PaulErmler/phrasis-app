@@ -47,7 +47,7 @@ export function FeatureGatedButton({
           {...buttonProps}
           className={className}
           onClick={() => {
-            // Covers every gated surface in one place — the other 17
+            // Covers every gated surface in one place. The other 17
             // `consumeQuota` sites all reject inside a mutation, whose rollback
             // would discard any event the backend tried to record.
             capture(CLIENT_EVENTS.QUOTA_EXHAUSTED, {

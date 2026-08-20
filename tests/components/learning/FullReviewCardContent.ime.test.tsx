@@ -9,7 +9,7 @@ import type { CardTranslation } from '@/components/app/learning/types';
  * submitted the half-composed answer instead of committing the text.
  *
  * `useImeSafeEnter` is unit-tested on its own; these tests assert the writing
- * card is actually *wired* to it — the regression that would reappear if
+ * card is actually *wired* to it. The regression that would reappear if
  * someone rewrote the input or dropped the spread props.
  */
 
@@ -54,7 +54,7 @@ function settleComposition() {
   });
 }
 
-describe('FullReviewCardContent — IME-safe Enter', () => {
+describe('FullReviewCardContent: IME-safe Enter', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -103,7 +103,7 @@ describe('FullReviewCardContent — IME-safe Enter', () => {
     fireEvent.compositionStart(input);
     fireEvent.change(input, { target: { value: 'きょうはあついですね' } });
 
-    // 2. Enter converts to kanji — must not grade.
+    // 2. Enter converts to kanji. Must not grade.
     fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
     fireEvent.compositionEnd(input);
     fireEvent.change(input, { target: { value: '今日は暑いですね。' } });
@@ -138,7 +138,7 @@ describe('FullReviewCardContent — IME-safe Enter', () => {
   });
 });
 
-describe('FullReviewCardContent — ignorePunctuation', () => {
+describe('FullReviewCardContent: ignorePunctuation', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -194,7 +194,7 @@ describe('FullReviewCardContent — ignorePunctuation', () => {
   });
 });
 
-describe('FullReviewCardContent — showClean toggle', () => {
+describe('FullReviewCardContent: showClean toggle', () => {
   // The i18n stub returns keys, so the button's aria-label is the literal
   // message key for whichever state the toggle would switch AWAY from.
   function submitWrongAnswer() {

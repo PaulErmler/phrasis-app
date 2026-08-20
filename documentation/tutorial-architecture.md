@@ -1,4 +1,4 @@
-# Tutorial System Architecture
+# Tutorial system architecture
 
 This document describes the implemented tutorial system, how it works, how to modify existing tutorials, and how to add new ones.
 
@@ -10,10 +10,10 @@ The teaching layer uses [driver.js](https://driverjs.com/) and has two parts
 (since 2026-08, when the onboarding wizard stopped embedding a tutorial
 lesson):
 
-1. **Tours** (`useTutorial`) — multi-step walkthroughs registered in
+1. **Tours** (`useTutorial`). Multi-step walkthroughs registered in
    `registry.ts`. Only `home_tour` remains; the review-mode tours were
    retired in favour of the tips below.
-2. **Learning-mode tips** (`useMilestoneTips`) — one-time popovers inside
+2. **Learning-mode tips** (`useMilestoneTips`). One-time popovers inside
    the real learning session: an intro walkthrough on the first card
    (persisted PER CONCEPT so switching review modes never re-explains
    shared concepts) and milestone tips gated on lifetime reviews
@@ -23,27 +23,27 @@ lesson):
 
 Shared traits:
 
-- **Persistent** — completion state is stored in `userSettings.completedTutorials` (Convex) and cached in localStorage (`phrasis_completed_tutorials`) to avoid a database call on every load once tutorials have run (shared plumbing: `useCompletedTutorials` in `use-tutorial.ts`)
-- **Prerequisite-aware** — a tour can require another to be completed first
-- **Auto-triggered** — the hooks start automatically when conditions are met
+- **Persistent.** Completion state is stored in `userSettings.completedTutorials` (Convex) and cached in localStorage (`phrasis_completed_tutorials`) to avoid a database call on every load once tutorials have run (shared plumbing: `useCompletedTutorials` in `use-tutorial.ts`)
+- **Prerequisite-aware.** A tour can require another to be completed first
+- **Auto-triggered.** The hooks start automatically when conditions are met
 
 ---
 
-## File Structure
+## File structure
 
 ```
 lib/tutorials/
-├── types.ts               — TutorialDefinition / TutorialFactory / TranslateFn types
-├── tour-step.ts           — tourStep() helper: builds a DriveStep from an i18n key prefix
-├── registry.ts            — Central registry (tours only); re-exports TUTORIAL_IDS
-├── use-tutorial.ts        — Tour lifecycle hook + shared useCompletedTutorials
-├── use-milestone-tips.ts  — One-time learning-mode tips (intro concepts + milestones)
-└── home-tour.ts           — Home screen overview tour
+├── types.ts               # TutorialDefinition / TutorialFactory / TranslateFn types
+├── tour-step.ts           # tourStep() helper: builds a DriveStep from an i18n key prefix
+├── registry.ts            # Central registry (tours only); re-exports TUTORIAL_IDS
+├── use-tutorial.ts        # Tour lifecycle hook + shared useCompletedTutorials
+├── use-milestone-tips.ts  # One-time learning-mode tips (intro concepts + milestones)
+└── home-tour.ts           # Home screen overview tour
 ```
 
 ---
 
-## Core Concepts
+## Core concepts
 
 ### TutorialDefinition (`types.ts`)
 
@@ -56,26 +56,26 @@ interface TutorialDefinition {
 }
 ```
 
-Tutorials are defined as **factories** (`TutorialFactory = (t: TranslateFn) => TutorialDefinition`) so step titles and descriptions come from `next-intl` — `useTutorial` calls `useTranslations('Tutorial')` and passes `t` through to the factory.
+Tutorials are defined as **factories** (`TutorialFactory = (t: TranslateFn) => TutorialDefinition`) so step titles and descriptions come from `next-intl`. `useTutorial` calls `useTranslations('Tutorial')` and passes `t` through to the factory.
 
 ### Registry (`registry.ts`)
 
 All tutorial factories live in a static `tutorialFactories` record (tutorial ID → factory) inside `registry.ts`. The registry exposes:
 
-- `getTutorial(id, t)` — look up the factory for `id` (own keys only, so prototype keys like `toString` never resolve) and invoke it with a translate function; returns the `TutorialDefinition` (or `undefined` for unknown IDs)
-- `TUTORIAL_IDS` — typed constant object for referencing IDs. It lives in `convex/features/tutorialIds.ts` (single source of truth shared with the backend's `tutorialIdValidator`) and is re-exported by `registry.ts`
+- `getTutorial(id, t)`: look up the factory for `id` (own keys only, so prototype keys like `toString` never resolve) and invoke it with a translate function; returns the `TutorialDefinition` (or `undefined` for unknown IDs)
+- `TUTORIAL_IDS`: typed constant object for referencing IDs. It lives in `convex/features/tutorialIds.ts` (single source of truth shared with the backend's `tutorialIdValidator`) and is re-exported by `registry.ts`
 
 ```typescript
 // convex/features/tutorialIds.ts (re-exported by lib/tutorials/registry.ts)
 export const TUTORIAL_IDS = {
   HOME_TOUR: 'home_tour',
   // retired tour ids kept valid for historical rows, plus the tip_* ids
-  // used by useMilestoneTips — see the file for the full list
+  // used by useMilestoneTips; see the file for the full list
   ...
 } as const;
 ```
 
-### useTutorial Hook (`use-tutorial.ts`)
+### useTutorial hook (`use-tutorial.ts`)
 
 The main integration point. Call it in any component to auto-trigger a tutorial.
 
@@ -101,7 +101,7 @@ The hook uses an effective completed list: Convex `getCompletedTutorials` when a
 1. `enabled` is `true`
 2. The tutorial is not already in the effective completed list
 3. The prerequisite tutorial (if any) is in the effective completed list
-4. Either the Convex query has returned or the localStorage cache has a value (so we don’t start before we know completion state)
+4. Either the Convex query has returned or the localStorage cache has a value (so we don't start before we know completion state)
 
 When Convex returns, the result is written to localStorage. When a tutorial is completed via `completeTutorial`, the mutation runs and the ID is appended to localStorage so the UI stays in sync.
 
@@ -132,7 +132,7 @@ Tutorial completion is stored on the `userSettings` table:
 completedTutorials: v.optional(v.array(v.string()))
 ```
 
-### Mutations & Queries (`convex/features/courses.ts`)
+### Mutations & queries (`convex/features/courses.ts`)
 
 | Endpoint | Type | Purpose |
 |----------|------|---------|
@@ -141,9 +141,9 @@ completedTutorials: v.optional(v.array(v.string()))
 
 ---
 
-## Existing Tutorials
+## Existing tutorials
 
-### Home Tour (`home-tour.ts`)
+### Home tour (`home-tour.ts`)
 
 **ID:** `home_tour`
 **Prerequisite:** none
@@ -151,10 +151,10 @@ completedTutorials: v.optional(v.array(v.string()))
 
 | Step | Element | Description |
 |------|---------|-------------|
-| 1 | *(none — centered popover)* | Welcome message |
+| 1 | *(none, centered popover)* | Welcome message |
 | 2 | `[data-tutorial="collection-carousel"]` | Explains sentence collections |
 | 3 | `[data-tutorial="start-learning"]` | Explains Full Review vs Audio Review (buttons disabled during this step) |
-| 4 | *(none — centered popover)* | Closing message: review difficulty, pick a mode |
+| 4 | *(none, centered popover)* | Closing message: review difficulty, pick a mode |
 
 **Integration:** `components/app/HomeView.tsx` calls `useTutorial(TUTORIAL_IDS.HOME_TOUR)`.
 
@@ -174,18 +174,18 @@ difficulty-check dialog is up so a popover can't stack on top of it).
   for Writing) per mode. Switching modes later shows a "Switched to …"
   welcome plus only the new mode's concepts. Concepts can opt out of the
   Transcribe writing style via `skipWhenTranscribe` (the shown-translation
-  step does — skipped, not persisted, so it still appears if the user later
+  step does: skipped, not persisted, so it still appears if the user later
   switches to Translate).
 - **Milestone tips** are single popovers gated on
   `api.features.courses.getLifetimeReviewCount` (the active course's
-  `courseStats.totalRepetitions`, reactive) — at most one per card
+  `courseStats.totalRepetitions`, reactive), at most one per card
   transition, lowest threshold first.
 - **Veteran guard:** if a tip becomes eligible while the lifetime count is
   already `> 50`, every unseen tip is marked completed silently (no
-  popover, no analytics event) — this is what keeps existing users from
+  popover, no analytics event). This is what keeps existing users from
   seeing beginner tips, with no data migration.
 - Popover CSS classes are `phrasis-tip-<id>` (`phrasis-tip-intro_audio` /
-  `phrasis-tip-intro_full` for the intro walkthroughs) — e2e helpers map
+  `phrasis-tip-intro_full` for the intro walkthroughs). E2E helpers map
   legacy tour ids onto these.
 - Copy lives in the `Tips` namespace of `messages/en.json` / `de.json`.
 - The learn header's Help dialog "restart tutorial" action calls the hook's
@@ -198,16 +198,16 @@ difficulty-check dialog is up so a popover can't stack on top of it).
 hook's `pending` signal holds the add (`useLearningMode({ holdAutoAdd })`);
 the `DifficultyCheckDialog` opens when the hold actually intercepts an add.
 
-Not a driver.js tour — a regular dialog whose show-once state rides the
+Not a driver.js tour, just a regular dialog whose show-once state rides the
 shared `completedTutorials` mechanism, with the same veteran rule as the
 milestone tips (lifetime reviews past the beginner window retire it
-silently). Skipped entirely — and not marked completed — when the active
+silently). Skipped entirely, and not marked completed, when the active
 collection isn't a dataset level (custom/chat/legacy CEFR), so the check
 still fires if the user later moves onto one.
 
 ---
 
-## data-tutorial Attributes
+## data-tutorial attributes
 
 These attributes are placed on components to serve as driver.js selectors.
 
@@ -267,7 +267,7 @@ The driver instance is configured with `stagePadding: 8` and `stageRadius: 8` fo
 
 ---
 
-## How to Add a New Tutorial
+## How to add a new tutorial
 
 ### 1. Create the tour file
 

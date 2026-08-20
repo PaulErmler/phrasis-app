@@ -15,7 +15,7 @@ describe('getCardOriginBucket (cardsByOriginStateAndDueDate namespace part)', ()
     expect(getCardOriginBucket(card('chat'))).toBe('chat');
   });
 
-  it("maps unresolved legacy cards to 'none' — counted under 'both' only, mirroring fetchDueCardsWithFilter", () => {
+  it("maps unresolved legacy cards to 'none', counted under 'both' only, mirroring fetchDueCardsWithFilter", () => {
     expect(getCardOriginBucket(card(undefined))).toBe('none');
   });
 

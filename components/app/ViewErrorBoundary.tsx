@@ -9,7 +9,7 @@ import { reportError } from '@/lib/report-error';
 interface ErrorBoundaryProps {
   /**
    * Rendered in place of the children after a crash. Receives a `retry`
-   * that resets the boundary — the subtree remounts fresh and Convex
+   * that resets the boundary. The subtree remounts fresh and Convex
    * queries re-subscribe. Return `null` for a boundary that should fail
    * invisibly.
    */
@@ -51,10 +51,10 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 /**
  * Wrap one view slot so a failing tab is contained to the view area while
  * the header and bottom nav stay interactive. Give each slot its own
- * instance — one crashing view must not blank its siblings.
+ * instance. One crashing view must not blank its siblings.
  *
  * A segment's error.tsx cannot catch errors thrown while rendering that same
- * segment's layout, and all tab views render from the layout's own JSX — so
+ * segment's layout, and all tab views render from the layout's own JSX, so
  * without this, any view error (e.g. a Convex query error thrown into render
  * by useQuery) unwinds to app/error.tsx and replaces the entire shell.
  */
@@ -86,7 +86,7 @@ export function ViewErrorBoundary({ children }: { children: ReactNode }) {
 
 /**
  * Contain a crash with no visible trace. For non-essential chrome that sits
- * OUTSIDE the view boundaries — notably anything in the app header, where an
+ * OUTSIDE the view boundaries, notably anything in the app header, where an
  * escaping error would unwind to app/error.tsx and replace the whole shell.
  * An error card in a header slot would be worse than an absent widget, so
  * the fallback renders nothing; the crash is still reported.

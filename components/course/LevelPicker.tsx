@@ -14,7 +14,7 @@ import { OGTE_MIN_LEVEL, OGTE_MAX_LEVEL } from '@/lib/constants/onboarding';
 /**
  * Shared OGTE level picker: continuous slider over levels 1..20 with a live
  * preview of sentences at the slid level (the placement corpus, in the
- * user's target language — the same material the learner will actually
+ * user's target language. The same material the learner will actually
  * see). Used by the onboarding CEFR self-pick step and the one-time
  * difficulty-check dialog in the learn view.
  *
@@ -94,7 +94,7 @@ type PreviewSentence = FunctionReturnType<
 >[number];
 
 /** Structural row shape shared by the placement-corpus preview and the
- *  upcoming-sentences preview — SampleRow renders either. */
+ *  upcoming-sentences preview. SampleRow renders either. */
 export interface PreviewRowShape {
   sourceText: string;
   targetText?: string;
@@ -179,7 +179,7 @@ export function PreviewSentenceRows({
       </>
     );
   }
-  // Fewer rows than slots is normal near the end of a collection — render
+  // Fewer rows than slots is normal near the end of a collection. Render
   // only what exists rather than padding with empty placeholders.
   return (
     <>

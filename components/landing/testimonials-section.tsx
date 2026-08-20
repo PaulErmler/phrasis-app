@@ -16,7 +16,7 @@ import {
 import { CarouselDots } from '@/components/ui/carousel-dots';
 import { fadeInUp } from './animations';
 
-// Verbatim user quotes (see docs/testimonials.md) — excerpted at sentence
+// Verbatim user quotes (see docs/testimonials.md), excerpted at sentence
 // boundaries only, so they are intentionally not translated. Unattributed
 // quotes render without an attribution line.
 const TESTIMONIALS: { quote: string; name?: string }[] = [

@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { dismissErrorBoundary, dismissTour } from "./helpers";
 
 /**
- * Crossing-navigation smoke — exercises the bottom nav inside the authed
+ * Crossing-navigation smoke. Exercises the bottom nav inside the authed
  * shell to verify the route-driven view switching wired up in MainLayout
  * still works end-to-end.
  */
@@ -12,7 +12,7 @@ test.describe("authed navigation shell", () => {
     await page.waitForLoadState("domcontentloaded");
     await dismissTour(page);
 
-    // Testid-based selection — accessible-name regexes were catching
+    // Testid-based selection. Accessible-name regexes were catching
     // hero/CTA buttons like "Start lesson" before they reached the
     // bottom-nav "Home" button.
     const targets: Array<{ view: 'library' | 'stats' | 'settings' | 'home'; urlFragment: RegExp }> = [
@@ -80,7 +80,7 @@ test.describe("authed navigation shell", () => {
     await expect(page).toHaveURL(/\/app\/library/, { timeout: 10_000 });
     await expect(page.getByTestId("library-search").first()).toBeVisible({ timeout: 10_000 });
 
-    // Back again to /app — collections should still render
+    // Back again to /app. Collections should still render
     await page.goBack();
     await expect(page).toHaveURL(/\/app(\/?$|\/?\?)/, { timeout: 10_000 });
     await expect(page.getByTestId("course-menu-trigger").first()).toBeVisible({ timeout: 10_000 });

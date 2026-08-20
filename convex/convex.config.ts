@@ -51,7 +51,7 @@ app.use(resend);
  *
  * `POSTHOG_PERSONAL_API_KEY` is deliberately NOT forwarded: setting it turns on
  * local feature-flag evaluation, which makes the component poll PostHog for
- * flag definitions in a background refresh loop — pointless load while nothing
+ * flag definitions in a background refresh loop. Pointless load while nothing
  * here uses flags. If they're ever wanted, either forward the key or use the
  * action-only remote `evaluateFlag` path, which works without it.
  */

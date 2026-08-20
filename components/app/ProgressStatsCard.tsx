@@ -49,7 +49,7 @@ function StatColumn({
   todayLabel?: string;
   todayFormatter?: (v: number) => string;
   animateToday?: boolean;
-  /** Extra classes for the column wrapper — used by the home view to hide
+  /** Extra classes for the column wrapper. Used by the home view to hide
    * the words stat on narrow screens (`hidden sm:flex`). */
   className?: string;
 }) {
@@ -120,7 +120,7 @@ export function ProgressStatsCard({
 
   const cacheSuffix = courseId ? `_${courseId}` : '';
   // Ticked once a minute so `today` flips at local midnight and the goal
-  // ring / streak / today-stats queries re-fetch the new day — the server
+  // ring / streak / today-stats queries re-fetch the new day. The server
   // cannot roll them over on its own (queries re-run on data changes, not
   // on time passing). The projection slot next to them already ticks; before
   // this the ring froze on "Goal reached!" while the projection advanced.
@@ -158,7 +158,7 @@ export function ProgressStatsCard({
   const words = stats?.totalWordCount ?? 0;
   const time = formatTimeMs(stats?.totalTimeMs ?? 0);
 
-  // Home summary powers the "current level" header strip — preloaded
+  // Home summary powers the "current level" header strip. Preloaded
   // server-side in app/app/layout.tsx so the level header is available on
   // the first paint and the card height doesn't grow when the data arrives.
   const { preloadedHomeSummary, preloadedCourseSettings } = useAppData();
@@ -201,7 +201,7 @@ export function ProgressStatsCard({
 
   // Streak badge visuals are driven by the server-derived live state so a
   // lapsed streak reads as broken (grey, 0) and the frozen/pending states show
-  // correctly on home entry. `hasLearned` is kept separately — it drives the
+  // correctly on home entry. `hasLearned` is kept separately. It drives the
   // today-counter animations below (reps/new/time), not the streak color.
   const hasLearned = todayStats != null && todayStats.reps > 0;
   const streakState = stats?.streakState ?? 'none';
@@ -225,7 +225,7 @@ export function ProgressStatsCard({
   );
   // Raw timeMs, NOT gated on `hasLearned`: undo decrements reps but
   // deliberately never time, so after undoing a whole day reps === 0 while
-  // timeMs stays. The ring arc and `goalReached` below use raw timeMs — the
+  // timeMs stays. The ring arc and `goalReached` below use raw timeMs. The
   // minute label must agree with them instead of animating down to
   // "0 / 20 min" under a fully-lapped "goal reached" ring.
   const animatedTimeMs = useAnimatedCounter(
@@ -247,7 +247,7 @@ export function ProgressStatsCard({
     goalMinutes > 0 &&
     goalTodayMs >= goalMinutes * 60_000;
 
-  // The home view is kept mounted (KeepMountedView) — "navigating to home"
+  // The home view is kept mounted (KeepMountedView), "navigating to home"
   // is a hidden→visible flip of `skipLiveStats`, not a remount. Bump an
   // epoch on each falling edge so the goal ring replays its sweep on every
   // visit; mount-keyed animations would fire exactly once per session.
@@ -266,7 +266,7 @@ export function ProgressStatsCard({
         className="card-surface overflow-hidden"
         data-tutorial="progress-stats"
       >
-        {/* Top progress bar — pinned to the card's top edge, tinted with the
+        {/* Top progress bar. Pinned to the card's top edge, tinted with the
          * active CEFR tier color. Renders even when level info hasn't loaded
          * yet (width: 0) so the card height stays stable. */}
         <div className="h-1 bg-muted">
@@ -282,7 +282,7 @@ export function ProgressStatsCard({
         </div>
 
         <div className="space-y-3 p-4">
-          {/* Level header row — inline CEFR badge + label + count + % pill.
+          {/* Level header row. Inline CEFR badge + label + count + % pill.
            * Hidden when the active collection is custom/chat. `homeSummary`
            * is preloaded server-side so this either renders on the first
            * paint or never; no two-step layout. */}
@@ -422,7 +422,7 @@ export function ProgressStatsCard({
             {/* Divider */}
             <div className="w-px self-stretch bg-border" />
 
-            {/* Stats grid — 3 columns on mobile, 4 on sm+ where words fits. */}
+            {/* Stats grid. 3 columns on mobile, 4 on sm+ where words fits. */}
             <div className="flex-1 grid grid-cols-3 gap-2 sm:grid-cols-4">
               <StatColumn
                 icon={<RotateCcw className="h-4 w-4" />}
@@ -467,11 +467,11 @@ export function ProgressStatsCard({
             </div>
           </div>
 
-          {/* Daily-goal row — ring sweeps on every visit (visitEpoch) and
+          {/* Daily-goal row. Ring sweeps on every visit (visitEpoch) and
            * animates only the delta since the user last looked (snapshot).
            * Left part opens the quick-edit popover (the whole block is the
-           * tap target — no separate edit icon); the right side is the
-           * rotating projection slot (its own tap target — cycles stats).
+           * tap target, no separate edit icon); the right side is the
+           * rotating projection slot (its own tap target, cycles stats).
            * Courses without a goal (created outside onboarding) get a
            * "Set daily goal" button in the ring's place instead. */}
           <div className="-mx-4 border-t" />

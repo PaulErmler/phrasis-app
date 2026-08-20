@@ -1,6 +1,6 @@
 # Issue tracker: Obsidian kanban board
 
-Work for this repo is tracked on `board/Flexling Board.md` — a gitignored
+Work for this repo is tracked on `board/Flexling Board.md`, a gitignored
 symlink into Paul's Obsidian vault. It may be absent on other machines; if it
 is, say so and fall back to `.scratch/` rather than inventing a queue.
 
@@ -9,19 +9,19 @@ is, say so and fall back to `.scratch/` rather than inventing a queue.
 Columns are `##` headings: Not Started, Prioritized, Doing, Done, Archived.
 Each card is a single `- [ ] <one-line summary>` under a column.
 
-**Never add priorities or reorder the Prioritized column** — prioritization is
+**Never add priorities or reorder the Prioritized column.** Prioritization is
 Paul's job. Moving a card you were explicitly asked to work on into Doing or
 Done is fine.
 
 ## Cards are titles, not bodies
 
-A card is one line. Anything longer — a spec, an issue with acceptance
-criteria, a wayfinder map — lives in the repo:
+A card is one line. A spec, an issue with acceptance criteria, or a wayfinder
+map is longer than that, so it lives in the repo:
 
 - One effort per directory: `.scratch/<feature-slug>/`
 - Spec: `.scratch/<feature-slug>/spec.md`
 - Issues: one file per ticket at
-  `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01` — never a
+  `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`. Never a
   single combined tickets file
 - The board card links to it:
   `- [ ] Fix audio gate — .scratch/audio-gate/`
@@ -50,7 +50,8 @@ Off. Incoming PRs are not part of the triage queue.
 
 Used by `/wayfinder`. The **map** is a file with one **child** file per ticket.
 
-- **Map**: `.scratch/<effort>/map.md` — the Notes / Decisions-so-far / Fog body.
+- **Map**: `.scratch/<effort>/map.md`, holding the Notes / Decisions-so-far /
+  Fog body.
 - **Child ticket**: `.scratch/<effort>/issues/NN-<slug>.md`, numbered from `01`,
   with the question in the body. A `Type:` line records the ticket type
   (`research`/`prototype`/`grilling`/`task`); a `Status:` line records

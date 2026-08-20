@@ -37,11 +37,11 @@ export interface ValidationResult {
   statuses: RowStatus[];
   /** Rows with no issues. */
   validCount: number;
-  /** Rows with advisory issues (e.g. duplicates) — still importable. */
+  /** Rows with advisory issues (e.g. duplicates), still importable. */
   warningCount: number;
-  /** Rows with blocking issues — not importable. */
+  /** Rows with blocking issues, not importable. */
   errorCount: number;
-  /** validCount + warningCount — rows that will actually be imported. */
+  /** validCount + warningCount. Rows that will actually be imported. */
   importableCount: number;
   mappingComplete: boolean;
   quotaSufficient: boolean;

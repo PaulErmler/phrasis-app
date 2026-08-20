@@ -8,8 +8,8 @@ import type { ActionCtx } from "../../_generated/server";
  * `attach`/`checkout` are PUBLIC actions: anyone with a session can call
  * them from the browser console with arbitrary args. Autumn's own trial
  * dedup is per-plan, so without this gate a user could hop
- * basic → pro → basic_annual and collect a fresh free trial on every plan —
- * weeks of paid usage for free. These tests pin the gate's decisions (and
+ * basic → pro → basic_annual and collect a fresh free trial on every plan.
+ * Weeks of paid usage for free. These tests pin the gate's decisions (and
  * the module's public surface, which closes the sibling negative-`track`
  * exploit) so a refactor can't quietly re-open either hole.
  *
@@ -24,7 +24,7 @@ const USER = "user_x";
 
 /**
  * The gate's generic is bounded by the weak type `{ freeTrial?: boolean }`,
- * which rejects a bare `{ productId }` literal — so args spell the optional
+ * which rejects a bare `{ productId }` literal, so args spell the optional
  * field out (matching what the attach/checkout actions actually pass).
  */
 type GateArgs = { productId: string; freeTrial?: boolean };
@@ -59,7 +59,7 @@ function stubCustomerFetch(res: {
   return fetchMock;
 }
 
-// v1.2 `products[]` shape — what the gate's x-api-version '1.2' GET returns.
+// v1.2 `products[]` shape. What the gate's x-api-version '1.2' GET returns.
 const freeProduct = {
   id: "free",
   status: "active",
@@ -93,14 +93,14 @@ describe("gateTrialArgs", () => {
     const args: GateArgs = { productId: "basic" };
     const result = await gateTrialArgs(ctxAs({ subject: USER }), "checkout", args);
 
-    // Same object, no freeTrial injected — injecting `freeTrial: false` here
+    // Same object, no freeTrial injected, injecting `freeTrial: false` here
     // would silently deny every legitimate first trial.
     expect(result.gated).toBe(args);
     expect("freeTrial" in result.gated).toBe(false);
     expect(result.state?.trialEligible).toBe(true);
 
     // Eligibility must be derived from the durable trials_used record, on
-    // the v1.2 shape the parsing expects — a version drift here would make
+    // the v1.2 shape the parsing expects. A version drift here would make
     // every customer look trial-eligible.
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toContain(`/customers/${USER}?expand=trials_used`);
@@ -121,7 +121,7 @@ describe("gateTrialArgs", () => {
     expect(result.state?.onTrial).toBe(false);
   });
 
-  it("rejects attach while trialing — plan switches must go through switchPlanDuringTrial", async () => {
+  it("rejects attach while trialing, plan switches must go through switchPlanDuringTrial", async () => {
     stubCustomerFetch({
       body: { products: [freeProduct, trialingProduct], trials_used: [{ product_id: "basic_annual" }] },
     });
@@ -147,18 +147,18 @@ describe("gateTrialArgs", () => {
     // rejected by its schema). Attach-side suppression is handled by the
     // v2 routing in the attach action, not by this flag.
     expect(result.gated).toEqual({ productId: "pro", freeTrial: false });
-    // Caller's args stay unmutated — they may be reused for a later retry.
+    // Caller's args stay unmutated. They may be reused for a later retry.
     expect("freeTrial" in args).toBe(false);
   });
 
-  it("forces freeTrial:false for a customer who ever trialed — the anti-trial-farming pin", async () => {
+  it("forces freeTrial:false for a customer who ever trialed, the anti-trial-farming pin", async () => {
     stubCustomerFetch({
       // Trial consumed in the past, nothing running now: `products` has
       // forgotten it (cancelled plans vanish), only trials_used remembers.
       body: { products: [freeProduct], trials_used: [{ product_id: "basic" }] },
     });
     // Even an explicit freeTrial:true from a hand-crafted direct action call
-    // must be overridden — this is exactly the basic → pro → basic_annual
+    // must be overridden. This is exactly the basic → pro → basic_annual
     // trial-hopping exploit the gate exists to stop.
     const result = await gateTrialArgs(ctxAs({ subject: USER }), "attach", {
       productId: "basic_annual",
@@ -188,7 +188,7 @@ describe("gateTrialArgs", () => {
     }
   });
 
-  it("passes unauthenticated calls through without hitting Autumn — identify() rejects them", async () => {
+  it("passes unauthenticated calls through without hitting Autumn, identify() rejects them", async () => {
     const fetchMock = stubCustomerFetch({ body: {} });
     const args: GateArgs = { productId: "basic" };
     // No identity means no customer id to gate on; the component's
@@ -202,7 +202,7 @@ describe("gateTrialArgs", () => {
 });
 
 describe("public action surface", () => {
-  it("exports only the endpoints the react hooks use — the negative-track exploit stays closed", () => {
+  it("exports only the endpoints the react hooks use, the negative-track exploit stays closed", () => {
     // Everything the client legitimately calls must exist...
     for (const name of [
       "check",
@@ -218,8 +218,8 @@ describe("public action surface", () => {
       ).toBeDefined();
     }
     // ...and nothing that lets a browser mutate its own balance or billing
-    // state. Public `track` accepted unbounded negative values — i.e. free
-    // self-service usage credits — and the rest are the same class of
+    // state. Public `track` accepted unbounded negative values, i.e. free
+    // self-service usage credits, and the rest are the same class of
     // self-scoped write. Re-exporting `autumn.api()` wholesale would bring
     // them all back at once.
     for (const name of [

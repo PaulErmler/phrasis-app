@@ -5,7 +5,7 @@ import { motion } from 'motion/react';
 
 /**
  * Radial confetti burst with a "mixed" piece set (rect / circle / streamer).
- * Mounts as an absolutely-positioned overlay anchored to its parent — the
+ * Mounts as an absolutely-positioned overlay anchored to its parent. The
  * pieces fan outward from the top-center and fade as they travel.
  *
  * Used both on the in-session celebration (`ProgressDisplay`) and on the

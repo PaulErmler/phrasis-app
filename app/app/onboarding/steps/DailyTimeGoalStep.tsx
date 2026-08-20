@@ -86,7 +86,7 @@ export function DailyTimeGoalStep({ selected, onSelect }: Props) {
               </button>
             );
           })}
-          {/* Custom is the 6th tile — five presets + Custom fills the grid
+          {/* Custom is the 6th tile. Five presets + Custom fills the grid
             evenly (3 rows × 2 on mobile, 1 row × 6 on desktop) so no
             col-span override is needed. */}
           <button

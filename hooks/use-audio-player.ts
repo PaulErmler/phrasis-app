@@ -60,7 +60,7 @@ export interface AudioPlayerState {
   revealedLanguages: ReadonlySet<string>;
   /**
    * Frame-rate position source on the merged-audio timeline. NOT React
-   * state — ~60 Hz updates would re-render the whole card tree. Leaves that
+   * state. ~60 Hz updates would re-render the whole card tree. Leaves that
    * need per-frame time (karaoke word index) subscribe via
    * `clock.subscribe()` and setState only when their derived value changes;
    * coarse consumers use `useActiveCue` for the active language cue.
@@ -87,7 +87,7 @@ function ignorePlayInterrupt(label: string) {
   };
 }
 
-// Run `fn` once the element has metadata — immediately if already loaded,
+// Run `fn` once the element has metadata. Immediately if already loaded,
 // otherwise on the next `loadedmetadata` event.
 function whenMetadataReady(audio: HTMLAudioElement, fn: () => void) {
   if (audio.readyState >= 1 /* HAVE_METADATA */) {
@@ -209,7 +209,7 @@ export function useAudioPlayer(
     if (!audio.src || audio.src === '') return;
     // Replaying after the audio has run to completion: browsers are
     // inconsistent about what a bare .play() call does on an ended element.
-    // In practice the element can stay "stuck" — play() resolves, but no
+    // In practice the element can stay "stuck". Play() resolves, but no
     // 'play' event fires, which means our isPlaying stays false and the
     // rAF loop never re-subscribes, so no word highlighting on the replay.
     //
@@ -255,7 +255,7 @@ export function useAudioPlayer(
     const audio = audioRef.current;
     if (audio && audio.duration) {
       audio.currentTime = Math.max(0, Math.min(seconds, audio.duration));
-      // Paused seeks won't tick the rAF loop — push one update so word
+      // Paused seeks won't tick the rAF loop. Push one update so word
       // highlights track the new position immediately.
       clock.notifyOnce();
       updateMediaSessionPosition(audio.duration, audio.currentTime);
@@ -347,8 +347,8 @@ export function useAudioPlayer(
 
     const handleEnded = () => {
       // Playback reached the end, so every revealing cue is behind us. The last
-      // cue can sit exactly at the blob duration — a silent placeholder for a
-      // zero-repetition language in the final group — and `timeupdate` is not
+      // cue can sit exactly at the blob duration. A silent placeholder for a
+      // zero-repetition language in the final group, and `timeupdate` is not
       // guaranteed to fire on that last sample, so sweep the remainder here.
       revealThrough(Infinity);
       setIsPlaying(false);
@@ -383,7 +383,7 @@ export function useAudioPlayer(
   // --------------------------------------------------------------------------
   // Drive the playback clock from the playing state. The clock runs its own
   // rAF loop (only while playing AND subscribed) and notifies subscribers
-  // outside React — no per-frame re-renders here.
+  // outside React, no per-frame re-renders here.
   // --------------------------------------------------------------------------
   useEffect(() => {
     if (isPlaying) {
@@ -398,7 +398,7 @@ export function useAudioPlayer(
   // --------------------------------------------------------------------------
   const allAudioReady = audioRecordings.length > 0 && audioRecordings.every((a) => a.url);
 
-  // Identity key for the audio set — see `audioIdentityKeyOf`. Stable across
+  // Identity key for the audio set. See `audioIdentityKeyOf`. Stable across
   // signed-URL refreshes while allAudioReady stays true.
   const audioIdentityKey = useMemo(
     () => audioIdentityKeyOf(audioRecordings),
@@ -416,11 +416,11 @@ export function useAudioPlayer(
   // merge finishes and the next card's audio URLs are ready, we run
   // `mergeCardAudio` in the background and stash the result here. On card
   // advance, the merge effect below uses the cached blob instead of re-running
-  // the fetch/decode/render pipeline — eliminating the perceptible gap between
+  // the fetch/decode/render pipeline, eliminating the perceptible gap between
   // "user rated card" and "audio starts playing."
   //
   // `compositionKey` is part of the validated keys because the baked-in blob
-  // is composition-specific — a prefetch made while review mode was 'audio'
+  // is composition-specific. A prefetch made while review mode was 'audio'
   // (target merged in) is the wrong blob to serve under 'full' (target stripped).
   // Without this check, a mode flip between prefetch and consume would auto-
   // play the previous mode's composition for the new card.
@@ -477,7 +477,7 @@ export function useAudioPlayer(
     // inclusion). Treat it like a fresh auto-play opportunity so that
     // entering audio mode after the card already played in full mode (or
     // vice versa) still starts playback. Settings tweaks alone (speed,
-    // reps) don't trigger this — they bump `settingsKey`, not the order
+    // reps) don't trigger this. They bump `settingsKey`, not the order
     // keys, so they correctly remain auto-play-suppressed.
     const isCompositionChange =
       !isCardChange && prevCompositionKeyRef.current !== compositionKey;
@@ -488,7 +488,7 @@ export function useAudioPlayer(
     }
 
     // A composition change re-bakes the blob under a new language layout and
-    // restarts playback from the top (no resume seek below) — so the reveal
+    // restarts playback from the top (no resume seek below), so the reveal
     // state must restart with it. Without this, a target language revealed
     // by earlier playback stays visible after switching into audio/Shadowing
     // mode instead of returning to its blurred initial state.
@@ -504,7 +504,7 @@ export function useAudioPlayer(
       !isCardChange;
 
     // Capture the user's structural position BEFORE the remerge so we can seek
-    // the new blob to the equivalent (language, repIndex, localTimeOriginal) —
+    // the new blob to the equivalent (language, repIndex, localTimeOriginal),
     // otherwise `audio.src = newBlob` implicitly resets `currentTime` to 0 and
     // a mid-playback speed change restarts playback from the top.
     //
@@ -537,7 +537,7 @@ export function useAudioPlayer(
     if (!allAudioReady) {
       // URLs transiently missing for this card. Clear only on a real card
       // change; otherwise leave the currently loaded blob playing and wait
-      // for URLs to return — so a reactive query hiccup doesn't strand audio.
+      // for URLs to return, so a reactive query hiccup doesn't strand audio.
       mergeAbortRef.current?.abort();
       mergeAbortRef.current = null;
       setIsMerging(false);
@@ -547,7 +547,7 @@ export function useAudioPlayer(
 
     if (isCardChange) clearCurrentAudio();
 
-    // Prefetch cache hit — if we pre-merged this card's audio while the
+    // Prefetch cache hit, if we pre-merged this card's audio while the
     // previous card was playing, adopt the cached blob instead of re-running
     // the fetch/decode/render pipeline. Only valid on a real card change and
     // only when the cached audio set and settings exactly match the current
@@ -581,7 +581,7 @@ export function useAudioPlayer(
 
       const doStart = () => {
         // Re-check autoPlay at the moment of play, not from the captured
-        // closure — see `autoPlayRef` comment near hook top.
+        // closure. See `autoPlayRef` comment near hook top.
         if (
           !hasAutoPlayedForCardRef.current &&
           autoPlayRef.current &&
@@ -659,7 +659,7 @@ export function useAudioPlayer(
 
         // Assigning `audio.src` resets `currentTime` to 0. If the user had a
         // structural position before this remerge, map it onto the new blob's
-        // timeline and seek there once metadata is loaded — otherwise a speed
+        // timeline and seek there once metadata is loaded, otherwise a speed
         // change mid-playback would jump back to the top of the merged audio.
         const doResume = () => {
           if (resumePos) {
@@ -678,21 +678,21 @@ export function useAudioPlayer(
                 clock.notifyOnce();
                 updateMediaSessionPosition(result.durationSec, clamped);
               } catch {
-                // readyState edge — safe to ignore; seek was best-effort.
+                // readyState edge. Safe to ignore; seek was best-effort.
               }
             }
           }
           // Same-card remerge resume (e.g. settings tweak or client refresh):
           // only resume if playback was running AND the caller hasn't gated
           // autoplay since. Resume-after-async-merge isn't "user-initiated at
-          // the moment of play" — the user clicked Play 100s of ms ago and an
+          // the moment of play". The user clicked Play 100s of ms ago and an
           // onboarding tutorial may have opened in between. A composition
           // change never "resumes": it restarts from the top via the
           // auto-play branch below, even when audio was mid-playback.
           const shouldResumePlay =
             wasPlayingSameCard && !isCompositionChange && autoPlayRef.current;
-          // Composition change is a user-initiated mode toggle in this tab —
-          // bypass the `hasAutoPlayed` and `reviewInitiatedByThisTab` gates.
+          // Composition change is a user-initiated mode toggle in this tab.
+          // Bypass the `hasAutoPlayed` and `reviewInitiatedByThisTab` gates.
           // Those exist to stop spurious auto-plays from URL refreshes and to
           // coordinate across tabs on initial load; once the user explicitly
           // flips review modes neither applies, and the tab-flag is otherwise
@@ -754,7 +754,7 @@ export function useAudioPlayer(
     // effect that just started, so the state value is still `false` here.
     // `isMerging` stays in the dep array so finishing a merge re-runs us.
     if (isMergingRef.current) return;
-    // Only prefetch when every clip URL is resolved — otherwise mergeCardAudio
+    // Only prefetch when every clip URL is resolved, otherwise mergeCardAudio
     // would skip clips and produce a truncated blob we'd have to redo.
     const allNextUrlsReady =
       nextCard.audioRecordings.length > 0 &&

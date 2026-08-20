@@ -73,7 +73,7 @@ import { PlacementTestStep } from './steps/PlacementTestStep';
 import { ReviewModeStep, type ReviewModeChoice } from './steps/ReviewModeStep';
 
 /**
- * Onboarding wizard — survey + placement only; learning starts for real the
+ * Onboarding wizard. Survey + placement only; learning starts for real the
  * moment it ends.
  *
  * Step / id / next:
@@ -87,14 +87,14 @@ import { ReviewModeStep, type ReviewModeChoice } from './steps/ReviewModeStep';
  *   7.  review-mode           → done: Continue runs `completeOnboarding`
  *                               (course + deck + seeded cards) then
  *                               `finalizeOnboarding`, and lands the user in
- *                               the REAL learning mode at /app/learn — no
+ *                               the REAL learning mode at /app/learn: no
  *                               filler screen, no embedded tutorial lesson
  *                               (the in-session milestone tips took that
  *                               job, see lib/tutorials/use-milestone-tips.ts),
  *                               no plan-pick step.
  *
  * `hasCompletedOnboarding` is the single source of truth for the auto-redirect
- * — it stays false until `finalizeOnboarding`, so mid-flow reloads resume
+ * It stays false until `finalizeOnboarding`, so mid-flow reloads resume
  * from `onboardingProgress.step`.
  */
 
@@ -122,7 +122,7 @@ const PROGRESS_STEP_ORDER: StepId[] = [
  * First step of the retired 12-step flow that sits AFTER the embedded first
  * lesson: 7 customizing, 8 first-lesson, 9 stats-recap, 10 word-projection,
  * 11 feature-tour, 12 plan-pick. A row at 9+ means the user finished or
- * skipped that lesson — everything the wizard still asks for is already
+ * skipped that lesson. Everything the wizard still asks for is already
  * answered, and everything past it (stats recap, word projection, feature
  * tour, plan pick) no longer exists. Those users are graduated straight out
  * to the dashboard instead of being walked back through the wizard; see
@@ -137,7 +137,7 @@ function resumeStepId(savedStep: number): StepId {
   // survey but never settled a review mode, so resume them at the final mode
   // pick. `completeOnboarding` is idempotent, so users whose course already
   // exists (old flow got past customizing) just re-confirm the mode and
-  // finish. Rows at 9+ never reach here — they graduate out first.
+  // finish. Rows at 9+ never reach here. They graduate out first.
   if (savedStep > PROGRESS_STEP_ORDER.length) return 'review-mode';
   return PROGRESS_STEP_ORDER[savedStep - 1] ?? 'language-pair';
 }
@@ -162,13 +162,13 @@ function OnboardingContent() {
   const saveProgress = useMutation(api.features.courses.saveOnboardingProgress);
   const completeOnboarding = useMutation(api.features.courses.completeOnboarding);
   // `withOptimisticUpdate` flips `hasCompletedOnboarding` to `true` in the
-  // local Convex cache the moment the wizard finishes — before the server
+  // local Convex cache the moment the wizard finishes, before the server
   // roundtrip and before `router.push('/app/learn')`. Without it, the
   // `OnboardingGuard` on `/app/*` would briefly see the still-`false`
   // preloaded value (Next.js doesn't re-execute server preloads on soft
   // navigation within the same `/app/*` segment) and bounce the user back
   // to `/app/onboarding` until the live subscription delivered the true
-  // value — a visible flicker. The optimistic update makes the
+  // value. A visible flicker. The optimistic update makes the
   // post-finalize value visible synchronously to every consumer of
   // `getUserSettings`, including the layout-preloaded query.
   const finalizeOnboarding = useMutation(
@@ -190,7 +190,7 @@ function OnboardingContent() {
   const syncQuotas = useAction(api.usage.actions.syncQuotas);
   const { isAuthenticated } = useConvexAuth();
   const syncedRef = useRef(false);
-  // True while the wizard's own finish flow is driving navigation — it
+  // True while the wizard's own finish flow is driving navigation. It
   // targets /app/learn, and the generic already-onboarded bounce below must
   // not race it with a competing push to /app.
   const finishingRef = useRef(false);
@@ -200,7 +200,7 @@ function OnboardingContent() {
     syncedRef.current = true;
     syncQuotas().catch((err) => {
       // Non-fatal, but it decides whether `completeOnboarding` can consume a
-      // COURSES unit later — a failure here surfaces as an unexplained
+      // COURSES unit later. A failure here surfaces as an unexplained
       // USAGE_LIMIT at the final step, so it needs to be visible.
       reportOnboardingFailure(err, {
         op: 'onboarding.syncQuotas',
@@ -212,7 +212,7 @@ function OnboardingContent() {
 
   // Once `hasCompletedOnboarding` is true (set only by `finalizeOnboarding`,
   // the very last step of the wizard), bounce the user out. This is the
-  // single source of truth — no session/local-storage gating.
+  // single source of truth, no session/local-storage gating.
   useEffect(() => {
     if (userSettings?.hasCompletedOnboarding && !finishingRef.current) {
       router.push('/app');
@@ -223,7 +223,7 @@ function OnboardingContent() {
   // Those users have a course, a review mode, and a completed (or skipped)
   // first session; the only steps they hadn't finished are ones that no
   // longer exist. Walking them back into the wizard to re-pick a mode they
-  // already chose is worse than just letting them in — so finalize and let
+  // already chose is worse than just letting them in, so finalize and let
   // the effect above bounce them to the dashboard, where the home tour plays
   // once and Start Learning takes them into the session.
   //
@@ -235,7 +235,7 @@ function OnboardingContent() {
     !!userSettings?.activeCourseId &&
     !userSettings.hasCompletedOnboarding &&
     (onboardingProgress?.step ?? 0) >= LEGACY_STEP_AFTER_FIRST_LESSON;
-  // Set only when finalize fails — the user then falls back to the wizard
+  // Set only when finalize fails. The user then falls back to the wizard
   // (resumed at the mode pick) instead of being stranded on a blank screen.
   const [graduationFailed, setGraduationFailed] = useState(false);
   const graduatedRef = useRef(false);
@@ -264,7 +264,7 @@ function OnboardingContent() {
     return <div className="h-dvh" />;
   }
 
-  // Graduating (see the effect above) — hold a blank screen rather than
+  // Graduating (see the effect above), hold a blank screen rather than
   // flashing the mode-pick step for the frame or two before the redirect.
   if (isLegacyGraduate && !graduationFailed) {
     return <div className="h-dvh" />;
@@ -323,7 +323,7 @@ interface SaveProgressArgs {
   step: number;
   reviewMode?: ReviewMode;
   /** `null` explicitly clears the stored style (Shadowing has no writing
-   *  input). Must NOT be collapsed to `undefined` — the Convex client strips
+   *  input). Must NOT be collapsed to `undefined`. The Convex client strips
    *  undefined args, which would leave a previous 'transcribe' in place. */
   writingInputMode?: WritingInputMode | null;
   targetLanguages?: string[];
@@ -352,7 +352,7 @@ export function buildProgressPayload(
   return {
     step,
     reviewMode: fd.reviewMode ?? undefined,
-    // Passed through as-is, including `null` — see SaveProgressArgs.
+    // Passed through as-is, including `null`. See SaveProgressArgs.
     writingInputMode: fd.writingInputMode,
     targetLanguages: fd.targetLanguages.length > 0 ? fd.targetLanguages : undefined,
     baseLanguages: fd.baseLanguages.length > 0 ? fd.baseLanguages : undefined,
@@ -407,7 +407,7 @@ function OnboardingWizard({
   // a sequence like (1) field change on step N → schedules debounce, (2)
   // user clicks Continue → step jumps to N+1 + immediate save, (3) stale
   // debounce fires 250ms later with the captured step=N and overwrites the
-  // newer step=N+1 row — so a reload resumes one step behind.
+  // newer step=N+1 row, so a reload resumes one step behind.
   const stepIdRef = useRef(stepId);
   useLayoutEffect(() => {
     stepIdRef.current = stepId;
@@ -421,8 +421,8 @@ function OnboardingWizard({
       // the same tick as a preceding `persist(...)` (e.g. the level
       // handlers do `persist({ currentLevel }); advance(...)`), and the
       // layout-effect refresh only lands after the next commit. Without
-      // this eager merge that save writes the pre-persist data — dropping
-      // the just-selected field — while also cancelling the debounce that
+      // this eager merge that save writes the pre-persist data, dropping
+      // the just-selected field, while also cancelling the debounce that
       // carried it, so the value never reaches the server.
       dataRef.current = { ...dataRef.current, ...partial };
       setData((d) => ({ ...d, ...partial }));
@@ -462,7 +462,7 @@ function OnboardingWizard({
 
   /**
    * Funnel instrumentation. One event per step entry, carrying how long the
-   * previous step took — which is enough to build both the drop-off funnel and
+   * previous step took, which is enough to build both the drop-off funnel and
    * the per-step timing chart from a single event type.
    *
    * Driven off `stepId` rather than wired into `advance`/`back` so it cannot be
@@ -519,7 +519,7 @@ function OnboardingWizard({
     try {
       await prepareLanguagePair({ sourceLanguage: source, targetLanguage: target });
     } catch (err) {
-      // Non-fatal — content warmup is best-effort, and we advance regardless.
+      // Non-fatal. Content warmup is best-effort, and we advance regardless.
       // But "advanced anyway" is exactly the state that later shows up as a
       // placement test with no content, so record why.
       reportOnboardingFailure(err, {
@@ -543,7 +543,7 @@ function OnboardingWizard({
     }
   };
 
-  // Continue on cefr-pick starts the course at the picked level directly —
+  // Continue on cefr-pick starts the course at the picked level directly,
   // no confirmation dialog. Users who want the adaptive test instead reach it
   // via the proficiency step's "take a test" branch.
   const onCefrPickContinue = useCallback(() => {
@@ -581,7 +581,7 @@ function OnboardingWizard({
    * The wizard's finish: create the course (deck + seeded cards, quota
    * consumed) with the chosen review mode, flag onboarding done, and land
    * the user in the REAL learning mode. `completeOnboarding` failing keeps
-   * the user on this step with a toast — advancing without a course would
+   * the user on this step with a toast, advancing without a course would
    * drop them into an empty learn view. `finalizeOnboarding` failing still
    * navigates (matching the old behaviour): OnboardingGuard bounces back
    * here, which the funnel event makes traceable.
@@ -589,7 +589,7 @@ function OnboardingWizard({
   const onFinishOnboarding = useCallback(async () => {
     setIsSubmitting(true);
     // Flush the mode pick before the course is created from the progress row
-    // — the debounced persist may not have fired yet.
+    // The debounced persist may not have fired yet.
     if (persistDebounceRef.current) {
       clearTimeout(persistDebounceRef.current);
       persistDebounceRef.current = null;
@@ -681,7 +681,7 @@ function OnboardingWizard({
 
   // Enter advances the wizard, so a keyboard user can answer the whole flow
   // without reaching for the mouse. Only on steps that render the shared
-  // Continue button — the rest own their advance and their own CTAs.
+  // Continue button. The rest own their advance and their own CTAs.
   const onContinueRef = useRef(onContinue);
   useLayoutEffect(() => {
     onContinueRef.current = onContinue;

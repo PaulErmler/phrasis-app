@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { dismissTour, expectSignedIn } from "./helpers";
 
 /**
- * Library smoke — verifies the LibraryView renders inside the app shell
+ * Library smoke. Verifies the LibraryView renders inside the app shell
  * and that there is at least one interactive control (search, filter,
  * collection toggle, …).
  */

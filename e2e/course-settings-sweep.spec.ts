@@ -12,8 +12,8 @@ import {
 
 /**
  * Course-settings sweep: flip every reachable control in the learning
- * settings sheet — across Shadowing, Writing/Translate and Writing/Transcribe
- * — and assert no page error, no Convex validator rejection, and a sheet that
+ * settings sheet. Across Shadowing, Writing/Translate and Writing/Transcribe,
+ * and assert no page error, no Convex validator rejection, and a sheet that
  * still renders. Complements the exhaustive Convex-level sweep
  * (convex/tests/features/courseSettingsSweep.test.ts, every patchable key ×
  * validator-derived samples): that one proves the API surface, this one
@@ -84,7 +84,7 @@ async function clickInSheet(
   // Real mouse clicks (even `force: true`) use viewport coordinates. When
   // a sheet control is clipped, mid-transform, or the inner scroll jumps
   // after a Convex re-render, those coordinates land on the overlay and
-  // Radix dismisses the sheet — the learn card underneath then receives
+  // Radix dismisses the sheet. The learn card underneath then receives
   // the click (rating buttons). Activate the control via the DOM instead:
   // Radix Switch / Radio / Button all honor `HTMLElement.click()`, and
   // there is no pointer event for the overlay to treat as "outside".
@@ -109,7 +109,7 @@ async function setWritingStyle(
 
 /**
  * Toggle every Radix switch currently in the sheet twice (on/off back to the
- * original value) — each click is a real updateCourseSettings write. Switches
+ * original value), each click is a real updateCourseSettings write. Switches
  * are addressed by DOM id (CSS ignores the aria-hidden Radix sometimes sets
  * on the SheetContent); each interaction is labeled so a failure names the
  * control.
@@ -160,7 +160,7 @@ async function cycleListeningStrategies(page: Page): Promise<void> {
   }
 }
 
-test.describe('course settings — full UI sweep', () => {
+test.describe('course settings: full UI sweep', () => {
   test('every control in every mode writes without errors', async ({
     page,
   }) => {

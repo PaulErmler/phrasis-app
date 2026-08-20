@@ -69,7 +69,7 @@ describe("useStatsSnapshot", () => {
     expect(stored.a).toBe(2);
   });
 
-  it("honors dateScoped — ignores stale date", () => {
+  it("honors dateScoped, ignores stale date", () => {
     localStorage.setItem(
       "k",
       JSON.stringify({ __date: "2000-01-01", reviews: 10 }),
@@ -80,7 +80,7 @@ describe("useStatsSnapshot", () => {
     expect(result.current.prev).toEqual({ reviews: 0 });
   });
 
-  it("dateScoped — stale multi-period snapshot zeroes all keys (NumbersRow shape)", () => {
+  it("dateScoped, stale multi-period snapshot zeroes all keys (NumbersRow shape)", () => {
     // Mirrors the stats-page `statsPage_periods` snapshot crossing a day
     // boundary: yesterday's day/week totals must not become the animation's
     // "from" value.

@@ -10,12 +10,12 @@ import { reportError } from "@/lib/report-error";
  *
  * Two failure shapes exist and BOTH must become visible:
  *
- * - Thrown errors — Convex actions rejected server-side (trial gate,
+ * - Thrown errors. Convex actions rejected server-side (trial gate,
  *   stale-client guard, injected e2e failures, network).
- * - `{ error }` containers — autumn-js wraps SDK/action failures into a
+ * - `{ error }` containers: autumn-js wraps SDK/action failures into a
  *   return value instead of throwing (`wrapSdkCall`), so a plain `await
  *   checkout(...)` "succeeds" while nothing happened. Before this helper
- *   existed, that path closed dialogs silently — the user saw no feedback
+ *   existed, that path closed dialogs silently: the user saw no feedback
  *   at all.
  */
 

@@ -3,8 +3,8 @@ import type { ToolUIPart } from 'ai';
 /**
  * The card tools' exact result strings. The approval renderers classify a
  * finished tool call by comparing its output against these, so they live in
- * this client-safe module — imported by BOTH the tool handlers
- * (convex/features/chat/agent.ts) and the approval boxes — instead of being
+ * this client-safe module. Imported by BOTH the tool handlers
+ * (convex/features/chat/agent.ts) and the approval boxes, instead of being
  * mirrored as per-file literals that could silently drift (a server-side
  * rewording would then render every success as an error box).
  */
@@ -12,7 +12,7 @@ export const CREATE_CARD_SUCCESS = 'Card has been created.';
 export const MARK_ALSO_CORRECT_SUCCESS =
   'Marked as also correct. The user has been offered to save it.';
 /**
- * The user's version already matches the card verbatim — a SUCCESS outcome
+ * The user's version already matches the card verbatim. A SUCCESS outcome
  * with nothing to offer, not a failure. Distinct from the string above so the
  * renderer draws no approval box (and, critically, no error box) while the
  * model's own prose still confirms the answer was right.
@@ -40,8 +40,8 @@ export interface CreateCardToolPart {
 
 /**
  * Type guard to check if a tool part is a createCard tool.
- * Only checks the type name — `input` can be undefined for error/streaming
- * states, which `CardApproval` handles gracefully.
+ * Only checks the type name. `input` can be undefined for error/streaming
+ * states; `CardApproval` renders a placeholder for those.
  */
 export function isCreateCardToolPart(
   toolPart: ToolUIPart,
@@ -76,8 +76,8 @@ export interface MarkAlsoCorrectToolPart {
 
 /**
  * Type guard to check if a tool part is a markAlsoCorrect tool.
- * Only checks the type name — `input` can be undefined for error/streaming
- * states, which `AlsoCorrectApproval` handles gracefully.
+ * Only checks the type name. `input` can be undefined for error/streaming
+ * states; `AlsoCorrectApproval` renders a placeholder for those.
  */
 export function isMarkAlsoCorrectToolPart(
   toolPart: ToolUIPart,

@@ -123,7 +123,7 @@ import {
 // ============================================================================
 
 /**
- * Claim + enqueue a translation job for (text, targetLanguage) — the routing
+ * Claim + enqueue a translation job for (text, targetLanguage), the routing
  * slice shared by `scheduleMissingContent` and the collection-preview
  * generation path (`requestPreviewTranslations`). OpenRouter languages go
  * through the LLM queue under a claim; the rest take the legacy Google path
@@ -136,7 +136,7 @@ export async function scheduleTranslationForLanguage(
   opts: {
     audioSpeakerGender?: string;
     preferredRegionVariant?: string;
-    /** Translation-only mode — the landing translation won't enqueue TTS. */
+    /** Translation-only mode. The landing translation won't enqueue TTS. */
     skipTts?: boolean;
   },
 ): Promise<boolean> {
@@ -189,7 +189,7 @@ export async function scheduleTranslationForLanguage(
 }
 
 /**
- * Resolve the curated gender for `voiceName` and enqueue the TTS job — the
+ * Resolve the curated gender for `voiceName` and enqueue the TTS job. The
  * shared tail of `scheduleAudioForLanguage` and
  * `storeTranslationAndScheduleTTS`. Claim acquisition deliberately stays at
  * the call sites so write ordering is unchanged.
@@ -234,7 +234,7 @@ async function enqueueTtsForVoice(
 }
 
 /**
- * Fill audio for (text, language) — the slice shared by
+ * Fill audio for (text, language), the slice shared by
  * `scheduleMissingContent`, `storeTranslationAndScheduleTTS`'s siblings,
  * and the preview audio-icon click (`requestPreviewAudio`). For the text's
  * own language the source text is synthesized; for any other language the
@@ -243,7 +243,7 @@ async function enqueueTtsForVoice(
  *
  * Checks the content-addressed `audioAssets` store first: when a fresh asset
  * already exists for this exact (language, gender, dialect, string), the
- * text's pointer row is attached to it and NO job is enqueued — no claim, no
+ * text's pointer row is attached to it and NO job is enqueued, no claim, no
  * synthesis cost, audio is available immediately. On a miss (or with
  * `opts.forceRegen`, the regenerate-audio path, which must synthesize anew)
  * the claim + enqueue flow runs; the job's completion upserts the asset by
@@ -342,7 +342,7 @@ export async function scheduleMissingContent(
   // source-language branch below queues audio for it regardless of what
   // the caller passed in `baseLanguages`. Without this, a user whose
   // course uses an English VARIANT (`en_gb` / `en_us` / `en_au`) would
-  // never get audio for `en` curriculum + placement-test texts —
+  // never get audio for `en` curriculum + placement-test texts.
   // `allRequiredLanguages` wouldn't contain `'en'`, so the
   // `lang === sourceLanguage` branch never fires. Same shape applies to
   // any other text where the user's variant differs from the text's
@@ -360,7 +360,7 @@ export async function scheduleMissingContent(
   );
 
   // Batch load existing translations, audio, AND LLM claims for the
-  // needed languages — all three sets in one Promise.all so the read
+  // needed languages. All three sets in one Promise.all so the read
   // round-trips run in parallel rather than serially inside the loop
   // below. The claim lookup gates whether `scheduleMissingContent`
   // should defer a TTS enqueue while an LLM retranslation is in flight;
@@ -411,7 +411,7 @@ export async function scheduleMissingContent(
   // the now-stale audio. See the sweep comment for full rationale.
   const langsWithAudioGenderDrift = new Set<string>();
 
-  // Validate audio rows — delete stale ones (missing blob, gender drift,
+  // Validate audio rows. Delete stale ones (missing blob, gender drift,
   // superseded provider, bumped ttsVersion). All checks read the row's
   // RESOLVED payload (the shared `audioAssets` row). Deleting a pointer row
   // leaves a still-shared asset untouched; the re-synthesis a stale asset
@@ -429,7 +429,7 @@ export async function scheduleMissingContent(
     if (!audio) continue;
     const payload = await resolveAudioPayload(ctx, audio);
     if (!payload) {
-      // Dangling pointer (asset gone) — no usable audio behind this row.
+      // Dangling pointer (asset gone), no usable audio behind this row.
       // Remove it so the enqueue loop below refills the language.
       if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
       await deleteAudioRow(ctx, audio, { blobAlreadyGone: true });
@@ -441,7 +441,7 @@ export async function scheduleMissingContent(
       if (await hasActiveTtsClaim(ctx, textId, lang)) {
         continue;
       }
-      // The blob is gone — nothing left to reference-protect; row (and, for
+      // The blob is gone, nothing left to reference-protect; row (and, for
       // a last-pointer row, its dead asset) bookkeeping still runs.
       await deleteAudioRow(ctx, audio, { blobAlreadyGone: true });
       audioMap.set(lang, null);
@@ -452,7 +452,7 @@ export async function scheduleMissingContent(
       // Assets carried over from pre-provider-field audio are legacy Google.
       const existingProvider = payload.ttsProvider ?? 'google';
       const currentProvider = getTtsProviderForLanguage(lang);
-      // Provider regen is now gated by lib/ttsPrecedence.ts — only the
+      // Provider regen is now gated by lib/ttsPrecedence.ts, only the
       // (current, existing) matchups listed there force a delete + re-synth
       // (e.g. google now overwrites azure, to migrate the Arabic dialects
       // off Azure). Unlisted pairs keep the existing audio.
@@ -472,7 +472,7 @@ export async function scheduleMissingContent(
         // Reference-aware delete: a shared asset (or an `editCard`-copied
         // legacy blob) survives while anything else still points at it.
         // Gender drift additionally keeps the asset+blob even as the last
-        // pointer: that audio is still CORRECT for this string+voice — it
+        // pointer: that audio is still CORRECT for this string+voice. It
         // stays in the content-addressed cache so flipping the gender back
         // (or any other text with the same sentence) reuses it for free.
         // Provider/ttsVersion migrations are true obsolescence (a new TTS
@@ -501,16 +501,16 @@ export async function scheduleMissingContent(
   //     gender-drifted by the validity loop above. Audio drift is the
   //     retrospective signal that the translation alongside it was almost
   //     certainly generated under a gender that's now wrong. Without this,
-  //     the audio loop heals the voice but the translation text — produced
-  //     with the wrong grammar — survives and gets stamped as if correct by
+  //     the audio loop heals the voice but the translation text: produced
+  //     with the wrong grammar: survives and gets stamped as if correct by
   //     the "fill if missing" path, so the user ends up hearing the right
   //     voice reading wrong-grammar text.
   //
-  // Legacy rows without an audio drift signal are left alone — we have no
+  // Legacy rows without an audio drift signal are left alone. We have no
   // evidence they're wrong, and a blanket invalidation would cause a regen
   // storm across the database.
   //
-  // Content we may not touch is skipped unconditionally — see
+  // Content we may not touch is skipped unconditionally. See
   // `mayRegenerateTranslation` (lib/translationProvenance.ts) for the rule:
   // user-created cards in full, plus human-authored rows on premade texts.
   // Note this gates the TEXT only; the audio validity loop above still runs
@@ -528,7 +528,7 @@ export async function scheduleMissingContent(
   for (const [lang, translation] of translationMap) {
     if (!translation) continue;
     // The one provenance gate for all three triggers below. Covers
-    // user-created (custom/chat) cards and human-authored rows alike — every
+    // user-created (custom/chat) cards and human-authored rows alike. Every
     // regeneration site shares this predicate so none of them can drift out of
     // agreement with the others.
     if (!mayRegenerateTranslation(text, translation)) continue;
@@ -546,7 +546,7 @@ export async function scheduleMissingContent(
 
     if (!isDrifted && !isLegacyAlongsideDriftedAudio && !isVersionStale) continue;
     if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
-    // Defer while an LLM retranslation is in flight — it will overwrite the row
+    // Defer while an LLM retranslation is in flight. It will overwrite the row
     // anyway, so deleting now just races the pending write.
     const llmClaim = llmClaimMap.get(lang) ?? null;
     if (llmClaim && isClaimFresh(llmClaim)) continue;
@@ -558,13 +558,13 @@ export async function scheduleMissingContent(
     translationMap.set(lang, null);
     // Audio for the legacy-alongside-drifted case was already deleted by the
     // validity loop. The block below only fires when the sweep itself owns
-    // the delete — i.e. post-PR drift / version bump where the audio looked fine
+    // the delete, i.e. post-PR drift / version bump where the audio looked fine
     // to the validity loop but the translation row is now stale. Reference-aware
     // delete so a blob shared via an `editCard` copy isn't dropped.
     const staleAudio = audioMap.get(lang);
     if (staleAudio) {
       // keepAsset: every trigger here is a CONTENT change (gender drift /
-      // translation-version bump regenerating the text) — the recording
+      // translation-version bump regenerating the text), the recording
       // itself is still valid audio of the old string, so it stays in the
       // audioAssets cache instead of being garbage-collected.
       await deleteAudioRow(ctx, staleAudio, { keepAsset: true });
@@ -583,7 +583,7 @@ export async function scheduleMissingContent(
     // has them needs no backfill.
     const payload = audioPayloadMap.get(lang);
     if (!audio || !payload || payload.wordTimings) return;
-    // Languages without STT support (e.g. `el` — Azure Fast Transcription
+    // Languages without STT support (e.g. `el`, Azure Fast Transcription
     // can't transcribe `el-GR`) will never get word timings, so don't waste
     // a claim on a backfill that's guaranteed to no-op.
     if (!languageSupportsStt(lang)) return;
@@ -603,7 +603,7 @@ export async function scheduleMissingContent(
   // Schedule romanization for source text if needed and missing.
   // `=== undefined` (not `!x`) so the empty-string sentinel that
   // `processRomanizationForSourceText` writes after 3 failed retries is
-  // honored — without that distinction every ensureContent call would burn
+  // honored, without that distinction every ensureContent call would burn
   // another 3 retries against the same failing input.
   if (
     ROMANIZATION_LANGUAGES.has(sourceLanguage) &&
@@ -621,7 +621,7 @@ export async function scheduleMissingContent(
     const hasAudio = audioMap.get(lang) != null;
 
     if (lang === sourceLanguage) {
-      // Source language — no translation needed, maybe TTS
+      // Source language, no translation needed, maybe TTS
       if (!hasAudio) {
         if (
           await scheduleAudioForLanguage(
@@ -639,7 +639,7 @@ export async function scheduleMissingContent(
         await scheduleTimingsBackfillIfNeeded(lang);
       }
     } else {
-      // Different language — need translation
+      // Different language. Need translation
       const translation = translationMap.get(lang);
       if (!translation) {
         // Route to either the LLM queue or the legacy Google path based on
@@ -655,7 +655,7 @@ export async function scheduleMissingContent(
           translationsScheduled++;
         }
       } else {
-        // Translation exists — backfill romanization if missing
+        // Translation exists. Backfill romanization if missing
         // `=== undefined` (not `!x`) so the empty-string "tried, failed,
         // leave empty" sentinel persisted by `processRomanizationForTranslation`
         // is respected on subsequent ensureContent runs.
@@ -675,7 +675,7 @@ export async function scheduleMissingContent(
           // deletes audio + enqueues an LLM retranslation) races with a
           // concurrent `scheduleMissingContent` that would otherwise see
           // "translation exists, audio missing" and enqueue TTS against
-          // the OLD `translation.translatedText` — producing stale audio
+          // the OLD `translation.translatedText`, producing stale audio
           // just before the new translation lands. The LLM worker's
           // `storeTranslationAndScheduleTTS` will enqueue TTS for the new
           // text once the LLM completes. The claim was pre-fetched in
@@ -684,7 +684,7 @@ export async function scheduleMissingContent(
           const llmRetranslationInFlight =
             existingLlmClaim !== null && isClaimFresh(existingLlmClaim);
           if (llmRetranslationInFlight) {
-            // Skip — the LLM worker owns the next TTS enqueue for this row.
+            // Skip. The LLM worker owns the next TTS enqueue for this row.
           } else if (
             await scheduleAudioForLanguage(
               ctx,
@@ -834,8 +834,8 @@ export const getCollectionProgress = query({
     const courseId = settings.activeCourseId;
 
     // Fetch only the premade rows actually displayed: the active dataset's ~20
-    // collections (one indexed scan) or the seven legacy CEFR rows by name —
-    // see getPremadeLevelCollections for the read pattern.
+    // collections (one indexed scan) or the seven legacy CEFR rows by name.
+    // See getPremadeLevelCollections for the read pattern.
     const { collections } = await getPremadeLevelCollections(ctx);
 
     const result = await Promise.all(
@@ -976,7 +976,7 @@ export const setActiveCollection = mutation({
     // Re-selecting the collection that's already active is a no-op, not an
     // error: `setCollectionTextMark` can complete a collection (via
     // `ignoredCount`) without running auto-advance, leaving it complete AND
-    // still active — the guard below would then reject a click that changes
+    // still active. The guard below would then reject a click that changes
     // nothing.
     if (courseSettings?.activeCollectionId === args.collectionId) return null;
 
@@ -990,7 +990,7 @@ export const setActiveCollection = mutation({
     // Complete = every text either added or deliberately ignored, counted
     // against the carry-widened total so this matches the predicate the UI
     // uses to decide whether to offer the button at all (empty collections
-    // included — there's nothing to finish, so selecting one isn't an error).
+    // included, there's nothing to finish, so selecting one isn't an error).
     if (
       progress &&
       effectiveTextCount(collection.textCount, progress) > 0 &&
@@ -1027,7 +1027,7 @@ export const getActiveDifficultyLevel = query({
 
 /**
  * The next sentences that would actually be added for THIS user from the
- * dataset level `ogteLevel` — the difficulty-check dialog's preview, so the
+ * dataset level `ogteLevel`. The difficulty-check dialog's preview, so the
  * user judges the level on the exact material coming up next, not generic
  * samples. Starts past the user's frontier (`lastRankProcessed`) like the
  * add-cards flow; the source side renders in the base language once its
@@ -1043,7 +1043,7 @@ export const getUpcomingSentencesForLevel = query({
     /** The level exists in the active dataset. */
     exists: v.boolean(),
     /**
-     * The course can move to this level — it exists and the user hasn't
+     * The course can move to this level. It exists and the user hasn't
      * already completed it (`setActiveCollectionByLevel` would throw).
      * Lets the pager disable a step instead of dead-ending on an error
      * toast. Always true for the level that is already active.
@@ -1088,7 +1088,7 @@ export const getUpcomingSentencesForLevel = query({
 
     // Mirror `setActiveCollectionByLevel`'s guard so the UI can't offer a
     // step the mutation would reject. The already-active level stays
-    // switchable — selecting it is a no-op there, not an error.
+    // switchable, selecting it is a no-op there, not an error.
     const courseSettings = await getCourseSettings(ctx, course._id);
     const isActiveLevel = courseSettings?.activeCollectionId === collection._id;
     const isComplete =
@@ -1146,8 +1146,8 @@ export const getUpcomingSentencesForLevel = query({
 });
 
 /**
- * Switch the active collection to the dataset level for `ogteLevel` —
- * the difficulty-check dialog's "switch level" action, which only knows the
+ * Switch the active collection to the dataset level for `ogteLevel`.
+ * The difficulty-check dialog's "switch level" action, which only knows the
  * slider's level, not a collection id. Same safety rails as
  * `setActiveCollection`: no-ops when the level is already active, refuses a
  * collection the user has already completed.
@@ -1274,7 +1274,7 @@ export async function createCardsFromTexts(
   // card carries the denormalized field for the content-source filter.
   // Fall back to `isPremadeLevelCollection` for legacy CEFR collections
   // (pre-OGTE-cutover rows that have neither a `datasetId` nor an explicit
-  // `legacy: true` flag and never got their `origin` backfilled) — otherwise
+  // `legacy: true` flag and never got their `origin` backfilled), otherwise
   // cards inserted from them get `collectionOrigin: undefined` and never
   // match the 'course' filter even though the UI treats them as course content.
   const collection = await ctx.db.get(collectionId);
@@ -1285,7 +1285,7 @@ export async function createCardsFromTexts(
   // With separateModeTracking on, seed the writing track at creation (a new
   // card's writing schedule is identical to its shared one) so the card is
   // immediately visible to the writing-due indexes without a backfill. While
-  // it's off, cards stay unseeded — the enable-time seedWritingTrack backfill
+  // it's off, cards stay unseeded. The enable-time seedWritingTrack backfill
   // copies the then-current shared state instead.
   const settingsForSeed = await getCourseSettings(ctx, course._id);
   const seedWritingTrack = settingsForSeed?.separateModeTracking === true;
@@ -1346,8 +1346,8 @@ export async function createCardsFromTexts(
  * them a second time.
  *
  * `frontierRank` advances `lastRankProcessed` (monotonic via Math.max).
- * Omit it for out-of-order adds (preview direct-add, prioritized drain) —
- * those must NOT move the frontier, or every unscanned text between the old
+ * Omit it for out-of-order adds (preview direct-add, prioritized drain).
+ * Those must NOT move the frontier, or every unscanned text between the old
  * frontier and the added rank would be silently skipped forever.
  */
 export async function updateCollectionProgress(
@@ -1409,10 +1409,10 @@ async function getOrCreateDeck(
  * Per-call bound on how many texts the sequential add scan may walk over.
  * Keeps one mutation's reads bounded when the frontier sits at the start of a
  * long ignored/direct-added streak: each scanned text costs ~2 reads (text
- * doc + card point-read), so 1500 ≈ 3k document reads — well inside Convex's
+ * doc + card point-read), so 1500 ≈ 3k document reads. Well inside Convex's
  * per-transaction limits. The frontier advance is persisted even when nothing
  * addable was found, so the caller can signal `scanIncomplete` and the client
- * re-calls — each retry resumes past the already-scanned stretch (guaranteed
+ * re-calls. Each retry resumes past the already-scanned stretch (guaranteed
  * progress). Exported for the scan-continuation test.
  */
 export const ADD_SCAN_CAP = 1500;
@@ -1423,7 +1423,7 @@ export const ADD_SCAN_CAP = 1500;
  * that already have a card (preview direct-adds ahead of the frontier).
  *
  * Returns the picked texts plus the new frontier (rank of the last text
- * processed — every text at or below it is added-or-ignored). `exhausted`
+ * processed, every text at or below it is added-or-ignored). `exhausted`
  * means the index range ran dry; `capped` means the ADD_SCAN_CAP was hit
  * before filling `limit` with more texts possibly remaining.
  */
@@ -1471,7 +1471,7 @@ async function getNextAddableTextsFromRank(
       exhausted = true;
       break;
     }
-    // Ignore set scoped to exactly this batch's rank window — bounded by the
+    // Ignore set scoped to exactly this batch's rank window. Bounded by the
     // batch size no matter how many marks the user has in total (a global
     // read would need an unbounded collect and silently miss marks past any
     // fixed cap).
@@ -1513,7 +1513,7 @@ async function getNextAddableTextsFromRank(
  * Load the texts behind one type of the user's marks for a collection, rank
  * order, up to `limit`. Orphan marks (text deleted, or a card already exists)
  * are cleaned up here without counting toward the batch. The kept marks are
- * NOT deleted yet — `addTextsAsCards` clears them in the same transaction
+ * NOT deleted yet. `addTextsAsCards` clears them in the same transaction
  * that inserts the cards.
  */
 async function drainMarkedTexts(
@@ -1618,10 +1618,10 @@ async function addTextsAsCards(
 }
 
 /**
- * If `collectionId` is the active premade collection and is now complete —
- * every text either added or deliberately ignored — advance the active
+ * If `collectionId` is the active premade collection and is now complete.
+ * Every text either added or deliberately ignored. Advance the active
  * collection to the next incomplete one (or clear it when none remain).
- * Walks forward within the same collection generation — new-dataset
+ * Walks forward within the same collection generation. New-dataset
  * collections advance by `order + 1`, legacy collections walk
  * LEGACY_LEVEL_ORDER. See findNextIncompleteCollection / getNextCollection.
  */
@@ -1663,7 +1663,7 @@ export const addCardsFromCollection = mutation({
   args: {
     collectionId: v.id('collections'),
     batchSize: v.number(),
-    /** When true, only add from this specific collection — skip custom collection mixing. */
+    /** When true, only add from this specific collection. Skip custom collection mixing. */
     exclusive: v.optional(v.boolean()),
   },
   returns: v.object({
@@ -1671,16 +1671,16 @@ export const addCardsFromCollection = mutation({
     totalCardsInDeck: v.number(),
     /**
      * True when the sequential scan hit its per-call read cap before filling
-     * the batch and the collection wasn't exhausted — addable texts may exist
+     * the batch and the collection wasn't exhausted. Addable texts may exist
      * beyond the scanned window. The frontier advance is already persisted,
-     * so the caller should simply re-call to continue (each retry makes
+     * so the caller re-calls to continue (each retry makes
      * guaranteed progress).
      */
     scanIncomplete: v.boolean(),
     /**
      * True when Phase 2 was skipped because the SENTENCES quota is exhausted.
      * Distinguishes "0 cards because out of quota" from "collection drained"
-     * — without it the two are byte-identical and clients would latch a
+     * Without it the two are byte-identical and clients would latch a
      * quota-limited collection as permanently exhausted. Optional so replies
      * from a not-yet-redeployed backend still validate.
      */
@@ -1711,7 +1711,7 @@ export const addCardsFromCollection = mutation({
 
     // Content-source filter: scopes the learning-mode auto-add flow only.
     // When `exclusive` is set, the user is explicitly adding from a specific
-    // collection via the collection detail dialog — honor that source directly.
+    // collection via the collection detail dialog. Honor that source directly.
     const studyContentFilter = courseSettings?.studyContentFilter ?? 'both';
     const skipCustomSources = !args.exclusive && studyContentFilter === 'course';
     const skipPremadeSource = !args.exclusive && studyContentFilter === 'custom';
@@ -1747,7 +1747,7 @@ export const addCardsFromCollection = mutation({
         const lastRank = prog?.lastRankProcessed ?? 0;
         // Ignored texts are deliberately excluded from auto-add, so they
         // don't count as pending. (Custom collections never carry cutover
-        // credit, so widening here is a no-op — it just keeps every
+        // credit, so widening here is a no-op. It just keeps every
         // `collectionRemaining` call on the effective total.)
         const pending = collectionRemaining(
           effectiveTextCount(coll.textCount, prog),
@@ -1827,7 +1827,7 @@ export const addCardsFromCollection = mutation({
         if (quota.balance > 0) {
           remainingBatch = quota.balance;
         } else {
-          // No sentences left — skip Phase 2 entirely, return Phase 1 results
+          // No sentences left. Skip Phase 2 entirely, return Phase 1 results
           if (totalCardsInserted > 0) {
             await ctx.db.patch(deck._id, { cardCount: deck.cardCount + totalCardsInserted });
           }
@@ -1887,7 +1887,7 @@ export const addCardsFromCollection = mutation({
         await maybeAutoAdvanceActiveCollection(ctx, userId, courseId, args.collectionId);
       } else if (scan.newFrontier > lastRankProcessed) {
         // Nothing addable in the scanned window (an ignored/direct-added
-        // streak) — persist the frontier advance so the next call continues
+        // streak), persist the frontier advance so the next call continues
         // past it instead of re-scanning the same stretch.
         await updateCollectionProgress(ctx, userId, courseId, args.collectionId, {
           addedDelta: 0,
@@ -1902,7 +1902,7 @@ export const addCardsFromCollection = mutation({
       await ctx.db.patch(deck._id, { cardCount: deck.cardCount + totalCardsInserted });
     }
 
-    // One event per batch with a count — not one per card. Adding 50 cards is
+    // One event per batch with a count, not one per card. Adding 50 cards is
     // a single user decision, and modelling it as 50 events would both distort
     // the behavioural picture and multiply the bill.
     if (totalCardsInserted > 0) {
@@ -1924,7 +1924,7 @@ export const addCardsFromCollection = mutation({
 });
 
 /**
- * Add ONE specific text from a collection to the user's deck — the collection
+ * Add ONE specific text from a collection to the user's deck. The collection
  * preview's per-card "Add" button. The card is created ahead of the
  * sequential frontier; the frontier is deliberately NOT advanced (the scan
  * later passes over the card via its dedup check without re-counting it).
@@ -1954,7 +1954,7 @@ export const addSingleTextFromCollection = mutation({
 
     const existingCard = await getCardByDeckAndText(ctx, deck._id, args.textId);
     if (existingCard) {
-      // Already in the deck — just make sure no stale mark survives.
+      // Already in the deck, just make sure no stale mark survives.
       await clearMarkForAddedText(ctx, userId, courseId, args.textId);
       return { added: false, alreadyAdded: true };
     }
@@ -1986,8 +1986,8 @@ export const addSingleTextFromCollection = mutation({
  * the ensure* endpoints are the content pipeline's self-heal path for cards
  * the user already owns, and blocking them while a payment is past due
  * would corrupt the study experience the free tier still promises. The
- * dunning block enforces at the spend boundary instead — `consumeQuota`
- * (card creation, chat, etc.) — plus the app-wide overdue dialog.
+ * dunning block enforces at the spend boundary instead. `consumeQuota`
+ * (card creation, chat, etc.), plus the app-wide overdue dialog.
  */
 export const ensureCardContent = mutation({
   args: {
@@ -2027,7 +2027,7 @@ export const ensureCardContent = mutation({
  * Query the next N upcoming cards for a given scheduling mode. The card set
  * differs by mode: `learn_new` pulls only new (non-graduated) cards via the
  * graduated index, `learnAndReview` pulls all due cards, and free play
- * (`radio`, either face) has no due filter at all — its rotations serve by
+ * (`radio`, either face) has no due filter at all. Its rotations serve by
  * round counter, so the cards to warm are each face's rotation head.
  */
 async function getUpcomingCardsForMode(
@@ -2042,7 +2042,7 @@ async function getUpcomingCardsForMode(
     // Both faces: the Radio and Free Study rotations advance independently,
     // so their heads can be entirely different cards.
     //
-    // Must go through `fetchFreePlayRotation` — the same selector the serving
+    // Must go through `fetchFreePlayRotation`. The same selector the serving
     // queue uses. Calling the unfiltered `fetch` here warmed a different set
     // than free play actually serves for anyone on a 'course'/'custom' filter.
     const [radioHead, freeStudyHead] = await Promise.all([
@@ -2054,9 +2054,9 @@ async function getUpcomingCardsForMode(
     return [...byId.values()];
   }
   // Due queues: warm exactly what the serving path (`fetchTrackDueCards`)
-  // will read — same track (shared vs writing schedule), same content-source
+  // will read, same track (shared vs writing schedule), same content-source
   // filter. Warming an unfiltered/other-track superset here looked harmless
-  // but warmed a different set than the queue actually serves — the same
+  // but warmed a different set than the queue actually serves. The same
   // trap the free-play comment above describes.
   return fetchTrackDueCards(
     ctx,
@@ -2145,7 +2145,7 @@ export const ensureUpcomingCardsContent = mutation({
 // Scheduling modes whose upcoming card sets differ for content purposes.
 // Free play's rotations serve by round counter with no due filter, so its
 // upcoming cards are NOT covered by the due-based modes and must be warmed
-// separately (both faces — see getUpcomingCardsForMode).
+// separately (both faces, see getUpcomingCardsForMode).
 const WARMABLE_SCHEDULING_MODES: SchedulingMode[] = [
   'learn_new',
   'learnAndReview',
@@ -2177,7 +2177,7 @@ export const ensureUpcomingCardsContentAllModes = mutation({
     const settings = await getCourseSettings(ctx, active.course._id);
     const filter = settings?.studyContentFilter ?? 'both';
     // With separateModeTracking on, the home-screen mode toggle switches
-    // between two different due queues — warm both tracks so either choice
+    // between two different due queues. Warm both tracks so either choice
     // starts instantly. (Free play ignores the track; it's warmed once.)
     const tracks: SchedulingTrack[] = settings?.separateModeTracking
       ? ['shared', 'writing']
@@ -2327,7 +2327,7 @@ export const processTranslationForCard = internalAction({
     //
     // Variant pin: prefer the existing row's persisted regionVariant, then
     // the pre-delete capture (`preferredRegionVariant`), then a fresh
-    // deterministic pick — regeneration must not flip the card's dialect.
+    // deterministic pick. Regeneration must not flip the card's dialect.
     // All three resolve to null for non-mixed targets.
     const mixed =
       (existingRow?.regionVariant
@@ -2345,7 +2345,7 @@ export const processTranslationForCard = internalAction({
 
     // Honor `replaceExisting`: a retranslation that fell back to Google
     // must Google-translate fresh rather than reuse the stale existing
-    // translatedText — otherwise the audio would be regenerated against
+    // translatedText, otherwise the audio would be regenerated against
     // an unchanged translation and we'd write the same row back.
     const reuseExisting = !args.replaceExisting && existingRow !== null;
     if (reuseExisting) {
@@ -2359,7 +2359,7 @@ export const processTranslationForCard = internalAction({
         try {
           romanizedText = await romanizeText(translation, translateTarget);
         } catch {
-          // 3 retries already exhausted — persist sentinel so subsequent
+          // 3 retries already exhausted. Persist sentinel so subsequent
           // ensureContent runs see "tried" and skip rescheduling.
           romanizedText = '';
         }
@@ -2394,7 +2394,7 @@ export const processTranslationForCard = internalAction({
         try {
           romanizedText = await romanizeText(translation, translateTarget);
         } catch (err) {
-          // 3 retries already exhausted — persist the empty-string
+          // 3 retries already exhausted. Persist the empty-string
           // sentinel so ensureContent doesn't reschedule another burst.
           console.error(
             `Romanization failed for ${args.targetLanguage} (persisting sentinel):`,
@@ -2480,19 +2480,19 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     regionVariant: v.optional(v.string()),
     /**
      * Retranslation flag. Set by callers that deliberately want to overwrite
-     * an existing translation — today only `flagTranslation` (the user
+     * an existing translation. Today only `flagTranslation` (the user
      * reported a bad translation and we want the new LLM output to replace
      * the displayed text).
      *
      * When `true` AND a translation row already exists, the mutation
      * replaces `translatedText`, `romanizedText` (matched with its source),
-     * `translationSource`, and `regionVariant`. `flagCount` is preserved —
-     * it tracks user dissatisfaction history. The audio decision also lives
+     * `translationSource`, and `regionVariant`. `flagCount` is preserved.
+     * It tracks user dissatisfaction history. The audio decision also lives
      * HERE (not in retranslation callers): when the new text sounds
      * identical to the old (punctuation/'_'-only diff, `soundsSame`), the
      * existing audio rows are kept and no TTS is enqueued; otherwise the
      * stale audio rows are deleted so the no-audio guard below schedules a
-     * fresh TTS. Callers must NOT delete audio up front — before the LLM
+     * fresh TTS. Callers must NOT delete audio up front, before the LLM
      * lands they can't know whether the change is audible.
      *
      * When `false`/absent, the historical concurrent-write protection
@@ -2504,7 +2504,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     replaceExisting: v.optional(v.boolean()),
     /**
      * Speaker gender ('male' | 'female') the translation was produced under
-     * — the card's resolved `audioSpeakerGender`. Persisted on the translation
+     * The card's resolved `audioSpeakerGender`. Persisted on the translation
      * row so the gender-mismatch sweep in `scheduleMissingContent` can
      * invalidate translations whose grammar no longer agrees with the card's
      * current voice gender. Optional during rollout so old call sites that
@@ -2514,7 +2514,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     /**
      * Single-writer token: the `llmTranslationClaims` row the calling job was
      * enqueued under. When supplied, the write only proceeds if that exact
-     * claim doc still exists — a reclaim deletes + reinserts the claim under
+     * claim doc still exists. A reclaim deletes + reinserts the claim under
      * a new `_id`, so a mismatch means another job now owns this
      * (textId, targetLanguage) and this result is stale. Absent on the
      * claimless direct-Google path (`scheduleMissingContent`'s non-openrouter
@@ -2544,7 +2544,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
 
     // Single-writer gate: a job whose claim was reclaimed mid-flight (it ran
     // past CLAIM_STALE_MS and a concurrent scheduler re-enqueued the row) must
-    // not write — the reclaiming job owns the row now, and a late stale result
+    // not write. The reclaiming job owns the row now, and a late stale result
     // landing after the owner's would silently revert it (worst case: a
     // flag-retranslation's text overwritten while its audio survives).
     if (args.expectedClaimId !== undefined) {
@@ -2565,20 +2565,20 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     // on a user-created card, whatever enqueued it. Callers already refuse to
     // ask (`flagTranslation` short-circuits on user-created texts, and
     // `updateEssentialGreetings` only targets premade rows), so no live path
-    // reaches this today — it is defence in depth against a future caller.
+    // reaches this today. It is defence in depth against a future caller.
     //
     // Deliberately scoped to the OVERWRITE. The `existing &&` is load-bearing,
     // and NOT for the fill-a-missing-language path: that one never sets
     // `replaceExisting` (see `scheduleTranslationForLanguage`), so the guard is
     // inert there either way. It matters for `onGoogleFallbackComplete`, which
-    // forwards the original job's `replaceExisting: true` into a re-enqueue —
+    // forwards the original job's `replaceExisting: true` into a re-enqueue,
     // by the time that lands, the row it meant to replace may have been swept,
     // and refusing then would leave the card with no translation at all.
     if (existing && args.replaceExisting && isUserCreatedText(text)) {
       return null;
     }
 
-    // Choke-point post-processing (idempotent — LLM/Google producers already
+    // Choke-point post-processing (idempotent, LLM/Google producers already
     // apply it upstream; this catches any path that didn't). The empty-string
     // romanization sentinel maps to itself, so "tried, failed" survives.
     const translatedText = postProcessTranslation(
@@ -2591,12 +2591,12 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         : undefined;
 
     // Set in the replaceExisting branch when the retranslation is a
-    // punctuation-only change — audio is kept and TTS must not be enqueued.
+    // punctuation-only change. Audio is kept and TTS must not be enqueued.
     let audioUnchangedBySound = false;
 
     // Set when this write changed content that belongs in the cards'
-    // searchableText (new/replaced translation, newly-filled romanization) —
-    // triggers the batched rebuild fan-out below.
+    // searchableText (new/replaced translation, newly-filled romanization).
+    // Triggers the batched rebuild fan-out below.
     let searchableContentChanged = false;
 
     if (!existing) {
@@ -2606,7 +2606,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         translatedText,
         // `!== undefined` so the empty-string sentinel ("tried, failed,
         // leave empty") persists on the new row and ensureContent stops
-        // rescheduling — otherwise `romanizedText === ''` would be
+        // rescheduling, otherwise `romanizedText === ''` would be
         // dropped by the truthy spread and look like "never attempted".
         ...(romanizedText !== undefined
           ? {
@@ -2628,12 +2628,12 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     } else if (args.replaceExisting) {
       // Audio decision for retranslations, made here where old and new text
       // are both in hand: a punctuation/'_'-only change sounds identical, so
-      // the existing audio stays valid — deleting + regenerating would spend
+      // the existing audio stays valid, deleting + regenerating would spend
       // real TTS cost on byte-identical speech. Only an audible change drops
       // the language's audio rows (all voices, reference-aware).
       audioUnchangedBySound = soundsSame(existing.translatedText, translatedText);
       if (!audioUnchangedBySound) {
-        // keepAsset: a retranslation is a content change — the old recording
+        // keepAsset: a retranslation is a content change. The old recording
         // is still correct audio of the old sentence and stays cached.
         await deleteAudioRowsForTextLanguage(
           ctx,
@@ -2644,7 +2644,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       }
 
       // Deliberate retranslation: overwrite the translation and its matched
-      // metadata. romanizedText and romanizationSource travel as a unit —
+      // metadata. romanizedText and romanizationSource travel as a unit,
       // both replaced together, including the empty-string sentinel. If the
       // caller didn't compute a new romanization (`romanizedText` undefined),
       // clear both fields so the next ensureContent pass regenerates them
@@ -2676,7 +2676,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       if (args.regionVariant) {
         patch.regionVariant = args.regionVariant;
       }
-      // Update the recorded speakerGender — a retranslation is what fixes a
+      // Update the recorded speakerGender. A retranslation is what fixes a
       // stale gender, so the new row's gender should reflect the current card.
       if (args.speakerGender) {
         patch.speakerGender = args.speakerGender;
@@ -2694,7 +2694,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       }> = {};
       // Same `!== undefined` reasoning: persist the sentinel on first write
       // but never overwrite a previously-stored real value. Source travels
-      // with the value — they're written/cleared as a unit.
+      // with the value. They're written/cleared as a unit.
       if (
         romanizedText !== undefined &&
         existing.romanizedText === undefined
@@ -2706,7 +2706,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       }
       // Translation source is set on first-write of `translatedText` (which
       // happened upstream when the row was inserted). For existing rows we
-      // only fill it in if it's missing — the legacy-backfill migration
+      // only fill it in if it's missing. The legacy-backfill migration
       // handles older rows, but a concurrent regenerate against an existing
       // row should keep the original source as the canonical record.
       if (args.translationSource && existing.translationSource === undefined) {
@@ -2725,7 +2725,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       // Fill-if-missing: stamp legacy rows (written before the field existed) at
       // BASELINE, not the current version. This branch keeps the row's OLD
       // translatedText, so it must stay regenerable by a future translationVersion
-      // bump — matching the one-time content-version backfill, which stamped
+      // bump, matching the one-time content-version backfill, which stamped
       // legacy rows at v1 so `baseline < bumped = stale`. Stamping the current
       // version here would mark
       // stale content as already up-to-date and silently defeat the bump. Only the
@@ -2735,7 +2735,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       }
       if (Object.keys(patch).length > 0) {
         await ctx.db.patch(existing._id, patch);
-        // Only a real romanization value changes the search string — the
+        // Only a real romanization value changes the search string. The
         // metadata fills (source/variant/gender/version) don't, and the
         // empty-string sentinel is filtered out of searchableText anyway.
         if (patch.romanizedText) {
@@ -2749,7 +2749,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     }
 
     // `audioUnchangedBySound`: the retained audio row already serves this
-    // (text, language) — skip outright.
+    // (text, language), skip outright.
     if (args.skipTts || audioUnchangedBySound) {
       return null;
     }
@@ -2762,7 +2762,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       .first();
 
     if (!existingAudio) {
-      // A translation just landed — check the content-addressed store before
+      // A translation just landed. Check the content-addressed store before
       // spending synthesis: another text with this exact string (same
       // language, gender, dialect) may already have fresh audio, in which
       // case attaching the pointer is all that's needed. Any drift the
@@ -2954,7 +2954,7 @@ export const storeTranslationRomanization = internalMutation({
 const REBUILD_SEARCHABLE_BATCH = 50;
 
 /**
- * Content lands in bursts — a text gets its translations and romanizations
+ * Content lands in bursts. A text gets its translations and romanizations
  * for every course language within seconds, and each store used to schedule
  * its own full rebuild over every card referencing the text (premade texts
  * are shared across all users' decks, so one burst multiplied into thousands
@@ -2996,9 +2996,9 @@ async function scheduleSearchableTextRebuild(
  * (`storeTranslationAndScheduleTTS`, `storeSourceRomanization`,
  * `storeTranslationRomanization`) so search stays correct for content that
  * lands AFTER a card was created. The review-time staleness check in
- * `reviewCard` only compares language sets — it misses retranslations and
+ * `reviewCard` only compares language sets. It misses retranslations and
  * late romanization fills entirely, and only fires when the card is actually
- * reviewed — so it stays as a backstop, not the primary path.
+ * reviewed, so it stays as a backstop, not the primary path.
  *
  * The rebuilt string depends only on (textId, course languages), so it is
  * computed once per distinct language list and reused across the batch;
@@ -3032,7 +3032,7 @@ export const rebuildSearchableTextForText = internalMutation({
       });
 
     // Shared per-page caches: deck→languages resolved once per deck, built
-    // strings memoized per (textId, languages) — every card here shares one
+    // strings memoized per (textId, languages), every card here shares one
     // text, so the build runs once per distinct language list.
     const caches = {
       deckLanguages: new Map<Id<'decks'>, string[] | null>(),
@@ -3074,8 +3074,8 @@ export const rebuildSearchableTextForText = internalMutation({
  * content-addressed `audioAssets` row for (language, voiceGender,
  * regionVariant, spokenText) and points this text's `audioRecordings` row at
  * it. When the asset already exists, a completed synthesis replaces its audio
- * IN PLACE — every text sharing the string gets the new audio on its next
- * query refresh — while a mid-flight attempt-0 write against completed audio
+ * IN PLACE. Every text sharing the string gets the new audio on its next
+ * query refresh, while a mid-flight attempt-0 write against completed audio
  * only attaches the pointer and drops its own blob (see `upsertAudioAsset`).
  */
 export const storeAudioRecording = internalMutation({
@@ -3099,7 +3099,7 @@ export const storeAudioRecording = internalMutation({
         }),
       ),
     ),
-    // The RAW string this audio speaks (asset key material) — `text.text` for
+    // The RAW string this audio speaks (asset key material), `text.text` for
     // source-language audio, the translation's `translatedText` otherwise.
     spokenText: v.string(),
     // Dialect pin for mixed-language rows; part of the asset key.
@@ -3141,7 +3141,7 @@ export const storeAudioRecording = internalMutation({
 
     if (result.outcome === 'kept') {
       // The asset already carries completed audio and this was a mid-flight
-      // 'unknown' write — the incoming blob is unused. Reference-safe drop.
+      // 'unknown' write. The incoming blob is unused. Reference-safe drop.
       await deleteStorageBlobIfUnreferenced(ctx, args.storageId);
     } else if (result.replacedStorageId !== null) {
       // In-place swap: the old blob stays downloadable for a grace window so

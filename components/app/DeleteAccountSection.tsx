@@ -16,9 +16,9 @@ import { api } from '@/convex/_generated/api';
 import { authClient } from '@/lib/auth-client';
 
 /**
- * Account deletion from settings — required by App Store Guideline 5.1.1(v)
+ * Account deletion from settings. Required by App Store Guideline 5.1.1(v)
  * now that the app ships in the stores. Files a deletion request (support@
- * is emailed automatically, deletion follows within 30 days — see
+ * is emailed automatically, deletion follows within 30 days. See
  * convex/features/accountDeletion.ts) and signs the user out.
  */
 export function DeleteAccountSection() {

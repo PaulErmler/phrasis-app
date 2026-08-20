@@ -15,7 +15,7 @@ function makeCollection(overrides: Partial<Doc<'collections'>>): Doc<'collection
 }
 
 describe('cardCollectionBackfillPatch (safety-net migrateOne logic)', () => {
-  it('returns undefined (skip) when both fields are already set — idempotent', () => {
+  it('returns undefined (skip) when both fields are already set, idempotent', () => {
     expect(
       cardCollectionBackfillPatch(
         { collectionId, collectionOrigin: 'premade' },

@@ -27,7 +27,7 @@ interface LanguageSelectorProps {
   onToggleLanguage: (languageCode: string) => void;
 }
 
-// Fixed display order — categories listed top-down in the picker. The
+// Fixed display order. Categories listed top-down in the picker. The
 // LanguageSelector.categories.* i18n keys map to these slugs.
 const CATEGORY_ORDER = [
   'germanic',
@@ -52,7 +52,7 @@ const _categoryOrderExhaustive: _CategoryOrderIsExhaustive = true;
 void _categoryOrderExhaustive;
 
 // Module-level singleton so `excludeLanguages = EMPTY_EXCLUDE` keeps a stable
-// reference when callers omit the prop — otherwise the inline `= []` default
+// reference when callers omit the prop, otherwise the inline `= []` default
 // would allocate a fresh array each render and invalidate the useMemo below.
 const EMPTY_EXCLUDE: string[] = [];
 
@@ -111,7 +111,7 @@ export function LanguageSelector({
 
       <Command
         // cmdk runs case-insensitive substring filtering on each item's `value`
-        // — we build a composite value below so the English name, native name,
+        // We build a composite value below so the English name, native name,
         // and the user-locale display name all match the search input.
         className="flex-1 bg-transparent overflow-hidden"
         filter={(value, search) =>
@@ -158,7 +158,7 @@ export function LanguageSelector({
                   >
                     <span className="text-2xl shrink-0">{language.flag}</span>
                     <div className="flex-1 min-w-0">
-                      {/* `llmSupportTier` stays internal-only — the badge is
+                      {/* `llmSupportTier` stays internal-only. The badge is
                           driven by the per-language `experimental` flag. */}
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-semibold text-sm leading-tight break-words">

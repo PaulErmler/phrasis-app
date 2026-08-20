@@ -94,7 +94,7 @@ export function validateRows({
       statuses.push({ kind: 'error', reasons });
       errorCount++;
     } else {
-      // Only advisory issues (e.g. duplicate) — still importable.
+      // Only advisory issues (e.g. duplicate), still importable.
       statuses.push({ kind: 'warning', translations, reasons });
       warningCount++;
     }

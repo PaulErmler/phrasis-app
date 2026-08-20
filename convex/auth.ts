@@ -43,7 +43,7 @@ export const authComponent = createClient<DataModel>(components.betterAuth, {
     user: {
       onCreate: async (ctx, doc) => {
         await upsertUserProfile(ctx, doc);
-        // Top of every funnel. `doc._id` is the Better Auth user id — the same
+        // Top of every funnel. `doc._id` is the Better Auth user id. The same
         // string the client identifies with and Autumn bills, so this event
         // lands on the person the rest of the timeline accrues to. No email or
         // name here: person data reaches PostHog only via the consent-gated
@@ -59,7 +59,7 @@ export const authComponent = createClient<DataModel>(components.betterAuth, {
           internal.features.welcomeEmail.sendScheduled,
           { userId: doc._id },
         );
-        // Heads-up to the support inbox, ~20 minutes in — by then the user
+        // Heads-up to the support inbox, ~20 minutes in, by then the user
         // has had a chance to finish onboarding, so the notification can
         // report their course, onboarding progress, and survey answers
         // (features/signupNotification.ts re-reads everything at send time).
@@ -93,7 +93,7 @@ export const getAuthUser = query({
 
 /**
  * Apple's "client secret" is a short-lived ES256 JWT signed with the Sign in
- * with Apple private key — generated on demand per the Better Auth docs
+ * with Apple private key. Generated on demand per the Better Auth docs
  * (https://better-auth.com/docs/authentication/apple) so no static token has
  * to be rotated every 6 months. Cached module-level and re-minted well before
  * expiry; signed for 180 days (below Apple's six-month cap).
@@ -127,7 +127,7 @@ async function appleClientSecret(): Promise<string> {
 /**
  * Rate gate for the unauthenticated transactional auth emails (verification
  * codes + password-reset links): per-recipient bucket first, then the
- * global backstop — in that order, so an address already at its own limit
+ * global backstop, in that order, so an address already at its own limit
  * doesn't burn global tokens. Callers silently skip the send on false; the
  * callbacks must never throw, since a 500 there would leak whether the
  * account exists.
@@ -153,7 +153,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
     trustedOrigins: ['https://appleid.apple.com'],
     database: authComponent.adapter(ctx),
     session: {
-      // 30 days instead of the 7-day default — a daily-habit app shouldn't
+      // 30 days instead of the 7-day default. A daily-habit app shouldn't
       // log people out over a vacation. Sliding: updateAge stays at the
       // 1-day default, so any visit >1 day after the last refresh pushes
       // expiry back to now + 30 days. Only affects sessions refreshed after
@@ -170,14 +170,14 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
       revokeSessionsOnPasswordReset: true,
       sendResetPassword: async ({ user, url }) => {
         // The callback runs inside the component's HTTP action (action
-        // ctx, no db) — requireRunMutationCtx accepts mutation OR action
+        // ctx, no db), requireRunMutationCtx accepts mutation OR action
         // ctx and only rejects the query ctx createAuth can also receive.
         const runCtx = requireRunMutationCtx(ctx);
         if (!(await allowAuthEmail(runCtx, user.email))) return;
         await sendResetPasswordEmail(runCtx, { to: user.email, url });
       },
     },
-    // Verification is CODE-based: no sendVerificationEmail here — the
+    // Verification is CODE-based: no sendVerificationEmail here. The
     // emailOTP plugin below (overrideDefaultEmailVerification) injects an
     // OTP sender in its place, so sign-up and unverified sign-ins email a
     // 6-digit code instead of a link.
@@ -201,7 +201,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
         clientId: process.env.GOOGLE_CLIENT_ID as string,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
       },
-      // Sign in with Apple — required by App Store Guideline 4.8 because
+      // Sign in with Apple. Required by App Store Guideline 4.8 because
       // Google sign-in is offered. Env-gated so deployments without the
       // Apple credentials keep working unchanged. The async form lets the
       // client secret be minted on demand (see appleClientSecret) instead of
@@ -212,7 +212,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
       process.env.APPLE_PRIVATE_KEY
         ? {
           apple: async () => {
-            // Better Auth resolves ALL providers together — if this throws,
+            // Better Auth resolves ALL providers together, if this throws,
             // Google/email sign-in break too. A bad Apple key must only
             // disable Apple (returning null skips the provider).
             try {
@@ -262,7 +262,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
         async sendVerificationOTP({ email, otp, type }) {
           // Only email verification is offered in the UI. The plugin's
           // other OTP types (passwordless sign-in, OTP password reset)
-          // are unused — never email codes for them.
+          // are unused, never email codes for them.
           if (type !== 'email-verification') return;
           const runCtx = requireRunMutationCtx(ctx);
           if (!(await allowAuthEmail(runCtx, email))) return;

@@ -35,7 +35,7 @@ export interface AccuracyPair {
  * This deliberately runs two independent comparisons rather than aligning once
  * and re-scoring with the punctuation weight zeroed. `alignWords` normalizes
  * each *word* token with the same options, and `normalize` strips punctuation
- * from inside words — so `don't` becomes `dont` and `well-known` becomes
+ * from inside words, so `don't` becomes `dont` and `well-known` becomes
  * `wellknown`. That changes the alignment itself, not just the weights: typing
  * `dont` for `don't` is a typo worth partial credit under the strict pass but
  * an exact match under the lenient one. Re-scoring a single alignment would

@@ -143,7 +143,7 @@ describe('PaymentOverdueDialog', () => {
     await userEvent.click(screen.getByTestId('payment-overdue-pay'));
 
     expect(assigned).toEqual([url]);
-    // Paying the invoice is the settlement path — the portal only swaps cards.
+    // Paying the invoice is the settlement path. The portal only swaps cards.
     expect(openBillingPortalMock).not.toHaveBeenCalled();
   });
 
@@ -163,7 +163,7 @@ describe('PaymentOverdueDialog', () => {
   it('surfaces a portal failure without releasing the block', async () => {
     // The portal is the only exit for users without a captured invoice URL.
     // If it fails silently they are stuck in a hard block with a dead
-    // button and no idea why — the toast is the only feedback they get,
+    // button and no idea why. The toast is the only feedback they get,
     // and the buttons must come back so they can retry.
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     useQueryMock.mockReturnValue(pastDueQuotas());
@@ -178,7 +178,7 @@ describe('PaymentOverdueDialog', () => {
     expect(screen.getByTestId('payment-overdue-dialog')).toBeInTheDocument();
     expect(screen.getByTestId('payment-overdue-pay')).toBeEnabled();
 
-    // Hard failure: network throw. Same contract — toast, still blocked.
+    // Hard failure: network throw. Same contract. Toast, still blocked.
     openBillingPortalMock.mockRejectedValue(new Error('offline'));
     await userEvent.click(screen.getByTestId('payment-overdue-pay'));
     await waitFor(() => expect(toastErrorMock).toHaveBeenCalledTimes(2));
@@ -193,7 +193,7 @@ describe('PaymentOverdueDialog', () => {
     render(<PaymentOverdueDialog />);
 
     await userEvent.click(screen.getByTestId('payment-overdue-cancel'));
-    // Confirmation replaces the primary actions — no accidental cancel.
+    // Confirmation replaces the primary actions, no accidental cancel.
     expect(
       screen.getByTestId('payment-overdue-cancel-warning'),
     ).toBeInTheDocument();
@@ -223,7 +223,7 @@ describe('PaymentOverdueDialog', () => {
   it('refetches the Autumn customer only after the cancel settled', async () => {
     // The refetch exists so /app/settings stops showing the cancelled plan.
     // Firing it before the server finished would cache the OLD subscription
-    // state — the user would see themselves still subscribed to a plan the
+    // state. The user would see themselves still subscribed to a plan the
     // server just destroyed. Order is the contract.
     useQueryMock.mockReturnValue(pastDueQuotas());
     let resolveCancel!: (v: unknown) => void;
@@ -248,7 +248,7 @@ describe('PaymentOverdueDialog', () => {
     // The cancel-after-pay race: the user paid the invoice, then clicked
     // Cancel out of confusion. The server detects the settled debt and
     // returns 'recovered' instead of destroying the subscription they just
-    // paid for — the UI must say "payment received", not "cancelled", or
+    // paid for. The UI must say "payment received", not "cancelled", or
     // the user will believe their money bought them a cancellation.
     useQueryMock.mockReturnValue(pastDueQuotas());
     cancelOverdueMock.mockResolvedValue({ outcome: 'recovered' });
@@ -264,7 +264,7 @@ describe('PaymentOverdueDialog', () => {
 
   it('a failed cancel resets the confirm step and keeps the block up', async () => {
     // If the cancel action throws, the subscription still exists and money
-    // is still owed — the block must stay, and the user must land back on
+    // is still owed. The block must stay, and the user must land back on
     // the pay/cancel choice (not a stuck confirm step) to try again.
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     useQueryMock.mockReturnValue(pastDueQuotas());
@@ -285,7 +285,7 @@ describe('PaymentOverdueDialog', () => {
   it('a refetch failure never masks a successful cancel as an error', async () => {
     // The cancel already went through server-side; the refetch is cosmetic
     // cache hygiene. Toasting an error here would make the user retry a
-    // cancel that already succeeded — against a subscription that no
+    // cancel that already succeeded. Against a subscription that no
     // longer exists.
     useQueryMock.mockReturnValue(pastDueQuotas());
     refetchMock.mockRejectedValue(new Error('offline'));
@@ -316,7 +316,7 @@ describe('PaymentOverdueDialog', () => {
   it('re-enables the buttons when the page returns from bfcache', async () => {
     // Clicking Pay leaves `busy` set on purpose while the tab navigates to
     // the Stripe invoice. Coming back via the Back button restores the page
-    // from bfcache with that state frozen — without the pageshow reset,
+    // from bfcache with that state frozen, without the pageshow reset,
     // every escape hatch in this hard block stays disabled forever.
     const url = 'https://invoice.stripe.com/i/abc';
     useQueryMock.mockReturnValue(pastDueQuotas({ pastDueInvoiceUrl: url }));

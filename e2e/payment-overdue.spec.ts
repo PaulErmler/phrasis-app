@@ -9,16 +9,16 @@ import {
 } from "./helpers";
 
 /**
- * Payment-overdue (dunning) journey — drives the app's overdue popup and
+ * Payment-overdue (dunning) journey. Drives the app's overdue popup and
  * the real Stripe billing-portal redirect against Autumn + Stripe test
  * mode:
  *
  *   1. Fresh user starts a card-required trial through Stripe Checkout
- *      (4242 card) — gives the account a real Stripe customer + payment
+ *      (4242 card): gives the account a real Stripe customer + payment
  *      method, which the billing-portal call needs.
  *   2. `usage/testing:setBillingOverride` forces the synced planStatus to
- *      past_due. Everything downstream of the sync — quota doc, reactive
- *      query, dialog, portal call — is the real production path; only the
+ *      past_due. Everything downstream of the sync: quota doc, reactive
+ *      query, dialog, portal call: is the real production path; only the
  *      Autumn-side trigger is simulated.
  *   3. The block is immediate and non-dismissible, and survives a reload
  *      (which triggers a real Autumn sync).
@@ -28,14 +28,14 @@ import {
  *
  * Why simulate: a genuine past_due only arises from a failed RENEWAL
  * invoice. Stripe test clocks can't attach to Autumn-created customers,
- * and the shortcut — attach with `free_trial: false` while charge-failing
- * card 4000-0000-0000-0341 is on file — was tried and does NOT produce
+ * and the shortcut. Attach with `free_trial: false` while charge-failing
+ * card 4000-0000-0000-0341 is on file. Was tried and does NOT produce
  * past_due (verified July 2026): the failed charge leaves an open→voided
  * invoice and an empty products list. Manual repro of the real thing:
  * subscribe with 0341 and wait for the trial to convert.
  *
  * Prerequisites (one-time, dev deployment only):
- *   - `pnpm exec convex env set E2E_TEST_HOOKS 1` — the usage/testing:* hooks
+ *   - `pnpm exec convex env set E2E_TEST_HOOKS 1`: the usage/testing:* hooks
  *     throw without it. NEVER set this in production.
  *   - The Stripe test-mode Customer Portal configuration must be saved
  *     once (Stripe dashboard → Settings → Billing → Customer portal),
@@ -46,7 +46,7 @@ import {
  * retry timing. Covered manually.
  *
  * Tagged @live; same self-contained fresh-user policy as billing.spec.ts
- * (no cleanup — the app has no account deletion; leftovers are harmless).
+ * (no cleanup, the app has no account deletion; leftovers are harmless).
  */
 
 const STORAGE_STATE = path.resolve(__dirname, ".auth/user-overdue.json");
@@ -67,7 +67,7 @@ function convexTestHook(fn: string, args: Record<string, unknown>): unknown {
     { cwd: REPO_ROOT, encoding: "utf8" },
   );
   // `convex run` prints the function's return value (JSON) on stdout,
-  // possibly surrounded by CLI noise — parse the last JSON-looking chunk.
+  // possibly surrounded by CLI noise. Parse the last JSON-looking chunk.
   const lines = out.trim().split("\n");
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i].trim();
@@ -130,7 +130,7 @@ test.describe("payment overdue dunning (live)", { tag: "@live" }, () => {
   test("block is immediate and non-dismissible", async ({ page }) => {
     test.setTimeout(180_000);
     // setBillingOverride refuses while the quota doc still reports the free
-    // plan — and that doc is written by BillingGate's mount sync, which can
+    // plan, and that doc is written by BillingGate's mount sync, which can
     // lag the useCustomer-driven CTA assertion test 1 passed on (or fail
     // transiently and only be console.error'd). Each attempt loads /app
     // first so a fresh mount sync runs before the hook re-checks the doc.
@@ -140,7 +140,7 @@ test.describe("payment overdue dunning (live)", { tag: "@live" }, () => {
     }).toPass({ timeout: 90_000, intervals: [2_000, 5_000] });
 
     // The override patches the quota doc directly, and every later sync
-    // re-applies it — entry retried in case the first mount races it.
+    // re-applies it. Entry retried in case the first mount races it.
     await expect(async () => {
       await page.goto("/app");
       await expect(overdueDialog(page)).toBeVisible({ timeout: 10_000 });
@@ -165,8 +165,8 @@ test.describe("payment overdue dunning (live)", { tag: "@live" }, () => {
     page,
   }) => {
     test.setTimeout(60_000);
-    // The reload triggers a real Autumn sync (healthy trialing customer) —
-    // the override must survive it via the syncAllFeatures hook.
+    // The reload triggers a real Autumn sync (healthy trialing customer).
+    // The override must survive it via the syncAllFeatures hook.
     await page.goto("/app");
     await expect(overdueDialog(page)).toBeVisible({ timeout: 20_000 });
   });
@@ -174,7 +174,7 @@ test.describe("payment overdue dunning (live)", { tag: "@live" }, () => {
   test("block covers the standalone /app/learn route", async ({ page }) => {
     test.setTimeout(60_000);
     // /app/learn sits outside the (main) route group, so it used to render
-    // neither the dialog nor the quota sync — a way to keep studying while
+    // neither the dialog nor the quota sync. A way to keep studying while
     // "blocked". Regression guard for the BillingGate mount point.
     await page.goto("/app/learn");
     await expect(overdueDialog(page)).toBeVisible({ timeout: 20_000 });
@@ -185,7 +185,7 @@ test.describe("payment overdue dunning (live)", { tag: "@live" }, () => {
     await page.goto("/app");
     await expect(overdueDialog(page)).toBeVisible({ timeout: 20_000 });
 
-    // openBillingPortal redirects the current tab itself — no app-side
+    // openBillingPortal redirects the current tab itself, no app-side
     // assertions after the click, just the destination.
     await page.getByTestId("payment-overdue-pay").click();
     await page.waitForURL(/billing\.stripe\.com/, { timeout: 30_000 });

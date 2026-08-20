@@ -36,7 +36,7 @@ export function useStatsSnapshot(
     : null;
 
   // Starts empty on both server and client so the first client render
-  // reproduces the server HTML exactly — reading localStorage in a useState
+  // reproduces the server HTML exactly. Reading localStorage in a useState
   // initializer would make the SSR pass (no snapshot) and hydration pass
   // (snapshot present) disagree, and every counter/ring seeded from `prev`
   // would render a different number. The read is deferred to a layout

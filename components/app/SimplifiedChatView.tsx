@@ -46,7 +46,7 @@ export function SimplifiedChatView({
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
   // The chat tab has no served card, so it has no thread rotation to suppress
-  // — it only needs the result, not the replacement card id that LearnView
+  // It only needs the result, not the replacement card id that LearnView
   // keys its suppression off.
   const replaceOnly = useCallback(
     async (id: Id<'cardApprovals'>) => (await handleReplace(id)).result,
@@ -55,7 +55,7 @@ export function SimplifiedChatView({
 
   // Both card tools: learn-view threads (where markAlsoCorrect fires) are
   // reachable from this tab's history sidebar, so their approval boxes must
-  // render — and stay actionable — here too.
+  // render, and stay actionable. Here too.
   const toolRenderers = useMemo(
     () => ({
       createCard: createCardToolRenderer({

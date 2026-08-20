@@ -7,7 +7,7 @@ import {
 } from './stretchCore';
 
 /**
- * Audio DSP worker: SoundTouch WSOLA time-stretch and WAV encoding — the two
+ * Audio DSP worker: SoundTouch WSOLA time-stretch and WAV encoding. The two
  * synchronous CPU-heavy stages of the merge pipeline. Channel data crosses
  * the boundary as transferred ArrayBuffers (zero copy); decode and
  * OfflineAudioContext rendering stay on the main thread (Window-only APIs).

@@ -5,9 +5,9 @@ import { renderHook, act } from '@testing-library/react';
  * Free play is ONE scheduling mode ('radio') with two faces, chosen by
  * `reviewMode`. useLearningAudio is where that choice becomes behaviour:
  *
- *   Shadowing → "Radio":      hands-free — forces autoplay + auto-advance
+ *   Shadowing → "Radio":      hands-free: forces autoplay + auto-advance
  *                             regardless of the user's settings.
- *   Writing   → "Free Study": user-paced — resolves the `*Full` playback
+ *   Writing   → "Free Study": user-paced: resolves the `*Full` playback
  *                             settings and never auto-advances.
  *
  * These tests pin exactly that, by mocking `useAudioPlayer` and inspecting
@@ -56,7 +56,7 @@ function reviewingState(courseSettings: Settings): LearningState {
 }
 
 /** Free play + the given review mode, with BOTH per-mode autoplay/advance
- *  settings turned off — so anything that ends up on counts as forced. */
+ *  settings turned off, so anything that ends up on counts as forced. */
 const freePlay = (reviewMode: 'audio' | 'full'): Settings => ({
   schedulingMode: 'radio',
   reviewMode,
@@ -69,7 +69,7 @@ beforeEach(() => {
   player.lastProps = null;
 });
 
-describe('useLearningAudio — free-play faces', () => {
+describe('useLearningAudio: free-play faces', () => {
   it('forces autoplay in the listening face, despite autoplay being off', () => {
     const { result } = renderHook(() => useLearningAudio(reviewingState(freePlay('audio'))));
     expect(result.current.userAutoPlay).toBe(true);
@@ -123,7 +123,7 @@ describe('useLearningAudio — free-play faces', () => {
 
   it('counts radio plays toward Practice Listening in the listening face', () => {
     // `radioPlayCount` graduates a card out of Practice Listening. The writing
-    // face never reaches this path — `isFullMode` returns the fixed
+    // face never reaches this path. `isFullMode` returns the fixed
     // base→target sequence before `applyOnlyNewListening` runs.
     const cs = {
       schedulingMode: 'radio',

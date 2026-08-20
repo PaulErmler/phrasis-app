@@ -27,7 +27,7 @@ interface AlsoCorrectToolRendererProps {
 
 /**
  * Creates a tool renderer function for markAlsoCorrect tool parts.
- * Mirrors createCardToolRenderer — approval state comes from
+ * Mirrors createCardToolRenderer. Approval state comes from
  * `useCardApprovals`; the add path reuses the approveCard mutation, the
  * replace path uses replaceCardFromApproval.
  */

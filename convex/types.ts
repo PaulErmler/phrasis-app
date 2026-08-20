@@ -49,7 +49,7 @@ export const translationValidator = v.object({
    * the first-time translation of a brand-new card). Drives the warning-
    * color "Retranslating" pill in the card header. Keyed off the LLM claim
    * (not on "audio missing") so it does NOT fire when the user clicks
-   * "regenerate audio" — that flow has no LLM phase.
+   * "regenerate audio". That flow has no LLM phase.
    */
   retranslating: v.optional(v.boolean()),
 });
@@ -60,7 +60,7 @@ export const audioRecordingValidator = v.object({
   url: v.union(v.string(), v.null()),
   // Word-level timings from Azure Fast Transcription, captured during TTS validation.
   // The schema field is `v.optional(v.array(...))` so DB rows can be `undefined`,
-  // but this validator is stricter — `null | array` only. Callers building a
+  // but this validator is stricter: `null | array` only. Callers building a
   // response from a raw audioRecordings row MUST coerce `undefined → null`
   // (`row.wordTimings ?? null`), or this validator will reject the response.
   wordTimings: v.union(
@@ -88,7 +88,7 @@ export const reviewModeValidator = v.union(
   v.literal('full'),
 );
 
-// 'radio' is the single *free play* scheduling mode — the endless, FSRS-free
+// 'radio' is the single *free play* scheduling mode. The endless, FSRS-free
 // round-robin through the whole deck. Which of its two faces you get is
 // derived from `reviewMode`, not stored: see `freePlayFace` below.
 export const schedulingModeValidator = v.union(
@@ -98,7 +98,7 @@ export const schedulingModeValidator = v.union(
 );
 
 // Writing mode: accuracy breakpoints that map a typed answer's score to an
-// FSRS rating. Percent points (0-100 integers), lower-inclusive — a score of
+// FSRS rating. Percent points (0-100 integers), lower-inclusive. A score of
 // exactly `hard` rates "hard", a score of exactly `good` rates "good". `easy`
 // is optional and currently never written by the UI (the control ships with
 // three bands); when unset the top band is "good".
@@ -150,7 +150,7 @@ export const cardSchedulingSnapshotFields = {
 // (Writing mode always forces FSRS via `forceReviewPhase`), hence no
 // schedulingPhase/preReviewCount here. Shared by the `cards` table and the
 // `reviewLogs.prevWriting` undo snapshot. All optional: unset means "never
-// seeded" — writing-track due queries must exclude undefined `writingDueDate`
+// seeded". Writing-track due queries must exclude undefined `writingDueDate`
 // via a `.gte('writingDueDate', 0)` lower bound.
 export const cardWritingSchedulingFields = {
   writingDueDate: v.optional(v.number()),
@@ -189,7 +189,7 @@ export const cardRadioSnapshotFields = {
   radioPlayCount: v.optional(v.number()), // Radio mode: true count of radio plays (+1 per play, NOT subject to radioRoundCounter's catch-up jump). Drives the "Only new" Practice-Listening limit. Optional/undefined for pre-existing cards — treated as the card's review count (preReviewCount + FSRS reps) so they don't reset to "new".
 } as const;
 
-// Free Study's rotation state — the writing-face counterpart of the radio
+// Free Study's rotation state. The writing-face counterpart of the radio
 // fields above, deliberately separate so the two faces shuffle and track
 // independently (listening to a card must not count as having typed it).
 // Shared by the `cards` table and the `reviewLogs.prevFreeStudy` undo
@@ -214,7 +214,7 @@ export const ttsQualityValidator = v.union(
 // 'minimax' = MiniMax Speech 2.8 Turbo, both via OpenRouter's /audio/speech
 // endpoint (distinct from 'google' = Cloud Chirp3).
 // 'elevenlabs' (index 1) and 'azure' (index 2) are retired providers retained
-// only so historical stored values still validate — neither is dispatchable
+// only so historical stored values still validate, neither is dispatchable
 // (Azure Speech remains in use for STT only; see convex/lib/stt).
 export const ttsProviderValidator = v.union(
   v.literal(TTS_PROVIDERS[0]),
@@ -262,7 +262,7 @@ export const cardApprovalResolutionValidator = v.union(
   v.literal('replaced'),
 );
 
-// Metadata changes the chat model proposes with markAlsoCorrect — only the
+// Metadata changes the chat model proposes with markAlsoCorrect, only the
 // fields the new phrasing actually changes are present. Applied on the
 // replace path via the applyMetadataAndPrepareCard mechanism (so a speaker
 // gender change re-voices audio); the new-card path re-infers metadata.
@@ -331,7 +331,7 @@ export const reviewsByModeValidator = v.object({
 export type StatsReviewMode = keyof Infer<typeof reviewsByModeValidator>;
 
 // `{language, text}` translation-entry list used by the cardApprovals
-// table/mutations. Also the stored document shape — do not widen; producers
+// table/mutations. Also the stored document shape. Do not widen; producers
 // that carry provenance use `sourcedTranslationEntriesValidator` below.
 export const translationEntriesValidator = v.array(
   v.object({ language: v.string(), text: v.string() }),
@@ -348,7 +348,7 @@ export const translationEntriesValidator = v.array(
 //   `'user-provided'` for manually-typed entries, persisted so a future
 //   strategy swap can target rows by source.
 // Consumers that only read `{language, text}` (the sentence-metadata job)
-// still accept this shape — requiring callers to strip the extras caused a
+// still accept this shape, requiring callers to strip the extras caused a
 // production ArgumentValidationError.
 export const sourcedTranslationEntriesValidator = v.array(
   v.object({

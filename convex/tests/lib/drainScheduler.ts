@@ -6,7 +6,7 @@ import { afterEach } from 'vitest';
  * convex-test executes scheduled functions on real timers, and content
  * scheduling fans out through 0ms `scheduler.runAfter` hops (e.g.
  * prepareCardContent → worker action). A test body runs entirely in
- * microtasks, so those chains only start firing after the test ends — and
+ * microtasks, so those chains only start firing after the test ends, and
  * their console output
  * then races vitest's environment teardown, failing the run with
  * `EnvironmentTeardownError: Closing rpc while "onUserConsoleLog" was
@@ -19,7 +19,7 @@ export function drainSchedulerAfterEach(rounds = 20): void {
 }
 
 /**
- * Same macrotask-per-hop drain, callable inside a test body — for tests that
+ * Same macrotask-per-hop drain, callable inside a test body, for tests that
  * need a scheduled chain (e.g. the seedWritingTrack sweep) to complete
  * before asserting.
  */

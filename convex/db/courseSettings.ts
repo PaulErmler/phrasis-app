@@ -47,7 +47,7 @@ export async function upsertCourseSettings(
   // constants, so changing behavior for new users here never flips it for
   // current ones. Practice Listening starts ON, limited to a card's first
   // initial review ("Only new" = 1). "Show translation on new sentences"
-  // (writing mode) also defaults on/1 — stamped for symmetry even though its
+  // (writing mode) also defaults on/1. Stamped for symmetry even though its
   // read-side fallback is on/1 for everyone.
   return ctx.db.insert('courseSettings', {
     courseId,

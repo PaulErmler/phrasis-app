@@ -12,7 +12,7 @@ describe("sendAdminNotificationEmail", () => {
 
   it("is skipped entirely in E2E capture mode", async () => {
     vi.stubEnv("E2E_TEST_HOOKS", "1");
-    // A ctx that would throw on any use — proves nothing is called.
+    // A ctx that would throw on any use. Proves nothing is called.
     const ctx = new Proxy(
       {},
       {

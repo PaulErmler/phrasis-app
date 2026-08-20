@@ -6,7 +6,7 @@ export interface AudioFixtureArgs {
   textId: Id<"texts">;
   language: string;
   storageId: Id<"_storage">;
-  /** Defaults to a per-language placeholder — pass the real string when the test exercises cache lookups. */
+  /** Defaults to a per-language placeholder. Pass the real string when the test exercises cache lookups. */
   spokenText?: string;
   voiceName?: string;
   voiceGender?: "male" | "female";
@@ -22,7 +22,7 @@ export interface AudioFixtureArgs {
 
 /**
  * Test fixture for "this text has audio": inserts an `audioAssets` row owning
- * the blob plus the `(textId, language)` pointer row — the shape every audio
+ * the blob plus the `(textId, language)` pointer row. The shape every audio
  * row has since the audioAssets narrow.
  */
 export async function insertAudioFixture(

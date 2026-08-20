@@ -127,7 +127,7 @@ export function StatsView() {
   // Show whichever punctuation variant matches how the learner currently
   // scores their writing, so the number means what the app just told them it
   // means. Reviews recorded before the two series existed only exist in the
-  // legacy pair, which is the fallback — otherwise the tile would vanish for
+  // legacy pair, which is the fallback, otherwise the tile would vanish for
   // anyone who hasn't reviewed since the split shipped.
   const accuracy =
     cs && cs.totalAccuracyDualCount > 0

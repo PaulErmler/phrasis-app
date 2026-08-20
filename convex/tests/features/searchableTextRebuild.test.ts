@@ -9,7 +9,7 @@ import { buildCardSearchableText } from "../../lib/cardContent";
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
-// The rebuild fan-out is DEBOUNCED (10s marker on the text row — see
+// The rebuild fan-out is DEBOUNCED (10s marker on the text row, see
 // scheduleSearchableTextRebuild in convex/features/decks.ts), so the tests
 // run under fake timers and drain via finishAllScheduledFunctions instead of
 // yielding real 0ms macrotasks.
@@ -22,7 +22,7 @@ afterEach(() => {
 
 // The three late-content store mutations in convex/features/decks.ts schedule
 // `rebuildSearchableTextForText` (0ms fan-out over cards.by_textId) whenever a
-// translation or romanization lands AFTER a card was created — the review-time
+// translation or romanization lands AFTER a card was created. The review-time
 // staleness check only compares language sets, so without this cards keep a
 // stale search string until reviewed (or forever, for in-place content
 // changes). These tests drive each funnel and assert the card's search string
@@ -253,7 +253,7 @@ describe("rebuildSearchableTextForText via the romanization store mutations", ()
   });
 });
 
-describe("scheduleSearchableTextRebuild — per-text debounce", () => {
+describe("scheduleSearchableTextRebuild: per-text debounce", () => {
   it("coalesces a burst of stores into one pending rebuild that sees all content", async () => {
     const t = convexTest(schema, modules);
     const { textId, cardId } = await seedCourseCardText(t, {

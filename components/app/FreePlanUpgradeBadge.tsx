@@ -19,18 +19,18 @@ import { SilentErrorBoundary } from '@/components/app/ViewErrorBoundary';
 
 /**
  * Home-header plan indicator for free users: a muted "Free" pill plus an
- * Upgrade button that opens the pricing table in a dialog right there — no
+ * Upgrade button that opens the pricing table in a dialog right there, no
  * navigation away from home. This is the app's standing upgrade entry point
- * now that onboarding shows no plan step and no paywall — usage-triggered
+ * now that onboarding shows no plan step and no paywall. Usage-triggered
  * dialogs plus this badge are the whole funnel.
  *
  * Renders nothing while the customer is loading (no flash for paid users),
  * for paid/trialing customers, and on native store builds (no purchase UI
- * allowed — same policy as PricingTable).
+ * allowed, same policy as PricingTable).
  */
 export function FreePlanUpgradeBadge() {
-  // The badge renders in the app header, outside every ViewErrorBoundary —
-  // a throw from the billing SDK would otherwise unwind to app/error.tsx
+  // The badge renders in the app header, outside every ViewErrorBoundary.
+  // A throw from the billing SDK would otherwise unwind to app/error.tsx
   // and replace the whole shell. An upgrade affordance is never worth that.
   return (
     <SilentErrorBoundary boundary="home.freePlanUpgradeBadge">

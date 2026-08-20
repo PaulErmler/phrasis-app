@@ -105,7 +105,7 @@ async function resolveLearnerDifficulty(
 
 /**
  * Internal query to get course languages (and learner difficulty) by userId.
- * Works without auth identity — used by scheduled actions and tool handlers.
+ * Works without auth identity. Used by scheduled actions and tool handlers.
  */
 export const getCourseLanguagesForUser = internalQuery({
   args: { userId: v.string() },
@@ -273,7 +273,7 @@ export const sendMessage = mutation({
         prompt: args.prompt,
         includeAiContent,
         // Only forwarded when the card context resolved (ownership verified
-        // above) — gates the markAlsoCorrect tool for this turn.
+        // above), gates the markAlsoCorrect tool for this turn.
         cardId: cardData ? args.cardId : undefined,
       },
     );
@@ -305,7 +305,7 @@ export const sendMessage = mutation({
  * for the requested `streamArgs`. The client streaming hook reads
  * `result.streams.messages` whenever it issues a `kind: 'list'` query, so the
  * early-return branches in `listMessages` (unauthenticated / thread not owned)
- * must still include a `streams` field of the right shape — otherwise the hook
+ * must still include a `streams` field of the right shape, otherwise the hook
  * throws `Cannot read properties of undefined (reading 'messages')`. Mirrors
  * `syncStreams` by returning `undefined` when no streaming was requested.
  */
@@ -429,12 +429,12 @@ export const generateResponse = internalAction({
 
       // Dynamic chat billing: 1 credit was consumed up-front in
       // `sendMessage`; here we accumulate the actual OpenRouter cost across
-      // all LLM steps (tool loops included) and charge the remainder — 1
+      // all LLM steps (tool loops included) and charge the remainder. 1
       // credit per additional started CHAT_CREDIT_USD_STEP. The handler
       // runs (awaited) per step while the stream is consumed, and
       // `agent.streamText` only resolves after the stream finishes, so the
       // accumulator is complete after the await. Thread-title generation is
-      // deliberately not billed (flash-lite, ~4 words — negligible).
+      // deliberately not billed (flash-lite, ~4 words, negligible).
       let totalCostUsd = 0;
       let billedUserId: string | undefined;
 
@@ -457,7 +457,7 @@ export const generateResponse = internalAction({
         { threadId: args.threadId },
         {
           promptMessageId: args.promptMessageId,
-          // Leave the AI SDK `system` slot empty — static instructions are
+          // Leave the AI SDK `system` slot empty. Static instructions are
           // injected via prepareStep with message-level cache_control so
           // OpenRouter can cache the stable prefix across turns/steps.
           //
@@ -465,7 +465,7 @@ export const generateResponse = internalAction({
           // @convex-dev/agent's `?? options.instructions` fallback and inject
           // the instructions a second time. The cost is one empty
           // `{role:'system', content:''}` block prepended at prompt
-          // conversion (the SDK only skips nullish `system`) — it is added
+          // conversion (the SDK only skips nullish `system`), it is added
           // AFTER prepareStep runs, so it cannot be filtered there. It is
           // byte-stable across all requests (cache-neutral) and OpenAI
           // endpoints accept empty system content; revisit if a future
@@ -479,7 +479,7 @@ export const generateResponse = internalAction({
               // Documented OpenRouter param: sticky-routing key. All requests
               // of a thread go to the same provider endpoint, which is what
               // makes automatic prefix caching actually hit across the
-              // multi-step tool loop (spread above must be kept — per-call
+              // multi-step tool loop (spread above must be kept, per-call
               // providerOptions REPLACES the agent-level default, so dropping
               // it would silently lose reasoning.effort).
               session_id: args.threadId,
@@ -514,8 +514,8 @@ export const generateResponse = internalAction({
           },
           // Card-context turns additionally get markAlsoCorrect, closed over
           // the reviewed card's id. A per-call `tools` REPLACES the
-          // agent-level set, so that set is spread back in (AGENT_TOOLS —
-          // the single source of truth; a tool added there is automatically
+          // agent-level set, so that set is spread back in (AGENT_TOOLS.
+          // The single source of truth; a tool added there is automatically
           // available here too). Registered on every card turn (not just
           // discussAnswer): the user can free-text ask "is X also correct?",
           // and persisted steering from an earlier quick action is re-read
@@ -551,7 +551,7 @@ export const generateResponse = internalAction({
               inputTokens: usage?.inputTokens,
               outputTokens: usage?.outputTokens,
               costUsd: stepCostUsd,
-              // OpenRouter's generation id — the join key back to their dashboard
+              // OpenRouter's generation id. The join key back to their dashboard
               // when a cost figure needs to be reconciled.
               generationId: openrouter?.id,
             });
@@ -561,7 +561,7 @@ export const generateResponse = internalAction({
 
       // Safe to await: `agent.streamText` only resolves after the stream has
       // finished (see the billing comment above), so this promise is already
-      // settled. Wrapped anyway — a missing transcript must not cost the user
+      // settled. Wrapped anyway. A missing transcript must not cost the user
       // their reply.
       let responseText: string | undefined;
       try {
@@ -586,7 +586,7 @@ export const generateResponse = internalAction({
           costUsd: step.costUsd,
           // Prompt on the first step, completion on the last: the intermediate
           // steps are tool loops with no user-facing text of their own.
-          // Content only with synced consent — the privacy policy promises
+          // Content only with synced consent. The privacy policy promises
           // that declining keeps chat text out of PostHog.
           input:
             args.includeAiContent && index === 0 && args.prompt
@@ -614,7 +614,7 @@ export const generateResponse = internalAction({
       // Autumn's credit schema each multiply a chat_messages amount by
       // CREDIT_COSTS[CHAT_MESSAGES], so passing credits through them would
       // double-convert. One unit deducts `unitCredits` credits, so it covers
-      // `unitCredits` billing steps — the effective rate stays 1 credit per
+      // `unitCredits` billing steps. The effective rate stays 1 credit per
       // CHAT_CREDIT_USD_STEP regardless of the configured cost.
       const stepMicroUsd = Math.round(CHAT_CREDIT_USD_STEP * 1e6);
       const unitCredits = CREDIT_COSTS[FEATURE_IDS.CHAT_MESSAGES] ?? 1;

@@ -99,7 +99,7 @@ describe("features/translation helpers", () => {
       // Arabic was moved OFF Google v3 after a production regression where
       // the endpoint started returning `{"romanizations":[{}]}` for short
       // Arabic strings. arabic-transliterate is now the local source of
-      // truth — guard against accidentally re-routing `ar*` back to Google.
+      // truth. Guard against accidentally re-routing `ar*` back to Google.
       const fetchMock = vi.fn(async () => {
         throw new Error(
           "romanizeText hit the network for Arabic — local path regressed",
@@ -138,8 +138,8 @@ describe("features/translation helpers", () => {
     it("Google v3 callers (Russian) get retried up to 3 times before failing", async () => {
       // The 3-retry wrapper applies to every language still routed through
       // Google v3. We exercise it with Russian since `ar` no longer reaches
-      // this path. The mock returns `{romanizations:[{}]}` every time —
-      // simulating the Google flake that prompted the retry — and we assert
+      // this path. The mock returns `{romanizations:[{}]}` every time,
+      // simulating the Google flake that prompted the retry, and we assert
       // the fetch was attempted exactly ROMANIZE_MAX_ATTEMPTS times before
       // the final throw.
       const { privateKey } = generateKeyPairSync("rsa", {
@@ -170,7 +170,7 @@ describe("features/translation helpers", () => {
             romanizeBody = init?.body
               ? JSON.parse(init.body as string)
               : null;
-            // Always-empty response — same shape we saw from production.
+            // Always-empty response, same shape we saw from production.
             return new Response(
               JSON.stringify({ romanizations: [{}] }),
               { status: 200, headers: { "Content-Type": "application/json" } },
@@ -190,7 +190,7 @@ describe("features/translation helpers", () => {
         vi.unstubAllEnvs();
       }
       expect(romanizeCalls).toBe(3);
-      // Wire format guard — keep on a still-Google-routed language now that
+      // Wire format guard. Keep on a still-Google-routed language now that
       // Arabic no longer covers it.
       expect(
         (romanizeBody as { source_language_code?: string } | null)
@@ -201,7 +201,7 @@ describe("features/translation helpers", () => {
     it("Google v3 succeeds on a later retry attempt (recovery path)", async () => {
       // The whole point of the retry: a transient empty response on attempt
       // 1 shouldn't doom the row. Mock returns empty once, then a real
-      // romanization on attempt 2 — the function should return the latter.
+      // romanization on attempt 2. The function should return the latter.
       const { privateKey } = generateKeyPairSync("rsa", {
         modulusLength: 2048,
         privateKeyEncoding: { type: "pkcs8", format: "pem" },

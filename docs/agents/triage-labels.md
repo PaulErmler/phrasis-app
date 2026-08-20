@@ -1,4 +1,4 @@
-# Triage Labels
+# Triage labels
 
 The skills speak in terms of five canonical triage roles. This repo keeps the
 canonical names as-is.
@@ -18,12 +18,12 @@ corresponding label string from this table.
 
 Kanban checkbox cards have no label field, so a label is applied in two places:
 
-- **On the board** — append it as an Obsidian tag to the card line:
+- On the board, append it as an Obsidian tag to the card line:
   `- [ ] Fix audio gate — .scratch/audio-gate/ #needs-triage`
   A card carries at most one triage tag; replace the old one rather than
   stacking them.
-- **In the repo** — mirror it on a `Status:` line near the top of the
-  `.scratch/` spec or issue file the card points at.
+- In the repo, mirror it on a `Status:` line near the top of the `.scratch/`
+  spec or issue file the card points at.
 
 If the board is unavailable (the symlink is absent on this machine), the
 `Status:` line in `.scratch/` is the source of truth.

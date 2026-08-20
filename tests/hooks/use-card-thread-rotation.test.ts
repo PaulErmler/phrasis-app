@@ -4,7 +4,7 @@ import { act, renderHook } from "@testing-library/react";
 import { useCardThreadRotation } from "@/hooks/use-card-thread-rotation";
 
 /**
- * The learn view rotates its chat thread when the served card changes — except
+ * The learn view rotates its chat thread when the served card changes, except
  * for the change a chat "replace" caused (Path B re-inserts the card doc, so
  * accepting a proposal changes the card's `_id`). The comments in the hook
  * record two bugs that lived in this exact spot, so each is pinned below.
@@ -50,7 +50,7 @@ describe("useCardThreadRotation", () => {
     expect(rotate).not.toHaveBeenCalled();
   });
 
-  it("suppression is keyed to the replacement id — a different card still rotates", () => {
+  it("suppression is keyed to the replacement id, a different card still rotates", () => {
     const { rotate, result, rerender } = setup();
     act(() => result.current.markThreadHasMessages());
     act(() => result.current.handleCardReplaced("card_replacement" as never));
@@ -100,7 +100,7 @@ describe("useCardThreadRotation", () => {
     expect(rotate).not.toHaveBeenCalled();
     rerender({ cardId: null });
     expect(rotate).not.toHaveBeenCalled();
-    // Same card again after the gap — not a change.
+    // Same card again after the gap, not a change.
     rerender({ cardId: "card_1" });
     expect(rotate).not.toHaveBeenCalled();
   });

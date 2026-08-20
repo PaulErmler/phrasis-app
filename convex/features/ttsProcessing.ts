@@ -42,7 +42,7 @@ import type { TtsProvider, VoiceGender } from '../types';
  *   1. `claimTtsIfAvailable` (called by scheduling mutations) atomically
  *      reserves the (textId, language) slot.
  *   2. `enqueueTtsJob` enqueues `processTTSForCard` into the pool and stamps
- *      the pool's workId onto the claim — the claim now lives exactly as long
+ *      the pool's workId onto the claim: the claim now lives exactly as long
  *      as the pool job.
  *   3. The worker synthesizes + validates. Provider request pacing happens
  *      here: every synthesis reserves a token from the provider's bucket
@@ -58,7 +58,7 @@ const MAX_TTS_VALIDATION_ATTEMPTS = 2;
 /**
  * Per-(textId, language) TTS claim freshness window. The claim is released by
  * the pool job's onComplete (guaranteed), so staleness is only a catastrophic
- * backstop — e.g. the onComplete handler itself failing. Generous on purpose:
+ * backstop, e.g. the onComplete handler itself failing. Generous on purpose:
  * a pool job (retries included) can legitimately run for minutes, and a
  * premature "stale" verdict makes a concurrent `scheduleMissingContent`
  * double-enqueue the same synthesis.
@@ -81,7 +81,7 @@ const TTS_TOKEN_MAX_WAIT_MS = 5_000;
  * (validation roundtrip, word-timing backfill). Deliberately looser than the
  * synthesis cap: a mid-validation throw wastes the synthesis that just
  * happened, and in-pool demand alone can only project ~7s (24 workers on a
- * 200/min bucket) — so 15s never fires on ordinary pool contention and only
+ * 200/min bucket), so 15s never fires on ordinary pool contention and only
  * trips when out-of-pool consumers (backfills, chat voice) genuinely
  * oversubscribe the bucket, which previously slept workers indefinitely.
  */
@@ -150,7 +150,7 @@ export async function hasActiveTtsClaim(
  * logging mismatches. Returns whether the final audio was validated and the
  * last stored blob id (for upserting the DB row if it was removed mid-flight).
  *
- * EVERY synthesis reserves a provider token first — including validation
+ * EVERY synthesis reserves a provider token first, including validation
  * re-synthesis, which used to run unmetered and pushed real request rates
  * above the configured budgets (the source of provider 429 bursts).
  */
@@ -176,7 +176,7 @@ async function synthesizeAndValidate(
      * Forced regeneration (regenerateCardAudio). Skips the attempt-0 early
      * write: the shared `audioAssets` row for this string already carries
      * completed audio, and it must keep playing untouched until the final
-     * write swaps it — mid-flight 'unknown' churn on shared audio would
+     * write swaps it. Mid-flight 'unknown' churn on shared audio would
      * degrade every other text pointing at the asset.
      */
     forceRegen?: boolean;
@@ -190,7 +190,7 @@ async function synthesizeAndValidate(
   // Azure Fast Transcription is the only STT backend; if it doesn't speak
   // this language, the validation loop is pure waste (every attempt 400s,
   // every retry re-synthesizes). Synthesize once, accept it, and skip
-  // straight to unvalidated — wordTimings are unavailable here too.
+  // straight to unvalidated. wordTimings are unavailable here too.
   const canValidate = languageSupportsStt(args.language);
 
   const rateLimitName =
@@ -211,7 +211,7 @@ async function synthesizeAndValidate(
     );
     // Google bills per character of input text, so the cost is exactly
     // derivable. Gemini TTS goes through OpenRouter, whose per-request cost is
-    // only retrievable by a follow-up lookup on the generation id — recorded
+    // only retrievable by a follow-up lookup on the generation id. Recorded
     // here without a cost figure so the call volume is at least visible, and
     // flagged so a zero can't be mistaken for "free".
     await captureGeneration(ctx, {
@@ -265,7 +265,7 @@ async function synthesizeAndValidate(
       return { validated: false, lastStorageId, wordTimings: null };
     }
 
-    // Backpressure, not an STT failure — kept OUTSIDE the try/catch below so
+    // Backpressure, not an STT failure. Kept OUTSIDE the try/catch below so
     // a saturated azureStt bucket throws out of the worker (the pool's
     // backoff retries the whole job once the bucket drains) instead of being
     // swallowed as a transcription error and accepting unvalidated audio
@@ -281,7 +281,7 @@ async function synthesizeAndValidate(
 
       // Every synthesized clip is round-tripped through Azure to validate it.
       // That makes this one of the largest spend lines in the app and, until
-      // now, an entirely invisible one — it is billed to no feature and no user.
+      // now, an entirely invisible one. It is billed to no feature and no user.
       await captureGeneration(ctx, {
         feature: 'tts_validation_stt',
         model: 'azure-fast-transcription',
@@ -303,7 +303,7 @@ async function synthesizeAndValidate(
       // Cheap strict check first. For Chinese/Korean this compares
       // pinyin/hangul-romanized strings so the STT model's homophone-character
       // substitutions pass at edit distance 0. If strict still fails, ask
-      // Gemini — which also tolerates phonetic names, digits-vs-words,
+      // Gemini, which also tolerates phonetic names, digits-vs-words,
       // abbreviations, diacritic drift, and single-char noise. Only
       // regenerate if both say no. Gemini errors fall back to the strict
       // verdict (already "no match" at this point), so a flaky LLM can't
@@ -362,9 +362,9 @@ async function synthesizeAndValidate(
         transcriptionErr,
       );
       if (attempt + 1 < maxAttempts) {
-        // The retry will supersede this attempt's blob, and — unlike a
-        // mismatch, whose blob the ttsMismatches record keeps for review —
-        // an errored transcription references it nowhere, so it would leak.
+        // The retry will supersede this attempt's blob, and. Unlike a
+        // mismatch, whose blob the ttsMismatches record keeps for review.
+        // An errored transcription references it nowhere, so it would leak.
         // Delayed + reference-checked: if the retry fails to store and the
         // asset ends up keeping this blob, the job sees the reference and
         // spares it.
@@ -407,7 +407,7 @@ type TtsJobArgs = Infer<typeof ttsJobArgsValidator>;
 // Explicit handler param types throughout this file: handlers reference
 // same-file functions via `internal.…` (enqueue → worker → onComplete), and
 // letting TS infer their types through the generated `internal` object is
-// circular — inference collapses to `any` for every handler in the module.
+// circular. Inference collapses to `any` for every handler in the module.
 type PoolRunResult =
   | { kind: 'success'; returnValue: unknown }
   | { kind: 'failed'; error: string }
@@ -417,8 +417,8 @@ type PoolRunResult =
  * Worker action: synthesize + validate + persist audio for one
  * (textId, language).
  *
- * Failure contract: THROW on any failure (synthesis HTTP error — 429s
- * included —, storage error, saturated rate-limit bucket). The pool retries
+ * Failure contract: THROW on any failure (synthesis HTTP error, 429s
+ * included, storage error, saturated rate-limit bucket). The pool retries
  * with jittered exponential backoff; the final failure lands in
  * `onTtsJobComplete`, which logs and releases the claim so the next
  * self-heal sweep can re-drive the row.
@@ -456,7 +456,7 @@ export const processTTSForCard = internalAction({
         ttsProvider: args.provider,
         voiceGender: args.voiceGender,
         speed: args.speed,
-        // Only persist timings alongside validated audio — mismatched
+        // Only persist timings alongside validated audio. Mismatched
         // transcriptions point to the wrong words.
         wordTimings: validated && wordTimings ? wordTimings : undefined,
         spokenText: args.text,
@@ -475,12 +475,12 @@ export const processTTSForCard = internalAction({
 
 /**
  * Enqueue a TTS job into the pool and stamp the pool's workId onto the
- * (textId, language) claim — enqueue and claim update commit atomically, so
+ * (textId, language) claim. Enqueue and claim update commit atomically, so
  * the claim is released exactly when THIS job's onComplete runs and a
  * superseded job's completion can't delete a newer owner's claim.
  *
  * No-ops when a live pool job already owns the claim (fresh + foreign
- * workId) — see the guard below.
+ * workId), see the guard below.
  *
  * The caller is expected to hold the claim already (via `claimTtsIfAvailable`,
  * usually in the same transaction).
@@ -539,7 +539,7 @@ export const enqueueTtsJob = internalMutation({
 /**
  * Pool onComplete for `processTTSForCard`. Guaranteed to run on success,
  * failure, and cancellation. Releases the claim (ownership-gated on `workId`,
- * so a superseded job's completion can't delete a newer owner's claim) —
+ * so a superseded job's completion can't delete a newer owner's claim),
  * releasing on failure too is deliberate: the next self-heal sweep sees
  * "no claim, no audio" and re-drives the row.
  */
@@ -580,13 +580,13 @@ export const onTtsJobComplete = internalMutation({
 
 /**
  * Update TTS quality and optionally swap the storage blob for the audio
- * behind a (textId, language) — the mid-retry write of the validate loop.
+ * behind a (textId, language), the mid-retry write of the validate loop.
  * No-ops if the row does not exist.
  *
  * The patch targets the shared `audioAssets` row, and ONLY while that asset
  * is still mid-flight (`ttsQuality === 'unknown'`, i.e. this job created it
  * at attempt 0 and owns it). An asset already carrying completed audio is
- * shared by other texts and is never churned by retries — the job's final
+ * shared by other texts and is never churned by retries. The job's final
  * write (`storeAudioRecording`) is what replaces it.
  */
 export const updateAudioRecordingQuality = internalMutation({
@@ -676,7 +676,7 @@ export const storeTtsMismatch = internalMutation({
  * from `scheduleMissingContent` after acquiring a TTS claim on (textId, lang).
  *
  * Re-downloads the stored audio blob, runs it through STT, and persists the
- * resulting timings — but only if the storageId still matches, so a
+ * resulting timings, but only if the storageId still matches, so a
  * concurrent voice swap doesn't get clobbered with stale alignment.
  */
 export const backfillWordTimings = internalAction({
@@ -684,7 +684,7 @@ export const backfillWordTimings = internalAction({
     textId: v.id('texts'),
     language: v.string(),
     storageId: v.id('_storage'),
-    // Same purpose as on `processTTSForCard` — the row's persisted Azure STT
+    // Same purpose as on `processTTSForCard`. The row's persisted Azure STT
     // locale for mixed-dialect languages. Supplied by `scheduleMissingContent`
     // from the translation row when the language is mixed.
     regionVariant: v.optional(v.string()),
@@ -740,7 +740,7 @@ export const backfillWordTimings = internalAction({
  * Persist word timings produced by `backfillWordTimings`. Guards against
  * storage swaps: if the asset's current `storageId` differs from the one we
  * transcribed, the timings belong to a now-stale blob and are discarded.
- * The patch lands on the shared asset — identical audio means the timings
+ * The patch lands on the shared asset. Identical audio means the timings
  * are correct for every text pointing at it.
  */
 export const persistBackfilledWordTimings = internalMutation({
@@ -778,7 +778,7 @@ export const persistBackfilledWordTimings = internalMutation({
  * so they have no onComplete). Backfill claims are workId-less; a claim
  * carrying a workId belongs to a pool job (a stale backfill's claim was
  * reclaimed and stamped mid-flight) and is released by that job's onComplete
- * — deleting it here would let a scheduler double-enqueue the synthesis.
+ * Deleting it here would let a scheduler double-enqueue the synthesis.
  */
 export const releaseTtsClaim = internalMutation({
   args: {

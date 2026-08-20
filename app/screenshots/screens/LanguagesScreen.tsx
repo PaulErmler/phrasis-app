@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { SUPPORTED_LANGUAGES } from '@/lib/languages';
 
 /**
- * Language-picker sheet replica — shows the breadth of supported languages
+ * Language-picker sheet replica. Shows the breadth of supported languages
  * (grid continues past the fold on purpose).
  */
 export function LanguagesScreen() {

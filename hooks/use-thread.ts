@@ -66,7 +66,7 @@ export function useThread({
         // of leaving the whole session without a thread.
         // Known residual: a token that expires at execution time (wake-from-
         // sleep) rejects without flipping `isAuthenticated`, so this re-arm
-        // has no trigger in that path — accepted; the client refreshes tokens
+        // has no trigger in that path. Accepted; the client refreshes tokens
         // proactively, and chat degrades to on-demand thread creation.
         if (isAuthError(error)) {
           didAutoCreate.current = false;

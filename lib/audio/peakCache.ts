@@ -3,7 +3,7 @@
  * consistent level across merged playback and single-clip playback.
  *
  * Peak is the max absolute sample value of a decoded audio buffer (channel 0).
- * We target TARGET_PEAK so every clip — merged or standalone — lands at the
+ * We target TARGET_PEAK so every clip. Merged or standalone. Lands at the
  * same output level.
  */
 

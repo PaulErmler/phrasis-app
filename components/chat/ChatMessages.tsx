@@ -194,7 +194,7 @@ function partsSignature(message: ExtendedUIMessage): string {
 
 /**
  * useUIMessages rebuilds every message object on each streamed delta, so
- * object identity is useless — compare the fields that affect rendering by
+ * object identity is useless. Compare the fields that affect rendering by
  * value instead. Completed rows then bail out and only the streaming row
  * re-renders (and re-parses markdown) per token.
  */
@@ -297,13 +297,13 @@ interface ChatMessagesProps {
   contentClassName?: string;
   /** Rendered inside the empty state, below the intro bullets (e.g. quick-action tiles). */
   emptyStateExtra?: ReactNode;
-  /** Composer status — shows thinking before the assistant message exists. */
+  /** Composer status. Shows thinking before the assistant message exists. */
   status?: ChatStatus;
 }
 
 /**
  * Component for displaying chat messages with streaming support.
- * Tool rendering is pluggable via `toolRenderers` — a map from
+ * Tool rendering is pluggable via `toolRenderers`. A map from
  * tool name (without "tool-" prefix) to a renderer function.
  */
 export function ChatMessages({

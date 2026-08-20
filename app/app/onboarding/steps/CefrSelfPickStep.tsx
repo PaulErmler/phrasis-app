@@ -23,11 +23,11 @@ interface Props {
 }
 
 /**
- * CEFR self-pick — slider variant (live step). Thin onboarding wrapper
+ * CEFR self-pick. Slider variant (live step). Thin onboarding wrapper
  * around the shared `LevelPicker` slider + sample preview (also used by the
  * learn view's one-time difficulty-check dialog).
  *
- * This step no longer owns a Continue button — the wizard footer's "Pick
+ * This step no longer owns a Continue button. The wizard footer's "Pick
  * this level" button handles confirmation.
  */
 export function CefrSelfPickStep({

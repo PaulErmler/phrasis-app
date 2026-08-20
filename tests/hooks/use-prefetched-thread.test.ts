@@ -58,7 +58,7 @@ describe("usePrefetchedThread", () => {
    * finishes its auth handshake, and Convex sends requests unauthenticated
    * instead of queueing them. The prefetch is one-shot, so an ungated call
    * rejected with "Unauthenticated" and left prefetchedThreadId null for the
-   * whole session — reported as an exception the user could do nothing about.
+   * whole session. Reported as an exception the user could do nothing about.
    */
   describe("auth gating (regression)", () => {
     it("does not prefetch while unauthenticated", async () => {
@@ -101,7 +101,7 @@ describe("usePrefetchedThread", () => {
       });
 
       // Convex notices the rejected token, ClientAuthBoundary confirms the
-      // session, auth flips back — the prefetch must retry, not stay
+      // session, auth flips back. The prefetch must retry, not stay
       // stranded at null (the exact symptom this hook's gating exists for).
       harness.auth = { isAuthenticated: false };
       rerender();

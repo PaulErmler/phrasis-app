@@ -27,7 +27,7 @@ const activeFilterValidator = v.optional(
 );
 
 // 'custom' includes both 'custom' and 'chat' origins (anything the user
-// authored — manual entry or via chat). 'premade' is curated course content.
+// authored, manual entry or via chat). 'premade' is curated course content.
 const sourceFilterValidator = v.optional(
   v.union(v.literal('custom'), v.literal('premade')),
 );
@@ -64,7 +64,7 @@ const libraryCardValidator = v.object({
 
 /**
  * Library query with optional full-text search and an exclusive filter
- * selection. Returns up to `LIBRARY_LIMIT` cards in one shot — no pagination.
+ * selection. Returns up to `LIBRARY_LIMIT` cards in one shot, no pagination.
  *
  * activeFilter:
  *   undefined  → all non-hidden cards (default)
@@ -81,7 +81,7 @@ export const MAX_SEARCH_TERMS = 16;
  * Mirror of the index-side CJK/Thai segmentation (see
  * `buildCardSearchableText`): for course languages written without word
  * boundaries, append the query's Intl.Segmenter word tokens so a
- * mid-sentence CJK query matches the segmented tokens in the index — the
+ * mid-sentence CJK query matches the segmented tokens in the index. The
  * raw query would otherwise be one giant token Convex can't match infix.
  */
 export function augmentSearchQuery(
@@ -89,13 +89,13 @@ export function augmentSearchQuery(
   courseLanguages: string[],
 ): string {
   // Budget against Convex's own tokenization of the raw query, which splits
-  // on punctuation as well as whitespace — a plain `/\s+/` count undercounts
+  // on punctuation as well as whitespace. A plain `/\s+/` count undercounts
   // queries like `私は、学生ですか？` and the augmented query would exceed the
   // 16-term cap, which makes the search throw instead of returning results.
   //
   // `\p{M}` is load-bearing: combining marks (Devanagari matras, Thai tone
   // marks, niqqud, harakat) are neither letters nor digits, so without it a
-  // mark counts as a SEPARATOR — मैं counts as two terms and, once the
+  // mark counts as a SEPARATOR. मैं counts as two terms and, once the
   // truncation below rebuilds the query from these pieces, is emitted as the
   // bare consonant म. That shreds every abugida and pointed-abjad query into
   // fragments that match nothing.
@@ -103,12 +103,12 @@ export function augmentSearchQuery(
 
   // A raw query can itself exceed the cap (a pasted 20-word sentence), which
   // makes the search throw rather than return partial results. Truncate to
-  // the first MAX_SEARCH_TERMS terms — but keep going, so a query that still
+  // the first MAX_SEARCH_TERMS terms, but keep going, so a query that still
   // has room gets its CJK segments appended instead of being returned bare.
   const overCap = baseTerms.length > MAX_SEARCH_TERMS;
   const keptTerms = overCap ? baseTerms.slice(0, MAX_SEARCH_TERMS) : baseTerms;
   // Under the cap the ORIGINAL string is preserved verbatim (punctuation and
-  // all) — only an over-cap query is rebuilt from its terms.
+  // all), only an over-cap query is rebuilt from its terms.
   const base = overCap ? keptTerms.join(' ') : searchQuery;
 
   const seen = new Set(keptTerms);
@@ -149,7 +149,7 @@ export const getLibraryCards = query({
     const searchQuery = args.searchQuery?.trim() ?? '';
 
     // Each (state × source) combo resolves via a single pure-index query, or
-    // (for source === 'custom') two pure-index queries merged on the server —
+    // (for source === 'custom') two pure-index queries merged on the server,
     // no Convex `.filter()` post-scans. 'custom' covers origins
     // ∈ {'custom','chat'}; 'premade' is curated course content. The state
     // dimension has its own existing indexes; the new
@@ -288,7 +288,7 @@ export const getLibraryCards = query({
           .take(LIBRARY_LIMIT),
       );
     } else {
-      // No state filter (or filter === 'hidden') — `isHidden` is the only
+      // No state filter (or filter === 'hidden'), `isHidden` is the only
       // state component.
       const fetchOrigin = (origin: Origin) =>
         ctx.db
@@ -319,7 +319,7 @@ export const getLibraryCards = query({
 
     const texts = await Promise.all(cards.map((c) => ctx.db.get(c.textId)));
 
-    // Source collections for the card-origin pill — one point read per
+    // Source collections for the card-origin pill. One point read per
     // distinct collection (a page has few: the levels + custom/chat).
     const collectionIds = [
       ...new Set(

@@ -21,7 +21,7 @@ export const sendScheduled = internalMutation({
   args: { userId: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Account deleted in the meantime — the onDelete trigger removes the
+    // Account deleted in the meantime. The onDelete trigger removes the
     // mirror row, so a missing profile means there is nothing to report.
     const profile = await ctx.db
       .query('userProfiles')
@@ -29,7 +29,7 @@ export const sendScheduled = internalMutation({
       .first();
     if (!profile) return null;
 
-    // Unlike the welcome email, UNVERIFIED accounts still notify — an
+    // Unlike the welcome email, UNVERIFIED accounts still notify. An
     // abandoned signup is exactly the kind of thing the heads-up is for;
     // the verification state is reported in the body instead.
     const authUser = await authComponent.getAnyUserById(ctx, args.userId);

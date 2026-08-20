@@ -3,7 +3,7 @@ import { EVENTS, track, type SchedulerCtx } from '../analytics';
 /**
  * Which product surface caused the spend. This is the dimension that answers
  * "what is each feature costing us", so it is a closed union rather than a free
- * string — a typo would quietly create a second, half-empty cost bucket.
+ * string. A typo would quietly create a second, half-empty cost bucket.
  */
 export type AiFeature =
   | 'chat'
@@ -21,8 +21,8 @@ export type CaptureGenerationArgs = {
   /**
    * The user this spend is attributed to.
    *
-   * Content is shared by design — a translation generated for one user is
-   * reused by every other user who reaches the same sentence — so this is the
+   * Content is shared by design. A translation generated for one user is
+   * reused by every other user who reaches the same sentence, so this is the
    * *requesting* user, paired with `sharedContent` below. Per-user cost then
    * reads as "spend this user caused", and the app-wide total stays exact
    * because nothing is counted twice.
@@ -54,7 +54,7 @@ export type CaptureGenerationArgs = {
   /** Completion, same shape wrapped as choices. */
   outputChoices?: Array<{ role: string; content: string }>;
 
-  /** OpenRouter generation id where available — the join key back to their dashboard. */
+  /** OpenRouter generation id where available. The join key back to their dashboard. */
   traceId?: string;
   isError?: boolean;
   error?: string;
@@ -81,7 +81,7 @@ export function openrouterCostUsd(providerMetadata: unknown): number | undefined
   return (providerMetadata as OpenRouterProviderMetadata | undefined)?.openrouter?.usage?.cost;
 }
 
-/** OpenRouter's generation id — the join key back to their dashboard for reconciliation. */
+/** OpenRouter's generation id. The join key back to their dashboard for reconciliation. */
 export function openrouterGenerationId(providerMetadata: unknown): string | undefined {
   return (providerMetadata as OpenRouterProviderMetadata | undefined)?.openrouter?.id;
 }
@@ -118,7 +118,7 @@ export async function captureGeneration(
   await track(
     ctx,
     // PostHog requires a distinct id. Unattributable background work is bucketed
-    // under one synthetic id rather than dropped — the money was still spent.
+    // under one synthetic id rather than dropped. The money was still spent.
     distinctId ?? 'system:content-pipeline',
     EVENTS.AI_GENERATION,
     {
@@ -135,7 +135,7 @@ export async function captureGeneration(
       ...(isError ? { $ai_is_error: true } : {}),
       ...(error ? { $ai_error: error } : {}),
 
-      // Custom dimensions — the ones the cost dashboards actually slice by.
+      // Custom dimensions. The ones the cost dashboards actually slice by.
       feature,
       shared_content: sharedContent ?? false,
       attributed: distinctId !== undefined,

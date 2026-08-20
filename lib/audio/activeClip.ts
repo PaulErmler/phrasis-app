@@ -5,7 +5,7 @@ import { audibleCues, type LanguageCue } from './mergeAudio';
  * playing language clip and the time offset within that clip.
  *
  * Each repetition of a language produces its own cue, so `localTime` naturally
- * resets to 0 at each repetition — no special casing required by callers.
+ * resets to 0 at each repetition, no special casing required by callers.
  * Returns null when `currentTime` is before the first cue (typically 0 at card
  * load, before playback begins).
  *
@@ -13,7 +13,7 @@ import { audibleCues, type LanguageCue } from './mergeAudio';
  * zero-repetition language is never reported as the active clip.
  *
  * Clips are time-stretched at merge time, so the returned `localTime` is
- * rescaled to the original (1×) timeline that word timings live on — otherwise
+ * rescaled to the original (1×) timeline that word timings live on, otherwise
  * highlighting drifts because a stretched clip is `original / speed` long. The
  * speed is read from the matched cue (per-occurrence, so the same language can
  * play at different speeds before vs after base); `speedByLanguage` is an
@@ -51,11 +51,11 @@ export interface ActiveCuePosition {
   language: string;
   /**
    * 0-based occurrence of `language` among the audible cues with the same
-   * language — silent placeholders are not repetitions, so both this and
+   * language. Silent placeholders are not repetitions, so both this and
    * `mergedTimeForCuePosition` count the same set.
    */
   repIndex: number;
-  /** In the original (1×) frame — same units as word timings. */
+  /** In the original (1×) frame, same units as word timings. */
   localTimeOriginal: number;
 }
 
@@ -83,7 +83,7 @@ export function resolveActiveCuePosition(
 /**
  * Map an `ActiveCuePosition` captured from one merge onto the merged-timeline
  * time of another (e.g. after a speed-only remerge). Returns null when the
- * target language/repIndex is absent in the new cue list — callers should
+ * target language/repIndex is absent in the new cue list. Callers should
  * fall back to playing from the start.
  *
  * Caller is responsible for clamping the result to the new blob's duration.

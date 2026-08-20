@@ -52,7 +52,7 @@ function viewFromPathname(pathname: string): {
 /** Keep-mounted view shell: the view stays mounted for the lifetime of the
  *  layout and toggles between `display: contents` (visible) and
  *  `display: none`, so switching tabs never loses view state. Must stay at
- *  MODULE scope — declared inside `MainLayout` it would be a new component
+ *  MODULE scope. Declared inside `MainLayout` it would be a new component
  *  type each render, remounting (and resetting) every view. */
 function KeepMountedView({
   visible,
@@ -93,7 +93,7 @@ export default function MainLayout({
   // Result unused, but the hook call keeps the preloaded-settings
   // subscription mounted for the lifetime of the layout.
   const _settings = usePreloadedQuery(preloadedSettings);
-  // activeCourse comes from AppDataProvider's always-mounted subscription —
+  // activeCourse comes from AppDataProvider's always-mounted subscription,
   // subscribing here instead would start cold after the onboarding soft nav
   // and flash the stale preloaded null (no-course empty state).
 
@@ -153,10 +153,10 @@ export default function MainLayout({
   } = usePrefetchedThread();
 
   // Quota syncing lives in BillingGate (mounted in the /app layout) so that
-  // routes outside this group — notably the standalone /app/learn page — are
+  // routes outside this group, notably the standalone /app/learn page. Are
   // covered too.
 
-  // Tab switching — pushState so browser back/forward works between tabs
+  // Tab switching. pushState so browser back/forward works between tabs
   const handleViewChange = useCallback((view: View) => {
     setActiveView(view);
     isLearnOpenRef.current = false;
@@ -212,7 +212,7 @@ export default function MainLayout({
   // that owns every tab in the app.
   const learnStartedAtRef = useRef<number | null>(null);
 
-  // Learn overlay — pushState so the browser back button can close it
+  // Learn overlay. pushState so the browser back button can close it
   const handleLearnOpen = useCallback(() => {
     setIsLearnOpen(true);
     setHasVisitedStats(false);

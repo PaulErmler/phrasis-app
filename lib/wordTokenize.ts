@@ -8,14 +8,14 @@ export type Token = { normalized: string; original: string };
  * which casing variant to keep as the display form: if we've ever seen
  * the word in all-lowercase form, prefer that (covers English "the" at
  * sentence start being downgraded from "The"). Words that never appear
- * lowercase — German nouns, proper nouns — keep their capitalized form.
+ * lowercase. German nouns, proper nouns. Keep their capitalized form.
  */
 export function isAllLowercase(s: string): boolean {
   return s === s.toLowerCase();
 }
 
 // Segmenter construction is measurable on hot paths (review writes,
-// migrations, edit flows) — `getSegmenter` caches per normalized BCP-47 tag.
+// migrations, edit flows), `getSegmenter` caches per normalized BCP-47 tag.
 export function getWordSegmenter(language: string): Intl.Segmenter {
   // Internal codes are not BCP-47: `zh_traditional` → "zh-traditional" has a
   // variant subtag over 8 chars, so Intl.Segmenter throws RangeError and the
@@ -28,7 +28,7 @@ export function getWordSegmenter(language: string): Intl.Segmenter {
 }
 
 /**
- * For languages written without word boundaries (zh/ja/yue/th — see
+ * For languages written without word boundaries (zh/ja/yue/th, see
  * `hasWordBoundaries` in lib/languages.ts), append the Intl.Segmenter word
  * tokens to the text so whitespace/punctuation-tokenized search engines
  * (Convex full-text search) can match words in the middle of a sentence.
@@ -66,7 +66,7 @@ export function tokenizeText(text: string, language: string): Token[] {
         normalized: seg.segment.toLowerCase().normalize('NFC'),
       }));
   } catch {
-    // Unknown/invalid BCP-47 tag — fall back to a Unicode-letter split so a
+    // Unknown/invalid BCP-47 tag. Fall back to a Unicode-letter split so a
     // bad language code never crashes a deck save. Behaviour is correct for
     // Latin-script languages; imperfect but non-fatal for others.
     return [...nfc.matchAll(/\p{L}[\p{L}\p{M}\p{N}'’-]*/gu)].map((m) => ({

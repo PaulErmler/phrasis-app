@@ -3,14 +3,14 @@ import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // ---------------------------------------------------------------------------
-// Convex mocks — useQuery returns whatever the latest mockImplementation gives,
+// Convex mocks. useQuery returns whatever the latest mockImplementation gives,
 // so each test can drive what the live library result looks like. Each
 // mutation is a fresh vi.fn so we can assert call shape per test.
 // ---------------------------------------------------------------------------
 // Mutation mocks. Each is callable like the real Convex mutation *and* exposes
 // `.withOptimisticUpdate(fn)` so code that chains it in production (e.g.
 // toggleFavorite) still type-checks and runs. The optimistic callback itself
-// is a no-op in these unit tests — the live query mock drives rendering.
+// is a no-op in these unit tests. The live query mock drives rendering.
 function makeMutationMock() {
   const fn = vi.fn().mockResolvedValue(null) as ReturnType<typeof vi.fn> & {
     withOptimisticUpdate: (cb: unknown) => typeof fn;
@@ -32,7 +32,7 @@ const updatePinnedActionsFn = makeMutationMock();
 
 const useQueryMock = vi.fn();
 
-// `usePreloadedQuery` is called twice in LibraryView — once for course
+// `usePreloadedQuery` is called twice in LibraryView. Once for course
 // settings, once for the user-settings row that carries `pinnedCardActions`.
 // Tag the preloaded handles so the mock can dispatch by which one we got.
 const PRELOADED_COURSE_SETTINGS = { __preloadKey: 'courseSettings' as const };
@@ -72,7 +72,7 @@ vi.mock('convex/react', () => ({
   },
   usePreloadedQuery: (handle: { __preloadKey?: string }) => {
     if (handle?.__preloadKey === 'userSettings') return userSettingsValue;
-    // Default — course settings.
+    // Default. Course settings.
     return { highlightWords: true };
   },
 }));
@@ -103,7 +103,7 @@ vi.mock('@/convex/_generated/api', () => ({
   },
 }));
 
-// Bypass the real Convex-backed quota hook — its `useQuery(api.usage.queries.getMyQuotas)`
+// Bypass the real Convex-backed quota hook. Its `useQuery(api.usage.queries.getMyQuotas)`
 // would need a separate mock branch. The card-action surface just needs a
 // "quota available, not loading" shape so the rendered buttons stay enabled.
 vi.mock('@/components/feature_tracking/useFeatureQuota', () => ({
@@ -134,7 +134,7 @@ vi.mock('@/components/app/NoCourseEmptyState', () => ({
 
 // Stub LearningCardContent with a thin shell that exposes the toggle state and
 // dispatches the parent callbacks. We don't care about audio/translation
-// rendering here — only that the sticky/toggle wiring and the new card-action
+// rendering here, only that the sticky/toggle wiring and the new card-action
 // pin surface are correct. Every action callback is rendered as a testable
 // button regardless of pin state; the stub also surfaces `pinnedActions` via a
 // `data-pinned` attribute so tests can assert what was pinned.
@@ -285,7 +285,7 @@ function makeCard(overrides: Partial<Card> & { _id: string; sourceText: string }
   };
 }
 
-// Card factory that includes a target-language translation — `onFlag` is only
+// Card factory that includes a target-language translation. `onFlag` is only
 // wired when `card.translations` has at least one `isTargetLanguage: true`
 // entry, so flag-flow tests must use this helper (or pass translations
 // explicitly into `makeCard`).
@@ -478,7 +478,7 @@ describe('LibraryView sticky-card behavior', () => {
     expect(hideCardFn).toHaveBeenCalledWith({ cardId: 'c1' });
     expect(screen.getByTestId('card-hola').dataset.hidden).toBe('true');
 
-    // Live query in the default view no longer returns c1 — but sticky keeps
+    // Live query in the default view no longer returns c1, but sticky keeps
     // it visible. Clicking hide again must call unhideCard, not hideCard.
     await act(async () => {
       useQueryMock.mockReturnValue([]);
@@ -555,7 +555,7 @@ describe('LibraryView delete flow', () => {
     expect(deleteCardFn).toHaveBeenCalledWith({ cardId: 'c1' });
 
     // In production the deleteCard mutation invalidates getLibraryCards and
-    // the subscription refires without the deleted row — simulate that here.
+    // the subscription refires without the deleted row. Simulate that here.
     useQueryMock.mockReturnValue([both[1]]);
     rerender(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
 
@@ -603,7 +603,7 @@ describe('LibraryView pinned card actions', () => {
     render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
 
     // The stub's "pin flag" button appends 'flag' to the current pin list and
-    // hands it to the parent's update handler — same shape the real
+    // hands it to the parent's update handler, same shape the real
     // CardActionsMenu produces from its in-menu Pin button.
     await user.click(screen.getByTestId('pin-flag-hola'));
     expect(updatePinnedActionsFn).toHaveBeenCalledWith({
@@ -638,7 +638,7 @@ describe('LibraryView flag flow', () => {
     expect(flagTranslationFn).toHaveBeenCalledWith({
       cardId: 'c1',
     });
-    // The flag flow no longer deletes the user's card — the new translation
+    // The flag flow no longer deletes the user's card. The new translation
     // lands in-place when the worker finishes, so the row stays visible.
     expect(deleteCardFn).not.toHaveBeenCalled();
     expect(screen.getByTestId('card-hola')).toBeInTheDocument();
@@ -660,7 +660,7 @@ describe('LibraryView flag flow', () => {
 
     expect(flagTranslationFn).not.toHaveBeenCalled();
     expect(deleteCardFn).not.toHaveBeenCalled();
-    // Card still visible — cancel is a no-op on the visible list.
+    // Card still visible. Cancel is a no-op on the visible list.
     expect(screen.getByTestId('card-hola')).toBeInTheDocument();
   });
 
@@ -693,7 +693,7 @@ describe('LibraryView regenerate-audio flow', () => {
     const [callArgs] = regenerateCardAudioFn.mock.calls[0];
     expect(callArgs.cardId).toBe('c1');
     // `getUserTimezone()` resolves to a non-empty IANA name in JSDOM (or
-    // falls back to 'UTC') — just assert it's a non-empty string.
+    // falls back to 'UTC'), just assert it's a non-empty string.
     expect(typeof callArgs.timezone).toBe('string');
     expect(callArgs.timezone.length).toBeGreaterThan(0);
   });

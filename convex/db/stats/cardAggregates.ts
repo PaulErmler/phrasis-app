@@ -34,7 +34,7 @@ export function getCardStateLabel(
 
 /**
  * Whether the card has a seeded writing track (separateModeTracking courses).
- * Gates every write to the writing aggregates — cards without the track are
+ * Gates every write to the writing aggregates. Cards without the track are
  * simply absent from them.
  */
 export function hasWritingTrack(doc: Doc<'cards'>): boolean {
@@ -43,7 +43,7 @@ export function hasWritingTrack(doc: Doc<'cards'>): boolean {
 
 /**
  * Origin bucket for the filter-aware aggregate. 'none' collects legacy cards
- * whose `collectionOrigin` was never resolved — they are only counted under
+ * whose `collectionOrigin` was never resolved. They are only counted under
  * the unfiltered 'both' path, mirroring `fetchDueCardsWithFilter`.
  */
 export const ORIGIN_BUCKETS = ['premade', 'custom', 'chat', 'none'] as const;
@@ -184,14 +184,14 @@ type CardsDueAggregate = TableAggregate<{
 
 /**
  * Everything track-selected about the two due-count aggregate families, keyed
- * by SchedulingTrack — the same shape as `TRACK_DUE_QUERIES` in
+ * by SchedulingTrack. The same shape as `TRACK_DUE_QUERIES` in
  * lib/dueQueue.ts, so track-dependent code selects once instead of
  * re-spelling `track === 'writing' ? … : …` per aggregate.
  *
  * `fields`: the card fields each family derives its namespace/sortKey from.
  * A patch that touches NONE of a family's fields cannot move or re-key any of
- * that family's entries, so its `replaceOrInsert`s are skipped entirely —
- * each one is a multi-read/write component subtransaction, and dropping the
+ * that family's entries, so its `replaceOrInsert`s are skipped entirely.
+ * Each one is a multi-read/write component subtransaction, and dropping the
  * no-op ones matters on hot paths (a shared-track review of a split-course
  * card would otherwise pay for two writing-aggregate writes; a
  * seedWritingTrack batch would pay for four shared ones per card, the exact
@@ -203,8 +203,8 @@ type CardsDueAggregate = TableAggregate<{
  * entry is missing, so before the skip existed every card patch incidentally
  * repaired a card that had fallen out of an aggregate (see the drift warning
  * on `cardsByOriginStateAndDueDate` above). Patches touching none of these
- * fields — `toggleFavoriteCard`, `setAudioSpeedOverride`, the free-play
- * counter advance — no longer do that, so drift no longer self-heals. It is
+ * fields. `toggleFavoriteCard`, `setAudioSpeedOverride`, the free-play
+ * counter advance, no longer do that, so drift no longer self-heals. It is
  * repaired only by `migrations/recalcUserCardAggregates`, which is where to
  * look first if due counts read low for one deck.
  */
@@ -246,14 +246,14 @@ export const TRACK_AGGREGATES: Record<
 /**
  * Patch a card and update both aggregates.
  *
- * Pass `oldDoc` when the caller has already fetched the card — saves a read
+ * Pass `oldDoc` when the caller has already fetched the card. Saves a read
  * on the hot path. The post-patch doc is computed in memory instead of being
  * re-read; the aggregates only key on fields that are deterministic from
  * `oldDoc + patch` (deckId, dueDate, isHidden, isMastered, schedulingPhase,
  * fsrsState, and their writing-track counterparts).
  *
  * Also bumps `collectionProgress.cardsMastered` on the false → true mastery
- * transition. The counter is strictly monotonic — true → false (demaster) is
+ * transition. The counter is strictly monotonic. True → false (demaster) is
  * a no-op. See schema.ts:collectionProgress for the broader semantic.
  */
 export async function patchCard(
@@ -281,7 +281,7 @@ export async function patchCard(
     await cardsByOriginStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
   }
   // Writing-track aggregates: membership is gated on the track existing, so a
-  // patch can move a card in (seeding), out (never in practice — nothing
+  // patch can move a card in (seeding), out (never in practice, nothing
   // unsets the track), or within them. Membership changes always come from a
   // `writingDueDate` write, so the untouched-skip can only apply to the
   // stayed-a-member branch.
@@ -306,14 +306,14 @@ export async function patchCard(
 /**
  * Bump `cardsMastered` on the matching collectionProgress row. Looks up the
  * (userId, courseId) pair via the card's deck. Idempotency is the caller's
- * responsibility — only call on actual false → true transitions.
+ * responsibility, only call on actual false → true transitions.
  *
  * Post-cutover redirect: if the card's collection is one of the seven legacy
  * CEFR rows AND the user has been reconciled to a new dataset, we bump the
  * rolled-forward destination collection's row instead. This keeps masteries
  * on pre-cutover cards (whose `collectionId` still points at the legacy row)
  * visible on the new home view. If the lookup fails at any step we fall back
- * to bumping the legacy row — never silently drop the increment.
+ * to bumping the legacy row, never silently drop the increment.
  */
 async function bumpCardsMastered(
   ctx: MutationCtx,
@@ -341,7 +341,7 @@ async function bumpCardsMastered(
     )
     .first();
   if (!progress) return;
-  // Skip if no row exists — `updateCollectionProgress` always creates the
+  // Skip if no row exists. `updateCollectionProgress` always creates the
   // row when the first card is added, so a missing row here means the card
   // was inserted by a path that bypasses progress tracking (manual import,
   // migration). The backfill migration handles those cases. Inserting here
@@ -354,8 +354,8 @@ async function bumpCardsMastered(
 /**
  * Resolve the collectionProgress collection a counter bump should target.
  * Returns the input id unchanged unless the card sits on a legacy CEFR
- * collection AND the user's course has been reconciled to a new dataset —
- * then returns the rolled-forward destination collection's id.
+ * collection AND the user's course has been reconciled to a new dataset.
+ * Then returns the rolled-forward destination collection's id.
  */
 async function resolveProgressTargetCollectionId(
   ctx: MutationCtx,
@@ -367,7 +367,7 @@ async function resolveProgressTargetCollectionId(
 
   const newCode = LEGACY_TO_NEW_CODE[collection.name];
   // Cheap guard: only proceed if this collection's name matches one of the
-  // seven legacy CEFR rows. Also require `datasetId` to be absent — a new
+  // seven legacy CEFR rows. Also require `datasetId` to be absent. A new
   // collection happens to satisfy `name === code` but always has datasetId
   // set, so this rejects new rows quickly and avoids the courseSettings read
   // on the hot path.
@@ -398,7 +398,7 @@ async function resolveProgressTargetCollectionId(
  * `${deckId}:${origin}:${state}`), so every possible label has to be cleared.
  *
  * Each track costs `EXTENDED_STATE_LABELS × (1 + ORIGIN_BUCKETS)` component
- * subtransactions — 30 today — plus the two deck-level namespaces on the
+ * subtransactions. 30 today, plus the two deck-level namespaces on the
  * shared track, so 32 shared + 30 writing. Doing both in one mutation was 62,
  * double what the recalc migration was sized for; it splits them across
  * scheduled steps for exactly that reason (see
@@ -412,7 +412,7 @@ export async function clearAggregatesForDeck(
   deckId: Id<'decks'>,
   track: SchedulingTrack = 'shared',
 ): Promise<void> {
-  // One track-selection up front — the loops below then use identical
+  // One track-selection up front. The loops below then use identical
   // namespaces for both tracks, so a label or namespace-format change cannot
   // land on one track's branch and miss its twin.
   const { state: stateAggregate, originState: originStateAggregate } =

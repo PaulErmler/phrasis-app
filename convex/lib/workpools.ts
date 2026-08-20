@@ -10,7 +10,7 @@ import { components } from '../_generated/api';
  * (`ttsGenerationClaims` / `llmTranslationClaims`) live exactly from enqueue
  * to onComplete with no staleness gymnastics in between.
  *
- * Both pools are FIFO — there are no priority tiers (deliberate
+ * Both pools are FIFO. There are no priority tiers (deliberate
  * simplification; admin warmups are manual and rare, so user-facing work
  * doesn't meaningfully queue behind background batches in normal operation).
  * maxParallelism can be tuned at runtime via
@@ -39,7 +39,7 @@ export const llmPool = new Workpool(components.llmPool, {
  * Throughput is rate-limiter-bound, not parallelism-bound, so a single pool
  * suffices; a throttled provider can't starve the others because workers
  * THROW (freeing the slot) instead of sleeping when the projected token wait
- * is long. Retry budget ≈ 80s (2s·3^n) — wide enough to ride out provider
+ * is long. Retry budget ≈ 80s (2s·3^n), wide enough to ride out provider
  * 429 bursts, the failure mode that used to permanently drop audio.
  */
 export const ttsPool = new Workpool(components.ttsPool, {
@@ -49,19 +49,19 @@ export const ttsPool = new Workpool(components.ttsPool, {
 });
 
 /**
- * Background data-sweep pool — currently only the separateModeTracking
+ * Background data-sweep pool, currently only the separateModeTracking
  * writing-track seed (convex/migrations/seedWritingTrack.ts).
  *
  * Deliberately NO retry config: the pool does not retry mutations (Convex
  * already retries them on OCC and transient failures, and they're
  * deterministic so external retries buy nothing). What this pool is here for
- * is the GUARANTEED onComplete callback — it runs in its own transaction, so
+ * is the GUARANTEED onComplete callback. It runs in its own transaction, so
  * it still fires when the batch mutation throws. That is what turns a
  * self-scheduling chain, which dies silently the moment one hop fails, into
  * one that is supervised: the handler decides whether to re-enqueue or give up
  * and report.
  *
- * Low parallelism on purpose — bulk backfill must never queue ahead of the
+ * Low parallelism on purpose. Bulk backfill must never queue ahead of the
  * user-facing llmPool/ttsPool work, and the seed is sequential per course
  * anyway (each batch enqueues its own successor).
  */

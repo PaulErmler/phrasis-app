@@ -11,7 +11,7 @@ import {
  * Quick actions: the client sends a compact action key (plus a small payload)
  * instead of a long prompt. The server expands it into a detailed steering
  * prompt that is persisted as a hidden system message right before the short
- * visible user label — so the model gets precise instructions while the chat
+ * visible user label, so the model gets precise instructions while the chat
  * shows a clean bubble, and follow-up turns still see what was asked.
  */
 
@@ -47,7 +47,7 @@ export const SENTENCE_QUICK_ACTION_KINDS = [
 export type SentenceQuickActionKind = (typeof SENTENCE_QUICK_ACTION_KINDS)[number];
 
 export const MAX_QUICK_ACTION_WORD_LENGTH = 100;
-// Generous — real BCP-47 codes are ≤ ~11 chars; this only stops the field
+// Generous. Real BCP-47 codes are ≤ ~11 chars; this only stops the field
 // being used to smuggle arbitrary-length text into the steering prompt.
 export const MAX_QUICK_ACTION_LANGUAGE_LENGTH = 50;
 
@@ -126,7 +126,7 @@ function replyLanguageNote(ctx: QuickActionContext): string {
  * card context carries both renderings, and without this the model
  * sometimes analyzes the base-language translation instead of the sentence
  * the user is actually learning. Multi-target courses are answered for
- * every target language in one reply — sentence actions are deliberately
+ * every target language in one reply. Sentence actions are deliberately
  * not scoped to a single language.
  */
 function targetSubjectNote(ctx: QuickActionContext): string {

@@ -61,11 +61,11 @@ const STRIPE = `repeating-linear-gradient(45deg, transparent 0 5px, color-mix(in
 const AUTO_RATE_STEP = 5;
 
 interface AutoRateBandSliderProps {
-  /** `[hard, good]` — the two boundaries, 0-100. */
+  /** `[hard, good]`. The two boundaries, 0-100. */
   value: [number, number];
   /** Fires continuously while dragging; keep this local. */
   onValueChange: (value: [number, number]) => void;
-  /** Fires once on release — persist here, not on every pixel. */
+  /** Fires once on release. Persist here, not on every pixel. */
   onValueCommit: (value: [number, number]) => void;
   disabled?: boolean;
 }
@@ -106,7 +106,7 @@ export function AutoRateBandSlider({
         step={AUTO_RATE_STEP}
         minStepsBetweenThumbs={1}
         disabled={disabled}
-        // touch-none is essential — without it a drag scrolls the settings
+        // touch-none is essential, without it a drag scrolls the settings
         // sheet instead of moving the thumb on iOS.
         className="relative flex w-full touch-none items-center select-none data-[disabled]:opacity-50"
       >
@@ -174,7 +174,7 @@ export function AutoRateBandSlider({
  * Persisting on every `onValueChange` would fire a Convex mutation (and its
  * optimistic update) for every pixel of a drag, so the live value is held
  * locally and only written on release. When the stored value changes
- * underneath us — another tab, or the mutation resolving — the draft re-syncs.
+ * underneath us. Another tab, or the mutation resolving. The draft re-syncs.
  */
 export function AutoRateThresholdControl({
   thresholds,

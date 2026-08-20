@@ -27,7 +27,7 @@ import {
  * Time-driven billing edge cases, simulated with REAL Stripe test clocks.
  *
  * Every state here is produced by actually moving time on a Stripe test
- * clock — no billing overrides. The one trick making that possible: test
+ * clock, no billing overrides. The one trick making that possible: test
  * clocks can only be set at Stripe-customer creation, so the spec creates
  * the clocked Stripe customer itself and hands it to Autumn via the
  * `usage/testing:relinkStripeCustomer` hook BEFORE the first purchase
@@ -35,37 +35,37 @@ import {
  * all billing for the user on the clocked customer, and advancing the clock
  * produces genuine trial conversions, renewals, failed charges, lapses.
  *
- * Journey A — trial start and clock-driven conversion:
+ * Journey A. Trial start and clock-driven conversion:
  *   1. First purchase redirects to Stripe's hosted checkout (the
  *      Managed-Payments-capable v2 session; `redirect_mode: 'always'`), and
- *      nothing exists in Stripe until the customer confirms THERE — the
+ *      nothing exists in Stripe until the customer confirms THERE: the
  *      button click alone never charges.
  *   2. Advancing past trial end converts the trial into a paid
  *      subscription; the app keeps working, no dunning.
  *
- * Journey D — the lapsed-subscriber repurchase, in REAL time (no clock):
+ * Journey D. The lapsed-subscriber repurchase, in REAL time (no clock):
  *   A trial is started through checkout (card saved), then the subscription
- *   is cancelled AT STRIPE (DELETE — Autumn's own `cancel_immediately`
+ *   is cancelled AT STRIPE (DELETE: Autumn's own `cancel_immediately`
  *   means "cancel with prorated refund", and Stripe forbids creating that
  *   refund invoice on Managed Payments subscriptions). At real-world
  *   timestamps Autumn's webhook ingestion reflects the lapse immediately,
  *   which manufactures the exact customer class the Managed-Payments
  *   review flagged: lapsed, card saved. The repurchase must redirect to
- *   Stripe (no silent inline charge — the §312j BGB regression), start
+ *   Stripe (no silent inline charge: the §312j BGB regression), start
  *   WITHOUT a second trial (pins `customize.free_trial: null` against live
  *   Autumn), and with the MoR flag on, carry `managed_payments.enabled`.
  *
- * Journey C — the legacy (grandfathered, non-MoR) customer:
- *   A subscription created the pre-Managed-Payments way — Autumn's v1.2
+ * Journey C. The legacy (grandfathered, non-MoR) customer:
+ *   A subscription created the pre-Managed-Payments way: Autumn's v1.2
  *   `/attach` with a card on file, no Checkout Session (the
- *   `usage/testing:legacyAttachPlan` hook) — must keep working untouched
+ *   `usage/testing:legacyAttachPlan` hook): must keep working untouched
  *   while the flag is on: upgrade updates the SAME subscription in place
  *   with no Stripe redirect, downgrade schedules and renew un-schedules,
  *   the annual renewal charges the saved card at period end, and cancel to
  *   Free executes at period end. The subscription stays non-MoR throughout
  *   (Stripe cannot convert existing subscriptions).
  *
- * Journey B — genuine past_due (no overrides, unlike payment-overdue.spec):
+ * Journey B. Genuine past_due (no overrides, unlike payment-overdue.spec):
  *   1. Trial started with card 0341 (attaches fine, every charge fails).
  *   2. Advancing past trial end makes the conversion invoice FAIL →
  *      subscription past_due → the real dunning dialog appears, driven by
@@ -76,7 +76,7 @@ import {
  *
  * Prerequisites:
  *   - The Stripe TEST-mode secret key of the account Autumn's sandbox org
- *     is connected to — either `STRIPE_TEST_SECRET_KEY` in the env, or any
+ *     is connected to: either `STRIPE_TEST_SECRET_KEY` in the env, or any
  *     `*STRIPE*` test-mode key in the repo-root `.env.local` (parsed by
  *     e2e/stripe-clock.ts; the Playwright runner doesn't load that file by
  *     itself). The whole spec self-skips without it; live keys are refused.
@@ -87,7 +87,7 @@ import {
  * test clocks accelerate STRIPE only. Hosted Autumn ingests *event-driven*
  * changes from clocked customers just fine (payment failures → past_due,
  * invoice.paid, cancellations via its API), but its `trialing` and
- * `scheduled` statuses are derived from ITS stored real-world dates — a
+ * `scheduled` statuses are derived from ITS stored real-world dates. A
  * clock-driven trial end or scheduled-plan start does not flip Autumn's
  * state until the real date arrives (hours after a 1-year advance, Autumn
  * still reported trialing + scheduled). Consequently: assert Stripe-side
@@ -96,7 +96,7 @@ import {
  * clock.
  *
  * Runtime warning: clock advances take tens of seconds on Stripe's side and
- * Autumn's webhook ingestion adds more — whole file runs several minutes.
+ * Autumn's webhook ingestion adds more. Whole file runs several minutes.
  */
 
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -114,7 +114,7 @@ function convexTestHook(fn: string, args: Record<string, unknown>): unknown {
     { cwd: REPO_ROOT, encoding: "utf8" },
   );
   // `convex run` prints the function's return value (JSON) on stdout,
-  // possibly surrounded by CLI noise — parse the last JSON-looking chunk.
+  // possibly surrounded by CLI noise. Parse the last JSON-looking chunk.
   const lines = out.trim().split("\n");
   for (let i = lines.length - 1; i >= 0; i--) {
     if (!lines[i].trim()) continue;
@@ -132,7 +132,7 @@ type AutumnPlanRow = { id: string; status: string; pastDue: boolean };
 /**
  * Poll AUTUMN's view of the customer until it satisfies `predicate`. Stripe
  * settles clock advances quickly, but Autumn ingests the resulting webhook
- * backlog asynchronously — a 1-year advance can take it minutes. Polling
+ * backlog asynchronously. A 1-year advance can take it minutes. Polling
  * Autumn directly (instead of only the UI) makes a timeout name the actual
  * laggard: the error shows what Autumn still reports.
  */
@@ -144,7 +144,7 @@ async function waitForAutumnPlans(
   const deadline = Date.now() + timeoutMs;
   let plans: AutumnPlanRow[] | undefined;
   for (;;) {
-    // A transient hook failure (Autumn API hiccup — live run 2026-08-10 died
+    // A transient hook failure (Autumn API hiccup, live run 2026-08-10 died
     // on one http2 keep-alive timeout) is just a missed poll, not a verdict.
     try {
       plans = convexTestHook("getBillingDebugState", {
@@ -186,7 +186,7 @@ async function openPricingTable(page: Page) {
 }
 
 /**
- * Reload settings until a plan CTA shows the expected label — Autumn state
+ * Reload settings until a plan CTA shows the expected label. Autumn state
  * propagates via its Stripe webhooks, so generous polling is the point.
  */
 async function expectPlanState(
@@ -205,10 +205,10 @@ async function expectPlanState(
 
 /**
  * Click a plan CTA, assert the redirect to Stripe's hosted page, and assert
- * that at that moment NOTHING new exists in Stripe — the click must never
+ * that at that moment NOTHING new exists in Stripe. The click must never
  * charge or subscribe by itself. Returns the Checkout Session for further
  * assertions. (When Managed Payments is on, the session must carry
- * `managed_payments.enabled` — the merchant-of-record marker.)
+ * `managed_payments.enabled`, the merchant-of-record marker.)
  */
 async function startFirstPurchase(
   page: Page,
@@ -219,7 +219,7 @@ async function startFirstPurchase(
   await planCta(page, productId).click();
   // "commit", not the default "load": reaching the URL is all that matters
   // here, and Stripe's checkout page can hold the load event open past 45s
-  // on a slow connection (live flake, 2026-08-10) — everything that follows
+  // on a slow connection (live flake, 2026-08-10), everything that follows
   // does its own waiting.
   await page.waitForURL(/checkout\.stripe\.com/, {
     timeout: 45_000,
@@ -227,7 +227,7 @@ async function startFirstPurchase(
   });
 
   // Resolved after the redirect. For unclocked journeys the Stripe customer
-  // was created by Autumn at SIGNUP (not by the session — verified live
+  // was created by Autumn at SIGNUP (not by the session, verified live
   // 2026-08-10), so it is looked up by email; findCustomerByEmail uses the
   // read-your-writes list filter, never the lagging search index.
   const customerId = await getCustomerId();
@@ -259,7 +259,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
 
   // Serial is scoped PER JOURNEY: within one journey the tests are stages of
   // one user's life and must skip after a failure, but the journeys use
-  // independent users — one failing must not take the others down.
+  // independent users. One failing must not take the others down.
   test.describe("journey A: trial → paid conversion on the clock", () => {
     test.describe.configure({ mode: "serial", retries: 0 });
     const STORAGE = path.resolve(__dirname, ".auth/user-clock-a.json");
@@ -285,7 +285,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await signupContext.close();
 
       // The clocked Stripe customer, linked to the Autumn customer BEFORE
-      // any purchase — the only moment a test clock can enter the picture.
+      // any purchase. The only moment a test clock can enter the picture.
       clocked = await createClockedCustomer(STRIPE_KEY!, email);
       convexTestHook("relinkStripeCustomer", {
         email,
@@ -334,7 +334,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
         { label: "active (converted) subscription", timeoutMs: 180_000 },
       );
 
-      // The app keeps working on the paid plan — no dunning, plan current.
+      // The app keeps working on the paid plan, no dunning, plan current.
       await expectPlanState(page, BASIC_ANNUAL, /current plan/i);
       await expect(page.getByTestId("payment-overdue-dialog")).toHaveCount(0);
     });
@@ -366,7 +366,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await signupContext.close();
 
       // Deliberately NO test clock and NO relink: this journey runs in real
-      // time so every Stripe timestamp matches Autumn's wall clock — the
+      // time so every Stripe timestamp matches Autumn's wall clock. The
       // only way its webhook-fed state can reflect a lapse immediately.
       context = await browser.newContext({ storageState: STORAGE });
       page = await context.newPage();
@@ -402,7 +402,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
 
     test("an immediate cancellation lapses the customer to Free", async () => {
       test.setTimeout(300_000);
-      // Cancelled via AUTUMN's /cancel (the cancelPlanNow hook — the same
+      // Cancelled via AUTUMN's /cancel (the cancelPlanNow hook, the same
       // call the app's cancelOverdueSubscription makes), NOT via a
       // Stripe-side DELETE of the subscription. A Stripe-side delete is a
       // dead end for this journey: Autumn does not ingest
@@ -452,7 +452,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await expect(page.getByTestId("pricing-trial-badge")).toHaveCount(0);
 
       // A saved card is exactly what made the old 'if_required' path charge
-      // silently on click — this asserts the redirect happens and nothing
+      // silently on click. This asserts the redirect happens and nothing
       // was bought before Stripe's confirmation page.
       await startFirstPurchase(page, async () => customerId, BASIC_ANNUAL);
       await completeStripeTestCheckout(page, { email });
@@ -466,7 +466,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       );
       const active = subs.filter((s) => s.status !== "canceled");
       expect(active).toHaveLength(1);
-      // No second trial: active immediately, no trial_end — live proof of
+      // No second trial: active immediately, no trial_end. Live proof of
       // the v2 `customize.free_trial: null` reading.
       expect(active[0].status).toBe("active");
       expect(active[0].trial_end).toBeNull();
@@ -562,7 +562,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await page.getByTestId("payment-overdue-cancel-confirm").click();
 
       // cancelOverdueSubscription verifies the unpaid invoice server-side,
-      // cancels immediately, and syncs — the block must clear without a
+      // cancels immediately, and syncs. The block must clear without a
       // reload and the customer lands on Free.
       await expect(dialog).toBeHidden({ timeout: 120_000 });
       await waitForSubscriptions(
@@ -584,7 +584,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
     let context: BrowserContext;
     let page: Page;
     let clocked: ClockedCustomer;
-    /** The one Stripe subscription — must stay THE one through every switch. */
+    /** The one Stripe subscription. Must stay THE one through every switch. */
     let legacySubId: string;
 
     test.beforeAll(async ({ browser }) => {
@@ -602,7 +602,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
 
       // A grandfathered customer, reconstructed faithfully: clocked Stripe
       // customer, card saved, subscription created through Autumn's legacy
-      // v1.2 attach — direct charge, no Checkout Session, so non-MoR by
+      // v1.2 attach. Direct charge, no Checkout Session, so non-MoR by
       // construction, exactly like every subscription that predates the flag.
       clocked = await createClockedCustomer(STRIPE_KEY!, creds.email);
       await attachTestCard(STRIPE_KEY!, clocked.customerId, "pm_card_visa");
@@ -662,7 +662,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await expectPlanState(page, PRO_ANNUAL, /current plan/i);
 
       // …and Stripe still holds the SAME single subscription, still non-MoR
-      // (Stripe cannot convert existing subscriptions — the expected mixed
+      // (Stripe cannot convert existing subscriptions, the expected mixed
       // estate).
       const active = (
         await listSubscriptions(STRIPE_KEY!, clocked.customerId)
@@ -736,7 +736,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       // cancellation wired to the period end. Without this pin, an immediate
       // cancel (the failure mode of routing a free-target attach to v2,
       // which has no cancel semantics) would still satisfy the
-      // all-cancelled check after the clock advance below — the worst
+      // all-cancelled check after the clock advance below. The worst
       // outcome would pass the test. Autumn spells the schedule as
       // `cancel_at` = period end, not `cancel_at_period_end` (see
       // stripe-clock.ts).
@@ -761,7 +761,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       // (cancel_at_period_end) provably executes when time arrives. Autumn's
       // mirror of the lapse is wall-clock-driven (its scheduled Free starts
       // at the stored REAL-WORLD date), so no Autumn/UI assertion after a
-      // clock advance can ever pass — the Autumn-side lapse handling is
+      // clock advance can ever pass. The Autumn-side lapse handling is
       // covered by journey A's immediate cancel instead.
       await waitForSubscriptions(
         STRIPE_KEY!,

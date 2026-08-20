@@ -7,7 +7,7 @@ import { addDays } from '@/lib/dateStrings';
 
 /**
  * `resolveClientToday` lets the client tell day-keyed queries what "today" is
- * (so the goal ring / streak roll over at local midnight — a Convex query
+ * (so the goal ring / streak roll over at local midnight, a Convex query
  * never re-runs because time passed), while clamping to ±1 day of the
  * server's view so a hostile or skewed client can only shift its own display.
  */
@@ -58,7 +58,7 @@ describe('resolveClientToday', () => {
     if (Math.abs(Date.parse(serverToday) - Date.parse(monthStart)) <= 86_400_000) {
       const zeroDay = serverToday.slice(0, 8) + '00';
       const resolved = resolveClientToday('UTC', zeroDay);
-      // Canonicalized (last day of previous month) or clamped to server —
+      // Canonicalized (last day of previous month) or clamped to server,
       // never the raw "…-00" string.
       expect(resolved).not.toBe(zeroDay);
       expect(/^\d{4}-\d{2}-(0[1-9]|[12]\d|3[01])$/.test(resolved)).toBe(true);

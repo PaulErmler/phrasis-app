@@ -7,7 +7,7 @@ vi.mock("ai", () => ({
 vi.mock("@openrouter/ai-sdk-provider", () => ({
   // The provider factory is called as `createOpenRouter({...})` and then
   // invoked as `openrouter(modelSlug)` to get a model handle. Tests only care
-  // that this returns something `generateText` can be called with — the mock
+  // that this returns something `generateText` can be called with. The mock
   // for `generateText` ignores it.
   createOpenRouter: () => (modelSlug: string) => ({ modelId: modelSlug }),
 }));
@@ -61,8 +61,8 @@ describe("features/translationLLM", () => {
       });
     });
 
-    it("default rule is length-agnostic — same chain for short and long inputs", () => {
-      // Lengths are arbitrary — length-hybrid branching was retired, so any
+    it("default rule is length-agnostic, same chain for short and long inputs", () => {
+      // Lengths are arbitrary. Length-hybrid branching was retired, so any
       // short vs long pair must resolve to the same chain.
       const short = resolveTranslationStages("nl", 5);
       const long = resolveTranslationStages("nl", 200);
@@ -201,7 +201,7 @@ describe("features/translationLLM", () => {
     });
 
     it("does NOT emit redundant parens when native name matches the English name", () => {
-      // English variants share the script — `en_us` has name=English,
+      // English variants share the script. `en_us` has name=English,
       // nativeName=English. The prompt should say "English", not "English (English)".
       const p = buildPrompt({
         ...baseArgs,
@@ -270,8 +270,8 @@ describe("features/translationLLM", () => {
     it("preserves unmatched typographic quote pairs (strip only fires when first === last)", async () => {
       mockOpenRouterOk("„Hallo.“");
       const result = await translateTextWithLLM(callArgs);
-      // „…" uses different open/close glyphs, so stripWrappingQuotes — which
-      // only fires when first === last — leaves the content alone.
+      // „…" uses different open/close glyphs, so stripWrappingQuotes, which
+      // only fires when first === last. Leaves the content alone.
       expect(result.ok).toBe(true);
       if (result.ok) expect(result.text).toBe("„Hallo.“");
     });
@@ -325,8 +325,8 @@ describe("features/translationLLM", () => {
     });
 
     it("omits providerOptions.openrouter.reasoning when caller doesn't pass reasoning", async () => {
-      // translateTextWithLLM no longer applies a length-hybrid default —
-      // the translation rule decides reasoning upstream. When the caller
+      // translateTextWithLLM no longer applies a length-hybrid default.
+      // The translation rule decides reasoning upstream. When the caller
       // passes no `reasoning`, no providerOptions are sent.
       mockOpenRouterOk("Hallo.");
       await translateTextWithLLM(callArgs);
@@ -379,7 +379,7 @@ describe("features/translationLLM", () => {
 
     it("maps reasoning='none' to reasoning:{enabled:false} (NOT field omission)", async () => {
       // Luna reasons adaptively (and bills hidden tokens) unless thinking is
-      // explicitly disabled — 'none' must be sent as {enabled: false}.
+      // explicitly disabled, 'none' must be sent as {enabled: false}.
       mockOpenRouterOk("Hallo.");
       await translateTextWithLLM({ ...callArgs, reasoning: "none" });
       const callArg = vi.mocked(generateText).mock.calls[0][0];

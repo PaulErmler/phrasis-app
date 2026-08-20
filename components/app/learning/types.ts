@@ -40,7 +40,7 @@ export interface CardAudioRecording {
   /**
    * TTS validation state mirrored from the server. 'unknown' while a synthesis
    * attempt is in flight; 'validated' or 'unvalidated' once the loop finishes.
-   * Drives the retranslating-pill logic in the server query — clients
+   * Drives the retranslating-pill logic in the server query. Clients
    * generally don't need to read it directly.
    */
   ttsQuality: string | null;
@@ -66,7 +66,7 @@ export interface CourseSettings {
   pauseBaseToTarget?: number;
   pauseTargetToTarget?: number;
   pauseBeforeAutoAdvance?: number;
-  // Writing ("full") mode counterparts — undefined falls back to the
+  // Writing ("full") mode counterparts. Undefined falls back to the
   // unsuffixed audio-mode field (see courseSettingsFields in convex/schema.ts).
   highlightWordsFull?: boolean;
   autoPlayAudioFull?: boolean;
@@ -100,7 +100,7 @@ export interface CourseSettings {
   // "Only new": Practice Listening only on a card's initial N reviews.
   // 0 / undefined = always (∞); 1-10 = limit.
   targetBeforeOnlyNewReps?: number;
-  // Practice Listening duration strategy — 'onlyNew' (the rep window above),
+  // Practice Listening duration strategy. 'onlyNew' (the rep window above),
   // 'untilGood' (off after N FSRS good/easy ratings), or 'continuous' (never
   // off). Unset = legacy doc; inferred from targetBeforeOnlyNewReps.
   targetBeforeListeningStrategy?: 'onlyNew' | 'untilGood' | 'continuous';
@@ -153,8 +153,8 @@ export interface CourseSettings {
  *    across languages) and callers only persist it once `allSubmitted` is true,
  *    so a half-answered card contributes nothing.
  *  - `min*` drives the auto-rating. The weakest language should decide when the
- *    card comes back — a perfect Spanish answer must not mask a failed
- *    Japanese one — and it is available as soon as anything is submitted.
+ *    card comes back: a perfect Spanish answer must not mask a failed
+ *    Japanese one: and it is available as soon as anything is submitted.
  *
  * Both punctuation variants are always computed, independently of the learner's
  * `ignorePunctuation` setting, so stats can record both series in parallel.
@@ -172,7 +172,7 @@ export interface WritingAccuracySummary {
 
 /** The three accuracy figures sent to `reviewCard`, all 0-100. */
 export interface ReviewAccuracyPayload {
-  /** Scored under the learner's current setting — the historical series. */
+  /** Scored under the learner's current setting. The historical series. */
   primary: number;
   /** Always punctuation-counted. */
   strict: number;

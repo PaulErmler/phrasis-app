@@ -53,7 +53,7 @@ function renderControls(
   );
 }
 
-describe('LearningControls — window shortcuts', () => {
+describe('LearningControls: window shortcuts', () => {
   beforeEach(() => {
     // jsdom has no matchMedia; report "no fine pointer" so the key-hint
     // tooltips stay off and the DOM matches the touch layout.
@@ -289,7 +289,7 @@ describe('LearningControls — window shortcuts', () => {
   });
 
   describe('key auto-repeat guards', () => {
-    // Held keys fire keydown with `repeat: true` ~30×/s — every action
+    // Held keys fire keydown with `repeat: true` ~30×/s. Every action
     // shortcut must act exactly once per physical press, or a held `1`
     // rates several cards before the user lifts the finger.
     it('a held digit rates exactly once', () => {

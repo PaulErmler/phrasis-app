@@ -1,4 +1,4 @@
-# Store submission guide — Flexling (Capacitor shell)
+# Store submission guide: Flexling (Capacitor shell)
 
 The store apps are thin Capacitor shells around `https://flexling.com/app`
 (`capacitor.config.ts`). Web deploys reach the apps instantly; only changes to
@@ -23,8 +23,8 @@ App ID (both stores): **`com.flexling.app`**
 Set via `npx convex env set -- NAME "<value>"` (the `--` matters for the PEM
 key) or the Convex dashboard. The **client secret JWT is minted at runtime**
 from these (`appleClientSecret` in `convex/auth.ts`, per the Better Auth
-docs' async-provider pattern) — there is no static secret and nothing to
-rotate. Sign in with Apple is env-gated — nothing breaks before the vars are
+docs' async-provider pattern), so there is no static secret and nothing to
+rotate. Sign in with Apple is env-gated, so nothing breaks before the vars are
 set; the Apple button simply won't work until they are.
 
 ### 1.2 Apple Developer portal (needs your logged-in browser)
@@ -34,7 +34,7 @@ set; the Apple button simply won't work until they are.
 2. Create a **Services ID** (`com.flexling.app.signin`), enable Sign in with
    Apple, set domain `flexling.com` and return URL
    `https://flexling.com/api/auth/callback/apple` (add the staging domain +
-   its callback URL too for staging tests — Apple only redirects to
+   its callback URL too for staging tests. Apple only redirects to
    registered URLs, and localhost is not accepted).
 3. Keys → create a *Sign in with Apple* key, download the `.p8` file, note the
    Key ID and your Team ID → these become the env vars in 1.1.
@@ -53,7 +53,7 @@ web client:
 3. Build-time env vars for the Next.js app (Coolify/Vercel, must be present at
    build time):
    - `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` = the **existing web** client ID
-     (token audience — matches the backend's `GOOGLE_CLIENT_ID`)
+     (token audience, matches the backend's `GOOGLE_CLIENT_ID`)
    - `NEXT_PUBLIC_GOOGLE_IOS_CLIENT_ID` = the iOS client ID
 
 ---
@@ -66,7 +66,7 @@ updating plugins.
 ### 2.1 Android (`android/`)
 
 ```bash
-# one-time: create the upload keystore — BACK IT UP + note the passwords
+# one-time: create the upload keystore. BACK IT UP + note the passwords
 keytool -genkey -v -keystore ~/flexling-upload.keystore \
   -alias flexling -keyalg RSA -keysize 2048 -validity 10000
 # SHA-1 for the Google OAuth client:
@@ -81,7 +81,7 @@ Configure signing in `android/app/build.gradle` (signingConfigs.release with
 the keystore) or sign via Android Studio. Use **Play App Signing** when
 creating the app so a lost upload key is recoverable.
 
-### 2.2 iOS (`ios/`) — requires full Xcode
+### 2.2 iOS (`ios/`), requires full Xcode
 
 ```bash
 npx cap open ios
@@ -117,11 +117,11 @@ In Xcode, one-time:
    - Collected: **Personal info → email address** (account), **App activity →
      in-app actions** (first-party PostHog analytics via `/ph-relay`),
      **Audio → voice recordings** (processed for transcription, not stored
-     long-term — verify current retention before answering).
+     long-term; verify current retention before answering).
    - All data encrypted in transit: yes. Deletion mechanism: yes (in-app
      account deletion in Settings).
    - Data shared with third parties: no (analytics is first-party proxied;
-     payment data never touches the app — there is no in-app purchase).
+     payment data never touches the app, since there is no in-app purchase).
    - No ads.
 4. Content rating questionnaire → Education; no user-generated public content
    (chat is private 1:1 with AI).
@@ -135,17 +135,17 @@ In Xcode, one-time:
 ## 4. App Store Connect
 
 1. Create app (bundle `com.flexling.app`, name/subtitle from listing-copy.md).
-2. Upload build via Xcode; add screenshots (`store-assets/ios/`, 6.9″ set —
+2. Upload build via Xcode; add screenshots (`store-assets/ios/`, 6.9″ set,
    also accepted for smaller sizes) and the 1024 icon is taken from the build.
 3. **App Privacy** labels (match the Play data-safety answers): Email address
    (account), Product interaction (analytics, *not* linked to identity if you
-   configure PostHog person-profiles accordingly — answer per current setup),
+   configure PostHog person-profiles accordingly; answer per current setup),
    Audio data (app functionality). No tracking → **no ATT prompt needed**.
 4. Age rating 4+. Export compliance: standard HTTPS encryption exemption
    (answer "yes, uses encryption; exempt").
-5. **App Review notes** — include:
+5. **App Review notes.** Include:
    - Demo account email/password (create a seeded account with an active
-     course, some review history, and chat threads — reviewers must reach the
+     course, some review history, and chat threads. Reviewers must reach the
      full experience without paying; the paywall is not present in the app).
    - "The app is free to use. There are no in-app purchases; optional
      subscriptions exist only on our website and are not offered, linked, or
@@ -159,7 +159,7 @@ In Xcode, one-time:
 
 | Rejection | Response |
 |---|---|
-| 4.2 minimum functionality | Point to background-audio lessons (screen off), native auth, offline page; resubmit with a video of audio mode with the screen locked. Appeal if needed — web-shell apps frequently pass on second attempt. |
+| 4.2 minimum functionality | Point to background-audio lessons (screen off), native auth, offline page; resubmit with a video of audio mode with the screen locked. Appeal if needed, web-shell apps frequently pass on second attempt. |
 | 2.1 can't sign in | Verify the demo account works; include a fresh one. |
 | 3.1.1 payments | Confirm no purchase mention is reachable; the `?native=1` override lets you audit exactly what reviewers see. |
 | 2.3.7 marketing screenshots | Drop `05-testimonials.png` from the iOS set. |
@@ -169,12 +169,12 @@ In Xcode, one-time:
 ## 5. Known follow-ups (post-launch)
 
 - **US storefront link-out** ("subscribe on flexling.com") as a follow-up
-  update once both apps are approved — decided at planning time.
-- **Push notifications** (streak reminders) — needs FCM/APNs infra +
+  update once both apps are approved, decided at planning time.
+- **Push notifications** (streak reminders). Needs FCM/APNs infra +
   `@capacitor/push-notifications`; also strengthens the 4.2 story.
 - **Account deletion currently removes the auth account + profile mirror**
   (Better Auth `deleteUser` + `onDelete` trigger). App data (decks, reviews,
-  chats) is not yet purged — add a cascade/scheduled purge for full GDPR
+  chats) is not yet purged. Add a cascade/scheduled purge for full GDPR
   erasure.
 - Regenerate screenshots after UI changes: `pnpm dev` + `pnpm store:assets`
   (writes to `store-assets/`; mock screens live at `/screenshots/[screen]`,

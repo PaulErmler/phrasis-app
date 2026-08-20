@@ -48,8 +48,8 @@ export function findCurrentIntervalGroup(
  * annual subscriber is offered Ultra Annual rather than monthly Ultra just
  * because €32 sorts below €288.
  *
- * Falls back to the full list when nothing in that interval qualifies —
- * a cross-interval upgrade beats telling the user to contact support. With no
+ * Falls back to the full list when nothing in that interval qualifies.
+ * A cross-interval upgrade beats telling the user to contact support. With no
  * paid plan there is no interval to honour, and the caller's price ordering
  * then picks the monthly plan, which is the smaller first commitment.
  */
@@ -70,10 +70,10 @@ export function preferIntervalGroup<
  *
  * Callers pass products in Autumn's dashboard order, which is not price-sorted. With
  * three paid tiers that would point a Basic user who ran out of credits at Ultra when
- * Pro would have done, so candidates are sorted by price before picking — after being
+ * Pro would have done, so candidates are sorted by price before picking, after being
  * narrowed to the customer's own billing interval (`preferredIntervalGroup`).
  *
- * Eligible rows: paid plans (`!is_free` — you never "upgrade" to Free, whatever
+ * Eligible rows: paid plans (`!is_free`, you never "upgrade" to Free, whatever
  * scenario Autumn reports) with scenario `"upgrade"` or `"new"`.
  * Boolean features (`consumable === undefined`): any product that includes the feature item.
  */

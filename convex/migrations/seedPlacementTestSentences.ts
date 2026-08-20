@@ -20,7 +20,7 @@ import type { Id } from '../_generated/dataModel';
  * lazily by `prepareLanguagePair` in `convex/features/onboarding.ts` when a
  * user picks that language at the start of onboarding.
  *
- * Idempotent: re-running upserts by (level, position) — already-seeded rows
+ * Idempotent: re-running upserts by (level, position), already-seeded rows
  * are left in place.
  *
  * Run with:
@@ -49,7 +49,7 @@ export const seedPlacementCorpus = internalMutation({
         ogteId: v.string(),
         rarestWord: v.string(),
         wordCount: v.number(),
-        // Optional metadata carried in the JSON corpus for traceability —
+        // Optional metadata carried in the JSON corpus for traceability,
         // not stored on the seeded rows.
         register: v.optional(v.union(v.string(), v.null())),
         formality: v.optional(v.union(v.string(), v.null())),
@@ -147,7 +147,7 @@ export const seedPlacementCorpus = internalMutation({
  * Public entry point. Reads the English corpus and seeds the placement-test
  * rows + pool collection.
  *
- * Translation backfill is **not** triggered here — translations land lazily
+ * Translation backfill is **not** triggered here. Translations land lazily
  * per target language via `prepareLanguagePair`. Pass `languages: [...]`
  * explicitly to pre-warm specific languages at deploy time.
  */

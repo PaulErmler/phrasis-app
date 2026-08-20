@@ -98,7 +98,7 @@ export default async function RootLayout({
         {/*
           PostHog sits outermost so `usePostHog()` resolves everywhere below,
           including inside the Convex and intl providers. It writes nothing to
-          the device until the banner is answered — see lib/posthog/client.ts.
+          the device until the banner is answered. See lib/posthog/client.ts.
         */}
         <PostHogProvider>
           <ServiceWorkerRegistration />
@@ -109,7 +109,7 @@ export default async function RootLayout({
                 {children}
               </AutumnWrapper>
               <Toaster position="top-center" />
-              {/* Inside NextIntlClientProvider — the banner is translated. */}
+              {/* Inside NextIntlClientProvider. The banner is translated. */}
               <ConsentBanner />
             </Providers>
           </ConvexClientProvider>

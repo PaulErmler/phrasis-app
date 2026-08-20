@@ -159,7 +159,7 @@ export function AlsoCorrectApproval({
     );
   }
 
-  // Unchanged entries render muted, the changed (also-correct) entries bold —
+  // Unchanged entries render muted, the changed (also-correct) entries bold.
   // EntryLines' base/target slots are purely presentational.
   const unchangedEntries = entries.filter(
     (e) => !changedLanguages.has(e.language),
@@ -212,8 +212,8 @@ export function AlsoCorrectApproval({
               {t('dismissButton')}
             </Button>
             {/* Dismiss stays left; the accepting actions sit right. Each
-                carries the badge for the quota IT spends — Replace bills
-                card_edits, Add bills custom_sentences — so the number next to
+                carries the badge for the quota IT spends. Replace bills
+                card_edits, Add bills custom_sentences, so the number next to
                 a button always describes that button. */}
             <div className="ml-auto flex flex-wrap items-center gap-2">
               <FeatureBadge featureId="card_edits" />

@@ -53,12 +53,12 @@ function makeCheckoutResult(overrides: {
   } as unknown as CheckoutResult;
 }
 
-describe('getCheckoutContent — trialing user', () => {
+describe('getCheckoutContent: trialing user', () => {
   // Regression: a trialing user selecting the Free plan used to fall
   // through to the generic downgrade/cancel copy (and, in the dialog, to a
   // raw attach that the server trial gate rejects). Free during a trial is
   // scheduled at trial end; Autumn classifies the free/default target as
-  // "downgrade" or "cancel" depending on version — both must map to the
+  // "downgrade" or "cancel" depending on version, both must map to the
   // dedicated copy.
   it.each(['downgrade', 'cancel'])(
     'free target with scenario "%s" gets the trialFreeScheduled copy',
@@ -97,7 +97,7 @@ describe('getCheckoutContent — trialing user', () => {
   );
 
   // Renewing (re-attaching the trialing plan to un-schedule a pending
-  // switch) deliberately keeps the generic renew copy — it is accurate:
+  // switch) deliberately keeps the generic renew copy. It is accurate:
   // nothing is charged and no fresh trial starts. The dialog still routes
   // the confirm through switchPlanDuringTrial (see isTrialSwitch).
   it('paid "renew" keeps the generic renew copy', () => {
@@ -120,7 +120,7 @@ describe('getCheckoutContent — trialing user', () => {
   });
 });
 
-describe('getCheckoutContent — period-end-anchored dates', () => {
+describe('getCheckoutContent: period-end-anchored dates', () => {
   // Regression: Autumn's v1.2 checkout preview returns next_cycle.starts_at
   // one year early for annual plans (the current period START). The copy
   // for scenarios that take effect at period end must prefer the
@@ -188,7 +188,7 @@ describe('getCheckoutContent — period-end-anchored dates', () => {
   });
 });
 
-describe('getCheckoutContent — not trialing', () => {
+describe('getCheckoutContent: not trialing', () => {
   it('free downgrade gets the generic downgrade copy, not trial copy', () => {
     const content = getCheckoutContent(
       makeCheckoutResult({ scenario: 'downgrade', is_free: true }),

@@ -10,11 +10,11 @@ const modules = import.meta.glob("/convex/**/*.ts");
  * Tests for the trial-switching and overdue-cancel actions. Originally
  * characterization tests pinned before the shared-normalizer refactor; the
  * cancelOverdueSubscription cases were later updated ON PURPOSE for the
- * recovered/cancelled contract (cancel-after-pay guard) — see that describe.
+ * recovered/cancelled contract (cancel-after-pay guard), see that describe.
  *
  * These actions had no tests at all despite carrying the most carefully
  * verified logic in the billing code. Autumn is reached over raw `fetch`, so
- * the network is stubbed and assertions are made on the requests issued —
+ * the network is stubbed and assertions are made on the requests issued,
  * which is exactly what a shape regression would corrupt.
  *
  * Payloads use the v1.2 `products[]` shape, which is what the code requests.
@@ -129,8 +129,8 @@ const asUser = (t: TestConvex<typeof schema>) =>
 const callsTo = (path: string) => calls.filter((c) => c.url.includes(path));
 
 /**
- * The follow-on quota sync always enters through get-or-create — POST
- * /customers with NO trailing slash — so this is the proof the sync ran.
+ * The follow-on quota sync always enters through get-or-create. POST
+ * /customers with NO trailing slash, so this is the proof the sync ran.
  */
 const syncPosts = () =>
   calls.filter((c) => c.method === "POST" && c.url.endsWith("/v1/customers"));
@@ -190,7 +190,7 @@ describe("switchPlanDuringTrial", () => {
     // Cancelling a trial can leave the plan in the payload with status
     // 'expired' while its trial_ends_at is still in the future. Treating
     // that as trialing would drive a switch off a trial that no longer
-    // exists — the currentPlans filter must exclude it.
+    // exists. The currentPlans filter must exclude it.
     stubAutumn({
       "/customers/": {
         products: [freeProduct, trialingProduct({ status: "expired" })],
@@ -240,7 +240,7 @@ describe("switchPlanDuringTrial", () => {
     expect(res.mode).toBe("scheduled");
     const attach = callsTo("/attach")[0];
     expect(attach.body).toEqual({ customer_id: USER, product_id: "basic" });
-    // No customize.free_trial — that would re-anchor the running trial.
+    // No customize.free_trial. That would re-anchor the running trial.
     expect(attach.body.customize).toBeUndefined();
     expect(attach.version).toBe("1.2");
   });
@@ -291,7 +291,7 @@ describe("switchPlanDuringTrial", () => {
       productId: "free",
     });
     expect(res.mode).toBe("scheduled");
-    // Free must never reach billing.attach — its free_trial would be meaningless.
+    // Free must never reach billing.attach. Its free_trial would be meaningless.
     expect(callsTo("/billing.attach")).toHaveLength(0);
   });
 
@@ -313,7 +313,7 @@ describe("switchPlanDuringTrial", () => {
     });
     const t = convexTest(schema, modules);
     // Same product id as the running trial: the "already trialing" guard must
-    // step aside for Autumn's "renew" classification — this is the only way
+    // step aside for Autumn's "renew" classification. This is the only way
     // back from a scheduled downgrade, and blocking it would strand the user
     // on a switch they changed their mind about.
     const res = await asUser(t).action(api.billing.switchPlanDuringTrial, {
@@ -344,7 +344,7 @@ describe("switchPlanDuringTrial", () => {
     const attach = callsTo("/billing.attach")[0];
     expect(attach.version).toBe("2.1.0");
     expect(attach.body.plan_id).toBe("pro");
-    // "new" must still carry the REMAINING trial — without it the customer
+    // "new" must still carry the REMAINING trial, without it the customer
     // would be billed immediately for a plan they were promised to try free.
     expect(attach.body.customize.free_trial.duration_length).toBe(5);
   });
@@ -360,7 +360,7 @@ describe("switchPlanDuringTrial", () => {
       productId: "pro",
     });
     // Swallowing this would leave the switch half-done with no way for the
-    // user to complete payment — the client must be able to redirect.
+    // user to complete payment. The client must be able to redirect.
     expect(res.paymentUrl).toBe("https://checkout.stripe.com/c/pay_123");
   });
 });
@@ -471,7 +471,7 @@ describe("cancelOverdueSubscription", () => {
     });
     const t = convexTest(schema, modules);
     // Ambiguous payload: without the invoices array we cannot prove the debt
-    // is settled, so we fail toward the user's explicit request — refusing
+    // is settled, so we fail toward the user's explicit request, refusing
     // would leave a genuinely delinquent customer stuck behind the block.
     const res = await asUser(t).action(api.billing.cancelOverdueSubscription, {});
 

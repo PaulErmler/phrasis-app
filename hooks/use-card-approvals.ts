@@ -23,19 +23,19 @@ export type ApprovalData = {
   resolution?: CardApprovalResolution;
   changedLanguages?: string[];
   proposedMetadata?: ProposedCardMetadata;
-  /** Card was missing a course language when proposed — replace is allowed,
+  /** Card was missing a course language when proposed. Replace is allowed,
    * add-as-new-card is not (it would produce a card with a blank line). */
   replaceOnly?: boolean;
 };
 
 /**
  * How an approval action ended, for the caller's optimistic UI:
- *   'success'       — the mutation committed; keep the optimistic state.
- *   'usage_limit'   — quota exhausted (USAGE_LIMIT); roll back and paywall.
- *   'card_replaced' — the card this proposal targets no longer exists (it was
+ *   'success': the mutation committed; keep the optimistic state.
+ *   'usage_limit': quota exhausted (USAGE_LIMIT); roll back and paywall.
+ *   'card_replaced': the card this proposal targets no longer exists (it was
  *                     replaced from another thread or device); roll back and
  *                     say so, rather than leaving an inert button.
- *   'error'         — anything else, incl. payment-past-due (whose canonical
+ *   'error': anything else, incl. payment-past-due (whose canonical
  *                     surface is the reactive overdue dialog); roll back.
  */
 export type ApprovalActionResult =
@@ -119,8 +119,8 @@ export function useCardApprovals(
     return byToolCallId;
   }, [threadApprovals, isTransitioning]);
 
-  // One processing-set + error-taxonomy wrapper for every approval action —
-  // the taxonomy was previously copy-pasted per handler and had already
+  // One processing-set + error-taxonomy wrapper for every approval action.
+  // The taxonomy was previously copy-pasted per handler and had already
   // drifted (reject silently lacked it). The result value is the caller's
   // contract for rolling back optimistic UI (see ApprovalActionResult).
   const runApprovalAction = useCallback(
@@ -180,7 +180,7 @@ export function useCardApprovals(
     [runApprovalAction, rejectCard],
   );
 
-  // Surfaces the replacement card id (see ApprovalReplaceOutcome) — the only
+  // Surfaces the replacement card id (see ApprovalReplaceOutcome), the only
   // action whose caller needs to know which card the edit left behind.
   const handleReplace = useCallback(
     async (approvalId: Id<'cardApprovals'>) => {

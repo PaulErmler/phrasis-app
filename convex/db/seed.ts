@@ -19,7 +19,7 @@ export async function adjustCollectionTextCount(
 }
 
 /**
- * Upsert a collection into the database (internal — for seeding only).
+ * Upsert a collection into the database (internal, for seeding only).
  */
 export const upsertCollection = internalMutation({
   args: {
@@ -46,7 +46,7 @@ export const upsertCollection = internalMutation({
 });
 
 /**
- * Batch upsert texts into the database (internal — for seeding only).
+ * Batch upsert texts into the database (internal, for seeding only).
  * Processes up to 500 texts at once.
  */
 export const batchUpsertTexts = internalMutation({

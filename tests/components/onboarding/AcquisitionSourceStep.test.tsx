@@ -11,7 +11,7 @@ import { AcquisitionSourceStep } from '@/app/app/onboarding/steps/AcquisitionSou
 const COUNTER_TESTID = 'acquisition-other-char-count';
 const INPUT_TESTID = 'acquisition-other-input';
 
-describe('AcquisitionSourceStep — free-text char limit', () => {
+describe('AcquisitionSourceStep: free-text char limit', () => {
   it('does not render the counter when the free-text input is short', () => {
     render(
       <AcquisitionSourceStep

@@ -6,7 +6,7 @@ import { renderHook, act } from '@testing-library/react';
  * replaced the onboarding tutorial lesson):
  *  - fresh user → the current mode's intro walkthrough fires on the first
  *    card and persists PER CONCEPT on dismissal;
- *  - switching modes replays nothing — only the new mode's own concepts;
+ *  - switching modes replays nothing, only the new mode's own concepts;
  *  - milestone tips fire one at a time at their lifetime-review thresholds;
  *  - veteran users (count far past every threshold) get everything
  *    silently marked instead of shown.
@@ -60,7 +60,7 @@ vi.mock('convex/react', async () => {
     );
     if (name.includes('getLifetimeReviewCount')) return queryState.lifetimeReps;
     if (name.includes('getCompletedTutorials')) return queryState.dbCompleted;
-    // Auth user — must resolve (isLoaded gates on it) so completions bind
+    // Auth user. Must resolve (isLoaded gates on it) so completions bind
     // to the per-user localStorage key, never the device-level fallback.
     return { userId: 'user_test', _id: 'user_test' };
   };
@@ -92,7 +92,7 @@ vi.mock('@/lib/posthog/events', async () => {
 
 import { TUTORIAL_IDS } from '@/convex/features/tutorialIds';
 
-// Per-user key — completion state is per USER (the mocked auth user above),
+// Per-user key. Completion state is per USER (the mocked auth user above),
 // not per device; the bare un-suffixed key must stay untouched.
 const STORAGE_KEY = 'phrasis_completed_tutorials_user_test';
 const DEVICE_LEVEL_KEY = 'phrasis_completed_tutorials';
@@ -114,7 +114,7 @@ const FULL_ONLY_IDS = [
   TUTORIAL_IDS.TIP_CONCEPT_RATING_FULL,
 ];
 
-// Fresh module per test — the completed-tutorials snapshot is module-level
+// Fresh module per test. The completed-tutorials snapshot is module-level
 // and reads localStorage at import time, so tests must seed localStorage
 // (preMark) BEFORE calling loadHook().
 let useMilestoneTips: typeof import('@/lib/tutorials/use-milestone-tips')['useMilestoneTips'];
@@ -139,7 +139,7 @@ function renderTips(props: {
   );
 }
 
-/** Advance past the intro delay (600ms) and the settle-wait timeout (2s —
+/** Advance past the intro delay (600ms) and the settle-wait timeout (2s,
  *  with no anchor mounted, jsdom reports no size and the wait falls back to
  *  its timeout). */
 async function firePendingTip() {
@@ -167,7 +167,7 @@ const STUB_RECT = {
  * settle on a real element and always falls through to its timeout. That is
  * fine for the intro (its welcome step is unanchored anyway), but a MILESTONE
  * whose anchor never appears now defers instead of mounting an unanchored
- * popover about a control the user cannot see — so any test expecting a
+ * popover about a control the user cannot see, so any test expecting a
  * milestone to fire has to provide its anchor.
  */
 function mountAnchor(attr: string, value: string): HTMLElement {
@@ -233,7 +233,7 @@ describe('useMilestoneTips', () => {
     await firePendingTip();
 
     expect(lastConfig).not.toBeNull();
-    // "Switched to Writing" welcome + input + full-mode rating ONLY —
+    // "Switched to Writing" welcome + input + full-mode rating ONLY.
     // card/autoAdd were taught in audio mode and must not repeat.
     expect(lastConfig!.steps).toHaveLength(1 + FULL_ONLY_IDS.length);
 
@@ -252,7 +252,7 @@ describe('useMilestoneTips', () => {
 
     expect(lastConfig).not.toBeNull();
     // welcome + full concepts minus shown-translation (doesn't exist in
-    // Transcribe — the shown target would BE the answer).
+    // Transcribe, the shown target would BE the answer).
     expect(lastConfig!.steps).toHaveLength(1 + FULL_ONLY_IDS.length + 2 - 1);
 
     await act(async () => {
@@ -305,7 +305,7 @@ describe('useMilestoneTips', () => {
       lastDriver!.closeFromUi();
     });
     lastConfig = null;
-    // The review count has NOT advanced — no card transition happened.
+    // The review count has NOT advanced, no card transition happened.
     await firePendingTip();
 
     expect(lastConfig, 'second tip fired on the same card').toBeNull();
@@ -337,7 +337,7 @@ describe('useMilestoneTips', () => {
   it('defers a milestone whose anchor never renders instead of burning it', async () => {
     // Regression: the word-tap anchor only exists in the card state that
     // renders clickable words. Without an anchor the settle wait used to hit
-    // its timeout and mount the popover unanchored — pointing at nothing,
+    // its timeout and mount the popover unanchored, pointing at nothing,
     // and marked completed on dismissal, so the tip was lost for good.
     preMark([
       ...AUDIO_INTRO_IDS,
@@ -371,10 +371,10 @@ describe('useMilestoneTips', () => {
     // Regression (2026-08-18): the count was read with `useQuery`, which
     // THROWS a server error into render. `getLifetimeReviewCount` is three
     // indexed reads, but the 1s query budget is wall-clock, so a saturated
-    // backend times it out — and the throw unwound past LearnView's
+    // backend times it out, and the throw unwound past LearnView's
     // ViewErrorBoundary to app/error.tsx, blanking the whole app shell.
     // Now the error arrives as a value; with the user's progress unknown we
-    // teach nothing, and — critically — must not leave `introPending` true,
+    // teach nothing, and critically must not leave `introPending` true,
     // which would gate card autoplay for the rest of the session waiting on
     // an intro that can never start.
     queryState.lifetimeReps = new Error('Function execution timed out');
@@ -410,7 +410,7 @@ describe('useMilestoneTips', () => {
 
   it('still fires under React StrictMode double-mount (dev), and audio gates release', async () => {
     // Regression: StrictMode's simulated unmount ran the unmount cleanup on
-    // the same component instance, latching `unmountedRef` true forever —
+    // the same component instance, latching `unmountedRef` true forever,
     // no tip ever mounted, while `isActive` stayed stuck true, which froze
     // audio autoplay/auto-advance ("no tutorials + auto-advance broken").
     const { StrictMode } = await import('react');

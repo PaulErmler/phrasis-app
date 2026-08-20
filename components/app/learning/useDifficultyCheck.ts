@@ -15,7 +15,7 @@ import { VETERAN_SUPPRESS_REPS } from '@/lib/tutorials/use-milestone-tips';
  *
  * Show-once state rides the shared `completedTutorials` mechanism
  * (per-user: Convex `userSettings` + per-user localStorage cache), and the
- * same veteran rule as the milestone tips applies — a user whose lifetime
+ * same veteran rule as the milestone tips applies. A user whose lifetime
  * review count is already far past the beginner window has long since
  * settled on a difficulty, so the check is silently retired instead of
  * shown.
@@ -30,7 +30,7 @@ import { VETERAN_SUPPRESS_REPS } from '@/lib/tutorials/use-milestone-tips';
  * skipped entirely instead of opening a dialog whose only possible outcome is
  * "Keep". Resolving it up front also means the dialog never renders a
  * placeholder level before snapping to the real one. Not marked completed in
- * that case — a user who later moves onto a level collection still gets asked.
+ * that case. A user who later moves onto a level collection still gets asked.
  */
 export function useDifficultyCheck() {
   const { completed, markCompleted, isLoaded } = useCompletedTutorials([
@@ -40,7 +40,7 @@ export function useDifficultyCheck() {
 
   // `useQueries`, not `useQuery`: a `useQuery` server error is THROWN into
   // render, and from here it unwound past LearnView's ViewErrorBoundary to
-  // app/error.tsx — blanking the whole app shell over a check that only
+  // app/error.tsx, blanking the whole app shell over a check that only
   // decides whether to show a one-time dialog. Both reads are tiny (three
   // indexed documents between them), but the 1s query budget is wall-clock,
   // so a saturated backend times them out anyway; that limit is the same in
@@ -49,7 +49,7 @@ export function useDifficultyCheck() {
   // known yet" and the live subscription recovers on its own.
   //
   // Memoised because `useQueriesHelper` keys its subscription on the
-  // descriptor's identity — a fresh literal each render resubscribes both
+  // descriptor's identity. A fresh literal each render resubscribes both
   // queries every render.
   const queries = useMemo(() => {
     const q: RequestForQueries = {};
@@ -67,9 +67,9 @@ export function useDifficultyCheck() {
   }, [done]);
   const results = useQueries(queries);
   // Both queries return `number | null`, so `typeof === 'number'` collapses
-  // all three not-an-answer cases — still loading (`undefined`), genuinely
+  // all three not-an-answer cases, still loading (`undefined`), genuinely
   // absent (`null`: no course, or a collection with no OGTE level), and
-  // failed (`Error`) — onto the same `null`. Every one of them means "don't
+  // failed (`Error`), onto the same `null`. Every one of them means "don't
   // hold auto-add and don't open the dialog", and an Error must NOT count as
   // a veteran read either, or a timeout would silently retire the check.
   const lifetimeReps =
@@ -89,7 +89,7 @@ export function useDifficultyCheck() {
   }, [markCompleted]);
 
   return {
-    /** Hold auto-add while true — the check still has to happen. Stays
+    /** Hold auto-add while true. The check still has to happen. Stays
      *  false until the per-user completion state has actually loaded, so a
      *  fresh device never blocks adds it shouldn't. */
     pending:
@@ -100,7 +100,7 @@ export function useDifficultyCheck() {
       currentLevel != null,
     /** The course's OGTE level, non-null whenever `pending` is true. */
     currentLevel: currentLevel ?? null,
-    /** Mark the check done (keep or switch — either way it never re-asks). */
+    /** Mark the check done (keep or switch, either way it never re-asks). */
     complete,
   };
 }

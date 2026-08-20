@@ -15,7 +15,7 @@ export default function GlobalError({
     // This boundary replaces the root layout, so it is the only place a crash
     // in the layout itself (providers, fonts, intl) can be observed at all.
     // Called directly rather than via `reportError`, which pulls in more of the
-    // app than is safe to trust at this point — and guarded, because a throw
+    // app than is safe to trust at this point, and guarded, because a throw
     // here would crash the crash page itself.
     try {
       posthog.captureException(error, { boundary: 'global-error', digest: error.digest });

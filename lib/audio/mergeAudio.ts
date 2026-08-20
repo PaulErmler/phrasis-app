@@ -47,14 +47,14 @@ export interface ResolvedAudioSettings {
   pauseT2B: number;
   // "Only new" limit: play the before-base target group only on a card's initial
   // N reviews. `Infinity` (the default) = always. Applied per-card via
-  // `applyOnlyNewListening` before the merge — `mergeCardAudio` itself ignores it.
+  // `applyOnlyNewListening` before the merge. `mergeCardAudio` itself ignores it.
   beforeOnlyNewReps: number;
   // Which per-card condition graduates the card out of Practice Listening:
   // 'onlyNew' compares the review count against `beforeOnlyNewReps`,
   // 'untilGood' compares the card's FSRS good/easy count against
   // `beforeUntilGoodReps`, 'continuous' never graduates (Listening plays on
   // every review). Applied via `applyOnlyNewListening`. Docs without a stored
-  // strategy resolve via legacy inference — see `resolveAudioSettings`.
+  // strategy resolve via legacy inference. See `resolveAudioSettings`.
   listeningStrategy: 'onlyNew' | 'untilGood' | 'continuous';
   beforeUntilGoodReps: number;
 }
@@ -86,7 +86,7 @@ export function resolveAudioSettings(
   mode: 'audio' | 'full' | 'transcribe' = 'audio',
 ): ResolvedAudioSettings {
   // Each mode has its own copy of the playback settings, resolved along the
-  // chain `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*` — undefined means
+  // chain `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*`. Undefined means
   // "same as the previous mode in the chain", so unmigrated/untweaked docs
   // behave identically (see docs/migrations/per-mode-settings-backfill.md).
   // Transcribe only copies the settings it uses; the rest resolves like full.
@@ -160,7 +160,7 @@ export function resolveAudioSettings(
     // Legacy inference: docs from before the strategy field encode
     // "continuously" as onlyNewReps 0/undefined (the old ∞ position). A
     // stored strategy always wins; without one, a positive rep window means
-    // 'onlyNew' and anything else means 'continuous' — behavior-identical to
+    // 'onlyNew' and anything else means 'continuous'. Behavior-identical to
     // the pre-strategy resolution, so old docs never change behavior.
     listeningStrategy:
       cs?.targetBeforeListeningStrategy ??
@@ -186,7 +186,7 @@ export function resolveAudioSettings(
  * to decide whether the card is still "new".
  *
  * "Only new" only makes sense when there's a Practice Speaking flow to graduate
- * into, so it no-ops (treated as `Infinity` — Practice Listening always plays)
+ * into, so it no-ops (treated as `Infinity`, Practice Listening always plays)
  * when Practice Speaking is off, when Practice Listening is off, or when the
  * limit is `Infinity` (the default). On graduation it disables `playTargetBefore`;
  * `playTargetAfter` is already on, so the card switches to Practice Speaking.
@@ -196,18 +196,18 @@ export function applyOnlyNewListening(
   opts: {
     reviewCount: number;
     radioReviewCount?: number;
-    /** The card's FSRS good/easy count — consulted by the 'untilGood' strategy. */
+    /** The card's FSRS good/easy count, consulted by the 'untilGood' strategy. */
     goodReviewCount?: number;
   },
 ): ResolvedAudioSettings {
   if (!settings.playTargetBefore || !settings.playTargetAfter) {
     return settings;
   }
-  // 'continuous': Listening never graduates — every card, every review.
+  // 'continuous': Listening never graduates. Every card, every review.
   if (settings.listeningStrategy === 'continuous') return settings;
   if (settings.listeningStrategy === 'untilGood') {
-    // Radio never rates cards, so radio plays can't graduate a card here —
-    // deliberate: without ratings there's no "rated good" signal.
+    // Radio never rates cards, so radio plays can't graduate a card here.
+    // Deliberate: without ratings there's no "rated good" signal.
     if ((opts.goodReviewCount ?? 0) < settings.beforeUntilGoodReps) {
       return settings;
     }
@@ -246,14 +246,14 @@ export interface LanguageCue {
    * set to 0. It marks the point on the timeline where the clip *would* have
    * started, so auto-reveal still un-blurs the text on schedule, but there is no
    * audio behind it and it occupies no time. Consumers that resolve a *clip
-   * position* (word highlighting, progress ticks, seek targets) must skip it —
-   * call `audibleCues` rather than testing the flag by hand; the reveal path
+   * position* (word highlighting, progress ticks, seek targets) must skip it.
+   * Call `audibleCues` rather than testing the flag by hand; the reveal path
    * must not skip it.
    */
   silent?: boolean;
 }
 
-/** A cue with real audio behind it — see `audibleCues`. */
+/** A cue with real audio behind it. See `audibleCues`. */
 export type AudibleCue = LanguageCue & { silent?: false };
 
 /**
@@ -264,7 +264,7 @@ export type AudibleCue = LanguageCue & { silent?: false };
  * marks where a zero-repetition language would have played, so resolving a
  * position against it latches onto a language that made no sound. Centralised so
  * a new consumer inherits the rule instead of having to remember it. The reveal
- * path deliberately does not use this — silent cues exist to un-blur text.
+ * path deliberately does not use this. Silent cues exist to un-blur text.
  */
 export function audibleCues(
   cues: ReadonlyArray<LanguageCue>,
@@ -361,7 +361,7 @@ export async function mergeCardAudio(
     }
 
     // Languages that play after base. A before-base cue for one of these does
-    // NOT reveal the blurred text — only the later, after-base play does. Silent
+    // NOT reveal the blurred text, only the later, after-base play does. Silent
     // after-base entries count: when the user zeroes the after-base reps the
     // reveal still belongs at the after-base slot, preserving the
     // listen-then-guess-then-see flow of "Practice Listening".
@@ -394,7 +394,7 @@ export async function mergeCardAudio(
     // --- 2b. Time-stretch per (url, speed) combination ---
     // Each (clip URL, effective speed) pair is stretched once and cached by
     // timeStretchBuffer, so identical combos across reps or cards are reused.
-    // `speed === 1` returns the original buffer — zero overhead in the common case.
+    // `speed === 1` returns the original buffer. Zero overhead in the common case.
     type StretchKey = string;
     const stretchKey = (url: string, speed: number): StretchKey =>
       `${url}|${speed.toFixed(3)}`;
@@ -439,7 +439,7 @@ export async function mergeCardAudio(
           // One cue at the moment the first repetition would have begun, so the
           // text un-blurs on schedule, then straight on to the next language. No
           // clip, no rep pauses (0 repetitions have no gaps between them), and
-          // deliberately no `speedByLanguage` entry — nothing was stretched for
+          // deliberately no `speedByLanguage` entry, nothing was stretched for
           // this language, and a phantom one would shadow the real per-cue speed
           // of a language that also plays in the other group.
           languageCues.push({ language: entry.language, startSec: cursor, speed: entry.speed, reveals, silent: true });
@@ -447,7 +447,7 @@ export async function mergeCardAudio(
           const originalBuffer = decoded.get(entry.url);
           const buffer = stretched.get(stretchKey(entry.url, entry.speed));
           if (!buffer || !originalBuffer) continue;
-          // Gain is computed from the original buffer — time-stretching preserves
+          // Gain is computed from the original buffer. Time-stretching preserves
           // amplitude envelope but we key the peak cache on the source URL anyway.
           const peak = computePeakFromBuffer(originalBuffer, entry.url);
           const gain = computeGain(peak);
@@ -471,8 +471,8 @@ export async function mergeCardAudio(
 
     // Base is part of the composition whenever base languages are ordered, even
     // if none of them plays (reps zeroed, or no playable recordings): the group
-    // keeps its place in the sequence so the pauses around it — which the user
-    // still sees in settings — play as silence instead of vanishing. orderedBase
+    // keeps its place in the sequence so the pauses around it, which the user
+    // still sees in settings. Play as silence instead of vanishing. orderedBase
     // is empty only when base is deliberately excluded (e.g. transcribe mode);
     // there, no phantom pauses are added.
     const baseInComposition = orderedBase.length > 0;
@@ -482,7 +482,7 @@ export async function mergeCardAudio(
     // works identically whether or not "Practice Speaking" (after) is enabled.
     if (beforeTargetEntries.length > 0) {
       // Before-base target reveals its text only when it isn't replayed after
-      // base — when both groups are on, the after-base play owns the reveal.
+      // base, when both groups are on, the after-base play owns the reveal.
       scheduleGroup(
         beforeTargetEntries,
         settings.pauseT2T,
@@ -492,7 +492,7 @@ export async function mergeCardAudio(
       if (baseInComposition) {
         cursor += settings.pauseT2B;
       } else if (afterTargetEntries.length > 0) {
-        // No base in the composition between the two target groups — separate
+        // No base in the composition between the two target groups. Separate
         // them with the target↔target pause so the before/after plays don't
         // butt together with zero silence.
         cursor += settings.pauseT2T;
@@ -515,7 +515,7 @@ export async function mergeCardAudio(
     // A composition with nothing audible is still a real timeline: the pauses
     // play as silence and the placeholder cues fire their auto-reveals at the
     // offsets the clips would have occupied, so the silence is worth rendering.
-    // Only a genuinely empty timeline — nothing audible AND no pauses — has
+    // Only a genuinely empty timeline, nothing audible AND no pauses. Has
     // nothing to play and nothing to reveal along.
     if (totalDuration <= 0) return null;
 

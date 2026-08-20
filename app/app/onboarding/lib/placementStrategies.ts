@@ -4,8 +4,8 @@
  * Seven strategy classes implement the same `PlacementStrategy` interface,
  * so the runtime test runner can swap them with a single identifier change.
  * The active strategy is named by the `DEFAULT_STRATEGY` string constant at
- * the bottom of this file and instantiated via `createStrategy(name)` —
- * change that one assignment to change what the live onboarding uses.
+ * the bottom of this file and instantiated via `createStrategy(name)`.
+ * Change that one assignment to change what the live onboarding uses.
  */
 
 import { OGTE_MIN_LEVEL, OGTE_MAX_LEVEL } from '@/lib/constants/onboarding';
@@ -21,7 +21,7 @@ export const MAX_LEVEL = OGTE_MAX_LEVEL;
  * Schema-version of placement-state rows. Stamped on every
  * `onboardingProgress.placementTest` write and verified on read. Bump
  * whenever the shape of `history`, the `strategy` identifier set, or the
- * semantics of `finalLevel` changes — readers will discard rows whose
+ * semantics of `finalLevel` changes. Readers will discard rows whose
  * `strategyVersion` doesn't match and restart the placement test from
  * scratch (kill-switch for resuming incompatible state). Strategy classes
  * themselves are not versioned individually; the single version covers the
@@ -137,7 +137,7 @@ export class BinaryStrategy extends BaseStrategy {
 
   finalLevel(): number {
     if (this.lastYesLevel !== null) return clampLevel(this.lastYesLevel);
-    // No yes ever — they didn't know even the easiest level we asked.
+    // No yes ever. They didn't know even the easiest level we asked.
     return MIN_LEVEL;
   }
 
@@ -194,7 +194,7 @@ export class StaircaseStrategy extends BaseStrategy {
       this.done = true;
     }
 
-    // Edge case: clamped at boundary in a single direction long enough — stop.
+    // Edge case: clamped at boundary in a single direction long enough. Stop.
     if (this.answers.length >= 6 && this.reversalLevels.length === 0) {
       this.done = true;
     }
@@ -297,7 +297,7 @@ export class BayesianStrategy extends BaseStrategy {
 // correct answers in a row at the current level; a single wrong answer steps
 // DOWN. Converges to the ~70.7% threshold (where the user "mostly knows it"),
 // not the 50% boundary the basic staircase converges to. In practice this
-// returns a level the user reliably handles — fixes the standard staircase's
+// returns a level the user reliably handles. Fixes the standard staircase's
 // tendency to overshoot by 1 level at the boundary.
 //
 // Trades more questions (typically 10–14) for tighter placement.
@@ -388,12 +388,12 @@ export class TransformedStaircaseStrategy extends BaseStrategy {
 // ─── Anchor + verify (with fine-tune phase) ─────────────────────────────────
 // Two phases:
 //
-//   COARSE — Ask 3 questions at the anchor (default 8).
+//   COARSE: Ask 3 questions at the anchor (default 8).
 //     3/3 right  → jump +3 (up to ANCHOR_MAX_JUMPS times)
 //     0/3 right  → jump −3
 //     mixed      → settle, enter FINE
 //
-//   FINE — After coarse settles or runs out of jumps, refine within ±2 levels
+//   FINE: After coarse settles or runs out of jumps, refine within ±2 levels
 //   of the current anchor by walking the boundary with single-level steps.
 //   Stops after one reversal or `ANCHOR_FINE_BUDGET` questions, whichever
 //   first. Eliminates the ±3 error band the coarse-only version had.
@@ -441,15 +441,15 @@ export class AnchorVerifyStrategy extends BaseStrategy {
    *  the coarse phase's outcome at the current level. */
   private enterFinePhase(coarseRatio: number): void {
     if (coarseRatio >= 1 - 1e-9) {
-      // Unanimous yes — user likely sits above current level. Probe up.
+      // Unanimous yes. User likely sits above current level. Probe up.
       this.fineDirection = 'up';
       this.current = clampLevel(this.current + 1);
     } else if (coarseRatio <= 1e-9) {
-      // Unanimous no — user sits below. Probe down.
+      // Unanimous no. User sits below. Probe down.
       this.fineDirection = 'down';
       this.current = clampLevel(this.current - 1);
     } else {
-      // Mixed — the answer is roughly here. Probe whichever side had fewer
+      // Mixed. The answer is roughly here. Probe whichever side had fewer
       // hits to confirm direction.
       if (coarseRatio >= 0.5) {
         this.fineDirection = 'up';
@@ -475,13 +475,13 @@ export class AnchorVerifyStrategy extends BaseStrategy {
         const allNo = ratio <= 1e-9;
 
         if (allYes && this.jumps < ANCHOR_MAX_JUMPS && this.current < MAX_LEVEL) {
-          // Coarse jump up — still room.
+          // Coarse jump up, still room.
           this.current = clampLevel(this.current + ANCHOR_JUMP);
           this.jumps++;
           this.batchYes = 0;
           this.batchCount = 0;
         } else if (allNo && this.jumps < ANCHOR_MAX_JUMPS && this.current > MIN_LEVEL) {
-          // Coarse jump down — still room.
+          // Coarse jump down, still room.
           this.current = clampLevel(this.current - ANCHOR_JUMP);
           this.jumps++;
           this.batchYes = 0;
@@ -498,7 +498,7 @@ export class AnchorVerifyStrategy extends BaseStrategy {
     if (this.phase === 'fine') {
       this.fineAsked++;
 
-      // Reversal — direction flipped — we found the boundary. Done.
+      // Reversal. Direction flipped. We found the boundary. Done.
       if (this.fineLastKnew !== null && this.fineLastKnew !== knew) {
         this.phase = 'done';
         return;
@@ -514,12 +514,12 @@ export class AnchorVerifyStrategy extends BaseStrategy {
       if (this.fineDirection === 'up' && knew && this.current < MAX_LEVEL) {
         this.current = clampLevel(this.current + 1);
       } else if (this.fineDirection === 'up' && !knew) {
-        // Stop — we just found a level the user doesn't know.
+        // Stop. We just found a level the user doesn't know.
         this.phase = 'done';
       } else if (this.fineDirection === 'down' && !knew && this.current > MIN_LEVEL) {
         this.current = clampLevel(this.current - 1);
       } else if (this.fineDirection === 'down' && knew) {
-        // Stop — found a level they DO know while probing downward.
+        // Stop. Found a level they DO know while probing downward.
         this.phase = 'done';
       } else {
         this.phase = 'done';
@@ -553,7 +553,7 @@ export class AnchorVerifyStrategy extends BaseStrategy {
 // ─── Staircase from bottom (1↑/1↓, starts at level 1) ──────────────────────
 // Walks up from MIN_LEVEL one step at a time: +1 on a correct answer, −1 on
 // a wrong one. Terminates as soon as any single level has been reached
-// (asked at) **three times** — that's the level the user oscillates around,
+// (asked at) **three times**. That's the level the user oscillates around,
 // so we lock it in as the placement.
 //
 // Boundary semantics: at MAX_LEVEL, "knew" stays at MAX_LEVEL and counts
@@ -601,7 +601,7 @@ export class StaircaseFromBottomStrategy extends BaseStrategy {
       return;
     }
 
-    // Move for the next ask. clampLevel handles the boundary cases — at
+    // Move for the next ask. clampLevel handles the boundary cases, at
     // MAX_LEVEL "knew" stays put, at MIN_LEVEL "didn't know" stays put.
     const target = knew ? level + 1 : level - 1;
     this.current = clampLevel(target);
@@ -609,7 +609,7 @@ export class StaircaseFromBottomStrategy extends BaseStrategy {
 
   finalLevel(): number {
     if (this.lockedLevel !== null) return this.lockedLevel;
-    // Safety-net (hit the hard cap without locking) — pick the most-visited
+    // Safety-net (hit the hard cap without locking), pick the most-visited
     // level, or MIN_LEVEL if nothing was visited yet.
     let best = MIN_LEVEL;
     let bestCount = 0;
@@ -635,16 +635,16 @@ export class StaircaseFromBottomStrategy extends BaseStrategy {
 // ─── Ramp + bisect (bottom-up, accelerating jumps) ──────────────────────────
 // Two phases:
 //
-//   RAMP — Walk up the curriculum starting at level 1 with progressively
+//   RAMP: Walk up the curriculum starting at level 1 with progressively
 //   larger jumps so the test never opens with a hard sentence. The jumps
 //   accelerate (+1, +1, +2, +3, +4, +5, +3) so an absolute-beginner only
 //   sees a couple of questions before the test ends, while an advanced
 //   user reaches the top in ~7 asks. Sequence: 1 → 2 → 3 → 5 → 8 → 12 →
 //   17 → 20. As soon as the user gets one wrong, exit ramp and bisect.
 //
-//   BISECT — Standard binary search between the last "knew" level (lo)
+//   BISECT: Standard binary search between the last "knew" level (lo)
 //   and the first "didn't know" level - 1 (hi). Converges within
-//   ⌈log2(span)⌉ further questions — typically 2-3.
+//   ⌈log2(span)⌉ further questions: typically 2-3.
 //
 // Final placement: highest level the user answered "knew it" on. If they
 // missed every question (including level 1), place at MIN_LEVEL.
@@ -690,7 +690,7 @@ export class RampBisectStrategy extends BaseStrategy {
         this.lastYesLevel = level;
         this.lo = level + 1;
         this.rampIdx++;
-        // Finished the ramp without a single miss — they're at the ceiling.
+        // Finished the ramp without a single miss. They're at the ceiling.
         if (this.rampIdx >= RAMP_SEQUENCE.length) {
           this.phase = 'done';
         }
@@ -698,7 +698,7 @@ export class RampBisectStrategy extends BaseStrategy {
         // First wrong → exit ramp, narrow to [lo, level-1] and bisect.
         this.hi = level - 1;
         if (this.lo > this.hi) {
-          // Wrong on the very first question (level 1) — they don't even
+          // Wrong on the very first question (level 1), they don't even
           // know L01. Place at MIN_LEVEL.
           this.phase = 'done';
         } else {

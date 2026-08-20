@@ -171,7 +171,7 @@ describe("collection browse add flows", () => {
     const asUser = t.withIdentity({ subject: "user_A" });
 
     await withContentChainMocks(async () => {
-      // Prioritize ranks 4 and 3 — the drain must pull them rank-ordered.
+      // Prioritize ranks 4 and 3. The drain must pull them rank-ordered.
       await asUser.mutation(api.features.collections.setCollectionTextMark, {
         textId: textIds[3],
         mark: "prioritized",
@@ -198,7 +198,7 @@ describe("collection browse add flows", () => {
       const progress = await getProgress(t, courseId, collId);
       expect(progress?.cardsAdded).toBe(3);
       expect(progress?.prioritizedCount).toBe(0);
-      // Drained adds must NOT move the frontier — only the scan (rank 1) did.
+      // Drained adds must NOT move the frontier, only the scan (rank 1) did.
       expect(progress?.lastRankProcessed).toBe(1);
       const marks = await t.run(async (ctx) =>
         ctx.db.query("collectionTextMarks").collect(),
@@ -290,7 +290,7 @@ describe("collection browse add flows", () => {
         [textIds[1], "readd"],
       ]);
 
-      // Next add drains the readd row first, then the scan continues at 4 —
+      // Next add drains the readd row first, then the scan continues at 4,
       // no rescan of ranks 1-3.
       const second = await asUser.mutation(api.features.decks.addCardsFromCollection, {
         collectionId: collId,
@@ -371,7 +371,7 @@ describe("collection browse add flows", () => {
       );
       expect(marks).toEqual([]);
 
-      // Quota (balance 1) is exhausted — the next premade direct-add throws.
+      // Quota (balance 1) is exhausted. The next premade direct-add throws.
       await expect(
         asUser.mutation(api.features.decks.addSingleTextFromCollection, {
           textId: textIds[1],
@@ -396,7 +396,7 @@ describe("collection browse add flows", () => {
       expect(first.cardsAdded).toBe(2);
       expect(first.quotaLimited).toBe(false);
 
-      // Balance 0: Phase 2 is skipped before any scan — the 0-card result
+      // Balance 0: Phase 2 is skipped before any scan. The 0-card result
       // must be distinguishable from a drained collection, or clients latch
       // the collection as exhausted and never retry after a refill.
       const second = await asUser.mutation(api.features.decks.addCardsFromCollection, {
@@ -451,7 +451,7 @@ describe("collection browse add flows", () => {
       t,
       totalTexts,
     );
-    // Chunked mark seeding — one giant transaction would be needlessly slow.
+    // Chunked mark seeding. One giant transaction would be needlessly slow.
     const CHUNK = 500;
     for (let start = 0; start < ignoredCount; start += CHUNK) {
       const end = Math.min(start + CHUNK, ignoredCount);
@@ -521,7 +521,7 @@ describe("collection browse add flows", () => {
       textId: textIds[0],
       targetLanguage: "en",
       translatedText: "Hello 1",
-      // A bogus voice would throw inside the TTS enqueue path — skipTts must
+      // A bogus voice would throw inside the TTS enqueue path. skipTts must
       // return before the voice is even validated.
       voiceName: "not-a-real-voice",
       skipTts: true,

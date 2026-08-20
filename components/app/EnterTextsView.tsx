@@ -112,7 +112,7 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
     orderedLanguages.some((lang) => (texts[lang] ?? '').trim().length > 0);
   const canReset = hasLanguages && hasAnythingToReset && !isSaving && !isAutoFilling;
 
-  // An unsaved draft lives in component state only — a reload would silently
+  // An unsaved draft lives in component state only. A reload would silently
   // discard whatever the user has typed.
   useReloadBlock(hasAnythingToReset || isSaving || isAutoFilling);
 

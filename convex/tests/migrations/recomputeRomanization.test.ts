@@ -32,7 +32,7 @@ describe('recomputeRomanizationPatch (migrateOne logic)', () => {
     });
   });
 
-  it('returns undefined when the value is already current — idempotent re-run', () => {
+  it('returns undefined when the value is already current, idempotent re-run', () => {
     expect(
       recomputeRomanizationPatch('ko', '한국말', 'hangungmal'),
     ).toBeUndefined();
@@ -51,7 +51,7 @@ describe('recomputeRomanizationPatch (migrateOne logic)', () => {
     expect(recomputeRomanizationPatch('ar', 'سلام', 'stale')).toBeUndefined();
   });
 
-  it('respects the romanizedText tri-state — never resurrects undefined or the failed sentinel', () => {
+  it('respects the romanizedText tri-state, never resurrects undefined or the failed sentinel', () => {
     // undefined = never attempted (the scheduler owns it); '' = attempted and
     // failed, a sentinel this migration has no new information about.
     expect(recomputeRomanizationPatch('zh', '你好', undefined)).toBeUndefined();

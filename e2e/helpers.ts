@@ -27,7 +27,7 @@ export interface OnboardingWalkOptions {
   dailyTime?: 5 | 10 | 20 | 30 | { custom: number };
   // Branch picker: "new" lands on customizing instantly, "self-pick" walks
   // through the CEFR slider + confirm dialog (Start here), and "test" runs
-  // the placement test answering everything as "I didn't know" — yielding
+  // the placement test answering everything as "I didn't know", yielding
   // the lowest level (~1) deterministically.
   proficiency?: 'new' | 'self-pick' | 'test';
   // Number of placement-test questions to answer before the strategy resolves.
@@ -81,7 +81,7 @@ export async function completeOnboardingFresh(
     });
   };
 
-  // 1. Language pair — target (learn) first, then source (already speak).
+  // 1. Language pair. Target (learn) first, then source (already speak).
   //    The selector hides + re-reveals between picks, so we re-query each time.
   await expect(page.getByTestId('onboarding-step-language-pair')).toBeVisible({
     timeout: 30_000,
@@ -99,7 +99,7 @@ export async function completeOnboardingFresh(
   }
   await advance(null, 'onboarding-step-goal');
 
-  // 3. Learning goal — multi-select, at least one.
+  // 3. Learning goal. Multi-select, at least one.
   for (const goal of goals) {
     await page.getByTestId(`goal-option-${goal}`).click();
   }
@@ -119,21 +119,21 @@ export async function completeOnboardingFresh(
   }
   await advance(null, 'onboarding-step-proficiency');
 
-  // 5. Proficiency branch. Picking a branch only selects it — Continue is
+  // 5. Proficiency branch. Picking a branch only selects it. Continue is
   // what actually advances the wizard. All three sub-branches click it.
   await page.getByTestId(`proficiency-branch-${proficiency}`).click();
   await page.getByTestId('onboarding-continue').click();
   if (proficiency === 'new') {
-    // Lands on customizing directly — the next assertion below picks it up.
+    // Lands on customizing directly. The next assertion below picks it up.
   } else if (proficiency === 'self-pick') {
     await expect(page.getByTestId('onboarding-step-cefr-pick')).toBeVisible({
       timeout: 20_000,
     });
-    // Default slider position is fine for the walk — Continue starts the
+    // Default slider position is fine for the walk. Continue starts the
     // course at the picked level directly (no confirmation dialog).
     await page.getByTestId('onboarding-continue').click();
   } else {
-    // proficiency === "test" — run the placement test deterministically.
+    // proficiency === "test". Run the placement test deterministically.
     await expect(
       page.getByTestId('onboarding-step-placement-test'),
     ).toBeVisible({
@@ -159,11 +159,11 @@ export async function completeOnboardingFresh(
     await page.getByTestId('placement-result-continue').click();
   }
 
-  // 6. Review mode — the final step. Continue ("Start learning") runs
+  // 6. Review mode. The final step. Continue ("Start learning") runs
   // completeOnboarding (course + deck + seeded cards) inline behind a
   // spinner, then finalizeOnboarding, then hands off to /app/learn. Under
   // @live load a transient backend error can crash the wizard into the view
-  // error boundary mid-transition; retry through it — wizard progress is
+  // error boundary mid-transition; retry through it. Wizard progress is
   // server-persisted, so a remount resumes where it left off.
   await expect
     .poll(
@@ -196,13 +196,13 @@ export async function completeOnboardingFresh(
 
   // Retire the REST of the one-time learning-mode UI for this fixture user:
   // milestone tips fire mid-session at 2/5/8/11/15 lifetime reviews and the
-  // difficulty check intercepts the first auto-add — each would block
+  // difficulty check intercepts the first auto-add. Each would block
   // clicks at an unpredictable point of whichever spec happens to cross the
   // threshold (seen 2026-08-17: learning-undo blocked by the chat tip,
   // course-settings-sweep by the card-options tip). Their behavior is
   // covered by unit/convex tests; e2e fixture users skip them. Written into
   // the per-user localStorage cache, which the saved storageState carries
-  // into every spec context. `home_tour` is deliberately NOT marked —
+  // into every spec context. `home_tour` is deliberately NOT marked.
   // tutorial.spec depends on it being armed for a fresh user.
   // Keep the id list in sync with convex/features/tutorialIds.ts.
   const RETIRED_ONE_TIME_UI_IDS = [
@@ -257,7 +257,7 @@ export async function completeOnboardingFresh(
   // 13. Confirm the server actually committed finalizeOnboarding before
   // returning. The redirect above is driven by the mutation's OPTIMISTIC
   // update (see app/app/onboarding/page.tsx), so at this point the server may
-  // not have the write yet — and callers immediately save storageState and
+  // not have the write yet, and callers immediately save storageState and
   // close the context, which kills the websocket and DROPS any un-acked
   // mutation. A dropped finalize leaves the user onboarding-incomplete, and
   // the next session bounces every /app route back into the wizard.
@@ -328,8 +328,8 @@ const TOUR_POPOVER_CLASSES: Record<TourId, string[]> = {
 /**
  * Best-effort recovery from the per-segment view error boundary
  * ("Something went wrong" + "Try again"). Under @live load the local Convex
- * dev backend can transiently error a query — every OpenRouter/TTS action
- * retrying with backoff saturates it — which crashes whatever view is open
+ * dev backend can transiently error a query. Every OpenRouter/TTS action
+ * retrying with backoff saturates it, which crashes whatever view is open
  * into the boundary. Clicking retry remounts the segment exactly like a
  * user would; persistent crashes still fail the spec at its next assertion.
  */
@@ -343,7 +343,7 @@ export async function dismissErrorBoundary(page: Page): Promise<void> {
 
 /**
  * Fail fast with a self-explanatory message when the saved storage state no
- * longer holds a valid session — the app then silently redirects protected
+ * longer holds a valid session. The app then silently redirects protected
  * routes to /auth/sign-in and specs otherwise time out ~20s later on some
  * unrelated domain assertion (a rating button, a pill, …), which reads like
  * a feature bug. Call right after the first goto('/app...') of a spec.
@@ -392,9 +392,9 @@ export async function gotoAuthedApp(
  * Best-effort dismissal of the cookie-consent banner. The banner is fixed,
  * bottom-anchored and z-100, so while visible it intercepts clicks on any
  * bottom-of-viewport control (the import wizard's Next/Submit, the learn
- * CTA, …). It only mounts while PostHog reports consent 'pending' — normally
+ * CTA, …). It only mounts while PostHog reports consent 'pending'. Normally
  * never in specs, because `signUpAndOnboard` records the decision into the
- * saved storageState — but a spec running with fresh or stale storage can
+ * saved storageState, but a spec running with fresh or stale storage can
  * still get it at any moment after the PostHog SDK boots.
  */
 export async function dismissConsent(page: Page): Promise<void> {
@@ -427,7 +427,7 @@ export async function dismissDifficultyCheck(page: Page): Promise<void> {
  * matching tour (by `popoverClass="phrasis-tutorial-<id>"`) is targeted;
  * otherwise any `.driver-popover` is dismissed. Always strips any lingering
  * `.driver-overlay` SVG so the backdrop never intercepts subsequent clicks.
- * Also clears the consent banner (see `dismissConsent`) — every spec that
+ * Also clears the consent banner (see `dismissConsent`), every spec that
  * needs overlays gone calls this helper, and the tour wait doubles as time
  * for the PostHog SDK to boot and mount the banner. The one-time
  * difficulty-check dialog is cleared on both paths too.
@@ -489,8 +489,8 @@ export async function dismissTour(
  */
 export async function openCardImport(page: Page): Promise<void> {
   await page.goto('/app/content/add-cards');
-  // `domcontentloaded` fires before client-side route resolves in Next dev —
-  // wait for the URL to actually equal the target, then for AddCardsView to
+  // `domcontentloaded` fires before client-side route resolves in Next dev.
+  // Wait for the URL to actually equal the target, then for AddCardsView to
   // mount. The individual tab is the default mode; its presence proves the
   // switcher is rendered (i.e. `isAddCardsRoute` is true in MainLayout).
   await page.waitForURL('**/app/content/add-cards', { timeout: 20_000 });
@@ -550,7 +550,7 @@ export async function isSelectedTestId(
  * Necessary for elements inside fixed-position Sheets: while the sheet
  * (re-)animates, the element is mid-transform for ~500ms. `force: true`
  * doesn't bypass Playwright's viewport check, and `position: fixed` defeats
- * auto-scroll — polling the bounding box waits the animation out
+ * auto-scroll. Polling the bounding box waits the animation out
  * deterministically.
  *
  * Each iteration re-issues `scrollIntoView` before checking: a settings
@@ -607,7 +607,7 @@ export interface FreshUserPaths {
  * billing-state specs that need a fresh identity per invocation: billing
  * state lives in Autumn/Stripe and survives suite runs, so shared fixture
  * users can never be reused for it (and there is intentionally no cleanup
- * — the app has no account deletion yet).
+ * The app has no account deletion yet).
  */
 export async function signUpFreshUser(
   page: Page,
@@ -618,7 +618,7 @@ export async function signUpFreshUser(
   const path = await import('node:path');
   const random = crypto.randomBytes(6).toString('hex');
   const creds = {
-    // Shape is load-bearing — see `isE2EFixtureAddress` in
+    // Shape is load-bearing. See `isE2EFixtureAddress` in
     // convex/lib/authEmails.ts (pinned by convex/tests/lib/authEmails.test.ts).
     email: `e2e-${prefix}-${Date.now()}-${random}@flexling.com`,
     password: `E2ePass!${random}`,
@@ -639,7 +639,7 @@ export async function signUpFreshUser(
   }
   // Locale-proof: the banner copy is translated (en/de), so match the testid
   // rather than the accessible name. The banner mounts only after the
-  // PostHog SDK boots (async), so an instant count() check races it — wait a
+  // PostHog SDK boots (async), so an instant count() check races it. Wait a
   // bounded moment instead. Recording the decision here matters beyond this
   // page: PostHog persists it into localStorage, so the saved storageState
   // carries it and the banner never overlays (and steals clicks from)
@@ -676,9 +676,9 @@ export async function signUpFreshUser(
 
 export interface CapturedAuthEmail {
   id: string;
-  /** Reset link — present on 'reset' emails. */
+  /** Reset link. Present on 'reset' emails. */
   url?: string;
-  /** 6-digit verification code — present on 'verify' emails. */
+  /** 6-digit verification code. Present on 'verify' emails. */
   otp?: string;
   subject: string;
 }
@@ -715,7 +715,7 @@ export async function fetchAuthEmail(
       { cwd: repoRoot, encoding: 'utf8' },
     );
     // `convex run` prints the function's return value (JSON) on stdout,
-    // possibly surrounded by CLI noise — parse the last JSON-looking chunk.
+    // possibly surrounded by CLI noise. Parse the last JSON-looking chunk.
     const lines = out.trim().split('\n');
     let result: CapturedAuthEmail | null = null;
     for (let i = lines.length - 1; i >= 0; i--) {
@@ -807,7 +807,7 @@ export async function completeStripeTestCheckout(
   }
 
   // The inline card form only renders once the "Card" payment-method
-  // radio is checked, and the accordion renders asynchronously — so
+  // radio is checked, and the accordion renders asynchronously, so
   // selecting the radio is part of the retry loop. Normal clicks on the
   // styled row time out (the Link iframe overlays the hit area);
   // force-checking the radio input works.
@@ -866,11 +866,11 @@ export async function completeStripeTestCheckout(
     await postal.fill('10115');
   }
 
-  // Submit — retried until the page actually leaves Stripe. The hosted page
+  // Submit. Retried until the page actually leaves Stripe. The hosted page
   // has variants (classic, Link, and the Managed Payments layout with its
   // "Subscribe with obligation to pay" button) that mount or re-render the
   // pay button late, so a single early `.first()` click can land on the
-  // wrong submit (or on nothing) while the form silently stays put — which
+  // wrong submit (or on nothing) while the form silently stays put, which
   // is exactly how the MoR variant made this helper time out. Prefer the
   // button by its pay wording, fall back to the classic locator, re-click
   // until the redirect happens.

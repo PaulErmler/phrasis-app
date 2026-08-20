@@ -13,7 +13,7 @@ import {
 const cs = (partial: Partial<CourseSettings>): CourseSettings =>
   partial as unknown as CourseSettings;
 
-describe('resolveAudioSettings — target before/after base', () => {
+describe('resolveAudioSettings: target before/after base', () => {
   it('defaults to the historical base→target sequence (after on, before off)', () => {
     const r = resolveAudioSettings(null);
     expect(r.playTargetBefore).toBe(DEFAULT_PLAY_TARGET_BEFORE_BASE);
@@ -68,7 +68,7 @@ describe('resolveAudioSettings — target before/after base', () => {
     // resolveAudioSettings only carries explicitly-set before speeds; the
     // fallback to DEFAULT_PLAYBACK_SPEED happens downstream in mergeCardAudio's
     // beforeSpeedFor, not here. (A vacuous `r.beforeSpeeds.es ?? DEFAULT` check
-    // would pass for any implementation — assert the actual returned shape.)
+    // would pass for any implementation, assert the actual returned shape.)
     const r = resolveAudioSettings(cs({ targetBeforeRepetitions: { es: 2 } }));
     expect(r.beforeSpeeds).toEqual({});
     expect(r.beforeSpeeds.es).toBeUndefined();
@@ -97,7 +97,7 @@ describe('resolveAudioSettings — target before/after base', () => {
   });
 });
 
-describe('resolveAudioSettings — "Only new" limit mapping', () => {
+describe('resolveAudioSettings: "Only new" limit mapping', () => {
   it('maps undefined / 0 to Infinity (always), and 1-10 to the number', () => {
     expect(resolveAudioSettings(null).beforeOnlyNewReps).toBe(Infinity);
     expect(
@@ -170,7 +170,7 @@ describe('applyOnlyNewListening', () => {
     const s = withLimit(3); // Practice Speaking defaults to on
     const g = applyOnlyNewListening(s, { reviewCount: 3 });
     expect(g.playTargetBefore).toBe(false);
-    // Speaking was on (default) and is left as-is — not forced.
+    // Speaking was on (default) and is left as-is, not forced.
     expect(g.playTargetAfter).toBe(true);
   });
 
@@ -207,7 +207,7 @@ describe('applyOnlyNewListening', () => {
   });
 });
 
-describe('applyOnlyNewListening — "until rated good" strategy', () => {
+describe('applyOnlyNewListening: "until rated good" strategy', () => {
   const untilGood = (reps: number, overrides: Record<string, unknown> = {}) => ({
     ...resolveAudioSettings(
       cs({
@@ -246,7 +246,7 @@ describe('applyOnlyNewListening — "until rated good" strategy', () => {
   });
 });
 
-describe("applyOnlyNewListening — 'continuous' strategy", () => {
+describe("applyOnlyNewListening: 'continuous' strategy", () => {
   it('never graduates a card, no matter the counts', () => {
     const s = {
       ...resolveAudioSettings(
@@ -254,7 +254,7 @@ describe("applyOnlyNewListening — 'continuous' strategy", () => {
           playTargetBeforeBase: true,
           targetBeforeListeningStrategy: 'continuous',
           // A rep window that would have graduated the card long ago under
-          // 'onlyNew' — must be ignored entirely.
+          // 'onlyNew'. Must be ignored entirely.
           targetBeforeOnlyNewReps: 1,
         }),
       ),

@@ -162,7 +162,7 @@ describe("getPlacementPreviewSentences", () => {
       targetLanguage: "es",
       targetText: "A-es",
     });
-    // No translation yet — preview must still include the row.
+    // No translation yet. Preview must still include the row.
     await seedPlacementSentence(t, { level: 1, position: 1, text: "B" });
     await seedPlacementSentence(t, {
       level: 2,

@@ -3,7 +3,7 @@ import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // File-level aggregate mock (takes precedence over the zero-count stub in
-// tests/convexTestSetup.ts — see the precedent in
+// tests/convexTestSetup.ts. See the precedent in
 // migrations/recalcUserCardAggregates.test.ts). `count()` records its args and
 // returns the value registered for the namespace's tail, defaulting to 0 so
 // tests that don't register counts behave like the global stub. Lookup tries
@@ -26,7 +26,7 @@ vi.mock("@convex-dev/aggregate", () => {
       _component: unknown,
       opts?: { sortKey?: (doc: unknown) => unknown },
     ) {
-      // Label the instance by which due date its sortKey reads — the only
+      // Label the instance by which due date its sortKey reads. The only
       // structural difference between a writing-track aggregate and its
       // shared twin (their NAMESPACE strings are identical, so namespace
       // alone can't tell the separate-mode tests which aggregate was hit).
@@ -198,7 +198,7 @@ describe("features/stats", () => {
     });
   });
 
-  describe("getCardCounts — aggregate namespace mapping", () => {
+  describe("getCardCounts: aggregate namespace mapping", () => {
     it("maps each `${deckId}:state` namespace count to its matching return field", async () => {
       const t = convexTest(schema, modules);
       const { deckId } = await seedActiveCourse(t);
@@ -309,7 +309,7 @@ describe("features/stats", () => {
       const t = convexTest(schema, modules);
       const { deckId } = await seedActiveCourse(t);
       Object.assign(countsByStateSuffix, {
-        // Unsplit namespaces — must NOT be used by the filtered path.
+        // Unsplit namespaces. Must NOT be used by the filtered path.
         new: 100,
         learning: 100,
         review: 100,
@@ -381,7 +381,7 @@ describe("features/stats", () => {
     });
   });
 
-  describe("due counts — separate mode tracking (writing track)", () => {
+  describe("due counts: separate mode tracking (writing track)", () => {
     const NOW = 1_754_000_000_000;
 
     async function seedWithSettings(
@@ -499,7 +499,7 @@ describe("features/stats", () => {
       );
     });
 
-    it("flags preparingWriting while the seed is unfinished — writing track only", async () => {
+    it("flags preparingWriting while the seed is unfinished, writing track only", async () => {
       const t = convexTest(schema, modules);
       await seedWithSettings(t, {
         separateModeTracking: true,
@@ -520,7 +520,7 @@ describe("features/stats", () => {
         preparingWriting: true,
       });
 
-      // The shared track's counts are always settled — no flag, even with the
+      // The shared track's counts are always settled, no flag, even with the
       // seed unfinished on the same course.
       const shared = await asUser.query(
         api.features.stats.getFilteredCardCounts,
@@ -529,13 +529,13 @@ describe("features/stats", () => {
       expect(shared).toEqual({ new: 0, learning: 0, relearning: 0, review: 0 });
     });
 
-    it("free play (radio + Writing) never flags preparingWriting — it serves the rotation, not the writing queue", async () => {
+    it("free play (radio + Writing) never flags preparingWriting, it serves the rotation, not the writing queue", async () => {
       const t = convexTest(schema, modules);
       await seedWithSettings(t, {
         separateModeTracking: true,
         reviewMode: "full",
         schedulingMode: "radio",
-        // writingSeedDone deliberately absent — the seed is still running,
+        // writingSeedDone deliberately absent. The seed is still running,
         // but free play never reads the writing queue, so its counts must
         // not be greyed out as provisional.
       });
@@ -623,7 +623,7 @@ describe("features/stats", () => {
       const t = convexTest(schema, modules);
       const { courseId } = await seedActiveCourse(t);
       await t.run(async (ctx) => {
-        // Two rows for the same (language, word) — different sessionIds.
+        // Two rows for the same (language, word), different sessionIds.
         // The session row must win regardless of insertion order.
         await ctx.db.insert("userWords", {
           userId: "user_A",

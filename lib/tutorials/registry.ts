@@ -8,7 +8,7 @@ import { createHomeTour } from './home-tour';
 export { TUTORIAL_IDS } from '@/convex/features/tutorialIds';
 
 /**
- * Static factory table — add new tours here, keyed by tutorial ID.
+ * Static factory table. Add new tours here, keyed by tutorial ID.
  *
  * Only multi-step tours driven by `useTutorial` live here. The one-time
  * learning-mode tips (`tip_*` ids) are self-contained in

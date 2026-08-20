@@ -9,7 +9,7 @@ import { internal } from '../_generated/api';
  * forward into the new dataset's first-of-tier levels).
  *
  * Gated by the FF_NEW_COURSE_CUTOVER env var when `runCutover: true` is
- * passed — if the flag is missing/unset, activation still happens but the
+ * passed, if the flag is missing/unset, activation still happens but the
  * cutover fan-out is skipped (the admin can invoke it later).
  *
  * Idempotent: re-running with the same datasetId is safe.
@@ -64,7 +64,7 @@ export const activateDataset = internalMutation({
 });
 
 /**
- * Bare cutover trigger — call this directly from the dashboard to run the
+ * Bare cutover trigger. Call this directly from the dashboard to run the
  * per-user cutover after `activateDataset` has been called. Useful when you
  * want to flip `isActive` first (silent) and only later kick off the
  * progress roll-forward.

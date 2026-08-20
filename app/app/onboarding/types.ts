@@ -1,6 +1,6 @@
 export type ReviewMode = 'audio' | 'full';
 
-/** Writing-mode input style — mirrors `courseSettings.writingInputMode`. */
+/** Writing-mode input style. Mirrors `courseSettings.writingInputMode`. */
 export type WritingInputMode = 'translate' | 'transcribe';
 
 export type CurrentLevel =
@@ -31,7 +31,7 @@ export type LearningReason =
 
 /** Persisted as a plain number on `courseSettings.dailyTimeGoalMinutes`. The
  *  step UI offers five preset tiles (5/10/20/30/60) plus a "Custom" tile that
- *  expands to a free number input — any value not in the preset set is
+ *  expands to a free number input. Any value not in the preset set is
  *  treated as a custom pick. Validated to 1..120 in the wizard. Constants
  *  live in lib/constants/dailyGoal.ts (shared with the in-app editors and
  *  the Convex clamp); re-exported here for the wizard steps. */
@@ -73,7 +73,7 @@ export interface OnboardingData {
   dailyTimeGoalMinutes: DailyTimeGoalMinutes | null;
   placementTest: PlacementTestState | null;
 
-  // Branch state — never persisted, only used by the wizard
+  // Branch state, never persisted, only used by the wizard
   proficiencyBranch: 'new' | 'self-pick' | 'test' | null;
 }
 

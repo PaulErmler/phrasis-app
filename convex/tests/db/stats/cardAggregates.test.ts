@@ -312,7 +312,7 @@ describe("patchCard → bumpCardsMastered legacy redirect", () => {
 
     const progress = await t.run((ctx) => ctx.db.get(newProgressId));
     expect(progress?.cardsMastered).toBe(1);
-    // Silence unused-binding lint — these names document the fixture shape.
+    // Silence unused-binding lint. These names document the fixture shape.
     void courseId;
     void deckId;
     void newL02;
@@ -344,7 +344,7 @@ describe("patchCard → bumpCardsMastered legacy redirect", () => {
       const customA1: Id<"collections"> = await ctx.db.insert("collections", {
         name: "A1",
         textCount: 0,
-        // No datasetId — this is a user-owned custom collection.
+        // No datasetId. This is a user-owned custom collection.
       });
       const courseId: Id<"courses"> = await ctx.db.insert("courses", {
         userId: "user_A",
@@ -397,7 +397,7 @@ describe("patchCard → bumpCardsMastered legacy redirect", () => {
       });
       // Known limitation: the redirect uses `LEGACY_TO_NEW_CODE[name]`. A
       // custom collection with the literal name "A1" would be incorrectly
-      // redirected if its `datasetId` were set — but it is undefined here,
+      // redirected if its `datasetId` were set, but it is undefined here,
       // and the guard rejects rows without a true legacy origin only by way
       // of the datasetId check on the *new* collection side. The current
       // behavior is documented in the bumpCardsMastered docstring.

@@ -34,13 +34,13 @@ import { scheduleMissingContent } from './decks';
 /**
  * Backend support for the onboarding flow.
  *
- * - `prepareLanguagePair` runs once the user picks (source, target) — it
+ * - `prepareLanguagePair` runs once the user picks (source, target): it
  *   schedules content warmup so the placement test (and the first real
  *   lesson right after the wizard) can run instantly.
  * - `warmupOnboardingTranslations` is the manually-fired global warm-up
  *   that pre-translates the same content for every language upfront.
  * - `getInitialCardsReadiness` reports how many of the first cards have
- *   content ready — currently unused by the app (the old "customizing"
+ *   content ready: currently unused by the app (the old "customizing"
  *   screen polled it) but kept as a dashboard/debug probe for stuck
  *   onboarding content.
  */
@@ -69,14 +69,14 @@ export const prepareLanguagePair = mutation({
     );
 
     // Schedule a placement-test translation backfill for this target language.
-    // This is idempotent — the inner mutation only enqueues missing rows.
+    // This is idempotent. The inner mutation only enqueues missing rows.
     await ctx.scheduler.runAfter(
       0,
       internal.features.onboarding.enqueueMissingPlacementTranslations,
       { targetLanguage, sourceLanguage },
     );
 
-    // Backstop sweep — runs after 60s so most placement translations have
+    // Backstop sweep. Runs after 60s so most placement translations have
     // had time to land. Re-enqueues TTS for any (translation exists,
     // audio missing) orphan left by an exhausted-retry TTS failure or
     // a claim race. Idempotent.
@@ -96,7 +96,7 @@ export const prepareLanguagePair = mutation({
  * `scheduleMissingContent` handles source-language audio (the text's own
  * language) AND translation enqueueing for every additional language AND the
  * downstream audio trigger via `storeTranslationAndScheduleTTS`, all with
- * idempotent claim/dedupe — so re-entrant batches do reads-only for rows that
+ * idempotent claim/dedupe, so re-entrant batches do reads-only for rows that
  * are already covered. We pass the user's chosen base language as an additional
  * translation target so the placement test can render the source side in that
  * language; `scheduleMissingContent` filters out the text's own language
@@ -132,13 +132,13 @@ async function processPlacementSentences(
 /**
  * Entry point for every placement-test content sweep.
  *
- * Enumerates the corpus once (cheap — only the small `placementTestSentences`
+ * Enumerates the corpus once (cheap, only the small `placementTestSentences`
  * rows), processes the first `PLACEMENT_CONTENT_BATCH_SIZE` texts inline, and
  * queues every remaining batch UPFRONT as an independent
- * `processPlacementContentBatch` worker — mirroring the per-collection fan-out
+ * `processPlacementContentBatch` worker, mirroring the per-collection fan-out
  * in `ensureFirstSentencesAcrossLevelCollections`
  * (`convex/features/collections.ts`). Sweeping the whole corpus inline used to
- * blow past Convex's per-mutation system-op ceiling — each sentence runs the
+ * blow past Convex's per-mutation system-op ceiling. Each sentence runs the
  * heavy `scheduleMissingContent` (per-language reads, `storage.getUrl` checks,
  * claim inserts, a nested `enqueueTtsJob` mutation, scheduler enqueues), so
  * ~256 sentences × ~20 ops overflowed one transaction.
@@ -146,7 +146,7 @@ async function processPlacementSentences(
  * Failure isolation is the reason the batches are queued upfront rather than
  * chained: a throw in the inline page rolls back this whole mutation
  * (including the enqueues), so the awaiting client sees the rejection and can
- * retry; a throw in one scheduled worker rolls back only that batch — every
+ * retry; a throw in one scheduled worker rolls back only that batch. Every
  * other batch was already enqueued here and runs regardless, and the failed
  * batch reschedules itself with backoff (see `processPlacementContentBatch`).
  * The returned tally covers the INLINE FIRST PAGE ONLY; the scheduled batches
@@ -193,13 +193,13 @@ async function runPlacementContentSweep(
 }
 
 /**
- * Independent batch worker fanned out by `runPlacementContentSweep` — internal
+ * Independent batch worker fanned out by `runPlacementContentSweep`. Internal
  * only. Each invocation covers its own fixed slice of the corpus in its own
  * transaction, so one failing batch never affects the others.
  *
  * Convex does not retry scheduled mutations that fail with application
  * errors, so on failure the worker reschedules itself with exponential
- * backoff (up to `PLACEMENT_BATCH_MAX_ATTEMPTS` total attempts) — the error
+ * backoff (up to `PLACEMENT_BATCH_MAX_ATTEMPTS` total attempts), the error
  * is swallowed on purpose: rethrowing would roll back the transaction
  * *including* the retry enqueue. Retries re-run the full slice; that's safe
  * because `scheduleMissingContent`'s claim/dedupe checks make already-covered
@@ -213,7 +213,7 @@ export const processPlacementContentBatch = internalMutation({
     targetLanguage: v.string(),
     sourceLanguage: v.string(),
     textIds: v.array(v.id('texts')),
-    /** Retry counter — omitted on the initial fan-out, set on reschedules. */
+    /** Retry counter. Omitted on the initial fan-out, set on reschedules. */
     attempt: v.optional(v.number()),
   },
   returns: v.object({
@@ -273,7 +273,7 @@ async function sweepAndCountEnqueued(
  * User-callable safety-net: when the placement test renders a card whose
  * translation isn't ready yet, the client invokes this so we can immediately
  * (re-)enqueue any missing placement-test translations for the target
- * language. Idempotent — won't double-enqueue if a claim already exists.
+ * language. Idempotent. Won't double-enqueue if a claim already exists.
  *
  * Kicks off the batched sweep: processes the first page inline and queues the
  * remaining batches upfront. `enqueued` counts the inline first page only.
@@ -319,11 +319,11 @@ export const enqueueMissingPlacementTranslations = internalMutation({
  * incomplete. Nothing else re-enters `scheduleMissingContent` for those
  * texts afterwards.
  *
- * This covers every placement-test sentence — the first page inline, the rest
- * via the batch workers `runPlacementContentSweep` queues upfront — and
+ * This covers every placement-test sentence. The first page inline, the rest
+ * via the batch workers `runPlacementContentSweep` queues upfront, and
  * re-runs `scheduleMissingContent` for both the source language (English
  * audio) and the target language (translation + downstream audio). All checks
- * inside `scheduleMissingContent` are idempotent — rows that already have
+ * inside `scheduleMissingContent` are idempotent. Rows that already have
  * translations + audio do nothing but reads.
  *
  * Scheduled 60s after `prepareLanguagePair` so most in-flow translations
@@ -345,8 +345,8 @@ export const ensureAudioForTestTranslations = internalMutation({
 });
 
 /**
- * Manually-fired content warm-up (dashboard / `npx convex run` only — no
- * cron, no in-app caller). Pre-generates TRANSLATIONS ONLY — never audio —
+ * Manually-fired content warm-up (dashboard / `npx convex run` only, no
+ * cron, no in-app caller). Pre-generates TRANSLATIONS ONLY, never audio,
  * for the two text sets a brand-new user hits during onboarding:
  *
  *   1. every `placementTestSentences` text, and
@@ -455,7 +455,7 @@ export const warmupOnboardingTranslations = internalMutation({
 });
 
 /**
- * Batch worker fanned out by `warmupOnboardingTranslations` — schedules
+ * Batch worker fanned out by `warmupOnboardingTranslations`. Schedules
  * missing translations (skipTts) for its slice of texts. Same
  * retry-with-backoff shape as `processPlacementContentBatch`: Convex doesn't
  * retry failed scheduled mutations, so the worker reschedules itself and
@@ -465,7 +465,7 @@ export const warmupTranslationsBatch = internalMutation({
   args: {
     textIds: v.array(v.id('texts')),
     languages: v.array(v.string()),
-    /** Retry counter — omitted on the initial fan-out, set on reschedules. */
+    /** Retry counter. Omitted on the initial fan-out, set on reschedules. */
     attempt: v.optional(v.number()),
   },
   returns: v.object({ translationsScheduled: v.number() }),
@@ -523,7 +523,7 @@ export const warmupTranslationsBatch = internalMutation({
  * The course/deck/cards are created by `completeOnboarding`
  * (`convex/features/courses.ts`) right before this runs. For users resuming
  * a row persisted by the old 12-step wizard, the course may predate their
- * final answers — so this mutation re-syncs `dailyTimeGoalMinutes` and the
+ * final answers, so this mutation re-syncs `dailyTimeGoalMinutes` and the
  * review-mode pick onto the active course's `courseSettings` (idempotent
  * for the normal flow, where `completeOnboarding` already copied them).
  * Keeping the flag-set deferred to this
@@ -603,7 +603,7 @@ export const finalizeOnboarding = mutation({
           // `progress.writingInputMode !== undefined`. Picking Shadowing
           // REMOVES the field (there is no writing input in that mode), so an
           // absent field has to clear courseSettings rather than read as
-          // "the user didn't answer" — otherwise a course that already
+          // "the user didn't answer", otherwise a course that already
           // carries 'transcribe' (re-onboarding, or an old-flow row whose
           // course predates the mode step) keeps it and the user silently
           // lands in Transcribe the first time they open Writing mode.

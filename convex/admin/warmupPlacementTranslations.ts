@@ -9,21 +9,21 @@ import { SUPPORTED_LANGUAGES } from '../../lib/languages';
  * regardless of which language pairs are currently in use across `courses`.
  *
  * For each target we schedule:
- *   1. `enqueueMissingPlacementTranslations` — enqueues LLM translations for
+ *   1. `enqueueMissingPlacementTranslations`: enqueues LLM translations for
  *      every placement-test sentence (idempotent: skips rows already
  *      translated). The downstream pipeline triggers TTS automatically.
- *   2. `ensureAudioForTestTranslations` (60s delay) — backstop sweep that
+ *   2. `ensureAudioForTestTranslations` (60s delay): backstop sweep that
  *      re-runs `scheduleMissingContent` for any (sentence, language) pair
  *      where the first pass left a row without audio.
  *
- * English-family targets (`en`, `en_gb`, …) are skipped — placement sentences
+ * English-family targets (`en`, `en_gb`, …) are skipped. Placement sentences
  * are stored in English and there's nothing to translate.
  *
  * Rate limiting is handled downstream by `convex/rateLimiter.ts` (per-provider
  * token buckets) and the priority queue in TTS dispatch: user-facing TTS
  * (priority 1/2) jumps ahead of warmup work (priority 0). Placement-test
  * translations enqueue at priority 2 because users may be on the screen
- * waiting — keep that in mind if running concurrently with `warmupCourseLevels`.
+ * waiting. Keep that in mind if running concurrently with `warmupCourseLevels`.
  *
  * Fully idempotent: re-running this mutation only re-reads rows that already
  * have translations + audio.
@@ -35,7 +35,7 @@ import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 const WARMUP_SOURCE_LANGUAGE = 'en';
 const WARMUP_AUDIO_BACKSTOP_DELAY_MS = 60_000;
 // ~100 placement-test sentences × translation+TTS per language. Used only
-// to compute an informational ETA — actual throughput is bounded by the
+// to compute an informational ETA. Actual throughput is bounded by the
 // `googleTts` token-bucket rate in `convex/rateLimiter.ts`.
 const WARMUP_TTS_JOBS_PER_LANGUAGE = 100;
 const WARMUP_GOOGLE_TTS_RATE_PER_MINUTE = 150;

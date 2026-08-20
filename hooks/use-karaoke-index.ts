@@ -20,7 +20,7 @@ export interface ClockBinding {
  *
  * - With a `clockBinding` (merged playback): subscribes to the playback
  *   clock and derives the index per frame, but calls setState ONLY when the
- *   word index changes — a few times per second instead of 60 re-renders/s,
+ *   word index changes: a few times per second instead of 60 re-renders/s,
  *   contained to this leaf.
  * - Without one (AudioButton previews): derives directly from the
  *   `localTime` prop, which updates at the button's own low cadence.

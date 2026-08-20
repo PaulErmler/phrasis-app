@@ -53,7 +53,7 @@ interface ChatPanelProps {
    * visible bubble label.
    */
   initialQuickAction?: QuickAction;
-  /** Monotonic counter — each new value re-fires the auto-submit, even if the text is identical. */
+  /** Monotonic counter. Each new value re-fires the auto-submit, even if the text is identical. */
   initialTextNonce?: number;
   /**
    * Optional dedup hook: returns true only for the first caller of a given
@@ -65,7 +65,7 @@ interface ChatPanelProps {
 
 /**
  * Reusable, embeddable chat panel combining messages and input.
- * Can be dropped into any layout — standalone page, sidebar, or overlay.
+ * Can be dropped into any layout. Standalone page, sidebar, or overlay.
  */
 export function ChatPanel({
   threadId,

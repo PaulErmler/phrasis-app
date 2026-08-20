@@ -5,9 +5,9 @@ import { v } from 'convex/values';
  * backend. Keep in sync with tutorial definitions in lib/tutorials/.
  *
  * Two families:
- *  - Tours (`home_tour`) — multi-step driver.js walkthroughs via
+ *  - Tours (`home_tour`), multi-step driver.js walkthroughs via
  *    `useTutorial`.
- *  - One-time learning-mode tips (`tip_*`) — shown by `useMilestoneTips`
+ *  - One-time learning-mode tips (`tip_*`), shown by `useMilestoneTips`
  *    inside the real learning session. Concept tips (`tip_concept_*`) are
  *    the intro walkthrough, persisted per concept so switching review modes
  *    never re-explains what the other mode already covered. Milestone tips
@@ -17,8 +17,8 @@ export const TUTORIAL_IDS = {
   HOME_TOUR: 'home_tour',
   // Retired 2026-08: the standalone review-mode tours were replaced by the
   // concept/milestone tips below. The IDs stay valid so historical
-  // `completedTutorials` rows (and clients mid-rollout) keep validating —
-  // do not reuse these strings for anything else.
+  // `completedTutorials` rows (and clients mid-rollout) keep validating.
+  // Do not reuse these strings for anything else.
   AUDIO_REVIEW_INTRO: 'audio_review_intro',
   FULL_REVIEW_INTRO: 'full_review_intro',
   // Intro concepts (one-time each, shown on the first card of a mode).

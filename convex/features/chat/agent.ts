@@ -30,7 +30,7 @@ import {
 
 // The agent-level tool set, defined once and exported: a per-call `tools`
 // override REPLACES this set entirely, so card turns (messages.ts) spread it
-// before adding their card-scoped tools — a tool added here can then never be
+// before adding their card-scoped tools. A tool added here can then never be
 // silently missing on exactly those turns.
 // (Assigned below, after the tool definitions.)
 
@@ -106,7 +106,7 @@ export const createCardTool = createTool({
 /**
  * Per-request factory: the tool closes over the reviewed card's id (the model
  * never sees document ids). Registered by generateResponse only on turns that
- * carry a cardId — see the tools override in messages.ts.
+ * carry a cardId. See the tools override in messages.ts.
  */
 export const createMarkAlsoCorrectTool = ({ cardId }: { cardId: Id<'cards'> }) =>
   createTool({

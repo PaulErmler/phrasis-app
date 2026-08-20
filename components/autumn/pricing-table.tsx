@@ -39,7 +39,7 @@ function productSortPrice(product: Product): number {
 /**
  * Extra bullets that are pure marketing copy with no Autumn feature behind
  * them, so they cannot come from `product.items` and are never metered or
- * enforced. Keyed by base plan id — the `_annual` variants share their base
+ * enforced. Keyed by base plan id. The `_annual` variants share their base
  * plan's copy. Values are keys in the `Pricing` i18n namespace.
  */
 const EXTRA_PLAN_FEATURES: Record<string, string[]> = {
@@ -64,7 +64,7 @@ function paidTiersInSameInterval(
  * Rank of a paid plan within its own interval group (0 = cheapest tier).
  * Used to compare tiers ACROSS billing intervals, where raw prices mislead:
  * Basic Annual (€72) costs more than a month of Pro (€16), so Autumn labels
- * it an "upgrade" — but tier-wise it is a downgrade.
+ * it an "upgrade", but tier-wise it is a downgrade.
  */
 function paidTierRank(product: Product, products: Product[]): number {
   return paidTiersInSameInterval(product, products).findIndex(
@@ -88,7 +88,7 @@ export function previousTier(
 }
 
 /**
- * The items this plan adds on top of `previous` — a bigger allowance, or a
+ * The items this plan adds on top of `previous`. A bigger allowance, or a
  * feature the tier below does not grant at all. Everything else is already
  * covered by the "Everything from X, plus:" line, so repeating it is noise:
  * Ultra and Pro differ only in credits, and listing seven identical bullets
@@ -96,9 +96,9 @@ export function previousTier(
  *
  * Consumable pools are rewritten to the INCREMENT, because the card reads as
  * a sum: Ultra under "Everything from Pro, plus:" must say 2,000 credits, not
- * 3,000 — Pro's 1,000 is already counted by the line above, and 1,000 + 2,000
+ * 3,000. Pro's 1,000 is already counted by the line above, and 1,000 + 2,000
  * is the 3,000 the plan actually grants. Caps (courses) and boolean flags are
- * not additive — a limit replaces the one below it — so they keep their own
+ * not additive. A limit replaces the one below it, so they keep their own
  * total, which is what "Up to 10 courses" has to mean to be true.
  *
  * Items are matched on feature id AND interval so a one-off starter grant
@@ -131,7 +131,7 @@ export function itemsAddedOver(
 
 /**
  * Store builds must not show plans or prices (Play/App Store payment
- * policies) — the shell renders nothing wherever a pricing table would be.
+ * policies), the shell renders nothing wherever a pricing table would be.
  */
 export default function PricingTable(
   props: React.ComponentProps<typeof PricingTableInner>,
@@ -161,7 +161,7 @@ function PricingTableInner({
   const showCheckoutError = useCheckoutErrorToast();
 
   // NOTE: passing `productDetails` to usePricingTable FILTERS the table to
-  // only the listed products — don't use it for display tweaks.
+  // only the listed products. Don't use it for display tweaks.
   const { products: rawProducts, isLoading: isProductsLoading, error, refetch } = usePricingTable({ productDetails });
 
   // Stable display order: Free first, then paid plans by ascending price.
@@ -295,7 +295,7 @@ function PricingTableInner({
                     product.scenario === "scheduled",
 
                   onClick: async () => {
-                    // The click, not the outcome — pairing this with
+                    // The click, not the outcome. Pairing this with
                     // `checkout_redirected` below is what separates "didn't
                     // want it" from "wanted it and the flow broke".
                     capture(CLIENT_EVENTS.PLAN_CTA_CLICKED, {
@@ -327,7 +327,7 @@ function PricingTableInner({
         </PricingTableContainer>
       )}
       {/* Paid plans are sold with Stripe as merchant of record, so the price
-          on the card is the gross amount — VAT is carved out of it rather
+          on the card is the gross amount. VAT is carved out of it rather
           than added at checkout. Suppressed when the table is showing only
           the free plan, where there is no tax to speak of. */}
       {visibleProducts.some((p) => !p.properties?.is_free) && (
@@ -613,13 +613,13 @@ export const PricingCard = ({
                  - this card is one the viewer can fresh-subscribe to
                    (scenario `"new"` for users with no plan record,
                    `"upgrade"` for users on the auto-default free plan
-                   moving to a paid tier — both mean "not currently on
+                   moving to a paid tier, both mean "not currently on
                    this card"; "active"/"scheduled"/"renew"/"cancel"
                    indicate the viewer is on or scheduled-onto this
                    card and should NOT see the trial promo), AND
                  - the viewer is trial-eligible: never trialed any plan
                    (per Autumn's trials_used record) and not on a paid
-                   plan — no trial promos while trialing, paying, or
+                   plan, no trial promos while trialing, paying, or
                    after a past trial. */}
             {product.properties?.has_trial &&
               (product.scenario === "new" ||
@@ -688,7 +688,7 @@ export const PricingFeatureList = ({
 }: {
   items: ProductItem[];
   everythingFrom?: string;
-  /** Display-only bullets (see EXTRA_PLAN_FEATURES) — not Autumn features. */
+  /** Display-only bullets (see EXTRA_PLAN_FEATURES), not Autumn features. */
   extraFeatureKeys?: string[];
   className?: string;
   tFeatures?: ReturnType<typeof useTranslations>;
@@ -735,7 +735,7 @@ export const PricingFeatureList = ({
         {extraFeatureKeys?.map((key) => (
           <FeatureBullet key={key} label={t(key)} />
         ))}
-        {/* Not a metered Autumn item — every plan has it, so it only belongs
+        {/* Not a metered Autumn item. Every plan has it, so it only belongs
             on the base card. Higher tiers inherit it via "Everything from". */}
         {!everythingFrom && (
           <FeatureBullet
@@ -769,7 +769,7 @@ export const PricingCardButton = React.forwardRef<
     }
   };
 
-  // One element description rendered in both hover layers — reusing the same
+  // One element description rendered in both hover layers. Reusing the same
   // element object in two tree positions is legal React and keeps the DOM
   // identical to spelling the pair out twice.
   const label = (

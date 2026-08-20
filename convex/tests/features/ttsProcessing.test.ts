@@ -31,7 +31,7 @@ vi.mock("../../rateLimiter", () => ({
 
 import { textsMatchSemantic } from "../../lib/ttsSemanticValidation";
 import { rateLimiter } from "../../rateLimiter";
-// The workpools are module-mocked globally (tests/convexTestSetup.ts — outside convex/ on purpose, see vitest.config.ts):
+// The workpools are module-mocked globally (tests/convexTestSetup.ts, outside convex/ on purpose, see vitest.config.ts):
 // `enqueueAction` is a vi.fn() resolving to unique fake workIds
 // ('test-tts-work-N'), so tests can assert claim→workId stamping and drive
 // the onComplete handlers by hand.
@@ -49,7 +49,7 @@ const mockEnqueue = vi.mocked(ttsPool.enqueueAction);
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
-// Some flows still run 0ms scheduled work — drain it inside the test context
+// Some flows still run 0ms scheduled work. Drain it inside the test context
 // so its logs don't race vitest teardown.
 drainSchedulerAfterEach();
 
@@ -60,7 +60,7 @@ beforeEach(() => {
   mockLimit.mockResolvedValue({ ok: true, retryAfter: 0 });
   mockCheck.mockReset();
   mockCheck.mockResolvedValue({ ok: true, retryAfter: 0 });
-  // Clear calls only — the setup-file implementation (unique fake workIds)
+  // Clear calls only. The setup-file implementation (unique fake workIds)
   // must stay installed.
   mockEnqueue.mockClear();
 });
@@ -132,7 +132,7 @@ describe("features/ttsProcessing", () => {
       expect(await claim(t, textId)).toBeNull();
     });
 
-    it("a claim several minutes old is still fresh — staleness is 10 minutes", async () => {
+    it("a claim several minutes old is still fresh, staleness is 10 minutes", async () => {
       // Under the pre-workpool 30s window this claim would have been
       // reclaimed; the pool's guaranteed onComplete owns the release now, so
       // staleness is only a catastrophic backstop.
@@ -201,7 +201,7 @@ describe("features/ttsProcessing", () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
       // A stale backfill's claim was reclaimed and stamped by a live pool job
-      // mid-flight; the backfill's finally-release must not delete it — the
+      // mid-flight; the backfill's finally-release must not delete it. The
       // pool job's onComplete owns it now.
       await t.run(async (ctx) => {
         await ctx.db.insert("ttsGenerationClaims", {
@@ -349,8 +349,8 @@ describe("features/ttsProcessing", () => {
         args: baseJobArgs(textId),
       });
 
-      // No duplicate synthesis, and the live owner keeps its claim —
-      // this guard stops an enqueue that doesn't re-claim from hijacking an
+      // No duplicate synthesis, and the live owner keeps its claim.
+      // This guard stops an enqueue that doesn't re-claim from hijacking an
       // in-flight job's claim.
       expect(mockEnqueue).not.toHaveBeenCalled();
       const claim = await getClaim(t, textId);
@@ -552,7 +552,7 @@ describe("features/ttsProcessing", () => {
     }
 
     // The pipeline writes thin pointer rows into the shared audioAssets
-    // store — resolve to the payload the row actually plays.
+    // store. Resolve to the payload the row actually plays.
     async function getAudio(
       t: TestConvex<typeof schema>,
       textId: Id<"texts">,
@@ -599,7 +599,7 @@ describe("features/ttsProcessing", () => {
       ).toBe(true);
     });
 
-    it("a pool job leaves the claim in place — release belongs to onTtsJobComplete", async () => {
+    it("a pool job leaves the claim in place, release belongs to onTtsJobComplete", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
       mockSemantic.mockReset();
@@ -659,7 +659,7 @@ describe("features/ttsProcessing", () => {
 
         const audio = await getAudio(t, textId);
         expect(audio?.ttsQuality).toBe("unvalidated");
-        // One Gemini call per attempt — strict fails first, then Gemini runs.
+        // One Gemini call per attempt. Strict fails first, then Gemini runs.
         expect(mockSemantic).toHaveBeenCalledTimes(2);
         const mismatches = await getMismatches(t, textId);
         expect(mismatches.length).toBe(2);
@@ -681,7 +681,7 @@ describe("features/ttsProcessing", () => {
       });
 
       it("Chinese homophone swap passes strict via pinyin match → no Gemini call", async () => {
-        // Seed a Chinese text — seedText uses 'es', so insert a fresh one.
+        // Seed a Chinese text. seedText uses 'es', so insert a fresh one.
         const t = convexTest(schema, modules);
         const zhTextId = await t.run(async (ctx) => {
           const collectionId = await ctx.db.insert("collections", {
@@ -705,9 +705,9 @@ describe("features/ttsProcessing", () => {
           audioContent: Buffer.from("fake").toString("base64"),
         });
         // STT transcription swaps 他 → 她 (same pinyin: "tā"). Strict
-        // on hanzi would fail (edit distance 1 is the limit — but the
+        // on hanzi would fail (edit distance 1 is the limit, but the
         // normalized hanzi are clearly different characters). Pinyin of
-        // both is "tā zài jiā" — identical, so strict passes at
+        // both is "tā zài jiā". Identical, so strict passes at
         // distance 0.
         const azureSttBody = JSON.stringify({
           combinedPhrases: [{ text: "她在家" }],
@@ -769,7 +769,7 @@ describe("features/ttsProcessing", () => {
     });
 
     describe("rate-limit token metering", () => {
-      it("reserves a provider token for EVERY synthesis attempt — validation re-synthesis is metered", async () => {
+      it("reserves a provider token for EVERY synthesis attempt, validation re-synthesis is metered", async () => {
         const t = convexTest(schema, modules);
         const { textId } = await seedText(t);
         mockSemantic.mockReset();
@@ -791,7 +791,7 @@ describe("features/ttsProcessing", () => {
       it("throws without consuming a token when the bucket's projected wait exceeds the cap", async () => {
         // Bucket saturated: projected wait (60s) > TTS_TOKEN_MAX_WAIT_MS
         // (15s). The worker must throw (freeing its pool slot for other
-        // providers) instead of sleeping — the pool's backoff retries later.
+        // providers) instead of sleeping. The pool's backoff retries later.
         const t = convexTest(schema, modules);
         const { textId } = await seedText(t);
         mockCheck.mockResolvedValue({ ok: true, retryAfter: 60_000 });
@@ -812,7 +812,7 @@ describe("features/ttsProcessing", () => {
         }
 
         expect(fetchMock).not.toHaveBeenCalled();
-        // Fast-fail uses check (non-consuming) BEFORE limit — a rejected call
+        // Fast-fail uses check (non-consuming) BEFORE limit. A rejected call
         // must not burn a reservation it walks away from.
         expect(mockLimit).not.toHaveBeenCalled();
       });
@@ -861,7 +861,7 @@ describe("features/ttsProcessing", () => {
         expect(limitBuckets.filter((b) => b === "azureStt").length).toBe(0);
       });
 
-      it("a provider 429 propagates to the pool — no self-re-enqueue", async () => {
+      it("a provider 429 propagates to the pool, no self-re-enqueue", async () => {
         const t = convexTest(schema, modules);
         const { textId } = await seedText(t);
 
@@ -934,7 +934,7 @@ describe("features/ttsProcessing", () => {
     });
 
     it("keeps an existing row when the language's active provider doesn't override its provider", async () => {
-      // yue is on MiniMax, whose override list never includes Gemini — so a
+      // yue is on MiniMax, whose override list never includes Gemini, so a
       // stray Gemini row for a MiniMax-routed language must be kept as-is.
       // (The fixture carries no ttsVersion stamp, so the "undefined ===
       // current" rule keeps it out of the version-stale sweep too; since bn /

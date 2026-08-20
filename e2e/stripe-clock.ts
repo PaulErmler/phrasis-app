@@ -10,13 +10,13 @@ import path from "node:path";
  * is connected to (Stripe dashboard → Developers → API keys, test mode).
  * Resolution order:
  *   1. `STRIPE_TEST_SECRET_KEY` in the Playwright process env, or
- *   2. `.env.local` at the repo root — the Playwright runner does not load
+ *   2. `.env.local` at the repo root: the Playwright runner does not load
  *      it (only Next.js does), so it is parsed here: `STRIPE_TEST_SECRET_KEY`
  *      if present, else any `*STRIPE*` variable whose value is a test-mode
  *      secret key.
  * The spec skips when neither yields a key. A live-mode key is refused
- * outright — everything here creates customers, advances time, and fails
- * charges — and values are never logged.
+ * outright. Everything here creates customers, advances time, and fails
+ * charges, and values are never logged.
  */
 
 const STRIPE_API = "https://api.stripe.com/v1";
@@ -57,7 +57,7 @@ export function stripeTestKey(): string | undefined {
   const preferred = env.STRIPE_TEST_SECRET_KEY;
   if (preferred && isTestKey(preferred)) return preferred;
   for (const [name, value] of Object.entries(env)) {
-    // Live-mode (or non-key) values are silently skipped — never referenced
+    // Live-mode (or non-key) values are silently skipped, never referenced
     // in errors or logs.
     if (/STRIPE/i.test(name) && isTestKey(value)) return value;
   }
@@ -83,7 +83,7 @@ async function stripeFetch<T>(
   });
   const json = (await res.json()) as T & { error?: { message?: string } };
   if (!res.ok) {
-    // Never echo the request (it could embed the key via a bug) — Stripe's
+    // Never echo the request (it could embed the key via a bug), Stripe's
     // error message is enough.
     throw new Error(
       `Stripe ${method} ${path} failed (${res.status}): ${json?.error?.message ?? "unknown"}`,
@@ -145,7 +145,7 @@ export async function attachTestCard(
 /**
  * Advance the clock to `toUnixSeconds` and wait until Stripe finishes
  * processing (status back to 'ready'). Stripe generates the interim events
- * — renewal invoices, charges, cancellations — while 'advancing'.
+ * Renewal invoices, charges, cancellations, while 'advancing'.
  */
 export async function advanceClock(
   key: string,
@@ -225,7 +225,7 @@ function normalizeSubscription(raw: RawSubscription): SubscriptionLite {
 
 /**
  * Is the subscription scheduled to end at its period end (rather than
- * renewing)? Either Stripe spelling counts — see the `cancel_at` note on
+ * renewing)? Either Stripe spelling counts. See the `cancel_at` note on
  * SubscriptionLite. The 26h slack absorbs Autumn anchoring the timestamp a
  * few minutes past the period boundary.
  */
@@ -280,7 +280,7 @@ export async function findCustomerByEmail(
   email: string,
 ): Promise<string | undefined> {
   // The list filter, NOT `/customers/search`: search reads a separate index
-  // with up-to-a-minute lag, and it raced the e2e flow — the customer Autumn
+  // with up-to-a-minute lag, and it raced the e2e flow. The customer Autumn
   // creates at signup was invisible to search minutes later (live failure,
   // 2026-08-10). The list endpoint is read-your-writes consistent.
   const res = await stripeFetch<{ data: Array<{ id: string }> }>(
@@ -292,7 +292,7 @@ export async function findCustomerByEmail(
 }
 
 /**
- * Cancel a subscription immediately AT STRIPE (DELETE — no proration
+ * Cancel a subscription immediately AT STRIPE (DELETE, no proration
  * invoice, so it works on Managed Payments subscriptions, where Stripe
  * forbids merchant-created invoices and Autumn's own `cancel_immediately`
  * therefore 400s). On an unclocked customer the cancellation carries

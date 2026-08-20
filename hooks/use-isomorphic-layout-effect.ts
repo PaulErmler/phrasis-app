@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect } from 'react';
  *
  * React warns when `useLayoutEffect` runs during SSR, but the hooks that need
  * it (cached-query hydration, snapshot restore, counter seeding) all read
- * client-only state and must do so synchronously before paint — otherwise the
+ * client-only state and must do so synchronously before paint, otherwise the
  * first visible frame shows a placeholder value and then jumps.
  *
  * Shared so the three call sites can't drift; each used to declare its own

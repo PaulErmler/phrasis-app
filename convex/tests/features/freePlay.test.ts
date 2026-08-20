@@ -12,7 +12,7 @@ const modules = import.meta.glob("/convex/**/*.ts");
 drainSchedulerAfterEach();
 
 /**
- * Free play — ONE scheduling mode ('radio') with two faces, chosen by
+ * Free play. ONE scheduling mode ('radio') with two faces, chosen by
  * `reviewMode`: Radio while listening (`'audio'`), Free Study while typing
  * (`'full'`). The faces share the round-robin mechanic but keep their own card
  * rotation fields (radio* vs freeStudy*), so practising a card in one face
@@ -20,7 +20,7 @@ drainSchedulerAfterEach();
  *
  * The radio-face mechanic itself is covered in scheduling.test.ts; these tests
  * focus on the writing face, the shared advance mutation, its stats bucket,
- * undo, and — most importantly — the independence of the two rotations.
+ * undo, and. Most importantly. The independence of the two rotations.
  */
 
 /**
@@ -151,7 +151,7 @@ async function seedFreePlayDeck(
   });
 }
 
-/** Flip the review mode — i.e. switch free-play faces mid-session, exactly as
+/** Flip the review mode, i.e. switch free-play faces mid-session, exactly as
  *  the settings-sheet switcher does. */
 async function setReviewMode(
   t: TestConvex<typeof schema>,
@@ -182,7 +182,7 @@ async function setStudyContentFilter(
   });
 }
 
-describe("features/scheduling — free play", () => {
+describe("features/scheduling: free play", () => {
   // --------------------------------------------------------------------------
   // getCardForReview (writing face)
   // --------------------------------------------------------------------------
@@ -214,7 +214,7 @@ describe("features/scheduling — free play", () => {
 
     it("orders by the freeStudy fields, not the radio fields", async () => {
       // Radio ordering would pick card 0 (radio counter 0); the writing face
-      // must pick card 1 (freeStudy counter 0) — the rotations are independent.
+      // must pick card 1 (freeStudy counter 0), the rotations are independent.
       const t = convexTest(schema, modules);
       const { cardIds } = await seedFreePlayDeck(t, [
         { counter: 7, radioCounter: 0 },
@@ -366,7 +366,7 @@ describe("features/scheduling — free play", () => {
       expect(card?.freeStudyPlayCount).toBe(1);
     });
 
-    it("does not modify FSRS state, dueDate, schedulingPhase, preReviewCount — or the radio fields", async () => {
+    it("does not modify FSRS state, dueDate, schedulingPhase, preReviewCount, or the radio fields", async () => {
       const t = convexTest(schema, modules);
       const { cardIds } = await seedFreePlayDeck(t, [
         {
@@ -389,7 +389,7 @@ describe("features/scheduling — free play", () => {
       expect(after?.schedulingPhase).toBe(before?.schedulingPhase);
       expect(after?.preReviewCount).toBe(before?.preReviewCount);
       expect(after?.fsrsState).toEqual(before?.fsrsState);
-      // Radio rotation untouched — the two faces are independent.
+      // Radio rotation untouched. The two faces are independent.
       expect(after?.radioRoundCounter).toBe(3);
       expect(after?.radioOrderKey).toBe(42);
       expect(after?.radioPlayCount).toBe(before?.radioPlayCount);
@@ -447,9 +447,9 @@ describe("features/scheduling — free play", () => {
   });
 
   // --------------------------------------------------------------------------
-  // Stats — per-face buckets, progress bar excluded
+  // Stats. Per-face buckets, progress bar excluded
   // --------------------------------------------------------------------------
-  describe("advanceFreePlayCard — stats", () => {
+  describe("advanceFreePlayCard: stats", () => {
     it("writes dailyStats with reviewsByMode.freeStudy + timeMsByMode.freeStudy", async () => {
       const t = convexTest(schema, modules);
       const { cardIds, courseId } = await seedFreePlayDeck(t, [{ counter: 0 }]);
@@ -659,7 +659,7 @@ describe("features/scheduling — free play", () => {
       expect(stats?.totalReviewsByMode?.freeStudy).toBe(0);
       expect(daily?.reps).toBe(0);
       expect(daily?.reviewsByMode?.freeStudy).toBe(0);
-      // Time deliberately stays — the practice genuinely happened.
+      // Time deliberately stays. The practice genuinely happened.
       expect(daily?.timeMs).toBe(3000);
 
       // The restored card is at the front of the queue again.
@@ -671,7 +671,7 @@ describe("features/scheduling — free play", () => {
       // Undo is scoped to the rotation on screen: popping a typing play while
       // looking at the listening queue would restore counters the visible
       // queue doesn't read. Flipping the switcher logs nothing, though, so the
-      // entry is only hidden — never lost.
+      // entry is only hidden, never lost.
       const t = convexTest(schema, modules);
       const { cardIds, courseId } = await seedFreePlayDeck(t, [{ counter: 0 }]);
       const asUser = t.withIdentity({ subject: "user_A" });
@@ -754,7 +754,7 @@ describe("features/scheduling — free play", () => {
     });
   });
 
-  describe("advanceRadioCard — deprecated back-compat alias", () => {
+  describe("advanceRadioCard: deprecated back-compat alias", () => {
     /**
      * Client bundles built before the radio→free-play rename (open tabs,
      * cached PWA/Capacitor builds) still call `advanceRadioCard` and read
@@ -804,10 +804,10 @@ describe("features/scheduling — free play", () => {
 });
 
 // ----------------------------------------------------------------------------
-// Content filter (studyContentFilter) — the rotation, the catch-up floor, and
+// Content filter (studyContentFilter), the rotation, the catch-up floor, and
 // the home-screen gate must all see the SAME filtered population.
 // ----------------------------------------------------------------------------
-describe("features/scheduling — free play under a content filter", () => {
+describe("features/scheduling: free play under a content filter", () => {
   it("serves only cards of the allowed origin", async () => {
     const t = convexTest(schema, modules);
     const { courseId } = await seedFreePlayDeck(t, [
@@ -824,7 +824,7 @@ describe("features/scheduling — free play under a content filter", () => {
   /**
    * The regression this exists for: the advance's catch-up floor was read
    * from the UNfiltered rotation, so with "Course only" active a hidden
-   * custom card stuck at counter 0 anchored the floor — a fresh premade card
+   * custom card stuck at counter 0 anchored the floor. A fresh premade card
    * jumped to 1 instead of past the premade veterans and was re-served
    * dozens of times in a row.
    */
@@ -834,7 +834,7 @@ describe("features/scheduling — free play under a content filter", () => {
       { counter: 0, text: "fresh", origin: "premade" },
       { counter: 50, text: "veteran-a", origin: "premade" },
       { counter: 51, text: "veteran-b", origin: "premade" },
-      // Filtered out under 'course' — must NOT anchor the floor at 0.
+      // Filtered out under 'course'. Must NOT anchor the floor at 0.
       { counter: 0, text: "invisible-custom", origin: "custom" },
     ]);
     await setStudyContentFilter(t, courseId, "course");

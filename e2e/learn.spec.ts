@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Learn surface smoke — the Learn overlay opens on top of the home view.
+ * Learn surface smoke. The Learn overlay opens on top of the home view.
  *
  * Visiting /app/learn directly causes MainLayout to mount with isLearnOpen,
  * pushing the LearnView component. We assert the overlay container and
@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
 test.describe('learn view', () => {
   test('learn overlay mounts at /app/learn', async ({ page }) => {
     await page.goto('/app/learn');
-    // Wait for app shell — the bottom nav is rendered by MainLayout.
+    // Wait for app shell. The bottom nav is rendered by MainLayout.
     await page.waitForLoadState('domcontentloaded');
 
     // The overlay should expose either:
@@ -52,7 +52,7 @@ test.describe('learn view', () => {
 
     const dialog = page.getByRole('dialog').first();
     await expect(dialog).toBeVisible({ timeout: 8_000 });
-    // The legend lists the new shortcuts as <kbd> chips — R, T and ← must
+    // The legend lists the new shortcuts as <kbd> chips. R, T and ← must
     // all be present.
     await expect(
       dialog.locator('kbd', { hasText: /^R$/ }).first(),

@@ -8,17 +8,17 @@ import { isUserCreatedText } from '../../lib/translationProvenance';
 /**
  * Proactive content warmup for the high-traffic languages (the Jul 2026 usage
  * chart: Arabic MSA, Chinese Simplified, Spanish Spain + LatAm, German,
- * French, Italian, Japanese, Russian, Korean, Greek — English is source-only
+ * French, Italian, Japanese, Russian, Korean, Greek. English is source-only
  * and gets its audio ensured automatically for every processed text, since
  * `scheduleMissingContent` always includes the text's own language).
  *
  * Deliberately NOT a full-table sweep: it warms exactly the content a new
- * user hits first — the first {@link TEXTS_PER_COLLECTION} premade sentences
+ * user hits first. The first {@link TEXTS_PER_COLLECTION} premade sentences
  * of every collection, plus all onboarding placement-test sentences. For each
  * of those texts it calls `scheduleMissingContent` with the warmup languages
  * as targets, so translations/audio are CREATED where missing and REGENERATED
  * where a `translationVersion` / `ttsVersion` bump (or provider switch) made
- * them stale — and skipped entirely when current. Re-running after a
+ * them stale, and skipped entirely when current. Re-running after a
  * completed warmup is a cheap no-op pass. All the "only if necessary" logic
  * lives in `scheduleMissingContent`; this file only picks the text set.
  *
@@ -81,7 +81,7 @@ export const warmupChartLanguages = internalMutation({
 
     const warmText = async (textId: Id<'texts'>) => {
       const text = await ctx.db.get(textId);
-      // Premade content only — custom/user texts stay on the lazy path.
+      // Premade content only. Custom/user texts stay on the lazy path.
       if (!text || isUserCreatedText(text)) return;
       const scheduled = await scheduleMissingContent(
         ctx,

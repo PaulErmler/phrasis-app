@@ -110,10 +110,10 @@ async function hasMissingContent(
   });
 }
 
-describe("buildTextContentBatchForLanguages — romanization sentinel", () => {
+describe("buildTextContentBatchForLanguages: romanization sentinel", () => {
   // `zh` needs romanization; `en` does not. The empty string is the
   // "tried, failed, leave empty" sentinel the romanization workers persist
-  // after exhausting their retries — the schedulers in decks.ts never
+  // after exhausting their retries. The schedulers in decks.ts never
   // re-enqueue it, so reporting the card as incomplete would ask forever for
   // work nothing is willing to do.
   it("treats a sentinel romanization on a translation as attempted", async () => {
@@ -163,7 +163,7 @@ describe("buildTextContentBatchForLanguages — romanization sentinel", () => {
   });
 });
 
-describe("buildTextContentBatchForLanguages — word timings", () => {
+describe("buildTextContentBatchForLanguages: word timings", () => {
   // `scheduleTimingsBackfillIfNeeded` refuses to schedule a backfill for
   // languages our STT backend can't transcribe, so flagging those cards as
   // incomplete asks for work that is deliberately never done.

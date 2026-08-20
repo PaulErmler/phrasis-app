@@ -15,8 +15,8 @@ import {
 } from '../fixtures';
 
 /**
- * Real StatsView building blocks (all pure/prop-driven) fed with mock data —
- * mirrors the layout of components/app/stats/StatsView.tsx minus the
+ * Real StatsView building blocks (all pure/prop-driven) fed with mock data.
+ * Mirrors the layout of components/app/stats/StatsView.tsx minus the
  * Convex-backed word cloud.
  */
 export function StatsScreen() {

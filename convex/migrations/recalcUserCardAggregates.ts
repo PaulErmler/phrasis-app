@@ -20,7 +20,7 @@ const BATCH_SIZE = 75;
 
 /**
  * Entry point: rebuild all card aggregates for every card under every
- * deck the given user owns. Only enumerates the decks here — clearing and
+ * deck the given user owns. Only enumerates the decks here, clearing and
  * re-inserting happens one deck per scheduled mutation, because a single
  * deck's clear is 32 aggregate namespace calls (states × origin buckets) and
  * doing every deck in one transaction can blow the mutation limits and fail
@@ -60,7 +60,7 @@ export const run = internalMutation({
 
 /**
  * Self-continuing worker. For each deck the clear runs as TWO scheduled
- * steps — shared-track namespaces, then writing-track — before paging through
+ * steps. Shared-track namespaces, then writing-track, before paging through
  * the deck's cards to re-insert, then advancing to the next deck (which starts
  * with its own clear steps).
  *

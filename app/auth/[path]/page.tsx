@@ -60,15 +60,15 @@ export default async function AuthPage({
             base: 'w-full',
             content: 'flex flex-col-reverse',
             // The reset-password footer only holds a "Go back" button that
-            // calls window.history.back() — a no-op when the page is opened
+            // calls window.history.back(), a no-op when the page is opened
             // from the emailed reset link in a fresh tab. Hide it; a
             // successful reset redirects to sign-in anyway.
             ...(path === 'reset-password' ? { footer: 'hidden' } : {}),
           }}
           {...(isSignInOrUp && {
             // cardHeader REPLACES the default title block, so it recreates the
-            // title and adds the store-shell social buttons directly beneath —
-            // inside the card, above the email form (NativeSocialButtons
+            // title and adds the store-shell social buttons directly beneath.
+            // Inside the card, above the email form (NativeSocialButtons
             // self-hides on the regular website, leaving just the title).
             cardHeader: (
               <>

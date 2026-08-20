@@ -5,7 +5,7 @@ import { createHomeTour } from '@/lib/tutorials/home-tour';
  * The home tour's third start button is mode-dependent: Shadowing shows
  * Radio, Writing shows Free Study. `StartLearningButton` picks the button's
  * `data-tutorial` anchor from `courseSettings.reviewMode`, and this factory
- * picks the matching step + copy from the same value — so the two must
+ * picks the matching step + copy from the same value, so the two must
  * agree, or the step highlights an element that isn't on screen and
  * silently degrades to a centered popover with the wrong description.
  *
@@ -21,7 +21,7 @@ const elementsOf = (ctx?: Parameters<typeof createHomeTour>[1]) =>
 const titlesOf = (ctx?: Parameters<typeof createHomeTour>[1]) =>
   createHomeTour(t, ctx).steps.map((s) => s.popover?.title);
 
-describe('createHomeTour — mode-dependent free-play step', () => {
+describe('createHomeTour: mode-dependent free-play step', () => {
   it('anchors Radio and uses radio copy in Shadowing', () => {
     const ctx = { reviewMode: 'audio' as const };
     expect(elementsOf(ctx)).toContain('[data-tutorial="radio-mode"]');
@@ -44,7 +44,7 @@ describe('createHomeTour — mode-dependent free-play step', () => {
     expect(elementsOf()).toContain('[data-tutorial="radio-mode"]');
   });
 
-  it('swaps exactly one step — the rest of the tour is identical', () => {
+  it('swaps exactly one step, the rest of the tour is identical', () => {
     const audio = elementsOf({ reviewMode: 'audio' });
     const full = elementsOf({ reviewMode: 'full' });
     expect(audio).toHaveLength(full.length);

@@ -10,8 +10,8 @@ export interface CardOriginPill {
 
 /**
  * Build the card-origin pill from a card's collection fields, shared by the
- * learn view and the library. Returns null when the pill should be hidden —
- * setting off, or the collection couldn't be resolved.
+ * learn view and the library. Returns null when the pill should be hidden.
+ * Setting off, or the collection couldn't be resolved.
  */
 export function buildCardOriginPill(
   show: boolean,

@@ -46,7 +46,7 @@ describe('hasLocalRomanization', () => {
   });
 });
 
-describe('romanizeLocal — Chinese (zh / zh_traditional)', () => {
+describe('romanizeLocal: Chinese (zh / zh_traditional)', () => {
   it('routes both Chinese codes through chinese-to-pinyin', () => {
     expect(getRomanizationSource('zh')).toBe(
       ROMANIZATION_SOURCES.chineseToPinyin,
@@ -91,14 +91,14 @@ describe('romanizeLocal — Chinese (zh / zh_traditional)', () => {
   });
 });
 
-describe('romanizeLocal — Korean (ko)', () => {
+describe('romanizeLocal: Korean (ko)', () => {
   it('routes ko through es-hangul', () => {
     expect(getRomanizationSource('ko')).toBe(ROMANIZATION_SOURCES.esHangul);
   });
 
   it('applies Revised Romanization pronunciation rules, not letter mapping', () => {
     // hangul-romanization transliterated the spelling: hangukmal / gati /
-    // sinra / johayo — misleading as a pronunciation guide.
+    // sinra / johayo, misleading as a pronunciation guide.
     expect(romanizeLocal('한국말', 'ko')).toBe('hangungmal');
     expect(romanizeLocal('같이', 'ko')).toBe('gachi');
     expect(romanizeLocal('신라', 'ko')).toBe('silla');
@@ -112,7 +112,7 @@ describe('romanizeLocal — Korean (ko)', () => {
   });
 });
 
-describe('romanizeLocal — Cantonese (yue / yue_traditional)', () => {
+describe('romanizeLocal: Cantonese (yue / yue_traditional)', () => {
   it('routes both Cantonese codes through to-jyutping', () => {
     expect(getRomanizationSource('yue')).toBe(ROMANIZATION_SOURCES.toJyutping);
     expect(getRomanizationSource('yue_traditional')).toBe(
@@ -171,7 +171,7 @@ describe('romanizeLocal — Cantonese (yue / yue_traditional)', () => {
   });
 });
 
-describe('romanizeLocal — Persian (fa)', () => {
+describe('romanizeLocal: Persian (fa)', () => {
   it('routes fa through @sindresorhus/transliterate', () => {
     expect(getRomanizationSource('fa')).toBe(
       ROMANIZATION_SOURCES.sindresorhusTransliterate,

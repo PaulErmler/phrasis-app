@@ -14,7 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 
 /**
- * Language pair step — Variant A.
+ * Language pair step. Variant A.
  *
  * One big question at a time (learn → speak), then a ready confirmation with
  * swap. Target is asked first because that’s the question users usually have

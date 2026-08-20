@@ -40,7 +40,7 @@ export function ExpandedWordsDialog({
   // larger page is being fetched so the UI doesn't flicker and only the new
   // words animate in at the bottom.
   const [displayed, setDisplayed] = useState<string[]>([]);
-  // Index of the first item in the newest batch — used to animate only the
+  // Index of the first item in the newest batch. Used to animate only the
   // tail that just arrived. Updated in the same effect that commits `words`.
   const [newFromIndex, setNewFromIndex] = useState(0);
   const prevLengthRef = useRef(0);

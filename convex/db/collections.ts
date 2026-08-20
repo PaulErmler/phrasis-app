@@ -11,7 +11,7 @@ import {
 
 /**
  * Get the globally active dataset, or null if none is active (i.e. before the
- * OGTE V1 cutover). The dataset is language-agnostic at the query level — its
+ * OGTE V1 cutover). The dataset is language-agnostic at the query level. Its
  * source texts are translated into all target languages via the `translations`
  * table, so a single active row serves every learner regardless of target
  * language.
@@ -29,7 +29,7 @@ export async function getActiveDataset(
  * Load the premade level collections shown across the app, plus the active
  * dataset they belong to (or null pre-cutover).
  *
- * Only fetches the rows actually displayed — either the active dataset's ~20
+ * Only fetches the rows actually displayed, either the active dataset's ~20
  * collections (one indexed scan of `by_datasetId_and_order`) or the seven
  * legacy CEFR rows by name (one indexed `first()` each). Avoids the global
  * `collections` scan that would otherwise grow with every user's custom and
@@ -138,7 +138,7 @@ export async function getNextCollection(
 
 /**
  * Walk forward from `current` (inclusive) and return the first collection
- * that is not yet complete for the given user/course — complete meaning every
+ * that is not yet complete for the given user/course. Complete meaning every
  * text either added (`cardsAdded`) or deliberately ignored (`ignoredCount`),
  * measured against the carry-widened total so a cutover user's levels aren't
  * skipped before they've studied them (see `isCollectionComplete`).
@@ -205,9 +205,9 @@ export async function getCollectionProgressForCourse(
 /**
  * Get the next `limit` texts from a collection after the given rank.
  *
- * - `onlyCurriculum` — only seed/dataset texts (userCreated === false).
+ * - `onlyCurriculum`: only seed/dataset texts (userCreated === false).
  *   Prevents user forks from leaking into shared difficulty collections.
- * - `forUserId` — only texts owned by this user.
+ * - `forUserId`: only texts owned by this user.
  *   Scopes custom/chat collections to the requesting user.
  *
  * The two flags are mutually exclusive; `onlyCurriculum` takes precedence.

@@ -110,7 +110,7 @@ async function seedCourse(
 }
 
 // The pool stamps a branded WorkId on every job. The seed's onComplete handler
-// ignores it — batches are stateless, so there is nothing to correlate — and
+// ignores it. Batches are stateless, so there is nothing to correlate, and
 // tests only need a placeholder that satisfies the brand.
 const FAKE_WORK_ID = 'work_test' as WorkId;
 
@@ -174,7 +174,7 @@ describe('separateModeTracking', () => {
       await drainScheduler();
 
       // A free-play-only card must NOT look review-touched on the writing
-      // track — that would permanently suppress the "first review" counters.
+      // track. That would permanently suppress the "first review" counters.
       const freePlayed = await getCard(t, cardIds[0]);
       expect(freePlayed.writingLastReviewedAt).toBeUndefined();
       const reviewed = await getCard(t, cardIds[1]);
@@ -233,7 +233,7 @@ describe('separateModeTracking', () => {
       expect(reason).toEqual({ reason: 'preparing_writing' });
     });
 
-    // The seed carries NO state between batches — it relocates its remaining
+    // The seed carries NO state between batches. It relocates its remaining
     // work through `by_deck_writingDue` each run. That is what makes a lost
     // batch survivable, so it is asserted directly: run one batch, then invoke
     // the next with nothing but the courseId and expect it to pick up exactly
@@ -272,7 +272,7 @@ describe('separateModeTracking', () => {
     });
 
     // Hidden and mastered cards are excluded from every writing DUE index, but
-    // they must still be seeded — they can be unhidden or demastered later, at
+    // they must still be seeded. They can be unhidden or demastered later, at
     // which point the track has to already exist. The seeding index
     // (`by_deck_writingDue`) deliberately has nothing between deckId and
     // writingDueDate for this reason.
@@ -356,7 +356,7 @@ describe('separateModeTracking', () => {
 
     // Free Study resolves to track 'writing' too (same settings combination),
     // but it serves from the free-play rotation and never reads the writing
-    // queue — so a seed in progress says nothing about why its rotation is
+    // queue, so a seed in progress says nothing about why its rotation is
     // empty, and must not hide the real empty state behind a spinner.
     it('does not report preparing_writing in Free Study', async () => {
       const t = convexTest(schema, modules);
@@ -432,7 +432,7 @@ describe('separateModeTracking', () => {
 
       const after = await getCard(t, cardIds[0]);
       // Shared SCHEDULE untouched. (`lastReviewedAt` is the track-agnostic
-      // activity timestamp — the Library sorts on it — so a writing review
+      // activity timestamp. The Library sorts on it, so a writing review
       // does stamp it, like free play does.)
       expect(after.dueDate).toBe(before.dueDate);
       expect(after.schedulingPhase).toBe('preReview');
@@ -563,7 +563,7 @@ describe('separateModeTracking', () => {
     it('Free Study serves cards with their REAL shared fields, not the writing mask', async () => {
       const t = convexTest(schema, modules);
       // Same settings combo as Writing mode plus free play: the track is
-      // 'writing' but cards come from the rotation — masking their
+      // 'writing' but cards come from the rotation. Masking their
       // preReviewCount/fsrsState made long-known cards look brand new to the
       // client (translation assist reappeared, auto-rating flipped).
       const { cardIds } = await seedCourse(t, {
@@ -636,7 +636,7 @@ describe('separateModeTracking', () => {
           .filter((q) => q.eq(q.field('courseId'), courseId))
           .unique(),
       );
-      // The first real review of the card must increment totalCards — the
+      // The first real review of the card must increment totalCards. The
       // seeded writing track must not make it look already-reviewed.
       expect(stats?.totalCards).toBe(1);
     });
@@ -660,7 +660,7 @@ describe('separateModeTracking', () => {
       });
 
       // FSRS scheduled from the COPIED state (reps 3 → 4), so the stats must
-      // say the same: bucket 'review' (not 'new'), depth 4 (not 1) — exactly
+      // say the same: bucket 'review' (not 'new'), depth 4 (not 1), exactly
       // what an identical backfill-seeded card would have recorded.
       const { daily, depthRows } = await t.run(async (ctx) => ({
         daily: await ctx.db
@@ -682,7 +682,7 @@ describe('separateModeTracking', () => {
     // The counterpart of the test above, and the reason `statsReversal.cardState`
     // is stamped rather than re-derived. The review is BUCKETED from the copied
     // shared state ('review'), but the undo snapshot necessarily records the
-    // card's true writing fields — which on a lazy seed are unset. Re-deriving
+    // card's true writing fields, which on a lazy seed are unset. Re-deriving
     // the bucket from that snapshot decremented 'new' (floored at 0, silently
     // lost) and left 'review' inflated forever, with no way to repair a
     // historical dailyStats row.
@@ -726,7 +726,7 @@ describe('separateModeTracking', () => {
       );
       expect(undone.status).toBe('undone');
 
-      // Back to zero in EVERY bucket — not "review still 1, new floored at 0".
+      // Back to zero in EVERY bucket, not "review still 1, new floored at 0".
       expect(await readBuckets()).toEqual({
         new: 0,
         learning: 0,
@@ -789,7 +789,7 @@ describe('separateModeTracking', () => {
       expect(undone.status).toBe('undone');
 
       const after = await getCard(t, cardIds[0]);
-      // Back to the unseeded state — as if the review never happened.
+      // Back to the unseeded state, as if the review never happened.
       expect(after.writingDueDate).toBeUndefined();
       expect(after.writingFsrsState).toBeUndefined();
       expect(after.writingLastReviewedAt).toBeUndefined();
@@ -816,7 +816,7 @@ describe('separateModeTracking', () => {
         await asUser.query(api.features.scheduling.getUndoableReviewCount, {}),
       ).toBe(1);
 
-      // Flip to Writing (track becomes 'writing') — the shared-track entry is
+      // Flip to Writing (track becomes 'writing'), the shared-track entry is
       // no longer undoable from here.
       await t.run(async (ctx) => {
         await ctx.db.patch(settingsId, { reviewMode: 'full' });
@@ -912,14 +912,14 @@ describe('separateModeTracking', () => {
       const cards = await deckCards(t, deckId);
       expect(cards).toHaveLength(2);
       for (const card of cards) {
-        // Seeded at insert — no backfill needed for cards created while the
+        // Seeded at insert, no backfill needed for cards created while the
         // split is on.
         expect(card.writingDueDate).toBeDefined();
         expect(card.writingIsGraduated).toBe(false);
       }
 
       // And the writing due index actually serves them (the queue every
-      // writing-track query draws from — unseeded cards are excluded by the
+      // writing-track query draws from. Unseeded cards are excluded by the
       // `.gte('writingDueDate', 0)` bound).
       const due = await t.run(async (ctx) =>
         ctx.db
@@ -960,7 +960,7 @@ describe('separateModeTracking', () => {
       const now = Date.now();
       // Card A due only on the shared track; card B due only on the writing
       // track. Texts have no audio, so every card the warmer selects leaves a
-      // ttsGenerationClaims row for its text — which card was warmed is read
+      // ttsGenerationClaims row for its text, which card was warmed is read
       // from there (the processed COUNT alone is 1 for either track and would
       // pass with the selection broken).
       const { settingsId, cardIds } = await seedCourse(t, {

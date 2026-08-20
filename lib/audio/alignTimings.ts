@@ -2,8 +2,8 @@
  * Aligns STT word timings onto the canonical source text.
  *
  * The transcription may differ from the original text (punctuation,
- * capitalization, word splits). The UI should always display the real text —
- * this helper maps the STT-produced timings onto the words the user sees, so
+ * capitalization, word splits). The UI should always display the real text.
+ * This helper maps the STT-produced timings onto the words the user sees, so
  * karaoke highlighting lights up the canonical tokens, not the transcribed
  * ones.
  */
@@ -18,13 +18,13 @@ export interface ScribeWord {
 export interface AlignedWord {
   /** Token exactly as it appears in the source text (including punctuation). */
   display: string;
-  /** Whitespace preceding the token — preserved so rendering looks natural. */
+  /** Whitespace preceding the token. Preserved so rendering looks natural. */
   leading: string;
   /**
    * Non-word run that follows the LAST word in the source text (final period,
    * "!", "؟", etc.). Empty string on every token except the last. Kept off
    * `display` so the last word's clickable span contains only word characters
-   * — mixing in trailing LTR punctuation inside an RTL `<span>` made the
+   * Mixing in trailing LTR punctuation inside an RTL `<span>` made the
    * popover trigger silently fail for Arabic sentences.
    */
   trailing: string;
@@ -53,7 +53,7 @@ export function normalise(s: string): string {
  * Any non-word run that follows the LAST word (final period/quote) is
  * returned separately as `trailing`. Callers render it after the last word's
  * clickable span so the rendered output still includes the final punctuation
- * without contaminating the trigger's child content — historically this
+ * without contaminating the trigger's child content, historically this
  * trailing run was glued onto `display`, but mixing LTR punctuation inside
  * an RTL `<span>` silently broke the popover trigger on Arabic sentences.
  */
@@ -88,8 +88,8 @@ function tokenise(
 /**
  * Walk real-text tokens and Scribe tokens in parallel; for each real token
  * look ahead up to `LOOKAHEAD` Scribe positions for a normalised match. This
- * handles the common transcription drifts — Scribe adding a filler token,
- * merging two words, or dropping punctuation — without collapsing when a
+ * handles the common transcription drifts. Scribe adding a filler token,
+ * merging two words, or dropping punctuation, without collapsing when a
  * single mismatch occurs.
  */
 const LOOKAHEAD = 2;
@@ -178,7 +178,7 @@ export function alignWordTimings(
 
 /**
  * Ratio of real-text tokens that found an exact Scribe match. Useful as a
- * quality gate — callers can render plain text when the ratio is too low.
+ * quality gate. Callers can render plain text when the ratio is too low.
  */
 export function matchRatio(aligned: AlignedWord[]): number {
   if (aligned.length === 0) return 0;
@@ -190,7 +190,7 @@ export function matchRatio(aligned: AlignedWord[]): number {
  * Finds the word whose active window contains `t`. For non-last words the
  * window extends from the word's start to the next word's start (keeps the
  * highlight steady across any gap Scribe leaves between words). For the LAST
- * word it stops at the word's own `end` — once the final syllable finishes
+ * word it stops at the word's own `end`. Once the final syllable finishes
  * the highlight should clear, even if the audio clip has trailing silence.
  */
 export function findCurrentIndex(words: AlignedWord[], t: number): number {

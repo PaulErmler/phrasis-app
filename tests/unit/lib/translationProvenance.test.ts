@@ -52,7 +52,7 @@ describe('mayRegenerateTranslation', () => {
 
   it('refuses human-authored rows even on premade texts', () => {
     // Curated rows live on premade texts, so the userCreated half of the guard
-    // does not cover them — a translationVersion bump must not undo curation.
+    // does not cover them. A translationVersion bump must not undo curation.
     expect(
       mayRegenerateTranslation(premade, {
         translationSource: CURATED_TRANSLATION_SOURCE,

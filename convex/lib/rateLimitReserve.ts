@@ -16,7 +16,7 @@ export type RateLimitName =
  *   (smooth pacing; with pool-bounded concurrency the wait stays small).
  * - Projected wait > `maxWaitMs` → THROW without consuming, so a workpool
  *   worker frees its parallelism slot and the pool's jittered backoff retries
- *   later — a throttled provider must not pin slots other providers could use.
+ *   later: a throttled provider must not pin slots other providers could use.
  *
  * Fast-fail uses `check` (non-consuming) before `limit` (consuming) so a
  * rejected call doesn't burn a reservation it walks away from. The small

@@ -15,21 +15,21 @@ import { baseDriverConfig, resolveStepAnchors } from './driver-common';
 import type { TranslateFn } from './types';
 
 /**
- * One-time tips inside the real learning mode — the app's teaching layer
+ * One-time tips inside the real learning mode. The app's teaching layer
  * since the onboarding wizard stopped embedding a tutorial lesson
  * (2026-08).
  *
  * Two tip families, all persisted per-user through `completedTutorials`
  * (localStorage-first with DB backfill, via `useCompletedTutorials`):
  *
- * 1. **Intro concepts** — the walkthrough of the current review mode,
+ * 1. **Intro concepts**. The walkthrough of the current review mode,
  *    shown on the first card. Persisted PER CONCEPT, so switching modes
  *    later replays nothing: only the new mode's own concepts (typing input
  *    and its rating scale for Writing; reveal/audio controls and its
  *    rating scale for Shadowing) appear, prefaced by a "Switched to …"
  *    welcome.
  *
- * 2. **Milestone tips** — single popovers gated on LIFETIME reviews of the
+ * 2. **Milestone tips**. Single popovers gated on LIFETIME reviews of the
  *    active course (`getLifetimeReviewCount`, reactive): card actions @2,
  *    chat @5, word tap @8, try-the-other-mode @11, settings @15. At most
  *    one fires per card transition; when several become eligible at once
@@ -37,7 +37,7 @@ import type { TranslateFn } from './types';
  *
  * **Veteran guard**: when a tip first becomes eligible while the lifetime
  * count is already far past every threshold (`VETERAN_SUPPRESS_REPS`), all
- * unseen tips are silently marked completed instead of shown — existing
+ * unseen tips are silently marked completed instead of shown, existing
  * users never get walked through an app they already know, and no data
  * migration is needed.
  */
@@ -71,7 +71,7 @@ interface ConceptDef {
   id: TutorialId;
   buildStep: (t: TranslateFn, mode: ReviewMode, transcribe: boolean) => DriveStep;
   /** Concept doesn't exist in the Transcribe writing style (e.g. the shown
-   *  translation — showing it there would BE the answer). Skipped, not
+   *  translation, showing it there would BE the answer). Skipped, not
    *  persisted, so it still appears if the user later switches styles. */
   skipWhenTranscribe?: boolean;
 }
@@ -211,7 +211,7 @@ const INTRO_SEQUENCES: Record<ReviewMode, ConceptDef[]> = {
   ],
 };
 
-/** The concepts the intro would show right now — mode sequence minus the
+/** The concepts the intro would show right now. Mode sequence minus the
  *  ones that don't exist in the current writing style. */
 function introSequenceFor(mode: ReviewMode, transcribe: boolean): ConceptDef[] {
   return INTRO_SEQUENCES[mode].filter(
@@ -246,7 +246,7 @@ function milestoneStep(
   };
 }
 
-/** Ordered by threshold — evaluation picks the first unseen eligible tip. */
+/** Ordered by threshold. Evaluation picks the first unseen eligible tip. */
 const MILESTONE_TIPS: MilestoneDef[] = [
   {
     id: TUTORIAL_IDS.TIP_CARD_ACTIONS,
@@ -291,7 +291,7 @@ const MILESTONE_TIPS: MilestoneDef[] = [
   },
 ];
 
-/** Every id this hook owns — the `useCompletedTutorials` sync set and the
+/** Every id this hook owns. The `useCompletedTutorials` sync set and the
  *  veteran guard's pre-marking set. */
 const ALL_TIP_IDS: TutorialId[] = [
   ...INTRO_SEQUENCES.audio.map((c) => c.id),
@@ -305,7 +305,7 @@ const ALL_TIP_IDS: TutorialId[] = [
  * Invoke `onSettled` once `selector` resolves to a visible, attached element
  * whose rect has stopped moving (identical across `stableFrames` consecutive
  * frames). Tips fire right after a rating, which also kicks off the card
- * swap animation — and driver.js draws its highlight exactly once, so a rect
+ * swap animation, and driver.js draws its highlight exactly once, so a rect
  * measured mid slide-in leaves the stage sitting where the element USED to
  * be. `minDelayMs` keeps a floor so the check can't latch onto the outgoing
  * card while it's still stationary pre-exit; `timeoutMs` guarantees the
@@ -314,7 +314,7 @@ const ALL_TIP_IDS: TutorialId[] = [
  * `found` distinguishes the two exits: `true` = settled on a real element,
  * `false` = timed out with nothing matching. A whole-card step can degrade to
  * a centered popover on `false`, but a step ABOUT one specific control can't
- * — see the milestone caller, which defers instead of teaching an anchor the
+ * See the milestone caller, which defers instead of teaching an anchor the
  * user cannot see.
  */
 function whenElementSettled(
@@ -367,7 +367,7 @@ function whenElementSettled(
 }
 
 /** Pause any playing DOM `<audio>`/`<video>` immediately. The merged card
- *  audio lives in a detached element the DOM query can't reach — the host
+ *  audio lives in a detached element the DOM query can't reach. The host
  *  pauses that one through the `onWillShow` callback. */
 function pauseAllAudioNow(): void {
   if (typeof document === 'undefined') return;
@@ -396,18 +396,18 @@ function teardownActiveDriver(
 // ─── The hook ───────────────────────────────────────────────────────────────
 
 export interface UseMilestoneTipsOptions {
-  /** Master gate — reviewing, not free play, settings closed. While false,
+  /** Master gate, reviewing, not free play, settings closed. While false,
    *  nothing fires and no lifetime-count query is subscribed. */
   enabled: boolean;
   reviewMode: ReviewMode;
-  /** Writing style is Transcribe (type what you hear) — swaps the full-mode
+  /** Writing style is Transcribe (type what you hear), swaps the full-mode
    *  card/input copy. */
   transcribe?: boolean;
-  /** Fires synchronously right before a tip mounts — pause the (detached)
+  /** Fires synchronously right before a tip mounts. Pause the (detached)
    *  card audio here so it doesn't compete with the popover. */
   onWillShow?: () => void;
-  /** Fires inside the click that closed a tip (user gesture preserved) —
-   *  kick card audio back off here. */
+  /** Fires inside the click that closed a tip (user gesture preserved).
+   *  Kick card audio back off here. */
   onClosed?: () => void;
 }
 
@@ -423,11 +423,11 @@ export function useMilestoneTips({
 
   const activeDriverRef = useRef<Driver | null>(null);
   const programmaticTeardownRef = useRef(false);
-  // Ids claimed by this mount — set the moment a tip is scheduled (before
+  // Ids claimed by this mount. Set the moment a tip is scheduled (before
   // the settle wait), so a re-render mid-wait can't double-fire it. Cleared
   // only by unmount; persistence via completedTutorials happens on close.
   const claimedRef = useRef<Set<string>>(new Set());
-  // True from claim until the driver is torn down — a second tip must not
+  // True from claim until the driver is torn down. A second tip must not
   // stack on top of an open one.
   const busyRef = useRef(false);
 
@@ -437,8 +437,8 @@ export function useMilestoneTips({
   const transcribeRef = useRef(transcribe);
   // Mirrors `enabled` for the fire-time liveness check in `runTip`. The
   // settle waits outlive the effect that scheduled them (see below), so the
-  // host can close the session or open the settings sheet inside the wait —
-  // the render-closure `enabled` captured at schedule time would be stale.
+  // host can close the session or open the settings sheet inside the wait.
+  // The render-closure `enabled` captured at schedule time would be stale.
   const enabledRef = useRef(enabled);
   useEffect(() => {
     onWillShowRef.current = onWillShow;
@@ -453,7 +453,7 @@ export function useMilestoneTips({
   const allTipsDone = ALL_TIP_IDS.every((id) => completed.includes(id));
   // `useQueries`, not `useQuery`: a `useQuery` server error is THROWN into
   // render, and from this hook it unwound past LearnView's ViewErrorBoundary
-  // to app/error.tsx — blanking the whole app shell over the teaching layer.
+  // to app/error.tsx, blanking the whole app shell over the teaching layer.
   // The query is three indexed documents, but the 1s budget is wall-clock, so
   // a saturated backend times it out anyway (the same limit applies in
   // production and is not configurable on the local backend). `useQueries`
@@ -474,7 +474,7 @@ export function useMilestoneTips({
   const lifetimeReps =
     typeof repsResult === 'number' ? repsResult : null;
 
-  // Effect-time check against the LIVE store — the DB backfill effect (in
+  // Effect-time check against the LIVE store. The DB backfill effect (in
   // useCompletedTutorials, registered earlier in hook order) may merge new
   // completions in the same commit this hook's effects run in, and a
   // render-closure `completed` would still be pre-merge.
@@ -485,7 +485,7 @@ export function useMilestoneTips({
     [],
   );
 
-  // Blocks any tip work after unmount — the settle waits are rAF loops that
+  // Blocks any tip work after unmount. The settle waits are rAF loops that
   // outlive effect cleanup on purpose (a claimed schedule is committed), so
   // the mount itself has to be re-checked at fire time.
   const unmountedRef = useRef(false);
@@ -493,7 +493,7 @@ export function useMilestoneTips({
   const runTip = useCallback(
     (steps: DriveStep[], tipIds: TutorialId[], analyticsId: string) => {
       if (unmountedRef.current || !enabledRef.current) {
-        // The claim was made but the popover must not mount — release the
+        // The claim was made but the popover must not mount. Release the
         // slot and the audio gates. Without this, a wrongly-latched flag
         // (StrictMode dev double-mount, before the reset below existed)
         // left `isActive` stuck true, permanently disabling autoplay and
@@ -529,12 +529,12 @@ export function useMilestoneTips({
           busyRef.current = false;
           setIsActive(false);
           if (!programmaticTeardownRef.current) {
-            // Finished or user-dismissed — either way, don't re-offer
+            // Finished or user-dismissed, either way, don't re-offer
             // (re-offering a tip someone deliberately closed is worse than
             // dropping it). Every concept in the sequence persists, matching
             // the tour semantics in use-tutorial.ts.
             for (const id of tipIds) markCompleted(id);
-            // Still inside the dismissing click's call stack — the one place
+            // Still inside the dismissing click's call stack. The one place
             // gesture-bound work (starting the card audio) can run on iOS.
             onClosedRef.current?.();
           }
@@ -564,15 +564,15 @@ export function useMilestoneTips({
   }, [enabled, isLoaded, isVeteran, seen, markCompleted]);
 
   // Whether the current mode's intro still has unseen concepts (ignoring
-  // this mount's claims — a claimed-but-unfinished intro is still pending).
+  // this mount's claims, a claimed-but-unfinished intro is still pending).
   const introPendingForMode = introSequenceFor(reviewMode, transcribe).some(
     (c) => !completed.includes(c.id),
   );
   // The host keeps autoplay gated while this is true so card audio can't
   // start underneath the intro (or before we even know whether one is
-  // needed — unknown counts stay gated).
+  // needed, unknown counts stay gated).
   // A FAILED count is not the same as an unknown one. `introReady` below
-  // requires `lifetimeReps != null`, so on failure no intro will ever run —
+  // requires `lifetimeReps != null`, so on failure no intro will ever run,
   // leaving this true would gate card autoplay for the rest of the session
   // waiting on a walkthrough that cannot start. If we can't tell where the
   // user is, teach nothing and gate nothing.
@@ -617,12 +617,12 @@ export function useMilestoneTips({
     if (unseenConcepts.length === 0) return;
 
     // A partial sequence means the shared concepts were taught in the other
-    // mode — open with the "Switched to …" welcome instead of the full one.
+    // mode. Open with the "Switched to …" welcome instead of the full one.
     const freshWelcome = unseenConcepts.length === sequence.length;
 
     // Claim before the settle wait: a re-render inside the wait must not
     // re-enter and double-schedule. (Local alias so the cleanup below reads
-    // the same set instance — the ref never repoints, but the lint rule
+    // the same set instance. The ref never repoints, but the lint rule
     // can't know that.)
     const claimed = claimedRef.current;
     for (const c of unseenConcepts) claimed.add(c.id);
@@ -660,7 +660,7 @@ export function useMilestoneTips({
   // ---- milestone tips, one per card transition ----
   useEffect(() => {
     if (!introReady || busyRef.current || lifetimeReps == null) return;
-    // The intro owns the first slot — milestones wait until the current
+    // The intro owns the first slot. Milestones wait until the current
     // mode's concepts are all persisted.
     if (
       introSequenceFor(reviewMode, transcribeRef.current).some(
@@ -684,7 +684,7 @@ export function useMilestoneTips({
       if (!found) {
         // Every milestone tip is ABOUT one specific control, so an
         // unanchored centered popover would explain something the user
-        // cannot see — and dismissing it would burn the one-time tip for
+        // cannot see, and dismissing it would burn the one-time tip for
         // good. Release the slot instead and re-offer on a later card, when
         // the control is on screen (e.g. the chat button in a layout that
         // hides it, or a card state that hasn't rendered the anchor yet).
@@ -696,13 +696,13 @@ export function useMilestoneTips({
       runTip([tip.buildStep(tRef.current, reviewMode)], [tip.id], tip.id);
     });
     // No cleanup: once claimed, the settle wait is committed (see the
-    // onboarding-tutorial precedent) — cancelling mid-wait would strand the
+    // onboarding-tutorial precedent), cancelling mid-wait would strand the
     // claim and the tip would never show. `runTip` re-checks liveness at
     // mount time instead.
     //
     // `completed` is deliberately NOT a dependency. Closing a tip persists
     // it, so including it would re-run this effect the moment one is
-    // dismissed and immediately fire the next eligible tip — a user between
+    // dismissed and immediately fire the next eligible tip. A user between
     // the last threshold and VETERAN_SUPPRESS_REPS would get all five
     // popovers chained on a single card. `lifetimeReps` is the intended
     // clock: it ticks once per review, giving the documented at-most-one-
@@ -745,7 +745,7 @@ export function useMilestoneTips({
   return {
     /** A tip popover is mounted (or committed to mount) right now. */
     isActive,
-    /** The current mode's intro hasn't fully run yet — keep autoplay off. */
+    /** The current mode's intro hasn't fully run yet. Keep autoplay off. */
     introPending,
     restartIntro,
   };

@@ -30,7 +30,7 @@ function roleLabel(
  * The card's sentences in the target language(s): the source text when the
  * card was authored in a target language, then every translation whose
  * language is a target. This is the single definition of "the sentence the
- * user is learning" — the card-context section and quick-action steering
+ * user is learning". The card-context section and quick-action steering
  * (convex/features/chat/quickActions.ts) must select identically, or the
  * two prompts would point the model at different texts.
  */
@@ -50,7 +50,7 @@ export function targetSentenceLines(
   ];
 }
 
-/** `"text" (Language) / "text" (Language)` — the quoted form prompts embed. */
+/** `"text" (Language) / "text" (Language)`. The quoted form prompts embed. */
 export function quoteSentences(
   lines: { language: string; text: string }[],
 ): string {
@@ -95,7 +95,7 @@ export function buildLanguageSection(courseLanguages: {
 }): string {
   const baseLangs = [...new Set(courseLanguages.baseLanguages)];
   const targetLangs = [...new Set(courseLanguages.targetLanguages)];
-  // base first, then target — must match the createCardTool contract.
+  // base first, then target. Must match the createCardTool contract.
   const allLangs = [...new Set([...baseLangs, ...targetLangs])];
 
   const nameLines = (codes: string[]) =>

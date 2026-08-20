@@ -23,11 +23,11 @@ async function openHome(page: Page): Promise<void> {
  * polling the DOM confirms nothing about the server. A reload (or the
  * test-end context close) that follows within ~100ms closes the Convex sync
  * websocket before the Mutation frame is applied server-side and the write is
- * silently dropped — a race this spec kept losing under full-suite load.
+ * silently dropped. A race this spec kept losing under full-suite load.
  * Watch the sync frames and hand out the server's MutationResponse acks, so
  * tests can await real persistence before navigating away.
  *
- * Must be called BEFORE the first `page.goto` — `page.on('websocket')` only
+ * Must be called BEFORE the first `page.goto`. `page.on('websocket')` only
  * sees sockets opened after it attaches (it keeps working across reloads,
  * which open a fresh socket).
  */
@@ -128,7 +128,7 @@ test.describe('daily goal quick-edit', () => {
       .toBe(target);
 
     // Server persistence, not just the optimistic cache. Reloading straight
-    // off the optimistic poll would race the in-flight write — wait for the
+    // off the optimistic poll would race the in-flight write. Wait for the
     // server ack first, so the reload asserts persistence instead of racing it.
     await goalWrites.nextAck();
     await page.reload();
@@ -138,7 +138,7 @@ test.describe('daily goal quick-edit', () => {
       .toBe(target);
 
     // Leave the shared user as found (original may be a non-preset custom
-    // value — restore via the custom input to cover any value).
+    // value, restore via the custom input to cover any value).
     if (original != null && original !== target) {
       await openQuickEdit(page);
       const custom = page.getByTestId('daily-goal-custom-input');

@@ -14,7 +14,7 @@ import {
  * detail, and confirms it then shows as a card in the library.
  *
  * Filling every language by hand (no auto-fill) keeps this on the
- * pure-manual branch — no metadata arg, so `createCustomText` schedules
+ * pure-manual branch, no metadata arg, so `createCustomText` schedules
  * `generateSentenceMetadata`. That is the exact path of the
  * `translationSource` ArgumentValidationError regression: the failure was
  * async and invisible to the saving user.
@@ -23,7 +23,7 @@ import {
  * card. Cards materialize only when a deck-add flow runs (learn-mode
  * auto-add mixes pending custom texts in; the collection detail offers
  * per-text add). The library lists *cards*, so polling it right after save
- * deadlocks on a trigger that never comes — the per-text add in the
+ * deadlocks on a trigger that never comes. The per-text add in the
  * collection detail is the deterministic user path. None of these steps
  * depend on LLM/TTS providers, so this spec passes even when content
  * generation is degraded (card content backfills later via self-heal).
@@ -31,12 +31,12 @@ import {
  * Tagged @live because it mutates shared user state (consumes
  * custom-sentence quota and adds a card to the test user's deck).
  *
- * Retries disabled — the marker changes per run, so a retry would save a
+ * Retries disabled. The marker changes per run, so a retry would save a
  * second sentence.
  */
 
 test.describe.configure({ mode: "serial", retries: 0 });
-test.describe("add cards — manual entry (live)", { tag: "@live" }, () => {
+test.describe("add cards: manual entry (live)", { tag: "@live" }, () => {
   test("saves a manually-entered text and surfaces it in the custom collection", async ({
     page,
   }) => {
@@ -46,7 +46,7 @@ test.describe("add cards — manual entry (live)", { tag: "@live" }, () => {
     // This spec asserts nothing about tours, and the home tour can mount
     // LATE (localStorage lacks the DB-side completion until the backfill
     // query lands; under load that loses the race against the tour's 1.2s
-    // delay) — a one-shot dismissTour then misses it and the overlay blocks
+    // delay), a one-shot dismissTour then misses it and the overlay blocks
     // the collection-dialog clicks. CSS-neutralize all tours for every
     // document this page loads instead (seen 2026-08-17).
     await neutralizeTours(page);
@@ -67,7 +67,7 @@ test.describe("add cards — manual entry (live)", { tag: "@live" }, () => {
     await expect(save).toBeEnabled({ timeout: 10_000 });
     await save.click();
 
-    // On success the form resets to empty fields — more reliable than
+    // On success the form resets to empty fields. More reliable than
     // catching the auto-dismissing sonner success toast. A Convex query
     // error under suite load can replace the view with the error boundary
     // mid-wait; retry remounts it (empty if the save landed).
@@ -80,8 +80,8 @@ test.describe("add cards — manual entry (live)", { tag: "@live" }, () => {
     await dismissTour(page, "home_tour");
 
     // Home content section → "Custom Content" tab. The tab shows one
-    // collection tile at a time behind a Chat/"Manually Added" switcher —
-    // select "Manually Added" (the Custom collection, targeted via its
+    // collection tile at a time behind a Chat/"Manually Added" switcher.
+    // Select "Manually Added" (the Custom collection, targeted via its
     // locale-proof raw-name testid).
     await page.getByRole("tab", { name: /custom content/i }).click();
     await page
@@ -105,7 +105,7 @@ test.describe("add cards — manual entry (live)", { tag: "@live" }, () => {
     await markerRow.getByTestId("collection-text-add").click();
     // Wait for the row's status testid to flip to `added`, then give the
     // mutation ack a beat: the flip is an optimistic update, and the
-    // full-page navigation below tears down the Convex client — navigating
+    // full-page navigation below tears down the Convex client, navigating
     // on the optimistic flip alone can drop the un-acked mutation (observed:
     // no card row ever created).
     await expect(
@@ -128,7 +128,7 @@ test.describe("add cards — manual entry (live)", { tag: "@live" }, () => {
 
     // Filter by marker text (not a bare count): right after `fill` the
     // reactive subscription can still be showing pre-filter results, and a
-    // bare count would pass on those. The card exists already — this poll
+    // bare count would pass on those. The card exists already. This poll
     // only rides out the subscription refresh, not content generation.
     const markerCard = page
       .getByTestId("library-card")

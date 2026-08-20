@@ -29,7 +29,7 @@ type CardCounts = {
   learning: number;
   relearning: number;
   review: number;
-  /** Writing-seed still filling the writing aggregates — counts are a partial
+  /** Writing-seed still filling the writing aggregates. Counts are a partial
    * prefix, not settled numbers. See countDueCardsByState in stats.ts. */
   preparingWriting?: boolean;
 };
@@ -50,7 +50,7 @@ interface ProgressDisplayProps {
   onContinue: () => void;
   /**
    * True once the milestone-triggering mutation has resolved. While false,
-   * the shell shows an empty placeholder — no audio, no animations, no
+   * the shell shows an empty placeholder, no audio, no animations, no
    * auto-advance bar.
    */
   ready?: boolean;
@@ -63,7 +63,7 @@ const NEW_WORDS_CAP = 200;
  * Capped "+N[+]" new-words counter. `displayed` is the value actually shown
  * (possibly mid-animation, already clamped to NEW_WORDS_CAP); the trailing
  * "+" appears only when the true value exceeds the cap AND the displayed
- * value has reached it — so an animating counter gains its "+" on the final
+ * value has reached it, so an animating counter gains its "+" on the final
  * tick, not before.
  */
 function formatCappedNewWords(displayed: number, trueValue: number): string {
@@ -152,7 +152,7 @@ function buildHeroEasing(N: number): (t: number) => number {
 }
 
 // Module-level guard against future regressions of the duplicate-mount bug
-// fixed by the LearningChatLayout dedup. Dev-only — production stays silent.
+// fixed by the LearningChatLayout dedup. Dev-only. Production stays silent.
 // If a layout change reintroduces double-mount (e.g. children rendered in
 // two tree positions, or LearningMode mounted twice), this fires at mount
 // time with a stack trace pointing at the offending caller.
@@ -181,7 +181,7 @@ function useDuplicateMountGuard() {
 /**
  * Outer shell: holds an empty placeholder until the milestone mutation has
  * resolved AND the celebration's queries have returned. Only then does
- * CelebrationContent mount — so the success sound, the 5-second
+ * CelebrationContent mount, so the success sound, the 5-second
  * auto-advance bar, and the counter animations all start together, against
  * fresh post-mutation data.
  */
@@ -201,23 +201,23 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
 
   // Cache the most-recent resolved query results so a Convex re-subscription
   // doesn't unmount `CelebrationContent`. Re-subscriptions happen when args
-  // change — most notably when another tab rotates `currentSessionId`
+  // change. Most notably when another tab rotates `currentSessionId`
   // (via its own celebration dismiss), which propagates to this tab's
   // `courseSettingsQuery` → flows into `props.sessionId` → forces
   // `celebrationWordsQuery` to re-subscribe. While the new subscription is
   // loading, `useQuery` returns `undefined`. Without the cache the
   // `queriesResolved` gate flips false and `CelebrationContent` unmounts,
   // wiping `isPausedRef` and restarting the 7-second auto-advance clock
-  // from 0 — i.e., a paused celebration silently resumes.
+  // from 0, i.e. a paused celebration silently resumes.
   const lastCardCountsRef = useRef<CardCounts | null | undefined>(undefined);
   const lastWordsRef = useRef<
     { session: LearnedWord[]; today: LearnedWord[] } | undefined
   >(undefined);
-  // Provisional counts (separateModeTracking writing seed still sweeping —
+  // Provisional counts (separateModeTracking writing seed still sweeping,
   // `preparingWriting`) are a partial prefix of the writing queue, so showing
   // them would read as a confident "nothing left". Same handling as
-  // DueCountsPills: never cache them, and fall back to the last settled counts
-  // — or collapse the pills slot (null) if none ever settled.
+  // DueCountsPills: never cache them, and fall back to the last settled counts,
+  // or collapse the pills slot (null) if none ever settled.
   const isProvisional = cardCountsQuery?.preparingWriting === true;
   if (cardCountsQuery !== undefined && !isProvisional)
     lastCardCountsRef.current = cardCountsQuery;
@@ -234,13 +234,13 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
       ? celebrationWordsQuery
       : lastWordsRef.current;
 
-  // `getCardCounts` returns `null` for unauthenticated / no-active-deck users
-  // — that's a resolved value too (we just won't render the pills).
+  // `getCardCounts` returns `null` for unauthenticated / no-active-deck users.
+  // That's a resolved value too (we just won't render the pills).
   const queriesResolved =
     effectiveCardCounts !== undefined && effectiveWords !== undefined;
 
   if (!ready || !queriesResolved) {
-    // Empty placeholder of identical size — no sound, no bar movement,
+    // Empty placeholder of identical size, no sound, no bar movement,
     // no counter ticking. Once both gates flip, CelebrationContent mounts
     // fresh and starts everything from t=0.
     return <div className="h-full" />;
@@ -304,7 +304,7 @@ function CelebrationContent({
   }, [sessionWordCounts.total, dailyNewWordsToday, dailyReviewsToday]);
 
   // For "new words" hero kinds, clamp the animated target so the counter
-  // never ticks past the cap. `reviewsToday` is uncapped — review counts
+  // never ticks past the cap. `reviewsToday` is uncapped. Review counts
   // can legitimately reach the hundreds.
   const heroAnimTarget =
     hero.kind === 'reviewsToday' ? hero.value : Math.min(hero.value, NEW_WORDS_CAP);
@@ -325,7 +325,7 @@ function CelebrationContent({
 
   // ----- Sound + Media Session + Auto-advance (mounts only when ready) -----
   // Pause state. The REF (`isPausedRef`) is the source of truth for any
-  // non-React code path — media session callbacks, audio event listeners,
+  // non-React code path. Media session callbacks, audio event listeners,
   // the auto-advance interval. The REACT STATE (`isPaused`) only drives
   // rendering (icon swap). Both are updated synchronously in `pauseSync` /
   // `resumeSync`.
@@ -333,7 +333,7 @@ function CelebrationContent({
   // Auto-advance mirrors the regular card's pause pattern: the card's
   // "clock" is the audio element itself, and `audio.pause()` freezes the
   // clock so the `ended` event never fires. Here the clock is a single
-  // `setInterval` that reads `isPausedRef.current` on every tick — when
+  // `setInterval` that reads `isPausedRef.current` on every tick, when
   // paused, the tick is a no-op so the accumulated playtime doesn't
   // advance. There is no separate `setTimeout` to race against the pause
   // click; the only way the celebration auto-dismisses is for the tick
@@ -351,8 +351,8 @@ function CelebrationContent({
 
   // The celebration only auto-advances when the underlying review flow
   // does (audio mode + the user's `autoAdvance` setting). In every other
-  // case — including onboarding's first-lesson recap which passes
-  // `autoAdvance={false}` — the screen stays up until the user taps
+  // case, including onboarding's first-lesson recap which passes
+  // `autoAdvance={false}`. The screen stays up until the user taps
   // Continue. The play/pause + bar pattern is layered on top of the
   // auto-advancing variant ONLY.
   const celebrationAutoAdvances = reviewMode === 'audio' && autoAdvance;
@@ -372,7 +372,7 @@ function CelebrationContent({
   const resumeSync = useCallback(() => {
     isPausedRef.current = false;
     setIsPaused(false);
-    // Don't resume past natural end — `audio.play()` on an ended element
+    // Don't resume past natural end. `audio.play()` on an ended element
     // restarts from 0 in some browsers, which we don't want for a one-
     // shot ding. The visual auto-advance interval will keep ticking.
     const audio = audioRef.current;
@@ -392,7 +392,7 @@ function CelebrationContent({
     audio.preload = 'auto';
     audioRef.current = audio;
     audio.play().catch(() => {
-      // Autoplay may be blocked — silently ignore; the visual celebration still runs.
+      // Autoplay may be blocked. Silently ignore; the visual celebration still runs.
     });
 
     const teardown = setupMediaSession({
@@ -424,7 +424,7 @@ function CelebrationContent({
   }, [mediaSessionTitle, pauseSync, resumeSync]);
 
   // Single ticking clock. On every tick: bank the wall-clock delta since
-  // the last tick into `accumulatedMsRef`, unless paused — in which case
+  // the last tick into `accumulatedMsRef`, unless paused, in which case
   // the tick is a no-op (`lastTickAt` advances so the next active tick
   // doesn't retroactively credit the paused interval). When accumulated
   // playtime reaches DURATION, dismiss. No separate timeout exists, so
@@ -506,7 +506,7 @@ function CelebrationContent({
                 : t('reviewsTodayHero')}
           </p>
 
-          {/* Per-language flags — fixed-height slot keeps layout stable. */}
+          {/* Per-language flags. Fixed-height slot keeps layout stable. */}
           <div className="mt-2 min-h-[1.25rem] flex items-center">
             {showPerLanguagePills && (
               <div
@@ -560,7 +560,7 @@ function CelebrationContent({
           </div>
         </motion.div>
 
-        {/* Word display — between the stats row and the state pills. Skipped
+        {/* Word display. Between the stats row and the state pills. Skipped
             entirely when there are no words to celebrate. */}
         {(sessionWordsList.length > 0 || todayWordsList.length > 0) && (
           <motion.div className="w-full max-w-sm" variants={CHILD_VARIANTS}>
@@ -572,7 +572,7 @@ function CelebrationContent({
           </motion.div>
         )}
 
-        {/* Anki-style state pills — shown when we have card counts. The slot
+        {/* Anki-style state pills. Shown when we have card counts. The slot
             collapses entirely when counts are unavailable (no active deck). */}
         {cardCounts && (
           <motion.div
@@ -607,8 +607,8 @@ function CelebrationContent({
       {/* Bottom controls. In auto-advancing mode (main app, audio +
           autoAdvance) we show a pausable progress bar with play/pause +
           next buttons so the user can stop to read the stats and tap
-          next to skip. In every other mode — most importantly
-          onboarding's StatsRecapStep — we keep the original full-width
+          next to skip. In every other mode. Most importantly
+          onboarding's StatsRecapStep. We keep the original full-width
           Continue button so the existing UX is byte-identical. */}
       <motion.div
         className="flex flex-col items-stretch gap-3 max-w-sm w-full mx-auto"
@@ -719,7 +719,7 @@ function StatePill({
   cap?: number;
 }) {
   const display = cap != null && value > cap ? `${cap}+` : String(value);
-  // `min-w` enforces label separation — relying on row-level `gap-x-*` alone
+  // `min-w` enforces label separation. Relying on row-level `gap-x-*` alone
   // is fragile because each pill's intrinsic width tracks its label
   // ("learning" ≈ 52 px, "new" ≈ 28 px), so the gap is between label edges
   // not pill centers, and long labels can run together regardless of gap.
@@ -732,7 +732,7 @@ function StatePill({
 }
 
 // =====================================================================
-// Word display — multiline ticker (the chosen production variant).
+// Word display. Multiline ticker (the chosen production variant).
 // =====================================================================
 
 interface WordVariantProps {
@@ -744,7 +744,7 @@ interface WordVariantProps {
 // overflow scrolls left-to-right; shorter rows just sit statically. Reads
 // like a stack of scrolling banners.
 function WordsMultilineTicker({ sessionWords, todayWords }: WordVariantProps) {
-  // Flag rendering is gated on having multiple target languages — single-
+  // Flag rendering is gated on having multiple target languages. Single-
   // language users would just see the same flag repeated, which adds clutter
   // without information.
   const showFlags = useMemo(() => {
@@ -760,7 +760,7 @@ function WordsMultilineTicker({ sessionWords, todayWords }: WordVariantProps) {
   ];
   // A new row only opens up after the previous one is "full" (PER_ROW_FILL).
   // Once we commit to N rows, the words are redistributed evenly across them
-  // round-robin — rather than packing the first row to capacity and leaving
+  // round-robin, rather than packing the first row to capacity and leaving
   // a sparse last row.
   const PER_ROW_FILL = 5;
   const MAX_ROWS = 3;
@@ -813,7 +813,7 @@ function WordsMultilineTicker({ sessionWords, todayWords }: WordVariantProps) {
               // each group's effective width = `(N items) + (N gaps)`.
               // Translating by -50% therefore lands the second group's
               // first item exactly where the first group's first item was,
-              // making the wrap pixel-perfect — no padding on the animated
+              // making the wrap pixel-perfect, no padding on the animated
               // element to throw off the percentage math.
               <motion.div
                 className="flex w-max whitespace-nowrap"

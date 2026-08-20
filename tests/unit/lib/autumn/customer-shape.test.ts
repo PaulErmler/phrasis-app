@@ -9,7 +9,7 @@ import {
 
 /**
  * The TRIALING fixtures below are real payloads captured from Autumn on
- * 2026-07-26 — the same customer, the same instant, fetched twice with
+ * 2026-07-26. The same customer, the same instant, fetched twice with
  * different `x-api-version` headers. The PAST-DUE pair comes from a
  * separate genuinely past-due customer and is hand-trimmed to the fields
  * the assertions touch (the trimming matters: an untrimmed v1 past-due
@@ -103,7 +103,7 @@ const only = (p: AutumnPlan[]) => {
   return p[0];
 };
 
-describe('normalizePlans — the two wire families agree after normalization', () => {
+describe('normalizePlans: the two wire families agree after normalization', () => {
   it('trialing normalizes identically despite v2 reporting status "active"', () => {
     const v1 = only(normalizePlans({ products: [V1_TRIALING] }, NOW));
     const v2 = only(normalizePlans({ subscriptions: [V2_TRIALING] }, NOW));
@@ -144,7 +144,7 @@ describe('normalizePlans — the two wire families agree after normalization', (
 
   it('a GRANDFATHERED free attachment with NO default flag is still isDefault', () => {
     // Free attachments created under old product versions report
-    // is_default:false on v1.2 (live payload, 2026-08-11) — the plan id is
+    // is_default:false on v1.2 (live payload, 2026-08-11), the plan id is
     // the only reliable signal, and misreading it as non-default made every
     // consumer treat those customers as paying.
     expect(
@@ -164,7 +164,7 @@ describe('normalizePlans — the two wire families agree after normalization', (
   });
 });
 
-describe('normalizePlans — shape selection', () => {
+describe('normalizePlans: shape selection', () => {
   it('prefers subscriptions+purchases and ignores products when both present', () => {
     const plans = normalizePlans(
       {
@@ -205,7 +205,7 @@ describe('normalizePlans — shape selection', () => {
   });
 });
 
-describe('normalizePlans — flags', () => {
+describe('normalizePlans: flags', () => {
   it('marks add-ons from either field name', () => {
     expect(only(normalizePlanList([{ id: 'x', is_add_on: true }], NOW)).isAddOn).toBe(true);
     expect(only(normalizePlanList([{ plan_id: 'x', add_on: true }], NOW)).isAddOn).toBe(true);

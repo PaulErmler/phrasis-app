@@ -49,7 +49,7 @@ describe("PricingSection", () => {
   it("does not repeat what a tier inherits", () => {
     render(<PricingSection />);
     // Free and Basic both cap at 1 course, and only Free spells out the
-    // credit hint — so those bullets appear once, on the base card.
+    // credit hint, so those bullets appear once, on the base card.
     expect(screen.getAllByText("plans.free.features.courses")).toHaveLength(1);
     expect(screen.queryByText("plans.basic.features.courses")).toBeNull();
     expect(

@@ -80,7 +80,7 @@ function WrappedChatPanel({
 
   // Naming the target language in the prompt ("…this Romanian sentence…")
   // removes the ambiguity that made the tutor analyze the base-language
-  // rendering of the card. Only for single-target courses — with several
+  // rendering of the card. Only for single-target courses, with several
   // targets there is no single name to insert, and the server-side steering
   // still lists every target sentence explicitly.
   const targetLanguageLabel = useMemo(
@@ -116,7 +116,7 @@ function WrappedChatPanel({
   );
 
   // Replace is the only approval action that rewrites the card document, so
-  // it is the only one that needs the rotation suppression — and it reports
+  // it is the only one that needs the rotation suppression, and it reports
   // exactly which card it produced, so the suppression can be keyed to that id
   // rather than to a time window. `handleApprove` is passed through untouched:
   // approving only appends a text to the chat collection, never changing the
@@ -244,7 +244,7 @@ function LearnViewInner({
     ? (state.courseSettings?.schedulingMode ?? 'learnAndReview')
     : 'learnAndReview';
   // Free play is one mode; `reviewMode` picks the face. Only the listening
-  // face (Radio) runs hands-free — the writing face (Free Study) is a
+  // face (Radio) runs hands-free. The writing face (Free Study) is a
   // user-paced typing session.
   const isFreePlay = schedulingMode === 'radio';
   const isHandsFree = isFreePlay && reviewMode === 'audio';
@@ -252,14 +252,14 @@ function LearnViewInner({
     state.status !== 'loading' &&
     (state.courseSettings?.writingInputMode ?? 'translate') === 'transcribe';
   // Autoplay is gated while a tip popover is up, and the audio hook only
-  // auto-plays on card change — so when the user dismisses a tip we have to
+  // auto-plays on card change, so when the user dismisses a tip we have to
   // kick playback off explicitly. `audio` doesn't exist yet at this point in
   // the render, so the callbacks go through refs assigned below once
   // `useLearningAudio` has run.
   const playAfterTutorialRef = useRef<() => void>(() => {});
   const pauseAudioRef = useRef<() => void>(() => {});
   const { isActive, introPending, restartIntro } = useMilestoneTips({
-    // Free play is its own flow — don't run the teaching layer when the
+    // Free play is its own flow. Don't run the teaching layer when the
     // user explicitly chose it (its writing face also hides the rating
     // buttons the intro anchors on). Held back while the difficulty-check
     // dialog is up so a milestone popover can't stack on top of it.
@@ -271,7 +271,7 @@ function LearnViewInner({
     reviewMode,
     transcribe,
     // The merged card audio lives in a detached `new Audio()` element the
-    // tip hook's DOM sweep can't reach — pause it through the host.
+    // tip hook's DOM sweep can't reach. Pause it through the host.
     onWillShow: () => pauseAudioRef.current(),
     // Runs inside the dismissing click, so iOS gets its user gesture.
     onClosed: () => playAfterTutorialRef.current(),
@@ -285,17 +285,17 @@ function LearnViewInner({
   const { audio, openSettings, userAutoPlay } = useLearningAudio(state, {
     // Free play's listening face forces autoplay + auto-advance. Neither
     // face runs the tips or the celebration, so those gates don't apply
-    // to free play at all — including the pending-completion state, which
+    // to free play at all, including the pending-completion state, which
     // would otherwise block autoplay forever there.
     // `hasInflightCardAction` keeps the user on the current card while a
-    // flag retranslation or audio regenerate is mid-flight — auto-advancing
+    // flag retranslation or audio regenerate is mid-flight. Auto-advancing
     // before the new content lands would skip past the very thing they
     // asked for.
     disableAutoAdvance:
       (!isHandsFree && reviewMode === 'audio' && isActive) ||
       hasInflightCardAction,
     // `introPending` keeps card audio silent until the current mode's intro
-    // walkthrough has fully run (or been ruled out) — the spoken sentence
+    // walkthrough has fully run (or been ruled out), the spoken sentence
     // must not fight the popovers.
     disableAutoPlay:
       !isFreePlay && (isActive || introPending || progressDisplayActive),
@@ -311,9 +311,9 @@ function LearnViewInner({
   pauseAudioRef.current = () => audio.pause();
 
   // Kick playback on the autoplay gate's falling edge for releases that
-  // don't pass through a dismissal click — notably the veteran guard
+  // don't pass through a dismissal click, notably the veteran guard
   // silently retiring the intro (no popover, no gesture). After a normal
-  // dismissal this runs right behind the synchronous kick — `audio.play()`
+  // dismissal this runs right behind the synchronous kick. `audio.play()`
   // on an already-playing element is a no-op.
   const prevIntroPendingRef = useRef(introPending);
   useEffect(() => {

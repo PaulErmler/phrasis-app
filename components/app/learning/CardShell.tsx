@@ -53,7 +53,7 @@ interface CardShellProps {
   /** Active per-language playback from an AudioButton; null when none. */
   activeClip?: ButtonPlaybackActive | null;
   /**
-   * Frame-rate word-position source for merged playback — passed to the
+   * Frame-rate word-position source for merged playback. Passed to the
    * active row's karaoke leaf so highlights tick without re-rendering the
    * card (see useKaraokeIndex).
    */
@@ -68,12 +68,12 @@ interface CardShellProps {
   audioSpeedOverrides?: Record<string, number>;
   /** Cycle handler for a language's speed badge; null clears the override. */
   onSpeedCycle?: (language: string, next: number | null) => void;
-  /** Badge behavior — `ephemeral` hides the null/default slot and greys 1.0. */
+  /** Badge behavior. `ephemeral` hides the null/default slot and greys 1.0. */
   speedBadgeVariant?: 'persistent' | 'ephemeral';
   /**
    * Client-only session state: did the viewer click the flag action on this
    * card during the current view? Set on click, cleared when navigating
-   * away. Drives the warning-color "Flagged" pill — a per-session signal
+   * away. Drives the warning-color "Flagged" pill. A per-session signal
    * scoped to the flagger, NOT a global server-derived state (which would
    * leak the flag to other users). Wins visually over the server-driven
    * "Retranslating" pill when both apply.
@@ -103,7 +103,7 @@ interface CardShellProps {
    *  Writing mode renders no target-language `ClickableWords` before submit,
    *  so the base row is the only clickable sentence on screen; audio mode
    *  anchors its target row instead (see LearningCardContent). Skipped while
-   *  the row is blurred — a hidden word is not a tap target. */
+   *  the row is blurred. A hidden word is not a tap target. */
   baseCoachmarkAnchorForLongestWord?: string;
   children: (ctx: {
     baseTranslations: CardTranslation[];
@@ -175,7 +175,7 @@ export function CardShell({
   // - "Flagged" (client-only, session-scoped): the viewer clicked the flag
   //   action on this card. Persists after the LLM lands (or shows
   //   immediately for over-cap flags that don't enqueue an LLM job),
-  //   purely client state — NOT leaked to other users.
+  //   purely client state: NOT leaked to other users.
   // Retranslating wins while the work is actively happening; Flagged
   // takes over once the retranslation finishes (or never started).
   const anyTargetRetranslating = targetTranslations.some(
@@ -255,7 +255,7 @@ export function CardShell({
             const isActive = activeClip?.language === translation.language;
             const override = audioSpeedOverrides?.[translation.language];
             const isEphemeral = speedBadgeVariant === 'ephemeral';
-            // Ephemeral surfaces ignore the course-level general speed — the
+            // Ephemeral surfaces ignore the course-level general speed. The
             // resting state is always 1.0, same as what the badge renders.
             const generalSpeed = isEphemeral
               ? DEFAULT_PLAYBACK_SPEED
@@ -272,7 +272,7 @@ export function CardShell({
               hideBaseLanguages &&
               !isAudioRevealed &&
               !(manuallyRevealedLanguages?.has(translation.language) ?? false);
-            // Base text matches the target rows' weight/size — no bolding.
+            // Base text matches the target rows' weight/size, no bolding.
             const baseTextClass = compact ? 'text-base leading-relaxed' : 'body-large';
             return (
               <div

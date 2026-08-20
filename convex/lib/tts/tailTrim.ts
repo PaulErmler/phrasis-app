@@ -3,7 +3,7 @@
  *
  * Gemini (via OpenRouter) intermittently appends a short, loud burst AFTER the
  * sentence, separated from it by a silence gap (~10% of clips). This removes it
- * using only the waveform's energy envelope — no STT, no word timings, pure
+ * using only the waveform's energy envelope, no STT, no word timings, pure
  * arithmetic that runs in the default Convex runtime, synchronously inside
  * `geminiTts.speak()` before the PCM→MP3 transcode.
  *
@@ -17,7 +17,7 @@
  * byte-identical to before).
  *
  * Validated against 100 short German clips: clean clips had a post-speech peak
- * ≈ 0.001, hiccup clips ≈ 0.43–0.75, and this flagged 10/100 — see the
+ * ≈ 0.001, hiccup clips ≈ 0.43–0.75, and this flagged 10/100. See the
  * scripts/tts-hiccup-* harness, whose `energyCut` this mirrors.
  */
 

@@ -105,7 +105,7 @@ describe("migrations/recalcUserCardAggregates", () => {
         userId: "user_A",
       });
 
-      // `run` only enumerates decks — a single deck's clear is dozens of
+      // `run` only enumerates decks. A single deck's clear is dozens of
       // aggregate calls (states × origin buckets × shared/writing), so
       // clearing every deck in the entry mutation could blow the mutation
       // limits and fail half-cleared. The clears happen one deck per

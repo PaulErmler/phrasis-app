@@ -7,8 +7,8 @@ import { throwOnCheckoutError } from "@/hooks/use-checkout-error";
 /**
  * autumn-js reports failures as a RESOLVED `{ error }` container
  * (wrapSdkCall), so a plain `await checkout(...)` "succeeds" while nothing
- * happened. Every billing entry point routes results through this helper —
- * these pin the container shapes it must and must not treat as failure.
+ * happened. Every billing entry point routes results through this helper.
+ * These pin the container shapes it must and must not treat as failure.
  */
 describe("throwOnCheckoutError", () => {
   it("passes through success containers and non-containers", () => {

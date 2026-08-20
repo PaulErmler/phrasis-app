@@ -111,7 +111,7 @@ export const batchUpsertTranslations = internalMutation({
       });
       stats.textsUpdated++;
 
-      // Check if source English text changed — invalidate English audio too
+      // Check if source English text changed. Invalidate English audio too
       if (textDoc.text !== item.textEn) {
         const enAudio = await ctx.db
           .query('audioRecordings')
@@ -144,10 +144,10 @@ export const batchUpsertTranslations = internalMutation({
           });
           stats.translationsInserted++;
         } else if (existing.translatedText !== tr.text) {
-          // Text changed — clear romanization + its source (next ensureContent
+          // Text changed. Clear romanization + its source (next ensureContent
           // will re-romanize under the current method). For `translationSource`:
           // only overwrite when the seed explicitly declares a new tag. If the
-          // seed omits it, KEEP the existing tag — clearing here would silently
+          // seed omits it, KEEP the existing tag, clearing here would silently
           // untag rows on every text edit once the legacy backfill has run.
           // Seeds from the new pipeline should always carry `translationSource`.
           await ctx.db.patch(existing._id, {
@@ -160,7 +160,7 @@ export const batchUpsertTranslations = internalMutation({
           });
           stats.translationsUpdated++;
 
-          // Translation text changed — delete audio so it regenerates on demand
+          // Translation text changed. Delete audio so it regenerates on demand
           const audio = await ctx.db
             .query('audioRecordings')
             .withIndex('by_text_and_language', (q) =>

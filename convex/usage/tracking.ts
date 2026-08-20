@@ -29,7 +29,7 @@ import { AUTUMN_API, getSecretKey } from './autumnClient';
  * old default, so pinning changes nothing else.
  *
  * If Autumn retires this version the request 400s loudly (1.3 already does)
- * rather than degrading quietly — and `normalizePlans` still falls back to
+ * rather than degrading quietly, and `normalizePlans` still falls back to
  * the v1 `products` shape if one ever arrives.
  */
 const AUTUMN_API_VERSION = '2.2';
@@ -45,7 +45,7 @@ export type AutumnBalanceEntry = {
 
 /**
  * Only the parts of the payload this file reads. Plan entries are left as
- * `unknown` on purpose — lib/autumn/customer-shape.ts owns those field
+ * `unknown` on purpose. lib/autumn/customer-shape.ts owns those field
  * names, for either API family.
  */
 type AutumnCustomerResponse = {
@@ -77,7 +77,7 @@ function isUnpaidInvoice(i: AutumnInvoiceEntry): boolean {
  * exists: for "has the debt been settled?" an unpaid invoice without a
  * hosted page still counts as unpaid. Stripe flips an invoice to `paid`
  * synchronously at payment time, which makes this the race-free signal for
- * the cancel-while-overdue guard — the subscription's own past_due status
+ * the cancel-while-overdue guard. The subscription's own past_due status
  * clears only after the Stripe→Autumn webhook. Only meaningful when
  * `invoices` was actually expanded; callers must treat a missing array as
  * "unknown", not as "nothing unpaid".
@@ -107,7 +107,7 @@ export function findPayableInvoiceUrl(
   return unpaid[0]?.hosted_invoice_url ?? undefined;
 }
 
-/** "pro_yearly" → "Pro Yearly" — the v1 payload carries no display name. */
+/** "pro_yearly" → "Pro Yearly". The v1 payload carries no display name. */
 function humanizePlanId(planId: string): string {
   return planId
     .split(/[_-]/)
@@ -120,7 +120,7 @@ export type DerivedBilling = {
   /** Undefined only when Autumn reported no usable (non-expired) plan. */
   plan?: { planId: string; planName: string; planStatus: string };
   /**
-   * Any current plan is delinquent. This — not `plan.planStatus` — is what
+   * Any current plan is delinquent. This, not `plan.planStatus`. Is what
    * drives the payment block, so a co-existing healthy entry can never mask
    * a past-due one.
    */
@@ -133,7 +133,7 @@ export type DerivedBilling = {
  * Derive the customer's billing state from subscriptions (+ one-time
  * purchases as fallback).
  *
- * Add-ons are excluded, as are `expired` and `scheduled` entries — neither
+ * Add-ons are excluded, as are `expired` and `scheduled` entries, neither
  * describes what the customer holds right now. The auto-attached default
  * free plan is always listed as active, so paid plans are ranked first,
  * otherwise a trialing paid customer would be recorded as 'free'. Within a
@@ -162,7 +162,7 @@ export function derivePlan(data: AutumnCustomerResponse): DerivedBilling {
     // Autumn answered, but everything it returned was expired / scheduled /
     // an add-on: the customer currently holds nothing. Report no plan (so
     // stale plan fields aren't overwritten with an expired one) but NOT
-    // `productsMissing` — this is a definitive answer, so the past-due state
+    // `productsMissing`. This is a definitive answer, so the past-due state
     // must still be allowed to clear. `productsMissing` is reserved for "the
     // response was empty", where we genuinely don't know.
     return { plan: undefined, anyPastDue, productsMissing: false };
@@ -226,7 +226,7 @@ export const trackUsage = internalAction({
 /**
  * Derive billing state from a customer payload and write it to the local
  * mirror. When the customer is past due, re-fetches with `?expand=invoices`
- * to capture the payable invoice URL — a second call, but only on the rare
+ * to capture the payable invoice URL. A second call, but only on the rare
  * delinquent path, so healthy syncs stay at one request.
  */
 async function pushCustomerState(
@@ -248,7 +248,7 @@ async function pushCustomerState(
       // Loud, because the degradation is otherwise invisible: the overdue
       // dialog silently falls back to the billing-portal CTA, which only
       // swaps the card on file and never settles the debt. Expected only if
-      // Stripe genuinely has no open invoice yet — if it fires for a
+      // Stripe genuinely has no open invoice yet, if it fires for a
       // customer who demonstrably owes money, suspect `?expand=invoices`
       // not being honored on this API version.
       console.warn(

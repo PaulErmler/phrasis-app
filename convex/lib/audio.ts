@@ -6,16 +6,16 @@ import { resolveAudioPayload } from './audioAssets';
  * Delete an `audioRecordings` pointer row; when it was the LAST pointer at
  * its asset, the asset is deleted too, and the asset's blob is dropped unless
  * another asset still references it. Assets shared by other texts survive
- * untouched — deleting one text's audio never affects the others.
+ * untouched, deleting one text's audio never affects the others.
  *
- * This is the safe audio-delete path — route `audioRecordings` deletions
+ * This is the safe audio-delete path. Route `audioRecordings` deletions
  * through it (reconcile invalidation, regen, retranslation, manual regenerate,
  * and orphan cascade) so no blob is ever dropped while still in use.
  *
  * `opts.keepAsset` detaches the pointer but PRESERVES the asset + blob even
  * when this was the last pointer. Use it whenever the audio itself is still
- * correct and only this text stops needing it — card edits, retranslations,
- * and speaker-gender re-voicing — so the content-addressed `audioAssets`
+ * correct and only this text stops needing it. Card edits, retranslations,
+ * and speaker-gender re-voicing, so the content-addressed `audioAssets`
  * cache keeps serving the string for other texts and future re-creation.
  * Full garbage collection (the default) is reserved for audio that is
  * OBSOLETE as audio: the manual regenerate button and TTS-system migrations
@@ -23,7 +23,7 @@ import { resolveAudioPayload } from './audioAssets';
  *
  * `opts.blobAlreadyGone` skips the storage delete when the blob is already
  * known to be missing (`storage.getUrl` returned null), as in
- * `scheduleMissingContent`'s stale-file cleanup — row/asset bookkeeping still
+ * `scheduleMissingContent`'s stale-file cleanup. Row/asset bookkeeping still
  * runs, but there is no blob left to delete.
  */
 export async function deleteAudioRow(
@@ -98,7 +98,7 @@ export interface AudioResult {
   url: string | null;
   wordTimings: AudioWordTiming[] | null;
   /**
-   * TTS validation state — 'unknown' while a synthesis attempt is still in
+   * TTS validation state. 'unknown' while a synthesis attempt is still in
    * flight (the asset is created at attempt 0 before validation), 'validated'
    * after STT roundtrip matched, 'unvalidated' for languages without STT
    * support or when all retries mismatched. Used by callers to decide

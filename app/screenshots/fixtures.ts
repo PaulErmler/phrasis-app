@@ -1,6 +1,6 @@
 /**
  * Deterministic mock data for the store-screenshot pages
- * (app/screenshots/[screen]) — impressive-but-plausible numbers for a user
+ * (app/screenshots/[screen]), impressive-but-plausible numbers for a user
  * ~4 months in. Series are seeded (no Math.random) so captures are
  * reproducible.
  */
@@ -66,7 +66,7 @@ export function dailySeries() {
   });
 }
 
-/** Daily new words — single language (Spanish), matching the Home course. */
+/** Daily new words. Single language (Spanish), matching the Home course. */
 export function languageDailySeries() {
   const rand = seededRandom(7);
   const days = lastDays(61);
@@ -94,7 +94,7 @@ export function weeklySeries() {
   return Array.from(byWeek.entries()).map(([week, v]) => ({ week, ...v }));
 }
 
-/** Reviews by hour of day — commute + evening peaks (hands-free story). */
+/** Reviews by hour of day. Commute + evening peaks (hands-free story). */
 export const HOURLY_DISTRIBUTION = [
   0, 0, 0, 0, 0, 2, 14, 38, 52, 24, 12, 9,
   16, 11, 7, 9, 14, 31, 46, 58, 41, 22, 8, 2,

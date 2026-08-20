@@ -9,11 +9,11 @@ import {
 } from "./helpers";
 
 /**
- * Learning settings sheet — mode toggle + boolean switch round-trip.
+ * Learning settings sheet. Mode toggle + boolean switch round-trip.
  *
  * The Sheet is opened from the gear icon in LearningHeader on /app/learn.
  * Once open, Radix sometimes leaves `aria-hidden="true"` on the
- * SheetContent even though `data-state="open"` — likely a focus-scope
+ * SheetContent even though `data-state="open"`. Likely a focus-scope
  * interaction with driver.js' tour overlay or another portal. The sheet
  * is visually/functionally active, so we bypass Playwright's accessibility
  * checks (`force: true`) and use CSS attribute selectors for switches
@@ -22,7 +22,7 @@ import {
 
 async function openSettingsSheet(page: Page): Promise<void> {
   // A Convex query error under @live suite load replaces LearnView with the
-  // view error boundary ("Something went wrong") — the settings gear is gone
+  // view error boundary ("Something went wrong"), the settings gear is gone
   // until retry remounts the subtree. The difficulty-check dialog also
   // aria-hides the header. Clear both before looking for the trigger.
   await dismissErrorBoundary(page);
@@ -50,14 +50,14 @@ async function openSettingsSheet(page: Page): Promise<void> {
  *  The sheet renders from an optimistic cache (`updateSettings` in
  *  LearningModeSettings carries a `withOptimisticUpdate`), so a single
  *  "audio selected" reading can be a value the server later rolls back to
- *  'full' — unmounting the practice switches mid-test. Require the selection
+ *  'full', unmounting the practice switches mid-test. Require the selection
  *  to survive a settle window (covering the server round-trip) and re-click
  *  when it snaps back.
  *
  *  Retries back off across ~15s: the known cause of a persistent snap-back is
  *  a transient JWT refresh window (see ClientAuthBoundary), during which every
- *  authenticated mutation is rejected and its optimistic update rolled back —
- *  the loop must outlast the window, not just re-click inside it. */
+ *  authenticated mutation is rejected and its optimistic update rolled back.
+ *  The loop must outlast the window, not just re-click inside it. */
 async function ensureAudioMode(page: Page): Promise<void> {
   const audioBtn = page.getByTestId("settings-mode-audio").first();
   await expect(audioBtn).toBeVisible({ timeout: 10_000 });
@@ -86,7 +86,7 @@ async function ensureAudioMode(page: Page): Promise<void> {
   }
 }
 
-/** Mirror of ensureAudioMode for the Writing ("full") review mode — the
+/** Mirror of ensureAudioMode for the Writing ("full") review mode. The
  *  writing-style sub-switcher and writing-only settings render there. Same
  *  optimistic-rollback/backoff rationale, see ensureAudioMode. */
 async function ensureFullMode(page: Page): Promise<void> {
@@ -201,7 +201,7 @@ async function expectSwitch(
  *
  *  Re-asserts Audio mode first: the switches unmount whenever the sheet
  *  leaves it, and the optimistic reviewMode value can roll back to the
- *  persisted 'full' mid-test (see ensureAudioMode) — clicking a vanished
+ *  persisted 'full' mid-test (see ensureAudioMode), clicking a vanished
  *  switch then fails on a null bounding box. */
 async function clickPracticeSwitch(
   page: Page,
@@ -235,7 +235,7 @@ test.describe("learning settings", () => {
     // authed layout's preloads can leave the Next splash ("Flexling"
     // logo, no shell) up past the 10s trigger wait, failing with
     // "learn-settings trigger should render" (seen 2026-08-18). One
-    // reload picks up the warmed route — same helper the other learn
+    // reload picks up the warmed route, same helper the other learn
     // specs already use.
     await gotoAuthedApp(
       page,
@@ -278,7 +278,7 @@ test.describe("learning settings", () => {
     // authed layout's preloads can leave the Next splash ("Flexling"
     // logo, no shell) up past the 10s trigger wait, failing with
     // "learn-settings trigger should render" (seen 2026-08-18). One
-    // reload picks up the warmed route — same helper the other learn
+    // reload picks up the warmed route, same helper the other learn
     // specs already use.
     await gotoAuthedApp(
       page,
@@ -300,7 +300,7 @@ test.describe("learning settings", () => {
 
     const initial = await sw.getAttribute("aria-checked");
     // The sheet is position:fixed and re-animates on open, so `force: true`
-    // alone can't bring the switch into the viewport — wait for it to settle
+    // alone can't bring the switch into the viewport. Wait for it to settle
     // (same guard the mode-toggle test uses on its buttons).
     await waitForInViewport(page, sw);
     await sw.click({ force: true });
@@ -320,7 +320,7 @@ test.describe("learning settings", () => {
     // authed layout's preloads can leave the Next splash ("Flexling"
     // logo, no shell) up past the 10s trigger wait, failing with
     // "learn-settings trigger should render" (seen 2026-08-18). One
-    // reload picks up the warmed route — same helper the other learn
+    // reload picks up the warmed route, same helper the other learn
     // specs already use.
     await gotoAuthedApp(
       page,
@@ -366,7 +366,7 @@ test.describe("learning settings", () => {
     // authed layout's preloads can leave the Next splash ("Flexling"
     // logo, no shell) up past the 10s trigger wait, failing with
     // "learn-settings trigger should render" (seen 2026-08-18). One
-    // reload picks up the warmed route — same helper the other learn
+    // reload picks up the warmed route, same helper the other learn
     // specs already use.
     await gotoAuthedApp(
       page,
@@ -385,7 +385,7 @@ test.describe("learning settings", () => {
     await expectSwitch(page, "before", true);
     await expectSwitch(page, "after", true);
 
-    // Turn Listening off — Speaking is unaffected (not the last-on toggle).
+    // Turn Listening off, Speaking is unaffected (not the last-on toggle).
     await setSwitch(page, "before", false);
     await expectSwitch(page, "after", true);
 
@@ -410,7 +410,7 @@ test.describe("learning settings", () => {
     // authed layout's preloads can leave the Next splash ("Flexling"
     // logo, no shell) up past the 10s trigger wait, failing with
     // "learn-settings trigger should render" (seen 2026-08-18). One
-    // reload picks up the warmed route — same helper the other learn
+    // reload picks up the warmed route, same helper the other learn
     // specs already use.
     await gotoAuthedApp(
       page,
@@ -439,7 +439,7 @@ test.describe("learning settings", () => {
     await expect(translateBtn).toBeVisible({ timeout: 8_000 });
     await expect(transcribeBtn).toBeVisible();
 
-    // Normalize to Translate first — a previously failed spec can leave the
+    // Normalize to Translate first. A previously failed spec can leave the
     // shared user on Transcribe, and the assertions below assume the
     // Translate starting point.
     await translateBtn.evaluate((el) => el.scrollIntoView({ block: "center" }));
@@ -455,7 +455,7 @@ test.describe("learning settings", () => {
     await expect(switchById(page, "targetAudioEnabled")).toBeVisible();
     // With target audio in its default 'afterSubmit' mode, the playback
     // timeline shows the post-submit target group behind the
-    // "Translation Entered" pill (normalize the sub-switch first — a prior
+    // "Translation Entered" pill (normalize the sub-switch first, a prior
     // run may have left 'always' selected).
     await setSwitchById(page, "targetAudioEnabled", true);
     await setSwitchById(page, "targetAudio_afterSubmit", true);
@@ -504,7 +504,7 @@ test.describe("learning settings", () => {
     // authed layout's preloads can leave the Next splash ("Flexling"
     // logo, no shell) up past the 10s trigger wait, failing with
     // "learn-settings trigger should render" (seen 2026-08-18). One
-    // reload picks up the warmed route — same helper the other learn
+    // reload picks up the warmed route, same helper the other learn
     // specs already use.
     await gotoAuthedApp(
       page,
@@ -524,7 +524,7 @@ test.describe("learning settings", () => {
     const audioAutoPlay = await isSwitchOnById(page, "autoPlayAudio");
 
     // Editing auto-play in Writing/Translate must NOT touch the audio-mode
-    // value. Normalize the style first — within Writing, Translate and
+    // value. Normalize the style first. Within Writing, Translate and
     // Transcribe each have their own copy too.
     await ensureFullMode(page);
     await ensureWritingStyle(page, "translate");
@@ -591,7 +591,7 @@ test.describe("learning settings", () => {
     // authed layout's preloads can leave the Next splash ("Flexling"
     // logo, no shell) up past the 10s trigger wait, failing with
     // "learn-settings trigger should render" (seen 2026-08-18). One
-    // reload picks up the warmed route — same helper the other learn
+    // reload picks up the warmed route, same helper the other learn
     // specs already use.
     await gotoAuthedApp(
       page,
@@ -690,7 +690,7 @@ test.describe("learning settings", () => {
     // authed layout's preloads can leave the Next splash ("Flexling"
     // logo, no shell) up past the 10s trigger wait, failing with
     // "learn-settings trigger should render" (seen 2026-08-18). One
-    // reload picks up the warmed route — same helper the other learn
+    // reload picks up the warmed route, same helper the other learn
     // specs already use.
     await gotoAuthedApp(
       page,
@@ -739,7 +739,7 @@ test.describe("learning settings", () => {
     // authed layout's preloads can leave the Next splash ("Flexling"
     // logo, no shell) up past the 10s trigger wait, failing with
     // "learn-settings trigger should render" (seen 2026-08-18). One
-    // reload picks up the warmed route — same helper the other learn
+    // reload picks up the warmed route, same helper the other learn
     // specs already use.
     await gotoAuthedApp(
       page,
@@ -752,7 +752,7 @@ test.describe("learning settings", () => {
     await openSettingsSheet(page);
 
     // The switch lives inside the Shadowing/Writing description card and is
-    // mode-independent — it must render in BOTH modes (unlike e.g. the
+    // mode-independent. It must render in BOTH modes (unlike e.g. the
     // writing-style sub-toggle).
     await ensureAudioMode(page);
     await expect(switchById(page, "separateModeTracking")).toBeVisible({
@@ -763,7 +763,7 @@ test.describe("learning settings", () => {
       timeout: 8_000,
     });
 
-    // Normalize OFF first — the shared e2e user may carry state from a
+    // Normalize OFF first. The shared e2e user may carry state from a
     // previously failed run.
     await setSwitchById(page, "separateModeTracking", false);
 
@@ -782,7 +782,7 @@ test.describe("learning settings", () => {
     // With the split on, the learn view must still serve a reviewable card in
     // Writing mode: enabling the toggle schedules the seedWritingTrack
     // backfill, which copies each card's shared schedule into the writing
-    // fields within a scheduler hop or two — the input's 15s wait below
+    // fields within a scheduler hop or two. The input's 15s wait below
     // comfortably covers it. Recover from a filter-blocked deck the same way
     // learning-journey.spec.ts does.
     await ensureFullMode(page);
@@ -823,7 +823,7 @@ test.describe("learning settings", () => {
   /**
    * The promise of separate progress, end to end: a Writing review advances
    * ONLY the writing schedule, so the same card is still waiting on the
-   * Shadowing side — and the home due-count pills, which read whichever
+   * Shadowing side, and the home due-count pills, which read whichever
    * track's aggregates the mode selects, keep rendering across the flip.
    *
    * Tagged @live: rating a card mutates the shared e2e user's review state
@@ -838,7 +838,7 @@ test.describe("learning settings", () => {
       // authed layout's preloads can leave the Next splash ("Flexling"
       // logo, no shell) up past the 10s trigger wait, failing with
       // "learn-settings trigger should render" (seen 2026-08-18). One
-      // reload picks up the warmed route — same helper the other learn
+      // reload picks up the warmed route, same helper the other learn
       // specs already use.
       await gotoAuthedApp(
         page,
@@ -899,7 +899,7 @@ test.describe("learning settings", () => {
         flashcard,
         "the shared track still serves a card after a writing-only review",
       ).toBeVisible({ timeout: 20_000 });
-      // The just-reviewed card is still due on the shared track — it is the
+      // The just-reviewed card is still due on the shared track. It is the
       // head of that queue, so it is exactly what Shadowing serves. (With the
       // tracks wrongly coupled, the review would have pushed it out and some
       // other card, or an empty state, would show here.)
@@ -927,7 +927,7 @@ test.describe("learning settings", () => {
       // authed layout's preloads can leave the Next splash ("Flexling"
       // logo, no shell) up past the 10s trigger wait, failing with
       // "learn-settings trigger should render" (seen 2026-08-18). One
-      // reload picks up the warmed route — same helper the other learn
+      // reload picks up the warmed route, same helper the other learn
       // specs already use.
       await gotoAuthedApp(
         page,

@@ -61,7 +61,7 @@ interface LearningCardContentProps {
   /**
    * Merged-audio playback state from useAudioPlayer. When present and playing,
    * takes priority over per-language AudioButton playback for highlight timing.
-   * Per-frame time lives in `clock`, not React state — see useActiveCue.
+   * Per-frame time lives in `clock`, not React state. See useActiveCue.
    */
   mergedPlayback?: MergedPlayback;
   /** Course-level per-language general speed (used by both CardShell base rows and target rows here). */
@@ -70,7 +70,7 @@ interface LearningCardContentProps {
   audioSpeedOverrides?: Record<string, number>;
   /** Cycle handler for a language's speed badge; null clears the override. */
   onSpeedCycle?: (language: string, next: number | null) => void;
-  /** Badge behavior — `ephemeral` hides the null/default slot and greys 1.0. */
+  /** Badge behavior. `ephemeral` hides the null/default slot and greys 1.0. */
   speedBadgeVariant?: 'persistent' | 'ephemeral';
   /** Client-only session flag: did the viewer click flag on this card? */
   flaggedInSession?: boolean;
@@ -140,7 +140,7 @@ export function LearningCardContent({
 
   // Last processed reveal signal. Initialized to the mount value so a stale
   // nonce from before this mount isn't treated as a fresh "reveal all"
-  // request; after that, any change is one (the nonce is monotonic — the
+  // request; after that, any change is one (the nonce is monotonic, the
   // parent never resets it, so no value can collide with an older one).
   const lastRevealSignalRef = useRef(revealAllSignal);
 
@@ -197,7 +197,7 @@ export function LearningCardContent({
 
   // Restart-card signal: drop manual reveals so the card re-blurs (the
   // parent resets the audio-driven reveals separately). Mount value is
-  // ignored — same stale-nonce contract as revealAllSignal above.
+  // ignored, same stale-nonce contract as revealAllSignal above.
   const lastResetSignalRef = useRef(resetSignal);
   useEffect(() => {
     if (resetSignal === undefined || resetSignal === lastResetSignalRef.current) {

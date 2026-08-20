@@ -19,9 +19,9 @@ import { Shimmer } from '@/components/ai-elements/shimmer';
 /**
  * The optimistic-with-rollback machine both approval boxes run their buttons
  * through: the resolved label (`optimisticState`) flips immediately, a
- * non-success result rolls it back — otherwise a quota hit or a stale card
+ * non-success result rolls it back, otherwise a quota hit or a stale card
  * ("Card not found" after a replace from another device) rendered as a green
- * "done" while the row was still pending — and a 'usage_limit' result (or a
+ * "done" while the row was still pending, and a 'usage_limit' result (or a
  * known-exhausted quota up front, `available: false`) opens the paywall for
  * the quota THAT action spends.
  *
@@ -104,7 +104,7 @@ export interface ApprovalToolFlags {
 
 /**
  * Derive the streaming state of an approval's tool part. `successOutput` is
- * the tool's exact success string — or every string it treats as success, for
+ * the tool's exact success string, or every string it treats as success, for
  * tools with more than one non-failure outcome (markAlsoCorrect also returns a
  * distinct "nothing to save" literal). The strings themselves live in
  * lib/types/tool-parts.ts, shared with the server-side tool handlers, so the

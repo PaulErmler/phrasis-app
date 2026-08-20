@@ -18,7 +18,7 @@ const MAX_TIME_PER_PLAY_MS = 180_000; // 3 minutes — same cap as reviews
  * Lightweight stats recorder for a free-play card advance (radio play or
  * free-study pass).
  *
- * Free play bypasses FSRS, ratings, accuracy, and word tracking — so the
+ * Free play bypasses FSRS, ratings, accuracy, and word tracking, so the
  * heavy `recordReviewStats` would do far too much work and (worse) inflate
  * counters that should only reflect active learning. This helper updates only:
  *
@@ -30,10 +30,10 @@ const MAX_TIME_PER_PLAY_MS = 180_000; // 3 minutes — same cap as reviews
  *
  * Explicitly skipped (NOT tracked for free plays):
  *   - word tracking (`userWords`, `userWordTexts`, `dailyLanguageStats`,
- *     `languageStats`) — free play is practice outside the schedule, not
+ *     `languageStats`): free play is practice outside the schedule, not
  *     graded vocabulary acquisition
- *   - rating / accuracy / hour buckets / reviewsByCardState — no FSRS rating
- *   - collection progress (`cardsLearned`) — only active reviews graduate cards
+ *   - rating / accuracy / hour buckets / reviewsByCardState: no FSRS rating
+ *   - collection progress (`cardsLearned`): only active reviews graduate cards
  */
 export async function recordFreePlayStats(
   ctx: MutationCtx,
@@ -90,7 +90,7 @@ export async function recordFreePlayStats(
   });
 
   // --- Daily aggregate (reps + reviewsByMode.<mode> + timeMsByMode.<mode>) ---
-  // No rating/accuracy/hour/cardState — free plays are explicitly anonymous
+  // No rating/accuracy/hour/cardState. Free plays are explicitly anonymous
   // along those dimensions.
   const { isFirstActivityToday } = await upsertDailyStats(ctx, {
     userId: args.userId,

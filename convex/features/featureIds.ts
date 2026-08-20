@@ -45,7 +45,7 @@ export function isCreditBackedFeature(featureId: string): boolean {
  * chat_messages unit is consumed before generation; the remainder is charged
  * after the response based on actual OpenRouter cost, in whole chat_messages
  * units (each covering CREDIT_COSTS[CHAT_MESSAGES] steps) so the amount is
- * credit-converted exactly once — see generateResponse in
+ * credit-converted exactly once. See generateResponse in
  * features/chat/messages.ts.
  */
 export const CHAT_CREDIT_USD_STEP = 0.005;

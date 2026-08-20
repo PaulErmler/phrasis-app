@@ -4,7 +4,7 @@ import { renderHook, act } from '@testing-library/react';
 /**
  * The tour-completion contract of useTutorial:
  *  - clicking the highlighted element of the FINAL (call-to-action) step
- *    completes the tour — that click usually navigates away and hides the
+ *    completes the tour: that click usually navigates away and hides the
  *    host, which would otherwise hit the suppress path below and leave the
  *    tour re-running on every visit ("Dashboard tutorial shows up again");
  *  - hiding the host mid-tour (enabled → false on an earlier step) tears
@@ -43,7 +43,7 @@ vi.mock('driver.js', () => ({
       drive: vi.fn(),
       // Real driver.js 1.4.0: the public `destroy()` is `g(false)`, which tears
       // down and deliberately SKIPS `onDestroyStarted` (dist/driver.js.mjs:594-604
-      // — only `g(true)` fires the hook, and it returns early without tearing
+      // Only `g(true)` fires the hook, and it returns early without tearing
       // down). An earlier version of this mock had destroy() call the hook,
       // which is the inverse of reality and hid a real bug: completion
       // bookkeeping hung off the hook never ran for app-initiated teardowns.
@@ -105,7 +105,7 @@ async function startTour() {
   expect(lastConfig).not.toBeNull();
 }
 
-describe('useTutorial — completion semantics', () => {
+describe('useTutorial: completion semantics', () => {
   beforeEach(async () => {
     vi.resetModules();
     localStorage.clear();
@@ -172,7 +172,7 @@ describe('useTutorial — completion semantics', () => {
     });
 
     expect(completedIds()).toContain(TUTORIAL_IDS.HOME_TOUR);
-    // The hook must perform the real teardown itself — driver.js will not.
+    // The hook must perform the real teardown itself. driver.js will not.
     expect(lastDriver!.destroy).toHaveBeenCalled();
   });
 
@@ -199,7 +199,7 @@ describe('useTutorial — completion semantics', () => {
     const { rerender } = renderTour({ enabled: true });
     await startTour();
 
-    // User clicks the closing CTA — this both completes the tour and (usually)
+    // User clicks the closing CTA. This both completes the tour and (usually)
     // navigates away, which hides the host.
     const steps = lastConfig!.steps;
     const lastStep = steps[steps.length - 1];
@@ -240,7 +240,7 @@ describe('useTutorial — completion semantics', () => {
     });
     expect(completedIds()).not.toContain(TUTORIAL_IDS.HOME_TOUR);
 
-    // Return to Home — the tour relaunches, and this time the user finishes it.
+    // Return to Home. The tour relaunches, and this time the user finishes it.
     await act(async () => {
       rerender({ enabled: true });
     });

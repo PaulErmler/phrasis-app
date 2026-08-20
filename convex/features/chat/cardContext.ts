@@ -9,7 +9,7 @@ import type { Id } from '../../_generated/dataModel';
  *
  * The ONE ownership walk + sentence assembly for chat card context, shared by
  * the prompt-context path (messages.ts) and the markAlsoCorrect approval
- * (cardApprovals.ts) — so what an approval stores is exactly what the tool
+ * (cardApprovals.ts), so what an approval stores is exactly what the tool
  * prompt saw. Lives in its own module (not messages.ts) because messages.ts
  * pulls in the agent/AI SDK stack, which approval-only importers and their
  * tests must not depend on.

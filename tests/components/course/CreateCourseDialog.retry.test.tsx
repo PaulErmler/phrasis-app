@@ -57,7 +57,7 @@ import { CreateCourseDialog } from '@/components/course/CreateCourseDialog';
 /**
  * The regression this file exists for: a partially-failed submit (course
  * created and activated, goal write failed) stored the new course id so a
- * retry wouldn't create a duplicate — but the id was remembered without the
+ * retry wouldn't create a duplicate, but the id was remembered without the
  * answers it came from. Going Back, choosing a DIFFERENT language and
  * submitting again then skipped `createCourse` entirely and re-activated the
  * original course: no error, no new course, and the user dropped into a
@@ -100,7 +100,7 @@ async function goBackAndSwitchTarget(
   await user.click(screen.getByTestId('course-dialog-create'));
 }
 
-describe('CreateCourseDialog — retry after a partial failure', () => {
+describe('CreateCourseDialog: retry after a partial failure', () => {
   beforeEach(() => {
     createCourse.mockReset();
     archiveCourse.mockReset();
@@ -151,7 +151,7 @@ describe('CreateCourseDialog — retry after a partial failure', () => {
     await goBackAndSwitchTarget(user, 'fr');
     await waitFor(() => expect(updateCourseSettings).toHaveBeenCalledTimes(2));
 
-    // The French course must actually be created and activated — not the
+    // The French course must actually be created and activated, not the
     // Spanish one silently reused.
     expect(createCourse).toHaveBeenCalledTimes(2);
     expect(createCourse).toHaveBeenLastCalledWith(
@@ -161,7 +161,7 @@ describe('CreateCourseDialog — retry after a partial failure', () => {
     expect(updateCourseSettings).toHaveBeenLastCalledWith(
       expect.objectContaining({ courseId: 'course_fr' }),
     );
-    // The abandoned Spanish course releases its slot — on the single-course
+    // The abandoned Spanish course releases its slot, on the single-course
     // free tier the second create would otherwise die on USAGE_LIMIT.
     expect(archiveCourse).toHaveBeenCalledWith({ courseId: 'course_es' });
   });

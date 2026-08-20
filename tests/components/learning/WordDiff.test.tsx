@@ -15,7 +15,7 @@ import {
  * When a word chip runs its per-character diff with `ignorePunctuation`,
  * punctuation-only chunks carry `ignored` and must render neutrally: muted,
  * no underline, no floated annotation, no strike-through. A removed/added
- * PAIR is forgiven only when BOTH sides are punctuation — a scored letter
+ * PAIR is forgiven only when BOTH sides are punctuation. A scored letter
  * paired with a forgiven mark must still read as an error.
  *
  * Each rendering test is preceded by a chunk-shape sanity check so a future
@@ -28,7 +28,7 @@ const optsIgnoring = toDiffOptions(
 );
 const optsScoring = toDiffOptions(getCompareConfig('en'));
 
-/** Innermost spans only — wrapper spans repeat their child's textContent. */
+/** Innermost spans only. Wrapper spans repeat their child's textContent. */
 function leafSpans(container: HTMLElement, text: string): HTMLElement[] {
   return Array.from(container.querySelectorAll('span')).filter(
     (el) => el.childElementCount === 0 && el.textContent === text,
@@ -42,7 +42,7 @@ function annotationTexts(container: HTMLElement): (string | null)[] {
   );
 }
 
-describe('WordDiff — intra-word ignored punctuation', () => {
+describe('WordDiff: intra-word ignored punctuation', () => {
   describe("removed apostrophe next to a real error (don't → dint)", () => {
     it('produces the expected alignment and chunk shape', () => {
       // Normalized dont vs dint is distance 1 → typo, so the chip takes the
@@ -107,7 +107,7 @@ describe('WordDiff — intra-word ignored punctuation', () => {
       expect(words).toHaveLength(1);
       expect(words[0].tag).toBe('typo');
 
-      // Only the removed side is punctuation — the added 'a' is scored, so
+      // Only the removed side is punctuation. The added 'a' is scored, so
       // the pair must NOT be ignored.
       expect(charDiff("don't", 'donat', optsIgnoring).chunks).toEqual([
         { kind: 'equal', text: 'don' },
@@ -121,7 +121,7 @@ describe('WordDiff — intra-word ignored punctuation', () => {
       const { container } = render(
         <WordDiff expected="don't" actual="donat" language="en" ignorePunctuation />,
       );
-      // The scored insertion sits where the forgiven mark was — muting it
+      // The scored insertion sits where the forgiven mark was. Muting it
       // would hide a mistake that cost the user accuracy.
       const [apostrophe] = leafSpans(container, "'");
       expect(apostrophe).toBeTruthy();

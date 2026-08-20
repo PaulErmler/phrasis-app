@@ -4,7 +4,7 @@ import { internalMutation, internalQuery } from '../_generated/server';
 /**
  * E2E test hooks for transactional auth emails (verification + password
  * reset). Gated like usage/testing.ts: every function throws unless the
- * deployment has `E2E_TEST_HOOKS=1` set — enable it ONLY on dev/test
+ * deployment has `E2E_TEST_HOOKS=1` set. Enable it ONLY on dev/test
  * deployments (`pnpm exec convex env set E2E_TEST_HOOKS 1`), never in production.
  *
  * While the flag is set, lib/authEmails.ts CAPTURES outbound auth emails

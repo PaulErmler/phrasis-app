@@ -42,8 +42,8 @@ export const run = migrations.runner();
  * Backfill for the per-mode playback-settings split (see
  * docs/migrations/per-mode-settings-backfill.md).
  *
- * Deployment does NOT depend on it — writing modes read
- * `*Transcribe ?? *Full ?? <audio field> ?? DEFAULT_*` — but once it has run,
+ * Deployment does NOT depend on it. Writing modes read
+ * `*Transcribe ?? *Full ?? <audio field> ?? DEFAULT_*`, but once it has run,
  * the `?? <audio field>` compatibility branch for the `*Full` set becomes
  * dead code. Per-field `undefined` guards keep it idempotent; user writes are
  * never overwritten. The `*Transcribe` / `transcribeAfter*` fields are
@@ -98,25 +98,25 @@ export const perModeSettingsBackfill = migrations.define({
 
 /**
  * Apply the translation post-processing step (default: strip trailing '_'
- * runs — see `postProcessTranslation` in lib/languages.ts) to all existing
+ * runs, see `postProcessTranslation` in lib/languages.ts) to all existing
  * machine-generated translation rows, covering both `translatedText` and the
  * derived `romanizedText` (Buckwalter-style romanizers map '_' through).
  *
- * User-provided rows are skipped — the step only ever applies to machine
+ * User-provided rows are skipped. The step only ever applies to machine
  * output, mirroring the write paths.
  *
  * Note this is the one provenance guard that can NOT use the full
  * `mayRegenerateTranslation` rule: `migrateOne` sees the translation row
  * alone, with no `texts` doc to test `userCreated` against. Machine-sourced
  * rows on user-created cards are therefore still normalized here. That is
- * acceptable because the step is punctuation-only — it strips trailing '_'
- * runs and never changes wording — but a migration that rewrites CONTENT must
+ * acceptable because the step is punctuation-only. It strips trailing '_'
+ * runs and never changes wording, but a migration that rewrites CONTENT must
  * load the text and go through `mayRegenerateTranslation`.
  *
  * Deliberately does NOT touch audio: a trailing-underscore diff is
  * punctuation-only, so existing audio stays valid (the same `soundsSame`
  * rule the live retranslation/edit paths use), and direct patches here
- * trigger no ensure-sweep — `audioRecordings` stores no source text.
+ * trigger no ensure-sweep. `audioRecordings` stores no source text.
  */
 export function stripTrailingUnderscoresPatch(
   doc: Pick<
@@ -148,7 +148,7 @@ export const stripTrailingUnderscores = migrations.define({
 /**
  * Safety net for `cards.collectionId` / `cards.collectionOrigin`. The schema
  * comments declare both "backfilled for all existing cards", but the original
- * backfill ran out-of-band and isn't tracked in `runAll` — this makes the
+ * backfill ran out-of-band and isn't tracked in `runAll`. This makes the
  * guarantee durable. Expected to patch ~0 docs.
  *
  * `collectionId` is recovered via the card's text (`texts.collectionId` is
@@ -157,12 +157,12 @@ export const stripTrailingUnderscores = migrations.define({
  * CEFR rows.
  *
  * Patching via raw `ctx.db` (the migrations component's path) is aggregate-safe
- * for three of the four card aggregates — they key only on deckId, dueDate and
+ * for three of the four card aggregates. They key only on deckId, dueDate and
  * the state label. `cardsByOriginStateAndDueDate` however DOES namespace on
  * `collectionOrigin`, so a raw patch would strand the card's entry in its old
  * namespace with nothing to ever clean it up (`deleteCard` would look under the
  * new origin). `migrateOne` therefore moves the entry itself, in the same
- * transaction as the patch — see the `replaceOrInsert` call below.
+ * transaction as the patch. See the `replaceOrInsert` call below.
  */
 export function cardCollectionBackfillPatch(
   card: Pick<Doc<'cards'>, 'collectionId' | 'collectionOrigin'>,
@@ -186,7 +186,7 @@ export function cardCollectionBackfillPatch(
 
 /**
  * The full `migrateOne` body, extracted so it can be exercised against a
- * convex-test db (the migrations component itself isn't registered there —
+ * convex-test db (the migrations component itself isn't registered there,
  * same approach as the other migration suites).
  */
 export async function cardCollectionBackfillOne(
@@ -208,7 +208,7 @@ export async function cardCollectionBackfillOne(
   // during the deploy→backfill window actually have one (they land under
   // origin 'none'); for everything else `replaceOrInsert` just inserts under
   // the final origin, which `cardOriginAggregateBackfill` then no-ops over.
-  // The writing mirror only holds cards with a seeded writing track — same
+  // The writing mirror only holds cards with a seeded writing track, same
   // membership gate `patchCard` uses.
   if (patch.collectionOrigin !== undefined) {
     await cardsByOriginStateAndDueDate.replaceOrInsert(ctx, doc, {
@@ -234,12 +234,12 @@ export const cardCollectionBackfill = migrations.define({
  * Full rebuild of `cards.searchableText` via the current
  * `buildCardSearchableText`. Fixes two things at once:
  *
- * 1. CJK/Thai segmentation — Convex's search tokenizer splits only on
+ * 1. CJK/Thai segmentation. Convex's search tokenizer splits only on
  *    whitespace/punctuation, so sentences in languages without word
  *    boundaries (zh/ja/yue/th) were indexed as one giant token and
  *    mid-sentence words could never match. The builder now appends
  *    Intl.Segmenter word tokens.
- * 2. Historically stale rows — translations/romanizations that landed after
+ * 2. Historically stale rows. Translations/romanizations that landed after
  *    card creation never updated the search string (the review-time check
  *    only compares language sets); going forward the store mutations in
  *    convex/features/decks.ts schedule `rebuildSearchableTextForText`, and
@@ -271,14 +271,14 @@ export const rebuildCardSearchableText = migrations.define({
 /**
  * Populate the filter-aware `cardsByOriginStateAndDueDate` aggregate for all
  * pre-existing cards. Writes only to the aggregate component (no doc patch),
- * and `insertIfDoesNotExist` makes it idempotent — cards written live through
+ * and `insertIfDoesNotExist` makes it idempotent. Cards written live through
  * the `cardAggregates.ts` helpers during the deploy→backfill gap, and cards
  * already inserted by `cardCollectionBackfill`'s `replaceOrInsert`, are simply
  * skipped. Must run after `cardCollectionBackfill` so origins are final.
  *
  * This is what makes `getFilteredCardCounts` stop reading zero for users on a
  * `course` / `custom` content filter, so it runs as early as its dependency
- * allows — ahead of the much more expensive `rebuildCardSearchableText`.
+ * allows. Ahead of the much more expensive `rebuildCardSearchableText`.
  */
 export const cardOriginAggregateBackfill = migrations.define({
   table: 'cards',
@@ -291,8 +291,8 @@ export const cardOriginAggregateBackfill = migrations.define({
 /**
  * Reset Cantonese romanizations produced by the retired `cantonese-romanisation`
  * library (source tag "cantonese-romanisation-v1"). Its dictionary mapped the
- * core vernacular particles (嘅/哋/咗/嘢…) to empty strings — leaking raw Han
- * characters into the Jyutping line — and picked the first candidate reading
+ * core vernacular particles (嘅/哋/咗/嘢…) to empty strings. Leaking raw Han
+ * characters into the Jyutping line, and picked the first candidate reading
  * with no context, yielding wrong tones (可 → hak1, 去 → heoi2). Clearing
  * `romanizedText` back to the `undefined` "never attempted" state lets the
  * lazy content pipeline regenerate rows on next view via `to-jyutping`.
@@ -303,11 +303,11 @@ export const cardOriginAggregateBackfill = migrations.define({
  * tag-only filter would skip them forever (the same trap
  * `recomputeRomanizationPatch` documents below). Any Cantonese row whose
  * romanization was NOT produced by the current `to-jyutping` source is
- * cleared — untagged pre-schema rows, retired-tag rows, and the
+ * cleared. Untagged pre-schema rows, retired-tag rows, and the
  * empty-string "tried, failed" sentinel alike. Rows the lazy pipeline has
  * already regenerated (tagged with the current source, e.g. between deploy
  * and this migration running) are left untouched, as are rows never
- * attempted (`romanizedText === undefined`) — simplified Cantonese (`yue`)
+ * attempted (`romanizedText === undefined`), simplified Cantonese (`yue`)
  * had romanization disabled, so those all fall in that bucket and the lazy
  * pipeline backfills them now that `needsRomanization` is on.
  */
@@ -375,7 +375,7 @@ export const recomputeTranslationRomanization = migrations.define({
  *
  * Unlike the Cantonese reset above, this RECOMPUTES rather than clearing to
  * `undefined`: `romanizeLocal` is pure, synchronous and network-free, so the
- * corrected value can be written here directly — no scheduler fan-out, no
+ * corrected value can be written here directly, no scheduler fan-out, no
  * regeneration storm, and every row is correct the moment the migration ends.
  *
  * Deliberately keyed on LANGUAGE, not on `romanizationSource`: rows written
@@ -392,7 +392,7 @@ export const recomputeTranslationRomanization = migrations.define({
 const RECOMPUTE_ROMANIZATION_CODES = new Set(['zh', 'zh_traditional', 'ko']);
 
 /**
- * @param sourceText the text the romanization is derived FROM — `texts.text`
+ * @param sourceText the text the romanization is derived FROM. `texts.text`
  *   for source rows, `translations.translatedText` for translation rows.
  */
 export function recomputeRomanizationPatch(
@@ -407,8 +407,8 @@ export function recomputeRomanizationPatch(
   if (romanizedText === undefined || romanizedText === '') return undefined;
 
   const recomputed = romanizeLocal(sourceText, language);
-  // `romanizeLocal` returns null only for languages with no local romanizer —
-  // impossible for these three, but never persist a null/empty over good data.
+  // `romanizeLocal` returns null only for languages with no local romanizer.
+  // Impossible for these three, but never persist a null/empty over good data.
   if (recomputed === null || recomputed === '') return undefined;
   if (recomputed === romanizedText) return undefined;
 
@@ -429,8 +429,8 @@ export function recomputeRomanizationPatch(
  *    rebuild, so that full-table pass goes last.
  *
  * There is deliberately no blanket aggregate rebuild at the end. The only
- * drift it existed to repair — a card aggregated under origin 'none' during
- * the deploy window, then raw-patched to a real origin — is now handled in
+ * drift it existed to repair. A card aggregated under origin 'none' during
+ * the deploy window, then raw-patched to a real origin. Is now handled in
  * `cardCollectionBackfill` itself, which moves the entry in the same
  * transaction as the patch. A per-deck clear + re-insert would have blanked
  * `cardsByState` / `cardsByDueDate` / `cardsByStateAndDueDate` (all already

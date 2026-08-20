@@ -16,7 +16,7 @@ import { SUPPORTED_LANGUAGES } from '../../lib/languages';
  * wallclock once the dataset grew to ~20 levels × 5 texts × multi-language
  * storage checks).
  *
- * English-family targets (`en`, `en_gb`, …) are skipped — curriculum texts
+ * English-family targets (`en`, `en_gb`, …) are skipped. Curriculum texts
  * are stored in English and there's nothing to translate.
  *
  * Rate limiting is handled downstream by `convex/rateLimiter.ts` (per-provider
@@ -34,7 +34,7 @@ import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 
 const WARMUP_SOURCE_LANGUAGE = 'en';
 // ~20 level collections × 5 sentences × translation+TTS per language. Used
-// only to compute an informational ETA — actual throughput is bounded by the
+// only to compute an informational ETA. Actual throughput is bounded by the
 // `googleTts` token-bucket rate in `convex/rateLimiter.ts`.
 const WARMUP_TTS_JOBS_PER_LANGUAGE = 100;
 const WARMUP_GOOGLE_TTS_RATE_PER_MINUTE = 150;

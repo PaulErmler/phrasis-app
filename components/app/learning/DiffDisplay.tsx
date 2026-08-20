@@ -15,7 +15,7 @@ interface DiffDisplayProps {
   /** Drop the accuracy footer entirely (see WordDiff.omitAccuracy). */
   omitAccuracy?: boolean;
   hideErrors?: boolean;
-  /** `courseSettings.ignorePunctuation` — drop punctuation from the score. */
+  /** `courseSettings.ignorePunctuation`. Drop punctuation from the score. */
   ignorePunctuation?: boolean;
 }
 
@@ -90,7 +90,7 @@ function CharDiffView({
   );
   const accuracyPct = Math.round(accuracy * 100);
 
-  // Clean revealed sentence — the char chunks reassemble to exactly
+  // Clean revealed sentence. The char chunks reassemble to exactly
   // `expected` once 'added' runs are hidden, so render it via
   // ClickableWords instead: locale-aware segmentation makes each word
   // clickable (ask-AI popover), matching the shadowing-mode card.

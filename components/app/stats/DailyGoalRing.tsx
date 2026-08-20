@@ -60,12 +60,12 @@ function useRingProgress(
  * gauge in components/ai-elements/context.tsx), with multi-lap
  * over-achievement: past 100% the arc keeps circling in the next color of
  * the ramp so a big day is visible at a glance. The entrance sweep replays
- * whenever `replayKey` changes — the homescreen bumps it on every
+ * whenever `replayKey` changes. The homescreen bumps it on every
  * hidden→visible transition of the kept-mounted home view.
  *
  * `fromMs` sets where the sweep starts: pass the previous snapshot value to
  * animate only the delta since the user last looked, or 0 for a full
- * draw-in. An incomplete goal never shows a warning color — the ramp only
+ * draw-in. An incomplete goal never shows a warning color. The ramp only
  * advances by completing laps.
  */
 export function DailyGoalRing({

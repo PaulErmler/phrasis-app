@@ -8,7 +8,7 @@ import { useConsentStatus } from '@/lib/posthog/consent';
 
 /**
  * Mirrors the browser's analytics-consent choice to `userSettings` so the
- * backend can honor it — chat cost events attach message content as
+ * backend can honor it. Chat cost events attach message content as
  * `$ai_input`, and the privacy policy promises that declining keeps that
  * content out of PostHog. The backend cannot read PostHog's device-side
  * consent record, so this is the bridge.
@@ -24,7 +24,7 @@ export function ConsentSync() {
   const lastSyncedRef = useRef<'granted' | 'denied' | null>(null);
 
   useEffect(() => {
-    // 'initializing' (SDK not booted — and in key-less builds, forever) and
+    // 'initializing' (SDK not booted, and in key-less builds, forever) and
     // 'pending' (banner unanswered) both mean there is no choice to mirror.
     // The readiness gate lives in the status itself rather than a separate
     // `isPostHogReady()` check: this effect only re-runs when `status` changes,

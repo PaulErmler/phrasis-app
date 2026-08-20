@@ -11,24 +11,24 @@ import { SUPPORTED_LANGUAGES } from "../../../lib/languages";
  * `/[^\p{L}\p{N}]+/u`, which treats COMBINING MARKS (`\p{M}`) as separators.
  * Devanagari matras, Thai tone marks, Hebrew niqqud and Arabic harakat are
  * marks, so a 9-word Hindi query counted as 17 terms, blew the 16-term cap,
- * and the over-cap branch rebuilt the query from those pieces — emitting bare
+ * and the over-cap branch rebuilt the query from those pieces, emitting bare
  * consonants (`मैं` → `म`) that match nothing in the index. Library search
  * returned zero results for eight supported languages.
  *
  * Two properties are asserted for every script class we support:
  *
- *  1. PRESERVATION — a query under the cap comes back with the original
+ *  1. PRESERVATION. A query under the cap comes back with the original
  *     string intact (segments may be appended). This is what fails when the
  *     splitter miscounts: an inflated count triggers the rebuild and shreds
  *     the query.
- *  2. CAP COMPLIANCE — the result stays within `MAX_SEARCH_TERMS` as the
+ *  2. CAP COMPLIANCE. The result stays within `MAX_SEARCH_TERMS` as the
  *     search index counts terms, or the query throws instead of returning.
  *
  * `countTerms` below is deliberately NOT the production regex. The previous
  * test copied that regex as its own oracle, so it asserted the implementation
  * agreed with itself and passed with the bug intact. This one enumerates the
- * SEPARATORS (whitespace, punctuation, symbols) instead of the keepers —
- * an independent construction that, unlike the buggy version, never treats a
+ * SEPARATORS (whitespace, punctuation, symbols) instead of the keepers.
+ * An independent construction that, unlike the buggy version, never treats a
  * combining mark as a boundary.
  */
 const countTerms = (q: string) => q.split(/[\s\p{P}\p{S}]+/u).filter(Boolean).length;
@@ -46,7 +46,7 @@ interface ScriptClass {
   query: string;
   /**
    * True when this class carries combining marks and the sample is sized so
-   * the OLD splitter exceeds the cap while the correct one does not — i.e.
+   * the OLD splitter exceeds the cap while the correct one does not, i.e.
    * the sample actually reproduces the bug. Asserted below, so nobody can
    * shorten a sample and silently defang the regression test.
    */
@@ -71,7 +71,7 @@ const SCRIPT_CLASSES: ScriptClass[] = [
   {
     name: "Latin with decomposed diacritics (NFD)",
     codes: ["es", "fr", "pt", "cs", "pl", "tr"],
-    // Same text decomposed — the accents are standalone combining marks, the
+    // Same text decomposed. The accents are standalone combining marks, the
     // form a macOS paste or some IMEs produce.
     query: "Añoréis la canción más allá del jardín pequeño después del café".normalize("NFD"),
     triggersLegacyBug: true,
@@ -162,7 +162,7 @@ const SCRIPT_CLASSES: ScriptClass[] = [
   },
 ];
 
-describe("augmentSearchQuery — every supported script class", () => {
+describe("augmentSearchQuery: every supported script class", () => {
   it("covers every language in SUPPORTED_LANGUAGES", () => {
     const covered = new Set(SCRIPT_CLASSES.flatMap((c) => c.codes));
     const missing = SUPPORTED_LANGUAGES.map((l) => l.code).filter(
@@ -239,7 +239,7 @@ describe("augmentSearchQuery — every supported script class", () => {
       expect(out.split(" ")[0]).toBe("word0");
     });
 
-    it("keeps whole words when truncating — never mid-word fragments", () => {
+    it("keeps whole words when truncating, never mid-word fragments", () => {
       const longHindi =
         "मैं कल स्कूल जाऊंगा और अपने दोस्तों से मिलूंगा क्योंकि वे बहुत अच्छे हैं और हम साथ में पढ़ेंगे तथा खेलेंगे";
       const out = augmentSearchQuery(longHindi, ["en", "hi"]);

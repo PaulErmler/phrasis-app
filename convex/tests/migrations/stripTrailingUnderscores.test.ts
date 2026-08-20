@@ -26,7 +26,7 @@ describe('stripTrailingUnderscoresPatch (backfill migrateOne logic)', () => {
     ).toEqual({ translatedText: 'Hola.' });
   });
 
-  it('returns undefined (skip) for clean rows — idempotent', () => {
+  it('returns undefined (skip) for clean rows, idempotent', () => {
     expect(
       stripTrailingUnderscoresPatch({
         targetLanguage: 'es',
@@ -36,7 +36,7 @@ describe('stripTrailingUnderscoresPatch (backfill migrateOne logic)', () => {
     ).toBeUndefined();
   });
 
-  it('skips user-provided rows — the step is machine-output-only', () => {
+  it('skips user-provided rows, the step is machine-output-only', () => {
     expect(
       stripTrailingUnderscoresPatch({
         targetLanguage: 'es',

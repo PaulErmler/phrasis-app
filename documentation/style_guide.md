@@ -1,4 +1,4 @@
-# Flexling App Style Guide
+# Flexling app style guide
 
 This document defines the canonical styling tokens and patterns used across the Flexling app. All views and components must follow these standards to ensure visual consistency.
 
@@ -6,7 +6,7 @@ This document defines the canonical styling tokens and patterns used across the 
 
 ---
 
-## Reusable CSS Classes
+## Reusable CSS classes
 
 These classes are defined in `app/globals.css` (`@layer components`). Prefer them over inline Tailwind when they match the pattern.
 
@@ -57,7 +57,7 @@ These classes are defined in `app/globals.css` (`@layer components`). Prefer the
 
 ---
 
-## Cards and Surfaces
+## Cards and surfaces
 
 | Token         | Classes                                                                  | Usage                                                          |
 | ------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------- |
@@ -75,7 +75,7 @@ These classes are defined in `app/globals.css` (`@layer components`). Prefer the
 
 ---
 
-## Page Layout
+## Page layout
 
 | Token                 | Classes                      | Usage                                                          |
 | --------------------- | ---------------------------- | -------------------------------------------------------------- |
@@ -91,7 +91,7 @@ These classes are defined in `app/globals.css` (`@layer components`). Prefer the
 
 ---
 
-## Sheet and Dialog Headers
+## Sheet and dialog headers
 
 | Token              | Classes                                                                                | Usage                           |
 | ------------------ | -------------------------------------------------------------------------------------- | ------------------------------- |
@@ -122,7 +122,7 @@ These classes are defined in `app/globals.css` (`@layer components`). Prefer the
 
 ---
 
-## Semantic Colors
+## Semantic colors
 
 | Token                | Classes                       | Usage                                 |
 | -------------------- | ----------------------------- | ------------------------------------- |
@@ -163,7 +163,7 @@ These classes are defined in `app/globals.css` (`@layer components`). Prefer the
 
 ---
 
-## Skeletons and Loading
+## Skeletons and loading
 
 | Pattern        | Classes                                       | Usage                      |
 | -------------- | --------------------------------------------- | -------------------------- |
@@ -173,7 +173,7 @@ These classes are defined in `app/globals.css` (`@layer components`). Prefer the
 
 ---
 
-## Spacing Reference
+## Spacing reference
 
 | Scale                     | Value | Common usage                  |
 | ------------------------- | ----- | ----------------------------- |

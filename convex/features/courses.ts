@@ -327,7 +327,7 @@ export const getOnboardingProgress = query({
  */
 export const getCourseStats = query({
   // `today` is client-supplied (ticked by useNowMinute) so the streak and
-  // goal ring roll over at the user's local midnight — a query re-runs on
+  // goal ring roll over at the user's local midnight. A query re-runs on
   // data changes, never on time passing, so deriving today from Date.now()
   // here would freeze yesterday's view until an unrelated write. Validated
   // and clamped to ±1 day of the server's view in resolveClientToday.
@@ -355,7 +355,7 @@ export const getCourseStats = query({
       totalReviewsByMode: v.optional(reviewsByModeValidator),
       totalAccuracySum: v.optional(v.number()),
       totalAccuracyCount: v.optional(v.number()),
-      // Course language config — exposed so the home view can label the
+      // Course language config. Exposed so the home view can label the
       // active level with the user's target languages without a second query.
       targetLanguages: v.array(v.string()),
       baseLanguages: v.array(v.string()),
@@ -374,7 +374,7 @@ export const getCourseStats = query({
       if (!stats) return null;
 
       const todayStr = resolveClientToday(args.timezone, args.today);
-      // Re-derive the live streak state at read time — the stored streak goes
+      // Re-derive the live streak state at read time. The stored streak goes
       // stale between activities (it's only recomputed when the user studies),
       // so a lapsed streak must show 0 and the frozen/pending states must be
       // computed from lastActivityDate vs today rather than the stored row.
@@ -421,7 +421,7 @@ export const getCourseStats = query({
  * Get today's learning stats for the user's active course.
  */
 export const getTodayStats = query({
-  // `today` client-supplied for local-midnight rollover — see getCourseStats.
+  // `today` client-supplied for local-midnight rollover. See getCourseStats.
   args: { timezone: v.string(), today: v.optional(v.string()) },
   returns: v.union(
     v.object({
@@ -546,7 +546,7 @@ export const archiveCourse = mutation({
  * Quota is the gate on every plan. The 30-day archive cooldown only applies to
  * single-course plans (free/basic, course allowance <= 1), where it guards
  * against archive/unarchive churn. Multi-course plans (Pro) skip the cooldown
- * entirely — having a free course slot is enough to reactivate immediately,
+ * entirely. Having a free course slot is enough to reactivate immediately,
  * even right after archiving.
  */
 export const unarchiveCourse = mutation({
@@ -630,7 +630,7 @@ export const unarchiveCourse = mutation({
 // Args for the onboarding-progress mutation, derived from the canonical
 // `onboardingProgressFields` in convex/schema.ts (the single point where new
 // wizard fields get plumbed through: schema → mutation → page). Omits
-// `userId` (derived from auth) and `completedAt` (the wizard can't set it —
+// `userId` (derived from auth) and `completedAt` (the wizard can't set it,
 // only `finalizeOnboarding` does); `step` stays required.
 const saveOnboardingProgressArgs = v
   .object(onboardingProgressFields)
@@ -641,7 +641,7 @@ export const saveOnboardingProgress = mutation({
     ...saveOnboardingProgressArgs.fields,
     // Widened over the schema field so the wizard can CLEAR the stored
     // style when the user switches to Shadowing. Plain `undefined` can't do
-    // that — the Convex client strips undefined args, so the field would
+    // that. The Convex client strips undefined args, so the field would
     // silently keep a previously saved 'transcribe' and `completeOnboarding`
     // would copy it onto courseSettings. `null` is normalised away below;
     // it is never stored.
@@ -677,7 +677,7 @@ export const saveOnboardingProgress = mutation({
       );
     }
 
-    // Same clamp window as updateCourseSettings — completeOnboarding copies
+    // Same clamp window as updateCourseSettings, completeOnboarding copies
     // this value onto courseSettings, so an unclamped write here would be a
     // side door around that mutation's guard. Non-finite values are dropped
     // (leaving any previously stored goal intact) rather than written.
@@ -868,7 +868,7 @@ export const completeOnboarding = mutation({
     // Create course settings in a separate table (with preselected collection and review mode).
     // `autoAddCards: true` is explicit so the default behaviour ships with the
     // new course rather than relying on the legacy `!== false` read-side
-    // convention — keeps the underlying flag visible in admin tooling and
+    // convention. Keeps the underlying flag visible in admin tooling and
     // means future schema changes won't accidentally flip the default off.
     await upsertCourseSettings(ctx, courseId, {
       initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
@@ -896,7 +896,7 @@ export const completeOnboarding = mutation({
     });
 
     // Seed `ONBOARDING_INITIAL_SEED_CARDS` cards upfront. The first lesson
-    // completes at `ONBOARDING_FIRST_LESSON_CARDS` reviews — the gap is
+    // completes at `ONBOARDING_FIRST_LESSON_CARDS` reviews. The gap is
     // filled by the regular auto-add path (`autoAddCards: true` +
     // `cardsToAddBatchSize` set above) firing mid-lesson when the deck
     // empties.
@@ -935,7 +935,7 @@ export const completeOnboarding = mutation({
     // Pin the active course on userSettings. The survey answers
     // (acquisition source, learning goals, placement-test history) stay
     // on `onboardingProgress`, which is frozen (not deleted) by
-    // `finalizeOnboarding` and serves as the permanent snapshot — they
+    // `finalizeOnboarding` and serves as the permanent snapshot. They
     // aren't mirrored to `userSettings`. `dailyTimeGoalMinutes` was
     // already written above as a `courseSettings` field (per-course
     // pacing target). `hasCompletedOnboarding` stays whatever it was
@@ -957,7 +957,7 @@ export const completeOnboarding = mutation({
       settingsId = existingSettings._id;
     }
 
-    // Same level-collection content warmup as `createCourse` — see comment there.
+    // Same level-collection content warmup as `createCourse`. See comment there.
     await ctx.scheduler.runAfter(
       0,
       internal.features.collections.ensureFirstSentencesAcrossLevelCollections,
@@ -1047,7 +1047,7 @@ export const getActiveCourseSettings = query({
  * to seed it, and (b) on each celebration dismiss to rotate the bucket.
  *
  * Server-side persistence (instead of localStorage) means the bucket survives
- * a fresh page load AND syncs across devices — a milestone earned by reviews
+ * a fresh page load AND syncs across devices. A milestone earned by reviews
  * done on phone + desktop in the same session counts toward the same
  * `getNewWordsForCelebration` bucket.
  *
@@ -1086,7 +1086,7 @@ export const setCurrentSessionId = mutation({
  * Update the initialReviewCount for the user's active course.
  */
 // The updatable settings shape (and the mutation's arg/patch key list) is
-// derived from the schema's canonical `courseSettingsFields` — see
+// derived from the schema's canonical `courseSettingsFields`. See
 // `coursePatchableSettingsValidator` in convex/schema.ts.
 type CoursePatchableSettings = Infer<typeof coursePatchableSettingsValidator>;
 
@@ -1126,7 +1126,7 @@ export const updateCourseSettings = mutation({
     for (const key of PATCHABLE_KEYS) {
       let value = args[key];
       // NaN/±Infinity survive Math.max/min/round/floor and Convex stores
-      // them as float64 — a NaN goal then poisons the daily-goal ring and
+      // them as float64. A NaN goal then poisons the daily-goal ring and
       // every projection until manually repaired. Drop such values instead.
       if (typeof value === 'number' && !Number.isFinite(value)) continue;
       if (key === 'cardsToAddBatchSize' && typeof value === 'number') {
@@ -1141,7 +1141,7 @@ export const updateCourseSettings = mutation({
       ) {
         value = Math.max(0, Math.min(10, Math.floor(value)));
       }
-      // "Until rated good" needs at least one good rating — 0 would mean
+      // "Until rated good" needs at least one good rating. 0 would mean
       // Listening never plays rather than always, so the floor is 1.
       if (key === 'targetBeforeUntilGoodReps' && typeof value === 'number') {
         value = Math.max(1, Math.min(10, Math.floor(value)));
@@ -1176,7 +1176,7 @@ export const updateCourseSettings = mutation({
 
     // Safety net for the "at least one target play position" invariant. The UI
     // enforces it (LearningModeSettings auto-enables the other toggle), but a
-    // partial write or non-UI caller could otherwise persist both toggles off —
+    // partial write or non-UI caller could otherwise persist both toggles off,
     // which drops all target audio in audio mode. If this write touches the
     // toggles and the resulting pair would be both-false, restore the historical
     // default (Practice Speaking on). Routed into the insert object below too.
@@ -1198,8 +1198,8 @@ export const updateCourseSettings = mutation({
     }
 
     // Enable transition for separateModeTracking: reset the seed bookkeeping
-    // so the sweep below starts (or restarts, after a disable) from scratch —
-    // cards created while the split was off get seeded, previously-seeded
+    // so the sweep below starts (or restarts, after a disable) from scratch.
+    // Cards created while the split was off get seeded, previously-seeded
     // cards are skipped by the sweep itself (freeze-and-keep).
     const seedTransition =
       args.separateModeTracking === true &&
@@ -1213,7 +1213,7 @@ export const updateCourseSettings = mutation({
       await ctx.db.patch(existing._id, patch);
     } else {
       // `patch` holds exactly the provided fields, with the loop's clamps and
-      // the both-toggles-off guard already applied — so first insert enforces
+      // the both-toggles-off guard already applied, so first insert enforces
       // the same ranges/invariants as the patch path. `initialReviewCount` is
       // the one field the table requires, so it gets a default.
       await ctx.db.insert('courseSettings', {
@@ -1225,11 +1225,11 @@ export const updateCourseSettings = mutation({
     }
 
     // Turning separateModeTracking ON seeds every card's writing track with a
-    // copy of its shared schedule (batched + scheduled — decks can hold
+    // copy of its shared schedule (batched + scheduled, decks can hold
     // thousands of cards). Beyond the transition, EVERY save while the split
     // is on re-kicks an unfinished sweep (debounced): a scheduler chain that
     // died mid-seed would otherwise strand the unseeded remainder outside the
-    // writing queue forever. Turning it OFF needs no work — the writing
+    // writing queue forever. Turning it OFF needs no work. The writing
     // fields stay dormant.
     const fresh = await dbGetCourseSettings(ctx, args.courseId);
     if (fresh) {
@@ -1263,7 +1263,7 @@ export const getCompletedTutorials = query({
 });
 
 /**
- * Lifetime review count for the active course — the gate for the one-time
+ * Lifetime review count for the active course. The gate for the one-time
  * learning-mode tips (`useMilestoneTips`): thresholds compare against this,
  * and counts far past a tip's threshold suppress it silently (veteran
  * guard). Deliberately tiny (two indexed reads) so the learn view can stay
@@ -1317,7 +1317,7 @@ export const completeTutorial = mutation({
 /**
  * Persist the user's pinned card-action order. Server-side
  * `normalizePinnedCardActions` filters to the whitelist, dedupes, and
- * clamps to the maximum count — the client may send anything; storage is
+ * clamps to the maximum count. The client may send anything; storage is
  * always a clean array.
  */
 export const updatePinnedCardActions = mutation({

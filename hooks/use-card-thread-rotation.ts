@@ -14,7 +14,7 @@ export interface UseCardThreadRotationReturn {
 }
 
 /**
- * Rotate the learn view's chat thread when the served card changes — except
+ * Rotate the learn view's chat thread when the served card changes, except
  * for the card change a chat "replace" itself caused.
  *
  * `applyCardEdit` Path B deletes and re-inserts the card document, so
@@ -27,7 +27,7 @@ export interface UseCardThreadRotationReturn {
  * wall-clock window instead, which was wrong twice over: it was also armed for
  * "approve" (which only inserts a text into the chat collection and never
  * changes the served card, so the arm was never consumed), and a genuine
- * rating-driven advance inside the window then ate it — leaving the NEXT card
+ * rating-driven advance inside the window then ate it, leaving the NEXT card
  * attached to the previous card's conversation, with markAlsoCorrect closed
  * over the new card's id against the old card's transcript. A rating-driven
  * advance can never land on the replacement's id, so keying on identity has no

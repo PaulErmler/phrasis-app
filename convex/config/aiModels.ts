@@ -7,7 +7,7 @@ import { LUNA_BO3 } from '../../lib/languages';
 
 /** OpenRouter model IDs by agent or task */
 export const OPENROUTER_MODELS = {
-  /** Main language-tutor chat (tools, streaming) — Gemini 3.7 Flash.
+  /** Main language-tutor chat (tools, streaming), Gemini 3.7 Flash.
    *  No `:nitro` suffix: nitro re-ranks endpoints each step, and Gemini 3
    *  thought signatures are not portable across Google backends (see
    *  OPENROUTER_CHAT_EXTRA_BODY). */
@@ -15,22 +15,22 @@ export const OPENROUTER_MODELS = {
   /** Bulk translation JSON for custom card auto-fill. Reuses the
    *  single-sentence pipeline's stage (`LUNA_BO3`) so model + no-thinking
    *  reasoning can't drift apart; autofill is a SINGLE call (no sampling,
-   *  no judge — that part of the stage is ignored here). Reasoning and the
+   *  no judge, that part of the stage is ignored here). Reasoning and the
    *  Luna price cap are set at the call site in customTexts.ts (also from
    *  the stage). */
   translationAutoFill: LUNA_BO3.model,
   /** Linguistic metadata inference (register, gender, addresseeNumber) for
    *  newly-created cards. Runs once per row, including during bulk import,
    *  so we stay on the lite tier. 3.5 Flash Lite is a tier up from 3.1
-   *  ($0.30/$2.50 per M vs $0.25/$1.50) — ~33% more per call at identical
+   *  ($0.30/$2.50 per M vs $0.25/$1.50), ~33% more per call at identical
    *  token counts, taken for the newer model's accuracy on cross-lingual
    *  gender/register inference. */
   sentenceMetadata: 'google/gemini-3.5-flash-lite',
-  /** Short thread title from first user message. Left on 3.1 Flash Lite —
-   *  a 4-word title in the user's own language is the one job here where
+  /** Short thread title from first user message. Left on 3.1 Flash Lite.
+   *  A 4-word title in the user's own language is the one job here where
    *  the newer model buys nothing. */
   threadTitle: 'google/gemini-3.1-flash-lite',
-  /** Lenient TTS validation — decides whether an STT transcription is
+  /** Lenient TTS validation. Decides whether an STT transcription is
    *  semantically equivalent to the original (ignores phonetic name
    *  spellings, digits-vs-words, punctuation, etc.). Only invoked after the
    *  strict Levenshtein check already failed, so every call is a judgment
@@ -40,7 +40,7 @@ export const OPENROUTER_MODELS = {
    *  3.5 (Jul 2026). A 35-case eval found both models perfect on ordinary
    *  artifacts (diacritics, kana/kanji, 他/她, matra drift, dropped
    *  negations), but on cases where the audio spoke different words for the
-   *  same meaning — a word-order swap, a dropped Japanese copula — 3.5
+   *  same meaning, such as a word-order swap or a dropped Japanese copula, 3.5
    *  answered "match" where 3.1 answered "mismatch". 3.5 reasons about
    *  semantic equivalence; the question here is whether the TTS spoke THIS
    *  text, so that regression would ship broken audio. Re-test before
@@ -50,7 +50,7 @@ export const OPENROUTER_MODELS = {
 
 /**
  * Reasoning effort for the language-tutor chat agent. Gemini 3.7 Flash
- * thinking levels are minimal / low / medium / high — chat uses `medium`.
+ * thinking levels are minimal / low / medium / high. Chat uses `medium`.
  */
 export const OPENROUTER_CHAT_REASONING = 'medium' as const;
 
@@ -103,7 +103,7 @@ export const OPENROUTER_USAGE_ACCOUNTING = {
 
 /** Default OpenRouter provider options for the chat agent.
  *  Reasoning is streamed (exclude: false) so Gemini thought signatures
- *  survive the tool loop; the chat UI never renders those tokens — it
+ *  survive the tool loop; the chat UI never renders those tokens. It
  *  only shows a Thinking indicator until visible reply text arrives. */
 export const OPENROUTER_CHAT_PROVIDER_OPTIONS = {
   openrouter: {
@@ -114,7 +114,7 @@ export const OPENROUTER_CHAT_PROVIDER_OPTIONS = {
 /**
  * Marks stable prompt prefix blocks for explicit prompt caching on providers
  * that need annotations (Anthropic, Gemini). Attach via
- * `providerOptions.openrouter.cacheControl` — message-level works for
+ * `providerOptions.openrouter.cacheControl`. Message-level works for
  * `role: 'system'` messages (the provider emits message-level cache_control
  * there); content-block-level is only required for user/assistant roles.
  *

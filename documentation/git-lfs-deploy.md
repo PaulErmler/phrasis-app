@@ -1,4 +1,4 @@
-# Git LFS and Deployments (Coolify)
+# Git LFS and deployments (Coolify)
 
 ## Problem
 
@@ -14,11 +14,11 @@ On each deploy, Coolify runs `git clone` / `git pull`, which triggers a full LFS
 - Slows down every deploy
 - Is unnecessary for production
 
-## Solution: Exclude only the large input file (recommended)
+## Solution: exclude only the large input file (recommended)
 
 The repo uses **`.lfsconfig`** so that the 708 MB input file is excluded from LFS fetch by default. All other LFS files (output CSVs, etc.) are still pulled on clone/pull.
 
-- **No Coolify (or other platform) config needed** — the behavior is in the repo.
+- **No Coolify (or other platform) config needed.** The behavior is in the repo.
 - Deploys will not download the 708 MB file, but will still get the smaller LFS files.
 - Saves GitHub LFS quota and deploy time.
 
@@ -30,7 +30,7 @@ If you need to run the data-preparation pipeline and must have the real `sentenc
 git lfs pull --include="data_preparation/data/inputs/sentences.csv"
 ```
 
-### Alternative: Skip all LFS files on deploy
+### Alternative: skip all LFS files on deploy
 
 If you ever want to skip **every** LFS file during clone/pull (e.g. app never needs any of them at runtime), set in your deploy environment:
 
@@ -40,7 +40,7 @@ GIT_LFS_SKIP_SMUDGE=1
 
 Then no LFS objects are downloaded. To pull everything later: `git lfs pull`.
 
-## Optional: Move large input out of the repo
+## Optional: move large input out of the repo
 
 To avoid LFS entirely for the 708 MB input:
 

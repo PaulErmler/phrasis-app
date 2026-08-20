@@ -12,7 +12,7 @@ import { RadioScreen } from '../screens/RadioScreen';
 
 /**
  * Store-screenshot pages (scripts/store-screenshots.ts renders these with
- * Playwright). Real app components + design tokens, mocked data — no Convex.
+ * Playwright). Real app components + design tokens, mocked data, no Convex.
  *
  * Dev-only: hidden in production unless ENABLE_STORE_SCREENS=1 is set at
  * build time, and always noindexed.

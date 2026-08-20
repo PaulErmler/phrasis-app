@@ -10,7 +10,7 @@ vi.mock("@openrouter/ai-sdk-provider", () => ({
   createOpenRouter: () => () => ({}),
 }));
 // Stub the action-retrier so `retrier.run(ctx, fnRef, args)` delegates to
-// `ctx.runAction` instead of the (unregistered) component — needed by the
+// `ctx.runAction` instead of the (unregistered) component. Needed by the
 // tests that replay the scheduled `generateSentenceMetadata` job.
 vi.mock("@convex-dev/action-retrier", () => {
   class ActionRetrier {
@@ -163,7 +163,7 @@ describe("features/customTexts", () => {
               text: "Hola",
               translationSource: "openrouter/some-model-none",
             },
-            // fr deliberately omits translationSource — accepted, and the
+            // fr deliberately omits translationSource. Accepted, and the
             // server fills in the honest provenance (see below).
             { language: "fr", text: "Bonjour" },
           ],
@@ -303,7 +303,7 @@ describe("features/customTexts", () => {
           timezone: "UTC",
         }),
       ).rejects.toThrow(/TEXT_TOO_LONG/);
-      // Validation precedes consumeQuota — nothing is charged.
+      // Validation precedes consumeQuota, nothing is charged.
       const quota = await t.run(async (ctx) =>
         ctx.db
           .query("usageQuotas")
@@ -314,7 +314,7 @@ describe("features/customTexts", () => {
     });
   });
 
-  describe("createCustomText — custom collection get-or-create", () => {
+  describe("createCustomText: custom collection get-or-create", () => {
     async function getSettings(
       t: TestConvex<typeof schema>,
       courseId: Awaited<ReturnType<typeof seedActiveCourseWithQuota>>["courseId"],
@@ -486,7 +486,7 @@ describe("features/customTexts", () => {
           targetLanguages: ["es"],
         },
       );
-      // Every autofill row carries a `translationSource` tag now — the
+      // Every autofill row carries a `translationSource` tag now. The
       // autofill model id plus its `none` (no-thinking) reasoning suffix.
       // The exact slug is owned by OPENROUTER_MODELS.translationAutoFill in
       // convex/config/aiModels.ts; we just assert the shape
@@ -593,7 +593,7 @@ describe("features/customTexts", () => {
       );
       expect(collection?.textCount).toBe(3);
 
-      // Bulk-import path is exclusively manual — every inserted translation
+      // Bulk-import path is exclusively manual. Every inserted translation
       // must carry the `'user-provided'` tag so a future strategy swap won't
       // overwrite text the user typed.
       const allTranslations = await t.run(async (ctx) =>

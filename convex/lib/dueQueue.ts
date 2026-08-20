@@ -13,9 +13,9 @@ type Origin = ReturnType<typeof originsForFilter>[number];
  * The four index queries one scheduling track's due queue draws from:
  * unfiltered / learn_new-only, each with an origin-keyed variant for the
  * content-source filter. Kept as per-track literals so each `withIndex`
- * chain stays fully typed; everything ABOVE the index lookup — the
+ * chain stays fully typed; everything ABOVE the index lookup. The
  * mode/filter branching, the per-origin fan-out, the merge-sort, the
- * truncation — lives once in `fetchTrackDueCards` and cannot drift between
+ * truncation. Lives once in `fetchTrackDueCards` and cannot drift between
  * tracks (the same reason `fetchFreePlayRotation` was hoisted for the
  * free-play faces).
  *
@@ -113,8 +113,8 @@ const TRACK_DUE_QUERIES: Record<SchedulingTrack, TrackDueQueries> = {
         .take(take),
   },
   writing: {
-    // `?? 0` is unreachable in practice — every range below bounds
-    // writingDueDate to numbers — but keeps the sort total.
+    // `?? 0` is unreachable in practice. Every range below bounds
+    // writingDueDate to numbers, but keeps the sort total.
     dueOf: (card) => card.writingDueDate ?? 0,
     both: (ctx, deckId, now, take) =>
       ctx.db
@@ -193,7 +193,7 @@ const TRACK_DUE_QUERIES: Record<SchedulingTrack, TrackDueQueries> = {
  * Shared by the serving path (`getCardForReview`), the empty-reason probe,
  * and the content warmer (`getUpcomingCardsForMode` in decks.ts) so all
  * three always draw from the same population. Free play never comes through
- * here — it serves from `fetchFreePlayRotation`.
+ * here. It serves from `fetchFreePlayRotation`.
  */
 export async function fetchTrackDueCards(
   ctx: QueryCtx,

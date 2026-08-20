@@ -17,7 +17,7 @@ import { PLACEMENT_SENTENCES_QUERY_CAP } from '../../lib/constants/onboarding';
  * The seed migration (`convex/migrations/seedPlacementTestSentences.ts`)
  * populates both tables and creates one `placement-test-pool` collection
  * that holds the English `texts` rows. The pool collection is never offered
- * as study material — `resolveStartingCollection` only maps to `L01..L20` /
+ * as study material. `resolveStartingCollection` only maps to `L01..L20` /
  * legacy CEFR collection names.
  */
 
@@ -224,7 +224,7 @@ export const getPlacementReadiness = query({
     audioReadySentences: v.number(),
   }),
   handler: async (ctx, { targetLanguage }) => {
-    // Public query — `userId` is read only to keep the auth shape uniform.
+    // Public query. `userId` is read only to keep the auth shape uniform.
     const userId = await getAuthUserId(ctx);
     void userId;
 

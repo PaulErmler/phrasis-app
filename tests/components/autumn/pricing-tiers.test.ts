@@ -154,7 +154,7 @@ describe('previousTier', () => {
   });
 
   it('never crosses billing intervals', () => {
-    // Annual Ultra builds on annual Pro, not on monthly Pro — even though
+    // Annual Ultra builds on annual Pro, not on monthly Pro. Even though
     // monthly Pro (€16) is the cheaper plan by raw price.
     expect(previousTier(ultraAnnual, ALL)?.id).toBe('pro_annual');
   });
@@ -175,7 +175,7 @@ describe('itemsAddedOver', () => {
   it('lists only what the tier actually adds, as an increment', () => {
     const added = itemsAddedOver(paidItems(ultra), pro);
     expect(added.map((i) => i.feature_id)).toEqual(['credits']);
-    // "Everything from Pro, plus N credits" — Pro's total is already counted
+    // "Everything from Pro, plus N credits". Pro's total is already counted
     // by the line above, so only the delta up to Ultra's grant is listed.
     expect(added[0].included_usage).toBe(monthlyCredits(ultraPlan) - monthlyCredits(proPlan));
   });
@@ -216,7 +216,7 @@ describe('itemsAddedOver', () => {
   it('does not conflate a one-off starter grant with a recurring one', () => {
     // Free gives a one-off starter pot of credits plus a monthly trickle.
     // Basic's monthly grant must be compared against the monthly trickle,
-    // not the larger one-off grant — giving the round "plus N credits per
+    // not the larger one-off grant, giving the round "plus N credits per
     // month" increment the plans are tuned for.
     const added = itemsAddedOver(paidItems(basic), free);
     expect(added.find((i) => i.feature_id === 'credits')?.included_usage).toBe(

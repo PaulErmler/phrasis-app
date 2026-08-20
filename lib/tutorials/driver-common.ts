@@ -42,12 +42,12 @@ export function baseDriverConfig(): Pick<
  *
  * `visibility: hidden` keeps its layout box (e.g. the due-count pills reserve
  * their width while counts load), so a pure rect check would highlight a
- * blank rectangle — treat such elements as absent.
+ * blank rectangle. Treat such elements as absent.
  *
  * When no visible match exists, `onMiss` decides the fallback:
- * - `'keep-selector'` — return the step untouched; driver.js re-queries the
+ * - `'keep-selector'`: return the step untouched; driver.js re-queries the
  *   selector itself at highlight time (tours: the element may mount later).
- * - `'unanchor'` — drop the element so the step renders as a centered
+ * - `'unanchor'`: drop the element so the step renders as a centered
  *   popover (tips: pointing at nothing is worse than not pointing).
  */
 export function resolveStepAnchors(

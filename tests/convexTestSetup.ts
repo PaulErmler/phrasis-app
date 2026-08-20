@@ -5,7 +5,7 @@ import { vi } from 'vitest';
  *
  * Real Workpool calls go through `components.llmPool` / `components.ttsPool`,
  * which convex-test can only provide via `t.registerComponent` (flagged
- * fragile in this project — same reasoning as the rateLimiter module mock in
+ * fragile in this project, same reasoning as the rateLimiter module mock in
  * individual test files). Any mutation that enqueues content generation
  * (`enqueueTtsJob`, `enqueueLlmTranslation`, `scheduleMissingContent` callers)
  * would otherwise crash on the missing component.
@@ -55,7 +55,7 @@ vi.mock('@/convex/lib/workpools', () => ({
 }));
 
 /**
- * Stub the aggregate component at the same module boundary — production code
+ * Stub the aggregate component at the same module boundary. Production code
  * instantiates `new TableAggregate(components.cardsByState, ...)` at
  * module-load, and the aggregate component is not registered with convex-test
  * (same reasoning as the workpool mocks above). No-op writes, zero counts.

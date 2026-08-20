@@ -18,7 +18,7 @@ const modules = import.meta.glob("/convex/**/*.ts");
  * `completeOnboarding` schedules background warmup via `ctx.scheduler.runAfter`
  * (translation queue, audio warmup). Those scheduled functions fire *after*
  * the test's synchronous mutation returns, but by then the convex-test
- * harness has torn down their `_scheduled_functions` row — they crash inside
+ * harness has torn down their `_scheduled_functions` row. They crash inside
  * the harness with "Cannot read properties of null (reading 'state')" and
  * surface as unhandled rejections that pollute the test output.
  *
@@ -26,21 +26,21 @@ const modules = import.meta.glob("/convex/**/*.ts");
  * after the mutation, before any scheduled work runs).
  *
  * Suppression strategy:
- *   1. **unhandledRejection** — vitest's worker listener
+ *   1. **unhandledRejection**: vitest's worker listener
  *      (init.D98-gwRW.js:105) reports the error only when
  *      `processListeners('unhandledRejection').length === 1`. We register a
  *      second listener that pattern-matches the known scheduler-teardown
  *      crashes; for those, do nothing (vitest's listener returns early
  *      because `length > 1`). For genuinely unexpected unhandled rejections
  *      we re-throw to a microtask so vitest still surfaces them.
- *   2. **console.error** — convex-test's scheduler logs failed scheduled
+ *   2. **console.error**: convex-test's scheduler logs failed scheduled
  *      functions via `console.error`. Filter the known patterns so the
  *      report stays readable.
  */
 const SCHEDULER_NOISE = /(Cannot read properties of null \(reading 'state'\)|Transaction already committed or rolled back|Error when running scheduled function|AUTUMN_SECRET_KEY environment variable)/;
 
 // Register the noise filters at MODULE TOP LEVEL (not in beforeAll/afterAll).
-// The deferred scheduled functions can fire after vitest's afterAll cleanup —
+// The deferred scheduled functions can fire after vitest's afterAll cleanup,
 // if we'd removed the listener by then, the rejection slips through to
 // vitest's worker handler.
 process.on("unhandledRejection", (reason) => {
@@ -184,7 +184,7 @@ async function drainScheduled(t: TestConvex<typeof schema>) {
     await t.finishInProgressScheduledFunctions();
   } catch {
     // Scheduled functions can fail in the test harness when they hit real
-    // network paths — that's fine; we only care about the in-memory state
+    // network paths. That's fine; we only care about the in-memory state
     // the synchronous mutation already produced.
   }
 }
@@ -235,8 +235,8 @@ describe("completeOnboarding", () => {
   });
 
   /**
-   * The boundary clamp in `saveOnboardingProgress` only defends NEW writes —
-   * an `onboardingProgress` row written before that guard existed can still
+   * The boundary clamp in `saveOnboardingProgress` only defends NEW writes.
+   * An `onboardingProgress` row written before that guard existed can still
    * carry an out-of-range or non-finite goal, and THIS is the copy that
    * reaches `courseSettings` and the homescreen ring. Seeded via `ctx.db`
    * to reproduce exactly that pre-existing-row case.
@@ -274,7 +274,7 @@ describe("completeOnboarding", () => {
         .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
         .first(),
     );
-    // Dropped, not stored as Infinity — the ring reads "Set daily goal"
+    // Dropped, not stored as Infinity. The ring reads "Set daily goal"
     // instead of "14 / Infinity min".
     expect(settings?.dailyTimeGoalMinutes).toBeUndefined();
 
@@ -319,7 +319,7 @@ describe("completeOnboarding", () => {
     await drainScheduled(t);
   });
 
-  it("is idempotent — a second call returns the same course/deck and does not double-consume quota", async () => {
+  it("is idempotent, a second call returns the same course/deck and does not double-consume quota", async () => {
     const t = convexTest(schema, modules);
     await seedEssentialCollection(t);
     await seedQuota(t, "user_A");
@@ -348,7 +348,7 @@ describe("completeOnboarding", () => {
     );
     expect(quota?.features.courses.used).toBe(1);
 
-    // Cards should still be exactly the initial seed — no double-seeding on
+    // Cards should still be exactly the initial seed, no double-seeding on
     // the second call. Without the idempotency guard this would be
     // 2 * ONBOARDING_INITIAL_SEED_CARDS (or fail elsewhere).
     const cards = await t.run(async (ctx) =>
@@ -372,7 +372,7 @@ describe("completeOnboarding", () => {
     // placementTest) live on `onboardingProgress` and stay there as the
     // permanent snapshot (the row is frozen, not deleted, by
     // finalizeOnboarding). `dailyTimeGoalMinutes` is mirrored to
-    // `courseSettings` because it's a per-course pacing target — see
+    // `courseSettings` because it's a per-course pacing target. See
     // the dedicated test below. `userSettings` only carries identity +
     // activeCourseId + tutorial state.
     await asUser.mutation(api.features.courses.saveOnboardingProgress, {
@@ -474,7 +474,7 @@ describe("completeOnboarding", () => {
   });
 });
 
-describe("completeOnboarding — starting level → collection", () => {
+describe("completeOnboarding: starting level → collection", () => {
   async function getActiveCollectionId(
     t: TestConvex<typeof schema>,
     courseId: Id<"courses">,
@@ -498,7 +498,7 @@ describe("completeOnboarding — starting level → collection", () => {
       step: 6,
       targetLanguages: ["es"],
       baseLanguages: ["en"],
-      // The 6-bucket mapping for `intermediate` is L08 — the precise
+      // The 6-bucket mapping for `intermediate` is L08. The precise
       // finalLevel (6) must win over it.
       currentLevel: "intermediate",
       reviewMode: "audio",
@@ -589,7 +589,7 @@ describe("completeOnboarding — starting level → collection", () => {
   });
 });
 
-describe("saveOnboardingProgress — free-text length guard", () => {
+describe("saveOnboardingProgress: free-text length guard", () => {
   it("accepts free-text up to MAX_ONBOARDING_FREE_TEXT_LENGTH", async () => {
     const t = convexTest(schema, modules);
     const asUser = t.withIdentity({ subject: "user_A" });
@@ -649,7 +649,7 @@ describe("finalizeOnboarding", () => {
     const settings = await asUser.query(api.features.courses.getUserSettings, {});
     expect(settings?.hasCompletedOnboarding).toBe(true);
     // The wizard no longer embeds a tutorial lesson, so nothing may be
-    // pre-marked — the home tour and every learning-mode tip must stay
+    // pre-marked. The home tour and every learning-mode tip must stay
     // armed for the fresh user (they teach in the real app now).
     expect(settings?.completedTutorials ?? []).toEqual([]);
 
@@ -731,7 +731,7 @@ describe("finalizeOnboarding", () => {
     );
     await drainScheduled(t);
 
-    // The word-projection step retunes the goal — that picker only writes
+    // The word-projection step retunes the goal. That picker only writes
     // the onboardingProgress row, after the courseSettings copy was made.
     await asUser.mutation(api.features.courses.saveOnboardingProgress, {
       step: 10,
@@ -753,7 +753,7 @@ describe("finalizeOnboarding", () => {
     expect(courseSettings?.dailyTimeGoalMinutes).toBe(30);
   });
 
-  it("works when the user has no progress row (defensive — userSettings stays well-formed)", async () => {
+  it("works when the user has no progress row (defensive, userSettings stays well-formed)", async () => {
     const t = convexTest(schema, modules);
     const asUser = t.withIdentity({ subject: "user_A" });
 
@@ -768,7 +768,7 @@ describe("finalizeOnboarding", () => {
     expect(settings?.hasCompletedOnboarding).toBe(true);
   });
 
-  it("is idempotent — a second call reports alreadyFinalized and does not re-stamp completedAt", async () => {
+  it("is idempotent, a second call reports alreadyFinalized and does not re-stamp completedAt", async () => {
     const t = convexTest(schema, modules);
     const asUser = t.withIdentity({ subject: "user_A" });
 
@@ -849,7 +849,7 @@ describe("finalizeOnboarding", () => {
   });
   it("clears a previously saved writing style when the user switches to Shadowing", async () => {
     // Regression: the wizard sends `writingInputMode: null` for Shadowing,
-    // but null used to collapse to `undefined` on the way out — and the
+    // but null used to collapse to `undefined` on the way out, and the
     // Convex client strips undefined args, so the patch left 'transcribe' on
     // the progress row. completeOnboarding then copied it onto courseSettings
     // and the user silently landed in Transcribe the first time they opened
@@ -1025,8 +1025,8 @@ describe("warmupOnboardingTranslations", () => {
   it("skips user forks so they can't consume the per-collection window", async () => {
     // Regression: the per-collection query used `by_collection_and_rank`
     // without the `userCreated: false` filter every other premade-level read
-    // applies. A user fork sitting at a low rank ate one of the five slots —
-    // paying for a private fork's translations while a curriculum text that
+    // applies. A user fork sitting at a low rank ate one of the five slots.
+    // Paying for a private fork's translations while a curriculum text that
     // the placement flow actually shows stayed cold.
     const t = convexTest(schema, modules);
     const byCode = await seedActiveDataset(t, [1]);
@@ -1050,7 +1050,7 @@ describe("warmupOnboardingTranslations", () => {
     );
 
     // The COUNT alone can't tell the two behaviours apart (take(5) returns
-    // five rows either way) — assert on which texts were actually fanned out.
+    // five rows either way), assert on which texts were actually fanned out.
     const scheduledTextIds = await t.run(async (ctx) => {
       const jobs = await ctx.db.system.query("_scheduled_functions").collect();
       return jobs.flatMap(

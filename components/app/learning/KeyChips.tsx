@@ -4,7 +4,7 @@ import { Fragment } from 'react';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 
 /**
- * Keyboard-key chips with an optional separator between them — the shared
+ * Keyboard-key chips with an optional separator between them. The shared
  * renderer behind the control tooltips (KeyHint in LearningControls) and the
  * shortcuts legend (ShortcutRow in LearningHeader). `join` disambiguates
  * multi-chip hints: "+" for chords (Shift+R), "/" for alternatives

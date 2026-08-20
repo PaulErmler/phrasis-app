@@ -20,7 +20,7 @@ function relayRequest(path = `${POSTHOG_PROXY_PATH}/e/`): NextRequest {
  * middleware must strip `cookie` before the rewrite runs.
  *
  * `NextResponse.next({ request: { headers } })` encodes the surviving headers
- * as `x-middleware-override-headers` (the allowlist — everything absent is
+ * as `x-middleware-override-headers` (the allowlist, everything absent is
  * deleted by the router) plus one `x-middleware-request-*` entry per header,
  * which is what these assertions read.
  */

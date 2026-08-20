@@ -181,7 +181,7 @@ describe("features/chat/messages", () => {
   });
 
   // STILL SKIPPED: each of these paths calls into the `@convex-dev/agent`
-  // component — `saveMessage`, `listUIMessages`, `syncStreams` delegate to
+  // component. `saveMessage`, `listUIMessages`, `syncStreams` delegate to
   // refs on `components.agent.*`, which convex-test resolves through its own
   // component registry. A local `vi.mock("@convex-dev/agent", ...)` cannot
   // intercept those ref-based calls, and they also hit the Agent's internal
@@ -192,7 +192,7 @@ describe("features/chat/messages", () => {
   // Quick actions need no skipped case: steering-before-label ordering is
   // structural (one `saveMessages` call whose array is [system, user]), the
   // payload length guards are covered by assertQuickActionWithinLimits tests,
-  // and the expansion itself by expandQuickAction tests — both in
+  // and the expansion itself by expandQuickAction tests, both in
   // quickActions.test.ts.
   it.skip("generateResponse: LLM path", () => {});
   it.skip("generateThreadTitle: LLM path", () => {});
