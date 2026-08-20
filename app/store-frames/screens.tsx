@@ -563,11 +563,7 @@ export const SCREENS: Record<string, () => ReactNode> = {
   'home-projection': () => <HomeProjectionScreen />,
   difficulty: () => <DifficultyScreen />,
   progress: () => <ProgressScreen />,
-  'langs-a': () => <LangsAScreen />,
-  'langs-b': () => <LangsBScreen />,
-  'langs-c': () => <LangsCScreen />,
-  'langs-d': () => <LangsDScreen />,
-  'langs-e': () => <LangsEScreen />,
+  langs: () => <LangsScreen />,
 };
 
 // ---------------------------------------------------------------- languages
@@ -620,7 +616,7 @@ function Pill({
         color: fg,
         border: border ? `2px solid ${border}` : 'none',
         borderRadius: 999,
-        padding: '14px 26px',
+        padding: size >= 50 ? '18px 30px' : '14px 26px',
         fontSize: size,
         fontWeight: 600,
         letterSpacing: '-0.01em',
@@ -633,145 +629,36 @@ function Pill({
   );
 }
 
-/** A. Pills on brand ground. */
-export function LangsAScreen() {
+/** The catalogue: flag-and-name pills, sized to read at thumbnail scale. */
+export function LangsScreen() {
   return (
     <Poster bg={BRAND.sky}>
-      <LangHead sub="Every language ships with natural audio, dialects included." />
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, alignContent: 'center', flex: 1, paddingTop: 44 }}>
-        {BASE_LANGS.map((l) => (
-          <Pill key={l.code} l={l} bg="rgba(255,255,255,.18)" fg="#fff" />
-        ))}
-      </div>
-    </Poster>
-  );
-}
-
-/** B. Big count over a flag mosaic. */
-export function LangsBScreen() {
-  return (
-    <Poster bg="#0B2A35">
-      <p style={{ margin: 0, fontSize: 230, lineHeight: 0.86, fontWeight: 800, letterSpacing: '-0.05em', color: BRAND.amber }}>
-        {COUNTS.languages}+
-      </p>
-      <p style={{ margin: '22px 0 0', fontSize: 62, lineHeight: 1.12, fontWeight: 700, color: '#fff', maxWidth: '18ch' }}>
-        languages, {COUNTS.withDialects} voices and dialects.
+      <p
+        style={{
+          margin: 0,
+          fontSize: 108,
+          lineHeight: 1.02,
+          fontWeight: 800,
+          letterSpacing: '-0.038em',
+          color: '#fff',
+        }}
+      >
+        One method.
+        <br />
+        {COUNTS.languages}+ languages.
       </p>
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(6, 1fr)',
-          gap: 22,
-          flex: 1,
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 20,
           alignContent: 'center',
-          paddingTop: 46,
+          flex: 1,
+          paddingTop: 52,
         }}
       >
-        {LANGS.map((l) => (
-          <span
-            key={l.code}
-            style={{
-              fontSize: 84,
-              textAlign: 'center',
-              lineHeight: 1.1,
-            }}
-          >
-            {l.flag}
-          </span>
-        ))}
-      </div>
-    </Poster>
-  );
-}
-
-/** C. Grouped by family, on paper. */
-export function LangsCScreen() {
-  return (
-    <Poster bg="#F4F7F8">
-      <p style={{ margin: 0, fontSize: 92, lineHeight: 1.02, fontWeight: 800, letterSpacing: '-0.035em', color: '#0D1416' }}>
-        One method.
-        <br />
-        {COUNTS.languages}+ languages.
-      </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 26, flex: 1, paddingTop: 44, justifyContent: 'center' }}>
-        {GROUPED.map((g) => (
-          <div key={g.group}>
-            <p
-              style={{
-                margin: '0 0 14px',
-                fontSize: 30,
-                fontWeight: 800,
-                letterSpacing: '.14em',
-                textTransform: 'uppercase',
-                color: BRAND.sky,
-              }}
-            >
-              {g.group}
-            </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-              {g.langs.map((l) => (
-                <Pill key={l.code} l={l} bg="#fff" fg="#0D1416" border="#DCE5E7" size={34} />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </Poster>
-  );
-}
-
-/** D. Offset rows on near-black. */
-export function LangsDScreen() {
-  const rows = [0, 1, 2, 3, 4, 5].map((r) =>
-    BASE_LANGS.filter((_, i) => i % 6 === r),
-  );
-  const offsets = [0, -70, 40, -30, 90, -50];
-  return (
-    <Poster bg="#0B0F11">
-      <LangHead sub="Pick one, or learn several side by side." />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, flex: 1, justifyContent: 'center', paddingTop: 40, overflow: 'hidden' }}>
-        {rows.map((row, i) => (
-          <div key={i} style={{ display: 'flex', gap: 18, marginLeft: offsets[i], flexWrap: 'nowrap' }}>
-            {row.map((l) => (
-              <Pill
-                key={l.code}
-                l={l}
-                bg="rgba(255,255,255,.08)"
-                fg="#fff"
-                border="rgba(255,255,255,.14)"
-                size={38}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-    </Poster>
-  );
-}
-
-/** E. Two columns, editorial. */
-export function LangsEScreen() {
-  const half = Math.ceil(BASE_LANGS.length / 2);
-  const cols = [BASE_LANGS.slice(0, half), BASE_LANGS.slice(half)];
-  return (
-    <Poster bg={BRAND.amber}>
-      <p style={{ margin: 0, fontSize: 96, lineHeight: 1.02, fontWeight: 800, letterSpacing: '-0.035em', color: '#3B2A00' }}>
-        One method.
-        <br />
-        {COUNTS.languages}+ languages.
-      </p>
-      <div style={{ display: 'flex', gap: 34, flex: 1, paddingTop: 48 }}>
-        {cols.map((col, i) => (
-          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly' }}>
-            {col.map((l) => (
-              <div key={l.code} style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-                <span style={{ fontSize: 46 }}>{l.flag}</span>
-                <span style={{ fontSize: 42, fontWeight: 600, color: '#3B2A00', letterSpacing: '-0.015em' }}>
-                  {l.label}
-                </span>
-              </div>
-            ))}
-          </div>
+        {BASE_LANGS.map((l) => (
+          <Pill key={l.code} l={l} bg="rgba(255,255,255,.18)" fg="#fff" size={54} />
         ))}
       </div>
     </Poster>
