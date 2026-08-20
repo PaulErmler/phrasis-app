@@ -98,3 +98,17 @@ export function ogteLevelToCollectionCode(level: number): string | null {
   }
   return `L${String(level).padStart(2, '0')}`;
 }
+
+/**
+ * Inverse of `ogteLevelToCollectionCode`: the OGTE level for a collection
+ * `code`, or null when the code isn't a dataset level ("L01".."L20" — e.g.
+ * custom/chat/legacy CEFR collections).
+ */
+export function collectionCodeToOgteLevel(
+  code: string | undefined,
+): number | null {
+  const match = code ? /^L(\d{2})$/.exec(code) : null;
+  if (!match) return null;
+  const level = Number(match[1]);
+  return level >= OGTE_MIN_LEVEL && level <= OGTE_MAX_LEVEL ? level : null;
+}

@@ -80,17 +80,18 @@ We tag production components with `data-testid` attributes so Playwright selecto
 | ---- | --- |
 | Chat | `chat-new-input`, `chat-input`, `chat-submit`, `chat-toggle-conversations`, `chat-new-thread`, `chat-messages-log`, `chat-user-message`, `chat-assistant-message`, `chat-thread-entry` (+ `data-thread-id`) |
 | Feature quota | `feature-quota-${featureId}` (e.g. `feature-quota-chat_messages`, `feature-quota-custom_sentences`) |
-| Card approval | `card-approval`, `card-approve`, `card-reject`, `card-edit`, `card-approved-indicator` |
-| Learn | `learn-rating-{again,hard,good,easy,still-learning,understood}`, `learn-undo`, `learn-reveal`, `learn-next`, `learn-submit-translation`, `learn-translation-input`, `learn-settings`, `clickable-word`, `ask-ai-button`, `progress-display-{continue,play-pause}`, `filter-blocked-{create-chat,create-custom,include-other}` |
+| Card approval | `card-approval`, `card-approve`, `card-reject`, `card-edit`, `card-approved-indicator`, `also-correct-{approval,add,replace,dismiss,resolved}` |
+| Learn | `learn-rating-{again,hard,good,easy,still-learning,understood}`, `learn-undo`, `learn-reveal`, `learn-next`, `learn-submit-translation`, `learn-translation-input`, `learn-settings`, `clickable-word`, `ask-ai-button`, `progress-display-{continue,play-pause}`, `filter-blocked-{create-chat,create-custom,include-other}`, `first-exposure-answer` |
+| Difficulty check | `difficulty-check-{dialog,level,confirm,easier,harder}` |
+| Home | `home-free-plan-badge`, `home-upgrade-button`, `home-upgrade-dialog` |
 | Learning settings | `settings-mode-audio`, `settings-mode-full`, `settings-writing-{translate,transcribe}`, `learning-settings-sheet` (switches use role=switch) |
 | Content filter | `content-filter-trigger`, `content-filter-dropdown`, `content-filter-option-{course,custom,both}`, `source-badge-off`, `source-badge-reenable` |
 | Library | `library-search`, `library-filter-{mastered,hidden,favorites}`, `library-source-{premade,custom}`, `library-card` |
 | Collections | `collection-add-cards`, `collection-load-{more,earlier}`, `collection-show-{added,ignored}-toggle`, `collection-text-{add,ignore,prioritize}`, `collection-text-${row.status}` |
 | Courses | `course-menu-trigger`, `course-menu-create`, `course-menu-entry`, `course-settings`, `course-settings-sheet`, `course-archive`, `course-confirm-archive`, `course-dialog-{next,back,create}`, `language-option-${language.code}` |
 | Add cards / import | `add-cards-mode-{individual,import}`, `import-{paste,dropzone,file-input,delimiter,has-header,submit,confirm}`, `import-step-${i}`, `import-mapping-${language}`, `import-review-row-${i}`, `import-review-{edit,save}-${i}-${lang}`, `import-review-edit-input-${i}-${lang}`, `import-review-delete-${i}` |
-| Onboarding wizard | `onboarding-step-<step>` (one per wizard step), `onboarding-back`, `onboarding-continue`, `proficiency-branch-{new,self-pick,test}`, `acquisition-option-${value}`, `acquisition-other-{input,char-count}`, `goal-option-${value}`, `goal-other-{input,char-count}`, `daily-time-option-${value}`, `daily-time-custom-input`, `plan-pick-skip`, `word-projection-continue`, `feature-tour-{next,back,done}` |
+| Onboarding wizard | `onboarding-step-<step>` (one per wizard step, incl. `onboarding-step-review-mode`), `onboarding-back`, `onboarding-continue`, `language-pair-back`, `proficiency-branch-{new,self-pick,test}`, `acquisition-option-${value}`, `acquisition-other-{input,char-count}`, `goal-option-${value}`, `goal-other-{input,char-count}`, `daily-time-option-${value}`, `daily-time-custom-input` |
 | Placement test | `placement-test-{reveal,knew-it,didnt-know}`, `placement-result-{continue,easier,harder}`, `placement-content-retry` |
-| First lesson | `first-lesson-start`, `first-lesson-skip`, `first-lesson-mode-{audio,translate,transcribe}` |
 | Stats | `stats-tile-{words,streak,reviews,sentences,time,accuracy}`, `stats-wordcloud` |
 | Navigation | `bottom-nav-${view}`, `language-switcher` |
 | Billing | `pricing-card-cta-${productId}` (e.g. `pricing-card-cta-basic_annual`), `pricing-trial-badge`, `checkout-dialog-{title,message,confirm}`, `checkout-due-today`, `checkout-no-commitment` |

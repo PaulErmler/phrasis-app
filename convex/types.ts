@@ -266,13 +266,33 @@ export const cardApprovalResolutionValidator = v.union(
 // fields the new phrasing actually changes are present. Applied on the
 // replace path via the applyMetadataAndPrepareCard mechanism (so a speaker
 // gender change re-voices audio); the new-card path re-infers metadata.
-// Loose strings by design: values are validated where they are applied,
-// matching the `texts` columns they patch.
+//
+// The value tuples are the single source for both this stored shape and the
+// zod tool schema in chat/agent.ts (`z.enum(...)`), so the model-facing
+// contract and the document validator can't drift apart. The matching
+// `texts` columns stay loose strings (legacy rows predate the enums).
+export const SPEAKER_GENDER_VALUES = ['male', 'female', 'neutral'] as const;
+export const REGISTER_VALUES = ['formal', 'informal', 'neutral'] as const;
+export const ADDRESSEE_GENDER_VALUES = [
+  'male',
+  'female',
+  'neutral',
+  'not_applicable',
+] as const;
+export const ADDRESSEE_NUMBER_VALUES = [
+  'singular',
+  'plural',
+  'not_applicable',
+] as const;
+
+const literalUnion = <T extends readonly string[]>(values: T) =>
+  v.union(...values.map((value: T[number]) => v.literal(value)));
+
 export const proposedCardMetadataValidator = v.object({
-  speakerGender: v.optional(v.string()),
-  register: v.optional(v.string()),
-  addresseeGender: v.optional(v.string()),
-  addresseeNumber: v.optional(v.string()),
+  speakerGender: v.optional(literalUnion(SPEAKER_GENDER_VALUES)),
+  register: v.optional(literalUnion(REGISTER_VALUES)),
+  addresseeGender: v.optional(literalUnion(ADDRESSEE_GENDER_VALUES)),
+  addresseeNumber: v.optional(literalUnion(ADDRESSEE_NUMBER_VALUES)),
   addressesSomeone: v.optional(v.boolean()),
 });
 

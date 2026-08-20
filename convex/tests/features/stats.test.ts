@@ -529,6 +529,24 @@ describe("features/stats", () => {
       expect(shared).toEqual({ new: 0, learning: 0, relearning: 0, review: 0 });
     });
 
+    it("free play (radio + Writing) never flags preparingWriting — it serves the rotation, not the writing queue", async () => {
+      const t = convexTest(schema, modules);
+      await seedWithSettings(t, {
+        separateModeTracking: true,
+        reviewMode: "full",
+        schedulingMode: "radio",
+        // writingSeedDone deliberately absent — the seed is still running,
+        // but free play never reads the writing queue, so its counts must
+        // not be greyed out as provisional.
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(api.features.stats.getFilteredCardCounts, {
+        filter: "both",
+        now: NOW,
+      });
+      expect(res).toEqual({ new: 0, learning: 0, relearning: 0, review: 0 });
+    });
+
     it("getCardCounts derives the track from settings and flags the unfinished seed too", async () => {
       const t = convexTest(schema, modules);
       await seedWithSettings(t, {

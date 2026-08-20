@@ -21,6 +21,12 @@ import {
   MARK_ALSO_CORRECT_SUCCESS,
   MARK_ALSO_CORRECT_NOOP,
 } from '../../../lib/types/tool-parts';
+import {
+  SPEAKER_GENDER_VALUES,
+  REGISTER_VALUES,
+  ADDRESSEE_GENDER_VALUES,
+  ADDRESSEE_NUMBER_VALUES,
+} from '../../types';
 
 // The agent-level tool set, defined once and exported: a per-call `tools`
 // override REPLACES this set entirely, so card turns (messages.ts) spread it
@@ -114,14 +120,10 @@ export const createMarkAlsoCorrectTool = ({ cardId }: { cardId: Id<'cards'> }) =
         ),
       metadata: z
         .object({
-          speakerGender: z.enum(['male', 'female', 'neutral']).optional(),
-          register: z.enum(['formal', 'informal', 'neutral']).optional(),
-          addresseeGender: z
-            .enum(['male', 'female', 'neutral', 'not_applicable'])
-            .optional(),
-          addresseeNumber: z
-            .enum(['singular', 'plural', 'not_applicable'])
-            .optional(),
+          speakerGender: z.enum(SPEAKER_GENDER_VALUES).optional(),
+          register: z.enum(REGISTER_VALUES).optional(),
+          addresseeGender: z.enum(ADDRESSEE_GENDER_VALUES).optional(),
+          addresseeNumber: z.enum(ADDRESSEE_NUMBER_VALUES).optional(),
           addressesSomeone: z.boolean().optional(),
         })
         .optional()

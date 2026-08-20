@@ -475,7 +475,9 @@ export const replaceCardFromApproval = mutation({
         .withIndex('by_thread_and_user', (q) =>
           q.eq('threadId', approval.threadId).eq('userId', userId),
         )
-        .collect();
+        // Bounded in practice by the approvals a single thread can hold; the
+        // cap is a pure backstop against an unbounded read.
+        .take(500);
       for (const sibling of siblings) {
         if (sibling._id === approval._id) continue;
         if (sibling.status !== 'pending') continue;

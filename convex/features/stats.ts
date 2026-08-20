@@ -7,19 +7,16 @@ import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
 import {
   cardsByState,
   cardsByDueDate,
-  cardsByStateAndDueDate,
-  cardsByOriginStateAndDueDate,
-  cardsByWritingStateAndDueDate,
-  cardsByOriginWritingStateAndDueDate,
+  TRACK_AGGREGATES,
 } from '../db/stats/cardAggregates';
 import { originsForFilter } from '../lib/collections';
 import {
   studyContentFilterValidator,
-  schedulingTrackFromSettings,
   reviewModeValidator,
   type ReviewMode,
   type StudyContentFilter,
 } from '../types';
+import { studyContextFromSettings } from '../db/reviewLogs';
 import {
   getCourseStats as dbGetCourseStats,
   getTodayInTimezone,
@@ -883,18 +880,16 @@ async function countDueCardsByState(
   // reviewMode (same rationale as the explicit `filter` arg: the counts then
   // flip in the same frame as the Shadowing↔Writing toggle instead of
   // lagging the settings round-trip); separateModeTracking itself is
-  // server-owned and always read from settings.
+  // server-owned and always read from settings. `face` comes from the same
+  // resolution so the preparingWriting gate below can tell Free Study apart
+  // from the due queue.
   const settings = await getCourseSettings(ctx, active.course._id);
-  const track = schedulingTrackFromSettings({
-    separateModeTracking: settings?.separateModeTracking,
-    reviewMode: reviewModeOverride ?? settings?.reviewMode,
-  });
-  const stateAggregate =
-    track === 'writing' ? cardsByWritingStateAndDueDate : cardsByStateAndDueDate;
-  const originStateAggregate =
-    track === 'writing'
-      ? cardsByOriginWritingStateAndDueDate
-      : cardsByOriginStateAndDueDate;
+  const { face, track } = studyContextFromSettings(
+    settings,
+    reviewModeOverride,
+  );
+  const { state: stateAggregate, originState: originStateAggregate } =
+    TRACK_AGGREGATES[track];
 
   const dueBounds = { upper: { key: now, inclusive: true } };
 
@@ -935,7 +930,16 @@ async function countDueCardsByState(
     // report a confident 0/0/0/0, which reads as "nothing to study" when the
     // queue is merely still being built. (getCardForReviewEmptyReason reports
     // the same state as 'preparing_writing'.)
-    ...(track === 'writing' && settings?.writingSeedDone !== true
+    //
+    // `face === null` is load-bearing, exactly as in that query's gate:
+    // schedulingTrackFromSettings ignores schedulingMode, so Free Study
+    // (radio + Writing) also resolves to track 'writing' — but free play
+    // serves from the rotation and never reads the writing queue, so flagging
+    // its counts provisional would grey out the pills for a queue the user is
+    // never served.
+    ...(face === null &&
+    track === 'writing' &&
+    settings?.writingSeedDone !== true
       ? { preparingWriting: true }
       : {}),
   };

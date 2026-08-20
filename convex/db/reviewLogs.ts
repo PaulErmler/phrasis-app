@@ -5,6 +5,7 @@ import {
   freePlayFace,
   schedulingTrackFromSettings,
   type FreePlayFace,
+  type ReviewMode,
   type SchedulingMode,
   type SchedulingTrack,
   type StudyContentFilter,
@@ -77,19 +78,27 @@ export type StudyContext = {
 
 /** Resolve the undo/queue scope from course settings, defaults included. The
  *  single place this defaulting lives, so the count query and the mutation
- *  can't drift apart. */
+ *  can't drift apart.
+ *
+ *  `reviewModeOverride` lets count queries substitute the client's
+ *  optimistically-updated review mode so counts flip in the same frame as the
+ *  Shadowing↔Writing toggle instead of lagging the settings round-trip. It
+ *  feeds BOTH `face` and `track` — they must be derived from the same
+ *  reviewMode or a Free Study user could resolve to a due-queue track. */
 export function studyContextFromSettings(
   settings: Doc<'courseSettings'> | null,
+  reviewModeOverride?: ReviewMode,
 ): StudyContext {
   const schedulingMode: SchedulingMode =
     settings?.schedulingMode ?? 'learnAndReview';
+  const reviewMode = reviewModeOverride ?? settings?.reviewMode;
   return {
     schedulingMode,
-    face: freePlayFace(schedulingMode, settings?.reviewMode ?? 'audio'),
+    face: freePlayFace(schedulingMode, reviewMode ?? 'audio'),
     studyContentFilter: settings?.studyContentFilter ?? 'both',
     track: schedulingTrackFromSettings({
       separateModeTracking: settings?.separateModeTracking,
-      reviewMode: settings?.reviewMode,
+      reviewMode,
     }),
   };
 }

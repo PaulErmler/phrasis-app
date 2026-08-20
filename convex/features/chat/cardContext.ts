@@ -48,7 +48,9 @@ export async function resolveCardContext(
   const translationRows = await ctx.db
     .query('translations')
     .withIndex('by_textId', (q) => q.eq('textId', card.textId))
-    .collect();
+    // Bounded in practice by the number of course languages; the cap is a
+    // pure backstop against an unbounded read.
+    .take(500);
   const textByLanguage = new Map(
     translationRows.map((t) => [t.targetLanguage, t.translatedText]),
   );

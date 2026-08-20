@@ -163,7 +163,9 @@ completedTutorials: v.optional(v.array(v.string()))
 **IDs:** `tip_concept_*` (intro concepts) and `tip_card_actions` / `tip_chat`
 / `tip_word_tap` / `tip_mode_switch` / `tip_settings` (milestones).
 **Trigger:** `LearnView` calls `useMilestoneTips({ enabled, reviewMode, transcribe, … })`
-with `enabled` gated on `state.status === 'reviewing' && !settingsOpen && !isFreePlay`.
+with `enabled` gated on `state.status === 'reviewing' && !settingsOpen &&
+!isFreePlay && !difficultyDialogOpen` (held back while the one-time
+difficulty-check dialog is up so a popover can't stack on top of it).
 
 - The **intro walkthrough** fires on the first card of a mode and shows only
   concepts not yet persisted: shared concepts (`tip_concept_card`,
@@ -189,28 +191,65 @@ with `enabled` gated on `state.status === 'reviewing' && !settingsOpen && !isFre
 - The learn header's Help dialog "restart tutorial" action calls the hook's
   `restartIntro` (replays the current mode's full intro).
 
+### Difficulty check (`useDifficultyCheck.ts`)
+
+**ID:** `difficulty_check`
+**Trigger:** Before the FIRST auto-add of new cards in the learn view, the
+hook's `pending` signal holds the add (`useLearningMode({ holdAutoAdd })`);
+the `DifficultyCheckDialog` opens when the hold actually intercepts an add.
+
+Not a driver.js tour — a regular dialog whose show-once state rides the
+shared `completedTutorials` mechanism, with the same veteran rule as the
+milestone tips (lifetime reviews past the beginner window retire it
+silently). Skipped entirely — and not marked completed — when the active
+collection isn't a dataset level (custom/chat/legacy CEFR), so the check
+still fires if the user later moves onto one.
+
 ---
 
 ## data-tutorial Attributes
 
 These attributes are placed on components to serve as driver.js selectors.
 
+Home (the home tour):
+
 | Attribute | Component | File |
 |-----------|-----------|------|
-| `collection-carousel` | Section wrapper (heading + carousel) | `HomeView.tsx` |
-| `active-collection` | The currently active collection card | `CollectionCarouselUI.tsx` |
+| `collection-carousel` | Section wrapper (heading + carousel) | `SegmentedHomeSection.tsx` |
 | `collection-detail` | Collection detail dialog content | `CollectionDetailDialog.tsx` |
 | `progress-stats` | Progress stats card | `ProgressStatsCard.tsx` |
 | `start-learning` | Learning mode buttons wrapper | `StartLearningButton.tsx` |
+| `learn-and-review` / `learn-new` / `radio-mode` / `free-study-mode` | Individual mode buttons (via the `tutorial:` prop) | `StartLearningButton.tsx` |
+| `review-mode-toggle` | Shadowing↔Writing toggle | `StartLearningButton.tsx` |
+| `due-counts` | Due-count pills | `DueCountsPills.tsx` |
+| `content-source-filter` | Content filter dropdown trigger | `ContentFilterDropdown.tsx` |
+| `projections` | Rotating projection block | `RotatingProjection.tsx` |
+
+Learn view (the in-lesson tips):
+
+| Attribute | Component | File |
+|-----------|-----------|------|
+| `card-flashcard` | Card surface wrapper | `CardShell.tsx` |
+| `base-languages` | Base language texts wrapper | `CardShell.tsx` |
 | `card-content` | Audio review card wrapper | `LearningCardContent.tsx` |
 | `target-text-audio` | First target translation block (click to unblur) | `LearningCardContent.tsx` |
 | `card-content-full` | Full review card wrapper | `FullReviewCardContent.tsx` |
-| `base-languages` | Base language texts wrapper | `CardShell.tsx` |
 | `target-input-full` | First target input wrapper (full review) | `FullReviewCardContent.tsx` |
+| `target-input-and-submit` | First target input + submit row (full review) | `FullReviewCardContent.tsx` |
 | `submit-answer` | Submit-answer button (first target, full review) | `FullReviewCardContent.tsx` |
+| `audio-controls` | Audio controls row | `LearningControls.tsx` |
+| `audio-play` | Play/pause button | `LearningControls.tsx` |
 | `rating-buttons` | Rating buttons row | `LearningControls.tsx` |
-| `chat-button` | Chat open button (mobile) | `LearningControls.tsx` |
+| `undo-restart` | Undo/restart buttons | `LearningControls.tsx` |
+| `chat-button` | Chat open button (mobile) | `LearningMode.tsx` |
 | `settings-button` | Settings button | `LearningHeader.tsx` |
+
+The tips also anchor on selectors outside the `data-tutorial` namespace:
+`[data-coachmark-anchor="card-actions"]` (`CardActionsMenu.tsx`),
+`[data-coachmark-anchor="word-tap"]` (the longest base-language word, tagged
+via `ClickableWords`/`CardShell`), `[data-coachmark-anchor="chat-button-desktop"]`
+(`LearningChatLayout.tsx`), and `[data-testid="first-exposure-answer"]`
+(the shown translation on new cards, `FullReviewCardContent.tsx`).
 
 ---
 

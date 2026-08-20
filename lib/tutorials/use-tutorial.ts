@@ -10,20 +10,13 @@ import { driver, type Driver, type DriveStep } from 'driver.js';
 import type { TutorialId } from '@/convex/features/tutorialIds';
 import { getTutorial } from './registry';
 import type { TutorialContext } from './types';
+import {
+  baseDriverConfig,
+  getDriverOverlayOpacity,
+  resolveStepAnchors,
+} from './driver-common';
 
 const STORAGE_PREFIX = 'phrasis_completed_tutorials';
-
-const DRIVER_OVERLAY_OPACITY_VAR = '--driver-overlay-opacity';
-
-/** Opaque fill + single opacity for driver.js SVG overlay (see app/globals.css). */
-function getDriverOverlayOpacity(): number {
-  if (typeof document === 'undefined') return 0.5;
-  const raw = getComputedStyle(document.documentElement)
-    .getPropertyValue(DRIVER_OVERLAY_OPACITY_VAR)
-    .trim();
-  const n = parseFloat(raw);
-  return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0.5;
-}
 
 let currentUserId: string | null = null;
 
@@ -332,24 +325,8 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
 
     const allSteps = [...tutorial.steps, ...(extraStepsRef.current ?? [])];
 
-    const resolvedSteps = allSteps.map((step) => {
-      if (typeof step.element !== 'string') return step;
-      const candidates = document.querySelectorAll<HTMLElement>(step.element);
-      for (const el of candidates) {
-        const rect = el.getBoundingClientRect();
-        // `visibility: hidden` keeps its layout box (e.g. the due-count
-        // pills reserve their width while counts load), so a pure rect
-        // check would highlight a blank rectangle — treat it as absent and
-        // let the step degrade to a centered popover instead.
-        if (
-          rect.width > 0 &&
-          rect.height > 0 &&
-          getComputedStyle(el).visibility !== 'hidden'
-        ) {
-          return { ...step, element: el };
-        }
-      }
-      return step;
+    const resolvedSteps = resolveStepAnchors(allSteps, {
+      onMiss: 'keep-selector',
     });
 
     const isInteractiveStep = (stepIndex: number) => {
@@ -402,13 +379,8 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     });
 
     const d = driver({
-      animate: true,
+      ...baseDriverConfig(),
       showProgress: true,
-      showButtons: ['next', 'previous', 'close'],
-      overlayColor: '#000',
-      overlayOpacity: getDriverOverlayOpacity(),
-      stagePadding: 8,
-      stageRadius: 8,
       popoverClass: `phrasis-tutorial-${tutorialId}`,
       steps: resolvedSteps,
       // Fires only on driver's own close paths (close button, Esc, overlay

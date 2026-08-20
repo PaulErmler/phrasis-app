@@ -11,6 +11,7 @@ import {
   useCompletedTutorials,
   getCompletedTutorialsSnapshot,
 } from './use-tutorial';
+import { baseDriverConfig, resolveStepAnchors } from './driver-common';
 import type { TranslateFn } from './types';
 
 /**
@@ -509,16 +510,8 @@ export function useMilestoneTips({
       }
       teardownActiveDriver(activeDriverRef, programmaticTeardownRef);
 
-      const resolved: DriveStep[] = steps.map((step) => {
-        if (typeof step.element !== 'string') return step;
-        const candidates = document.querySelectorAll<HTMLElement>(step.element);
-        for (const el of candidates) {
-          const rect = el.getBoundingClientRect();
-          if (rect.width > 0 && rect.height > 0) {
-            return { ...step, element: el };
-          }
-        }
-        return { ...step, element: undefined };
+      const resolved: DriveStep[] = resolveStepAnchors(steps, {
+        onMiss: 'unanchor',
       });
 
       capture(CLIENT_EVENTS.TUTORIAL_STARTED, {
@@ -527,13 +520,8 @@ export function useMilestoneTips({
       });
 
       const d = driver({
-        animate: true,
+        ...baseDriverConfig(),
         showProgress: resolved.length > 1,
-        showButtons: ['next', 'previous', 'close'],
-        overlayColor: '#000',
-        overlayOpacity: 0.5,
-        stagePadding: 8,
-        stageRadius: 8,
         popoverClass: `phrasis-tip-${analyticsId}`,
         steps: resolved,
         onDestroyStarted: () => {

@@ -73,6 +73,7 @@ type PoolRunResult =
  */
 export const processBatch = internalMutation({
   args: { courseId: v.id('courses') },
+  returns: v.object({ seeded: v.number(), isDone: v.boolean() }),
   handler: async (ctx, args) => {
     // Abort if the user toggled the split back off — the seed would only be
     // wasted writes then (cards already seeded stay seeded; that's the

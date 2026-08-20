@@ -27,7 +27,10 @@ import {
 import { getAuthUserId, requireAuthUserId, getUserSettings } from '../db/users';
 import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
-import { ogteLevelToCollectionCode } from '../../lib/constants/onboarding';
+import {
+  ogteLevelToCollectionCode,
+  collectionCodeToOgteLevel,
+} from '../../lib/constants/onboarding';
 import {
   findNextIncompleteCollection,
   getActiveDataset,
@@ -1018,9 +1021,7 @@ export const getActiveDifficultyLevel = query({
     const settings = await getCourseSettings(ctx, active.course._id);
     if (!settings?.activeCollectionId) return null;
     const collection = await ctx.db.get(settings.activeCollectionId);
-    const code = collection?.code;
-    const match = code ? /^L(\d{2})$/.exec(code) : null;
-    return match ? Number(match[1]) : null;
+    return collectionCodeToOgteLevel(collection?.code);
   },
 });
 

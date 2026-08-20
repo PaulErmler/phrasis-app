@@ -15,24 +15,21 @@ import { FSRS_STATE_LABELS, EXTENDED_STATE_LABELS } from '../../lib/fsrsStates';
 /**
  * Derive a single state label for a card document.
  * Priority: hidden > mastered > FSRS state (or preReview).
+ *
+ * For `track: 'writing'` the label derives from `writingFsrsState` instead.
+ * The writing track has no pre-review phase, so an unreviewed (or
+ * freshly-seeded-from-preReview) track is simply 'new'; only meaningful for
+ * cards where `hasWritingTrack` is true.
  */
-export function getCardStateLabel(doc: Doc<'cards'>): string {
+export function getCardStateLabel(
+  doc: Doc<'cards'>,
+  track: SchedulingTrack = 'shared',
+): string {
   if (doc.isHidden) return 'hidden';
   if (doc.isMastered) return 'mastered';
-  if (doc.schedulingPhase === 'preReview') return 'new';
-  return FSRS_STATE_LABELS[doc.fsrsState?.state ?? 0] ?? 'new';
-}
-
-/**
- * Writing-track counterpart of `getCardStateLabel`, derived from
- * `writingFsrsState`. The writing track has no pre-review phase, so an
- * unreviewed (or freshly-seeded-from-preReview) track is simply 'new'.
- * Only meaningful for cards where `hasWritingTrack` is true.
- */
-export function getCardWritingStateLabel(doc: Doc<'cards'>): string {
-  if (doc.isHidden) return 'hidden';
-  if (doc.isMastered) return 'mastered';
-  return FSRS_STATE_LABELS[doc.writingFsrsState?.state ?? 0] ?? 'new';
+  if (track === 'shared' && doc.schedulingPhase === 'preReview') return 'new';
+  const fsrs = track === 'shared' ? doc.fsrsState : doc.writingFsrsState;
+  return FSRS_STATE_LABELS[fsrs?.state ?? 0] ?? 'new';
 }
 
 /**
@@ -121,7 +118,7 @@ export const cardsByWritingStateAndDueDate = new TableAggregate<{
   DataModel: DataModel;
   TableName: 'cards';
 }>(components.cardsByWritingStateAndDueDate, {
-  namespace: (doc) => `${doc.deckId}:${getCardWritingStateLabel(doc)}`,
+  namespace: (doc) => `${doc.deckId}:${getCardStateLabel(doc, 'writing')}`,
   sortKey: (doc) => doc.writingDueDate ?? 0,
 });
 
@@ -136,7 +133,7 @@ export const cardsByOriginWritingStateAndDueDate = new TableAggregate<{
   TableName: 'cards';
 }>(components.cardsByOriginWritingStateAndDueDate, {
   namespace: (doc) =>
-    `${doc.deckId}:${getCardOriginBucket(doc)}:${getCardWritingStateLabel(doc)}`,
+    `${doc.deckId}:${getCardOriginBucket(doc)}:${getCardStateLabel(doc, 'writing')}`,
   sortKey: (doc) => doc.writingDueDate ?? 0,
 });
 
@@ -178,42 +175,73 @@ export async function insertCard(
   return id;
 }
 
-// The card fields each aggregate family derives its namespace/sortKey from.
-// A patch that touches NONE of a family's fields cannot move or re-key any of
-// that family's entries, so its `replaceOrInsert`s are skipped entirely —
-// each one is a multi-read/write component subtransaction, and dropping the
-// no-op ones matters on hot paths (a shared-track review of a split-course
-// card would otherwise pay for two writing-aggregate writes; a
-// seedWritingTrack batch would pay for four shared ones per card, the exact
-// cost class that has blown mutation limits before). Key-presence is checked,
-// not value-equality, so the skip is conservative: a key listed in the patch
-// always counts as touched.
-//
-// One property this deliberately gives up: `replaceOrInsert` INSERTS when the
-// entry is missing, so before the skip existed every card patch incidentally
-// repaired a card that had fallen out of an aggregate (see the drift warning
-// on `cardsByOriginStateAndDueDate` above). Patches touching none of these
-// fields — `toggleFavoriteCard`, `setAudioSpeedOverride`, the free-play
-// counter advance — no longer do that, so drift no longer self-heals. It is
-// repaired only by `migrations/recalcUserCardAggregates`, which is where to
-// look first if due counts read low for one deck.
-const SHARED_AGGREGATE_FIELDS = new Set<string>([
-  'deckId',
-  'dueDate',
-  'isHidden',
-  'isMastered',
-  'schedulingPhase',
-  'fsrsState',
-  'collectionOrigin',
-]);
-const WRITING_AGGREGATE_FIELDS = new Set<string>([
-  'deckId',
-  'writingDueDate',
-  'writingFsrsState',
-  'isHidden',
-  'isMastered',
-  'collectionOrigin',
-]);
+type CardsDueAggregate = TableAggregate<{
+  Namespace: string;
+  Key: number;
+  DataModel: DataModel;
+  TableName: 'cards';
+}>;
+
+/**
+ * Everything track-selected about the two due-count aggregate families, keyed
+ * by SchedulingTrack — the same shape as `TRACK_DUE_QUERIES` in
+ * lib/dueQueue.ts, so track-dependent code selects once instead of
+ * re-spelling `track === 'writing' ? … : …` per aggregate.
+ *
+ * `fields`: the card fields each family derives its namespace/sortKey from.
+ * A patch that touches NONE of a family's fields cannot move or re-key any of
+ * that family's entries, so its `replaceOrInsert`s are skipped entirely —
+ * each one is a multi-read/write component subtransaction, and dropping the
+ * no-op ones matters on hot paths (a shared-track review of a split-course
+ * card would otherwise pay for two writing-aggregate writes; a
+ * seedWritingTrack batch would pay for four shared ones per card, the exact
+ * cost class that has blown mutation limits before). Key-presence is checked,
+ * not value-equality, so the skip is conservative: a key listed in the patch
+ * always counts as touched.
+ *
+ * One property this deliberately gives up: `replaceOrInsert` INSERTS when the
+ * entry is missing, so before the skip existed every card patch incidentally
+ * repaired a card that had fallen out of an aggregate (see the drift warning
+ * on `cardsByOriginStateAndDueDate` above). Patches touching none of these
+ * fields — `toggleFavoriteCard`, `setAudioSpeedOverride`, the free-play
+ * counter advance — no longer do that, so drift no longer self-heals. It is
+ * repaired only by `migrations/recalcUserCardAggregates`, which is where to
+ * look first if due counts read low for one deck.
+ */
+export const TRACK_AGGREGATES: Record<
+  SchedulingTrack,
+  {
+    state: CardsDueAggregate;
+    originState: CardsDueAggregate;
+    fields: ReadonlySet<string>;
+  }
+> = {
+  shared: {
+    state: cardsByStateAndDueDate,
+    originState: cardsByOriginStateAndDueDate,
+    fields: new Set([
+      'deckId',
+      'dueDate',
+      'isHidden',
+      'isMastered',
+      'schedulingPhase',
+      'fsrsState',
+      'collectionOrigin',
+    ]),
+  },
+  writing: {
+    state: cardsByWritingStateAndDueDate,
+    originState: cardsByOriginWritingStateAndDueDate,
+    fields: new Set([
+      'deckId',
+      'writingDueDate',
+      'writingFsrsState',
+      'isHidden',
+      'isMastered',
+      'collectionOrigin',
+    ]),
+  },
+};
 
 /**
  * Patch a card and update both aggregates.
@@ -239,8 +267,12 @@ export async function patchCard(
   await ctx.db.patch(cardId, patch);
   const newDoc: Doc<'cards'> = { ...resolvedOld, ...patch };
   const patchKeys = Object.keys(patch);
-  const touchesShared = patchKeys.some((k) => SHARED_AGGREGATE_FIELDS.has(k));
-  const touchesWriting = patchKeys.some((k) => WRITING_AGGREGATE_FIELDS.has(k));
+  const touchesShared = patchKeys.some((k) =>
+    TRACK_AGGREGATES.shared.fields.has(k),
+  );
+  const touchesWriting = patchKeys.some((k) =>
+    TRACK_AGGREGATES.writing.fields.has(k),
+  );
 
   if (touchesShared) {
     await cardsByState.replaceOrInsert(ctx, resolvedOld, newDoc);
@@ -383,12 +415,8 @@ export async function clearAggregatesForDeck(
   // One track-selection up front — the loops below then use identical
   // namespaces for both tracks, so a label or namespace-format change cannot
   // land on one track's branch and miss its twin.
-  const stateAggregate =
-    track === 'shared' ? cardsByStateAndDueDate : cardsByWritingStateAndDueDate;
-  const originStateAggregate =
-    track === 'shared'
-      ? cardsByOriginStateAndDueDate
-      : cardsByOriginWritingStateAndDueDate;
+  const { state: stateAggregate, originState: originStateAggregate } =
+    TRACK_AGGREGATES[track];
 
   if (track === 'shared') {
     await cardsByState.clear(ctx, { namespace: deckId });
