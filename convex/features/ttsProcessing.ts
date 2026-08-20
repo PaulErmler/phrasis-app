@@ -24,16 +24,21 @@ import { captureGeneration } from '../lib/posthogAi';
 import { costForAudioMs, costForCharacters } from '../config/aiCosts';
 import { OPENROUTER_MODELS } from '../config/aiModels';
 import { deleteStorageBlobIfUnreferenced } from '../lib/audio';
-import { BLOB_SWAP_DELETE_DELAY_MS } from '../lib/audioAssets';
+import {
+  BLOB_SWAP_DELETE_DELAY_MS,
+  scheduleBlobSwapDelete,
+} from '../lib/audioAssets';
 import { TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
 import { reserveRateLimitToken } from '../lib/rateLimitReserve';
-import { ttsPool } from '../lib/workpools';
+import { ttsPool, ttsWarmPool } from '../lib/workpools';
+import type { WorkId } from '@convex-dev/workpool';
 import {
   ttsQualityValidator,
   ttsProviderValidator,
+  ttsPriorityValidator,
   voiceGenderValidator,
 } from '../types';
-import type { TtsProvider, VoiceGender } from '../types';
+import type { TtsPriority, TtsProvider, VoiceGender } from '../types';
 
 /**
  * TTS pipeline, built on the `ttsPool` workpool (convex/lib/workpools.ts).
@@ -77,6 +82,16 @@ const TTS_CLAIM_STALE_MS = 10 * 60 * 1000;
 const TTS_TOKEN_MAX_WAIT_MS = 5_000;
 
 /**
+ * Synthesis-token wait cap for priority-'background' jobs. Near-zero on
+ * purpose: a warm job may only take a token that is free right now. Any
+ * projected wait means interactive demand exists, so the warm worker throws,
+ * frees its `ttsWarmPool` slot, and that pool's patient backoff retries
+ * later. This is the token half of TTS priority; the queue half is the pool
+ * split (see workpools.ts).
+ */
+const TTS_WARM_TOKEN_MAX_WAIT_MS = 1_000;
+
+/**
  * Longest azureStt refill wait a caller rides out before an STT call
  * (validation roundtrip, word-timing backfill). Deliberately looser than the
  * synthesis cap: a mid-validation throw wastes the synthesis that just
@@ -107,18 +122,36 @@ async function getTtsClaim(
  * null when a fresh claim already exists (another mutation already scheduled
  * this work). Claims older than `TTS_CLAIM_STALE_MS` are reclaimed.
  *
+ * One exception to "fresh claim wins": an interactive caller takes over a
+ * fresh claim held at priority 'background'. The warm job may be riding
+ * `ttsWarmPool`'s patient backoff for many minutes while a user stares at
+ * the card's audio spinner, and without takeover the interactive request
+ * would no-op until the claim goes stale. The takeover cancels the warm
+ * job (a queued/backing-off job dies; one already mid-run finishes, but the
+ * caller's enqueue re-stamps `workId` in this same transaction, so the
+ * superseded job's ownership-gated completion can't release the new claim —
+ * worst case is one duplicate synthesis into the upserting store).
+ * Background callers never take over anything.
+ *
  * Must be called inside a mutation context so Convex OCC prevents duplicates.
  */
 export async function claimTtsIfAvailable(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   language: string,
+  priority?: TtsPriority,
 ): Promise<Id<'ttsGenerationClaims'> | null> {
   const existing = await getTtsClaim(ctx, textId, language);
 
   if (existing) {
-    if (Date.now() - existing.claimedAt < TTS_CLAIM_STALE_MS) {
+    if (ttsClaimBlocksPriority(existing, priority)) {
       return null;
+    }
+    // Not blocking = stale, or a fresh background claim this caller takes
+    // over. Only the takeover has a live warm job to cancel.
+    const takeover = Date.now() - existing.claimedAt < TTS_CLAIM_STALE_MS;
+    if (takeover && existing.workId !== undefined) {
+      await ttsWarmPool.cancel(ctx, existing.workId as WorkId);
     }
     await ctx.db.delete(existing._id);
   }
@@ -127,7 +160,43 @@ export async function claimTtsIfAvailable(
     textId,
     language,
     claimedAt: Date.now(),
+    priority,
   });
+}
+
+/**
+ * Would `claimTtsIfAvailable` at `priority` return null against this claim?
+ * The read-only mirror of that function's fresh-vs-takeover rule, split out
+ * so the two can't drift. A fresh claim blocks, EXCEPT a background claim
+ * checked at interactive priority (the takeover case, which would write).
+ */
+function ttsClaimBlocksPriority(
+  claim: Doc<'ttsGenerationClaims'>,
+  priority: TtsPriority | undefined,
+): boolean {
+  const fresh = Date.now() - claim.claimedAt < TTS_CLAIM_STALE_MS;
+  const takeover =
+    fresh && claim.priority === 'background' && priority !== 'background';
+  return fresh && !takeover;
+}
+
+/**
+ * True when a claim exists that `claimTtsIfAvailable` at `priority` would
+ * respect (return null against). The probe paths in decks.ts use this
+ * instead of `hasActiveTtsClaim`: a background-held slot probed at
+ * interactive priority must classify as NEEDY, because the real run would
+ * take the claim over (cancel the warm job, re-enqueue interactively) — a
+ * write. `hasActiveTtsClaim` is priority-blind and would report it handled,
+ * leaving the user waiting out `ttsWarmPool`'s patient backoff.
+ */
+export async function hasBlockingTtsClaim(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+  language: string,
+  priority: TtsPriority | undefined,
+): Promise<boolean> {
+  const existing = await getTtsClaim(ctx, textId, language);
+  return existing !== null && ttsClaimBlocksPriority(existing, priority);
 }
 
 /**
@@ -180,6 +249,8 @@ async function synthesizeAndValidate(
      * degrade every other text pointing at the asset.
      */
     forceRegen?: boolean;
+    /** Scheduling priority; picks the synthesis-token wait cap below. */
+    priority?: TtsPriority;
   },
   maxAttempts: number,
 ): Promise<{
@@ -196,10 +267,17 @@ async function synthesizeAndValidate(
   const rateLimitName =
     TTS_RATE_LIMIT_BY_PROVIDER[args.provider] ?? 'googleTts';
 
+  // Background (warm) jobs only take tokens that are free immediately;
+  // interactive jobs ride out short refills. See the two constants above.
+  const tokenMaxWaitMs =
+    args.priority === 'background'
+      ? TTS_WARM_TOKEN_MAX_WAIT_MS
+      : TTS_TOKEN_MAX_WAIT_MS;
+
   let lastStorageId: Id<'_storage'> | null = null;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     await reserveRateLimitToken(ctx, rateLimitName, {
-      maxWaitMs: TTS_TOKEN_MAX_WAIT_MS,
+      maxWaitMs: tokenMaxWaitMs,
     });
     const synthStartedAt = Date.now();
     const blob = await synthesizeSpeech(
@@ -400,6 +478,10 @@ const ttsJobArgsValidator = v.object({
   // early write so the shared audio asset keeps its current audio until the
   // final write swaps it in place.
   forceRegen: v.optional(v.boolean()),
+  // Scheduling priority (see ttsPriorityValidator). Picks the pool at
+  // enqueue time and the rate-limit wait cap in the worker. Absent =
+  // 'interactive'.
+  priority: v.optional(ttsPriorityValidator),
 });
 
 type TtsJobArgs = Infer<typeof ttsJobArgsValidator>;
@@ -509,7 +591,11 @@ export const enqueueTtsJob = internalMutation({
       return null;
     }
 
-    const workId: string = await ttsPool.enqueueAction(
+    // Priority = pool choice: interactive jobs go to ttsPool, warm jobs to
+    // the low-parallelism ttsWarmPool (see workpools.ts). Both pools share
+    // onTtsJobComplete, so claim lifetime is identical either way.
+    const pool = args.priority === 'background' ? ttsWarmPool : ttsPool;
+    const workId: string = await pool.enqueueAction(
       ctx,
       internal.features.ttsProcessing.processTTSForCard,
       {
@@ -521,6 +607,7 @@ export const enqueueTtsJob = internalMutation({
         speed: args.speed,
         regionVariant: args.regionVariant,
         forceRegen: args.forceRegen,
+        priority: args.priority,
         provider,
       },
       {
@@ -610,13 +697,22 @@ export const updateAudioRecordingQuality = internalMutation({
     const asset = await ctx.db.get(record.assetId);
     if (!asset || asset.ttsQuality !== 'unknown') return null;
     if (args.storageId && args.storageId !== asset.storageId) {
+      // Same dead-asset guard as storeAudioRecording: never re-point the
+      // asset at a blob that no longer exists.
+      if ((await ctx.db.system.get(args.storageId)) === null) {
+        return null;
+      }
       const previousStorageId = asset.storageId;
       await ctx.db.patch(asset._id, {
         ttsQuality: args.ttsQuality,
         storageId: args.storageId,
       });
       if (!args.preserveOldStorage) {
-        await deleteStorageBlobIfUnreferenced(ctx, previousStorageId);
+        // Delayed, not immediate: a concurrent job for the same key may
+        // still hold `previousStorageId` as its lastStorageId and reference
+        // it in its final write. The delayed job re-checks references at
+        // fire time, so it only collects what nothing ended up keeping.
+        await scheduleBlobSwapDelete(ctx, previousStorageId);
       }
     } else {
       await ctx.db.patch(asset._id, { ttsQuality: args.ttsQuality });

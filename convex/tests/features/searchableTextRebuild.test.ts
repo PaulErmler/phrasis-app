@@ -118,11 +118,15 @@ describe("rebuildSearchableTextForText via storeTranslationAndScheduleTTS", () =
     expect(before.searchableText).not.toContain("considerate");
     expect(before.searchableTextLanguages).toEqual([]);
 
+    // A real curated voice: every text here has a card, so `skipTts` no
+    // longer short-circuits the TTS tail (cards always get audio) and the
+    // enqueue resolves the voice's gender from the curated list. The pool is
+    // module-mocked; nothing synthesizes.
     await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
       textId,
       targetLanguage: "en",
       translatedText: "You are really considerate",
-      voiceName: "voice",
+      voiceName: "en-US-Chirp3-HD-Leda",
       skipTts: true,
     });
     await drainScheduled(t);
@@ -147,7 +151,7 @@ describe("rebuildSearchableTextForText via storeTranslationAndScheduleTTS", () =
       textId,
       targetLanguage: "en",
       translatedText: "You are truly thoughtful",
-      voiceName: "voice",
+      voiceName: "en-US-Chirp3-HD-Leda",
       replaceExisting: true,
       skipTts: true,
     });
@@ -175,7 +179,7 @@ describe("rebuildSearchableTextForText via storeTranslationAndScheduleTTS", () =
       textId,
       targetLanguage: "zh",
       translatedText: "你好吗",
-      voiceName: "voice",
+      voiceName: "cmn-CN-Chirp3-HD-Leda",
       romanizedText: "nihaoma",
       romanizationSource: "pinyin",
       skipTts: true,
@@ -268,7 +272,7 @@ describe("scheduleSearchableTextRebuild: per-text debounce", () => {
       textId,
       targetLanguage: "en",
       translatedText: "You are really considerate",
-      voiceName: "voice",
+      voiceName: "en-US-Chirp3-HD-Leda",
       skipTts: true,
     });
     const marker1 = (await t.run(async (ctx) => (await ctx.db.get(textId))!))

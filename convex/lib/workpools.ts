@@ -10,9 +10,13 @@ import { components } from '../_generated/api';
  * (`ttsGenerationClaims` / `llmTranslationClaims`) live exactly from enqueue
  * to onComplete with no staleness gymnastics in between.
  *
- * Both pools are FIFO. There are no priority tiers (deliberate
- * simplification; admin warmups are manual and rare, so user-facing work
- * doesn't meaningfully queue behind background batches in normal operation).
+ * Each pool is FIFO. TTS priority is expressed by POOL CHOICE, not tiers
+ * within a pool: interactive jobs (a card on the user's screen) go to
+ * `ttsPool`, warm jobs (collection previews, deferred placement batches,
+ * admin warmups) to the low-parallelism `ttsWarmPool`. A fresh signup
+ * enqueues hundreds of warm jobs at once, and in a single FIFO pool those
+ * queued ahead of the seeded first-lesson cards' audio. See
+ * `ttsPriorityValidator` (convex/types.ts) for the classification rule.
  * maxParallelism can be tuned at runtime via
  * `components.<pool>.config.update` without a redeploy.
  *
@@ -46,6 +50,23 @@ export const ttsPool = new Workpool(components.ttsPool, {
   maxParallelism: 24,
   retryActionsByDefault: true,
   defaultRetryBehavior: { maxAttempts: 5, initialBackoffMs: 2_000, base: 3 },
+});
+
+/**
+ * Background TTS pool for warm/prefetch synthesis (priority 'background').
+ * Low parallelism so warm bursts can't crowd interactive jobs out of the
+ * provider rate budgets; warm workers additionally reserve tokens with a
+ * near-zero wait cap (`TTS_WARM_TOKEN_MAX_WAIT_MS`), so they only consume
+ * capacity interactive jobs aren't using and throw otherwise. That makes
+ * throws routine here, hence the patient retry curve: 8 attempts at
+ * 10s·3^n ≈ 3h of jittered backoff, wide enough to ride out minutes-long
+ * interactive bursts (an onboarding signup) instead of exhausting retries
+ * and dropping the job.
+ */
+export const ttsWarmPool = new Workpool(components.ttsWarmPool, {
+  maxParallelism: 6,
+  retryActionsByDefault: true,
+  defaultRetryBehavior: { maxAttempts: 8, initialBackoffMs: 10_000, base: 3 },
 });
 
 /**

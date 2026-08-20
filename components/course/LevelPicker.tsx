@@ -56,11 +56,16 @@ export function LevelSliderCard({
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t('levelLabel')}
             </div>
-            <div className="flex items-baseline gap-2">
-              <div className="text-3xl md:text-4xl font-bold tabular-nums">
+            <div className="flex items-center gap-2">
+              <div className="text-3xl md:text-4xl font-bold tabular-nums leading-none">
                 {ogte.toString().padStart(2, '0')}
               </div>
-              <Badge variant="outline">{cefr}</Badge>
+              <Badge
+                variant="outline"
+                className="h-auto px-3 py-0 text-3xl md:text-4xl font-bold leading-none"
+              >
+                {cefr}
+              </Badge>
             </div>
           </div>
           <div className="text-right text-xs text-muted-foreground hidden md:block">

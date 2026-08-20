@@ -1063,7 +1063,6 @@
       "speakHint": "This will be your base language",
       "learnHint": "The language you’re studying — not the one you already know.",
       "backToLearn": "Change {language}",
-      "stepOf": "Step {current} of 2",
       "stepReady": "Ready",
       "readyTitle": "Looking good.",
       "readyHint": "Tap a language to change it, or swap if they’re the wrong way around.",
@@ -1156,6 +1155,7 @@
     "proficiency": {
       "title": "How well do you know this language?",
       "subtitle": "We'll customize where you start.",
+      "recommended": "Recommended",
       "branches": {
         "new": {
           "title": "I'm completely new",
@@ -1167,7 +1167,7 @@
         },
         "test": {
           "title": "Test me — find my level",
-          "description": "Short adaptive test, about 5–20 questions. Most accurate."
+          "description": "Short adaptive test, about 5–20 questions."
         }
       }
     },

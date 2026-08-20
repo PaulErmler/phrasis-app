@@ -31,7 +31,7 @@ import {
 import { romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
 import { llmPool } from '../lib/workpools';
-import { asVoiceGender } from '../types';
+import { asVoiceGender, ttsPriorityValidator } from '../types';
 import { captureGeneration } from '../lib/posthogAi';
 
 /**
@@ -154,6 +154,10 @@ const llmJobArgsValidator = v.object({
   // an explicit audio-icon click, or by the normal ensure path once the text
   // becomes a card.
   skipTts: v.optional(v.boolean()),
+  // TTS priority, forwarded to `storeTranslationAndScheduleTTS` so the audio
+  // this translation triggers lands in the tier the content was requested at
+  // (warm sweeps pass 'background'). See ttsPriorityValidator.
+  priority: v.optional(ttsPriorityValidator),
 });
 
 /** onComplete context: everything the Google fallback needs to run. */
@@ -166,6 +170,7 @@ const llmCompletionContextValidator = v.object({
   replaceExisting: v.optional(v.boolean()),
   preferredRegionVariant: v.optional(v.string()),
   skipTts: v.optional(v.boolean()),
+  priority: v.optional(ttsPriorityValidator),
 });
 
 type LlmJobArgs = Infer<typeof llmJobArgsValidator>;
@@ -223,6 +228,7 @@ export const enqueueLlmTranslation = internalMutation({
         claimId: claim?._id,
         preferredRegionVariant: args.preferredRegionVariant,
         skipTts: args.skipTts,
+        priority: args.priority,
       },
       {
         onComplete:
@@ -236,6 +242,7 @@ export const enqueueLlmTranslation = internalMutation({
           replaceExisting: args.replaceExisting,
           preferredRegionVariant: args.preferredRegionVariant,
           skipTts: args.skipTts,
+          priority: args.priority,
         },
       },
     );
@@ -630,6 +637,7 @@ export const processLlmTranslationForCard = internalAction({
         // enqueued under has been reclaimed by a newer job mid-flight.
         expectedClaimId: args.claimId,
         skipTts: args.skipTts,
+        priority: args.priority,
       },
     );
     return null;
@@ -705,6 +713,7 @@ export const onLlmTranslationComplete = internalMutation({
         replaceExisting: context.replaceExisting,
         preferredRegionVariant: context.preferredRegionVariant,
         skipTts: context.skipTts,
+        priority: context.priority,
         // The claim keeps its _id across the re-point below, so the fallback
         // inherits the same single-writer token.
         claimId: claim._id,

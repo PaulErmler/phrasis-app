@@ -147,11 +147,11 @@ export function LanguagePairStep({ source, target, onSource, onTarget }: Props) 
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-1 pb-2 pt-3 md:pt-4">
         <div className="mb-4 shrink-0 space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {phase === 'ready'
-              ? t('stepReady')
-              : t('stepOf', { current: phase === 'target' ? 1 : 2 })}
-          </p>
+          {phase === 'ready' ? (
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t('stepReady')}
+            </p>
+          ) : null}
           <h2 className="text-2xl font-bold tracking-tight sm:text-[1.7rem] sm:leading-tight">
             {phase === 'target' && t('learnTitle')}
             {phase === 'source' && t('speakTitle')}

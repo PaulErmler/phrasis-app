@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { convexTest, type TestConvex } from 'convex-test';
 import type { WorkId } from '@convex-dev/workpool';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 import schema from '../../schema';
 import { api, internal } from '../../_generated/api';
@@ -983,22 +983,38 @@ describe('separateModeTracking', () => {
           ),
         );
 
-      // Writing mode → only card B (writing-due) is warmed.
-      expect(
-        await asUser.mutation(api.features.decks.ensureUpcomingCardsContent, {}),
-      ).toBe(1);
-      expect(await claimedTextIds()).toEqual([await textIdOf(1)]);
+      // The ensure is a dispatcher (per-card scheduled prepareCardContent),
+      // so claims appear only after draining the scheduled fan-out. Fake
+      // timers + finishAllScheduledFunctions per the addCardsFromCollection
+      // pattern; fetch is stubbed to fail fast so the en-translation Google
+      // action in the fan-out can't reach the network.
+      vi.useFakeTimers();
+      vi.stubGlobal('fetch', vi.fn(async () => {
+        throw new Error('network disabled in test');
+      }));
+      try {
+        // Writing mode → only card B (writing-due) is warmed.
+        expect(
+          await asUser.mutation(api.features.decks.ensureUpcomingCardsContent, {}),
+        ).toBe(1);
+        await t.finishAllScheduledFunctions(vi.runAllTimers);
+        expect(await claimedTextIds()).toEqual([await textIdOf(1)]);
 
-      // Shadowing → only card A (shared-due) is warmed on top.
-      await t.run(async (ctx) => {
-        await ctx.db.patch(settingsId, { reviewMode: 'audio' });
-      });
-      expect(
-        await asUser.mutation(api.features.decks.ensureUpcomingCardsContent, {}),
-      ).toBe(1);
-      expect((await claimedTextIds()).sort()).toEqual(
-        [await textIdOf(0), await textIdOf(1)].sort(),
-      );
+        // Shadowing → only card A (shared-due) is warmed on top.
+        await t.run(async (ctx) => {
+          await ctx.db.patch(settingsId, { reviewMode: 'audio' });
+        });
+        expect(
+          await asUser.mutation(api.features.decks.ensureUpcomingCardsContent, {}),
+        ).toBe(1);
+        await t.finishAllScheduledFunctions(vi.runAllTimers);
+        expect((await claimedTextIds()).sort()).toEqual(
+          [await textIdOf(0), await textIdOf(1)].sort(),
+        );
+      } finally {
+        vi.unstubAllGlobals();
+        vi.useRealTimers();
+      }
     });
 
     it('ensureUpcomingCardsContentAllModes warms BOTH tracks when the split is on', async () => {

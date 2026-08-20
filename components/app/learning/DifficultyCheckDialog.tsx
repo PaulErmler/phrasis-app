@@ -183,12 +183,17 @@ export function DifficultyCheckDialog({
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-center gap-2">
                 <span
-                  className="text-2xl font-bold tabular-nums"
+                  className="text-2xl font-bold tabular-nums leading-none"
                   data-testid="difficulty-check-level"
                 >
                   {levelLabel}
                 </span>
-                <Badge variant="outline">{cefrForOgte(level)}</Badge>
+                <Badge
+                  variant="outline"
+                  className="h-auto px-2.5 py-0 text-2xl font-bold leading-none"
+                >
+                  {cefrForOgte(level)}
+                </Badge>
               </div>
 
               <div className="space-y-2">

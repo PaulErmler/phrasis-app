@@ -89,6 +89,8 @@ export const warmupChartLanguages = internalMutation({
         text,
         [],
         languages,
+        // Admin warmup: never ahead of user-facing audio.
+        { priority: 'background' },
       );
       textsProcessed++;
       translationsScheduled += scheduled.translationsScheduled;

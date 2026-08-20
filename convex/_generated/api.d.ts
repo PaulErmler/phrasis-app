@@ -304,6 +304,7 @@ export declare const components: {
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
   llmPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"llmPool">;
   ttsPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"ttsPool">;
+  ttsWarmPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"ttsWarmPool">;
   seedPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"seedPool">;
   migrations: import("@convex-dev/migrations/_generated/component.js").ComponentApi<"migrations">;
   resend: import("@convex-dev/resend/_generated/component.js").ComponentApi<"resend">;

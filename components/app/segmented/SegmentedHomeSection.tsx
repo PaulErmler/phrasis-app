@@ -284,7 +284,7 @@ function groupLevelsByCefr(levels: Level[]): { cefr: Cefr; levels: Level[] }[] {
   })).filter((g) => g.levels.length > 0);
 }
 
-function GroupedLevelRail({
+export function GroupedLevelRail({
   groups,
   activeCollectionId,
   focusedId,

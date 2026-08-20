@@ -36,6 +36,10 @@ app.use(rateLimiter);
 // instances because each pool needs its own parallelism cap.
 app.use(workpool, { name: 'llmPool' });
 app.use(workpool, { name: 'ttsPool' });
+// Background TTS warms (priority 'background'): low-parallelism sibling of
+// ttsPool so signup-time warm bursts can't queue ahead of the audio a user
+// is looking at. See convex/lib/workpools.ts.
+app.use(workpool, { name: 'ttsWarmPool' });
 // Background data sweeps (currently the separateModeTracking writing-track
 // seed). Its own instance so bulk backfill can never queue ahead of, or steal
 // slots from, the user-facing content pools.

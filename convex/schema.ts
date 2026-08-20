@@ -19,6 +19,7 @@ import {
   schedulingTrackValidator,
   ttsQualityValidator,
   ttsProviderValidator,
+  ttsPriorityValidator,
   voiceGenderValidator,
   featureStateValidator,
   reviewsByModeValidator,
@@ -1146,6 +1147,11 @@ export default defineSchema({
     // superseded job's completion. Optional: claims created for non-pool work
     // (word-timing backfills) and legacy rows carry none.
     workId: v.optional(v.string()),
+    // Scheduling tier of the job holding this claim (see ttsPriorityValidator;
+    // absent = interactive). Lets `claimTtsIfAvailable` hand a
+    // background-held claim over to interactive demand instead of making a
+    // visible card wait out the warm pool's patient backoff.
+    priority: v.optional(ttsPriorityValidator),
   }).index('by_text_and_language', ['textId', 'language']),
 
   // Per-(textId, language) dedup claim. Atomically check-and-insert before

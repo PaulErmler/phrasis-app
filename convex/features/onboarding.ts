@@ -30,6 +30,7 @@ import {
 } from '../../lib/constants/dailyGoal';
 import { getCourseSettings } from '../db/courseSettings';
 import { scheduleMissingContent } from './decks';
+import type { TtsPriority } from '../types';
 
 /**
  * Backend support for the onboarding flow.
@@ -107,6 +108,7 @@ async function processPlacementSentences(
   textIds: Id<'texts'>[],
   targetLanguage: string,
   sourceLanguage: string,
+  priority: TtsPriority,
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   let translationsScheduled = 0;
   let audioScheduled = 0;
@@ -122,6 +124,7 @@ async function processPlacementSentences(
       text,
       [text.language],
       targetLanguages,
+      { priority },
     );
     translationsScheduled += result.translationsScheduled;
     audioScheduled += result.audioScheduled;
@@ -166,11 +169,16 @@ async function runPlacementContentSweep(
     );
   }
 
+  // The inline first page covers the sentences the test shows first, while
+  // the user sits in front of it: interactive. The deferred batches below
+  // pre-warm the rest of the corpus: background, so a signup's ~200-job
+  // placement burst can't queue ahead of audio someone is waiting on.
   const tally = await processPlacementSentences(
     ctx,
     sentences.slice(0, PLACEMENT_CONTENT_BATCH_SIZE).map((s) => s.textId),
     targetLanguage,
     sourceLanguage,
+    'interactive',
   );
 
   for (
@@ -230,6 +238,7 @@ export const processPlacementContentBatch = internalMutation({
         textIds,
         targetLanguage,
         sourceLanguage,
+        'background',
       );
     } catch (error) {
       if (attempt + 1 < PLACEMENT_BATCH_MAX_ATTEMPTS) {

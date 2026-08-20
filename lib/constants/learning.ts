@@ -15,6 +15,17 @@ export const ENSURE_CONTENT_LOOKAHEAD = 15;
 /** Re-trigger content pre-generation every N reviews. */
 export const ENSURE_CONTENT_REVIEW_INTERVAL = 4;
 
+/** Cooldown before re-firing an ensure call for a card whose content is
+ * still missing. Long enough for in-flight translation + TTS to land in the
+ * common case, so retries mostly fire when the first attempt was actually
+ * lost (silent mutation failure, a claim held by a job that died). */
+export const ENSURE_CONTENT_RETRY_MS = 15_000;
+
+/** Retry budget per stuck card. Bounds the ensure re-fires so a permanently
+ * broken card (e.g. no voice configured for the language) can't ping the
+ * backend for the whole session. */
+export const ENSURE_CONTENT_MAX_RETRIES = 3;
+
 /** Maximum character length for any single translation text (editing and creating cards). */
 export const MAX_CARD_TEXT_LENGTH = 150;
 

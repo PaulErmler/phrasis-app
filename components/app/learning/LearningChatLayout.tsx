@@ -39,7 +39,7 @@ interface LearningChatContextValue {
   claimPrompt: (nonce: number) => boolean;
 }
 
-const LearningChatContext = createContext<LearningChatContextValue | null>(null);
+export const LearningChatContext = createContext<LearningChatContextValue | null>(null);
 
 export function useLearningChatToggle(): LearningChatContextValue | null {
   return useContext(LearningChatContext);

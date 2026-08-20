@@ -69,6 +69,20 @@ describe('AcquisitionSourceStep: free-text char limit', () => {
     expect(input.maxLength).toBe(MAX_ONBOARDING_FREE_TEXT_LENGTH);
   });
 
+  it('keeps Other as the last option after shuffling', () => {
+    render(
+      <AcquisitionSourceStep
+        selected={null}
+        freeText={null}
+        onSelect={() => {}}
+        onFreeText={() => {}}
+      />,
+    );
+    const buttons = screen.getAllByTestId(/acquisition-option-/);
+    expect(buttons).toHaveLength(8);
+    expect(buttons.at(-1)).toHaveAttribute('data-testid', 'acquisition-option-other');
+  });
+
   it('does not render the free-text input when "other" is not selected', () => {
     render(
       <AcquisitionSourceStep

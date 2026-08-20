@@ -480,6 +480,10 @@ export async function scheduleMissingTranslationsForText(
         audioSpeakerGender,
         preferredRegionVariant,
         skipTts: true,
+        // Warm work. If the landing translation still triggers TTS (a card
+        // references the text, see storeTranslationAndScheduleTTS's skipTts
+        // docs), that audio rides the background pool.
+        priority: 'background',
       })
     ) {
       scheduled++;
@@ -774,6 +778,9 @@ export const ensureFirstSentencesForCollection = internalMutation({
           text,
           args.baseLanguages,
           args.targetLanguages,
+          // Signup-time warm of ~20 collections × 5 texts: background, so
+          // this burst can't queue ahead of the user's own cards.
+          { priority: 'background' },
         ),
       ),
     );

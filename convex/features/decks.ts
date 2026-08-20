@@ -77,6 +77,8 @@ import {
   audioRecordingValidator,
   ttsQualityValidator,
   ttsProviderValidator,
+  ttsPriorityValidator,
+  type TtsPriority,
   voiceGenderValidator,
   asVoiceGender,
   schedulingTrackFromSettings,
@@ -84,7 +86,11 @@ import {
   type SchedulingTrack,
   type StudyContentFilter,
 } from '../types';
-import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
+import {
+  claimTtsIfAvailable,
+  hasActiveTtsClaim,
+  hasBlockingTtsClaim,
+} from './ttsProcessing';
 import { languageSupportsStt } from '../../lib/languages';
 import {
   claimLlmTranslationIfAvailable,
@@ -123,6 +129,23 @@ import {
 // ============================================================================
 
 /**
+ * Thrown by the schedulers below in probe mode (`opts.probe`) at the FIRST
+ * point where a real run would write. Probe mode turns the authoritative
+ * content sweep into a pure read: `scheduleContentForUpcomingCards` probes
+ * each upcoming card and dispatches a per-card `prepareCardContent` mutation
+ * ONLY for cards that need work. A probe pass that finds nothing performs
+ * zero writes, and a zero-write mutation cannot lose an OCC race, so the
+ * steady-state ensure sweep can no longer be killed by concurrently
+ * completing TTS jobs (the 2026-08-20 "audioRecordings changed on every
+ * retry" failure) — while staying a single billed mutation.
+ */
+export class ProbeNeedsWork extends Error {
+  constructor() {
+    super('probe: content work needed');
+  }
+}
+
+/**
  * Claim + enqueue a translation job for (text, targetLanguage), the routing
  * slice shared by `scheduleMissingContent` and the collection-preview
  * generation path (`requestPreviewTranslations`). OpenRouter languages go
@@ -138,9 +161,27 @@ export async function scheduleTranslationForLanguage(
     preferredRegionVariant?: string;
     /** Translation-only mode. The landing translation won't enqueue TTS. */
     skipTts?: boolean;
+    /**
+     * Priority the downstream TTS enqueue (in
+     * `storeTranslationAndScheduleTTS`) runs at once the translation lands.
+     * The translation itself always rides llmPool; only audio is tiered.
+     */
+    priority?: TtsPriority;
+    /** Read-only probe: throw ProbeNeedsWork instead of writing. */
+    probe?: boolean;
   },
 ): Promise<boolean> {
   const tCfg = getTranslationConfigForLanguage(targetLanguage);
+  if (opts.probe) {
+    // A fresh LLM claim means a job already owns this translation: the real
+    // call would no-op, so it is not "work needed". Google-path languages
+    // are claimless and always enqueue, hence always needy here.
+    if (tCfg.provider === 'openrouter') {
+      const claim = await getLlmClaim(ctx, text._id, targetLanguage);
+      if (claim && isClaimFresh(claim)) return false;
+    }
+    throw new ProbeNeedsWork();
+  }
   if (tCfg.provider === 'openrouter') {
     const claimId = await claimLlmTranslationIfAvailable(
       ctx,
@@ -159,6 +200,7 @@ export async function scheduleTranslationForLanguage(
           audioSpeakerGender: opts.audioSpeakerGender,
           preferredRegionVariant: opts.preferredRegionVariant,
           skipTts: opts.skipTts,
+          priority: opts.priority,
         },
       },
     );
@@ -178,6 +220,7 @@ export async function scheduleTranslationForLanguage(
       audioSpeakerGender: opts.audioSpeakerGender,
       preferredRegionVariant: opts.preferredRegionVariant,
       skipTts: opts.skipTts,
+      priority: opts.priority,
     },
     {
       onComplete:
@@ -203,6 +246,7 @@ async function enqueueTtsForVoice(
     voiceName,
     regionVariant,
     forceRegen,
+    priority,
   }: {
     textId: Id<'texts'>;
     text: string;
@@ -210,6 +254,7 @@ async function enqueueTtsForVoice(
     voiceName: string;
     regionVariant: string | undefined;
     forceRegen?: boolean;
+    priority?: TtsPriority;
   },
 ): Promise<void> {
   const voiceGender = getVoiceGenderByApiCode(voiceName);
@@ -229,6 +274,7 @@ async function enqueueTtsForVoice(
       speed: 1,
       regionVariant,
       forceRegen,
+      priority,
     },
   });
 }
@@ -258,10 +304,27 @@ export async function scheduleAudioForLanguage(
   language: string,
   audioSpeakerGender: string | undefined,
   translation: Doc<'translations'> | null,
-  opts?: { forceRegen?: boolean },
+  opts?: {
+    forceRegen?: boolean;
+    priority?: TtsPriority;
+    /** Read-only probe: throw ProbeNeedsWork instead of writing. */
+    probe?: boolean;
+  },
 ): Promise<boolean> {
   const isSource = language === text.language;
   if (!isSource && !translation) return false;
+  if (opts?.probe) {
+    // A fresh TTS claim the real run would respect means a job is already
+    // filling this slot — not needy. Priority-aware on purpose: a fresh
+    // 'background' claim probed at interactive priority IS needy, because
+    // the real run would take it over (cancel the warm job, re-enqueue on
+    // the interactive pool) — a write. Anything else (cache attach or
+    // claim + enqueue) would write too.
+    if (await hasBlockingTtsClaim(ctx, text._id, language, opts?.priority)) {
+      return false;
+    }
+    throw new ProbeNeedsWork();
+  }
   // For mixed-dialect rows, prefer a voice in the same locale that was
   // picked at translation time and forward the variant to TTS so the
   // validation roundtrip uses the matching STT locale.
@@ -287,7 +350,7 @@ export async function scheduleAudioForLanguage(
     }
   }
 
-  const claimed = await claimTtsIfAvailable(ctx, text._id, language);
+  const claimed = await claimTtsIfAvailable(ctx, text._id, language, opts?.priority);
   if (!claimed) return false;
   await enqueueTtsForVoice(ctx, {
     textId: text._id,
@@ -296,6 +359,7 @@ export async function scheduleAudioForLanguage(
     voiceName,
     regionVariant,
     forceRegen: opts?.forceRegen,
+    priority: opts?.priority,
   });
   return true;
 }
@@ -319,6 +383,20 @@ export async function scheduleMissingContent(
      * and the synthesis job replaces the shared asset in place on completion.
      */
     forceAudioRegen?: boolean;
+    /**
+     * TTS priority for every audio enqueue this sweep triggers, directly or
+     * via a landing translation. Absent = 'interactive'; warm callers
+     * (collection warms, deferred placement batches, admin warmups) pass
+     * 'background'. See ttsPriorityValidator.
+     */
+    priority?: TtsPriority;
+    /**
+     * Read-only probe: run the sweep's full decision logic but THROW
+     * ProbeNeedsWork at the first point a real run would write, and write
+     * nothing. In-flight work (fresh TTS/LLM claims) counts as handled, not
+     * needy. Completing without the throw means the text needs nothing.
+     */
+    probe?: boolean;
   },
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   const sourceLanguage = text.language;
@@ -335,6 +413,7 @@ export async function scheduleMissingContent(
   );
 
   if (Object.keys(genderPatch).length > 0) {
+    if (opts?.probe) throw new ProbeNeedsWork();
     await ctx.db.patch(textId, genderPatch);
   }
 
@@ -432,15 +511,21 @@ export async function scheduleMissingContent(
       // Dangling pointer (asset gone), no usable audio behind this row.
       // Remove it so the enqueue loop below refills the language.
       if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
+      if (opts?.probe) throw new ProbeNeedsWork();
       await deleteAudioRow(ctx, audio, { blobAlreadyGone: true });
       audioMap.set(lang, null);
       continue;
     }
-    const url = await ctx.storage.getUrl(payload.storageId);
-    if (url === null) {
+    // `db.system.get` (metadata point-read), not `storage.getUrl`: presence
+    // is the signal, and the metadata read is far cheaper than minting a
+    // signed URL — this loop runs per (card × language) on the ensure path.
+    const blobExists =
+      (await ctx.db.system.get(payload.storageId)) !== null;
+    if (!blobExists) {
       if (await hasActiveTtsClaim(ctx, textId, lang)) {
         continue;
       }
+      if (opts?.probe) throw new ProbeNeedsWork();
       // The blob is gone, nothing left to reference-protect; row (and, for
       // a last-pointer row, its dead asset) bookkeeping still runs.
       await deleteAudioRow(ctx, audio, { blobAlreadyGone: true });
@@ -469,6 +554,7 @@ export async function scheduleMissingContent(
         langsWithAudioGenderDrift.add(lang);
       }
       if (genderMismatch || providerMismatch || versionMismatch) {
+        if (opts?.probe) throw new ProbeNeedsWork();
         // Reference-aware delete: a shared asset (or an `editCard`-copied
         // legacy blob) survives while anything else still points at it.
         // Gender drift additionally keeps the asset+blob even as the last
@@ -551,6 +637,7 @@ export async function scheduleMissingContent(
     const llmClaim = llmClaimMap.get(lang) ?? null;
     if (llmClaim && isClaimFresh(llmClaim)) continue;
 
+    if (opts?.probe) throw new ProbeNeedsWork();
     if (translation.regionVariant) {
       sweptRegionVariants.set(lang, translation.regionVariant);
     }
@@ -587,6 +674,13 @@ export async function scheduleMissingContent(
     // can't transcribe `el-GR`) will never get word timings, so don't waste
     // a claim on a backfill that's guaranteed to no-op.
     if (!languageSupportsStt(lang)) return;
+    if (opts?.probe) {
+      // Claim-held = a job (synthesis or backfill) already owns the slot —
+      // unless it's a background claim the real (priority-less, hence
+      // interactive) claim below would take over, which is a write.
+      if (await hasBlockingTtsClaim(ctx, textId, lang, undefined)) return;
+      throw new ProbeNeedsWork();
+    }
     const claimed = await claimTtsIfAvailable(ctx, textId, lang);
     if (!claimed) return;
     // Forward the persisted regionVariant for mixed-dialect rows so STT runs
@@ -609,6 +703,7 @@ export async function scheduleMissingContent(
     ROMANIZATION_LANGUAGES.has(sourceLanguage) &&
     text.romanizedText === undefined
   ) {
+    if (opts?.probe) throw new ProbeNeedsWork();
     await ctx.scheduler.runAfter(
       0,
       internal.features.decks.processRomanizationForSourceText,
@@ -630,7 +725,11 @@ export async function scheduleMissingContent(
             lang,
             audioSpeakerGender,
             null,
-            { forceRegen: opts?.forceAudioRegen },
+            {
+              forceRegen: opts?.forceAudioRegen,
+              priority: opts?.priority,
+              probe: opts?.probe,
+            },
           )
         ) {
           audioScheduled++;
@@ -650,6 +749,8 @@ export async function scheduleMissingContent(
           await scheduleTranslationForLanguage(ctx, text, lang, {
             audioSpeakerGender,
             preferredRegionVariant: sweptRegionVariants.get(lang),
+            priority: opts?.priority,
+            probe: opts?.probe,
           })
         ) {
           translationsScheduled++;
@@ -663,6 +764,7 @@ export async function scheduleMissingContent(
           ROMANIZATION_LANGUAGES.has(lang) &&
           translation.romanizedText === undefined
         ) {
+          if (opts?.probe) throw new ProbeNeedsWork();
           await ctx.scheduler.runAfter(
             0,
             internal.features.decks.processRomanizationForTranslation,
@@ -692,7 +794,11 @@ export async function scheduleMissingContent(
               lang,
               audioSpeakerGender,
               translation,
-              { forceRegen: opts?.forceAudioRegen },
+              {
+                forceRegen: opts?.forceAudioRegen,
+                priority: opts?.priority,
+                probe: opts?.probe,
+              },
             )
           ) {
             audioScheduled++;
@@ -1881,6 +1987,24 @@ export const addCardsFromCollection = mutation({
           frontierRank: scan.newFrontier,
         });
 
+        // Warm-ahead: pre-generate content for the NEXT batch beyond the
+        // just-advanced frontier, so it is ready by the time a fast reviewer
+        // adds it (the full pipeline takes ~15-40s per card, and batches were
+        // observed being added ~30s apart). Fire-and-forget in its own
+        // transaction so a warm failure can't fail the add.
+        await ctx.scheduler.runAfter(
+          0,
+          internal.features.decks.warmNextCollectionBatch,
+          {
+            collectionId: args.collectionId,
+            courseId,
+            deckId: deck._id,
+            userId,
+            afterRank: scan.newFrontier,
+            limit: Math.min(clampedBatchSize, ENSURE_CONTENT_LOOKAHEAD),
+          },
+        );
+
         // Auto-advance: if the collection is now complete (every text added
         // or deliberately ignored) and is the active one, move to the next
         // incomplete collection (or clear if last).
@@ -1920,6 +2044,65 @@ export const addCardsFromCollection = mutation({
       scanIncomplete,
       quotaLimited: false,
     };
+  },
+});
+
+/**
+ * Warm-ahead for the batch add: pre-generate content (translations + audio)
+ * for the next addable texts beyond the collection frontier WITHOUT adding
+ * cards, so the next "add cards" batch is ready before the user reaches it.
+ * Scheduled by `addCardsFromCollection` after each successful premade add.
+ *
+ * Interactive priority on purpose: these texts are one batch away from the
+ * user's screen (observed add cadence ~30s between batches), which is
+ * "imminently on screen" under the ttsPriorityValidator classification.
+ * Marked (prioritized/readd) texts can occasionally jump the queue ahead of
+ * this prediction; the warmed texts stay next-in-line, so the work is spent
+ * early rather than wasted. No SENTENCES quota is consumed: nothing is added.
+ */
+export const warmNextCollectionBatch = internalMutation({
+  args: {
+    collectionId: v.id('collections'),
+    courseId: v.id('courses'),
+    deckId: v.id('decks'),
+    userId: v.string(),
+    afterRank: v.number(),
+    limit: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const course = await ctx.db.get(args.courseId);
+    if (!course) return null;
+    const scan = await getNextAddableTextsFromRank(ctx, {
+      collectionId: args.collectionId,
+      afterRank: args.afterRank,
+      limit: args.limit,
+      deckId: args.deckId,
+      userId: args.userId,
+      courseId: args.courseId,
+      options: { onlyCurriculum: true },
+    });
+    for (const text of scan.picked) {
+      // Inline (no per-text dispatch): these texts are brand-new to the
+      // pipeline, so no jobs are completing against their rows yet and the
+      // OCC contention the ensure sweep needed dispatch for doesn't apply.
+      // One bad text must still not abort the rest of the warm.
+      try {
+        await scheduleMissingContent(
+          ctx,
+          text._id,
+          text,
+          course.baseLanguages,
+          course.targetLanguages,
+        );
+      } catch (error) {
+        console.error('[warmNextCollectionBatch] scheduleMissingContent failed for one text — continuing', {
+          textId: text._id,
+          error,
+        });
+      }
+    }
+    return null;
   },
 });
 
@@ -2073,7 +2256,19 @@ async function getUpcomingCardsForMode(
  * Schedule missing content (translations + TTS) for the supplied due cards.
  * Shared by the per-mode (`ensureUpcomingCardsContent`) and all-modes
  * (`ensureUpcomingCardsContentAllModes`) ensure mutations. Returns the number
- * of due cards processed.
+ * of cards that actually needed work.
+ *
+ * PROBE-THEN-DISPATCH: each card is first run through the sweep in read-only
+ * probe mode (see ProbeNeedsWork); only cards that need work get a scheduled
+ * per-card `prepareCardContent` mutation. Two properties this buys:
+ *  - Steady state (nothing needy, or everything in-flight under claims) does
+ *    ZERO writes, and a write-free mutation cannot lose an OCC race — the
+ *    2026-08-20 permanent failure ("audioRecordings changed on every retry"
+ *    vs completing TTS jobs) is structurally impossible then. It is also one
+ *    single billed mutation, no per-card fan-out.
+ *  - When cards DO need work, each runs in its own small transaction, so a
+ *    completing job conflicts with at most that one card's mutation (cheap
+ *    auto-retry) instead of killing the whole sweep.
  */
 async function scheduleContentForUpcomingCards(
   ctx: MutationCtx,
@@ -2081,30 +2276,51 @@ async function scheduleContentForUpcomingCards(
   cards: Doc<'cards'>[],
 ): Promise<number> {
   let processed = 0;
-  // Batch-load the texts for all due cards up front (one concurrent read
-  // instead of one sequential `ctx.db.get` per card) before the sequential
-  // scheduleMissingContent loop.
+  // Batch-load the texts up front (one concurrent read round, not one
+  // sequential get per card) before the sequential probe loop.
   const texts = await Promise.all(cards.map((card) => ctx.db.get(card.textId)));
   for (let i = 0; i < cards.length; i++) {
     const card = cards[i];
     const text = texts[i];
     if (!text) continue;
-    await scheduleMissingContent(
-      ctx,
-      card.textId,
-      text,
-      active.course.baseLanguages,
-      active.course.targetLanguages,
-    );
-    processed++;
+    let needsWork = false;
+    try {
+      await scheduleMissingContent(
+        ctx,
+        card.textId,
+        text,
+        active.course.baseLanguages,
+        active.course.targetLanguages,
+        { probe: true },
+      );
+    } catch (error) {
+      if (error instanceof ProbeNeedsWork) {
+        needsWork = true;
+      } else {
+        // A probe is read-only, so an unexpected throw is data-shaped (bad
+        // config etc.) — skip this card, keep probing the rest.
+        console.error('[ensureUpcomingCards] probe failed for one card — continuing', {
+          textId: card.textId,
+          error,
+        });
+      }
+    }
+    if (needsWork) {
+      await ctx.scheduler.runAfter(0, internal.features.decks.prepareCardContent, {
+        textId: card.textId,
+        baseLanguages: active.course.baseLanguages,
+        targetLanguages: active.course.targetLanguages,
+      });
+      processed++;
+    }
   }
 
-  // Deliberately does NOT pre-generate content for not-yet-added texts of the
-  // active premade collection: audio is the dominant generation cost, the
-  // prioritized-marks drain makes any "next N by rank" prediction unreliable,
-  // and content for cards that ARE added is scheduled at add time
-  // (`prepareCardContent`). Preview browsing generates translations lazily
-  // and audio only on an explicit audio-icon click.
+  // This sweep does NOT reach past the deck into not-yet-added collection
+  // texts; that proved too late for fast reviewers (batches observed added
+  // ~30s apart vs a ~15-40s per-card pipeline), so the batch add now
+  // schedules `warmNextCollectionBatch` to pre-generate the next batch
+  // beyond the frontier at add time. Preview browsing still generates
+  // translations lazily and audio only on an explicit audio-icon click.
   return processed;
 }
 
@@ -2309,6 +2525,8 @@ export const processTranslationForCard = internalAction({
      * collection-preview generation path (directly or via the LLM fallback).
      */
     skipTts: v.optional(v.boolean()),
+    /** TTS priority, forwarded to `storeTranslationAndScheduleTTS`. */
+    priority: v.optional(ttsPriorityValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -2440,6 +2658,7 @@ export const processTranslationForCard = internalAction({
         speakerGender: asVoiceGender(args.audioSpeakerGender),
         expectedClaimId: args.claimId,
         skipTts: args.skipTts,
+        priority: args.priority,
       },
     );
 
@@ -2523,12 +2742,23 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     expectedClaimId: v.optional(v.id('llmTranslationClaims')),
     /**
      * Translation-only mode: store the translation but do NOT auto-enqueue
-     * TTS. Used by the collection-preview generation path, where audio is
-     * deliberately deferred to an explicit audio-icon click (or to the normal
-     * ensure path once the text becomes a card). Absent/false → historical
-     * behavior (translation landing schedules its TTS).
+     * TTS, UNLESS a card references this text. Used by the collection-preview
+     * generation path, where audio for preview-only texts is deliberately
+     * deferred to an explicit audio-icon click. The card check closes a
+     * pipeline hole: a text can become a card while its skipTts warm job is
+     * in flight (onboarding seeds racing the collection warms), and the
+     * concurrent ensure sweep defers TTS to this very job via the fresh LLM
+     * claim, so honoring skipTts unconditionally left the card with a
+     * translation and no audio, forever. Absent/false → historical behavior
+     * (translation landing schedules its TTS).
      */
     skipTts: v.optional(v.boolean()),
+    /**
+     * Priority for the TTS enqueue below (see ttsPriorityValidator).
+     * Threaded from the enqueue that carried the translation job so audio
+     * lands in the tier the content was requested at.
+     */
+    priority: v.optional(ttsPriorityValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -2750,8 +2980,25 @@ export const storeTranslationAndScheduleTTS = internalMutation({
 
     // `audioUnchangedBySound`: the retained audio row already serves this
     // (text, language), skip outright.
-    if (args.skipTts || audioUnchangedBySound) {
+    if (audioUnchangedBySound) {
       return null;
+    }
+    let ttsPriority = args.priority;
+    if (args.skipTts) {
+      // skipTts means "don't spend synthesis on texts nobody studies". A
+      // card referencing this text disproves that premise (see the arg's
+      // docstring for the race this closes), so only skip when none exists.
+      const cardForText = await ctx.db
+        .query('cards')
+        .withIndex('by_textId', (q) => q.eq('textId', args.textId))
+        .first();
+      if (!cardForText) {
+        return null;
+      }
+      // The card also disproves "nobody is waiting on this": this is audio
+      // the race left missing on a studied card, so it rides the interactive
+      // pool even though the warm caller requested 'background'.
+      ttsPriority = undefined;
     }
 
     const existingAudio = await ctx.db
@@ -2786,7 +3033,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
           asset._id,
         );
       } else {
-        const claimed = await claimTtsIfAvailable(ctx, args.textId, args.targetLanguage);
+        const claimed = await claimTtsIfAvailable(ctx, args.textId, args.targetLanguage, ttsPriority);
         if (claimed) {
           await enqueueTtsForVoice(ctx, {
             textId: args.textId,
@@ -2794,6 +3041,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
             language: args.targetLanguage,
             voiceName: args.voiceName,
             regionVariant: args.regionVariant,
+            priority: ttsPriority,
           });
         }
       }
@@ -3117,6 +3365,19 @@ export const storeAudioRecording = internalMutation({
       return null;
     }
 
+    // Guard: never point an asset at a blob that no longer exists. A cleanup
+    // can collect a long-running job's stored blob before this write lands;
+    // writing anyway births a dead asset that looks valid ('validated', doc
+    // intact) but serves a null URL. Skipping is safe: the claim releases
+    // via onComplete and the next ensure sweep re-drives the language.
+    if ((await ctx.db.system.get(args.storageId)) === null) {
+      console.error(
+        '[storeAudioRecording] blob already deleted — refusing to write a dead asset',
+        { textId: args.textId, language: args.language, storageId: args.storageId },
+      );
+      return null;
+    }
+
     const result = await upsertAudioAsset(
       ctx,
       {
@@ -3141,8 +3402,15 @@ export const storeAudioRecording = internalMutation({
 
     if (result.outcome === 'kept') {
       // The asset already carries completed audio and this was a mid-flight
-      // 'unknown' write. The incoming blob is unused. Reference-safe drop.
-      await deleteStorageBlobIfUnreferenced(ctx, args.storageId);
+      // 'unknown' write. The incoming blob is unused BY THE ASSET — but the
+      // job that stored it is still running and will reference this very
+      // blob in its final (completed) write, which replaces the asset. An
+      // immediate delete here killed that blob under the running job, and
+      // the final write then either birthed a dead asset (pre blob-guard)
+      // or was refused, looping forever. Delayed + reference-checked: if
+      // the final write lands the blob into the asset it survives, if the
+      // job dies or goes elsewhere it is collected.
+      await scheduleBlobSwapDelete(ctx, args.storageId);
     } else if (result.replacedStorageId !== null) {
       // In-place swap: the old blob stays downloadable for a grace window so
       // clients holding a just-issued signed URL don't 404 mid-listen.

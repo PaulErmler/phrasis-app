@@ -31,6 +31,8 @@ import { getUserTimezone } from '@/lib/timezone';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import {
+  ENSURE_CONTENT_MAX_RETRIES,
+  ENSURE_CONTENT_RETRY_MS,
   ENSURE_CONTENT_REVIEW_INTERVAL,
   PROGRESS_DISPLAY_INTERVAL,
 } from '@/lib/constants/learning';
@@ -643,32 +645,67 @@ export function useLearningMode(
   const prevCardIdForEnsureRef = useRef<string | null>(null);
   const reviewsSinceEnsureRef = useRef(ENSURE_CONTENT_REVIEW_INTERVAL);
   const ensureInFlightRef = useRef(false);
+  const ensureRetriesRef = useRef(0);
   const hasEnsuredForEmptyDeckRef = useRef(false);
 
   useEffect(() => {
-    if (!cardForReview || ensureInFlightRef.current) return;
+    if (!cardForReview) return;
 
-    if (prevCardIdForEnsureRef.current === cardForReview._id) return;
-
-    if (prevCardIdForEnsureRef.current !== null) {
-      reviewsSinceEnsureRef.current++;
+    if (prevCardIdForEnsureRef.current !== cardForReview._id) {
+      if (prevCardIdForEnsureRef.current !== null) {
+        reviewsSinceEnsureRef.current++;
+      }
+      prevCardIdForEnsureRef.current = cardForReview._id;
+      ensureRetriesRef.current = 0;
     }
-    prevCardIdForEnsureRef.current = cardForReview._id;
 
+    const missingContent = cardForReview.hasMissingContent;
     const shouldEnsure =
-      cardForReview.hasMissingContent ||
+      missingContent ||
       reviewsSinceEnsureRef.current >= ENSURE_CONTENT_REVIEW_INTERVAL;
     if (!shouldEnsure) return;
 
-    reviewsSinceEnsureRef.current = 0;
-    ensureInFlightRef.current = true;
-    ensureUpcomingContentMutation()
-      .catch((err) => {
-        console.error('Failed to ensure upcoming cards content:', err);
-      })
-      .finally(() => {
-        ensureInFlightRef.current = false;
-      });
+    // While the displayed card stays missing content, keep re-firing the
+    // ensure on a cooldown (bounded per card) instead of trying exactly
+    // once. One attempt was not enough: the mutation can fail silently
+    // (OCC, a throw mid-sweep) or no-op against a claim held by a job that
+    // died, and this effect's deps don't change while the card is stuck, so
+    // without the timer the user would sit on the spinner until they
+    // advance. When the audio lands, `hasMissingContent` flips and the
+    // cleanup below cancels the pending retry.
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const attempt = () => {
+      if (cancelled) return;
+      if (ensureInFlightRef.current) {
+        // An ensure fired for the previous card is still in flight. Check
+        // back after the cooldown instead of dropping this card's turn.
+        // Deferrals don't count against the retry budget; only mutations
+        // actually fired below do.
+        if (missingContent) {
+          retryTimer = setTimeout(attempt, ENSURE_CONTENT_RETRY_MS);
+        }
+        return;
+      }
+      reviewsSinceEnsureRef.current = 0;
+      ensureInFlightRef.current = true;
+      ensureUpcomingContentMutation()
+        .catch((err) => {
+          console.error('Failed to ensure upcoming cards content:', err);
+        })
+        .finally(() => {
+          ensureInFlightRef.current = false;
+          if (cancelled || !missingContent) return;
+          if (ensureRetriesRef.current >= ENSURE_CONTENT_MAX_RETRIES) return;
+          ensureRetriesRef.current++;
+          retryTimer = setTimeout(attempt, ENSURE_CONTENT_RETRY_MS);
+        });
+    };
+    attempt();
+    return () => {
+      cancelled = true;
+      if (retryTimer !== null) clearTimeout(retryTimer);
+    };
   }, [cardForReview?._id, cardForReview?.hasMissingContent, ensureUpcomingContentMutation]);
 
   // When the deck has no due cards, the per-card effect above never fires,
@@ -680,17 +717,34 @@ export function useLearningMode(
     if (cardForReview === undefined) return; // query still loading
     if (!courseSettings?.activeCollectionId) return;
     if (hasEnsuredForEmptyDeckRef.current) return;
-    if (ensureInFlightRef.current) return;
 
-    hasEnsuredForEmptyDeckRef.current = true;
-    ensureInFlightRef.current = true;
-    ensureUpcomingContentMutation()
-      .catch((err) => {
-        console.error('Failed to ensure upcoming cards content:', err);
-      })
-      .finally(() => {
-        ensureInFlightRef.current = false;
-      });
+    // Same retry-on-failure shape as the per-card ensure above: a failed
+    // pre-warm should not latch `hasEnsuredForEmptyDeckRef` for the session,
+    // or the next "Add cards" click pulls texts with nothing scheduled.
+    let cancelled = false;
+    let attempts = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const attempt = () => {
+      if (cancelled || ensureInFlightRef.current) return;
+      hasEnsuredForEmptyDeckRef.current = true;
+      ensureInFlightRef.current = true;
+      ensureUpcomingContentMutation()
+        .catch((err) => {
+          console.error('Failed to ensure upcoming cards content:', err);
+          if (cancelled || attempts >= ENSURE_CONTENT_MAX_RETRIES) return;
+          attempts++;
+          hasEnsuredForEmptyDeckRef.current = false;
+          retryTimer = setTimeout(attempt, ENSURE_CONTENT_RETRY_MS);
+        })
+        .finally(() => {
+          ensureInFlightRef.current = false;
+        });
+    };
+    attempt();
+    return () => {
+      cancelled = true;
+      if (retryTimer !== null) clearTimeout(retryTimer);
+    };
   }, [cardForReview, courseSettings?.activeCollectionId, ensureUpcomingContentMutation]);
 
   // --------------------------------------------------------------------------

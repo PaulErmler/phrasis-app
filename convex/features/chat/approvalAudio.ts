@@ -293,6 +293,11 @@ export const saveApprovalAudioAsset = internalMutation({
       await deleteStorageBlobIfUnreferenced(ctx, args.storageId);
       return null;
     }
+    // Same dead-asset guard as storeAudioRecording: never write an asset
+    // pointing at a blob that no longer exists.
+    if ((await ctx.db.system.get(args.storageId)) === null) {
+      return null;
+    }
     const result = await upsertAudioAsset(ctx, key, {
       storageId: args.storageId,
       voiceName: args.voiceName,

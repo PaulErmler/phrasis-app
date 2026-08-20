@@ -35,7 +35,7 @@ import { rateLimiter } from "../../rateLimiter";
 // `enqueueAction` is a vi.fn() resolving to unique fake workIds
 // ('test-tts-work-N'), so tests can assert claim→workId stamping and drive
 // the onComplete handlers by hand.
-import { ttsPool } from "@/convex/lib/workpools";
+import { ttsPool, ttsWarmPool } from "@/convex/lib/workpools";
 import type { WorkId } from "@convex-dev/workpool";
 import { claimTtsIfAvailable } from "../../features/ttsProcessing";
 import { resolveAudioPayload } from "../../lib/audioAssets";
@@ -46,6 +46,8 @@ const mockSemantic = vi.mocked(textsMatchSemantic);
 const mockLimit = vi.mocked(rateLimiter.limit);
 const mockCheck = vi.mocked(rateLimiter.check);
 const mockEnqueue = vi.mocked(ttsPool.enqueueAction);
+const mockWarmEnqueue = vi.mocked(ttsWarmPool.enqueueAction);
+const mockWarmCancel = vi.mocked(ttsWarmPool.cancel);
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
@@ -63,6 +65,8 @@ beforeEach(() => {
   // Clear calls only. The setup-file implementation (unique fake workIds)
   // must stay installed.
   mockEnqueue.mockClear();
+  mockWarmEnqueue.mockClear();
+  mockWarmCancel.mockClear();
 });
 
 async function seedText(t: TestConvex<typeof schema>) {
@@ -130,6 +134,64 @@ describe("features/ttsProcessing", () => {
         });
       });
       expect(await claim(t, textId)).toBeNull();
+    });
+
+    it("interactive request takes over a fresh background-held claim and cancels the warm job", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const warmClaimId = await t.run(async (ctx) =>
+        ctx.db.insert("ttsGenerationClaims", {
+          textId,
+          language: "es",
+          claimedAt: Date.now(),
+          priority: "background",
+          workId: "warm-work-1",
+        }),
+      );
+      const newId = await claim(t, textId);
+      expect(newId).not.toBeNull();
+      expect(newId).not.toBe(warmClaimId);
+      expect(mockWarmCancel).toHaveBeenCalledTimes(1);
+      expect(mockWarmCancel.mock.calls[0][1]).toBe("warm-work-1");
+      const row = await getClaim(t, textId);
+      expect(row?._id).toBe(newId);
+      expect(row?.priority).toBeUndefined();
+    });
+
+    it("takes over a workId-less background claim (latch case) without cancelling anything", async () => {
+      // A claim inserted whose enqueue subtransaction then failed latches
+      // with no workId; interactive demand still reclaims it immediately.
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("ttsGenerationClaims", {
+          textId,
+          language: "es",
+          claimedAt: Date.now(),
+          priority: "background",
+        });
+      });
+      expect(await claim(t, textId)).not.toBeNull();
+      expect(mockWarmCancel).not.toHaveBeenCalled();
+    });
+
+    it("background request does NOT take over a fresh background-held claim", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("ttsGenerationClaims", {
+          textId,
+          language: "es",
+          claimedAt: Date.now(),
+          priority: "background",
+          workId: "warm-work-2",
+        });
+      });
+      const result = await t.run(async (ctx) =>
+        claimTtsIfAvailable(ctx as any, textId, "es", "background"),
+      );
+      expect(result).toBeNull();
+      expect(mockWarmCancel).not.toHaveBeenCalled();
     });
 
     it("a claim several minutes old is still fresh, staleness is 10 minutes", async () => {
@@ -318,6 +380,46 @@ describe("features/ttsProcessing", () => {
       const claim = await getClaim(t, textId);
       expect(claim?.workId).toBe(workId);
       expect(claim?.claimedAt).toBeGreaterThan(claimedBefore);
+    });
+
+    it("routes priority 'background' into ttsWarmPool (and stamps the warm workId)", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("ttsGenerationClaims", {
+          textId,
+          language: "es",
+          claimedAt: Date.now() - 60_000,
+        });
+      });
+
+      await t.mutation(internal.features.ttsProcessing.enqueueTtsJob, {
+        provider: "google",
+        args: { ...baseJobArgs(textId), priority: "background" },
+      });
+
+      expect(mockEnqueue).not.toHaveBeenCalled();
+      expect(mockWarmEnqueue).toHaveBeenCalledTimes(1);
+      // The worker also receives the priority so it picks the near-zero
+      // rate-limit wait cap.
+      expect(mockWarmEnqueue.mock.calls[0][2]).toEqual({
+        ...baseJobArgs(textId),
+        priority: "background",
+        provider: "google",
+      });
+      const workId = await (mockWarmEnqueue.mock.results[0].value as Promise<string>);
+      expect((await getClaim(t, textId))?.workId).toBe(workId);
+    });
+
+    it("routes priority-less (interactive) jobs into ttsPool, not the warm pool", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.mutation(internal.features.ttsProcessing.enqueueTtsJob, {
+        provider: "google",
+        args: baseJobArgs(textId),
+      });
+      expect(mockWarmEnqueue).not.toHaveBeenCalled();
+      expect(mockEnqueue).toHaveBeenCalledTimes(1);
     });
 
     it("still enqueues when no claim row exists (nothing to stamp)", async () => {

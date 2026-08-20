@@ -1063,7 +1063,6 @@
       "speakHint": "Das wird deine Ausgangssprache",
       "learnHint": "Die Sprache, die du lernst — nicht die, die du schon kannst.",
       "backToLearn": "{language} ändern",
-      "stepOf": "Schritt {current} von 2",
       "stepReady": "Bereit",
       "readyTitle": "Sieht gut aus.",
       "readyHint": "Tippe auf eine Sprache zum Ändern, oder tausche sie, falls sie vertauscht sind.",
@@ -1156,6 +1155,7 @@
     "proficiency": {
       "title": "Wie gut kannst du diese Sprache schon?",
       "subtitle": "Wir passen an, wo du startest.",
+      "recommended": "Empfohlen",
       "branches": {
         "new": {
           "title": "Ich bin völlig neu",
@@ -1167,7 +1167,7 @@
         },
         "test": {
           "title": "Teste mich — find mein Niveau",
-          "description": "Kurzer adaptiver Test, etwa 5–20 Fragen. Am genauesten."
+          "description": "Kurzer adaptiver Test, etwa 5–20 Fragen."
         }
       }
     },

@@ -230,6 +230,24 @@ export const voiceGenderValidator = v.union(
 );
 
 /**
+ * TTS scheduling priority. 'interactive' work is (or will imminently be) on a
+ * user's screen: cards in their deck, an audio-icon click, the placement
+ * sentence in front of them. 'background' work warms content nobody is
+ * waiting on (collection previews, deferred placement batches, admin
+ * warmups). Interactive jobs run in `ttsPool`; background jobs run in the
+ * low-parallelism `ttsWarmPool` and only take rate-limit tokens that are
+ * free immediately (see workpools.ts / rateLimitReserve.ts), so a signup
+ * burst of warm jobs can no longer queue ahead of the audio the user is
+ * staring at. Absent means 'interactive': deprioritizing is opt-in at the
+ * warm call sites.
+ */
+export const ttsPriorityValidator = v.union(
+  v.literal('interactive'),
+  v.literal('background'),
+);
+export type TtsPriority = Infer<typeof ttsPriorityValidator>;
+
+/**
  * Narrow a loosely-typed string to a strict voice gender, or `undefined` when
  * it is neither. Use at boundaries where a `v.string()`-typed value (e.g.
  * `texts.audioSpeakerGender`, or a queued job's `audioSpeakerGender`) flows

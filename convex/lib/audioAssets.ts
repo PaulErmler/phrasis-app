@@ -90,6 +90,14 @@ export async function findReusableAudioAsset(
     return null;
   }
   if (asset.speed !== 1) return null;
+  // A hit is only reusable while its blob still exists. An asset can outlive
+  // its blob (observed 2026-08-20: validated assets pointing at deleted
+  // storage), and reusing the corpse re-attaches the very pointer rows the
+  // validity sweep just deleted for having no blob — an attach/delete loop
+  // that never produces audio. Missing instead routes the caller to
+  // claim + enqueue; the completed synthesis replaces this asset's blob in
+  // place (upsertAudioAsset), healing every text that shares it.
+  if ((await ctx.db.system.get(asset.storageId)) === null) return null;
   return asset;
 }
 

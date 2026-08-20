@@ -83,6 +83,11 @@ export async function deleteStorageBlobIfUnreferenced(
     .withIndex('by_storageId', (q) => q.eq('storageId', storageId))
     .first();
   if (referencedByAsset) return;
+  // Tolerate already-deleted blobs: two cleanups can race to the same id
+  // (each reference-checked correctly), and the loser must not crash its
+  // mutation over a blob that is already in the desired state.
+  if ((await ctx.db.system.get(storageId)) === null) return;
+  console.log('[audio] deleting unreferenced blob', { storageId });
   await ctx.storage.delete(storageId);
 }
 

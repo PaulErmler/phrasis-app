@@ -1014,7 +1014,6 @@ function TargetLanguageInput({
           onButtonStop={onButtonStop}
           speed={speed}
           playSignal={playSignal}
-          wrapAudio
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
           onSpeedCycle={onSpeedCycle}
@@ -1077,7 +1076,6 @@ function TargetLanguageInput({
           onButtonStop={onButtonStop}
           speed={speed}
           playSignal={playSignal}
-          wrapAudio
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
           onSpeedCycle={onSpeedCycle}
@@ -1179,14 +1177,24 @@ function TargetLanguageInput({
                 </p>
               )}
             </div>
-            <AudioButton
-              url={audioUrl}
-              language={translation.language}
-              onPlay={onAudioPlay}
-              onTimeUpdate={onButtonTimeUpdate}
-              onStop={onButtonStop}
-              playSignal={playSignal}
-            />
+            <div className="flex items-center">
+              <AudioButton
+                url={audioUrl}
+                language={translation.language}
+                onPlay={onAudioPlay}
+                onTimeUpdate={onButtonTimeUpdate}
+                onStop={onButtonStop}
+                speed={speed}
+                playSignal={playSignal}
+              />
+              {onSpeedCycle && (
+                <CardSpeedBadge
+                  override={speedOverride}
+                  generalSpeed={generalSpeed}
+                  onCycle={onSpeedCycle}
+                />
+              )}
+            </div>
           </div>
         </>
       ) : (
@@ -1197,10 +1205,11 @@ function TargetLanguageInput({
           onAudioPlay={onAudioPlay}
           onButtonTimeUpdate={onButtonTimeUpdate}
           onButtonStop={onButtonStop}
+          speed={speed}
           playSignal={playSignal}
-          wrapAudio={false}
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
+          onSpeedCycle={onSpeedCycle}
         />
       )}
       <div
@@ -1251,16 +1260,10 @@ interface TargetRowHeaderProps {
   onAudioPlay?: () => void;
   onButtonTimeUpdate: (language: string, localTime: number) => void;
   onButtonStop: (language: string) => void;
-  /** Effective playback speed; omitted on the input row (AudioButton defaults to 1). */
+  /** Effective playback speed. */
   speed?: number;
   /** Keyboard replay nonce forwarded to the AudioButton (first target only). */
   playSignal?: number;
-  /**
-   * Wrap the audio button in the flex container that also hosts the speed
-   * badge (revealed/submitted rows). The input row renders the bare button
-   * with no badge.
-   */
-  wrapAudio: boolean;
   /** Stored override value, or null when none is stored. */
   speedOverride: number | null;
   /** Course-level general speed for this language. */
@@ -1279,25 +1282,21 @@ function TargetRowHeader({
   onButtonStop,
   speed,
   playSignal,
-  wrapAudio,
   speedOverride,
   generalSpeed,
   onSpeedCycle,
 }: TargetRowHeaderProps) {
-  const audioButton = (
-    <AudioButton
-      url={audioUrl}
-      language={language}
-      onPlay={onAudioPlay}
-      onTimeUpdate={onButtonTimeUpdate}
-      onStop={onButtonStop}
-      speed={speed}
-      playSignal={playSignal}
-    />
-  );
-  const audio = wrapAudio ? (
+  const audio = (
     <div className="flex items-center">
-      {audioButton}
+      <AudioButton
+        url={audioUrl}
+        language={language}
+        onPlay={onAudioPlay}
+        onTimeUpdate={onButtonTimeUpdate}
+        onStop={onButtonStop}
+        speed={speed}
+        playSignal={playSignal}
+      />
       {onSpeedCycle && (
         <CardSpeedBadge
           override={speedOverride}
@@ -1306,8 +1305,6 @@ function TargetRowHeader({
         />
       )}
     </div>
-  ) : (
-    audioButton
   );
   return languageDisplayName ? (
     <div className="flex items-center justify-between">

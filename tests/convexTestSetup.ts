@@ -27,6 +27,13 @@ vi.mock('@/convex/lib/workpools', () => ({
     cancel: vi.fn(async () => undefined),
     status: vi.fn(async () => ({ state: 'pending', previousAttempts: 0 })),
   },
+  // Background sibling of ttsPool for priority-'background' TTS (warm
+  // sweeps). Same fake-workId contract so claim stamping stays assertable.
+  ttsWarmPool: {
+    enqueueAction: vi.fn(async () => `test-tts-warm-work-${nextWorkId++}`),
+    cancel: vi.fn(async () => undefined),
+    status: vi.fn(async () => ({ state: 'pending', previousAttempts: 0 })),
+  },
   // The seed pool enqueues MUTATIONS, and unlike the content pools its jobs
   // must actually run for a test to observe anything (the writing-track sweep
   // chains batch → batch until the course is seeded). Route each job through

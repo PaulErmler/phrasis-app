@@ -35,7 +35,7 @@ export interface AppDataValue extends AppData {
   >;
 }
 
-const AppDataContext = createContext<AppDataValue | null>(null);
+export const AppDataContext = createContext<AppDataValue | null>(null);
 
 export function AppDataProvider({
   children,
