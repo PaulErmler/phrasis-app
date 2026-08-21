@@ -45,7 +45,14 @@ import { EVENTS, track } from '../analytics';
 import { costForCharacters } from '../config/aiCosts';
 import { getRomanizationSource } from '../lib/localRomanization';
 import {
+  missingAnnotationKinds,
+  TEXT_ANNOTATIONS,
+  vAnnotationKind,
+  type AnnotationField,
+} from '../lib/textAnnotations';
+import {
   ROMANIZATION_LANGUAGES,
+  IPA_LANGUAGES,
   DEFAULT_CONTENT_VERSION,
   getCurrentTranslationVersion,
   getCurrentTtsVersion,
@@ -78,6 +85,7 @@ import {
   ttsQualityValidator,
   ttsProviderValidator,
   ttsPriorityValidator,
+  llmPriorityValidator,
   type TtsPriority,
   type LlmPriority,
   voiceGenderValidator,
@@ -410,8 +418,8 @@ export async function scheduleMissingContent(
     /**
      * TTS priority for every audio enqueue this sweep triggers, directly or
      * via a landing translation. Absent = 'interactive'; warm callers
-     * (collection warms, deferred placement batches, admin warmups) pass
-     * 'background'. See ttsPriorityValidator.
+     * (collection warms, deferred placement batches, admin warmups, bulk
+     * custom-card import) pass 'background'. See ttsPriorityValidator.
      */
     priority?: TtsPriority;
     /**
@@ -726,21 +734,18 @@ export async function scheduleMissingContent(
     );
   };
 
-  // Schedule romanization for source text if needed and missing.
-  // `=== undefined` (not `!x`) so the empty-string sentinel that
-  // `processRomanizationForSourceText` writes after 3 failed retries is
-  // honored, without that distinction every ensureContent call would burn
-  // another 3 retries against the same failing input.
-  if (
-    ROMANIZATION_LANGUAGES.has(sourceLanguage) &&
-    text.romanizedText === undefined
-  ) {
+  // Schedule missing annotations (romanization, IPA) for the source text.
+  // `missingAnnotationKinds` tests `=== undefined` per kind (not `!x`) so the
+  // empty-string sentinel the process actions write after a failed attempt is
+  // honored; without that distinction every ensureContent call would burn
+  // another attempt against the same failing input.
+  for (const kind of missingAnnotationKinds(sourceLanguage, text)) {
     if (opts?.probe) throw new ProbeNeedsWork();
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.decks.processRomanizationForSourceText,
-      { textId, text: text.text, language: sourceLanguage },
-    );
+    await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].sourceTextAction, {
+      textId,
+      text: text.text,
+      language: sourceLanguage,
+    });
   }
 
   // Schedule missing content for each required language
@@ -789,19 +794,15 @@ export async function scheduleMissingContent(
           translationsScheduled++;
         }
       } else {
-        // Translation exists. Backfill romanization if missing
-        // `=== undefined` (not `!x`) so the empty-string "tried, failed,
-        // leave empty" sentinel persisted by `processRomanizationForTranslation`
-        // is respected on subsequent ensureContent runs.
-        if (
-          ROMANIZATION_LANGUAGES.has(lang) &&
-          translation.romanizedText === undefined
-        ) {
+        // Translation exists. Backfill missing annotations (romanization,
+        // IPA). Same `=== undefined` sentinel semantics as the source-text
+        // loop above.
+        for (const kind of missingAnnotationKinds(lang, translation)) {
           if (opts?.probe) throw new ProbeNeedsWork();
           await ctx.scheduler.runAfter(
             0,
-            internal.features.decks.processRomanizationForTranslation,
-            { textId, translatedText: translation.translatedText, language: lang },
+            TEXT_ANNOTATIONS[kind].translationAction,
+            { textId, text: translation.translatedText, language: lang },
           );
         }
         if (!hasAudio) {
@@ -906,6 +907,7 @@ export const getDeckCards = query({
           sourceText: text.text,
           sourceLanguage: text.language,
           sourceRomanization: text.romanizedText ?? undefined,
+          sourceIpa: text.ipaText ?? undefined,
           userCreated: text.userCreated,
         };
       })
@@ -2463,6 +2465,8 @@ export const prepareCardContent = internalMutation({
     textId: v.id('texts'),
     baseLanguages: v.array(v.string()),
     targetLanguages: v.array(v.string()),
+    priority: v.optional(ttsPriorityValidator),
+    llmPriority: v.optional(llmPriorityValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -2475,6 +2479,7 @@ export const prepareCardContent = internalMutation({
       text,
       args.baseLanguages,
       args.targetLanguages,
+      { priority: args.priority, llmPriority: args.llmPriority },
     );
     return null;
   },
@@ -2862,6 +2867,13 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     // Triggers the batched rebuild fan-out below.
     let searchableContentChanged = false;
 
+    // Set when the row ends this mutation without an IPA transcription
+    // (fresh insert, replace-cleared, or a legacy row that never had one).
+    // IPA can't be computed inline here: espeak lives in the Node runtime
+    // (convex/features/ipa.ts), so it's scheduled as a follow-up below.
+    // Assigned by every branch of the insert/replace/fill structure.
+    let ipaMissingAfterWrite: boolean;
+
     if (!existing) {
       await ctx.db.insert('translations', {
         textId: args.textId,
@@ -2888,6 +2900,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         translationVersion: getCurrentTranslationVersion(args.targetLanguage),
       });
       searchableContentChanged = true;
+      ipaMissingAfterWrite = true;
     } else if (args.replaceExisting) {
       // Audio decision for retranslations, made here where old and new text
       // are both in hand: a punctuation/'_'-only change sounds identical, so
@@ -2916,6 +2929,8 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         translatedText: string;
         romanizedText: string | undefined;
         romanizationSource: string | undefined;
+        ipaText: string | undefined;
+        ipaSource: string | undefined;
         translationSource: string | undefined;
         regionVariant: string | undefined;
         speakerGender: 'male' | 'female';
@@ -2933,6 +2948,12 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         patch.romanizedText = undefined;
         patch.romanizationSource = undefined;
       }
+      // No caller computes IPA inline (Node-runtime engine), so a replaced
+      // translation always clears the pair; the follow-up scheduled below
+      // regenerates it against the new wording.
+      patch.ipaText = undefined;
+      patch.ipaSource = undefined;
+      ipaMissingAfterWrite = true;
       if (args.translationSource) {
         patch.translationSource = args.translationSource;
       }
@@ -3005,10 +3026,30 @@ export const storeTranslationAndScheduleTTS = internalMutation({
           searchableContentChanged = true;
         }
       }
+      // Legacy row this job merely filled metadata on: schedule IPA only
+      // when the row never had one (`=== undefined` honors the sentinel).
+      ipaMissingAfterWrite = existing.ipaText === undefined;
     }
 
     if (searchableContentChanged) {
       await scheduleSearchableTextRebuild(ctx, args.textId);
+    }
+
+    // Follow-up IPA transcription. Deliberately BEFORE the
+    // `audioUnchangedBySound` early-return: a sounds-the-same retranslation
+    // still changed the wording, and the replace branch just cleared the
+    // pair. Harmless to race the ensureContent gate; the store mutation's
+    // `=== undefined` guard makes the second write a no-op.
+    if (ipaMissingAfterWrite && IPA_LANGUAGES.has(args.targetLanguage)) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.ipa.processIpaForTranslation,
+        {
+          textId: args.textId,
+          text: translatedText,
+          language: args.targetLanguage,
+        },
+      );
     }
 
     // `audioUnchangedBySound`: the retained audio row already serves this
@@ -3086,6 +3127,8 @@ export const storeTranslationAndScheduleTTS = internalMutation({
 
 /**
  * Internal action to romanize a source text (in the texts table).
+ * (The IPA sibling lives in convex/features/ipa.ts: espeak needs the Node
+ * runtime; both write through the generic store mutations below.)
  */
 export const processRomanizationForSourceText = internalAction({
   args: {
@@ -3107,45 +3150,46 @@ export const processRomanizationForSourceText = internalAction({
     }
     // Source recorded even on failure: lets a strategy swap target failed
     // rows by the source that produced the sentinel.
-    const romanizationSource = getRomanizationSource(args.language);
-    await ctx.runMutation(
-      internal.features.decks.storeSourceRomanization,
-      {
-        textId: args.textId,
-        romanizedText: romanized,
-        romanizationSource,
-      },
-    );
+    await ctx.runMutation(internal.features.decks.storeSourceAnnotation, {
+      textId: args.textId,
+      kind: 'romanization',
+      value: romanized,
+      source: getRomanizationSource(args.language),
+    });
     return null;
   },
 });
 
 /**
- * Internal mutation to store romanized text on a source text document.
+ * Internal mutation to store an annotation (romanization or IPA) on a
+ * source text document.
  *
  * Idempotent against a real-value race: only patches when the row hasn't
- * been written yet (`romanizedText === undefined`). The empty-string
- * sentinel for "tried and failed" also wins on first write but never
- * overwrites a previously-stored real value. `romanizationSource` is
- * recorded so a future strategy swap can find + invalidate the row.
+ * been written yet (`=== undefined` on the kind's value field). The
+ * empty-string sentinel for "tried and failed" also wins on first write but
+ * never overwrites a previously-stored real value. `source` is recorded so
+ * a future strategy swap can find + invalidate the row.
  */
-export const storeSourceRomanization = internalMutation({
+export const storeSourceAnnotation = internalMutation({
   args: {
     textId: v.id('texts'),
-    romanizedText: v.string(),
-    romanizationSource: v.string(),
+    kind: vAnnotationKind,
+    value: v.string(),
+    source: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const spec = TEXT_ANNOTATIONS[args.kind];
     const text = await ctx.db.get(args.textId);
-    if (text && text.romanizedText === undefined) {
-      await ctx.db.patch(args.textId, {
-        romanizedText: args.romanizedText,
-        romanizationSource: args.romanizationSource,
-      });
-      // A newly-landed source romanization belongs in the cards' search
-      // string (the empty-string "tried, failed" sentinel doesn't).
-      if (args.romanizedText !== '') {
+    if (text && text[spec.textField] === undefined) {
+      const patch: Partial<Record<AnnotationField, string>> = {};
+      patch[spec.textField] = args.value;
+      patch[spec.sourceField] = args.source;
+      await ctx.db.patch(args.textId, patch);
+      // A newly-landed value belongs in the cards' search string only for
+      // kinds users actually type (romanization; not IPA), and the
+      // empty-string "tried, failed" sentinel never does.
+      if (spec.inSearchableText && args.value !== '') {
         await scheduleSearchableTextRebuild(ctx, args.textId);
       }
     }
@@ -3155,18 +3199,19 @@ export const storeSourceRomanization = internalMutation({
 
 /**
  * Internal action to romanize an existing translation (backfill).
+ * (IPA sibling: processIpaForTranslation in convex/features/ipa.ts.)
  */
 export const processRomanizationForTranslation = internalAction({
   args: {
     textId: v.id('texts'),
-    translatedText: v.string(),
+    text: v.string(),
     language: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     let romanized: string;
     try {
-      romanized = await romanizeText(args.translatedText, args.language);
+      romanized = await romanizeText(args.text, args.language);
     } catch (err) {
       // `romanizeText` already retried up to 3 times before throwing.
       // Persist an empty-string sentinel so `scheduleMissingContent` doesn't
@@ -3179,52 +3224,46 @@ export const processRomanizationForTranslation = internalAction({
     }
     // Source recorded even on failure: lets a strategy swap target failed
     // rows by the source that produced the sentinel.
-    const romanizationSource = getRomanizationSource(args.language);
-    await ctx.runMutation(
-      internal.features.decks.storeTranslationRomanization,
-      {
-        textId: args.textId,
-        language: args.language,
-        romanizedText: romanized,
-        romanizationSource,
-      },
-    );
+    await ctx.runMutation(internal.features.decks.storeTranslationAnnotation, {
+      textId: args.textId,
+      language: args.language,
+      kind: 'romanization',
+      value: romanized,
+      source: getRomanizationSource(args.language),
+    });
     return null;
   },
 });
 
 /**
- * Internal mutation to store romanized text on a translation document.
- *
- * Idempotent against a real-value race: only patches when the field hasn't
- * been written yet. The empty-string sentinel for "tried and failed" wins
- * on first write but never overwrites a previously-stored real value.
- * `romanizationSource` is recorded so a future strategy swap can find +
- * invalidate the row.
+ * Internal mutation to store an annotation (romanization or IPA) on a
+ * translation document. Same idempotence + sentinel + source semantics as
+ * `storeSourceAnnotation` above.
  */
-export const storeTranslationRomanization = internalMutation({
+export const storeTranslationAnnotation = internalMutation({
   args: {
     textId: v.id('texts'),
     language: v.string(),
-    romanizedText: v.string(),
-    romanizationSource: v.string(),
+    kind: vAnnotationKind,
+    value: v.string(),
+    source: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const spec = TEXT_ANNOTATIONS[args.kind];
     const translation = await ctx.db
       .query('translations')
       .withIndex('by_text_and_language', (q) =>
         q.eq('textId', args.textId).eq('targetLanguage', args.language),
       )
       .first();
-    if (translation && translation.romanizedText === undefined) {
-      await ctx.db.patch(translation._id, {
-        romanizedText: args.romanizedText,
-        romanizationSource: args.romanizationSource,
-      });
-      // A newly-landed romanization belongs in the cards' search string
-      // (the empty-string "tried, failed" sentinel doesn't).
-      if (args.romanizedText !== '') {
+    if (translation && translation[spec.textField] === undefined) {
+      const patch: Partial<Record<AnnotationField, string>> = {};
+      patch[spec.textField] = args.value;
+      patch[spec.sourceField] = args.source;
+      await ctx.db.patch(translation._id, patch);
+      // See storeSourceAnnotation: only searchable kinds with a real value.
+      if (spec.inSearchableText && args.value !== '') {
         await scheduleSearchableTextRebuild(ctx, args.textId);
       }
     }
@@ -3274,8 +3313,8 @@ async function scheduleSearchableTextRebuild(
  * self-continuation.
  *
  * Scheduled by the three late-content write funnels
- * (`storeTranslationAndScheduleTTS`, `storeSourceRomanization`,
- * `storeTranslationRomanization`) so search stays correct for content that
+ * (`storeTranslationAndScheduleTTS`, `storeSourceAnnotation`,
+ * `storeTranslationAnnotation`) so search stays correct for content that
  * lands AFTER a card was created. The review-time staleness check in
  * `reviewCard` only compares language sets. It misses retranslations and
  * late romanization fills entirely, and only fires when the card is actually

@@ -12,6 +12,7 @@ import { getTutorial } from './registry';
 import type { TutorialContext } from './types';
 import {
   baseDriverConfig,
+  bindTourKeyboard,
   getDriverOverlayOpacity,
   resolveStepAnchors,
 } from './driver-common';
@@ -245,6 +246,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     context,
   } = options;
   const driverRef = useRef<Driver | null>(null);
+  const unbindKeyboardRef = useRef<(() => void) | null>(null);
   // Guards the re-entrancy of teardown → driver.destroy() → onDestroyStarted
   // → teardown on driver's internal close paths.
   const isTearingDownRef = useRef(false);
@@ -305,6 +307,8 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
           completeTutorial();
           onCompleteRef.current?.();
         }
+        unbindKeyboardRef.current?.();
+        unbindKeyboardRef.current = null;
         driverRef.current = null;
         setIsActive(false);
         active.destroy();
@@ -398,6 +402,8 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       },
     });
 
+    unbindKeyboardRef.current?.();
+    unbindKeyboardRef.current = bindTourKeyboard(d);
     driverRef.current = d;
     setIsActive(true);
     d.drive();
@@ -439,6 +445,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   }, []);
 
   const showCompletionStep = useCallback((title: string, description: string) => {
+    let unbind = () => {};
     const d = driver({
       showButtons: ['close'],
       overlayColor: '#000',
@@ -448,9 +455,11 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
         popover: { title, description },
       }],
       onDestroyStarted: () => {
+        unbind();
         d.destroy();
       },
     });
+    unbind = bindTourKeyboard(d);
     d.drive();
   }, []);
 
@@ -461,6 +470,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
 
   const showChatStep = useCallback(() => {
     const tr = tRef.current;
+    let unbind = () => {};
     const d = driver({
       showButtons: ['close'],
       overlayColor: '#000',
@@ -476,11 +486,13 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
         },
       }],
       onDestroyStarted: () => {
+        unbind();
         completeTutorial();
         onCompleteRef.current?.();
         d.destroy();
       },
     });
+    unbind = bindTourKeyboard(d);
     d.drive();
   }, [completeTutorial]);
 

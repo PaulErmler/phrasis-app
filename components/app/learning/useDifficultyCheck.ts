@@ -8,6 +8,13 @@ import { useCompletedTutorials } from '@/lib/tutorials/use-tutorial';
 import { VETERAN_SUPPRESS_REPS } from '@/lib/tutorials/use-milestone-tips';
 
 /**
+ * Flip to true to show the one-time "Does the difficulty feel right?"
+ * dialog before the first auto-add. Off for now; the dialog, hook, and
+ * tutorial id stay in place so it can come back without a rebuild.
+ */
+const DIFFICULTY_CHECK_ENABLED = false;
+
+/**
  * One-time difficulty check: before the FIRST batch of new cards is
  * auto-added, the learn view asks whether the difficulty feels right and
  * offers the level slider (with sentence previews) to move the course to a
@@ -33,9 +40,9 @@ import { VETERAN_SUPPRESS_REPS } from '@/lib/tutorials/use-milestone-tips';
  * that case. A user who later moves onto a level collection still gets asked.
  */
 export function useDifficultyCheck() {
-  const { completed, markCompleted, isLoaded } = useCompletedTutorials([
-    TUTORIAL_IDS.DIFFICULTY_CHECK,
-  ]);
+  const { completed, markCompleted, isLoaded } = useCompletedTutorials(
+    DIFFICULTY_CHECK_ENABLED ? [TUTORIAL_IDS.DIFFICULTY_CHECK] : [],
+  );
   const done = completed.includes(TUTORIAL_IDS.DIFFICULTY_CHECK);
 
   // `useQueries`, not `useQuery`: a `useQuery` server error is THROWN into
@@ -53,7 +60,7 @@ export function useDifficultyCheck() {
   // queries every render.
   const queries = useMemo(() => {
     const q: RequestForQueries = {};
-    if (!done) {
+    if (DIFFICULTY_CHECK_ENABLED && !done) {
       q.lifetimeReps = {
         query: api.features.courses.getLifetimeReviewCount,
         args: {},
@@ -80,7 +87,7 @@ export function useDifficultyCheck() {
     lifetimeReps != null && lifetimeReps > VETERAN_SUPPRESS_REPS;
 
   useEffect(() => {
-    if (!isLoaded || !isVeteran || done) return;
+    if (!DIFFICULTY_CHECK_ENABLED || !isLoaded || !isVeteran || done) return;
     markCompleted(TUTORIAL_IDS.DIFFICULTY_CHECK, { captureEvent: false });
   }, [isLoaded, isVeteran, done, markCompleted]);
 
@@ -93,6 +100,7 @@ export function useDifficultyCheck() {
      *  false until the per-user completion state has actually loaded, so a
      *  fresh device never blocks adds it shouldn't. */
     pending:
+      DIFFICULTY_CHECK_ENABLED &&
       isLoaded &&
       !done &&
       lifetimeReps != null &&

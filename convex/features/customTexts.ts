@@ -684,7 +684,9 @@ export const createCustomTextsBatch = mutation({
       createdTextIds.push(textId);
 
       // Pure-manual path: generate metadata first, which then schedules
-      // prepareCardContent. Mirrors createCustomText's no-metadata branch.
+      // prepareCardContent. Mirrors createCustomText's no-metadata branch,
+      // except TTS/LLM ride the background pools: a bulk paste must not
+      // queue ahead of audio the user is currently reviewing.
       await ctx.scheduler.runAfter(
         0,
         internal.features.sentenceMetadata.generateSentenceMetadata,
@@ -695,6 +697,8 @@ export const createCustomTextsBatch = mutation({
           baseLanguages: course.baseLanguages,
           targetLanguages: course.targetLanguages,
           userId,
+          priority: 'background',
+          llmPriority: 'background',
         },
       );
     }

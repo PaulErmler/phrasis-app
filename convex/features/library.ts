@@ -343,6 +343,7 @@ export const getLibraryCards = query({
           sourceText: text.text,
           sourceLanguage: text.language,
           sourceRomanization: text.romanizedText ?? undefined,
+          sourceIpa: text.ipaText ?? undefined,
           userCreated: text.userCreated,
         };
       })

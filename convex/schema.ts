@@ -136,6 +136,7 @@ export const courseSettingsFields = {
   hideBaseLanguagesFull: v.optional(v.boolean()), // writing mode: blur base language text by default (default: on in Transcribe, off in Translate; independent of the audio-mode hideBaseLanguages)
   autoRevealBaseOnSubmit: v.optional(v.boolean()), // writing mode: unblur base text once all translations are submitted (default on; sub-setting of hideBaseLanguagesFull)
   showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
+  showIpa: v.optional(v.boolean()), // show IPA transcription below sentence text (default OFF, unlike showRomanization)
   // Language order overrides
   baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
   targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages
@@ -229,7 +230,7 @@ export const courseSettingsDocValidator = v.object({
 // separate required arg there) and the fields managed by dedicated flows
 // (collection wiring, dataset reconciliation, session id); `.partial()`
 // because a patch supplies only the fields it changes.
-// `dailyTimeGoalMinutes` is patchable (goal editors on home/settings);
+// `dailyTimeGoalMinutes` is patchable (homescreen goal editor);
 // the user's original onboarding answer stays preserved on the frozen
 // `onboardingProgress` row.
 export const coursePatchableSettingsValidator = v
@@ -395,6 +396,13 @@ export default defineSchema({
     // sentinel. Bumping the source identifier on the failing method is
     // how you re-attempt those rows.
     romanizationSource: v.optional(v.string()),
+    // IPA transcription (espeak-ng). Same undefined / '' / non-empty
+    // tri-state as `romanizedText` above, same `=== undefined` rule.
+    ipaText: v.optional(v.string()),
+    // Identifier of the engine build that produced `ipaText` (e.g.
+    // "espeak-ng-emscripten-0.3.5-v1"). Same invalidate-by-source migration
+    // pattern as `romanizationSource`.
+    ipaSource: v.optional(v.string()),
     // Debounce marker for the searchableText rebuild fan-out: timestamp until
     // which a scheduled `rebuildSearchableTextForText` is already pending for
     // this text. Content stores within that window skip re-scheduling. See
@@ -448,6 +456,11 @@ export default defineSchema({
     // `romanizedText` (or attempted to and persisted the empty-string
     // sentinel). See the texts table for the migration pattern.
     romanizationSource: v.optional(v.string()),
+    // IPA transcription (espeak-ng). Same undefined / '' / non-empty
+    // tri-state as `texts.ipaText`; see the notes there.
+    ipaText: v.optional(v.string()),
+    // Engine identifier for `ipaText`, mirroring `texts.ipaSource`.
+    ipaSource: v.optional(v.string()),
     // Identifier of the translation method that produced `translatedText`.
     // Format: "<model-slug>-<reasoning|none>" for LLM translations (e.g.
     // "google/gemini-3.1-flash-lite-high"), "google-translate-v2"
@@ -1077,6 +1090,14 @@ export default defineSchema({
     messageId: v.string(),
     toolCallId: v.string(),
     translations: translationEntriesValidator,
+    // IPA transcriptions for `translations`, keyed by language. Computed by
+    // a scheduled espeak action (convex/features/ipa.ts) right after the
+    // proposal lands, so the approval card can show the line before any
+    // card/text row exists. Key absent = not (yet) computed, '' = espeak
+    // failed (same sentinel semantics as texts.ipaText), non-empty = done.
+    // Entries are dropped when the user edits the proposed text and
+    // recomputed against the new wording.
+    entryIpa: v.optional(v.record(v.string(), v.string())),
     userId: v.string(),
     status: cardApprovalStatusValidator,
     // Absent = 'createCard' (rows predate the field). 'alsoCorrect' rows are

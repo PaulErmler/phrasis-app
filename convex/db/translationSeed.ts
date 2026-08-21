@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { internalMutation } from '../_generated/server';
 import { deleteAudioRow } from '../lib/audio';
 import { resolveAudioPayload } from '../lib/audioAssets';
+import { clearedAnnotationFields } from '../lib/textAnnotations';
 
 const SPANISH_VOICE_PREFIXES: Record<string, string> = {
   es: 'es-ES',
@@ -144,16 +145,15 @@ export const batchUpsertTranslations = internalMutation({
           });
           stats.translationsInserted++;
         } else if (existing.translatedText !== tr.text) {
-          // Text changed. Clear romanization + its source (next ensureContent
-          // will re-romanize under the current method). For `translationSource`:
+          // Text changed. Clear the annotations + their sources (next
+          // ensureContent regenerates under the current methods). For `translationSource`:
           // only overwrite when the seed explicitly declares a new tag. If the
           // seed omits it, KEEP the existing tag, clearing here would silently
           // untag rows on every text edit once the legacy backfill has run.
           // Seeds from the new pipeline should always carry `translationSource`.
           await ctx.db.patch(existing._id, {
             translatedText: tr.text,
-            romanizedText: undefined,
-            romanizationSource: undefined,
+            ...clearedAnnotationFields(),
             ...(tr.translationSource !== undefined
               ? { translationSource: tr.translationSource }
               : {}),

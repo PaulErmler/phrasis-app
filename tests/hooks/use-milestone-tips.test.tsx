@@ -20,6 +20,8 @@ type DriverConfig = {
 type MockDriver = {
   drive: () => void;
   destroy: () => void;
+  isActive: () => boolean;
+  moveNext: () => void;
   closeFromUi: () => void;
 };
 
@@ -29,9 +31,14 @@ let lastDriver: MockDriver | null = null;
 vi.mock('driver.js', () => ({
   driver: (config: DriverConfig) => {
     lastConfig = config;
+    let active = true;
     const d: MockDriver = {
       drive: vi.fn(),
-      destroy: vi.fn(),
+      destroy: vi.fn(() => {
+        active = false;
+      }),
+      isActive: () => active,
+      moveNext: vi.fn(),
       // Simulates driver-internal close paths (X / Esc / finishing) which
       // fire onDestroyStarted; the public destroy() does not.
       closeFromUi: () => {
@@ -289,8 +296,8 @@ describe('useMilestoneTips', () => {
     // Regression: `completed` used to be a dependency of the milestone
     // effect, so persisting a dismissed tip re-ran it and immediately fired
     // the next eligible one. At 15 lifetime reviews EVERY threshold is met
-    // (and the veteran guard doesn't apply below 50), so the user got all
-    // five popovers back-to-back on a single card. Both anchors are mounted,
+    // (and the veteran guard doesn't apply below 50), so the user got every
+    // remaining milestone popover back-to-back on a single card. Both anchors are mounted,
     // so only the dependency change can keep the second tip from showing.
     preMark(AUDIO_INTRO_IDS);
     mountAnchor('data-coachmark-anchor', 'card-actions');

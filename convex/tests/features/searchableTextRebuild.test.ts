@@ -191,7 +191,7 @@ describe("rebuildSearchableTextForText via storeTranslationAndScheduleTTS", () =
 });
 
 describe("rebuildSearchableTextForText via the romanization store mutations", () => {
-  it("adds a late source romanization (storeSourceRomanization)", async () => {
+  it("adds a late source romanization (storeSourceAnnotation)", async () => {
     const t = convexTest(schema, modules);
     const { textId, cardId } = await seedCourseCardText(t, {
       sourceText: "你真的体贴",
@@ -202,10 +202,11 @@ describe("rebuildSearchableTextForText via the romanization store mutations", ()
     });
     expect((await getCard(t, cardId)).searchableText).not.toContain("zhende");
 
-    await t.mutation(internal.features.decks.storeSourceRomanization, {
+    await t.mutation(internal.features.decks.storeSourceAnnotation, {
       textId,
-      romanizedText: "ni zhende titie",
-      romanizationSource: "pinyin",
+      kind: "romanization",
+      value: "ni zhende titie",
+      source: "pinyin",
     });
     await drainScheduled(t);
 
@@ -222,10 +223,11 @@ describe("rebuildSearchableTextForText via the romanization store mutations", ()
     });
     const before = await getCard(t, cardId);
 
-    await t.mutation(internal.features.decks.storeSourceRomanization, {
+    await t.mutation(internal.features.decks.storeSourceAnnotation, {
       textId,
-      romanizedText: "",
-      romanizationSource: "pinyin",
+      kind: "romanization",
+      value: "",
+      source: "pinyin",
     });
     await drainScheduled(t);
 
@@ -234,7 +236,7 @@ describe("rebuildSearchableTextForText via the romanization store mutations", ()
     );
   });
 
-  it("adds a late translation romanization (storeTranslationRomanization)", async () => {
+  it("adds a late translation romanization (storeTranslationAnnotation)", async () => {
     const t = convexTest(schema, modules);
     const { textId, cardId } = await seedCourseCardText(t, {
       sourceText: "How are you",
@@ -245,11 +247,12 @@ describe("rebuildSearchableTextForText via the romanization store mutations", ()
     });
     expect((await getCard(t, cardId)).searchableText).not.toContain("nihaoma");
 
-    await t.mutation(internal.features.decks.storeTranslationRomanization, {
+    await t.mutation(internal.features.decks.storeTranslationAnnotation, {
       textId,
       language: "zh",
-      romanizedText: "nihaoma",
-      romanizationSource: "pinyin",
+      kind: "romanization",
+      value: "nihaoma",
+      source: "pinyin",
     });
     await drainScheduled(t);
 
@@ -281,10 +284,11 @@ describe("scheduleSearchableTextRebuild: per-text debounce", () => {
 
     // …and a second store inside the window piggybacks on it (same marker,
     // no second schedule) instead of fanning out its own full rebuild.
-    await t.mutation(internal.features.decks.storeSourceRomanization, {
+    await t.mutation(internal.features.decks.storeSourceAnnotation, {
       textId,
-      romanizedText: "ni zhende titie",
-      romanizationSource: "pinyin",
+      kind: "romanization",
+      value: "ni zhende titie",
+      source: "pinyin",
     });
     const marker2 = (await t.run(async (ctx) => (await ctx.db.get(textId))!))
       .searchableRebuildScheduledAt;

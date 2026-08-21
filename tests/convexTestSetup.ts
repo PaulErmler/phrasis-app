@@ -70,7 +70,7 @@ vi.mock('@/convex/lib/workpools', () => ({
 
 /**
  * Stub the aggregate component at the same module boundary. Production code
- * instantiates `new TableAggregate(components.cardsByState, ...)` at
+ * instantiates `new TableAggregate(components.cardsByStateAndDueDate, ...)` at
  * module-load, and the aggregate component is not registered with convex-test
  * (same reasoning as the workpool mocks above). No-op writes, zero counts.
  *
@@ -108,4 +108,28 @@ vi.mock('@/convex/posthog', () => ({
     groupIdentify: vi.fn(async () => undefined),
     alias: vi.fn(async () => undefined),
   },
+}));
+
+/**
+ * Stub the espeak-ng WASM engine (IPA transcription). The real module reads
+ * its ~24 MB data bundle from disk, which the edge-runtime test environment
+ * has no filesystem for, and any test that drains the scheduler after a
+ * translation lands would otherwise execute `processIpaFor*` and crash on
+ * the import. The stub yields a fixed transcription in espeak's raw shape
+ * (`_`-separated phonemes + trailing newline) so `cleanEspeakIpa`'s
+ * post-processing stays exercised. Real-engine coverage lives in the
+ * node-environment suite (tests/node/espeak-ipa.test.ts).
+ */
+vi.mock('@echogarden/espeak-ng-emscripten', () => ({
+  default: async () => ({
+    eSpeakNGWorker: class {
+      set_voice(_identifier: string): void {}
+      synthesize_ipa(_text: string): { code: number; ipa: string } {
+        return { code: 0, ipa: 'm_ˈɒ_k_aɪ_p_iː_eɪ\n' };
+      }
+      list_voices(): unknown[] {
+        return [];
+      }
+    },
+  }),
 }));

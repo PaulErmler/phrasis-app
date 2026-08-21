@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/tooltip';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
+import { AnnotationLines } from './AnnotationLines';
 import type { CardOriginPill } from './cardOriginPill';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import {
@@ -108,6 +109,8 @@ interface FullReviewCardContentProps {
   onAccuracyChange?: (summary: WritingAccuracySummary | null) => void;
   bare?: boolean;
   showRomanization?: boolean;
+  /** IPA line toggle (from courseSettings.showIpa; default OFF). */
+  showIpa?: boolean;
   /** Clears submission stack when the reviewed card changes */
   cardId?: Id<'cards'>;
   /**
@@ -189,6 +192,7 @@ export function FullReviewCardContent({
   onAccuracyChange,
   bare = false,
   showRomanization = true,
+  showIpa = false,
   cardId,
   onRegisterRevert,
   firstExposure = false,
@@ -624,6 +628,7 @@ export function FullReviewCardContent({
         onAudioPlay={onAudioPlay}
         bare={bare}
         showRomanization={showRomanization}
+        showIpa={showIpa}
         highlightEnabled={highlightEnabled}
         flaggedInSession={flaggedInSession}
         activeClip={activeClip}
@@ -708,6 +713,7 @@ export function FullReviewCardContent({
                   allRevealed={allRevealed}
                   firstExposure={firstExposure}
                   showRomanization={showRomanization}
+                  showIpa={showIpa}
                   ignorePunctuation={ignorePunctuation}
                   highlightEnabled={highlightEnabled}
                   activeClip={activeClip}
@@ -763,6 +769,8 @@ interface TargetLanguageInputProps {
    */
   firstExposure?: boolean;
   showRomanization?: boolean;
+  /** IPA line toggle (from courseSettings.showIpa; default OFF). */
+  showIpa?: boolean;
   ignorePunctuation?: boolean;
   highlightEnabled: boolean;
   activeClip: ButtonPlaybackActive | null;
@@ -807,6 +815,7 @@ function TargetLanguageInput({
   allRevealed = false,
   firstExposure = false,
   showRomanization = true,
+  showIpa = false,
   ignorePunctuation = false,
   highlightEnabled,
   activeClip,
@@ -1052,11 +1061,12 @@ function TargetLanguageInput({
             className="body-large text-muted-foreground"
           />
         )}
-        {showRomanization && translation.romanization && (
-          <p className="text-xs text-muted-foreground leading-tight">
-            {translation.romanization}
-          </p>
-        )}
+        <AnnotationLines
+          romanization={translation.romanization}
+          ipa={translation.ipa}
+          showRomanization={showRomanization}
+          showIpa={showIpa}
+        />
       </div>
     );
   }
@@ -1132,11 +1142,12 @@ function TargetLanguageInput({
             {discussButton}
           </div>
         </div>
-        {showRomanization && translation.romanization && (
-          <p className="text-xs text-muted-foreground leading-tight">
-            {translation.romanization}
-          </p>
-        )}
+        <AnnotationLines
+          romanization={translation.romanization}
+          ipa={translation.ipa}
+          showRomanization={showRomanization}
+          showIpa={showIpa}
+        />
       </div>
     );
   }
@@ -1171,11 +1182,12 @@ function TargetLanguageInput({
                 enabled={highlightEnabled}
                 className="body-large text-muted-foreground"
               />
-              {showRomanization && translation.romanization && (
-                <p className="text-xs text-muted-foreground leading-tight">
-                  {translation.romanization}
-                </p>
-              )}
+              <AnnotationLines
+                romanization={translation.romanization}
+                ipa={translation.ipa}
+                showRomanization={showRomanization}
+                showIpa={showIpa}
+              />
             </div>
             <div className="flex items-center">
               <AudioButton

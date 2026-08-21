@@ -9,6 +9,10 @@ import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getCourseSettings } from '../db/courseSettings';
+import {
+  carriedAnnotationFields,
+  clearedAnnotationFields,
+} from '../lib/textAnnotations';
 import { getCollectionProgress } from '../db/collections';
 import { getDeckByCourseId } from '../db/decks';
 import { trackEvent } from '../db/stats/dailyStats';
@@ -295,6 +299,7 @@ export const getCardForReview = query({
               sourceText: text.text,
               sourceLanguage: text.language,
               sourceRomanization: text.romanizedText ?? undefined,
+              sourceIpa: text.ipaText ?? undefined,
               userCreated: text.userCreated,
             },
           ]
@@ -2033,13 +2038,12 @@ export async function applyCardEdit(
       resolvedTextId = card.textId;
 
       if (changedLanguages.has(sourceLanguage)) {
-        // `romanizedText` and `romanizationSource` travel as a unit. The old
-        // transliteration no longer matches the new text, so its provenance
-        // tag has to go with it (mirrors the translation branch below).
+        // Annotation values and their provenance tags travel as units. The
+        // old transliteration/IPA no longer matches the new text, so the
+        // tags go with them (mirrors the translation branch below).
         await ctx.db.patch(text._id, {
           text: submittedMap.get(sourceLanguage)!,
-          romanizedText: undefined,
-          romanizationSource: undefined,
+          ...clearedAnnotationFields(),
         });
       }
 
@@ -2048,14 +2052,13 @@ export async function applyCardEdit(
         if (!changedLanguages.has(lang)) continue;
         const existing = existingTranslationMap.get(lang);
         if (existing) {
-          // User edited an existing translation. Drop the romanization (it
-          // doesn't match the new text), drop the old romanization source,
-          // and re-tag as user-provided so a future strategy swap doesn't
-          // overwrite the user's edit.
+          // User edited an existing translation. Drop the annotations (they
+          // don't match the new text), drop their source tags, and re-tag
+          // as user-provided so a future strategy swap doesn't overwrite
+          // the user's edit.
           await ctx.db.patch(existing._id, {
             translatedText: submittedMap.get(lang)!,
-            romanizedText: undefined,
-            romanizationSource: undefined,
+            ...clearedAnnotationFields(),
             translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
             // Stamp with the card's current gender so the mismatch sweep in
             // `scheduleMissingContent` sees agreement (the user-provided
@@ -2095,11 +2098,11 @@ export async function applyCardEdit(
       const newTextId = await ctx.db.insert('texts', {
         text: sourceChanged && submittedSource ? submittedSource : text.text,
         language: text.language,
-        romanizedText: sourceChanged ? undefined : text.romanizedText,
-        // Source travels with the value: copy when unchanged (so we keep
-        // pointing at whichever romanizer produced the carried-over text);
-        // drop when changed (next ensureContent will re-romanize and tag).
-        romanizationSource: sourceChanged ? undefined : text.romanizationSource,
+        // Annotations (romanization, IPA) travel with their source tags:
+        // copy when unchanged (so we keep pointing at whichever engine
+        // produced the carried-over text); drop when changed (next
+        // ensureContent regenerates and re-tags).
+        ...(sourceChanged ? {} : carriedAnnotationFields(text)),
         userCreated: true,
         userId,
         collectionId: text.collectionId,
@@ -2125,10 +2128,10 @@ export async function applyCardEdit(
 
       // Create translations rows for all non-source languages.
       // Sources travel with their values:
-      //   - User-edited rows: tag as `'user-provided'`; carry no romanization.
-      //   - Unchanged rows: copy `translatedText` + `translationSource` + (if
-      //     present) `romanizedText` + `romanizationSource` so we don't lose
-      //     the original tags on the logical-copy operation.
+      //   - User-edited rows: tag as `'user-provided'`; carry no annotations.
+      //   - Unchanged rows: copy `translatedText` + `translationSource` +
+      //     every present annotation pair (romanization, IPA) so we don't
+      //     lose the original tags on the logical-copy operation.
       for (const lang of allLanguages) {
         if (lang === sourceLanguage) continue;
         const existing = existingTranslationMap.get(lang);
@@ -2144,16 +2147,7 @@ export async function applyCardEdit(
             : existing?.translationSource
               ? { translationSource: existing.translationSource }
               : {}),
-          ...(changed
-            ? {}
-            : existing?.romanizedText !== undefined
-              ? {
-                romanizedText: existing.romanizedText,
-                ...(existing.romanizationSource
-                  ? { romanizationSource: existing.romanizationSource }
-                  : {}),
-              }
-              : {}),
+          ...(changed || !existing ? {} : carriedAnnotationFields(existing)),
           // Copy the prior row's speakerGender on the carry-over path so the
           // logical copy doesn't trigger a gender-mismatch regeneration on
           // the new text. For user-edited (changed) rows, stamp with the

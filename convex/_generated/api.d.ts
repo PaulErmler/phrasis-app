@@ -9,6 +9,7 @@
  */
 
 import type * as admin_activateDataset from "../admin/activateDataset.js";
+import type * as admin_backfillIpa from "../admin/backfillIpa.js";
 import type * as admin_dashboard from "../admin/dashboard.js";
 import type * as admin_deleteUser from "../admin/deleteUser.js";
 import type * as admin_lib from "../admin/lib.js";
@@ -63,10 +64,12 @@ import type * as features_chat_transcribe from "../features/chat/transcribe.js";
 import type * as features_collections from "../features/collections.js";
 import type * as features_consent from "../features/consent.js";
 import type * as features_courses from "../features/courses.js";
+import type * as features_curriculumFlagTesting from "../features/curriculumFlagTesting.js";
 import type * as features_customTexts from "../features/customTexts.js";
 import type * as features_decks from "../features/decks.js";
 import type * as features_featureIds from "../features/featureIds.js";
 import type * as features_home from "../features/home.js";
+import type * as features_ipa from "../features/ipa.js";
 import type * as features_library from "../features/library.js";
 import type * as features_llmTranslationQueue from "../features/llmTranslationQueue.js";
 import type * as features_onboarding from "../features/onboarding.js";
@@ -102,6 +105,7 @@ import type * as lib_sha256 from "../lib/sha256.js";
 import type * as lib_stt_azure from "../lib/stt/azure.js";
 import type * as lib_stt_index from "../lib/stt/index.js";
 import type * as lib_stt_languageCodes from "../lib/stt/languageCodes.js";
+import type * as lib_textAnnotations from "../lib/textAnnotations.js";
 import type * as lib_textComparison from "../lib/textComparison.js";
 import type * as lib_tts_gemini from "../lib/tts/gemini.js";
 import type * as lib_tts_google from "../lib/tts/google.js";
@@ -141,6 +145,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "admin/activateDataset": typeof admin_activateDataset;
+  "admin/backfillIpa": typeof admin_backfillIpa;
   "admin/dashboard": typeof admin_dashboard;
   "admin/deleteUser": typeof admin_deleteUser;
   "admin/lib": typeof admin_lib;
@@ -195,10 +200,12 @@ declare const fullApi: ApiFromModules<{
   "features/collections": typeof features_collections;
   "features/consent": typeof features_consent;
   "features/courses": typeof features_courses;
+  "features/curriculumFlagTesting": typeof features_curriculumFlagTesting;
   "features/customTexts": typeof features_customTexts;
   "features/decks": typeof features_decks;
   "features/featureIds": typeof features_featureIds;
   "features/home": typeof features_home;
+  "features/ipa": typeof features_ipa;
   "features/library": typeof features_library;
   "features/llmTranslationQueue": typeof features_llmTranslationQueue;
   "features/onboarding": typeof features_onboarding;
@@ -234,6 +241,7 @@ declare const fullApi: ApiFromModules<{
   "lib/stt/azure": typeof lib_stt_azure;
   "lib/stt/index": typeof lib_stt_index;
   "lib/stt/languageCodes": typeof lib_stt_languageCodes;
+  "lib/textAnnotations": typeof lib_textAnnotations;
   "lib/textComparison": typeof lib_textComparison;
   "lib/tts/gemini": typeof lib_tts_gemini;
   "lib/tts/google": typeof lib_tts_google;

@@ -29,6 +29,8 @@ type MockDriver = {
   destroy: () => void;
   moveTo: (i: number) => void;
   hasNextStep: () => boolean;
+  isActive: () => boolean;
+  moveNext: () => void;
   /** Test-only: simulate a driver-internal close (`g(true)`). Not part of the real API. */
   closeFromUi: () => void;
 };
@@ -39,6 +41,7 @@ let lastDriver: MockDriver | null = null;
 vi.mock('driver.js', () => ({
   driver: (config: DriverConfig) => {
     lastConfig = config;
+    let active = true;
     const d: MockDriver = {
       drive: vi.fn(),
       // Real driver.js 1.4.0: the public `destroy()` is `g(false)`, which tears
@@ -47,15 +50,16 @@ vi.mock('driver.js', () => ({
       // down). An earlier version of this mock had destroy() call the hook,
       // which is the inverse of reality and hid a real bug: completion
       // bookkeeping hung off the hook never ran for app-initiated teardowns.
-      destroy: vi.fn(),
-      // Driver's own close paths (close button, Esc, overlay click, stepping
-      // past the last step) go through `g(true)`: fire the hook and let it
-      // call destroy() for the real teardown.
+      destroy: vi.fn(() => {
+        active = false;
+      }),
       closeFromUi: () => {
         config.onDestroyStarted?.();
       },
       moveTo: vi.fn(),
       hasNextStep: vi.fn(() => false),
+      isActive: () => active,
+      moveNext: vi.fn(),
     };
     lastDriver = d;
     return d;
@@ -250,5 +254,17 @@ describe('useTutorial: completion semantics', () => {
     });
 
     expect(completedIds()).toContain(TUTORIAL_IDS.HOME_TOUR);
+  });
+
+  it('Enter advances the tour instead of dismissing it', async () => {
+    renderTour({ enabled: true });
+    await startTour();
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+
+    expect(lastDriver!.moveNext).toHaveBeenCalledOnce();
+    expect(completedIds()).not.toContain(TUTORIAL_IDS.HOME_TOUR);
   });
 });

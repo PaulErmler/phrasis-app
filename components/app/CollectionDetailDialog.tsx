@@ -36,6 +36,7 @@ import { HighlightedText } from '@/components/app/learning/HighlightedText';
 import { useTranslations } from 'next-intl';
 import { usePreloadedQuery } from 'convex/react';
 import { useAppData } from '@/components/app/AppDataProvider';
+import { AnnotationLines } from '@/components/app/learning/AnnotationLines';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
 import {
   COLLECTION_PREVIEW_SIZE,
@@ -109,6 +110,7 @@ export function CollectionDetailDialog({
   const { preloadedCourseSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords === true;
+  const showIpa = courseSettings?.showIpa === true;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   // Scroll preservation: remember which row sits at the top of the viewport
@@ -406,6 +408,7 @@ export function CollectionDetailDialog({
                   )}
                   {visibleEarlierRows.map((row) => (
                     <PreviewTextRow
+                      showIpa={showIpa}
                       key={row._id}
                       row={row}
                       highlightEnabled={highlightEnabled}
@@ -427,6 +430,7 @@ export function CollectionDetailDialog({
                 <div className="space-y-4">
                   {visibleRows.map((row) => (
                     <PreviewTextRow
+                      showIpa={showIpa}
                       key={row._id}
                       row={row}
                       highlightEnabled={highlightEnabled}
@@ -470,11 +474,13 @@ export function CollectionDetailDialog({
 function PreviewTextRow({
   row,
   highlightEnabled,
+  showIpa,
   browse,
   sentencesRemaining,
 }: {
   row: BrowseTextRow;
   highlightEnabled: boolean;
+  showIpa: boolean;
   browse: CollectionBrowse;
   sentencesRemaining?: number | null;
 }) {
@@ -515,9 +521,11 @@ function PreviewTextRow({
               isBase && 'font-medium',
             )}
           />
-          {translation.romanization && (
-            <p className="text-romanization">{translation.romanization}</p>
-          )}
+          <AnnotationLines
+            romanization={translation.romanization}
+            ipa={translation.ipa}
+            showIpa={showIpa}
+          />
         </div>
         <AudioButton
           url={audio?.url ?? null}

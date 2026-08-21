@@ -6,7 +6,7 @@ import { api } from '@/convex/_generated/api';
 /**
  * Wraps `updateCourseSettings` with an optimistic update that patches the
  * active-course settings cache, so every surface reading those settings. The
- * homescreen daily-goal ring, the settings sheet, the content-filter badges
+ * homescreen daily-goal ring, the content-filter badges
  * and empty states. Reflects a change immediately instead of lagging one
  * round-trip behind the tap.
  *

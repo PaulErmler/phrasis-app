@@ -11,7 +11,11 @@ import {
   useCompletedTutorials,
   getCompletedTutorialsSnapshot,
 } from './use-tutorial';
-import { baseDriverConfig, resolveStepAnchors } from './driver-common';
+import {
+  baseDriverConfig,
+  bindTourKeyboard,
+  resolveStepAnchors,
+} from './driver-common';
 import type { TranslateFn } from './types';
 
 /**
@@ -31,7 +35,7 @@ import type { TranslateFn } from './types';
  *
  * 2. **Milestone tips**. Single popovers gated on LIFETIME reviews of the
  *    active course (`getLifetimeReviewCount`, reactive): card actions @2,
- *    chat @5, word tap @8, try-the-other-mode @11, settings @15. At most
+ *    chat @5, word tap @8, try-the-other-mode @11. At most
  *    one fires per card transition; when several become eligible at once
  *    the lowest threshold wins and the rest wait for later reviews.
  *
@@ -283,13 +287,11 @@ const MILESTONE_TIPS: MilestoneDef[] = [
           : 'modeSwitch.descriptionFull',
       ),
   },
-  {
-    id: TUTORIAL_IDS.TIP_SETTINGS,
-    threshold: 15,
-    selector: SETTINGS_SELECTOR,
-    buildStep: (t) => milestoneStep(t, 'settings', SETTINGS_SELECTOR, 'bottom', 'end'),
-  },
 ];
+
+/** Shown tips only. `TIP_SETTINGS` stays in `ALL_TIP_IDS` so veterans
+ *  still get it pre-marked; drop it back into `MILESTONE_TIPS` to restore. */
+const HIDDEN_MILESTONE_IDS: TutorialId[] = [TUTORIAL_IDS.TIP_SETTINGS];
 
 /** Every id this hook owns. The `useCompletedTutorials` sync set and the
  *  veteran guard's pre-marking set. */
@@ -297,6 +299,7 @@ const ALL_TIP_IDS: TutorialId[] = [
   ...INTRO_SEQUENCES.audio.map((c) => c.id),
   ...INTRO_SEQUENCES.full.map((c) => c.id),
   ...MILESTONE_TIPS.map((m) => m.id),
+  ...HIDDEN_MILESTONE_IDS,
 ].filter((id, i, arr) => arr.indexOf(id) === i);
 
 // ─── Element settling (ported from the retired onboarding-lesson tutorial) ──
@@ -382,7 +385,10 @@ function pauseAllAudioNow(): void {
 function teardownActiveDriver(
   activeDriverRef: RefObject<Driver | null>,
   programmaticTeardownRef: RefObject<boolean>,
+  unbindKeyboardRef: RefObject<(() => void) | null>,
 ): void {
+  unbindKeyboardRef.current?.();
+  unbindKeyboardRef.current = null;
   if (!activeDriverRef.current) return;
   programmaticTeardownRef.current = true;
   try {
@@ -422,6 +428,7 @@ export function useMilestoneTips({
   const [isActive, setIsActive] = useState(false);
 
   const activeDriverRef = useRef<Driver | null>(null);
+  const unbindKeyboardRef = useRef<(() => void) | null>(null);
   const programmaticTeardownRef = useRef(false);
   // Ids claimed by this mount. Set the moment a tip is scheduled (before
   // the settle wait), so a re-render mid-wait can't double-fire it. Cleared
@@ -508,7 +515,11 @@ export function useMilestoneTips({
         setIsActive(false);
         return;
       }
-      teardownActiveDriver(activeDriverRef, programmaticTeardownRef);
+      teardownActiveDriver(
+        activeDriverRef,
+        programmaticTeardownRef,
+        unbindKeyboardRef,
+      );
 
       const resolved: DriveStep[] = resolveStepAnchors(steps, {
         onMiss: 'unanchor',
@@ -525,6 +536,8 @@ export function useMilestoneTips({
         popoverClass: `phrasis-tip-${analyticsId}`,
         steps: resolved,
         onDestroyStarted: () => {
+          unbindKeyboardRef.current?.();
+          unbindKeyboardRef.current = null;
           activeDriverRef.current = null;
           busyRef.current = false;
           setIsActive(false);
@@ -541,6 +554,8 @@ export function useMilestoneTips({
           d.destroy();
         },
       });
+      unbindKeyboardRef.current?.();
+      unbindKeyboardRef.current = bindTourKeyboard(d);
       activeDriverRef.current = d;
       setIsActive(true);
       onWillShowRef.current?.();
@@ -649,7 +664,11 @@ export function useMilestoneTips({
       // of this effect can reschedule.
       cancelled = true;
       clearTimeout(timer);
-      teardownActiveDriver(activeDriverRef, programmaticTeardownRef);
+      teardownActiveDriver(
+        activeDriverRef,
+        programmaticTeardownRef,
+        unbindKeyboardRef,
+      );
       for (const id of tipIds) claimed.delete(id);
       busyRef.current = false;
       setIsActive(false);
@@ -703,8 +722,8 @@ export function useMilestoneTips({
     // `completed` is deliberately NOT a dependency. Closing a tip persists
     // it, so including it would re-run this effect the moment one is
     // dismissed and immediately fire the next eligible tip. A user between
-    // the last threshold and VETERAN_SUPPRESS_REPS would get all five
-    // popovers chained on a single card. `lifetimeReps` is the intended
+    // the last threshold and VETERAN_SUPPRESS_REPS would get every remaining
+    // milestone popover chained on a single card. `lifetimeReps` is the intended
     // clock: it ticks once per review, giving the documented at-most-one-
     // per-card-transition. `seen()` reads the live store, so the eligibility
     // check inside the body is still current without re-triggering.
@@ -720,7 +739,11 @@ export function useMilestoneTips({
     unmountedRef.current = false;
     return () => {
       unmountedRef.current = true;
-      teardownActiveDriver(activeDriverRef, programmaticTeardownRef);
+      teardownActiveDriver(
+        activeDriverRef,
+        programmaticTeardownRef,
+        unbindKeyboardRef,
+      );
     };
   }, []);
 

@@ -1754,6 +1754,9 @@ describe("features/decks", () => {
           collectionRank: 1,
           speakerGender: "female",
           audioSpeakerGender: "female",
+          // Complete cards carry IPA now (part of hasMissingContent / the
+          // scheduleMissingContent annotation sweep).
+          ipaText: "həlˈoʊ ðɛr",
         });
         await ctx.db.insert("cards", {
           deckId,
@@ -1771,6 +1774,7 @@ describe("features/decks", () => {
           translatedText: "Hola amigo",
           speakerGender: "female",
           translationVersion: getCurrentTranslationVersion("es"),
+          ipaText: "ˈola aˈmiɣo",
         });
         const timings = [{ word: "x", start: 0, end: 0.4 }];
         const enBlob = await ctx.storage.store(new Blob([new Uint8Array([1])]));

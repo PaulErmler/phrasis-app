@@ -27,6 +27,7 @@ import {
   deriveApprovalToolState,
   useApprovalAudio,
   useOptimisticApprovalAction,
+  useShowIpa,
   type EntryAudio,
 } from './approvalCommon';
 
@@ -42,6 +43,7 @@ export interface CardApprovalProps {
       _id: Id<'cardApprovals'>;
       toolCallId: string;
       translations: { language: string; text: string }[];
+      entryIpa?: Record<string, string>;
       status: CardApprovalStatus;
     }
   >;
@@ -69,25 +71,42 @@ export function EntryLines({
   targetEntries,
   className,
   audio,
+  ipaByLanguage,
+  showIpa = false,
 }: {
   baseEntries: { language: string; text: string }[];
   targetEntries: { language: string; text: string }[];
   className?: string;
   /** When set, each line gets a play icon (click-to-generate, like collection previews). */
   audio?: EntryAudio;
+  /**
+   * IPA per language (cardApprovals.entryIpa), rendered under the sentence
+   * when `showIpa` is on. `''` = espeak failed (hidden).
+   */
+  ipaByLanguage?: Record<string, string>;
+  /**
+   * IPA line toggle (from courseSettings.showIpa; default OFF). Passed in
+   * rather than read from context here: this component also renders outside
+   * AppDataProvider, in the store-screenshot route (app/store-frames).
+   */
+  showIpa?: boolean;
 }) {
   const renderLine = (
     entry: { language: string; text: string },
     key: string,
     textClass: string,
   ) => {
+    const ipa = showIpa ? ipaByLanguage?.[entry.language] : undefined;
     const line = (
-      <p key={audio ? undefined : key} className={textClass}>
-        <Lang code={entry.language} />{' '}
-        {/* Own dir-scoped span: the Latin language label shares this <p>,
-            so the sentence needs its own bidi context for RTL languages. */}
-        <span dir={getTextDirection(entry.language)}>{entry.text}</span>
-      </p>
+      <div key={audio ? undefined : key}>
+        <p className={textClass}>
+          <Lang code={entry.language} />{' '}
+          {/* Own dir-scoped span: the Latin language label shares this <p>,
+              so the sentence needs its own bidi context for RTL languages. */}
+          <span dir={getTextDirection(entry.language)}>{entry.text}</span>
+        </p>
+        {ipa && <p className="text-ipa">/{ipa}/</p>}
+      </div>
     );
     if (!audio) return line;
     return (
@@ -126,6 +145,7 @@ export function CardApproval({
 }: CardApprovalProps) {
   const { targetLanguages } = useCourseLanguages();
   const t = useTranslations('Chat.cardApproval');
+  const showIpa = useShowIpa();
   // Optimistic-with-rollback + paywall machine, shared with
   // AlsoCorrectApproval (approvalCommon.tsx). This box bills exactly one
   // quota, so `paywallFeature` reduces to an open flag.
@@ -187,6 +207,8 @@ export function CardApproval({
           <EntryLines
             baseEntries={baseEntries}
             targetEntries={targetEntries}
+            ipaByLanguage={approval?.entryIpa}
+            showIpa={showIpa}
           />
         </AlertDescription>
         <div className="flex items-center justify-end gap-2 h-8">
@@ -215,6 +237,8 @@ export function CardApproval({
             targetEntries={targetEntries}
             className="opacity-60"
             audio={entryAudio}
+            ipaByLanguage={approval?.entryIpa}
+            showIpa={showIpa}
           />
           <div className="mt-3">
             <Shimmer duration={1.5}>{t('creatingApproval')}</Shimmer>
@@ -241,6 +265,8 @@ export function CardApproval({
           baseEntries={baseEntries}
           targetEntries={targetEntries}
           audio={entryAudio}
+          ipaByLanguage={approval?.entryIpa}
+          showIpa={showIpa}
         />
       </AlertDescription>
       <div className="flex w-full items-center gap-2 h-8">

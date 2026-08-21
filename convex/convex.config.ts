@@ -20,6 +20,12 @@ const app = defineApp({
 app.use(betterAuth);
 app.use(agent);
 app.use(autumn);
+// Retired 2026-08-21: both TableAggregate instances are gone from
+// db/stats/cardAggregates.ts (their counts are summed out of
+// cardsByStateAndDueDate instead, see getDueCardCount in features/stats.ts).
+// The registrations stay for one deploy so the write path can be confirmed
+// clean in prod before the component data is dropped. Remove both lines in a
+// follow-up once that deploy is verified.
 app.use(aggregate, { name: 'cardsByState' });
 app.use(aggregate, { name: 'cardsByDueDate' });
 app.use(aggregate, { name: 'cardsByStateAndDueDate' });

@@ -750,7 +750,7 @@ describe("features/collections", () => {
       expect(romanizationJobs).toHaveLength(1);
       expect(romanizationJobs[0].args[0]).toMatchObject({
         textId,
-        translatedText: "Καλημέρα",
+        text: "Καλημέρα",
         language: "el",
       });
     });

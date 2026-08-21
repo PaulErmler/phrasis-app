@@ -14,7 +14,10 @@ import {
   generateCourseName,
   getLocalizedLanguageName,
   getLocalizedLanguageNameByCode,
+  languageNeedsIpa,
   languageNeedsRomanization,
+  getIpaVoice,
+  IPA_LANGUAGES,
   normalizeLanguageCode,
   ROMANIZATION_LANGUAGES,
   resolveMixedVariant,
@@ -247,6 +250,39 @@ describe('getLocalizedLanguageNameByCode', () => {
       (l) => l.displayNameOverrides,
     ).map((l) => l.code);
     expect(overridden.sort()).toEqual(Object.keys(EXPECTED_NAMES).sort());
+  });
+});
+
+describe('IPA helpers', () => {
+  it('languageNeedsIpa follows the ipaVoice field', () => {
+    expect(languageNeedsIpa('en')).toBe(true);
+    expect(languageNeedsIpa('fr')).toBe(true);
+    expect(languageNeedsIpa('zh')).toBe(true);
+    expect(languageNeedsIpa('th')).toBe(true);
+  });
+
+  it('excludes the two languages espeak cannot serve', () => {
+    // ja: espeak reads kana only, would garble kanji. fil: no voice at all.
+    expect(languageNeedsIpa('ja')).toBe(false);
+    expect(languageNeedsIpa('fil')).toBe(false);
+    expect(IPA_LANGUAGES.has('ja')).toBe(false);
+    expect(IPA_LANGUAGES.has('fil')).toBe(false);
+  });
+
+  it('covers every supported language except ja and fil', () => {
+    const uncovered = SUPPORTED_LANGUAGES.filter(
+      (l) => l.ipaVoice === undefined,
+    ).map((l) => l.code);
+    expect(uncovered.sort()).toEqual(['fil', 'ja']);
+  });
+
+  it('getIpaVoice maps regional codes onto espeak voices', () => {
+    expect(getIpaVoice('zh')).toBe('cmn');
+    expect(getIpaVoice('zh_traditional')).toBe('cmn');
+    expect(getIpaVoice('pt')).toBe('pt-br');
+    expect(getIpaVoice('ar_eg')).toBe('ar');
+    expect(getIpaVoice('vi_south')).toBe('vi-vn-x-south');
+    expect(getIpaVoice('ja')).toBeNull();
   });
 });
 

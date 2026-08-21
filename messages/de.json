@@ -618,6 +618,8 @@
       "autoRevealBaseLanguagesDescription": "Text einblenden, sobald dessen Audio abgespielt wird",
       "showRomanization": "Romanisierung anzeigen",
       "showRomanizationDescription": "Lateinische Aussprache unter nicht-lateinischem Text anzeigen",
+      "showIpa": "IPA anzeigen",
+      "showIpaDescription": "Phonetische Transkription (Internationales Phonetisches Alphabet) unter Sätzen anzeigen",
       "autoAdvance": "Automatisch weiter",
       "autoAdvanceDescription": "Zum nächsten Satz wechseln, nachdem das Audio fertig ist",
       "pauseBeforeAutoAdvance": "Vor dem Weitergehen",
@@ -1390,12 +1392,12 @@
     },
     "modeSwitch": {
       "title": "Probier den anderen Modus",
-      "descriptionAudio": "Du lernst gerade im Shadowing-Modus. Es gibt auch den Schreibmodus, in dem du die Übersetzung eintippst und sofort Feedback zu jedem Wort bekommst. In den Einstellungen hier oben kannst du jederzeit wechseln.",
-      "descriptionFull": "Du lernst gerade im Schreibmodus. Es gibt auch Shadowing, bei dem Sätze automatisch vorgelesen werden und du ganz ohne Tippen wiederholst. In den Einstellungen hier oben kannst du jederzeit wechseln."
+      "descriptionAudio": "Du lernst gerade im Shadowing-Modus. Es gibt auch den Schreibmodus, in dem du die Übersetzung eintippst und sofort Feedback zu jedem Wort bekommst. In den Einstellungen hier oben kannst du jederzeit wechseln. Hier kannst du auch fast alles anpassen. Und das ist die letzte Information.",
+      "descriptionFull": "Du lernst gerade im Schreibmodus. Es gibt auch Shadowing, bei dem Sätze automatisch vorgelesen werden und du ganz ohne Tippen wiederholst. In den Einstellungen hier oben kannst du jederzeit wechseln. Hier kannst du auch fast alles anpassen. Und das ist die letzte Information."
     },
     "settings": {
       "title": "Alles anpassbar",
-      "description": "In den Einstellungen kannst du vieles anpassen — Abspielgeschwindigkeit, Sprachreihenfolge, Auto-Weiter, wie viele neue Karten dazukommen, Tagesziele und mehr. Schau rein, wenn du neugierig bist."
+      "description": "In den Einstellungen kannst du vieles anpassen — Abspielgeschwindigkeit, Sprachreihenfolge, Auto-Weiter, wie viele neue Karten dazukommen, und mehr. Schau rein, wenn du neugierig bist."
     }
   },
   "DifficultyCheck": {

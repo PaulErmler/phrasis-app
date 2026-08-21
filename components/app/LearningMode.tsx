@@ -584,6 +584,7 @@ export function LearningMode({
         onAllSubmittedChange={setAllSubmitted}
         onAccuracyChange={setWritingAccuracy}
         showRomanization={state.courseSettings.showRomanization ?? true}
+        showIpa={state.courseSettings.showIpa ?? false}
         cardId={state.cardId}
         onRegisterRevert={registerRevertHandler}
         resetSignal={cardResetNonce}
@@ -644,6 +645,7 @@ export function LearningMode({
         autoRevealBaseLanguages={state.courseSettings.autoRevealBaseLanguages ?? true}
         revealedLanguages={audio.revealedLanguages}
         showRomanization={state.courseSettings.showRomanization ?? true}
+        showIpa={state.courseSettings.showIpa ?? false}
         revealAllSignal={audioRevealNonce}
         resetSignal={cardResetNonce}
         replayTargetSignal={targetReplayNonce}

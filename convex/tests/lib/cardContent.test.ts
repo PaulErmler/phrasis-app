@@ -23,9 +23,16 @@ async function seedCard(
     sourceLanguage: string;
     /** Undefined = never attempted, '' = tried-and-failed sentinel. */
     sourceRomanizedText?: string;
+    /**
+     * IPA tri-state: omit for the default complete value, '' for the
+     * sentinel, null to leave the field absent (never attempted).
+     */
+    sourceIpaText?: string | null;
     translations: Array<{
       language: string;
       romanizedText?: string;
+      /** Same tri-state convention as sourceIpaText. */
+      ipaText?: string | null;
     }>;
     /** Languages whose audio row should carry no word timings. */
     languagesWithoutTimings?: string[];
@@ -36,6 +43,10 @@ async function seedCard(
       name: "A1",
       textCount: 0,
     });
+    // IPA defaults to a complete value (a fully-populated card carries one
+    // since the annotations refactor); '' seeds the sentinel; null omits.
+    const sourceIpa =
+      args.sourceIpaText === undefined ? "ipa-source" : args.sourceIpaText;
     const textId = await ctx.db.insert("texts", {
       text: "source text",
       language: args.sourceLanguage,
@@ -45,9 +56,11 @@ async function seedCard(
       ...(args.sourceRomanizedText !== undefined
         ? { romanizedText: args.sourceRomanizedText }
         : {}),
+      ...(sourceIpa !== null ? { ipaText: sourceIpa } : {}),
     });
 
     for (const tr of args.translations) {
+      const trIpa = tr.ipaText === undefined ? `ipa-${tr.language}` : tr.ipaText;
       await ctx.db.insert("translations", {
         textId,
         targetLanguage: tr.language,
@@ -55,6 +68,7 @@ async function seedCard(
         ...(tr.romanizedText !== undefined
           ? { romanizedText: tr.romanizedText }
           : {}),
+        ...(trIpa !== null ? { ipaText: trIpa } : {}),
       });
     }
 
@@ -99,6 +113,7 @@ async function hasMissingContent(
           sourceLanguage,
           sourceRomanization:
             (await ctx.db.get(textId))!.romanizedText ?? undefined,
+          sourceIpa: (await ctx.db.get(textId))!.ipaText ?? undefined,
           userCreated: false,
         },
       ],
@@ -160,6 +175,50 @@ describe("buildTextContentBatchForLanguages: romanization sentinel", () => {
       translations: [{ language: "de" }],
     });
     expect(await hasMissingContent(t, textId, "en", ["en"], ["de"])).toBe(false);
+  });
+});
+
+describe("buildTextContentBatchForLanguages: IPA sentinel", () => {
+  // Same tri-state as romanization, IPA edition: '' = tried-and-failed
+  // sentinel (espeak produced nothing), undefined/absent = never attempted.
+  it("treats a sentinel IPA on a translation as attempted", async () => {
+    const t = convexTest(schema, modules);
+    const textId = await seedCard(t, {
+      sourceLanguage: "en",
+      translations: [{ language: "es", ipaText: "" }],
+    });
+    expect(await hasMissingContent(t, textId, "en", ["en"], ["es"])).toBe(false);
+  });
+
+  it("still reports a never-attempted IPA on a translation", async () => {
+    const t = convexTest(schema, modules);
+    const textId = await seedCard(t, {
+      sourceLanguage: "en",
+      translations: [{ language: "es", ipaText: null }],
+    });
+    expect(await hasMissingContent(t, textId, "en", ["en"], ["es"])).toBe(true);
+  });
+
+  it("still reports a never-attempted IPA on the source text", async () => {
+    const t = convexTest(schema, modules);
+    const textId = await seedCard(t, {
+      sourceLanguage: "en",
+      sourceIpaText: null,
+      translations: [{ language: "es" }],
+    });
+    expect(await hasMissingContent(t, textId, "en", ["en"], ["es"])).toBe(true);
+  });
+
+  it("ignores IPA for languages espeak can't serve (ja)", async () => {
+    const t = convexTest(schema, modules);
+    // ja is excluded from IPA_LANGUAGES; romanization present, so complete.
+    const textId = await seedCard(t, {
+      sourceLanguage: "ja",
+      sourceRomanizedText: "konnichiwa",
+      sourceIpaText: null,
+      translations: [{ language: "en", romanizedText: "hello" }],
+    });
+    expect(await hasMissingContent(t, textId, "ja", ["en"], ["ja"])).toBe(false);
   });
 });
 

@@ -3,8 +3,6 @@ import { internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
 import {
-  cardsByState,
-  cardsByDueDate,
   cardsByStateAndDueDate,
   cardsByOriginStateAndDueDate,
   cardsByWritingStateAndDueDate,
@@ -13,16 +11,17 @@ import {
   clearAggregatesForDeck,
 } from '../db/stats/cardAggregates';
 
-// 100 cards x 4 aggregate inserts was the old ceiling; the writing-track
-// mirrors take a split-course deck to 6 per card, so the batch is trimmed to
-// keep the per-mutation write count in the same band.
+// A card costs 2 aggregate inserts, or 4 on a split-course deck where the
+// writing-track mirrors also apply. The batch stays at 75 rather than rising
+// with the cheaper per-card cost: it keeps the paginate + insert loop in the
+// same per-mutation write band it has always run in.
 const BATCH_SIZE = 75;
 
 /**
  * Entry point: rebuild all card aggregates for every card under every
  * deck the given user owns. Only enumerates the decks here, clearing and
  * re-inserting happens one deck per scheduled mutation, because a single
- * deck's clear is 32 aggregate namespace calls (states × origin buckets) and
+ * deck's clear is 30 aggregate namespace calls (states × origin buckets) and
  * doing every deck in one transaction can blow the mutation limits and fail
  * half-cleared.
  *
@@ -64,8 +63,8 @@ export const run = internalMutation({
  * the deck's cards to re-insert, then advancing to the next deck (which starts
  * with its own clear steps).
  *
- * The clear is split because doing both tracks at once is 62 component
- * subtransactions in one mutation, double the 32 this one-deck-per-mutation
+ * The clear is split because doing both tracks at once is 60 component
+ * subtransactions in one mutation, double the 30 this one-deck-per-mutation
  * design was sized for (see `run` above). Blowing the limit mid-clear would
  * leave a deck's aggregates half-wiped with no re-insert pass, so every due
  * count for it reads low until the migration is run again by hand.
@@ -108,8 +107,6 @@ export const processBatch = internalMutation({
       .paginate({ cursor: args.cursor ?? null, numItems: BATCH_SIZE });
 
     for (const doc of result.page) {
-      await cardsByState.insertIfDoesNotExist(ctx, doc);
-      await cardsByDueDate.insertIfDoesNotExist(ctx, doc);
       await cardsByStateAndDueDate.insertIfDoesNotExist(ctx, doc);
       await cardsByOriginStateAndDueDate.insertIfDoesNotExist(ctx, doc);
       if (hasWritingTrack(doc)) {

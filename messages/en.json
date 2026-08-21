@@ -618,6 +618,8 @@
       "autoRevealBaseLanguagesDescription": "Unblur text as soon as its audio starts playing",
       "showRomanization": "Show romanization",
       "showRomanizationDescription": "Display Latin script pronunciation below non-Latin text",
+      "showIpa": "Show IPA",
+      "showIpaDescription": "Display the phonetic transcription (International Phonetic Alphabet) below sentences",
       "autoAdvance": "Auto-advance",
       "autoAdvanceDescription": "Advance to next card after audio finishes",
       "pauseBeforeAutoAdvance": "Before Advancing",
@@ -1390,12 +1392,12 @@
     },
     "modeSwitch": {
       "title": "Try the other mode",
-      "descriptionAudio": "You've been learning in Shadowing mode. There's also Writing, where you type the translation and get instant word-by-word feedback. You can switch between the two anytime in the settings up here.",
-      "descriptionFull": "You've been learning in Writing mode. There's also Shadowing, where sentences are read aloud and you review hands-free. You can switch between the two anytime in the settings up here."
+      "descriptionAudio": "You've been learning in Shadowing mode. There's also Writing, where you type the translation and get instant word-by-word feedback. You can switch between the two anytime in the settings up here. You can also customize almost everything here. And this will be the last information.",
+      "descriptionFull": "You've been learning in Writing mode. There's also Shadowing, where sentences are read aloud and you review hands-free. You can switch between the two anytime in the settings up here. You can also customize almost everything here. And this will be the last information."
     },
     "settings": {
       "title": "Make it yours",
-      "description": "There's a lot you can customize in the settings — playback speed, language order, auto-advance, how many new cards are added, daily goals and more. Take a look when you're curious."
+      "description": "There's a lot you can customize in the settings — playback speed, language order, auto-advance, how many new cards are added, and more. Take a look when you're curious."
     }
   },
   "DifficultyCheck": {

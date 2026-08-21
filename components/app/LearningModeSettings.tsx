@@ -21,11 +21,6 @@ import {
   type CourseSettings,
 } from '@/components/app/learning/types';
 import { StepperControl } from '@/components/app/learning/StepperControl';
-import {
-  DAILY_TIME_PRESETS,
-  DAILY_TIME_CUSTOM_MIN,
-  DAILY_TIME_CUSTOM_MAX,
-} from '@/lib/constants/dailyGoal';
 import { TimelineLanguageCard } from '@/components/app/learning/TimelineLanguageCard';
 import {
   StepperPauseConnector,
@@ -53,7 +48,7 @@ import {
 } from '@/lib/constants/audioPlayback';
 import { MAX_CARDS_PER_BATCH } from '@/lib/constants/learning';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
-import { languageNeedsRomanization } from '@/lib/languages';
+import { languageNeedsIpa, languageNeedsRomanization } from '@/lib/languages';
 
 interface LearningModeSettingsProps {
   open: boolean;
@@ -272,6 +267,7 @@ export function LearningModeSettings({
   const courseSupportsRomanization = [...baseProp, ...targetProp].some(
     languageNeedsRomanization,
   );
+  const courseSupportsIpa = [...baseProp, ...targetProp].some(languageNeedsIpa);
 
   // ---- existing setting handlers ----
 
@@ -287,14 +283,6 @@ export function LearningModeSettings({
     await updateSettings({
       courseId: courseSettings.courseId,
       autoAddCards: checked,
-    });
-  };
-
-  const handleDailyGoalChange = async (value: number) => {
-    if (value < DAILY_TIME_CUSTOM_MIN || value > DAILY_TIME_CUSTOM_MAX) return;
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      dailyTimeGoalMinutes: value,
     });
   };
 
@@ -397,6 +385,13 @@ export function LearningModeSettings({
     await updateSettings({
       courseId: courseSettings.courseId,
       showRomanization: checked,
+    });
+  };
+
+  const handleShowIpaChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      showIpa: checked,
     });
   };
 
@@ -1094,25 +1089,6 @@ export function LearningModeSettings({
             </div>
           )}
 
-          {/* Daily study-time goal. Editable post-onboarding; the original
-           * onboarding answer stays preserved on the onboardingProgress row. */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">{t('dailyGoal')}</Label>
-                <p className="text-muted-xs">{t('dailyGoalDescription')}</p>
-              </div>
-              <StepperControl
-                value={
-                  courseSettings.dailyTimeGoalMinutes ?? DAILY_TIME_PRESETS[2]
-                }
-                min={DAILY_TIME_CUSTOM_MIN}
-                max={DAILY_TIME_CUSTOM_MAX}
-                onChange={handleDailyGoalChange}
-              />
-            </div>
-          </div>
-
           {/* Auto-add cards */}
           <SettingSwitchRow
             id="autoAdd"
@@ -1698,6 +1674,20 @@ export function LearningModeSettings({
               description={t('showRomanizationDescription')}
               checked={courseSettings.showRomanization ?? true}
               onCheckedChange={handleShowRomanizationChange}
+            />
+          )}
+
+          {/* Show IPA. Same hide-don't-clear reasoning as romanization above.
+              Nearly every language has an espeak voice, so in practice this
+              row shows for all courses except pure ja/fil ones. Defaults OFF,
+              IPA is a specialist aid and shouldn't appear unasked. */}
+          {courseSupportsIpa && (
+            <SettingSwitchRow
+              id="showIpa"
+              label={t('showIpa')}
+              description={t('showIpaDescription')}
+              checked={courseSettings.showIpa ?? false}
+              onCheckedChange={handleShowIpaChange}
             />
           )}
 

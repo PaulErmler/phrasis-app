@@ -9,6 +9,7 @@ import { AudioProgressBar } from './AudioProgressBar';
 import { CardActionsMenu, type CardActionsMenuProps } from './CardActionsMenu';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
+import { AnnotationLines } from './AnnotationLines';
 import type { CardOriginPill } from './cardOriginPill';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
@@ -48,6 +49,8 @@ interface CardShellProps {
   onAudioPlay?: () => void;
   bare?: boolean;
   showRomanization?: boolean;
+  /** IPA line toggle (from courseSettings.showIpa; default OFF). */
+  showIpa?: boolean;
   /** Karaoke word highlighting toggle (from courseSettings). */
   highlightEnabled?: boolean;
   /** Active per-language playback from an AudioButton; null when none. */
@@ -136,6 +139,7 @@ export function CardShell({
   onAudioPlay,
   bare = false,
   showRomanization = true,
+  showIpa = false,
   highlightEnabled = false,
   activeClip = null,
   clockBinding,
@@ -303,13 +307,13 @@ export function CardShell({
                         : undefined
                     }
                   />
-                  {showRomanization && translation.romanization && (
-                    <p
-                      className={`text-romanization ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
-                    >
-                      {translation.romanization}
-                    </p>
-                  )}
+                  <AnnotationLines
+                    romanization={translation.romanization}
+                    ipa={translation.ipa}
+                    showRomanization={showRomanization}
+                    showIpa={showIpa}
+                    className={isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}
+                  />
                 </div>
                 <div className="flex items-center">
                   <AudioButton

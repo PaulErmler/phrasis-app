@@ -5,8 +5,7 @@ import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
 import {
-  cardsByState,
-  cardsByDueDate,
+  cardsByStateAndDueDate,
   TRACK_AGGREGATES,
 } from '../db/stats/cardAggregates';
 import { originsForFilter } from '../lib/collections';
@@ -553,6 +552,7 @@ export const getSentencesForWord = query({
           sourceText: text.text,
           sourceLanguage: text.language,
           sourceRomanization: text.romanizedText ?? undefined,
+          sourceIpa: text.ipaText ?? undefined,
           userCreated: text.userCreated,
           card: cardDocs[i] ?? null,
         };
@@ -805,7 +805,14 @@ export const getCollectionLearningProgress = internalQuery({
   },
 });
 
-/** Card distribution across FSRS states (O(log n) via aggregates). */
+/**
+ * Card distribution across FSRS states (O(log n) via aggregates).
+ *
+ * Counted as whole `${deckId}:${state}` namespaces of `cardsByStateAndDueDate`,
+ * which is exactly what a `deckId`-namespaced state aggregate would have held:
+ * the two differ only in whether the due-date bound is applied, and here it
+ * isn't. See `getDueCardCount` for the other half of that equivalence.
+ */
 export const getCardMaturityDistribution = internalQuery({
   args: {},
   handler: async (ctx) => {
@@ -818,16 +825,22 @@ export const getCardMaturityDistribution = internalQuery({
 
     const result: Record<string, number> = {};
     for (const label of STATE_LABELS) {
-      result[label] = await cardsByState.count(ctx, {
-        namespace: deck._id,
-        bounds: { eq: label },
+      result[label] = await cardsByStateAndDueDate.count(ctx, {
+        namespace: `${deck._id}:${label}`,
       });
     }
     return result;
   },
 });
 
-/** Number of cards currently due for review (O(log n) via aggregates). */
+/**
+ * Number of cards currently due for review (O(log n) via aggregates).
+ *
+ * Summed over every state namespace of `cardsByStateAndDueDate` rather than
+ * read from one deck-wide tree. STATE_LABELS is `EXTENDED_STATE_LABELS`, so
+ * `mastered` and `hidden` cards are included exactly as a deck-wide due
+ * aggregate would have included them.
+ */
 export const getDueCardCount = internalQuery({
   args: {},
   handler: async (ctx) => {
@@ -838,12 +851,16 @@ export const getDueCardCount = internalQuery({
     const deck = await getDeckByCourseId(ctx, active.course._id);
     if (!deck) return 0;
 
-    return cardsByDueDate.count(ctx, {
-      namespace: deck._id,
-      bounds: {
-        upper: { key: Date.now(), inclusive: true },
-      },
-    });
+    const dueBounds = { upper: { key: Date.now(), inclusive: true } };
+    const perState = await Promise.all(
+      STATE_LABELS.map((label) =>
+        cardsByStateAndDueDate.count(ctx, {
+          namespace: `${deck._id}:${label}`,
+          bounds: dueBounds,
+        }),
+      ),
+    );
+    return perState.reduce((a, b) => a + b, 0);
   },
 });
 

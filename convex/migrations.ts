@@ -433,8 +433,8 @@ export function recomputeRomanizationPatch(
  * the deploy window, then raw-patched to a real origin. Is now handled in
  * `cardCollectionBackfill` itself, which moves the entry in the same
  * transaction as the patch. A per-deck clear + re-insert would have blanked
- * `cardsByState` / `cardsByDueDate` / `cardsByStateAndDueDate` (all already
- * correct) for the whole userbase mid-session. `migrations/
+ * `cardsByStateAndDueDate` (already correct) for the whole userbase
+ * mid-session. `migrations/
  * recalcUserCardAggregates.ts` stays available as a per-user repair tool.
  */
 export const runAll = migrations.runner([

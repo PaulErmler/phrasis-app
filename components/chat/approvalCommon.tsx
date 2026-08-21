@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useMutation, useQuery } from 'convex/react';
+import { useMutation, usePreloadedQuery, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import type { ApprovalActionResult } from '@/hooks/use-card-approvals';
+import { useAppData } from '@/components/app/AppDataProvider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Shimmer } from '@/components/ai-elements/shimmer';
 
@@ -15,6 +16,20 @@ import { Shimmer } from '@/components/ai-elements/shimmer';
  * playback wiring, and the error/skeleton chrome. Extracted so a fix to any
  * of them lands in both boxes.
  */
+
+/**
+ * The course's IPA-line setting, for the `showIpa` prop on `EntryLines`.
+ * Defaults OFF (matching `courseSettings.showIpa ?? false` everywhere else).
+ *
+ * Lives on the boxes, not inside `EntryLines`: the boxes only ever render in
+ * chat, under AppDataProvider, while `EntryLines` is also mounted bare by the
+ * store-screenshot route (app/store-frames), where `useAppData` would throw.
+ */
+export function useShowIpa(): boolean {
+  const { preloadedCourseSettings } = useAppData();
+  const courseSettings = usePreloadedQuery(preloadedCourseSettings);
+  return courseSettings?.showIpa === true;
+}
 
 /**
  * The optimistic-with-rollback machine both approval boxes run their buttons

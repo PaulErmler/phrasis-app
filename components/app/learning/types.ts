@@ -17,6 +17,8 @@ export interface CardTranslation {
   isBaseLanguage: boolean;
   isTargetLanguage: boolean;
   romanization?: string;
+  /** IPA transcription (espeak-ng); same display semantics as romanization. */
+  ipa?: string;
   /**
    * True while an LLM retranslation is in flight for this language
    * (server-driven, keyed off `llmTranslationClaims`). Excludes the
@@ -119,6 +121,8 @@ export interface CourseSettings {
   hideBaseLanguagesFull?: boolean;
   autoRevealBaseOnSubmit?: boolean;
   showRomanization?: boolean;
+  /** IPA transcription line below sentences. Default OFF (`?? false`). */
+  showIpa?: boolean;
   // Instant proceed on rating
   instantProceedAudio?: boolean;
   instantProceedFull?: boolean;

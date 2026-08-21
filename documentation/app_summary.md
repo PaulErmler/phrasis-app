@@ -223,10 +223,13 @@ When a user rates a card, a cascading update runs in a single transaction:
 
 Uses the Convex `TableAggregate` component for O(log n) lookups instead of full table scans:
 
-- **cardsByState.** Namespace: deckId, key: state label → enables instant count of cards per state
-- **cardsByDueDate.** Namespace: deckId, key: dueDate → enables instant "cards due now" count
+- **cardsByStateAndDueDate.** Namespace: `deckId:stateLabel`, key: dueDate → due count per state, and (unbounded) the plain count per state
+- **cardsByOriginStateAndDueDate.** Namespace: `deckId:originBucket:stateLabel`, key: dueDate → the same counts under a `course`/`custom` content filter
+- **cardsByWritingStateAndDueDate** / **cardsByOriginWritingStateAndDueDate.** Writing-track mirrors of the two above, keyed on `writingDueDate`. Only cards with a seeded writing track are members.
 
-Both aggregates auto-update via `insertCard()`, `patchCard()`, `deleteCard()` helpers.
+Every aggregate is namespaced by at least `deckId:stateLabel`. Deck-wide totals are summed across the state namespaces rather than kept in a separate deck-wide tree: `dueDate` is the sort key and changes on every review, so each extra tree costs a B-tree delete + insert on the `reviewCard` hot path.
+
+All aggregates auto-update via `insertCard()`, `patchCard()`, `deleteCard()` helpers.
 
 Card state labels are derived with priority: `hidden > mastered > preReview("new") > FSRS state` (new/learning/review/relearning).
 

@@ -220,10 +220,9 @@ describe('cardCollectionBackfill: origin-aggregate consistency', () => {
 describe('runAll deploy chain', () => {
   it('no longer schedules a blanket per-deck aggregate rebuild', async () => {
     const mod = await import('../../migrations');
-    // `recalcCardAggregatesAfterBackfills` cleared cardsByState /
-    // cardsByDueDate / cardsByStateAndDueDate. All already correct, for
-    // EVERY deck, so users mid-session saw zeroed due counts while their deck
-    // rebuilt. It is unnecessary now that cardCollectionBackfill moves the one
+    // `recalcCardAggregatesAfterBackfills` cleared cardsByStateAndDueDate,
+    // already correct, for EVERY deck, so users mid-session saw zeroed due
+    // counts while their deck rebuilt. It is unnecessary now that cardCollectionBackfill moves the one
     // namespaced entry itself. `migrations/recalcUserCardAggregates.ts` stays
     // as the per-user repair tool.
     expect('recalcCardAggregatesAfterBackfills' in mod).toBe(false);

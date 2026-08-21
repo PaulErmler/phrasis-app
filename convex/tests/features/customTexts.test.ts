@@ -228,6 +228,9 @@ describe("features/customTexts", () => {
       const jobArgs = metadataJobs[0].args[0] as any;
       // The job carries the text's owner for exception attribution.
       expect(jobArgs.userId).toBe("user_A");
+      // Single-card create stays interactive: the user just typed this
+      // sentence and will likely study it next.
+      expect(jobArgs.priority).toBeUndefined();
 
       await t.action(
         internal.features.sentenceMetadata.generateSentenceMetadata,
@@ -649,13 +652,28 @@ describe("features/customTexts", () => {
       expect(metadataJobs).toHaveLength(2);
       for (const job of metadataJobs) {
         expect((job.args[0] as any).userId).toBe("user_A");
+        expect((job.args[0] as any).priority).toBe("background");
+        expect((job.args[0] as any).llmPriority).toBe("background");
       }
       // Replay one job through the real action to prove the forwarded args
-      // pass its validator.
+      // pass its validator, and that background priority reaches
+      // prepareCardContent (the TTS enqueue).
       await t.action(
         internal.features.sentenceMetadata.generateSentenceMetadata,
         metadataJobs[0].args[0] as any,
       );
+      const afterReplay = await t.run(async (ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      );
+      const prepJobs = afterReplay.filter((j) =>
+        j.name.includes("prepareCardContent"),
+      );
+      expect(prepJobs.length).toBeGreaterThan(0);
+      for (const job of prepJobs) {
+        expect((job.args[0] as { priority?: string }).priority).toBe(
+          "background",
+        );
+      }
     });
 
     it("returns skipped entries for invalid rows without aborting the batch", async () => {

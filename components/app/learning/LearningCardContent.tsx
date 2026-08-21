@@ -6,6 +6,7 @@ import { CardShell } from './CardShell';
 import type { CardOriginPill } from './cardOriginPill';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
+import { AnnotationLines } from './AnnotationLines';
 import type { MergedPlayback } from '@/hooks/use-active-cue';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import { useCardPlayback, displayReviewCount } from './useCardPlayback';
@@ -56,6 +57,8 @@ interface LearningCardContentProps {
   onAllTargetsRevealedChange?: (allRevealed: boolean) => void;
   bare?: boolean;
   showRomanization?: boolean;
+  /** IPA line toggle (from courseSettings.showIpa; default OFF). */
+  showIpa?: boolean;
   /** Karaoke word highlighting toggle (defaults true; pass false to force off). */
   highlightEnabled?: boolean;
   /**
@@ -119,6 +122,7 @@ export function LearningCardContent({
   onAllTargetsRevealedChange,
   bare = false,
   showRomanization = true,
+  showIpa = false,
   highlightEnabled = true,
   mergedPlayback,
   languagePlaybackSpeeds,
@@ -234,6 +238,7 @@ export function LearningCardContent({
         onAudioPlay={onAudioPlay}
         bare={bare}
         showRomanization={showRomanization}
+        showIpa={showIpa}
         highlightEnabled={highlightEnabled}
         activeClip={activeClip}
         clockBinding={clockBinding}
@@ -297,13 +302,13 @@ export function LearningCardContent({
                       // target-language word via this data attribute.
                       coachmarkAnchorForLongestWord={index === 0 ? 'word-tap' : undefined}
                     />
-                    {showRomanization && translation.romanization && (
-                      <p
-                        className={`text-romanization ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
-                      >
-                        {translation.romanization}
-                      </p>
-                    )}
+                    <AnnotationLines
+                      romanization={translation.romanization}
+                      ipa={translation.ipa}
+                      showRomanization={showRomanization}
+                      showIpa={showIpa}
+                      className={isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}
+                    />
                   </div>
                   <div className="flex items-center">
                     <AudioButton

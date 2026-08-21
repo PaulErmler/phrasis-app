@@ -7,6 +7,12 @@ import userEvent from "@testing-library/user-event";
 vi.mock("convex/react", () => ({
   useQuery: () => undefined,
   useMutation: () => vi.fn(async () => ({ scheduled: false })),
+  usePreloadedQuery: () => undefined,
+}));
+// The approval box reads the course's showIpa setting through the app-data
+// context (useShowIpa, approvalCommon.tsx); these tests render it standalone.
+vi.mock("@/components/app/AppDataProvider", () => ({
+  useAppData: () => ({ preloadedCourseSettings: {} }),
 }));
 const quotaAvailable = { custom_sentences: true, card_edits: true };
 vi.mock("@/components/feature_tracking/useFeatureQuota", () => ({

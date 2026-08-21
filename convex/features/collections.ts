@@ -33,8 +33,11 @@ import {
 import {
   isTranslationVersionStale,
   resolveCardSpeakerGenders,
-  ROMANIZATION_LANGUAGES,
 } from '../../lib/languages';
+import {
+  missingAnnotationKinds,
+  TEXT_ANNOTATIONS,
+} from '../lib/textAnnotations';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { deleteAudioRow } from '../lib/audio';
 import { resolveAudioPayload } from '../lib/audioAssets';
@@ -242,6 +245,7 @@ export const browseCollectionTexts = query({
       sourceText: row.text.text,
       sourceLanguage: row.text.language,
       sourceRomanization: row.text.romanizedText ?? undefined,
+      sourceIpa: row.text.ipaText ?? undefined,
       userCreated: row.text.userCreated,
     }));
     const contentMap = await buildTextContentBatchForLanguages(
@@ -269,6 +273,25 @@ export const browseCollectionTexts = query({
             (!tr.text || tr.versionStale === true),
         )
         .map((tr) => tr.language);
+      // Rows whose translations are all present can still be missing an
+      // annotation (romanization after an engine swap, IPA on rows predating
+      // the feature). The client's requestPreviewTranslations batching keys
+      // off `missingTranslationLanguages`, so without this flag those rows
+      // were never requested and the annotation gap stayed visible forever
+      // in the preview. Projected values mirror the stored tri-state for
+      // course languages, so `=== undefined` (via missingAnnotationKinds)
+      // honours the '' failure sentinel here too.
+      const needsAnnotationBackfill =
+        missingAnnotationKinds(row.text.language, row.text).length > 0 ||
+        content.translations.some(
+          (tr) =>
+            tr.language !== row.text.language &&
+            tr.text.length > 0 &&
+            missingAnnotationKinds(tr.language, {
+              romanizedText: tr.romanization,
+              ipaText: tr.ipa,
+            }).length > 0,
+        );
       return {
         _id: row.text._id,
         text: row.text.text,
@@ -284,6 +307,7 @@ export const browseCollectionTexts = query({
         translations: content.translations,
         audioRecordings: content.audioRecordings,
         missingTranslationLanguages,
+        needsAnnotationBackfill,
       };
     });
 
@@ -400,18 +424,16 @@ export async function scheduleMissingTranslationsForText(
   if (Object.keys(genderPatch).length > 0) {
     await ctx.db.patch(text._id, genderPatch);
   }
-  // Backfill romanization for the source text. Same `=== undefined` test as
-  // the card sweep. The empty-string sentinel means "tried and failed", and
-  // re-running it would burn the retries again on every page reveal.
-  if (
-    ROMANIZATION_LANGUAGES.has(text.language) &&
-    text.romanizedText === undefined
-  ) {
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.decks.processRomanizationForSourceText,
-      { textId: text._id, text: text.text, language: text.language },
-    );
+  // Backfill missing annotations (romanization, IPA) for the source text.
+  // Same `=== undefined` test as the card sweep. The empty-string sentinel
+  // means "tried and failed", and re-running it would burn the retries again
+  // on every page reveal.
+  for (const kind of missingAnnotationKinds(text.language, text)) {
+    await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].sourceTextAction, {
+      textId: text._id,
+      text: text.text,
+      language: text.language,
+    });
   }
 
   let scheduled = 0;
@@ -434,23 +456,21 @@ export async function scheduleMissingTranslationsForText(
         mayRegenerateTranslation(text, existing) &&
         isTranslationVersionStale(lang, existing.translationVersion);
       if (!isStale) {
-        // The translation is current, but its romanization may not exist.
-        // A row can reach that state through a romanizer swap, which resets
-        // `romanizedText` to `undefined` so the new implementation refills
-        // it. The only backfill was in `scheduleMissingContent`, which the
-        // preview never runs (preview rows are usually not cards), so those
-        // rows rendered with a bare transliteration gap until the text was
-        // added to a deck. Mirrors that sweep's check in decks.ts.
-        if (
-          ROMANIZATION_LANGUAGES.has(lang) &&
-          existing.romanizedText === undefined
-        ) {
+        // The translation is current, but an annotation may not exist. A row
+        // can reach that state through an engine swap, which resets the
+        // value to `undefined` so the new implementation refills it, or (for
+        // IPA) by predating the feature. The only backfill used to be in
+        // `scheduleMissingContent`, which the preview never runs (preview
+        // rows are usually not cards), so those rows rendered with a bare
+        // annotation gap until the text was added to a deck. Mirrors that
+        // sweep's loop in decks.ts.
+        for (const kind of missingAnnotationKinds(lang, existing)) {
           await ctx.scheduler.runAfter(
             0,
-            internal.features.decks.processRomanizationForTranslation,
+            TEXT_ANNOTATIONS[kind].translationAction,
             {
               textId: text._id,
-              translatedText: existing.translatedText,
+              text: existing.translatedText,
               language: lang,
             },
           );

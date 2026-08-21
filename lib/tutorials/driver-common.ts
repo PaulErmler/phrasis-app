@@ -1,4 +1,5 @@
-import type { Config, DriveStep } from 'driver.js';
+import type { Config, DriveStep, Driver } from 'driver.js';
+import { isComposingKeyEvent } from '@/hooks/use-ime-safe-enter';
 
 const DRIVER_OVERLAY_OPACITY_VAR = '--driver-overlay-opacity';
 
@@ -35,6 +36,37 @@ export function baseDriverConfig(): Pick<
     stagePadding: 8,
     stageRadius: 8,
   };
+}
+
+/**
+ * Should this keydown advance (or, on the last step, dismiss) a driver.js
+ * tour? Enter used to activate the close button because driver.js focuses
+ * it first; we intercept that keystroke instead. Esc stays with driver.js.
+ */
+export function shouldAdvanceTourOnEnter(e: KeyboardEvent): boolean {
+  if (e.key !== 'Enter' || e.repeat) return false;
+  if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return false;
+  if (isComposingKeyEvent(e)) return false;
+  return true;
+}
+
+type TourKeyboardDriver = Pick<Driver, 'isActive' | 'moveNext'>;
+
+/**
+ * Enter → next step. On the last step `moveNext()` is driver.js's own close
+ * path (same as Done), so `onDestroyStarted` still fires. Capture-phase so
+ * a focused × cannot dismiss first. Caller must unbind on teardown.
+ */
+export function bindTourKeyboard(d: TourKeyboardDriver): () => void {
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (typeof d.isActive !== 'function' || !d.isActive()) return;
+    if (!shouldAdvanceTourOnEnter(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    d.moveNext();
+  };
+  window.addEventListener('keydown', onKeyDown, true);
+  return () => window.removeEventListener('keydown', onKeyDown, true);
 }
 
 /**

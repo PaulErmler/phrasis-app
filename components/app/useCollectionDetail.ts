@@ -369,7 +369,11 @@ export function useCollectionDetail({
       .filter(
         (row) =>
           row.status !== 'added' &&
-          row.missingTranslationLanguages.length > 0 &&
+          (row.missingTranslationLanguages.length > 0 ||
+            // Complete translations can still lack an annotation line
+            // (IPA/romanization); requesting the row runs the server's
+            // annotation backfill without touching the translations.
+            row.needsAnnotationBackfill) &&
           !requestedTranslationsRef.current.has(row._id),
       )
       .map((row) => row._id);

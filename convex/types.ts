@@ -42,6 +42,8 @@ export const translationValidator = v.object({
   isBaseLanguage: v.boolean(),
   isTargetLanguage: v.boolean(),
   romanization: v.optional(v.string()),
+  /** IPA transcription (espeak-ng); same display semantics as romanization. */
+  ipa: v.optional(v.string()),
   /**
    * True iff an LLM retranslation is currently in flight for this language:
    * a non-stale row exists in `llmTranslationClaims` for (textId, lang) AND
@@ -234,7 +236,7 @@ export const voiceGenderValidator = v.union(
  * user's screen: cards in their deck, an audio-icon click, the placement
  * sentence in front of them. 'background' work warms content nobody is
  * waiting on (collection previews, deferred placement batches, admin
- * warmups). Interactive jobs run in `ttsPool`; background jobs run in the
+ * warmups, bulk custom-card import). Interactive jobs run in `ttsPool`; background jobs run in the
  * low-parallelism `ttsWarmPool` and only take rate-limit tokens that are
  * free immediately (see workpools.ts / rateLimitReserve.ts), so a signup
  * burst of warm jobs can no longer queue ahead of the audio the user is

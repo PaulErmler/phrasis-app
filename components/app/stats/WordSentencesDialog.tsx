@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { usePaginatedQuery, useMutation, usePreloadedQuery } from 'convex/react';
 import { useAppData } from '@/components/app/AppDataProvider';
+import { AnnotationLines } from '@/components/app/learning/AnnotationLines';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
 import { HighlightedText } from '@/components/app/learning/HighlightedText';
 import { api } from '@/convex/_generated/api';
@@ -55,6 +56,7 @@ export function WordSentencesDialog({
   const { preloadedCourseSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords === true;
+  const showIpa = courseSettings?.showIpa === true;
   const buttonPlayback = useButtonPlayback();
 
   // Ephemeral per-card per-language speed overrides. This dialog is a
@@ -299,11 +301,11 @@ export function WordSentencesDialog({
                               className="text-sm font-medium leading-relaxed"
                               highlightTerm={isWordLanguage ? word : undefined}
                             />
-                            {tr.romanization && (
-                              <p className="text-romanization">
-                                {tr.romanization}
-                              </p>
-                            )}
+                            <AnnotationLines
+                              romanization={tr.romanization}
+                              ipa={tr.ipa}
+                              showIpa={showIpa}
+                            />
                           </div>
                           <div className="flex items-center">
                             <AudioButton
@@ -358,11 +360,11 @@ export function WordSentencesDialog({
                               className="text-sm leading-relaxed"
                               highlightTerm={isWordLanguage ? word : undefined}
                             />
-                            {tr.romanization && (
-                              <p className="text-romanization">
-                                {tr.romanization}
-                              </p>
-                            )}
+                            <AnnotationLines
+                              romanization={tr.romanization}
+                              ipa={tr.ipa}
+                              showIpa={showIpa}
+                            />
                           </div>
                           <div className="flex items-center">
                             <AudioButton

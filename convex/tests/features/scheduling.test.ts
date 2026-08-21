@@ -277,6 +277,9 @@ describe("features/scheduling", () => {
           ...(sourceRomanization !== undefined
             ? { romanizedText: sourceRomanization }
             : {}),
+          // A "complete" card includes an IPA transcription (part of
+          // hasMissingContent since the annotations refactor).
+          ipaText: `ipa-${sourceLanguage}`,
           userCreated: true,
           userId: "user_A",
           collectionId,
@@ -286,7 +289,7 @@ describe("features/scheduling", () => {
         for (const tr of translations) {
           translationIds[tr.targetLanguage] = await ctx.db.insert(
             "translations",
-            { textId, ...tr },
+            { textId, ipaText: `ipa-${tr.targetLanguage}`, ...tr },
           );
         }
         const audioIds: Record<string, Id<"audioRecordings">> = {};
@@ -349,6 +352,7 @@ describe("features/scheduling", () => {
           isBaseLanguage: true,
           isTargetLanguage: false,
           romanization: "heh-loh",
+          ipa: "ipa-en",
           retranslating: false,
         },
         {
@@ -356,16 +360,18 @@ describe("features/scheduling", () => {
           text: "Hallo Welt",
           isBaseLanguage: true,
           isTargetLanguage: true,
+          ipa: "ipa-de",
           retranslating: false,
         },
         {
           // Source entry: text comes from texts.text (no translations row),
-          // romanization from texts.romanizedText.
+          // romanization from texts.romanizedText, ipa from texts.ipaText.
           language: "es",
           text: "Hola mundo",
           isBaseLanguage: false,
           isTargetLanguage: true,
           romanization: "oh-la moon-doh",
+          ipa: "ipa-es",
           retranslating: false,
         },
       ]);

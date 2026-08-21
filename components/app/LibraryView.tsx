@@ -538,6 +538,7 @@ export function LibraryView({
                 <LearningCardContent
                   bare
                   compact
+                  showIpa={courseSettings?.showIpa === true}
                   preReviewCount={card.preReviewCount}
                   schedulingPhase={card.schedulingPhase}
                   fsrsState={card.fsrsState}

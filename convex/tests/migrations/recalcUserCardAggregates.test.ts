@@ -114,18 +114,18 @@ describe("migrations/recalcUserCardAggregates", () => {
 
       await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-      // Each deck triggers: 1 cardsByState.clear + 1 cardsByDueDate.clear +
-      // per state label: 1 cardsByStateAndDueDate.clear + 1
-      // cardsByWritingStateAndDueDate.clear + one clear per origin bucket for
+      // Each deck triggers, per state label: 1 cardsByStateAndDueDate.clear +
+      // 1 cardsByWritingStateAndDueDate.clear + one clear per origin bucket for
       // each of cardsByOriginStateAndDueDate / cardsByOriginWritingStateAndDueDate.
       const perDeck =
-        2 + EXTENDED_STATE_LABELS.length * (2 + 2 * ORIGIN_BUCKETS.length);
+        EXTENDED_STATE_LABELS.length * (2 + 2 * ORIGIN_BUCKETS.length);
       expect(calls.clear).toHaveLength(deckIds.length * perDeck);
 
-      // The two deckId-only namespaces show up once per deck.
+      // No aggregate is namespaced by a bare deckId any more: every namespace
+      // carries at least a state label.
       for (const deckId of deckIds) {
         const hits = calls.clear.filter((c) => c.namespace === deckId);
-        expect(hits).toHaveLength(2);
+        expect(hits).toHaveLength(0);
       }
 
       // Each `${deckId}:${state}` namespace is cleared twice (the shared and
@@ -150,7 +150,7 @@ describe("migrations/recalcUserCardAggregates", () => {
     }
   });
 
-  it("re-inserts every card on all four aggregates after draining the scheduler", async () => {
+  it("re-inserts every card on both shared aggregates after draining the scheduler", async () => {
     vi.useFakeTimers();
     try {
       const t = convexTest(schema, modules);
@@ -164,11 +164,13 @@ describe("migrations/recalcUserCardAggregates", () => {
       });
       await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-      // Each card should be inserted into all 4 aggregates exactly once.
-      expect(calls.insert).toHaveLength(cardIds.length * 4);
+      // These decks have no writing track, so each card is inserted into both
+      // shared aggregates (cardsByStateAndDueDate + the origin mirror) exactly
+      // once, and into nothing else.
+      expect(calls.insert).toHaveLength(cardIds.length * 2);
       for (const cardId of cardIds) {
         const hits = calls.insert.filter((c) => c.docId === cardId);
-        expect(hits).toHaveLength(4);
+        expect(hits).toHaveLength(2);
       }
     } finally {
       vi.useRealTimers();

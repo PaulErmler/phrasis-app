@@ -265,6 +265,15 @@ export interface Language {
    */
   romanizationBackend?: 'local' | 'google-v3';
   /**
+   * espeak-ng voice identifier used to derive an IPA transcription
+   * (`convex/features/ipa.ts`). Presence doubles as the opt-in flag: a
+   * language without `ipaVoice` never gets IPA scheduled, stored rows stop
+   * being served, and the UI hides the toggle (mirrors `needsRomanization`).
+   * Omitted only for `ja` (espeak reads kana, garbles kanji) and `fil`
+   * (no espeak voice).
+   */
+  ipaVoice?: string;
+  /**
    * Locale-keyed display-name overrides (e.g. { de: 'Spanisch (Spanien)' })
    * for codes where Intl.DisplayNames is ambiguous. The `en` value is derived
    * from `name` when the override map is built. Resolution falls back to the
@@ -292,6 +301,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'en-us',
     supportsKaraoke: true,
     supportsStt: true,
     translationPromptNotes: 'No strong British or American spelling bias.',
@@ -317,6 +327,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsPromptName: 'British English',
     ttsVersion: 2,
     needsRomanization: false,
+    ipaVoice: 'en-gb',
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
@@ -338,6 +349,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'en-us',
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
@@ -364,6 +376,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsPromptName: 'Australian English',
     ttsVersion: 2,
     needsRomanization: false,
+    ipaVoice: 'en',
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
@@ -386,6 +399,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Castilian Spanish',
     needsRomanization: false,
+    ipaVoice: 'es',
     supportsKaraoke: true,
     supportsStt: true,
     translationPromptNotes: 'vosotros for the informal plural, peninsular vocabulary.',
@@ -412,6 +426,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Latin American Spanish',
     needsRomanization: false,
+    ipaVoice: 'es-419',
     supportsKaraoke: true,
     supportsStt: true,
     translationPromptNotes: 'ustedes for the plural, regionally neutral Latin American vocabulary.',
@@ -443,6 +458,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // single `ttsPromptName` applies here. The locale on the voice carries it.
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'es-419',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -459,6 +475,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'fr',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -475,6 +492,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'de',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -491,6 +509,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'it',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -509,6 +528,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'pt-br',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -537,6 +557,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationPromptNotes: 'European Portuguese vocabulary, spelling, and phonetics.',
     translationVersion: 2,
     needsRomanization: false,
+    ipaVoice: 'pt-pt',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -552,6 +573,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'ro',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -571,6 +593,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'ca',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -587,6 +610,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
+    ipaVoice: 'ru',
     // Cyrillic. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
@@ -604,6 +628,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'pl',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -620,6 +645,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'sk',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -637,6 +663,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'cs',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -654,6 +681,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'hr',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -670,6 +698,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'sl',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -687,6 +716,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
+    ipaVoice: 'uk',
     // Cyrillic. Karaoke off (non-Latin script policy, matches Russian).
     supportsKaraoke: false,
     supportsStt: true,
@@ -708,6 +738,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: true,
+    ipaVoice: 'sr',
     // Cyrillic. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
@@ -736,6 +767,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: true,
+    ipaVoice: 'bg',
     // Cyrillic. Karaoke off (non-Latin script policy, matches ru/uk/sr).
     supportsKaraoke: false,
     supportsStt: true,
@@ -753,6 +785,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'lt',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -768,6 +801,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'lv',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -786,6 +820,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'et',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -801,6 +836,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'nl',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -818,6 +854,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'sv',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -837,6 +874,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'nb',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -853,6 +891,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'da',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -873,6 +912,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'is',
     supportsKaraoke: true,
     supportsStt: true,
     // Bumped 1 → 2 with the Aug 2026 switch to the Luna best-of-3 pipeline:
@@ -896,6 +936,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'fi',
     supportsKaraoke: true,
     supportsStt: true,
     translationPromptNotes: 'The formal/informal distinction is minimal; focus on naturalness.',
@@ -915,6 +956,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
+    ipaVoice: 'el',
     supportsKaraoke: false,
     // Azure Fast Transcription doesn't support el-GR; without STT we can't
     // produce per-word timings, so karaoke highlighting will no-op for Greek.
@@ -938,6 +980,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
+    ipaVoice: 'hi',
     // Devanagari. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
@@ -963,6 +1006,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // audio; the Chirp3 bn-IN pool stays listed dormant for a one-line revert.
     ttsProvider: 'gemini',
     needsRomanization: true,
+    ipaVoice: 'bn',
     // Bengali script. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
@@ -982,6 +1026,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: true,
+    ipaVoice: 'ta',
     // Tamil script. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
@@ -1000,6 +1045,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: true,
+    ipaVoice: 'te',
     // Telugu script. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
@@ -1016,6 +1062,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'tr',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -1034,6 +1081,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'hu',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -1054,6 +1102,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
+    ipaVoice: 'cmn',
     // Disabled along with other CJK + Thai languages: word-level segmentation
     // produces per-character tokens that flicker too fast to read. Revisit
     // when we have a learner-grade segmenter.
@@ -1086,6 +1135,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Taiwanese Mandarin',
     needsRomanization: true,
+    ipaVoice: 'cmn',
     supportsKaraoke: false,
     supportsStt: true,
     // Traditional script is also Hong Kong's. Name Taiwanese Mandarin
@@ -1120,6 +1170,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Jyutping via to-jyutping (rime-cantonese data), which covers simplified
     // script as well as traditional. See convex/lib/localRomanization.ts.
     needsRomanization: true,
+    ipaVoice: 'yue',
     supportsKaraoke: false,
     supportsStt: true,
     // Pins BOTH the register (spoken vernacular, 係/唔/嘅, not Standard
@@ -1154,6 +1205,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // (the asset cache key contains neither provider nor voice).
     ttsVersion: 2,
     needsRomanization: true,
+    ipaVoice: 'yue',
     supportsKaraoke: false,
     supportsStt: true,
     // Pins BOTH the register (spoken vernacular, 係/唔/嘅, not Standard
@@ -1180,6 +1232,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
+    // No ipaVoice: espeak-ng only reads kana, so kanji sentences would
+    // come out with gaps/garbage. Revisit if a kanji-aware G2P shows up.
     // Japanese tokenizes per-morpheme; karaoke flickers too fast to read.
     // Click-to-explain popovers still work, only the current-word colour
     // is gated off.
@@ -1202,6 +1256,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
+    ipaVoice: 'ko',
     // Hangul. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
@@ -1226,6 +1281,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // `name` and would fall back to unpinned "Vietnamese".
     ttsPromptName: 'Northern Vietnamese',
     needsRomanization: false,
+    ipaVoice: 'vi',
     supportsKaraoke: true,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1257,6 +1313,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Southern Vietnamese',
     needsRomanization: false,
+    ipaVoice: 'vi-vn-x-south',
     supportsKaraoke: true,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1281,6 +1338,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // available pure-JS Thai libraries have not yet been evaluated for
     // learner-grade quality. Re-enable once a good lib is wired up.
     needsRomanization: false,
+    ipaVoice: 'th',
     // No spaces between words; per-character karaoke flickers. Disabled
     // alongside CJK; revisit with a learner-grade Thai segmenter.
     supportsKaraoke: false,
@@ -1302,6 +1360,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'id',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -1319,6 +1378,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'ms',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -1341,6 +1401,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // fil-PH supports Fast Transcription, so STT + karaoke stay on.
     ttsProvider: 'gemini',
     needsRomanization: false,
+    // No ipaVoice: espeak-ng has no Filipino/Tagalog voice.
     supportsKaraoke: true,
     supportsStt: true,
     // Models index far more data under "Tagalog" than "Filipino", same
@@ -1368,6 +1429,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Modern Standard Arabic',
     needsRomanization: true,
+    ipaVoice: 'ar',
     // Karaoke disabled for Arabic: ligatures + clitics don't align to STT
     // word timings, producing flickery/mis-positioned per-word highlights.
     supportsKaraoke: false,
@@ -1398,6 +1460,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Saudi Arabic',
     needsRomanization: true,
+    ipaVoice: 'ar',
     supportsKaraoke: false,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1428,6 +1491,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Egyptian Arabic',
     needsRomanization: true,
+    ipaVoice: 'ar',
     supportsKaraoke: false,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1456,6 +1520,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Iraqi Arabic',
     needsRomanization: true,
+    ipaVoice: 'ar',
     supportsKaraoke: false,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1487,6 +1552,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Levantine Arabic',
     needsRomanization: true,
+    ipaVoice: 'ar',
     supportsKaraoke: false,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1512,6 +1578,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Romanization via the `hebrew-transliteration` package (SBL Academic
     // style), wired in convex/lib/localRomanization.ts.
     needsRomanization: true,
+    ipaVoice: 'he',
     // Hebrew script. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
@@ -1542,6 +1609,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Wired in convex/lib/localRomanization.ts. Google v3 isn't an option here
     // (its romanizeText 400s on `fa`).
     needsRomanization: true,
+    ipaVoice: 'fa',
     romanizationBackend: 'local',
     // Non-Latin script. Karaoke highlighting off (matches Arabic/Hebrew).
     supportsKaraoke: false,
@@ -1563,6 +1631,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'sw',
     supportsKaraoke: true,
     supportsStt: true,
     translationPromptNotes: 'Standard Kiswahili as spoken in Kenya, Sheng-free.',
@@ -1590,6 +1659,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Tanzanian Swahili',
     needsRomanization: false,
+    ipaVoice: 'sw',
     supportsKaraoke: false,
     // Azure Fast Transcription rejects sw-TZ (May 2026). sw-KE is supported;
     // sw_tz courses inherit the Greek pattern, no validation roundtrips,
@@ -2311,6 +2381,31 @@ export const ROMANIZATION_LANGUAGES = new Set<string>(
 
 export function languageNeedsRomanization(code: string): boolean {
   return ROMANIZATION_LANGUAGES.has(code);
+}
+
+/**
+ * Languages with a working IPA transcription (espeak-ng voice configured).
+ * Derived from `ipaVoice` the same way ROMANIZATION_LANGUAGES is derived
+ * from `needsRomanization`: dropping the field on an entry immediately stops
+ * scheduling (decks.ts / collections.ts), drops stored `ipaText` from query
+ * responses (cardContent.ts), and hides the settings toggle.
+ */
+export const IPA_LANGUAGES = new Set<string>(
+  SUPPORTED_LANGUAGES.filter((l) => l.ipaVoice !== undefined).map(
+    (l) => l.code,
+  ),
+);
+
+export function languageNeedsIpa(code: string): boolean {
+  return IPA_LANGUAGES.has(code);
+}
+
+/**
+ * espeak-ng voice for a language, or null when IPA is unsupported.
+ * Consumed by the Node-runtime IPA action (convex/features/ipa.ts).
+ */
+export function getIpaVoice(code: string): string | null {
+  return getLanguageByCode(code)?.ipaVoice ?? null;
 }
 
 /**

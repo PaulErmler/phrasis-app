@@ -2,7 +2,13 @@ import { v } from 'convex/values';
 import { internalAction, internalMutation, MutationCtx } from '../_generated/server';
 import { Id } from '../_generated/dataModel';
 import { internal } from '../_generated/api';
-import { sourcedTranslationEntriesValidator } from '../types';
+import {
+  sourcedTranslationEntriesValidator,
+  ttsPriorityValidator,
+  llmPriorityValidator,
+  type TtsPriority,
+  type LlmPriority,
+} from '../types';
 import { trackException } from '../analytics';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
@@ -203,6 +209,11 @@ const metadataJobArgs = v.object({
   // to the affected user. Optional so jobs already scheduled before this
   // field existed still validate.
   userId: v.optional(v.string()),
+  // Threaded to prepareCardContent. Bulk import passes 'background' so a
+  // paste of dozens of sentences cannot queue ahead of on-screen card audio.
+  // Absent = interactive (single-card create, chat approval).
+  priority: v.optional(ttsPriorityValidator),
+  llmPriority: v.optional(llmPriorityValidator),
 });
 
 /**
@@ -236,6 +247,8 @@ export const generateSentenceMetadata = internalAction({
           schedulePrepareCard: args.schedulePrepareCard,
           baseLanguages: args.baseLanguages,
           targetLanguages: args.targetLanguages,
+          priority: args.priority,
+          llmPriority: args.llmPriority,
         },
       );
 
@@ -253,6 +266,8 @@ export const generateSentenceMetadata = internalAction({
           baseLanguages: args.baseLanguages,
           targetLanguages: args.targetLanguages,
           userId: args.userId,
+          priority: args.priority,
+          llmPriority: args.llmPriority,
         },
       );
 
@@ -337,6 +352,8 @@ export const fetchSentenceMetadata = internalAction({
           schedulePrepareCard: args.schedulePrepareCard,
           baseLanguages: args.baseLanguages,
           targetLanguages: args.targetLanguages,
+          priority: args.priority,
+          llmPriority: args.llmPriority,
         },
       );
 
@@ -383,6 +400,8 @@ export async function applyTextMetadata(
     schedulePrepareCard: boolean;
     baseLanguages: string[];
     targetLanguages: string[];
+    priority?: TtsPriority;
+    llmPriority?: LlmPriority;
   },
 ): Promise<null> {
     const text = await ctx.db.get(args.textId);
@@ -514,6 +533,8 @@ export async function applyTextMetadata(
           textId: args.textId,
           baseLanguages: args.baseLanguages,
           targetLanguages: args.targetLanguages,
+          priority: args.priority,
+          llmPriority: args.llmPriority,
         },
       );
     }
@@ -536,6 +557,8 @@ export const applyMetadataAndPrepareCard = internalMutation({
     schedulePrepareCard: v.boolean(),
     baseLanguages: v.array(v.string()),
     targetLanguages: v.array(v.string()),
+    priority: v.optional(ttsPriorityValidator),
+    llmPriority: v.optional(llmPriorityValidator),
   },
   returns: v.null(),
   handler: applyTextMetadata,

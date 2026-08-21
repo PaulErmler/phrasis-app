@@ -58,20 +58,6 @@ export function getCardOriginBucket(doc: Doc<'cards'>): OriginBucket {
 // ============================================================================
 
 /**
- * Cards grouped by [deckId, stateLabel].
- * Enables O(log n) counts like: how many cards in "learning" state for a deck.
- */
-export const cardsByState = new TableAggregate<{
-  Namespace: string; // deckId as string
-  Key: string; // state label
-  DataModel: DataModel;
-  TableName: 'cards';
-}>(components.cardsByState, {
-  namespace: (doc) => doc.deckId,
-  sortKey: (doc) => getCardStateLabel(doc),
-});
-
-/**
  * Cards grouped by [deckId:stateLabel], sorted by dueDate.
  * Enables O(log n) count of due cards per state: e.g. count 'new' cards where dueDate <= now.
  */
@@ -137,20 +123,6 @@ export const cardsByOriginWritingStateAndDueDate = new TableAggregate<{
   sortKey: (doc) => doc.writingDueDate ?? 0,
 });
 
-/**
- * Cards sorted by [deckId, dueDate].
- * Enables O(log n) count of due cards: count where dueDate <= now.
- */
-export const cardsByDueDate = new TableAggregate<{
-  Namespace: string; // deckId as string
-  Key: number; // dueDate timestamp
-  DataModel: DataModel;
-  TableName: 'cards';
-}>(components.cardsByDueDate, {
-  namespace: (doc) => doc.deckId,
-  sortKey: (doc) => doc.dueDate,
-});
-
 // ============================================================================
 // Card write helpers (wrap ctx.db calls + aggregate sync)
 // ============================================================================
@@ -164,8 +136,6 @@ export async function insertCard(
 ): Promise<Id<'cards'>> {
   const id = await ctx.db.insert('cards', data);
   const doc = (await ctx.db.get(id))!;
-  await cardsByState.insertIfDoesNotExist(ctx, doc);
-  await cardsByDueDate.insertIfDoesNotExist(ctx, doc);
   await cardsByStateAndDueDate.insertIfDoesNotExist(ctx, doc);
   await cardsByOriginStateAndDueDate.insertIfDoesNotExist(ctx, doc);
   if (hasWritingTrack(doc)) {
@@ -194,7 +164,7 @@ type CardsDueAggregate = TableAggregate<{
  * Each one is a multi-read/write component subtransaction, and dropping the
  * no-op ones matters on hot paths (a shared-track review of a split-course
  * card would otherwise pay for two writing-aggregate writes; a
- * seedWritingTrack batch would pay for four shared ones per card, the exact
+ * seedWritingTrack batch would pay for two shared ones per card, the exact
  * cost class that has blown mutation limits before). Key-presence is checked,
  * not value-equality, so the skip is conservative: a key listed in the patch
  * always counts as touched.
@@ -275,8 +245,6 @@ export async function patchCard(
   );
 
   if (touchesShared) {
-    await cardsByState.replaceOrInsert(ctx, resolvedOld, newDoc);
-    await cardsByDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
     await cardsByStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
     await cardsByOriginStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
   }
@@ -398,9 +366,8 @@ async function resolveProgressTargetCollectionId(
  * `${deckId}:${origin}:${state}`), so every possible label has to be cleared.
  *
  * Each track costs `EXTENDED_STATE_LABELS × (1 + ORIGIN_BUCKETS)` component
- * subtransactions. 30 today, plus the two deck-level namespaces on the
- * shared track, so 32 shared + 30 writing. Doing both in one mutation was 62,
- * double what the recalc migration was sized for; it splits them across
+ * subtransactions, so 30 shared + 30 writing. Doing both in one mutation was
+ * 60, double what the recalc migration was sized for; it splits them across
  * scheduled steps for exactly that reason (see
  * migrations/recalcUserCardAggregates).
  *
@@ -418,10 +385,6 @@ export async function clearAggregatesForDeck(
   const { state: stateAggregate, originState: originStateAggregate } =
     TRACK_AGGREGATES[track];
 
-  if (track === 'shared') {
-    await cardsByState.clear(ctx, { namespace: deckId });
-    await cardsByDueDate.clear(ctx, { namespace: deckId });
-  }
   for (const state of EXTENDED_STATE_LABELS) {
     await stateAggregate.clear(ctx, { namespace: `${deckId}:${state}` });
     for (const origin of ORIGIN_BUCKETS) {
@@ -441,8 +404,6 @@ export async function deleteCard(
 ): Promise<void> {
   const oldDoc = await ctx.db.get(cardId);
   if (!oldDoc) return;
-  await cardsByState.deleteIfExists(ctx, oldDoc);
-  await cardsByDueDate.deleteIfExists(ctx, oldDoc);
   await cardsByStateAndDueDate.deleteIfExists(ctx, oldDoc);
   await cardsByOriginStateAndDueDate.deleteIfExists(ctx, oldDoc);
   if (hasWritingTrack(oldDoc)) {

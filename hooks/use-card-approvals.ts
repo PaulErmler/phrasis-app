@@ -16,6 +16,9 @@ export type ApprovalData = {
   _id: Id<'cardApprovals'>;
   toolCallId: string;
   translations: { language: string; text: string }[];
+  /** IPA per language (espeak), shown under the proposed sentences when the
+   * course's showIpa setting is on. '' = engine failed for that entry. */
+  entryIpa?: Record<string, string>;
   status: CardApprovalStatus;
   // Absent = 'createCard' (rows predate the field).
   kind?: CardApprovalKind;

@@ -625,9 +625,9 @@ describe('admin/deleteUser purge', () => {
       expect(audit?.docsDeleted ?? 0).toBeGreaterThan(20);
     });
 
-    // Aggregates: both tracks cleared for the victim's deck (32 shared +
+    // Aggregates: both tracks cleared for the victim's deck (30 shared +
     // 30 writing namespaces).
-    expect(aggregateCalls.clears.length).toBe(62);
+    expect(aggregateCalls.clears.length).toBe(60);
     expect(
       aggregateCalls.clears.every((c) => c.namespace.startsWith(fx.deckId)),
     ).toBe(true);

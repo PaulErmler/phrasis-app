@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { LandingAudioButton } from '@/components/landing/LandingAudioButton';
 import { LandingCardShell } from '@/components/landing/LandingCardShell';
+import { AnnotationLines } from '@/components/app/learning/AnnotationLines';
 import type { CardTranslation, CardAudioRecording } from '@/components/app/learning/types';
 import {
   getLandingAudioUrl,
@@ -36,6 +37,8 @@ interface LandingLearningCardContentProps {
   revealedLanguages?: ReadonlySet<string>;
   bare?: boolean;
   showRomanization?: boolean;
+  /** IPA line toggle; landing demos leave it off. */
+  showIpa?: boolean;
 }
 
 export function LandingLearningCardContent({
@@ -58,6 +61,7 @@ export function LandingLearningCardContent({
   revealedLanguages,
   bare = false,
   showRomanization = true,
+  showIpa = false,
 }: LandingLearningCardContentProps) {
   const displayReviewCount =
     schedulingPhase === 'review' && fsrsState != null
@@ -145,6 +149,7 @@ export function LandingLearningCardContent({
         onFavorite={onFavorite}
         bare={bare}
         showRomanization={showRomanization}
+        showIpa={showIpa}
       >
         {({ targetTranslations }) => (
           <div className="space-y-2">
@@ -180,21 +185,20 @@ export function LandingLearningCardContent({
                     >
                       {translation.text || '...'}
                     </p>
-                    {showRomanization && translation.romanization && (
-                      <p
-                        className={cn(
-                          'text-romanization',
-                          isBlurred
-                            ? cn(
-                              'blur-md opacity-90 select-none',
-                              audioDemoAutoUnlockSequence ? 'cursor-default' : 'cursor-pointer',
-                            )
-                            : 'blur-0 cursor-auto opacity-100 transition-[filter,opacity] duration-700 ease-out',
-                        )}
-                      >
-                        {translation.romanization}
-                      </p>
-                    )}
+                    <AnnotationLines
+                      romanization={translation.romanization}
+                      ipa={translation.ipa}
+                      showRomanization={showRomanization}
+                      showIpa={showIpa}
+                      className={cn(
+                        isBlurred
+                          ? cn(
+                            'blur-md opacity-90 select-none',
+                            audioDemoAutoUnlockSequence ? 'cursor-default' : 'cursor-pointer',
+                          )
+                          : 'blur-0 cursor-auto opacity-100 transition-[filter,opacity] duration-700 ease-out',
+                      )}
+                    />
                   </div>
                   <LandingAudioButton
                     url={getLandingAudioUrl(translation.text, translation.language)}
