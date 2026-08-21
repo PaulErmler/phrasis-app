@@ -2,10 +2,11 @@
   "name": "flexling-app",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.26.2",
   "scripts": {
     "dev": "npm-run-all --parallel dev:frontend dev:backend",
     "dev:frontend": "next dev",
-    "dev:backend": "convex dev",
+    "dev:backend": "DATABASE_UDF_USER_TIMEOUT_SECONDS=10 DATABASE_UDF_SYSTEM_TIMEOUT_SECONDS=30 APPLICATION_MAX_CONCURRENT_QUERIES=64 APPLICATION_MAX_CONCURRENT_MUTATIONS=64 APPLICATION_MAX_CONCURRENT_V8_ACTIONS=64 APPLICATION_MAX_CONCURRENT_NODE_ACTIONS=64 convex dev",
     "predev": "convex dev --until-success",
     "build": "node scripts/build-id.mjs && next build",
     "build:deploy": "convex deploy --cmd 'pnpm run build' && convex run migrations:runAll --prod",
