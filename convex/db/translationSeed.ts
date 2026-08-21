@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { internalMutation } from '../_generated/server';
 import { deleteAudioRow } from '../lib/audio';
 import { resolveAudioPayload } from '../lib/audioAssets';
+import { clearedAnnotationFields } from '../lib/textAnnotations';
 
 const SPANISH_VOICE_PREFIXES: Record<string, string> = {
   es: 'es-ES',
@@ -111,7 +112,7 @@ export const batchUpsertTranslations = internalMutation({
       });
       stats.textsUpdated++;
 
-      // Check if source English text changed — invalidate English audio too
+      // Check if source English text changed. Invalidate English audio too
       if (textDoc.text !== item.textEn) {
         const enAudio = await ctx.db
           .query('audioRecordings')
@@ -144,23 +145,22 @@ export const batchUpsertTranslations = internalMutation({
           });
           stats.translationsInserted++;
         } else if (existing.translatedText !== tr.text) {
-          // Text changed — clear romanization + its source (next ensureContent
-          // will re-romanize under the current method). For `translationSource`:
+          // Text changed. Clear the annotations + their sources (next
+          // ensureContent regenerates under the current methods). For `translationSource`:
           // only overwrite when the seed explicitly declares a new tag. If the
-          // seed omits it, KEEP the existing tag — clearing here would silently
+          // seed omits it, KEEP the existing tag, clearing here would silently
           // untag rows on every text edit once the legacy backfill has run.
           // Seeds from the new pipeline should always carry `translationSource`.
           await ctx.db.patch(existing._id, {
             translatedText: tr.text,
-            romanizedText: undefined,
-            romanizationSource: undefined,
+            ...clearedAnnotationFields(),
             ...(tr.translationSource !== undefined
               ? { translationSource: tr.translationSource }
               : {}),
           });
           stats.translationsUpdated++;
 
-          // Translation text changed — delete audio so it regenerates on demand
+          // Translation text changed. Delete audio so it regenerates on demand
           const audio = await ctx.db
             .query('audioRecordings')
             .withIndex('by_text_and_language', (q) =>

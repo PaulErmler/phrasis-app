@@ -1,6 +1,6 @@
 /**
  * Verifies every language in SUPPORTED_LANGUAGES is reachable by the legacy
- * Google Translate v2 fallback path — the final safety net the LLM queue
+ * Google Translate v2 fallback path. The final safety net the LLM queue
  * schedules when every model stage fails (`GOOGLE_TRANSLATE_SOURCE`).
  *
  * For each supported language we resolve its app code through the same

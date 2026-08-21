@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 /**
- * "Add your own sentences" replica — the learn-what-matters-to-you story:
+ * "Add your own sentences" replica. The learn-what-matters-to-you story:
  * personal hobby sentences typed in, translations + audio generated.
  */
 const TYPED = [

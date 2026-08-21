@@ -21,11 +21,6 @@ import {
   type CourseSettings,
 } from '@/components/app/learning/types';
 import { StepperControl } from '@/components/app/learning/StepperControl';
-import {
-  DAILY_TIME_PRESETS,
-  DAILY_TIME_CUSTOM_MIN,
-  DAILY_TIME_CUSTOM_MAX,
-} from '@/lib/constants/dailyGoal';
 import { TimelineLanguageCard } from '@/components/app/learning/TimelineLanguageCard';
 import {
   StepperPauseConnector,
@@ -53,7 +48,7 @@ import {
 } from '@/lib/constants/audioPlayback';
 import { MAX_CARDS_PER_BATCH } from '@/lib/constants/learning';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
-import { languageNeedsRomanization } from '@/lib/languages';
+import { languageNeedsIpa, languageNeedsRomanization } from '@/lib/languages';
 
 interface LearningModeSettingsProps {
   open: boolean;
@@ -272,6 +267,7 @@ export function LearningModeSettings({
   const courseSupportsRomanization = [...baseProp, ...targetProp].some(
     languageNeedsRomanization,
   );
+  const courseSupportsIpa = [...baseProp, ...targetProp].some(languageNeedsIpa);
 
   // ---- existing setting handlers ----
 
@@ -287,14 +283,6 @@ export function LearningModeSettings({
     await updateSettings({
       courseId: courseSettings.courseId,
       autoAddCards: checked,
-    });
-  };
-
-  const handleDailyGoalChange = async (value: number) => {
-    if (value < DAILY_TIME_CUSTOM_MIN || value > DAILY_TIME_CUSTOM_MAX) return;
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      dailyTimeGoalMinutes: value,
     });
   };
 
@@ -397,6 +385,13 @@ export function LearningModeSettings({
     await updateSettings({
       courseId: courseSettings.courseId,
       showRomanization: checked,
+    });
+  };
+
+  const handleShowIpaChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      showIpa: checked,
     });
   };
 
@@ -677,6 +672,16 @@ export function LearningModeSettings({
     });
   };
 
+  // Split scheduling: each mode keeps its own per-card review schedule.
+  // Enabling triggers a server-side seed of the writing track (copy of the
+  // current schedule); disabling just freezes it, nothing is deleted.
+  const handleSeparateModeTrackingChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      separateModeTracking: checked,
+    });
+  };
+
   const handleFullReviewTargetAudioModeChange = async (
     mode: 'always' | 'afterSubmit' | 'never',
   ) => {
@@ -695,7 +700,7 @@ export function LearningModeSettings({
     });
   };
 
-  // Writing-mode "Hide base languages" — independent of the audio-mode pair;
+  // Writing-mode "Hide base languages". Independent of the audio-mode pair;
   // its sub-setting reveals on submit (not on audio playback).
   const handleHideBaseLanguagesFullChange = async (checked: boolean) => {
     await updateSettings({
@@ -817,7 +822,7 @@ export function LearningModeSettings({
       courseSettings.highlightWords,
     ) === true;
   // Target cards with no stored reps default to 2x in audio mode but 1x in
-  // the writing modes (once is enough when the learner is typing) — mirrors
+  // the writing modes (once is enough when the learner is typing), mirrors
   // resolveAudioSettings.defaultTargetReps.
   const defaultTargetReps = isFull
     ? DEFAULT_REPETITIONS_TARGET_WRITING
@@ -837,7 +842,7 @@ export function LearningModeSettings({
     courseSettings.transcribeAfterPlaybackSpeeds ?? {};
   const pauseT2B = courseSettings.pauseTargetToBase ?? DEFAULT_PAUSE_TARGET_TO_BASE;
   // Listening-duration strategy. Docs from before the strategy field encode
-  // "continuously" as onlyNewReps 0/undefined — mirror resolveAudioSettings'
+  // "continuously" as onlyNewReps 0/undefined. Mirror resolveAudioSettings'
   // legacy inference so the radio selection always matches actual playback.
   const onlyNewStored = courseSettings.targetBeforeOnlyNewReps;
   const listeningStrategy =
@@ -853,7 +858,7 @@ export function LearningModeSettings({
   );
   // The after-base target section shows in audio mode only when "Practice
   // Speaking" is on; full mode keeps its existing "always" gating (the
-  // before/after toggles don't apply there — see useLearningAudio). Transcribe
+  // before/after toggles don't apply there, see useLearningAudio). Transcribe
   // always shows the targets: the merged target audio is the prompt.
   const showAfterTarget =
     reviewMode === 'audio'
@@ -974,9 +979,19 @@ export function LearningModeSettings({
                 </p>
               </div>
             </div>
+            {/* Split scheduling: on = each mode keeps its own per-card
+                spaced-repetition schedule; off = both modes share one
+                schedule (the historical behavior). */}
+            <SettingSwitchRow
+              id="separateModeTracking"
+              label={t('separateModeTracking')}
+              description={t('separateModeTrackingDescription')}
+              checked={courseSettings.separateModeTracking === true}
+              onCheckedChange={handleSeparateModeTrackingChange}
+            />
           </div>
 
-          {/* Writing style — sub-switcher shown when Writing is selected:
+          {/* Writing style. Sub-switcher shown when Writing is selected:
               Translate (base audio plays, type the translation) vs Transcribe
               (target audio plays alone, type what you hear). */}
           {isFull && (
@@ -1052,7 +1067,7 @@ export function LearningModeSettings({
             </div>
           </div>
 
-          {/* Initial reviews — audio mode only */}
+          {/* Initial reviews. Audio mode only */}
           {reviewMode === 'audio' && (
             <div className="space-y-1">
               <div className="flex items-center justify-between gap-4">
@@ -1074,25 +1089,6 @@ export function LearningModeSettings({
             </div>
           )}
 
-          {/* Daily study-time goal. Editable post-onboarding; the original
-           * onboarding answer stays preserved on the onboardingProgress row. */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">{t('dailyGoal')}</Label>
-                <p className="text-muted-xs">{t('dailyGoalDescription')}</p>
-              </div>
-              <StepperControl
-                value={
-                  courseSettings.dailyTimeGoalMinutes ?? DAILY_TIME_PRESETS[2]
-                }
-                min={DAILY_TIME_CUSTOM_MIN}
-                max={DAILY_TIME_CUSTOM_MAX}
-                onChange={handleDailyGoalChange}
-              />
-            </div>
-          </div>
-
           {/* Auto-add cards */}
           <SettingSwitchRow
             id="autoAdd"
@@ -1102,7 +1098,7 @@ export function LearningModeSettings({
             onCheckedChange={handleAutoAddChange}
           />
 
-          {/* Auto-advance — audio mode only */}
+          {/* Auto-advance. Audio mode only */}
           {reviewMode === 'audio' && (
             <SettingSwitchRow
               id="autoAdvance"
@@ -1113,7 +1109,7 @@ export function LearningModeSettings({
             />
           )}
 
-          {/* Instant proceed on rating — both modes */}
+          {/* Instant proceed on rating, both modes */}
           <SettingSwitchRow
             id="instantProceed"
             label={t('instantProceed')}
@@ -1133,10 +1129,10 @@ export function LearningModeSettings({
 
           {/* Writing-mode scoring: how the accuracy percentage is computed, and
               what it then does with the rating. Both are writing-only, but this
-              section is shared with audio mode — hence the guard. */}
+              section is shared with audio mode, hence the guard. */}
           {reviewMode === 'full' && (
             <>
-              {/* "Show translation on new sentences" — the copy-through assist:
+              {/* "Show translation on new sentences". The copy-through assist:
                   the answer is displayed above the input on a card's first N
                   reviews. Defaults on / N = 1; the stepper's ∞ position (0)
                   keeps the translation visible on every review. */}
@@ -1234,7 +1230,7 @@ export function LearningModeSettings({
             onCheckedChange={handleAutoPlayChange}
           />
 
-          {/* Practice Listening / Speaking — target before/after base (audio mode only).
+          {/* Practice Listening / Speaking. Target before/after base (audio mode only).
               At least one must stay enabled; toggling the last-on one auto-enables
               the other. */}
           {reviewMode === 'audio' && (
@@ -1255,7 +1251,7 @@ export function LearningModeSettings({
                 onCheckedChange={handlePlayTargetBeforeBaseChange}
               />
 
-              {/* Listening duration — when a card graduates from Practice
+              {/* Listening duration, when a card graduates from Practice
                   Listening to Practice Speaking. Only shows (and only takes
                   effect) when BOTH are on: 'continuous' is the no-graduation
                   strategy, the old "Only new = ∞" position. */}
@@ -1306,7 +1302,7 @@ export function LearningModeSettings({
             </>
           )}
 
-          {/* Target language audio — full review mode only. Hidden in
+          {/* Target language audio. Full review mode only. Hidden in
               transcribe, where the merged target audio IS the prompt and this
               setting is ignored. */}
           {reviewMode === 'full' && !isTranscribe && (
@@ -1360,7 +1356,7 @@ export function LearningModeSettings({
           </p>
 
           <div className="flex flex-col items-center gap-0 py-1">
-            {/* Before-base target languages ("Practice Listening") — shown above
+            {/* Before-base target languages ("Practice Listening"), shown above
                 base when the toggle is on. Reps/pauses/speed are independent of
                 the after-base group. */}
             {showBeforeTarget && targetLanguages.length > 0 && (
@@ -1420,7 +1416,7 @@ export function LearningModeSettings({
               />
             )}
 
-            {/* After-base target languages ("Practice Speaking") — shown when
+            {/* After-base target languages ("Practice Speaking"), shown when
                 they're part of the main audio sequence */}
             {showAfterTarget && (
               <>
@@ -1587,7 +1583,7 @@ export function LearningModeSettings({
             {t('uiSettings')}
           </p>
 
-          {/* Hide target languages + sub-setting — audio mode only */}
+          {/* Hide target languages + sub-setting. Audio mode only */}
           {reviewMode === 'audio' && (
             <div className="space-y-0">
               <SettingSwitchRow
@@ -1598,7 +1594,7 @@ export function LearningModeSettings({
                 onCheckedChange={handleHideTargetLanguagesChange}
               />
 
-              {/* Auto-reveal — visually indented as a sub-setting */}
+              {/* Auto-reveal. Visually indented as a sub-setting */}
               {(courseSettings.hideTargetLanguages ?? true) && (
                 <SettingSwitchRow
                   id="autoRevealLanguages"
@@ -1612,7 +1608,7 @@ export function LearningModeSettings({
             </div>
           )}
 
-          {/* Hide base languages + sub-setting — audio mode only */}
+          {/* Hide base languages + sub-setting. Audio mode only */}
           {reviewMode === 'audio' && (
             <div className="space-y-0">
               <SettingSwitchRow
@@ -1623,7 +1619,7 @@ export function LearningModeSettings({
                 onCheckedChange={handleHideBaseLanguagesChange}
               />
 
-              {/* Auto-reveal — visually indented as a sub-setting */}
+              {/* Auto-reveal. Visually indented as a sub-setting */}
               {courseSettings.hideBaseLanguages === true && (
                 <SettingSwitchRow
                   id="autoRevealBaseLanguages"
@@ -1637,7 +1633,7 @@ export function LearningModeSettings({
             </div>
           )}
 
-          {/* Hide base languages + reveal-on-submit sub-setting — writing mode
+          {/* Hide base languages + reveal-on-submit sub-setting. Writing mode
               only (independent of the audio-mode pair above) */}
           {reviewMode === 'full' && (
             <div className="space-y-0">
@@ -1649,7 +1645,7 @@ export function LearningModeSettings({
                 onCheckedChange={handleHideBaseLanguagesFullChange}
               />
 
-              {/* Auto-reveal on submit — visually indented as a sub-setting */}
+              {/* Auto-reveal on submit. Visually indented as a sub-setting */}
               {(courseSettings.hideBaseLanguagesFull ?? isTranscribe) && (
                 <SettingSwitchRow
                   id="autoRevealBaseOnSubmit"
@@ -1663,12 +1659,12 @@ export function LearningModeSettings({
             </div>
           )}
 
-          {/* Show romanization — only when a language on this course actually
+          {/* Show romanization, only when a language on this course actually
               has a Latin transliteration to show. Hiding the control leaves the
               stored value untouched: course languages are editable from this
               same sheet, so clearing it would silently reset the preference
               every time a language was removed and re-added. A stale `true` is
-              inert anyway — every consumer is gated on the translation
+              inert anyway. Every consumer is gated on the translation
               carrying a `romanization`, which the server only ever populates
               for romanized languages. */}
           {courseSupportsRomanization && (
@@ -1678,6 +1674,20 @@ export function LearningModeSettings({
               description={t('showRomanizationDescription')}
               checked={courseSettings.showRomanization ?? true}
               onCheckedChange={handleShowRomanizationChange}
+            />
+          )}
+
+          {/* Show IPA. Same hide-don't-clear reasoning as romanization above.
+              Nearly every language has an espeak voice, so in practice this
+              row shows for all courses except pure ja/fil ones. Defaults OFF,
+              IPA is a specialist aid and shouldn't appear unasked. */}
+          {courseSupportsIpa && (
+            <SettingSwitchRow
+              id="showIpa"
+              label={t('showIpa')}
+              description={t('showIpaDescription')}
+              checked={courseSettings.showIpa ?? false}
+              onCheckedChange={handleShowIpaChange}
             />
           )}
 
@@ -1702,7 +1712,7 @@ export function LearningModeSettings({
         </div>
 
         {/* Rendered INSIDE SheetContent so its portal events bubble through
-            this Sheet's React tree — otherwise Radix sees focus moving into
+            this Sheet's React tree, otherwise Radix sees focus moving into
             the nested course-settings Sheet as a focus-outside and dismisses
             this Sheet behind it (the whole settings view then appears to
             close when the nested sheet is closed). */}

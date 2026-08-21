@@ -61,7 +61,7 @@ function annualPrice(variant: Variant): number {
 }
 
 /**
- * Every integer in a catalog string, thousands separators removed — covers
+ * Every integer in a catalog string, thousands separators removed. Covers
  * both the en "2,000" and the de "2.000" spellings. The catalogs quote only
  * whole amounts, so stripping all separators is safe.
  */
@@ -84,7 +84,7 @@ describe.each(catalogs)('$locale landing catalog vs autumn.config.ts', ({ pricin
   const { plans } = pricing;
 
   it("advertises Free's starter and monthly credit grants", () => {
-    // "200 credits to start, then 30 per month" — one-off first, recurring second.
+    // "200 credits to start, then 30 per month". One-off first, recurring second.
     expect(numbersIn(plans.free.features.credits)).toEqual([
       grantOf(free, credits.id, 'one_off'),
       grantOf(free, credits.id, 'month'),
@@ -100,7 +100,7 @@ describe.each(catalogs)('$locale landing catalog vs autumn.config.ts', ({ pricin
 
   it("advertises each paid tier's credit line as its increment over the tier below", () => {
     // The cards stack ("Everything from X, plus:"), so each credit bullet is
-    // a delta, not a total — see the note on `basic` in autumn.config.ts.
+    // a delta, not a total. See the note on `basic` in autumn.config.ts.
     expect(numbersIn(plans.basic.features.credits)).toEqual([
       monthlyCredits(basic) - monthlyCredits(free),
     ]);
@@ -121,7 +121,7 @@ describe.each(catalogs)('$locale landing catalog vs autumn.config.ts', ({ pricin
   it('quotes the configured annual totals and their per-month equivalent', () => {
     for (const tier of paidTiers) {
       // Yearly billing headlines the effective per-month price, with the
-      // billed-annually total as a subline — both derive from the variant.
+      // billed-annually total as a subline, both derive from the variant.
       expect(numbersIn(plans[tier.key].billedAnnually)).toEqual([annualPrice(tier.annual)]);
       expect(numbersIn(plans[tier.key].priceYearlyPerMonth)).toEqual([
         annualPrice(tier.annual) / 12,
@@ -135,7 +135,7 @@ describe.each(catalogs)('$locale landing catalog vs autumn.config.ts', ({ pricin
   });
 
   it('backs the yearly-billing save badge with the configured discount', () => {
-    // "Save 25%" — every annual variant must actually be 12x monthly minus
+    // "Save 25%". Every annual variant must actually be 12x monthly minus
     // that percentage, or the badge overstates (or hides) the discount.
     const [savePercent] = numbersIn(pricing.billing.save);
     for (const tier of paidTiers) {

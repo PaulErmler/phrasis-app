@@ -4,7 +4,7 @@ import { Id } from '../_generated/dataModel';
 import { adjustCollectionTextCount } from '../db/seed';
 
 /**
- * Create-or-return a dataset row by (slug, version). Idempotent — re-running
+ * Create-or-return a dataset row by (slug, version). Idempotent. Re-running
  * the upload script with the same version is a no-op for this call.
  *
  * The new dataset is created with `isActive: false`. Activation is a separate
@@ -90,7 +90,7 @@ export const upsertDatasetCollection = internalMutation({
  * On insert: increments collections.textCount by 1 per new row.
  * On update: leaves textCount alone; the row already counted.
  *
- * Translations and audio are NOT generated here — they're produced lazily by
+ * Translations and audio are NOT generated here. They're produced lazily by
  * `scheduleMissingContent` (convex/features/decks.ts) the first time a user
  * adds a card backing the text.
  */
@@ -110,8 +110,8 @@ export const batchUpsertDatasetTexts = internalMutation({
         register: v.union(v.string(), v.null()),
         // Carries the OGTE `register` column: 'not_applicable' for
         // descriptive sentences (no addressee → no T/V pronoun choice in
-        // translations), `null` for direct-address (singular/plural unknown
-        // — the LLM classifier fills that in later).
+        // translations), `null` for direct-address (singular/plural unknown,
+        // the LLM classifier fills that in later).
         addresseeNumber: v.union(v.string(), v.null()),
         // Translation-metadata fields populated from the OGTE curation pipeline
         // (helpers.py Row.compute_translation_metadata). `null` clears.

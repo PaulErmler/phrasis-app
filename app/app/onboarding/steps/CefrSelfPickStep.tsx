@@ -1,15 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useQuery } from 'convex/react';
-import type { FunctionReturnType } from 'convex/server';
-import { api } from '@/convex/_generated/api';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Slider } from '@/components/ui/slider';
-import { Loader2 } from 'lucide-react';
-import { OGTE_MIN_LEVEL, OGTE_MAX_LEVEL } from '@/lib/constants/onboarding';
+import {
+  LevelSliderCard,
+  LevelSamplePreview,
+  clampOgte,
+  cefrForOgte,
+} from '@/components/course/LevelPicker';
 import type { StrategyName } from '../lib/placementStrategies';
 
 interface Props {
@@ -25,16 +23,12 @@ interface Props {
 }
 
 /**
- * CEFR self-pick — slider variant (live step).
+ * CEFR self-pick. Slider variant (live step). Thin onboarding wrapper
+ * around the shared `LevelPicker` slider + sample preview (also used by the
+ * learn view's one-time difficulty-check dialog).
  *
- * Continuous slider over OGTE levels 1..20. The preview corpus (5 placement-
- * test sentences per level, in the user's *target* language so it matches
- * what they'll see during learning) is fetched once for ALL levels, so
- * dragging the slider re-renders instantly from memory.
- *
- * This step no longer owns a Continue button — the wizard footer's "Pick
- * this level" button handles confirmation (and opens a follow-up dialog
- * offering to refine via the placement test).
+ * This step no longer owns a Continue button. The wizard footer's "Pick
+ * this level" button handles confirmation.
  */
 export function CefrSelfPickStep({
   sourceLanguage,
@@ -44,7 +38,6 @@ export function CefrSelfPickStep({
 }: Props) {
   const t = useTranslations('Onboarding.cefrPick');
   const [ogte, setOgte] = useState(clampOgte(initialOgteLevel));
-  const cefr = cefrForOgte(ogte);
 
   // Push the initial level up exactly once on mount so the wizard can light
   // up the Continue button without waiting for the user to wiggle the slider.
@@ -53,8 +46,7 @@ export function CefrSelfPickStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleChange = (v: number[]) => {
-    const next = clampOgte(v[0]);
+  const handleChange = (next: number) => {
     setOgte(next);
     onLevelChange(next);
   };
@@ -71,45 +63,8 @@ export function CefrSelfPickStep({
 
       <div className="flex-1 min-h-0 overflow-y-auto px-1 pb-6">
         <div className="space-y-4 max-w-2xl mx-auto w-full">
-          <Card>
-            <CardContent className="p-4 md:p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                    {t('levelLabel')}
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <div className="text-3xl md:text-4xl font-bold tabular-nums">
-                      {ogte.toString().padStart(2, '0')}
-                    </div>
-                    <Badge variant="outline">{cefr}</Badge>
-                  </div>
-                </div>
-                <div className="text-right text-xs text-muted-foreground hidden md:block">
-                  <div>{t('levelsTotal')}</div>
-                  <div>{t('levelsRange')}</div>
-                </div>
-              </div>
-              <Slider
-                value={[ogte]}
-                min={OGTE_MIN_LEVEL}
-                max={OGTE_MAX_LEVEL}
-                step={1}
-                onValueChange={handleChange}
-                aria-label={t('ariaLabel')}
-              />
-              <div className="flex justify-between text-[10px] text-muted-foreground -mt-2 px-1">
-                <span>Pre-A1</span>
-                <span>A2</span>
-                <span>B1</span>
-                <span>B2</span>
-                <span>C1</span>
-                <span>C2</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <SamplePreview
+          <LevelSliderCard ogte={ogte} onChange={handleChange} />
+          <LevelSamplePreview
             ogteLevel={ogte}
             sourceLanguage={sourceLanguage}
             targetLanguage={targetLanguage}
@@ -120,128 +75,5 @@ export function CefrSelfPickStep({
   );
 }
 
-type PreviewSentence = FunctionReturnType<
-  typeof api.features.placementTest.getPlacementPreviewSentences
->[number];
-
-const PREVIEW_POSITIONS = [0, 1, 2, 3, 4];
-
-function SamplePreview({
-  ogteLevel,
-  sourceLanguage,
-  targetLanguage,
-}: {
-  ogteLevel: number;
-  sourceLanguage: string;
-  targetLanguage: string;
-}) {
-  const t = useTranslations('Onboarding.cefrPick');
-  // One subscription for the WHOLE corpus (no per-(level, position) queries):
-  // sliding between levels renders instantly from memory instead of flashing
-  // five loading rows per tick while fresh queries resolve. Translations
-  // landing mid-onboarding still stream in reactively.
-  const corpus = useQuery(
-    api.features.placementTest.getPlacementPreviewSentences,
-    { targetLanguage, sourceLanguage },
-  );
-  const byLevel = useMemo(() => {
-    if (!corpus) return null;
-    const map = new Map<number, PreviewSentence[]>();
-    for (const row of corpus) {
-      const rows = map.get(row.level);
-      if (rows) rows.push(row);
-      else map.set(row.level, [row]);
-    }
-    return map;
-  }, [corpus]);
-
-  const levelRows = byLevel?.get(ogteLevel);
-  return (
-    <Card>
-      <CardContent className="p-4 md:p-6 space-y-2">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">
-          {t('samplesHeading', { level: ogteLevel.toString().padStart(2, '0') })}
-        </div>
-        {byLevel === null
-          ? PREVIEW_POSITIONS.map((p) => <SampleLoadingRow key={p} />)
-          : PREVIEW_POSITIONS.map((p) => (
-            <SampleRow
-              key={p}
-              sentence={levelRows?.find((row) => row.position === p) ?? null}
-              sourceLanguage={sourceLanguage}
-              targetLanguage={targetLanguage}
-            />
-          ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-/** Shown only while the one-time corpus fetch is in flight on step mount. */
-function SampleLoadingRow() {
-  const t = useTranslations('Onboarding.cefrPick');
-  const [showSpinner, setShowSpinner] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setShowSpinner(true), 120);
-    return () => clearTimeout(timer);
-  }, []);
-  return (
-    <div className="rounded bg-muted/40 px-3 py-2 text-sm text-muted-foreground italic flex items-center gap-2">
-      {showSpinner ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-      {t('sampleLoading')}
-    </div>
-  );
-}
-
-function SampleRow({
-  sentence,
-  sourceLanguage,
-  targetLanguage,
-}: {
-  sentence: PreviewSentence | null;
-  sourceLanguage: string;
-  targetLanguage: string;
-}) {
-  const t = useTranslations('Onboarding.cefrPick');
-  if (sentence === null) {
-    return (
-      <div className="rounded bg-muted/40 px-3 py-2 text-sm text-muted-foreground italic">
-        {t('sampleEmpty')}
-      </div>
-    );
-  }
-
-  const showTarget = targetLanguage !== sourceLanguage && !!sentence.targetText;
-  const primary = showTarget ? sentence.targetText! : sentence.sourceText;
-
-  return (
-    <div className="rounded bg-muted/50 px-3 py-2 text-sm space-y-0.5">
-      <div>{primary}</div>
-      {showTarget && sentence.targetRomanization ? (
-        <div className="text-[11px] text-muted-foreground italic">
-          {sentence.targetRomanization}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function clampOgte(n: number): number {
-  if (n < OGTE_MIN_LEVEL) return OGTE_MIN_LEVEL;
-  if (n > OGTE_MAX_LEVEL) return OGTE_MAX_LEVEL;
-  return Math.round(n);
-}
-
-export function cefrForOgte(ogte: number): string {
-  if (ogte <= 1) return 'Pre-A1';
-  if (ogte <= 4) return 'A1';
-  if (ogte <= 7) return 'A2';
-  if (ogte <= 10) return 'B1';
-  if (ogte <= 13) return 'B2';
-  if (ogte <= 16) return 'C1';
-  return 'C2';
-}
-
+export { cefrForOgte };
 export type { StrategyName };

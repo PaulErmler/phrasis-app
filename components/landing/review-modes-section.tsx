@@ -2,9 +2,15 @@
 
 import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
-import { Mail } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Headphones, NotebookPen, Radio } from 'lucide-react';
 import { ReviewModesDemo } from '@/components/landing/review-modes-demo';
+import { fadeInUp } from './animations';
+
+const JOBS = [
+  { key: 'speak', Icon: Headphones },
+  { key: 'write', Icon: NotebookPen },
+  { key: 'radio', Icon: Radio },
+] as const;
 
 export function ReviewModesSection() {
   const t = useTranslations('LandingPage.reviewModes');
@@ -12,15 +18,11 @@ export function ReviewModesSection() {
   return (
     <section
       id="review-modes"
-      className="relative py-20 md:py-32 px-4 sm:px-6 border-t border-border/40"
+      className="relative pt-8 md:pt-10 pb-20 md:pb-32 px-4 sm:px-6"
     >
       <div className="max-w-7xl mx-auto">
-        {/* Text on top */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, ease: 'easeOut' as const }}
+          {...fadeInUp}
           className="space-y-5 max-w-3xl mb-10 md:mb-14"
         >
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground">
@@ -32,42 +34,48 @@ export function ReviewModesSection() {
           </p>
         </motion.div>
 
-        {/* Demo below at full width */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 mb-10 md:mb-14">
+          {JOBS.map(({ key, Icon }, index) => (
+            <motion.div
+              key={key}
+              {...fadeInUp}
+              transition={{
+                duration: 0.6,
+                delay: 0.1 + index * 0.08,
+                ease: 'easeOut' as const,
+              }}
+              className="relative rounded-2xl border border-border/40 bg-card p-6 md:p-7 h-full"
+            >
+              <div className="flex items-center gap-2.5 mb-3">
+                <Icon className="h-5 w-5 text-primary shrink-0" />
+                <h3 className="text-base md:text-lg font-semibold">
+                  {t(`jobs.${key}.title`)}
+                </h3>
+              </div>
+              <p className="text-xs font-medium uppercase tracking-wide text-primary mb-2">
+                {t(`jobs.${key}.mode`)}
+              </p>
+              <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+                {t(`jobs.${key}.body`)}
+              </p>
+            </motion.div>
+          ))}
+        </div>
+
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          {...fadeInUp}
           transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' as const }}
           className="min-w-0 max-w-4xl mx-auto"
         >
           <ReviewModesDemo />
         </motion.div>
 
-        {/* "Missing a way to learn?" — invites users to request new modes. */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, ease: 'easeOut' as const }}
-          className="mt-12 md:mt-16 flex flex-col items-center gap-4 rounded-2xl border border-border/40 bg-card/50 px-6 py-8 text-center"
+        <motion.p
+          {...fadeInUp}
+          className="mt-10 md:mt-12 text-sm md:text-base text-muted-foreground leading-relaxed max-w-2xl mx-auto text-center"
         >
-          <div className="space-y-1.5">
-            <h3 className="text-lg md:text-xl font-semibold text-foreground">
-              {t('missingTitle')}
-            </h3>
-            <p className="text-sm md:text-base text-muted-foreground max-w-md">
-              {t('missingBody')}
-            </p>
-          </div>
-          <Button asChild variant="outline" size="sm" className="gap-2 rounded-lg">
-            <a
-              href={`mailto:support@flexling.com?subject=${encodeURIComponent(t('emailSubjects.requestMode'))}`}
-            >
-              <Mail className="w-4 h-4" />
-              {t('missingCta')}
-            </a>
-          </Button>
-        </motion.div>
+          {t('settingsNote')}
+        </motion.p>
       </div>
     </section>
   );

@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { ChatHistorySidebar } from '@/components/chat/ChatHistorySidebar';
 import { createCardToolRenderer } from '@/components/chat/tools/CardToolRenderer';
+import { createAlsoCorrectToolRenderer } from '@/components/chat/tools/AlsoCorrectToolRenderer';
 import { useCardApprovals } from '@/hooks/use-card-approvals';
 import {
   Sheet,
@@ -14,6 +15,7 @@ import {
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { useTranslations } from 'next-intl';
 import type { Thread } from '@/lib/types/chat';
+import type { Id } from '@/convex/_generated/dataModel';
 
 interface SimplifiedChatViewProps {
   threadId: string;
@@ -37,11 +39,23 @@ export function SimplifiedChatView({
     processingApprovals,
     handleApprove,
     handleReject,
+    handleReplace,
     isLoaded: approvalsLoaded,
   } = useCardApprovals(threadId);
   const t = useTranslations('Chat.sidebar');
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
+  // The chat tab has no served card, so it has no thread rotation to suppress
+  // It only needs the result, not the replacement card id that LearnView
+  // keys its suppression off.
+  const replaceOnly = useCallback(
+    async (id: Id<'cardApprovals'>) => (await handleReplace(id)).result,
+    [handleReplace],
+  );
+
+  // Both card tools: learn-view threads (where markAlsoCorrect fires) are
+  // reachable from this tab's history sidebar, so their approval boxes must
+  // render, and stay actionable. Here too.
   const toolRenderers = useMemo(
     () => ({
       createCard: createCardToolRenderer({
@@ -51,8 +65,16 @@ export function SimplifiedChatView({
         handleReject,
         isLoaded: approvalsLoaded,
       }),
+      markAlsoCorrect: createAlsoCorrectToolRenderer({
+        approvalsByToolCallId,
+        processingApprovals,
+        handleApprove,
+        handleReplace: replaceOnly,
+        handleReject,
+        isLoaded: approvalsLoaded,
+      }),
     }),
-    [approvalsByToolCallId, processingApprovals, handleApprove, handleReject, approvalsLoaded],
+    [approvalsByToolCallId, processingApprovals, handleApprove, handleReject, replaceOnly, approvalsLoaded],
   );
 
   const handleThreadSelect = (id: string) => {

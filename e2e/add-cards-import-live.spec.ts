@@ -8,15 +8,15 @@ import { dismissTour, openCardImport, pasteImport } from "./helpers";
  * unique marker, then verifies they show up in the library. Tagged @live
  * because it mutates shared user state (adds cards to the test user's deck).
  *
- * Retries disabled — the marker in the first cell changes per run so a
+ * Retries disabled. The marker in the first cell changes per run so a
  * retry would create a second batch.
  */
 
 test.describe.configure({ mode: "serial", retries: 0 });
-test.describe("add cards — import (live)", { tag: "@live" }, () => {
+test.describe("add cards: import (live)", { tag: "@live" }, () => {
   test("imports 3 cards and surfaces them in the library", async ({ page }) => {
     // The default 30s test budget can't cover this test's own internal waits
-    // (dialog-hidden wait up to 30s + the library poll below) — under @live
+    // (dialog-hidden wait up to 30s + the library poll below), under @live
     // load the poll was getting only the seconds left over from the wizard
     // steps and timing out at 0 cards. Budget generously; every wait inside
     // is still individually bounded, so a true hang fails early regardless.
@@ -44,7 +44,7 @@ test.describe("add cards — import (live)", { tag: "@live" }, () => {
     );
 
     // Step 2: 3 valid rows, submit enabled. There are two `import-submit`
-    // buttons on this step (SummaryBar at top, stepper primary at bottom) —
+    // buttons on this step (SummaryBar at top, stepper primary at bottom),
     // both trigger the same confirm dialog; use the first consistently.
     await page.getByTestId("import-next").click();
     const submit = page.getByTestId("import-submit").first();
@@ -58,7 +58,7 @@ test.describe("add cards — import (live)", { tag: "@live" }, () => {
     await expect(dialog).toBeVisible({ timeout: 5_000 });
     await page.getByTestId("import-confirm").click();
 
-    // Wait for the submission to settle — the submit button re-enables or
+    // Wait for the submission to settle. The submit button re-enables or
     // the user is navigated back to the content hub. Don't rely on the toast
     // (sonner auto-dismisses inside a few seconds, flaky to catch).
     await expect(dialog).toBeHidden({ timeout: 30_000 });
@@ -77,12 +77,12 @@ test.describe("add cards — import (live)", { tag: "@live" }, () => {
     await expect(search).toBeVisible({ timeout: 20_000 });
     await search.fill(marker);
 
-    // The import mutation only inserts the *texts* synchronously — the cards
+    // The import mutation only inserts the *texts* synchronously. The cards
     // are created by scheduled background functions (generateSentenceMetadata
     // → prepareCardContent, one LLM metadata call per sentence), so under
     // @live load they can land well after the confirm dialog closes. The
-    // library search is a reactive Convex subscription — cards appear in the
-    // still-open results the moment they exist — so a long poll is safe.
+    // library search is a reactive Convex subscription. Cards appear in the
+    // still-open results the moment they exist, so a long poll is safe.
     const cards = page.getByTestId("library-card");
     await expect
       .poll(async () => cards.count(), { timeout: 90_000 })

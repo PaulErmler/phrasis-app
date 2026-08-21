@@ -102,7 +102,7 @@ describe('useImeSafeEnter', () => {
   it('stays composing across a restarted composition', () => {
     fireEvent.compositionStart(field);
     fireEvent.compositionEnd(field);
-    // A new composition begins before the deferred clear runs — the pending
+    // A new composition begins before the deferred clear runs. The pending
     // clear must be cancelled, not left to fire mid-composition.
     fireEvent.compositionStart(field);
     flushCompositionClear();

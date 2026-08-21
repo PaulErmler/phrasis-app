@@ -41,7 +41,7 @@ describe('shouldShowTranslationAssist', () => {
     expect(shouldShowTranslationAssist(settings, 1, 1)).toBe(false);
   });
 
-  it('never shows in transcribe mode — the shown target would BE the answer', () => {
+  it('never shows in transcribe mode, the shown target would BE the answer', () => {
     // Even with the widest window (0 = always) and a brand-new card.
     expect(
       shouldShowTranslationAssist({ showTranslationOnlyNewReps: 0 }, 0, 0, true),
@@ -64,7 +64,7 @@ describe('shouldShowTranslationAssist', () => {
   it('takes the max of FSRS exposures and free-study plays, not their sum', () => {
     const settings = { showTranslationOnlyNewReps: 3 };
     // 2 FSRS exposures + 2 free-study plays must not read as 4 and retire early
-    // — each face retires the assist on its own exposures.
+    // Each face retires the assist on its own exposures.
     expect(shouldShowTranslationAssist(settings, 1, 1, false, 2)).toBe(true);
     expect(shouldShowTranslationAssist(settings, 1, 2, false, 0)).toBe(false);
     expect(shouldShowTranslationAssist(settings, 0, 0, false, 3)).toBe(false);
@@ -77,7 +77,7 @@ describe('shouldShowTranslationAssist', () => {
 });
 
 /**
- * Shared transcribe predicate — used by both the auto-rating gate in
+ * Shared transcribe predicate. Used by both the auto-rating gate in
  * LearningMode (before its early returns) and the render path (after them),
  * so the two can't disagree about whether a card is copy-through.
  */
@@ -110,7 +110,7 @@ describe('isTranscribeMode', () => {
 
 /**
  * The auto-rating gate. A copy-through card prints the target above the input,
- * so a verbatim copy scores 100% — that must not preselect a rating (with
+ * so a verbatim copy scores 100%. That must not preselect a rating (with
  * instantProceed it would graduate the card on a copy) nor reach the accuracy
  * series. This mirrors the `autoRateEnabled` expression in LearningMode.
  */
@@ -143,7 +143,7 @@ describe('auto-rating suppression on copy-through cards', () => {
     expect(autoRateEnabled({ reviewMode: 'full' }, 1, 0)).toBe(true);
   });
 
-  it('is never suppressed in transcribe mode — no assist is shown there', () => {
+  it('is never suppressed in transcribe mode, no assist is shown there', () => {
     expect(
       autoRateEnabled(
         { reviewMode: 'full', writingInputMode: 'transcribe' },
@@ -166,7 +166,7 @@ describe('auto-rating suppression on copy-through cards', () => {
     expect(autoRateEnabled(s, 3, 0)).toBe(true);
   });
 
-  it('resumes for a card retired by Free Study plays alone — the render path hides the assist for it, so the answer is real recall', () => {
+  it('resumes for a card retired by Free Study plays alone, the render path hides the assist for it, so the answer is real recall', () => {
     // preReviewCount and FSRS reps are both 0 (free play advances neither),
     // but freeStudyPlayCount already exhausted the assist window; the gate
     // must agree with the visible assist, not re-suppress.

@@ -157,7 +157,7 @@ describe('alignWordTimings', () => {
       .map((w) => w.leading + w.display + w.trailing)
       .join('');
     // Joining leading+display+trailing across all tokens reconstructs the
-    // full source — every codepoint is in either an inter-word leading run
+    // full source. Every codepoint is in either an inter-word leading run
     // on the next token or in the final trailing slot on the last token.
     expect(reconstructed).toBe(text);
   });
@@ -182,7 +182,7 @@ describe('alignWordTimings', () => {
   it('segments Japanese into multiple word tokens, not a single sentence token', () => {
     const text = 'どうするかはもう決めたわ。';
     const aligned = alignWordTimings(text, null, 'ja');
-    // Intl.Segmenter "ja" identifies multiple word-like segments — the exact
+    // Intl.Segmenter "ja" identifies multiple word-like segments. The exact
     // count depends on the ICU dictionary in the test runtime, but it must be
     // strictly more than one (otherwise the "whole sentence as one word" bug
     // is back).

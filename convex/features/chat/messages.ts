@@ -4,17 +4,18 @@ import {
   internalQuery,
   mutation,
   query,
-  type MutationCtx,
+  type QueryCtx,
 } from '../../_generated/server';
 import { paginationOptsValidator } from 'convex/server';
 import { internal, components } from '../../_generated/api';
 import { saveMessages, listUIMessages, syncStreams } from '@convex-dev/agent';
 import { requireAuthUserId, getAuthUserId, getUserSettings } from '../../db/users';
 import { getActiveCourseForUser } from '../../db/courses';
+import { getCourseSettings } from '../../db/courseSettings';
 import { consumeQuota } from '../../usage/helpers';
 import { CHAT_CREDIT_USD_STEP, CREDIT_COSTS, FEATURE_IDS } from '../featureIds';
-import { agent } from './agent';
-import type { Id } from '../../_generated/dataModel';
+import { agent, AGENT_TOOLS, createMarkAlsoCorrectTool } from './agent';
+import type { Doc, Id } from '../../_generated/dataModel';
 import { THREAD_MESSAGE_LIMIT, MAX_MESSAGE_LENGTH } from './constants';
 import { trackEvent } from '../../db/stats/dailyStats';
 import { EVENTS, track, trackException } from '../../analytics';
@@ -26,12 +27,24 @@ import {
 import { generateText, type ModelMessage } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import {
+  OPENROUTER_CHAT_MAX_OUTPUT_TOKENS,
   OPENROUTER_CHAT_PROVIDER_OPTIONS,
   OPENROUTER_INPUT_CACHE_CONTROL,
   OPENROUTER_MODELS,
   OPENROUTER_USAGE_ACCOUNTING,
 } from '../../config/aiModels';
-import { buildCardContextSection, buildLanguageSection } from './promptSections';
+import {
+  buildCardContextSection,
+  buildDifficultySection,
+  buildLanguageSection,
+  type LearnerDifficulty,
+} from './promptSections';
+import {
+  deriveLegacyCefrTier,
+  isPremadeLevelCollection,
+  LEVEL_TO_COLLECTION,
+} from '../../lib/collections';
+import { resolveCardContext } from './cardContext';
 import {
   assertQuickActionWithinLimits,
   expandQuickAction,
@@ -41,9 +54,58 @@ import {
 
 const agentComponent = components.agent;
 
+const learnerDifficultyValidator = v.object({
+  label: v.string(),
+  cefrTier: v.string(),
+});
+
+function difficultyFromCurrentLevel(level: string): LearnerDifficulty | null {
+  const mapping = LEVEL_TO_COLLECTION[level];
+  if (!mapping) return null;
+  const cefrTier = deriveLegacyCefrTier(mapping.legacyName);
+  if (!cefrTier) return null;
+  return { label: cefrTier, cefrTier };
+}
+
+function difficultyFromCollection(
+  collection: Doc<'collections'>,
+): LearnerDifficulty | null {
+  if (!isPremadeLevelCollection(collection)) return null;
+  const cefrTier =
+    collection.cefrTier ?? deriveLegacyCefrTier(collection.name);
+  if (!cefrTier) return null;
+  return {
+    label: collection.displayName ?? collection.name,
+    cefrTier,
+  };
+}
+
 /**
- * Internal query to get course languages by userId.
- * Works without auth identity — used by scheduled actions and tool handlers.
+ * The level the user is currently studying at: the active curriculum
+ * collection when there is one, else the course's 6-bucket `currentLevel`.
+ */
+async function resolveLearnerDifficulty(
+  ctx: QueryCtx,
+  course: Doc<'courses'> | undefined,
+): Promise<LearnerDifficulty | null> {
+  if (!course) return null;
+  const settings = await getCourseSettings(ctx, course._id);
+  if (settings?.activeCollectionId) {
+    const collection = await ctx.db.get(settings.activeCollectionId);
+    if (collection) {
+      const fromCollection = difficultyFromCollection(collection);
+      if (fromCollection) return fromCollection;
+    }
+  }
+  if (course.currentLevel) {
+    return difficultyFromCurrentLevel(course.currentLevel);
+  }
+  return null;
+}
+
+/**
+ * Internal query to get course languages (and learner difficulty) by userId.
+ * Works without auth identity. Used by scheduled actions and tool handlers.
  */
 export const getCourseLanguagesForUser = internalQuery({
   args: { userId: v.string() },
@@ -51,6 +113,7 @@ export const getCourseLanguagesForUser = internalQuery({
     v.object({
       baseLanguages: v.array(v.string()),
       targetLanguages: v.array(v.string()),
+      difficulty: v.union(learnerDifficultyValidator, v.null()),
     }),
     v.null(),
   ),
@@ -60,67 +123,11 @@ export const getCourseLanguagesForUser = internalQuery({
     return {
       baseLanguages: active.course.baseLanguages,
       targetLanguages: active.course.targetLanguages,
+      difficulty: await resolveLearnerDifficulty(ctx, active.course),
     };
   },
 });
 
-/**
- * Look up a card's source text, course-scoped translations, and course
- * languages via card → deck → course. Only fetches translations whose
- * targetLanguage is in the course's language set (uses the compound
- * by_text_and_language index for each language).
- */
-async function resolveCardContext(
-  ctx: MutationCtx,
-  cardId: Id<'cards'>,
-  userId: string,
-): Promise<{
-  sourceText: string;
-  sourceLanguage: string;
-  translations: { language: string; text: string }[];
-  baseLanguages: string[];
-  targetLanguages: string[];
-} | null> {
-  const card = await ctx.db.get(cardId);
-  if (!card) return null;
-
-  const deck = await ctx.db.get(card.deckId);
-  if (!deck) return null;
-
-  const course = await ctx.db.get(deck.courseId);
-  if (!course) return null;
-
-  if (course.userId !== userId) return null;
-
-  const text = await ctx.db.get(card.textId);
-  if (!text) return null;
-
-  const courseLangs = new Set([...course.baseLanguages, ...course.targetLanguages]);
-  courseLangs.delete(text.language);
-
-  const translations = (
-    await Promise.all(
-      [...courseLangs].map((lang) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('targetLanguage', lang),
-          )
-          .unique(),
-      ),
-    )
-  )
-    .filter((t): t is NonNullable<typeof t> => t !== null)
-    .map((t) => ({ language: t.targetLanguage, text: t.translatedText }));
-
-  return {
-    sourceText: text.text,
-    sourceLanguage: text.language,
-    translations,
-    baseLanguages: course.baseLanguages,
-    targetLanguages: course.targetLanguages,
-  };
-}
 
 /**
  * Expand a quick action into its steering prompt, resolving the language
@@ -227,6 +234,10 @@ export const sendMessage = mutation({
       ? buildCardContextSection(cardData)
       : undefined;
     const languageSection = cardData ? buildLanguageSection(cardData) : undefined;
+    const difficulty = await resolveLearnerDifficulty(ctx, active?.course);
+    const difficultySection = difficulty
+      ? buildDifficultySection(difficulty)
+      : undefined;
 
     if (userMessageCount === 0) {
       await ctx.runMutation(agentComponent.threads.updateThread, {
@@ -258,8 +269,12 @@ export const sendMessage = mutation({
         promptMessageId: messageId,
         cardContextSection,
         languageSection,
+        difficultySection,
         prompt: args.prompt,
         includeAiContent,
+        // Only forwarded when the card context resolved (ownership verified
+        // above), gates the markAlsoCorrect tool for this turn.
+        cardId: cardData ? args.cardId : undefined,
       },
     );
 
@@ -290,7 +305,7 @@ export const sendMessage = mutation({
  * for the requested `streamArgs`. The client streaming hook reads
  * `result.streams.messages` whenever it issues a `kind: 'list'` query, so the
  * early-return branches in `listMessages` (unauthenticated / thread not owned)
- * must still include a `streams` field of the right shape — otherwise the hook
+ * must still include a `streams` field of the right shape, otherwise the hook
  * throws `Cannot read properties of undefined (reading 'messages')`. Mirrors
  * `syncStreams` by returning `undefined` when no streaming was requested.
  */
@@ -361,6 +376,7 @@ export const generateResponse = internalAction({
     promptMessageId: v.string(),
     cardContextSection: v.optional(v.string()),
     languageSection: v.optional(v.string()),
+    difficultySection: v.optional(v.string()),
     // Passed through from sendMessage purely so the cost event can carry the
     // prompt as `$ai_input`. Re-reading it from the agent component here would
     // cost an extra query for data the caller already had in hand.
@@ -370,12 +386,17 @@ export const generateResponse = internalAction({
     // latency are captured either way (legitimate-interest telemetry); the
     // *content* is consent-gated. Resolved in sendMessage, which has db access.
     includeAiContent: v.optional(v.boolean()),
+    // The reviewed card, when this turn has card context (ownership already
+    // verified by sendMessage's resolveCardContext). Presence registers the
+    // markAlsoCorrect tool for this turn, closed over this id.
+    cardId: v.optional(v.id('cards')),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
       let languageSection = args.languageSection;
-      if (!languageSection) {
+      let difficultySection = args.difficultySection;
+      if (!languageSection || !difficultySection) {
         const thread = await ctx.runQuery(agentComponent.threads.getThread, {
           threadId: args.threadId,
         });
@@ -386,7 +407,10 @@ export const generateResponse = internalAction({
           )
           : null;
         if (courseLanguages) {
-          languageSection = buildLanguageSection(courseLanguages);
+          languageSection ??= buildLanguageSection(courseLanguages);
+          if (!difficultySection && courseLanguages.difficulty) {
+            difficultySection = buildDifficultySection(courseLanguages.difficulty);
+          }
         }
       }
 
@@ -395,6 +419,9 @@ export const generateResponse = internalAction({
       if (languageSection) {
         dynamicContextParts.push(languageSection);
       }
+      if (difficultySection) {
+        dynamicContextParts.push(difficultySection);
+      }
       if (args.cardContextSection) {
         dynamicContextParts.push(args.cardContextSection);
       }
@@ -402,12 +429,12 @@ export const generateResponse = internalAction({
 
       // Dynamic chat billing: 1 credit was consumed up-front in
       // `sendMessage`; here we accumulate the actual OpenRouter cost across
-      // all LLM steps (tool loops included) and charge the remainder — 1
+      // all LLM steps (tool loops included) and charge the remainder. 1
       // credit per additional started CHAT_CREDIT_USD_STEP. The handler
       // runs (awaited) per step while the stream is consumed, and
       // `agent.streamText` only resolves after the stream finishes, so the
       // accumulator is complete after the await. Thread-title generation is
-      // deliberately not billed (flash-lite, ~4 words — negligible).
+      // deliberately not billed (flash-lite, ~4 words, negligible).
       let totalCostUsd = 0;
       let billedUserId: string | undefined;
 
@@ -430,7 +457,7 @@ export const generateResponse = internalAction({
         { threadId: args.threadId },
         {
           promptMessageId: args.promptMessageId,
-          // Leave the AI SDK `system` slot empty — static instructions are
+          // Leave the AI SDK `system` slot empty. Static instructions are
           // injected via prepareStep with message-level cache_control so
           // OpenRouter can cache the stable prefix across turns/steps.
           //
@@ -438,20 +465,21 @@ export const generateResponse = internalAction({
           // @convex-dev/agent's `?? options.instructions` fallback and inject
           // the instructions a second time. The cost is one empty
           // `{role:'system', content:''}` block prepended at prompt
-          // conversion (the SDK only skips nullish `system`) — it is added
+          // conversion (the SDK only skips nullish `system`), it is added
           // AFTER prepareStep runs, so it cannot be filtered there. It is
           // byte-stable across all requests (cache-neutral) and OpenAI
           // endpoints accept empty system content; revisit if a future
           // provider rejects it.
           system: '',
           allowSystemInMessages: true,
+          maxOutputTokens: OPENROUTER_CHAT_MAX_OUTPUT_TOKENS,
           providerOptions: {
             openrouter: {
               ...OPENROUTER_CHAT_PROVIDER_OPTIONS.openrouter,
               // Documented OpenRouter param: sticky-routing key. All requests
               // of a thread go to the same provider endpoint, which is what
               // makes automatic prefix caching actually hit across the
-              // multi-step tool loop (spread above must be kept — per-call
+              // multi-step tool loop (spread above must be kept, per-call
               // providerOptions REPLACES the agent-level default, so dropping
               // it would silently lose reasoning.effort).
               session_id: args.threadId,
@@ -484,6 +512,24 @@ export const generateResponse = internalAction({
 
             return { messages: [...prefix, ...messages] };
           },
+          // Card-context turns additionally get markAlsoCorrect, closed over
+          // the reviewed card's id. A per-call `tools` REPLACES the
+          // agent-level set, so that set is spread back in (AGENT_TOOLS.
+          // The single source of truth; a tool added there is automatically
+          // available here too). Registered on every card turn (not just
+          // discussAnswer): the user can free-text ask "is X also correct?",
+          // and persisted steering from an earlier quick action is re-read
+          // on later turns.
+          ...(args.cardId
+            ? {
+                tools: {
+                  ...AGENT_TOOLS,
+                  markAlsoCorrect: createMarkAlsoCorrectTool({
+                    cardId: args.cardId,
+                  }),
+                },
+              }
+            : {}),
         },
         {
           saveStreamDeltas: { chunking: "word", throttleMs: 500 },
@@ -505,7 +551,7 @@ export const generateResponse = internalAction({
               inputTokens: usage?.inputTokens,
               outputTokens: usage?.outputTokens,
               costUsd: stepCostUsd,
-              // OpenRouter's generation id — the join key back to their dashboard
+              // OpenRouter's generation id. The join key back to their dashboard
               // when a cost figure needs to be reconciled.
               generationId: openrouter?.id,
             });
@@ -515,7 +561,7 @@ export const generateResponse = internalAction({
 
       // Safe to await: `agent.streamText` only resolves after the stream has
       // finished (see the billing comment above), so this promise is already
-      // settled. Wrapped anyway — a missing transcript must not cost the user
+      // settled. Wrapped anyway. A missing transcript must not cost the user
       // their reply.
       let responseText: string | undefined;
       try {
@@ -540,7 +586,7 @@ export const generateResponse = internalAction({
           costUsd: step.costUsd,
           // Prompt on the first step, completion on the last: the intermediate
           // steps are tool loops with no user-facing text of their own.
-          // Content only with synced consent — the privacy policy promises
+          // Content only with synced consent. The privacy policy promises
           // that declining keeps chat text out of PostHog.
           input:
             args.includeAiContent && index === 0 && args.prompt
@@ -568,7 +614,7 @@ export const generateResponse = internalAction({
       // Autumn's credit schema each multiply a chat_messages amount by
       // CREDIT_COSTS[CHAT_MESSAGES], so passing credits through them would
       // double-convert. One unit deducts `unitCredits` credits, so it covers
-      // `unitCredits` billing steps — the effective rate stays 1 credit per
+      // `unitCredits` billing steps. The effective rate stays 1 credit per
       // CHAT_CREDIT_USD_STEP regardless of the configured cost.
       const stepMicroUsd = Math.round(CHAT_CREDIT_USD_STEP * 1e6);
       const unitCredits = CREDIT_COSTS[FEATURE_IDS.CHAT_MESSAGES] ?? 1;

@@ -28,11 +28,11 @@ interface Props {
   /**
    * Merged-playback word-position source. When set (and active), the word
    * index ticks from a clock subscription inside this leaf instead of the
-   * `localTime` prop — no parent re-renders per frame.
+   * `localTime` prop, no parent re-renders per frame.
    */
   clockBinding?: ClockBinding;
   isActive: boolean;
-  /** User setting — when false, karaoke is off but words remain clickable. */
+  /** User setting, when false, karaoke is off but words remain clickable. */
   enabled: boolean;
   className?: string;
   /** When false, renders plain text without popovers (e.g. blurred translations). */
@@ -60,7 +60,7 @@ interface AskAboutWordProps {
   language: string;
   className?: string;
   children: ReactNode;
-  /** Controlled open state — pass both to share open-state across words
+  /** Controlled open state. Pass both to share open-state across words
    *  (ClickableWords' single-open `openIndex`). Omit for local state. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -70,7 +70,7 @@ interface AskAboutWordProps {
 }
 
 /**
- * Per-word "Ask AI" popover — the single implementation of the clickable
+ * Per-word "Ask AI" popover. The single implementation of the clickable
  * word trigger, used both by ClickableWords' word loop and by content that
  * renders its own word visuals (e.g. the writing-mode diff chips). Falls
  * back to a plain span when there's no chat context (landing demo) or the
@@ -95,7 +95,7 @@ export function AskAboutWord({
   const cleaned = cleanWord(word);
 
   if (!chatContext || !cleaned) {
-    // No wrapper span in the bare case — e.g. punctuation chips rely on
+    // No wrapper span in the bare case, e.g. punctuation chips rely on
     // being direct flex children (their -ml-1 cancels the parent's gap).
     return className ? (
       <span className={className}>{children}</span>
@@ -226,7 +226,7 @@ export function ClickableWords({
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   // Explicit direction so RTL sentences (Arabic, Hebrew, Persian) keep a
-  // trailing neutral mark (. ! ?) at the sentence END — without it the bidi
+  // trailing neutral mark (. ! ?) at the sentence END, without it the bidi
   // algorithm resolves the mark to the page's LTR direction and renders it
   // at the visual start of the sentence. `text-left` overrides the
   // right-alignment `dir="rtl"` would otherwise apply, keeping RTL sentences
@@ -260,7 +260,7 @@ export function ClickableWords({
 
   // Tag the longest cleaned word with a `data-coachmark-anchor` *only* when
   // the caller opted in (target-language instance). Without the opt-in, the
-  // first ClickableWords in DOM order would win the global query selector —
+  // first ClickableWords in DOM order would win the global query selector,
   // typically the source paragraph, which is the wrong thing to highlight.
   const longestWordIndex = coachmarkAnchorForLongestWord
     ? aligned.reduce<{ idx: number; len: number }>(
@@ -275,7 +275,7 @@ export function ClickableWords({
   return (
     <p dir={dir} className={dirClassName}>
       {aligned.map((w, i) => (
-        // Fragment (not wrapper <span>) — wrapping each word in a span made
+        // Fragment (not wrapper <span>), wrapping each word in a span made
         // the LAST word's clickable area lose the hit-test in RTL paragraphs:
         // the picker landed on the wrapper instead of the inner trigger span,
         // and hover/click never fired on the actual word. Inline children of

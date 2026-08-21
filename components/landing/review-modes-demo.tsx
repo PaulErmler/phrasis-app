@@ -271,7 +271,7 @@ export function ReviewModesDemo() {
   }, [allSubmitted]);
 
   // Audio review demo plays exactly once per mount (or per Replay click) and
-  // then stops — no auto-loop. The hands-free Radio panel below covers the
+  // then stops, no auto-loop. The hands-free Radio panel below covers the
   // continuous-play story; the audio panel demonstrates a single review.
 
   const showLanguageLabel = fullTargets.length > 1;
@@ -364,7 +364,7 @@ export function ReviewModesDemo() {
                   onMaster={() => {}}
                   onHide={() => {}}
                   onFavorite={() => {}}
-                  // No autoplay anywhere on the landing page — audio only
+                  // No autoplay anywhere on the landing page. Audio only
                   // fires when the visitor clicks an audio button. Targets
                   // start blurred so the demo still has interaction value
                   // (click target text to reveal, click audio to listen).
@@ -426,7 +426,7 @@ export function ReviewModesDemo() {
                               </div>
                             )}
                             {/* min-h (not fixed h + overflow-hidden): the diff
-                             * is taller than the input row it replaces — its
+                             * is taller than the input row it replaces. Its
                              * floating correction marks sit above the chips
                              * and were clipped by a fixed 36px box. */}
                             <div className="min-h-9">

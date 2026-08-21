@@ -1,5 +1,5 @@
 /**
- * Stripe Managed Payments — Stripe's merchant-of-record mode.
+ * Stripe Managed Payments. Stripe's merchant-of-record mode.
  *
  * With it enabled, Stripe (not Flexling) is the seller of record on the
  * checkout: it calculates, charges, and remits indirect tax in 80+
@@ -12,7 +12,7 @@
  *
  * 1. **Only the v2 `/billing.attach` REST calls in convex/billing.ts may
  *    carry this.** The autumn-js/component path pins `x-api-version: 1.2`,
- *    whose handler builds its Stripe client on 2025-02-24.acacia — and
+ *    whose handler builds its Stripe client on 2025-02-24.acacia: and
  *    Stripe rejects `managed_payments` before 2025-03-31.basil. The bodies
  *    in convex/billing.ts are hand-written snake_case for the REST API;
  *    nothing case-converts them, so the keys below MUST stay snake_case or
@@ -20,9 +20,9 @@
  * 2. **Autumn's own session params win the merge.** Server-side Autumn does
  *    `{...checkout_session_params, ...params}`, so anything Autumn sets
  *    itself overrides us. That is fine for `managed_payments` (Autumn never
- *    sets it), but it means Autumn's org-level automatic tax — which bakes
+ *    sets it), but it means Autumn's org-level automatic tax: which bakes
  *    in `automatic_tax`, `tax_id_collection`, and `customer_update`, all
- *    forbidden under Managed Payments — must be turned OFF in the Autumn
+ *    forbidden under Managed Payments: must be turned OFF in the Autumn
  *    dashboard or Stripe rejects the session.
  * 3. **It only ever applies to purchases that go through Stripe Checkout.**
  *    Stripe cannot convert existing subscriptions, and Autumn skips Checkout
@@ -37,7 +37,7 @@
 
 /**
  * The Stripe Checkout Session payload that turns Managed Payments on.
- * Snake_case is deliberate — see (1) above.
+ * Snake_case is deliberate. See (1) above.
  */
 export const MANAGED_PAYMENTS_SESSION_PARAMS = {
   managed_payments: { enabled: true },
@@ -47,7 +47,7 @@ export const MANAGED_PAYMENTS_SESSION_PARAMS = {
  * Whether the Managed Payments rollout flag is on for this deployment.
  * Read per call rather than at module load so `npx convex env set/unset
  * AUTUMN_MANAGED_PAYMENTS` takes effect without waiting on isolate
- * recycling. Server-only (convex/) — the env var is not a NEXT_PUBLIC one.
+ * recycling. Server-only (convex/), the env var is not a NEXT_PUBLIC one.
  */
 export function managedPaymentsEnabled(): boolean {
   return process.env.AUTUMN_MANAGED_PAYMENTS === 'true';

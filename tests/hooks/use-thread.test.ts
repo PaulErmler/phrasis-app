@@ -131,7 +131,7 @@ describe("useThread", () => {
       expect(result.current.threadId).toBeNull();
 
       // Convex notices the rejected token, ClientAuthBoundary confirms the
-      // session, auth flips back — the hook must retry, not stay latched.
+      // session, auth flips back. The hook must retry, not stay latched.
       harness.auth = { isAuthenticated: false };
       rerender();
       harness.auth = { isAuthenticated: true };

@@ -8,7 +8,7 @@ const agentComponent = components.agent;
 
 /**
  * Chat threads of an arbitrary user for the admin detail page. Threads
- * with status 'archived' are empty (created but never messaged — see
+ * with status 'archived' are empty (created but never messaged, see
  * features/chat/threads.ts) and are surfaced with their status so the UI
  * can label them.
  */
@@ -55,7 +55,7 @@ export const listUserThreads = adminQuery({
 
 /**
  * Messages of one thread, read-only (no streaming). The thread must belong
- * to the given user — defense-in-depth so a stray threadId can't cross
+ * to the given user. Defense-in-depth so a stray threadId can't cross
  * users in the admin UI.
  */
 export const listThreadMessages = adminQuery({
@@ -89,8 +89,8 @@ export const listThreadMessages = adminQuery({
 });
 
 /**
- * Custom texts (sentences) a user created — via manual card creation or
- * chat approval — newest first, with translations and origin badge.
+ * Custom texts (sentences) a user created, via manual card creation or
+ * chat approval. Newest first, with translations and origin badge.
  */
 export const listUserTexts = adminQuery({
   args: {

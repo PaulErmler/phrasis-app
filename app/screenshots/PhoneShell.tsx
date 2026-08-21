@@ -7,8 +7,8 @@ import { BottomNav, type View } from '@/components/app/BottomNav';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 
 /**
- * Replica of the real /app shell from app/app/(main)/layout.tsx — same
- * header, spacers, and (real) BottomNav — without any Convex data
+ * Replica of the real /app shell from app/app/(main)/layout.tsx, same
+ * header, spacers, and (real) BottomNav, without any Convex data
  * dependencies. Only used by the store-screenshot pages.
  */
 export function PhoneShell({

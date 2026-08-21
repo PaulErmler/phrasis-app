@@ -80,7 +80,7 @@ export function StepperPauseConnector({
 /**
  * Non-interactive timeline divider: same connector lines as
  * StepperPauseConnector but with a plain event pill (e.g. "Translation
- * Entered") instead of a pause stepper — for groups whose playback is
+ * Entered") instead of a pause stepper, for groups whose playback is
  * triggered by a user action rather than a timed pause.
  */
 export function TimelineEventConnector({

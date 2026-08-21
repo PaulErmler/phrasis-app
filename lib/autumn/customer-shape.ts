@@ -48,7 +48,7 @@ export type AutumnPlan = {
   planId: string;
   /**
    * The wire `status` verbatim. Safe for display and the admin dashboard;
-   * never branch on it — use the booleans, which are correct on both shapes.
+   * never branch on it. Use the booleans, which are correct on both shapes.
    */
   rawStatus: string;
   /** Bolt-on usage product, not a subscription. */
@@ -61,7 +61,7 @@ export type AutumnPlan = {
   /** A pending plan change that has not taken effect yet. */
   isScheduled: boolean;
   /**
-   * Best-effort trial end in ms — only meaningful when `isTrialing`. The
+   * Best-effort trial end in ms, only meaningful when `isTrialing`. The
    * v1 shape reports a running trial's end via `current_period_end`, so
    * this falls back to that field and therefore carries the ordinary
    * renewal date for ACTIVE non-trialing v1 products. Gate on `isTrialing`
@@ -75,7 +75,7 @@ export type AutumnPlan = {
  * The auto-enabled free plan's id (autumn.config.ts). Needed here because
  * the wire flags alone cannot identify it on GRANDFATHERED customers:
  * free-plan attachments created under old product versions report
- * `is_default: false` on v1.2 (verified live 2026-08-11 — a May-2026
+ * `is_default: false` on v1.2 (verified live 2026-08-11, a May-2026
  * customer's only product was `free`/active/`is_default: false`), which
  * made every default-flag consumer misclassify those customers as paying.
  */
@@ -101,7 +101,7 @@ function normalizeOne(raw: AutumnRawPlan, now: number): AutumnPlan {
     isDefault:
       raw.auto_enable === true ||
       raw.is_default === true ||
-      // Grandfathered free attachments carry NO default flag — see
+      // Grandfathered free attachments carry NO default flag. See
       // FREE_PLAN_ID above.
       planId === FREE_PLAN_ID,
     isPastDue: raw.past_due === true || status === 'past_due',
@@ -144,7 +144,7 @@ export function normalizePlanList(
   return asArray(entries).map((entry) => normalizeOne(entry, now));
 }
 
-/** Plans the customer holds right now — excludes expired and scheduled. */
+/** Plans the customer holds right now. Excludes expired and scheduled. */
 export function currentPlans(plans: AutumnPlan[]): AutumnPlan[] {
   return plans.filter((p) => !p.isExpired && !p.isScheduled);
 }

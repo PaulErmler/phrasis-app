@@ -99,7 +99,7 @@ describe('HighlightedText', () => {
 
   it('reuses the same span elements when localTime advances within the same word', () => {
     // Two ticks that both map to currentIndex=1 ("mundo") must produce the
-    // exact same DOM nodes — that's what proves the per-frame reconciliation
+    // exact same DOM nodes. That's what proves the per-frame reconciliation
     // is gated on currentIndex, not localTime, which is the flicker fix.
     const props = {
       text: 'hola mundo bonito',
@@ -343,7 +343,7 @@ describe('HighlightedText', () => {
       // the first word briefly flashed) when audio started, because the
       // component swapped its render tree from a fallback subtree to per-word
       // spans. With highlightTerm the spans must be the same DOM nodes
-      // before and after the flip — only their class/style change.
+      // before and after the flip, only their class/style change.
       const props = {
         text: sentence,
         language: 'en',

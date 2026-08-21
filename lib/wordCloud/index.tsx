@@ -92,7 +92,7 @@ export function useCloudSize(): {
  * sentence-example dialogs on both the stats page and the landing page.
  *
  * Uses Intl.Segmenter so non-whitespace-delimited scripts (Chinese, Japanese,
- * Thai) match mid-string — a Unicode-letter lookaround regex would never fire
+ * Thai) match mid-string. A Unicode-letter lookaround regex would never fire
  * for them because surrounding characters are also letters. Falls back to the
  * original regex if the locale is invalid. */
 export function highlightWord(

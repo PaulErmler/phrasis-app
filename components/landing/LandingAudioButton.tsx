@@ -7,8 +7,8 @@ import { Volume2 } from 'lucide-react';
 /**
  * Landing-only speaker button. When `url` is provided, the button plays the
  * pre-generated mp3 on click; otherwise it renders the same disabled
- * placeholder the page used to ship (so a missing manifest entry degrades
- * gracefully instead of blocking render).
+ * placeholder the page used to ship (so a missing manifest entry disables the
+ * button instead of blocking render).
  */
 export function LandingAudioButton({
   url,

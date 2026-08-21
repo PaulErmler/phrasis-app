@@ -100,6 +100,7 @@ export default defineConfig({
         /add-cards-live\.spec\.ts/,
         /add-cards-import-live\.spec\.ts/,
         /content-filter-live\.spec\.ts/,
+        /curriculum-edit-flag\.spec\.ts/,
       ],
       dependencies: ["chromium-parallel"],
       fullyParallel: false,
@@ -175,6 +176,20 @@ export default defineConfig({
       name: "email-auth",
       testMatch: /email-auth\.spec\.ts/,
       dependencies: ["course-management"],
+      fullyParallel: false,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      // Full account-deletion lifecycle: fresh signup, in-app request,
+      // operator purge via convex run, re-signup with the same email.
+      // Own user, empty storageState (set via test.use). Chained after
+      // email-auth for the same warmup-fan-out reason, and because both
+      // consume the per-address auth-email rate budget of fresh addresses.
+      name: "account-deletion",
+      testMatch: /account-deletion\.spec\.ts/,
+      dependencies: ["email-auth"],
       fullyParallel: false,
       use: {
         ...devices["Desktop Chrome"],

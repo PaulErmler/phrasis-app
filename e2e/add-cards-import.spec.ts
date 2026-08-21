@@ -7,7 +7,7 @@ import { dismissTour, openCardImport, pasteImport } from "./helpers";
  * These tests exercise the 3-step stepper flow end-to-end client-side: input
  * parsing, auto column mapping, validation (warnings + errors), inline cell
  * editing, row deletion, and dialog navigation. None of them submit the
- * import — the actual mutation is covered by add-cards-import-live.spec.ts.
+ * import. The actual mutation is covered by add-cards-import-live.spec.ts.
  *
  * All scenarios use at most 3 rows to keep runs fast.
  */
@@ -37,7 +37,12 @@ async function pickSelectOption(
   await page.getByRole("option", { name: optionText }).first().click();
 }
 
-test.describe("add cards — import", () => {
+test.describe("add cards: import", () => {
+  // Same route as add-cards.spec.ts: under parallel load the layout's
+  // auth preloads + on-demand compile can eat the default 30s before
+  // openCardImport's reload retry finishes (the helper waits 8s, reloads,
+  // then 20s, that does not fit in 30s).
+  test.describe.configure({ timeout: 60_000 });
   test.describe("mode switcher", () => {
     test("defaults to individual mode and can switch to import", async ({
       page,
@@ -124,7 +129,7 @@ test.describe("add cards — import", () => {
       await clickNext(page);
       await expect(page.getByTestId("import-mapping-en")).toBeVisible();
 
-      // Flip delimiter to pipe — no pipes present, each row becomes 1 column
+      // Flip delimiter to pipe, no pipes present, each row becomes 1 column
       await page.getByTestId("import-step-0").click();
       await pickSelectOption(page, "import-delimiter", /pipe/i);
       await clickNext(page);
@@ -216,7 +221,7 @@ test.describe("add cards — import", () => {
     });
   });
 
-  test.describe("review step — validation", () => {
+  test.describe("review step: validation", () => {
     test("three valid rows: summary shows 3 ready, submit enabled", async ({
       page,
     }) => {
@@ -334,7 +339,7 @@ test.describe("add cards — import", () => {
       await expect(rows).toHaveCount(3);
 
       // Delete the middle data-row ("Goodbye"). After deletion the remaining
-      // rows re-index, so we can't look up by the old testid — just assert
+      // rows re-index, so we can't look up by the old testid, just assert
       // total count and that "Goodbye" is gone.
       await page.getByTestId("import-review-delete-1").click();
 

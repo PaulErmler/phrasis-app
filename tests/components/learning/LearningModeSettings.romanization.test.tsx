@@ -7,7 +7,7 @@ import type { Id } from '@/convex/_generated/dataModel';
 
 /**
  * "Show romanization" used to render for every course, including all-Latin
- * ones where it controls nothing — the toggle was there but no card ever has a
+ * ones where it controls nothing. The toggle was there but no card ever has a
  * romanization line to reveal. It should only appear when a language on the
  * course actually has a Latin transliteration.
  */
@@ -51,7 +51,7 @@ function renderSettings(baseLanguages: string[], targetLanguages: string[]) {
   );
 }
 
-describe('LearningModeSettings — romanization gate', () => {
+describe('LearningModeSettings: romanization gate', () => {
   it('hides the toggle when no language needs romanization', () => {
     renderSettings(['en'], ['de', 'es']);
     expect(screen.queryByLabelText('showRomanization')).toBeNull();

@@ -19,7 +19,7 @@ interface StartLearningButtonProps {
    * loading. */
   hasPlayableCards?: boolean;
   /** Pause the due-count subscription while the home view is hidden
-   * (kept-mounted views stay rendered — see KeepMountedView). */
+   * (kept-mounted views stay rendered, see KeepMountedView). */
   skipLiveCounts?: boolean;
 }
 
@@ -33,7 +33,7 @@ export function StartLearningButton({
   const { courseSettings } = useAppData();
   const reviewMode = courseSettings?.reviewMode ?? 'audio';
 
-  // Third slot: free play — one scheduling mode ('radio') that wears the face
+  // Third slot: free play. One scheduling mode ('radio') that wears the face
   // of whichever review mode is selected. Shadowing gets Radio (endless
   // listening), Writing gets Free Study (endless typing practice). Both draw
   // the whole deck round-robin, each from its own rotation, and never touch
@@ -108,7 +108,7 @@ export function StartLearningButton({
         </Button>
       </div>
 
-      {/* Review mode toggle — its own full-width row. Selected toggle uses a
+      {/* Review mode toggle. Its own full-width row. Selected toggle uses a
        * soft primary tint (not the solid dark-blue fill) so the hierarchy
        * stays clean: only Learn & Review carries the strong accent. */}
       <div
@@ -138,8 +138,8 @@ export function StartLearningButton({
 
       {/* Deck triad + source filter, below the toggle: one line when there's
        * room (pills left, dropdown pinned right), otherwise the dropdown
-       * wraps under them. This row spans the full width, so — unlike the
-       * earlier nested flex-grow layout — there's no leftover-width
+       * wraps under them. This row spans the full width, so. Unlike the
+       * earlier nested flex-grow layout. There's no leftover-width
        * computation for Safari and Chrome to disagree on. */}
       <div className="flex flex-wrap items-center gap-2 gap-y-2 sm:gap-3">
         <DueCountsPills skip={skipLiveCounts} />

@@ -28,7 +28,7 @@ export interface AudioAssetKey {
   voiceGender: VoiceGender;
   /** Dialect pin for mixed languages; undefined otherwise. */
   regionVariant: string | undefined;
-  /** The RAW spoken string, exactly as sent to TTS — never normalized. */
+  /** The RAW spoken string, exactly as sent to TTS, never normalized. */
   spokenText: string;
 }
 
@@ -51,7 +51,7 @@ export interface AudioAssetPayload {
  * voice of the right gender matches and a regeneration replaces the one
  * shared asset whatever voice it picked. A future favorite-voice feature
  * turns per-voice by adding `.eq('voiceName', …)` here and in
- * `upsertAudioAsset` — the index already supports it.
+ * `upsertAudioAsset`. The index already supports it.
  */
 export async function findAudioAssetByKey(
   ctx: QueryCtx,
@@ -75,7 +75,7 @@ export async function findAudioAssetByKey(
  * Cache lookup for the enqueue paths: the asset for `key`, but only when it is
  * still servable as-is. A stale asset (ttsVersion below the language's current
  * config, provider superseded per lib/ttsPrecedence.ts, or non-current speed)
- * returns null — the caller proceeds to synthesis, whose completion patches
+ * returns null. The caller proceeds to synthesis, whose completion patches
  * the same asset in place by key. Never deletes anything.
  */
 export async function findReusableAudioAsset(
@@ -90,6 +90,14 @@ export async function findReusableAudioAsset(
     return null;
   }
   if (asset.speed !== 1) return null;
+  // A hit is only reusable while its blob still exists. An asset can outlive
+  // its blob (observed 2026-08-20: validated assets pointing at deleted
+  // storage), and reusing the corpse re-attaches the very pointer rows the
+  // validity sweep just deleted for having no blob — an attach/delete loop
+  // that never produces audio. Missing instead routes the caller to
+  // claim + enqueue; the completed synthesis replaces this asset's blob in
+  // place (upsertAudioAsset), healing every text that shares it.
+  if ((await ctx.db.system.get(asset.storageId)) === null) return null;
   return asset;
 }
 
@@ -99,7 +107,7 @@ export async function findReusableAudioAsset(
  *  - 'replaced': the existing asset was patched to the payload (in-place swap;
  *    `replacedStorageId` is its previous blob when it changed).
  *  - 'kept': the existing asset already carries completed audio and the
- *    incoming write is a mid-flight 'unknown' attempt-0 — the asset is left
+ *    incoming write is a mid-flight 'unknown' attempt-0: the asset is left
  *    untouched and the caller must drop the incoming blob.
  */
 export interface UpsertAudioAssetResult {
@@ -111,11 +119,11 @@ export interface UpsertAudioAssetResult {
 /**
  * Find-or-create/patch the asset for `key` with freshly synthesized audio.
  *
- * Replace rules: a COMPLETED synthesis ('validated' or 'unvalidated' — a
+ * Replace rules: a COMPLETED synthesis ('validated' or 'unvalidated', a
  * regeneration must land even when its validation failed) always replaces the
  * asset's audio, as does any write while the asset is still mid-flight
  * ('unknown'). Only a mid-flight 'unknown' write against an asset that already
- * has completed audio is refused ('kept') — the attempt-0 early write exists
+ * has completed audio is refused ('kept'), the attempt-0 early write exists
  * to give a brand-new asset visible audio, not to churn shared audio while a
  * job is still validating.
  */
@@ -172,7 +180,7 @@ export async function upsertAudioAsset(
 /**
  * Upsert the (textId, language) pointer row → `assetId`. When the row was
  * pointing at a DIFFERENT asset (racing jobs under different keys), the old
- * asset is cleaned up if this row was its last pointer — nothing else
+ * asset is cleaned up if this row was its last pointer, nothing else
  * garbage-collects a pointerless asset.
  */
 export async function upsertAudioPointer(
@@ -225,8 +233,8 @@ export async function scheduleBlobSwapDelete(
 }
 
 /**
- * The audio a row actually plays — its asset's payload. `null` means the row
- * carries no usable audio (a dangling pointer whose asset is gone) — callers
+ * The audio a row actually plays. Its asset's payload. `null` means the row
+ * carries no usable audio (a dangling pointer whose asset is gone), callers
  * should treat the row as missing audio and let the sweep heal it.
  */
 export interface ResolvedAudioPayload {

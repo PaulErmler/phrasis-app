@@ -7,28 +7,30 @@ import { LUNA_BO3 } from '../../lib/languages';
 
 /** OpenRouter model IDs by agent or task */
 export const OPENROUTER_MODELS = {
-  /** Main language-tutor chat (tools, streaming) — Luna nitro, adaptive
-   *  high thinking (see OPENROUTER_CHAT_REASONING). */
-  languageTeacher: 'openai/gpt-5.6-luna:nitro',
+  /** Main language-tutor chat (tools, streaming), Gemini 3.7 Flash.
+   *  No `:nitro` suffix: nitro re-ranks endpoints each step, and Gemini 3
+   *  thought signatures are not portable across Google backends (see
+   *  OPENROUTER_CHAT_EXTRA_BODY). */
+  languageTeacher: 'google/gemini-3.7-flash',
   /** Bulk translation JSON for custom card auto-fill. Reuses the
    *  single-sentence pipeline's stage (`LUNA_BO3`) so model + no-thinking
    *  reasoning can't drift apart; autofill is a SINGLE call (no sampling,
-   *  no judge — that part of the stage is ignored here). Reasoning and the
+   *  no judge, that part of the stage is ignored here). Reasoning and the
    *  Luna price cap are set at the call site in customTexts.ts (also from
    *  the stage). */
   translationAutoFill: LUNA_BO3.model,
   /** Linguistic metadata inference (register, gender, addresseeNumber) for
    *  newly-created cards. Runs once per row, including during bulk import,
    *  so we stay on the lite tier. 3.5 Flash Lite is a tier up from 3.1
-   *  ($0.30/$2.50 per M vs $0.25/$1.50) — ~33% more per call at identical
+   *  ($0.30/$2.50 per M vs $0.25/$1.50), ~33% more per call at identical
    *  token counts, taken for the newer model's accuracy on cross-lingual
    *  gender/register inference. */
   sentenceMetadata: 'google/gemini-3.5-flash-lite',
-  /** Short thread title from first user message. Left on 3.1 Flash Lite —
-   *  a 4-word title in the user's own language is the one job here where
+  /** Short thread title from first user message. Left on 3.1 Flash Lite.
+   *  A 4-word title in the user's own language is the one job here where
    *  the newer model buys nothing. */
   threadTitle: 'google/gemini-3.1-flash-lite',
-  /** Lenient TTS validation — decides whether an STT transcription is
+  /** Lenient TTS validation. Decides whether an STT transcription is
    *  semantically equivalent to the original (ignores phonetic name
    *  spellings, digits-vs-words, punctuation, etc.). Only invoked after the
    *  strict Levenshtein check already failed, so every call is a judgment
@@ -38,7 +40,7 @@ export const OPENROUTER_MODELS = {
    *  3.5 (Jul 2026). A 35-case eval found both models perfect on ordinary
    *  artifacts (diacritics, kana/kanji, 他/她, matra drift, dropped
    *  negations), but on cases where the audio spoke different words for the
-   *  same meaning — a word-order swap, a dropped Japanese copula — 3.5
+   *  same meaning, such as a word-order swap or a dropped Japanese copula, 3.5
    *  answered "match" where 3.1 answered "mismatch". 3.5 reasons about
    *  semantic equivalence; the question here is whether the TTS spoke THIS
    *  text, so that regression would ship broken audio. Re-test before
@@ -47,22 +49,21 @@ export const OPENROUTER_MODELS = {
 } as const;
 
 /**
- * Reasoning effort for the language-tutor chat agent. GPT-5.6 Luna reasons
- * ADAPTIVELY in its (default) standard mode: trivial prompts get 0 reasoning
- * tokens regardless of effort, substantive tutoring questions think under
- * `high` (~300-500 reasoning tokens, ~7 s median — measured 2026-08-04). Do
- * NOT switch to `reasoning.mode: 'pro'` for chat: it forces heavy reasoning
- * on every reply (28–60 s at high effort), unusable interactively.
+ * Reasoning effort for the language-tutor chat agent. Gemini 3.7 Flash
+ * thinking levels are minimal / low / medium / high. Chat uses `medium`.
  */
-export const OPENROUTER_CHAT_REASONING = 'high' as const;
+export const OPENROUTER_CHAT_REASONING = 'medium' as const;
+
+/** Headroom for medium thinking + a multi-card tutor reply (explanation
+ *  prose, several createCard calls). Thinking tokens count against this
+ *  cap; too low and the model finishes its thoughts with no visible reply. */
+export const OPENROUTER_CHAT_MAX_OUTPUT_TOKENS = 16_384;
 
 /**
  * Per-model OpenRouter settings for the chat agent. Sequential tool calls
  * are a product requirement, not a workaround: the tutor prompt interleaves
  * prose explanation between createCard calls (explain → card → explain →
  * card), which only works when cards are emitted one step at a time.
- * (Historically this also dodged a Gemini-3 thought_signature bug with
- * parallel functionCalls; that model is gone but the setting stays.)
  */
 export const OPENROUTER_CHAT_MODEL_SETTINGS = {
   parallelToolCalls: false,
@@ -71,28 +72,21 @@ export const OPENROUTER_CHAT_MODEL_SETTINGS = {
 /** Extra OpenRouter body for the chat agent.
  *  `usage.include` makes OpenRouter report the actual USD cost of each
  *  request (providerMetadata.openrouter.usage.cost), which drives the
- *  per-message credit charge in chat. `sort: "throughput"` picks the
- *  fastest endpoint first (same as the `:nitro` model suffix).
- *  `max_price.completion` still caps routing at $2/M output tokens.
- *  preferred_* deprioritize endpoints slower than 2s p50 / under 50 tok/s.
+ *  per-message credit charge in chat.
  *
- *  Do NOT set `require_parameters: true` here — verified 2026-08-04 that it
- *  404s ("No endpoints found that can handle the requested parameters") for
- *  gpt-5.6-luna with tools even WITHOUT a reasoning field. The old guard's
- *  job (never route to a provider without tool support) is covered in
- *  practice by `max_price` + `sort: throughput`, which keep routing on
- *  OpenAI's own endpoints. Sequential tool calls are enforced separately
- *  via OPENROUTER_CHAT_MODEL_SETTINGS.parallelToolCalls. */
+ *  Provider routing is load-bearing for Gemini 3 tool loops: each
+ *  createCard step echoes an encrypted thought signature that is only
+ *  valid on the Google backend that issued it. `:nitro` / fallbacks
+ *  hop Studio ↔ Vertex after a 429 and Google then 400s with
+ *  "Invalid thought signature." `sort: 'throughput'` still prefers a
+ *  fast endpoint on the first step; `allow_fallbacks: false` plus
+ *  `session_id` (set per-thread in messages.ts) keep later steps there.
+ *  A 429 then fails retryably instead of corrupting the loop. */
 export const OPENROUTER_CHAT_EXTRA_BODY = {
   usage: { include: true },
   provider: {
-    sort: 'throughput',
-    allow_fallbacks: true,
-    max_price: {
-      completion: 2,
-    },
-    preferred_max_latency: 2,
-    preferred_min_throughput: 50,
+    sort: 'throughput' as const,
+    allow_fallbacks: false,
   },
 } as const;
 
@@ -101,33 +95,32 @@ export const OPENROUTER_CHAT_EXTRA_BODY = {
  *
  * Every non-chat OpenRouter call spreads this in so its real USD cost lands on
  * `providerMetadata.openrouter.usage.cost` and can be reported to PostHog. Chat
- * uses `OPENROUTER_CHAT_EXTRA_BODY` above, which already includes it alongside
- * the routing constraints chat specifically needs.
+ * uses `OPENROUTER_CHAT_EXTRA_BODY` above, which already includes it.
  */
 export const OPENROUTER_USAGE_ACCOUNTING = {
   usage: { include: true },
 } as const;
 
-/** Default OpenRouter provider options for the chat agent. */
+/** Default OpenRouter provider options for the chat agent.
+ *  Reasoning is streamed (exclude: false) so Gemini thought signatures
+ *  survive the tool loop; the chat UI never renders those tokens. It
+ *  only shows a Thinking indicator until visible reply text arrives. */
 export const OPENROUTER_CHAT_PROVIDER_OPTIONS = {
   openrouter: {
-    reasoning: { effort: OPENROUTER_CHAT_REASONING },
+    reasoning: { effort: OPENROUTER_CHAT_REASONING, exclude: false },
   },
 } as const;
 
 /**
  * Marks stable prompt prefix blocks for explicit prompt caching on providers
  * that need annotations (Anthropic, Gemini). Attach via
- * `providerOptions.openrouter.cacheControl` — message-level works for
+ * `providerOptions.openrouter.cacheControl`. Message-level works for
  * `role: 'system'` messages (the provider emits message-level cache_control
  * there); content-block-level is only required for user/assistant roles.
  *
- * NOTE: for the current OpenAI-family chat model this marker is inert —
- * OpenAI prefix caching is automatic for stable ≥1k-token prefixes and
- * ignores cache_control. It's kept so a future swap back to an
- * Anthropic/Gemini chat model keeps its caching without anyone remembering
- * to re-add the annotation; the real work on OpenAI is done by prefix
- * stability + the `session_id` sticky-routing key in messages.ts.
+ * NOTE: Gemini honors this annotation for explicit prefix caching. Keep it
+ * on the static system block in messages.ts; `session_id` sticky routing
+ * still helps the cache hit across the multi-step tool loop.
  */
 export const OPENROUTER_INPUT_CACHE_CONTROL = {
   type: 'ephemeral',

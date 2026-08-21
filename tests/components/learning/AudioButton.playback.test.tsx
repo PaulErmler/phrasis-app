@@ -142,7 +142,7 @@ describe('AudioButton playback state', () => {
   it('stops the previous clip before the slow peak measurement, not after', async () => {
     // getPeak fetches and decodes; claiming the slot after it meant the old
     // clip kept playing for a noticeable beat after the user pressed another
-    // button — reading as "it didn't switch".
+    // button. Reading as "it didn't switch".
     const { getPeak } = await import('@/lib/audio/peakCache');
     let releasePeak!: (v: number) => void;
     vi.mocked(getPeak).mockReturnValueOnce(Promise.resolve(1)).mockReturnValueOnce(
@@ -185,7 +185,7 @@ describe('AudioButton playback state', () => {
     await waitFor(() => expect(FakeAudio.instances).toHaveLength(1));
     expect(FakeAudio.instances[0].paused).toBe(false);
 
-    // Starting the second must stop the first — without this, rapid clicks
+    // Starting the second must stop the first, without this, rapid clicks
     // stacked concurrent elements and the browser silently killed some.
     await user.click(second);
     await waitFor(() => expect(FakeAudio.instances).toHaveLength(2));

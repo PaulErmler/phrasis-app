@@ -11,7 +11,7 @@ import { LearningGoalStep } from '@/app/app/onboarding/steps/LearningGoalStep';
 const COUNTER_TESTID = 'goal-other-char-count';
 const INPUT_TESTID = 'goal-other-input';
 
-describe('LearningGoalStep — free-text char limit', () => {
+describe('LearningGoalStep: free-text char limit', () => {
   it('does not render the counter when the free-text input is short', () => {
     render(
       <LearningGoalStep

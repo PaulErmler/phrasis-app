@@ -85,7 +85,7 @@ describe("LanguageSelector", () => {
     const user = userEvent.setup();
     const onToggle = vi.fn();
     const { getByText } = renderSelector({ onToggleLanguage: onToggle });
-    // Pick French by its native name "Français" — unique across rows (the
+    // Pick French by its native name "Français". Unique across rows (the
     // English variants all share the word "English"). Specific assertion
     // catches "wrong code emitted" bugs the previous "any code" check missed.
     await user.click(getByText("Français"));

@@ -35,7 +35,7 @@ export function useScreenWakeLock(enabled: boolean) {
           if (sentinel === s) sentinel = null;
         });
       } catch {
-        // Unsupported, denied, or not allowed in this context — ignore
+        // Unsupported, denied, or not allowed in this context. Ignore
       }
     };
 

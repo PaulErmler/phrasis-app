@@ -9,6 +9,10 @@ import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getCourseSettings } from '../db/courseSettings';
+import {
+  carriedAnnotationFields,
+  clearedAnnotationFields,
+} from '../lib/textAnnotations';
 import { getCollectionProgress } from '../db/collections';
 import { getDeckByCourseId } from '../db/decks';
 import { trackEvent } from '../db/stats/dailyStats';
@@ -47,7 +51,9 @@ import {
   reviewModeValidator,
   asVoiceGender,
   freePlayFace,
+  schedulingTrackFromSettings,
   type SchedulingMode,
+  type SchedulingTrack,
   type StudyContentFilter,
   type FreePlayFace,
 } from '../types';
@@ -71,11 +77,17 @@ import { soundsSame } from '../lib/textComparison';
 import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
 import {
   isUserCreatedText,
+  mayRegenerateTranslation,
   USER_PROVIDED_TRANSLATION_SOURCE,
 } from '../../lib/translationProvenance';
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { scheduleMissingContent } from './decks';
+import {
+  maybeScheduleWritingSeed,
+  writingSeedPatch,
+} from '../migrations/seedWritingTrack';
+import { fetchTrackDueCards } from '../lib/dueQueue';
 import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
 import {
@@ -86,7 +98,9 @@ import {
 
 /**
  * Authenticate the user and verify ownership of a card via deck → course.
- * Throws ConvexError on failure.
+ * Throws ConvexError on failure. Every card-mutating entry point shares this
+ * ONE ownership rule instead of re-implementing the card → deck → course walk
+ * The chat "also correct" replace inherits it through `applyCardEdit`.
  */
 async function authorizeCardAccess(ctx: MutationCtx, cardId: Id<'cards'>) {
   const userId = await requireAuthUserId(ctx);
@@ -107,7 +121,7 @@ async function authorizeCardAccess(ctx: MutationCtx, cardId: Id<'cards'>) {
 /**
  * One `card_action` event for every deliberate action a user takes on a card.
  *
- * Deliberately NOT fired on review — ratings are the highest-frequency thing in
+ * Deliberately NOT fired on review. Ratings are the highest-frequency thing in
  * the app and are already recorded, with far more detail, in `dailyStats` /
  * `courseStats` / `reviewDepthAccuracy`. These are the low-volume, intentful
  * actions: the ones that say something about how people curate their deck.
@@ -163,7 +177,7 @@ const cardResultFields = {
   // copy-typing assist can retire itself in free play, which advances neither
   // preReviewCount nor the FSRS reps. Undefined for cards that predate it.
   freeStudyPlayCount: v.optional(v.number()),
-  // FSRS good/easy count — the "until rated good" Practice-Listening strategy.
+  // FSRS good/easy count. The "until rated good" Practice-Listening strategy.
   goodReviewCount: v.optional(v.number()),
   hasMissingContent: v.boolean(),
   audioSpeedOverrides: v.optional(v.record(v.string(), v.number())),
@@ -183,26 +197,13 @@ const cardResultFields = {
 const cardResultValidator = v.object(cardResultFields);
 
 /**
- * Fetch the top-K due cards for a scheduling mode, honoring the
- * content-source filter. Filter semantics:
- *   - 'both' / undefined : existing indexes, no origin filtering.
- *   - 'course'           : single origin-keyed query with origin='premade'.
- *   - 'custom'           : two origin-keyed queries (origin='custom' and
- *                          origin='chat') merged by the mode's sort key.
- *
- * Cards inserted before the origin backfill won't match the new indexes;
- * they're handled by the fallback unfiltered query in the 'both' branch.
- */
-/**
- * The free-play rotation exactly as the client is served it: unfiltered for
- * 'both', otherwise one origin-keyed query per allowed origin merged by the
- * face's (counter, order key, _creationTime) sort. Shared by the serving path
- * (`fetchDueCardsWithFilter`) and the advance's catch-up floor
- * (`advanceFreePlayCardImpl`) so the floor is always computed over the same
- * population the queue draws from — an unfiltered floor can sit far below the
- * filtered queue (a filtered-out card stuck at counter 0), letting a new card
- * be re-served dozens of times before it "catches up" to cards the user can
- * never even be shown.
+ * Fetch the top-K cards the current study surface serves: the free-play
+ * rotation when a face is active, otherwise the active track's due queue
+ * (see `fetchTrackDueCards` in convex/lib/dueQueue.ts, one selector for
+ * both tracks, shared with the content warmer in decks.ts). Both shared
+ * selectors exist for the same reason: the serving path and its consumers
+ * (catch-up floor, warmer, probes) must always draw from the same
+ * population.
  */
 async function fetchDueCardsWithFilter(
   ctx: QueryCtx,
@@ -210,90 +211,21 @@ async function fetchDueCardsWithFilter(
   schedulingMode: SchedulingMode,
   face: FreePlayFace | null,
   filter: StudyContentFilter,
+  track: SchedulingTrack,
   now: number,
   take: number,
 ): Promise<Doc<'cards'>[]> {
   if (face) {
     return fetchFreePlayRotation(ctx, deckId, face, filter, take);
   }
-  if (filter === 'both') {
-    if (schedulingMode === 'learn_new') {
-      return ctx.db
-        .query('cards')
-        .withIndex('by_deck_hidden_mastered_graduated_due', (q) =>
-          q
-            .eq('deckId', deckId)
-            .eq('isHidden', false)
-            .eq('isMastered', false)
-            .eq('isGraduated', false)
-            .lte('dueDate', now),
-        )
-        .order('asc')
-        .take(take);
-    }
-    return ctx.db
-      .query('cards')
-      .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
-        q
-          .eq('deckId', deckId)
-          .eq('isHidden', false)
-          .eq('isMastered', false)
-          .lte('dueDate', now),
-      )
-      .order('asc')
-      .take(take);
-  }
-
-  // Filtered path: run one query per allowed origin and merge results.
-  const allowedOrigins = originsForFilter(filter);
-  const perOriginResults = await Promise.all(
-    allowedOrigins.map((origin) => {
-      if (schedulingMode === 'learn_new') {
-        return ctx.db
-          .query('cards')
-          .withIndex('by_deck_hidden_mastered_origin_graduated_due', (q) =>
-            q
-              .eq('deckId', deckId)
-              .eq('isHidden', false)
-              .eq('isMastered', false)
-              .eq('collectionOrigin', origin)
-              .eq('isGraduated', false)
-              .lte('dueDate', now),
-          )
-          .order('asc')
-          .take(take);
-      }
-      return ctx.db
-        .query('cards')
-        .withIndex('by_deck_hidden_mastered_origin_dueDate', (q) =>
-          q
-            .eq('deckId', deckId)
-            .eq('isHidden', false)
-            .eq('isMastered', false)
-            .eq('collectionOrigin', origin)
-            .lte('dueDate', now),
-        )
-        .order('asc')
-        .take(take);
-    }),
-  );
-
-  // Merge by dueDate, tiebreak by _creationTime to mirror Convex's default
-  // index ordering. (Free play never reaches here — it exits early through
-  // fetchFreePlayRotation, which merges by the face's counter+order key.)
-  const merged = perOriginResults.flat();
-  merged.sort((a, b) => {
-    if (a.dueDate !== b.dueDate) return a.dueDate - b.dueDate;
-    return a._creationTime - b._creationTime;
-  });
-  return merged.slice(0, take);
+  return fetchTrackDueCards(ctx, deckId, schedulingMode, filter, track, now, take);
 }
 
 export const getCardForReview = query({
   // `timezone` is optional so callers that don't care about the daily-count
   // side-channel (tests, the layout warm-up) can still call `{}`. The learn
   // view always supplies it so the in-learn progress bar can subscribe to
-  // today's active review count via this single query — no separate
+  // today's active review count via this single query, no separate
   // `getTodayReviewCount` subscription, and updates flow in live whether they
   // come from a local mutation or another device.
   args: { timezone: v.optional(v.string()) },
@@ -307,7 +239,7 @@ export const getCardForReview = query({
       dailyReviewsToday: v.number(),
       /** How many reviews the undo button can take back (0..UNDO_DEPTH).
        * Bundled here so the learn view needs a single subscription that
-       * invalidates once per review — not this query plus a separate
+       * invalidates once per review, not this query plus a separate
        * `getUndoableReviewCount`. */
       undoableCount: v.number(),
     }),
@@ -340,6 +272,7 @@ export const getCardForReview = query({
       schedulingMode,
       studyContext.face,
       studyContentFilter,
+      studyContext.track,
       now,
       2,
     );
@@ -366,6 +299,7 @@ export const getCardForReview = query({
               sourceText: text.text,
               sourceLanguage: text.language,
               sourceRomanization: text.romanizedText ?? undefined,
+              sourceIpa: text.ipaText ?? undefined,
               userCreated: text.userCreated,
             },
           ]
@@ -386,6 +320,20 @@ export const getCardForReview = query({
 
       const collection = collections[index];
 
+      // Under separateModeTracking + Writing mode the writing track IS the
+      // card's schedule as far as this session is concerned, so surface its
+      // state in the shared-named fields the client already consumes (rating
+      // interval previews read fsrsState; the writing track has no pre-review
+      // phase, hence phase 'review' / count 0).
+      //
+      // DUE-QUEUE SERVING ONLY (`face === null`): in Free Study the track is
+      // also 'writing' (same settings combination) but cards come from the
+      // rotation. Masking their real preReviewCount/fsrsState there made
+      // long-known cards look brand new to the client (translation assist
+      // reappeared, first-exposure auto-rating kicked in).
+      const writingTrack =
+        studyContext.track === 'writing' && studyContext.face === null;
+
       return {
         _id: card._id,
         _creationTime: card._creationTime,
@@ -394,14 +342,14 @@ export const getCardForReview = query({
         sourceLanguage: text.language,
         translations: content.translations,
         audioRecordings: content.audioRecordings,
-        dueDate: card.dueDate,
+        dueDate: writingTrack ? card.writingDueDate ?? card.dueDate : card.dueDate,
         isMastered: card.isMastered,
         isHidden: card.isHidden,
         isFavorite: card.isFavorite ?? false,
-        schedulingPhase: card.schedulingPhase,
-        preReviewCount: card.preReviewCount,
+        schedulingPhase: writingTrack ? ('review' as const) : card.schedulingPhase,
+        preReviewCount: writingTrack ? 0 : card.preReviewCount,
         initialReviewCount,
-        fsrsState: card.fsrsState ?? null,
+        fsrsState: (writingTrack ? card.writingFsrsState : card.fsrsState) ?? null,
         radioPlayCount: card.radioPlayCount,
         freeStudyPlayCount: card.freeStudyPlayCount,
         goodReviewCount: card.goodReviewCount,
@@ -417,7 +365,7 @@ export const getCardForReview = query({
 
     if (!current) return null;
 
-    // Today's active (non-radio) review count — same audio+full sum used by
+    // Today's active (non-radio) review count, same audio+full sum used by
     // `triggerCelebration` in `reviewCard`. Folding it into this query means
     // the bar updates live across devices via the same subscription, and we
     // avoid a second `getTodayReviewCount` subscription on the hot path.
@@ -433,7 +381,7 @@ export const getCardForReview = query({
       dailyReviewsToday = displayedActiveReviews(todayStats);
     }
 
-    // Undo stack depth under the CURRENT study context — shares
+    // Undo stack depth under the CURRENT study context. Shares
     // takeUndoableLogs with undoLastReview so the button and the mutation
     // can't disagree.
     const undoable = await takeUndoableLogs(ctx, userId, course._id, studyContext);
@@ -455,11 +403,11 @@ export const getCardForReview = query({
  *   - 'no_cards'       : deck has zero cards from any source (new user).
  *   - 'filtered_out'   : the content filter is hiding cards. The shape of
  *                        the unblock CTA depends on TWO signals:
- *                          • `currentSourceHasAnyCards` — does the user have
+ *                          • `currentSourceHasAnyCards`: does the user have
  *                            ANY cards in the source they're filtering to?
  *                            (false ⇒ they need to add cards, not just
  *                            wait for them to come due).
- *                          • `availableInOtherSource`  — does the OTHER
+ *                          • `availableInOtherSource`: does the OTHER
  *                            source have at least one due card right now?
  *   - 'all_caught_up'  : the deck has cards but none are due right now
  *                        (filter not the cause).
@@ -468,7 +416,7 @@ export const getCardForReview = query({
  * True iff any of the user's active custom collections has at least one text
  * the deck hasn't pulled in yet. The auto-add Phase 1 (custom/chat) consumes
  * no `SENTENCES` quota, so when this returns `true` the user can still get
- * more cards without paying — the UI must NOT show the upgrade button in
+ * more cards without paying. The UI must NOT show the upgrade button in
  * that case (see decks.ts:`addCardsFromCollection`).
  *
  * `activeCustomCollectionIds` is the canonical source-of-truth: when the
@@ -510,6 +458,10 @@ export const getCardForReviewEmptyReason = query({
       reason: v.literal('all_caught_up'),
       customCardsPendingAdd: v.boolean(),
     }),
+    // separateModeTracking: the enable-time writing seed is still in flight
+    // (or stalled and awaiting a re-kick), so an empty writing queue says
+    // nothing about the user's actual due state.
+    v.object({ reason: v.literal('preparing_writing') }),
   ),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
@@ -522,7 +474,7 @@ export const getCardForReviewEmptyReason = query({
     if (!deck) return { reason: 'no_session' as const };
 
     const settings = await getCourseSettings(ctx, active.course._id);
-    const { schedulingMode, studyContentFilter, face } =
+    const { schedulingMode, studyContentFilter, face, track } =
       studyContextFromSettings(settings);
     const now = Date.now();
 
@@ -538,6 +490,25 @@ export const getCardForReviewEmptyReason = query({
       .first();
     if (!anyCard) return { reason: 'no_cards' as const };
 
+    // Writing queue while the enable-time seed is incomplete: unseeded cards
+    // are deliberately excluded from every writing due query, so neither
+    // "all caught up" nor the filtered-out analysis would be truthful yet.
+    // (`track === 'writing'` already implies separateModeTracking is on.)
+    //
+    // `face === null` is load-bearing, exactly as in getCardForReview's
+    // writing-track mask: schedulingTrackFromSettings ignores schedulingMode,
+    // so Free Study (radio + Writing) also resolves to track 'writing', but
+    // free play serves from the rotation and never reads the writing queue, so
+    // reporting a seed-in-progress there would hide the real reason its
+    // rotation is empty behind a spinner it can never clear.
+    if (
+      face === null &&
+      track === 'writing' &&
+      settings?.writingSeedDone !== true
+    ) {
+      return { reason: 'preparing_writing' as const };
+    }
+
     const customCardsPendingAdd = await hasPendingCustomCardsToAdd(
       ctx,
       userId,
@@ -551,7 +522,7 @@ export const getCardForReviewEmptyReason = query({
 
     // Filter is active. Two probes:
     //   1. Does the current (filtered-to) source have ANY card at all? If
-    //      not, the user must add — flipping the filter alone won't help in
+    //      not, the user must add: flipping the filter alone won't help in
     //      the long run.
     //   2. Does the OTHER source have any DUE card right now? If yes, we
     //      can offer the one-tap unblock.
@@ -583,6 +554,7 @@ export const getCardForReviewEmptyReason = query({
       schedulingMode,
       face,
       otherFilter,
+      track,
       now,
       1,
     );
@@ -618,7 +590,7 @@ export const reviewCard = mutation({
     accuracy: v.optional(v.number()),
     // Same review scored both ways, so stats keep both series regardless of
     // the learner's `ignorePunctuation` setting. Only recorded when both are
-    // present — see recordReviewStats.
+    // present. See recordReviewStats.
     accuracyStrict: v.optional(v.number()),
     accuracyLenient: v.optional(v.number()),
     wasDefaultRating: v.optional(v.boolean()),
@@ -641,9 +613,44 @@ export const reviewCard = mutation({
     const reviewSettings = await getCourseSettings(ctx, deck.courseId);
     const initialReviewCount = reviewSettings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
 
+    // Which per-card schedule this review writes: the writing track iff the
+    // course has separateModeTracking on AND the review happened in Writing
+    // mode. Derived from args.reviewMode (what the user actually did), not
+    // settings.reviewMode. The two only diverge on a settings-update race.
+    const track: SchedulingTrack = schedulingTrackFromSettings({
+      separateModeTracking: reviewSettings?.separateModeTracking,
+      reviewMode: args.reviewMode,
+    });
+
+    // Lazy seed: a writing-track review of a card the enable-time backfill
+    // hasn't reached yet (or one created while the split was off) starts from
+    // a copy of the shared schedule. Exactly what the backfill would have
+    // written. The undo snapshot below still records the true prior (unset)
+    // writing fields, so undoing returns the card to its unseeded state.
+    const writingUnseeded =
+      track === 'writing' && card.writingDueDate === undefined;
+    // An unseeded card reaching a writing review means the enable-time sweep
+    // hasn't finished (or died mid-chain), re-kick it. Debounced inside the
+    // helper, and the sweep fast-skips already-seeded cards, so this is cheap
+    // and only fires during the (normally short) backfill window.
+    if (writingUnseeded && reviewSettings) {
+      await maybeScheduleWritingSeed(ctx, reviewSettings);
+    }
+    // The baseline this review schedules FROM: for an unseeded card, exactly
+    // the patch the backfill sweep would have written. The same helper, so
+    // the two seeding paths share one formula and cannot diverge.
+    const writingBaseline = writingUnseeded ? writingSeedPatch(card) : card;
+    const priorWritingFsrsState = writingBaseline.writingFsrsState;
+    const priorWritingGraduated = writingBaseline.writingIsGraduated ?? false;
+    const priorWritingGoodCount = writingBaseline.writingGoodReviewCount ?? 0;
+
     // When forceReviewPhase is true (full review mode), treat the card as
     // being in the 'review' phase so FSRS ratings are accepted directly.
-    const phase = args.forceReviewPhase ? 'review' as const : card.schedulingPhase;
+    // The writing track has no pre-review phase at all.
+    const phase =
+      args.forceReviewPhase || track === 'writing'
+        ? ('review' as const)
+        : card.schedulingPhase;
     const validRatings = getValidRatings(phase);
     if (!validRatings.includes(args.rating)) {
       throw new ConvexError(
@@ -660,13 +667,21 @@ export const reviewCard = mutation({
     assertAccuracy(args.accuracyStrict, 'accuracyStrict');
     assertAccuracy(args.accuracyLenient, 'accuracyLenient');
 
-    // Build current scheduling state
-    const cardState: CardSchedulingState = {
-      schedulingPhase: phase,
-      preReviewCount: card.preReviewCount,
-      dueDate: card.dueDate,
-      fsrsState: card.fsrsState ?? null,
-    };
+    // Build current scheduling state from the reviewed track
+    const cardState: CardSchedulingState =
+      track === 'writing'
+        ? {
+            schedulingPhase: 'review',
+            preReviewCount: 0,
+            dueDate: writingBaseline.writingDueDate ?? card.dueDate,
+            fsrsState: priorWritingFsrsState ?? null,
+          }
+        : {
+            schedulingPhase: phase,
+            preReviewCount: card.preReviewCount,
+            dueDate: card.dueDate,
+            fsrsState: card.fsrsState ?? null,
+          };
 
     // Run the shared scheduling algorithm
     const result = scheduleCard(cardState, args.rating, initialReviewCount);
@@ -717,7 +732,7 @@ export const reviewCard = mutation({
         : {};
 
     // Record stats first so we can fold the new wordsTrackedLanguages stamp
-    // into the single patchCard call below — `recordReviewStats` reads `card`
+    // into the single patchCard call below. `recordReviewStats` reads `card`
     // by value and intentionally uses the pre-patch state for its own
     // bookkeeping (isFirstReview, fsrsCardState, reviewDepth), so order is safe.
     const {
@@ -738,6 +753,14 @@ export const reviewCard = mutation({
       timezone: args.timezone,
       timeSpentMs: args.timeSpentMs,
       reviewMode: args.reviewMode,
+      track,
+      // The state this review was scheduled FROM, on the writing track's
+      // lazy-seed path that's the copied shared state, not the (still unset)
+      // raw writingFsrsState.
+      priorFsrsState:
+        track === 'writing'
+          ? priorWritingFsrsState ?? null
+          : card.fsrsState ?? null,
       rating: args.rating,
       accuracy: args.accuracy,
       accuracyStrict: args.accuracyStrict,
@@ -748,29 +771,78 @@ export const reviewCard = mutation({
     });
 
     // Patch the card (via aggregate-aware helper). We pass `card` as oldDoc so
-    // patchCard can skip both the pre- and post-patch reads.
-    await patchCard(
-      ctx,
-      args.cardId,
-      {
-        schedulingPhase: result.schedulingPhase,
-        preReviewCount: result.preReviewCount,
-        dueDate: dueDateWithJitter,
-        lastReviewedAt: Date.now(),
-        // Only FSRS good/easy count (never pre-review "understood") — drives
-        // the "until rated good" Practice-Listening strategy.
-        ...(args.rating === 'good' || args.rating === 'easy'
-          ? { goodReviewCount: (card.goodReviewCount ?? 0) + 1 }
-          : {}),
-        ...searchableTextPatch,
-        ...(result.fsrsState && { fsrsState: result.fsrsState }),
-        ...isGraduatedPatch,
-        ...(newWordsTrackedLanguages
-          ? { wordsTrackedLanguages: newWordsTrackedLanguages }
-          : {}),
+    // patchCard can skip both the pre- and post-patch reads. Only the reviewed
+    // track's scheduling fields are written, under separateModeTracking the
+    // other track's schedule is untouched.
+    // Per-mode review counter. Keyed by what the user actually did
+    // (args.reviewMode), independent of the track the review wrote, so it
+    // counts correctly with the split on or off. Same 'audio' default as
+    // statsReversal.reviewModeForStats; decremented symmetrically on undo.
+    const prevModeCounts = card.reviewCountByMode ?? { audio: 0, full: 0 };
+    const reviewModeKey = args.reviewMode ?? 'audio';
+    const nonSchedulingPatch = {
+      ...searchableTextPatch,
+      ...(newWordsTrackedLanguages
+        ? { wordsTrackedLanguages: newWordsTrackedLanguages }
+        : {}),
+      reviewCountByMode: {
+        ...prevModeCounts,
+        [reviewModeKey]: prevModeCounts[reviewModeKey] + 1,
       },
-      card,
-    );
+    };
+    if (track === 'writing') {
+      await patchCard(
+        ctx,
+        args.cardId,
+        {
+          writingDueDate: dueDateWithJitter,
+          writingLastReviewedAt: Date.now(),
+          // `lastReviewedAt` is the track-agnostic activity timestamp (the
+          // Library sorts and displays it; even free-play stamps it), so a
+          // writing review updates it too. Like free play, undo does not
+          // restore it, prevWriting snapshots only the writing schedule.
+          lastReviewedAt: Date.now(),
+          // Writing-track counterpart of goodReviewCount. On a lazy seed the
+          // copied baseline is persisted even for non-good ratings, so the
+          // review is indistinguishable from backfill-then-review.
+          ...(args.rating === 'good' || args.rating === 'easy'
+            ? { writingGoodReviewCount: priorWritingGoodCount + 1 }
+            : writingUnseeded && card.goodReviewCount !== undefined
+              ? { writingGoodReviewCount: priorWritingGoodCount }
+              : {}),
+          ...(result.fsrsState && { writingFsrsState: result.fsrsState }),
+          // Always write the flag (never leave it undefined): the learn_new
+          // writing index matches on eq(writingIsGraduated, false), which an
+          // undefined field would silently fall out of. One-way like
+          // isGraduated.
+          writingIsGraduated:
+            priorWritingGraduated ||
+            (result.fsrsState !== null && result.fsrsState.state >= 2),
+          ...nonSchedulingPatch,
+        },
+        card,
+      );
+    } else {
+      await patchCard(
+        ctx,
+        args.cardId,
+        {
+          schedulingPhase: result.schedulingPhase,
+          preReviewCount: result.preReviewCount,
+          dueDate: dueDateWithJitter,
+          lastReviewedAt: Date.now(),
+          // Only FSRS good/easy count (never pre-review "understood"), drives
+          // the "until rated good" Practice-Listening strategy.
+          ...(args.rating === 'good' || args.rating === 'easy'
+            ? { goodReviewCount: (card.goodReviewCount ?? 0) + 1 }
+            : {}),
+          ...(result.fsrsState && { fsrsState: result.fsrsState }),
+          ...isGraduatedPatch,
+          ...nonSchedulingPatch,
+        },
+        card,
+      );
+    }
 
     // Log the review for the learn-mode undo stack: the pre-patch card
     // snapshot plus the keys `reverseReviewStats` needs to decrement the
@@ -786,15 +858,30 @@ export const reviewCard = mutation({
       date: todayDate,
       schedulingMode: reviewSettings?.schedulingMode ?? 'learnAndReview',
       studyContentFilter: reviewSettings?.studyContentFilter ?? 'both',
-      prevCard: {
-        dueDate: card.dueDate,
-        schedulingPhase: card.schedulingPhase,
-        preReviewCount: card.preReviewCount,
-        fsrsState: card.fsrsState,
-        isGraduated: card.isGraduated,
-        lastReviewedAt: card.lastReviewedAt,
-        goodReviewCount: card.goodReviewCount,
-      },
+      track,
+      // Snapshot the reviewed track's TRUE prior fields (for a lazy seed
+      // that's all-undefined), so undo restores exactly what was overwritten.
+      ...(track === 'writing'
+        ? {
+            prevWriting: {
+              writingDueDate: card.writingDueDate,
+              writingFsrsState: card.writingFsrsState,
+              writingIsGraduated: card.writingIsGraduated,
+              writingLastReviewedAt: card.writingLastReviewedAt,
+              writingGoodReviewCount: card.writingGoodReviewCount,
+            },
+          }
+        : {
+            prevCard: {
+              dueDate: card.dueDate,
+              schedulingPhase: card.schedulingPhase,
+              preReviewCount: card.preReviewCount,
+              fsrsState: card.fsrsState,
+              isGraduated: card.isGraduated,
+              lastReviewedAt: card.lastReviewedAt,
+              goodReviewCount: card.goodReviewCount,
+            },
+          }),
       statsReversal: {
         hourOfDay,
         rating: args.rating,
@@ -811,10 +898,23 @@ export const reviewCard = mutation({
               accuracyLenient: args.accuracyLenient,
             }
           : {}),
+        // Must mirror recordReviewStats' formula per track, including the
+        // lazy-seed resolution (priorWritingFsrsState, not the raw card).
         reviewDepth:
           args.accuracy != null
-            ? card.preReviewCount + (card.fsrsState?.reps ?? 0) + 1
+            ? track === 'writing'
+              ? (priorWritingFsrsState?.reps ?? 0) + 1
+              : card.preReviewCount + (card.fsrsState?.reps ?? 0) + 1
             : undefined,
+        // Same rule, same reason, for the reviewsByCardState bucket: stamp the
+        // state the review was scheduled FROM. `prevWriting` below snapshots
+        // the card's true (on a lazy seed, unset) writing fields because undo
+        // must restore them, so it is NOT a valid source for the stat bucket,
+        // and re-deriving from it would decrement 'new' for a review counted
+        // under the copied shared state.
+        cardState:
+          (track === 'writing' ? priorWritingFsrsState : card.fsrsState)
+            ?.state ?? 0,
         languages,
         collectionId: card.collectionId,
       },
@@ -864,17 +964,39 @@ export const reviewCard = mutation({
  * Pops the newest `reviewLogs` entry whose study context matches the CURRENT
  * course settings (see `takeUndoableLogs`), restores the card's pre-review
  * scheduling/rotation state from the snapshot, and reverses the review's
- * counting stats — time spent, streak, and word tracking stay (the learning
+ * counting stats. Time spent, streak, and word tracking stay (the learning
  * genuinely happened; see `reverseReviewStats`). Restoring the snapshot
  * `dueDate` (or radio counters) deterministically makes the card the next one
  * served, since it was at the front of the queue when it was reviewed and
  * reviews only ever push cards backward.
  *
  * Cards hidden or mastered since the review are still undone (so the user can
- * unhide/unmaster and continue where they were) — only deleted cards are
+ * unhide/unmaster and continue where they were), only deleted cards are
  * skipped. Returns `nothing_to_undo` instead of throwing when the stack is
  * empty: two devices racing over the same stack is expected, not an error.
  */
+/**
+ * Reverse `reviewCard`'s per-mode counter bump for one undone review entry.
+ * Keyed by the entry's recorded raw mode with the same 'audio' default the
+ * increment used. Cards whose counter predates the field (undefined) have
+ * nothing to reverse; the floor guards a counter that was reset/migrated
+ * between review and undo.
+ */
+function reviewCountUndoPatch(
+  card: Doc<'cards'>,
+  log: Doc<'reviewLogs'>,
+): Partial<Doc<'cards'>> {
+  const counts = card.reviewCountByMode;
+  if (!counts) return {};
+  const mode = log.statsReversal?.reviewModeRaw ?? 'audio';
+  return {
+    reviewCountByMode: {
+      ...counts,
+      [mode]: Math.max(0, counts[mode] - 1),
+    },
+  };
+}
+
 export const undoLastReview = mutation({
   args: { timezone: v.string() },
   returns: v.union(
@@ -901,14 +1023,42 @@ export const undoLastReview = mutation({
     for (const log of undoable) {
       const card = await ctx.db.get(log.cardId);
       if (!card) {
-        // Card deleted since the review — nothing to restore, and deletion
+        // Card deleted since the review, nothing to restore, and deletion
         // never reverses stat contributions elsewhere either. Discard and
         // fall through to the next entry.
         await ctx.db.delete(log._id);
         continue;
       }
 
-      if (log.kind === 'review' && log.prevCard) {
+      if (
+        log.kind === 'review' &&
+        (log.track ?? 'shared') === 'writing' &&
+        log.prevWriting
+      ) {
+        // Writing-track review: restore only the writing fields. Explicit
+        // per-field patch so snapshot values that were `undefined` (the
+        // lazy-seed case, where the track didn't exist yet) unset the fields
+        // again, returning the card to its unseeded state, and dropping it
+        // from the writing aggregates via patchCard.
+        await patchCard(
+          ctx,
+          log.cardId,
+          {
+            writingDueDate: log.prevWriting.writingDueDate,
+            writingFsrsState: log.prevWriting.writingFsrsState,
+            writingIsGraduated: log.prevWriting.writingIsGraduated,
+            writingLastReviewedAt: log.prevWriting.writingLastReviewedAt,
+            writingGoodReviewCount: log.prevWriting.writingGoodReviewCount,
+            ...reviewCountUndoPatch(card, log),
+          },
+          card,
+        );
+        await reverseReviewStats(ctx, { userId, courseId: course._id, log });
+      } else if (
+        log.kind === 'review' &&
+        (log.track ?? 'shared') === 'shared' &&
+        log.prevCard
+      ) {
         // `undefined` snapshot values (e.g. fsrsState before the card entered
         // FSRS) correctly unset the field again via patchCard → ctx.db.patch.
         await patchCard(
@@ -922,6 +1072,7 @@ export const undoLastReview = mutation({
             isGraduated: log.prevCard.isGraduated,
             lastReviewedAt: log.prevCard.lastReviewedAt,
             goodReviewCount: log.prevCard.goodReviewCount,
+            ...reviewCountUndoPatch(card, log),
           },
           card,
         );
@@ -929,7 +1080,7 @@ export const undoLastReview = mutation({
       } else if (log.kind === 'radio' || log.kind === 'freeStudy') {
         const patch = FREE_PLAY_MODES[log.kind].undoPatch(log);
         if (!patch) {
-          // Malformed entry (kind without its snapshot) — discard defensively.
+          // Malformed entry (kind without its snapshot), discard defensively.
           await ctx.db.delete(log._id);
           continue;
         }
@@ -941,7 +1092,7 @@ export const undoLastReview = mutation({
           mode: log.kind,
         });
       } else {
-        // Malformed entry (kind without its snapshot) — discard defensively.
+        // Malformed entry (kind without its snapshot), discard defensively.
         await ctx.db.delete(log._id);
         continue;
       }
@@ -967,7 +1118,7 @@ export const undoLastReview = mutation({
  * (0..UNDO_DEPTH): the newest-first run of review-log entries matching the
  * current study context.
  *
- * The learn view no longer subscribes to this — it reads the bundled
+ * The learn view no longer subscribes to this. It reads the bundled
  * `undoableCount` field on `getCardForReview` (one invalidation per review
  * instead of two). Kept as a standalone query for tests, which need to
  * assert the count in states where `getCardForReview` returns null.
@@ -993,7 +1144,7 @@ export const getUndoableReviewCount = query({
 });
 
 /**
- * Master a card — marks `isMastered: true` so it no longer appears for review.
+ * Master a card. Marks `isMastered: true` so it no longer appears for review.
  */
 export const masterCard = mutation({
   args: {
@@ -1009,7 +1160,7 @@ export const masterCard = mutation({
 });
 
 /**
- * Hide a card — marks `isHidden: true` so it no longer appears for review.
+ * Hide a card. Marks `isHidden: true` so it no longer appears for review.
  */
 export const hideCard = mutation({
   args: {
@@ -1026,7 +1177,7 @@ export const hideCard = mutation({
 
 /**
  * Delete a text's translations + audio (rows AND storage blobs) and the text
- * row itself — but ONLY when the text is user-created AND no card references it
+ * row itself, but ONLY when the text is user-created AND no card references it
  * any more. Shared premade/dataset texts (and texts still referenced by another
  * card) are left untouched. Call after deleting/replacing a card so a custom or
  * chat sentence the user removed doesn't leave orphaned translations/audio/blobs.
@@ -1038,7 +1189,7 @@ export const hideCard = mutation({
  * Invariant relied on: a user-created text is never referenced by another user's
  * card. Every userCreated text is stamped with the acting user's `userId` and
  * lives in that user's own per-course collection, and `authorizeCardAccess`
- * enforces course ownership — so the `userCreated` guard below is sufficient and
+ * enforces course ownership, so the `userCreated` guard below is sufficient and
  * no `text.userId === userId` check is needed. If cross-user sharing of
  * user-created texts is ever introduced, add an owner check here.
  */
@@ -1087,7 +1238,7 @@ export const deleteCardPermanently = mutation({
   handler: async (ctx, args) => {
     const { userId, card } = await authorizeCardAccess(ctx, args.cardId);
     const textId = card.textId;
-    // Tracked before the delete — `card` is still readable, and the event is
+    // Tracked before the delete, while `card` is still readable, and the event is
     // rolled back with the mutation if the cascade throws.
     await trackCardAction(ctx, userId, 'delete', card);
     await deleteCard(ctx, args.cardId);
@@ -1125,8 +1276,8 @@ export const unhideCard = mutation({
  * mode puts them (Shadowing → radio rotation, Writing → free-study rotation).
  *
  * The face is resolved from course settings rather than passed in, so the
- * rotation advanced here is always the one the client is being served from —
- * there is no argument the client could get out of sync with.
+ * rotation advanced here is always the one the client is being served from.
+ * There is no argument the client could get out of sync with.
  *
  * Bumps the card's round counter so the next-lowest counter rises to the
  * front, re-rolls the order key so the round-robin shuffles every loop (and
@@ -1136,7 +1287,7 @@ export const unhideCard = mutation({
  * Catch-up rule: a brand-new card (counter 0) joining a deck whose other
  * cards are all at e.g. 100 should not replay 99 more times. After playing,
  * its counter jumps to `max(picked, floorOfOthers) + 1` so it lands one
- * step past the rest of the deck — strictly above every other playable
+ * step past the rest of the deck. Strictly above every other playable
  * card. This guarantees the just-played card is never re-picked as the
  * next card while any other playable card exists (the random order-key
  * tiebreak only kicks in at equal counters, which can no longer include
@@ -1145,7 +1296,7 @@ export const unhideCard = mutation({
  * Stats: writes the face's `dailyStats.reviewsByMode` + `timeMsByMode`
  * buckets and the equivalent rollups, plus `courseStats.totalReviewsByMode`
  * and the streak. Word tracking, FSRS state, accuracy, ratings, and
- * collection progress are explicitly skipped — free play never touches the
+ * collection progress are explicitly skipped. Free play never touches the
  * spaced-repetition schedule.
  */
 async function advanceFreePlayCardImpl(
@@ -1168,7 +1319,7 @@ async function advanceFreePlayCardImpl(
   }
   const cfg = FREE_PLAY_MODES[face];
 
-  // Fetch the two lowest-counter playable cards — from the same
+  // Fetch the two lowest-counter playable cards, from the same
   // origin-filtered rotation the card was served from, or the floor could
   // come from a card the active content filter never serves (stuck at a far
   // lower counter), neutering the catch-up jump below. The first should be
@@ -1183,7 +1334,7 @@ async function advanceFreePlayCardImpl(
   );
 
   const pickedCounter = card[cfg.counterField] ?? 0;
-  // Identify the floor card — the second-lowest, excluding `card` itself.
+  // Identify the floor card. The second-lowest, excluding `card` itself.
   // If the just-played card is no longer the lowest (e.g. it was favorited
   // or another tab advanced concurrently), `lowestTwo[0]` may differ from
   // `card`; in that case the floor is whichever of the two is not `card`.
@@ -1196,7 +1347,7 @@ async function advanceFreePlayCardImpl(
 
   // Separate from the round counter (a rotation position subject to the
   // catch-up jump above): a true +1-per-play count. The seed for cards that
-  // predate the field is face-specific — see `playCountSeed` in
+  // predate the field is face-specific. See `playCountSeed` in
   // convex/lib/freePlay.ts.
   const newPlayCount = (card[cfg.playCountField] ?? cfg.playCountSeed(card)) + 1;
 
@@ -1219,7 +1370,7 @@ async function advanceFreePlayCardImpl(
   // Log the play for the learn-mode undo stack. Restoring the pre-play
   // rotation state puts this card back at the front (advancing only ever
   // raises counters, so nothing can have slotted in below it since).
-  // `kind` carries the face — that is what scopes the undo stack to the
+  // `kind` carries the face. That is what scopes the undo stack to the
   // rotation the user is actually looking at (see takeUndoableLogs).
   await logReview(ctx, {
     userId,
@@ -1253,8 +1404,8 @@ export const advanceFreePlayCard = mutation({
  * @deprecated Back-compat alias for client bundles built before the
  * radio→free-play rename (open tabs, cached PWA/Capacitor builds). Same
  * behavior as `advanceFreePlayCard`, but keeps the old name and the old
- * `nextRadioRoundCounter` return field. Remove once the deploy has soaked —
- * tracked in `.devtool/features/remove-advance-radio-card-alias-2026-08-03.md`.
+ * `nextRadioRoundCounter` return field. Remove once the deploy has soaked.
+ * Tracked in `.devtool/features/remove-advance-radio-card-alias-2026-08-03.md`.
  */
 export const advanceRadioCard = mutation({
   args: {
@@ -1274,7 +1425,7 @@ export const advanceRadioCard = mutation({
 /**
  * Whether the user's active deck has at least one playable card
  * (non-hidden, non-mastered). Used by the home screen to gate the free-play
- * button (Radio / Free Study) — free play is meaningless on an empty deck.
+ * button (Radio / Free Study), free play is meaningless on an empty deck.
  *
  * Uses the narrowest index that answers the question (free play doesn't care
  * about due-ness): the plain hidden/mastered index for 'both', the
@@ -1372,7 +1523,7 @@ export const setCardAudioSpeedOverride = mutation({
 });
 
 /**
- * Toggle a card's favorite state — flips `isFavorite` between true and false.
+ * Toggle a card's favorite state. Flips `isFavorite` between true and false.
  */
 export const toggleFavoriteCard = mutation({
   args: {
@@ -1389,6 +1540,129 @@ export const toggleFavoriteCard = mutation({
 });
 
 /**
+ * Claim the (text, language) translation slot and enqueue a `retranslation_high`
+ * job for it. The single unit of work shared by the two gestures that can
+ * trigger an automatic retranslation: the explicit Flag button below, and a
+ * manual card edit of a curriculum translation
+ * (`suggestCurriculumFixesForEdit`).
+ *
+ * Returns true iff this call acquired the claim and enqueued. False means
+ * something else is already retranslating this (text, language) and this
+ * caller's request, including any suggestion it carried, is dropped. Callers
+ * that bill quota should do so only on a true return.
+ *
+ * Audio is deliberately NOT deleted here: before the LLM lands we can't know
+ * whether the retranslation is audibly different. That decision lives in
+ * `storeTranslationAndScheduleTTS`'s replaceExisting branch, which has old +
+ * new text in hand. It keeps the audio when the change is punctuation-only
+ * (`soundsSame`) and deletes + re-enqueues TTS otherwise.
+ */
+async function enqueueFlagRetranslation(
+  ctx: MutationCtx,
+  text: Doc<'texts'>,
+  targetLanguage: string,
+  opts?: {
+    userSuggestedTranslation?: string;
+    /** Runs after the claim is acquired and before the job is enqueued.
+     * `flagTranslation` bills its one quota unit here so a depleted user
+     * throws before any pool work is created, rather than relying on the
+     * surrounding transaction to unwind an enqueue that already happened. */
+    onClaimed?: () => Promise<void>;
+  },
+): Promise<boolean> {
+  const claimId = await claimLlmTranslationIfAvailable(
+    ctx,
+    text._id,
+    targetLanguage,
+  );
+  if (!claimId) return false;
+
+  await opts?.onClaimed?.();
+
+  await ctx.runMutation(
+    internal.features.llmTranslationQueue.enqueueLlmTranslation,
+    {
+      args: {
+        textId: text._id,
+        sourceLanguage: text.language,
+        targetLanguage,
+        text: text.text,
+        audioSpeakerGender: text.audioSpeakerGender,
+        ruleOverride: 'retranslation_high',
+        // Deliberate retranslation. Overwrite the existing translation
+        // row (and its romanization) once the LLM lands.
+        replaceExisting: true,
+        ...(opts?.userSuggestedTranslation
+          ? { userSuggestedTranslation: opts.userSuggestedTranslation }
+          : {}),
+      },
+    },
+  );
+  return true;
+}
+
+/**
+ * A manual edit of a curriculum card is also a complaint about the curriculum.
+ * Path B of `applyCardEdit` forks the shared text so the editor keeps their
+ * wording, which leaves the shared row every OTHER learner studies exactly as
+ * wrong as it was. This closes that loop: each changed target language flags
+ * the original shared `translations` row and, within the flag cap, enqueues a
+ * retranslation carrying the user's wording as a suggestion the prompt tells
+ * the model to distrust.
+ *
+ * Called only from Path B (shared text) and only for manual edits. The chat
+ * "also correct" replace is excluded at the call site: accepting an
+ * alternative phrasing from the tutor is not a claim that the curriculum
+ * translation is wrong, and burning the row's capped retranslations on it
+ * would be wrong. Edits that also change the source line are excluded too,
+ * since the user's target text then translates THEIR source, not the
+ * curriculum's.
+ *
+ * No quota: `applyCardEdit` already consumed a CARD_EDITS unit in this same
+ * mutation, and the shared `flagCount` cap bounds provider spend per row
+ * across every user and both trigger paths. Not calling `consumeQuota` also
+ * means no new USAGE_LIMIT throw can roll back an otherwise-valid edit.
+ *
+ * Returns the languages that were flagged, for the caller's analytics event.
+ */
+async function suggestCurriculumFixesForEdit(
+  ctx: MutationCtx,
+  originalText: Doc<'texts'>,
+  changedLanguages: Set<string>,
+  submittedMap: Map<string, string>,
+  existingTranslationMap: Map<string, Doc<'translations'>>,
+): Promise<string[]> {
+  const flagged: string[] = [];
+
+  for (const lang of changedLanguages) {
+    if (lang === originalText.language) continue;
+
+    const existing = existingTranslationMap.get(lang);
+    // No shared row for this language: the curriculum never had a translation
+    // here, so there is nothing to correct and nothing to count.
+    if (!existing) continue;
+
+    // Hand-curated and user-provided rows are never second-guessed by the
+    // pipeline. Skip them whole, counter included: a flag we will never act on
+    // reads as unresolved triage rather than a deliberate exemption.
+    if (!mayRegenerateTranslation(originalText, existing)) continue;
+
+    // Post-increment cap, matching `flagTranslation`. The counter always rises
+    // (over-cap flags are the admin-triage signal); only the enqueue is gated.
+    const nextCount = (existing.flagCount ?? 0) + 1;
+    await ctx.db.patch(existing._id, { flagCount: nextCount });
+    flagged.push(lang);
+    if (nextCount > FLAG_AUTO_RETRANSLATION_MAX) continue;
+
+    await enqueueFlagRetranslation(ctx, originalText, lang, {
+      userSuggestedTranslation: submittedMap.get(lang),
+    });
+  }
+
+  return flagged;
+}
+
+/**
  * Flag a card as having bad translation content. The user sees a single
  * "Flag" affordance on the card; we then increment `flagCount` on every
  * non-source-language `translations` row for that card's text, and enqueue
@@ -1399,7 +1673,7 @@ export const toggleFavoriteCard = mutation({
  *
  * Routing per text: curriculum (premade-dataset) texts use
  * `retranslation_high` (Pro-medium). User-created custom texts are
- * **flagged without retranslation** — the LLM has no curated source of
+ * **flagged without retranslation**. The LLM has no curated source of
  * truth to second-guess against, so flagging a custom-text translation
  * only bumps `flagCount` (for admin triage / surfacing the "Flagged" pill)
  * and exits without enqueueing an LLM call. The rule applies to the whole
@@ -1410,7 +1684,7 @@ export const toggleFavoriteCard = mutation({
  * how many languages were retranslated. Charged on the first language
  * that successfully claims a slot; not charged at all if every language
  * was over-cap or claim-contested. If `consumeQuota` throws USAGE_LIMIT,
- * the whole mutation rolls back — counters and any prior claim/audio
+ * the whole mutation rolls back. Counters and any prior claim/audio
  * deletion are reverted.
  */
 export const flagTranslation = mutation({
@@ -1431,7 +1705,7 @@ export const flagTranslation = mutation({
     // both base and target (unusual but possible). Fetching this exact
     // set via the `by_text_and_language` index lets us skip orphan
     // translation rows that may exist for languages the user has since
-    // removed from their course — we shouldn't bump flagCount on those.
+    // removed from their course. We shouldn't bump flagCount on those.
     const cardLanguages = Array.from(
       new Set([...course.baseLanguages, ...course.targetLanguages]),
     ).filter((lang) => lang !== text.language);
@@ -1440,7 +1714,7 @@ export const flagTranslation = mutation({
       return { retranslated: false };
     }
 
-    // Parallel indexed reads — one per language, each O(1) via the
+    // Parallel indexed reads. One per language, each O(1) via the
     // composite index. Faster than a single `by_textId` collect + JS
     // filter when only a subset of the text's translations matter.
     const fetched = await Promise.all(
@@ -1455,7 +1729,7 @@ export const flagTranslation = mutation({
     );
 
     // Drop languages with no translation row (the card simply doesn't
-    // have a translation in that language yet — nothing to flag).
+    // have a translation in that language yet, nothing to flag).
     const nonSourceTranslations = fetched.filter(
       (tr): tr is NonNullable<typeof tr> => tr !== null,
     );
@@ -1476,7 +1750,7 @@ export const flagTranslation = mutation({
     }
 
     // Custom-text flag policy: increment counters but never auto-retranslate.
-    // Custom texts have no curated source of truth — the LLM would only be
+    // Custom texts have no curated source of truth. The LLM would only be
     // second-guessing the user's own content. Flagging surfaces them in the
     // "Flagged" UI pill for the user and admin triage; that's the full
     // workflow. No quota charge, no audio invalidation, no enqueue.
@@ -1498,57 +1772,31 @@ export const flagTranslation = mutation({
       return { retranslated: false };
     }
 
-    // Curriculum-only path: user-created texts already short-circuited above.
-    const ruleOverride = 'retranslation_high';
-
-    // 3) Per-language: claim slot, charge quota on first success only,
-    // delete stale audio, enqueue retranslation. Claim-contested rows
-    // skip silently (something else is already retranslating them).
+    // 3) Per-language: claim slot, enqueue the retranslation, charge quota on
+    // the first success only. Claim-contested rows skip silently (something
+    // else is already retranslating them). The rule is always
+    // `retranslation_high` here; user-created texts short-circuited above.
     let anyEnqueued = false;
     let quotaCharged = false;
 
     for (const { tr } of enqueueable) {
-      const lang = tr.targetLanguage;
-
-      const claimId = await claimLlmTranslationIfAvailable(
+      const enqueued = await enqueueFlagRetranslation(
         ctx,
-        card.textId,
-        lang,
-      );
-      if (!claimId) continue;
-
-      // Charge quota once total — on the first successful claim. If the
-      // user is depleted, this throws USAGE_LIMIT and the whole mutation
-      // rolls back (counters, claim row, audio deletes).
-      if (!quotaCharged) {
-        await consumeQuota(ctx, userId, FEATURE_IDS.TRANSLATION_FLAGS);
-        quotaCharged = true;
-      }
-
-      // Audio is deliberately NOT deleted here: before the LLM lands we
-      // can't know whether the retranslation is audibly different. The
-      // decision lives in storeTranslationAndScheduleTTS's replaceExisting
-      // branch, which has old + new text in hand — it keeps the audio when
-      // the change is punctuation-only (`soundsSame`) and deletes + re-
-      // enqueues TTS otherwise.
-
-      await ctx.runMutation(
-        internal.features.llmTranslationQueue.enqueueLlmTranslation,
+        text,
+        tr.targetLanguage,
         {
-          args: {
-            textId: card.textId,
-            sourceLanguage: text.language,
-            targetLanguage: lang,
-            text: text.text,
-            audioSpeakerGender: text.audioSpeakerGender,
-            ruleOverride,
-            // Deliberate retranslation — overwrite the existing translation
-            // row (and its romanization) once the LLM lands.
-            replaceExisting: true,
+          // Charge once total, on the first successful claim. If the user is
+          // depleted this throws USAGE_LIMIT from inside the helper, before
+          // that language's job is enqueued, and the whole mutation rolls
+          // back (counters, claim rows, any earlier enqueue).
+          onClaimed: async () => {
+            if (quotaCharged) return;
+            await consumeQuota(ctx, userId, FEATURE_IDS.TRANSLATION_FLAGS);
+            quotaCharged = true;
           },
         },
       );
-      anyEnqueued = true;
+      if (enqueued) anyEnqueued = true;
     }
 
     // Flag volume per language is the clearest quality signal the app has for
@@ -1616,26 +1864,63 @@ export const regenerateCardAudio = mutation({
 });
 
 /**
- * Edit the translations of a card.
+ * Core of `editCard`, shared with the chat "also correct" replace path
+ * (convex/features/chat/cardApprovals.ts).
  *
  * Creates a replacement card with identical scheduling stats but updated text.
  * Two paths:
- *   A) User-owned text — patches rows in place, reuses textId.
- *   B) Shared/dataset text — creates new textId, copies unchanged content.
+ *   A) User-owned text: patches rows in place, reuses textId.
+ *   B) Shared/dataset text: creates new textId, copies unchanged content.
+ *
+ * Options beyond the editCard args:
+ *   - ensureUserOwnedText: run Path B even when no text changed, so the
+ *     returned textId is always user-owned. The also-correct replace path
+ *     patches metadata (speaker gender, register, …) onto the row afterwards,
+ *     which must never hit a shared/dataset text other users reference.
+ *   - skipQuota: caller owns CARD_EDITS billing (bills once itself).
+ *   - suggestCurriculumFix: on Path B, also flag the shared rows this edit
+ *     disagrees with and suggest the user's wording to the retranslation.
+ *     Manual edits only.
+ *
+ * Returns the resolved textId and whether anything was written; a no-op diff
+ * without ensureUserOwnedText returns `changed: false` and consumes nothing.
  */
-export const editCard = mutation({
+export async function applyCardEdit(
+  ctx: MutationCtx,
   args: {
-    cardId: v.id('cards'),
-    translations: v.array(
-      v.object({
-        language: v.string(),
-        text: v.string(),
-      }),
-    ),
-    timezone: v.string(),
+    cardId: Id<'cards'>;
+    translations: { language: string; text: string }[];
+    timezone: string;
+    ensureUserOwnedText?: boolean;
+    skipQuota?: boolean;
+    /** Definitive speaker gender proposed alongside the edit (the chat
+     * "also correct" replace). Applied to the text row BEFORE this edit's
+     * `scheduleMissingContent` pass: the TTS enqueue resolves its voice from
+     * the row and takes a per-(text, language) claim, so a gender patched
+     * only afterwards (applyTextMetadata) would come too late. The claim
+     * blocks the follow-up pass and the wrong-gender synthesis wins. */
+    proposedAudioSpeakerGender?: 'male' | 'female';
+    /** Treat this edit as a complaint about the curriculum as well as a
+     * private fix. On Path B only, flag the ORIGINAL shared translation rows
+     * for the changed languages and hand the user's wording to the
+     * retranslation as a suggestion. See `suggestCurriculumFixesForEdit`.
+     *
+     * Off by default so a caller has to opt in deliberately. Only `editCard`
+     * (the manual edit dialog) does; the chat "also correct" replace must
+     * not, since an alternative phrasing the tutor offered is not a claim
+     * that the curriculum translation is wrong. */
+    suggestCurriculumFix?: boolean;
   },
-  returns: v.null(),
-  handler: async (ctx, args) => {
+): Promise<{
+  textId: Id<'texts'>;
+  /** The card after the edit, same id on Path A, a NEW id on Path B. */
+  cardId: Id<'cards'>;
+  changed: boolean;
+  /** The card's course, from the one authorizeCardAccess walk this edit
+   * already performs. Returned so callers needing course languages (the
+   * also-correct replace) don't repeat the card → deck → course reads. */
+  course: Doc<'courses'>;
+}> {
     const { userId, card, course } = await authorizeCardAccess(ctx, args.cardId);
 
     const text = await ctx.db.get(card.textId);
@@ -1644,8 +1929,11 @@ export const editCard = mutation({
     // Narrow the card's resolved voice gender once for stamping onto the
     // translation rows below. `texts.audioSpeakerGender` is typed as a loose
     // string but is always 'male' | 'female' in practice; the stamped
-    // `translations.speakerGender` field is strict.
-    const audioGenderStamp = asVoiceGender(text.audioSpeakerGender);
+    // `translations.speakerGender` field is strict. A proposed gender wins.
+    // The re-stamped rows must agree with the voice the edit enqueues.
+    const audioGenderStamp = asVoiceGender(
+      args.proposedAudioSpeakerGender ?? text.audioSpeakerGender,
+    );
 
     const sourceLanguage = text.language;
     const allLanguages = [
@@ -1692,11 +1980,20 @@ export const editCard = mutation({
       }
     }
 
-    if (changedLanguages.size === 0) return null;
+    const isUserOwned = text.userCreated && text.userId === userId;
+    // Path B must also run for a no-text-change call that requires ownership
+    // (metadata-only "also correct" replace on a shared text): the pure
+    // logical copy gives the caller a user-owned row to patch.
+    const needsCopy =
+      !isUserOwned &&
+      (changedLanguages.size > 0 || args.ensureUserOwnedText === true);
+    if (changedLanguages.size === 0 && !needsCopy) {
+      return { textId: card.textId, cardId: args.cardId, changed: false, course };
+    }
 
     // Audio-relevant subset of the diff: an edit that only touches
     // punctuation/'_' (`soundsSame`) sounds identical spoken aloud, so the
-    // language keeps its audio — Path A skips the delete, Path B copies the
+    // language keeps its audio. Path A skips the delete, Path B copies the
     // rows like an unchanged language (word timings still align; the words
     // are the same). Text/romanization writes keep using the full
     // `changedLanguages` set.
@@ -1724,26 +2021,29 @@ export const editCard = mutation({
     }
 
     // Consume quota before making changes
-    await consumeQuota(ctx, userId, FEATURE_IDS.CARD_EDITS);
+    if (!args.skipQuota) {
+      await consumeQuota(ctx, userId, FEATURE_IDS.CARD_EDITS);
+    }
 
     // Track card edit event
     await trackEvent(ctx, { userId, courseId: course._id, timezone: args.timezone, field: 'cardsEdited' });
 
-    const isUserOwned = text.userCreated && text.userId === userId;
     let resolvedTextId: Id<'texts'>;
+    // Languages whose shared curriculum row this edit flagged, for the
+    // analytics event at the end. Only ever non-empty on Path B.
+    let flaggedLanguages: string[] = [];
 
     if (isUserOwned) {
       // Path A: modify in place
       resolvedTextId = card.textId;
 
       if (changedLanguages.has(sourceLanguage)) {
-        // `romanizedText` and `romanizationSource` travel as a unit — the old
-        // transliteration no longer matches the new text, so its provenance
-        // tag has to go with it (mirrors the translation branch below).
+        // Annotation values and their provenance tags travel as units. The
+        // old transliteration/IPA no longer matches the new text, so the
+        // tags go with them (mirrors the translation branch below).
         await ctx.db.patch(text._id, {
           text: submittedMap.get(sourceLanguage)!,
-          romanizedText: undefined,
-          romanizationSource: undefined,
+          ...clearedAnnotationFields(),
         });
       }
 
@@ -1752,14 +2052,13 @@ export const editCard = mutation({
         if (!changedLanguages.has(lang)) continue;
         const existing = existingTranslationMap.get(lang);
         if (existing) {
-          // User edited an existing translation — drop the romanization (it
-          // doesn't match the new text), drop the old romanization source,
-          // and re-tag as user-provided so a future strategy swap doesn't
-          // overwrite the user's edit.
+          // User edited an existing translation. Drop the annotations (they
+          // don't match the new text), drop their source tags, and re-tag
+          // as user-provided so a future strategy swap doesn't overwrite
+          // the user's edit.
           await ctx.db.patch(existing._id, {
             translatedText: submittedMap.get(lang)!,
-            romanizedText: undefined,
-            romanizationSource: undefined,
+            ...clearedAnnotationFields(),
             translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
             // Stamp with the card's current gender so the mismatch sweep in
             // `scheduleMissingContent` sees agreement (the user-provided
@@ -1782,10 +2081,15 @@ export const editCard = mutation({
         }
       }
 
-      // Delete audio recordings for audibly-changed languages only —
-      // punctuation-only edits keep their audio.
+      // Detach audio pointers for audibly-changed languages only.
+      // Punctuation-only edits keep their audio. keepAsset: the old audio is
+      // still correct for the old sentence, so it stays in the audioAssets
+      // cache (only the regenerate button and TTS-system migrations fully
+      // delete audio).
       for (const lang of audioChangedLanguages) {
-        await deleteAudioRowsForTextLanguage(ctx, card.textId, lang);
+        await deleteAudioRowsForTextLanguage(ctx, card.textId, lang, {
+          keepAsset: true,
+        });
       }
     } else {
       // Path B: create new textId, copy unchanged content
@@ -1794,17 +2098,17 @@ export const editCard = mutation({
       const newTextId = await ctx.db.insert('texts', {
         text: sourceChanged && submittedSource ? submittedSource : text.text,
         language: text.language,
-        romanizedText: sourceChanged ? undefined : text.romanizedText,
-        // Source travels with the value: copy when unchanged (so we keep
-        // pointing at whichever romanizer produced the carried-over text);
-        // drop when changed (next ensureContent will re-romanize and tag).
-        romanizationSource: sourceChanged ? undefined : text.romanizationSource,
+        // Annotations (romanization, IPA) travel with their source tags:
+        // copy when unchanged (so we keep pointing at whichever engine
+        // produced the carried-over text); drop when changed (next
+        // ensureContent regenerates and re-tags).
+        ...(sourceChanged ? {} : carriedAnnotationFields(text)),
         userCreated: true,
         userId,
         collectionId: text.collectionId,
         collectionRank: text.collectionRank,
-        // This row is a logical copy of `text` — the user only edited
-        // translations, not the source — so preserve all pipeline-derived
+        // This row is a logical copy of `text`. The user only edited
+        // translations, not the source, so preserve all pipeline-derived
         // metadata rather than regenerating it. speakerGender specifically
         // also prevents the downstream `scheduleMissingContent` sweep from
         // coin-flipping a new gender that disagrees with the copied audio
@@ -1824,10 +2128,10 @@ export const editCard = mutation({
 
       // Create translations rows for all non-source languages.
       // Sources travel with their values:
-      //   - User-edited rows: tag as `'user-provided'`; carry no romanization.
-      //   - Unchanged rows: copy `translatedText` + `translationSource` + (if
-      //     present) `romanizedText` + `romanizationSource` so we don't lose
-      //     the original tags on the logical-copy operation.
+      //   - User-edited rows: tag as `'user-provided'`; carry no annotations.
+      //   - Unchanged rows: copy `translatedText` + `translationSource` +
+      //     every present annotation pair (romanization, IPA) so we don't
+      //     lose the original tags on the logical-copy operation.
       for (const lang of allLanguages) {
         if (lang === sourceLanguage) continue;
         const existing = existingTranslationMap.get(lang);
@@ -1843,16 +2147,7 @@ export const editCard = mutation({
             : existing?.translationSource
               ? { translationSource: existing.translationSource }
               : {}),
-          ...(changed
-            ? {}
-            : existing?.romanizedText !== undefined
-              ? {
-                romanizedText: existing.romanizedText,
-                ...(existing.romanizationSource
-                  ? { romanizationSource: existing.romanizationSource }
-                  : {}),
-              }
-              : {}),
+          ...(changed || !existing ? {} : carriedAnnotationFields(existing)),
           // Copy the prior row's speakerGender on the carry-over path so the
           // logical copy doesn't trigger a gender-mismatch regeneration on
           // the new text. For user-edited (changed) rows, stamp with the
@@ -1877,8 +2172,8 @@ export const editCard = mutation({
         });
       }
 
-      // Copy audio recordings for languages whose audio is still valid —
-      // unchanged ones AND punctuation-only edits (audibly identical).
+      // Copy audio recordings for languages whose audio is still valid.
+      // Unchanged ones AND punctuation-only edits (audibly identical).
       for (const lang of allLanguages) {
         if (audioChangedLanguages.has(lang)) continue;
         const audioRows = await ctx.db
@@ -1888,7 +2183,7 @@ export const editCard = mutation({
           )
           .take(20);
         for (const row of audioRows) {
-          // The copy shares the same asset — staleness (the asset's
+          // The copy shares the same asset. Staleness (the asset's
           // ttsVersion stamp) travels with the asset itself.
           await ctx.db.insert('audioRecordings', {
             textId: newTextId,
@@ -1897,6 +2192,38 @@ export const editCard = mutation({
           });
         }
       }
+
+      // The fork above is now the user's private copy. `text` and
+      // `existingTranslationMap` still describe the untouched shared rows, so
+      // this is the one place with both the original rows and the user's
+      // wording in hand.
+      //
+      // Skipped entirely when the source line changed: the user's target text
+      // is then a translation of THEIR source sentence, not the curriculum's,
+      // so offering it as a correction would compare two different sentences.
+      if (args.suggestCurriculumFix && !changedLanguages.has(sourceLanguage)) {
+        flaggedLanguages = await suggestCurriculumFixesForEdit(
+          ctx,
+          text,
+          changedLanguages,
+          submittedMap,
+          existingTranslationMap,
+        );
+      }
+    }
+
+    // Metadata-before-scheduling: land the proposed gender on the resolved
+    // text row now, so `scheduleMissingContent` below (which resolves the
+    // voice from this row and claims the synthesis) already speaks with the
+    // right voice. See the arg's doc comment for why afterwards is too late.
+    // Both fields: `resolveCardSpeakerGenders` gives the definitive
+    // linguistic `speakerGender` precedence over `audioSpeakerGender` and
+    // would flip a lone audio-gender patch straight back.
+    if (args.proposedAudioSpeakerGender !== undefined) {
+      await ctx.db.patch(resolvedTextId, {
+        speakerGender: args.proposedAudioSpeakerGender,
+        audioSpeakerGender: args.proposedAudioSpeakerGender,
+      });
     }
 
     // Build searchable text for the new card
@@ -1907,9 +2234,15 @@ export const editCard = mutation({
     const { searchableText, searchableTextLanguages } =
       await buildCardSearchableText(ctx, resolvedTextId, resolvedText.text, courseLanguages);
 
+    // The card this edit leaves behind: unchanged on Path A (patched in
+    // place), a brand-new document on Path B (insert + delete). Callers need
+    // to know which. The chat replace path retargets its sibling approvals
+    // and the learn view suppresses its thread rotation off this identity.
+    let resolvedCardId: Id<'cards'> = args.cardId;
+
     if (isUserOwned) {
       // Path A edits the existing text row, so the card still points at the
-      // right content — only its derived search index needs refreshing. Patch
+      // right content, only its derived search index needs refreshing. Patch
       // in place: the card keeps its `_id`, `_creationTime` and `dueDate`, so
       // it holds its exact position in the queue and costs three aggregate
       // writes instead of the six a delete + insert would.
@@ -1936,7 +2269,7 @@ export const editCard = mutation({
       // uses _creationTime as the tiebreaker within equal index values, and the
       // new doc would otherwise sort last, causing a different card to be
       // returned by getCardForReview).
-      await insertCard(ctx, {
+      resolvedCardId = await insertCard(ctx, {
         deckId: card.deckId,
         textId: resolvedTextId,
         collectionId: card.collectionId,
@@ -1948,7 +2281,7 @@ export const editCard = mutation({
         isGraduated: card.isGraduated ?? false,
         schedulingPhase: card.schedulingPhase,
         preReviewCount: card.preReviewCount,
-        // Preserve the "until rated good" Practice-Listening progress — losing
+        // Preserve the "until rated good" Practice-Listening progress. Losing
         // this on edit would restart listening for an already-graduated card.
         goodReviewCount: card.goodReviewCount,
         audioSpeedOverrides: card.audioSpeedOverrides,
@@ -1965,6 +2298,21 @@ export const editCard = mutation({
         freeStudyOrderKey: card.freeStudyOrderKey ?? randomOrderKey(),
         fsrsState: card.fsrsState,
         lastReviewedAt: card.lastReviewedAt,
+        // Preserve the writing track (separateModeTracking) so an edit doesn't
+        // reset the card's writing schedule; same -1ms queue-position trick as
+        // dueDate above. Undefined (no track) stays undefined.
+        writingDueDate:
+          card.writingDueDate !== undefined ? card.writingDueDate - 1 : undefined,
+        writingFsrsState: card.writingFsrsState,
+        writingIsGraduated: card.writingIsGraduated,
+        writingLastReviewedAt: card.writingLastReviewedAt,
+        writingGoodReviewCount: card.writingGoodReviewCount,
+        // Per-mode review history, same rationale as goodReviewCount and the
+        // play counters above: an edit must not reset it. There is no backfill
+        // for these counters, so a drop here is unrecoverable, and it would
+        // also silently disable undo's decrement, which no-ops when the field
+        // is undefined.
+        reviewCountByMode: card.reviewCountByMode,
         wordsTrackedLanguages: card.wordsTrackedLanguages,
         searchableText,
         searchableTextLanguages,
@@ -1973,8 +2321,8 @@ export const editCard = mutation({
       await deleteCard(ctx, args.cardId);
     }
     // Defensive cleanup: if the edit left the old text orphaned and user-created
-    // (path A reuses the textId, so the new card normally still references it —
-    // this is a no-op then), drop its now-unreferenced translations/audio/blobs.
+    // (path A reuses the textId, so the new card normally still references it.
+    // This is a no-op then), drop its now-unreferenced translations/audio/blobs.
     await cascadeCleanupTextIfOrphaned(ctx, card.textId);
 
     // Update word-text links for changed languages (only if words were previously tracked)
@@ -2005,8 +2353,40 @@ export const editCard = mutation({
 
     await trackCardAction(ctx, userId, 'edit', card, {
       changed_languages: [...changedLanguages],
+      // Present only when the edit doubled as a curriculum complaint. Keeps
+      // the quality signal `flag_translation` provides on this path too, since
+      // it charges no TRANSLATION_FLAGS unit and fires no flag event.
+      ...(flaggedLanguages.length > 0
+        ? { flagged_languages: flaggedLanguages }
+        : {}),
     });
 
+    return { textId: resolvedTextId, cardId: resolvedCardId, changed: true, course };
+}
+
+/**
+ * Edit the translations of a card. Thin wrapper over `applyCardEdit`. See
+ * its doc comment for the Path A/B mechanics.
+ *
+ * The manual edit dialog is the one caller that opts into
+ * `suggestCurriculumFix`: a user retyping a curriculum translation is telling
+ * us it is wrong, so the edit flags the shared row and offers their wording to
+ * the retranslation alongside forking their own card.
+ */
+export const editCard = mutation({
+  args: {
+    cardId: v.id('cards'),
+    translations: v.array(
+      v.object({
+        language: v.string(),
+        text: v.string(),
+      }),
+    ),
+    timezone: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await applyCardEdit(ctx, { ...args, suggestCurriculumFix: true });
     return null;
   },
 });

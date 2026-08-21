@@ -43,7 +43,7 @@ export function Providers({ children, locale, messages, timeZone }: Props) {
 
   /**
    * better-auth-ui renders error toasts from the raw fetch error, which for a
-   * bodiless response is just the status number — users were seeing a toast
+   * bodiless response is just the status number. Users were seeing a toast
    * reading "404". Swap those for real copy; everything else (wrong password,
    * unverified email, success messages) is already localized and passes
    * through untouched.
@@ -87,13 +87,13 @@ export function Providers({ children, locale, messages, timeZone }: Props) {
             router.refresh();
           }}
           // Redirect-based OAuth breaks inside the store-app WebView (Google
-          // blocks it) — the shell uses NativeSocialButtons' token flow
+          // blocks it), the shell uses NativeSocialButtons' token flow
           // instead, so the redirect buttons are dropped there.
           social={isNative ? undefined : {
             // 'apple' requires APPLE_CLIENT_ID, APPLE_TEAM_ID, APPLE_KEY_ID
             // and APPLE_PRIVATE_KEY in the Convex deployment (the client
-            // secret is minted from them at runtime, see convex/auth.ts) —
-            // set them before deploying this.
+            // secret is minted from them at runtime, see convex/auth.ts).
+            // Set them before deploying this.
             providers: ['google', 'apple'],
           }}
           Link={Link}

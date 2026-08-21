@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildCardContextSection,
+  buildDifficultySection,
   buildLanguageSection,
 } from '../../../features/chat/promptSections';
 
@@ -130,6 +131,37 @@ describe('features/chat/promptSections', () => {
       expect(section).toContain('"Bună ziua, ce mai faci?" (Romanian)');
       expect(section).toContain('"¿Hola, cómo estás?" (Spanish (Spain))');
       expect(section).toContain('cover every target language');
+    });
+  });
+
+  describe('buildDifficultySection', () => {
+    it('names the CEFR band and tells the tutor to match example-card difficulty', () => {
+      const section = buildDifficultySection({
+        label: 'A1',
+        cefrTier: 'A1',
+      });
+      expect(section).toContain('currently learning at CEFR A1');
+      expect(section).not.toContain(' (A1)');
+      expect(section).toContain('write example sentences at roughly this difficulty');
+      expect(section).toContain('basic everyday phrases');
+      expect(section).toContain('not much simpler');
+      expect(section).toContain('not much harder');
+    });
+
+    it('mentions the sublevel when it differs from the CEFR band', () => {
+      const section = buildDifficultySection({
+        label: 'A1.2',
+        cefrTier: 'A1',
+      });
+      expect(section).toContain('currently learning at CEFR A1 (A1.2)');
+    });
+
+    it('uses Pre-A1 survival-sentence guidance', () => {
+      const section = buildDifficultySection({
+        label: 'Pre-A1',
+        cefrTier: 'Pre-A1',
+      });
+      expect(section).toContain('very short, high-frequency survival sentences');
     });
   });
 });

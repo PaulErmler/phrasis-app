@@ -126,7 +126,7 @@ export function computeStreakUpdate(
     };
   }
 
-  // Gap of exactly 1 day (skipped yesterday) — consume freeze if available.
+  // Gap of exactly 1 day (skipped yesterday), consume freeze if available.
   const yesterday = getPreviousDay(todayDate);
   const dayBeforeYesterday = getPreviousDay(yesterday);
   if (
@@ -142,7 +142,7 @@ export function computeStreakUpdate(
     };
   }
 
-  // Longer gap — reset streak; freeze is preserved.
+  // Longer gap. Reset streak; freeze is preserved.
   return {
     newStreak: 1,
     newLastActivityDate: todayDate,
@@ -160,7 +160,7 @@ export type StreakDisplayState =
   | 'none';
 
 export interface StreakDisplayResult {
-  /** The streak as it should be DISPLAYED today — 0 once it has lapsed. */
+  /** The streak as it should be DISPLAYED today. 0 once it has lapsed. */
   displayStreak: number;
   state: StreakDisplayState;
   freezeAvailable: boolean;
@@ -174,14 +174,14 @@ export interface StreakDisplayResult {
  * activity, so the stored `currentStreak` / `lastActivityDate` go stale between
  * activities. This re-derives the live state at read time:
  *
- *  - `active`  — learned today; streak shown as-is.
- *  - `pending` — learned yesterday, not yet today; streak alive but not yet
+ *  - `active`: learned today; streak shown as-is.
+ *  - `pending`: learned yesterday, not yet today; streak alive but not yet
  *                validated for today.
- *  - `frozen`  — missed yesterday, but a freeze is shielding the streak (the
+ *  - `frozen`: missed yesterday, but a freeze is shielding the streak (the
  *                next activity today would consume it); streak shown as-is.
- *  - `broken`  — missed yesterday with no freeze, or a gap of 2+ days; the
+ *  - `broken`: missed yesterday with no freeze, or a gap of 2+ days; the
  *                streak is dead and shows 0.
- *  - `none`    — no activity ever; shows 0.
+ *  - `none`: no activity ever; shows 0.
  *
  * Kept consistent with `computeStreakUpdate`: for live states the displayed
  * number equals what the next activity would leave in the document (it bumps
@@ -218,6 +218,6 @@ export function deriveStreakDisplay(
     return { displayStreak: currentStreak, state: 'frozen', freezeAvailable };
   }
 
-  // today-2 with no freeze, or a gap of 2+ days — the streak is dead.
+  // today-2 with no freeze, or a gap of 2+ days. The streak is dead.
   return { displayStreak: 0, state: 'broken', freezeAvailable };
 }

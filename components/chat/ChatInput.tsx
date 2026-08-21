@@ -99,7 +99,7 @@ export function ChatInput({
         )}
         <div className="w-full min-w-0">
           <PromptInput
-            // File uploads disabled — add globalDrop and multiple back when re-enabling
+            // File uploads disabled. Add globalDrop and multiple back when re-enabling
             onSubmit={onSubmit}
             className="w-full"
           >
@@ -108,7 +108,7 @@ export function ChatInput({
                 placeholder={t('placeholder')}
                 onChange={(event) => onTextChange(event.target.value)}
                 value={text}
-                // Learners often type in the target language — dir="auto"
+                // Learners often type in the target language. dir="auto"
                 // makes RTL input read right-to-left while typing.
                 dir="auto"
                 {...(inputTestId ? { 'data-testid': inputTestId } : {})}

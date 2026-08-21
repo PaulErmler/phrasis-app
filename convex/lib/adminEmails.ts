@@ -16,7 +16,7 @@ import type { Doc } from '../_generated/dataModel';
  * changes (usage/helpers.ts syncAllFeatures).
  *
  * Best-effort by design: the send is wrapped in try/catch so a notification
- * can never fail the mutation it rides on (signup, billing sync) — the
+ * can never fail the mutation it rides on (signup, billing sync), the
  * failed component subtransaction rolls back alone.
  *
  * Skipped entirely in E2E capture mode: Playwright runs create users and
@@ -39,7 +39,7 @@ export async function sendAdminNotificationEmail(
   try {
     // Signup notifications sit behind an unauthenticated endpoint, so a
     // global cap keeps mass signups from flooding the inbox 1:1. Dropping
-    // is fine — these are best-effort heads-ups, not records.
+    // is fine. These are best-effort heads-ups, not records.
     const { ok } = await rateLimiter.limit(ctx, 'adminEmail');
     if (!ok) return;
     const labeledSubject = withEmailEnvSubject(subject);
@@ -64,7 +64,7 @@ export async function sendAdminNotificationEmail(
  * have finished (or abandoned) onboarding, so the email can report the chosen
  * course and how far they got instead of just an address. Lives here (not in
  * features/signupNotification.ts) so convex/auth.ts can import it without a
- * circular auth ↔ feature dependency — same split as lib/welcomeEmail.ts.
+ * circular auth ↔ feature dependency, same split as lib/welcomeEmail.ts.
  */
 export const SIGNUP_NOTIFICATION_DELAY_MS = 20 * 60_000;
 
@@ -103,8 +103,8 @@ const formatMinutes = (ms: number): string =>
 const levelLabel = (level: string): string => level.replaceAll('_', ' ');
 
 /**
- * Subject + body lines for the delayed new-signup notification. Pure —
- * exported for tests. Lines with no data are omitted rather than rendered
+ * Subject + body lines for the delayed new-signup notification. Pure.
+ * Exported for tests. Lines with no data are omitted rather than rendered
  * as "(none)" noise; only Name/Email/Course/Onboarding always appear.
  */
 export function buildSignupNotification(

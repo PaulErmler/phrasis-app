@@ -4,11 +4,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
  * Locks the load-bearing `posthog.init` options. Each of these flags encodes a
  * decision that is invisible at runtime when it regresses:
  *
- * - `opt_out_capturing_by_default` — without it the SDK silently drops every
+ * - `opt_out_capturing_by_default`: without it the SDK silently drops every
  *   event while the banner is unanswered (pending ≠ rejected to the SDK).
- * - `cookieless_mode: 'on_reject'` — decliners stay measurable without storage.
- * - `autocapture: false` / `capture_heatmaps: false` — the cost decisions.
- * - `person_profiles: 'identified_only'` — anonymous traffic gets no profile.
+ * - `cookieless_mode: 'on_reject'`: decliners stay measurable without storage.
+ * - `autocapture: false` / `capture_heatmaps: false`: the cost decisions.
+ * - `person_profiles: 'identified_only'`: anonymous traffic gets no profile.
  *
  * `lib/posthog/hosts.ts` reads the env at module scope and `client.ts` keeps
  * an `initialized` flag, so each case re-imports with a fresh module registry.

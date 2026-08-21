@@ -2,7 +2,7 @@
  * Build identity of the currently deployed frontend, for AppUpdateGate.
  *
  * `force-static` prerenders this at build time into the deployment and serves it
- * from the CDN — zero function invocations. It is also what makes the signal
+ * from the CDN. Zero function invocations. It is also what makes the signal
  * correct by construction: the response only exists once *this* deployment is
  * serving, so it can never announce a build that is not live yet (which a
  * backend-published version could, since `convex deploy --cmd 'pnpm run build'`
@@ -16,7 +16,7 @@ export const dynamic = 'force-static';
 export function GET() {
   const buildId = process.env.NEXT_PUBLIC_BUILD_ID ?? 'dev';
   // Where next.config.ts got that id. AppUpdateGate ignores this field; it is
-  // here so `curl /api/version` diagnoses itself — a 'fallback' source means no
+  // here so `curl /api/version` diagnoses itself. A 'fallback' source means no
   // host variable matched and update detection is dead, which is otherwise only
   // visible in the build log.
   const source = process.env.NEXT_PUBLIC_BUILD_ID_SOURCE ?? 'fallback';

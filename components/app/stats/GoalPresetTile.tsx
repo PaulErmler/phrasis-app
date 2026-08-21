@@ -4,7 +4,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * One preset tile of a daily-goal picker — the shared visual between the
+ * One preset tile of a daily-goal picker. The shared visual between the
  * onboarding goal step and the homescreen quick-edit (which differ in grid
  * layout and commit semantics, but must look identical per tile).
  */

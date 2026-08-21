@@ -11,7 +11,7 @@ import type {
 /**
  * Lazy singleton client for the audio DSP worker, with a synchronous
  * main-thread fallback (same stretchCore code) when workers are unavailable
- * or construction fails — playback must keep working either way.
+ * or construction fails. Playback must keep working either way.
  */
 
 let worker: Worker | null = null;
@@ -109,7 +109,7 @@ export function extractChannels(buffer: AudioBuffer): RawAudioData {
   for (let ch = 0; ch < channelCount; ch++) {
     const data = new Float32Array(buffer.length);
     // copyFromChannel is missing on some older WebKit AudioBuffers (and on
-    // test doubles) — fall back to copying the live channel array.
+    // test doubles), fall back to copying the live channel array.
     if (typeof buffer.copyFromChannel === 'function') {
       buffer.copyFromChannel(data, ch);
     } else {
@@ -122,7 +122,7 @@ export function extractChannels(buffer: AudioBuffer): RawAudioData {
 
 /**
  * Time-stretch raw channel data, on the worker when possible. The input
- * arrays are TRANSFERRED (detached) on the worker path — callers must pass
+ * arrays are TRANSFERRED (detached) on the worker path. Callers must pass
  * copies they don't reuse; on failure, re-extract from the source
  * AudioBuffer and run the sync fallback.
  */
@@ -151,7 +151,7 @@ export async function stretchRaw(
   try {
     return await attempted;
   } catch {
-    // Input arrays may be detached after a transfer — always re-extract.
+    // Input arrays may be detached after a transfer, always re-extract.
     return stretchChannels(refetchInput(), rate);
   }
 }

@@ -6,8 +6,8 @@ import { useAnimatedCounter } from '@/hooks/use-animated-counter';
 /**
  * The counter animates from → target once. The regression pinned here: a
  * re-run of the effect (live stats landing while home is open changes
- * `target` mid-sweep) must CONTINUE from the currently displayed value —
- * the old implementation snapped back to `from` and sat there for `delay`
+ * `target` mid-sweep) must CONTINUE from the currently displayed value.
+ * The old implementation snapped back to `from` and sat there for `delay`
  * ms, visibly resetting the daily-goal counter on every stats update.
  */
 describe('useAnimatedCounter', () => {

@@ -16,7 +16,7 @@ export function shouldAdvanceOnEnter(e: KeyboardEvent): boolean {
   // A chord is someone else's shortcut, not "go on".
   if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return false;
   // Enter inside a field is text entry, and in ja/zh/ko/vi it confirms an IME
-  // conversion — treating that as "continue" would skip the step out from
+  // conversion, treating that as "continue" would skip the step out from
   // under someone mid-word. See `useImeSafeEnter`.
   if (isEditableTarget(e.target) || isComposingKeyEvent(e)) return false;
   // A focused control already handles Enter natively. Without this, tabbing to

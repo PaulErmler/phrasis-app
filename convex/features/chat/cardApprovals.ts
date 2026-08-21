@@ -7,15 +7,25 @@ import { getActiveCourseForUser } from '../../db/courses';
 import {
   getOrCreateChatCollection,
 } from '../../db/collections';
-import { cardApprovalStatusValidator, translationEntriesValidator } from '../../types';
+import {
+  cardApprovalKindValidator,
+  cardApprovalResolutionValidator,
+  cardApprovalStatusValidator,
+  proposedCardMetadataValidator,
+  translationEntriesValidator,
+} from '../../types';
 import type { Id, Doc } from '../../_generated/dataModel';
 import type { MutationCtx } from '../../_generated/server';
 import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
+import { applyCardEdit } from '../scheduling';
+import { applyTextMetadata } from '../sentenceMetadata';
+import { resolveCardContext } from './cardContext';
 import { MAX_CARD_TEXT_LENGTH } from '../../../lib/constants/learning';
 import { trackEvent } from '../../db/stats/dailyStats';
 import {
   getTranslationSource,
+  IPA_LANGUAGES,
   postProcessTranslation,
 } from '../../../lib/languages';
 import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
@@ -91,7 +101,7 @@ async function processApproval(
   for (let i = 1; i < approval.translations.length; i++) {
     const entry = approval.translations[i];
     // User-edited entries (EditApprovalDialog) are the user's own words:
-    // store VERBATIM and tag user-provided — the machine post-processing
+    // store VERBATIM and tag user-provided. The machine post-processing
     // step must never touch user-typed text (a deliberate trailing '_'
     // would be stripped), and the tag shields the row from future
     // machine-output backfills. Untouched entries are chat-model output
@@ -142,6 +152,65 @@ async function processApproval(
 /**
  * Internal mutation to create approval request from tool handler.
  */
+/**
+ * Schedule IPA transcription for a proposal's entries (espeak lives in the
+ * Node runtime, so it can't run inline here). Only languages with an espeak
+ * voice are sent; rows with none simply never get an `entryIpa` key, and the
+ * approval card renders nothing for them.
+ */
+async function scheduleApprovalIpa(
+  ctx: MutationCtx,
+  approvalId: Id<'cardApprovals'>,
+  translations: Array<{ language: string; text: string }>,
+): Promise<void> {
+  const entries = translations.filter(
+    (t) => IPA_LANGUAGES.has(t.language) && t.text.length > 0,
+  );
+  if (entries.length === 0) return;
+  await ctx.scheduler.runAfter(0, internal.features.ipa.processIpaForApproval, {
+    approvalId,
+    entries: entries.map((t) => ({ language: t.language, text: t.text })),
+  });
+}
+
+/**
+ * Store IPA results on an approval row. Each result carries the text it was
+ * computed FOR; results whose language has since been edited to different
+ * wording are dropped (the edit path re-schedules against the new text), so
+ * a slow espeak action can never overwrite a fresher proposal.
+ */
+export const storeApprovalEntryIpa = internalMutation({
+  args: {
+    approvalId: v.id('cardApprovals'),
+    results: v.array(
+      v.object({
+        language: v.string(),
+        forText: v.string(),
+        ipa: v.string(),
+      }),
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const approval = await ctx.db.get(args.approvalId);
+    if (!approval) return null; // resolved + cleaned up while in flight
+    const currentByLanguage = new Map(
+      approval.translations.map((t) => [t.language, t.text]),
+    );
+    const entryIpa = { ...(approval.entryIpa ?? {}) };
+    let changed = false;
+    for (const result of args.results) {
+      if (currentByLanguage.get(result.language) !== result.forText) continue;
+      entryIpa[result.language] = result.ipa;
+      changed = true;
+    }
+    if (changed) {
+      await ctx.db.patch(args.approvalId, { entryIpa });
+    }
+    return null;
+  },
+});
+
 export const createApprovalRequestInternal = internalMutation({
   args: {
     threadId: v.string(),
@@ -194,8 +263,308 @@ export const createApprovalRequestInternal = internalMutation({
       userId: args.userId,
       status: 'pending',
     });
+    await scheduleApprovalIpa(ctx, approvalId, cappedTranslations);
 
     return approvalId;
+  },
+});
+
+/**
+ * Whether a proposedMetadata object carries at least one committed field.
+ * The model may send an empty object; treat that the same as absent.
+ */
+function hasProposedMetadata(
+  metadata: Doc<'cardApprovals'>['proposedMetadata'],
+): metadata is NonNullable<Doc<'cardApprovals'>['proposedMetadata']> {
+  return (
+    metadata !== undefined &&
+    Object.values(metadata).some((value) => value !== undefined)
+  );
+}
+
+/**
+ * Create an "also correct" approval from the markAlsoCorrect tool handler.
+ *
+ * `translations` carries only the languages the model changed (full corrected
+ * sentence each, the user may have asked about a single word or verb form).
+ * The stored row holds the FULL course-language set merged over the card's
+ * current entries, base languages first, so `processApproval`'s
+ * translations[0]-is-main-text convention holds on the add-as-new-card path.
+ */
+export const createAlsoCorrectApprovalInternal = internalMutation({
+  args: {
+    threadId: v.string(),
+    messageId: v.string(),
+    toolCallId: v.string(),
+    cardId: v.id('cards'),
+    translations: translationEntriesValidator,
+    proposedMetadata: v.optional(proposedCardMetadataValidator),
+    userId: v.string(),
+  },
+  // 'identical' is a NO-OP outcome, not a failure: the user's version already
+  // matches the card. The tool turns it into a distinct success string so the
+  // chat renders nothing rather than an error box. See MARK_ALSO_CORRECT_NOOP.
+  returns: v.union(
+    v.object({
+      status: v.literal('created'),
+      approvalId: v.id('cardApprovals'),
+    }),
+    v.object({ status: v.literal('identical') }),
+  ),
+  handler: async (ctx, args) => {
+    // Ownership via card → deck → course. The tool passes the agent ctx's
+    // userId; never trust the closed-over cardId alone. resolveCardContext is
+    // the ONE walk + sentence assembly shared with the prompt-context path,
+    // so what this approval stores is exactly what the tool prompt saw.
+    const context = await resolveCardContext(ctx, args.cardId, args.userId);
+    if (!context) throw new ConvexError('Not authorized');
+
+    // Base languages first, then target. The order createCard proposals use
+    // and processApproval depends on (entry 0 becomes the texts row).
+    const courseLanguages = [
+      ...new Set([...context.baseLanguages, ...context.targetLanguages]),
+    ];
+
+    const providedLanguages = args.translations.map((t) => t.language);
+    const invalidLanguages = providedLanguages.filter(
+      (lang) => !courseLanguages.includes(lang),
+    );
+    if (invalidLanguages.length > 0) {
+      throw new ConvexError(
+        `Languages not in course: ${invalidLanguages.join(', ')}. Valid languages: ${courseLanguages.join(', ')}`,
+      );
+    }
+    if (new Set(providedLanguages).size !== providedLanguages.length) {
+      throw new ConvexError('Duplicate language in translations.');
+    }
+
+    // The card's current per-language sentences, from the shared context
+    // (course-scoped, source language included).
+    const currentByLanguage = new Map<string, string>([
+      [context.sourceLanguage, context.sourceText],
+      ...context.translations.map(
+        (t) => [t.language, t.text] as [string, string],
+      ),
+    ]);
+
+    const proposedByLanguage = new Map(
+      args.translations.map((t) => [
+        t.language,
+        t.text.slice(0, MAX_CARD_TEXT_LENGTH),
+      ]),
+    );
+    for (const [, proposed] of proposedByLanguage) {
+      if (proposed.trim().length === 0) {
+        throw new ConvexError('Translation text must not be empty');
+      }
+    }
+    const changedLanguages = [...proposedByLanguage.entries()]
+      .filter(([lang, proposed]) => currentByLanguage.get(lang) !== proposed)
+      .map(([lang]) => lang);
+
+    const metadata = hasProposedMetadata(args.proposedMetadata)
+      ? args.proposedMetadata
+      : undefined;
+    // Not an error: the single most common Writing-mode case is a user who
+    // typed the sentence correctly (or missed only a diacritic), for which the
+    // prompt's "keep the user's wording, fix punctuation/diacritics" rule
+    // yields the card's own text. Throwing here surfaced as a red "Could not
+    // save your version" box on a right answer. The model's prose already
+    // tells the user they were correct, so there is simply nothing to offer.
+    if (changedLanguages.length === 0 && !metadata) {
+      return { status: 'identical' as const };
+    }
+
+    const merged = courseLanguages
+      .map((lang) => ({
+        language: lang,
+        text: proposedByLanguage.get(lang) ?? currentByLanguage.get(lang) ?? '',
+      }))
+      .filter((entry) => entry.text.length > 0);
+    // A card whose content pipeline hasn't produced every course language yet
+    // can still be REPLACED (applyCardEdit only touches the languages it is
+    // given), it just can't be added as a new card, which would create a card
+    // with a blank line. Degrade to a replace-only offer instead of failing the
+    // whole tool call; `approveCard` enforces the same rule server-side.
+    const replaceOnly = merged.length < courseLanguages.length;
+
+    const approvalId = await ctx.db.insert('cardApprovals', {
+      threadId: args.threadId,
+      messageId: args.messageId,
+      toolCallId: args.toolCallId,
+      translations: merged,
+      userId: args.userId,
+      status: 'pending',
+      kind: 'alsoCorrect',
+      cardId: args.cardId,
+      changedLanguages,
+      proposedMetadata: metadata,
+      ...(replaceOnly ? { replaceOnly: true } : {}),
+    });
+    await scheduleApprovalIpa(ctx, approvalId, merged);
+
+    return { status: 'created' as const, approvalId };
+  },
+});
+
+/**
+ * Accept an "also correct" proposal by replacing the discussed card's text
+ * (and optionally its metadata) instead of creating a new card.
+ *
+ * Reuses `applyCardEdit` (Path A/B copy-on-write, audio invalidation for
+ * audibly-changed languages) with quota handled here, then applies the
+ * model's proposed metadata via `applyTextMetadata`, whose prepareCardContent
+ * pass is what re-voices audio after a speaker-gender change. When metadata is
+ * present the edit is forced onto a user-owned text row (ensureUserOwnedText)
+ * so a shared/dataset text other users reference is never patched.
+ */
+export const replaceCardFromApproval = mutation({
+  args: {
+    approvalId: v.id('cardApprovals'),
+    timezone: v.string(),
+  },
+  // `cardId` is the card the edit LEFT BEHIND (a new document on Path B). The
+  // learn view keys its thread-rotation suppression off this exact identity,
+  // so it must be the replacement's id, not the input's.
+  returns: v.object({
+    success: v.boolean(),
+    cardId: v.id('cards'),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await requireUser(ctx);
+
+    const approval = await getAuthenticatedPendingApproval(
+      ctx,
+      args.approvalId,
+      userId,
+    );
+    if ((approval.kind ?? 'createCard') !== 'alsoCorrect' || !approval.cardId) {
+      throw new ConvexError('Approval does not support replacing a card');
+    }
+    const previousCardId = approval.cardId;
+
+    // A proposal whose card is already gone. Replaced from another thread or
+    // another device. Gets a specific code rather than the generic "Card not
+    // found", so the client can say the card changed instead of leaving a
+    // button that silently does nothing on every retry. This is the only read
+    // of the card here: ownership is checked (once) inside applyCardEdit,
+    // which also hands back the course this handler needs afterwards.
+    if ((await ctx.db.get(previousCardId)) === null) {
+      throw new ConvexError({
+        code: 'CARD_REPLACED',
+        message: 'This card has changed since the suggestion was made.',
+      });
+    }
+
+    const metadata = hasProposedMetadata(approval.proposedMetadata)
+      ? approval.proposedMetadata
+      : undefined;
+
+    // Write ONLY the languages the model actually changed. `translations`
+    // holds the full course-language set merged at PROPOSAL time, so passing it
+    // wholesale would diff a stale snapshot against the card and silently
+    // revert any edit the user made to an untouched language in between (and
+    // drop that language's audio with it). `changedLanguages` is absent only on
+    // rows written before it existed, where the full set is the best available.
+    const changed = new Set(approval.changedLanguages ?? []);
+    const translationsToWrite =
+      approval.changedLanguages === undefined
+        ? approval.translations
+        : approval.translations.filter((t) => changed.has(t.language));
+
+    const {
+      textId,
+      cardId: replacementCardId,
+      changed: editChanged,
+      course,
+    } = await applyCardEdit(ctx, {
+      cardId: previousCardId,
+      translations: translationsToWrite,
+      timezone: args.timezone,
+      ensureUserOwnedText: metadata !== undefined,
+      skipQuota: true,
+      // A definitive proposed gender must reach the text row BEFORE the
+      // edit's own content scheduling. applyTextMetadata below runs after
+      // applyCardEdit already enqueued (and claimed) the re-synthesis, so a
+      // gender applied only there ships wrong-voice audio. Non-definitive
+      // values keep the row's gender and stay applyTextMetadata's business.
+      proposedAudioSpeakerGender:
+        metadata?.speakerGender === 'male' || metadata?.speakerGender === 'female'
+          ? metadata.speakerGender
+          : undefined,
+      // `suggestCurriculumFix` is deliberately omitted. The manual edit dialog
+      // sets it so a retyped curriculum translation flags the shared row and
+      // suggests the user's wording to a retranslation. Accepting an
+      // "also correct" alternative from the tutor is not the same claim: both
+      // renderings are usually fine, which is the point of the tool, and
+      // flagging here would spend the shared row's capped auto-retranslations
+      // on sentences nobody said were wrong.
+    });
+
+    // Bill only a real write. A no-op diff (the card was edited to exactly the
+    // proposed wording in the meantime) resolves the approval below but keeps
+    // applyCardEdit's documented promise. "`Changed: false` consumes nothing"
+    // True for this caller too. Convex mutations are transactional, so a
+    // USAGE_LIMIT throw here still rolls back the edit above.
+    if (editChanged) {
+      await consumeQuota(ctx, userId, FEATURE_IDS.CARD_EDITS);
+    }
+
+    if (metadata) {
+      await applyTextMetadata(ctx, {
+        textId,
+        metadata,
+        schedulePrepareCard: true,
+        baseLanguages: course.baseLanguages,
+        targetLanguages: course.targetLanguages,
+      });
+    }
+
+    await ctx.db.patch(approval._id, {
+      status: 'approved',
+      resolution: 'replaced',
+      processedAt: Date.now(),
+      textId,
+      cardId: replacementCardId,
+    });
+
+    // Path B replaced the card document, so every OTHER pending proposal for
+    // the old card now points at a deleted row and would dead-end on "Card not
+    // found". The button just appearing to do nothing. Retarget them.
+    //
+    // Scoped to this thread because `by_thread_and_user` is the only index on
+    // cardApprovals, and it is the right scope in practice: markAlsoCorrect is
+    // registered only on card-context turns and the learn view rotates threads
+    // when the card changes, so a card's proposals live in one conversation by
+    // construction. A stray cross-thread row is left to the "card has changed"
+    // error rather than paying for a by_cardId index on every insert.
+    if (replacementCardId !== previousCardId) {
+      const siblings = await ctx.db
+        .query('cardApprovals')
+        .withIndex('by_thread_and_user', (q) =>
+          q.eq('threadId', approval.threadId).eq('userId', userId),
+        )
+        // Bounded in practice by the approvals a single thread can hold; the
+        // cap is a pure backstop against an unbounded read.
+        .take(500);
+      for (const sibling of siblings) {
+        if (sibling._id === approval._id) continue;
+        if (sibling.status !== 'pending') continue;
+        if (sibling.cardId !== previousCardId) continue;
+        await ctx.db.patch(sibling._id, { cardId: replacementCardId });
+      }
+    }
+
+    await track(ctx, userId, EVENTS.CHAT_CARD_APPROVAL, {
+      outcome: 'approved',
+      kind: 'alsoCorrect',
+      resolution: 'replaced',
+      thread_id: approval.threadId,
+      changed_languages: approval.changedLanguages ?? [],
+      has_metadata: metadata !== undefined,
+    });
+
+    return { success: true, cardId: replacementCardId };
   },
 });
 
@@ -219,7 +588,23 @@ export const approveCard = mutation({
       args.approvalId,
       userId,
     );
+    // Replace-only rows carry a partial language set (the card was still
+    // missing a translation when the proposal was made), so the add path would
+    // create a card with a blank line. The UI hides the button; this is the
+    // server-side enforcement. Throwing rolls the whole mutation back,
+    // including the quota consumed above.
+    if (approval.replaceOnly === true) {
+      throw new ConvexError(
+        'This version can only replace the card — it is missing text for some course languages.',
+      );
+    }
+
     const textId = await processApproval(ctx, approval, userId);
+
+    const kind = approval.kind ?? 'createCard';
+    if (kind === 'alsoCorrect') {
+      await ctx.db.patch(approval._id, { resolution: 'newCard' });
+    }
 
     // Track card approval event
     const active = await getActiveCourseForUser(ctx, userId);
@@ -228,6 +613,8 @@ export const approveCard = mutation({
     }
     await track(ctx, userId, EVENTS.CHAT_CARD_APPROVAL, {
       outcome: 'approved',
+      kind,
+      ...(kind === 'alsoCorrect' ? { resolution: 'newCard' } : {}),
       thread_id: approval.threadId,
       edited_languages: approval.userEditedLanguages ?? [],
     });
@@ -277,7 +664,7 @@ export const updateApprovalTranslations = mutation({
     }));
 
     // Record which languages the user actually changed (union across
-    // repeated edits — the dialog can be reopened). processApproval stores
+    // repeated edits, the dialog can be reopened). processApproval stores
     // these verbatim as user-provided instead of running the machine
     // post-processing step on them.
     const previousTextByLanguage = new Map(
@@ -290,10 +677,23 @@ export const updateApprovalTranslations = mutation({
       }
     }
 
+    // Drop IPA for languages whose wording changed (it no longer matches)
+    // and recompute against the new text. Unchanged languages keep theirs.
+    const changedNow = cappedTranslations.filter(
+      (entry) => previousTextByLanguage.get(entry.language) !== entry.text,
+    );
+    let entryIpa = approval.entryIpa;
+    if (entryIpa && changedNow.length > 0) {
+      entryIpa = { ...entryIpa };
+      for (const entry of changedNow) delete entryIpa[entry.language];
+    }
+
     await ctx.db.patch(args.approvalId, {
       translations: cappedTranslations,
       userEditedLanguages: [...userEditedLanguages],
+      ...(entryIpa !== approval.entryIpa ? { entryIpa } : {}),
     });
+    await scheduleApprovalIpa(ctx, args.approvalId, changedNow);
 
     return { success: true };
   },
@@ -321,10 +721,15 @@ export const rejectCard = mutation({
       processedAt: Date.now(),
     });
 
-    // The reject rate is the quality signal for the createCard tool — a rise
-    // here means the model is proposing cards people don't want.
+    // The reject rate is the quality signal for the proposing tool. A rise
+    // means the model is proposing things people don't want. `kind` is
+    // REQUIRED for that reading to hold: this one mutation backs both the
+    // createCard reject and the also-correct dismiss, so without it a rise in
+    // "createCard rejects" could just be markAlsoCorrect being dismissed, with
+    // no way to separate them after the fact.
     await track(ctx, userId, EVENTS.CHAT_CARD_APPROVAL, {
       outcome: 'rejected',
+      kind: approval.kind ?? 'createCard',
       thread_id: approval.threadId,
     });
 
@@ -344,7 +749,14 @@ export const getApprovalsByThread = query({
       _id: v.id('cardApprovals'),
       toolCallId: v.string(),
       translations: translationEntriesValidator,
+      entryIpa: v.optional(v.record(v.string(), v.string())),
       status: cardApprovalStatusValidator,
+      kind: v.optional(cardApprovalKindValidator),
+      cardId: v.optional(v.id('cards')),
+      resolution: v.optional(cardApprovalResolutionValidator),
+      changedLanguages: v.optional(v.array(v.string())),
+      proposedMetadata: v.optional(proposedCardMetadataValidator),
+      replaceOnly: v.optional(v.boolean()),
     }),
   ),
   handler: async (ctx, args) => {
@@ -362,7 +774,14 @@ export const getApprovalsByThread = query({
       _id: a._id,
       toolCallId: a.toolCallId,
       translations: a.translations,
+      entryIpa: a.entryIpa,
       status: a.status,
+      kind: a.kind,
+      cardId: a.cardId,
+      resolution: a.resolution,
+      changedLanguages: a.changedLanguages,
+      proposedMetadata: a.proposedMetadata,
+      replaceOnly: a.replaceOnly,
     }));
   },
 });

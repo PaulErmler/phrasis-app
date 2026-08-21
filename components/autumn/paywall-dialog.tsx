@@ -105,7 +105,7 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
   ]);
 
   // Top of the upgrade funnel. Above the early return because hooks must run in
-  // the same order every render — `params` is null until the paywall is
+  // the same order every render. `params` is null until the paywall is
   // triggered, so both arguments are guarded rather than the call site.
   //
   // Edge-triggered on `open`, not fired per render: this dialog re-renders

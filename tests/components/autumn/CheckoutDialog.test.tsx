@@ -7,7 +7,7 @@ import type { CheckoutDialogProps } from '@/components/autumn/checkout-dialog';
 const attachMock = vi.fn();
 const refetchMock = vi.fn();
 const refetchPricingTableMock = vi.fn();
-// Swapped per test — the trial state derived from this customer decides
+// Swapped per test. The trial state derived from this customer decides
 // whether confirm bills through attach() or the Convex trial-switch action.
 let currentCustomer: Record<string, unknown> | null = null;
 vi.mock('autumn-js/react', () => ({
@@ -49,7 +49,7 @@ const trialingCustomer = () => ({
   trials_used: [{ product_id: 'basic' }],
 });
 
-// Trialed in the past, now on a regular paid plan — the population where a
+// Trialed in the past, now on a regular paid plan. The population where a
 // phantom cross-plan trial (or a fresh one) must never be offered again.
 const paidNonTrialCustomer = () => ({
   products: [{ id: 'basic', status: 'active' }],
@@ -168,7 +168,7 @@ describe('CheckoutDialog', () => {
       freeTrial: false,
       options: [{ featureId: 'seats', quantity: 2 }],
     });
-    // The trial-switch action must stay out of non-trial checkouts — it
+    // The trial-switch action must stay out of non-trial checkouts. It
     // would throw ("No active trial") and block a perfectly payable order.
     expect(switchPlanMock).not.toHaveBeenCalled();
     expect(toastErrorMock).not.toHaveBeenCalled();
@@ -176,7 +176,7 @@ describe('CheckoutDialog', () => {
 
   it('trialing plan switch routes through the Convex action, not attach', async () => {
     // A plain attach during a trial hits the server-side trial gate (or,
-    // ungated, would end the running trial and bill immediately) — the
+    // ungated, would end the running trial and bill immediately), the
     // Convex action is the only path that carries the trial over.
     currentCustomer = trialingCustomer();
     const { setOpen } = renderDialog(checkoutResult({ scenario: 'upgrade' }));
@@ -187,7 +187,7 @@ describe('CheckoutDialog', () => {
     expect(switchPlanMock).toHaveBeenCalledWith({ productId: 'pro' });
     expect(attachMock).not.toHaveBeenCalled();
     // The action bypasses attach()'s internal SWR refetches, so the dialog
-    // must refresh both the customer and the pricing-table scenarios —
+    // must refresh both the customer and the pricing-table scenarios,
     // otherwise the table still shows the pre-switch CTA (e.g. "Cancel")
     // and invites a second, conflicting billing action.
     expect(refetchMock).toHaveBeenCalledTimes(1);
@@ -195,7 +195,7 @@ describe('CheckoutDialog', () => {
   });
 
   // The isTrialSwitch routing table must mirror the scenarios accepted by
-  // convex/billing.ts switchPlanDuringTrial — nothing else pins that
+  // convex/billing.ts switchPlanDuringTrial, nothing else pins that
   // correspondence. A row drifting to "attach" bills a trialing customer
   // early; drifting to "action" makes the server reject a valid checkout.
   const routingTable: Array<{
@@ -215,11 +215,11 @@ describe('CheckoutDialog', () => {
     // classifies free/default as "downgrade" or "cancel").
     { name: 'free downgrade', scenario: 'downgrade', is_free: true, route: 'action' },
     { name: 'free cancel', scenario: 'cancel', is_free: true, route: 'action' },
-    // One-off purchases are bolt-ons, not subscriptions — they must not be
+    // One-off purchases are bolt-ons, not subscriptions. They must not be
     // rerouted into the subscription-switch action mid-trial.
     { name: 'one-off purchase', scenario: 'new', is_free: false, is_one_off: true, route: 'attach' },
     // A free non-downgrade target is outside the action's accepted set
-    // (the server throws on it) — it stays on the plain attach path.
+    // (the server throws on it), it stays on the plain attach path.
     { name: 'free enable (new)', scenario: 'new', is_free: true, route: 'attach' },
   ];
 
@@ -248,14 +248,14 @@ describe('CheckoutDialog', () => {
         expect(attachMock).toHaveBeenCalledTimes(1);
         expect(switchPlanMock).not.toHaveBeenCalled();
         // checkoutTrialParams contract: a trialing customer must never send
-        // freeTrial:false — that would end the running trial and bill now.
+        // freeTrial:false. That would end the running trial and bill now.
         expect(attachMock.mock.calls[0][0]).not.toHaveProperty('freeTrial');
       }
     },
   );
 
   it('surfaces an attach rejection instead of silently closing', async () => {
-    // A silently-reset dialog looks like nothing happened — this is exactly
+    // A silently-reset dialog looks like nothing happened. This is exactly
     // how the trial-gate rejection was hidden before (the user believed the
     // plan changed when no money moved).
     attachMock.mockRejectedValue(new Error('trial gate rejected'));
@@ -271,7 +271,7 @@ describe('CheckoutDialog', () => {
 
   it('surfaces an attach {error} container instead of silently closing', async () => {
     // autumn-js wraps SDK/action failures into a RESOLVED `{ error }`
-    // container (wrapSdkCall) — and the server's v2 no-trial branch mirrors
+    // container (wrapSdkCall), and the server's v2 no-trial branch mirrors
     // that shape. Before throwOnCheckoutError, this closed the dialog as if
     // the plan had changed while nothing happened.
     attachMock.mockResolvedValue({
@@ -312,7 +312,7 @@ describe('CheckoutDialog', () => {
   it('a failed cancel keeps the dialog open and shows the error toast', async () => {
     // What the user sees when a cancellation fails: the standard
     // "your plan was not changed" toast, the dialog still open, and an
-    // enabled confirm to retry — never a silent close.
+    // enabled confirm to retry, never a silent close.
     attachMock.mockResolvedValue({
       data: null,
       error: { message: 'cancel failed upstream' },
@@ -366,7 +366,7 @@ describe('CheckoutDialog', () => {
     await confirm();
 
     await waitFor(() => expect(assigned).toEqual([url]));
-    // The confirm handler returns before closing — the page is navigating
+    // The confirm handler returns before closing. The page is navigating
     // away, and closing first would flash the app behind the redirect.
     expect(setOpen).not.toHaveBeenCalled();
     expect(refetchMock).not.toHaveBeenCalled();

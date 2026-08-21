@@ -27,7 +27,7 @@ import type { CurrentLevel } from '../types';
  * answers `knew` to the current question, without mutating the real strategy.
  *
  * Works for every `PlacementStrategy` because each strategy is fully
- * determined by `init(opts)` + the `history` of (level, knew) pairs — so we
+ * determined by `init(opts)` + the `history` of (level, knew) pairs, so we
  * spin up a fresh instance, replay history, apply the would-be answer, and
  * read its `nextQuestionLevel()`. Used for client-side query prefetching so
  * the next sentence is already in Convex's cache when the user clicks an
@@ -93,7 +93,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
   const historyArr = strategy.history();
   const historyLen = historyArr.length;
   // `strategy` mutates `historyArr` in place, so its identity is stable and
-  // `historyLen` is the real invalidation signal — not "unnecessary".
+  // `historyLen` is the real invalidation signal, not "unnecessary".
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const history = useMemo(() => [...historyArr], [historyLen, historyArr]);
   const isDone = nextLevel === null;
@@ -115,7 +115,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
   // `revealed` derives from comparing the user-last-revealed textId to the
   // current sentence's textId. State stored as the *revealed* id (not a
   // boolean) so revealed becomes synchronously false the moment the sentence
-  // changes — important now that the next question is prefetched and the
+  // changes. Important now that the next question is prefetched and the
   // useQuery returns the next sentence on the SAME render as the answer
   // click. With a separate `useEffect(() => setRevealed(false), [...])` reset
   // there was one render where revealed was still true AND the next
@@ -130,7 +130,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
 
   // Prefetch the two possible next sentences (one per answer path) so the
   // Convex client cache holds them by the time the user clicks an answer
-  // button — eliminates the "loading…" flash between questions. Both
+  // button. Eliminates the "loading…" flash between questions. Both
   // results are discarded; only the subscription matters. Strategies are
   // deterministic given `init` + history, so the peek helper replays the
   // sequence on a clone to predict where each branch lands.
@@ -190,7 +190,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
   // pass. Fully idempotent on the server.
   //
   // Failure handling: one silent automatic retry after 3s, then a visible
-  // inline retry row + toast — previously a failure was swallowed and never
+  // inline retry row + toast. Previously a failure was swallowed and never
   // retried for the language, leaving the placement test content-less with
   // zero feedback.
   const ensureTranslations = useMutation(api.features.onboarding.ensurePlacementTranslations);
@@ -275,7 +275,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
   const targetMissing = sentence === null || !targetText;
 
   // Label the source side with the language the query actually rendered
-  // — falls back to the user's requested base language while the sentence
+  // Falls back to the user's requested base language while the sentence
   // is still loading.
   const renderedSourceLanguage = sentence?.sourceLanguage ?? sourceLanguage;
   const sourceLanguageLabel = getLocalizedLanguageNameByCode(
@@ -334,7 +334,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
               </div>
             </div>
 
-            {/* Target row — height is reserved whether revealed or not, so the
+            {/* Target row. Height is reserved whether revealed or not, so the
                 card width and the page layout don't jump on reveal. The whole
                 row is a tap target before reveal so users can poke the empty
                 area as well as the explicit button. */}
@@ -451,7 +451,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
         </div>
       </div>
 
-      {/* Hidden audio elements — preload metadata only so we don't burn
+      {/* Hidden audio elements. Preload metadata only so we don't burn
           bandwidth before reveal. Source audio plays only on button-tap. */}
       {sentence?.sourceAudioUrl ? (
         <audio ref={sourceAudioRef} src={sentence.sourceAudioUrl} preload="auto" />
@@ -479,7 +479,7 @@ function PlacementResult({
   onContinue: (adjustedLevel: number) => void;
 }) {
   const t = useTranslations('Onboarding.placementTest.result');
-  // Local adjustment — Easier / Harder nudge the level by ±1 within the
+  // Local adjustment. Easier / Harder nudge the level by ±1 within the
   // OGTE range without re-running the test. The user confirms with
   // "Continue" once they're happy with the displayed level.
   const [level, setLevel] = useState(finalLevel);
@@ -583,7 +583,7 @@ function ResultSample({
     sourceLanguage,
   });
   // Hold onto the last good sentence so Easier/Harder doesn't blank the
-  // row to a skeleton — the previous level's sentence stays visible until
+  // row to a skeleton. The previous level's sentence stays visible until
   // the new level's query resolves, then swaps cleanly.
   const [lastGood, setLastGood] = useState<typeof sentence | null>(null);
   useEffect(() => {

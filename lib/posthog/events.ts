@@ -5,7 +5,7 @@ import { posthog } from './client';
 /**
  * Client-side event names.
  *
- * Split from the backend list in `convex/analytics.ts` on purpose — these are
+ * Split from the backend list in `convex/analytics.ts` on purpose. These are
  * the events that only the browser can see (intent, navigation, UI state), plus
  * the ones the backend *cannot* record because they happen on a failed
  * transaction.
@@ -13,13 +13,13 @@ import { posthog } from './client';
  * That last point is subtle and worth stating: a Convex mutation that throws
  * rolls back everything it did, including any analytics event it scheduled. So
  * "the user hit their quota" can never be captured from inside the mutation
- * that rejected them — it has to be captured here, where the ConvexError is
+ * that rejected them. It has to be captured here, where the ConvexError is
  * caught.
  */
 export const CLIENT_EVENTS = {
   REVIEW_SESSION_STARTED: 'review_session_started',
   /**
-   * Fired when the learn overlay closes — which covers both "finished the
+   * Fired when the learn overlay closes, which covers both "finished the
    * queue" and "gave up", so it is deliberately named for the transition rather
    * than an outcome we cannot actually observe from here.
    */
@@ -63,7 +63,7 @@ export const CLIENT_EVENTS = {
   LOCALE_CHANGED: 'locale_changed',
   THEME_CHANGED: 'theme_changed',
   PWA_INSTALL_PROMPTED: 'pwa_install_prompted',
-  /** The browser's `appinstalled` event — fires however the install started
+  /** The browser's `appinstalled` event. Fires however the install started
    *  (our dialog, the omnibox icon, browser menu), Chromium-only. */
   PWA_INSTALLED: 'pwa_installed',
 } as const;
@@ -71,7 +71,7 @@ export const CLIENT_EVENTS = {
 export type ClientEvent = (typeof CLIENT_EVENTS)[keyof typeof CLIENT_EVENTS];
 
 /**
- * Capture a product event. Never throws — a broken analytics call must not
+ * Capture a product event. Never throws. A broken analytics call must not
  * change what the user sees.
  */
 export function capture(event: ClientEvent, properties?: Record<string, unknown>): void {

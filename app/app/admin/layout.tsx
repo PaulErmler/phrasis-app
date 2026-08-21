@@ -3,7 +3,7 @@ import { fetchAuthQuery } from '@/lib/auth-server';
 import { api } from '@/convex/_generated/api';
 import { SuspendSessionReplay } from '@/components/analytics/SuspendSessionReplay';
 
-// Cosmetic gate for every /app/admin route — each admin query re-checks via
+// Cosmetic gate for every /app/admin route. Each admin query re-checks via
 // requireAdmin on the server, so a spoofed render here would still show no
 // data.
 export default async function AdminLayout({

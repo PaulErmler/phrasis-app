@@ -1,7 +1,14 @@
 import { v } from 'convex/values';
-import { internalAction, internalMutation } from '../_generated/server';
+import { internalAction, internalMutation, MutationCtx } from '../_generated/server';
+import { Id } from '../_generated/dataModel';
 import { internal } from '../_generated/api';
-import { sourcedTranslationEntriesValidator } from '../types';
+import {
+  sourcedTranslationEntriesValidator,
+  ttsPriorityValidator,
+  llmPriorityValidator,
+  type TtsPriority,
+  type LlmPriority,
+} from '../types';
 import { trackException } from '../analytics';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
@@ -142,7 +149,7 @@ function pickField<T extends string>(
 /**
  * Best-effort extraction of metadata from a raw LLM response. Never throws.
  * Returns whichever subset of fields validated; unparseable or non-object
- * responses yield an empty object. The goal is graceful degradation — the
+ * responses yield an empty object. The goal is graceful degradation. The
  * caller applies whatever fields came back and leaves the rest unset rather
  * than triggering retrier backoff on a bad-but-recurring LLM response.
  */
@@ -164,7 +171,7 @@ function safeExtractMetadata(raw: string): Partial<Metadata> {
   }
   const obj = parsed as Record<string, unknown>;
   // addresseeNumber uses "not_applicable" for the no-addressee case, but the
-  // other three fields use "neutral" — so the LLM sometimes emits "neutral"
+  // other three fields use "neutral", so the LLM sometimes emits "neutral"
   // here. Coerce that single known confusion so the value survives validation.
   if (obj.addresseeNumber === 'neutral') obj.addresseeNumber = 'not_applicable';
   const out: Partial<Metadata> = {};
@@ -174,7 +181,7 @@ function safeExtractMetadata(raw: string): Partial<Metadata> {
   pickField(stringOut, obj, 'speakerGender', ALLOWED_SPEAKER_GENDER);
   pickField(stringOut, obj, 'addresseeGender', ALLOWED_ADDRESSEE_GENDER);
   Object.assign(out, stringOut);
-  // addressesSomeone is the only boolean field — handle separately.
+  // addressesSomeone is the only boolean field. Handle separately.
   if (typeof obj.addressesSomeone === 'boolean') {
     out.addressesSomeone = obj.addressesSomeone;
   } else if (obj.addressesSomeone !== undefined) {
@@ -186,7 +193,7 @@ function safeExtractMetadata(raw: string): Partial<Metadata> {
 }
 
 /**
- * Shared args for the two metadata actions below — the job payload that flows
+ * Shared args for the two metadata actions below. The job payload that flows
  * from `generateSentenceMetadata` through the retrier into
  * `fetchSentenceMetadata` unchanged.
  */
@@ -198,15 +205,20 @@ const metadataJobArgs = v.object({
   targetLanguages: v.array(v.string()),
   // Owner of the text. Scheduled functions run with no auth/request context,
   // so a failure here reaches PostHog's error tracking anonymously via the
-  // Convex log stream — this id lets us re-capture the exception attributed
+  // Convex log stream. This id lets us re-capture the exception attributed
   // to the affected user. Optional so jobs already scheduled before this
   // field existed still validate.
   userId: v.optional(v.string()),
+  // Threaded to prepareCardContent. Bulk import passes 'background' so a
+  // paste of dozens of sentences cannot queue ahead of on-screen card audio.
+  // Absent = interactive (single-card create, chat approval).
+  priority: v.optional(ttsPriorityValidator),
+  llmPriority: v.optional(llmPriorityValidator),
 });
 
 /**
  * Entry point used by manual custom-text creation, bulk import, and
- * post-chat-approval. All three insert `userCreated: true` texts — see the
+ * post-chat-approval. All three insert `userCreated: true` texts. See the
  * stamping block in `applyMetadataAndPrepareCard`, which depends on that.
  *
  * Two-step orchestration:
@@ -214,8 +226,8 @@ const metadataJobArgs = v.object({
  *      card is unblocked and audio generation starts with a coin-flipped voice gender.
  *      This preserves the "card creation is never blocked on metadata" guarantee.
  *   2. Hand the LLM call to the `action-retrier` component. The retrier only sees
- *      transient infrastructure errors (e.g. `generateText` network failures) —
- *      bad-but-parseable LLM output degrades to a partial patch inside
+ *      transient infrastructure errors (e.g. `generateText` network failures).
+ *      Bad-but-parseable LLM output degrades to a partial patch inside
  *      `fetchSentenceMetadata` rather than throwing. On success, whatever fields
  *      validated are patched onto the row and `prepareCardContent` is re-scheduled
  *      so any audio whose voice gender no longer matches the now-resolved
@@ -235,6 +247,8 @@ export const generateSentenceMetadata = internalAction({
           schedulePrepareCard: args.schedulePrepareCard,
           baseLanguages: args.baseLanguages,
           targetLanguages: args.targetLanguages,
+          priority: args.priority,
+          llmPriority: args.llmPriority,
         },
       );
 
@@ -252,6 +266,8 @@ export const generateSentenceMetadata = internalAction({
           baseLanguages: args.baseLanguages,
           targetLanguages: args.targetLanguages,
           userId: args.userId,
+          priority: args.priority,
+          llmPriority: args.llmPriority,
         },
       );
 
@@ -260,7 +276,7 @@ export const generateSentenceMetadata = internalAction({
       // The log-stream copy of this error is anonymous; re-capture it
       // attributed to the text's owner, then rethrow so Convex still records
       // the failure. Actions aren't transactional, so the capture survives
-      // the rethrow (unlike in mutations — see convex/analytics.ts).
+      // the rethrow (unlike in mutations, see convex/analytics.ts).
       await trackException(ctx, error, args.userId, {
         textId: args.textId,
         source: 'generateSentenceMetadata',
@@ -273,7 +289,7 @@ export const generateSentenceMetadata = internalAction({
 /**
  * Run the OpenRouter LLM to infer linguistic metadata and patch whatever
  * fields validate onto the row. Only transient infrastructure failures from
- * `generateText` bubble up and trigger retrier backoff — a bad-but-parseable
+ * `generateText` bubble up and trigger retrier backoff. A bad-but-parseable
  * LLM response degrades to a partial patch rather than a retry loop.
  */
 export const fetchSentenceMetadata = internalAction({
@@ -282,7 +298,7 @@ export const fetchSentenceMetadata = internalAction({
   handler: async (ctx, args) => {
     try {
       if (args.translations.length === 0) {
-        // Permanent error — nothing to retry. Log and return without throwing.
+        // Permanent error, nothing to retry. Log and return without throwing.
         console.error(
           'fetchSentenceMetadata: no translations',
           args.textId,
@@ -312,7 +328,7 @@ export const fetchSentenceMetadata = internalAction({
       });
 
       // Fires once per newly-created card and was previously both unmetered and
-      // unbilled — i.e. pure invisible cost that scales with content growth.
+      // unbilled, i.e. pure invisible cost that scales with content growth.
       await captureGeneration(ctx, {
         feature: 'sentence_metadata',
         model: OPENROUTER_MODELS.sentenceMetadata,
@@ -336,6 +352,8 @@ export const fetchSentenceMetadata = internalAction({
           schedulePrepareCard: args.schedulePrepareCard,
           baseLanguages: args.baseLanguages,
           targetLanguages: args.targetLanguages,
+          priority: args.priority,
+          llmPriority: args.llmPriority,
         },
       );
 
@@ -361,25 +379,31 @@ export const fetchSentenceMetadata = internalAction({
  * Idempotent: safe to call twice (once with `metadata: undefined` to unblock,
  * then again with real metadata after a retry success). The audioSpeakerGender
  * precedence rule below ensures the coin flip never re-rolls.
+ *
+ * Exported as a plain helper (not only the internalMutation below) so the
+ * chat "also correct" replace path (cardApprovals.ts) can apply model-proposed
+ * metadata inside its own transaction. The prepareCardContent pass this
+ * schedules is what re-voices audio after a speaker-gender change (payload
+ * voiceGender mismatch check in decks.ts).
  */
-export const applyMetadataAndPrepareCard = internalMutation({
+export async function applyTextMetadata(
+  ctx: MutationCtx,
   args: {
-    textId: v.id('texts'),
-    metadata: v.optional(
-      v.object({
-        register: v.optional(v.string()),
-        addresseeNumber: v.optional(v.string()),
-        speakerGender: v.optional(v.string()),
-        addresseeGender: v.optional(v.string()),
-        addressesSomeone: v.optional(v.boolean()),
-      }),
-    ),
-    schedulePrepareCard: v.boolean(),
-    baseLanguages: v.array(v.string()),
-    targetLanguages: v.array(v.string()),
+    textId: Id<'texts'>;
+    metadata?: {
+      register?: string;
+      addresseeNumber?: string;
+      speakerGender?: string;
+      addresseeGender?: string;
+      addressesSomeone?: boolean;
+    };
+    schedulePrepareCard: boolean;
+    baseLanguages: string[];
+    targetLanguages: string[];
+    priority?: TtsPriority;
+    llmPriority?: LlmPriority;
   },
-  returns: v.null(),
-  handler: async (ctx, args) => {
+): Promise<null> {
     const text = await ctx.db.get(args.textId);
     if (!text) return null;
 
@@ -465,7 +489,7 @@ export const applyMetadataAndPrepareCard = internalMutation({
     // translations that were inserted alongside the text.
     //
     // Chat approval and custom-text creation write their translation rows
-    // BEFORE any gender exists, so they landed unstamped — "legacy" to every
+    // BEFORE any gender exists, so they landed unstamped, "legacy" to every
     // consumer of `translations.speakerGender`. That is not what legacy means:
     // these rows are current, and their gender is precisely the one resolved
     // here (for chat cards the metadata LLM *infers* the gender by reading
@@ -477,12 +501,12 @@ export const applyMetadataAndPrepareCard = internalMutation({
     // rows into "drifted" ones. Only rows that disagree are patched, so the
     // common re-run writes nothing.
     //
-    // Restricted to user-created cards, whose wording is never regenerated —
-    // there the stamp records the card's gender rather than licensing a
+    // Restricted to user-created cards, whose wording is never regenerated.
+    // There the stamp records the card's gender rather than licensing a
     // rewrite. On a PREMADE text the same stamp would be actively harmful: it
     // clears both `isLegacy` and `isDrifted` for rows that really were written
     // under the old gender, suppressing the `isLegacyAlongsideDriftedAudio`
-    // heal path in `scheduleMissingContent` — the audio gets re-voiced while
+    // heal path in `scheduleMissingContent`. The audio gets re-voiced while
     // the wrong-grammar text survives, which is the exact failure that branch
     // exists to prevent. Every caller creates user-created cards today, so
     // this is a guard on an invariant rather than a live branch; it is here so
@@ -509,10 +533,33 @@ export const applyMetadataAndPrepareCard = internalMutation({
           textId: args.textId,
           baseLanguages: args.baseLanguages,
           targetLanguages: args.targetLanguages,
+          priority: args.priority,
+          llmPriority: args.llmPriority,
         },
       );
     }
 
     return null;
+}
+
+export const applyMetadataAndPrepareCard = internalMutation({
+  args: {
+    textId: v.id('texts'),
+    metadata: v.optional(
+      v.object({
+        register: v.optional(v.string()),
+        addresseeNumber: v.optional(v.string()),
+        speakerGender: v.optional(v.string()),
+        addresseeGender: v.optional(v.string()),
+        addressesSomeone: v.optional(v.boolean()),
+      }),
+    ),
+    schedulePrepareCard: v.boolean(),
+    baseLanguages: v.array(v.string()),
+    targetLanguages: v.array(v.string()),
+    priority: v.optional(ttsPriorityValidator),
+    llmPriority: v.optional(llmPriorityValidator),
   },
+  returns: v.null(),
+  handler: applyTextMetadata,
 });

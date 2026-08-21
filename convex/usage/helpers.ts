@@ -34,12 +34,12 @@ async function getQuotaDoc(
  * Resolve which local balance a feature consumption applies to.
  *
  * Credit-consuming features (see CREDIT_COSTS) draw from the shared
- * `credits` balance when the user's plan grants one — the amount is
+ * `credits` balance when the user's plan grants one. The amount is
  * converted via the feature's credit cost. Users on legacy (pre-credits)
  * plan versions have per-feature balances instead, so we fall back to the
  * feature's own entry when no `credits` balance exists.
  *
- * Note: Autumn tracking always receives the UNDERLYING feature id — only
+ * Note: Autumn tracking always receives the UNDERLYING feature id, only
  * the local mirror is credit-aware. If a user somehow holds both a direct
  * feature balance and credits, Autumn consumes the direct balance first;
  * the post-track sync re-converges the local cache in that case.
@@ -59,7 +59,7 @@ function resolveQuotaTarget(
   return { targetFeatureId: featureId, targetAmount: amount };
 }
 
-/** `checkQuota` against an already-loaded doc — no further reads. */
+/** `checkQuota` against an already-loaded doc, no further reads. */
 function checkQuotaForDoc(
   doc: Doc<'usageQuotas'> | null,
   featureId: string,
@@ -103,7 +103,7 @@ export async function checkQuota(
 
 /**
  * Hard gate for anything that spends money. Throws while Autumn reports the
- * user's plan as past due — there is no grace window.
+ * user's plan as past due. There is no grace window.
  *
  * Autumn keeps granting entitlements during the (multi-week) Stripe retry
  * period, so the local balances alone would happily let a delinquent user
@@ -137,7 +137,7 @@ export function assertBillingCurrent(
 /**
  * Check whether a boolean feature is available for the user.
  * Mirrors the frontend `useFeatureQuota.isAvailable` logic.
- * `synced: false` means no quota doc yet — same notion as `checkQuota`.
+ * `synced: false` means no quota doc yet, same notion as `checkQuota`.
  */
 export async function hasFeatureAccess(
   ctx: QueryCtx | MutationCtx,
@@ -160,7 +160,7 @@ export async function hasFeatureAccess(
 
 /**
  * Decrement the local quota for a feature.
- * Does NOT check — caller must check first or use `consumeQuota`.
+ * Does NOT check. Caller must check first or use `consumeQuota`.
  */
 async function decrementQuota(
   ctx: MutationCtx,
@@ -176,7 +176,7 @@ async function decrementQuota(
   );
 }
 
-/** `decrementQuota` against an already-loaded doc — no further reads. */
+/** `decrementQuota` against an already-loaded doc, no further reads. */
 async function decrementQuotaForDoc(
   ctx: MutationCtx,
   doc: Doc<'usageQuotas'> | null,
@@ -309,11 +309,11 @@ export async function releaseQuota(
  * Charge the post-generation remainder of a chat message's dynamic credit
  * cost (1 chat_messages unit is consumed up-front in `sendMessage`; this adds
  * the extra units `generateResponse` derived from the actual LLM cost).
- * `extraMessageUnits` is denominated in chat_messages UNITS — decrementQuota
+ * `extraMessageUnits` is denominated in chat_messages UNITS. decrementQuota
  * (via resolveQuotaTarget) and Autumn's credit schema each convert it into
  * credits exactly once, so a credit-denominated amount here would be
  * double-multiplied by CREDIT_COSTS[CHAT_MESSAGES]. Applied without a balance
- * check — the work is already done, so the balance may go negative and block
+ * check. The work is already done, so the balance may go negative and block
  * the next message instead.
  *
  * No-op for users on legacy plan versions (no `credits` balance): their
@@ -361,7 +361,7 @@ export const syncAllFeatures = internalMutation({
     planId: v.optional(v.string()),
     planName: v.optional(v.string()),
     planStatus: v.optional(v.string()),
-    // Whether ANY current plan is delinquent — see derivePlan. This, not
+    // Whether ANY current plan is delinquent. See derivePlan. This, not
     // planStatus, drives the payment block.
     anyPastDue: v.boolean(),
     // Autumn returned no plans at all, so we don't know the billing state:
@@ -378,8 +378,8 @@ export const syncAllFeatures = internalMutation({
     const newIncluded = args.features[FEATURE_IDS.COURSES]?.included;
 
     // E2E-only: a billingTestOverrides row forces the effective plan status
-    // (dev/test deployments with E2E_TEST_HOOKS=1 only). Applied here — the
-    // single funnel for both sync paths — so app reloads re-apply the
+    // (dev/test deployments with E2E_TEST_HOOKS=1 only). Applied here. The
+    // single funnel for both sync paths, so app reloads re-apply the
     // override on top of real Autumn data instead of clearing it. It must
     // also drive `anyPastDue`, since that is what the block keys on.
     let effectiveStatus = args.planStatus;
@@ -411,7 +411,7 @@ export const syncAllFeatures = internalMutation({
           }
           : {}),
         pastDueSince: pastDue ? (doc?.pastDueSince ?? now) : undefined,
-        // Keep the last known URL while still past due — a later sync that
+        // Keep the last known URL while still past due. A later sync that
         // didn't expand invoices shouldn't blank the pay button.
         pastDueInvoiceUrl: pastDue
           ? (args.pastDueInvoiceUrl ?? doc?.pastDueInvoiceUrl)
@@ -435,7 +435,7 @@ export const syncAllFeatures = internalMutation({
 
     // Never auto-archive while the payment is past due. Autumn can revoke
     // entitlements during dunning (an org-level option), which would shrink
-    // `included` and silently archive the user's courses — and paying the
+    // `included` and silently archive the user's courses, and paying the
     // invoice would not bring them back. Wait until billing is healthy.
     //
     // Keyed on the state that is actually persisted, not on `pastDue`: a
@@ -475,19 +475,19 @@ export const syncAllFeatures = internalMutation({
     /**
      * Plan attributes on the PostHog person. This is the single funnel every
      * piece of Autumn state passes through, so it is the one place that can
-     * keep them fresh — and it lets every other event be segmented by plan
+     * keep them fresh, and it lets every other event be segmented by plan
      * without the client ever learning the plan id (`getMyQuotas` deliberately
      * withholds it).
      *
      * Fired only on change: this funnel runs on every app open (BillingGate →
      * syncQuotas), and re-identifying an unchanged plan each time is pure
-     * event noise. Credit balances are deliberately not person properties — a
+     * event noise. Credit balances are deliberately not person properties. A
      * balance is a point-in-time fact that belongs on events, and its churn
      * would defeat this change gate.
      *
      * `plan_changed` is the missing bookend of the checkout funnel: the
      * client's `checkout_redirected` is the last observable step before
-     * Stripe, and this is the first observable step after — activation,
+     * Stripe, and this is the first observable step after. Activation,
      * cancellation, trial conversion and dunning all land here. Mirrors the
      * persistence rules above: `productsMissing` or an unknown plan keep the
      * stored identity, so a sync that learned nothing reports nothing.
@@ -521,7 +521,7 @@ export const syncAllFeatures = internalMutation({
       await identifyUser(ctx, args.userId, next);
     }
     if (planIdentityChanged) {
-      // First-ever sync reports { from_plan_id: undefined } — that is the
+      // First-ever sync reports { from_plan_id: undefined }. That is the
       // free-plan attach at signup, the top of the monetization funnel.
       await track(ctx, args.userId, EVENTS.PLAN_CHANGED, {
         from_plan_id: previous.plan_id,
@@ -531,8 +531,8 @@ export const syncAllFeatures = internalMutation({
         past_due: stillPastDue,
       });
       // Notify the support inbox about real subscription events. The
-      // first-ever sync is the automatic free-plan attach at signup —
-      // already covered by the signup notification, so skip it.
+      // first-ever sync is the automatic free-plan attach at signup.
+      // Already covered by the signup notification, so skip it.
       if (previous.plan_id !== undefined) {
         const profile = await ctx.db
           .query('userProfiles')

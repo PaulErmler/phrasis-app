@@ -18,7 +18,7 @@ export interface ButtonPlaybackState {
 
 /**
  * Tracks which per-language AudioButton is currently playing and at what
- * time. Mutual exclusion comes for free — any new language replaces the
+ * time. Mutual exclusion comes for free. Any new language replaces the
  * previous entry. Used to drive `<HighlightedText>` when the merged card
  * audio isn't running (e.g. library previews, individual-language replays).
  */

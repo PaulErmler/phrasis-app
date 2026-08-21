@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 
 /**
  * Each tier lists only what it ADDS over the one below, under an "Everything
- * from X, plus:" line — the same structure as the in-app pricing table
+ * from X, plus:" line. The same structure as the in-app pricing table
  * (`itemsAddedOver` in components/autumn/pricing-table.tsx). Anything the
  * lower tier already grants is inherited, not repeated: Basic and Free both
  * cap at 1 course, Pro and Ultra both give unlimited sentences.
@@ -52,7 +52,7 @@ const plans = [
     paid: true,
     features: [
       'credits',
-      // Display-only — no Autumn feature backs these.
+      // Display-only, no Autumn feature backs these.
       'priorityFeatureAccess',
       'prioritySupport',
     ],
@@ -269,7 +269,7 @@ export function PricingSection() {
         {/* Paid plans are sold with Stripe as merchant of record, so the
             listed price is the gross amount and any VAT is carved out of it
             rather than added at checkout. Stated once under the grid rather
-            than per card — it applies to every paid plan equally. */}
+            than per card. It applies to every paid plan equally. */}
         <p className="mt-6 text-center text-xs text-muted-foreground">
           {t('taxNote')}
         </p>

@@ -13,7 +13,7 @@ export interface MergedPlayback {
   speedByLanguage: Record<string, number>;
 }
 
-/** The active language cue — changes a handful of times per playback. */
+/** The active language cue. Changes a handful of times per playback. */
 export interface ActiveCue {
   language: string;
   /** Cue start on the merged timeline, for per-frame localTime derivation. */
@@ -40,7 +40,7 @@ export function useActiveCue(
 
   // Reveal-only placeholders for zero-repetition languages have no clip to
   // highlight, so they are dropped once here rather than skipped inside the
-  // per-tick scan — `cueIndex` therefore indexes this list, not `languageCues`.
+  // per-tick scan. `cueIndex` therefore indexes this list, not `languageCues`.
   const cues = useMemo(
     () => (languageCues ? audibleCues(languageCues) : []),
     [languageCues],

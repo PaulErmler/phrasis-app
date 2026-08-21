@@ -2,7 +2,7 @@ import type { Scheduler } from 'convex/server';
 
 import { posthog } from './posthog';
 
-/** Any mutation or action context — the only two that can schedule. */
+/** Any mutation or action context. The only two that can schedule. */
 export type SchedulerCtx = { scheduler: Scheduler };
 
 /**
@@ -43,19 +43,19 @@ export const EVENTS = {
   // Onboarding
   ONBOARDING_COMPLETED: 'onboarding_completed',
 
-  // AI cost — see convex/lib/posthogAi.ts
+  // AI cost. See convex/lib/posthogAi.ts
   AI_GENERATION: '$ai_generation',
 } as const;
 
 /**
- * Deliberately absent, and why — so nobody re-adds them here.
+ * Deliberately absent, and why, so nobody re-adds them here.
  *
  * `quota_exhausted`, `billing_blocked`, `chat_message_failed`,
  * `onboarding_failed`: every one of these happens on a mutation that *throws*.
  * Convex rolls the transaction back, including the `scheduler.runAfter` a
  * capture enqueues, so the event would be discarded exactly when it matters.
- * They are captured client-side instead, where the ConvexError is caught —
- * see `lib/posthog/events.ts`.
+ * They are captured client-side instead, where the ConvexError is caught.
+ * See `lib/posthog/events.ts`.
  *
  * `review_session_*`: session boundaries are a UI concept (the learn overlay
  * opening and closing); the backend never sees them. Per-review detail stays in
@@ -108,7 +108,7 @@ export async function identifyUser(
  *
  * Uncaught exceptions already reach PostHog through the Convex dashboard's
  * first-party Error Tracking destination, so reach for this only where the
- * error is *caught* and would otherwise vanish — the onboarding swallow points
+ * error is *caught* and would otherwise vanish. The onboarding swallow points
  * being the motivating case.
  */
 export async function trackException(

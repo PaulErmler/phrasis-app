@@ -48,7 +48,7 @@ describe("features/home", () => {
           publishedAt: 1,
           isActive: true,
         });
-        // L02 inserted BEFORE L01 — output order must come from the
+        // L02 inserted BEFORE L01. Output order must come from the
         // by_datasetId_and_order index, not insertion order. L02 has no
         // displayName so the `displayName ?? name` fallback is pinned on the
         // dataset branch too.
@@ -71,7 +71,7 @@ describe("features/home", () => {
           displayName: "Level 1",
           origin: "premade",
         });
-        // Legacy row without datasetId — must not leak into the dataset branch.
+        // Legacy row without datasetId. Must not leak into the dataset branch.
         await ctx.db.insert("collections", { name: "A1", textCount: 99 });
         const chat = await ctx.db.insert("collections", {
           name: "Chat",
@@ -94,7 +94,7 @@ describe("features/home", () => {
           activeCollectionId: l01,
           chatCollectionId: chat,
           customCollectionId: custom,
-          // `custom` repeated here on purpose — the Set in the handler must
+          // `custom` repeated here on purpose. The Set in the handler must
           // dedupe it so the collection appears once.
           activeCustomCollectionIds: [custom, extra],
         });
@@ -203,7 +203,7 @@ describe("features/home", () => {
       const t = convexTest(schema, modules);
       const { courseId } = await seedCourse(t);
       const ids = await t.run(async (ctx) => {
-        // An INACTIVE dataset must not switch branches — getActiveDataset
+        // An INACTIVE dataset must not switch branches. getActiveDataset
         // filters on isActive, so the legacy by_name fallback still runs.
         await ctx.db.insert("datasets", {
           slug: "ogte-curated",

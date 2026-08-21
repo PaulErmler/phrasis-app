@@ -32,7 +32,7 @@ interface SendMessageOptions {
 
 /**
  * Custom hook for sending messages with consistent error handling and status management.
- * Course languages are resolved server-side — an optional cardId provides
+ * Course languages are resolved server-side. An optional cardId provides
  * per-card review context (the server looks up all card data from the DB).
  */
 export function useSendMessage({
@@ -81,7 +81,7 @@ export function useSendMessage({
         if (error instanceof ConvexError) {
           const code = convexErrorCode(error);
           // Captured here rather than in `sendMessage`: the mutation threw, so
-          // everything it scheduled — including any analytics event — rolled
+          // everything it scheduled, including any analytics event. Rolled
           // back with it. The client is the only place these failures exist.
           capture(CLIENT_EVENTS.CHAT_MESSAGE_FAILED, {
             code: code ?? 'UNKNOWN',

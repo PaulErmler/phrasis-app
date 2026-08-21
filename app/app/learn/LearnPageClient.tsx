@@ -14,7 +14,7 @@ export function LearnPageClient() {
 
   // Standalone learn page is rendered outside the (main) layout, so it has
   // no in-app chat overlay to fall back on. Create / fetch a thread, then
-  // push directly to the chat route — the main layout picks the thread up
+  // push directly to the chat route. The main layout picks the thread up
   // via `viewFromPathname` and renders the chat view.
   const handleNavigateToChat = useCallback(async () => {
     try {

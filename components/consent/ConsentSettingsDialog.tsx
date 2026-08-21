@@ -17,7 +17,7 @@ import { setConsent, useConsentStatus } from '@/lib/posthog/consent';
 
 /**
  * The preference centre. Reachable from the footer at any time, which is what
- * makes consent withdrawable — the privacy policy promises exactly this and,
+ * makes consent withdrawable. The privacy policy promises exactly this and,
  * before this component existed, nothing in the app could reopen the choice.
  */
 export function ConsentSettingsDialog({

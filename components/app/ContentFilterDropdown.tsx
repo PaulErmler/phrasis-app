@@ -26,11 +26,11 @@ const FIXED_TRIGGER_WIDTH = { width: '140px' } as const;
  *
  * The trigger has a fixed width so the row layout stays stable as the user
  * cycles through values of different lengths. The constraint "cannot disable
- * both sources" is implicit — Select can't pick a no-op value.
+ * both sources" is implicit. Select can't pick a no-op value.
  */
 export function ContentFilterDropdown() {
   // `getActiveCourseSettings` is preloaded server-side in app/app/layout.tsx,
-  // so the dropdown renders with real data on first paint — no width jitter
+  // so the dropdown renders with real data on first paint, no width jitter
   // when the row appears.
   const { preloadedCourseSettings } = useAppData();
   const settings = usePreloadedQuery(preloadedCourseSettings);

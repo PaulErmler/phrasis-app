@@ -6,7 +6,7 @@ import { unregisterRun } from "./run-lock";
 /**
  * Counterpart to global-setup.ts: remove the E2E_TEST_HOOKS flag so the
  * dev deployment goes back to sending real auth emails after the run.
- * Best-effort — a failure here must not turn a green suite red.
+ * Best-effort. A failure here must not turn a green suite red.
  */
 export default function globalTeardown() {
   if (!unregisterRun()) {

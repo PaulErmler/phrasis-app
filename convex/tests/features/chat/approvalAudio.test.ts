@@ -140,7 +140,7 @@ describe('features/chat/approvalAudio', () => {
       // synthesis of the same line.
       expect(await request()).toEqual({ scheduled: false });
 
-      // A hand-edited line is different content — the stale marker must not
+      // A hand-edited line is different content. The stale marker must not
       // block its (first) synthesis.
       await t.run(async (ctx) => {
         await ctx.db.patch(approvalId, {

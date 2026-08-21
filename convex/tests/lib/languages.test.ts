@@ -10,7 +10,7 @@ import {
   SUPPORTED_LANGUAGES,
 } from "../../../lib/languages";
 
-describe("lib/languages — postProcessTranslation", () => {
+describe("lib/languages: postProcessTranslation", () => {
   it("strips trailing underscore runs (the default step, every language)", () => {
     expect(postProcessTranslation("es", "Hola_")).toBe("Hola");
     expect(postProcessTranslation("es", "Hola.__")).toBe("Hola.");
@@ -44,7 +44,7 @@ describe("lib/languages — postProcessTranslation", () => {
   });
 });
 
-describe("lib/languages — getTextDirection", () => {
+describe("lib/languages: getTextDirection", () => {
   it("returns 'rtl' for every Arabic dialect, Hebrew, and Persian", () => {
     const rtlCodes = SUPPORTED_LANGUAGES.filter(
       (l) => l.code === "ar" || l.code.startsWith("ar_"),
@@ -67,7 +67,7 @@ describe("lib/languages — getTextDirection", () => {
   });
 });
 
-describe("lib/languages — dominantTextDirection", () => {
+describe("lib/languages: dominantTextDirection", () => {
   // Regression: a chat explanation that OPENS with a target-language token
   // used to flip wholesale to RTL under dir="auto"'s first-strong-character
   // heuristic, putting English punctuation on the wrong side.
@@ -98,7 +98,7 @@ describe("lib/languages — dominantTextDirection", () => {
   });
 });
 
-describe("lib/languages — getTranslationConfigForLanguage", () => {
+describe("lib/languages: getTranslationConfigForLanguage", () => {
   it("returns provider='google' for English (source-only, never translated)", () => {
     const cfg = getTranslationConfigForLanguage("en");
     expect(cfg.provider).toBe("google");
@@ -135,7 +135,7 @@ describe("lib/languages — getTranslationConfigForLanguage", () => {
     expect(getCurrentTranslationVersion("yue")).toBe(3);
     expect(getCurrentTranslationVersion("yue_traditional")).toBe(3);
     expect(getCurrentTranslationVersion("th")).toBe(3);
-    // Icelandic: bumped with the Aug 2026 Luna best-of-3 switch — the only
+    // Icelandic: bumped with the Aug 2026 Luna best-of-3 switch. The only
     // language whose existing rows regenerate under the new rule (native
     // speaker flagged systematic register/imperative errors).
     expect(getCurrentTranslationVersion("is")).toBe(2);
@@ -188,16 +188,16 @@ describe("lib/languages — getTranslationConfigForLanguage", () => {
   });
 });
 
-describe("lib/languages — resolveTranslationStages", () => {
+describe("lib/languages: resolveTranslationStages", () => {
   it("returns the default luna_bo3 chain (Luna best-of-3 + Gemini fallback) for an unruled language", () => {
     const stages = resolveTranslationStages("nl", 50);
     expect(stages.length).toBe(2);
     expect(stages[0].model).toBe("openai/gpt-5.6-luna:nitro");
     expect(stages[0].reasoning).toBe("none");
     expect(stages[0].samples).toEqual({ total: 3, extraTemperature: 1 });
-    // The fallback is the pre-Aug-2026 production config, before the Google
+    // The fallback is Gemini 3.7 Flash Nitro (minimal), before the Google
     // safety net.
-    expect(stages[1].model).toBe("google/gemini-3.6-flash:nitro");
+    expect(stages[1].model).toBe("google/gemini-3.7-flash:nitro");
     expect(stages[1].reasoning).toBe("minimal");
   });
 
@@ -214,7 +214,7 @@ describe("lib/languages — resolveTranslationStages", () => {
       expect(stages[0].model).toBe("openai/gpt-5.6-luna:nitro");
       expect(stages[0].judge?.model).toBe("openai/gpt-5.6-luna:nitro");
       expect(stages[1]).toEqual({
-        model: "google/gemini-3.6-flash:nitro",
+        model: "google/gemini-3.7-flash:nitro",
         reasoning: "minimal",
         maxOutputTokens: 4_000,
       });

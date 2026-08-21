@@ -1,5 +1,5 @@
 /**
- * Shared card scheduling logic — used by both Convex backend and React frontend.
+ * Shared card scheduling logic. Used by both Convex backend and React frontend.
  *
  * Two-phase scheduling:
  *   1. Pre-review: fixed intervals (1m, 3m, 5m, then 10m) with "Still learning" / "Understood"
@@ -101,7 +101,7 @@ export type FSRSRating = 'again' | 'hard' | 'good' | 'easy';
 export type ReviewRating = PreReviewRating | FSRSRating;
 
 /**
- * Serialised FSRS card state (plain numbers — no Date objects).
+ * Serialised FSRS card state (plain numbers, no Date objects).
  * Stored in Convex alongside the card document.
  */
 export interface FsrsCardState {

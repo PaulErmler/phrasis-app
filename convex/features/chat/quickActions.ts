@@ -11,7 +11,7 @@ import {
  * Quick actions: the client sends a compact action key (plus a small payload)
  * instead of a long prompt. The server expands it into a detailed steering
  * prompt that is persisted as a hidden system message right before the short
- * visible user label — so the model gets precise instructions while the chat
+ * visible user label, so the model gets precise instructions while the chat
  * shows a clean bubble, and follow-up turns still see what was asked.
  */
 
@@ -47,7 +47,7 @@ export const SENTENCE_QUICK_ACTION_KINDS = [
 export type SentenceQuickActionKind = (typeof SENTENCE_QUICK_ACTION_KINDS)[number];
 
 export const MAX_QUICK_ACTION_WORD_LENGTH = 100;
-// Generous — real BCP-47 codes are ≤ ~11 chars; this only stops the field
+// Generous. Real BCP-47 codes are ≤ ~11 chars; this only stops the field
 // being used to smuggle arbitrary-length text into the steering prompt.
 export const MAX_QUICK_ACTION_LANGUAGE_LENGTH = 50;
 
@@ -126,7 +126,7 @@ function replyLanguageNote(ctx: QuickActionContext): string {
  * card context carries both renderings, and without this the model
  * sometimes analyzes the base-language translation instead of the sentence
  * the user is actually learning. Multi-target courses are answered for
- * every target language in one reply — sentence actions are deliberately
+ * every target language in one reply. Sentence actions are deliberately
  * not scoped to a single language.
  */
 function targetSubjectNote(ctx: QuickActionContext): string {
@@ -173,8 +173,8 @@ function wordSteering(
 
   if (kind === 'explainWord') {
     return isTarget
-      ? `The user clicked the ${name} word "${word}" (a TARGET language). Explain this word: meaning(s), part of speech, essential grammar (e.g. gender, plural, conjugation class, governed prepositions — as relevant), register, common collocations, and typical pitfalls for learners. Create 2-4 flashcards (createCard) with varied example sentences that use the word in different everyday contexts.`
-      : `The user clicked the word "${word}" in a BASE-language (${name}) rendering. Do NOT explain this base-language word itself. Instead give its translation(s)/equivalent(s) ${forEachTarget}: explain the differences between those equivalents (nuance, register, when to use which) and the essential grammar of each, and create 2-4 flashcards (createCard) with example sentences using them.`;
+      ? `The user clicked the ${name} word "${word}" (a TARGET language). Explain this word: meaning(s), part of speech, essential grammar (e.g. gender, plural, conjugation class, governed prepositions — as relevant), register, common collocations, and typical pitfalls for learners. Create 2-4 flashcards (createCard) with varied example sentences. Each card MUST use a DIFFERENT grammatical form of "${word}" (other persons, tenses, number, case, comparison — whichever the part of speech allows). Do not put the same surface form on every card.`
+      : `The user clicked the word "${word}" in a BASE-language (${name}) rendering. Do NOT explain this base-language word itself. Instead give its translation(s)/equivalent(s) ${forEachTarget}: explain the differences between those equivalents (nuance, register, when to use which) and the essential grammar of each, and create 2-4 flashcards (createCard) with example sentences. Spread the cards across DIFFERENT grammatical forms of those equivalents — not the same form repeated.`;
   }
 
   const relation = kind === 'synonyms' ? 'synonyms' : 'antonyms (opposites)';
@@ -214,6 +214,6 @@ export function expandQuickAction(action: QuickAction, ctx: QuickActionContext):
         ctx.targetLanguages,
       )}${replyNote}`;
     case 'discussAnswer':
-      return `${header} The user is practicing writing. The expected ${languageName(action.language)} sentence was: "${action.expected}". The user wrote: "${action.userAnswer}". Judge whether the user's version is ALSO a correct, natural way to express the same thing. If fully correct: say so clearly, then point out any nuance or register differences from the expected sentence. If partially correct: identify exactly which parts are right and which are off, and why. If incorrect: explain every error (grammar, vocabulary, word order, spelling/diacritics) concretely, quoting the exact words, and give the corrected form. If you spot a recurring error pattern, create 1-2 flashcards (createCard) with fresh example sentences that train exactly that pattern — otherwise create no cards for this reply.${replyNote}`;
+      return `${header} The user is practicing writing. The expected ${languageName(action.language)} sentence was: "${action.expected}". The user wrote: "${action.userAnswer}". Judge whether the user's version is ALSO a correct, natural way to express the same thing. If fully correct: say so clearly, point out any nuance or register differences from the expected sentence, and call the markAlsoCorrect tool exactly once — pass the full corrected sentence for every language whose text changes (keep the user's wording; fix only punctuation/capitalization/diacritics) plus any card-metadata fields the version changes (speaker gender, register, addressee); the app then offers to save it, so do not ask. If partially correct: identify exactly which parts are right and which are off, and why — do NOT call markAlsoCorrect. If incorrect: explain every error (grammar, vocabulary, word order, spelling/diacritics) concretely, quoting the exact words, and give the corrected form. If you spot a recurring error pattern, create 1-2 flashcards (createCard) with fresh example sentences that train exactly that pattern — otherwise create no cards for this reply, and never createCard the user's variant itself.${replyNote}`;
   }
 }

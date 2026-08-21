@@ -25,7 +25,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: 'easeOut' }}
-              className="text-[2.5rem] md:text-[3.5rem] lg:text-[5rem] font-semibold tracking-tight leading-[1.08]"
+              className="text-[2rem] md:text-[2.5rem] lg:text-[3.25rem] font-semibold tracking-tight leading-[1.15]"
             >
               {t.rich('tagline', {
                 highlight: (chunks) => <span className="text-primary">{chunks}</span>,
@@ -79,6 +79,16 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
                 {t('cta.install')}
               </PwaInstallTrigger>
             </motion.div>
+            {!isAuthenticated && (
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.3, ease: 'easeOut' }}
+                className="text-sm text-muted-foreground"
+              >
+                {t('cta.friction')}
+              </motion.p>
+            )}
           </div>
 
           {/* App icon column */}

@@ -9,14 +9,14 @@ export interface SpeakInput {
   text: string;
   /** Internal language code (e.g. `'en'`, `'es_latam'`, `'zh'`). */
   language: string;
-  /** Provider-specific voice id — e.g. Google voice name or Azure short name. */
+  /** Provider-specific voice id, e.g. Google voice name or Azure short name. */
   voiceApiCode: string;
   /** Playback speed; 1.0 = normal. */
   speed: number;
 }
 
 export interface SpeakResult {
-  /** MP3 audio as a Blob — uniform output shape across providers. */
+  /** MP3 audio as a Blob. Uniform output shape across providers. */
   audio: Blob;
   provider: TtsProvider;
 }

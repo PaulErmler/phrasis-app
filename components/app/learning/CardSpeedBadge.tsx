@@ -20,7 +20,7 @@ interface CardSpeedBadgeProps {
   /**
    * Called with the next cycle value on click. In `persistent` mode this
    * may be `null` (clears the override). In `ephemeral` mode it is always a
-   * number — the cycle has no null slot.
+   * number. The cycle has no null slot.
    */
   onCycle: (next: number | null) => void;
   /**
@@ -44,7 +44,7 @@ export function CardSpeedBadge({
   const isEphemeral = variant === 'ephemeral';
 
   // In ephemeral mode the badge ignores `generalSpeed` and treats `null` as
-  // 1.0 — the "no change" resting display.
+  // 1.0. The "no change" resting display.
   const displayed = isEphemeral
     ? (override ?? 1.0)
     : (override ?? generalSpeed);

@@ -4,7 +4,7 @@ import { dismissTour } from './helpers';
 /**
  * Mutating tests for the content-source filter dropdown. Runs in the
  * chromium-serial project because flipping the filter mid-test changes
- * shared user state — concurrent tests would race for the value.
+ * shared user state. Concurrent tests would race for the value.
  *
  * Each test resets the filter to "Both" in afterEach so subsequent specs
  * see the same baseline.
@@ -64,7 +64,7 @@ test.describe(
         widths.push(box!.width);
       }
 
-      // All three widths should be within ~1px of each other — the trigger's
+      // All three widths should be within ~1px of each other. The trigger's
       // fixed-width class is the contract being verified.
       const min = Math.min(...widths);
       const max = Math.max(...widths);
@@ -81,7 +81,7 @@ test.describe(
       await page.getByTestId('content-filter-option-course').click();
       await page.waitForTimeout(300);
 
-      // Exactly one Off pill — on the excluded (Custom Content) tab.
+      // Exactly one Off pill, on the excluded (Custom Content) tab.
       await expect(page.getByTestId('source-badge-off')).toHaveCount(1);
     });
 
@@ -112,7 +112,7 @@ test.describe(
 
       // The default selected tab is 'premade' (Course). Pill should open the
       // popover instead of switching tabs (no tab switch happens because we
-      // were already on the Course tab — verify the re-enable CTA appears).
+      // were already on the Course tab, verify the re-enable CTA appears).
       await offPill.click();
       await expect(page.getByTestId('source-badge-reenable')).toBeVisible({
         timeout: 5_000,

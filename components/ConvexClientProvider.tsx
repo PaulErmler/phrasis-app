@@ -21,7 +21,7 @@ export function ConvexClientProvider({
   return (
     <ConvexBetterAuthProvider
       client={convex}
-      // Cast: see ClientAuthBoundary — 0.12.5's AuthClient type is not
+      // Cast: see ClientAuthBoundary. 0.12.5'S AuthClient type is not
       // satisfiable under better-auth 1.6.23.
       authClient={authClient as unknown as AuthClient}
       initialToken={initialToken}

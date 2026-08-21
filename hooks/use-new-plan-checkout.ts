@@ -16,15 +16,15 @@ import { throwOnCheckoutError } from "@/hooks/use-checkout-error";
  *
  * Why the legacy path won't do: for a customer without a usable card, the
  * v1.2 `/checkout` preview itself creates the Stripe Checkout Session and
- * autumn-js redirects to it before any dialog opens — and that session is
+ * autumn-js redirects to it before any dialog opens, and that session is
  * built on a Stripe API version too old for Managed Payments (merchant of
  * record). So first purchases must never reach `checkout()` at all. The v2
  * endpoint builds the session on an unpinned API version and, with
  * `redirect_mode: 'always'`, guarantees EVERY first purchase confirms on
- * Stripe's hosted page — which is also what keeps a lapsed subscriber with
+ * Stripe's hosted page, which is also what keeps a lapsed subscriber with
  * a surviving saved card from being charged silently on button click.
  *
- * Everything else — upgrades, downgrades, cancels, trial switches — stays on
+ * Everything else. Upgrades, downgrades, cancels, trial switches. Stays on
  * `checkout()` + CheckoutDialog, which keeps `product.scenario` driving the
  * dialog copy and the pricing-table CTA labels.
  *
@@ -41,7 +41,7 @@ export function useNewPlanCheckout() {
   /**
    * True when this purchase must skip `checkout()`: a customer with a paid
    * plan takes an in-place subscription update, and a trialing one must go
-   * through `switchPlanDuringTrial` — neither may create a session, and both
+   * through `switchPlanDuringTrial`, neither may create a session, and both
    * need the dialog. Everyone else is buying their first subscription.
    */
   const isFirstPurchase = (trialState: TrialState) =>
@@ -58,7 +58,7 @@ export function useNewPlanCheckout() {
   ) => {
     const { paymentUrl } = await attachNewPlan({ productId });
     if (paymentUrl) {
-      // Last event observable on our domain — the session (and any replay)
+      // Last event observable on our domain. The session (and any replay)
       // resumes as a fresh page load when the customer returns from Stripe.
       capture(CLIENT_EVENTS.CHECKOUT_REDIRECTED, {
         product_id: productId,
@@ -73,7 +73,7 @@ export function useNewPlanCheckout() {
   /**
    * The one purchase entry point shared by the pricing table and the
    * paywall/low-quota dialogs. First purchases go to the v2 hosted
-   * checkout — never `checkout()`, whose legacy preview can't carry
+   * checkout, never `checkout()`, whose legacy preview can't carry
    * Managed Payments; everyone else opens CheckoutDialog via `checkout()`,
    * with autumn-js's `{ error }` containers surfaced as throws (a plain
    * await "succeeds" silently on failure).
@@ -95,7 +95,7 @@ export function useNewPlanCheckout() {
     }) => Promise<unknown>;
     dialog: ElementType;
     /**
-     * True when the clicked product is the Free plan — a cancel/downgrade,
+     * True when the clicked product is the Free plan. A cancel/downgrade,
      * never a purchase, so it always goes through `checkout()` + the dialog
      * (the v2 route only sells paid plans).
      */

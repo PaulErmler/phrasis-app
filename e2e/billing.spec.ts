@@ -3,30 +3,31 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   completeStripeTestCheckout,
+  gotoAuthedApp,
   neutralizeTours,
   signUpFreshUser,
 } from "./helpers";
 
 /**
- * Billing / trial lifecycle — drives the REAL upgrade/downgrade-during-trial
+ * Billing / trial lifecycle. Drives the REAL upgrade/downgrade-during-trial
  * flows end-to-end against Autumn + Stripe test mode:
  *
  *   1. A fresh (trial-eligible) user sees the trial badge + "Start Free Trial".
  *   2. Starting a plan opens Stripe Checkout (card-required trial); completing
- *      it with the 4242 test card lands the user in a trialing state — after
+ *      it with the 4242 test card lands the user in a trialing state: after
  *      which NO trial promo may appear anywhere (trials are once-ever).
  *   3. Upgrading during the trial switches the plan immediately but KEEPS the
  *      running trial: dialog says "…still ends on {date}", €0.00 due today,
  *      and never "Start trial". (convex/billing.ts switchPlanDuringTrial)
  *   4. Downgrading during the trial schedules the cheaper plan at trial end
- *      with the SAME end date as captured in step 3 — the trial is untouched.
+ *      with the SAME end date as captured in step 3: the trial is untouched.
  *      This is the reported regression: it used to read "Start trial for
  *      Basic Annual".
  *   5. Selecting the FREE plan during the trial schedules Free at the same
  *      unchanged trial end. This is the second reported regression: the
  *      confirm used to call the raw `attach` action, which the server-side
  *      trial gate rejects ("Plan switches during a trial must go through
- *      switchPlanDuringTrial") — the dialog then silently stayed open.
+ *      switchPlanDuringTrial"): the dialog then silently stayed open.
  *   6. Renewing the still-trialing plan afterwards un-schedules the Free
  *      switch. Third reported regression: Autumn classifies this as
  *      "renew", which the dialog's trial routing didn't cover either, so
@@ -35,7 +36,7 @@ import {
  * The journey signs up its OWN fresh `e2e-billing-*` user in beforeAll
  * instead of borrowing the shared user B: the tests' premise is a
  * NEVER-TRIALED identity, and billing state lives in Autumn/Stripe (not
- * the app database), so it survives across suite runs — a user B from an
+ * the app database), so it survives across suite runs. A user B from an
  * earlier run (or an abandoned Stripe checkout session completing late)
  * would break eligibility in ways that are impossible to clean up, since
  * the app has no account-deletion logic yet. A dedicated per-invocation
@@ -46,7 +47,7 @@ import {
  *   pnpm exec playwright test --grep @live            # live only
  *   pnpm exec playwright test --grep-invert @live     # skip live
  *
- * NOTE: there is intentionally NO account/billing cleanup afterwards — the
+ * NOTE: there is intentionally NO account/billing cleanup afterwards. The
  * app has no user-deletion logic yet, so (like the auth fixture users) the
  * e2e account and its Autumn/Stripe test customer are left behind.
  */
@@ -73,9 +74,7 @@ function planCta(page: Page, productId: string) {
  * the annual plan cards are the ones rendered).
  */
 async function openPricingTable(page: Page) {
-  await page.goto("/app/settings");
-  await page.waitForURL("**/app/settings", { timeout: 20_000 });
-  await expect(planCta(page, BASIC_ANNUAL)).toBeVisible({ timeout: 30_000 });
+  await gotoAuthedApp(page, "/app/settings", planCta(page, BASIC_ANNUAL));
 }
 
 /**
@@ -124,7 +123,7 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
   });
 
   // Captured in the upgrade dialog (step 3) and asserted identical in the
-  // downgrade dialog (step 4) — proves the trial end never moves.
+  // downgrade dialog (step 4), proves the trial end never moves.
   let trialEndDate: string | undefined;
 
   test("trial-eligible user sees trial badge and Start Free Trial", async ({
@@ -180,7 +179,7 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     await expect(message).toContainText(/still ends on/i);
     await expect(message).not.toContainText(/start a free trial/i);
 
-    // Nothing is charged now — billing starts at the (kept) trial end.
+    // Nothing is charged now. Billing starts at the (kept) trial end.
     await expect(page.getByTestId("checkout-due-today")).toHaveText("€0.00");
 
     const messageText = (await message.innerText()).trim();
@@ -214,10 +213,10 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     await expect(message).toContainText(/continues unchanged until/i);
     await expect(message).not.toContainText(/start a free trial/i);
 
-    // The trial end must be EXACTLY the date shown during the upgrade —
+    // The trial end must be EXACTLY the date shown during the upgrade,
     // switching plans neither restarts nor extends the trial. (The
     // carry-over rounds the remaining trial UP to whole days, so the end
-    // can move by the seconds elapsed between signup and the upgrade —
+    // can move by the seconds elapsed between signup and the upgrade,
     // only a run straddling midnight could shift the calendar date.)
     const messageText = (await message.innerText()).trim();
     const scheduledDate = /continues unchanged until (.+?)\./.exec(
@@ -246,7 +245,7 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     test.setTimeout(120_000);
     await openPricingTable(page);
 
-    // The free product's Autumn id is dashboard config, not in the repo —
+    // The free product's Autumn id is dashboard config, not in the repo,
     // but the table sorts Free first, so the first CTA belongs to it.
     const freeCta = page.locator('[data-testid^="pricing-card-cta-"]').first();
     const freeTestId = await freeCta.getAttribute("data-testid");
@@ -255,7 +254,7 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     expect(freeProductId).not.toBe(PRO_ANNUAL);
 
     // The reported regression: confirming this dialog used to call the raw
-    // `attach` action, which convex/autumn.ts's trial gate rejects — the
+    // `attach` action, which convex/autumn.ts's trial gate rejects. The
     // dialog then just stayed open with nothing happening.
     await freeCta.click();
 
@@ -268,7 +267,7 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     await expect(message).toContainText(/continues unchanged until/i);
     await expect(message).not.toContainText(/start a free trial/i);
 
-    // Dropping to Free neither ends the trial early nor extends it — same
+    // Dropping to Free neither ends the trial early nor extends it, same
     // end date as captured during the upgrade (step 3).
     const messageText = (await message.innerText()).trim();
     const scheduledDate = /continues unchanged until (.+?)\./.exec(
@@ -285,7 +284,7 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
 
     // The table must update IN PLACE, without a reload: the trial-switch
     // path refetches the shared SWR caches after confirming (second
-    // user-reported regression — the card kept its old label until a
+    // user-reported regression. The card kept its old label until a
     // manual page reload).
     await expect(freeCta).toHaveText(/plan scheduled/i, { timeout: 20_000 });
 
@@ -306,7 +305,7 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
 
     // The reported regression: Autumn classifies re-attaching the trialing
     // plan as "renew", which the dialog's trial routing didn't divert to
-    // switchPlanDuringTrial — the confirm hit the raw-attach trial gate.
+    // switchPlanDuringTrial. The confirm hit the raw-attach trial gate.
     await expect(planCta(page, PRO_ANNUAL)).toHaveText(/renew/i);
     await planCta(page, PRO_ANNUAL).click();
 

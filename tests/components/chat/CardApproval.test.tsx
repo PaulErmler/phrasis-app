@@ -7,6 +7,12 @@ import userEvent from "@testing-library/user-event";
 vi.mock("convex/react", () => ({
   useQuery: () => undefined,
   useMutation: () => vi.fn(async () => ({ scheduled: false })),
+  usePreloadedQuery: () => undefined,
+}));
+// The approval box reads the course's showIpa setting through the app-data
+// context (useShowIpa, approvalCommon.tsx); these tests render it standalone.
+vi.mock("@/components/app/AppDataProvider", () => ({
+  useAppData: () => ({ preloadedCourseSettings: {} }),
 }));
 vi.mock("@/components/feature_tracking/useFeatureQuota", () => ({
   useFeatureQuota: () => ({ isAvailable: true, isLoading: false }),
@@ -32,13 +38,17 @@ vi.mock("@/components/chat/EditApprovalDialog", () => ({
 }));
 
 import { CardApproval } from "@/components/chat/CardApproval";
+// The REAL string the server tool returns. Imported, not re-typed, so a
+// server-side rewording fails here instead of silently rendering every
+// successful call as an error box.
+import { CREATE_CARD_SUCCESS } from "@/lib/types/tool-parts";
 
 function makeToolPart(extra: Partial<any> = {}) {
   return {
     type: "tool-createCard",
     toolCallId: "tc-1",
     state: "output-available",
-    output: "Card has been created.",
+    output: CREATE_CARD_SUCCESS,
     input: {
       translations: [
         { language: "en", text: "hello" },

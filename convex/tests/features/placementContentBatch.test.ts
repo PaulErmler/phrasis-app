@@ -5,7 +5,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 // Isolate the fan-out contract from `scheduleMissingContent`'s heavy
 // internals (workpool enqueues + TTS/LLM/STT network). We only want to
 // assert that the placement sweep bounds each transaction to one batch and
-// that the upfront-queued batch workers cover the whole corpus — the
+// that the upfront-queued batch workers cover the whole corpus. The
 // primitive itself is exercised end-to-end in `collectionBrowseAdd.test.ts`.
 const { scheduleMissingContentSpy, defaultScheduleMissingContent } = vi.hoisted(() => {
   const defaultScheduleMissingContent = async () => ({
@@ -39,7 +39,7 @@ const modules = import.meta.glob("/convex/**/*.ts");
 afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
-  // `clearAllMocks` clears calls but keeps implementations — restore the
+  // `clearAllMocks` clears calls but keeps implementations. Restore the
   // default so a test's poisoned impl can't leak into the next one.
   scheduleMissingContentSpy.mockImplementation(defaultScheduleMissingContent);
 });
@@ -78,7 +78,7 @@ async function seedPlacementCorpus(
   });
 }
 
-describe("placement content sweep — upfront batch fan-out", () => {
+describe("placement content sweep: upfront batch fan-out", () => {
   // Regression guard for the "too many system operations" timeout: the sweep
   // must NOT run `scheduleMissingContent` over the whole corpus inline.
   it("bounds the entry invocation to one page and covers the whole corpus via the fanned-out batches", async () => {
@@ -100,15 +100,15 @@ describe("placement content sweep — upfront batch fan-out", () => {
       PLACEMENT_CONTENT_BATCH_SIZE,
     );
     // Mock returns {1,1} per sentence, so the returned tally reflects exactly
-    // the inline page — never the full corpus.
+    // the inline page, never the full corpus.
     expect(first.translationsScheduled).toBe(PLACEMENT_CONTENT_BATCH_SIZE);
     expect(first.audioScheduled).toBe(PLACEMENT_CONTENT_BATCH_SIZE);
 
     // Drain the fanned-out batch workers.
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-    // Every placement sentence's text is processed exactly once, no more —
-    // the disjoint batches cover the corpus without duplicating work.
+    // Every placement sentence's text is processed exactly once, no more.
+    // The disjoint batches cover the corpus without duplicating work.
     expect(scheduleMissingContentSpy).toHaveBeenCalledTimes(CORPUS);
     const processedTextIds = scheduleMissingContentSpy.mock.calls.map(
       (call) => call[1] as Id<"texts">,
@@ -136,8 +136,8 @@ describe("placement content sweep — upfront batch fan-out", () => {
     expect(new Set(targetLanguages as string[])).toEqual(new Set(["es", "de"]));
   });
 
-  // The batches are INDEPENDENT — queued upfront by the entry mutation, not
-  // chained — so one failing batch must not orphan the batches after it. (A
+  // The batches are INDEPENDENT. Queued upfront by the entry mutation, not
+  // chained, so one failing batch must not orphan the batches after it. (A
   // self-continuing chain would die at the first failing page: the next
   // page's enqueue rolls back with the failing transaction and Convex does
   // not retry failed scheduled mutations.)
@@ -173,7 +173,7 @@ describe("placement content sweep — upfront batch fan-out", () => {
   });
 
   // A throw in the INLINE page rejects the client-observed mutation and rolls
-  // back the batch enqueues with it — the placement test's reject-driven
+  // back the batch enqueues with it. The placement test's reject-driven
   // retry path stays intact and no half-scheduled sweep survives.
   it("rejects the entry mutation (and enqueues nothing) when the inline page fails", async () => {
     const t = convexTest(schema, modules);
@@ -200,7 +200,7 @@ describe("placement content sweep — upfront batch fan-out", () => {
   });
 });
 
-describe("placement content sweep — batch self-retry", () => {
+describe("placement content sweep: batch self-retry", () => {
   // Convex does not retry scheduled mutations on application error; the batch
   // worker reschedules itself. Without the retry, every sentence of a
   // transiently-failed batch stayed content-less for the rest of onboarding
@@ -229,8 +229,8 @@ describe("placement content sweep — batch self-retry", () => {
     });
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-    // The retried batch re-ran its full slice, so every placement sentence —
-    // including the ones AFTER the poisoned text in the failed batch — was
+    // The retried batch re-ran its full slice, so every placement sentence,
+    // including the ones AFTER the poisoned text in the failed batch. Was
     // processed.
     const processed = new Set(
       scheduleMissingContentSpy.mock.calls.map((call) => call[1] as Id<"texts">),
@@ -255,7 +255,7 @@ describe("placement content sweep — batch self-retry", () => {
       targetLanguage: "es",
       sourceLanguage: "en",
     });
-    // Draining to completion also proves the chain is finite — an unbounded
+    // Draining to completion also proves the chain is finite. An unbounded
     // reschedule loop would never run out of scheduled functions.
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 

@@ -16,7 +16,7 @@ const modules = import.meta.glob("/convex/**/*.ts");
  * targeted tests can miss:
  *
  *   1. arg-validator vs clamp/insert-branch mismatches (a key that validates
- *      but throws — or silently vanishes — when written), and
+ *      but throws: or silently vanishes, when written), and
  *   2. write vs read-validator mismatches (a stored value the settings query
  *      can no longer return).
  *
@@ -56,7 +56,7 @@ function samplesFor(validator: AnyValidator): unknown[] {
         ),
       ];
     default:
-      // ids / unknown kinds — nothing generic to write safely.
+      // ids / unknown kinds, nothing generic to write safely.
       return [];
   }
 }
@@ -81,7 +81,7 @@ const PATCHABLE_FIELDS = Object.entries(
   coursePatchableSettingsValidator.fields,
 ) as Array<[string, AnyValidator]>;
 
-describe("updateCourseSettings — exhaustive settings sweep", () => {
+describe("updateCourseSettings: exhaustive settings sweep", () => {
   it("covers every patchable key with at least one sample value", () => {
     expect(PATCHABLE_FIELDS.length).toBeGreaterThan(0);
     for (const [key, validator] of PATCHABLE_FIELDS) {
@@ -110,8 +110,8 @@ describe("updateCourseSettings — exhaustive settings sweep", () => {
             { cause: e },
           );
         }
-        // The read query's return validator must still accept the row —
-        // this is where a stored-but-unreturnable value surfaces.
+        // The read query's return validator must still accept the row.
+        // This is where a stored-but-unreturnable value surfaces.
         const settings = await asUser.query(
           api.features.courses.getActiveCourseSettings,
           {},
@@ -123,7 +123,7 @@ describe("updateCourseSettings — exhaustive settings sweep", () => {
 
   it("all keys written together still produce a readable row (fresh insert branch)", async () => {
     // A single mutation carrying every key exercises the INSERT branch's
-    // field list — a key present in the validator but missing from the
+    // field list. A key present in the validator but missing from the
     // insert object silently drops (regression class: showRomanization).
     const t = convexTest(schema, modules);
     const { asUser, courseId } = await makeActiveCourse(t);

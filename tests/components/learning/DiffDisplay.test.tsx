@@ -5,14 +5,14 @@ import { DiffDisplay, computeAccuracy } from '@/components/app/learning/DiffDisp
 
 /**
  * End-to-end coverage of the `ignorePunctuation` setting through the component
- * layer — `getCompareConfig` → word/char routing → score → rendering.
+ * layer. `getCompareConfig` → word/char routing → score → rendering.
  *
  * `ja` matters most here: it has `hasWordBoundaries: false`, so it takes the
  * grapheme `charDiff` path rather than the word-alignment path that Latin
  * scripts use. A fix applied to only one of the two would pass half of these.
  */
-describe('computeAccuracy — ignorePunctuation', () => {
-  describe('word path (de — has word boundaries)', () => {
+describe('computeAccuracy: ignorePunctuation', () => {
+  describe('word path (de: has word boundaries)', () => {
     it('penalizes a missing period by default', () => {
       expect(computeAccuracy('Das ist ein Test.', 'Das ist ein Test', 'de'))
         .toBeLessThan(100);
@@ -31,7 +31,7 @@ describe('computeAccuracy — ignorePunctuation', () => {
     });
   });
 
-  describe('char path (ja — no word boundaries)', () => {
+  describe('char path (ja: no word boundaries)', () => {
     it('penalizes a missing 。 by default', () => {
       expect(computeAccuracy('今日は暑いですね。', '今日は暑いですね', 'ja'))
         .toBeLessThan(100);
@@ -57,14 +57,14 @@ describe('computeAccuracy — ignorePunctuation', () => {
   });
 
   it('defaults to counting punctuation when the argument is omitted', () => {
-    // The setting must be opt-in — existing courses keep today's scoring.
+    // The setting must be opt-in, existing courses keep today's scoring.
     expect(computeAccuracy('Hello, world!', 'Hello world', 'en')).toBeLessThan(
       100,
     );
   });
 });
 
-describe('DiffDisplay — ignorePunctuation rendering', () => {
+describe('DiffDisplay: ignorePunctuation rendering', () => {
   it('shows 100% for a missing Japanese full stop when enabled', () => {
     render(
       <DiffDisplay
@@ -101,7 +101,7 @@ describe('DiffDisplay — ignorePunctuation rendering', () => {
       (el) => el.textContent === '。',
     );
     expect(mark).toBeTruthy();
-    // Muted, not destructive — it cost the user nothing, so it must not read
+    // Muted, not destructive. It cost the user nothing, so it must not read
     // as a mistake.
     expect(mark?.className).toContain('text-muted-foreground');
     expect(mark?.className).not.toContain('destructive');

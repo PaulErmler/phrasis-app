@@ -9,17 +9,17 @@ import {
 } from "./helpers";
 
 /**
- * Setup project — runs before every chromium spec.
+ * Setup project. Runs before every chromium spec.
  *
  * Creates exactly TWO fresh test users in a single run, each walks a different
  * onboarding-wizard branch (so the wizard's branching logic is covered as a
  * side-effect of producing the fixtures), and saves the resulting sessions to:
  *
- *   - `e2e/.auth/user.json`   — user A, default "completely-new" walk
+ *   - `e2e/.auth/user.json`: user A, default "completely-new" walk
  *       (proficiency=new, skip lesson). This is the **primary shared user**
- *       consumed by every downstream parallel + serial project — keeping
+ *       consumed by every downstream parallel + serial project: keeping
  *       the filename stable means none of those configs need to change.
- *   - `e2e/.auth/user-b.json` — user B, "placement-test" walk
+ *   - `e2e/.auth/user-b.json`: user B, "placement-test" walk
  *       (proficiency=test, all-"didn't know" answers). Available as a
  *       secondary fixture for any test that wants a second account.
  *
@@ -34,7 +34,7 @@ import {
  * most distinct backend code paths (`enqueueMissingPlacementTranslations`,
  * `getPlacementSentence`, the placement question loop). The other wizard
  * variants (self-pick, "Other" goal free-text, mid-wizard reload) are
- * covered by unit/component tests — see:
+ * covered by unit/component tests. See:
  *   - tests/components/onboarding/{AcquisitionSourceStep,LearningGoalStep}.test.tsx (free-text)
  *   - convex/tests/features/onboarding.test.ts (server-side resume + idempotency)
  *
@@ -47,8 +47,8 @@ import {
  * convex/features/onboarding.ts:finalizeOnboarding). Suites that don't care
  * about the tour should call `dismissTour(page, 'home_tour')` in beforeEach.
  *
- * The wizard walker uses `data-testid` attributes exclusively — no copy
- * matching — so locale flips, copy tweaks, or language renames cannot
+ * The wizard walker uses `data-testid` attributes exclusively, no copy
+ * matching, so locale flips, copy tweaks, or language renames cannot
  * break this fixture.
  *
  * Email verification is REQUIRED (convex/auth.ts). global-setup.ts sets
@@ -101,7 +101,7 @@ async function fillSignUp(
 
   // Locale-proof: the banner copy is translated (en/de), so match the testid
   // rather than the accessible name. Bounded wait instead of an instant
-  // count() check — the banner mounts only after the PostHog SDK boots, so
+  // count() check. The banner mounts only after the PostHog SDK boots, so
   // the instant check raced it and consent stayed 'pending' in the saved
   // storageState, leaving the banner to intercept clicks in dependent specs.
   const acceptCookies = page.getByTestId("consent-accept").first();
@@ -144,13 +144,13 @@ async function signUpAndOnboard(
 }
 
 test("authenticate user A (default 'completely-new' walk)", async ({ page }) => {
-  // Default walk — proficiency=new, skip lesson. Exercises the most common
+  // Default walk: proficiency=new, skip lesson. Exercises the most common
   // path through the wizard and produces the primary shared session.
   await signUpAndOnboard(page, "a", STORAGE_STATE_A, {});
 });
 
 test("authenticate user B (placement-test branch walk)", async ({ page }) => {
-  // Placement-test branch — answers every question as "I didn't know" so the
+  // Placement-test branch. Answers every question as "I didn't know" so the
   // strategy resolves to ~L01 deterministically. Exercises
   // `enqueueMissingPlacementTranslations`, `getPlacementSentence`, and the
   // staircase loop in one go.

@@ -58,7 +58,7 @@ export const getAllowedLanguagesForAutoFill = internalQuery({
 });
 
 /**
- * Reasoning setting for the autofill call — taken from the single-sentence
+ * Reasoning setting for the autofill call. Taken from the single-sentence
  * pipeline's LUNA_BO3 stage so the two pipelines can't drift apart
  * (`'none'` → `reasoning: {enabled: false}` on the wire; Luna otherwise
  * reasons adaptively and bills the hidden tokens). Also baked into each
@@ -67,7 +67,7 @@ export const getAllowedLanguagesForAutoFill = internalQuery({
 const AUTOFILL_REASONING = LUNA_BO3.reasoning;
 
 /**
- * Output cap for the bulk-JSON autofill response. Previously uncapped — a
+ * Output cap for the bulk-JSON autofill response. Previously uncapped. A
  * latent unbounded-cost/truncation blind spot. ~200 tokens per requested
  * target language covers translations + metadata comfortably; the floor
  * keeps single-language requests from being starved by the JSON envelope.
@@ -154,7 +154,7 @@ export const autoFillTranslations = action({
   },
   returns: v.object({
     // Provenance fields (`regionVariant`, `translationSource`) are plumbed
-    // back to `createCustomText` for persistence — see the validator's doc
+    // back to `createCustomText` for persistence. See the validator's doc
     // in convex/types.ts.
     translations: sourcedTranslationEntriesValidator,
     metadata: sentenceMetadataValidator,
@@ -214,7 +214,7 @@ export const autoFillTranslations = action({
       { userId },
     );
 
-    // Prompt name = `translationName ?? name` — the same resolution as the
+    // Prompt name = `translationName ?? name`. The same resolution as the
     // single-sentence pipeline (see getTranslationConfigForLanguage), so
     // dialect/script/register qualifiers like 'Taiwanese Mandarin
     // (Traditional characters)' reach this prompt too. The native-script
@@ -234,7 +234,7 @@ export const autoFillTranslations = action({
     // One line per target: "code: name, for region — requirements". Region
     // and requirements come from the language entry (`regionLabel`,
     // `translationPromptNotes`), so the prompt carries exactly the guidance
-    // relevant to the requested languages and nothing else — the system
+    // relevant to the requested languages and nothing else. The system
     // prompt's PER-LANGUAGE REQUIREMENTS rule tells the model to obey it.
     const describeTargetLanguage = (code: string): string => {
       const lang = getLanguageByCode(code);
@@ -248,7 +248,7 @@ export const autoFillTranslations = action({
     };
 
     // Resolve mixed-dialect targets (today: `es_mixed`) to a concrete
-    // sub-code BEFORE building the prompt — the LLM never sees the mixed
+    // sub-code BEFORE building the prompt. The LLM never sees the mixed
     // sentinel; it gets a real regional code (`es`, `es_latam`) and an
     // accurate regional prompt label. The seed is the source text(s) so the
     // choice is deterministic for the same input across retries. The returned
@@ -341,7 +341,7 @@ export const autoFillTranslations = action({
       throw new ConvexError('Translation response missing "metadata" object');
     }
 
-    // Source identifier for every translation in this batch — single LLM
+    // Source identifier for every translation in this batch. Single LLM
     // call, so every row gets the same tag.
     const translationSource = getTranslationSource(
       OPENROUTER_MODELS.translationAutoFill,
@@ -366,7 +366,7 @@ export const autoFillTranslations = action({
       }
       results.push({
         language: lang,
-        // LLM output — run the language's post-processing step (default:
+        // LLM output. Run the language's post-processing step (default:
         // strip trailing '_' runs) before the client round-trip stores it.
         text: postProcessTranslation(resolved, translation.trim()),
         ...(regionVariant ? { regionVariant } : {}),
@@ -519,7 +519,7 @@ export const createCustomText = mutation({
         // everything else as user-provided (EnterTextsView). Default here
         // rather than trusting that: an entry with no tag reached us from a
         // form the user typed into, so `user-provided` is the honest
-        // provenance — and an untagged row would otherwise read as machine
+        // provenance, and an untagged row would otherwise read as machine
         // output to every provenance guard.
         translationSource:
           entry.translationSource ?? USER_PROVIDED_TRANSLATION_SOURCE,
@@ -573,7 +573,7 @@ export const createCustomText = mutation({
  * language set, over-length text) are reported in `skipped` rather than
  * aborting the whole batch. Quota is consumed only for accepted items.
  * Authentication, course membership, and the USAGE_LIMIT check are still
- * hard errors — the client is expected to pre-check quota.
+ * hard errors. The client is expected to pre-check quota.
  */
 export const createCustomTextsBatch = mutation({
   args: {
@@ -646,7 +646,7 @@ export const createCustomTextsBatch = mutation({
       return { createdTextIds: [], skipped };
     }
 
-    // Quota is authoritative here — client pre-check is advisory.
+    // Quota is authoritative here. Client pre-check is advisory.
     await consumeQuota(ctx, userId, FEATURE_IDS.CUSTOM_SENTENCES, accepted.length);
 
     const collection = await getOrCreateCustomCollection(ctx, course._id);
@@ -674,7 +674,7 @@ export const createCustomTextsBatch = mutation({
           textId,
           targetLanguage: entry.language,
           translatedText: entry.text,
-          // Bulk-import is exclusively manual — no autofill path here, so
+          // Bulk-import is exclusively manual, no autofill path here, so
           // every inserted translation is user-typed. Tag it explicitly so
           // a future strategy swap doesn't regenerate text the user wrote.
           translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
@@ -684,7 +684,9 @@ export const createCustomTextsBatch = mutation({
       createdTextIds.push(textId);
 
       // Pure-manual path: generate metadata first, which then schedules
-      // prepareCardContent. Mirrors createCustomText's no-metadata branch.
+      // prepareCardContent. Mirrors createCustomText's no-metadata branch,
+      // except TTS/LLM ride the background pools: a bulk paste must not
+      // queue ahead of audio the user is currently reviewing.
       await ctx.scheduler.runAfter(
         0,
         internal.features.sentenceMetadata.generateSentenceMetadata,
@@ -695,6 +697,8 @@ export const createCustomTextsBatch = mutation({
           baseLanguages: course.baseLanguages,
           targetLanguages: course.targetLanguages,
           userId,
+          priority: 'background',
+          llmPriority: 'background',
         },
       );
     }

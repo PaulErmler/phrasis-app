@@ -24,7 +24,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * until an unrelated write invalidates it. Callers that need the day to roll
  * over pass a client-computed date (ticked via `useNowMinute`); it is
  * accepted only when well-formed and within ±1 day of the server's view of
- * that timezone — anything else falls back to the server date, so a hostile
+ * that timezone. Anything else falls back to the server date, so a hostile
  * or skewed client can only shift its own display by a day.
  */
 export function resolveClientToday(timezone: string, clientToday?: string): string {
@@ -37,7 +37,7 @@ export function resolveClientToday(timezone: string, clientToday?: string): stri
   // Fail CLOSED on a non-finite delta. `DATE_RE` admits out-of-range dates
   // ("9999-99-99"), which canonicalize to an ISO expanded-year string
   // ("+010007-06"); `daysBetween` then splits that into two parts and returns
-  // NaN, and `NaN > 1` is false — so a bare `> 1` check would return the
+  // NaN, and `NaN > 1` is false, so a bare `> 1` check would return the
   // malformed string as "today" and the first `addDays` downstream would throw
   // `RangeError: Invalid time value`, failing the whole query.
   const delta = daysBetween(serverToday, canonical);

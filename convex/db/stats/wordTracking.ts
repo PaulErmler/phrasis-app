@@ -46,7 +46,7 @@ export async function trackNewWords(
         .first();
 
       if (!existing) {
-        // Persist sessionId whenever it's defined — including the empty
+        // Persist sessionId whenever it's defined, including the empty
         // string. A client that hands us `""` is buggy; orphaning the row
         // (the prior `args.sessionId &&` guard did) silently shifts it to
         // the celebration screen's "earlier today" bucket and breaks the
@@ -67,7 +67,7 @@ export async function trackNewWords(
       ) {
         // Upgrade the display form: either it was missing (pre-migration
         // row) or the new occurrence is all-lowercase and the stored one
-        // isn't — per the rule "if one of them is lowercase, keep lowercase".
+        // isn't, per the rule "if one of them is lowercase, keep lowercase".
         await ctx.db.patch(existing._id, { displayWord: original });
       }
 
@@ -200,7 +200,7 @@ export async function updateWordTextsForEdit(
         .first();
 
       if (!remaining) {
-        // No sentences left — remove from userWords
+        // No sentences left. Remove from userWords
         const userWord = await ctx.db
           .query('userWords')
           .withIndex('by_userId_and_courseId_and_language_and_word', (q) =>
@@ -229,7 +229,7 @@ export async function updateWordTextsForEdit(
   }
 
   // Insert links and userWords entries for new words. Reuse the dedup maps
-  // built at the top — avoids a second round of tokenization per language.
+  // built at the top. Avoids a second round of tokenization per language.
   for (const { language } of args.languages) {
     const uniqueByNormalized = perLanguageTokens.get(language)!;
 
@@ -267,8 +267,8 @@ export async function updateWordTextsForEdit(
       // Defensive: re-check for an exact existing link before inserting.
       // `survivingWords` is derived from the initial `existingLinks` snapshot
       // and doesn't cover writes from a concurrent mutation that may have
-      // raced in (Convex OCC will retry, but only on write-set conflicts —
-      // this index read guards against the read-stale-then-insert case).
+      // raced in (Convex OCC will retry, but only on write-set conflicts.
+      // This index read guards against the read-stale-then-insert case).
       //
       // Single index read serves both the existence check and the cap check.
       const existingForWord = await ctx.db

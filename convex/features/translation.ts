@@ -1,5 +1,5 @@
 /**
- * Shared translation helpers — used by features/decks.ts and
+ * Shared translation helpers. Used by features/decks.ts and
  * features/llmTranslationQueue.ts; `toGoogleTranslateCode` is also exercised
  * by tests/integration/google-translate-fallback.test.ts and
  * convex/tests/features/translationCodes.test.ts.
@@ -21,7 +21,7 @@ import { SUPPORTED_LANGUAGES } from '../../lib/languages';
  * Derived from each Language's `googleTranslateCode` field (single source of
  * truth in lib/languages.ts); codes without one pass through unchanged. Most
  * ISO 639-1 codes work unmapped against both the v2 translate and v3
- * romanizeText endpoints — only regional variants and internal dialect codes
+ * romanizeText endpoints, only regional variants and internal dialect codes
  * set an override (e.g. Spanish/English variants collapse to the bare lang,
  * Arabic dialects collapse to `ar`, Chinese Traditional / European Portuguese
  * keep their locale-tagged form which v2 accepts).
@@ -196,7 +196,7 @@ const GOOGLE_V3_ROMANIZE_SUPPORTED = new Set([
 const ROMANIZE_MAX_ATTEMPTS = 3;
 
 /** One call to Google v3 romanizeText. Returns the romanized string or
- * throws — wrapped by `romanizeText` in a retry loop. */
+ * throws. Wrapped by `romanizeText` in a retry loop. */
 async function romanizeViaGoogleV3Once(
   text: string,
   sourceLanguage: string,
@@ -250,7 +250,7 @@ async function romanizeViaGoogleV3Once(
   const romanized = data.romanizations?.[0]?.romanizedText;
   if (!romanized) {
     // Diagnostic dump for the empty-result case (200 OK, empty/missing
-    // romanizedText) — a Google-side flake that retries can sometimes
+    // romanizedText), a Google-side flake that retries can sometimes
     // paper over.
     console.error('[translation] Google romanizeText v3 empty result', {
       sourceLanguage,

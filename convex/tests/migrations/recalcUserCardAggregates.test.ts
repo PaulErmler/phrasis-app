@@ -105,40 +105,43 @@ describe("migrations/recalcUserCardAggregates", () => {
         userId: "user_A",
       });
 
-      // `run` only enumerates decks — a single deck's clear is 32 aggregate
-      // calls (states × origin buckets), so clearing every deck in the entry
-      // mutation could blow the mutation limits and fail half-cleared. The
-      // clears happen one deck per scheduled continuation instead.
+      // `run` only enumerates decks. A single deck's clear is dozens of
+      // aggregate calls (states × origin buckets × shared/writing), so
+      // clearing every deck in the entry mutation could blow the mutation
+      // limits and fail half-cleared. The clears happen one deck per
+      // scheduled continuation instead.
       expect(calls.clear).toHaveLength(0);
 
       await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-      // Each deck triggers: 1 cardsByState.clear + 1 cardsByDueDate.clear +
-      // per state label: 1 cardsByStateAndDueDate.clear + one
-      // cardsByOriginStateAndDueDate.clear per origin bucket.
+      // Each deck triggers, per state label: 1 cardsByStateAndDueDate.clear +
+      // 1 cardsByWritingStateAndDueDate.clear + one clear per origin bucket for
+      // each of cardsByOriginStateAndDueDate / cardsByOriginWritingStateAndDueDate.
       const perDeck =
-        2 + EXTENDED_STATE_LABELS.length * (1 + ORIGIN_BUCKETS.length);
+        EXTENDED_STATE_LABELS.length * (2 + 2 * ORIGIN_BUCKETS.length);
       expect(calls.clear).toHaveLength(deckIds.length * perDeck);
 
-      // The two deckId-only namespaces show up once per deck.
+      // No aggregate is namespaced by a bare deckId any more: every namespace
+      // carries at least a state label.
       for (const deckId of deckIds) {
         const hits = calls.clear.filter((c) => c.namespace === deckId);
-        expect(hits).toHaveLength(2);
+        expect(hits).toHaveLength(0);
       }
 
-      // Each `${deckId}:${state}` namespace is cleared once, and each
-      // `${deckId}:${origin}:${state}` namespace once.
+      // Each `${deckId}:${state}` namespace is cleared twice (the shared and
+      // the writing state aggregates share the namespace string), and each
+      // `${deckId}:${origin}:${state}` namespace twice for the same reason.
       for (const deckId of deckIds) {
         for (const state of EXTENDED_STATE_LABELS) {
           const ns = `${deckId}:${state}`;
           const hits = calls.clear.filter((c) => c.namespace === ns);
-          expect(hits).toHaveLength(1);
+          expect(hits).toHaveLength(2);
           for (const origin of ORIGIN_BUCKETS) {
             const originNs = `${deckId}:${origin}:${state}`;
             const originHits = calls.clear.filter(
               (c) => c.namespace === originNs,
             );
-            expect(originHits).toHaveLength(1);
+            expect(originHits).toHaveLength(2);
           }
         }
       }
@@ -147,7 +150,7 @@ describe("migrations/recalcUserCardAggregates", () => {
     }
   });
 
-  it("re-inserts every card on all four aggregates after draining the scheduler", async () => {
+  it("re-inserts every card on both shared aggregates after draining the scheduler", async () => {
     vi.useFakeTimers();
     try {
       const t = convexTest(schema, modules);
@@ -161,11 +164,13 @@ describe("migrations/recalcUserCardAggregates", () => {
       });
       await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-      // Each card should be inserted into all 4 aggregates exactly once.
-      expect(calls.insert).toHaveLength(cardIds.length * 4);
+      // These decks have no writing track, so each card is inserted into both
+      // shared aggregates (cardsByStateAndDueDate + the origin mirror) exactly
+      // once, and into nothing else.
+      expect(calls.insert).toHaveLength(cardIds.length * 2);
       for (const cardId of cardIds) {
         const hits = calls.insert.filter((c) => c.docId === cardId);
-        expect(hits).toHaveLength(4);
+        expect(hits).toHaveLength(2);
       }
     } finally {
       vi.useRealTimers();

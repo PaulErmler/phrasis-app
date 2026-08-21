@@ -5,7 +5,7 @@
  * from here so onboarding promises and in-app projections can never
  * disagree).
  *
- * Everything here is deterministic on its inputs — no clocks, no I/O.
+ * Everything here is deterministic on its inputs, no clocks, no I/O.
  */
 
 import { addDays, daysBetween, endOfMonth, endOfYear } from './dateStrings';
@@ -16,20 +16,20 @@ import { addDays, daysBetween, endOfMonth, endOfYear } from './dateStrings';
 
 /**
  * Long-horizon vocab projections are noisy and unrealistic past a certain
- * point — cap word milestones at a believable ceiling so the UI doesn't
+ * point. Cap word milestones at a believable ceiling so the UI doesn't
  * promise "you'll know 73,412 words in a year" off a hot week.
  */
 export const PROJECTION_CAP_WORDS = 10_000;
 
 /**
  * A user's first session is unrealistically fast (all cards new, warm-up
- * reviews inflate early counts) — dampen first-session extrapolations by
+ * reviews inflate early counts), dampen first-session extrapolations by
  * this factor. Extracted from onboarding's WordProjectionStep.
  */
 export const FIRST_SESSION_DAMPENER = 7;
 
 /**
- * The 'goal' basis rate is all-time words per study-minute — measured over a
+ * The 'goal' basis rate is all-time words per study-minute. Measured over a
  * short lifetime it is just a first-session rate wearing an all-time hat, so
  * it gets the same dampener, faded out linearly as real history accumulates.
  * At or beyond this many minutes of total study the rate is trusted as-is.
@@ -38,7 +38,7 @@ export const GOAL_BASIS_FULL_TRUST_MINUTES = 300;
 
 /**
  * The year-end level walk has no natural ceiling the way word indicators have
- * PROJECTION_CAP_WORDS — an inflated pace would happily promise C2.4 to a
+ * PROJECTION_CAP_WORDS. An inflated pace would happily promise C2.4 to a
  * 15-minute-old account. Cap the projected climb at this many levels above
  * the current one (an ambitious but plausible year).
  */
@@ -140,7 +140,7 @@ export interface ProjectionResult {
 
 /**
  * Exponentially weighted daily pace over the trailing window. Missing days
- * count as ZERO — a pause honestly craters the pace instead of averaging
+ * count as ZERO. A pause honestly craters the pace instead of averaging
  * only active days. The denominator is truncated at the course age so a
  * 3-day-old account isn't diluted by phantom empty days.
  */
@@ -180,7 +180,7 @@ export function firstSessionDailyRate(
 }
 
 /**
- * First-session extrapolation — same rounded-total contract onboarding's
+ * First-session extrapolation, same rounded-total contract onboarding's
  * WordProjectionStep has always shown, layered over the shared rate above
  * so both surfaces promise the same numbers.
  */
@@ -251,14 +251,14 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
     // Fresh account: dampened first-session extrapolation (matches the
     // numbers onboarding just promised).
     basis = 'firstSession';
-    // Average ACTUAL study time per active day — not the daily goal. A user
+    // Average ACTUAL study time per active day, not the daily goal. A user
     // who studies 17 minutes against a 5-minute goal would otherwise see
     // their pace cut 3.5× by the goal scaling on top of the ÷7 dampener,
     // compounding into a day-one level ETA (~4 months for a level their
     // real throughput clears in days) that reads as broken next to the
     // day's own stats.
     const minutesPerActiveDay = windowMinutes / activeDays;
-    // Unrounded rates — see firstSessionDailyRate for why rounding a
+    // Unrounded rates. See firstSessionDailyRate for why rounding a
     // per-day pace here would zero out slow sessions or overstate fast ones.
     wordsPerDay = Math.min(
       PROJECTION_CAP_WORDS,
@@ -278,7 +278,7 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
     // everything as goal-conditional ("if you hit your goal daily…").
     // An all-time rate measured over a short lifetime is as inflated as a
     // first session (all cards new, warm-up reviews), so it gets the same
-    // dampener, fading to 1 as history approaches full trust — without this,
+    // dampener, fading to 1 as history approaches full trust, without this,
     // a user who studied 15 minutes and stopped lands here once the pace
     // window empties and is promised thousands of words a year.
     basis = 'goal';
@@ -300,7 +300,7 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
   // "target" BELOW their current count (12,000 known → "~10,000 by end of
   // August"), while the uncapped nextWordMilestone simultaneously promised
   // 13,000. The cap exists to stop the extrapolation running away, which is a
-  // property of how much is added — not of where the user started.
+  // property of how much is added, not of where the user started.
   const wordCeiling = currentWords + PROJECTION_CAP_WORDS;
   const cap = (raw: number) => roundFriendly(Math.min(wordCeiling, raw));
   const isCapped = (raw: number) => raw >= wordCeiling;
@@ -349,7 +349,7 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
     }
   }
 
-  // Counterfactual "if every day were like today" — positive-only, observed
+  // Counterfactual "if every day were like today". Positive-only, observed
   // basis only (a goal/firstSession baseline makes the comparison unfair).
   if (basis === 'observed' && todayWords >= Math.max(5, 1.25 * wordsPerDay)) {
     const horizonDate =
@@ -372,7 +372,7 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
     }
   }
 
-  // "+X words per Y-min session" — what one goal-length session yields.
+  // "+X words per Y-min session". What one goal-length session yields.
   if (goalMinutes != null && goalMinutes > 0 && wordsPerMinute > 0) {
     const words = Math.round(wordsPerMinute * goalMinutes);
     if (words >= 1) {
@@ -429,7 +429,7 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
     }
 
     // Walk the level ladder with the year's remaining card budget, capped at
-    // MAX_LEVEL_JUMP_YEAR_END steps — the word indicators have
+    // MAX_LEVEL_JUMP_YEAR_END steps. The word indicators have
     // PROJECTION_CAP_WORDS to keep a hot week honest; this is the level
     // equivalent, so an inflated pace can't promise the top of the ladder.
     if (daysToYearEnd >= MIN_DAYS_FOR_YEAR_HORIZON) {

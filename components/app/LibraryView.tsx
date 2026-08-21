@@ -154,7 +154,7 @@ export function LibraryView({
   } | null>(null);
   const [deletingCardId, setDeletingCardId] = useState<Id<'cards'> | null>(null);
 
-  // Ephemeral per-card per-language speed overrides — live only for as long
+  // Ephemeral per-card per-language speed overrides. Live only for as long
   // as this view is mounted. The library is a preview surface: the user
   // should be able to slow a clip down to check pronunciation without
   // persisting that choice onto the card (which LearningMode would then
@@ -270,11 +270,11 @@ export function LibraryView({
 
   // Flag opens a confirm dialog identical to LearningMode's: on confirm we
   // fire the retranslation in the background for every non-source-language
-  // translation on the card at once. The card stays in the library — the
+  // translation on the card at once. The card stays in the library. The
   // new translations land in-place when the worker finishes.
   const [flagConfirmCardId, setFlagConfirmCardId] = useState<Id<'cards'> | null>(null);
   // Client-only session record of cards the viewer has flagged. Drives the
-  // "Flagged" pill on each card row — purely local, never persisted, so it
+  // "Flagged" pill on each card row. Purely local, never persisted, so it
   // doesn't leak to other users that someone flagged a row.
   const [flaggedCardIds, setFlaggedCardIds] = useState<Set<Id<'cards'>>>(
     () => new Set(),
@@ -286,7 +286,7 @@ export function LibraryView({
     // Only mark the card as session-flagged when the mutation reports no
     // retranslation was triggered (all non-source languages over-cap or
     // claim-contested). With a retranslation in flight, the server-driven
-    // "Retranslating" pill is the right signal — and once it lands, no
+    // "Retranslating" pill is the right signal, and once it lands, no
     // pill (the flag has been acted on, nothing lingering).
     flagTranslation({ cardId })
       .then((result) => {
@@ -400,7 +400,7 @@ export function LibraryView({
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-20" style={{ scrollbarGutter: 'stable' }}>
       {/* Sticky search + filters card. -mx-4/px-4 makes the opaque background
-          span the scroll container's horizontal padding too — otherwise card
+          span the scroll container's horizontal padding too, otherwise card
           edges slide past in the gutters beside the sticky block. */}
       <div className="sticky top-0 z-10 bg-background -mx-4 px-4">
         {/* Soft edge below the sticky block: scrolling cards fade in under
@@ -431,7 +431,7 @@ export function LibraryView({
               )}
             </div>
 
-            {/* All filters as one compact chip row — status toggles, then a
+            {/* All filters as one compact chip row. Status toggles, then a
                 divider, then source toggles. Labels live on the chips. */}
             <div className="flex flex-wrap items-center gap-1.5">
               <Toggle
@@ -538,6 +538,7 @@ export function LibraryView({
                 <LearningCardContent
                   bare
                   compact
+                  showIpa={courseSettings?.showIpa === true}
                   preReviewCount={card.preReviewCount}
                   schedulingPhase={card.schedulingPhase}
                   fsrsState={card.fsrsState}

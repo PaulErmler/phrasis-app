@@ -82,7 +82,7 @@ export type CourseQuotaSnapshot = {
 
 /**
  * Read the courses quota from the local usageQuotas cache.
- * Returns null if no doc or no `courses` feature entry — caller should treat as not synced.
+ * Returns null if no doc or no `courses` feature entry. Caller should treat as not synced.
  */
 export async function getCourseQuotaSnapshot(
   ctx: QueryCtx,

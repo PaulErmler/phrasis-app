@@ -5,15 +5,22 @@ import {
   currentLevelValidator,
   reviewModeValidator,
   cardApprovalStatusValidator,
+  cardApprovalKindValidator,
+  cardApprovalResolutionValidator,
+  proposedCardMetadataValidator,
   schedulingModeValidator,
   studyContentFilterValidator,
   autoRateThresholdsValidator,
   reviewRatingValidator,
   cardSchedulingSnapshotFields,
+  cardWritingSchedulingFields,
   cardRadioSnapshotFields,
   cardFreeStudySnapshotFields,
+  schedulingTrackValidator,
   ttsQualityValidator,
   ttsProviderValidator,
+  ttsPriorityValidator,
+  llmPriorityValidator,
   voiceGenderValidator,
   featureStateValidator,
   reviewsByModeValidator,
@@ -58,7 +65,7 @@ export const courseSettingsFields = {
   pauseBeforeAutoAdvanceFull: v.optional(v.number()),
   // Transcribe writing style: its own copy of the playback settings, so
   // Translate and Transcribe tweak independently. Resolution chain:
-  // `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*` — undefined means
+  // `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*`. Undefined means
   // "same as Translate". Only the settings transcribe actually uses get a
   // copy (target reps/pauses/speeds, target↔target pause, auto-play,
   // highlighting); base-group pauses and auto-advance don't apply there.
@@ -94,13 +101,13 @@ export const courseSettingsFields = {
   // preReviewCount + FSRS reps in audio mode, and max(that, radioPlayCount)
   // in radio mode (radio plays don't bump the FSRS review count).
   targetBeforeOnlyNewReps: v.optional(v.number()),
-  // Practice Listening duration strategy — when a card graduates from
+  // Practice Listening duration strategy, when a card graduates from
   // Listening (target-before-base) to Speaking-only:
-  //   'onlyNew'    — after the card's first targetBeforeOnlyNewReps reviews;
-  //   'untilGood'  — after targetBeforeUntilGoodReps FSRS good/easy ratings
+  //   'onlyNew': after the card's first targetBeforeOnlyNewReps reviews;
+  //   'untilGood': after targetBeforeUntilGoodReps FSRS good/easy ratings
   //                  (pre-review "Understood" doesn't count, see
   //                  cards.goodReviewCount);
-  //   'continuous' — never (Listening plays on every review).
+  //   'continuous': never (Listening plays on every review).
   // Unset = legacy docs from before the strategy existed; resolveAudioSettings
   // infers it from targetBeforeOnlyNewReps (>0 → 'onlyNew', else 'continuous',
   // matching the old "0/undefined = ∞" convention). Each strategy keeps its
@@ -129,6 +136,7 @@ export const courseSettingsFields = {
   hideBaseLanguagesFull: v.optional(v.boolean()), // writing mode: blur base language text by default (default: on in Transcribe, off in Translate; independent of the audio-mode hideBaseLanguages)
   autoRevealBaseOnSubmit: v.optional(v.boolean()), // writing mode: unblur base text once all translations are submitted (default on; sub-setting of hideBaseLanguagesFull)
   showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
+  showIpa: v.optional(v.boolean()), // show IPA transcription below sentence text (default OFF, unlike showRomanization)
   // Language order overrides
   baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
   targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages
@@ -137,13 +145,36 @@ export const courseSettingsFields = {
   instantProceedFull: v.optional(v.boolean()), // auto-advance when rating is clicked (full mode, default true)
   // Review mode
   reviewMode: v.optional(reviewModeValidator), // 'audio' (default) or 'full'
+  // Split scheduling: give Writing mode its own per-card FSRS schedule
+  // (cards.writing* fields) instead of sharing one schedule with Shadowing.
+  // Unset/false = off (both modes share the legacy fields). Turning it on
+  // triggers a one-time seed of the writing track from the shared state
+  // (see convex/migrations/seedWritingTrack.ts); turning it off freezes the
+  // writing track in place, nothing is deleted, re-enabling resumes it.
+  separateModeTracking: v.optional(v.boolean()),
+  // Bookkeeping for the enable-time writing-track seed (server-managed, not
+  // user-patchable). `writingSeedDone` flips true when the sequential
+  // per-deck sweep finishes; while the split is on and this is not true,
+  // `updateCourseSettings` saves and `reviewCard` lazy seeds re-schedule the
+  // sweep (a resume is a cheap rescan, already-seeded cards are skipped), so
+  // a dead scheduler chain can never permanently strand cards, and
+  // `getCardForReviewEmptyReason` reports 'preparing_writing' instead of a
+  // false "all caught up". `writingSeedStartedAt` debounces those re-kicks so
+  // overlapping sweeps don't pile up.
+  writingSeedDone: v.optional(v.boolean()),
+  writingSeedStartedAt: v.optional(v.number()),
+  // Consecutive failed seed batches, bumped by the workpool's onComplete
+  // handler and cleared on any successful batch. Bounds the retry loop and
+  // makes a genuinely stuck seed visible (the handler reports it once the cap
+  // is hit) instead of failing silently forever.
+  writingSeedAttempts: v.optional(v.number()),
   // Daily study-time goal in minutes. Seeded from the user's onboarding
   // answer when the course is created by `completeOnboarding`. Lives
   // here rather than `userSettings` because the goal is per-course
   // (different courses can have different pacing targets).
   dailyTimeGoalMinutes: v.optional(v.number()),
   // Scheduling mode
-  // 'learnAndReview' (default), 'learn_new', or 'radio' — the single free-play
+  // 'learnAndReview' (default), 'learn_new', or 'radio'. The single free-play
   // mode: round-robin through the whole deck, no FSRS. Free play has two faces
   // chosen by `reviewMode` (Radio while listening, Free Study while typing),
   // each with its own card rotation; the face is derived, never stored. See
@@ -152,7 +183,7 @@ export const courseSettingsFields = {
   fullReviewTargetAudioMode: v.optional(
     v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
   ), // When to play target audio in full review mode
-  // Writing-mode input style: 'translate' (default — base audio plays, user
+  // Writing-mode input style: 'translate' (default, base audio plays, user
   // types the translation) or 'transcribe' (target audio plays alone, user
   // types what they hear). Ignored in audio mode.
   writingInputMode: v.optional(
@@ -176,12 +207,12 @@ export const courseSettingsFields = {
   customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
   activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
   reconciledDatasetId: v.optional(v.id('datasets')), // Dataset version this course's progress has been cutover to (idempotency gate for datasetMigration_cutoverUser)
-  // Source-of-content filter — see studyContentFilterValidator in types.ts.
+  // Source-of-content filter. See studyContentFilterValidator in types.ts.
   studyContentFilter: v.optional(studyContentFilterValidator),
   // Current "between celebrations" bucket id. Rotated by the client on
   // celebration dismiss (via `setCurrentSessionId`). Stored server-side so
   // the bucket survives the user closing the learn view OR moving to a
-  // different device — `getNewWordsForCelebration` then keeps counting words
+  // different device. `getNewWordsForCelebration` then keeps counting words
   // toward the same milestone instead of restarting from zero on each remount.
   currentSessionId: v.optional(v.string()),
 } as const;
@@ -199,7 +230,7 @@ export const courseSettingsDocValidator = v.object({
 // separate required arg there) and the fields managed by dedicated flows
 // (collection wiring, dataset reconciliation, session id); `.partial()`
 // because a patch supplies only the fields it changes.
-// `dailyTimeGoalMinutes` is patchable (goal editors on home/settings);
+// `dailyTimeGoalMinutes` is patchable (homescreen goal editor);
 // the user's original onboarding answer stays preserved on the frozen
 // `onboardingProgress` row.
 export const coursePatchableSettingsValidator = v
@@ -212,6 +243,9 @@ export const coursePatchableSettingsValidator = v
     'activeCustomCollectionIds',
     'reconciledDatasetId',
     'currentSessionId',
+    'writingSeedDone',
+    'writingSeedStartedAt',
+    'writingSeedAttempts',
   )
   .partial();
 
@@ -223,6 +257,12 @@ export const onboardingProgressFields = {
   userId: v.string(), // Links to auth user
   step: v.number(), // Current step number in the new flow
   reviewMode: v.optional(reviewModeValidator),
+  // Writing-mode input style picked on the review-mode step ('translate' |
+  // 'transcribe'). Copied onto `courseSettings.writingInputMode` by
+  // `completeOnboarding`; only meaningful when `reviewMode === 'full'`.
+  writingInputMode: v.optional(
+    v.union(v.literal('translate'), v.literal('transcribe')),
+  ),
   currentLevel: v.optional(currentLevelValidator),
   targetLanguages: v.optional(v.array(v.string())),
   baseLanguages: v.optional(v.array(v.string())),
@@ -239,7 +279,7 @@ export const onboardingProgressFields = {
       // Schema-version of the placement state. Bump
       // CURRENT_PLACEMENT_STRATEGY_VERSION in
       // app/app/onboarding/lib/placementStrategies.ts whenever the shape
-      // of `history`/`strategy`/`finalLevel` changes — readers discard
+      // of `history`/`strategy`/`finalLevel` changes. Readers discard
       // rows whose version doesn't match (kill-switch for resuming
       // incompatible state). Optional so historical rows (written before
       // this field existed) still validate; treat missing as version 0
@@ -256,12 +296,12 @@ export const onboardingProgressFields = {
   // Persisted so a reload mid-lesson resumes at the right card count and
   // re-seeds which staged tutorials have already fired.
   firstLessonCardsRated: v.optional(v.number()),
-  // Underlying `studySessions` row id for the embedded first lesson —
-  // captured on the first rated card and replayed into `useLearningMode`
+  // Underlying `studySessions` row id for the embedded first lesson.
+  // Captured on the first rated card and replayed into `useLearningMode`
   // on the next mount so X/N progress and the +N new-words hero stay
   // continuous across a mid-flow reload.
   firstLessonSessionId: v.optional(v.string()),
-  // Snapshot of the embedded first-lesson session — written when the
+  // Snapshot of the embedded first-lesson session. Written when the
   // lesson completes (or skipped). Keeps the stats-recap +
   // word-projection screens alive across a mid-flow reload.
   firstLessonSummary: v.optional(
@@ -276,7 +316,7 @@ export const onboardingProgressFields = {
   // Set by `finalizeOnboarding` (replaces the previous delete). When
   // undefined, the row is in-progress and is the only row the wizard
   // reads / writes. When set, the row is the permanent record of the
-  // user's onboarding answers — `getOnboardingProgress` filters these
+  // user's onboarding answers. `getOnboardingProgress` filters these
   // out so completed rows can't be accidentally re-edited.
   completedAt: v.optional(v.number()),
 } as const;
@@ -291,7 +331,7 @@ export const onboardingProgressDocValidator = v.object({
 export default defineSchema({
   // Datasets table - versioned premade content sets. A dataset is a corpus of
   // texts (whose own language lives on `texts.language`) fanned out to every
-  // target language via the `translations` table — so at most one dataset is
+  // target language via the `translations` table, so at most one dataset is
   // `isActive: true` at a time, globally. Inactive rows remain in place for
   // rollback and historical reference.
   datasets: defineTable({
@@ -319,9 +359,9 @@ export default defineSchema({
     order: v.optional(v.number()), // 1..20 within the dataset
     displayName: v.optional(v.string()),
     legacy: v.optional(v.boolean()), // true on old Essential/A1..C2 post-cutover
-    // Explicit origin tag — source of truth for the content-source filter.
+    // Explicit origin tag. Source of truth for the content-source filter.
     // 'premade' = dataset-uploaded; 'custom' = user-typed; 'chat' = chat-approved.
-    // Backfilled for all existing rows; optional only in the validator — treat
+    // Backfilled for all existing rows; optional only in the validator. Treat
     // as required for new writes.
     origin: v.optional(
       v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
@@ -339,13 +379,13 @@ export default defineSchema({
     text: v.string(),
     language: v.string(), // e.g., "en" for English
     // Latin transliteration for non-Latin scripts. THREE states, not two:
-    //   undefined — never attempted; a scheduler should enqueue romanization.
-    //   ''        — attempted and failed (`romanizeText` exhausted its retries);
+    //   undefined: never attempted; a scheduler should enqueue romanization.
+    //   '': attempted and failed (`romanizeText` exhausted its retries);
     //               the sentinel exists so nothing re-enqueues it. Re-attempt by
     //               bumping the method's `romanizationSource` identifier and
     //               migrating rows tagged with the old one.
-    //   non-empty — done.
-    // Test with `=== undefined`, never `!x` — collapsing '' into "missing" makes
+    //   non-empty: done.
+    // Test with `=== undefined`, never `!x`, collapsing '' into "missing" makes
     // callers ask forever for work that is deliberately never scheduled.
     romanizedText: v.optional(v.string()),
     // Identifier of which romanizer produced `romanizedText` (e.g.
@@ -353,12 +393,19 @@ export default defineSchema({
     // swap can find + invalidate rows produced by the old method via a
     // simple `romanizationSource != currentSource` migration. Also set when
     // `romanizedText` is the empty-string "tried, failed, leave empty"
-    // sentinel — bumping the source identifier on the failing method is
+    // sentinel. Bumping the source identifier on the failing method is
     // how you re-attempt those rows.
     romanizationSource: v.optional(v.string()),
+    // IPA transcription (espeak-ng). Same undefined / '' / non-empty
+    // tri-state as `romanizedText` above, same `=== undefined` rule.
+    ipaText: v.optional(v.string()),
+    // Identifier of the engine build that produced `ipaText` (e.g.
+    // "espeak-ng-emscripten-0.3.5-v1"). Same invalidate-by-source migration
+    // pattern as `romanizationSource`.
+    ipaSource: v.optional(v.string()),
     // Debounce marker for the searchableText rebuild fan-out: timestamp until
     // which a scheduled `rebuildSearchableTextForText` is already pending for
-    // this text. Content stores within that window skip re-scheduling — see
+    // this text. Content stores within that window skip re-scheduling. See
     // scheduleSearchableTextRebuild in convex/features/decks.ts.
     searchableRebuildScheduledAt: v.optional(v.number()),
     userCreated: v.boolean(), // false for uploaded data, true for user-created
@@ -403,12 +450,17 @@ export default defineSchema({
     targetLanguage: v.string(), // e.g., "es" for Spanish
     translatedText: v.string(),
     // Latin transliteration for non-Latin scripts. Same undefined / '' /
-    // non-empty tri-state as `texts.romanizedText` — see the note there.
+    // non-empty tri-state as `texts.romanizedText`. See the note there.
     romanizedText: v.optional(v.string()),
-    // Same purpose as on `texts` — identifier of the romanizer that produced
+    // Same purpose as on `texts`. Identifier of the romanizer that produced
     // `romanizedText` (or attempted to and persisted the empty-string
     // sentinel). See the texts table for the migration pattern.
     romanizationSource: v.optional(v.string()),
+    // IPA transcription (espeak-ng). Same undefined / '' / non-empty
+    // tri-state as `texts.ipaText`; see the notes there.
+    ipaText: v.optional(v.string()),
+    // Engine identifier for `ipaText`, mirroring `texts.ipaSource`.
+    ipaSource: v.optional(v.string()),
     // Identifier of the translation method that produced `translatedText`.
     // Format: "<model-slug>-<reasoning|none>" for LLM translations (e.g.
     // "google/gemini-3.1-flash-lite-high"), "google-translate-v2"
@@ -427,19 +479,19 @@ export default defineSchema({
     // Undefined for non-mixed languages.
     regionVariant: v.optional(v.string()),
     // Number of times a user has flagged this translation as bad. Drives the
-    // automatic retranslation policy in `flagTranslation` — flags 1 and 2
+    // automatic retranslation policy in `flagTranslation`. Flags 1 and 2
     // enqueue a stronger model; flags 3+ only increment the counter for
     // later admin triage. Undefined treated as 0 for back-compat.
     flagCount: v.optional(v.number()),
     // Voice/audio speaker gender ('male' | 'female') the translation was
-    // produced under — the resolved `texts.audioSpeakerGender` at write time,
+    // produced under. The resolved `texts.audioSpeakerGender` at write time,
     // NOT `texts.speakerGender` (which can be 'neutral' and is what the
     // translation prompt reads). Recording the voice gender is what lets
     // `scheduleMissingContent` invalidate translations whose grammar would no
     // longer agree with the card's current voice gender (e.g. when LLM
     // metadata analysis lands a definitive gender that overrides the initial
-    // coin-flip). Undefined on legacy rows written before this field existed —
-    // treated as "unknown, regenerate on next sweep."
+    // coin-flip). Undefined on legacy rows written before this field existed.
+    // Treated as "unknown, regenerate on next sweep."
     speakerGender: v.optional(voiceGenderValidator),
     // Version of the translation METHOD this row was produced under, per the
     // language's `translationVersion` in lib/languages.ts (single source of
@@ -450,16 +502,16 @@ export default defineSchema({
     // current version is), so un-backfilled rows don't mass-regenerate. Rows
     // predating the versioning system were stamped to the baseline (v1) by a
     // one-time backfill, so a later bump correctly marks them stale. Rows that
-    // `mayRegenerateTranslation` (lib/translationProvenance.ts) protects —
-    // every row on a userCreated text, plus user-provided / curated-manual
-    // rows anywhere — are skipped by the sweep regardless of their stamp.
+    // `mayRegenerateTranslation` (lib/translationProvenance.ts) protects.
+    // Every row on a userCreated text, plus user-provided / curated-manual
+    // rows anywhere. Are skipped by the sweep regardless of their stamp.
     translationVersion: v.optional(v.number()),
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'targetLanguage']),
 
   // Content-addressed audio store. One row per unique
-  // (language, voiceGender, regionVariant, spoken string) — every text whose
+  // (language, voiceGender, regionVariant, spoken string), every text whose
   // audio speaks that exact string points at the same asset via
   // `audioRecordings.assetId`, so identical sentences are synthesized once and
   // the blob is stored once. The asset OWNS its storage blob: regenerating
@@ -474,7 +526,7 @@ export default defineSchema({
     // part of the key so accents never collide. Undefined for non-mixed
     // languages and source-language audio.
     regionVariant: v.optional(v.string()),
-    // SHA-256 hex of the RAW spoken string (exactly what was sent to TTS — no
+    // SHA-256 hex of the RAW spoken string (exactly what was sent to TTS, no
     // trimming/normalization; that belongs to card-edit comparison only).
     // Hashing keeps the index key bounded regardless of text length.
     spokenTextHash: v.string(),
@@ -486,8 +538,8 @@ export default defineSchema({
     // Full voice identifier (e.g., "en-US-Chirp3-HD-Leda"). Also the last
     // column of `by_key`: today asset identity is GENDER-level (all lookups
     // and upserts use the 4-field prefix, so one asset exists per
-    // string+gender and a regeneration replaces it whatever voice it picked
-    // — that's what propagates regen to every sharer). The extra column is
+    // string+gender and a regeneration replaces it whatever voice it picked,
+    // that's what propagates regen to every sharer). The extra column is
     // forward-compat for a user-selectable favorite voice: switching
     // `findAudioAssetByKey`/`upsertAudioAsset` to include `.eq('voiceName',…)`
     // gives per-voice assets with no schema or index migration.
@@ -514,8 +566,8 @@ export default defineSchema({
     // audio was produced under, per the language's `ttsVersion` in
     // lib/languages.ts. A stamped version below the language's current config
     // makes cache lookups MISS (the asset is never served to new texts), and
-    // the sweep-triggered re-synthesis patches this same asset in place —
-    // healing every pointing text at once. Same "undefined === current"
+    // the sweep-triggered re-synthesis patches this same asset in place.
+    // Healing every pointing text at once. Same "undefined === current"
     // semantics as the other content-version stamps.
     ttsVersion: v.optional(v.number()),
   })
@@ -532,7 +584,7 @@ export default defineSchema({
 
   // Audio pointer table: one row per (textId, language), pointing at the
   // shared `audioAssets` row that owns the actual audio (blob + payload).
-  // Deliberately payload-free — everything about the audio itself lives on
+  // Deliberately payload-free. Everything about the audio itself lives on
   // the asset so an in-place asset swap reaches every pointing text at once.
   audioRecordings: defineTable({
     textId: v.id('texts'),
@@ -578,14 +630,14 @@ export default defineSchema({
     pinnedCardActions: v.optional(v.array(v.string())),
     // Mirror of the browser's analytics-consent choice, synced by
     // `features/consent.setAnalyticsConsent`. Gates whether AI chat *content*
-    // may be attached to PostHog cost events (see chat/messages.ts) — the
+    // may be attached to PostHog cost events (see chat/messages.ts), the
     // privacy policy promises "if you decline, no AI content is transmitted".
     // undefined = never synced, treated as declined. Account-scoped where the
     // browser choice is device-scoped, so the last device to sync wins.
     analyticsConsent: v.optional(v.boolean()),
   }).index('by_userId', ['userId']),
 
-  // Onboarding progress table — stores the user's onboarding answers.
+  // Onboarding progress table. Stores the user's onboarding answers.
   //
   // Row lifecycle:
   //   - `completedAt === undefined` → in-progress; the wizard reads and
@@ -619,7 +671,7 @@ export default defineSchema({
     archivedAt: v.optional(v.number()), // Timestamp; 30-day cooldown before unarchive
   }).index('by_userId', ['userId']),
 
-  // Course settings table — separated so changes don't trigger course re-fetches
+  // Course settings table. Separated so changes don't trigger course re-fetches
   courseSettings: defineTable(courseSettingsFields).index('by_courseId', ['courseId']),
 
   // Decks table - one deck per course, auto-created
@@ -641,8 +693,22 @@ export default defineSchema({
     ),
     // Scheduling + free-play rotation state mutated by reviewCard /
     // advanceFreePlayCard (one rotation per face). Shared with the `reviewLogs`
-    // undo snapshots — definitions and field comments live in convex/types.ts.
+    // undo snapshots. Definitions and field comments live in convex/types.ts.
     ...cardSchedulingSnapshotFields,
+    // Writing-track schedule, only populated for courses with
+    // `separateModeTracking` on (seeded from the shared fields on enable).
+    ...cardWritingSchedulingFields,
+    // How many times this card was reviewed in each review MODE ('audio' =
+    // Shadowing, 'full' = Writing), counted from the review's actual mode,
+    // independent of which schedule (track) it wrote, so the counts stay
+    // truthful whether the split is on or off. Undefined = never counted;
+    // there is deliberately no backfill (per-mode attribution of historical
+    // reviews is unrecoverable, reviewLogs is a capped undo stack), so the
+    // counters are accurate from their introduction onward. Decremented on
+    // undo.
+    reviewCountByMode: v.optional(
+      v.object({ audio: v.number(), full: v.number() }),
+    ),
     ...cardRadioSnapshotFields,
     ...cardFreeStudySnapshotFields,
     isMastered: v.boolean(), // Whether the card has been mastered
@@ -687,7 +753,7 @@ export default defineSchema({
       'isGraduated',
       'dueDate',
     ])
-    // Content-source filter variants — used when courseSettings.studyContentFilter is 'custom' or 'course'.
+    // Content-source filter variants. Used when courseSettings.studyContentFilter is 'custom' or 'course'.
     .index('by_deck_hidden_mastered_origin_dueDate', [
       'deckId',
       'isHidden',
@@ -702,6 +768,47 @@ export default defineSchema({
       'collectionOrigin',
       'isGraduated',
       'dueDate',
+    ])
+    // Writing-track mirrors of the four due-queue indexes above, used when a
+    // course has separateModeTracking on and reviewMode 'full'. Cards without
+    // a writing track have writingDueDate undefined, which sorts FIRST in the
+    // index. Writing-track due queries must therefore always add a
+    // `.gte('writingDueDate', 0)` lower bound to exclude them.
+    // Seeding-only companion to the four writing due-queue indexes below.
+    // Deliberately has NOTHING between deckId and writingDueDate: the seed
+    // sweep must reach hidden and mastered cards too (they can be unhidden or
+    // demastered later), and it needs `undefined`, which sorts FIRST, to be
+    // directly reachable so each batch can locate the remaining unseeded cards
+    // itself instead of threading a pagination cursor through the chain.
+    // See convex/migrations/seedWritingTrack.ts.
+    .index('by_deck_writingDue', ['deckId', 'writingDueDate'])
+    .index('by_deck_hidden_mastered_writingDue', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'writingDueDate',
+    ])
+    .index('by_deck_hidden_mastered_writingGraduated_writingDue', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'writingIsGraduated',
+      'writingDueDate',
+    ])
+    .index('by_deck_hidden_mastered_origin_writingDue', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'collectionOrigin',
+      'writingDueDate',
+    ])
+    .index('by_deck_hidden_mastered_origin_writingGraduated_writingDue', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'collectionOrigin',
+      'writingIsGraduated',
+      'writingDueDate',
     ])
     .index('by_deck_hidden_mastered_origin_radioCounter_radioOrder', [
       'deckId',
@@ -719,7 +826,7 @@ export default defineSchema({
       'freeStudyRoundCounter',
       'freeStudyOrderKey',
     ])
-    // Library source-filter variants — origin appended to each state-aware
+    // Library source-filter variants. Origin appended to each state-aware
     // library index so every (state × origin) combo resolves via a pure index
     // query (no post-filter). For 'custom' (= origin ∈ {'custom','chat'}) the
     // query runs twice, once per non-premade origin, and the results are
@@ -772,7 +879,7 @@ export default defineSchema({
     totalAccuracyCount: v.optional(v.number()),
     // Writing accuracy split by punctuation handling, so the headline number
     // keeps its meaning when the learner toggles `ignorePunctuation`. Written
-    // as a trio — both sums share one count and are only ever incremented
+    // as a trio, both sums share one count and are only ever incremented
     // together. Rows predating this simply don't contribute.
     totalAccuracyStrictSum: v.optional(v.number()), // punctuation always counted
     totalAccuracyLenientSum: v.optional(v.number()), // punctuation always ignored
@@ -801,7 +908,7 @@ export default defineSchema({
     // Full review accuracy
     accuracySum: v.optional(v.number()),
     accuracyCount: v.optional(v.number()),
-    // Same punctuation split as courseStats — see there for the rationale.
+    // Same punctuation split as courseStats. See there for the rationale.
     accuracyStrictSum: v.optional(v.number()),
     accuracyLenientSum: v.optional(v.number()),
     accuracyDualCount: v.optional(v.number()),
@@ -818,14 +925,14 @@ export default defineSchema({
     cardsAddedManually: v.optional(v.number()),
     // High-water mark: today's review count when a celebration last fired.
     // A milestone only triggers when the count EXCEEDS this, and undoing a
-    // review never lowers it — so undo + re-review can't replay a celebration.
+    // review never lowers it, so undo + re-review can't replay a celebration.
     lastCelebratedAtCount: v.optional(v.number()),
   })
     .index('by_userId_and_courseId_and_date', ['userId', 'courseId', 'date'])
     // Admin dashboard: per-day DAU scan across all users
     .index('by_date', ['date']),
 
-  // Review log table — one entry per card review / radio play, capped at
+  // Review log table. One entry per card review / radio play, capped at
   // UNDO_DEPTH newest entries per (user, course) by logReview's trim. Each
   // entry snapshots the card state the review overwrote plus the keys needed
   // to reverse its stat increments, powering the learn-mode undo button.
@@ -843,15 +950,25 @@ export default defineSchema({
     kind: v.union(v.literal('review'), v.literal('radio'), v.literal('freeStudy')),
     date: v.string(), // "YYYY-MM-DD" day key of the stats rows the review incremented; week/month/year keys derived
     // Study context at review time. Undo only applies while the CURRENT
-    // course settings match — the undoable stack is the newest-first
+    // course settings match. The undoable stack is the newest-first
     // consecutive run of matching entries, so entries logged under another
     // mode/face/filter block everything older beneath them.
     schedulingMode: schedulingModeValidator,
     studyContentFilter: studyContentFilterValidator,
+    // kind === 'review': which per-card schedule the review wrote. 'shared'
+    // (legacy fields; also every log from before this field existed, hence
+    // optional with undefined ≡ 'shared') or 'writing' (cards.writing*, only
+    // under separateModeTracking). Part of the undo stack's match key so a
+    // toggle/mode flip fences off older entries, and selector for which
+    // snapshot below to restore.
+    track: v.optional(schedulingTrackValidator),
 
-    // kind === 'review': pre-review card scheduling state (shared field set
-    // with the cards table — see convex/types.ts). undefined = field was absent.
+    // kind === 'review', track 'shared': pre-review card scheduling state
+    // (shared field set with the cards table, see convex/types.ts).
+    // undefined = field was absent.
     prevCard: v.optional(v.object(cardSchedulingSnapshotFields)),
+    // kind === 'review', track 'writing': pre-review writing-track state.
+    prevWriting: v.optional(v.object(cardWritingSchedulingFields)),
     // kind === 'review': stat increments to reverse, keyed as computed at
     // review time (hour bucket, resolved mode, languages) since they are not
     // recomputable later.
@@ -867,6 +984,15 @@ export default defineSchema({
         accuracyStrict: v.optional(v.number()), // present iff the dual trio was written
         accuracyLenient: v.optional(v.number()),
         reviewDepth: v.optional(v.number()), // reviewDepthAccuracy bucket, only when accuracy present
+        // dailyStats.reviewsByCardState bucket (FSRS state 0-3) as RESOLVED at
+        // review time. Must be stamped, never re-derived on undo: on the
+        // writing track's lazy-seed path the review is scheduled from a COPY of
+        // the shared fsrsState, while the undo snapshot necessarily records the
+        // true (unset) writingFsrsState, so re-deriving decrements 'new' while
+        // the increment landed on e.g. 'review', leaving that day permanently
+        // skewed with no way to repair it. Optional for logs written before
+        // this field existed.
+        cardState: v.optional(v.number()),
         languages: v.array(v.string()), // course languages whose per-language stats were incremented
         collectionId: v.optional(v.id('collections')),
       }),
@@ -932,8 +1058,8 @@ export default defineSchema({
   // text the frontier already passed flips its row to 'readd' instead of
   // deleting it, so the text stays discoverable (browse injection) and
   // addable (drained like 'prioritized', after it) without rolling the
-  // frontier back. Counter-neutral — not part of prioritizedCount/ignoredCount.
-  // Marks exist only for texts WITHOUT a card — every add path clears the
+  // frontier back. Counter-neutral, not part of prioritizedCount/ignoredCount.
+  // Marks exist only for texts WITHOUT a card. Every add path clears the
   // mark in the same transaction that inserts the card.
   collectionTextMarks: defineTable({
     userId: v.string(), // Links to auth user
@@ -964,14 +1090,42 @@ export default defineSchema({
     messageId: v.string(),
     toolCallId: v.string(),
     translations: translationEntriesValidator,
+    // IPA transcriptions for `translations`, keyed by language. Computed by
+    // a scheduled espeak action (convex/features/ipa.ts) right after the
+    // proposal lands, so the approval card can show the line before any
+    // card/text row exists. Key absent = not (yet) computed, '' = espeak
+    // failed (same sentinel semantics as texts.ipaText), non-empty = done.
+    // Entries are dropped when the user edits the proposed text and
+    // recomputed against the new wording.
+    entryIpa: v.optional(v.record(v.string(), v.string())),
     userId: v.string(),
     status: cardApprovalStatusValidator,
+    // Absent = 'createCard' (rows predate the field). 'alsoCorrect' rows are
+    // markAlsoCorrect proposals: an alternative phrasing of the card at
+    // `cardId` the user may add as a new card or replace the card text with.
+    kind: v.optional(cardApprovalKindValidator),
+    // Which accept path resolved an 'alsoCorrect' row ('newCard'/'replaced').
+    resolution: v.optional(cardApprovalResolutionValidator),
+    // Metadata changes (speaker gender, register, addressee) proposed by the
+    // model for the new phrasing. Applied only on the replace path.
+    proposedMetadata: v.optional(proposedCardMetadataValidator),
+    // Languages whose text the model actually changed vs. the card.
+    // `translations` stores the merged course-language set (so processApproval
+    // works unchanged); this drives UI emphasis and, on the replace path, is
+    // the authoritative list of languages to write.
+    changedLanguages: v.optional(v.array(v.string())),
+    // The card was missing text for at least one course language when the
+    // proposal was made, so `translations` covers only a subset. Replacing is
+    // still valid (applyCardEdit only touches the languages it is given) but
+    // adding as a new card would produce a card with a blank line, both the
+    // UI and `approveCard` refuse that path for these rows.
+    replaceOnly: v.optional(v.boolean()),
     processedAt: v.optional(v.number()),
     textId: v.optional(v.id('texts')),
     cardId: v.optional(v.id('cards')),
     // Languages whose text the user hand-edited via EditApprovalDialog
     // (updateApprovalTranslations). On approval these entries are stored
-    // VERBATIM and tagged user-provided — machine post-processing
+    // VERBATIM and tagged user-provided. Machine post-processing
     // (postProcessTranslation) must never touch user-typed text.
     userEditedLanguages: v.optional(v.array(v.string())),
     // In-flight synthesis marker per language (requestApprovalAudio): a
@@ -986,9 +1140,12 @@ export default defineSchema({
       ),
     ),
   })
-    .index('by_thread_and_user', ['threadId', 'userId']),
+    .index('by_thread_and_user', ['threadId', 'userId'])
+    // Account purge: enumerate a user's approvals without knowing their
+    // threads (the agent component owns those and is purged separately).
+    .index('by_userId', ['userId']),
 
-  // TTS mismatches — stores audio that failed validation for later analysis
+  // TTS mismatches. Stores audio that failed validation for later analysis
   ttsMismatches: defineTable({
     textId: v.id('texts'),
     language: v.string(),
@@ -1000,7 +1157,7 @@ export default defineSchema({
   })
     .index('by_textId', ['textId']),
 
-  // TTS generation claims — prevents duplicate processTTSForCard scheduling.
+  // TTS generation claims. Prevents duplicate processTTSForCard scheduling.
   // Mutations atomically check-and-insert before scheduling; Convex OCC
   // guarantees only one claim per (textId, language) wins. The claim lives
   // from enqueue until the pool job's onComplete deletes it; `claimedAt`
@@ -1015,6 +1172,11 @@ export default defineSchema({
     // superseded job's completion. Optional: claims created for non-pool work
     // (word-timing backfills) and legacy rows carry none.
     workId: v.optional(v.string()),
+    // Scheduling tier of the job holding this claim (see ttsPriorityValidator;
+    // absent = interactive). Lets `claimTtsIfAvailable` hand a
+    // background-held claim over to interactive demand instead of making a
+    // visible card wait out the warm pool's patient backoff.
+    priority: v.optional(ttsPriorityValidator),
   }).index('by_text_and_language', ['textId', 'language']),
 
   // Per-(textId, language) dedup claim. Atomically check-and-insert before
@@ -1025,9 +1187,15 @@ export default defineSchema({
     textId: v.id('texts'),
     targetLanguage: v.string(),
     claimedAt: v.number(),
-    // Workpool work id of the pool job holding this claim — see the
+    // Workpool work id of the pool job holding this claim. See the
     // ttsGenerationClaims.workId comment.
     workId: v.optional(v.string()),
+    // Scheduling tier of the job holding this claim (see llmPriorityValidator;
+    // absent = interactive). Lets `claimLlmTranslationIfAvailable` hand a
+    // background-held claim over to interactive demand instead of making a
+    // user wait out the warm pool's queue. Matters most during onboarding:
+    // the warmup translates exactly the texts a new user hits first.
+    priority: v.optional(llmPriorityValidator),
   }).index('by_text_and_language', ['textId', 'targetLanguage']),
 
   // Daily per-language stats
@@ -1051,7 +1219,7 @@ export default defineSchema({
     userId: v.string(),
     courseId: v.optional(v.id('courses')),
     language: v.string(),
-    // Normalized (lowercased, NFC) form — used as the uniqueness key.
+    // Normalized (lowercased, NFC) form. Used as the uniqueness key.
     word: v.string(),
     // Preferred display form, preserving original casing from source text
     // (e.g. German nouns stay capitalized). Optional to accommodate
@@ -1059,7 +1227,7 @@ export default defineSchema({
     displayWord: v.optional(v.string()),
     // Client-minted session id stamped on insert so we can partition the
     // celebration screen's word list into "this session" vs "earlier today".
-    // Read by `getNewWordsForCelebration` via the language index — a session
+    // Read by `getNewWordsForCelebration` via the language index. A session
     // id only ever matters alongside the auth context that created it.
     sessionId: v.optional(v.string()),
   })
@@ -1155,13 +1323,13 @@ export default defineSchema({
     .index('by_userId_and_courseId', ['userId', 'courseId'])
     .index('by_userId_and_courseId_and_reviewNumber', ['userId', 'courseId', 'reviewNumber']),
 
-  // Usage quotas — local cache of Autumn entitlements for synchronous checks.
+  // Usage quotas. Local cache of Autumn entitlements for synchronous checks.
   // One document per user; features stored as a record keyed by feature ID.
   usageQuotas: defineTable({
     userId: v.string(),
     features: v.record(v.string(), featureStateValidator),
     lastSyncedAt: v.number(),
-    // Current Autumn product (plan), captured during sync. Optional — rows
+    // Current Autumn product (plan), captured during sync. Optional. Rows
     // synced before this field existed (or users with no product) have none.
     planId: v.optional(v.string()),
     planName: v.optional(v.string()),
@@ -1175,13 +1343,13 @@ export default defineSchema({
     // presence is the single source of truth for the block.
     pastDueSince: v.optional(v.number()),
     // Stripe-hosted page for the outstanding invoice (from Autumn's
-    // ?expand=invoices). The overdue dialog's primary CTA — paying this is
+    // ?expand=invoices). The overdue dialog's primary CTA. Paying this is
     // what actually settles the debt; the billing portal only swaps cards.
     pastDueInvoiceUrl: v.optional(v.string()),
   }).index('by_userId', ['userId']),
 
   // E2E-only planStatus overrides, applied inside syncAllFeatures when the
-  // deployment has E2E_TEST_HOOKS=1 (dev/test only — see usage/testing.ts).
+  // deployment has E2E_TEST_HOOKS=1 (dev/test only, see usage/testing.ts).
   // Needed because a genuine past_due can't be produced synchronously in
   // Stripe test mode (verified July 2026: a failed attach charge voids the
   // invoice and drops the products instead of going past_due).
@@ -1207,6 +1375,36 @@ export default defineSchema({
     otp: v.optional(v.string()), // verification code ('verify' emails)
     subject: v.string(),
   }).index('by_email', ['email']),
+
+  // Account-deletion lifecycle, one row per Better Auth user id. Written as
+  // `requested` by features/accountDeletion.requestAccountDeletion (the
+  // in-app request flow) and driven to `completed` by the operator-run purge
+  // in admin/deleteUser.ts. The row is three things at once: the proof the
+  // user actually asked (the purge refuses to run without it, absent an
+  // explicit override), the resume/progress state of the batched purge, and
+  // the audit record that deletion was fulfilled. Deliberately survives the
+  // purge itself.
+  accountDeletions: defineTable({
+    userId: v.string(), // Better Auth user._id === identity.subject
+    email: v.string(), // lowercase; double-checked against the auth user before purging
+    status: v.union(
+      v.literal('requested'),
+      v.literal('running'),
+      v.literal('completed'),
+    ),
+    requestedAt: v.optional(v.number()), // absent when the run was forced via overrideNoRequest
+    // The purge ran without an in-app request row (out-of-band GDPR email,
+    // or a request filed before this table existed). Recorded for audit.
+    overrideNoRequest: v.optional(v.boolean()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    phase: v.optional(v.string()), // current purge phase, for the status query
+    // Within-phase position for the phases that can't re-derive it from the
+    // data (today: which deck's aggregates are being cleared).
+    phaseCursor: v.optional(v.string()),
+    lastProgressAt: v.optional(v.number()), // heartbeat; guards against double-kicking a live chain
+    docsDeleted: v.optional(v.number()), // running tally across all phases
+  }).index('by_userId', ['userId']),
 
   // Admin allowlist for the /app/admin dashboard. The gate (requireAdmin in
   // convex/admin/lib.ts) requires BOTH fields to match the caller's Better

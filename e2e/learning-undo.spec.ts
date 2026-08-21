@@ -3,7 +3,7 @@ import { dismissTour } from "./helpers";
 import { UNDO_DEPTH } from "../lib/constants/learning";
 
 /**
- * Learning undo (LIVE) — the undo-last-review button in learning mode:
+ * Learning undo (LIVE), the undo-last-review button in learning mode:
  *   rate a card → undo → the same card comes back; exhaust the stack
  *   (UNDO_DEPTH entries) → the button greys out.
  *
@@ -38,7 +38,7 @@ async function dismissAllTours(page: Page, waitMs = 250) {
   await dismissTour(page, undefined, waitMs);
 }
 
-/** First line of the flashcard's text — stable identity for "the same card
+/** First line of the flashcard's text. Stable identity for "the same card
  * came back". Blur is CSS-only, so the text is present either way. */
 async function cardSnippet(page: Page): Promise<string> {
   const flashcard = page.locator('[data-tutorial="card-flashcard"]').first();
@@ -53,7 +53,7 @@ async function cardSnippet(page: Page): Promise<string> {
  * Full review: submitting a translation gates the ratings, and
  * `instantProceedFull` defaults to true, so clicking a rating advances.
  * Audio review: a rating click only SELECTS (`instantProceedAudio` defaults
- * to false) — the review commits when the Next button fires, so we click
+ * to false), the review commits when the Next button fires, so we click
  * `learn-reveal` (when the target is still blurred, Next hides behind it)
  * and then `learn-next` explicitly.
  */
@@ -134,7 +134,7 @@ test.describe("learning undo (live)", { tag: "@live" }, () => {
     await anyRating(page).waitFor({ state: "visible", timeout: 20_000 });
     await dismissAllTours(page, 1_000);
 
-    // Rate one more card than the stack holds — the trim keeps only the
+    // Rate one more card than the stack holds. The trim keeps only the
     // UNDO_DEPTH newest entries, so exactly UNDO_DEPTH undos are possible
     // regardless of what earlier serial specs left behind.
     for (let i = 0; i < UNDO_DEPTH + 1; i++) {

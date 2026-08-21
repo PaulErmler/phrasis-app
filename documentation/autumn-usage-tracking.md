@@ -1,10 +1,10 @@
-# Autumn Integration & Usage Tracking
+# Autumn integration & usage tracking
 
 This document describes how feature gating, usage quotas, and the Autumn billing SDK are wired together across the Flexling codebase. Use it as a reference when adding new gated features, modifying quota enforcement, or debugging paywall/checkout flows.
 
 ---
 
-## Table of Contents
+## Table of contents
 
 1. [Architecture Overview](#architecture-overview)
 2. [Feature IDs](#feature-ids)
@@ -22,7 +22,7 @@ This document describes how feature gating, usage quotas, and the Autumn billing
 
 ---
 
-## Architecture Overview
+## Architecture overview
 
 The system uses a **two-layer** approach:
 
@@ -81,11 +81,11 @@ These IDs **must** match the feature IDs configured in Autumn's dashboard and `a
 
 | Feature ID | Type | Description |
 |---|---|---|
-| `chat_messages` | Usage (metered, consumable) | Messages sent in chat — billed in credits (see Credit System) |
+| `chat_messages` | Usage (metered, consumable) | Messages sent in chat, billed in credits (see Credit System) |
 | `courses` | Usage (metered, non-consumable) | Number of active courses |
 | `sentences` | Usage (metered, consumable) | Sentences added from collections (free tier: 300 one-off + 50/month) |
-| `custom_sentences` | Usage (metered, consumable) | Custom cards created/approved — billed in credits |
-| `translation_auto_fill` | Usage (metered, consumable) | Auto-translate on custom card creation — billed in credits |
+| `custom_sentences` | Usage (metered, consumable) | Custom cards created/approved, billed in credits |
+| `translation_auto_fill` | Usage (metered, consumable) | Auto-translate on custom card creation, billed in credits |
 | `transcriptions` | Usage (metered, consumable) | Transcription uses, resets monthly |
 | `card_edits` / `audio_regenerations` / `translation_flags` | Usage (metered, consumable, hidden) | Internal meters, resets monthly |
 | `multiple_languages` | Boolean (feature flag) | Whether the user can add >2 languages per course (Pro only) |
@@ -100,11 +100,11 @@ In the local `usageQuotas` cache, boolean features are stored as `{ balance: 1, 
 
 ---
 
-## Credit System
+## Credit system
 
 Since the credits rollout, `custom_sentences`, `translation_auto_fill`, and `chat_messages` are no longer granted as separate plan items. Instead, plans grant a shared `credits` pool (Free: 200 one-off + 30/month; Basic: 430/month; Pro: 1,030/month; Ultra: 3,030/month) and the `credits` feature in `autumn.config.ts` declares a `creditSchema` mapping each of those features to a credit cost (currently 1 credit per unit each). Monthly credits reset with the billing cycle (no rollover); one-off grants persist.
 
-The odd-looking monthly grants are deliberate, not round-number misses. The pricing table lists each tier as what it ADDS over the one below (see `itemsAddedOver` in `components/autumn/pricing-table.tsx`), so the totals are tuned to make those increments round — and they chain, so changing one tier shifts every tier above it:
+The odd-looking monthly grants are deliberate, not round-number misses. The pricing table lists each tier as what it ADDS over the one below (see `itemsAddedOver` in `components/autumn/pricing-table.tsx`), so the totals are tuned to make those increments round, and they chain, so changing one tier shifts every tier above it:
 
 | Plan | Total/month | Renders as |
 |---|---|---|
@@ -113,7 +113,7 @@ The odd-looking monthly grants are deliberate, not round-number misses. The pric
 | Pro | 1,030 | plus **600** credits per month |
 | Ultra | 3,030 | plus **2,000** credits per month |
 
-**Starter credits stay on the free plan.** Since `free` is `autoEnable`, every customer is attached to it at creation and receives the 200 one-off grant once. A customer who subscribes to a paid tier no longer holds `free` (verified in sandbox: a `pro_annual` customer's `subscriptions` contains only that plan), so paid-from-day-one subscribers get no starter credits — accepted. Do NOT "fix" this by adding a `one_off` credits item to Basic/Pro/Ultra: switching plans ends one entitlement and creates a new one, so that would grant a fresh 200 on every upgrade.
+**Starter credits stay on the free plan.** Since `free` is `autoEnable`, every customer is attached to it at creation and receives the 200 one-off grant once. A customer who subscribes to a paid tier no longer holds `free` (verified in sandbox: a `pro_annual` customer's `subscriptions` contains only that plan), so paid-from-day-one subscribers get no starter credits, which is accepted. Do NOT "fix" this by adding a `one_off` credits item to Basic/Pro/Ultra: switching plans ends one entitlement and creates a new one, so that would grant a fresh 200 on every upgrade.
 
 **Golden rule (from Autumn's docs): always check/track the UNDERLYING feature id, never `credits`.** Autumn converts tracked usage into credit deductions server-side via the `creditSchema`.
 
@@ -124,13 +124,13 @@ Client + server mirror this rule:
 - `useFeatureQuota` applies the same redirect on the client, returning balances in feature units (`credits / cost`).
 - `toBillableFeature` in `lib/autumn/find-upgrade-product.ts` maps credit-billed features to the `credits` product item when searching for upgrade products (paywall / low-quota dialogs).
 
-**Dynamic chat pricing:** a chat message costs 1 credit per started $0.005 (`CHAT_CREDIT_USD_STEP`) of actual LLM cost. `sendMessage` consumes 1 credit up-front via `consumeQuota(CHAT_MESSAGES, 1)`. `generateResponse` accumulates the real OpenRouter cost across all LLM steps (via a per-call `usageHandler` reading `providerMetadata.openrouter.usage.cost`; requires `usage: { include: true }` in `OPENROUTER_CHAT_EXTRA_BODY`) and then charges the remainder through the `chargeExtraChatCredits` internal mutation. The remainder is billed in whole `chat_messages` units (`ceil(cost / (step × creditCost)) - 1`), never in raw credits — `resolveQuotaTarget` and Autumn's `creditSchema` each multiply a `chat_messages` amount by its credit cost once, so passing credits would double-convert. That charge is applied without a balance check — the balance may go negative, which blocks the next message. Stream failures charge nothing extra; thread-title generation is intentionally not billed.
+**Dynamic chat pricing:** a chat message costs 1 credit per started $0.005 (`CHAT_CREDIT_USD_STEP`) of actual LLM cost. `sendMessage` consumes 1 credit up-front via `consumeQuota(CHAT_MESSAGES, 1)`. `generateResponse` accumulates the real OpenRouter cost across all LLM steps (via a per-call `usageHandler` reading `providerMetadata.openrouter.usage.cost`; requires `usage: { include: true }` in `OPENROUTER_CHAT_EXTRA_BODY`) and then charges the remainder through the `chargeExtraChatCredits` internal mutation. The remainder is billed in whole `chat_messages` units (`ceil(cost / (step × creditCost)) - 1`), never in raw credits. `resolveQuotaTarget` and Autumn's `creditSchema` each multiply a `chat_messages` amount by its credit cost once, so passing credits would double-convert. That charge is applied without a balance check, so the balance may go negative, which blocks the next message. Stream failures charge nothing extra; thread-title generation is intentionally not billed.
 
-**Grandfathering:** existing subscribers stay on their old plan version (Autumn plan versioning — config pushes used `create_version` / no migration). Pre-credits-rollout customers have per-feature balances and no `credits` entry, so every code path above falls back to the legacy per-feature behavior automatically. Chat costs them a flat 1 `chat_messages` unit per message (`chargeExtraChatCredits` is a no-op without a `credits` balance). The same versioning applies to the Ultra rollout: Pro subscribers from before it keep 1,200 credits/month, and only new Pro subscriptions get 1,030.
+**Grandfathering:** existing subscribers stay on their old plan version (Autumn plan versioning; config pushes used `create_version` / no migration). Pre-credits-rollout customers have per-feature balances and no `credits` entry, so every code path above falls back to the legacy per-feature behavior automatically. Chat costs them a flat 1 `chat_messages` unit per message (`chargeExtraChatCredits` is a no-op without a `credits` balance). The same versioning applies to the Ultra rollout: Pro subscribers from before it keep 1,200 credits/month, and only new Pro subscriptions get 1,030.
 
 ---
 
-## Backend – Convex Usage Module
+## Backend – Convex usage module
 
 All quota logic lives in `convex/usage/`:
 
@@ -173,7 +173,7 @@ Each user has at most one document. The `features` record is keyed by feature ID
 
 ---
 
-## Backend – Autumn Component
+## Backend – Autumn component
 
 **`convex/autumn.ts`** configures the `@useautumn/convex` component:
 
@@ -195,7 +195,7 @@ This file exports Autumn's API functions (`track`, `check`, `checkout`, `listPro
 
 ---
 
-## Autumn REST API Contract
+## Autumn REST API contract
 
 Our `tracking.ts` uses raw `fetch` calls (not the SDK) because Convex scheduled actions lack auth context. The Autumn REST API response format differs from the `autumn-js` SDK's normalised types.
 
@@ -268,13 +268,13 @@ Records a usage event. As of March 17, 2026, this endpoint no longer auto-create
 | past due | `status: "past_due"` | `status: "active"` + `past_due: true` |
 | trial end | `current_period_end` | `trial_ends_at` |
 
-v2 has NO `"trialing"` and NO `"past_due"` status — it keeps `status` as the lifecycle state and moves both into dedicated fields. So a check against `status` alone is blind on v2, and one against the boolean alone is blind on v1. Every consumer reads the version-independent `AutumnPlan` from `lib/autumn/customer-shape.ts` instead, and that file is the only place either set of raw field names appears.
+v2 has NO `"trialing"` and NO `"past_due"` status. It keeps `status` as the lifecycle state and moves both into dedicated fields. So a check against `status` alone is blind on v2, and one against the boolean alone is blind on v1. Every consumer reads the version-independent `AutumnPlan` from `lib/autumn/customer-shape.ts` instead, and that file is the only place either set of raw field names appears.
 
-We can't simply standardise on one version: the client SDK is pinned to v1.2 (`LATEST_API_VERSION` in autumn-js, not overridable through `useCustomer()`), while `convex/usage/tracking.ts` needs v2 for `balances`/`flags` — v1.2 returns `features` instead.
+We can't simply standardise on one version: the client SDK is pinned to v1.2 (`LATEST_API_VERSION` in autumn-js, not overridable through `useCustomer()`), while `convex/usage/tracking.ts` needs v2 for `balances`/`flags`, while v1.2 returns `features` instead.
 
 ---
 
-## Quota Sync Lifecycle
+## Quota sync lifecycle
 
 1. **On app load** – `app/app/(main)/layout.tsx` calls `syncQuotas` action once per session (guarded by a `useRef`). This calls `POST /customers` (getOrCreate) to ensure the customer exists in Autumn and fetch all entitlements, then writes them to the local `usageQuotas` table. For new users, this idempotently creates the customer and auto-enables the free plan.
 
@@ -284,7 +284,7 @@ We can't simply standardise on one version: the client SDK is pinned to v1.2 (`L
 
 ---
 
-## Backend Enforcement (Mutations)
+## Backend enforcement (mutations)
 
 Mutations that change metered usage call `consumeQuota` or `releaseQuota`. Only non-archived courses count toward the course limit (archiving a course releases its `COURSES` quota; unarchiving re-consumes it). The current enforcement points:
 
@@ -331,17 +331,17 @@ If `consumeQuota` or `releaseQuota` throws, the mutation aborts and the client r
 
 When Autumn reports a plan as past due, `syncAllFeatures` stamps `pastDueSince` on the user's `usageQuotas` doc (and clears it once the state recovers). Everything below keys off that field.
 
-**No grace window.** From the moment the synced state shows past due, `PaymentOverdueDialog` (`components/autumn/payment-overdue-dialog.tsx`, mounted once in `BillingGate` from the /app layout) hard-blocks the app: no dismiss button, no close X, escape and outside clicks are swallowed. The dialog is UX only — the authoritative backstop is `assertBillingCurrent` in `convex/usage/helpers.ts`, which runs inside `consumeQuota` and fails every quota-consuming mutation with `PAYMENT_PAST_DUE` while `pastDueSince` is set.
+**No grace window.** From the moment the synced state shows past due, `PaymentOverdueDialog` (`components/autumn/payment-overdue-dialog.tsx`, mounted once in `BillingGate` from the /app layout) hard-blocks the app: no dismiss button, no close X, escape and outside clicks are swallowed. The dialog is UX only. The authoritative backstop is `assertBillingCurrent` in `convex/usage/helpers.ts`, which runs inside `consumeQuota` and fails every quota-consuming mutation with `PAYMENT_PAST_DUE` while `pastDueSince` is set.
 
 **Two exits, and only two:**
 
-1. **Pay the outstanding invoice** (`pastDueInvoiceUrl`, the Stripe-hosted page). This is the CTA because it is the only action that actually settles the debt — the billing portal merely swaps the card on file and waits for Stripe's next retry.
+1. **Pay the outstanding invoice** (`pastDueInvoiceUrl`, the Stripe-hosted page). This is the CTA because it is the only action that actually settles the debt. The billing portal merely swaps the card on file and waits for Stripe's next retry.
 2. **Cancel**, dropping to Free immediately, via the `cancelOverdueSubscription` action (`convex/billing.ts`). Behind a confirmation step because it archives every active course but one.
 
 **`cancelOverdueSubscription` outcomes** (the past-due state is re-derived from Autumn server-side, never trusted from the client):
 
-- `cancelled` — the plan was past due with an unsettled invoice; it is cancelled immediately and Stripe voids the outstanding invoice.
-- `recovered` — nothing needed cancelling: either Autumn no longer reports a past-due plan (payment landed, Stripe's retry succeeded, or a previous partial run already cancelled), or the plan still reads past_due but the expanded invoices show nothing unpaid — i.e. the user just paid the hosted invoice and Autumn's subscription state is lagging the Stripe webhook. Cancelling in that window would destroy a subscription that was just paid for, so the server refuses. Both branches re-sync the quota mirror first so a stale block clears instead of stranding the user.
+- `cancelled`: the plan was past due with an unsettled invoice; it is cancelled immediately and Stripe voids the outstanding invoice.
+- `recovered`: nothing needed cancelling: either Autumn no longer reports a past-due plan (payment landed, Stripe's retry succeeded, or a previous partial run already cancelled), or the plan still reads past_due but the expanded invoices show nothing unpaid: i.e. the user just paid the hosted invoice and Autumn's subscription state is lagging the Stripe webhook. Cancelling in that window would destroy a subscription that was just paid for, so the server refuses. Both branches re-sync the quota mirror first so a stale block clears instead of stranding the user.
 
 **Admin routes are excluded** from the dialog: /app/admin nests under the same layout, and an admin whose own account goes past due would otherwise lose access to the dashboard. `requireAdmin` still guards the underlying data.
 
@@ -351,12 +351,12 @@ E2E coverage: `e2e/payment-overdue.spec.ts` forces the synced past-due state via
 
 ---
 
-## Stripe Managed Payments (merchant of record)
+## Stripe managed payments (merchant of record)
 
 Managed Payments makes **Stripe** the seller of record for paid subscriptions:
 Stripe calculates, charges, and remits indirect tax in 80+ countries, and owns
 fraud, disputes, and transaction-level support. Autumn has no first-class support
-for it — the only activation path is to forward Stripe's `managed_payments` field
+for it, and the only activation path is to forward Stripe's `managed_payments` field
 onto the Checkout Session Autumn creates.
 
 **Kill switch:** the Convex env var `AUTUMN_MANAGED_PAYMENTS`. Only the literal
@@ -364,30 +364,30 @@ string `'true'` enables it; `npx convex env unset AUTUMN_MANAGED_PAYMENTS` rever
 checkout to the previous behaviour on the next call. Read per call (not at module
 load) so the switch doesn't wait on isolate recycling.
 
-**Where it is injected.** One file — `convex/billing.ts` — deliberately
+**Where it is injected.** One file, `convex/billing.ts`, deliberately
 server-side only, so the browser can neither enable nor suppress it:
 
 - `attachNewPlan` (the first-purchase path, the only flow that can actually be
-  MoR — see below) adds `checkout_session_params` while the flag is on, and
+  MoR; see below) adds `checkout_session_params` while the flag is on, and
   always sends `redirect_mode: 'always'` (flag or no flag): `'if_required'`
   would bill a lapsed subscriber's surviving card directly, creating a
-  subscription with no Checkout Session — charged on button click without any
+  subscription with no Checkout Session, charged on button click without any
   confirmation step, and (with the flag on) silently **not**
   merchant-of-record. With `'always'`, Stripe's hosted page is both the MoR
   carrier and the explicit price+tax confirmation for every first purchase.
 - `switchPlanDuringTrial` adds `checkout_session_params` to its
-  `/billing.attach` body too (usually inert — a trialing customer has a card on
+  `/billing.attach` body too (usually inert, since a trialing customer has a card on
   file, so that branch rarely produces a session).
 
 The legacy `attach`/`checkout` actions in `convex/autumn.ts` inject **nothing**:
 their path cannot carry MoR (API version, below), so injecting there could only
 produce Stripe 400s. Instead BOTH carry a guard
-(`guardFirstPurchaseOffLegacyPath`) — while the flag is on, a first purchase
+(`guardFirstPurchaseOffLegacyPath`). While the flag is on, a first purchase
 (no paid plan, no running trial) is rejected with a "please refresh" error, so
 a stale client can never complete a first purchase without merchant of record.
 `checkout` is guarded too because for a card-less customer the v1.2 preview
 *itself* creates the Stripe session and autumn-js redirects straight to it
-(dialog never opens) — the sandbox findings below show the MoR error surfacing
+(dialog never opens). The sandbox findings below show the MoR error surfacing
 from `autumn:checkout` for exactly this reason. Trialing customers and payers
 pass the guard: their calls never create sessions, and the dialog needs the
 preview. The public actions also no longer accept `checkoutSessionParams` from
@@ -397,7 +397,7 @@ session, letting any authenticated user pass
 us.
 
 **Casing is load-bearing and looks wrong.** The `/billing.attach` bodies in
-`convex/billing.ts` are hand-written snake_case for the raw REST API — nothing
+`convex/billing.ts` are hand-written snake_case for the raw REST API, so nothing
 case-converts them, and the children of `checkout_session_params` are forwarded
 to Stripe verbatim. `MANAGED_PAYMENTS_SESSION_PARAMS`
 (`lib/autumn/managed-payments.ts`) must stay snake_case; a "consistency"
@@ -405,7 +405,7 @@ refactor to camelCase silently breaks MoR (or turns it into a Stripe 400).
 
 **Autumn's own session params win the merge.** Server-side Autumn does
 `{...checkoutSessionParams, ...params}`. It never sets `managed_payments`, so ours
-survives — but when the Autumn org has **automatic tax enabled**, Autumn bakes in
+survives. But when the Autumn org has **automatic tax enabled**, Autumn bakes in
 `automatic_tax`, `tax_id_collection`, and `customer_update`, all of which are
 *forbidden* under Managed Payments and cannot be overridden from our side. Autumn's
 automatic tax must therefore stay **off**, which is correct anyway: Stripe now does
@@ -414,16 +414,16 @@ the tax.
 **Dashboard prerequisites** (none of these live in the repo):
 
 1. Managed Payments terms of service accepted at `dashboard.stripe.com/settings/managed-payments`.
-2. The Autumn↔Stripe link must be a **secret-key** connection — Managed Payments
+2. The Autumn↔Stripe link must be a **secret-key** connection. Managed Payments
    does not support platform-controlled/Connect accounts.
 3. An eligible `tax_code` set on every Stripe product Autumn created, in **both**
-   test and live mode. `txcd_10103000` (*SaaS – personal use*) fits our plans —
+   test and live mode. `txcd_10103000` (*SaaS – personal use*) fits our plans,
    personal-use rather than business-use because AGB §1.2/§2.3 restrict the
    Services to consumers. Dashboard → Product catalog → ⋯ → Edit product →
    Product tax code; eligible codes are labelled `Eligible for Managed Payments`.
 
    > ⚠️ **Recurring footgun.** Autumn never sets `tax_code` when it creates
-   > Stripe products — it only reads the field for tax previews. So *every new
+   > Stripe products; it only reads the field for tax previews. So *every new
    > paid plan added to `autumn.config.ts` needs its tax code set by hand in
    > Stripe*, or checkout for that plan fails with:
    > `Invalid line_items[0]: the product tax code is missing.`
@@ -439,14 +439,14 @@ the tax.
    determined by your USD configuration, even if the customer pays in EUR."*
    Adaptive Pricing (always on under Managed Payments) only changes the
    presentment currency, not the tax behaviour. So with EUR-only plans every
-   customer gets tax-inclusive, including US ones — US sales tax then comes out
+   customer gets tax-inclusive, including US ones. US sales tax then comes out
    of margin. Genuinely exclusive US pricing requires a USD price on the plan
    via `additional_currencies` in `autumn.config.ts`.
 
    Note `tax_behavior` **cannot be changed** once a Price is created as inclusive
    or exclusive, so get this right before live-mode prices exist.
 
-**Scope limit — new Checkout purchases only.** Stripe cannot convert existing
+**Scope limit: new Checkout purchases only.** Stripe cannot convert existing
 subscriptions, and Autumn skips Checkout entirely when the customer already has a
 usable card (upgrades and downgrades become direct Stripe subscription updates). A
 permanently mixed estate of MoR and non-MoR subscriptions is the expected steady
@@ -454,13 +454,13 @@ state, not a bug.
 
 **Immediate cancels on MoR subscriptions fail in Autumn** (live-verified
 2026-08-10): Autumn's `cancel_immediately` means "cancel with prorated refund",
-and creating that refund invoice is forbidden under Managed Payments —
+and creating that refund invoice is forbidden under Managed Payments,
 `(Stripe Error) Invoices cannot be created for Subscriptions with Managed
 Payments enabled` (400). Production is unaffected today: the only immediate
 cancel in the app, `cancelOverdueSubscription`, acts on past-due subscriptions
 where Stripe VOIDS the existing invoice instead of creating one (proven live by
 the billing-clock dunning journey). But never add an immediate-cancel feature
-for active MoR subscriptions on Autumn's `/cancel` — a Stripe-side DELETE
+for active MoR subscriptions on Autumn's `/cancel`. A Stripe-side DELETE
 (which invoices nothing) is the working alternative, and end-of-cycle cancels
 are unaffected.
 
@@ -476,7 +476,7 @@ Two things follow from that one line:
 - **The blocker is the Connect link, not the API version.** Autumn's
   `createStripeCli` prefers a stored secret key and otherwise falls back to a
   Connect account ID sent as the `Stripe-Account` header. That header is present,
-  so the org is linked to Stripe through the Connect/OAuth flow — which Managed
+  so the org is linked to Stripe through the Connect/OAuth flow, which Managed
   Payments does not support at all. Fix in the Autumn dashboard
   (`app.useautumn.com/sandbox/dev?tab=stripe`): connect the Stripe **secret key**
   instead. Until then no amount of parameter plumbing helps.
@@ -485,7 +485,7 @@ Two things follow from that one line:
   Stripe). Nothing in *our* code needs to change.
 - Note it surfaced from `autumn:checkout`, i.e. the preview *does* reach Stripe.
   (At the time the flag was injected on the legacy `checkout`/`attach` actions
-  too; that injection was later removed — the legacy path can never carry MoR,
+  too; that injection was later removed, because the legacy path can never carry MoR,
   so it could only ever produce this class of error.)
 
 Clearing the Connect link and setting product tax codes then surfaced the
@@ -498,15 +498,15 @@ request to 2025-03-31.basil or greater.'
 ```
 
 **This is upstream in Autumn and has no configuration seam on our side.** The
-chain: `@useautumn/convex` builds `new AutumnSDK({ secretKey, url })` — no
-version option — so autumn-js sends its `LATEST_API_VERSION = "1.2"`, which
+chain: `@useautumn/convex` builds `new AutumnSDK({ secretKey, url })` with no
+version option, so autumn-js sends its `LATEST_API_VERSION = "1.2"`, which
 routes to Autumn's legacy `handleCreateCheckout.ts`, which calls
 `createStripeCli({ org, env, legacyVersion: true })`, pinning
 `2025-02-24.acacia`. Managed Payments requires `2025-03-31.basil`+.
 
 **How we work around it: `billing.attachNewPlan`.** Only the *first* paid
 purchase makes Autumn build a Checkout Session (`redirect_mode: 'always'`
-guarantees it even when a saved card survived — see above). So exactly that one
+guarantees it even when a saved card survived; see above). So exactly that one
 flow is routed to `POST /billing.attach` at api version `2.1.0`, whose Stripe
 client carries no `legacyVersion` pin. Everything else stays on the legacy
 path.
@@ -520,7 +520,7 @@ That split is deliberate, not laziness:
   dialog copy, the pricing-table CTA labels, and every branch of
   `switchPlanDuringTrial`. v2 offers only `attach_action`
   (`activate | upgrade | downgrade | none | purchase`), which collapses
-  renew/active/scheduled and has no `cancel` — the exact distinctions
+  renew/active/scheduled and has no `cancel`. The exact distinctions
   `e2e/billing.spec.ts` steps 4–6 exist to protect. Keeping the legacy preview
   keeps that classifier.
 - **`switchPlanDuringTrial`'s preview is safe on the legacy path** precisely
@@ -534,8 +534,8 @@ table and the paywall/low-quota dialogs: a first purchase
 redirects to the returned `payment_url`; everything else calls `checkout()` +
 CheckoutDialog as before. Routing *before* `checkout()` is mandatory, not
 style: for card-less customers the preview would itself create the (legacy,
-non-MoR-capable) session and redirect — the dialog never opens, so a
-dialog-side branch could not intercept it. The routing needs no server flag —
+non-MoR-capable) session and redirect. The dialog never opens, so a
+dialog-side branch could not intercept it. The routing needs no server flag,
 it is deterministic from the customer's own trial state (nothing to race), and
 first purchases always take v2, which behaves identically with MoR off (the
 env flag only controls the session params server-side). It is a hint only:
@@ -544,7 +544,7 @@ customers and existing payers outright, and the legacy-path guard (above)
 catches stale clients.
 
 > ⚠️ **`customize: { free_trial: null }`** is our reading of v2's
-> `object | null` type as the equivalent of v1.2's `free_trial: false` — it is
+> `object | null` type as the equivalent of v1.2's `free_trial: false`. It is
 > what stops a repeat trial on this path. A wrong reading either grants a
 > second trial (the hole `gateTrialArgs` exists to close) or wrongly denies a
 > first one. `e2e/billing-clock.spec.ts` ("lapsed repurchase … grants no
@@ -555,14 +555,14 @@ catches stale clients.
 > trial at all** (found 2026-08-09 by the billing-clock e2e, journey C;
 > probed live the same day). The exact behavior matrix on v1.2:
 >
-> - `/checkout` (preview): `free_trial: false` still **works** — the preview
+> - `/checkout` (preview): `free_trial: false` still **works**. The preview
 >   suppresses the plan's trial. `null` → 400 "free_trial: Invalid input".
 > - `/attach`: `false` passes validation but is **silently lost** in
 >   Autumn's v1.2→v2 translation (`freeTrialParamsV0ToV1` handles
->   undefined/null/object — a boolean falls through), so the plan's
+>   undefined/null/object, so a boolean falls through), which means the plan's
 >   configured trial applies anyway. `null` → the same 400. Live effect: a
 >   PAYING customer upgrading Basic→Pro got a full "unused Basic Annual"
->   credit note **plus Pro's 7-day free trial**, €0 due — the cross-plan
+>   credit note **plus Pro's 7-day free trial**, €0 due. The cross-plan
 >   trial hole `gateTrialArgs` closes, reopened upstream, with a refund
 >   attached.
 > - v2 `/billing.attach` with `customize.free_trial: null` works (what
@@ -571,11 +571,11 @@ catches stale clients.
 > Our fix (convex/autumn.ts): previews keep `freeTrial: false` on the legacy
 > path; the `attach` action routes trial-suppressed **cross-plan switches to
 > a paid target** (target not currently held AND not the free plan) through
-> v2 via `attachViaV2NoTrial` — upgrades stay immediate-with-proration,
+> v2 via `attachViaV2NoTrial`. Upgrades stay immediate-with-proration,
 > downgrades stay scheduled-at-period-end, and the response is wrapped in
 > the component's `{data, error}` container so autumn-js's redirect/refetch
 > handling is unchanged. Renew (re-attaching a held plan) and cancel-to-Free
-> stay fully legacy — v2's `attach_action` has no cancel, and free has no
+> stay fully legacy, since v2's `attach_action` has no cancel and free has no
 > trial to suppress. NOTE the free target cannot be detected via "is it
 > held": a paying customer does not hold `free` (see the starter-credits
 > section above), so `attach` asks Autumn's product record
@@ -586,27 +586,27 @@ catches stale clients.
 > journey C's "upgrade … in place" e2e (post-upgrade status must be
 > `active`, not `trialing`).
 
-The time-driven states around all of this — trial conversion, the scheduled
+The time-driven states around all of this, meaning trial conversion, the scheduled
 Free executing at period end, the lapsed-customer repurchase, a REAL
-`past_due` from a failed renewal — are covered by `e2e/billing-clock.spec.ts`
+`past_due` from a failed renewal, are covered by `e2e/billing-clock.spec.ts`
 on genuine Stripe **test clocks**: the spec pre-creates the clocked Stripe
 customer and hands it to Autumn via `usage/testing:relinkStripeCustomer`
-before the first purchase (needs a Stripe test-mode secret key —
+before the first purchase (needs a Stripe test-mode secret key;
 `STRIPE_TEST_SECRET_KEY` in the env, or auto-picked-up from `.env.local`;
 self-skips without one, refuses live keys).
 
 **Test clocks accelerate Stripe only.** Hosted Autumn ingests event-driven
 changes from clocked customers (payment failures → `past_due`, invoice.paid,
 API cancels), but its `trialing`/`scheduled` statuses derive from its stored
-**real-world** dates — a clock-driven trial end or scheduled-plan start does
+**real-world** dates. A clock-driven trial end or scheduled-plan start does
 not flip Autumn's state until the real date arrives. The spec therefore
 asserts Stripe-side effects after clock advances and produces Autumn-side
 transitions via Autumn's API (`usage/testing:cancelPlanNow`, immediate
 cancel) or real payment events. Its journey C additionally
 reconstructs a
-**grandfathered legacy customer** — subscription created via Autumn's v1.2
+**grandfathered legacy customer.** Subscription created via Autumn's v1.2
 `/attach` with a card on file (`usage/testing:legacyAttachPlan`), so non-MoR
-by construction — and proves the mixed estate works with the flag on:
+by construction, and proves the mixed estate works with the flag on:
 in-place upgrade (same subscription id, still non-MoR), scheduled
 downgrade + renew, the annual renewal charging the saved card, and cancel to
 Free at period end.
@@ -619,11 +619,11 @@ Free at period end.
 > mechanism (journey D uses `cancelPlanNow` instead). Product-side it means
 > an MoR subscription cancelled at Stripe outside Autumn (support action,
 > fraud/dispute cancellation) leaves the customer with paid access in
-> Autumn — and therefore in our quota mirror — indefinitely. Worth raising
+> Autumn, and therefore in our quota mirror, indefinitely. Worth raising
 > with Autumn alongside the legacyVersion report below. Two spellings of
 > Stripe cancellation state, while we're at it: Autumn's scheduled
 > cancel-to-Free sets `cancel_at` (= period end) on the subscription, NOT
-> `cancel_at_period_end` — check both when asserting.
+> `cancel_at_period_end`. Check both when asserting.
 
 **The upstream fix would make all of this unnecessary:** Autumn dropping
 `legacyVersion: true` in
@@ -634,7 +634,7 @@ guard, and go back to plain `checkout()` + `attach()`.
 
 ---
 
-## Frontend – Quota Hook
+## Frontend – quota hook
 
 **`components/feature_tracking/useFeatureQuota.ts`**
 
@@ -652,7 +652,7 @@ Behavior:
 
 ---
 
-## Frontend – UI Components
+## Frontend – UI components
 
 ### `FeatureBadge` (`components/feature_tracking/FeatureBadge.tsx`)
 
@@ -675,7 +675,7 @@ Shown when a feature limit is fully reached (balance = 0). Uses `usePaywall({ fe
 
 - Shows a spinner only while `isLoading` is true.
 - Once loaded, displays a title from `getPaywallTitle()` and a message from `getPaywallMessage()` (both in `lib/autumn/paywall-content.tsx`).
-- Products from the paywall preview are filtered with `filterProductsByFeatureIncrease()` so the suggested plan actually raises the limit for that feature. If that filter removes every product (e.g. the next tier is Basic but both Free and Basic grant the same number of active courses), **`PaywallDialog` falls back to `usePricingTable()`** and `findUpgradeProductFromPricingTable()` in `lib/autumn/find-upgrade-product.ts`—the same resolution path as `LowQuotaDialog`—so checkout can still offer a real upgrade (e.g. Pro).
+- Products from the paywall preview are filtered with `filterProductsByFeatureIncrease()` so the suggested plan actually raises the limit for that feature. If that filter removes every product (e.g. the next tier is Basic but both Free and Basic grant the same number of active courses), **`PaywallDialog` falls back to `usePricingTable()`** and `findUpgradeProductFromPricingTable()` in `lib/autumn/find-upgrade-product.ts`, the same resolution path as `LowQuotaDialog`, so checkout can still offer a real upgrade (e.g. Pro).
 - Footer has two buttons:
   - **"Not now"** – dismisses the dialog.
   - **"Upgrade to {plan}"** – calls `useCustomer().checkout({ productId, dialog: CheckoutDialog })` to initiate the Autumn checkout flow in a dialog.
@@ -699,12 +699,12 @@ The Autumn-provided checkout UI rendered as a dialog. Passed to `checkout({ dial
 Uses `useFeatureQuota(FEATURE_IDS.MULTIPLE_LANGUAGES)` to determine language limits:
 - **Has feature**: max 3 total languages, max 2 per group.
 - **Doesn't have feature**: max 2 total languages, max 1 per group.
-- **Grandfathering**: if a saved course already exceeds the current caps (legacy Pro courses created when the limit was 5), the editor raises its limits to the existing language counts — nothing is force-removed; adding more is disabled instead.
+- **Grandfathering**: if a saved course already exceeds the current caps (legacy Pro courses created when the limit was 5), the editor raises its limits to the existing language counts. Nothing is force-removed; adding more is disabled instead.
 - Shows an inline upgrade banner with lock icon when the feature is not available.
 
 ---
 
-## Frontend – Error Handling
+## Frontend – error handling
 
 When a backend mutation throws `USAGE_LIMIT`, the frontend catches it:
 
@@ -731,7 +731,7 @@ The `usageLimitHit` state triggers `PaywallDialog` rendering in `CardApproval.ts
 
 ---
 
-## Adding a New Gated Feature
+## Adding a new gated feature
 
 Follow these steps to gate a new feature behind Autumn:
 
@@ -790,7 +790,7 @@ Add entries in `messages/en.json` and `messages/de.json` for any new user-facing
 
 ---
 
-## Common Pitfalls
+## Common pitfalls
 
 ### `usePaywall` vs `usePricingTable`
 - `usePaywall({ featureId })` only returns product data when the feature is actually at its limit. If you call it for a feature that still has balance, `preview` will be `undefined`. This is why `LowQuotaDialog` uses `usePricingTable()` instead.
@@ -803,7 +803,7 @@ While the Convex query is loading (`quotas === undefined`), the hook returns `is
 If a user's `usageQuotas` doc doesn't exist yet (e.g., first visit before `syncQuotas` completes), `useFeatureQuota` returns `isAvailable: false` and `consumeQuota` throws `QUOTA_NOT_SYNCED`. The app calls `syncQuotas` on load in `app/app/(main)/layout.tsx` to handle this.
 
 ### Boolean vs metered features
-Boolean features (like `multiple_languages`) have `balance: 1` when enabled and `balance: 0` when disabled. They are **not** decremented via `consumeQuota`. They are read-only on the frontend via `useFeatureQuota(...).isAvailable`. Don't call `consumeQuota` for boolean features — it would decrement the balance to 0 and effectively disable the feature.
+Boolean features (like `multiple_languages`) have `balance: 1` when enabled and `balance: 0` when disabled. They are **not** decremented via `consumeQuota`. They are read-only on the frontend via `useFeatureQuota(...).isAvailable`. Don't call `consumeQuota` for boolean features. It would decrement the balance to 0 and effectively disable the feature.
 
 ### The `identify` function
 Autumn identifies users by `user.subject` from the Convex auth identity. This must match the customer ID used in Autumn's dashboard. If auth changes, the mapping may break.
@@ -813,7 +813,7 @@ After a user completes checkout via `CheckoutDialog`, Autumn updates their entit
 
 ---
 
-## File Reference
+## File reference
 
 | File | Role |
 |---|---|

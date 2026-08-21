@@ -4,7 +4,7 @@ import path from "node:path";
 import { neutralizeTours } from "./helpers";
 
 /**
- * Settings smoke — verifies the SettingsView mounts and exposes at least
+ * Settings smoke. Verifies the SettingsView mounts and exposes at least
  * one section. As a bonus we attempt a locale toggle (EN ↔ DE) and look
  * for a translated string change. Also covers the change-password dialog
  * using the shared fixture user's saved credentials (the password is
@@ -58,7 +58,7 @@ test.describe("settings", () => {
       // The dialog has a 200ms exit animation and Radix keeps the content
       // mounted (plus `pointer-events: none` on <body>) for its duration.
       // Flipping `open` back to true inside that window leaves Presence
-      // stuck — the click lands, but the content never re-mounts. Wait for
+      // stuck. The click lands, but the content never re-mounts. Wait for
       // the previous instance to be fully gone before re-opening.
       await expect(currentField()).toBeHidden({ timeout: 10_000 });
       await page.getByTestId("settings-change-password").click();
@@ -81,8 +81,8 @@ test.describe("settings", () => {
     });
 
     // The consent banner is fixed to the bottom edge and intercepts clicks
-    // on the dialog's footer buttons when it mounts (PostHog boots async —
-    // bounded wait, same pattern as auth.setup.ts). Accepting here also
+    // on the dialog's footer buttons when it mounts (PostHog boots async.
+    // Bounded wait, same pattern as auth.setup.ts). Accepting here also
     // persists the decision into the storageState saved below.
     const acceptCookies = page.getByTestId("consent-accept").first();
     await acceptCookies
@@ -108,7 +108,7 @@ test.describe("settings", () => {
     await changePassword(tempPassword, password);
 
     // CRITICAL: changePassword with revokeOtherSessions rotates the
-    // session cookie — the stored fixture still holds the old, now-revoked
+    // session cookie. The stored fixture still holds the old, now-revoked
     // token, which would silently log out every later spec. Persist the
     // fresh session over it. This file runs in the settings-serial project
     // (after chromium-serial) so the revoke cannot race concurrent live specs.

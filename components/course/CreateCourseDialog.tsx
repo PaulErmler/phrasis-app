@@ -46,7 +46,7 @@ export function CreateCourseDialog({
   const [customGoal, setCustomGoal] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Course created by a partially-failed submit, stamped with the answers it
-  // was created FROM. A retry reuses it instead of creating a duplicate — but
+  // was created FROM. A retry reuses it instead of creating a duplicate, but
   // only while those answers still hold: without the signature, going Back
   // and switching the language would silently re-activate the original course
   // and never create the one the user just asked for.
@@ -72,7 +72,7 @@ export function CreateCourseDialog({
     parsedCustomGoal <= DAILY_TIME_CUSTOM_MAX;
   const effectiveGoal = customGoalValid ? parsedCustomGoal : dailyGoal;
 
-  /** The answers `createCourse` is called with — see `createdCourseRef`. */
+  /** The answers `createCourse` is called with. See `createdCourseRef`. */
   const courseSignature = () =>
     JSON.stringify([targetLanguage, baseLanguage, difficulty]);
 
@@ -131,7 +131,7 @@ export function CreateCourseDialog({
     setIsSubmitting(true);
     try {
       // A previous attempt may have created (and activated) the course and
-      // only failed on the goal write below — a retry must reuse it, not
+      // only failed on the goal write below. A retry must reuse it, not
       // create a duplicate (or, on the single-course free tier, dead-end on
       // USAGE_LIMIT inside a dialog whose course already exists behind it).
       // Reuse only when the course still matches what the form now says; the
@@ -146,7 +146,7 @@ export function CreateCourseDialog({
       if (courseId === null) {
         if (remembered) {
           // The half-created course from the previous attempt no longer
-          // matches the form — archive it to release its course slot, or
+          // matches the form. Archive it to release its course slot, or
           // the retry dead-ends on USAGE_LIMIT on the single-course free
           // tier. Best-effort: on failure createCourse below surfaces the
           // quota error exactly as before.
@@ -171,7 +171,7 @@ export function CreateCourseDialog({
       // ring). Idempotent, so re-running it on a retry is harmless.
       await setActiveCourse({ courseId });
 
-      // Persist the daily goal (createCourse doesn't take it — the goal is
+      // Persist the daily goal (createCourse doesn't take it, the goal is
       // a courseSettings field, patchable via updateCourseSettings).
       await updateCourseSettings({
         courseId,

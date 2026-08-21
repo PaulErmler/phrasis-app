@@ -60,7 +60,7 @@ function LandingChatScrollBinder({
     if (!root) return;
     const el = root.querySelector('[role="log"]');
     if (!el || !(el instanceof HTMLElement)) return;
-    // Follow the stream only while the viewer is near the bottom — once they
+    // Follow the stream only while the viewer is near the bottom. Once they
     // scroll up to re-read, stop yanking the log down (like a real chat). The
     // threshold must absorb the height jump of a card revealing all at once,
     // or the follow silently stops mid-conversation.
@@ -93,7 +93,7 @@ function usePrefersReducedMotion() {
   return reduced;
 }
 
-/** Base lines muted, target lines bold — same hierarchy as the in-app CardApproval. */
+/** Base lines muted, target lines bold, same hierarchy as the in-app CardApproval. */
 function lineTextClass(code: string) {
   if (code === 'es' || code === 'fr') return 'text-base font-semibold';
   return 'text-sm text-muted-foreground';
@@ -181,7 +181,7 @@ function CourseProposalCard({
 }
 
 /**
- * The card "currently being reviewed" — shown in the section's text column so
+ * The card "currently being reviewed". Shown in the section's text column so
  * visitors see the context the tutor already knows about. Same card as the
  * review-modes demo, so the whole landing page tells one story.
  */
@@ -392,7 +392,7 @@ export function ChatFlashcardDemo() {
   useEffect(() => {
     if (prevMulti.current !== multiCourse) {
       // The toggle swaps the conversation content, so finished runs no
-      // longer apply — replay everything from scratch.
+      // longer apply. Replay everything from scratch.
       completedRef.current.clear();
       clearTimers();
       setRunKey((k) => k + 1);

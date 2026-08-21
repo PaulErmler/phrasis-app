@@ -18,50 +18,62 @@
     "themeSystem": "System"
   },
   "hero": {
-    "tagline": "Wortschatzaufbau <highlight>leicht gemacht</highlight>.",
-    "subtitle": "Flexling ist eine audio-basierte Flashcard-App mit einer großen Datenbank an Sätzen. Lade deine eigenen hoch oder lass die KI neue Flashcards für dich erstellen — konzentriere dich aufs Lernen statt auf die Vorbereitung.",
+    "tagline": "Lerne eine Sprache so, wie du deine <highlight>erste</highlight> gelernt hast.",
+    "subtitle": "Deine erste Sprache hast du nicht aus Vokabellisten gelernt. Nimm Wörter in Sätzen auf, die dir wirklich etwas bedeuten.",
     "cta": {
       "start": "Kostenlos starten",
       "howItWorks": "So funktioniert's",
       "goToApp": "Zur App",
-      "install": "App installieren"
+      "install": "App installieren",
+      "friction": "Kostenlos starten · Keine Kreditkarte nötig"
     }
   },
   "philosophy": {
-    "title": "Aufgebaut auf dem, was",
-    "titleHighlight": "wirklich funktioniert.",
-    "lead": "Aktives Erinnern, Shadowing und Spaced Repetition sorgen nachweislich dafür, dass Sprachen haften — Flexling ist ganz auf diese Prinzipien ausgelegt.",
+    "title": "Aufgebaut um",
+    "titleHighlight": "dich.",
+    "lead": "Der Inhalt, die Übung und der lange Atem — abgestimmt darauf, wie du wirklich lebst und lernst.",
     "cards": {
-      "activeRecall": {
-        "title": "Aktives Erinnern",
-        "body": "Übersetze echte Sätze aus deiner Sprache, überprüfe dich selbst und wiederhole, bis es sitzt. Spaced Repetition — derselbe Algorithmus wie bei Anki — bringt jeden Satz genau dann zurück, bevor du ihn vergisst."
+      "practice": {
+        "title": "Übung für jeden Moment",
+        "body": "Sprich beim Spazieren, schreib am Schreibtisch, oder lass Sätze laufen, während du kochst. Dieselben Karten, ein Modus für jede Situation."
       },
-      "grammar": {
-        "title": "Grammatik ohne Pauken",
-        "body": "Vergiss Regeln und Arbeitsblätter. Indem du echte Sätze sprichst und schreibst, nimmst du Grammatik so auf, wie du deine Muttersprache gelernt hast — durch Anwenden."
+      "content": {
+        "title": "Inhalt, der wirklich deiner ist",
+        "body": "Praktische Sätze, die du wirklich sagst — kein Lehrbuch-Curriculum. Bring eigene mit, frag die KI, oder starte mit einer großen Bibliothek."
       },
-      "daily": {
-        "title": "Nur 15 Minuten am Tag",
-        "body": "Beständiges tägliches Üben schlägt Marathon-Sessions. Flexling plant genau das, was du heute wiederholen musst — ganz ohne eigene Planung."
-      },
-      "practical": {
-        "title": "Praktisch statt theoretisch",
-        "body": "Lerne die Sätze, die du wirklich sagen wirst. Jede Karte ist für echte Kommunikation gemacht."
-      },
-      "customisation": {
-        "title": "Mach es zu deinem",
-        "body": "Bring eigene Sätze mit, importiere eine Tabelle oder lass die KI sie erstellen. Inhalt, der für dich relevant ist, bleibt besser im Gedächtnis."
-      },
-      "feedback": {
-        "title": "Sofortiges Feedback",
-        "body": "Erhalte bei jedem Satz sofortiges Feedback zu Rechtschreibung und Erinnerung — plus einen KI-Tutor, der jede Frage beantwortet und daraus eine Lernkarte macht."
+      "path": {
+        "title": "Ein Weg, den du siehst",
+        "body": "Statistiken, ein Wiederholungsplan und eine Prognose, wohin du unterwegs bist. Motivation, die Jahre hält, nicht nur Wochen."
       }
     }
   },
+  "howWeAchieve": {
+    "title": "Wie erreichen",
+    "titleHighlight": "wir das?",
+    "lead": "Drei Teile, die zusammenwirken."
+  },
   "reviewModes": {
-    "title": "Drei Wege, Flexling",
-    "titleHighlight": "zu nutzen.",
-    "subtitle": "Dieselben Sätze, drei Arten zu üben. Sprich sie laut nach, schreib sie aus dem Gedächtnis oder lass sie im Hintergrund laufen — wechsle jederzeit.",
+    "title": "Übung, die",
+    "titleHighlight": "zum Moment passt.",
+    "subtitle": "Willst du sprechen? Shadowing. Willst du schreiben? Tippen. Willst du Input beim Kochen? Radio an. In den Einstellungen passt du jeden Modus daran an, wie du lernst.",
+    "jobs": {
+      "speak": {
+        "title": "Sprechen und Hören üben",
+        "mode": "Shadowing",
+        "body": "Hör zu, übersetze im Kopf, sprich laut nach. Freihändig auf einem Spaziergang oder mit Bildschirm vor dir."
+      },
+      "write": {
+        "title": "Schreiben üben",
+        "mode": "Schreiben",
+        "body": "Tippe den Satz und bekomme sofortiges Feedback, Zeichen für Zeichen. Übersetze aus deiner Sprache oder schreib auf, was du hörst."
+      },
+      "radio": {
+        "title": "Passiver verständlicher Input",
+        "mode": "Radio",
+        "body": "Lass Sätze und Übersetzungen im Hintergrund laufen. Die Sprache kommt dir ins Ohr, ohne deinen Wiederholungsplan zu berühren."
+      }
+    },
+    "settingsNote": "Jeder Modus ist einstellbar — was du zuerst hörst, wie viel Hilfe du bekommst, wie lange du übst. Flexling passt sich dir an, nicht umgekehrt.",
     "audioTitle": "Shadowing",
     "audioBody": "Das Herzstück von Flexling. Hör einen Satz, übersetze ihn im Kopf und sprich ihn dann laut nach, um deine Aussprache zu üben — sprich vom ersten Tag an, freihändig oder mit den Händen. Jede Zielzeile startet unscharf und wird nach und nach scharf, genau wie nach dem Abspielen in der App.",
     "fullTitle": "Schreiben",
@@ -76,12 +88,6 @@
     "radioBody": "Lass Sätze und ihre Übersetzungen den ganzen Tag laufen — passives Hören, das dir die Sprache ins Ohr bringt, ohne deinen Spaced-Repetition-Plan zu beeinflussen.",
     "freeStudyTitle": "Freies Üben",
     "freeStudyBody": "Soll eine Session deinen Spaced-Repetition-Plan nicht beeinflussen? Freies Üben mischt endlos durch alle deine Sätze, sodass du in deinem Tempo tippen kannst — nichts wird eingeplant, nichts zählt auf deine Wiederholungen.",
-    "missingTitle": "Fehlt dir eine Funktion?",
-    "missingBody": "Sag uns Bescheid und wir versuchen unser Bestes, Flexling an deine Bedürfnisse anzupassen. Schließlich geht es genau darum: sich anzupassen und flexibel zu sein.",
-    "missingCta": "Lernart vorschlagen",
-    "emailSubjects": {
-      "requestMode": "Vorschlag für Lernmodus"
-    },
     "multiLabel": "Mehrere Sprachen",
     "replay": "Demo erneut abspielen",
     "mock": {
@@ -95,9 +101,23 @@
     }
   },
   "chatDemo": {
-    "title": "Stell jede Frage.",
-    "titleHighlight": "Behalte die Antwort.",
-    "subtitle": "Du verstehst ein Wort nicht? Nicht ganz sicher, warum der Satz so formuliert ist? Frag einfach und erhalte sofortige Antworten von hochmodernen Sprachmodellen. Wir erstellen automatisch Lernkarten, damit du dir genau die Konzepte merkst, mit denen du gerade kämpfst.",
+    "title": "Karten hinzufügen, die",
+    "titleHighlight": "wirklich deine sind.",
+    "subtitle": "Die Sätze, die dir etwas bedeuten, bleiben hängen. Drei Wege, sie reinzuholen:",
+    "paths": {
+      "type": {
+        "title": "Tippe sie",
+        "body": "Füg einen Satz hinzu, sobald du einen behalten willst."
+      },
+      "import": {
+        "title": "Importiere eine Tabelle",
+        "body": "CSV, TSV oder Excel/Sheets-Datei — Audio wird automatisch erzeugt."
+      },
+      "ask": {
+        "title": "Frag den Tutor",
+        "body": "Beschreib eine Situation — oder ein Wort, bei dem du hängst — und er erstellt die Karten, mit denen du genau die Wörter übst, die dir am schwersten fallen."
+      }
+    },
     "contextTitle": "Du wiederholst gerade diese Karte:",
     "contextNote": "Der Tutor sieht automatisch die Karte, die du gerade lernst — frag nach „diesem Satz“ und er weiß genau, was du meinst.",
     "scenarioGrammar": "Grammatik",
@@ -326,16 +346,16 @@
   },
   "analytics": {
     "label": "Fortschritt verfolgen",
-    "title": "Sieh, wie deine Fähigkeiten",
-    "titleHighlight": "mit der Zeit wachsen.",
-    "lead": "Sieh genau, wie sich dein Wortschatz Woche für Woche erweitert. Detaillierte Statistiken zeigen deine Serie, gelernte Wörter pro Sprache und Lerngewohnheiten — damit du immer weißt, wie weit du gekommen bist.",
+    "title": "Bleib motiviert",
+    "titleHighlight": "auf lange Sicht.",
+    "lead": "Eine Serie zählt Tage. Zu sehen, wie dein Wortschatz Gestalt annimmt, holt dich über Jahre zurück.",
     "progressTitle": "Wissen, was du kannst",
     "progressBody": "Verfolge genau, welche Wörter du bereits kennst und wie viel Fortschritt du über Tage, Wochen und Monate gemacht hast — aufgeschlüsselt nach Sprache, wenn du mehr als eine lernst.",
     "activityTitle": "Baue Konstanz auf",
     "activityBody": "Sieh deine Lerngewohnheit auf einen Blick. Jeder Tag, an dem du übst, erscheint im Kalender — beobachte, wie deine Serie wächst und bleibe motiviert.",
     "wordCloudHint": "Klicke auf ein Wort, um die Sätze zu sehen, mit denen du es gelernt hast",
-    "insightsTitle": "Sitzungsübersicht",
-    "insightsBody": "Nach jeder Wiederholung siehst du genau, was du geschafft hast: Dein Tagesziel-Ring füllt sich beim Lernen, Badges zeigen, was auf dich wartet, und eine Prognose zeigt, wohin dich dein Tempo bringt.",
+    "insightsTitle": "Wisse, wohin du gehst",
+    "insightsBody": "Nach jeder Wiederholung siehst du genau, was du geschafft hast und wohin du unterwegs bist. Wie viele Wörter wirst du bis Jahresende gelernt haben?",
     "projectionLabel": "Deine Prognose",
     "projectionFacts": {
       "wordsByYearEnd": "~2.400 Wörter bis Ende 2026",
@@ -381,8 +401,8 @@
         "description": "Behalte bis zu 10x mehr mit wissenschaftlich bewährten Algorithmen, die dir Karten genau dann zeigen, wenn du sie brauchst."
       },
       "languageIntelligence": {
-        "title": "Verständlicher Input",
-        "description": "Jeder Satz ist in einer Sprache verankert, die du bereits kennst. Du arbeitest dich zur Übersetzung vor – herausfordernd, aber nie frustrierend."
+        "title": "Grammatik ohne Pauken",
+        "description": "Vergiss Regeln und Arbeitsblätter. Indem du echte Sätze sprichst und schreibst, nimmst du Grammatik so auf, wie du deine Muttersprache gelernt hast — durch Anwenden."
       }
     }
   },

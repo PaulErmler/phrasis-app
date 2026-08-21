@@ -311,7 +311,7 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown> & {
   /**
    * Base text direction for the rendered markdown. Default 'auto':
    * free-form model output has no language code, so the direction comes
-   * from the DOMINANT script of the text (`dominantTextDirection`) —
+   * from the DOMINANT script of the text (`dominantTextDirection`).
    * fully-RTL replies (Arabic, Hebrew, Persian) render right-to-left,
    * while an English explanation that merely OPENS with a target-language
    * token stays LTR (the HTML dir="auto" first-strong heuristic would

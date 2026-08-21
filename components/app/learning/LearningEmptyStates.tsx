@@ -55,7 +55,7 @@ interface NoCardsDueStateProps {
    *   • activeFilter             : which filter direction is active.
    *   • currentSourceHasAnyCards : does the user have ANY card in the source
    *                                they're filtering to? (false ⇒ "must add"
-   *                                — flipping the filter alone won't help
+   *                                Flipping the filter alone won't help
    *                                long-term; the user needs to add cards.)
    *   • filterUnblockAvailable   : does the other source have a DUE card
    *                                right now? (true ⇒ surface the one-tap
@@ -78,6 +78,13 @@ interface NoCardsDueStateProps {
    * doesn't see a misleading paywall.
    */
   customCardsPendingAdd?: boolean;
+  /**
+   * True while the enable-time writing-track seed is still running (reason
+   * 'preparing_writing'): the queue only looks empty because cards aren't
+   * seeded yet, so render a transient preparing state instead of "all caught
+   * up" / add-cards CTAs.
+   */
+  isPreparingWriting?: boolean;
   /** Called when the user opts to include the other source (set filter to 'both'). */
   onIncludeOtherSource?: () => void;
   /**
@@ -102,6 +109,7 @@ export function NoCardsDueState({
   currentSourceHasAnyCards,
   filterUnblockAvailable,
   customCardsPendingAdd,
+  isPreparingWriting,
   onIncludeOtherSource,
   onCreateChatCards,
   onCreateCustomCards,
@@ -109,12 +117,28 @@ export function NoCardsDueState({
   const t = useTranslations('LearningMode');
   const tFeature = useTranslations('FeatureTracking');
 
+  if (isPreparingWriting) {
+    return (
+      <main className="flex-1 flex flex-col items-center justify-center gap-4 px-4">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="space-y-2 text-center">
+          <h2 className="body-large font-medium">
+            {t('empty.preparingWriting.title')}
+          </h2>
+          <p className="text-muted-sm">
+            {t('empty.preparingWriting.subtitle')}
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   // The upgrade button suppresses the auto-add CTA when sentences quota
-  // hits zero — but only when the user actually needs the quota. Phase 1
+  // hits zero, but only when the user actually needs the quota. Phase 1
   // of `addCardsFromCollection` (custom/chat) consumes nothing, so when
   // `customCardsPendingAdd` is true we let Add Cards render normally.
   // Likewise, when the filter is 'custom', Phase 2 (premade, the only
-  // quota-gated source) never runs — the SENTENCES paywall is irrelevant.
+  // quota-gated source) never runs. The SENTENCES paywall is irrelevant.
   const sentencesQuotaApplies =
     !customCardsPendingAdd && activeFilter !== 'custom';
   const isLimitReached = sentencesRemaining === 0 && sentencesQuotaApplies;
@@ -132,7 +156,7 @@ export function NoCardsDueState({
   //                     (just not due now); must-add when they don't.
   //   • include-other : the "turn off the filter" CTA. Always shown when a
   //                     filter is active so the user has a one-tap escape
-  //                     hatch back to the full deck — regardless of whether
+  //                     hatch back to the full deck: regardless of whether
   //                     the other source currently has a due card. (If the
   //                     deck is truly empty, the backend returns 'no_cards'
   //                     instead, so we never render this branch with zero
@@ -192,7 +216,7 @@ export function NoCardsDueState({
           </Button>
         ) : isFilterBlocked && activeFilter === 'custom' ? (
           // When filtered to custom, the regular auto-add pipeline doesn't
-          // help — custom cards come from the chat or the manual entry
+          // help. Custom cards come from the chat or the manual entry
           // page. Surface those two routes side-by-side, and stack the
           // "turn off the filter" CTA above them at the combined width.
           <div className="flex flex-col items-stretch gap-2">

@@ -38,7 +38,7 @@ export default async function AppLayout({
         <PostHogIdentify />
         <ConsentSync />
         {/* Wraps rather than sits beside the guard so useReloadBlock is
-            reachable from every view — notably LearnView, whose detached
+            reachable from every view, notably LearnView, whose detached
             audio element cannot be detected from outside the hook tree. */}
         <AppUpdateGate>
           {/* Sibling of OnboardingGuard, not a child: the guard renders null

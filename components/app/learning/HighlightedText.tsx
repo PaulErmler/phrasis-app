@@ -13,7 +13,7 @@ import { useKaraokeIndex, type ClockBinding } from '@/hooks/use-karaoke-index';
 import type { WordTiming } from './types';
 
 interface Props {
-  /** Canonical source text — this is what the user always sees. */
+  /** Canonical source text. This is what the user always sees. */
   text: string;
   /** BCP-47 language code of `text`. Drives locale-aware word segmentation. */
   language: string;
@@ -24,12 +24,12 @@ interface Props {
   /**
    * Merged-playback word-position source. When set (and active), the word
    * index ticks from a clock subscription inside this leaf instead of the
-   * `localTime` prop — no parent re-renders per frame.
+   * `localTime` prop, no parent re-renders per frame.
    */
   clockBinding?: ClockBinding;
   /** True when the merged audio is currently playing THIS clip. */
   isActive: boolean;
-  /** User setting — when false, always render plain text. */
+  /** User setting, when false, always render plain text. */
   enabled: boolean;
   className?: string;
   /**
@@ -45,14 +45,14 @@ interface Props {
 /**
  * If fewer than this fraction of real-text tokens matched Scribe's output the
  * alignment is unreliable (likely a non-whitespace-delimited script or a
- * mis-transcribed clip). Fall back to showing plain text — we'd rather show
+ * mis-transcribed clip). Fall back to showing plain text. We'd rather show
  * no highlight than a desynced one.
  */
 const MIN_MATCH_RATIO = 0.5;
 
 /**
  * Karaoke-style text: the current word is primary-coloured, every other word
- * renders as plain default text — same as before play and after the audio
+ * renders as plain default text, same as before play and after the audio
  * ends, so the rendered output is identical in those two states. Always
  * renders the canonical text from the database; Scribe's timings are aligned
  * onto those tokens but never shown directly, so transcription drift can't
@@ -91,7 +91,7 @@ export function HighlightedText({
 
   // Indices of aligned tokens that match the search term (case-insensitive,
   // punctuation-tolerant via the same normalise() the alignment uses). When
-  // karaoke is rendering, these tokens get the accent-orange colour — except
+  // karaoke is rendering, these tokens get the accent-orange colour, except
   // the currently-spoken one, which stays blue so playback position remains
   // visually unambiguous.
   const highlightedIndices = useMemo(() => {
@@ -106,7 +106,7 @@ export function HighlightedText({
   }, [aligned, highlightTerm]);
 
   // Memoized on currentIndex (not localTime), so 60 Hz ticks that fall inside
-  // the same word reuse the cached children — React skips reconciliation of
+  // the same word reuse the cached children. React skips reconciliation of
   // every span every frame, which is the main mobile flicker source. When
   // currentIndex does change, only the previously-current and newly-current
   // spans get a different className; the rest diff to a no-op.
@@ -116,7 +116,7 @@ export function HighlightedText({
       const isHighlighted = highlightedIndices?.has(i) ?? false;
       return (
         // Fragment (not wrapper span) so the rendered span count stays at one
-        // per word — tests query `container.querySelectorAll('span')` and
+        // per word. Tests query `container.querySelectorAll('span')` and
         // index by word position. Trailing is "" on every token except the
         // last, so this is effectively a single text node after the final
         // word's colored span.
@@ -157,7 +157,7 @@ export function HighlightedText({
 
   // Single render path for active + idle when highlighting is possible. Idle
   // still renders per-word spans (currentIndex is -1 so no blue is applied),
-  // which keeps the DOM structure identical across an isActive flip — that's
+  // which keeps the DOM structure identical across an isActive flip. That's
   // what prevents the search-word orange from disappearing at play start.
   return <p dir={dir} className={dirClassName}>{wordSpans}</p>;
 }

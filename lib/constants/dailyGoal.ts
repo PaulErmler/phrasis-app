@@ -1,7 +1,7 @@
 /**
  * Daily study-time goal bounds and preset tiles. Shared between the
- * onboarding wizard, the in-app goal editors (settings row, homescreen
- * quick-edit), and the Convex-side clamp in `updateCourseSettings` —
+ * onboarding wizard, the homescreen quick-edit, and the Convex-side clamp
+ * in `updateCourseSettings`.
  * Convex code cannot import from `app/`, so these live in `lib/`.
  */
 export const DAILY_TIME_PRESETS = [5, 10, 20, 30, 60] as const;
@@ -26,7 +26,7 @@ export function parseCustomGoal(value: string): number | null {
  * Clamp a stored goal into the valid window, or `undefined` when there is
  * nothing storable. NaN/±Infinity survive Math.max/min/round and Convex
  * persists them as float64, where a poisoned goal breaks the homescreen ring
- * and every projection until repaired by hand — so non-finite values are
+ * and every projection until repaired by hand, so non-finite values are
  * dropped rather than clamped.
  *
  * Single source of the server-side clamp, shared by every path that writes

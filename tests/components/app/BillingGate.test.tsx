@@ -8,12 +8,12 @@ import { BillingGate } from '@/components/app/BillingGate';
  * eagerly turns every render / tab switch into an Autumn round-trip plus a
  * syncAllFeatures write on the usageQuotas OCC hotspot, while not syncing
  * means a long-idle session never notices a failed payment (usage keeps
- * flowing for free) — and a user who already FIXED their card stays trapped
+ * flowing for free), and a user who already FIXED their card stays trapped
  * behind the hard-block overdue dialog.
  *
  * The real PaymentOverdueDialog is deliberately left in place (not mocked):
  * it reads the same mocked useQuery / usePathname, and with pastDue false it
- * must render nothing — which doubles as coverage that healthy users mounting
+ * must render nothing, which doubles as coverage that healthy users mounting
  * the gate app-wide never see the block.
  */
 
@@ -27,7 +27,7 @@ vi.mock('convex/react', () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
 }));
 
-// Only needed so the real overdue dialog can mount in the past-due cases —
+// Only needed so the real overdue dialog can mount in the past-due cases.
 // useCustomer() would otherwise demand an AutumnProvider.
 vi.mock('autumn-js/react', () => ({
   useCustomer: () => ({
@@ -135,14 +135,14 @@ describe('BillingGate', () => {
     await flushSync();
     expect(syncQuotasMock).toHaveBeenCalledTimes(1);
 
-    // Backgrounding fires visibilitychange too — syncing on hide would double
+    // Backgrounding fires visibilitychange too. Syncing on hide would double
     // every refresh for zero benefit (nobody is looking at the tab).
     fireVisibility('hidden');
     await flushSync();
     expect(syncQuotasMock).toHaveBeenCalledTimes(1);
 
     // Stale + visible is the one signal a long-idle session has to notice a
-    // payment failure — or, after the card was fixed in Stripe, the recovery
+    // payment failure, or, after the card was fixed in Stripe, the recovery
     // that lifts the hard block.
     fireVisibility('visible');
     await flushSync();
@@ -163,7 +163,7 @@ describe('BillingGate', () => {
 
     // The mount sync is still awaiting Autumn; letting a second one start now
     // would race two syncAllFeatures writers on the same usageQuotas row, and
-    // whichever snapshot lands last wins — possibly the older one.
+    // whichever snapshot lands last wins. Possibly the older one.
     fireVisibility('visible');
     await flushSync();
     expect(syncQuotasMock).toHaveBeenCalledTimes(1);
@@ -180,7 +180,7 @@ describe('BillingGate', () => {
   });
 
   it('ignores the staleness window on refocus while the block is up', async () => {
-    // The mirror is FRESH, so the healthy-path guard would skip this sync —
+    // The mirror is FRESH, so the healthy-path guard would skip this sync,
     // but a blocked user has no dismiss button, and the thing they were just
     // sent off to do (pay the hosted invoice) is settled elsewhere. Making
     // them wait out a 10-minute window before the app notices leaves them
@@ -200,7 +200,7 @@ describe('BillingGate', () => {
     // Paying navigates this tab to the Stripe invoice page; Back restores it
     // from bfcache with no remount, so nothing else re-syncs. Stripe settles
     // the invoice synchronously but Autumn only follows once the webhook
-    // lands, so the first sync back usually still reads past due — one shot
+    // lands, so the first sync back usually still reads past due. One shot
     // would leave the block up on the happy path.
     useQueryMock.mockReturnValue(pastDueQuotas(NOW));
     render(<BillingGate />);
@@ -211,7 +211,7 @@ describe('BillingGate', () => {
     await flushSync();
     expect(syncQuotasMock).toHaveBeenCalledTimes(2);
 
-    // Still past due after the first retry — keep going, but only for the
+    // Still past due after the first retry. Keep going, but only for the
     // bounded number of attempts (no open-ended polling of Autumn).
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5_000);
@@ -283,7 +283,7 @@ describe('BillingGate', () => {
         expect.any(Error),
       );
 
-      // finally{} must release the in-flight latch even on error — otherwise
+      // finally{} must release the in-flight latch even on error, otherwise
       // one bad response disables billing refresh until a full reload, and an
       // overdue user is never blocked (or an unblocked user never released).
       fireVisibility('visible');

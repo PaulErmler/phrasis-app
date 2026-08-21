@@ -72,7 +72,7 @@ describe('normalize', () => {
     });
 
     it('does not strip currency or math symbols', () => {
-      // \p{S}, not \p{P} — meaningful content, so it stays.
+      // \p{S}, not \p{P}. Meaningful content, so it stays.
       expect(normalize('$5 + 3 = 8', { ignorePunctuation: true })).toBe(
         '$5 + 3 = 8',
       );

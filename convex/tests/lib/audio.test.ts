@@ -17,7 +17,7 @@ const modules = import.meta.glob("../../**/*.ts");
  * the asset while another row still points at it would corrupt that text's
  * audio.
  */
-describe("deleteAudioRow — reference-aware asset cleanup", () => {
+describe("deleteAudioRow: reference-aware asset cleanup", () => {
   async function seedTwoRowsSharingOneAsset(t: TestConvex<typeof schema>) {
     return t.run(async (ctx) => {
       const collectionId = await ctx.db.insert("collections", {
@@ -58,7 +58,7 @@ describe("deleteAudioRow — reference-aware asset cleanup", () => {
     const { storageId, assetId, rowA, rowB } =
       await seedTwoRowsSharingOneAsset(t);
 
-    // Delete the first row — asset + blob must survive (rowB still points).
+    // Delete the first row. Asset + blob must survive (rowB still points).
     await t.run(async (ctx) => {
       await deleteAudioRow(ctx, (await ctx.db.get(rowA))!);
     });
@@ -69,7 +69,7 @@ describe("deleteAudioRow — reference-aware asset cleanup", () => {
       expect(await ctx.storage.getUrl(storageId)).not.toBeNull();
     });
 
-    // Delete the last row — asset and blob are now unreferenced and go.
+    // Delete the last row. Asset and blob are now unreferenced and go.
     await t.run(async (ctx) => {
       await deleteAudioRow(ctx, (await ctx.db.get(rowB))!);
     });
@@ -119,10 +119,10 @@ describe("deleteAudioRow — reference-aware asset cleanup", () => {
 /**
  * `deleteStorageBlobIfUnreferenced` drops a blob by storageId only when no
  * `audioAssets` row still references it. Used after an asset was patched to
- * a NEW blob (and by the delayed swap-delete job) — the OLD blob must not be
+ * a NEW blob (and by the delayed swap-delete job), the OLD blob must not be
  * dropped while another asset still owns it.
  */
-describe("deleteStorageBlobIfUnreferenced — reference-aware blob cleanup", () => {
+describe("deleteStorageBlobIfUnreferenced: reference-aware blob cleanup", () => {
   it("keeps a blob still referenced by an asset; drops it once unreferenced", async () => {
     const t = convexTest(schema, modules);
     const { assetId, blobX, blobY } = await t.run(async (ctx) => {
@@ -159,7 +159,7 @@ describe("deleteStorageBlobIfUnreferenced — reference-aware blob cleanup", () 
       expect(await ctx.storage.getUrl(blobX)).not.toBeNull();
     });
 
-    // Swap the asset to Y (the in-place replace shape) — X is unreferenced
+    // Swap the asset to Y (the in-place replace shape), X is unreferenced
     // and must now be removed.
     await t.run(async (ctx) => {
       await ctx.db.patch(assetId, { storageId: blobY });

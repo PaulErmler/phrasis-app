@@ -6,8 +6,8 @@ import { createPlaybackClock } from '@/lib/audio/playbackClock';
 
 /**
  * `useActiveCue` decides which line shows the karaoke word highlight. A silent
- * cue is a reveal-only placeholder for a language whose repetitions are 0 —
- * there is no clip behind it, so it must never become the active cue.
+ * cue is a reveal-only placeholder for a language whose repetitions are 0.
+ * There is no clip behind it, so it must never become the active cue.
  */
 function render(languageCues: LanguageCue[]) {
   const clock = createPlaybackClock();

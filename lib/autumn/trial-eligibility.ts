@@ -8,7 +8,7 @@ import {
 
 /**
  * One consumed-trial record from `expand: ["trials_used"]`. Includes
- * trials that are still running. Only the count is ever used — the legacy
+ * trials that are still running. Only the count is ever used. The legacy
  * (v1.2) API names the plan field `product_id` and newer versions call it
  * `plan_id`, and we deliberately depend on neither.
  */
@@ -18,7 +18,7 @@ export type TrialUsedLite = {
 };
 
 export type TrialState = {
-  /** Has consumed a trial at some point — including one running now. */
+  /** Has consumed a trial at some point, including one running now. */
   everTrialed: boolean;
   /** Is currently trialing a paid plan. */
   onTrial: boolean;
@@ -49,10 +49,10 @@ export function findCurrentPaidProduct(
  * pro_annual and collect a fresh 7-day trial each time. The policy here:
  *
  * - A trial can only ever start for a user who has never had one on any
- *   plan (`trials_used` is the durable record — it survives cancellations,
+ *   plan (`trials_used` is the durable record: it survives cancellations,
  *   unlike `customer.products`, which only lists current products).
  * - A currently-trialing user switching plans keeps their running trial
- *   (see `switchPlanDuringTrial` in convex/billing.ts) — they are neither
+ *   (see `switchPlanDuringTrial` in convex/billing.ts): they are neither
  *   offered a fresh trial nor billed early.
  * - Everyone else attaches with `freeTrial: false` (see
  *   `checkoutTrialParams`).
@@ -62,8 +62,8 @@ export function getTrialState(
 ): TrialState {
   // Only plans held RIGHT NOW: an `expired` entry (a lapsed trial or a
   // fully executed cancel can leave one in the payload) must not read as a
-  // paid plan — that misrouted lapsed customers off the first-purchase
-  // path — and a trial cancelled early leaves an expired entry whose
+  // paid plan. That misrouted lapsed customers off the first-purchase
+  // path, and a trial cancelled early leaves an expired entry whose
   // trial_ends_at is still in the future, which must not read as onTrial.
   // A `scheduled` entry is a pending change, not a held plan.
   const plans = currentPlans(normalizePlans(customer));
@@ -74,7 +74,7 @@ export function getTrialState(
   );
   // Add-ons are bolt-on usage products, not subscriptions.
   const hasPaidPlan = plans.some((p) => !p.isDefault && !p.isAddOn);
-  // A running trial also implies "trialed" — fallback for customers
+  // A running trial also implies "trialed". Fallback for customers
   // fetched without the trials_used expand.
   const everTrialed = trialsUsed.length > 0 || trialing !== undefined;
 
@@ -98,7 +98,7 @@ export function getTrialState(
  *   dialog overrides copy and amounts for trialing users.
  * - Everyone else (paying now, or trialed/paid in the past) gets
  *   `freeTrial: false`. On `/checkout` previews this still works (probed
- *   2026-08-09). On the legacy `/attach` it no longer does — Autumn's
+ *   2026-08-09). On the legacy `/attach` it no longer does: Autumn's
  *   v1.2→v2 translation silently loses the boolean and `null` fails its
  *   schema, so the server routes these attaches through v2
  *   `/billing.attach` with `customize.free_trial: null` instead (see

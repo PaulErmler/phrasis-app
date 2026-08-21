@@ -16,7 +16,7 @@ export interface UseLearningAudioOptions {
   /** Fires synchronously right before audio-mode auto-advance proceeds to
    *  the next card. The onboarding wrapper uses this to bump its
    *  `cardsRated` counter (which is what triggers staged coachmarks +
-   *  lesson completion) on auto-advanced cards — without it those cards
+   *  lesson completion) on auto-advanced cards, without it those cards
    *  silently slip past the wizard's threshold and the tutorial stops
    *  firing past the first manual rating. */
   onAutoNext?: () => void;
@@ -36,7 +36,7 @@ export function useLearningAudio(
 
   const isReviewing = state.status === 'reviewing';
   // While the settings sheet is open the user is configuring playback, not
-  // listening — never auto-start audio. This also stops changing the language
+  // listening, never auto-start audio. This also stops changing the language
   // order (a composition change that would otherwise be treated as a fresh
   // "play this now" opportunity) from kicking off playback behind the sheet.
   const settingsOpen = state.settingsOpen;
@@ -50,13 +50,13 @@ export function useLearningAudio(
   const reviewMode = cs?.reviewMode ?? 'audio';
   const isHandsFree = isFreePlay && reviewMode === 'audio';
   // Writing ("full") mode resolves its own playback settings, falling back to
-  // the audio-mode values while a doc is unmigrated — including in free play's
+  // the audio-mode values while a doc is unmigrated, including in free play's
   // writing face, which is a typing session and must not borrow Radio's
   // listening settings.
   const isFullMode = reviewMode !== 'audio';
   const fullReviewTargetAudioMode = cs?.fullReviewTargetAudioMode ?? 'afterSubmit';
-  // Transcribe: writing-mode variant where the target audio is the prompt —
-  // the merged blob contains only the target group and the base stays silent.
+  // Transcribe: writing-mode variant where the target audio is the prompt.
+  // The merged blob contains only the target group and the base stays silent.
   // It carries its own settings copy, chained `*Transcribe ?? *Full ?? audio`.
   const isTranscribe =
     isFullMode && (cs?.writingInputMode ?? 'translate') === 'transcribe';
@@ -96,7 +96,7 @@ export function useLearningAudio(
       isTranscribe ? 'transcribe' : isFullMode ? 'full' : 'audio',
     );
     // The "Practice Listening / Speaking" (target before/after base) toggles
-    // only apply to the merged-audio practice path — audio review mode and
+    // only apply to the merged-audio practice path. Audio review mode and
     // radio. Full (typing) review mode keeps the historical base→target
     // sequence regardless of the stored toggles. Full mode never auto-advances
     // (handleScheduleComplete below no-ops), so also drop the trailing
@@ -156,7 +156,7 @@ export function useLearningAudio(
   }, [state]);
 
   // In full review mode, only include target languages in merged audio
-  // if the setting is 'always' — except transcribe, where the target IS the
+  // if the setting is 'always', except transcribe, where the target IS the
   // prompt (and the base is dropped entirely). Otherwise, individual clips
   // are played per-language inside FullReviewCardContent.
   const includeTargetInMerge =

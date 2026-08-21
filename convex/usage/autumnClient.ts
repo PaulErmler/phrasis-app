@@ -31,13 +31,13 @@ export interface AutumnRawResponse {
 }
 
 /**
- * Low-level Autumn call. Never throws on HTTP errors — callers own the
+ * Low-level Autumn call. Never throws on HTTP errors. Callers own the
  * policy (billing throws, convex/autumn.ts wraps failures in the
  * `{ data, error }` container autumn-js expects, the trial gate treats 404
  * as "customer not created yet").
  */
 export async function autumnFetchRaw(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   body: unknown,
   apiVersion: string,
@@ -62,13 +62,13 @@ export async function autumnFetchRaw(
 }
 
 export async function autumnFetch<T>(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   body: unknown,
   apiVersion: string,
 ): Promise<T>;
 export async function autumnFetch<T>(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   body: unknown,
   apiVersion: string,
@@ -76,11 +76,11 @@ export async function autumnFetch<T>(
 ): Promise<T | null>;
 /**
  * Autumn call that throws on any non-2xx (after logging the body). Pass
- * `{ nullOn404: true }` to get `null` for a 404 instead — the "customer /
+ * `{ nullOn404: true }` to get `null` for a 404 instead. The "customer /
  * resource not created yet" reading.
  */
 export async function autumnFetch<T>(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   body: unknown,
   apiVersion: string,

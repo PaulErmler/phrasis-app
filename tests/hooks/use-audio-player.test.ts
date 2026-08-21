@@ -458,7 +458,7 @@ describe('useAudioPlayer', () => {
       });
 
     it('reveals a silent cue when playback passes it', async () => {
-      // A zero-repetition language has no audio, only a placeholder cue — the
+      // A zero-repetition language has no audio, only a placeholder cue. The
       // reveal must still fire when the timeline reaches it.
       const { result } = renderPlayer();
       await resolveMerge(

@@ -11,7 +11,7 @@ import { AUTUMN_API } from './autumnClient';
 
 /**
  * E2E test hooks for the payment-overdue (dunning) flow. Every function
- * here throws unless the deployment has `E2E_TEST_HOOKS=1` set — enable it
+ * here throws unless the deployment has `E2E_TEST_HOOKS=1` set. Enable it
  * ONLY on dev/test deployments (`pnpm exec convex env set E2E_TEST_HOOKS 1`),
  * never in production.
  *
@@ -21,8 +21,8 @@ import { AUTUMN_API } from './autumnClient';
  * Why an override instead of a real failed payment: a genuine `past_due`
  * only arises from a failed RENEWAL invoice, and Stripe test clocks can't
  * be attached to customers Autumn creates on its own. The obvious shortcut
- * — attach with `free_trial: false` while test card 4000-0000-0000-0341
- * (attaches fine, charges fail) is on file — was tried and does NOT work
+ * Attach with `free_trial: false` while test card 4000-0000-0000-0341
+ * (attaches fine, charges fail) is on file. Was tried and does NOT work
  * (verified July 2026): the failed charge leaves an `open` (then voided)
  * invoice and an EMPTY products list, never `past_due`. So the e2e forces
  * the synced planStatus via `billingTestOverrides`, which syncAllFeatures
@@ -31,8 +31,8 @@ import { AUTUMN_API } from './autumnClient';
  *
  * `relinkStripeCustomer` (below) is the OTHER route: pre-build the Stripe
  * customer WITH a test clock and hand it to Autumn, which makes genuinely
- * time-driven states (trial conversion, lapse, real past_due) reachable —
- * used by e2e/billing-clock.spec.ts. The override stays for the cheap
+ * time-driven states (trial conversion, lapse, real past_due) reachable.
+ * Used by e2e/billing-clock.spec.ts. The override stays for the cheap
  * dunning-UI spec that doesn't want minutes of clock advancing.
  */
 
@@ -160,11 +160,11 @@ export const clearBillingOverride = internalMutation({
 });
 
 /**
- * Re-create a user's Autumn customer linked to a PRE-BUILT Stripe customer —
- * the Stripe-test-clock provisioning flow.
+ * Re-create a user's Autumn customer linked to a PRE-BUILT Stripe customer.
+ * The Stripe-test-clock provisioning flow.
  *
  * Stripe test clocks can only be set at Stripe-customer creation, and Autumn
- * normally creates that customer itself during the first attach — which is
+ * normally creates that customer itself during the first attach, which is
  * why clocks "can't attach to Autumn-created customers". The way around it
  * (Autumn's own test suite does exactly this, see initCustomerV3.ts in the
  * autumn repo): create the clocked Stripe customer FIRST via the Stripe API,
@@ -228,21 +228,21 @@ export const relinkStripeCustomer = internalAction({
 });
 
 /**
- * Attach a plan through Autumn's LEGACY v1.2 `/attach` — the way every
+ * Attach a plan through Autumn's LEGACY v1.2 `/attach`. The way every
  * subscription was created before Managed Payments existed. With a card
  * already on file Autumn charges it directly and creates the subscription
  * WITHOUT a Stripe Checkout Session, i.e. a genuinely non-MoR subscription.
  *
  * This is how e2e/billing-clock.spec.ts manufactures a "grandfathered"
  * customer: someone whose subscription predates the MoR flag and must keep
- * working untouched (upgrades, downgrades, renew, cancel — the mixed-estate
+ * working untouched (upgrades, downgrades, renew, cancel, the mixed-estate
  * steady state). It goes straight to Autumn's REST API on purpose,
- * BYPASSING the app's `guardFirstPurchaseOffLegacyPath` — the guard blocks
+ * BYPASSING the app's `guardFirstPurchaseOffLegacyPath`. The guard blocks
  * new first purchases from the legacy path; a subscription that already
  * exists is exactly what it must not touch.
  *
  * Fails loudly if Autumn returns a checkout_url instead of attaching
- * directly — that means no usable card was on the Stripe customer and the
+ * directly. That means no usable card was on the Stripe customer and the
  * "legacy customer" premise doesn't hold.
  */
 export const legacyAttachPlan = internalAction({
@@ -287,13 +287,13 @@ export const legacyAttachPlan = internalAction({
 
 /**
  * Immediately cancel the customer's current (non-default) plan via Autumn's
- * own `/cancel` — the same call the app's cancelOverdueSubscription makes.
+ * own `/cancel`. The same call the app's cancelOverdueSubscription makes.
  * Produces a genuinely lapsed customer (plan gone, `trials_used` kept, any
  * saved card surviving) for the billing-clock lapse/repurchase journey.
  *
  * Why Autumn-side and not a Stripe-side DELETE of the subscription: Autumn
  * does NOT ingest `customer.subscription.deleted` for Managed Payments
- * subscriptions — two live probes (2026-08-10) left Autumn reporting
+ * subscriptions. Two live probes (2026-08-10) left Autumn reporting
  * `trialing` 40+ minutes after the Stripe subscription was deleted, with
  * the event fired and fully delivered. Only Autumn's own cancel reliably
  * updates its state.
@@ -342,7 +342,7 @@ export const cancelPlanNow = internalAction({
   },
 });
 /**
- * Snapshot of the customer's Autumn products (status + past_due) —
+ * Snapshot of the customer's Autumn products (status + past_due),
  * debugging aid for billing specs.
  */
 export const getBillingDebugState = internalAction({
@@ -376,7 +376,7 @@ export const getBillingDebugState = internalAction({
     }
     // Normalized rather than read raw: this endpoint is pinned to 1.2, which
     // reports delinquency as `status: 'past_due'` and ships no `past_due`
-    // field at all — so reading the boolean directly (as this did) reported
+    // field at all, so reading the boolean directly (as this did) reported
     // `pastDue: false` for genuinely past-due customers.
     const customer = (await res.json()) as { products?: unknown };
     return normalizePlans(customer).map((p) => ({

@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { dismissTour } from "./helpers";
 
 /**
- * Chat LIVE — hits the real Convex backend and real LLM / TTS APIs.
+ * Chat LIVE. Hits the real Convex backend and real LLM / TTS APIs.
  *
  * Cost-aware design: a fresh test account starts with only 5 chat
  * messages (quota tracked by the "N left" badge next to the chat input).
@@ -10,7 +10,7 @@ import { dismissTour } from "./helpers";
  * live chat messages per full run and asserts as many behaviors as
  * possible off of those exchanges:
  *
- * Test 1 — the card-generation exchange:
+ * Test 1. The card-generation exchange:
  *   1. sendMessage       → user turn appears in the UI
  *   2. generateResponse  → assistant turn comes back with substantive text
  *   3. agent emits card-approval proposals (structured output)
@@ -22,11 +22,11 @@ import { dismissTour } from "./helpers";
  *   7. quota decrement   → "N left" counter drops by exactly 1
  *   8. library persistence → the *edited* card text shows up in /app/library
  *
- * Test 2 — thread persistence (no extra messages):
+ * Test 2. Thread persistence (no extra messages):
  *   8. getThread         → navigating away and back restores messages
  *   9. listThreads       → the thread is still listed in the sidebar
  *
- * Test 3 — the word-explain exchange (learning mode → "Ask AI" popover):
+ * Test 3. The word-explain exchange (learning mode → "Ask AI" popover):
  *  10. ClickableWords trigger → popover opens next to a clicked word
  *  11. openChatWithPrompt + auto-submit → user bubble shows
  *      "Explain: <word>" without the user pressing send
@@ -46,7 +46,7 @@ const TITLE_TIMEOUT = 60_000;
 
 async function readQuotaLeft(page: Page): Promise<number | null> {
   // Badge renders as "N left" or "Limit reached". Iterate all matches and
-  // return the first one with a readable value — avoids an isVisible race
+  // return the first one with a readable value. Avoids an isVisible race
   // against Convex refetches and tolerates duplicate test-ids if both the
   // home NewChatInput and the /app/chat ChatInput are in the DOM.
   const badges = page.getByTestId("feature-quota-chat_messages");
@@ -67,7 +67,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
   // No retries on live: every retry spends another real chat message.
   test.describe.configure({ retries: 0 });
 
-  // Shared between the two tests — the thread created in test A is
+  // Shared between the two tests. The thread created in test A is
   // exercised (read-only, no extra LLM cost) in test B.
   let threadUrl: string | undefined;
   let userMarker: string | undefined;
@@ -76,7 +76,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
     "full chat-to-card flow: send → response → approve → quota decrements → card in library",
     async ({ page }) => {
       // Live LLM round-trips (assistant reply, card streaming, title gen)
-      // can take 30–60s each — well beyond Playwright's 30s default.
+      // can take 30–60s each. Well beyond Playwright's 30s default.
       test.setTimeout(180_000);
 
       await page.goto("/app");
@@ -84,7 +84,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       await dismissTour(page, "home_tour");
 
       // (1) Capture quota before sending. If the account is already out,
-      // skip rather than fail — this keeps a re-run on an exhausted user
+      // skip rather than fail. This keeps a re-run on an exhausted user
       // from going red.
       const quotaBefore = await readQuotaLeft(page);
       test.skip(
@@ -112,7 +112,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       threadUrl = page.url();
 
       // (4) User message lands in the UI. We don't require the assistant
-      // to echo the marker — we just assert the user bubble rendered.
+      // to echo the marker. We just assert the user bubble rendered.
       await expect(page.getByTestId("chat-user-message").first()).toBeVisible({
         timeout: 15_000,
       });
@@ -168,7 +168,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       // (8) Approve the first card. After approval the card's "Add
       // Sentence" button is replaced by the "approved" indicator inside
       // that specific card-approval alert. Scope the assertion to the
-      // first card's subtree — counting enabled buttons across the whole
+      // first card's subtree, counting enabled buttons across the whole
       // page would race with the AI streaming in additional cards after
       // we captured cardCount, inflating the count and masking the flip.
       const firstApprove = firstCardAlert.getByTestId("card-approve").first();
@@ -177,7 +177,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
         firstCardAlert.getByTestId("card-approved-indicator"),
       ).toBeVisible({ timeout: 15_000 });
 
-      // (9) Thread auto-titles — a sidebar entry with substantive text
+      // (9) Thread auto-titles. A sidebar entry with substantive text
       // appears within TITLE_TIMEOUT. On desktop the sidebar auto-opens;
       // on mobile it starts closed. Only toggle if entries aren't yet in
       // the DOM, otherwise we'd close an already-open desktop sidebar.
@@ -192,7 +192,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
         expect(substantive).toBe(true);
       }).toPass({ timeout: TITLE_TIMEOUT });
 
-      // (10) Quota decrement — the "N left" badge is rendered both on
+      // (10) Quota decrement. The "N left" badge is rendered both on
       // /app (NewChatInput) and on /app/chat/* (ChatInput). We're
       // already on the chat page; poll in place and wait for the
       // Convex mutation to propagate.
@@ -210,13 +210,13 @@ test.describe("chat (live)", { tag: "@live" }, () => {
 
       await page.goto("/app/library");
       await page.waitForLoadState("domcontentloaded");
-      // No tour registered on /app/library — just strip any lingering overlay.
+      // No tour registered on /app/library, just strip any lingering overlay.
       await dismissTour(page, undefined, 250);
 
       const searchBox = page.getByTestId("library-search").first();
       await expect(searchBox).toBeVisible({ timeout: 15_000 });
       await searchBox.fill(searchSeed);
-      // Debounced ~300ms — wait then assert at least one result visible.
+      // Debounced ~300ms. Wait then assert at least one result visible.
       await page.waitForTimeout(600);
       const emptyState = page.getByText(
         /no results|no sentences match/i,
@@ -226,7 +226,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
         .first();
       // Either we see the search seed in the result list, OR library
       // hasn't indexed the card yet (race with post-approval processing)
-      // — in that case just require the search input accepted the query.
+      // In that case just require the search input accepted the query.
       const matched =
         (await visibleResult.isVisible().catch(() => false)) ||
         !(await emptyState.isVisible().catch(() => false));
@@ -239,7 +239,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
   }) => {
     test.skip(!threadUrl, "Prior test did not create a thread.");
 
-    // Cold-load the chat URL on this test's fresh page — exercises
+    // Cold-load the chat URL on this test's fresh page. Exercises
     // getThread without burning any LLM quota (no new messages sent).
     // (main)/layout.tsx derives activeView from pathname only inside its
     // useState initializer, so a direct goto on a fresh mount is what
@@ -266,7 +266,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       await chatInput.waitFor({ state: "visible", timeout: 10_000 });
     }
 
-    // getThread — the user's original message comes back.
+    // getThread. The user's original message comes back.
     await expect(page.getByTestId("chat-user-message").first()).toBeVisible({
       timeout: 20_000,
     });
@@ -281,7 +281,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       timeout: 20_000,
     });
 
-    // listThreads — open the sidebar if collapsed, then assert the
+    // listThreads. Open the sidebar if collapsed, then assert the
     // thread is represented as a sidebar entry.
     const toggle = page.getByTestId("chat-toggle-conversations").first();
     if (await toggle.count()) await toggle.click().catch(() => {});
@@ -317,14 +317,14 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       await dismissTour(page, "audio_review_intro", 500);
       await dismissTour(page, "full_review_intro", 500);
 
-      // The review tour can launch ~1s after reviewing state begins —
-      // try again in case we missed it on first sweep.
+      // The review tour can launch ~1s after reviewing state begins.
+      // Try again in case we missed it on first sweep.
       await dismissTour(page, "audio_review_intro", 1_500);
       await dismissTour(page, "full_review_intro", 500);
 
       // (3) Wait for a clickable word span to appear. If the deck happens
       // to be empty on this run (no cards approved in test 1, or review
-      // phase not yet loaded), skip rather than fail — the first test in
+      // phase not yet loaded), skip rather than fail. The first test in
       // this spec is what seeds the deck, and its failure would already
       // have propagated via serial-mode.
       const firstWord = page.getByTestId("clickable-word").first();
@@ -343,18 +343,18 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       // Retried as one unit: in audio review mode, karaoke re-renders the
       // ClickableWords parent on every `localTime` tick and the audio-mode
       // auto-advance can swap the CARD between the click and the popover
-      // mount — the popover then never opens (or unmounts instantly), and
+      // mount. The popover then never opens (or unmounts instantly), and
       // the first word may be a different word on the next attempt. Each
       // attempt re-pauses audio (playback can have resumed on a card
       // advance) before clicking the current first word.
       //
       // The play/pause button is the same physical element regardless of
-      // state — only the inner Lucide icon swaps (`lucide-pause` vs
+      // state, only the inner Lucide icon swaps (`lucide-pause` vs
       // `lucide-play`). Click ONLY if the Pause icon is showing, so we
       // don't accidentally start playback on a paused card.
       //
       // ClickableWords strips surrounding punctuation before injecting into
-      // the prompt template (e.g. "Haus," → "Haus") — mirror that here so
+      // the prompt template (e.g. "Haus," → "Haus"), mirror that here so
       // the regex below matches.
       const playPauseBtn = page.locator('[data-tutorial="audio-play"]').first();
       const askBtn = page.getByTestId("ask-ai-button").first();
@@ -395,7 +395,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
         // DOM: if the card advanced between the click and the popover mount,
         // the pre-click read names a word that is no longer on screen and the
         // prompt assertion below would look for the wrong text. An empty read
-        // means the popover unmounted under us — retry the whole unit.
+        // means the popover unmounted under us. Retry the whole unit.
         const rawWord = (
           (await openWord.innerText().catch(() => "")) || ""
         ).trim();
@@ -409,12 +409,12 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       ).toBe(true);
 
       // Use a forced click on the Ask AI button as a belt-and-suspenders
-      // measure — even with audio paused the popover can re-position briefly
+      // measure. Even with audio paused the popover can re-position briefly
       // when first appearing; force skips the stability poll once we've
       // confirmed the button is rendered.
       await askBtn.click({ force: true });
 
-      // (7) Auto-submit fires from ChatPanel's initialTextNonce effect —
+      // (7) Auto-submit fires from ChatPanel's initialTextNonce effect,
       // no user send-press involved. The user bubble should contain the
       // templated prompt. Escape cleanedWord for safe regex embedding.
       const escaped = cleanedWord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -429,14 +429,14 @@ test.describe("chat (live)", { tag: "@live" }, () => {
 
       // (8) Assistant reply arrives in the in-learn chat. Use .first()
       // because LearningChatLayout renders the chat panel in two sibling
-      // slots (desktop + mobile) — on a desktop viewport the mobile copy
+      // slots (desktop + mobile), on a desktop viewport the mobile copy
       // is display:none, so .last() would target the hidden one and never
       // resolve to visible.
       const assistant = page.getByTestId("chat-assistant-message").first();
       await expect(assistant).toBeVisible({ timeout: ASSISTANT_TIMEOUT });
       await expect(assistant).not.toBeEmpty();
 
-      // (9) Quota drops by one — a fresh message was sent via the
+      // (9) Quota drops by one. A fresh message was sent via the
       // learning-mode chat panel. Poll because the Convex mutation is
       // asynchronous. Assert strict decrement rather than exact count to
       // tolerate races with unrelated usage refreshes.

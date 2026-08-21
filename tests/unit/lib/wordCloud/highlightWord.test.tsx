@@ -40,7 +40,7 @@ describe('highlightWord', () => {
   });
 
   it('does not match a partial substring of a larger word', () => {
-    // "happy" must not match inside "happiness" or "unhappy" — Intl.Segmenter
+    // "happy" must not match inside "happiness" or "unhappy". Intl.Segmenter
     // boundaries treat them as single word-like segments.
     const { container } = renderHighlighted(
       highlightWord('happiness is unhappy work', 'happy', 'en'),

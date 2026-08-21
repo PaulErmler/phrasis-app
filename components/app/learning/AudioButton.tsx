@@ -23,7 +23,7 @@ const GENERATE_TIMEOUT_MS = 30_000;
  * Without this, each button owned its own HTMLAudioElement with no awareness
  * of the others: clicking several play buttons in quick succession started
  * concurrent playback, and the browser/OS media layer would silently stop or
- * refuse some of them — leaving those buttons stuck showing the playing icon
+ * refuse some of them, leaving those buttons stuck showing the playing icon
  * in silence. Learning mode escaped it only because its call sites pass
  * `onPlay` to stop the main player first; the collection preview and the
  * library views never did.
@@ -31,7 +31,7 @@ const GENERATE_TIMEOUT_MS = 30_000;
  * Registering here rather than fixing each call site means a new call site
  * cannot reintroduce the bug by forgetting a prop. Pausing the previous
  * element fires its `pause` handler, which is what drops that button out of
- * the playing state — see the `onpause` wiring in `handlePlay`.
+ * the playing state. See the `onpause` wiring in `handlePlay`.
  */
 let currentlyPlaying: HTMLAudioElement | null = null;
 
@@ -116,7 +116,7 @@ export function AudioButton({
   // per element and would otherwise close over a stale value.
   const isPlayingRef = useRef(false);
   // Set when the user clicked generate: the URL arriving should start
-  // playback without a second tap (best effort — see the autoplay note).
+  // playback without a second tap (best effort, see the autoplay note).
   const pendingPlayRef = useRef(false);
   const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -126,7 +126,7 @@ export function AudioButton({
   onStopRef.current = onStop;
 
   /**
-   * Single exit from the playing state, whoever triggered it — the natural
+   * Single exit from the playing state, whoever triggered it. The natural
    * end of the clip, an explicit toggle, `stopPlayback`, or another button
    * claiming playback through `stopOtherPlayback`. Guarded on
    * `isPlayingRef` so the transition (and the `onStop` broadcast) happens
@@ -225,7 +225,7 @@ export function AudioButton({
     try {
       const result = await onRequestGenerate();
       // `{scheduled: false}` means this click enqueued nothing (translation
-      // not landed yet, or a previous job's claim still holds the slot) — no
+      // not landed yet, or a previous job's claim still holds the slot), no
       // URL is coming from it, so don't hold the spinner.
       if (
         result &&
@@ -239,7 +239,7 @@ export function AudioButton({
       console.error('Error requesting audio generation:', error);
       resetGenerating(true);
     }
-    // On success we stay in the generating state — the reactive query
+    // On success we stay in the generating state. The reactive query
     // delivers the URL and the effect below flips us out of it (or the
     // GENERATE_TIMEOUT_MS guard does, if the job dies without a trace).
   };
@@ -274,9 +274,9 @@ export function AudioButton({
           markStoppedRef.current();
         };
         // The element is the source of truth for whether sound is coming out.
-        // Anything can pause it — another AudioButton via `claimPlayback`, the
+        // Anything can pause it. Another AudioButton via `claimPlayback`, the
         // OS media controls, a headphone disconnect, or the browser's own
-        // media policy — and without this the button would keep showing the
+        // media policy, and without this the button would keep showing the
         // playing icon in silence.
         audioRef.current.onpause = () => markStoppedRef.current();
       }
@@ -293,7 +293,7 @@ export function AudioButton({
       // measurement fetches and decodes the clip, so for anything not already
       // cached it takes long enough that the previously playing clip would
       // keep going for a noticeable beat after the user pressed a different
-      // button — reading as "it didn't switch".
+      // button. Reading as "it didn't switch".
       claimPlayback(audioRef.current);
       // Capture the element before awaiting. If another handlePlay swaps
       // audioRef.current (different URL) while getPeak is in-flight, we'd
@@ -345,7 +345,7 @@ export function AudioButton({
 
   // Generated audio arrived (url flipped non-null after a generate click):
   // leave the generating state and auto-play. `play()` may be rejected by
-  // strict autoplay policies (iOS Safari — the gesture is long gone by now);
+  // strict autoplay policies (iOS Safari, the gesture is long gone by now);
   // handlePlay already swallows that, leaving the button in the normal ready
   // state for a second tap.
   useEffect(() => {

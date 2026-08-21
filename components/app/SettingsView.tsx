@@ -64,7 +64,7 @@ export function SettingsView({ activeView }: { activeView: View }) {
                 {userEmail && (
                   <div className="flex items-center gap-2 p-3 surface-muted">
                     <Mail className="h-4 w-4 text-muted-foreground" />
-                    {/* Hidden from session replay — masking happens in the
+                    {/* Hidden from session replay. Masking happens in the
                         browser, so the address never reaches PostHog. */}
                     <span className="text-sm" data-ph-mask>
                       {userEmail}
@@ -77,7 +77,7 @@ export function SettingsView({ activeView }: { activeView: View }) {
           </Card>
 
           {/* Plans are not shown in the store-app shell (store payment
-              policies) — PricingTable also self-hides, this just keeps an
+              policies), PricingTable also self-hides, this just keeps an
               empty card from rendering. */}
           {!isNative && (
             <Card>
@@ -169,7 +169,7 @@ export function SettingsView({ activeView }: { activeView: View }) {
             </CardContent>
           </Card>
 
-          {/* Attribution footer — deliberately below everything else. */}
+          {/* Attribution footer, deliberately below everything else. */}
           <p className="px-2 pb-2 text-xs text-muted-foreground text-center">
             {t.rich('settings.attribution.text', {
               tatoeba: (chunks) => (

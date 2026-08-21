@@ -18,7 +18,7 @@ describe('soundsSame', () => {
     expect(soundsSame('أوه، أنا', 'أوه أنا')).toBe(true);
   });
 
-  it('question marks are audible — intonation changes', () => {
+  it('question marks are audible, intonation changes', () => {
     expect(soundsSame('Estás bien.', '¿Estás bien?')).toBe(false);
     expect(soundsSame('You are coming.', 'You are coming?')).toBe(false);
     expect(soundsSame('هل تتكلم العربية؟', 'هل تتكلم العربية')).toBe(false);
@@ -41,14 +41,14 @@ describe('soundsSame', () => {
     expect(soundsSame('mail@host', 'mail host')).toBe(false);
   });
 
-  it('semicolon counts as audible — the documented cheap-and-safe trade-off', () => {
+  it('semicolon counts as audible, the documented cheap-and-safe trade-off', () => {
     // An English 'a; b' → 'a b' edit is spoken the same but still counts as
     // different (unneeded regeneration); the price of Greek questions
     // (';' after NFC) staying audible.
     expect(soundsSame('Komm her; jetzt', 'Komm her jetzt')).toBe(false);
   });
 
-  it('punctuation between digits is audible — the number changes', () => {
+  it('punctuation between digits is audible, the number changes', () => {
     expect(soundsSame('I ran 3.5 miles', 'I ran 35 miles')).toBe(false);
     expect(soundsSame('Es ist 1:30', 'Es ist 130')).toBe(false);
     // Trade-off documented on soundsSame: '1,000' → '1000' is spoken the
@@ -69,7 +69,7 @@ describe('soundsSame', () => {
     expect(soundsSame('hola', 'Hola')).toBe(false);
   });
 
-  it('keeps symbols — "€" is pronounced', () => {
+  it('keeps symbols, "€" is pronounced', () => {
     expect(soundsSame('5 €', '5')).toBe(false);
   });
 });
@@ -77,13 +77,13 @@ describe('soundsSame', () => {
 /**
  * TTS validation romanizes both sides for zh / zh_traditional / ko before
  * comparing, so Scribe returning a homophone character still matches. These
- * guard that path against romanizer changes — notably the switch to
+ * guard that path against romanizer changes, notably the switch to
  * segment-based pinyin (which stopped deleting punctuation and digits) and to
  * pronunciation-based Korean romanization.
  */
 describe('textsMatchForLanguage', () => {
   it('accepts a hanzi homophone swap that romanizes identically', () => {
-    // 在 vs 再 — the whole reason this comparison romanizes first.
+    // 在 vs 再. The whole reason this comparison romanizes first.
     expect(textsMatchForLanguage('我在这里', '我再这里', 'zh')).toBe(true);
   });
 
@@ -114,8 +114,8 @@ describe('textsMatchForLanguage', () => {
   });
 
   it('accepts a Korean spelling difference that sounds identical', () => {
-    // 신라 and 실라 are spelled differently but both pronounced "silla" —
-    // exactly the case pronunciation-based romanization is meant to absorb.
+    // 신라 and 실라 are spelled differently but both pronounced "silla".
+    // Exactly the case pronunciation-based romanization is meant to absorb.
     expect(textsMatchForLanguage('신라', '실라', 'ko')).toBe(true);
   });
 

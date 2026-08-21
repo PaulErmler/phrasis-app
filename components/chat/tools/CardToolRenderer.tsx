@@ -4,14 +4,21 @@ import type { ReactNode } from 'react';
 import type { ToolUIPart } from 'ai';
 import { CardApproval } from '@/components/chat/CardApproval';
 import { isCreateCardToolPart } from '@/lib/types/tool-parts';
-import type { ApprovalData } from '@/hooks/use-card-approvals';
+import type {
+  ApprovalActionResult,
+  ApprovalData,
+} from '@/hooks/use-card-approvals';
 import type { Id } from '@/convex/_generated/dataModel';
 
 interface CardToolRendererProps {
   approvalsByToolCallId: Map<string, ApprovalData>;
   processingApprovals: Set<string>;
-  handleApprove: (approvalId: Id<'cardApprovals'>) => Promise<void>;
-  handleReject: (approvalId: Id<'cardApprovals'>) => Promise<void>;
+  handleApprove: (
+    approvalId: Id<'cardApprovals'>,
+  ) => Promise<ApprovalActionResult>;
+  handleReject: (
+    approvalId: Id<'cardApprovals'>,
+  ) => Promise<ApprovalActionResult>;
   isLoaded: boolean;
 }
 

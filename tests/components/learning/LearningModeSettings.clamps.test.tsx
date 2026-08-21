@@ -8,7 +8,7 @@ import type { Id } from '@/convex/_generated/dataModel';
 /**
  * The client-side clamp handlers (speed round-to-tenth + 0.6–2.0 clamp, the
  * "only new" 0/1–10 clamp) duplicate the server clamps in
- * `updateCourseSettings` — they can silently diverge. These tests pin what the
+ * `updateCourseSettings`. They can silently diverge. These tests pin what the
  * CLIENT currently sends for out-of-range values. The real stepper buttons
  * pre-clamp at the control level, so the child controls are stubbed to reach
  * the handlers with raw boundary values.
@@ -78,7 +78,7 @@ function renderSettings(settings: Partial<CourseSettings>) {
   );
 }
 
-describe('LearningModeSettings — client clamp handlers', () => {
+describe('LearningModeSettings: client clamp handlers', () => {
   beforeEach(() => {
     updateSettings.mockClear();
     timelineCards.length = 0;
@@ -185,7 +185,7 @@ describe('LearningModeSettings — client clamp handlers', () => {
       playTargetBeforeBase: true,
       playTargetAfterBase: true,
     });
-    // cardsPerBatch is min 1/uncapped-ish, initial reviews min 1/max 20 — the
+    // cardsPerBatch is min 1/uncapped-ish, initial reviews min 1/max 20. The
     // two strategy steppers ("Only new" reps, "Until rated Good" count) are
     // the only 1..10 ranges, rendered in that order.
     const strategySteppers = steppers.filter((s) => s.min === 1 && s.max === 10);

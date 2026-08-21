@@ -18,50 +18,62 @@
     "themeSystem": "System"
   },
   "hero": {
-    "tagline": "Vocabulary building made <highlight>easy</highlight>.",
-    "subtitle": "Flexling is an audio-based flashcard app with a large database of sentences. Upload your own or ask AI to create new flashcards for you — focus on learning instead of preparing flashcards.",
+    "tagline": "Learn a language the way you learned your <highlight>first</highlight>.",
+    "subtitle": "You didn’t learn your first language from vocabulary lists. Absorb words in sentences that actually matter to you.",
     "cta": {
       "start": "Start Learning Free",
       "howItWorks": "See How It Works",
       "goToApp": "Go to App",
-      "install": "Install App"
+      "install": "Install App",
+      "friction": "Free to start · No credit card required"
     }
   },
   "philosophy": {
-    "title": "Built on what",
-    "titleHighlight": "actually works.",
-    "lead": "Active recall, shadowing, and spaced repetition are proven to make languages stick — Flexling is built entirely around them.",
+    "title": "Built around",
+    "titleHighlight": "you.",
+    "lead": "The content, the practice, and the long game — all tuned to how you actually live and learn.",
     "cards": {
-      "activeRecall": {
-        "title": "Active Recall",
-        "body": "Translate real sentences from your language, check yourself, and repeat until it sticks. Spaced repetition — the same algorithm as Anki — brings each sentence back right before you'd forget it."
+      "practice": {
+        "title": "Practice for every moment",
+        "body": "Speak on a walk, write at a desk, or let sentences play while you cook. Same cards, a mode for every circumstance."
       },
-      "grammar": {
-        "title": "Grammar without the grind",
-        "body": "Skip the rules and worksheets. By speaking and writing real sentences, you pick up grammar the way you learned your first language — by using it."
+      "content": {
+        "title": "Content that is actually yours",
+        "body": "Practical sentences you will say — not a textbook curriculum. Bring your own, ask AI, or start from a large library."
       },
-      "daily": {
-        "title": "Just 15 minutes a day",
-        "body": "Consistent daily practice beats marathon sessions. Flexling schedules exactly what you need to review today — no planning required."
-      },
-      "practical": {
-        "title": "Practical, not theoretical",
-        "body": "Learn the sentences you'll actually say. Every card is built for real-world communication."
-      },
-      "customisation": {
-        "title": "Make it yours",
-        "body": "Bring your own sentences, import a spreadsheet, or let AI generate them. Content that is relevant to you increases retention."
-      },
-      "feedback": {
-        "title": "Instant feedback",
-        "body": "Get immediate spelling and recall feedback on every sentence — plus an AI tutor that answers any question and turns it into a flashcard."
+      "path": {
+        "title": "A path you can see",
+        "body": "Stats, a review plan, and a projection of where you are headed. Motivation that lasts years, not weeks."
       }
     }
   },
+  "howWeAchieve": {
+    "title": "How do we",
+    "titleHighlight": "achieve this?",
+    "lead": "Three pieces, working together."
+  },
   "reviewModes": {
-    "title": "Three ways to",
-    "titleHighlight": "use Flexling.",
-    "subtitle": "The same sentences, three kinds of practice. Shadow them out loud, write them from memory, or let them play in the background — switch anytime.",
+    "title": "Practice that",
+    "titleHighlight": "fits the moment.",
+    "subtitle": "Want to speak? Shadow. Want to write? Type. Want input while you cook? Turn on Radio. Settings let you tune every mode to how you learn.",
+    "jobs": {
+      "speak": {
+        "title": "Practice speaking and listening",
+        "mode": "Shadowing",
+        "body": "Hear it, translate it in your head, say it aloud. Hands-free on a walk or with the screen in front of you."
+      },
+      "write": {
+        "title": "Practice writing",
+        "mode": "Writing",
+        "body": "Type the sentence and get instant, character-level feedback. Translate from your language, or transcribe what you hear."
+      },
+      "radio": {
+        "title": "Passive comprehensible input",
+        "mode": "Radio",
+        "body": "Let sentences and translations play in the background. The language gets into your ear without touching your review schedule."
+      }
+    },
+    "settingsNote": "Every mode is tunable — what you hear first, how much help you get, how long you go. Flexling adapts to you, not the other way around.",
     "audioTitle": "Shadowing",
     "audioBody": "The heart of Flexling. Listen to a sentence, translate it in your head, then say it aloud to practice your pronunciation — start speaking from day one, hands-free or hands-on. Each target line starts blurred and eases into focus, just like it does after playback in the app.",
     "fullTitle": "Writing",
@@ -76,12 +88,6 @@
     "radioBody": "Let sentences and their translations play all day — passive listening that gets the language into your ear, without touching your spaced-repetition schedule.",
     "freeStudyTitle": "Free Study",
     "freeStudyBody": "Don't want a session to touch your spaced-repetition schedule? Free Study shuffles endlessly through all your sentences so you can practice typing at your own pace — nothing gets scheduled, nothing counts against your reviews.",
-    "missingTitle": "Missing a feature?",
-    "missingBody": "Let us know and we'll try our best to adapt Flexling to your needs. After all, it is all about adapting to your needs and being flexible.",
-    "missingCta": "Suggest a way to learn",
-    "emailSubjects": {
-      "requestMode": "Learning Mode Suggestion"
-    },
     "multiLabel": "Multiple Language",
     "replay": "Replay demo",
     "mock": {
@@ -95,9 +101,23 @@
     }
   },
   "chatDemo": {
-    "title": "Ask any question.",
-    "titleHighlight": "Remember the answer.",
-    "subtitle": "Don't understand a word? Not quite sure why the sentence is written this way? Just ask and get instant answers from state-of-the-art language models. We will automatically create flashcards for you to remember the specific concepts you are struggling with.",
+    "title": "Add cards that",
+    "titleHighlight": "are actually yours.",
+    "subtitle": "The sentences you care about are the ones that stick. Three ways to get them in:",
+    "paths": {
+      "type": {
+        "title": "Type them",
+        "body": "Add a sentence whenever you meet one you want to keep."
+      },
+      "import": {
+        "title": "Import a spreadsheet",
+        "body": "Drop in a CSV, TSV, or Excel/Sheets file; audio is generated for you."
+      },
+      "ask": {
+        "title": "Ask the tutor",
+        "body": "Describe a situation — or a word you are stuck on — and it creates the cards to practice precisely the words that are hardest for you."
+      }
+    },
     "contextTitle": "You're reviewing this card:",
     "contextNote": "The tutor automatically sees the card you're studying — ask about “this sentence” and it knows exactly what you mean.",
     "scenarioGrammar": "Grammar",
@@ -326,16 +346,16 @@
   },
   "analytics": {
     "label": "Track Your Progress",
-    "title": "Watch your skills",
-    "titleHighlight": "grow over time.",
-    "lead": "See exactly how your vocabulary expands week by week. Detailed analytics show your streak, words learned per language, and study habits — so you always know how far you've come.",
+    "title": "Stay motivated",
+    "titleHighlight": "in the long run.",
+    "lead": "A streak counts days. Seeing your vocabulary take shape is what keeps you coming back for years.",
     "progressTitle": "Know What You Know",
     "progressBody": "Track precisely which words you already know and how much progress you have made over days, weeks and months — broken down by language if you study more than one.",
     "activityTitle": "Feel Your Progress",
     "activityBody": "See exactly what words you learned recently and stay motivated as your vocabulary expands.",
     "wordCloudHint": "Click any word to see the sentences you learned with that word",
-    "insightsTitle": "Session Snapshot",
-    "insightsBody": "After every review, see exactly what you accomplished: your daily-goal ring fills as you study, badges show what's waiting, and a forecast projects where your pace is taking you.",
+    "insightsTitle": "Know where you are going",
+    "insightsBody": "After every review, see exactly what you accomplished and where you are headed. How many words will you have learned by the end of the year?",
     "projectionLabel": "Your forecast",
     "projectionFacts": {
       "wordsByYearEnd": "~2,400 words by end of 2026",
@@ -381,8 +401,8 @@
         "description": "Remember up to 10x more with scientifically-proven algorithms that show you cards exactly when you need them."
       },
       "languageIntelligence": {
-        "title": "Comprehensible Input",
-        "description": "Every sentence is anchored in a language you already know. You stretch toward the translation, keeping difficulty challenging but never frustrating."
+        "title": "Grammar without the grind",
+        "description": "Skip the rules and worksheets. By speaking and writing real sentences, you pick up grammar the way you learned your first language — by using it."
       }
     }
   },

@@ -16,7 +16,7 @@ import { authClient } from '@/lib/auth-client';
  * a real sign-in.
  *
  * Deliberate consequence: switching accounts requires signing out first (the
- * Settings sign-out button) — this page no longer shows a login form to
+ * Settings sign-out button), this page no longer shows a login form to
  * someone with a live session.
  */
 export function SignedInRedirect() {

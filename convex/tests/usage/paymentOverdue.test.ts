@@ -10,7 +10,7 @@ import { ARCHIVE_COOLDOWN_MS } from "../../../lib/constants/courses";
 const modules = import.meta.glob("/convex/**/*.ts");
 
 // consumeQuota/releaseQuota schedule the REAL trackUsage action, and
-// convex-test executes scheduled jobs on a timer — with fetch unstubbed that
+// convex-test executes scheduled jobs on a timer, with fetch unstubbed that
 // job would hit the live Autumn API whenever AUTUMN_SECRET_KEY happens to be
 // in the runner's env. Stubbed at module scope (not per-test) so a job that
 // fires after a test's cleanup still hits the stub, never the network.
@@ -75,7 +75,7 @@ async function getQuotaDoc(t: TestConvex<typeof schema>) {
   );
 }
 
-/** FEATURES plus a `courses` entry — what drives the auto-archival path. */
+/** FEATURES plus a `courses` entry. What drives the auto-archival path. */
 const withCourses = (state: {
   balance: number;
   included: number;
@@ -130,7 +130,7 @@ const entry = (over: Partial<Record<string, unknown>> = {}) => ({
   ...over,
 });
 
-describe("usage — derivePlan", () => {
+describe("usage: derivePlan", () => {
   it("flags past_due from the boolean encoding", () => {
     const d = derivePlan({
       id: "c",
@@ -194,7 +194,7 @@ describe("usage — derivePlan", () => {
     });
   });
 
-  it("reports no plan — but not productsMissing — when all plans expired", () => {
+  it("reports no plan, but not productsMissing, when all plans expired", () => {
     // Autumn answered definitively: the customer holds nothing. The overdue
     // state must still be allowed to clear, so this is NOT productsMissing.
     const d = derivePlan({
@@ -215,7 +215,7 @@ describe("usage — derivePlan", () => {
   });
 });
 
-describe("usage — findPayableInvoiceUrl", () => {
+describe("usage: findPayableInvoiceUrl", () => {
   const inv = (over: Record<string, unknown>) => ({
     status: "open",
     hosted_invoice_url: "https://invoice.stripe.com/x",
@@ -257,7 +257,7 @@ describe("usage — findPayableInvoiceUrl", () => {
   });
 });
 
-describe("usage — pastDueSince lifecycle in syncAllFeatures", () => {
+describe("usage: pastDueSince lifecycle in syncAllFeatures", () => {
   it("sets pastDueSince when a plan first goes past_due", async () => {
     const t = convexTest(schema, modules);
     await sync(t, "active");
@@ -350,7 +350,7 @@ describe("usage — pastDueSince lifecycle in syncAllFeatures", () => {
   it("does not auto-archive on a productsMissing sync while still blocked", async () => {
     // The gap the `anyPastDue` flag alone leaves open: a productsMissing
     // reply carries anyPastDue:false (Autumn told us nothing), yet it
-    // deliberately preserves pastDueSince — so the user is still hard-blocked
+    // deliberately preserves pastDueSince, so the user is still hard-blocked
     // while the incoming flag reads healthy. Archiving on that flag would
     // destroy courses during the exact window the guard exists for, and
     // paying the invoice would not bring them back.
@@ -367,15 +367,15 @@ describe("usage — pastDueSince lifecycle in syncAllFeatures", () => {
 
     const docs = await readCourses(t, courseIds);
     expect(docs.filter((d) => d?.isArchived).length).toBe(0);
-    // Still blocked, so the archival is only deferred — not skipped forever.
+    // Still blocked, so the archival is only deferred, not skipped forever.
     expect((await getQuotaDoc(t))?.pastDueSince).toBeDefined();
   });
 });
 
-describe("usage — course auto-archival on healthy downgrade", () => {
+describe("usage: course auto-archival on healthy downgrade", () => {
   it("archives exactly the excess, sparing the active course", async () => {
     // A downgrade must actually shrink the account to what is being paid
-    // for — but archiving the course the user is currently studying would
+    // for, but archiving the course the user is currently studying would
     // yank the app out from under them mid-session. `archivedAt` matters
     // beyond bookkeeping: it drives the 30-day unarchive cooldown, so a
     // missing stamp would let the slice be gamed via archive/unarchive churn.
@@ -399,7 +399,7 @@ describe("usage — course auto-archival on healthy downgrade", () => {
   it("protects the active course even when it would otherwise be excess", async () => {
     // The unprotected slice archives the oldest courses first. If the user's
     // active course IS the oldest, protection must shift the archival onto a
-    // sibling rather than silently deactivating what they are studying —
+    // sibling rather than silently deactivating what they are studying,
     // otherwise a plan change looks like data loss in the middle of a lesson.
     const t = convexTest(schema, modules);
     const ids = await seedCourses(t, 3, { activeIndex: 0 });
@@ -418,7 +418,7 @@ describe("usage — course auto-archival on healthy downgrade", () => {
     // During dunning the archival is deferred so that paying the invoice
     // restores everything. But the deferral must not become permanent: once
     // billing recovers onto a smaller entitlement, the very next sync has to
-    // collect — otherwise a lapsed subscriber keeps paid-tier course slots
+    // collect, otherwise a lapsed subscriber keeps paid-tier course slots
     // forever just because the revocation happened to arrive while past due.
     const t = convexTest(schema, modules);
     const ids = await seedCourses(t, 2);
@@ -439,12 +439,12 @@ describe("usage — course auto-archival on healthy downgrade", () => {
   });
 });
 
-describe("usage — pastDueInvoiceUrl lifecycle in syncAllFeatures", () => {
+describe("usage: pastDueInvoiceUrl lifecycle in syncAllFeatures", () => {
   it("keeps the last known URL across non-expanded syncs, clears on recovery", async () => {
     // The hosted invoice page is the only CTA that actually settles the
     // debt (the billing portal just swaps cards). Most syncs don't pay for
     // ?expand=invoices, so a sync without the URL must not blank the pay
-    // button while still overdue — but a recovered customer must never be
+    // button while still overdue, but a recovered customer must never be
     // pointed at a stale invoice they no longer owe.
     const t = convexTest(schema, modules);
     await sync(t, "past_due", { pastDueInvoiceUrl: "X" });
@@ -458,7 +458,7 @@ describe("usage — pastDueInvoiceUrl lifecycle in syncAllFeatures", () => {
   });
 });
 
-describe("usage — server-side payment gate", () => {
+describe("usage: server-side payment gate", () => {
   it("consumeQuota throws PAYMENT_PAST_DUE while past due", async () => {
     const t = convexTest(schema, modules);
     await sync(t, "past_due");
@@ -492,7 +492,7 @@ describe("usage — server-side payment gate", () => {
   });
 });
 
-describe("usage — quota used-clamp and sync-guard errors", () => {
+describe("usage: quota used-clamp and sync-guard errors", () => {
   it("consumeQuota reports QUOTA_NOT_SYNCED before any sync has run", async () => {
     const t = convexTest(schema, modules);
     await expect(
@@ -563,7 +563,7 @@ describe("usage — quota used-clamp and sync-guard errors", () => {
   });
 });
 
-describe("usage — getMyQuotas billing fields", () => {
+describe("usage: getMyQuotas billing fields", () => {
   it("exposes pastDue and pastDueSince when overdue", async () => {
     const t = convexTest(schema, modules);
     await sync(t, "past_due");
@@ -587,7 +587,7 @@ describe("usage — getMyQuotas billing fields", () => {
   });
 
   it("exposes the live course count and invoice URL while overdue", async () => {
-    // The cancel confirmation warns "N courses will be archived" — counting
+    // The cancel confirmation warns "N courses will be archived", counting
     // an already-archived course would overstate the loss and scare users
     // out of a legitimate cancel; undercounting would understate real data
     // loss. And without the invoice URL the dialog's pay CTA has nowhere to
@@ -629,7 +629,7 @@ describe("usage — getMyQuotas billing fields", () => {
   });
 });
 
-describe("usage — e2e test hooks gating", () => {
+describe("usage: e2e test hooks gating", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
@@ -685,7 +685,7 @@ describe("usage — e2e test hooks gating", () => {
         planStatus: "past_due",
       });
     });
-    // Real Autumn state is healthy — the override must win and keep
+    // Real Autumn state is healthy. The override must win and keep
     // winning across repeated syncs (this is what makes reloads safe).
     await sync(t, "active");
     let doc = await getQuotaDoc(t);
@@ -761,10 +761,10 @@ describe("usage — e2e test hooks gating", () => {
   });
 });
 
-describe("usage — chargeExtraChatCredits past-due exemption", () => {
+describe("usage: chargeExtraChatCredits past-due exemption", () => {
   beforeEach(() => {
     // The charge schedules the REAL trackUsage, whose post-track sync would
-    // overwrite the features record with the stub's empty payload — racing
+    // overwrite the features record with the stub's empty payload. Racing
     // the balance assertions below. Failing the GET /customers leg makes
     // that job a deterministic no-op after the (harmless) POST /track.
     fetchMock.mockImplementation(async (...args: unknown[]) =>
@@ -786,7 +786,7 @@ describe("usage — chargeExtraChatCredits past-due exemption", () => {
   it("still charges the post-generation remainder while blocked", async () => {
     // By the time this runs the LLM cost is already incurred. Gating it
     // behind the past-due block would hand delinquent users free chat
-    // completions; instead the ledger stays honest — the balance may go
+    // completions; instead the ledger stays honest. The balance may go
     // negative and block the NEXT message (mirrors the releaseQuota
     // exemption above).
     const t = convexTest(schema, modules);
@@ -812,11 +812,11 @@ describe("usage — chargeExtraChatCredits past-due exemption", () => {
   });
 });
 
-describe("usage — resubscribe after auto-archival", () => {
+describe("usage: resubscribe after auto-archival", () => {
   it("lets a resubscribed multi-course plan unarchive immediately", async () => {
     // The churn round-trip that must not look like data loss: downgrade
     // auto-archives a course, the user pays for a bigger plan again, and the
-    // archived course has to come back at once — multi-course plans skip the
+    // archived course has to come back at once. Multi-course plans skip the
     // 30-day cooldown by design, so quota is the only gate.
     const t = convexTest(schema, modules);
     const ids = await seedCourses(t, 2);
@@ -850,7 +850,7 @@ describe("usage — resubscribe after auto-archival", () => {
     // as anti-churn for USER-initiated archives, but the auto-archival sync
     // stamps the same `archivedAt`. On a plan with included <= 1 the user
     // therefore cannot swap TO the course the downgrade archived FOR them
-    // for 30 days — even with a free slot, as here. If that's not intended,
+    // for 30 days. Even with a free slot, as here. If that's not intended,
     // the sync needs to mark its own archives; reported as a source issue.
     const t = convexTest(schema, modules);
     const ids = await seedCourses(t, 2);
@@ -862,8 +862,8 @@ describe("usage — resubscribe after auto-archival", () => {
     const archived = docs.find((d) => d?.isArchived === true);
     expect(archived).toBeDefined();
 
-    // Free the slot (still a single-course plan) so the cooldown — not
-    // quota — is provably what blocks the unarchive.
+    // Free the slot (still a single-course plan) so the cooldown, not
+    // quota. Is provably what blocks the unarchive.
     await sync(t, "active", {
       features: withCourses({ balance: 1, included: 1, used: 0 }),
     });

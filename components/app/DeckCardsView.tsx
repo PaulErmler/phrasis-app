@@ -6,6 +6,7 @@ import { useQuery, usePreloadedQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
 import { useAppData } from '@/components/app/AppDataProvider';
+import { AnnotationLines } from '@/components/app/learning/AnnotationLines';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
 import { HighlightedText } from '@/components/app/learning/HighlightedText';
 import {
@@ -39,6 +40,7 @@ export function DeckCardsView() {
   const { preloadedCourseSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords === true;
+  const showIpa = courseSettings?.showIpa === true;
   const languagePlaybackSpeeds = courseSettings?.languagePlaybackSpeeds ?? {};
   const buttonPlayback = useButtonPlayback();
 
@@ -168,11 +170,11 @@ export function DeckCardsView() {
                           >
                             {baseTranslation?.text || card.sourceText}
                           </p>
-                          {baseTranslation?.romanization && (
-                            <p className="text-romanization">
-                              {baseTranslation.romanization}
-                            </p>
-                          )}
+                          <AnnotationLines
+                            romanization={baseTranslation?.romanization}
+                            ipa={baseTranslation?.ipa}
+                            showIpa={showIpa}
+                          />
                           {targetTranslation?.text && (
                             <p
                               dir={getTextDirection(targetTranslation.language)}
@@ -181,11 +183,11 @@ export function DeckCardsView() {
                               {targetTranslation.text}
                             </p>
                           )}
-                          {targetTranslation?.romanization && (
-                            <p className="text-romanization">
-                              {targetTranslation.romanization}
-                            </p>
-                          )}
+                          <AnnotationLines
+                            romanization={targetTranslation?.romanization}
+                            ipa={targetTranslation?.ipa}
+                            showIpa={showIpa}
+                          />
                         </div>
                       </div>
                     </div>
@@ -221,11 +223,11 @@ export function DeckCardsView() {
                             />
                           );
                         })()}
-                        {baseTranslation?.romanization && (
-                          <p className="text-romanization">
-                            {baseTranslation.romanization}
-                          </p>
-                        )}
+                        <AnnotationLines
+                          romanization={baseTranslation?.romanization}
+                          ipa={baseTranslation?.ipa}
+                          showIpa={showIpa}
+                        />
                         {!baseTranslation?.text &&
                           baseTranslation === undefined && (
                           <p className="text-muted-sm italic">
@@ -296,11 +298,11 @@ export function DeckCardsView() {
                                 />
                               );
                             })()}
-                            {targetTranslation.romanization && (
-                              <p className="text-romanization">
-                                {targetTranslation.romanization}
-                              </p>
-                            )}
+                            <AnnotationLines
+                              romanization={targetTranslation.romanization}
+                              ipa={targetTranslation.ipa}
+                              showIpa={showIpa}
+                            />
                           </>
                         ) : (
                           <p className="text-muted-sm italic">{t('translating')}</p>

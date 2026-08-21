@@ -1,6 +1,6 @@
 # Flexling
 
-## Tech Stack
+## Tech stack
 
 - **Frontend**: [Next.js 16](https://nextjs.org/) with React 19
 - **Backend/Database**: [Convex](https://convex.dev/) - real-time backend with automatic sync
@@ -10,7 +10,7 @@
 
 ---
 
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
@@ -24,9 +24,9 @@
 pnpm install
 ```
 
-### Setup Environment Variables
+### Setup environment variables
 
-#### Local Development
+#### Local development
 
 Make sure Docker is running and run:
 
@@ -53,7 +53,7 @@ SITE_URL=http://localhost:3000
 
 You also have to set SITE_URL and BETTER_AUTH_SECRET in the convex dashboard.
 
-#### Develop Against Convex Dev/Prod Environment
+#### Develop against Convex dev/prod environment
 
 For developing against the cloud instance, you can take the URLS and keys from the convex dashboard.
 
@@ -82,14 +82,14 @@ pnpm dev:backend   # Convex dev server
 pnpm seed-texts
 ```
 
-### Other Commands
+### Other commands
 
 ```bash
 # Type checking
 pnpm typecheck         # tsc --noEmit over the app
 pnpm typecheck:tests   # type-check the test files (tsconfig.test.json)
 
-# Tests — see TESTING.md for the full guide
+# Tests. See TESTING.md for the full guide
 pnpm test              # all vitest projects (convex + app)
 pnpm test:convex       # Convex backend tests only (edge-runtime)
 pnpm test:app          # frontend tests only (jsdom)
@@ -117,7 +117,7 @@ The testing setup (vitest projects, Playwright phases, `@live` tagging, testid c
 
 # Git LFS
 
-[Install Git LFS](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage) if you haven’t already.
+[Install Git LFS](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage) if you haven't already.
 
 The repo uses **`.lfsconfig`** so the currently largest input files (`data_preparation/data/inputs/sentences.csv`, ~708 MB) is excluded from LFS fetch by default. Other LFS files are still pulled on clone/pull, which keeps deploys (e.g. Coolify) fast and within GitHub LFS quota. 
 
@@ -133,7 +133,7 @@ The repo uses **`.lfsconfig`** so the currently largest input files (`data_prepa
 
 Here are relevant tutorials for making LLMs in cursor more accurate with the tech stack we are using:
 
-## MCP Servers and rules
+## MCP servers and rules
 Convex: https://docs.convex.dev/ai/using-cursor
 BetterAuth: https://www.better-auth.com/docs/introduction#llmstxt
 Follow the turorials on the websites to add MCP servers and docs
@@ -173,7 +173,7 @@ You can also add the MCP Servers for Convex, BetterAuth and AI Elements by setti
 
 # More things that are not setup related
 
-## Project Structure
+## Project structure
 
 ```
 ├── app/                    # Next.js app router
@@ -215,7 +215,7 @@ You can also add the MCP Servers for Convex, BetterAuth and AI Elements by setti
 
 ---
 
-## Recommended VS Code Extensions
+## Recommended VS Code extensions
 
 Install the **Tailwind CSS IntelliSense** extension for:
 
@@ -231,7 +231,7 @@ Install the **Tailwind CSS IntelliSense** extension for:
 
 This project uses [shadcn/ui](https://ui.shadcn.com/) for UI components. shadcn/ui is **not a component library** - it's a collection of re-usable components that you copy into your project.
 
-### Adding Components
+### Adding components
 
 ```bash
 # Add a new component
@@ -262,7 +262,7 @@ Components are installed to `components/ui/` and can be freely modified.
 - Social providers (Google, GitHub, etc.)
 - Session management
 
-### Client Usage
+### Client usage
 
 ```tsx
 import { authClient } from '@/lib/auth-client';
@@ -280,7 +280,7 @@ await authClient.signOut();
 const { data: session, isPending } = authClient.useSession();
 ```
 
-### UI Components
+### UI components
 
 The project includes pre-built auth UI from `@daveyplate/better-auth-ui`:
 
@@ -307,9 +307,9 @@ import { SignedIn, SignedOut, UserButton } from "@daveyplate/better-auth-ui";
 - **Mutations**: Transactional writes
 - **Actions**: Server-side functions for external APIs
 
-### Writing Functions
+### Writing functions
 
-Real modules live under `convex/features/` (e.g. `convex/features/library.ts` exports `getLibraryCards`). The snippet below is a generic illustration of the function syntax — see `convex/_generated/ai/guidelines.md` for the project's authoritative Convex patterns.
+Real modules live under `convex/features/` (e.g. `convex/features/library.ts` exports `getLibraryCards`). The snippet below is a generic illustration of the function syntax. See `convex/_generated/ai/guidelines.md` for the project's authoritative Convex patterns.
 
 ```typescript
 // convex/features/<feature>.ts (illustrative)
@@ -335,24 +335,24 @@ export const createItem = mutation({
 });
 ```
 
-### Client Usage
+### Client usage
 
 ```tsx
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 
-// Use query (automatically re-renders when data changes) — function refs
+// Use query; it re-renders automatically when the data changes. Function refs
 // mirror the file layout, e.g. convex/features/library.ts → api.features.library.*
 const cards = useQuery(api.features.library.getLibraryCards, {
   activeFilter: 'favorites',
 });
 
-// Use mutation (illustrative — see convex/features/ for real mutations)
+// Use mutation. This one is illustrative; see convex/features/ for real ones.
 const createItem = useMutation(api.features.example.createItem);
 await createItem({ name: 'New Item' });
 ```
 
-### Convex Dashboard
+### Convex dashboard
 
 Access your Convex dashboard to view data, logs, and manage deployments:
 
@@ -362,7 +362,7 @@ pnpm exec convex dashboard
 
 ---
 
-## Learn More
+## Learn more
 
 - [Convex Documentation](https://docs.convex.dev/)
 - [Better Auth Documentation](https://www.better-auth.com/docs)

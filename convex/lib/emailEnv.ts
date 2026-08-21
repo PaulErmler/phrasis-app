@@ -5,7 +5,7 @@
  *   pnpm exec convex env set EMAIL_ENV staging
  *   pnpm exec convex env set EMAIL_ENV test
  *
- * Leave unset (or set to `production` / `prod`) on production — no prefix.
+ * Leave unset (or set to `production` / `prod`) on production, no prefix.
  */
 
 const PRODUCTION_VALUES = new Set(['', 'production', 'prod']);

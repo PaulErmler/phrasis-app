@@ -46,7 +46,7 @@ export const getHomeSummary = query({
           cardsAdded: v.number(),
           ignoredCount: v.number(),
           prioritizedCount: v.number(),
-          // Sequential-add frontier (lastRankProcessed) — the preview dialog
+          // Sequential-add frontier (lastRankProcessed), the preview dialog
           // snapshots this once at open as its browse range anchor.
           browseAnchor: v.number(),
           cardsLearned: v.number(),
@@ -107,8 +107,8 @@ export const getHomeSummary = query({
         displayName: collection.displayName ?? collection.name,
         // Carry-widened: the cutover credit is already baked into
         // `cardsAdded` (numerator), so widening the denominator keeps the
-        // displayed ratio coherent — legacy 100/295 lands on L02 as
-        // 100/(L02.textCount + 100), not 100/L02.textCount — and keeps this
+        // displayed ratio coherent. Legacy 100/295 lands on L02 as
+        // 100/(L02.textCount + 100), not 100/L02.textCount, and keeps this
         // in step with the backend completeness guards.
         totalTexts: effectiveTextCount(collection.textCount, progress),
         cardsAdded: progress?.cardsAdded ?? 0,

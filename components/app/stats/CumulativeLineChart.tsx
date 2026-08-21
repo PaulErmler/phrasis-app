@@ -42,7 +42,7 @@ interface CumulativeLineChartProps {
   monthlyData: MonthlyPoint[];
   weeklyData?: WeeklyPoint[];
   languageDailyData?: LanguageDailyPoint[];
-  /** User's IANA timezone — used to build the day range so the cumulative line
+  /** User's IANA timezone. Used to build the day range so the cumulative line
    * spans every calendar day through today (in the user's zone). */
   timezone: string;
 }
@@ -82,7 +82,7 @@ function formatDateInTz(date: Date, timezone: string): string {
 }
 
 /** Inclusive list of "YYYY-MM-DD" day keys ending at today (user's timezone),
- * spanning `daysBack` days back — so the cumulative series reaches today and
+ * spanning `daysBack` days back, so the cumulative series reaches today and
  * flat-lines across inactive days. daysBack=7 → 8 points, daysBack=30 → 31. */
 function buildDayRange(daysBack: number, timezone: string): string[] {
   const today = new Date();
@@ -210,7 +210,7 @@ export function CumulativeLineChart({ dailyData, weeklyData, languageDailyData, 
       });
     }
 
-    // Week or month — continuous daily series from the window edge through
+    // Week or month. Continuous daily series from the window edge through
     // today (mirrors chartData) so each language line reaches today.
     const daysBack = range === 'week' ? 7 : 30;
     const dayKeys = buildDayRange(daysBack, timezone);

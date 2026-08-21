@@ -26,10 +26,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import type { LearningState } from '@/components/app/learning/useLearningMode';
-import {
-  buildSessionSnapshot,
-  type SessionSnapshot,
-} from '@/components/app/learning/sessionSnapshot';
 import type { ReviewRating } from '@/lib/scheduling';
 import { autoRating } from '@/lib/autoRating';
 import type {
@@ -62,33 +58,11 @@ interface LearningModeProps {
   onNavigateToChat: () => void;
   /** Navigate to the custom-card creation page (same condition). */
   onNavigateToAddCustomCards: () => void;
-  /**
-   * Render mode. In `'onboarding'`, the LearningModeSettings sheet is
-   * suppressed so the user can't slip into deep settings during their guided
-   * first lesson. Other behaviour (chat, FSRS, audio) is unchanged.
-   */
-  mode?: 'normal' | 'onboarding';
-  /**
-   * Fires after the user rates a card and the FSRS update is in flight.
-   * Receives the rating + a snapshot of the session counters so the
-   * onboarding wizard can advance / surface stats without spinning up its
-   * own counter logic.
-   */
-  onCardRated?: (
-    rating: ReviewRating | undefined,
-    snapshot: SessionSnapshot,
-  ) => void;
-  /**
-   * Fires after an undo actually reverted a review — the mirror image of
-   * `onCardRated`, so the onboarding wizard can decrement its rated-card
-   * counter and keep the lesson progress accurate.
-   */
-  onCardUndone?: (snapshot: SessionSnapshot) => void;
 }
 
 /**
  * Learning mode body content (card, controls, settings).
- * Does NOT render its own header — the parent layout handles that.
+ * Does NOT render its own header. The parent layout handles that.
  */
 export function LearningMode({
   state,
@@ -96,9 +70,6 @@ export function LearningMode({
   onGoHome,
   onNavigateToChat,
   onNavigateToAddCustomCards,
-  mode = 'normal',
-  onCardRated,
-  onCardUndone,
 }: LearningModeProps) {
   const t = useTranslations('LearningMode');
   const chatContext = useLearningChatToggle();
@@ -113,7 +84,7 @@ export function LearningMode({
   const [fullReviewRevealed, setFullReviewRevealed] = useState(false);
 
   // Stable merged-playback surface for the card content. Identity only
-  // changes on play/pause or a re-merge — NOT per frame; per-frame time
+  // changes on play/pause or a re-merge, NOT per frame; per-frame time
   // lives in audio.clock (see useActiveCue / useKaraokeIndex).
   const mergedPlayback = useMemo(
     () => ({
@@ -130,7 +101,7 @@ export function LearningMode({
   const [audioAllTargetsRevealed, setAudioAllTargetsRevealed] = useState(true);
   const [audioRevealNonce, setAudioRevealNonce] = useState(0);
   // Monotonic signals for the keyboard shortcuts: T replays the target clip,
-  // Shift+R resets the card. Never reset — the children treat any change as
+  // Shift+R resets the card. Never reset. The children treat any change as
   // a fresh request (same contract as audioRevealNonce).
   const [targetReplayNonce, setTargetReplayNonce] = useState(0);
   const [cardResetNonce, setCardResetNonce] = useState(0);
@@ -163,7 +134,7 @@ export function LearningMode({
     audio.load();
   }, []);
 
-  // Pause card audio while the celebration screen is showing — the success
+  // Pause card audio while the celebration screen is showing. The success
   // sound and Media Session belong to it, not the underlying card. When the
   // celebration dismisses, resume autoplay for the now-visible card if the
   // user has it enabled (the audio hook only auto-plays on cardId change, so
@@ -171,14 +142,14 @@ export function LearningMode({
   // The celebration is now lifted to BaseState so it survives a transition
   // from `reviewing` to `noCardsDue` (milestone hit on the very last card).
   const progressDisplayActive = state.progressDisplayActive;
-  // Mirror useLearningAudio's default exactly — `autoPlayAudio` is opt-out
+  // Mirror useLearningAudio's default exactly. `autoPlayAudio` is opt-out
   // (DEFAULT_AUTO_PLAY = true), not opt-in.
   const autoPlayAudio =
     state.status === 'reviewing'
       ? (state.courseSettings.autoPlayAudio ?? DEFAULT_AUTO_PLAY)
       : false;
   // Capture audio + setting via refs so the celebration-flag effect depends
-  // only on `progressDisplayActive` — `useLearningAudio` returns a fresh
+  // only on `progressDisplayActive`. `useLearningAudio` returns a fresh
   // object on every render, which would otherwise cause that effect to
   // re-run (and call `audio.pause()`) on every parent render.
   const autoPlayAudioRef = useRef(autoPlayAudio);
@@ -203,10 +174,10 @@ export function LearningMode({
   // `audioAllTargetsRevealed` is driven entirely by LearningCardContent's
   // report (it fires on mount and on every change of its computed value,
   // which matches the actual blur state). Forcing it back to "hidden" here on
-  // card/mode changes could contradict the child's unchanged computed value —
-  // the child then never re-reports, leaving the button stuck on "Reveal"
+  // card/mode changes could contradict the child's unchanged computed value.
+  // The child then never re-reports, leaving the button stuck on "Reveal"
   // while every target is already visible (so pressing it did nothing).
-  // The reveal nonce is likewise monotonic — never reset — so the child can
+  // The reveal nonce is likewise monotonic, never reset, so the child can
   // treat any change as a fresh "reveal all" request.
 
   const handleReveal = useCallback(() => setFullReviewRevealed(true), []);
@@ -253,12 +224,12 @@ export function LearningMode({
   // Auto-rating: derive a rating from the WORST target language submitted so
   // far, so a perfect answer in one language can't mask a failed one in
   // another. Pushed into the hook rather than computed there because the
-  // summary lives here. It only ever preselects — nothing advances the card.
+  // summary lives here. It only ever preselects, nothing advances the card.
   const settingsForAutoRate =
     state.status === 'reviewing' ? state.courseSettings : null;
   // A copy-through card ("Abschreiben") prints the target above the input, so
   // a verbatim copy scores 100%. That is not recall, so it must neither
-  // preselect a rating nor reach the accuracy series — otherwise instantProceed
+  // preselect a rating nor reach the accuracy series, otherwise instantProceed
   // graduates the card on a copy and the stats read as a perfect answer.
   // Recomputed here because the render-time `firstExposure` below sits after
   // this component's early returns, and hooks have to run before those.
@@ -290,13 +261,11 @@ export function LearningMode({
     );
   }, [autoRateEnabled, autoRateAccuracy, autoRateThresholds, setAutoRating]);
 
-  // Wrap handleNext to include accuracy from full review mode + notify the
-  // onboarding container (if any) that a card was just rated, along with a
-  // session-state snapshot so the wizard can show the celebration screen.
+  // Wrap handleNext to include accuracy from full review mode.
   const handleNextWithAccuracy = useCallback(
     (ratingOverride?: ReviewRating) => {
       if (state.status !== 'reviewing') return;
-      // Only a fully answered card contributes to the accuracy stats — the
+      // Only a fully answered card contributes to the accuracy stats. The
       // same rule as before this became a summary. Both punctuation variants
       // are recorded together; `primary` is whichever one matches the learner's
       // setting, so the historical series keeps the meaning it always had.
@@ -316,17 +285,13 @@ export function LearningMode({
           }
           : undefined;
       state.handleNext(ratingOverride, accuracy);
-      onCardRated?.(ratingOverride, buildSessionSnapshot(state));
     },
-    [state, writingAccuracy, autoRateFirstExposure, onCardRated],
+    [state, writingAccuracy, autoRateFirstExposure],
   );
-  // Mirror of handleNextWithAccuracy for the undo direction — only notifies
-  // when a review was actually reverted (empty stack / races resolve false).
   const handleUndoWithNotify = useCallback(async () => {
     if (state.status !== 'reviewing') return;
-    const undone = await state.handleUndo();
-    if (undone) onCardUndone?.(buildSessionSnapshot(state));
-  }, [state, onCardUndone]);
+    await state.handleUndo();
+  }, [state]);
   const handleRevealAllAudioTargets = useCallback(() => {
     setAudioRevealNonce((n) => n + 1);
   }, []);
@@ -338,7 +303,7 @@ export function LearningMode({
   const registerRevertHandler = useCallback((fn: (() => boolean) | null) => {
     revertHandlerRef.current = fn;
   }, []);
-  // Returns whether anything was actually taken back — the ← shortcut only
+  // Returns whether anything was actually taken back. The ← shortcut only
   // consumes the keypress when it acts (see LearningControls).
   const handleBack = useCallback((): boolean => {
     if (revertHandlerRef.current?.()) return true;
@@ -352,7 +317,7 @@ export function LearningMode({
   }, []);
   // Restart the current card from scratch: re-blur everything, drop typed and
   // submitted translations, clear the picked rating, and replay the merged
-  // audio from 0 (deliberately unconditional, like the R shortcut — the user
+  // audio from 0 (deliberately unconditional, like the R shortcut, the user
   // just asked for a restart).
   const handleRestartCard = useCallback(() => {
     if (state.status !== 'reviewing') return;
@@ -379,7 +344,7 @@ export function LearningMode({
     setDeleteConfirmOpen(false);
     await state.handleDelete();
   }, [state]);
-  // Card-level flag — the mutation flags every non-source-language
+  // Card-level flag. The mutation flags every non-source-language
   // translation on the card at once, so no per-language pick here.
   const handleConfirmFlag = useCallback(async () => {
     if (state.status !== 'reviewing') return;
@@ -388,7 +353,7 @@ export function LearningMode({
   }, [state]);
   // Declared up here (above the early returns) so its `useCallback` keeps a
   // stable position in the hook list across loading → reviewing transitions.
-  // Gates on status internally — non-reviewing states get a no-op.
+  // Gates on status internally. Non-reviewing states get a no-op.
   const handleRegenerateAudioWithPause = useCallback(() => {
     if (state.status !== 'reviewing') return;
     audio.pause();
@@ -446,15 +411,13 @@ export function LearningMode({
     return (
       <div className="flex flex-col h-full">
         <NoCollectionState onGoHome={onGoHome} />
-        {mode === 'onboarding' ? null : (
-          <LearningModeSettings
-            open={state.settingsOpen}
-            onOpenChange={state.setSettingsOpen}
-            courseSettings={state.courseSettings}
-            baseLanguages={state.baseLanguages}
-            targetLanguages={state.targetLanguages}
-          />
-        )}
+        <LearningModeSettings
+          open={state.settingsOpen}
+          onOpenChange={state.setSettingsOpen}
+          courseSettings={state.courseSettings}
+          baseLanguages={state.baseLanguages}
+          targetLanguages={state.targetLanguages}
+        />
       </div>
     );
   }
@@ -473,15 +436,13 @@ export function LearningMode({
           onNavigateToChat={onNavigateToChat}
           onNavigateToAddCustomCards={onNavigateToAddCustomCards}
         />
-        {mode === 'onboarding' ? null : (
-          <LearningModeSettings
-            open={state.settingsOpen}
-            onOpenChange={state.setSettingsOpen}
-            courseSettings={state.courseSettings}
-            baseLanguages={state.baseLanguages}
-            targetLanguages={state.targetLanguages}
-          />
-        )}
+        <LearningModeSettings
+          open={state.settingsOpen}
+          onOpenChange={state.setSettingsOpen}
+          courseSettings={state.courseSettings}
+          baseLanguages={state.baseLanguages}
+          targetLanguages={state.targetLanguages}
+        />
         {paywallOpen && (
           <PaywallDialog
             open={paywallOpen}
@@ -510,7 +471,7 @@ export function LearningMode({
       state.courseSettings.autoPlayAudio ??
       DEFAULT_AUTO_PLAY);
 
-  // Flagging acts at the card level — the mutation retranslates every
+  // Flagging acts at the card level. The mutation retranslates every
   // non-source-language translation on the card. We hide the button when
   // there's no target translation to display since "flag" makes little
   // sense to the learner on a card they can't actually review.
@@ -539,7 +500,7 @@ export function LearningMode({
   );
 
   // "Show translation on new sentences" (writing mode): the answer is shown
-  // above the input to copy-type on the card's first N reviews — never in
+  // above the input to copy-type on the card's first N reviews, never in
   // transcribe, where the shown target would BE the answer (gate lives in
   // the helper). freeStudyPlayCount is passed because free play advances
   // neither preReviewCount nor the FSRS reps, so without it the assist would
@@ -623,6 +584,7 @@ export function LearningMode({
         onAllSubmittedChange={setAllSubmitted}
         onAccuracyChange={setWritingAccuracy}
         showRomanization={state.courseSettings.showRomanization ?? true}
+        showIpa={state.courseSettings.showIpa ?? false}
         cardId={state.cardId}
         onRegisterRevert={registerRevertHandler}
         resetSignal={cardResetNonce}
@@ -683,6 +645,7 @@ export function LearningMode({
         autoRevealBaseLanguages={state.courseSettings.autoRevealBaseLanguages ?? true}
         revealedLanguages={audio.revealedLanguages}
         showRomanization={state.courseSettings.showRomanization ?? true}
+        showIpa={state.courseSettings.showIpa ?? false}
         revealAllSignal={audioRevealNonce}
         resetSignal={cardResetNonce}
         replayTargetSignal={targetReplayNonce}
@@ -706,18 +669,14 @@ export function LearningMode({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Normal mode: bar tracks `dailyReviewsToday` (audio + full, server-
-          persisted, hydrated on mount) so the fill level always matches when
-          the milestone celebration will fire, even after a reload or a break
-          mid-day. Onboarding keeps its in-memory session counter (0/10 lesson
-          progress). Free play never shows the bar in either face, since plays
+      {/* The bar tracks `dailyReviewsToday` (audio + full, server-persisted,
+          hydrated on mount) so the fill level always matches when the
+          milestone celebration will fire, even after a reload or a break
+          mid-day. Free play never shows the bar in either face, since plays
           don't count toward the milestone. */}
       {!isFreePlay &&
         state.courseSettings.progressDisplayEnabled !== false && (
-        <SessionProgressBar
-          current={mode === 'onboarding' ? state.sessionCardCount : state.dailyReviewsToday}
-          max={mode === 'onboarding' ? 10 : undefined}
-        />
+        <SessionProgressBar current={state.dailyReviewsToday} />
       )}
       <div className="flex-1 min-h-0 relative">
         <AnimatePresence mode="wait" initial={false}>
@@ -775,7 +734,7 @@ export function LearningMode({
         onReveal={handleReveal}
         shortcutsDisabled={
           // Any overlay that owns the keyboard must silence the session
-          // shortcuts — with a confirm dialog open, a stray ← would undo
+          // shortcuts, with a confirm dialog open, a stray ← would undo
           // the previous review behind the modal. Dialogs/menus that manage
           // their own open state (help, card menu) are caught structurally in
           // LearningControls' handler; the chat panel isn't a dialog and traps
@@ -791,15 +750,13 @@ export function LearningMode({
         onRevealAllAudioTargets={handleRevealAllAudioTargets}
       />
 
-      {mode === 'onboarding' ? null : (
-        <LearningModeSettings
-          open={state.settingsOpen}
-          onOpenChange={state.setSettingsOpen}
-          courseSettings={state.courseSettings}
-          baseLanguages={state.baseLanguages}
-          targetLanguages={state.targetLanguages}
-        />
-      )}
+      <LearningModeSettings
+        open={state.settingsOpen}
+        onOpenChange={state.setSettingsOpen}
+        courseSettings={state.courseSettings}
+        baseLanguages={state.baseLanguages}
+        targetLanguages={state.targetLanguages}
+      />
 
       <EditCardDialog
         open={editDialogOpen}
@@ -864,8 +821,8 @@ export function LearningMode({
  *
  * `customCardsPendingAdd` mirrors the `addCardsFromCollection` Phase 1
  * branch: any text in `activeCustomCollectionIds` that hasn't been pulled
- * yet is free to add (custom cards don't consume the `SENTENCES` quota —
- * see decks.ts). The upgrade button is gated on this so a user with custom
+ * yet is free to add (custom cards don't consume the `SENTENCES` quota.
+ * See decks.ts). The upgrade button is gated on this so a user with custom
  * cards still queued never gets a misleading paywall.
  */
 function NoCardsDueWithFilter({
@@ -912,6 +869,9 @@ function NoCardsDueWithFilter({
     emptyReason?.reason === 'all_caught_up'
       ? emptyReason.customCardsPendingAdd
       : false;
+  // separateModeTracking enable-time seed still running. The writing queue
+  // is empty only because cards aren't seeded yet.
+  const isPreparingWriting = emptyReason?.reason === 'preparing_writing';
 
   const handleIncludeOtherSource = useCallback(() => {
     updateSettings({ courseId, studyContentFilter: 'both' });
@@ -930,6 +890,7 @@ function NoCardsDueWithFilter({
       currentSourceHasAnyCards={currentSourceHasAnyCards}
       filterUnblockAvailable={filterUnblockAvailable}
       customCardsPendingAdd={customCardsPendingAdd}
+      isPreparingWriting={isPreparingWriting}
       onIncludeOtherSource={handleIncludeOtherSource}
       onCreateChatCards={onNavigateToChat}
       onCreateCustomCards={onNavigateToAddCustomCards}

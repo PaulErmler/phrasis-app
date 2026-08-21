@@ -6,6 +6,7 @@ import { CardShell } from './CardShell';
 import type { CardOriginPill } from './cardOriginPill';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
+import { AnnotationLines } from './AnnotationLines';
 import type { MergedPlayback } from '@/hooks/use-active-cue';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import { useCardPlayback, displayReviewCount } from './useCardPlayback';
@@ -56,12 +57,14 @@ interface LearningCardContentProps {
   onAllTargetsRevealedChange?: (allRevealed: boolean) => void;
   bare?: boolean;
   showRomanization?: boolean;
+  /** IPA line toggle (from courseSettings.showIpa; default OFF). */
+  showIpa?: boolean;
   /** Karaoke word highlighting toggle (defaults true; pass false to force off). */
   highlightEnabled?: boolean;
   /**
    * Merged-audio playback state from useAudioPlayer. When present and playing,
    * takes priority over per-language AudioButton playback for highlight timing.
-   * Per-frame time lives in `clock`, not React state — see useActiveCue.
+   * Per-frame time lives in `clock`, not React state. See useActiveCue.
    */
   mergedPlayback?: MergedPlayback;
   /** Course-level per-language general speed (used by both CardShell base rows and target rows here). */
@@ -70,7 +73,7 @@ interface LearningCardContentProps {
   audioSpeedOverrides?: Record<string, number>;
   /** Cycle handler for a language's speed badge; null clears the override. */
   onSpeedCycle?: (language: string, next: number | null) => void;
-  /** Badge behavior — `ephemeral` hides the null/default slot and greys 1.0. */
+  /** Badge behavior. `ephemeral` hides the null/default slot and greys 1.0. */
   speedBadgeVariant?: 'persistent' | 'ephemeral';
   /** Client-only session flag: did the viewer click flag on this card? */
   flaggedInSession?: boolean;
@@ -119,6 +122,7 @@ export function LearningCardContent({
   onAllTargetsRevealedChange,
   bare = false,
   showRomanization = true,
+  showIpa = false,
   highlightEnabled = true,
   mergedPlayback,
   languagePlaybackSpeeds,
@@ -140,7 +144,7 @@ export function LearningCardContent({
 
   // Last processed reveal signal. Initialized to the mount value so a stale
   // nonce from before this mount isn't treated as a fresh "reveal all"
-  // request; after that, any change is one (the nonce is monotonic — the
+  // request; after that, any change is one (the nonce is monotonic, the
   // parent never resets it, so no value can collide with an older one).
   const lastRevealSignalRef = useRef(revealAllSignal);
 
@@ -197,7 +201,7 @@ export function LearningCardContent({
 
   // Restart-card signal: drop manual reveals so the card re-blurs (the
   // parent resets the audio-driven reveals separately). Mount value is
-  // ignored — same stale-nonce contract as revealAllSignal above.
+  // ignored, same stale-nonce contract as revealAllSignal above.
   const lastResetSignalRef = useRef(resetSignal);
   useEffect(() => {
     if (resetSignal === undefined || resetSignal === lastResetSignalRef.current) {
@@ -234,6 +238,7 @@ export function LearningCardContent({
         onAudioPlay={onAudioPlay}
         bare={bare}
         showRomanization={showRomanization}
+        showIpa={showIpa}
         highlightEnabled={highlightEnabled}
         activeClip={activeClip}
         clockBinding={clockBinding}
@@ -297,13 +302,13 @@ export function LearningCardContent({
                       // target-language word via this data attribute.
                       coachmarkAnchorForLongestWord={index === 0 ? 'word-tap' : undefined}
                     />
-                    {showRomanization && translation.romanization && (
-                      <p
-                        className={`text-romanization ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
-                      >
-                        {translation.romanization}
-                      </p>
-                    )}
+                    <AnnotationLines
+                      romanization={translation.romanization}
+                      ipa={translation.ipa}
+                      showRomanization={showRomanization}
+                      showIpa={showIpa}
+                      className={isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}
+                    />
                   </div>
                   <div className="flex items-center">
                     <AudioButton

@@ -2,17 +2,14 @@
 
 import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
-import { RefreshCw, Sprout, Clock, Target, SlidersHorizontal, Zap } from 'lucide-react';
+import { Headphones, Sparkles, TrendingUp } from 'lucide-react';
 import { LandingSquircleIcon } from '@/components/landing/landing-squircle-icon';
 import { fadeInUp } from './animations';
 
 const CARDS = [
-  { key: 'activeRecall', Icon: RefreshCw },
-  { key: 'grammar', Icon: Sprout },
-  { key: 'daily', Icon: Clock },
-  { key: 'practical', Icon: Target },
-  { key: 'customisation', Icon: SlidersHorizontal },
-  { key: 'feedback', Icon: Zap },
+  { key: 'practice', Icon: Headphones },
+  { key: 'content', Icon: Sparkles },
+  { key: 'path', Icon: TrendingUp },
 ] as const;
 
 export function PhilosophySection() {
@@ -31,7 +28,7 @@ export function PhilosophySection() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6">
           {CARDS.map(({ key, Icon }, index) => (
             <motion.div
               key={key}

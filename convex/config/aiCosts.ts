@@ -2,7 +2,7 @@
  * Published list prices for the providers PostHog cannot price on its own.
  *
  * PostHog computes `$ai_total_cost_usd` automatically for LLM calls by matching
- * model + provider against OpenRouter's pricing table — which is exactly the
+ * model + provider against OpenRouter's pricing table, which is exactly the
  * provider we bill against, so every OpenRouter path needs nothing here. The
  * providers below (speech synthesis, transcription, machine translation) have
  * no entry in that table, so we compute the cost ourselves and send it.
@@ -10,7 +10,7 @@
  * ⚠️ These are list prices transcribed by hand, not values read from an invoice.
  * They should be reconciled against real billing before anyone makes a pricing
  * decision on top of them. Volume discounts, free tiers, and regional pricing
- * are all deliberately ignored — the goal is per-feature relative cost and a
+ * are all deliberately ignored. The goal is per-feature relative cost and a
  * defensible order of magnitude, not accounting.
  */
 
@@ -38,7 +38,7 @@ export const AI_COST_RATES = {
     sourceUrl: 'https://cloud.google.com/translate/pricing',
     lastVerified: '2026-07-28',
   },
-  /** Azure Speech — Fast Transcription, billed per hour of audio. */
+  /** Azure Speech. Fast Transcription, billed per hour of audio. */
   azureStt: {
     usdPerUnit: 0.36,
     unit: 'audio_hour',

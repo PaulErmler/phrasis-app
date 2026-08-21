@@ -19,7 +19,7 @@ import landingDe from '@/messages/landing/de.json';
  *    compared by argument name, type, and the set of branch keys; branch
  *    bodies are scanned recursively for nested simple arguments (e.g.
  *    `other {Next {count} sentences from {name}}`),
- *  - `#` inside plural branches (the implicit plural value — normalized away).
+ *  - `#` inside plural branches (the implicit plural value: normalized away).
  *
  * NOT supported (unused here, and the extractor throws on anything it does
  * not recognize rather than silently skipping): `offset:`, selectordinal,
@@ -108,8 +108,8 @@ function collectPlaceholders(message: string, out: Set<string>): void {
     } else if (/^[a-zA-Z0-9_]+$/.test(inner)) {
       out.add(inner);
     } else {
-      // Anything else means the extractor's supported subset is out of date —
-      // fail loudly instead of silently under-checking.
+      // Anything else means the extractor's supported subset is out of date.
+      // Fail loudly instead of silently under-checking.
       throw new Error(`Unsupported ICU syntax "{${inner}}" in message: ${message}`);
     }
     i = close + 1;

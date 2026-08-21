@@ -53,7 +53,7 @@ export default function LowQuotaDialog({
   const consumable = isFeatureConsumable(featureId);
   const creditBacked = isCreditBackedFeature(featureId);
 
-  // Store builds must not offer upgrades — forcing "no upgrade available"
+  // Store builds must not offer upgrades. Forcing "no upgrade available"
   // routes every branch below to the neutral contact-support copy.
   const isNative = useIsNativeApp();
   const upgradeProduct = isNative

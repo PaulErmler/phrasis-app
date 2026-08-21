@@ -9,7 +9,7 @@ import { buildCardSearchableText } from "../../lib/cardContent";
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
-// The rebuild fan-out is DEBOUNCED (10s marker on the text row — see
+// The rebuild fan-out is DEBOUNCED (10s marker on the text row, see
 // scheduleSearchableTextRebuild in convex/features/decks.ts), so the tests
 // run under fake timers and drain via finishAllScheduledFunctions instead of
 // yielding real 0ms macrotasks.
@@ -22,7 +22,7 @@ afterEach(() => {
 
 // The three late-content store mutations in convex/features/decks.ts schedule
 // `rebuildSearchableTextForText` (0ms fan-out over cards.by_textId) whenever a
-// translation or romanization lands AFTER a card was created — the review-time
+// translation or romanization lands AFTER a card was created. The review-time
 // staleness check only compares language sets, so without this cards keep a
 // stale search string until reviewed (or forever, for in-place content
 // changes). These tests drive each funnel and assert the card's search string
@@ -118,11 +118,15 @@ describe("rebuildSearchableTextForText via storeTranslationAndScheduleTTS", () =
     expect(before.searchableText).not.toContain("considerate");
     expect(before.searchableTextLanguages).toEqual([]);
 
+    // A real curated voice: every text here has a card, so `skipTts` no
+    // longer short-circuits the TTS tail (cards always get audio) and the
+    // enqueue resolves the voice's gender from the curated list. The pool is
+    // module-mocked; nothing synthesizes.
     await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
       textId,
       targetLanguage: "en",
       translatedText: "You are really considerate",
-      voiceName: "voice",
+      voiceName: "en-US-Chirp3-HD-Leda",
       skipTts: true,
     });
     await drainScheduled(t);
@@ -147,7 +151,7 @@ describe("rebuildSearchableTextForText via storeTranslationAndScheduleTTS", () =
       textId,
       targetLanguage: "en",
       translatedText: "You are truly thoughtful",
-      voiceName: "voice",
+      voiceName: "en-US-Chirp3-HD-Leda",
       replaceExisting: true,
       skipTts: true,
     });
@@ -175,7 +179,7 @@ describe("rebuildSearchableTextForText via storeTranslationAndScheduleTTS", () =
       textId,
       targetLanguage: "zh",
       translatedText: "你好吗",
-      voiceName: "voice",
+      voiceName: "cmn-CN-Chirp3-HD-Leda",
       romanizedText: "nihaoma",
       romanizationSource: "pinyin",
       skipTts: true,
@@ -187,7 +191,7 @@ describe("rebuildSearchableTextForText via storeTranslationAndScheduleTTS", () =
 });
 
 describe("rebuildSearchableTextForText via the romanization store mutations", () => {
-  it("adds a late source romanization (storeSourceRomanization)", async () => {
+  it("adds a late source romanization (storeSourceAnnotation)", async () => {
     const t = convexTest(schema, modules);
     const { textId, cardId } = await seedCourseCardText(t, {
       sourceText: "你真的体贴",
@@ -198,10 +202,11 @@ describe("rebuildSearchableTextForText via the romanization store mutations", ()
     });
     expect((await getCard(t, cardId)).searchableText).not.toContain("zhende");
 
-    await t.mutation(internal.features.decks.storeSourceRomanization, {
+    await t.mutation(internal.features.decks.storeSourceAnnotation, {
       textId,
-      romanizedText: "ni zhende titie",
-      romanizationSource: "pinyin",
+      kind: "romanization",
+      value: "ni zhende titie",
+      source: "pinyin",
     });
     await drainScheduled(t);
 
@@ -218,10 +223,11 @@ describe("rebuildSearchableTextForText via the romanization store mutations", ()
     });
     const before = await getCard(t, cardId);
 
-    await t.mutation(internal.features.decks.storeSourceRomanization, {
+    await t.mutation(internal.features.decks.storeSourceAnnotation, {
       textId,
-      romanizedText: "",
-      romanizationSource: "pinyin",
+      kind: "romanization",
+      value: "",
+      source: "pinyin",
     });
     await drainScheduled(t);
 
@@ -230,7 +236,7 @@ describe("rebuildSearchableTextForText via the romanization store mutations", ()
     );
   });
 
-  it("adds a late translation romanization (storeTranslationRomanization)", async () => {
+  it("adds a late translation romanization (storeTranslationAnnotation)", async () => {
     const t = convexTest(schema, modules);
     const { textId, cardId } = await seedCourseCardText(t, {
       sourceText: "How are you",
@@ -241,11 +247,12 @@ describe("rebuildSearchableTextForText via the romanization store mutations", ()
     });
     expect((await getCard(t, cardId)).searchableText).not.toContain("nihaoma");
 
-    await t.mutation(internal.features.decks.storeTranslationRomanization, {
+    await t.mutation(internal.features.decks.storeTranslationAnnotation, {
       textId,
       language: "zh",
-      romanizedText: "nihaoma",
-      romanizationSource: "pinyin",
+      kind: "romanization",
+      value: "nihaoma",
+      source: "pinyin",
     });
     await drainScheduled(t);
 
@@ -253,7 +260,7 @@ describe("rebuildSearchableTextForText via the romanization store mutations", ()
   });
 });
 
-describe("scheduleSearchableTextRebuild — per-text debounce", () => {
+describe("scheduleSearchableTextRebuild: per-text debounce", () => {
   it("coalesces a burst of stores into one pending rebuild that sees all content", async () => {
     const t = convexTest(schema, modules);
     const { textId, cardId } = await seedCourseCardText(t, {
@@ -268,7 +275,7 @@ describe("scheduleSearchableTextRebuild — per-text debounce", () => {
       textId,
       targetLanguage: "en",
       translatedText: "You are really considerate",
-      voiceName: "voice",
+      voiceName: "en-US-Chirp3-HD-Leda",
       skipTts: true,
     });
     const marker1 = (await t.run(async (ctx) => (await ctx.db.get(textId))!))
@@ -277,10 +284,11 @@ describe("scheduleSearchableTextRebuild — per-text debounce", () => {
 
     // …and a second store inside the window piggybacks on it (same marker,
     // no second schedule) instead of fanning out its own full rebuild.
-    await t.mutation(internal.features.decks.storeSourceRomanization, {
+    await t.mutation(internal.features.decks.storeSourceAnnotation, {
       textId,
-      romanizedText: "ni zhende titie",
-      romanizationSource: "pinyin",
+      kind: "romanization",
+      value: "ni zhende titie",
+      source: "pinyin",
     });
     const marker2 = (await t.run(async (ctx) => (await ctx.db.get(textId))!))
       .searchableRebuildScheduledAt;

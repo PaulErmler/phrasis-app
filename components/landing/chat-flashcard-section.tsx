@@ -2,10 +2,17 @@
 
 import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
+import { Keyboard, FileSpreadsheet, MessageCircle } from 'lucide-react';
 import {
   ChatFlashcardDemo,
   ChatDemoContextCard,
 } from '@/components/landing/chat-flashcard-demo';
+
+const PATHS = [
+  { key: 'type', Icon: Keyboard },
+  { key: 'import', Icon: FileSpreadsheet },
+  { key: 'ask', Icon: MessageCircle },
+] as const;
 
 export function ChatFlashcardSection() {
   const t = useTranslations('LandingPage.chatDemo');
@@ -32,6 +39,21 @@ export function ChatFlashcardSection() {
             <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
               {t('subtitle')}
             </p>
+            <ul className="space-y-4 pt-1">
+              {PATHS.map(({ key, Icon }) => (
+                <li key={key} className="flex gap-3">
+                  <Icon className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm md:text-base font-semibold text-foreground">
+                      {t(`paths.${key}.title`)}
+                    </p>
+                    <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+                      {t(`paths.${key}.body`)}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
             <div className="space-y-3 pt-2">
               <p className="text-sm font-medium text-muted-foreground">
                 {t('contextTitle')}

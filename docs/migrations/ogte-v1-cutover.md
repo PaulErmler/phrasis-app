@@ -1,4 +1,4 @@
-# OGTE V1 Migration Runbook
+# OGTE V1 migration runbook
 
 How to migrate the production app from the legacy 7-collection course
 (`Essential`, `A1`..`C2`) to the OGTE 20-level course
@@ -25,7 +25,7 @@ new home view.
   `B2` → `L11`, `C1` → `L14`, `C2` → `L17`). The rolled-forward `cardsAdded`
   is *also* stored separately as `collectionProgress.legacyCarryAdded` so the
   home view can widen the denominator (`textCount + legacyCarryAdded`) and the
-  displayed ratio stays coherent — a user with legacy `100/295` on `A1` lands
+  displayed ratio stays coherent. A user with legacy `100/295` on `A1` lands
   on L02 as `100/(L02.textCount + 100)`, not `100/L02.textCount`.
 - **`courseSettings.reconciledDatasetId`** acts as the idempotency gate.
   `cutoverUser` no-ops if it already matches the target dataset.
@@ -58,7 +58,7 @@ new home view.
   (`c-<hex>`). The pipeline in `data_preparation/ogte-dataset/curation/curate.py`
   produces these automatically.
 
-## Step 1 — One-time `cardsMastered` backfill
+## Step 1: one-time `cardsMastered` backfill
 
 Required *once per environment*. Populates `cardsMastered` on existing
 `collectionProgress` rows by counting current mastered cards. Skipped rows
@@ -75,7 +75,7 @@ Convex dashboard for `processBatch` invocations.
 If the database has zero `collectionProgress` rows (fresh staging), the
 backfill finishes in one batch with `processed: 0`.
 
-## Step 1b — One-time content-origin backfill
+## Step 1b: one-time content-origin backfill
 
 Also required *once per environment*, alongside Step 1. Powers the
 content-source filter feature (`courseSettings.studyContentFilter`) by
@@ -86,9 +86,9 @@ Going forward, all new collection/card inserts already write these fields
 directly (see `convex/db/collections.ts`, `convex/admin/uploadDataset.ts`,
 `convex/features/decks.ts:createCardsFromTexts`), so the backfill only
 touches rows that pre-date the deploy. Both phases are idempotent on the
-field-undefined check — re-runs are free.
+field-undefined check, so re-runs are free.
 
-### Phase A — collections
+### Phase A: collections
 
 Small one-pass mutation (tens to low hundreds of rows). Classifies each
 collection:
@@ -104,7 +104,7 @@ npx convex run admin/backfillCollectionOrigin:runCollectionsOriginBackfill
 Returns `{ processed, updated, classified: { premade, custom, chat } }`.
 Verify `updated > 0` on first run, `updated === 0` on the second.
 
-### Phase B — cards
+### Phase B: cards
 
 Paginated batch processor (`CARDS_BATCH_SIZE = 200`, self-schedules until
 done). For each card missing `collectionId` or `collectionOrigin`, reads
@@ -120,7 +120,7 @@ The action returns `{ status: 'started' }`. Watch the **Functions** tab
 for `processCardsBatch` invocations until they stop firing. For ~100k
 cards expect a few minutes total.
 
-**Must run Phase A before Phase B** — Phase B reads `collection.origin`
+**Must run Phase A before Phase B.** Phase B reads `collection.origin`
 from Phase A's output.
 
 ### Tightening the schema (separate follow-up PR)
@@ -136,7 +136,7 @@ and `cards` filtered by `collectionOrigin === undefined`), drop the
 
 This ships as its own deploy so a stuck backfill can't break writes.
 
-## Step 2 — Upload the OGTE dataset (inactive)
+## Step 2: upload the OGTE dataset (inactive)
 
 ```bash
 node scripts/uploadOgteV1.mjs --version 1.0.0
@@ -145,7 +145,7 @@ node scripts/uploadOgteV1.mjs --version 1.0.0
 What happens:
 
 1. `createOrGetDataset` upserts a `datasets` row by `(slug, version)` with
-   `isActive: false`. **Save the printed `Dataset id: <id>`** — you need it
+   `isActive: false`. **Save the printed `Dataset id: <id>`.** You need it
    for step 3.
 2. For each of the 20 levels, `upsertDatasetCollection` upserts a
    `collections` row keyed by `(datasetId, order)`, setting `code`,
@@ -154,14 +154,14 @@ What happens:
    keyed by `(datasetId, externalId)`. New rows get `language: 'en'`,
    `userCreated: false`, `register` mapped from the CSV's `formality` column.
 
-Re-running with the same `--version` is safe — texts are upserted in place,
+Re-running with the same `--version` is safe. Texts are upserted in place,
 collection metadata is patched, and no duplicates are created.
 
 To re-upload with different display names or a new dataset version, change
 the `LEVELS` array in `scripts/uploadOgteV1.mjs` (for display tweaks) or pass
 a different `--version` (for a new dataset row).
 
-## Step 3 — Verify the upload landed but is not yet referenced
+## Step 3: verify the upload landed but is not yet referenced
 
 ```bash
 # In the Convex dashboard data tab:
@@ -174,10 +174,10 @@ The home view will still render the legacy 7-collection view because
 `convex/features/home.ts:getActiveDataset` returns `null` (no active dataset
 for English yet) and the query falls back to legacy rows only.
 
-## Step 4 — Activate + fan out the per-user cutover
+## Step 4: activate + fan out the per-user cutover
 
 ```bash
-# Enable the cutover flag — the activation mutation refuses to schedule
+# Enable the cutover flag; the activation mutation refuses to schedule
 # without it, so accidental dashboard clicks cannot fan out across users.
 npx convex env set FF_NEW_COURSE_CUTOVER true
 
@@ -190,7 +190,7 @@ npx convex run admin/activateDataset:activateDataset \
 What happens server-side:
 
 1. The dataset's `isActive` flips to `true`; any other active dataset for the
-   same language flips to `false`. **The home query immediately switches** —
+   same language flips to `false`. **The home query immediately switches.**
    users with the app open will see the 20-level view on the next subscription
    tick.
 2. `cutoverAllUsers` paginates over `courses` (25 per page) and schedules
@@ -211,9 +211,9 @@ What happens server-side:
 
 Watch the **Functions** tab during the fan-out. For ~10k active courses the
 fan-out completes in roughly `10000 × 50ms ≈ 8 minutes`, plus whatever each
-`cutoverUser` takes (small — single-digit ms typical).
+`cutoverUser` takes (small, single-digit ms typical).
 
-## Step 5 — Verify
+## Step 5: verify
 
 For a representative user with prior legacy progress:
 
@@ -227,7 +227,7 @@ For a representative user with prior legacy progress:
 3. In the app, the home view should show 20 chips in 7 CEFR bands and the
    focused-level detail card should reflect the per-tier blurb.
 4. FSRS state on cards (`dueDate`, `fsrsState`) should be **byte-identical**
-   pre/post cutover — we don't touch any `cards` row.
+   pre/post cutover, because we don't touch any `cards` row.
 
 ## Retroactive `legacyCarryAdded` backfill
 
@@ -250,7 +250,7 @@ The mutation paginates over `courses` (25 per page) and schedules
 `backfillUser` for each non-archived course with a 50ms stagger. Each
 `backfillUser` no-ops if `courseSettings.reconciledDatasetId !== datasetId`
 (only already-cutover users are touched) and overwrites `legacyCarryAdded`
-on each destination row with the legacy snapshot — idempotent on re-run.
+on each destination row with the legacy snapshot, idempotent on re-run.
 
 Skip this step entirely in environments that have not yet run Step 4;
 `cutoverUser` writes `legacyCarryAdded` directly on first cutover.
@@ -268,7 +268,7 @@ npx convex run admin/activateDataset:runCutoverNow \
 
 `runCutoverNow` requires `FF_NEW_COURSE_CUTOVER=true`. It schedules
 `cutoverAllUsers` which paginates all courses but skips already-reconciled
-ones — only the cleared user runs.
+ones. Only the cleared user runs.
 
 ## Rollback
 
@@ -283,23 +283,23 @@ Two reversible knobs:
    `getCollectionProgress` still returns the legacy rows, the old UI continues
    to function.
 
-No data is destroyed at any step — the migration is purely additive.
+No data is destroyed at any step. The migration is purely additive.
 
 ## Production rollout (recommended sequencing)
 
-1. **Weekday deploy 1** — Phase 1 schema + Phase 2 hooks + `cardsMastered`
+1. **Weekday deploy 1.** Phase 1 schema + Phase 2 hooks + `cardsMastered`
    backfill. Silent: no behavior change.
-2. **Weekday deploy 2** — Phase 5 segmented home view + Phase 6 collection
+2. **Weekday deploy 2.** Phase 5 segmented home view + Phase 6 collection
    helpers, behind a feature flag if desired. Silent: legacy fallback still
    renders the 7-collection view because no dataset is active.
-3. **Off-hours** — Run `node scripts/uploadOgteV1.mjs --version 1.0.0`
+3. **Off-hours.** Run `node scripts/uploadOgteV1.mjs --version 1.0.0`
    against production. Dataset lands with `isActive: false`; no user
    visibility.
-4. **Off-hours, low-traffic window** — `npx convex env set
+4. **Off-hours, low-traffic window.** `npx convex env set
    FF_NEW_COURSE_CUTOVER true` then call `activateDataset` with
    `runCutover: true`. Monitor for ~30 minutes.
-5. **Several days later** — Once active-user metrics are stable, optionally
-   mark legacy collections `legacy: true` (cosmetic only — they're already
+5. **Several days later.** Once active-user metrics are stable, optionally
+   mark legacy collections `legacy: true` (cosmetic only, they're already
    hidden) and remove the legacy fallback branch in
    `convex/features/home.ts`.
 
@@ -310,7 +310,7 @@ No data is destroyed at any step — the migration is purely additive.
   `cardsAdded` to the destination row's `cardsAdded` AND mirrors it into
   `legacyCarryAdded`, and the home view computes
   `totalTexts = collection.textCount + legacyCarryAdded`. So a user who had
-  `100/295` on legacy A1 displays as `100/(L02.textCount + 100)` on L02 —
+  `100/295` on legacy A1 displays as `100/(L02.textCount + 100)` on L02,
   numerator and denominator both reflect the prior work, the user doesn't
   feel like they're starting from scratch, and the ratio can't exceed 100%.
 - **Users mid-review during activation**: `cards` are never touched; FSRS
@@ -318,7 +318,7 @@ No data is destroyed at any step — the migration is purely additive.
   remap from a legacy collection to its new first-of-tier collection between
   reviews. Auto-add will then pull from the new collection on the next batch.
 - **Users with `currentLevel` set to a legacy CEFR string**: remapped to the
-  corresponding L-code during `cutoverUser`. Defensive — onboarding hasn't
+  corresponding L-code during `cutoverUser`. Defensive, since onboarding hasn't
   written CEFR strings into `currentLevel` for years, so most rows will not
   trigger this branch.
 - **Curation IDs in `levels_curated/`**: if the upstream dataset was

@@ -24,12 +24,12 @@ import { toast } from 'sonner';
  *
  * Three tiers, in order of preference:
  *   1. Silent reload when the tab returns from being hidden long enough and
- *      nothing is in flight — indistinguishable from a slow tab wake.
+ *      nothing is in flight: indistinguishable from a slow tab wake.
  *   2. A dismissible toast with a Reload button, but only once an update has
  *      been pending for a while with no safe moment to take it.
  *   3. A one-shot guarded reload if a chunk actually fails to load.
  *
- * Detection is focus-driven, not polled — mirroring BillingGate ("Focus-driven
+ * Detection is focus-driven, not polled, mirroring BillingGate ("Focus-driven
  * rather than an interval: no polling, no cron"). `visibilitychange` also fires
  * on desktop tab switches, so the only uncovered case is a tab that stays
  * foregrounded forever.
@@ -43,7 +43,7 @@ import { toast } from 'sonner';
  *     NEXT_PUBLIC_UPDATE_ESCALATE_MS=5000 pnpm dev
  *
  * Deliberately a flag of its own rather than a `NODE_ENV !== 'production'`
- * check. Every deployed build — staging included — is a production build, so
+ * check. Every deployed build. Staging included. Is a production build, so
  * keying on NODE_ENV made the one environment that most needs to verify this
  * behaviour the one environment that could not. Shortening the windows is not a
  * capability worth protecting: the worst it can do is reload sooner.
@@ -71,7 +71,7 @@ const ESCALATE_AFTER_MS = tunableMs(
 /**
  * At most one silent reload per target build per tab. If we reloaded toward a
  * build and came back still running the old one, something upstream is serving
- * a stale document and trying again will not fix it — no time window makes that
+ * a stale document and trying again will not fix it, no time window makes that
  * false, so this is a flat one-shot rather than a cooldown. The toast still
  * escalates afterwards, so a transiently failed reload is not a dead end.
  */
@@ -93,7 +93,7 @@ type ReloadBlockContextValue = {
 const ReloadBlockContext = createContext<ReloadBlockContextValue | null>(null);
 
 /**
- * Holds off the silent reload while something un-resumable is in flight — a
+ * Holds off the silent reload while something un-resumable is in flight. A
  * review session, audio playback, a dirty form, a streaming chat response.
  *
  * This has to be registered from the hook tree rather than sniffed from the
@@ -118,7 +118,7 @@ function readReloadAttempt(): string | null {
   try {
     return sessionStorage.getItem(RELOAD_ATTEMPT_KEY);
   } catch {
-    // Private mode or disabled storage — treat as no attempt.
+    // Private mode or disabled storage. Treat as no attempt.
     return null;
   }
 }
@@ -182,7 +182,7 @@ export function AppUpdateGate({ children }: { children: React.ReactNode }) {
         if (typeof body.buildId !== 'string') return;
         buildId = body.buildId;
       } catch {
-        // Offline, or the endpoint is unreachable. Fail open — a network error
+        // Offline, or the endpoint is unreachable. Fail open. A network error
         // is not a new version.
         return;
       } finally {

@@ -24,7 +24,7 @@ export async function getDailyStats(
  * Floor a displayed review count to the celebration high-water mark (which
  * undo deliberately never lowers): after undoing past a milestone the
  * progress bar stays put, and re-reviewing those cards doesn't visibly
- * advance it or replay the celebration. Single owner of the formula —
+ * advance it or replay the celebration. Single owner of the formula.
  * `getCardForReview`, `reviewCard`, and `readTodayCounters` must all agree
  * or the bar jumps between initial load, post-review, and post-undo syncs.
  */
@@ -307,7 +307,7 @@ const DAILY_TO_TOTAL_MAP: Record<DailyField, keyof Doc<'courseStats'>> = {
  * cumulative courseStats total in one call. Pass `count` > 1 for bulk flows
  * (e.g. importing many custom cards at once) to avoid doing N round-trips.
  *
- * Timezone is optional — if omitted, it's read from courseStats.timezone
+ * Timezone is optional, if omitted, it's read from courseStats.timezone
  * (set during card reviews). Falls back to 'UTC' if neither is available.
  */
 export async function trackEvent(

@@ -22,8 +22,8 @@ export interface UsageLimitDialogProps {
 
 /**
  * Lightweight "limit reached" dialog for hidden / internal-only features.
- * Unlike PaywallDialog this makes no Autumn API calls and has no upgrade flow —
- * it simply tells the user to contact support.
+ * Unlike PaywallDialog this makes no Autumn API calls and has no upgrade flow.
+ * It tells the user to contact support.
  */
 export default function UsageLimitDialog({
   open,

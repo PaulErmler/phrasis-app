@@ -1,5 +1,5 @@
 /**
- * Azure Speech Fast Transcription — used app-wide for STT.
+ * Azure Speech Fast Transcription. Used app-wide for STT.
  *
  * Endpoint: POST https://{region}.api.cognitive.microsoft.com
  *   /speechtotext/transcriptions:transcribe?api-version=2024-11-15
@@ -23,8 +23,8 @@ import { buildAutoDetectLocales, toAzureSttLocales } from './languageCodes';
  * Every caller passes `maxWaitMs`: interactive ones (chat voice) keep it
  * tight so a saturated bucket fast-fails into a user-facing "busy" error,
  * and background ones (TTS validation, word-timing backfill) cap it so a
- * saturated bucket throws instead of sleeping a workpool worker in-slot —
- * an uncapped reservation used to pin pool slots for the full refill wait.
+ * saturated bucket throws instead of sleeping a workpool worker in-slot.
+ * An uncapped reservation used to pin pool slots for the full refill wait.
  */
 export async function reserveAzureSttSlot(
   ctx: ActionCtx,
@@ -42,7 +42,7 @@ export interface TranscribeOptions {
   /**
    * Known regional variant (Azure locale, e.g. `"es-MX"`). When set together
    * with `internalLanguageCode`, the array of locales sent to Azure is a
-   * single-element `[regionVariant]` — used for TTS validation, where the
+   * single-element `[regionVariant]`. Used for TTS validation, where the
    * synthesized voice's locale is already known so we skip language-ID.
    */
   regionVariant?: string;
@@ -86,7 +86,7 @@ interface AzureTranscriptionResponse {
  * text and word-level timestamps (seconds).
  *
  * When `internalLanguageCode` is provided, the corresponding Azure locale is
- * passed as the only candidate — best accuracy. When omitted, Azure auto-
+ * passed as the only candidate. Best accuracy. When omitted, Azure auto-
  * detects from `AUTO_DETECT_LOCALES`.
  */
 export async function transcribeAudio(
@@ -153,7 +153,7 @@ export async function transcribeAudio(
     }
   }
 
-  // Azure bills per hour of audio, and this is the figure it billed on — so
+  // Azure bills per hour of audio, and this is the figure it billed on, so
   // it is the only honest input for a cost event. Optional because the field is
   // absent on some response shapes; callers fall back to skipping the cost
   // rather than inventing one.

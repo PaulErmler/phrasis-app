@@ -4,7 +4,7 @@ import { renderHook, act } from '@testing-library/react';
 /**
  * The tour-completion contract of useTutorial:
  *  - clicking the highlighted element of the FINAL (call-to-action) step
- *    completes the tour — that click usually navigates away and hides the
+ *    completes the tour: that click usually navigates away and hides the
  *    host, which would otherwise hit the suppress path below and leave the
  *    tour re-running on every visit ("Dashboard tutorial shows up again");
  *  - hiding the host mid-tour (enabled → false on an earlier step) tears
@@ -29,6 +29,8 @@ type MockDriver = {
   destroy: () => void;
   moveTo: (i: number) => void;
   hasNextStep: () => boolean;
+  isActive: () => boolean;
+  moveNext: () => void;
   /** Test-only: simulate a driver-internal close (`g(true)`). Not part of the real API. */
   closeFromUi: () => void;
 };
@@ -39,23 +41,25 @@ let lastDriver: MockDriver | null = null;
 vi.mock('driver.js', () => ({
   driver: (config: DriverConfig) => {
     lastConfig = config;
+    let active = true;
     const d: MockDriver = {
       drive: vi.fn(),
       // Real driver.js 1.4.0: the public `destroy()` is `g(false)`, which tears
       // down and deliberately SKIPS `onDestroyStarted` (dist/driver.js.mjs:594-604
-      // — only `g(true)` fires the hook, and it returns early without tearing
+      // Only `g(true)` fires the hook, and it returns early without tearing
       // down). An earlier version of this mock had destroy() call the hook,
       // which is the inverse of reality and hid a real bug: completion
       // bookkeeping hung off the hook never ran for app-initiated teardowns.
-      destroy: vi.fn(),
-      // Driver's own close paths (close button, Esc, overlay click, stepping
-      // past the last step) go through `g(true)`: fire the hook and let it
-      // call destroy() for the real teardown.
+      destroy: vi.fn(() => {
+        active = false;
+      }),
       closeFromUi: () => {
         config.onDestroyStarted?.();
       },
       moveTo: vi.fn(),
       hasNextStep: vi.fn(() => false),
+      isActive: () => active,
+      moveNext: vi.fn(),
     };
     lastDriver = d;
     return d;
@@ -105,7 +109,7 @@ async function startTour() {
   expect(lastConfig).not.toBeNull();
 }
 
-describe('useTutorial — completion semantics', () => {
+describe('useTutorial: completion semantics', () => {
   beforeEach(async () => {
     vi.resetModules();
     localStorage.clear();
@@ -172,7 +176,7 @@ describe('useTutorial — completion semantics', () => {
     });
 
     expect(completedIds()).toContain(TUTORIAL_IDS.HOME_TOUR);
-    // The hook must perform the real teardown itself — driver.js will not.
+    // The hook must perform the real teardown itself. driver.js will not.
     expect(lastDriver!.destroy).toHaveBeenCalled();
   });
 
@@ -199,7 +203,7 @@ describe('useTutorial — completion semantics', () => {
     const { rerender } = renderTour({ enabled: true });
     await startTour();
 
-    // User clicks the closing CTA — this both completes the tour and (usually)
+    // User clicks the closing CTA. This both completes the tour and (usually)
     // navigates away, which hides the host.
     const steps = lastConfig!.steps;
     const lastStep = steps[steps.length - 1];
@@ -240,7 +244,7 @@ describe('useTutorial — completion semantics', () => {
     });
     expect(completedIds()).not.toContain(TUTORIAL_IDS.HOME_TOUR);
 
-    // Return to Home — the tour relaunches, and this time the user finishes it.
+    // Return to Home. The tour relaunches, and this time the user finishes it.
     await act(async () => {
       rerender({ enabled: true });
     });
@@ -250,5 +254,17 @@ describe('useTutorial — completion semantics', () => {
     });
 
     expect(completedIds()).toContain(TUTORIAL_IDS.HOME_TOUR);
+  });
+
+  it('Enter advances the tour instead of dismissing it', async () => {
+    renderTour({ enabled: true });
+    await startTour();
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+
+    expect(lastDriver!.moveNext).toHaveBeenCalledOnce();
+    expect(completedIds()).not.toContain(TUTORIAL_IDS.HOME_TOUR);
   });
 });

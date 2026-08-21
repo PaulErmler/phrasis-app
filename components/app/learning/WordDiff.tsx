@@ -20,11 +20,11 @@ interface WordDiffProps {
   actual: string;
   language: string;
   hideAccuracy?: boolean;
-  /** Drop the accuracy footer entirely (no invisible height-keeper) — for
+  /** Drop the accuracy footer entirely (no invisible height-keeper), for
    * embeds like the landing demo where the reserved line reads as dead space. */
   omitAccuracy?: boolean;
   hideErrors?: boolean;
-  /** User setting — punctuation is still shown, just neutral and unscored. */
+  /** User setting. Punctuation is still shown, just neutral and unscored. */
   ignorePunctuation?: boolean;
 }
 
@@ -43,7 +43,7 @@ interface AlignedSegment {
   correct: string;
   wrong: string | null;
   equal: boolean;
-  /** Punctuation-only mismatch while ignoring punctuation — it didn't cost
+  /** Punctuation-only mismatch while ignoring punctuation. It didn't cost
    * accuracy, so it renders neutrally. A removed/added pair counts only when
    * both sides are punctuation: a scored insertion next to a forgiven mark
    * must still show as an error. */
@@ -96,7 +96,7 @@ function PunctChip({
   // -ml-1 cancels the parent's gap-x-1 so punctuation hugs the preceding word
   // like natural text.
   if (ignored) {
-    // Punctuation isn't scored, so it must not be flagged either — no
+    // Punctuation isn't scored, so it must not be flagged either, no
     // red/green marks for something that can't cost the user anything.
     return (
       <span className="-ml-1 rounded-sm bg-muted text-muted-foreground px-1 py-0.5">
@@ -125,7 +125,7 @@ function PunctChip({
       </span>
     );
   }
-  // 'wrong' (or 'typo' — punctuation never tags as typo, but be safe):
+  // 'wrong' (or 'typo', punctuation never tags as typo, but be safe):
   // show expected at the baseline with the user's mark floated above in red.
   return (
     <span className="-ml-1 rounded-sm bg-destructive/10 text-destructive px-0.5 relative inline-block">

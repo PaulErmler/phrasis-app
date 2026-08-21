@@ -164,7 +164,7 @@ export const getProjections = query({
           .take(PACE_WINDOW_DAYS + 5),
         // Descending so that if the window holds more rows than the cap
         // (≥7 tracked languages × 90 days), truncation drops the OLDEST
-        // days — the decayed pace weights the newest days most, and an
+        // days. The decayed pace weights the newest days most, and an
         // ascending read would silently cut exactly those.
         ctx.db
           .query('dailyLanguageStats')
@@ -190,7 +190,7 @@ export const getProjections = query({
     const currentWords = wordCounts.reduce((acc, w) => acc + w.words, 0);
     const totalTimeMs = courseStats?.totalTimeMs ?? 0;
 
-    // Below the unlock threshold there is nothing worth projecting — bail out
+    // Below the unlock threshold there is nothing worth projecting. Bail out
     // before the level-collection reads and let the client show its teaser.
     if (totalTimeMs < MIN_STUDY_MS_FOR_PROJECTIONS) {
       return {
@@ -201,7 +201,7 @@ export const getProjections = query({
       };
     }
 
-    // Per-day new words, target languages only (variants merged — same
+    // Per-day new words, target languages only (variants merged, same
     // normalization as the words-known total).
     const targetSet = new Set(
       course.targetLanguages.map((l) => normalizeLanguageCode(l)),
@@ -240,8 +240,8 @@ export const getProjections = query({
     const levels: LevelInfo[] = levelCollections.map((c) => {
       const progress = progressByCollection.get(c._id);
       return {
-        // Difficulty label ("A1.2"), not the internal dataset code ("L02") —
-        // matches the level rail's chips.
+        // Difficulty label ("A1.2"), not the internal dataset code ("L02").
+        // Matches the level rail's chips.
         code: c.displayName ?? c.code ?? c.name,
         totalTexts: effectiveTextCount(c.textCount, progress),
         cardsAdded: progress?.cardsAdded ?? 0,

@@ -33,14 +33,18 @@ import {
 import {
   isTranslationVersionStale,
   resolveCardSpeakerGenders,
-  ROMANIZATION_LANGUAGES,
 } from '../../lib/languages';
+import {
+  missingAnnotationKinds,
+  TEXT_ANNOTATIONS,
+} from '../lib/textAnnotations';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { deleteAudioRow } from '../lib/audio';
 import { resolveAudioPayload } from '../lib/audioAssets';
 import { hasActiveTtsClaim } from './ttsProcessing';
 import { getLlmClaim, isClaimFresh } from './llmTranslationQueue';
 import { getCourseSettings } from '../db/courseSettings';
+import type { LlmPriority } from '../types';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 
@@ -72,8 +76,8 @@ export async function isCollectionAccessible(
 /**
  * Fetch a text and enforce the full access chain for user-facing text
  * endpoints: the text exists, its collection is accessible to the course, and
- * the text itself is within the user's scope (`canUserAccessCollectionText` —
- * curriculum rows for premade collections, the owner's texts for custom/chat).
+ * the text itself is within the user's scope (`canUserAccessCollectionText`.
+ * Curriculum rows for premade collections, the owner's texts for custom/chat).
  * Throws the same ConvexErrors the previously-inlined checks did.
  */
 export async function requireAccessibleText(
@@ -114,21 +118,21 @@ export async function requireAccessibleText(
  * (`collectionProgress.lastRankProcessed`) once when the dialog opens and
  * passes it as `anchorRank` on every request, so the range NEVER shifts
  * while the dialog is open. Rows are returned with their live status and no
- * server-side filtering — a row the user adds or ignores mid-session flips
+ * server-side filtering. A row the user adds or ignores mid-session flips
  * to 'added'/'ignored' in place (the client decides visibility) instead of
  * vanishing from the page. Reopening the dialog captures a fresh anchor,
  * which is what makes the session's green/grey rows disappear.
  *
- * - `direction: 'after'` — ranks > anchor, ascending: the main stream (the
+ * - `direction: 'after'`: ranks > anchor, ascending: the main stream (the
  *   not-yet-added zone plus this session's activity). The user's marked
  *   texts at/below the anchor are injected at the top of the first page
  *   (rank-ordered) so passed-over ignored/prioritized sentences stay
  *   visible and manageable.
- * - `direction: 'upTo'` — ranks ≤ anchor, DESCENDING: the added-history
+ * - `direction: 'upTo'`: ranks ≤ anchor, DESCENDING: the added-history
  *   feed the "show added" toggle reveals above the list, paged further as
  *   the user scrolls up.
  *
- * Each row carries `missingTranslationLanguages` — the client batches those
+ * Each row carries `missingTranslationLanguages`. The client batches those
  * into `requestPreviewTranslations` as pages are revealed. Audio is never
  * generated here; rows expose whatever exists (`requestPreviewAudio` handles
  * the on-click generation).
@@ -195,8 +199,8 @@ export const browseCollectionTexts = query({
 
     // First page of the main stream: surface the user's marked texts that
     // sit at/below the anchor (the scan passed over them; the range above
-    // won't reach them). Bounded to MARK_READ_LIMIT injected rows total —
-    // mark counts are user-writable and uncapped, and every injected row
+    // won't reach them). Bounded to MARK_READ_LIMIT injected rows total.
+    // Mark counts are user-writable and uncapped, and every injected row
     // costs a text read + card/mark point-reads + full content assembly, so
     // an unbounded injection would blow Convex's per-execution read limits.
     let injectedTexts: Doc<'texts'>[] = [];
@@ -230,7 +234,7 @@ export const browseCollectionTexts = query({
       Promise.all(combined.map((t) => getMark(ctx, userId, course._id, t._id))),
     ]);
 
-    // No server-side filtering — every row ships with its status and the
+    // No server-side filtering. Every row ships with its status and the
     // client decides visibility (session persistence + the show-added /
     // show-ignored toggles are pure client concerns).
     const rows = combined.map((text, i) => ({ text, card: cards[i], mark: marks[i] }));
@@ -241,6 +245,7 @@ export const browseCollectionTexts = query({
       sourceText: row.text.text,
       sourceLanguage: row.text.language,
       sourceRomanization: row.text.romanizedText ?? undefined,
+      sourceIpa: row.text.ipaText ?? undefined,
       userCreated: row.text.userCreated,
     }));
     const contentMap = await buildTextContentBatchForLanguages(
@@ -254,7 +259,7 @@ export const browseCollectionTexts = query({
     const page = rows.map((row, i) => {
       const content = contentMap.get(String(i))!;
       // Version-stale rows count as missing too: the client then routes them
-      // through requestPreviewTranslations, which regenerates them — so
+      // through requestPreviewTranslations, which regenerates them, so
       // browsing already upgrades translations to the current version
       // instead of deferring the delete+regen to the card-add sweep. The
       // stale text still ships in `translations` for display until the
@@ -268,13 +273,32 @@ export const browseCollectionTexts = query({
             (!tr.text || tr.versionStale === true),
         )
         .map((tr) => tr.language);
+      // Rows whose translations are all present can still be missing an
+      // annotation (romanization after an engine swap, IPA on rows predating
+      // the feature). The client's requestPreviewTranslations batching keys
+      // off `missingTranslationLanguages`, so without this flag those rows
+      // were never requested and the annotation gap stayed visible forever
+      // in the preview. Projected values mirror the stored tri-state for
+      // course languages, so `=== undefined` (via missingAnnotationKinds)
+      // honours the '' failure sentinel here too.
+      const needsAnnotationBackfill =
+        missingAnnotationKinds(row.text.language, row.text).length > 0 ||
+        content.translations.some(
+          (tr) =>
+            tr.language !== row.text.language &&
+            tr.text.length > 0 &&
+            missingAnnotationKinds(tr.language, {
+              romanizedText: tr.romanization,
+              ipaText: tr.ipa,
+            }).length > 0,
+        );
       return {
         _id: row.text._id,
         text: row.text.text,
         sourceLanguage: row.text.language,
         collectionRank: row.text.collectionRank,
         // 'readd' is internal bookkeeping (un-marked below the frontier,
-        // waiting for the drain) — the client sees it as a plain unmarked row.
+        // waiting for the drain), the client sees it as a plain unmarked row.
         status: (row.card
           ? 'added'
           : row.mark?.mark === 'readd'
@@ -283,6 +307,7 @@ export const browseCollectionTexts = query({
         translations: content.translations,
         audioRecordings: content.audioRecordings,
         missingTranslationLanguages,
+        needsAnnotationBackfill,
       };
     });
 
@@ -312,11 +337,11 @@ export const setCollectionTextMark = mutation({
     const { userId, course } = await requireActiveCourse(ctx);
     const courseId = course._id;
 
-    // Full access chain — without the scope check, prioritizing another
+    // Full access chain, without the scope check, prioritizing another
     // user's fork text would later make the drain add it to this user's deck.
     const { text } = await requireAccessibleText(ctx, args.textId, courseId, userId);
 
-    // Marks exist only for texts that aren't cards yet — the preview hides
+    // Marks exist only for texts that aren't cards yet. The preview hides
     // these buttons on added rows; this guards direct calls.
     const deck = await getDeckByCourseId(ctx, courseId);
     if (deck) {
@@ -327,7 +352,7 @@ export const setCollectionTextMark = mutation({
     const existing = await getMark(ctx, userId, courseId, args.textId);
     const prev = existing?.mark ?? null;
     if (prev === args.mark) return null;
-    // A 'readd' row already means "unmarked, back in the queue" — clearing it
+    // A 'readd' row already means "unmarked, back in the queue", clearing it
     // again is a no-op (the row must survive so the drain can still reach the
     // text; it renders as 'none' either way).
     if (prev === 'readd' && args.mark === null) return null;
@@ -345,7 +370,7 @@ export const setCollectionTextMark = mutation({
         // the text (injection only surfaces marked texts and the scan never
         // looks backwards). Flip it to the internal 'readd' mark instead: it
         // stays visible via the browse injection and is drained like
-        // 'prioritized' by the next add — the frontier stays monotonic, so
+        // 'prioritized' by the next add. The frontier stays monotonic, so
         // no rescan of the added stretch and no browseAnchor regression.
         await ctx.db.patch(existing._id, { mark: 'readd' });
       } else {
@@ -378,14 +403,19 @@ export const setCollectionTextMark = mutation({
  * with the same exemptions and claim deferrals as scheduleMissingContent's
  * sweep). Resolves + persists speaker gender BEFORE translating (same as
  * scheduleMissingContent) so the translation's grammar agrees with the voice
- * that will eventually read it — otherwise the gender sweep would invalidate
+ * that will eventually read it, otherwise the gender sweep would invalidate
  * these rows the moment audio is generated. Shared by the on-reveal and
  * prewarm preview-generation mutations.
+ *
+ * `opts.llmPriority` tiers the translation enqueues. A parameter rather than a
+ * constant because the preview paths that share this function are user-facing:
+ * only the onboarding warmup passes 'background'.
  */
-async function scheduleMissingTranslationsForText(
+export async function scheduleMissingTranslationsForText(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   languages: string[],
+  opts?: { llmPriority?: LlmPriority },
 ): Promise<number> {
   const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
     text,
@@ -394,18 +424,16 @@ async function scheduleMissingTranslationsForText(
   if (Object.keys(genderPatch).length > 0) {
     await ctx.db.patch(text._id, genderPatch);
   }
-  // Backfill romanization for the source text. Same `=== undefined` test as
-  // the card sweep — the empty-string sentinel means "tried and failed", and
-  // re-running it would burn the retries again on every page reveal.
-  if (
-    ROMANIZATION_LANGUAGES.has(text.language) &&
-    text.romanizedText === undefined
-  ) {
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.decks.processRomanizationForSourceText,
-      { textId: text._id, text: text.text, language: text.language },
-    );
+  // Backfill missing annotations (romanization, IPA) for the source text.
+  // Same `=== undefined` test as the card sweep. The empty-string sentinel
+  // means "tried and failed", and re-running it would burn the retries again
+  // on every page reveal.
+  for (const kind of missingAnnotationKinds(text.language, text)) {
+    await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].sourceTextAction, {
+      textId: text._id,
+      text: text.text,
+      language: text.language,
+    });
   }
 
   let scheduled = 0;
@@ -420,7 +448,7 @@ async function scheduleMissingTranslationsForText(
     let preferredRegionVariant: string | undefined;
     if (existing) {
       // Version-stale rows regenerate here too, so browsing a collection
-      // already upgrades its translations to the current version — otherwise
+      // already upgrades its translations to the current version, otherwise
       // the card-add sweep (scheduleMissingContent) deletes exactly what the
       // preview just showed. Shares that sweep's provenance gate so the two
       // can't disagree about what is regenerable.
@@ -428,23 +456,21 @@ async function scheduleMissingTranslationsForText(
         mayRegenerateTranslation(text, existing) &&
         isTranslationVersionStale(lang, existing.translationVersion);
       if (!isStale) {
-        // The translation is current, but its romanization may not exist —
-        // a row can reach that state through a romanizer swap, which resets
-        // `romanizedText` to `undefined` so the new implementation refills
-        // it. The only backfill was in `scheduleMissingContent`, which the
-        // preview never runs (preview rows are usually not cards), so those
-        // rows rendered with a bare transliteration gap until the text was
-        // added to a deck. Mirrors that sweep's check in decks.ts.
-        if (
-          ROMANIZATION_LANGUAGES.has(lang) &&
-          existing.romanizedText === undefined
-        ) {
+        // The translation is current, but an annotation may not exist. A row
+        // can reach that state through an engine swap, which resets the
+        // value to `undefined` so the new implementation refills it, or (for
+        // IPA) by predating the feature. The only backfill used to be in
+        // `scheduleMissingContent`, which the preview never runs (preview
+        // rows are usually not cards), so those rows rendered with a bare
+        // annotation gap until the text was added to a deck. Mirrors that
+        // sweep's loop in decks.ts.
+        for (const kind of missingAnnotationKinds(lang, existing)) {
           await ctx.scheduler.runAfter(
             0,
-            internal.features.decks.processRomanizationForTranslation,
+            TEXT_ANNOTATIONS[kind].translationAction,
             {
               textId: text._id,
-              translatedText: existing.translatedText,
+              text: existing.translatedText,
               language: lang,
             },
           );
@@ -462,7 +488,7 @@ async function scheduleMissingTranslationsForText(
       // Keep mixed-dialect rows on their pinned dialect across regeneration.
       preferredRegionVariant = existing.regionVariant;
       await ctx.db.delete(existing._id);
-      // The old audio was synthesized from the deleted wording — drop it so
+      // The old audio was synthesized from the deleted wording. Drop it so
       // the new translation can't pair with mismatched audio (reference-aware,
       // like the card sweep's delete).
       const staleAudio = await ctx.db
@@ -480,6 +506,11 @@ async function scheduleMissingTranslationsForText(
         audioSpeakerGender,
         preferredRegionVariant,
         skipTts: true,
+        // Warm work. If the landing translation still triggers TTS (a card
+        // references the text, see storeTranslationAndScheduleTTS's skipTts
+        // docs), that audio rides the background pool.
+        priority: 'background',
+        llmPriority: opts?.llmPriority,
       })
     ) {
       scheduled++;
@@ -490,13 +521,13 @@ async function scheduleMissingTranslationsForText(
 
 /**
  * Generate missing translations (NO audio) for up to MAX_PREVIEW_PAGE_SIZE
- * texts of a collection — called by the preview as pages are revealed.
+ * texts of a collection. Called by the preview as pages are revealed.
  * Dedup comes from the existing per-(textId, language) claims, so re-calls
  * while jobs are in flight are cheap no-ops. Deliberately not quota-gated:
  * translations are the cheap part; audio (the dominant cost) only happens on
  * an explicit audio-icon click or once a text becomes a card. Also
  * deliberately not gated by `assertBillingCurrent` while past due (decided
- * 2026-07-26) — same rationale as ensureCardContent in decks.ts: the
+ * 2026-07-26), same rationale as ensureCardContent in decks.ts: the
  * pipeline self-heals content, and enforcement lives at the consumeQuota
  * spend boundary plus the app-wide overdue dialog.
  */
@@ -593,11 +624,11 @@ export const prewarmPreviewTranslations = mutation({
 });
 
 /**
- * Generate audio for ONE (text, language) — the preview's audio-icon click.
+ * Generate audio for ONE (text, language), the preview's audio-icon click.
  * No-ops when the audio already exists or a TTS claim is in flight; returns
  * `scheduled: false` when the language's translation hasn't landed yet (the
  * client keeps the spinner and the reactive page query delivers the URL when
- * TTS completes). Free, like the regular ensure path — the click is the cost
+ * TTS completes). Free, like the regular ensure path. The click is the cost
  * control.
  */
 export const requestPreviewAudio = mutation({
@@ -632,13 +663,13 @@ export const requestPreviewAudio = mutation({
       .first();
     if (existingAudio) {
       // A row only counts as "audio exists" if it still resolves to a
-      // playable blob. A dangling pointer — asset row deleted, or asset
-      // present but its blob gone — otherwise wedges the preview
+      // playable blob. A dangling pointer. Asset row deleted, or asset
+      // present but its blob gone, otherwise wedges the preview
       // permanently: this mutation would return `scheduled: false` forever
       // while `buildTextContentBatchForLanguages` hands the client a null
       // url, so the button can neither play nor regenerate. The card sweep
       // (`scheduleMissingContent`) is the only other place that clears these,
-      // and the preview never runs it — preview rows are usually not cards.
+      // and the preview never runs it. Preview rows are usually not cards.
       // Mirrors that sweep's checks in convex/features/decks.ts.
       const payload = await resolveAudioPayload(ctx, existingAudio);
       const url = payload
@@ -674,7 +705,7 @@ export const requestPreviewAudio = mutation({
           )
           .first();
     if (args.language !== text.language && !translation) {
-      // Translation still generating — the click raced it. Nothing to
+      // Translation still generating. The click raced it. Nothing to
       // synthesize yet; the client retries once the translation row lands.
       return { scheduled: false };
     }
@@ -698,10 +729,10 @@ export const requestPreviewAudio = mutation({
  * later doesn't show a loading spinner.
  *
  * Internal because the only callers are the two course-creation paths,
- * which already know the course's language arrays — no auth lookup needed.
+ * which already know the course's language arrays, no auth lookup needed.
  *
  * Independent of user progress (unlike `ensureContentForCollection` which
- * paginates from `lastRankProcessed`) — always starts at collectionRank 1.
+ * paginates from `lastRankProcessed`), always starts at collectionRank 1.
  *
  * Fans out one scheduled `ensureFirstSentencesForCollection` mutation per
  * level collection so each child runs in its own transaction; the inline
@@ -719,7 +750,7 @@ export const ensureFirstSentencesAcrossLevelCollections = internalMutation({
   handler: async (ctx, args) => {
     // Load only the ~20 premade level collections via indexed lookups so this
     // doesn't scan every user's custom/chat collections (which share the
-    // table) — see getPremadeLevelCollections for the read pattern.
+    // table), see getPremadeLevelCollections for the read pattern.
     const { collections: levelCollections } =
       await getPremadeLevelCollections(ctx);
 
@@ -744,7 +775,7 @@ export const ensureFirstSentencesAcrossLevelCollections = internalMutation({
 /**
  * Per-collection child of `ensureFirstSentencesAcrossLevelCollections`.
  *
- * Idempotent — `scheduleMissingContent` skips any (textId, language) already
+ * Idempotent. `scheduleMissingContent` skips any (textId, language) already
  * covered, so re-entries do reads only and write nothing. Processes the 5
  * texts in parallel; safe because each text writes only to its own
  * (textId, language)-keyed rows (audio patches, claim inserts, per-text
@@ -774,6 +805,9 @@ export const ensureFirstSentencesForCollection = internalMutation({
           text,
           args.baseLanguages,
           args.targetLanguages,
+          // Signup-time warm of ~20 collections × 5 texts: background, so
+          // this burst can't queue ahead of the user's own cards.
+          { priority: 'background' },
         ),
       ),
     );
