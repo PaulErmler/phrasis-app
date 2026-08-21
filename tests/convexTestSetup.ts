@@ -22,6 +22,13 @@ vi.mock('@/convex/lib/workpools', () => ({
     cancel: vi.fn(async () => undefined),
     status: vi.fn(async () => ({ state: 'pending', previousAttempts: 0 })),
   },
+  // Background sibling of llmPool for llmPriority-'background' translations
+  // (the onboarding / admin warmups). Same fake-workId contract.
+  llmWarmPool: {
+    enqueueAction: vi.fn(async () => `test-llm-warm-work-${nextWorkId++}`),
+    cancel: vi.fn(async () => undefined),
+    status: vi.fn(async () => ({ state: 'pending', previousAttempts: 0 })),
+  },
   ttsPool: {
     enqueueAction: vi.fn(async () => `test-tts-work-${nextWorkId++}`),
     cancel: vi.fn(async () => undefined),

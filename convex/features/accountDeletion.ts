@@ -27,6 +27,26 @@ export const requestAccountDeletion = mutation({
       throws: true,
     });
 
+    // Durable proof of the request. The operator-run purge
+    // (admin/deleteUser.ts) refuses to delete an account without a
+    // `requested` row for it, so a mistyped userId on the CLI can't wipe
+    // someone who never asked. Repeat requests just refresh the timestamp;
+    // a purge already running or completed is left untouched.
+    const existing = await ctx.db
+      .query('accountDeletions')
+      .withIndex('by_userId', (q) => q.eq('userId', user._id))
+      .first();
+    if (!existing) {
+      await ctx.db.insert('accountDeletions', {
+        userId: user._id,
+        email: user.email.toLowerCase(),
+        status: 'requested',
+        requestedAt: Date.now(),
+      });
+    } else if (existing.status === 'requested') {
+      await ctx.db.patch(existing._id, { requestedAt: Date.now() });
+    }
+
     await resend.sendEmail(ctx, {
       from: `Flexling <${SUPPORT_EMAIL}>`,
       to: SUPPORT_EMAIL,

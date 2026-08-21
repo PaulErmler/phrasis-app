@@ -41,6 +41,7 @@ import { resolveAudioPayload } from '../lib/audioAssets';
 import { hasActiveTtsClaim } from './ttsProcessing';
 import { getLlmClaim, isClaimFresh } from './llmTranslationQueue';
 import { getCourseSettings } from '../db/courseSettings';
+import type { LlmPriority } from '../types';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 
@@ -381,11 +382,16 @@ export const setCollectionTextMark = mutation({
  * that will eventually read it, otherwise the gender sweep would invalidate
  * these rows the moment audio is generated. Shared by the on-reveal and
  * prewarm preview-generation mutations.
+ *
+ * `opts.llmPriority` tiers the translation enqueues. A parameter rather than a
+ * constant because the preview paths that share this function are user-facing:
+ * only the onboarding warmup passes 'background'.
  */
 export async function scheduleMissingTranslationsForText(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   languages: string[],
+  opts?: { llmPriority?: LlmPriority },
 ): Promise<number> {
   const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
     text,
@@ -484,6 +490,7 @@ export async function scheduleMissingTranslationsForText(
         // references the text, see storeTranslationAndScheduleTTS's skipTts
         // docs), that audio rides the background pool.
         priority: 'background',
+        llmPriority: opts?.llmPriority,
       })
     ) {
       scheduled++;

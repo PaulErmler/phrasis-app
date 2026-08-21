@@ -172,10 +172,12 @@ In Xcode, one-time:
   update once both apps are approved, decided at planning time.
 - **Push notifications** (streak reminders). Needs FCM/APNs infra +
   `@capacitor/push-notifications`; also strengthens the 4.2 story.
-- **Account deletion currently removes the auth account + profile mirror**
-  (Better Auth `deleteUser` + `onDelete` trigger). App data (decks, reviews,
-  chats) is not yet purged. Add a cascade/scheduled purge for full GDPR
-  erasure.
+- ~~Account deletion cascade~~ **Done (2026-08-20):** in-app requests write a
+  durable `accountDeletions` row and support fulfills them with
+  `npx convex run admin/deleteUser:run '{"userId":"…","email":"…"}' --prod`
+  (dry-run first with `"dryRun": true`). Purges all app data, AI chat, the
+  auth account, and the Autumn/Stripe customer; see `convex/admin/deleteUser.ts`.
+  Still open: PostHog person deletion (events keyed by the deleted user id).
 - Regenerate screenshots after UI changes: `pnpm dev` + `pnpm store:assets`
   (writes to `store-assets/`; mock screens live at `/screenshots/[screen]`,
   dev-only).

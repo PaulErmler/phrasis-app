@@ -248,6 +248,29 @@ export const ttsPriorityValidator = v.union(
 export type TtsPriority = Infer<typeof ttsPriorityValidator>;
 
 /**
+ * LLM translation scheduling priority. Same classification rule as
+ * `ttsPriorityValidator`, applied to the translation itself rather than the
+ * audio it triggers: 'background' is work nobody is waiting on (the onboarding
+ * translation warmup, the admin chart-language warmup), everything else is
+ * interactive. Interactive jobs run in `llmPool`, background jobs in the
+ * low-parallelism `llmWarmPool` (see workpools.ts). Absent means
+ * 'interactive'.
+ *
+ * Deliberately a SEPARATE type from `TtsPriority` even though the literals
+ * match. The two travel together through the same job args, where `priority`
+ * means "the tier the audio this translation triggers should run at" and
+ * `llmPriority` means "the tier this translation runs at". They diverge in
+ * practice: a collection preview requests background audio for an interactive
+ * translation, and `storeTranslationAndScheduleTTS` rewrites `priority`
+ * mid-flight (features/decks.ts) in a way that must not touch the LLM tier.
+ */
+export const llmPriorityValidator = v.union(
+  v.literal('interactive'),
+  v.literal('background'),
+);
+export type LlmPriority = Infer<typeof llmPriorityValidator>;
+
+/**
  * Narrow a loosely-typed string to a strict voice gender, or `undefined` when
  * it is neither. Use at boundaries where a `v.string()`-typed value (e.g.
  * `texts.audioSpeakerGender`, or a queued job's `audioSpeakerGender`) flows

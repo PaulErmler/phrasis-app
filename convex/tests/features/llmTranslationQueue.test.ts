@@ -18,11 +18,14 @@ import { Id } from "../../_generated/dataModel";
 // `enqueueAction` is a vi.fn() resolving to unique fake workIds
 // ('test-llm-work-N'), so tests can assert claim→workId stamping and drive
 // the onComplete handlers by hand.
-import { llmPool } from "@/convex/lib/workpools";
+import { llmPool, llmWarmPool } from "@/convex/lib/workpools";
+import { claimLlmTranslationIfAvailable } from "../../features/llmTranslationQueue";
 import type { WorkId } from "@convex-dev/workpool";
 import { drainSchedulerAfterEach } from "../lib/drainScheduler";
 
 const mockEnqueue = vi.mocked(llmPool.enqueueAction);
+const mockWarmEnqueue = vi.mocked(llmWarmPool.enqueueAction);
+const mockWarmCancel = vi.mocked(llmWarmPool.cancel);
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
@@ -34,6 +37,8 @@ beforeEach(() => {
   // Clear calls only. The setup-file implementation (unique fake workIds)
   // must stay installed.
   mockEnqueue.mockClear();
+  mockWarmEnqueue.mockClear();
+  mockWarmCancel.mockClear();
 });
 
 async function seedText(t: TestConvex<typeof schema>) {
@@ -82,6 +87,115 @@ const baseArgs = (textId: Id<"texts">) => ({
 });
 
 describe("features/llmTranslationQueue", () => {
+  describe("claimLlmTranslationIfAvailable", () => {
+    const claim = (
+      t: TestConvex<typeof schema>,
+      textId: Id<"texts">,
+      priority?: "interactive" | "background",
+    ) =>
+      t.run(async (ctx) =>
+        claimLlmTranslationIfAvailable(ctx as any, textId, "de", priority),
+      );
+
+    it("stamps the caller's tier onto the new claim", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const claimId = await claim(t, textId, "background");
+      const row = await getClaim(t, textId);
+      expect(row?._id).toBe(claimId);
+      expect(row?.priority).toBe("background");
+    });
+
+    it("returns null while a fresh interactive claim holds the slot", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "de",
+          claimedAt: Date.now(),
+        });
+      });
+      expect(await claim(t, textId)).toBeNull();
+    });
+
+    it("interactive request takes over a fresh background-held claim and cancels the warm job", async () => {
+      // The onboarding warmup translates exactly the texts a new user hits
+      // first, so this collision is the normal path. Without takeover the
+      // user's request no-ops and then waits out llmWarmPool's queue.
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const warmClaimId = await t.run(async (ctx) =>
+        ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "de",
+          claimedAt: Date.now(),
+          priority: "background",
+          workId: "llm-warm-work-1",
+        }),
+      );
+
+      const newId = await claim(t, textId);
+
+      expect(newId).not.toBeNull();
+      expect(newId).not.toBe(warmClaimId);
+      expect(mockWarmCancel).toHaveBeenCalledTimes(1);
+      expect(mockWarmCancel.mock.calls[0][1]).toBe("llm-warm-work-1");
+      const row = await getClaim(t, textId);
+      expect(row?._id).toBe(newId);
+      expect(row?.priority).toBeUndefined();
+    });
+
+    it("takes over a workId-less background claim without cancelling anything", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "de",
+          claimedAt: Date.now(),
+          priority: "background",
+        });
+      });
+      expect(await claim(t, textId)).not.toBeNull();
+      expect(mockWarmCancel).not.toHaveBeenCalled();
+    });
+
+    it("one warmup job does NOT take over another's fresh background claim", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "de",
+          claimedAt: Date.now(),
+          priority: "background",
+          workId: "llm-warm-work-2",
+        });
+      });
+      expect(await claim(t, textId, "background")).toBeNull();
+      expect(mockWarmCancel).not.toHaveBeenCalled();
+    });
+
+    it("reclaims a stale background claim without cancelling its dead job", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const staleId = await t.run(async (ctx) =>
+        ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "de",
+          claimedAt: Date.now() - 11 * 60 * 1000,
+          priority: "background",
+          workId: "llm-warm-work-3",
+        }),
+      );
+      const newId = await claim(t, textId, "background");
+      expect(newId).not.toBeNull();
+      expect(newId).not.toBe(staleId);
+      expect(mockWarmCancel).not.toHaveBeenCalled();
+    });
+  });
+
   describe("enqueueLlmTranslation", () => {
     it("enqueues processLlmTranslationForCard into llmPool with a fallback-ready context and stamps the workId onto the held claim", async () => {
       const t = convexTest(schema, modules);
@@ -129,6 +243,42 @@ describe("features/llmTranslationQueue", () => {
       const claim = await getClaim(t, textId);
       expect(claim?.workId).toBe(workId);
       expect(claim?.claimedAt).toBeGreaterThan(claimedBefore);
+    });
+
+    it("routes an llmPriority 'background' job to llmWarmPool, keeping llmPool free for user-facing work", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const claimId = await t.run(async (ctx) =>
+        ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "de",
+          claimedAt: Date.now() - 60_000,
+          priority: "background",
+        }),
+      );
+
+      await t.mutation(
+        internal.features.llmTranslationQueue.enqueueLlmTranslation,
+        { args: { ...baseArgs(textId), llmPriority: "background" } },
+      );
+
+      expect(mockEnqueue).not.toHaveBeenCalled();
+      expect(mockWarmEnqueue).toHaveBeenCalledTimes(1);
+      const call = mockWarmEnqueue.mock.calls[0];
+      expect(getFunctionName(call[1])).toBe(
+        "features/llmTranslationQueue:processLlmTranslationForCard",
+      );
+      // The tier picked the pool and is not forwarded to the worker, which
+      // makes no scheduling decisions of its own.
+      expect(call[2]).toEqual({ ...baseArgs(textId), claimId });
+      // It does ride in the completion context, so the Google fallback can't
+      // jump onto the interactive pool.
+      const opts = call[3] as any;
+      expect(opts.context.llmPriority).toBe("background");
+
+      const workId = await (mockWarmEnqueue.mock.results[0]
+        .value as Promise<string>);
+      expect((await getClaim(t, textId))?.workId).toBe(workId);
     });
 
     it("still enqueues when no claim is held (nothing to stamp)", async () => {
@@ -202,6 +352,7 @@ describe("features/llmTranslationQueue", () => {
         | { kind: "success"; returnValue: null }
         | { kind: "failed"; error: string }
         | { kind: "canceled" },
+      llmPriority?: "interactive" | "background",
     ) =>
       t.mutation(
         internal.features.llmTranslationQueue.onLlmTranslationComplete,
@@ -213,6 +364,7 @@ describe("features/llmTranslationQueue", () => {
             targetLanguage: "de",
             text: "Hi.",
             audioSpeakerGender: "male",
+            llmPriority,
           },
           result,
         },
@@ -351,6 +503,39 @@ describe("features/llmTranslationQueue", () => {
       expect(claim?._id).toBe(claimId);
       expect(claim?.workId).toBe(fallbackWorkId);
       expect(claim?.claimedAt).toBeGreaterThan(claimedBefore);
+    });
+
+    it("failed on a background job keeps the Google fallback on llmWarmPool", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const claimId = await t.run(async (ctx) =>
+        ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "de",
+          claimedAt: Date.now() - 60_000,
+          priority: "background",
+          workId: "llm-warm-w-1",
+        }),
+      );
+
+      await complete(
+        t,
+        textId,
+        "llm-warm-w-1",
+        { kind: "failed", error: "stage chain failed" },
+        "background",
+      );
+
+      expect(mockEnqueue).not.toHaveBeenCalled();
+      expect(mockWarmEnqueue).toHaveBeenCalledTimes(1);
+      expect(getFunctionName(mockWarmEnqueue.mock.calls[0][1])).toBe(
+        "features/decks:processTranslationForCard",
+      );
+      const fallbackWorkId = await (mockWarmEnqueue.mock.results[0]
+        .value as Promise<string>);
+      const claim = await getClaim(t, textId);
+      expect(claim?._id).toBe(claimId);
+      expect(claim?.workId).toBe(fallbackWorkId);
     });
 
     it("failed on a superseded job (mismatched workId) skips the fallback and leaves the foreign claim untouched", async () => {

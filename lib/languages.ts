@@ -1961,18 +1961,21 @@ export const LUNA_BO3: ModelStage = {
 };
 
 /**
- * Maximum number of auto-retranslations triggered by user flags on a single
- * translation row. The first flag enqueues a retranslation via
- * `retranslation_high` / `retranslation_custom`; the second flag (and
- * beyond) only increments `flagCount` for admin triage, at that point the
- * row has already had its one shot at automatic recovery, so further
- * complaints surface as "Flagged" rather than retriggering the pipeline.
- * Surfaced here (rather than inline in `flagTranslation`) so the card
- * queries can also use it to decide between the "Retranslating" pill
- * (under-cap, in flight) and the "Flagged" pill (over-cap, no
- * auto-retranslation will happen).
+ * Maximum number of auto-retranslations a single translation row can accrue
+ * from user complaints. Flags 1 and 2 enqueue a retranslation via
+ * `retranslation_high` / `retranslation_custom`; flag 3 and beyond only
+ * increment `flagCount` for admin triage. By then the row has had both of its
+ * shots at automatic recovery, so further complaints surface as "Flagged"
+ * rather than retriggering the pipeline.
+ *
+ * Two gestures share this counter and this cap, so the ceiling is per row and
+ * not per trigger: the explicit Flag button (`flagTranslation`) and a manual
+ * card edit of a curriculum translation, which flags the shared row and hands
+ * the user's wording to the retranslation as a suggestion
+ * (`suggestCurriculumFixesForEdit` in `convex/features/scheduling.ts`). Both
+ * check the post-increment count against this constant.
  */
-export const FLAG_AUTO_RETRANSLATION_MAX = 1;
+export const FLAG_AUTO_RETRANSLATION_MAX = 2;
 
 export const TRANSLATION_RULES = {
   /**

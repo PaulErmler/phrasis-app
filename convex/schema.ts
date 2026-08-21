@@ -20,6 +20,7 @@ import {
   ttsQualityValidator,
   ttsProviderValidator,
   ttsPriorityValidator,
+  llmPriorityValidator,
   voiceGenderValidator,
   featureStateValidator,
   reviewsByModeValidator,
@@ -1118,7 +1119,10 @@ export default defineSchema({
       ),
     ),
   })
-    .index('by_thread_and_user', ['threadId', 'userId']),
+    .index('by_thread_and_user', ['threadId', 'userId'])
+    // Account purge: enumerate a user's approvals without knowing their
+    // threads (the agent component owns those and is purged separately).
+    .index('by_userId', ['userId']),
 
   // TTS mismatches. Stores audio that failed validation for later analysis
   ttsMismatches: defineTable({
@@ -1165,6 +1169,12 @@ export default defineSchema({
     // Workpool work id of the pool job holding this claim. See the
     // ttsGenerationClaims.workId comment.
     workId: v.optional(v.string()),
+    // Scheduling tier of the job holding this claim (see llmPriorityValidator;
+    // absent = interactive). Lets `claimLlmTranslationIfAvailable` hand a
+    // background-held claim over to interactive demand instead of making a
+    // user wait out the warm pool's queue. Matters most during onboarding:
+    // the warmup translates exactly the texts a new user hits first.
+    priority: v.optional(llmPriorityValidator),
   }).index('by_text_and_language', ['textId', 'targetLanguage']),
 
   // Daily per-language stats
@@ -1344,6 +1354,36 @@ export default defineSchema({
     otp: v.optional(v.string()), // verification code ('verify' emails)
     subject: v.string(),
   }).index('by_email', ['email']),
+
+  // Account-deletion lifecycle, one row per Better Auth user id. Written as
+  // `requested` by features/accountDeletion.requestAccountDeletion (the
+  // in-app request flow) and driven to `completed` by the operator-run purge
+  // in admin/deleteUser.ts. The row is three things at once: the proof the
+  // user actually asked (the purge refuses to run without it, absent an
+  // explicit override), the resume/progress state of the batched purge, and
+  // the audit record that deletion was fulfilled. Deliberately survives the
+  // purge itself.
+  accountDeletions: defineTable({
+    userId: v.string(), // Better Auth user._id === identity.subject
+    email: v.string(), // lowercase; double-checked against the auth user before purging
+    status: v.union(
+      v.literal('requested'),
+      v.literal('running'),
+      v.literal('completed'),
+    ),
+    requestedAt: v.optional(v.number()), // absent when the run was forced via overrideNoRequest
+    // The purge ran without an in-app request row (out-of-band GDPR email,
+    // or a request filed before this table existed). Recorded for audit.
+    overrideNoRequest: v.optional(v.boolean()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    phase: v.optional(v.string()), // current purge phase, for the status query
+    // Within-phase position for the phases that can't re-derive it from the
+    // data (today: which deck's aggregates are being cleared).
+    phaseCursor: v.optional(v.string()),
+    lastProgressAt: v.optional(v.number()), // heartbeat; guards against double-kicking a live chain
+    docsDeleted: v.optional(v.number()), // running tally across all phases
+  }).index('by_userId', ['userId']),
 
   // Admin allowlist for the /app/admin dashboard. The gate (requireAdmin in
   // convex/admin/lib.ts) requires BOTH fields to match the caller's Better

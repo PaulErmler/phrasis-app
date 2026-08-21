@@ -10,6 +10,7 @@
 
 import type * as admin_activateDataset from "../admin/activateDataset.js";
 import type * as admin_dashboard from "../admin/dashboard.js";
+import type * as admin_deleteUser from "../admin/deleteUser.js";
 import type * as admin_lib from "../admin/lib.js";
 import type * as admin_manage from "../admin/manage.js";
 import type * as admin_uploadDataset from "../admin/uploadDataset.js";
@@ -141,6 +142,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   "admin/activateDataset": typeof admin_activateDataset;
   "admin/dashboard": typeof admin_dashboard;
+  "admin/deleteUser": typeof admin_deleteUser;
   "admin/lib": typeof admin_lib;
   "admin/manage": typeof admin_manage;
   "admin/uploadDataset": typeof admin_uploadDataset;
@@ -303,6 +305,7 @@ export declare const components: {
   actionRetrier: import("@convex-dev/action-retrier/_generated/component.js").ComponentApi<"actionRetrier">;
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
   llmPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"llmPool">;
+  llmWarmPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"llmWarmPool">;
   ttsPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"ttsPool">;
   ttsWarmPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"ttsWarmPool">;
   seedPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"seedPool">;

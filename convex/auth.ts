@@ -195,7 +195,8 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
     // Account deletion is deliberately NOT self-serve (`user.deleteUser`
     // stays disabled): deleting only the Better Auth user would orphan all
     // app data and the Autumn/Stripe subscription. Deletion goes through
-    // features/accountDeletion.ts (support request, manual fulfillment).
+    // features/accountDeletion.ts (support request) and is fulfilled by an
+    // operator with the full purge in admin/deleteUser.ts.
     socialProviders: {
       google: {
         clientId: process.env.GOOGLE_CLIENT_ID as string,

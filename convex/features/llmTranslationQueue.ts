@@ -1,5 +1,9 @@
 import { v, Infer } from 'convex/values';
-import { NonRetryableError, vOnCompleteArgs } from '@convex-dev/workpool';
+import {
+  NonRetryableError,
+  vOnCompleteArgs,
+  type WorkId,
+} from '@convex-dev/workpool';
 import {
   internalAction,
   internalMutation,
@@ -30,13 +34,19 @@ import {
 } from '../../lib/languages';
 import { romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
-import { llmPool } from '../lib/workpools';
-import { asVoiceGender, ttsPriorityValidator } from '../types';
+import { llmPool, llmWarmPool } from '../lib/workpools';
+import {
+  asVoiceGender,
+  llmPriorityValidator,
+  ttsPriorityValidator,
+  type LlmPriority,
+} from '../types';
 import { captureGeneration } from '../lib/posthogAi';
 
 /**
- * LLM translation pipeline, built on the `llmPool` workpool
- * (convex/lib/workpools.ts). Per translation:
+ * LLM translation pipeline, built on the `llmPool` / `llmWarmPool` workpools
+ * (convex/lib/workpools.ts; the tier comes from `llmPriority`, see
+ * `llmPriorityValidator`). Per translation:
  *
  *   1. `claimLlmTranslationIfAvailable` (called from `scheduleMissingContent`
  *      / `flagTranslation`) atomically reserves the (textId, language) slot.
@@ -96,21 +106,72 @@ const GOOGLE_FALLBACK_RETRY = {
 } as const;
 
 /**
+ * Would `claimLlmTranslationIfAvailable` at `priority` return null against this
+ * claim? The read-only mirror of that function's fresh-vs-takeover rule, split
+ * out so the two can't drift. A fresh claim blocks, EXCEPT a background claim
+ * checked at interactive priority (the takeover case, which would write).
+ */
+function llmClaimBlocksPriority(
+  claim: Doc<'llmTranslationClaims'>,
+  priority: LlmPriority | undefined,
+): boolean {
+  const fresh = isClaimFresh(claim);
+  const takeover =
+    fresh && claim.priority === 'background' && priority !== 'background';
+  return fresh && !takeover;
+}
+
+/**
+ * True when a claim exists that `claimLlmTranslationIfAvailable` at `priority`
+ * would respect (return null against). Used by the probe path in
+ * `scheduleTranslationForLanguage`: a background-held slot probed at
+ * interactive priority must classify as NEEDY, because the real run would take
+ * the claim over (cancel the warm job, re-enqueue interactively), and that is a
+ * write. A priority-blind check would report it handled and leave the user
+ * waiting out `llmWarmPool`'s queue.
+ */
+export async function hasBlockingLlmClaim(
+  ctx: QueryCtx | MutationCtx,
+  textId: Id<'texts'>,
+  targetLanguage: string,
+  priority: LlmPriority | undefined,
+): Promise<boolean> {
+  const existing = await getLlmClaim(ctx, textId, targetLanguage);
+  return existing !== null && llmClaimBlocksPriority(existing, priority);
+}
+
+/**
  * Atomically check-and-insert an LLM translation claim. Returns the new claim's
  * `_id` iff the caller acquired the claim (and should enqueue the job), or null
  * when a fresh claim already holds the slot. Stale claims (older than
  * CLAIM_STALE_MS) are reclaimed.
+ *
+ * One exception to "fresh claim wins", mirroring `claimTtsIfAvailable`: an
+ * interactive caller takes over a fresh claim held at priority 'background'.
+ * The warmup translates exactly the texts a new user hits during onboarding,
+ * so this collision is the normal path, not an edge case, and without takeover
+ * the user's request would no-op and then wait out the low-parallelism warm
+ * pool. The takeover cancels the warm job (a queued one dies; one already
+ * mid-run finishes, but the caller's enqueue re-stamps `workId` in this same
+ * transaction, so the superseded job's ownership-gated completion can't release
+ * the new claim). Background callers never take over anything.
  */
 export async function claimLlmTranslationIfAvailable(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   targetLanguage: string,
+  priority?: LlmPriority,
 ): Promise<Id<'llmTranslationClaims'> | null> {
   const existing = await getLlmClaim(ctx, textId, targetLanguage);
 
   if (existing) {
-    if (isClaimFresh(existing)) {
+    if (llmClaimBlocksPriority(existing, priority)) {
       return null;
+    }
+    // Not blocking = stale, or a fresh background claim this caller takes
+    // over. Only the takeover has a live warm job to cancel.
+    if (isClaimFresh(existing) && existing.workId !== undefined) {
+      await llmWarmPool.cancel(ctx, existing.workId as WorkId);
     }
     await ctx.db.delete(existing._id);
   }
@@ -119,6 +180,7 @@ export async function claimLlmTranslationIfAvailable(
     textId,
     targetLanguage,
     claimedAt: Date.now(),
+    priority,
   });
 }
 
@@ -158,6 +220,23 @@ const llmJobArgsValidator = v.object({
   // this translation triggers lands in the tier the content was requested at
   // (warm sweeps pass 'background'). See ttsPriorityValidator.
   priority: v.optional(ttsPriorityValidator),
+  // Tier THIS translation runs at, as opposed to `priority` above, which is
+  // about the audio it triggers. Read only by `enqueueLlmTranslation`, to pick
+  // the pool and to stamp the claim; the worker itself makes no scheduling
+  // decisions, so it is deliberately NOT forwarded into the worker's args.
+  // The Google fallback reads its copy from the completion context below.
+  // See llmPriorityValidator.
+  llmPriority: v.optional(llmPriorityValidator),
+  // Wording a user typed when manually editing a curriculum card's
+  // translation, forwarded to the prompt as a fenced, sanitized
+  // <user_suggested_translation> hint. Set only by
+  // `suggestCurriculumFixesForEdit` (features/scheduling.ts).
+  //
+  // Deliberately absent from `llmCompletionContextValidator` below: the
+  // Google Translate fallback has nowhere to put a suggestion, so leaving the
+  // field out of the completion context makes it structurally impossible for
+  // one to leak down that path.
+  userSuggestedTranslation: v.optional(v.string()),
 });
 
 /** onComplete context: everything the Google fallback needs to run. */
@@ -171,6 +250,7 @@ const llmCompletionContextValidator = v.object({
   preferredRegionVariant: v.optional(v.string()),
   skipTts: v.optional(v.boolean()),
   priority: v.optional(ttsPriorityValidator),
+  llmPriority: v.optional(llmPriorityValidator),
 });
 
 type LlmJobArgs = Infer<typeof llmJobArgsValidator>;
@@ -214,7 +294,11 @@ export const enqueueLlmTranslation = internalMutation({
       return null;
     }
 
-    const workId: string = await llmPool.enqueueAction(
+    // Priority = pool choice: interactive jobs go to llmPool, warm sweeps to
+    // the low-parallelism llmWarmPool (see workpools.ts). Both pools share
+    // onLlmTranslationComplete, so claim lifetime is identical either way.
+    const pool = args.llmPriority === 'background' ? llmWarmPool : llmPool;
+    const workId: string = await pool.enqueueAction(
       ctx,
       internal.features.llmTranslationQueue.processLlmTranslationForCard,
       {
@@ -229,6 +313,7 @@ export const enqueueLlmTranslation = internalMutation({
         preferredRegionVariant: args.preferredRegionVariant,
         skipTts: args.skipTts,
         priority: args.priority,
+        userSuggestedTranslation: args.userSuggestedTranslation,
       },
       {
         onComplete:
@@ -243,6 +328,7 @@ export const enqueueLlmTranslation = internalMutation({
           preferredRegionVariant: args.preferredRegionVariant,
           skipTts: args.skipTts,
           priority: args.priority,
+          llmPriority: args.llmPriority,
         },
       },
     );
@@ -451,6 +537,11 @@ export const processLlmTranslationForCard = internalAction({
       formality,
       arcContext,
       previousTranslation,
+      // No gate needed, unlike previousTranslation: this arrives only from
+      // `suggestCurriculumFixesForEdit`, which sets it exactly when the
+      // "a user thinks this is wrong" framing is true. buildPrompt sanitizes
+      // it before it reaches the model.
+      userSuggestedTranslation: args.userSuggestedTranslation,
     } as const;
 
     // Run each stage of the resolved translation rule in order. The first
@@ -701,7 +792,11 @@ export const onLlmTranslationComplete = internalMutation({
       targetLanguage: context.targetLanguage,
       error: result.error,
     });
-    const fallbackWorkId: string = await llmPool.enqueueAction(
+    // Stay on the tier the LLM attempt ran at: a warm translation's fallback
+    // must not jump onto the interactive pool.
+    const fallbackPool =
+      context.llmPriority === 'background' ? llmWarmPool : llmPool;
+    const fallbackWorkId: string = await fallbackPool.enqueueAction(
       ctx,
       internal.features.decks.processTranslationForCard,
       {

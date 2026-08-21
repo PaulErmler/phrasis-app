@@ -376,6 +376,12 @@ export const ensureAudioForTestTranslations = internalMutation({
  * in-flight jobs, so re-runs are read-only no-ops. Work is fanned out to
  * `warmupTranslationsBatch` workers sized by (texts × languages) so an
  * all-languages run never exceeds one transaction's limits.
+ *
+ * Every job runs at `llmPriority: 'background'`, i.e. on `llmWarmPool`, so an
+ * all-languages run (thousands of jobs) cannot delay a user's own
+ * translations. If a user asks for one of these (text, language) pairs while
+ * the warm job still holds its claim, `claimLlmTranslationIfAvailable` cancels
+ * the warm job and re-runs it interactively.
  */
 export const warmupOnboardingTranslations = internalMutation({
   args: {
@@ -488,6 +494,10 @@ export const warmupTranslationsBatch = internalMutation({
           ctx,
           text,
           languages,
+          // Nobody is waiting on a warmup run, and it enqueues thousands of
+          // jobs at once. Route them to llmWarmPool so they can't queue ahead
+          // of a user's own translations.
+          { llmPriority: 'background' },
         );
       }
       return { translationsScheduled };

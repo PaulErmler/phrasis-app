@@ -30,8 +30,8 @@ import type { Id } from "../../../_generated/dataModel";
 import type { ProposedCardMetadata } from "../../../types";
 import { insertAudioFixture } from "../../lib/audioFixtures";
 // Module-mocked globally (tests/convexTestSetup.ts), used to assert on the
-// voice the replace path enqueues.
-import { ttsPool } from "../../../lib/workpools";
+// voice the replace path enqueues and to prove it enqueues no retranslation.
+import { ttsPool, llmPool } from "../../../lib/workpools";
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
@@ -327,6 +327,43 @@ describe("features/chat/alsoCorrect", () => {
       expect(newText?.text).toBe("Me gustaría un café.");
       expect(newText?.userCreated).toBe(true);
       expect(newText?.userId).toBe("user_A");
+    });
+
+    // The manual edit dialog treats a retyped curriculum translation as a
+    // complaint: it flags the shared row and suggests the user's wording to a
+    // retranslation. Accepting an "also correct" alternative from the tutor is
+    // not that claim, so this path must leave the shared row alone.
+    it("does not flag the shared curriculum row (unlike a manual edit)", async () => {
+      const t = convexTest(schema, modules);
+      vi.mocked(llmPool.enqueueAction).mockClear();
+      const { cardId, textId } = await seedOwnedCard(t, { userCreated: false });
+      // Change "en", a translation row rather than the text's own language,
+      // so the manual path's guards would all pass here.
+      const approvalId = await createApproval(t, cardId, [
+        { language: "en", text: "I'd like a coffee." },
+      ]);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(
+        api.features.chat.cardApprovals.replaceCardFromApproval,
+        { approvalId, timezone: "UTC" },
+      );
+
+      const sharedTranslation = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("targetLanguage", "en"),
+          )
+          .first(),
+      );
+      expect(sharedTranslation?.flagCount).toBeUndefined();
+      expect(sharedTranslation?.translatedText).toBe("I want a coffee.");
+
+      const retranslations = vi
+        .mocked(llmPool.enqueueAction)
+        .mock.calls.map((c) => c[2] as { textId: Id<"texts">; ruleOverride?: string })
+        .filter((a) => a.textId === textId);
+      expect(retranslations).toHaveLength(0);
     });
 
     // The learn view suppresses its chat-thread rotation for exactly the card

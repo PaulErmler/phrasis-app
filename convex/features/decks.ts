@@ -79,6 +79,7 @@ import {
   ttsProviderValidator,
   ttsPriorityValidator,
   type TtsPriority,
+  type LlmPriority,
   voiceGenderValidator,
   asVoiceGender,
   schedulingTrackFromSettings,
@@ -95,9 +96,10 @@ import { languageSupportsStt } from '../../lib/languages';
 import {
   claimLlmTranslationIfAvailable,
   getLlmClaim,
+  hasBlockingLlmClaim,
   isClaimFresh,
 } from './llmTranslationQueue';
-import { llmPool } from '../lib/workpools';
+import { llmPool, llmWarmPool } from '../lib/workpools';
 import {
   buildTextContentBatchForLanguages,
   buildCardSearchableText,
@@ -164,9 +166,17 @@ export async function scheduleTranslationForLanguage(
     /**
      * Priority the downstream TTS enqueue (in
      * `storeTranslationAndScheduleTTS`) runs at once the translation lands.
-     * The translation itself always rides llmPool; only audio is tiered.
+     * Distinct from `llmPriority` below: this is about the audio, that is
+     * about the translation. A collection preview wants an interactive
+     * translation whose audio, if any, rides the warm pool.
      */
     priority?: TtsPriority;
+    /**
+     * Tier the translation itself runs at: 'background' routes it to
+     * `llmWarmPool` so a warm sweep can't queue ahead of user-facing work.
+     * Absent means interactive.
+     */
+    llmPriority?: LlmPriority;
     /** Read-only probe: throw ProbeNeedsWork instead of writing. */
     probe?: boolean;
   },
@@ -174,11 +184,22 @@ export async function scheduleTranslationForLanguage(
   const tCfg = getTranslationConfigForLanguage(targetLanguage);
   if (opts.probe) {
     // A fresh LLM claim means a job already owns this translation: the real
-    // call would no-op, so it is not "work needed". Google-path languages
-    // are claimless and always enqueue, hence always needy here.
+    // call would no-op, so it is not "work needed". Priority-aware on purpose:
+    // a fresh 'background' claim probed at interactive priority IS needy,
+    // because the real run would take it over (cancel the warm job, re-enqueue
+    // on llmPool) — a write. Google-path languages are claimless and always
+    // enqueue, hence always needy here.
     if (tCfg.provider === 'openrouter') {
-      const claim = await getLlmClaim(ctx, text._id, targetLanguage);
-      if (claim && isClaimFresh(claim)) return false;
+      if (
+        await hasBlockingLlmClaim(
+          ctx,
+          text._id,
+          targetLanguage,
+          opts.llmPriority,
+        )
+      ) {
+        return false;
+      }
     }
     throw new ProbeNeedsWork();
   }
@@ -187,6 +208,7 @@ export async function scheduleTranslationForLanguage(
       ctx,
       text._id,
       targetLanguage,
+      opts.llmPriority,
     );
     if (!claimId) return false;
     await ctx.runMutation(
@@ -201,15 +223,17 @@ export async function scheduleTranslationForLanguage(
           preferredRegionVariant: opts.preferredRegionVariant,
           skipTts: opts.skipTts,
           priority: opts.priority,
+          llmPriority: opts.llmPriority,
         },
       },
     );
     return true;
   }
-  // Legacy Google Translate path. Runs through the llmPool too (for
+  // Legacy Google Translate path. Runs through the LLM pools too (for
   // retries + slot bounding); holds no LLM claim, so its onComplete's
   // claim lookup no-ops.
-  await llmPool.enqueueAction(
+  const pool = opts.llmPriority === 'background' ? llmWarmPool : llmPool;
+  await pool.enqueueAction(
     ctx,
     internal.features.decks.processTranslationForCard,
     {
@@ -390,6 +414,14 @@ export async function scheduleMissingContent(
      * 'background'. See ttsPriorityValidator.
      */
     priority?: TtsPriority;
+    /**
+     * LLM priority for every translation enqueue this sweep triggers. Absent =
+     * 'interactive'; only the warmups that nobody is waiting on pass
+     * 'background'. Separate from `priority` above because most warm callers
+     * want background AUDIO for a translation the user may be about to read.
+     * See llmPriorityValidator.
+     */
+    llmPriority?: LlmPriority;
     /**
      * Read-only probe: run the sweep's full decision logic but THROW
      * ProbeNeedsWork at the first point a real run would write, and write
@@ -750,6 +782,7 @@ export async function scheduleMissingContent(
             audioSpeakerGender,
             preferredRegionVariant: sweptRegionVariants.get(lang),
             priority: opts?.priority,
+            llmPriority: opts?.llmPriority,
             probe: opts?.probe,
           })
         ) {

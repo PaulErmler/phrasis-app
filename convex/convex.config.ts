@@ -35,6 +35,10 @@ app.use(rateLimiter);
 // Content-generation pools (LLM translation / TTS synthesis). Separate
 // instances because each pool needs its own parallelism cap.
 app.use(workpool, { name: 'llmPool' });
+// Background LLM translation warms (llmPriority 'background'): low-parallelism
+// sibling of llmPool so a manually fired warmup run can't queue thousands of
+// jobs ahead of the translation a user is waiting on. See convex/lib/workpools.ts.
+app.use(workpool, { name: 'llmWarmPool' });
 app.use(workpool, { name: 'ttsPool' });
 // Background TTS warms (priority 'background'): low-parallelism sibling of
 // ttsPool so signup-time warm bursts can't queue ahead of the audio a user

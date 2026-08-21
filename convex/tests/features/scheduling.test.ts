@@ -27,9 +27,11 @@ const llmEnqueues = () =>
   vi.mocked(llmPool.enqueueAction).mock.calls.map(
     (c) =>
       c[2] as {
+        textId: Id<"texts">;
         targetLanguage: string;
         ruleOverride?: string;
         replaceExisting?: boolean;
+        userSuggestedTranslation?: string;
       },
   );
 beforeEach(() => {
@@ -1313,6 +1315,252 @@ describe("features/scheduling", () => {
       // Wording kept; the wrong-gender voice still dropped for re-synthesis.
       expect(after.translation?.translatedText).toBe("Hello");
       expect(after.audio).toBeNull();
+    });
+  });
+
+  describe("editCard: curriculum fix suggestion", () => {
+    /**
+     * Seed a card on a SHARED curriculum text so editCard takes Path B. The
+     * text's own language is "sv" and the course is en→sv, so the "en" row is
+     * an ordinary translation the user can edit, and "sv" is the curriculum
+     * source line. Editing "en" should flag the shared row; editing "sv"
+     * should suppress flagging for the whole submission.
+     */
+    async function seedCurriculumCard(
+      t: TestConvex<typeof schema>,
+      opts: {
+        flagCount?: number;
+        translationSource?: string;
+        userCreated?: boolean;
+      } = {},
+    ) {
+      return t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["sv"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        const deckId = await ctx.db.insert("decks", {
+          courseId,
+          name: "d",
+          cardCount: 1,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hej",
+          language: "sv",
+          userCreated: opts.userCreated ?? false,
+          ...(opts.userCreated ? { userId: "user_A" } : {}),
+          collectionId,
+          collectionRank: 1,
+        });
+        const translationId = await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "en",
+          translatedText: "Hello",
+          ...(opts.flagCount != null ? { flagCount: opts.flagCount } : {}),
+          ...(opts.translationSource
+            ? { translationSource: opts.translationSource }
+            : {}),
+        });
+        const cardId = await ctx.db.insert("cards", {
+          deckId,
+          textId,
+          collectionId,
+          dueDate: Date.now() - 1000,
+          isMastered: false,
+          isHidden: false,
+          schedulingPhase: "preReview",
+          preReviewCount: 0,
+        });
+        // Only card_edits is funded. The suggestion path must not need a
+        // translation_flags unit; if it consumed one this seed would throw.
+        await ctx.db.insert("usageQuotas", {
+          userId: "user_A",
+          features: {
+            card_edits: {
+              balance: 100,
+              included: 100,
+              used: 0,
+              unlimited: false,
+            },
+          },
+          lastSyncedAt: Date.now(),
+        });
+        return { cardId, textId, translationId };
+      });
+    }
+
+    it("flags the original shared row and sends the user's wording as a suggestion", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId, translationId } = await seedCurriculumCard(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hej" },
+          { language: "en", text: "Hi there" },
+        ],
+        timezone: "UTC",
+      });
+
+      // The ORIGINAL shared row is flagged. Other learners still study it,
+      // which is the whole point of doing this on top of the fork.
+      const original = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(original?.flagCount).toBe(1);
+      expect(original?.translatedText).toBe("Hello");
+
+      const enqueues = llmEnqueues();
+      expect(enqueues).toHaveLength(1);
+      expect(enqueues[0].textId).toBe(textId);
+      expect(enqueues[0].targetLanguage).toBe("en");
+      expect(enqueues[0].ruleOverride).toBe("retranslation_high");
+      expect(enqueues[0].replaceExisting).toBe(true);
+      expect(enqueues[0].userSuggestedTranslation).toBe("Hi there");
+
+      // The fork carries the user's wording, tagged user-provided, and is not
+      // itself flagged: the complaint is against the curriculum, not the copy.
+      const forked = await t.run(async (ctx) => {
+        const cards = await ctx.db.query("cards").collect();
+        const replacement = cards.find((c) => c.textId !== textId);
+        return replacement
+          ? ctx.db
+            .query("translations")
+            .withIndex("by_text_and_language", (q) =>
+              q.eq("textId", replacement.textId).eq("targetLanguage", "en"),
+            )
+            .first()
+          : null;
+      });
+      expect(forked?.translatedText).toBe("Hi there");
+      expect(forked?.translationSource).toBe("user-provided");
+      expect(forked?.flagCount).toBeUndefined();
+    });
+
+    it("respects the flag cap: an over-cap edit counts but does not enqueue", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, translationId } = await seedCurriculumCard(t, {
+        flagCount: 2,
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hej" },
+          { language: "en", text: "Hi there" },
+        ],
+        timezone: "UTC",
+      });
+
+      const original = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(original?.flagCount).toBe(3);
+      expect(llmEnqueues()).toHaveLength(0);
+    });
+
+    it("skips flagging entirely when the edit also changes the curriculum source line", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, translationId } = await seedCurriculumCard(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      // "sv" is the text's own language. Changing it means the new English is
+      // a translation of the user's sentence, not the curriculum's, so it is
+      // not evidence the curriculum's English is wrong.
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hejsan" },
+          { language: "en", text: "Hi there" },
+        ],
+        timezone: "UTC",
+      });
+
+      const original = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(original?.flagCount).toBeUndefined();
+      expect(llmEnqueues()).toHaveLength(0);
+    });
+
+    it("leaves hand-curated rows alone, counter included", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, translationId } = await seedCurriculumCard(t, {
+        translationSource: "curated-manual",
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hej" },
+          { language: "en", text: "Hi there" },
+        ],
+        timezone: "UTC",
+      });
+
+      // mayRegenerateTranslation blocks the retranslation, so a flag here
+      // would be a complaint nothing will ever act on.
+      const original = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(original?.flagCount).toBeUndefined();
+      expect(llmEnqueues()).toHaveLength(0);
+    });
+
+    it("drops the suggestion when another retranslation already holds the claim", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId, translationId } = await seedCurriculumCard(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "en",
+          claimedAt: Date.now(),
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hej" },
+          { language: "en", text: "Hi there" },
+        ],
+        timezone: "UTC",
+      });
+
+      // The complaint is still recorded; only the suggestion is lost.
+      const original = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(original?.flagCount).toBe(1);
+      expect(llmEnqueues()).toHaveLength(0);
+    });
+
+    it("does not flag when the text is already user-owned (Path A)", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, translationId } = await seedCurriculumCard(t, {
+        userCreated: true,
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hej" },
+          { language: "en", text: "Hi there" },
+        ],
+        timezone: "UTC",
+      });
+
+      // Path A patches the row in place; there is no shared row to complain
+      // about, and the patched row must not carry a flag from its own owner.
+      const row = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(row?.translatedText).toBe("Hi there");
+      expect(row?.flagCount).toBeUndefined();
+      expect(llmEnqueues()).toHaveLength(0);
     });
   });
 
@@ -2864,6 +3112,38 @@ describe("features/scheduling", () => {
       expect(enqueuedLangs).toEqual(["en", "fr"]);
 
       // Single quota charge regardless of language count.
+      const quota = await t.run(async (ctx) =>
+        ctx.db
+          .query("usageQuotas")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .first(),
+      );
+      expect(quota?.features.translation_flags.balance).toBe(9);
+    });
+
+    it("second flag still enqueues: the cap allows two attempts per row", async () => {
+      // FLAG_AUTO_RETRANSLATION_MAX is 2, so a row that has been flagged once
+      // gets a second automatic retranslation. The cap is shared with the
+      // manual-edit suggestion path, which is why a row can reach it via two
+      // different gestures.
+      const t = convexTest(schema, modules);
+      const { cardId, translationId } = await seedFlaggableCard(t, {
+        flagCount: 1,
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+      });
+      expect(res).toEqual({ retranslated: true });
+
+      const translation = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(translation?.flagCount).toBe(2);
+
+      const enqueues = llmEnqueues();
+      expect(enqueues).toHaveLength(1);
+      expect(enqueues[0].ruleOverride).toBe("retranslation_high");
+
       const quota = await t.run(async (ctx) =>
         ctx.db
           .query("usageQuotas")

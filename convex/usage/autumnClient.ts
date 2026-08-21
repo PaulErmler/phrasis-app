@@ -37,7 +37,7 @@ export interface AutumnRawResponse {
  * as "customer not created yet").
  */
 export async function autumnFetchRaw(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   body: unknown,
   apiVersion: string,
@@ -62,13 +62,13 @@ export async function autumnFetchRaw(
 }
 
 export async function autumnFetch<T>(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   body: unknown,
   apiVersion: string,
 ): Promise<T>;
 export async function autumnFetch<T>(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   body: unknown,
   apiVersion: string,
@@ -80,7 +80,7 @@ export async function autumnFetch<T>(
  * resource not created yet" reading.
  */
 export async function autumnFetch<T>(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   body: unknown,
   apiVersion: string,

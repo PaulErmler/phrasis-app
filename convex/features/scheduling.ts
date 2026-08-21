@@ -73,6 +73,7 @@ import { soundsSame } from '../lib/textComparison';
 import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
 import {
   isUserCreatedText,
+  mayRegenerateTranslation,
   USER_PROVIDED_TRANSLATION_SOURCE,
 } from '../../lib/translationProvenance';
 import { consumeQuota } from '../usage/helpers';
@@ -1534,6 +1535,129 @@ export const toggleFavoriteCard = mutation({
 });
 
 /**
+ * Claim the (text, language) translation slot and enqueue a `retranslation_high`
+ * job for it. The single unit of work shared by the two gestures that can
+ * trigger an automatic retranslation: the explicit Flag button below, and a
+ * manual card edit of a curriculum translation
+ * (`suggestCurriculumFixesForEdit`).
+ *
+ * Returns true iff this call acquired the claim and enqueued. False means
+ * something else is already retranslating this (text, language) and this
+ * caller's request, including any suggestion it carried, is dropped. Callers
+ * that bill quota should do so only on a true return.
+ *
+ * Audio is deliberately NOT deleted here: before the LLM lands we can't know
+ * whether the retranslation is audibly different. That decision lives in
+ * `storeTranslationAndScheduleTTS`'s replaceExisting branch, which has old +
+ * new text in hand. It keeps the audio when the change is punctuation-only
+ * (`soundsSame`) and deletes + re-enqueues TTS otherwise.
+ */
+async function enqueueFlagRetranslation(
+  ctx: MutationCtx,
+  text: Doc<'texts'>,
+  targetLanguage: string,
+  opts?: {
+    userSuggestedTranslation?: string;
+    /** Runs after the claim is acquired and before the job is enqueued.
+     * `flagTranslation` bills its one quota unit here so a depleted user
+     * throws before any pool work is created, rather than relying on the
+     * surrounding transaction to unwind an enqueue that already happened. */
+    onClaimed?: () => Promise<void>;
+  },
+): Promise<boolean> {
+  const claimId = await claimLlmTranslationIfAvailable(
+    ctx,
+    text._id,
+    targetLanguage,
+  );
+  if (!claimId) return false;
+
+  await opts?.onClaimed?.();
+
+  await ctx.runMutation(
+    internal.features.llmTranslationQueue.enqueueLlmTranslation,
+    {
+      args: {
+        textId: text._id,
+        sourceLanguage: text.language,
+        targetLanguage,
+        text: text.text,
+        audioSpeakerGender: text.audioSpeakerGender,
+        ruleOverride: 'retranslation_high',
+        // Deliberate retranslation. Overwrite the existing translation
+        // row (and its romanization) once the LLM lands.
+        replaceExisting: true,
+        ...(opts?.userSuggestedTranslation
+          ? { userSuggestedTranslation: opts.userSuggestedTranslation }
+          : {}),
+      },
+    },
+  );
+  return true;
+}
+
+/**
+ * A manual edit of a curriculum card is also a complaint about the curriculum.
+ * Path B of `applyCardEdit` forks the shared text so the editor keeps their
+ * wording, which leaves the shared row every OTHER learner studies exactly as
+ * wrong as it was. This closes that loop: each changed target language flags
+ * the original shared `translations` row and, within the flag cap, enqueues a
+ * retranslation carrying the user's wording as a suggestion the prompt tells
+ * the model to distrust.
+ *
+ * Called only from Path B (shared text) and only for manual edits. The chat
+ * "also correct" replace is excluded at the call site: accepting an
+ * alternative phrasing from the tutor is not a claim that the curriculum
+ * translation is wrong, and burning the row's capped retranslations on it
+ * would be wrong. Edits that also change the source line are excluded too,
+ * since the user's target text then translates THEIR source, not the
+ * curriculum's.
+ *
+ * No quota: `applyCardEdit` already consumed a CARD_EDITS unit in this same
+ * mutation, and the shared `flagCount` cap bounds provider spend per row
+ * across every user and both trigger paths. Not calling `consumeQuota` also
+ * means no new USAGE_LIMIT throw can roll back an otherwise-valid edit.
+ *
+ * Returns the languages that were flagged, for the caller's analytics event.
+ */
+async function suggestCurriculumFixesForEdit(
+  ctx: MutationCtx,
+  originalText: Doc<'texts'>,
+  changedLanguages: Set<string>,
+  submittedMap: Map<string, string>,
+  existingTranslationMap: Map<string, Doc<'translations'>>,
+): Promise<string[]> {
+  const flagged: string[] = [];
+
+  for (const lang of changedLanguages) {
+    if (lang === originalText.language) continue;
+
+    const existing = existingTranslationMap.get(lang);
+    // No shared row for this language: the curriculum never had a translation
+    // here, so there is nothing to correct and nothing to count.
+    if (!existing) continue;
+
+    // Hand-curated and user-provided rows are never second-guessed by the
+    // pipeline. Skip them whole, counter included: a flag we will never act on
+    // reads as unresolved triage rather than a deliberate exemption.
+    if (!mayRegenerateTranslation(originalText, existing)) continue;
+
+    // Post-increment cap, matching `flagTranslation`. The counter always rises
+    // (over-cap flags are the admin-triage signal); only the enqueue is gated.
+    const nextCount = (existing.flagCount ?? 0) + 1;
+    await ctx.db.patch(existing._id, { flagCount: nextCount });
+    flagged.push(lang);
+    if (nextCount > FLAG_AUTO_RETRANSLATION_MAX) continue;
+
+    await enqueueFlagRetranslation(ctx, originalText, lang, {
+      userSuggestedTranslation: submittedMap.get(lang),
+    });
+  }
+
+  return flagged;
+}
+
+/**
  * Flag a card as having bad translation content. The user sees a single
  * "Flag" affordance on the card; we then increment `flagCount` on every
  * non-source-language `translations` row for that card's text, and enqueue
@@ -1643,57 +1767,31 @@ export const flagTranslation = mutation({
       return { retranslated: false };
     }
 
-    // Curriculum-only path: user-created texts already short-circuited above.
-    const ruleOverride = 'retranslation_high';
-
-    // 3) Per-language: claim slot, charge quota on first success only,
-    // delete stale audio, enqueue retranslation. Claim-contested rows
-    // skip silently (something else is already retranslating them).
+    // 3) Per-language: claim slot, enqueue the retranslation, charge quota on
+    // the first success only. Claim-contested rows skip silently (something
+    // else is already retranslating them). The rule is always
+    // `retranslation_high` here; user-created texts short-circuited above.
     let anyEnqueued = false;
     let quotaCharged = false;
 
     for (const { tr } of enqueueable) {
-      const lang = tr.targetLanguage;
-
-      const claimId = await claimLlmTranslationIfAvailable(
+      const enqueued = await enqueueFlagRetranslation(
         ctx,
-        card.textId,
-        lang,
-      );
-      if (!claimId) continue;
-
-      // Charge quota once total, on the first successful claim. If the
-      // user is depleted, this throws USAGE_LIMIT and the whole mutation
-      // rolls back (counters, claim row, audio deletes).
-      if (!quotaCharged) {
-        await consumeQuota(ctx, userId, FEATURE_IDS.TRANSLATION_FLAGS);
-        quotaCharged = true;
-      }
-
-      // Audio is deliberately NOT deleted here: before the LLM lands we
-      // can't know whether the retranslation is audibly different. The
-      // decision lives in storeTranslationAndScheduleTTS's replaceExisting
-      // branch, which has old + new text in hand. It keeps the audio when
-      // the change is punctuation-only (`soundsSame`) and deletes + re-
-      // enqueues TTS otherwise.
-
-      await ctx.runMutation(
-        internal.features.llmTranslationQueue.enqueueLlmTranslation,
+        text,
+        tr.targetLanguage,
         {
-          args: {
-            textId: card.textId,
-            sourceLanguage: text.language,
-            targetLanguage: lang,
-            text: text.text,
-            audioSpeakerGender: text.audioSpeakerGender,
-            ruleOverride,
-            // Deliberate retranslation. Overwrite the existing translation
-            // row (and its romanization) once the LLM lands.
-            replaceExisting: true,
+          // Charge once total, on the first successful claim. If the user is
+          // depleted this throws USAGE_LIMIT from inside the helper, before
+          // that language's job is enqueued, and the whole mutation rolls
+          // back (counters, claim rows, any earlier enqueue).
+          onClaimed: async () => {
+            if (quotaCharged) return;
+            await consumeQuota(ctx, userId, FEATURE_IDS.TRANSLATION_FLAGS);
+            quotaCharged = true;
           },
         },
       );
-      anyEnqueued = true;
+      if (enqueued) anyEnqueued = true;
     }
 
     // Flag volume per language is the clearest quality signal the app has for
@@ -1775,6 +1873,9 @@ export const regenerateCardAudio = mutation({
  *     patches metadata (speaker gender, register, …) onto the row afterwards,
  *     which must never hit a shared/dataset text other users reference.
  *   - skipQuota: caller owns CARD_EDITS billing (bills once itself).
+ *   - suggestCurriculumFix: on Path B, also flag the shared rows this edit
+ *     disagrees with and suggest the user's wording to the retranslation.
+ *     Manual edits only.
  *
  * Returns the resolved textId and whether anything was written; a no-op diff
  * without ensureUserOwnedText returns `changed: false` and consumes nothing.
@@ -1794,6 +1895,16 @@ export async function applyCardEdit(
      * only afterwards (applyTextMetadata) would come too late. The claim
      * blocks the follow-up pass and the wrong-gender synthesis wins. */
     proposedAudioSpeakerGender?: 'male' | 'female';
+    /** Treat this edit as a complaint about the curriculum as well as a
+     * private fix. On Path B only, flag the ORIGINAL shared translation rows
+     * for the changed languages and hand the user's wording to the
+     * retranslation as a suggestion. See `suggestCurriculumFixesForEdit`.
+     *
+     * Off by default so a caller has to opt in deliberately. Only `editCard`
+     * (the manual edit dialog) does; the chat "also correct" replace must
+     * not, since an alternative phrasing the tutor offered is not a claim
+     * that the curriculum translation is wrong. */
+    suggestCurriculumFix?: boolean;
   },
 ): Promise<{
   textId: Id<'texts'>;
@@ -1913,6 +2024,9 @@ export async function applyCardEdit(
     await trackEvent(ctx, { userId, courseId: course._id, timezone: args.timezone, field: 'cardsEdited' });
 
     let resolvedTextId: Id<'texts'>;
+    // Languages whose shared curriculum row this edit flagged, for the
+    // analytics event at the end. Only ever non-empty on Path B.
+    let flaggedLanguages: string[] = [];
 
     if (isUserOwned) {
       // Path A: modify in place
@@ -2084,6 +2198,24 @@ export async function applyCardEdit(
           });
         }
       }
+
+      // The fork above is now the user's private copy. `text` and
+      // `existingTranslationMap` still describe the untouched shared rows, so
+      // this is the one place with both the original rows and the user's
+      // wording in hand.
+      //
+      // Skipped entirely when the source line changed: the user's target text
+      // is then a translation of THEIR source sentence, not the curriculum's,
+      // so offering it as a correction would compare two different sentences.
+      if (args.suggestCurriculumFix && !changedLanguages.has(sourceLanguage)) {
+        flaggedLanguages = await suggestCurriculumFixesForEdit(
+          ctx,
+          text,
+          changedLanguages,
+          submittedMap,
+          existingTranslationMap,
+        );
+      }
     }
 
     // Metadata-before-scheduling: land the proposed gender on the resolved
@@ -2227,6 +2359,12 @@ export async function applyCardEdit(
 
     await trackCardAction(ctx, userId, 'edit', card, {
       changed_languages: [...changedLanguages],
+      // Present only when the edit doubled as a curriculum complaint. Keeps
+      // the quality signal `flag_translation` provides on this path too, since
+      // it charges no TRANSLATION_FLAGS unit and fires no flag event.
+      ...(flaggedLanguages.length > 0
+        ? { flagged_languages: flaggedLanguages }
+        : {}),
     });
 
     return { textId: resolvedTextId, cardId: resolvedCardId, changed: true, course };
@@ -2235,6 +2373,11 @@ export async function applyCardEdit(
 /**
  * Edit the translations of a card. Thin wrapper over `applyCardEdit`. See
  * its doc comment for the Path A/B mechanics.
+ *
+ * The manual edit dialog is the one caller that opts into
+ * `suggestCurriculumFix`: a user retyping a curriculum translation is telling
+ * us it is wrong, so the edit flags the shared row and offers their wording to
+ * the retranslation alongside forking their own card.
  */
 export const editCard = mutation({
   args: {
@@ -2249,7 +2392,7 @@ export const editCard = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await applyCardEdit(ctx, args);
+    await applyCardEdit(ctx, { ...args, suggestCurriculumFix: true });
     return null;
   },
 });

@@ -606,8 +606,8 @@ export interface FreshUserPaths {
  * cannot be imported because it registers its own test() calls). Used by
  * billing-state specs that need a fresh identity per invocation: billing
  * state lives in Autumn/Stripe and survives suite runs, so shared fixture
- * users can never be reused for it (and there is intentionally no cleanup
- * The app has no account deletion yet).
+ * users can never be reused for it (and there is intentionally no cleanup;
+ * operators can purge stragglers via admin/deleteUser:run).
  */
 export async function signUpFreshUser(
   page: Page,

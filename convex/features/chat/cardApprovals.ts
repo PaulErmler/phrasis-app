@@ -430,6 +430,13 @@ export const replaceCardFromApproval = mutation({
         metadata?.speakerGender === 'male' || metadata?.speakerGender === 'female'
           ? metadata.speakerGender
           : undefined,
+      // `suggestCurriculumFix` is deliberately omitted. The manual edit dialog
+      // sets it so a retyped curriculum translation flags the shared row and
+      // suggests the user's wording to a retranslation. Accepting an
+      // "also correct" alternative from the tutor is not the same claim: both
+      // renderings are usually fine, which is the point of the tool, and
+      // flagging here would spend the shared row's capped auto-retranslations
+      // on sentences nobody said were wrong.
     });
 
     // Bill only a real write. A no-op diff (the card was edited to exactly the
