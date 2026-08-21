@@ -5,11 +5,11 @@ import type { MockInstance } from 'vitest';
 /**
  * Characterization tests for the two refactor-critical behaviors of
  * useLearningMode:
- *  (a) sticky query values — a query flipping value → undefined (refetch)
+ *  (a) sticky query values. A query flipping value → undefined (refetch)
  *      keeps serving the last resolved value while authenticated, and the
  *      stickiness is fully reset on sign-out;
- *  (b) the exiting-mutation prelude shared by handleDelete / handleNext —
- *      one mutation per invocation, isExiting set before the await,
+ *  (b) the exiting-mutation prelude shared by handleDelete / handleNext.
+ *      One mutation per invocation, isExiting set before the await,
  *      isReviewing cleared in finally, error paths restoring isExiting
  *      (radio's finally clears isExiting unconditionally).
  *
@@ -389,7 +389,7 @@ describe('useLearningMode', () => {
     });
   });
 
-  describe('handleNext — master/hide branches', () => {
+  describe('handleNext: master/hide branches', () => {
     it('pending master: fires masterCard once, never reviewCard, holds isExiting in flight', async () => {
       const master = harness.mutationFor(REFS.masterCard);
       const review = harness.mutationFor(REFS.reviewCard);
@@ -473,7 +473,7 @@ describe('useLearningMode', () => {
     });
   });
 
-  describe('handleNext — free-play branch', () => {
+  describe('handleNext: free-play branch', () => {
     it('fires advanceFreePlayCard once and always clears isExiting on success', async () => {
       seedReviewing({}, { schedulingMode: 'radio' });
       const radio = harness.mutationFor(REFS.advanceFreePlayCard);
@@ -549,7 +549,7 @@ describe('useLearningMode', () => {
         expect(args.cardId).toBe('card1');
         expect(typeof args.timezone).toBe('string');
         expect(typeof args.timeSpentMs).toBe('number');
-        // No face argument — the server reads it off course settings.
+        // No face argument. The server reads it off course settings.
         expect(args).not.toHaveProperty('mode');
         expect(review).not.toHaveBeenCalled();
         expect(reviewing(result).isExiting).toBe(false);
@@ -558,7 +558,7 @@ describe('useLearningMode', () => {
     );
   });
 
-  describe('handleNext — review branch', () => {
+  describe('handleNext: review branch', () => {
     it('fires reviewCard once with the phase-default rating and updates daily counters', async () => {
       const review = harness.mutationFor(REFS.reviewCard);
       const gate = deferred<Record<string, unknown>>();

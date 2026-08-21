@@ -3,7 +3,7 @@ import { QueryCtx, MutationCtx } from '../_generated/server';
 import { Id, Doc } from '../_generated/dataModel';
 import { getCollectionProgress } from './collections';
 
-/** Client-settable marks. 'readd' is internal-only — see schema comment. */
+/** Client-settable marks. 'readd' is internal-only. See schema comment. */
 export const collectionTextMarkValidator = v.union(
   v.literal('prioritized'),
   v.literal('ignored'),
@@ -77,7 +77,7 @@ export async function listMarksForCollection(
  * Apply prioritized/ignored counter deltas to the user's collectionProgress
  * row, creating it when absent. Runs in the SAME transaction as the mark-row
  * write, which is what keeps the denormalized counters drift-free.
- * ('readd' marks are deliberately not counted — they represent "back in the
+ * ('readd' marks are deliberately not counted, they represent "back in the
  * queue", so they must not shift completion/remaining math.)
  */
 export async function applyMarkCounterDelta(

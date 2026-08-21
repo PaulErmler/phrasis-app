@@ -1,10 +1,10 @@
 /**
- * Shared TTS + STT helper — used by features/decks.ts and features/ttsProcessing.ts.
+ * Shared TTS + STT helper. Used by features/decks.ts and features/ttsProcessing.ts.
  * No Convex function exports; just plain async helpers.
  *
  * Provider-specific TTS synthesis lives behind the `TTSProvider` interface in
  * ../lib/tts. Speech-to-text goes through ../lib/stt (Azure Fast
- * Transcription — sole STT provider). Text-comparison utilities live in
+ * Transcription, sole STT provider). Text-comparison utilities live in
  * ../lib/textComparison.ts and are re-exported here for convenience.
  */
 

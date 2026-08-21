@@ -35,12 +35,12 @@ export function toAzureSttLocale(internalCode: string): string {
 /**
  * Array-returning sibling of `toAzureSttLocale` for mixed-dialect codes whose
  * regional variant isn't known at request time. Azure Fast Transcription
- * accepts up to 10 candidate locales and runs language-ID across them — the
+ * accepts up to 10 candidate locales and runs language-ID across them. The
  * same mechanism used for the chat-voice auto-detect path.
  *
  * Behavior:
  *  - `regionVariant` provided → returns `[regionVariant]` (no language-ID
- *    needed, the audio's locale is known — e.g. TTS validation roundtrip
+ *    needed, the audio's locale is known: e.g. TTS validation roundtrip
  *    after synthesizing with a specific voice).
  *  - `es_mixed` and no variant → returns both Spanish classifiers so Azure
  *    picks whichever the audio matches.
@@ -78,8 +78,8 @@ const AUTO_DETECT_BASE: readonly string[] = [
  * (today: `es_mixed` → `es-ES` + `es-MX`) into their underlying variants.
  *
  * Pass the active course's `baseLanguages` ∪ `targetLanguages` as
- * `courseLanguages`. Returns the base 8 unchanged when the array is empty —
- * preserves the previous behavior for chat voice input on users without a
+ * `courseLanguages`. Returns the base 8 unchanged when the array is empty.
+ * Preserves the previous behavior for chat voice input on users without a
  * selected course.
  */
 export function buildAutoDetectLocales(

@@ -160,7 +160,7 @@ describe("datasetMigration_cutoverUser", () => {
     const { courseId, newL02, datasetId } = await seedCourseWithLegacyA1(t, {
       cardsAdded: 5,
       cardsMasteredOnProgress: 7,
-      // Cards table only has 3 mastered cards — proves we don't recompute.
+      // Cards table only has 3 mastered cards. Proves we don't recompute.
       masteredCardCount: 3,
     });
 
@@ -192,7 +192,7 @@ describe("datasetMigration_cutoverUser", () => {
     expect(dest?.cardsMastered).toBe(2);
   });
 
-  it("is idempotent — second run is a no-op once reconciledDatasetId matches", async () => {
+  it("is idempotent, second run is a no-op once reconciledDatasetId matches", async () => {
     const t = convexTest(schema, modules);
     const { courseId, newL02, datasetId } = await seedCourseWithLegacyA1(t, {
       cardsAdded: 5,

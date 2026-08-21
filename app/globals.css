@@ -279,6 +279,11 @@
   .text-romanization {
     @apply text-xs text-muted-foreground leading-tight mt-0.5;
   }
+  /* Smaller and more faded than .text-romanization on purpose: IPA is a
+     specialist aid line, it should read as a footnote under the sentence. */
+  .text-ipa {
+    @apply text-xs text-muted-foreground/75 leading-tight mt-0.5;
+  }
 
   /* Cards & surfaces */
   .card-surface {

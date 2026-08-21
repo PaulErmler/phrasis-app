@@ -12,10 +12,10 @@
  *   - Languages whose "How are you?" inflects for addressee gender (Arabic
  *     dialects, Hebrew, Hindi) use the conventional masculine-singular
  *     textbook form.
- *   - No romanization is curated here — the app's romanization pipeline
+ *   - No romanization is curated here: the app's romanization pipeline
  *     generates it automatically for languages that need it.
- *   - `helloHowAreYou` is the natural per-language join of the two parts —
- *     stored explicitly because joining rules differ (Thai spacing, CJK
+ *   - `helloHowAreYou` is the natural per-language join of the two parts.
+ *     Stored explicitly because joining rules differ (Thai spacing, CJK
  *     punctuation, Greek question mark).
  */
 

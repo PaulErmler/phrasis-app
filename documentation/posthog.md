@@ -1,6 +1,6 @@
-# PostHog Integration
+# PostHog integration
 
-Product analytics, session replay, error tracking, and AI cost attribution — one
+Product analytics, session replay, error tracking, and AI cost attribution, all from one
 vendor, one identity, one consent gate. EU Cloud (Frankfurt).
 
 ## Projects
@@ -11,7 +11,7 @@ vendor, one identity, one consent gate. EU Cloud (Frankfurt).
 | staging | `234379` | Coolify staging build + its Convex deployment |
 | production | `234368` | Coolify production build, Convex prod deployment |
 
-Project tokens (`phc_…`) are **public** client-side identifiers — they ship in the
+Project tokens (`phc_…`) are **public** client-side identifiers. They ship in the
 browser bundle. `POSTHOG_API_KEY` (personal, source-map upload) is the only secret.
 
 ## Required setup
@@ -21,20 +21,20 @@ browser bundle. `POSTHOG_API_KEY` (personal, source-map upload) is the only secr
 **Blocking.** `lib/posthog/client.ts` runs with `cookieless_mode: 'on_reject'` +
 `opt_out_capturing_by_default: true`, and PostHog **silently discards every
 cookieless event** unless the project also has cookieless mode enabled in its
-settings. Without this, users who decline — and everyone who hasn't answered
-the banner yet, since pending is captured cookieless too — produce no data at
+settings. Without this, users who decline, plus everyone who hasn't answered
+the banner yet since pending is captured cookieless too, produce no data at
 all rather than anonymous data.
 
 ### 2. Enable the Convex dashboard integrations (Pro)
 
 Deployment Settings → Integrations, **per deployment**:
 
-- **PostHog Error Tracking** — every uncaught Convex exception, with stack trace,
+- **PostHog Error Tracking.** Every uncaught Convex exception, with stack trace,
   function name, request id, and authenticated user identity. No code required.
-- **PostHog Log Streams** — 14-day triage buffer (see retention below).
+- **PostHog Log Streams.** 14-day triage buffer (see retention below).
 
 Set the **Host** field to `https://eu.i.posthog.com`. It defaults to US Cloud, and
-a valid EU token against the US endpoint is rejected as *unauthorized* — that is
+a valid EU token against the US endpoint is rejected as *unauthorized*, and that is
 the single most likely reason this step fails.
 
 ### 3. Environment variables
@@ -52,13 +52,13 @@ bundle and analytics silently no-op.
 | GitHub Actions secrets | `NEXT_PUBLIC_POSTHOG_KEY` (dev token), `NEXT_PUBLIC_POSTHOG_HOST` |
 | `.env.local` | `POSTHOG_API_KEY`, plus the development token + host for local dev |
 
-`POSTHOG_PROJECT_TOKEN` is a **required** Convex component env var — `convex dev`
+`POSTHOG_PROJECT_TOKEN` is a **required** Convex component env var. `convex dev`
 and `convex deploy` fail without it. Everything else degrades gracefully: a build
 with no `NEXT_PUBLIC_POSTHOG_KEY` simply never initializes PostHog.
 
 `POSTHOG_PERSONAL_API_KEY` is deliberately **not** set. It would enable local
 feature-flag evaluation, which makes the component poll PostHog for flag
-definitions in a background refresh loop — pointless load while nothing uses
+definitions in a background refresh loop, which is pointless load while nothing uses
 flags. Flags, if ever needed, work through the action-only remote
 `evaluateFlag` path with no key, or by setting the key to get local evaluation.
 
@@ -81,7 +81,7 @@ Convex ──► @posthog/convex ──► capture / identify / captureException
    └──► Convex dashboard destinations (Pro, zero code)
 ```
 
-**The invariant:** `distinctId` is always the Better Auth user id — `identity.subject`
+**The invariant:** `distinctId` is always the Better Auth user id, i.e. `identity.subject`
 on the server (`requireAuthUserId`), `user._id` on the client. It is also the Autumn
 customer id. Deviating fragments one person into two ghosts that never meet.
 
@@ -94,10 +94,10 @@ customer id. Deviating fragments one person into two ghosts that never meet.
 | `lib/posthog/consent.ts` | Consent state machine over PostHog's own consent API |
 | `lib/posthog/events.ts` | Client event names + `capture()` |
 | `lib/posthog/server.ts` | `posthog-node` singleton for the Next server |
-| `lib/report-error.ts` | `reportError` — the console.error replacement |
+| `lib/report-error.ts` | `reportError`, the console.error replacement |
 | `convex/posthog.ts` | Server SDK instance |
 | `convex/analytics.ts` | Backend event names + `track` / `identifyUser` / `trackException` |
-| `convex/features/consent.ts` | `setAnalyticsConsent` — account mirror of the browser choice |
+| `convex/features/consent.ts` | `setAnalyticsConsent`, account mirror of the browser choice |
 | `convex/lib/posthogAi.ts` | `$ai_generation` cost events |
 | `convex/config/aiCosts.ts` | Rate table for providers PostHog can't price |
 | `components/consent/*` | Banner, settings dialog, footer link |
@@ -106,17 +106,17 @@ customer id. Deviating fragments one person into two ghosts that never meet.
 ## Consent
 
 There is no CMP dependency. c15t (5 packages) was removed along with ~96 lines of
-`!important` CSS overrides in `globals.css` — after this change PostHog is the only
+`!important` CSS overrides in `globals.css`. After this change PostHog is the only
 non-essential storage in the app, and PostHog's own consent primitives cover it.
 
 - **Before a choice:** cookieless capture (`opt_out_capturing_by_default: true`
   makes the SDK treat pending like reject). Nothing is written to or read from
   the device, the banner stays up, and landing/onboarding funnels include the
-  people who ignore it — without the flag the SDK silently *drops* every event
+  people who ignore it. Without the flag the SDK silently *drops* every event
   until a choice is made.
 - **Accept:** cookies + localStorage, `identify()`, session replay.
 - **Reject:** cookieless mode. Events still flow under a daily-rotated server-side
-  hash — outside TTDSG § 25 entirely — so funnels and error rates stay measurable
+  hash, outside TTDSG § 25 entirely, so funnels and error rates stay measurable
   for people who decline. No replay, no cross-session identity. The only device
   write is the choice itself (`__ph_opt_in_out_*`, § 25(2)-exempt).
 
@@ -130,7 +130,7 @@ browser's decision into `userSettings.analyticsConsent`
 (`convex/features/consent.setAnalyticsConsent`); `sendMessage` reads it and the
 chat `$ai_generation` events attach `$ai_input`/`$ai_output_choices` only when
 it is `true`. Unset counts as declined, so a lost sync can only withhold
-content, never leak it. Tokens, cost and latency flow regardless — that is the
+content, never leak it. Tokens, cost and latency flow regardless, and that is the
 legitimate-interest half.
 
 Withdrawal is the **Cookie settings** link in the footer, which the privacy policy
@@ -150,7 +150,7 @@ than the thousands of dollars.
 
 **Server vs client.** Backend for anything that must not be lost (a `capture` inside
 a mutation runs in the transaction the backend already committed). Client for
-intent, navigation, and — importantly — **anything that happens on a failed
+intent, navigation, and, most importantly, **anything that happens on a failed
 mutation**: a Convex mutation that throws rolls back everything it scheduled,
 including its own analytics event. `quota_exhausted` and `chat_message_failed` can
 therefore only be captured client-side.
@@ -170,18 +170,18 @@ compute `$ai_total_cost_usd` from `convex/config/aiCosts.ts`.
 | `sentence_metadata` | OpenRouter | exact USD |
 | `tts_validation_judge` | OpenRouter | exact USD |
 | `tts_synthesis` | Google | characters × rate |
-| `tts_synthesis` | Gemini/OpenRouter | ⚠️ volume only, no USD — see below |
+| `tts_synthesis` | Gemini/OpenRouter | ⚠️ volume only, no USD, see below |
 | `tts_validation_stt` | Azure | billed audio duration × rate |
 | `chat_voice_input` | Azure | billed audio duration × rate |
 | `machine_translation` | Google | characters × rate |
 
 ### Attribution policy
 
-Content is shared by design — a translation generated for user A is reused by user
+Content is shared by design. A translation generated for user A is reused by user
 B. Spend is attributed to the **requesting** user and tagged `shared_content: true`.
 Per-user cost then reads as "spend this user caused", app-wide totals stay exact,
 and the tag separates marginal from amortised cost in a query. Unattributable
-background work is bucketed under `system:content-pipeline` rather than dropped —
+background work is bucketed under `system:content-pipeline` rather than dropped,
 the money was still spent.
 
 ### Known gaps
@@ -199,11 +199,11 @@ the money was still spent.
 ## Session replay
 
 Masked via `data-ph-mask` (text) and `data-ph-block` (whole element). Masking runs
-in the browser — masked content never reaches PostHog. `maskAllInputs` is on, so
+in the browser, so masked content never reaches PostHog. `maskAllInputs` is on, so
 every form field is masked by default.
 
 Explicitly masked: the signed-in user's email in Settings, and the email columns in
-both admin views. Replay is **suspended entirely on `/app/admin`** — those screens
+both admin views. Replay is **suspended entirely on `/app/admin`**. Those screens
 are lists of other people's personal data with no analytical value.
 
 User-authored free text (chat, custom cards, bulk import, Writing-mode answers) is
@@ -220,9 +220,9 @@ React tree, and `AppUpdateGate`'s `window.location.reload()` splits sessions.
 | Data | Retention |
 |---|---|
 | Events (incl. `$ai_generation`) | 1 year free / **7 years paid** |
-| Exceptions | same as events — this is the long-term error store |
+| Exceptions | same as events, this is the long-term error store |
 | Session recordings | 30 days (configurable) |
-| Logs (Convex log stream) | **14 days** — triage buffer only |
+| Logs (Convex log stream) | **14 days**, triage buffer only |
 
 Anything needed long-term must go through **Error Tracking / `captureException`**,
 not the Logs product.

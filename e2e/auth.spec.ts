@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Auth page smoke — verifies the Better Auth sign-in form mounts.
+ * Auth page smoke. Verifies the Better Auth sign-in form mounts.
  *
  * We deliberately browse from a logged-out state; the storage state used
  * by the chromium project would otherwise redirect to /app/onboarding.
@@ -16,7 +16,7 @@ test.describe("auth pages", () => {
     await expect(page.getByLabel(/password/i)).toBeVisible();
     // The email/password submit is labeled "Login" (better-auth-ui's
     // SIGN_IN_ACTION default). Anchor the regex so it can never collide with
-    // the "Sign in with Google" / "Sign in with Apple" social buttons — the
+    // the "Sign in with Google" / "Sign in with Apple" social buttons. The
     // old unanchored /sign in|log in/i actually matched those, never the
     // submit, and went strict-mode-ambiguous when Apple became the second
     // provider.

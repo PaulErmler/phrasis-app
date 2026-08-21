@@ -3,8 +3,15 @@ import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 import schema from "../../schema";
 import { api, internal } from "../../_generated/api";
+import { drainSchedulerAfterEach } from "../lib/drainScheduler";
 
 const modules = import.meta.glob("/convex/**/*.ts");
+
+// Quota consumption fans out through 0ms scheduler hops whose console output
+// otherwise races vitest's teardown. An intermittent
+// `EnvironmentTeardownError: Closing rpc while "onUserConsoleLog" was pending`
+// that failed the whole run (exit 1) while every test passed.
+drainSchedulerAfterEach();
 
 async function seedCourse(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) => {

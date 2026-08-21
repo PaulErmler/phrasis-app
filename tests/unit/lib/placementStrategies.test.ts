@@ -24,7 +24,7 @@ describe('CURRENT_PLACEMENT_STRATEGY_VERSION', () => {
 });
 
 /**
- * Drives a strategy with a synthetic "true level" — the user knows everything
+ * Drives a strategy with a synthetic "true level". The user knows everything
  * at or below `trueLevel`, nothing above. Returns the placed level along with
  * the question count.
  */
@@ -158,11 +158,11 @@ describe('TransformedStaircaseStrategy', () => {
     expect(s.nextQuestionLevel()).toBe(10);
 
     s.recordAnswer(10, true);
-    // One correct — still at 10.
+    // One correct, still at 10.
     expect(s.nextQuestionLevel()).toBe(10);
 
     s.recordAnswer(10, true);
-    // Two correct — step up to 11.
+    // Two correct. Step up to 11.
     expect(s.nextQuestionLevel()).toBe(11);
   });
 
@@ -256,7 +256,7 @@ describe('StaircaseFromBottomStrategy', () => {
     const s = new StaircaseFromBottomStrategy();
     s.init();
     // Walk up: levels 1..20, each "knew" → 19 steps, then 2 more "knew" at
-    // MAX_LEVEL get clamped to MAX_LEVEL — third visit terminates.
+    // MAX_LEVEL get clamped to MAX_LEVEL. Third visit terminates.
     let asked = 0;
     while (s.nextQuestionLevel() !== null && asked < 25) {
       s.recordAnswer(s.nextQuestionLevel()!, true);
@@ -307,7 +307,7 @@ describe('RampBisectStrategy', () => {
   it('exits the ramp on the first "didn\'t know" and bisects', () => {
     const s = new RampBisectStrategy();
     s.init();
-    // Knew 1, 2, 3, 5; didn't know 8 — should now bisect [6, 7].
+    // Knew 1, 2, 3, 5; didn't know 8. Should now bisect [6, 7].
     for (const lvl of [1, 2, 3, 5]) {
       const next = s.nextQuestionLevel();
       expect(next).toBe(lvl);
@@ -316,7 +316,7 @@ describe('RampBisectStrategy', () => {
     const askedHigh = s.nextQuestionLevel();
     expect(askedHigh).toBe(8);
     s.recordAnswer(8, false);
-    // Now bisect [6, 7] — mid = 6.
+    // Now bisect [6, 7]. Mid = 6.
     const bisect1 = s.nextQuestionLevel();
     expect(bisect1).toBe(6);
   });

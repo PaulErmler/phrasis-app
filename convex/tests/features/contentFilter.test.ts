@@ -169,7 +169,7 @@ async function setFilter(
   });
 }
 
-describe("content-source filter — getCardForReview", () => {
+describe("content-source filter: getCardForReview", () => {
   it("returns cards from any origin when filter is undefined ('both' default)", async () => {
     const t = convexTest(schema, modules);
     await seedFilterFixture(t);
@@ -189,7 +189,7 @@ describe("content-source filter — getCardForReview", () => {
     const res = await asUser.query(api.features.scheduling.getCardForReview, {});
     // Premade card is earliest-due among the premade-origin pool.
     expect(res?._id).toBe(f.premadeCard);
-    // Peek-next is the edited-premade card — still classified as course content.
+    // Peek-next is the edited-premade card, still classified as course content.
     expect(res?.nextCard?._id).toBe(f.editedPremadeCard);
   });
 
@@ -237,7 +237,7 @@ describe("content-source filter — getCardForReview", () => {
   });
 });
 
-describe("content-source filter — getCardForReviewEmptyReason", () => {
+describe("content-source filter: getCardForReviewEmptyReason", () => {
   it("can-unblock: currentSourceHasAnyCards=true AND availableInOtherSource=true", async () => {
     const t = convexTest(schema, modules);
     const f = await seedFilterFixture(t);
@@ -266,7 +266,7 @@ describe("content-source filter — getCardForReviewEmptyReason", () => {
   it("must-add: currentSourceHasAnyCards=false; availableInOtherSource is independent", async () => {
     const t = convexTest(schema, modules);
     const f = await seedFilterFixture(t);
-    // Delete all custom/chat cards — user has zero cards in 'custom' source.
+    // Delete all custom/chat cards. User has zero cards in 'custom' source.
     await t.run(async (ctx) => {
       await ctx.db.delete(f.customCard);
       await ctx.db.delete(f.chatCard);
@@ -329,7 +329,7 @@ describe("content-source filter — getCardForReviewEmptyReason", () => {
   });
 });
 
-describe("content-source filter — updateCourseSettings", () => {
+describe("content-source filter: updateCourseSettings", () => {
   it("persists studyContentFilter and rejects invalid values via validator", async () => {
     const t = convexTest(schema, modules);
     const f = await seedFilterFixture(t);
@@ -351,7 +351,7 @@ describe("content-source filter — updateCourseSettings", () => {
     await expect(
       asUser.mutation(api.features.courses.updateCourseSettings, {
         courseId: f.courseId,
-        // @ts-expect-error — invalid literal on purpose.
+        // @ts-expect-error. Invalid literal on purpose.
         studyContentFilter: "neither",
       }),
     ).rejects.toThrow();

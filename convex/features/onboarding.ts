@@ -1,4 +1,4 @@
-import { v } from 'convex/values';
+import { v, ConvexError } from 'convex/values';
 import {
   mutation,
   query,
@@ -7,7 +7,7 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { EVENTS, track } from '../analytics';
-import type { Id } from '../_generated/dataModel';
+import type { Doc, Id } from '../_generated/dataModel';
 import {
   requireAuthUserId,
   getAuthUserId,
@@ -18,23 +18,32 @@ import {
   PLACEMENT_BATCH_RETRY_BACKOFF_MS,
   PLACEMENT_CONTENT_BATCH_SIZE,
   PLACEMENT_SENTENCES_QUERY_CAP,
+  WARMUP_TRANSLATIONS_MAX_PAIRS_PER_BATCH,
 } from '../../lib/constants/onboarding';
+import { COLLECTION_PREVIEW_SIZE } from '../lib/collections';
+import { getPremadeLevelCollections } from '../db/collections';
+import { scheduleMissingTranslationsForText } from './collections';
+import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 import {
   DAILY_TIME_CUSTOM_MIN,
   DAILY_TIME_CUSTOM_MAX,
 } from '../../lib/constants/dailyGoal';
 import { getCourseSettings } from '../db/courseSettings';
 import { scheduleMissingContent } from './decks';
+import type { TtsPriority } from '../types';
 
 /**
- * Backend support for the new onboarding flow.
+ * Backend support for the onboarding flow.
  *
- * - `prepareLanguagePair` runs once the user picks (source, target) — it
- *   schedules content warmup so the placement test (and the first lesson
- *   that follows) can run instantly.
- * - `getInitialCardsReadiness` is polled by the "Customizing your first
- *   lesson…" step to gate the transition into the first lesson once the
- *   first cards' translations + audio are ready.
+ * - `prepareLanguagePair` runs once the user picks (source, target): it
+ *   schedules content warmup so the placement test (and the first real
+ *   lesson right after the wizard) can run instantly.
+ * - `warmupOnboardingTranslations` is the manually-fired global warm-up
+ *   that pre-translates the same content for every language upfront.
+ * - `getInitialCardsReadiness` reports how many of the first cards have
+ *   content ready: currently unused by the app (the old "customizing"
+ *   screen polled it) but kept as a dashboard/debug probe for stuck
+ *   onboarding content.
  */
 
 export const prepareLanguagePair = mutation({
@@ -61,14 +70,14 @@ export const prepareLanguagePair = mutation({
     );
 
     // Schedule a placement-test translation backfill for this target language.
-    // This is idempotent — the inner mutation only enqueues missing rows.
+    // This is idempotent. The inner mutation only enqueues missing rows.
     await ctx.scheduler.runAfter(
       0,
       internal.features.onboarding.enqueueMissingPlacementTranslations,
       { targetLanguage, sourceLanguage },
     );
 
-    // Backstop sweep — runs after 60s so most placement translations have
+    // Backstop sweep. Runs after 60s so most placement translations have
     // had time to land. Re-enqueues TTS for any (translation exists,
     // audio missing) orphan left by an exhausted-retry TTS failure or
     // a claim race. Idempotent.
@@ -88,7 +97,7 @@ export const prepareLanguagePair = mutation({
  * `scheduleMissingContent` handles source-language audio (the text's own
  * language) AND translation enqueueing for every additional language AND the
  * downstream audio trigger via `storeTranslationAndScheduleTTS`, all with
- * idempotent claim/dedupe — so re-entrant batches do reads-only for rows that
+ * idempotent claim/dedupe, so re-entrant batches do reads-only for rows that
  * are already covered. We pass the user's chosen base language as an additional
  * translation target so the placement test can render the source side in that
  * language; `scheduleMissingContent` filters out the text's own language
@@ -99,6 +108,7 @@ async function processPlacementSentences(
   textIds: Id<'texts'>[],
   targetLanguage: string,
   sourceLanguage: string,
+  priority: TtsPriority,
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   let translationsScheduled = 0;
   let audioScheduled = 0;
@@ -114,6 +124,7 @@ async function processPlacementSentences(
       text,
       [text.language],
       targetLanguages,
+      { priority },
     );
     translationsScheduled += result.translationsScheduled;
     audioScheduled += result.audioScheduled;
@@ -124,13 +135,13 @@ async function processPlacementSentences(
 /**
  * Entry point for every placement-test content sweep.
  *
- * Enumerates the corpus once (cheap — only the small `placementTestSentences`
+ * Enumerates the corpus once (cheap, only the small `placementTestSentences`
  * rows), processes the first `PLACEMENT_CONTENT_BATCH_SIZE` texts inline, and
  * queues every remaining batch UPFRONT as an independent
- * `processPlacementContentBatch` worker — mirroring the per-collection fan-out
+ * `processPlacementContentBatch` worker, mirroring the per-collection fan-out
  * in `ensureFirstSentencesAcrossLevelCollections`
  * (`convex/features/collections.ts`). Sweeping the whole corpus inline used to
- * blow past Convex's per-mutation system-op ceiling — each sentence runs the
+ * blow past Convex's per-mutation system-op ceiling. Each sentence runs the
  * heavy `scheduleMissingContent` (per-language reads, `storage.getUrl` checks,
  * claim inserts, a nested `enqueueTtsJob` mutation, scheduler enqueues), so
  * ~256 sentences × ~20 ops overflowed one transaction.
@@ -138,7 +149,7 @@ async function processPlacementSentences(
  * Failure isolation is the reason the batches are queued upfront rather than
  * chained: a throw in the inline page rolls back this whole mutation
  * (including the enqueues), so the awaiting client sees the rejection and can
- * retry; a throw in one scheduled worker rolls back only that batch — every
+ * retry; a throw in one scheduled worker rolls back only that batch. Every
  * other batch was already enqueued here and runs regardless, and the failed
  * batch reschedules itself with backoff (see `processPlacementContentBatch`).
  * The returned tally covers the INLINE FIRST PAGE ONLY; the scheduled batches
@@ -158,11 +169,16 @@ async function runPlacementContentSweep(
     );
   }
 
+  // The inline first page covers the sentences the test shows first, while
+  // the user sits in front of it: interactive. The deferred batches below
+  // pre-warm the rest of the corpus: background, so a signup's ~200-job
+  // placement burst can't queue ahead of audio someone is waiting on.
   const tally = await processPlacementSentences(
     ctx,
     sentences.slice(0, PLACEMENT_CONTENT_BATCH_SIZE).map((s) => s.textId),
     targetLanguage,
     sourceLanguage,
+    'interactive',
   );
 
   for (
@@ -185,13 +201,13 @@ async function runPlacementContentSweep(
 }
 
 /**
- * Independent batch worker fanned out by `runPlacementContentSweep` — internal
+ * Independent batch worker fanned out by `runPlacementContentSweep`. Internal
  * only. Each invocation covers its own fixed slice of the corpus in its own
  * transaction, so one failing batch never affects the others.
  *
  * Convex does not retry scheduled mutations that fail with application
  * errors, so on failure the worker reschedules itself with exponential
- * backoff (up to `PLACEMENT_BATCH_MAX_ATTEMPTS` total attempts) — the error
+ * backoff (up to `PLACEMENT_BATCH_MAX_ATTEMPTS` total attempts), the error
  * is swallowed on purpose: rethrowing would roll back the transaction
  * *including* the retry enqueue. Retries re-run the full slice; that's safe
  * because `scheduleMissingContent`'s claim/dedupe checks make already-covered
@@ -205,7 +221,7 @@ export const processPlacementContentBatch = internalMutation({
     targetLanguage: v.string(),
     sourceLanguage: v.string(),
     textIds: v.array(v.id('texts')),
-    /** Retry counter — omitted on the initial fan-out, set on reschedules. */
+    /** Retry counter. Omitted on the initial fan-out, set on reschedules. */
     attempt: v.optional(v.number()),
   },
   returns: v.object({
@@ -222,6 +238,7 @@ export const processPlacementContentBatch = internalMutation({
         textIds,
         targetLanguage,
         sourceLanguage,
+        'background',
       );
     } catch (error) {
       if (attempt + 1 < PLACEMENT_BATCH_MAX_ATTEMPTS) {
@@ -265,7 +282,7 @@ async function sweepAndCountEnqueued(
  * User-callable safety-net: when the placement test renders a card whose
  * translation isn't ready yet, the client invokes this so we can immediately
  * (re-)enqueue any missing placement-test translations for the target
- * language. Idempotent — won't double-enqueue if a claim already exists.
+ * language. Idempotent. Won't double-enqueue if a claim already exists.
  *
  * Kicks off the batched sweep: processes the first page inline and queues the
  * remaining batches upfront. `enqueued` counts the inline first page only.
@@ -311,11 +328,11 @@ export const enqueueMissingPlacementTranslations = internalMutation({
  * incomplete. Nothing else re-enters `scheduleMissingContent` for those
  * texts afterwards.
  *
- * This covers every placement-test sentence — the first page inline, the rest
- * via the batch workers `runPlacementContentSweep` queues upfront — and
+ * This covers every placement-test sentence. The first page inline, the rest
+ * via the batch workers `runPlacementContentSweep` queues upfront, and
  * re-runs `scheduleMissingContent` for both the source language (English
  * audio) and the target language (translation + downstream audio). All checks
- * inside `scheduleMissingContent` are idempotent — rows that already have
+ * inside `scheduleMissingContent` are idempotent. Rows that already have
  * translations + audio do nothing but reads.
  *
  * Scheduled 60s after `prepareLanguagePair` so most in-flow translations
@@ -337,24 +354,197 @@ export const ensureAudioForTestTranslations = internalMutation({
 });
 
 /**
+ * Manually-fired content warm-up (dashboard / `npx convex run` only, no
+ * cron, no in-app caller). Pre-generates TRANSLATIONS ONLY, never audio,
+ * for the two text sets a brand-new user hits during onboarding:
+ *
+ *   1. every `placementTestSentences` text, and
+ *   2. the first `COLLECTION_PREVIEW_SIZE` (5) curriculum texts of every
+ *      premade level collection,
+ *
+ * into every requested language. With translations pre-warmed, the wizard's
+ * per-user `prepareLanguagePair` sweep finds nothing left to translate and
+ * onboarding content is instant; audio stays lazy (generated per-user by the
+ * existing pipelines) because it is the dominant cost.
+ *
+ * `languages` filters the run to individual languages, e.g.
+ *   npx convex run features/onboarding:warmupOnboardingTranslations '{"languages":["fr"]}'
+ * Omitted → every supported picker-visible language. Unknown codes throw.
+ *
+ * Idempotent: `scheduleMissingTranslationsForText` skips (text, language)
+ * pairs whose translation already exists and is current, and claim-dedupes
+ * in-flight jobs, so re-runs are read-only no-ops. Work is fanned out to
+ * `warmupTranslationsBatch` workers sized by (texts × languages) so an
+ * all-languages run never exceeds one transaction's limits.
+ *
+ * Every job runs at `llmPriority: 'background'`, i.e. on `llmWarmPool`, so an
+ * all-languages run (thousands of jobs) cannot delay a user's own
+ * translations. If a user asks for one of these (text, language) pairs while
+ * the warm job still holds its claim, `claimLlmTranslationIfAvailable` cancels
+ * the warm job and re-runs it interactively.
+ */
+export const warmupOnboardingTranslations = internalMutation({
+  args: {
+    languages: v.optional(v.array(v.string())),
+  },
+  returns: v.object({
+    languages: v.number(),
+    texts: v.number(),
+    batches: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const supportedCodes = new Set(SUPPORTED_LANGUAGES.map((l) => l.code));
+    const languages =
+      args.languages !== undefined
+        ? args.languages
+        : SUPPORTED_LANGUAGES.filter((l) => !l.hiddenFromPicker).map(
+          (l) => l.code,
+        );
+    const unknown = languages.filter((code) => !supportedCodes.has(code));
+    if (unknown.length > 0) {
+      throw new ConvexError(
+        `Unknown language code(s): ${unknown.join(', ')}`,
+      );
+    }
+    if (languages.length === 0) {
+      return { languages: 0, texts: 0, batches: 0 };
+    }
+
+    const textIds = new Set<Id<'texts'>>();
+
+    const sentences = await ctx.db
+      .query('placementTestSentences')
+      .take(PLACEMENT_SENTENCES_QUERY_CAP);
+    if (sentences.length === PLACEMENT_SENTENCES_QUERY_CAP) {
+      console.warn(
+        `placementTestSentences query hit cap ${PLACEMENT_SENTENCES_QUERY_CAP} ` +
+          '— raise PLACEMENT_SENTENCES_QUERY_CAP.',
+      );
+    }
+    for (const sentence of sentences) {
+      textIds.add(sentence.textId);
+    }
+
+    const { collections } = await getPremadeLevelCollections(ctx);
+    for (const collection of collections) {
+      // `userCreated: false` matters: user forks live in the same level
+      // collection and would otherwise consume this take() window, paying
+      // for private-fork translations while the curriculum texts stay cold.
+      const texts = await ctx.db
+        .query('texts')
+        .withIndex('by_collection_and_userCreated_and_rank', (q) =>
+          q.eq('collectionId', collection._id).eq('userCreated', false),
+        )
+        .order('asc')
+        .take(COLLECTION_PREVIEW_SIZE);
+      for (const text of texts) {
+        textIds.add(text._id);
+      }
+    }
+
+    const allTextIds = Array.from(textIds);
+    const textsPerBatch = Math.max(
+      1,
+      Math.floor(WARMUP_TRANSLATIONS_MAX_PAIRS_PER_BATCH / languages.length),
+    );
+    let batches = 0;
+    for (let i = 0; i < allTextIds.length; i += textsPerBatch) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.onboarding.warmupTranslationsBatch,
+        { textIds: allTextIds.slice(i, i + textsPerBatch), languages },
+      );
+      batches++;
+    }
+
+    console.log(
+      `[warmupOnboardingTranslations] fanned out ${batches} batches ` +
+        `(${allTextIds.length} texts × ${languages.length} languages)`,
+    );
+    return {
+      languages: languages.length,
+      texts: allTextIds.length,
+      batches,
+    };
+  },
+});
+
+/**
+ * Batch worker fanned out by `warmupOnboardingTranslations`. Schedules
+ * missing translations (skipTts) for its slice of texts. Same
+ * retry-with-backoff shape as `processPlacementContentBatch`: Convex doesn't
+ * retry failed scheduled mutations, so the worker reschedules itself and
+ * swallows the error (rethrowing would roll back the retry enqueue too).
+ */
+export const warmupTranslationsBatch = internalMutation({
+  args: {
+    textIds: v.array(v.id('texts')),
+    languages: v.array(v.string()),
+    /** Retry counter. Omitted on the initial fan-out, set on reschedules. */
+    attempt: v.optional(v.number()),
+  },
+  returns: v.object({ translationsScheduled: v.number() }),
+  handler: async (ctx, { textIds, languages, attempt = 0 }) => {
+    try {
+      let translationsScheduled = 0;
+      for (const textId of textIds) {
+        const text = await ctx.db.get(textId);
+        if (!text) continue;
+        translationsScheduled += await scheduleMissingTranslationsForText(
+          ctx,
+          text,
+          languages,
+          // Nobody is waiting on a warmup run, and it enqueues thousands of
+          // jobs at once. Route them to llmWarmPool so they can't queue ahead
+          // of a user's own translations.
+          { llmPriority: 'background' },
+        );
+      }
+      return { translationsScheduled };
+    } catch (error) {
+      if (attempt + 1 < PLACEMENT_BATCH_MAX_ATTEMPTS) {
+        console.warn(
+          `[warmupTranslationsBatch] attempt ${attempt + 1}/${PLACEMENT_BATCH_MAX_ATTEMPTS} ` +
+            `failed for ${textIds.length} texts × ${languages.length} languages; retrying`,
+          error,
+        );
+        await ctx.scheduler.runAfter(
+          PLACEMENT_BATCH_RETRY_BACKOFF_MS * 2 ** attempt,
+          internal.features.onboarding.warmupTranslationsBatch,
+          { textIds, languages, attempt: attempt + 1 },
+        );
+      } else {
+        console.error(
+          `[warmupTranslationsBatch] giving up after ${PLACEMENT_BATCH_MAX_ATTEMPTS} attempts ` +
+            `for ${textIds.length} texts × ${languages.length} languages`,
+          error,
+        );
+      }
+      return { translationsScheduled: 0 };
+    }
+  },
+});
+
+/**
  * Final phase of the onboarding wizard.
  *
  *   - Sets `hasCompletedOnboarding = true`.
- *   - Pre-marks the in-app driver.js tutorials (`HOME_TOUR`, `FULL_REVIEW_INTRO`,
- *     `AUDIO_REVIEW_INTRO`) complete — the onboarding flow already taught
- *     those mechanics during the embedded first lesson.
  *   - Stamps `completedAt` on the `onboardingProgress` row (the row is
  *     kept as the permanent snapshot of the user's onboarding answers;
  *     `getOnboardingProgress` filters frozen rows out so the wizard
  *     can't re-edit them).
  *
- * The course/deck/cards (and the per-course `dailyTimeGoalMinutes` on
- * `courseSettings`) are created earlier in `completeOnboarding`
- * (`convex/features/courses.ts`). Because the word-projection step lets the
- * user retune the goal AFTER that copy was made (its picker only writes the
- * `onboardingProgress` row), this mutation re-syncs the final goal value
- * onto the active course's `courseSettings` — otherwise the home-screen
- * goal ring and projections would keep the stale pre-projection value.
+ * Nothing is pre-marked into `completedTutorials` anymore: the wizard no
+ * longer embeds a tutorial lesson, so the in-app teaching layer (the
+ * `home_tour` plus the milestone tips in lib/tutorials/use-milestone-tips.ts)
+ * must all stay armed for the fresh user.
+ *
+ * The course/deck/cards are created by `completeOnboarding`
+ * (`convex/features/courses.ts`) right before this runs. For users resuming
+ * a row persisted by the old 12-step wizard, the course may predate their
+ * final answers, so this mutation re-syncs `dailyTimeGoalMinutes` and the
+ * review-mode pick onto the active course's `courseSettings` (idempotent
+ * for the normal flow, where `completeOnboarding` already copied them).
  * Keeping the flag-set deferred to this
  * final step means the `OnboardingGuard` redirect logic stays the single
  * source of truth: as long as `hasCompletedOnboarding` is false the user
@@ -378,31 +568,14 @@ export const finalizeOnboarding = mutation({
 
     const alreadyFinalized = settings?.hasCompletedOnboarding === true;
 
-    // `home_tour` is intentionally *not* pre-marked — we want it to fire
-    // when the user first lands on /app so the top-card learning modes,
-    // source selector, and collection picker get explained. The two
-    // in-lesson tutorials (`full_review_intro`/`audio_review_intro`) are
-    // pre-marked since the embedded first-lesson coachmarks taught the
-    // same mechanics already.
-    const ONBOARDING_HANDLED_TUTORIALS = [
-      'full_review_intro',
-      'audio_review_intro',
-    ];
-
     if (settings) {
-      const existing = settings.completedTutorials ?? [];
-      const merged = Array.from(
-        new Set<string>([...existing, ...ONBOARDING_HANDLED_TUTORIALS]),
-      );
       await ctx.db.patch(settings._id, {
         hasCompletedOnboarding: true,
-        completedTutorials: merged,
       });
     } else {
       await ctx.db.insert('userSettings', {
         userId,
         hasCompletedOnboarding: true,
-        completedTutorials: ONBOARDING_HANDLED_TUTORIALS,
       });
     }
 
@@ -413,28 +586,58 @@ export const finalizeOnboarding = mutation({
     if (progress) {
       await ctx.db.patch(progress._id, { completedAt: Date.now() });
 
-      // Sync the wizard's final daily-goal answer onto the active course.
-      // Same clamp window as `updateCourseSettings` so a hand-crafted
-      // progress write can't smuggle an out-of-range goal past it.
-      const goal = progress.dailyTimeGoalMinutes;
-      if (
-        typeof goal === 'number' &&
-        Number.isFinite(goal) &&
-        settings?.activeCourseId
-      ) {
+      if (settings?.activeCourseId) {
         const courseSettings = await getCourseSettings(
           ctx,
           settings.activeCourseId,
         );
         if (courseSettings) {
-          const clamped = Math.max(
-            DAILY_TIME_CUSTOM_MIN,
-            Math.min(DAILY_TIME_CUSTOM_MAX, Math.round(goal)),
-          );
-          if (courseSettings.dailyTimeGoalMinutes !== clamped) {
-            await ctx.db.patch(courseSettings._id, {
-              dailyTimeGoalMinutes: clamped,
-            });
+          const patch: Partial<Doc<'courseSettings'>> = {};
+
+          // Sync the wizard's final daily-goal answer onto the active course.
+          // Same clamp window as `updateCourseSettings` so a hand-crafted
+          // progress write can't smuggle an out-of-range goal past it.
+          const goal = progress.dailyTimeGoalMinutes;
+          if (typeof goal === 'number' && Number.isFinite(goal)) {
+            const clamped = Math.max(
+              DAILY_TIME_CUSTOM_MIN,
+              Math.min(DAILY_TIME_CUSTOM_MAX, Math.round(goal)),
+            );
+            if (courseSettings.dailyTimeGoalMinutes !== clamped) {
+              patch.dailyTimeGoalMinutes = clamped;
+            }
+          }
+
+          // Sync the review-mode pick. In the normal flow
+          // `completeOnboarding` just copied these, so this is a no-op; it
+          // only bites for resumed old-flow rows whose course was created
+          // before the mode step.
+          if (
+            progress.reviewMode !== undefined &&
+            courseSettings.reviewMode !== progress.reviewMode
+          ) {
+            patch.reviewMode = progress.reviewMode;
+          }
+          // The writing style is derived from `reviewMode`, not from
+          // `progress.writingInputMode !== undefined`. Picking Shadowing
+          // REMOVES the field (there is no writing input in that mode), so an
+          // absent field has to clear courseSettings rather than read as
+          // "the user didn't answer", otherwise a course that already
+          // carries 'transcribe' (re-onboarding, or an old-flow row whose
+          // course predates the mode step) keeps it and the user silently
+          // lands in Transcribe the first time they open Writing mode.
+          if (progress.reviewMode !== undefined) {
+            const desired =
+              progress.reviewMode === 'audio'
+                ? undefined
+                : progress.writingInputMode;
+            if (courseSettings.writingInputMode !== desired) {
+              patch.writingInputMode = desired;
+            }
+          }
+
+          if (Object.keys(patch).length > 0) {
+            await ctx.db.patch(courseSettings._id, patch);
           }
         }
       }

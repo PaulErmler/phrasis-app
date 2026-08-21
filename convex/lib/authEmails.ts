@@ -20,8 +20,8 @@ const FROM = `Flexling <${SUPPORT_EMAIL}>`;
 // Emails need absolute asset URLs regardless of deployment; the production
 // icon doubles as the logo.
 const LOGO_URL = 'https://flexling.com/icons/icon-192x192.png';
-// --primary from app/globals.css (oklch(0.7162 0.119 217.31)) as sRGB hex —
-// email clients need literal colors, not CSS variables.
+// --primary from app/globals.css (oklch(0.7162 0.119 217.31)) as sRGB hex.
+// Email clients need literal colors, not CSS variables.
 const BRAND_COLOR = '#2bb5d4';
 
 export type AuthEmailKind = 'verify' | 'reset';
@@ -30,7 +30,7 @@ export interface AuthEmailCopy {
   subject: string;
   heading: string;
   body: string;
-  /** CTA button label — link emails only. */
+  /** CTA button label. Link emails only. */
   cta?: string;
 }
 
@@ -68,7 +68,7 @@ export function escapeHtml(value: string): string {
     .replaceAll('"', '&quot;');
 }
 
-// All styles inline — email clients strip <style> blocks. Simple div layout
+// All styles inline. Email clients strip <style> blocks. Simple div layout
 // (no tables) renders fine in Gmail/Apple Mail/Outlook.com for a
 // single-column card.
 const bodyStyle = 'color:#4b5563;font-size:14px;line-height:1.6;margin:0 0 20px;';
@@ -170,7 +170,7 @@ export function renderOtpEmail(
 }
 
 // The Better Auth callbacks run inside the component's HTTP action, so the
-// ctx is a mutation OR action ctx — everything below must go through
+// ctx is a mutation OR action ctx. Everything below must go through
 // runMutation-style APIs, never ctx.db (see requireRunMutationCtx in
 // convex/auth.ts).
 export type AuthEmailCtx = RunMutationCtx<DataModel>;
@@ -183,7 +183,7 @@ export const captureMode = () => process.env.E2E_TEST_HOOKS === '1';
  *
  * Kept deliberately tight (prefix + epoch ms + 12 hex chars) so a real user who
  * happens to pick an `e2e-…` local part is never silently dropped. Must stay in
- * sync with the two generators — `generateCredentials` in e2e/auth.setup.ts and
+ * sync with the two generators. `generateCredentials` in e2e/auth.setup.ts and
  * `signUpFreshUser` in e2e/helpers.ts; convex/tests/lib/authEmails.test.ts pins
  * the shape.
  */
@@ -197,7 +197,7 @@ const E2E_FIXTURE_ADDRESS_RE =
  * and the deferred mails (welcome ~24h, signup notification ~20min) fire long
  * after e2e/global-teardown.ts has removed `E2E_TEST_HOOKS`. Without this
  * filter Resend would attempt real delivery to a mailbox that does not exist on
- * our own sending domain — one hard bounce per fixture user per run, degrading
+ * our own sending domain. One hard bounce per fixture user per run, degrading
  * the reputation of the domain that also carries production transactional mail.
  *
  * Unlike the env flag, this holds whenever the email fires.

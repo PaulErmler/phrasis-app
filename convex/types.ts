@@ -42,6 +42,8 @@ export const translationValidator = v.object({
   isBaseLanguage: v.boolean(),
   isTargetLanguage: v.boolean(),
   romanization: v.optional(v.string()),
+  /** IPA transcription (espeak-ng); same display semantics as romanization. */
+  ipa: v.optional(v.string()),
   /**
    * True iff an LLM retranslation is currently in flight for this language:
    * a non-stale row exists in `llmTranslationClaims` for (textId, lang) AND
@@ -49,7 +51,7 @@ export const translationValidator = v.object({
    * the first-time translation of a brand-new card). Drives the warning-
    * color "Retranslating" pill in the card header. Keyed off the LLM claim
    * (not on "audio missing") so it does NOT fire when the user clicks
-   * "regenerate audio" — that flow has no LLM phase.
+   * "regenerate audio". That flow has no LLM phase.
    */
   retranslating: v.optional(v.boolean()),
 });
@@ -60,7 +62,7 @@ export const audioRecordingValidator = v.object({
   url: v.union(v.string(), v.null()),
   // Word-level timings from Azure Fast Transcription, captured during TTS validation.
   // The schema field is `v.optional(v.array(...))` so DB rows can be `undefined`,
-  // but this validator is stricter — `null | array` only. Callers building a
+  // but this validator is stricter: `null | array` only. Callers building a
   // response from a raw audioRecordings row MUST coerce `undefined → null`
   // (`row.wordTimings ?? null`), or this validator will reject the response.
   wordTimings: v.union(
@@ -88,7 +90,7 @@ export const reviewModeValidator = v.union(
   v.literal('full'),
 );
 
-// 'radio' is the single *free play* scheduling mode — the endless, FSRS-free
+// 'radio' is the single *free play* scheduling mode. The endless, FSRS-free
 // round-robin through the whole deck. Which of its two faces you get is
 // derived from `reviewMode`, not stored: see `freePlayFace` below.
 export const schedulingModeValidator = v.union(
@@ -98,7 +100,7 @@ export const schedulingModeValidator = v.union(
 );
 
 // Writing mode: accuracy breakpoints that map a typed answer's score to an
-// FSRS rating. Percent points (0-100 integers), lower-inclusive — a score of
+// FSRS rating. Percent points (0-100 integers), lower-inclusive. A score of
 // exactly `hard` rates "hard", a score of exactly `good` rates "good". `easy`
 // is optional and currently never written by the UI (the control ships with
 // three bands); when unset the top band is "good".
@@ -142,6 +144,44 @@ export const cardSchedulingSnapshotFields = {
   goodReviewCount: v.optional(v.number()), // # of FSRS good/easy ratings (pre-review "understood" excluded). Drives the "until rated good" Practice-Listening strategy. Undefined = 0 for pre-field cards.
 } as const;
 
+// The writing-track counterpart of the scheduling fields above, active only
+// while a course has `separateModeTracking` enabled. When the split is on,
+// Writing-mode reviews read/write ONLY these fields and Shadowing keeps using
+// the shared set above; when it is off (default) both modes use the shared
+// set and these lie dormant. The writing track has no pre-review phase
+// (Writing mode always forces FSRS via `forceReviewPhase`), hence no
+// schedulingPhase/preReviewCount here. Shared by the `cards` table and the
+// `reviewLogs.prevWriting` undo snapshot. All optional: unset means "never
+// seeded". Writing-track due queries must exclude undefined `writingDueDate`
+// via a `.gte('writingDueDate', 0)` lower bound.
+export const cardWritingSchedulingFields = {
+  writingDueDate: v.optional(v.number()),
+  writingFsrsState: v.optional(fsrsStateValidator),
+  writingIsGraduated: v.optional(v.boolean()), // One-way flag, same semantics as isGraduated (FSRS state >= Review)
+  writingLastReviewedAt: v.optional(v.number()),
+  writingGoodReviewCount: v.optional(v.number()),
+} as const;
+
+// Which per-card schedule a review reads/writes: the shared (audio/legacy)
+// fields or the writing-track fields. Derived, never stored on courseSettings:
+// 'writing' iff `separateModeTracking` is on AND `reviewMode === 'full'`.
+export const schedulingTrackValidator = v.union(
+  v.literal('shared'),
+  v.literal('writing'),
+);
+export type SchedulingTrack = Infer<typeof schedulingTrackValidator>;
+
+/** The schedule a review touches, given the course's settings. */
+export function schedulingTrackFromSettings(settings: {
+  separateModeTracking?: boolean;
+  reviewMode?: ReviewMode;
+}): SchedulingTrack {
+  return settings.separateModeTracking === true &&
+    (settings.reviewMode ?? 'audio') === 'full'
+    ? 'writing'
+    : 'shared';
+}
+
 // The card fields free play mutates in its LISTENING face (minus
 // `lastReviewedAt`, which lives in the scheduling set above). Shared by the
 // `cards` table and the `reviewLogs.prevRadio` undo snapshot.
@@ -151,7 +191,7 @@ export const cardRadioSnapshotFields = {
   radioPlayCount: v.optional(v.number()), // Radio mode: true count of radio plays (+1 per play, NOT subject to radioRoundCounter's catch-up jump). Drives the "Only new" Practice-Listening limit. Optional/undefined for pre-existing cards — treated as the card's review count (preReviewCount + FSRS reps) so they don't reset to "new".
 } as const;
 
-// Free Study's rotation state — the writing-face counterpart of the radio
+// Free Study's rotation state. The writing-face counterpart of the radio
 // fields above, deliberately separate so the two faces shuffle and track
 // independently (listening to a card must not count as having typed it).
 // Shared by the `cards` table and the `reviewLogs.prevFreeStudy` undo
@@ -176,7 +216,7 @@ export const ttsQualityValidator = v.union(
 // 'minimax' = MiniMax Speech 2.8 Turbo, both via OpenRouter's /audio/speech
 // endpoint (distinct from 'google' = Cloud Chirp3).
 // 'elevenlabs' (index 1) and 'azure' (index 2) are retired providers retained
-// only so historical stored values still validate — neither is dispatchable
+// only so historical stored values still validate, neither is dispatchable
 // (Azure Speech remains in use for STT only; see convex/lib/stt).
 export const ttsProviderValidator = v.union(
   v.literal(TTS_PROVIDERS[0]),
@@ -190,6 +230,47 @@ export const voiceGenderValidator = v.union(
   v.literal('male'),
   v.literal('female'),
 );
+
+/**
+ * TTS scheduling priority. 'interactive' work is (or will imminently be) on a
+ * user's screen: cards in their deck, an audio-icon click, the placement
+ * sentence in front of them. 'background' work warms content nobody is
+ * waiting on (collection previews, deferred placement batches, admin
+ * warmups, bulk custom-card import). Interactive jobs run in `ttsPool`; background jobs run in the
+ * low-parallelism `ttsWarmPool` and only take rate-limit tokens that are
+ * free immediately (see workpools.ts / rateLimitReserve.ts), so a signup
+ * burst of warm jobs can no longer queue ahead of the audio the user is
+ * staring at. Absent means 'interactive': deprioritizing is opt-in at the
+ * warm call sites.
+ */
+export const ttsPriorityValidator = v.union(
+  v.literal('interactive'),
+  v.literal('background'),
+);
+export type TtsPriority = Infer<typeof ttsPriorityValidator>;
+
+/**
+ * LLM translation scheduling priority. Same classification rule as
+ * `ttsPriorityValidator`, applied to the translation itself rather than the
+ * audio it triggers: 'background' is work nobody is waiting on (the onboarding
+ * translation warmup, the admin chart-language warmup), everything else is
+ * interactive. Interactive jobs run in `llmPool`, background jobs in the
+ * low-parallelism `llmWarmPool` (see workpools.ts). Absent means
+ * 'interactive'.
+ *
+ * Deliberately a SEPARATE type from `TtsPriority` even though the literals
+ * match. The two travel together through the same job args, where `priority`
+ * means "the tier the audio this translation triggers should run at" and
+ * `llmPriority` means "the tier this translation runs at". They diverge in
+ * practice: a collection preview requests background audio for an interactive
+ * translation, and `storeTranslationAndScheduleTTS` rewrites `priority`
+ * mid-flight (features/decks.ts) in a way that must not touch the LLM tier.
+ */
+export const llmPriorityValidator = v.union(
+  v.literal('interactive'),
+  v.literal('background'),
+);
+export type LlmPriority = Infer<typeof llmPriorityValidator>;
 
 /**
  * Narrow a loosely-typed string to a strict voice gender, or `undefined` when
@@ -208,6 +289,55 @@ export const cardApprovalStatusValidator = v.union(
   v.literal('approved'),
   v.literal('rejected'),
 );
+
+// What the approval row proposes. Absent = 'createCard' (rows predate the
+// field). 'alsoCorrect' rows reference an existing card via `cardId` and
+// offer two accept paths (new card / replace) instead of one.
+export const cardApprovalKindValidator = v.union(
+  v.literal('createCard'),
+  v.literal('alsoCorrect'),
+);
+
+// Which accept path resolved an 'alsoCorrect' approval. Stored alongside
+// status 'approved' ('rejected' rows never carry one).
+export const cardApprovalResolutionValidator = v.union(
+  v.literal('newCard'),
+  v.literal('replaced'),
+);
+
+// Metadata changes the chat model proposes with markAlsoCorrect, only the
+// fields the new phrasing actually changes are present. Applied on the
+// replace path via the applyMetadataAndPrepareCard mechanism (so a speaker
+// gender change re-voices audio); the new-card path re-infers metadata.
+//
+// The value tuples are the single source for both this stored shape and the
+// zod tool schema in chat/agent.ts (`z.enum(...)`), so the model-facing
+// contract and the document validator can't drift apart. The matching
+// `texts` columns stay loose strings (legacy rows predate the enums).
+export const SPEAKER_GENDER_VALUES = ['male', 'female', 'neutral'] as const;
+export const REGISTER_VALUES = ['formal', 'informal', 'neutral'] as const;
+export const ADDRESSEE_GENDER_VALUES = [
+  'male',
+  'female',
+  'neutral',
+  'not_applicable',
+] as const;
+export const ADDRESSEE_NUMBER_VALUES = [
+  'singular',
+  'plural',
+  'not_applicable',
+] as const;
+
+const literalUnion = <T extends readonly string[]>(values: T) =>
+  v.union(...values.map((value: T[number]) => v.literal(value)));
+
+export const proposedCardMetadataValidator = v.object({
+  speakerGender: v.optional(literalUnion(SPEAKER_GENDER_VALUES)),
+  register: v.optional(literalUnion(REGISTER_VALUES)),
+  addresseeGender: v.optional(literalUnion(ADDRESSEE_GENDER_VALUES)),
+  addresseeNumber: v.optional(literalUnion(ADDRESSEE_NUMBER_VALUES)),
+  addressesSomeone: v.optional(v.boolean()),
+});
 
 // Per-feature quota snapshot mirrored from Autumn (usageQuotas.features
 // values). Lives here (not in usage/helpers.ts, which re-exports it) so
@@ -244,7 +374,7 @@ export const reviewsByModeValidator = v.object({
 export type StatsReviewMode = keyof Infer<typeof reviewsByModeValidator>;
 
 // `{language, text}` translation-entry list used by the cardApprovals
-// table/mutations. Also the stored document shape — do not widen; producers
+// table/mutations. Also the stored document shape. Do not widen; producers
 // that carry provenance use `sourcedTranslationEntriesValidator` below.
 export const translationEntriesValidator = v.array(
   v.object({ language: v.string(), text: v.string() }),
@@ -261,7 +391,7 @@ export const translationEntriesValidator = v.array(
 //   `'user-provided'` for manually-typed entries, persisted so a future
 //   strategy swap can target rows by source.
 // Consumers that only read `{language, text}` (the sentence-metadata job)
-// still accept this shape — requiring callers to strip the extras caused a
+// still accept this shape, requiring callers to strip the extras caused a
 // production ArgumentValidationError.
 export const sourcedTranslationEntriesValidator = v.array(
   v.object({
@@ -283,6 +413,9 @@ export type TtsQuality = Infer<typeof ttsQualityValidator>;
 export type TtsProvider = Infer<typeof ttsProviderValidator>;
 export type VoiceGender = Infer<typeof voiceGenderValidator>;
 export type CardApprovalStatus = Infer<typeof cardApprovalStatusValidator>;
+export type CardApprovalKind = Infer<typeof cardApprovalKindValidator>;
+export type CardApprovalResolution = Infer<typeof cardApprovalResolutionValidator>;
+export type ProposedCardMetadata = Infer<typeof proposedCardMetadataValidator>;
 
 /**
  * Free play ('radio') is ONE scheduling mode with two faces, chosen by the

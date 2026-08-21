@@ -6,7 +6,7 @@ import type { ImportController } from '@/components/app/import-texts/useImportCo
 
 /**
  * The cell editor on the Review step saves on Enter, inserts a newline on
- * Shift+Enter and cancels on Escape — and both Enter and Escape are guarded by
+ * Shift+Enter and cancels on Escape, and both Enter and Escape are guarded by
  * `isComposingEvent`: during an IME conversion, Enter confirms the conversion
  * and Escape cancels it, so neither may commit or discard the cell edit.
  *
@@ -88,7 +88,7 @@ function settleComposition() {
   });
 }
 
-describe('StepperImportView — cell editor keydown', () => {
+describe('StepperImportView: cell editor keydown', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });

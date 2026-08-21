@@ -6,7 +6,7 @@ import { SUPPORTED_LANGUAGES } from '../../../../lib/languages';
 /**
  * Characterization tests: pin the exact provider-locale output for every
  * supported language code. These guard the "single source of truth" refactor
- * (locale data moving onto the Language record) — the derived map must produce
+ * (locale data moving onto the Language record), the derived map must produce
  * identical output for every code. They also fail loudly if a language is added
  * to SUPPORTED_LANGUAGES without a Gemini-locale decision.
  */
@@ -19,8 +19,8 @@ const EXPECTED_GEMINI: Record<string, string> = {
   en_us: 'en-US',
   en_au: 'en-AU',
   es: 'es-ES',
-  // es_latam now routes through Gemini, which has no `es-419` macro locale —
-  // it uses `es-US` (American Spanish), matching the es_mixed es_latam variant.
+  // es_latam now routes through Gemini, which has no `es-419` macro locale.
+  // It uses `es-US` (American Spanish), matching the es_mixed es_latam variant.
   es_latam: 'es-US',
   es_mixed: 'es-ES',
   fr: 'fr-FR',

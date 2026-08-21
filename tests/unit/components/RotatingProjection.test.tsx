@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 
 import { RotatingProjection } from '@/components/app/stats/RotatingProjection';
 
-// The component reads its data through useCachedQuery — feed it directly.
+// The component reads its data through useCachedQuery. Feed it directly.
 const useCachedQueryMock = vi.fn();
 vi.mock('@/hooks/use-cached-query', () => ({
   useCachedQuery: (...args: unknown[]) => useCachedQueryMock(...args),
@@ -16,7 +16,7 @@ vi.mock('@/hooks/use-cached-query', () => ({
  *  - a new visit (replayKey bump) picks up the advanced cursor, so repeat
  *    visitors actually see a different rotation.
  * (Regression: the cursor used to be read inside the frames memo without
- * being a dependency — variety never applied, and any data re-emit swapped
+ * being a dependency. Variety never applied, and any data re-emit swapped
  * the visible fact with no animation.)
  */
 
@@ -48,7 +48,7 @@ function renderSlot(replayKey: number) {
 const currentLabel = () =>
   screen.getByTestId('rotating-projection').getAttribute('aria-label') ?? '';
 
-describe('RotatingProjection — per-visit variety cursor', () => {
+describe('RotatingProjection: per-visit variety cursor', () => {
   beforeEach(() => {
     localStorage.clear();
     useCachedQueryMock.mockReset();
@@ -65,7 +65,7 @@ describe('RotatingProjection — per-visit variety cursor', () => {
 
     // Live re-emit: fresh object identity, same visit. The mount effect
     // already bumped the STORED cursor, but this visit's snapshot must keep
-    // the order — the old bug rotated the array here and swapped the fact.
+    // the order. The old bug rotated the array here and swapped the fact.
     useCachedQueryMock.mockReturnValue(projectionData());
     rerender(
       <RotatingProjection

@@ -16,20 +16,22 @@ import { insertAudioFixture } from '../lib/audioFixtures';
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
-// Tests here enqueue content work whose scheduled chains fire on 0ms timers —
-// drain them inside the test context so their logs don't race vitest teardown.
+// Tests here enqueue content work whose scheduled chains fire on 0ms timers.
+// Drain them inside the test context so their logs don't race vitest teardown.
 drainSchedulerAfterEach();
 
-// The workpools are module-mocked globally (tests/convexTestSetup.ts — outside convex/ on purpose, see vitest.config.ts). The
+// The workpools are module-mocked globally (tests/convexTestSetup.ts, outside convex/ on purpose, see vitest.config.ts). The
 // flagTranslation tests assert against the LLM pool's enqueue calls; each
 // call's third argument is the worker's fnArgs.
 const llmEnqueues = () =>
   vi.mocked(llmPool.enqueueAction).mock.calls.map(
     (c) =>
       c[2] as {
+        textId: Id<"texts">;
         targetLanguage: string;
         ruleOverride?: string;
         replaceExisting?: boolean;
+        userSuggestedTranslation?: string;
       },
   );
 beforeEach(() => {
@@ -163,7 +165,7 @@ describe("features/scheduling", () => {
       const t = convexTest(schema, modules);
       const { courseId } = await seedCardWithCourse(t);
       // Even if today's row has plenty of active reviews, omitting `timezone`
-      // makes the caller opt out of the count side-channel — the field must
+      // makes the caller opt out of the count side-channel. The field must
       // be 0 so test callers (and the layout warm-up) don't accidentally
       // depend on it.
       const today = new Date().toISOString().slice(0, 10);
@@ -218,11 +220,11 @@ describe("features/scheduling", () => {
     });
   });
 
-  describe("getCardForReview — card payload assembly", () => {
+  describe("getCardForReview: card payload assembly", () => {
     /**
      * Seed a due card with fine-grained control over the course language
      * pair, the source text's romanization, the translation rows, and which
-     * languages have an audio row — the knobs `buildCardResult` reads.
+     * languages have an audio row. The knobs `buildCardResult` reads.
      */
     async function seedPayloadCard(
       t: TestConvex<typeof schema>,
@@ -275,6 +277,9 @@ describe("features/scheduling", () => {
           ...(sourceRomanization !== undefined
             ? { romanizedText: sourceRomanization }
             : {}),
+          // A "complete" card includes an IPA transcription (part of
+          // hasMissingContent since the annotations refactor).
+          ipaText: `ipa-${sourceLanguage}`,
           userCreated: true,
           userId: "user_A",
           collectionId,
@@ -284,7 +289,7 @@ describe("features/scheduling", () => {
         for (const tr of translations) {
           translationIds[tr.targetLanguage] = await ctx.db.insert(
             "translations",
-            { textId, ...tr },
+            { textId, ipaText: `ipa-${tr.targetLanguage}`, ...tr },
           );
         }
         const audioIds: Record<string, Id<"audioRecordings">> = {};
@@ -347,6 +352,7 @@ describe("features/scheduling", () => {
           isBaseLanguage: true,
           isTargetLanguage: false,
           romanization: "heh-loh",
+          ipa: "ipa-en",
           retranslating: false,
         },
         {
@@ -354,16 +360,18 @@ describe("features/scheduling", () => {
           text: "Hallo Welt",
           isBaseLanguage: true,
           isTargetLanguage: true,
+          ipa: "ipa-de",
           retranslating: false,
         },
         {
           // Source entry: text comes from texts.text (no translations row),
-          // romanization from texts.romanizedText.
+          // romanization from texts.romanizedText, ipa from texts.ipaText.
           language: "es",
           text: "Hola mundo",
           isBaseLanguage: false,
           isTargetLanguage: true,
           romanization: "oh-la moon-doh",
+          ipa: "ipa-es",
           retranslating: false,
         },
       ]);
@@ -401,7 +409,7 @@ describe("features/scheduling", () => {
       });
 
       it("hides the pill for a fresh claim when the translated text is still empty", async () => {
-        // First-time translations also hold a claim — no prior text means no
+        // First-time translations also hold a claim, no prior text means no
         // "Retranslating" pill. The gate is `translatedText.length > 0`.
         const t = convexTest(schema, modules);
         const { textId } = await seedPayloadCard(t, {
@@ -466,7 +474,7 @@ describe("features/scheduling", () => {
       it("fires on a missing translation alone, whose entry gets text: ''", async () => {
         const t = convexTest(schema, modules);
         // Audio present for both languages, no romanization language in the
-        // course — the absent en translation row is the only gap.
+        // course. The absent en translation row is the only gap.
         await seedPayloadCard(t, {
           translations: [],
           audioLanguages: ["en", "es"],
@@ -484,7 +492,7 @@ describe("features/scheduling", () => {
 
       it("fires on a missing audio url alone", async () => {
         const t = convexTest(schema, modules);
-        // Translation present, no romanization language — the missing en
+        // Translation present, no romanization language. The missing en
         // audio row is the only gap. getAudioForText still emits an entry
         // for it, with every resolved field null.
         await seedPayloadCard(t, { audioLanguages: ["es"] });
@@ -526,7 +534,7 @@ describe("features/scheduling", () => {
         );
         expect(res?.hasMissingContent).toBe(true);
 
-        // Filling in the romanization is what flips the flag off — proving
+        // Filling in the romanization is what flips the flag off. Proving
         // it was the romanization cause, not translation or audio.
         await t.run(async (ctx) => {
           await ctx.db.patch(translationIds.ja, {
@@ -690,7 +698,7 @@ describe("features/scheduling", () => {
       const t = convexTest(schema, modules);
       const { cardId, textId } = await seedCardWithCourse(t);
       // A shared/premade text (userCreated: false) must never be cascade-deleted
-      // — other users' cards may reference it.
+      // Other users' cards may reference it.
       await t.run(async (ctx) => ctx.db.patch(textId, { userCreated: false }));
       const asUser = t.withIdentity({ subject: "user_A" });
       await asUser.mutation(api.features.scheduling.deleteCardPermanently, {
@@ -732,7 +740,7 @@ describe("features/scheduling", () => {
 
       // Seed the orphaned text with a real translation + audio row, and a SECOND
       // surviving text (with its own card so it isn't orphaned) whose audio
-      // reuses the SAME storageId — the editCard copy-by-storageId shape. The
+      // reuses the SAME storageId. The editCard copy-by-storageId shape. The
       // cascade must delete the orphan's rows but keep the shared blob alive.
       const { trId, audioId, sharedBlob, otherTextId, otherAudioId } =
         await t.run(async (ctx) => {
@@ -794,7 +802,7 @@ describe("features/scheduling", () => {
         // The surviving text and its audio row remain.
         expect(await ctx.db.get(otherTextId)).not.toBeNull();
         expect(await ctx.db.get(otherAudioId)).not.toBeNull();
-        // Shared blob survives — the surviving text's row still references it.
+        // Shared blob survives. The surviving text's row still references it.
         expect(await ctx.storage.getUrl(sharedBlob)).not.toBeNull();
       });
     });
@@ -814,7 +822,7 @@ describe("features/scheduling", () => {
     });
   });
 
-  describe("editCard — Path B (shared/dataset text)", () => {
+  describe("editCard: Path B (shared/dataset text)", () => {
     /**
      * Seed a card backed by a *shared* (not user-owned) text so editCard
      * takes the "create new textId, copy unchanged content" branch. Includes
@@ -863,7 +871,7 @@ describe("features/scheduling", () => {
           textId,
           language: "sv",
           // Use the current Swedish provider (Gemini) so the row survives the
-          // precedence sweep on the copied textId — `gemini` sits at the top of
+          // precedence sweep on the copied textId. `gemini` sits at the top of
           // lib/ttsPrecedence.ts (it overrides google/azure/elevenlabs and
           // nothing overrides it), so a google/azure row here would be deleted
           // and regenerated. The test's intent is to verify the copy shares
@@ -948,7 +956,7 @@ describe("features/scheduling", () => {
     it("preserves goodReviewCount and audioSpeedOverrides on the replacement card", async () => {
       const t = convexTest(schema, modules);
       const { cardId, textId: oldTextId } = await seedSharedCardWithAudio(t);
-      // "Until rated Good" listening progress + per-card speed overrides —
+      // "Until rated Good" listening progress + per-card speed overrides,
       // both were silently dropped by the replace path before, resetting
       // Practice Listening for an already-graduated card on every edit.
       await t.run(async (ctx) => {
@@ -982,7 +990,7 @@ describe("features/scheduling", () => {
       const { cardId, textId: oldTextId } = await seedSharedCardWithAudio(t);
       const asUser = t.withIdentity({ subject: "user_A" });
 
-      // "Hej" → "Hej!" — the source text is a changed language for the
+      // "Hej" → "Hej!". The source text is a changed language for the
       // text write (new textId stores "Hej!") but sounds identical, so its
       // audio must be copied like an unchanged language. "en" changes
       // audibly and gets no copy.
@@ -1173,7 +1181,7 @@ describe("features/scheduling", () => {
      * whose OTHER languages keep the machine `translationSource` they were
      * generated with. That copy is a custom card by every definition, so a
      * later speaker-gender resolution must not rewrite the languages the user
-     * didn't touch — which is what the provenance guard now prevents.
+     * didn't touch, which is what the provenance guard now prevents.
      *
      * The gender is patched directly rather than by re-running the metadata
      * step: `resolveCardSpeakerGenders` seeds its coin flip from the textId,
@@ -1208,7 +1216,7 @@ describe("features/scheduling", () => {
           collectionId,
           collectionRank: 1,
         });
-        // Machine-translated, unstamped — the shape the sweep used to delete.
+        // Machine-translated, unstamped. The shape the sweep used to delete.
         await ctx.db.insert("translations", {
           textId,
           targetLanguage: "en",
@@ -1316,7 +1324,253 @@ describe("features/scheduling", () => {
     });
   });
 
-  describe("editCard — Path A (user-owned text, in-place edit)", () => {
+  describe("editCard: curriculum fix suggestion", () => {
+    /**
+     * Seed a card on a SHARED curriculum text so editCard takes Path B. The
+     * text's own language is "sv" and the course is en→sv, so the "en" row is
+     * an ordinary translation the user can edit, and "sv" is the curriculum
+     * source line. Editing "en" should flag the shared row; editing "sv"
+     * should suppress flagging for the whole submission.
+     */
+    async function seedCurriculumCard(
+      t: TestConvex<typeof schema>,
+      opts: {
+        flagCount?: number;
+        translationSource?: string;
+        userCreated?: boolean;
+      } = {},
+    ) {
+      return t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["sv"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        const deckId = await ctx.db.insert("decks", {
+          courseId,
+          name: "d",
+          cardCount: 1,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hej",
+          language: "sv",
+          userCreated: opts.userCreated ?? false,
+          ...(opts.userCreated ? { userId: "user_A" } : {}),
+          collectionId,
+          collectionRank: 1,
+        });
+        const translationId = await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "en",
+          translatedText: "Hello",
+          ...(opts.flagCount != null ? { flagCount: opts.flagCount } : {}),
+          ...(opts.translationSource
+            ? { translationSource: opts.translationSource }
+            : {}),
+        });
+        const cardId = await ctx.db.insert("cards", {
+          deckId,
+          textId,
+          collectionId,
+          dueDate: Date.now() - 1000,
+          isMastered: false,
+          isHidden: false,
+          schedulingPhase: "preReview",
+          preReviewCount: 0,
+        });
+        // Only card_edits is funded. The suggestion path must not need a
+        // translation_flags unit; if it consumed one this seed would throw.
+        await ctx.db.insert("usageQuotas", {
+          userId: "user_A",
+          features: {
+            card_edits: {
+              balance: 100,
+              included: 100,
+              used: 0,
+              unlimited: false,
+            },
+          },
+          lastSyncedAt: Date.now(),
+        });
+        return { cardId, textId, translationId };
+      });
+    }
+
+    it("flags the original shared row and sends the user's wording as a suggestion", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId, translationId } = await seedCurriculumCard(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hej" },
+          { language: "en", text: "Hi there" },
+        ],
+        timezone: "UTC",
+      });
+
+      // The ORIGINAL shared row is flagged. Other learners still study it,
+      // which is the whole point of doing this on top of the fork.
+      const original = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(original?.flagCount).toBe(1);
+      expect(original?.translatedText).toBe("Hello");
+
+      const enqueues = llmEnqueues();
+      expect(enqueues).toHaveLength(1);
+      expect(enqueues[0].textId).toBe(textId);
+      expect(enqueues[0].targetLanguage).toBe("en");
+      expect(enqueues[0].ruleOverride).toBe("retranslation_high");
+      expect(enqueues[0].replaceExisting).toBe(true);
+      expect(enqueues[0].userSuggestedTranslation).toBe("Hi there");
+
+      // The fork carries the user's wording, tagged user-provided, and is not
+      // itself flagged: the complaint is against the curriculum, not the copy.
+      const forked = await t.run(async (ctx) => {
+        const cards = await ctx.db.query("cards").collect();
+        const replacement = cards.find((c) => c.textId !== textId);
+        return replacement
+          ? ctx.db
+            .query("translations")
+            .withIndex("by_text_and_language", (q) =>
+              q.eq("textId", replacement.textId).eq("targetLanguage", "en"),
+            )
+            .first()
+          : null;
+      });
+      expect(forked?.translatedText).toBe("Hi there");
+      expect(forked?.translationSource).toBe("user-provided");
+      expect(forked?.flagCount).toBeUndefined();
+    });
+
+    it("respects the flag cap: an over-cap edit counts but does not enqueue", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, translationId } = await seedCurriculumCard(t, {
+        flagCount: 2,
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hej" },
+          { language: "en", text: "Hi there" },
+        ],
+        timezone: "UTC",
+      });
+
+      const original = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(original?.flagCount).toBe(3);
+      expect(llmEnqueues()).toHaveLength(0);
+    });
+
+    it("skips flagging entirely when the edit also changes the curriculum source line", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, translationId } = await seedCurriculumCard(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      // "sv" is the text's own language. Changing it means the new English is
+      // a translation of the user's sentence, not the curriculum's, so it is
+      // not evidence the curriculum's English is wrong.
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hejsan" },
+          { language: "en", text: "Hi there" },
+        ],
+        timezone: "UTC",
+      });
+
+      const original = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(original?.flagCount).toBeUndefined();
+      expect(llmEnqueues()).toHaveLength(0);
+    });
+
+    it("leaves hand-curated rows alone, counter included", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, translationId } = await seedCurriculumCard(t, {
+        translationSource: "curated-manual",
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hej" },
+          { language: "en", text: "Hi there" },
+        ],
+        timezone: "UTC",
+      });
+
+      // mayRegenerateTranslation blocks the retranslation, so a flag here
+      // would be a complaint nothing will ever act on.
+      const original = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(original?.flagCount).toBeUndefined();
+      expect(llmEnqueues()).toHaveLength(0);
+    });
+
+    it("drops the suggestion when another retranslation already holds the claim", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId, translationId } = await seedCurriculumCard(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "en",
+          claimedAt: Date.now(),
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hej" },
+          { language: "en", text: "Hi there" },
+        ],
+        timezone: "UTC",
+      });
+
+      // The complaint is still recorded; only the suggestion is lost.
+      const original = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(original?.flagCount).toBe(1);
+      expect(llmEnqueues()).toHaveLength(0);
+    });
+
+    it("does not flag when the text is already user-owned (Path A)", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, translationId } = await seedCurriculumCard(t, {
+        userCreated: true,
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hej" },
+          { language: "en", text: "Hi there" },
+        ],
+        timezone: "UTC",
+      });
+
+      // Path A patches the row in place; there is no shared row to complain
+      // about, and the patched row must not carry a flag from its own owner.
+      const row = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(row?.translatedText).toBe("Hi there");
+      expect(row?.flagCount).toBeUndefined();
+      expect(llmEnqueues()).toHaveLength(0);
+    });
+  });
+
+  describe("editCard: Path A (user-owned text, in-place edit)", () => {
     /**
      * Seed a card backed by a USER-OWNED text (userCreated && userId matches)
      * so editCard takes Path A: reuse the textId and patch translations/audio
@@ -1432,7 +1686,7 @@ describe("features/scheduling", () => {
       });
 
       await t.run(async (ctx) => {
-        // No new texts row — the user-owned text is reused as-is.
+        // No new texts row. The user-owned text is reused as-is.
         const texts = await ctx.db.query("texts").collect();
         expect(texts).toHaveLength(1);
         expect(texts[0]._id).toBe(textId);
@@ -1497,7 +1751,7 @@ describe("features/scheduling", () => {
         expect(texts[0]._id).toBe(textId);
         expect(texts[0].text).toBe("Hejsan");
         expect(texts[0].romanizedText).toBeUndefined();
-        // `romanizedText` and `romanizationSource` travel as a unit — the
+        // `romanizedText` and `romanizationSource` travel as a unit. The
         // provenance tag goes with the transliteration it described.
         expect(texts[0].romanizationSource).toBeUndefined();
 
@@ -1525,7 +1779,7 @@ describe("features/scheduling", () => {
     });
   });
 
-  describe("reviewCard — dual punctuation accuracy", () => {
+  describe("reviewCard: dual punctuation accuracy", () => {
     async function reviewWith(
       t: TestConvex<typeof schema>,
       cardId: Id<"cards">,
@@ -1603,7 +1857,7 @@ describe("features/scheduling", () => {
     });
   });
 
-  describe("reviewCard — progress display plumbing", () => {
+  describe("reviewCard: progress display plumbing", () => {
     it("returns today's review/time/new-words counts after a review", async () => {
       const t = convexTest(schema, modules);
       const { cardId } = await seedCardWithCourseAndStats(t);
@@ -1617,7 +1871,7 @@ describe("features/scheduling", () => {
       });
       expect(result.dailyReviewsToday).toBe(1);
       expect(result.dailyTimeMsToday).toBe(4_000);
-      // `dailyNewWordsToday` only counts target-language words — the seed
+      // `dailyNewWordsToday` only counts target-language words. The seed
       // card has "hola" and "mundo" in `es` (target). The base-language
       // translation ("Hello", "world") tracks userWords but doesn't bump
       // this count.
@@ -1631,7 +1885,7 @@ describe("features/scheduling", () => {
       const { cardId, courseId } = await seedCardWithCourseAndStats(t);
       // Pre-seed today's reviews so the next one lands exactly on the
       // milestone boundary. UTC matches the timezone arg below.
-      // `reviewsByMode.audio` must mirror `reps` here — the milestone trigger
+      // `reviewsByMode.audio` must mirror `reps` here. The milestone trigger
       // counts non-radio reviews (audio + full), and the next review will
       // bump audio from INTERVAL-1 → INTERVAL.
       const today = new Date().toISOString().slice(0, 10);
@@ -1746,7 +2000,7 @@ describe("features/scheduling", () => {
       const t = convexTest(schema, modules);
       const { cardId, courseId } = await seedCardWithCourseAndStats(t);
       // Pre-seed today's dailyStats with INTERVAL-1 audio reviews PLUS a few
-      // radio plays. Total `reps` already exceeds the milestone — but only the
+      // radio plays. Total `reps` already exceeds the milestone, but only the
       // audio count drives the celebration trigger.
       const today = new Date().toISOString().slice(0, 10);
       await t.run(async (ctx) => {
@@ -1832,7 +2086,7 @@ describe("features/scheduling", () => {
   //
   // Radio mode bypasses FSRS entirely. Cards are picked by `radioRoundCounter`
   // (lowest first), and the free-play advance only patches `radioRoundCounter` +
-  // `lastReviewedAt` — it must NOT touch FSRS state, dueDate, schedulingPhase,
+  // `lastReviewedAt`. It must NOT touch FSRS state, dueDate, schedulingPhase,
   // or daily stats. The catch-up rule keeps a freshly-added card (counter 0)
   // from monopolizing the queue when other cards are at a high counter.
   describe("radio mode", () => {
@@ -1941,7 +2195,7 @@ describe("features/scheduling", () => {
       });
 
       it("ignores dueDate in radio mode (plays cards even when nothing is due)", async () => {
-        // Every card here is dated *in the future* — under learnAndReview the
+        // Every card here is dated *in the future*, under learnAndReview the
         // query would return null. Radio must still pick by counter so the
         // user can listen at any time, not just when reviews are due.
         const t = convexTest(schema, modules);
@@ -2074,8 +2328,8 @@ describe("features/scheduling", () => {
       it("catches a fresh card up to one past the floor instead of incrementing by 1", async () => {
         // Headline catch-up rule: picked card at 0, floor at 100.
         // newCounter = max(0, 100) + 1 = 101. The picked card lands one step
-        // PAST the rest of the deck — strictly above every other playable
-        // card — so it doesn't replay 99 more times in a row AND so it cannot
+        // PAST the rest of the deck. Strictly above every other playable
+        // card, so it doesn't replay 99 more times in a row AND so it cannot
         // be immediately re-picked when the random `radioOrderKey` tiebreak
         // would otherwise put it first within a tie.
         const t = convexTest(schema, modules);
@@ -2099,7 +2353,7 @@ describe("features/scheduling", () => {
         // rotation-position `radioRoundCounter` (which jumps via catch-up). A
         // card with no `radioPlayCount` (predates the field) but a review count
         // of 4 (preReviewCount 4 + 0 reps) seeds to 4, then +1 → 5 on first
-        // play, 6 on the next — so an already-practiced card doesn't reset to
+        // play, 6 on the next, so an already-practiced card doesn't reset to
         // "new" in radio.
         const t = convexTest(schema, modules);
         const { cardIds } = await seedRadioDeck(t, [{ counter: 0 }]);
@@ -2182,7 +2436,7 @@ describe("features/scheduling", () => {
         }
 
         // D plays first (counter 0 wins). Then A, B, C all play in some
-        // (now random — see ordering tests below) order before D could be
+        // (now random, see ordering tests below) order before D could be
         // picked again.
         expect(playOrder.length).toBe(4);
         expect(playOrder[0]).toBe("D-fresh");
@@ -2206,14 +2460,14 @@ describe("features/scheduling", () => {
     });
 
     // ------------------------------------------------------------------------
-    // advanceFreePlayCard — stats tracking
+    // advanceFreePlayCard. Stats tracking
     // ------------------------------------------------------------------------
     //
     // Radio plays write LIGHT stats: dailyStats reps/timeMs/reviewsByMode.radio
     // /timeMsByMode.radio + courseStats totals + weekly/monthly/yearly rollups
     // + streak. Word tracking, accuracy, ratings, hour buckets, card-state
     // breakdown, and collection progress are intentionally skipped.
-    describe("advanceFreePlayCard — stats (listening face)", () => {
+    describe("advanceFreePlayCard: stats (listening face)", () => {
       it("writes dailyStats with reviewsByMode.radio + timeMsByMode.radio", async () => {
         const t = convexTest(schema, modules);
         const { cardIds, courseId } = await seedRadioDeck(t, [{ counter: 0 }]);
@@ -2330,7 +2584,7 @@ describe("features/scheduling", () => {
         expect(stats?.totalRepetitions).toBe(1);
         expect(stats?.totalTimeMs).toBe(4000);
         expect(stats?.totalReviewsByMode?.radio).toBe(1);
-        // Radio doesn't graduate cards or count "first review" — totalCards
+        // Radio doesn't graduate cards or count "first review". totalCards
         // should stay at the seeded value (0).
         expect(stats?.totalCards).toBe(0);
         expect(stats?.totalWordCount ?? 0).toBe(0);
@@ -2465,7 +2719,7 @@ describe("features/scheduling", () => {
     //
     // The radio queue is sorted by `[deckId, isHidden, isMastered,
     // radioRoundCounter, radioOrderKey]`. Within ties on the counter, the
-    // random `radioOrderKey` decides — and gets re-rolled on every play so
+    // random `radioOrderKey` decides, and gets re-rolled on every play so
     // every loop visits cards in a different order.
     describe("radio tiebreak (radioOrderKey)", () => {
       it("when counters tie, the lower radioOrderKey plays first", async () => {
@@ -2509,8 +2763,8 @@ describe("features/scheduling", () => {
           expect(k).toBeGreaterThanOrEqual(0);
           expect(k).toBeLessThan(0x7fffffff);
         }
-        // At least 5 distinct values across 6 reads (1 initial + 5 plays) —
-        // collisions are vanishingly rare in a 32-bit space.
+        // At least 5 distinct values across 6 reads (1 initial + 5 plays).
+        // Collisions are vanishingly rare in a 32-bit space.
         expect(new Set(seen).size).toBeGreaterThanOrEqual(5);
       });
 
@@ -2729,7 +2983,7 @@ describe("features/scheduling", () => {
       expect(enqueues[0].replaceExisting).toBe(true);
       expect(enqueues[0].targetLanguage).toBe("en");
 
-      // Quota debited by exactly 1 — single charge per flag click,
+      // Quota debited by exactly 1. Single charge per flag click,
       // regardless of how many languages got retranslated.
       const quota = await t.run(async (ctx) =>
         ctx.db
@@ -2743,7 +2997,7 @@ describe("features/scheduling", () => {
     it("flagging a custom (user-created) text increments flagCount but does not retranslate", async () => {
       // Curriculum texts (userCreated: false) get retranslated via
       // `retranslation_high`. Custom texts (userCreated: true) are
-      // flag-only: counter bumps, no LLM enqueue, no quota charge — the
+      // flag-only: counter bumps, no LLM enqueue, no quota charge. The
       // LLM has no source-of-truth to second-guess user-created content.
       const t = convexTest(schema, modules);
       const { cardId } = await seedFlaggableCard(t, { userCreated: true });
@@ -2763,7 +3017,7 @@ describe("features/scheduling", () => {
       expect(translations).toHaveLength(1);
       expect(translations[0].flagCount).toBe(1);
 
-      // No quota charge — the helper seeds 10 units, expect all 10 left.
+      // No quota charge. The helper seeds 10 units, expect all 10 left.
       const quota = await t.run(async (ctx) =>
         ctx.db
           .query("usageQuotas")
@@ -2873,7 +3127,39 @@ describe("features/scheduling", () => {
       expect(quota?.features.translation_flags.balance).toBe(9);
     });
 
-    it("over-cap flag only increments counter — no enqueue, no charge", async () => {
+    it("second flag still enqueues: the cap allows two attempts per row", async () => {
+      // FLAG_AUTO_RETRANSLATION_MAX is 2, so a row that has been flagged once
+      // gets a second automatic retranslation. The cap is shared with the
+      // manual-edit suggestion path, which is why a row can reach it via two
+      // different gestures.
+      const t = convexTest(schema, modules);
+      const { cardId, translationId } = await seedFlaggableCard(t, {
+        flagCount: 1,
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+      });
+      expect(res).toEqual({ retranslated: true });
+
+      const translation = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(translation?.flagCount).toBe(2);
+
+      const enqueues = llmEnqueues();
+      expect(enqueues).toHaveLength(1);
+      expect(enqueues[0].ruleOverride).toBe("retranslation_high");
+
+      const quota = await t.run(async (ctx) =>
+        ctx.db
+          .query("usageQuotas")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .first(),
+      );
+      expect(quota?.features.translation_flags.balance).toBe(9);
+    });
+
+    it("over-cap flag only increments counter, no enqueue, no charge", async () => {
       // Pre-seed flagCount=2 (the cap). Next flag bumps it to 3, which is
       // past FLAG_AUTO_RETRANSLATION_MAX, so the short-circuit returns before
       // claiming, enqueuing, or charging quota.
@@ -2899,7 +3185,7 @@ describe("features/scheduling", () => {
           .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
           .first(),
       );
-      // Balance untouched — the over-cap path doesn't bill.
+      // Balance untouched. The over-cap path doesn't bill.
       expect(quota?.features.translation_flags.balance).toBe(10);
     });
 

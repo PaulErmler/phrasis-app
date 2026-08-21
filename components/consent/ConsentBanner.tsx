@@ -9,7 +9,7 @@ import { denyConsent, grantConsent, useConsentStatus } from '@/lib/posthog/conse
 import { ConsentSettingsDialog } from './ConsentSettingsDialog';
 
 /**
- * Cookie banner. Only rendered while PostHog reports 'pending' — i.e. before the
+ * Cookie banner. Only rendered while PostHog reports 'pending', i.e. before the
  * user has made an explicit choice. Until then PostHog writes nothing to the
  * device, so there is no "we already set cookies, please confirm" problem.
  *

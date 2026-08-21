@@ -2,7 +2,7 @@
  * Gemini-backed lenient validator for TTS transcriptions.
  *
  * Strict `textsMatch` (Levenshtein ≤1) rejects cosmetically-different
- * transcriptions that are actually correct audio — names spelled phonetically
+ * transcriptions that are actually correct audio. Names spelled phonetically
  * by Scribe, digits spoken as words, and the like. This validator asks a
  * small Gemini model whether the transcription is semantically equivalent to
  * the original, so those cases pass.
@@ -22,8 +22,8 @@ const openrouter = createOpenRouter({
 
 /**
  * What one validator call cost. Reported through a caller-supplied sink rather
- * than the return value so the `SemanticMatchResult` contract — and the tests
- * that mock this function against it — stay unchanged.
+ * than the return value so the `SemanticMatchResult` contract, and the tests
+ * that mock this function against it. Stay unchanged.
  */
 export type SemanticValidationTelemetry = {
   latencyMs: number;

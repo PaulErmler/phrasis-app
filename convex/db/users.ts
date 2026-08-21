@@ -42,7 +42,7 @@ export async function getUserSettings(
 /**
  * Get the user's *active* onboarding progress row (i.e. an in-flight
  * onboarding that hasn't been finalized yet). Returns null once
- * `finalizeOnboarding` has stamped `completedAt` on the row — completed
+ * `finalizeOnboarding` has stamped `completedAt` on the row. Completed
  * rows are the permanent snapshot of the user's answers and must not be
  * mutated by the wizard.
  *

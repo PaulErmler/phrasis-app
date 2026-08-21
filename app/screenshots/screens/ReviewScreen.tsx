@@ -112,7 +112,7 @@ export function ReviewScreen() {
 
                 <Separator />
 
-                {/* Target language row — revealed, karaoke highlight on one word */}
+                {/* Target language row. Revealed, karaoke highlight on one word */}
                 <div className="space-y-2">
                   <div className="flex items-start gap-2">
                     <div className="flex-1">

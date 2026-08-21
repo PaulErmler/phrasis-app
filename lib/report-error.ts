@@ -8,7 +8,7 @@ import { posthog } from '@/lib/posthog/client';
  *
  * This is the helper the July 2026 code review asked for. Adopt it at the
  * ~50 existing `console.error` sites incrementally, starting with the ones that
- * currently swallow silently — those are invisible today by construction.
+ * currently swallow silently. Those are invisible today by construction.
  *
  * Deliberately not a drop-in for every catch block: errors the product expects
  * and handles (`USAGE_LIMIT`, autoplay rejection, `PAYMENT_PAST_DUE`) belong in

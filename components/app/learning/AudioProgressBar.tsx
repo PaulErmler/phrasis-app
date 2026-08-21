@@ -33,7 +33,7 @@ export const AudioProgressBar = memo(function AudioProgressBar({
   // pauses the audio and re-merges; resetting here keeps the bar from snapping
   // back to the old position (which read as a flicker). Reordering languages
   // keeps the same total duration, so the `durationSec` reset above can't catch
-  // it — this cue-identity reset does. Skipped while playing so a mid-playback
+  // it. This cue-identity reset does. Skipped while playing so a mid-playback
   // speed change resumes smoothly instead of jumping to 0.
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
@@ -64,7 +64,7 @@ export const AudioProgressBar = memo(function AudioProgressBar({
     }
 
     // While playing, read currentTime each animation frame for a smoothly
-    // sliding bar — the native `timeupdate` event only fires at ~250ms.
+    // sliding bar. The native `timeupdate` event only fires at ~250ms.
     let raf = 0;
     const tick = () => {
       setCurrentTime(audio.currentTime);
@@ -122,7 +122,7 @@ export const AudioProgressBar = memo(function AudioProgressBar({
           />
         ))}
       </SliderPrimitive.Track>
-      {/* No visible thumb — would get clipped by the card's overflow-hidden.
+      {/* No visible thumb. Would get clipped by the card's overflow-hidden.
           The fill edge already indicates drag position. */}
       <SliderPrimitive.Thumb
         aria-label="Audio progress"

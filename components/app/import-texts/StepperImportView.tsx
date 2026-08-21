@@ -148,7 +148,7 @@ function ReviewRow({
                       // Enter saves; Shift+Enter inserts a newline; Esc cancels.
                       // isComposingEvent guards both: this text is in the target
                       // language, where Enter confirms an IME conversion and
-                      // Escape cancels it — neither may hit the cell edit. See
+                      // Escape cancels it, neither may hit the cell edit. See
                       // `useImeSafeEnter`.
                       if (
                         e.key === 'Enter' &&
@@ -324,7 +324,7 @@ export function StepperImportView({ c }: { c: ImportController }) {
 
   return (
     <div className="space-y-4">
-      {/* Step indicator — clickable */}
+      {/* Step indicator. Clickable */}
       <div
         className="flex w-full rounded-lg border bg-muted/50 p-1 gap-0.5"
         role="tablist"
@@ -381,7 +381,7 @@ export function StepperImportView({ c }: { c: ImportController }) {
             <textarea
               value={c.input}
               onChange={(e) => c.setInput(e.target.value)}
-              // Mixed-language raw paste — no single language code exists, so
+              // Mixed-language raw paste, no single language code exists, so
               // first-strong-character detection is the best available dir.
               dir="auto"
               placeholder={t('pastePlaceholder')}

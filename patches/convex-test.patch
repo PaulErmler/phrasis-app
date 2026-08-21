@@ -1,0 +1,22 @@
+diff --git a/dist/index.js b/dist/index.js
+index ea6b022c07068d5cb4b1e5d6fc2cd3351c0b449e..4b96033cdb4621c4886eea5aa9ea360d12d08d67 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1042,6 +1042,17 @@ function asyncSyscallImpl() {
+                 (() => convexGlobalStorage.run(capturedGlobal, () => authStorage.run(new AuthFake(), async () => {
+                     const canceled = await withAuth().runInComponent(componentPath, async () => {
+                         const job = db.get("_scheduled_functions", jobId);
++                        if (job === null) {
++                            // The scheduling mutation's transaction rolled back
++                            // (probe subtransactions, quota throws): the job row
++                            // was never committed, but this setTimeout callback
++                            // was registered unconditionally at schedule time.
++                            // The real backend cancels the schedule with the
++                            // rollback; mirror that instead of crashing on
++                            // `null.state` (an unhandled rejection that poisons
++                            // unrelated test files in the same run).
++                            return true;
++                        }
+                         if (job.state.kind === "canceled") {
+                             return true;
+                         }

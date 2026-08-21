@@ -79,6 +79,11 @@ overrides:
   nanoid@>=4.0.0 <5.1.16: '>=5.1.16'
   nanoid@<3.3.17: '>=3.3.17'
 
+patchedDependencies:
+  convex-test:
+    hash: 10b599691f1265c01acda4227bfd4661a76644ff77b94eb5f5e28be961095961
+    path: patches/convex-test.patch
+
 importers:
 
   .:
@@ -152,6 +157,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.4)
+      '@echogarden/espeak-ng-emscripten':
+        specifier: ^0.3.5
+        version: 0.3.5
       '@hookform/resolvers':
         specifier: ^5.4.0
         version: 5.4.0(react-hook-form@7.79.0(react@19.2.4))
@@ -509,7 +517,7 @@ importers:
         version: 1.9.4
       convex-test:
         specifier: ^0.0.48
-        version: 0.0.48(convex@1.42.1(react@19.2.4))
+        version: 0.0.48(patch_hash=10b599691f1265c01acda4227bfd4661a76644ff77b94eb5f5e28be961095961)(convex@1.42.1(react@19.2.4))
       eslint:
         specifier: ^9.39.4
         version: 9.39.4(jiti@2.7.0)
@@ -1056,6 +1064,9 @@ packages:
     resolution: {integrity: sha512-+MKAJEOfaBe5SmV6t34p80MMKhjvUz0vRrvVJbPT0WElzaOJ/1xs+D+KDv+tD/NE5ujfrChEcshd4fLn0wpiqg==}
     peerDependencies:
       react: '>=16.8.0'
+
+  '@echogarden/espeak-ng-emscripten@0.3.5':
+    resolution: {integrity: sha512-Izbkm7NWccwb//RKgOp1/0k21StKN1DFIn+K7GU1XN7n6pmSi4bsk/0tYUsgQbysC4GVyrVompNmLInU/BFE+A==}
 
   '@edge-runtime/primitives@6.0.0':
     resolution: {integrity: sha512-FqoxaBT+prPBHBwE1WXS1ocnu/VLTQyZ6NMUBAdbP7N2hsFTTxMC/jMu2D/8GAlMQfxeuppcPuCUk/HO3fpIvA==}
@@ -8939,6 +8950,8 @@ snapshots:
       react: 19.2.4
       tslib: 2.8.1
 
+  '@echogarden/espeak-ng-emscripten@0.3.5': {}
+
   '@edge-runtime/primitives@6.0.0': {}
 
   '@edge-runtime/vm@5.0.0':
@@ -12356,7 +12369,7 @@ snapshots:
       typescript: 5.9.3
       zod: 4.4.3
 
-  convex-test@0.0.48(convex@1.42.1(react@19.2.4)):
+  convex-test@0.0.48(patch_hash=10b599691f1265c01acda4227bfd4661a76644ff77b94eb5f5e28be961095961)(convex@1.42.1(react@19.2.4)):
     dependencies:
       convex: 1.42.1(react@19.2.4)
 

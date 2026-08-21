@@ -48,8 +48,8 @@ describe('charDiff', () => {
     expect(joinedExpected).toBe('Hello');
   });
 
-  // The char path is what ja/zh/th/yue use — see `hasWordBoundaries` in
-  // lib/languages.ts — so this is the one that matters for Japanese.
+  // The char path is what ja/zh/th/yue use. See `hasWordBoundaries` in
+  // lib/languages.ts, so this is the one that matters for Japanese.
   describe('ignorePunctuation', () => {
     const OPTS = { ignorePunctuation: true, locale: 'ja' };
 
@@ -100,7 +100,7 @@ describe('charDiff', () => {
       expect(joinedExpected).toBe('今日は暑いですね。');
     });
 
-    // Thai takes the char path but uses real spaces — a missing space costs
+    // Thai takes the char path but uses real spaces. A missing space costs
     // accuracy, so it must not render as a neutral "ignored" chunk.
     it('does not mark a missing space as ignored (Thai)', () => {
       const r = charDiff('สวัสดี ครับ', 'สวัสดีครับ', {

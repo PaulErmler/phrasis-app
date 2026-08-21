@@ -15,6 +15,7 @@ import { LandingAudioButton } from '@/components/landing/LandingAudioButton';
 import { getLandingAudioUrl } from '@/lib/landing/audio';
 import { getLanguageShortLabel } from '@/lib/languages';
 import type { CardTranslation, CardAudioRecording } from '@/components/app/learning/types';
+import { AnnotationLines } from '@/components/app/learning/AnnotationLines';
 
 interface LandingCardShellProps {
   reviewCount: number;
@@ -29,6 +30,8 @@ interface LandingCardShellProps {
   onFavorite: () => void;
   bare?: boolean;
   showRomanization?: boolean;
+  /** IPA line toggle; landing demos leave it off. */
+  showIpa?: boolean;
   children: (ctx: {
     baseTranslations: CardTranslation[];
     targetTranslations: CardTranslation[];
@@ -48,6 +51,7 @@ export function LandingCardShell({
   onFavorite,
   bare = false,
   showRomanization = true,
+  showIpa = false,
   children,
 }: LandingCardShellProps) {
   const t = useTranslations('LearningMode');
@@ -112,11 +116,12 @@ export function LandingCardShell({
               <div key={translation.language} className="flex items-start gap-2">
                 <div className="flex-1">
                   <p className="body-large font-medium">{translation.text || '...'}</p>
-                  {showRomanization && translation.romanization && (
-                    <p className="text-romanization">
-                      {translation.romanization}
-                    </p>
-                  )}
+                  <AnnotationLines
+                    romanization={translation.romanization}
+                    ipa={translation.ipa}
+                    showRomanization={showRomanization}
+                    showIpa={showIpa}
+                  />
                 </div>
                 <LandingAudioButton
                   url={getLandingAudioUrl(translation.text, translation.language)}

@@ -35,8 +35,21 @@ export default defineConfig({
           name: "app",
           environment: "jsdom",
           include: ["tests/**/*.test.{ts,tsx}"],
+          exclude: ["tests/node/**"],
           setupFiles: ["./tests/setup.ts"],
           globals: true,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          // Real-Node suite for code that needs Node APIs unavailable in
+          // edge-runtime/jsdom — today the espeak-ng WASM engine, which
+          // loads its data bundle from disk (convex tests stub it instead;
+          // see tests/convexTestSetup.ts).
+          name: "node",
+          environment: "node",
+          include: ["tests/node/**/*.test.ts"],
         },
       },
     ],

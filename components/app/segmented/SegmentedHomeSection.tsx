@@ -65,7 +65,7 @@ export function SegmentedHomeSection({
   }
 
   // Filter-driven badges: only the *excluded* source gets an "Off" pill.
-  // The badge is purely informational — the user is still free to browse
+  // The badge is purely informational. The user is still free to browse
   // either tab regardless of filter.
   const filter = settings?.studyContentFilter ?? 'both';
   const courseOff = filter === 'custom'; // course tab is off when filter='custom'
@@ -88,7 +88,7 @@ export function SegmentedHomeSection({
       className="flex flex-col gap-3"
     >
       {/* Header row: section title on the left, compact source switcher on
-          the right — the switcher no longer spans the full card width. */}
+          the right. The switcher no longer spans the full card width. */}
       <div className="flex items-center justify-between gap-2 px-1">
         {/* min-w-0 + truncate: the title yields to the switcher when both
             don't fit (long locales like German on narrow phones). */}
@@ -133,7 +133,7 @@ export function SegmentedHomeSection({
 }
 
 // ============================================================================
-// Premade tab — CEFR-grouped rail + inline detail card (original preview)
+// Premade tab. CEFR-grouped rail + inline detail card (original preview)
 // ============================================================================
 
 function PremadeTab({ summary }: { summary: HomeSummary }) {
@@ -182,7 +182,15 @@ function PremadeTab({ summary }: { summary: HomeSummary }) {
     isAdding,
     handleAddCards,
     sentencesRemaining,
+    usageLimitHit,
   } = useCollectionDetail({ collections: items });
+
+  // An add-cards attempt ran into the sentences quota. Surface the paywall
+  // instead of failing silently. `handleAddCards` resets the flag on every
+  // new attempt, so re-tries after dismissing re-open it.
+  React.useEffect(() => {
+    if (usageLimitHit) setPaywallOpen(true);
+  }, [usageLimitHit]);
 
   const handleSelect = React.useCallback(
     async (collectionId: Id<'collections'>) => {
@@ -276,7 +284,7 @@ function groupLevelsByCefr(levels: Level[]): { cefr: Cefr; levels: Level[] }[] {
   })).filter((g) => g.levels.length > 0);
 }
 
-function GroupedLevelRail({
+export function GroupedLevelRail({
   groups,
   activeCollectionId,
   focusedId,
@@ -306,7 +314,7 @@ function GroupedLevelRail({
         // Match the per-chip progress fill (`cardsAdded / totalTexts`). Clamp
         // to 100% because cutover roll-forward credits can briefly push a
         // tier's added-count above its texts-count (legacy A1's 295 cards land
-        // entirely on L02 even though L02 has only ~1k texts of its own — but
+        // entirely on L02 even though L02 has only ~1k texts of its own, but
         // the user could still hold credit above 100% if they over-progressed
         // on legacy before cutover).
         const groupPct = total > 0 ? Math.min(1, added / total) : 0;
@@ -465,7 +473,7 @@ function LevelChip({
 }
 
 // ============================================================================
-// Custom tab — 2-chip scrollable rail (Manually Added + Chat), no tiering.
+// Custom tab. 2-Chip scrollable rail (Manually Added + Chat), no tiering.
 // Same chip + inline-detail pattern as the premade tab.
 // ============================================================================
 
@@ -543,7 +551,16 @@ function CustomTab({
     browse,
     isAdding,
     handleAddCards,
+    usageLimitHit,
   } = useCollectionDetail({ collections: items });
+
+  // Same silent-quota fix as the premade tab: adding from a custom/chat
+  // collection consumes the sentences quota too, and previously a free user
+  // at the limit got no feedback at all here.
+  const [paywallOpen, setPaywallOpen] = React.useState(false);
+  React.useEffect(() => {
+    if (usageLimitHit) setPaywallOpen(true);
+  }, [usageLimitHit]);
 
   const handleToggleCollection = React.useCallback(
     async (collectionId: string) => {
@@ -578,7 +595,7 @@ function CustomTab({
     return actions;
   }, [customCollections, tApp, onNavigateToContent, onNavigateToChat]);
 
-  // Empty state — keep the original 2-button card so users can navigate to
+  // Empty state. Keep the original 2-button card so users can navigate to
   // chat or the custom-content page to seed the collections.
   if (customCollections.length === 0) {
     const emptyStateDescription = t('customCarousel.emptyState', {
@@ -670,6 +687,10 @@ function CustomTab({
         onAddCards={() => handleAddCards()}
         showToggleWhenComplete
       />
+
+      {paywallOpen && (
+        <PaywallDialog open={paywallOpen} setOpen={setPaywallOpen} featureId={FEATURE_IDS.SENTENCES} />
+      )}
     </div>
   );
 }
@@ -702,7 +723,7 @@ function CustomChipRail({
       className="-mx-3 flex gap-3 overflow-x-auto px-3 pt-2 pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <div className="flex shrink-0 flex-col gap-1.5">
-        {/* Invisible spacer — mirrors the band-header row in
+        {/* Invisible spacer. Mirrors the band-header row in
             GroupedLevelRail so the Course and Custom Content tabs render at
             the same height and switching between them doesn't shift layout. */}
         <div
@@ -772,7 +793,7 @@ function CustomChip({
  *   - Tab IS selected: pill click opens a popover with a one-tap
  *     re-enable CTA. We stopPropagation so Tabs doesn't see the click.
  *
- * The popover is anchored (not triggered) by the badge — using
+ * The popover is anchored (not triggered) by the badge. Using
  * PopoverTrigger here would intercept every click and either fight with
  * the tab-switch (preventDefault skips Radix's TabsTrigger composeHandler)
  * or open the popover when the user just meant to switch tabs.

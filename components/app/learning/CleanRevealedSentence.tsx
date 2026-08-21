@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { ClickableWords } from './ClickableWords';
 
 /**
- * "Accuracy: N%" footer under a diffed/revealed sentence — the single
+ * "Accuracy: N%" footer under a diffed/revealed sentence. The single
  * implementation shared by the clean reveal below and the show-diff branches
  * of WordDiff and DiffDisplay. `hideAccuracy` keeps the layout height via
  * `invisible` instead of unmounting.
@@ -34,7 +34,7 @@ interface CleanRevealedSentenceProps {
 }
 
 /**
- * Clean revealed sentence for the hideErrors reveal — words are clickable
+ * Clean revealed sentence for the hideErrors reveal. Words are clickable
  * (ask-AI popover), matching the shadowing-mode card. Karaoke props are off;
  * this is a static reveal. Shared by the word-diff and char-diff paths so
  * space-separated and CJK languages render the reveal identically.

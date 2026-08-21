@@ -14,7 +14,7 @@ import { SUPPORTED_LANGUAGES } from '../../lib/languages';
  * it without re-paying the full all-languages sweep.
  *
  * Schedules (all immediate, except the 60s backstop):
- *   1. `enqueueMissingPlacementTranslations` (priority 2 — user-facing)
+ *   1. `enqueueMissingPlacementTranslations` (priority 2: user-facing)
  *   2. `ensureFirstSentencesAcrossLevelCollections`
  *   3. `ensureAudioForTestTranslations` at +60s (backstop sweep)
  *
@@ -22,7 +22,7 @@ import { SUPPORTED_LANGUAGES } from '../../lib/languages';
  * token buckets). With ~200 TTS jobs for a single language this completes in
  * ~1.5 minutes under the Google TTS 150/min cap, assuming no contention.
  *
- * Validation: rejects English-family codes (`en*`) — the source content is
+ * Validation: rejects English-family codes (`en*`), the source content is
  * already in English. Rejects unknown codes against `SUPPORTED_LANGUAGES` so
  * a typo doesn't silently no-op.
  *

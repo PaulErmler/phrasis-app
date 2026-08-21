@@ -23,7 +23,7 @@ describe('findUpgradeProductFromPricingTable', () => {
 
   it('returns undefined when no product matches', () => {
     const products = [
-      // 'current' is not in autumn-js' ProductScenario union — the matcher
+      // 'current' is not in autumn-js' ProductScenario union. The matcher
       // only distinguishes 'upgrade'/'new' from everything else, so the
       // legacy fixture value is kept as-is.
       makeProduct({
@@ -90,7 +90,7 @@ describe('findUpgradeProductFromPricingTable', () => {
   });
 
   // With three paid tiers (Basic/Pro/Ultra), Autumn's dashboard order is not
-  // price order — the lookup must still land on the cheapest sufficient tier.
+  // price order. The lookup must still land on the cheapest sufficient tier.
   it('returns the cheapest sufficient tier regardless of input order', () => {
     const tier = (id: string, price: number, credits: number) =>
       makeProduct({

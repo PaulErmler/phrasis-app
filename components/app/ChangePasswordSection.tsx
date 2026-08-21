@@ -19,11 +19,11 @@ import { authClient } from '@/lib/auth-client';
  * Password management in settings.
  *
  * - Credential accounts get a change-password dialog (current + new
- *   password; other sessions are revoked on success — the standard "log
+ *   password; other sessions are revoked on success: the standard "log
  *   out my other devices" hardening).
  * - Google/Apple-only accounts have no password to change; they get a
  *   "set a password" action instead, which emails the (rate-limited)
- *   reset link — completing it attaches a credential account so email +
+ *   reset link: completing it attaches a credential account so email +
  *   password login works alongside the social login.
  */
 export function ChangePasswordSection({ email }: { email: string | undefined }) {
@@ -52,7 +52,7 @@ export function ChangePasswordSection({ email }: { email: string | undefined }) 
         );
       })
       .catch(() => {
-        // Leave undefined — the section simply doesn't render.
+        // Leave undefined. The section simply doesn't render.
       });
     return () => {
       cancelled = true;

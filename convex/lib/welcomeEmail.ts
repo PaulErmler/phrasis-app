@@ -16,7 +16,7 @@ import { resend } from './resendClient';
  *
  * Deliberately does NOT use the branded emailShell from authEmails.ts: no
  * logo, no card, no button. Plain founder emails read like a direct message
- * and get far higher reply rates than designed HTML — and replies are the
+ * and get far higher reply rates than designed HTML, and replies are the
  * whole point of this email.
  */
 
@@ -30,7 +30,7 @@ export const WELCOME_EMAIL_DELAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Random ±jitter added to the base delay, so the email doesn't land at
- * exactly the signup time + 24h — that timing reads as automated, and this
+ * exactly the signup time + 24h. That timing reads as automated, and this
  * email is meant to feel personal.
  */
 export const WELCOME_EMAIL_JITTER_MS = 3 * 60 * 60 * 1000;
@@ -40,7 +40,7 @@ export function renderWelcomeEmail(name?: string): {
   html: string;
   text: string;
 } {
-  // First name only — "Hi Anna," not "Hi Anna Schmidt,". OAuth-less signups
+  // First name only. "Hi Anna," not "Hi Anna Schmidt,". OAuth-less signups
   // can have an empty name; fall back to a bare greeting.
   const firstName = name?.trim().split(/\s+/)[0];
   const greeting = firstName ? `Hi ${firstName},` : 'Hi,';

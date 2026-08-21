@@ -6,7 +6,7 @@ import { isNativeApp } from '@/lib/native';
 
 /**
  * Inside the Capacitor store-app shell the marketing site (with its pricing
- * section and install CTAs) must never show — any visit to the landing page
+ * section and install CTAs) must never show. Any visit to the landing page
  * (e.g. after sign-out) is bounced to /app, where the auth middleware takes
  * over.
  */

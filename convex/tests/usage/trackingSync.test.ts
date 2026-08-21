@@ -20,11 +20,11 @@ const modules = import.meta.glob("/convex/**/*.ts");
  * The header pin matters just as much: the payload's SHAPE is version-
  * dependent (see AUTUMN_API_VERSION in usage/tracking.ts), so a request that
  * drops `x-api-version: 2.2` would ride Autumn's moving default and one day
- * stop seeing `subscriptions[].past_due` at all — disabling the payment
+ * stop seeing `subscriptions[].past_due` at all, disabling the payment
  * block with zero errors.
  */
 
-// No "track" substring in the id — the fetch stub routes by URL substring
+// No "track" substring in the id. The fetch stub routes by URL substring
 // and must never confuse the customer path with the /track endpoint.
 const USER = "user_sync_wiring";
 
@@ -35,7 +35,7 @@ let calls: Call[] = [];
 /**
  * Route stubbed responses by URL substring (same pattern as
  * convex/tests/billing/switchPlanDuringTrial.test.ts). Key order is match
- * order, so "expand=invoices" must be registered BEFORE "/customers/" —
+ * order, so "expand=invoices" must be registered BEFORE "/customers/",
  * otherwise the expanded re-fetch would be served the un-expanded payload
  * and the invoice-capture tests would pass vacuously.
  */
@@ -64,7 +64,7 @@ function stubAutumn(routes: Record<string, unknown>) {
 /** Requests to a given Autumn path, in order. */
 const callsTo = (path: string) => calls.filter((c) => c.url.includes(path));
 
-/** v2 subscription entry — the shape `x-api-version: 2.2` actually returns. */
+/** v2 subscription entry. The shape `x-api-version: 2.2` actually returns. */
 const subscription = (over: Record<string, unknown> = {}) => ({
   plan_id: "pro",
   status: "active",
@@ -120,11 +120,11 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("usage — trackUsage sync wiring", () => {
+describe("usage: trackUsage sync wiring", () => {
   it("past-due customer: blocks, captures the invoice URL, in exactly one extra request", async () => {
     stubAutumn({
       "/track": {},
-      // Registered before "/customers/" — see stubAutumn note.
+      // Registered before "/customers/". See stubAutumn note.
       "expand=invoices": customerPayload({
         subscriptions: [subscription({ past_due: true })],
         invoices: [
@@ -148,11 +148,11 @@ describe("usage — trackUsage sync wiring", () => {
     });
 
     const doc = await getQuotaDoc(t);
-    // pastDueSince is what assertBillingCurrent keys on — if the
+    // pastDueSince is what assertBillingCurrent keys on, if the
     // action didn't forward anyPastDue, the delinquent user keeps spending.
     expect(doc?.pastDueSince).toBeGreaterThanOrEqual(before);
     expect(doc?.planStatus).toBe("past_due");
-    // Without the URL the overdue dialog has no pay button — the user
+    // Without the URL the overdue dialog has no pay button. The user
     // literally cannot settle the debt.
     expect(doc?.pastDueInvoiceUrl).toBe(INVOICE_URL);
     // granted→included, remaining→balance, usage→used.
@@ -189,7 +189,7 @@ describe("usage — trackUsage sync wiring", () => {
       used: 40,
     });
 
-    // The expanded call costs a second Autumn round-trip per sync — it must
+    // The expanded call costs a second Autumn round-trip per sync. It must
     // stay reserved for the rare delinquent path.
     expect(callsTo("expand=invoices")).toHaveLength(0);
     for (const c of calls) expect(c.version).toBe("2.2");
@@ -197,7 +197,7 @@ describe("usage — trackUsage sync wiring", () => {
 
   it("captures the URL from an 'uncollectible' invoice too", async () => {
     // Stripe flips an invoice to uncollectible after final dunning, but the
-    // debt still exists and the hosted page still accepts payment — dropping
+    // debt still exists and the hosted page still accepts payment, dropping
     // it would strand exactly the longest-overdue customers without a pay
     // button.
     stubAutumn({
@@ -249,7 +249,7 @@ describe("usage — trackUsage sync wiring", () => {
     const doc = await getQuotaDoc(t);
     expect(doc?.planStatus).toBe("past_due");
     expect(doc?.pastDueSince).toBe(seededSince);
-    // The balances themselves are still authoritative — quota refresh must
+    // The balances themselves are still authoritative. Quota refresh must
     // not be held hostage by the missing plan list.
     expect(doc?.features.chat_messages).toEqual({
       balance: 60,

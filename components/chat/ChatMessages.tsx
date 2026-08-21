@@ -24,10 +24,15 @@ import {
 } from '@/components/ai-elements/tool';
 import { useSmoothText } from '@convex-dev/agent/react';
 import { dominantTextDirection } from '@/lib/languages';
-import type { ExtendedUIMessage } from '@/lib/types/chat';
+import type { ChatStatus, ExtendedUIMessage } from '@/lib/types/chat';
+import { CHAT_STATUS } from '@/lib/constants/chat';
 import type { ToolUIPart } from 'ai';
 import type { ReactNode } from 'react';
 import { getToolCallId } from '@/lib/types/tool-parts';
+
+function isReasoningPart(type: string): boolean {
+  return type === 'reasoning' || type === 'redacted-reasoning';
+}
 
 // ---------------------------------------------------------------------------
 // Extracted sub-components
@@ -100,6 +105,10 @@ function MessageParts({
   for (let idx = 0; idx < parts.length; idx++) {
     const part = parts[idx];
 
+    // Reasoning stays off-screen: the row shows a Thinking shimmer until
+    // visible text or a tool part arrives.
+    if (isReasoningPart(part.type)) continue;
+
     if (part.type === 'text') {
       const { text } = part as { type: 'text'; text: string };
       if (!text || text.trim() === '' || renderedTextParts.has(text)) continue;
@@ -171,6 +180,8 @@ function partsSignature(message: ExtendedUIMessage): string {
   for (const part of parts) {
     if (part.type === 'text') {
       sig += `t${(part as { text?: string }).text?.length ?? 0};`;
+    } else if (isReasoningPart(part.type)) {
+      continue;
     } else if (part.type.startsWith('tool-')) {
       const toolPart = part as ToolUIPart;
       sig += `${toolPart.type}:${toolPart.state}:${getToolCallId(toolPart) ?? ''};`;
@@ -183,7 +194,7 @@ function partsSignature(message: ExtendedUIMessage): string {
 
 /**
  * useUIMessages rebuilds every message object on each streamed delta, so
- * object identity is useless — compare the fields that affect rendering by
+ * object identity is useless. Compare the fields that affect rendering by
  * value instead. Completed rows then bail out and only the streaming row
  * re-renders (and re-parses markdown) per token.
  */
@@ -286,11 +297,13 @@ interface ChatMessagesProps {
   contentClassName?: string;
   /** Rendered inside the empty state, below the intro bullets (e.g. quick-action tiles). */
   emptyStateExtra?: ReactNode;
+  /** Composer status. Shows thinking before the assistant message exists. */
+  status?: ChatStatus;
 }
 
 /**
  * Component for displaying chat messages with streaming support.
- * Tool rendering is pluggable via `toolRenderers` — a map from
+ * Tool rendering is pluggable via `toolRenderers`. A map from
  * tool name (without "tool-" prefix) to a renderer function.
  */
 export function ChatMessages({
@@ -300,11 +313,16 @@ export function ChatMessages({
   messageFooter,
   contentClassName,
   emptyStateExtra,
+  status,
 }: ChatMessagesProps) {
   const t = useTranslations('Chat');
 
   const visibleMessages = messages?.filter((m) => m.role !== 'system') ?? [];
   const displayMessages = isLoading ? [] : visibleMessages;
+  const lastMessage = displayMessages[displayMessages.length - 1];
+  const showPendingThinking =
+    (status === CHAT_STATUS.SUBMITTED || status === CHAT_STATUS.STREAMING) &&
+    lastMessage?.role === 'user';
 
   return (
     <div className="relative flex-1 h-full w-full flex flex-col overflow-hidden">
@@ -324,6 +342,13 @@ export function ChatMessages({
                   thinkingLabel={t('thinking')}
                 />
               ))}
+              {showPendingThinking ? (
+                <Message from="assistant">
+                  <MessageContent>
+                    <Shimmer>{t('thinking')}</Shimmer>
+                  </MessageContent>
+                </Message>
+              ) : null}
             </>
           ) : !isLoading ? (
             <ConversationEmptyState>

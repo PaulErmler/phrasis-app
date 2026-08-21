@@ -23,7 +23,7 @@ export const consumeTranscriptionQuota = internalMutation({
  * Read the active course's base + target language codes so chat-voice
  * transcription can run Azure language-ID across the 8 most-common locales
  * PLUS the codes the user is actively studying. Returns an empty array when
- * the user has no active course — the helper still falls back to the base set.
+ * the user has no active course. The helper still falls back to the base set.
  */
 export const getActiveCourseLanguages = internalQuery({
   args: { userId: v.string() },
@@ -92,7 +92,7 @@ export const transcribeAudio = action({
       });
       return text;
     } catch (error) {
-      // This is an action, so nothing rolls back when it throws — unlike the
+      // This is an action, so nothing rolls back when it throws. Unlike the
       // mutation paths, the failure event genuinely persists.
       await track(ctx, userId, EVENTS.VOICE_TRANSCRIPTION_FAILED, {
         latency_ms: Date.now() - startedAt,

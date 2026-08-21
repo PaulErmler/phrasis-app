@@ -13,7 +13,7 @@ export interface CharChunk {
   kind: CharChunkKind;
   text: string;
   /** Set on a mismatched chunk that is pure punctuation while
-   * `ignorePunctuation` is on — it didn't affect the accuracy, so the UI
+   * `ignorePunctuation` is on. It didn't affect the accuracy, so the UI
    * renders it neutrally instead of as an error. */
   ignored?: boolean;
 }

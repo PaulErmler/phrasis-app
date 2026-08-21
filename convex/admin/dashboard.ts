@@ -8,7 +8,7 @@ import { featureStateValidator } from '../usage/helpers';
 
 // Bounded-read caps. Convex hard-fails any query execution that scans more
 // than 16,384 documents, so each query below must keep its worst case under
-// that — the biggest is listUsers at 3 × MAX_SCAN + 200 × 20 = 16,000. When
+// that. The biggest is listUsers at 3 × MAX_SCAN + 200 × 20 = 16,000. When
 // these caps start clipping real data, the upgrade path is denormalized
 // counters or @convex-dev/aggregate (already installed for cards).
 const MAX_SCAN = 4000;
@@ -68,7 +68,7 @@ function summarizeCourseStats(
 }
 
 /**
- * Frontend gate for the /app/admin routes. Never throws — non-admins just
+ * Frontend gate for the /app/admin routes. Never throws. Non-admins just
  * get `false`. Real protection is the `adminQuery` builder every data
  * query is registered through.
  */
@@ -206,7 +206,7 @@ export const getPlanDistribution = adminQuery({
 
 /**
  * Which languages users are learning (target) and learning from (base),
- * plus the level distribution — active (non-archived) courses only.
+ * plus the level distribution. Active (non-archived) courses only.
  */
 export const getLanguageStats = adminQuery({
   args: {},
@@ -296,7 +296,7 @@ export const getOnboardingFunnel = adminQuery({
  * (case-insensitive, via the userProfiles search index); plan and activity
  * filters plus streak/last-active sorting are computed over bounded scans
  * of the one-row-per-user summary tables (usageQuotas, courseStats) and
- * applied in memory — heavier joins (courses) run only for the returned
+ * applied in memory. Heavier joins (courses) run only for the returned
  * rows. `limit` grows for "load more"; `total` is the filtered match count.
  */
 export const listUsers = adminQuery({

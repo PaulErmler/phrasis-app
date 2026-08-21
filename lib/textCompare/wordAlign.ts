@@ -33,7 +33,7 @@ const COST_TYPO = 0.4;
 const COST_DIFF = 1; // substitute
 const COST_GAP = 1; // insert/delete
 // Prohibitive cost forces the DP to gap rather than pair a word with a
-// punctuation mark — otherwise we'd get nonsensical alignments like "Test" ↔ ".".
+// punctuation mark, otherwise we'd get nonsensical alignments like "Test" ↔ ".".
 const COST_CROSS_KIND = 1000;
 
 interface WordToken {
@@ -61,7 +61,7 @@ function tokenize(input: string, opts: WordAlignOptions): WordToken[] {
     // Skip pure whitespace; keep punctuation/symbols as their own tokens.
     if (!seg.text.trim()) continue;
     // For punctuation we only NFC-normalize. Case folding / diacritic stripping
-    // are meaningless for marks like ¿ or „ and would muddy comparisons — and
+    // are meaningless for marks like ¿ or „ and would muddy comparisons, and
     // `ignorePunctuation` must not strip these to '' either: the tokens stay so
     // the diff can still render them, and `scoreWordAlignment` zero-weights them.
     const norm = seg.text.normalize('NFC');

@@ -55,7 +55,7 @@ function renderCard(translations: CardTranslation[]) {
 
 /**
  * Type into the Nth still-unsubmitted input and submit it. Selected by role
- * rather than test id — only the first target input carries
+ * rather than test id, only the first target input carries
  * `learn-translation-input`, since that id anchors the tutorial coachmark.
  */
 function submitNth(index: number, value: string) {
@@ -75,7 +75,7 @@ function typeNth(index: number, value: string) {
   });
 }
 
-describe('FullReviewCardContent — accuracy summary across target languages', () => {
+describe('FullReviewCardContent: accuracy summary across target languages', () => {
   it('reports a running minimum before every language is submitted', () => {
     const onAccuracyChange = renderCard(TWO_TARGETS);
 
@@ -101,7 +101,7 @@ describe('FullReviewCardContent — accuracy summary across target languages', (
     expect(summary.submittedCount).toBe(2);
 
     // The perfect answer pulls the average up, but the minimum stays with the
-    // failed language — that is what decides when the card comes back.
+    // failed language. That is what decides when the card comes back.
     expect(summary.avgWithPunctuation).toBeGreaterThan(
       summary.minWithPunctuation!,
     );
@@ -124,7 +124,7 @@ describe('FullReviewCardContent — accuracy summary across target languages', (
   // Regression: `inputs` gets a new identity on every keystroke, so typing into
   // a language that hasn't been submitted yet re-runs the summary memo. Nothing
   // about the already-submitted answers changed, so neither the diff nor the
-  // parent should see any work — the pairs are cached per (language, expected,
+  // parent should see any work. The pairs are cached per (language, expected,
   // actual) and the emit is gated on structural equality.
   it('does not re-diff or re-emit while typing into an unsubmitted language', () => {
     const onAccuracyChange = renderCard(TWO_TARGETS);
@@ -133,7 +133,7 @@ describe('FullReviewCardContent — accuracy summary across target languages', (
     const callsAfterSubmit = onAccuracyChange.mock.calls.length;
     computeAccuracyPairSpy.mockClear();
 
-    // The remaining input is now at index 0 — type without pressing Enter.
+    // The remaining input is now at index 0. Type without pressing Enter.
     typeNth(0, 'D');
     typeNth(0, 'Da');
     typeNth(0, 'Das');
@@ -147,7 +147,7 @@ describe('FullReviewCardContent — accuracy summary across target languages', (
 
   // Regression: the summary memo re-produces a new (structurally equal) object
   // whenever its deps change. When the parent stores the emitted summary in
-  // state — as LearningMode does — emitting on referential change feeds back:
+  // state, as LearningMode does, emitting on referential change feeds back:
   // emit → setState → re-render → new object → emit. Gating the emit on
   // structural equality is what stops it. (With `targetTranslations` unstable
   // this was an outright "Maximum update depth exceeded".)

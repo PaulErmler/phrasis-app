@@ -8,8 +8,8 @@ import { posthog } from '@/lib/posthog/client';
  * Stops session replay for as long as this is mounted, and resumes on unmount.
  *
  * Used on `/app/admin`, where the screen is a list of *other people's* personal
- * data. Masking individual fields there would be a losing game — every new admin
- * table is a new leak — and admin screens have no product-analytics value that
+ * data. Masking individual fields there would be a losing game. Every new admin
+ * table is a new leak, and admin screens have no product-analytics value that
  * would justify the risk.
  */
 export function SuspendSessionReplay() {

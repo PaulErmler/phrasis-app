@@ -52,7 +52,7 @@ describe('consent', () => {
     expect(mocks.optOut).not.toHaveBeenCalled();
   });
 
-  it('opts out on reject — which keeps cookieless capture running', () => {
+  it('opts out on reject, which keeps cookieless capture running', () => {
     mocks.ready = true;
     denyConsent();
     expect(mocks.optOut).toHaveBeenCalledTimes(1);
@@ -101,7 +101,7 @@ describe('consent', () => {
   /**
    * The pre-boot snapshot must be a value no real status can take. When it
    * impersonated 'granted', a user whose *stored* choice was granted saw
-   * 'granted' → 'granted' across SDK boot — no snapshot change, no re-render —
+   * 'granted' → 'granted' across SDK boot, no snapshot change, no re-render,
    * and `ConsentSync` never mirrored the choice to `userSettings`, so chat
    * content was withheld for a user who had consented (the consent-before-signup
    * path, on every fresh page load).

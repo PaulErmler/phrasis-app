@@ -1,24 +1,24 @@
 import type { SpeakInput, SpeakResult, TTSProvider } from './types';
 
 // MiniMax Speech 2.8 Turbo, reached through OpenRouter's OpenAI-compatible
-// speech endpoint — same endpoint + OPENROUTER_API_KEY as the Gemini provider,
+// speech endpoint, same endpoint + OPENROUTER_API_KEY as the Gemini provider,
 // but a much simpler contract: `response_format: 'mp3'` works (no PCM
 // transcode needed) and the raw sentence goes in `input` (no instruction
-// wrapper — the voice itself pins language + dialect, reinforced by the
+// wrapper. The voice itself pins language + dialect, reinforced by the
 // `language_boost` provider option below).
 //
 // Adopted for Cantonese (Aug 2026): Chirp3-HD consistently mispronounced 唔,
 // and Gemini TTS has no Cantonese at all. MiniMax ships native Cantonese
-// system voices (`Cantonese_*` ids) — listener-verified with correct
+// system voices (`Cantonese_*` ids), listener-verified with correct
 // vernacular readings (唔 = m4). NOTE the voice ids use a FULLWIDTH opening
-// paren + ASCII closing paren, e.g. `Cantonese_ProfessionalHost（F)` — the
+// paren + ASCII closing paren, e.g. `Cantonese_ProfessionalHost（F)`. The
 // all-ASCII form errors upstream (verified live).
 const MODEL = 'minimax/speech-2.8-turbo';
 const ENDPOINT = 'https://openrouter.ai/api/v1/audio/speech';
 
 // MiniMax's dialect hint. Only Cantonese routes to this provider today; if
 // another language ever does, this must become a per-language lookup ("Chinese,
-// Yue" is the documented value for Cantonese — comma included).
+// Yue" is the documented value for Cantonese, comma included).
 const LANGUAGE_BOOST = 'Chinese,Yue';
 
 // MP3 responses start with an ID3 tag or an MPEG frame sync. Anything else
@@ -64,7 +64,7 @@ export const minimaxTts: TTSProvider = {
           voice: input.voiceApiCode,
           response_format: 'mp3',
           // Accepted without error at any value (verified live); the pipeline
-          // only ever synthesizes at 1 — playback speed is client-side.
+          // only ever synthesizes at 1. Playback speed is client-side.
           speed: input.speed,
           provider: {
             options: {
@@ -76,7 +76,7 @@ export const minimaxTts: TTSProvider = {
 
       if (!response.ok) {
         lastError = `MiniMax TTS API error: ${response.status} - ${await response.text()}`;
-        // 4xx won't get better on retry — except 429; 5xx / upstream flakes
+        // 4xx won't get better on retry, except 429; 5xx / upstream flakes
         // and rate limits deserve a backoff instead of hammering upstream.
         const retryable = response.status === 429 || response.status >= 500;
         if (!retryable) throw new Error(lastError);
@@ -100,7 +100,7 @@ export const minimaxTts: TTSProvider = {
         `[minimaxTts] ${lastError} for "${input.text.slice(0, 40)}" ` +
           `(attempt ${attempt + 1}/${MAX_RETRIES + 1})`,
       );
-      // A 200 with a bad body is an upstream incident too — back off like the
+      // A 200 with a bad body is an upstream incident too. Back off like the
       // HTTP-error path instead of re-POSTing immediately.
       if (attempt < MAX_RETRIES) {
         await new Promise((resolve) =>

@@ -20,16 +20,40 @@ const app = defineApp({
 app.use(betterAuth);
 app.use(agent);
 app.use(autumn);
+// Retired 2026-08-21: both TableAggregate instances are gone from
+// db/stats/cardAggregates.ts (their counts are summed out of
+// cardsByStateAndDueDate instead, see getDueCardCount in features/stats.ts).
+// The registrations stay for one deploy so the write path can be confirmed
+// clean in prod before the component data is dropped. Remove both lines in a
+// follow-up once that deploy is verified.
 app.use(aggregate, { name: 'cardsByState' });
 app.use(aggregate, { name: 'cardsByDueDate' });
 app.use(aggregate, { name: 'cardsByStateAndDueDate' });
 app.use(aggregate, { name: 'cardsByOriginStateAndDueDate' });
+// Writing-track mirrors of the two due-count aggregates, keyed on
+// cards.writingDueDate. Only cards with a seeded writing track (courses with
+// separateModeTracking on) are inserted, so courses without the split pay no
+// extra aggregate writes.
+app.use(aggregate, { name: 'cardsByWritingStateAndDueDate' });
+app.use(aggregate, { name: 'cardsByOriginWritingStateAndDueDate' });
 app.use(actionRetrier);
 app.use(rateLimiter);
 // Content-generation pools (LLM translation / TTS synthesis). Separate
 // instances because each pool needs its own parallelism cap.
 app.use(workpool, { name: 'llmPool' });
+// Background LLM translation warms (llmPriority 'background'): low-parallelism
+// sibling of llmPool so a manually fired warmup run can't queue thousands of
+// jobs ahead of the translation a user is waiting on. See convex/lib/workpools.ts.
+app.use(workpool, { name: 'llmWarmPool' });
 app.use(workpool, { name: 'ttsPool' });
+// Background TTS warms (priority 'background'): low-parallelism sibling of
+// ttsPool so signup-time warm bursts can't queue ahead of the audio a user
+// is looking at. See convex/lib/workpools.ts.
+app.use(workpool, { name: 'ttsWarmPool' });
+// Background data sweeps (currently the separateModeTracking writing-track
+// seed). Its own instance so bulk backfill can never queue ahead of, or steal
+// slots from, the user-facing content pools.
+app.use(workpool, { name: 'seedPool' });
 // Batched, resumable data migrations. Chained after every deploy via
 // `npx convex run migrations:runAll --prod` (completed ones are skipped).
 app.use(migrations);
@@ -41,7 +65,7 @@ app.use(resend);
  *
  * `POSTHOG_PERSONAL_API_KEY` is deliberately NOT forwarded: setting it turns on
  * local feature-flag evaluation, which makes the component poll PostHog for
- * flag definitions in a background refresh loop — pointless load while nothing
+ * flag definitions in a background refresh loop. Pointless load while nothing
  * here uses flags. If they're ever wanted, either forward the key or use the
  * action-only remote `evaluateFlag` path, which works without it.
  */

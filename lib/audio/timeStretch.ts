@@ -43,7 +43,7 @@ function cacheSet(key: CacheKey, buf: AudioBuffer): void {
  * - Pitch is preserved (SoundTouch uses WSOLA, driven by its `tempo` setter).
  *
  * The WSOLA loop runs in the audio worker (lib/audio/stretch.worker.ts) with
- * a synchronous main-thread fallback — the same stretchCore code either way.
+ * a synchronous main-thread fallback. The same stretchCore code either way.
  * Channel data crosses the boundary as transferred ArrayBuffers.
  *
  * Results are memoised by `(url, rate)` so the same clip/speed pair is only
@@ -63,7 +63,7 @@ export async function timeStretchBuffer(
   if (cached) return cached;
 
   // The worker path transfers (detaches) the arrays, so the fallback inside
-  // stretchRaw re-extracts from `buffer` — which the main thread still owns.
+  // stretchRaw re-extracts from `buffer`, which the main thread still owns.
   const out = await stretchRaw(extractChannels(buffer), rate, () =>
     extractChannels(buffer),
   );

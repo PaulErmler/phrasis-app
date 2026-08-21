@@ -77,7 +77,7 @@ describe('resolveActiveClip', () => {
   });
 
   it('resets localTime at each repetition of the same language', () => {
-    // Same language repeated — each rep is its own cue, so localTime resets
+    // Same language repeated. Each rep is its own cue, so localTime resets
     // naturally without callers needing to track repetition count.
     const cues: LanguageCue[] = [
       { language: 'en', startSec: 0 },

@@ -7,7 +7,7 @@
  */
 
 // ---------------------------------------------------------------------------
-// Repetitions — how many times each language's audio is played per card
+// Repetitions. How many times each language's audio is played per card
 // ---------------------------------------------------------------------------
 
 /** Default repetitions for every base language */
@@ -18,13 +18,13 @@ export const DEFAULT_REPETITIONS_TARGET = 2;
 
 /**
  * Default target repetitions for the before-base group ("Practice Listening")
- * in audio/Shadowing mode — the prompt only needs to play once.
+ * in audio/Shadowing mode. The prompt only needs to play once.
  */
 export const DEFAULT_REPETITIONS_TARGET_BEFORE = 1;
 
 /**
  * Default target repetitions in the writing modes (Translate merged playback
- * and the Transcribe prompt) — once is enough when the learner is typing.
+ * and the Transcribe prompt), once is enough when the learner is typing.
  */
 export const DEFAULT_REPETITIONS_TARGET_WRITING = 1;
 
@@ -77,7 +77,7 @@ export const PLAYBACK_SPEED_STEP = 0.1;
 
 /**
  * Clamp a raw speed input into the general range, rounding to one decimal
- * first (round, then clamp — matches the historical handler behavior).
+ * first (round, then clamp, matches the historical handler behavior).
  */
 export function clampPlaybackSpeed(value: number): number {
   return Math.max(
@@ -88,7 +88,7 @@ export function clampPlaybackSpeed(value: number): number {
 
 /**
  * Persistent cycle used by LearningMode where the override is stored on the
- * card. `null` = "default" state — clears any stored override so the
+ * card. `null` = "default" state. Clears any stored override so the
  * course-level general speed applies.
  */
 export const CARD_OVERRIDE_CYCLE = [null, 0.6, 0.7, 0.8, 0.9, 1.0] as const;
@@ -114,7 +114,7 @@ export function nextCardOverrideValue(
 /**
  * Ephemeral cycle used by the Library and word-cloud sentences dialog. Those
  * surfaces don't persist the override and ignore the course-level general
- * speed — the badge is a pure preview control that resets to 1.0 when the
+ * speed. The badge is a pure preview control that resets to 1.0 when the
  * view remounts. 1.0 is rendered greyed to signal "no change" (the same way
  * the persistent cycle renders its null default). There is no null slot, so
  * once the user starts cycling they stay inside 0.6–1.0 until unmount.

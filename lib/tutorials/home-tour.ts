@@ -17,7 +17,7 @@ export function createHomeTour(
 
   const steps: DriveStep[] = [
     {
-      // Welcome — heading only; no description per design.
+      // Welcome. Heading only; no description per design.
       popover: {
         title: t('home.welcome.title'),
         description: '',
@@ -33,7 +33,7 @@ export function createHomeTour(
     // The rotating forecast in the progress card ("by the end of the year…").
     tourStep(t, 'home.projections', '[data-tutorial="projections"]', 'bottom', 'center'),
     tourStep(t, 'home.difficultySelection', '[data-tutorial="collection-carousel"]', 'top', 'center'),
-    // Closing call-to-action — re-highlights Learn & Review (the primary
+    // Closing call-to-action. Re-highlights Learn & Review (the primary
     // entry point) so the tour finishes on the button the user is most
     // likely to click next.
     tourStep(t, 'home.readyToLearn', '[data-tutorial="learn-and-review"]', 'bottom', 'center'),

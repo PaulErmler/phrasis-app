@@ -2,13 +2,13 @@ import { test, expect, type Page } from "@playwright/test";
 import { dismissTour } from "./helpers";
 
 /**
- * Course management — archive an existing course, then create a new one.
+ * Course management. Archive an existing course, then create a new one.
  *
  * Order matters because the app enforces: a new course can only be
  * created when NO other course is active. So we archive first to free
  * the slot, then create.
  *
- * State is unpredictable on entry — by the time course-management runs,
+ * State is unpredictable on entry, by the time course-management runs,
  * earlier specs (and Convex quota sync, see convex/usage/helpers.ts:251)
  * may already have archived the onboarding Spanish course. Each test
  * detects current state and adapts:
@@ -155,7 +155,7 @@ test.describe("course management", () => {
     ).toBeVisible({ timeout: 8_000 });
     await createBtn.click();
 
-    // Step 1: target language. Use testids — `language-option-<code>` is
+    // Step 1: target language. Use testids. `language-option-<code>` is
     // attached to every CommandItem inside the shared LanguageSelector.
     const french = page.getByTestId("language-option-fr").first();
     const italian = page.getByTestId("language-option-it").first();
@@ -176,7 +176,7 @@ test.describe("course management", () => {
     }
     await page.getByTestId("course-dialog-next").first().click();
 
-    // Step 2: base language — English.
+    // Step 2: base language. English.
     const english = page.getByTestId("language-option-en").first();
     if (await english.isVisible().catch(() => false)) {
       await english.click();

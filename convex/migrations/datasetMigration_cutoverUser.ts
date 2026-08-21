@@ -58,7 +58,7 @@ export const cutoverAllUsers = internalMutation({
 
 /**
  * Roll forward a single (userId, courseId)'s legacy CEFR progress into the
- * matching first-of-tier new-dataset collection. Idempotent — short-circuits
+ * matching first-of-tier new-dataset collection. Idempotent. Short-circuits
  * if courseSettings.reconciledDatasetId already matches.
  */
 export const cutoverUser = internalMutation({
@@ -234,7 +234,7 @@ export const cutoverUser = internalMutation({
           : {}),
       });
     } else {
-      // No courseSettings row yet — create a minimal one with the marker so
+      // No courseSettings row yet. Create a minimal one with the marker so
       // future cutover invocations short-circuit.
       await ctx.db.insert('courseSettings', {
         courseId: args.courseId,

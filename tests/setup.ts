@@ -23,7 +23,7 @@ vi.mock("next/navigation", () => ({
   notFound: vi.fn(),
 }));
 
-// Stub next-intl — tests can re-mock per-file if they need translation values
+// Stub next-intl. Tests can re-mock per-file if they need translation values
 vi.mock("next-intl", async () => {
   const actual =
     await vi.importActual<typeof import("next-intl")>("next-intl");

@@ -76,7 +76,7 @@ export function detectHasHeader(firstRow: string[] | undefined, locale: string):
 /**
  * Auto-assign columns to course languages by matching the header row.
  * Returns a fresh mapping. Does not touch cells that can't be confidently
- * matched — the user still has to fill those in.
+ * matched. The user still has to fill those in.
  */
 export function autoMapColumns(
   headerRow: string[] | undefined,

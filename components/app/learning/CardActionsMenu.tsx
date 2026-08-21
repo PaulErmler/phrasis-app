@@ -88,7 +88,7 @@ interface ActionConfig {
   onClick: () => void;
   /** Hidden when the parent didn't wire a callback (mirrors edit/delete gating). */
   available: boolean;
-  /** Quota state for this action — drives disabled + badge rendering. */
+  /** Quota state for this action. Drives disabled + badge rendering. */
   quota?: ActionQuotaState;
 }
 
@@ -116,7 +116,7 @@ export function CardActionsMenu({
   // Controlled so the trigger only opens on a true tap (onClick fires after
   // pointerup with no significant movement). Radix's default behaviour opens
   // on pointerdown, which fires the moment a finger first lands on the
-  // button — so on mobile, a scroll that starts on the button pops the menu
+  // button, so on mobile, a scroll that starts on the button pops the menu
   // open. Suppressing pointerdown and toggling via click avoids that.
   const [open, setOpen] = useState(false);
 
@@ -208,10 +208,10 @@ export function CardActionsMenu({
 
   const pinnedKeys = normalizedPins.filter((key) => actions[key].available);
   // `pinnedKeys` is a fresh array every render so memoising the Set buys
-  // nothing — and the Set is at most MAX_PINNED_CARD_ACTIONS entries.
+  // nothing, and the Set is at most MAX_PINNED_CARD_ACTIONS entries.
   const pinnedSet = new Set(pinnedKeys);
 
-  // Toggle a pin without dismissing the dropdown — pinning is a side gesture,
+  // Toggle a pin without dismissing the dropdown. Pinning is a side gesture,
   // not the primary action. The pin icon is its own button, so we stop the
   // event from bubbling into the row's onSelect (which would fire the
   // underlying action) and call updatePinnedActions directly.
@@ -228,7 +228,7 @@ export function CardActionsMenu({
       // the `disabled` attribute) so the tooltip still fires when the user
       // hovers a full slot. Because aria-disabled does NOT block keyboard
       // activation or pointer events, this check is what actually prevents
-      // over-pinning — do not remove it just because the DOM appears disabled.
+      // over-pinning. Do not remove it just because the DOM appears disabled.
       if (pinnedKeys.length >= MAX_PINNED_CARD_ACTIONS) return;
       next = [...pinnedKeys, key];
     }
@@ -347,7 +347,7 @@ export function CardActionsMenu({
       <DropdownMenuItem
         key={cfg.key}
         // Radix wraps `onSelect` so calling preventDefault keeps the menu
-        // open — we want it to close on every successful select, so don't
+        // open. We want it to close on every successful select, so don't
         // prevent default. Just no-op when depleted.
         onSelect={depleted ? () => undefined : cfg.onClick}
         aria-disabled={depleted}
@@ -366,14 +366,14 @@ export function CardActionsMenu({
                 aria-pressed={isPinned}
                 aria-disabled={pinDisabled}
                 // We use aria-disabled instead of the `disabled` attribute so
-                // hovering still fires pointer events on the button — the
+                // hovering still fires pointer events on the button. The
                 // disabled-pointer-events default would prevent the tooltip
                 // from showing, which is exactly when we want the "max 3"
                 // hint to surface.
                 // Block Radix from treating the pointer events as a menu-item
                 // activation. Radix's DropdownMenuItem synthesizes a click on
                 // the menu item from its own `pointerup` (so touch devices
-                // still fire onSelect) — that synthesized click bubbles into
+                // still fire onSelect), that synthesized click bubbles into
                 // the row's onSelect even if we stop the React click. We
                 // therefore have to stop the pointer events *before* they
                 // reach the menu item: pointerdown, pointerup, and click.

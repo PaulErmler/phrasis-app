@@ -18,7 +18,7 @@ describe('aiCosts', () => {
     });
 
     it('scales linearly below a million characters', () => {
-      // A typical sentence — the realistic unit of work in this app.
+      // A typical sentence. The realistic unit of work in this app.
       expect(costForCharacters('googleTts', 100)).toBeCloseTo(
         (100 / 1_000_000) * AI_COST_RATES.googleTts.usdPerUnit,
         12,

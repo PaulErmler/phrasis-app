@@ -15,8 +15,8 @@ export const getCheckoutContent = (
      * The customer's own `current_period_end`. Scenarios that take effect
      * at the end of the current period (cancel / downgrade / scheduled)
      * prefer this over the preview's `next_cycle.starts_at`: Autumn's
-     * v1.2 checkout preview returns the period START for annual plans —
-     * exactly one year early (verified July 2026) — while the customer
+     * v1.2 checkout preview returns the period START for annual plans.
+     * Exactly one year early (verified July 2026), while the customer
      * record carries the correct end.
      */
     currentPeriodEndsAt?: number;
@@ -60,9 +60,9 @@ export const getCheckoutContent = (
   // Currently-trialing user switching plans: the running trial is kept
   // (see convex/billing.ts switchPlanDuringTrial), so the copy must not
   // promise a fresh trial or an immediate charge. The date comes from the
-  // customer's own trial end — the preview's next_cycle can reflect a
-  // phantom fresh trial. Downgrades — including to the Free plan, which
-  // Autumn classifies as "downgrade" or "cancel" — are scheduled at trial
+  // customer's own trial end. The preview's next_cycle can reflect a
+  // phantom fresh trial. Downgrades, including to the Free plan, which
+  // Autumn classifies as "downgrade" or "cancel". Are scheduled at trial
   // end; everything else switches now with the trial carried over. Must
   // mirror the scenarios accepted by checkout-dialog.tsx isTrialSwitch.
   if (
@@ -87,7 +87,7 @@ export const getCheckoutContent = (
 
   // Only trial-eligible users get trial copy. For everyone else the
   // checkout preview was requested with `freeTrial: false`, so has_trial
-  // should already be false — this gate is the safety net for previews
+  // should already be false. This gate is the safety net for previews
   // opened without it (falls through to the scenario copy below).
   if (has_trial && trialState.trialEligible) {
     return {

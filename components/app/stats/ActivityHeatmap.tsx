@@ -64,7 +64,7 @@ function MonthView({ lookup, timezone }: { lookup: Map<string, number>; timezone
   const month = parseInt(parts.find(p => p.type === 'month')!.value) - 1;
 
   // Use UTC-constructed dates so day-of-week and day count don't depend on
-  // the browser's local timezone — we're computing pure calendar values.
+  // the browser's local timezone; we're computing pure calendar values.
   const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 
   // Monday = 0, Sunday = 6

@@ -5,9 +5,9 @@ import { api } from '@/convex/_generated/api';
 
 /**
  * Wraps `updateCourseSettings` with an optimistic update that patches the
- * active-course settings cache, so every surface reading those settings — the
- * homescreen daily-goal ring, the settings sheet, the content-filter badges
- * and empty states — reflects a change immediately instead of lagging one
+ * active-course settings cache, so every surface reading those settings. The
+ * homescreen daily-goal ring, the content-filter badges
+ * and empty states. Reflects a change immediately instead of lagging one
  * round-trip behind the tap.
  *
  * The update spreads whatever the caller passed (minus `courseId`, which is a
@@ -18,7 +18,7 @@ import { api } from '@/convex/_generated/api';
  * closures meant a fix or a new field had to be remembered in four places, and
  * the home ring could disagree with the settings sheet.
  *
- * The server is still the authority — `updateCourseSettings` clamps
+ * The server is still the authority. `updateCourseSettings` clamps
  * `dailyTimeGoalMinutes` via `clampDailyGoal`, so an out-of-range optimistic
  * value is corrected on the next round trip.
  */

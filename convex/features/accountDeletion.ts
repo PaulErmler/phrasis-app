@@ -20,12 +20,32 @@ export const requestAccountDeletion = mutation({
     const user = await authComponent.safeGetAuthUser(ctx);
     if (!user) throw new ConvexError('Unauthenticated');
 
-    // Each request emails support@ for real — cap per user so the public
+    // Each request emails support@ for real. Cap per user so the public
     // mutation can't be scripted into an inbox flood.
     await rateLimiter.limit(ctx, 'accountDeletionRequest', {
       key: user._id,
       throws: true,
     });
+
+    // Durable proof of the request. The operator-run purge
+    // (admin/deleteUser.ts) refuses to delete an account without a
+    // `requested` row for it, so a mistyped userId on the CLI can't wipe
+    // someone who never asked. Repeat requests just refresh the timestamp;
+    // a purge already running or completed is left untouched.
+    const existing = await ctx.db
+      .query('accountDeletions')
+      .withIndex('by_userId', (q) => q.eq('userId', user._id))
+      .first();
+    if (!existing) {
+      await ctx.db.insert('accountDeletions', {
+        userId: user._id,
+        email: user.email.toLowerCase(),
+        status: 'requested',
+        requestedAt: Date.now(),
+      });
+    } else if (existing.status === 'requested') {
+      await ctx.db.patch(existing._id, { requestedAt: Date.now() });
+    }
 
     await resend.sendEmail(ctx, {
       from: `Flexling <${SUPPORT_EMAIL}>`,

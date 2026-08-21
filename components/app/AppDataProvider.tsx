@@ -17,8 +17,8 @@ export interface AppData {
 }
 
 export interface AppDataValue extends AppData {
-  /** Live active course. The subscription is owned HERE — the one component
-   *  that stays mounted across the onboarding → home soft navigation —
+  /** Live active course. The subscription is owned HERE. The one component
+   *  that stays mounted across the onboarding → home soft navigation,
    *  because the server preload is snapshotted on the initial hard load
    *  (before onboarding creates the course) and Next.js never re-runs it on
    *  soft nav. A consumer that mounts fresh (e.g. the home layout) and
@@ -26,7 +26,7 @@ export interface AppDataValue extends AppData {
    *  flash the no-course empty state; reading the always-warm value from
    *  context instead means the course is present by the time home mounts. */
   activeCourse: FunctionReturnType<typeof api.features.courses.getActiveCourse>;
-  /** Live course settings — same always-warm rationale as `activeCourse`.
+  /** Live course settings, same always-warm rationale as `activeCourse`.
    *  Home reads `reviewMode` from here so the Shadowing/Writing toggle
    *  doesn't flash the 'audio' default while a stale null preload catches up
    *  after the onboarding soft nav. */
@@ -35,7 +35,7 @@ export interface AppDataValue extends AppData {
   >;
 }
 
-const AppDataContext = createContext<AppDataValue | null>(null);
+export const AppDataContext = createContext<AppDataValue | null>(null);
 
 export function AppDataProvider({
   children,

@@ -2,6 +2,7 @@ import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import {
   ROMANIZATION_LANGUAGES,
+  IPA_LANGUAGES,
   isTranslationVersionStale,
   languageSupportsStt,
 } from '../../lib/languages';
@@ -21,6 +22,8 @@ export interface CardTranslationContent {
   isBaseLanguage: boolean;
   isTargetLanguage: boolean;
   romanization?: string;
+  /** IPA transcription (espeak-ng), same display semantics as romanization. */
+  ipa?: string;
   /**
    * True iff an LLM retranslation is currently in flight for this language
    * AND an existing `translatedText` is on file. Keyed off the LLM claim
@@ -33,7 +36,7 @@ export interface CardTranslationContent {
    * regenerate this row: its `translationVersion` is below the language's
    * current config version AND `mayRegenerateTranslation` allows the rewrite.
    * Only populated when the caller opts in via `markVersionStale`. The full
-   * predicate is applied here — callers must NOT re-derive any part of it.
+   * predicate is applied here. Callers must NOT re-derive any part of it.
    */
   versionStale?: boolean;
 }
@@ -44,7 +47,7 @@ export interface CardAudioContent {
   url: string | null;
   wordTimings: { word: string; start: number; end: number }[] | null;
   /**
-   * TTS validation state — see AudioResult in convex/lib/audio.ts. Surfaced
+   * TTS validation state. See AudioResult in convex/lib/audio.ts. Surfaced
    * here so the retranslating-pill computation can distinguish "audio row
    * exists and points at the final blob" (validated/unvalidated) from "audio
    * row exists but the blob behind it may still be replaced by the
@@ -66,12 +69,17 @@ interface TextContentInput {
   sourceLanguage: string;
   /**
    * `texts.romanizedText` for this row. Pass it as `text.romanizedText ??
-   * undefined` — never `|| undefined`, which collapses the empty-string
+   * undefined`, never `|| undefined`, which collapses the empty-string
    * "tried, failed" sentinel into "never attempted" and makes
    * `hasMissingContent` ask forever for work no scheduler will do. See the
    * tri-state note on `romanizedText` in convex/schema.ts.
    */
   sourceRomanization?: string;
+  /**
+   * `texts.ipaText` for this row. Same tri-state and same `?? undefined`
+   * (never `|| undefined`) rule as `sourceRomanization` above.
+   */
+  sourceIpa?: string;
   /**
    * `texts.userCreated` for this row. Required so `versionStale` can apply the
    * whole `mayRegenerateTranslation` rule here instead of leaving half of it
@@ -166,6 +174,7 @@ export async function buildTextContentBatchForLanguages(
     {
       text: string;
       romanization?: string;
+      ipa?: string;
       llmClaimedAt: number | null;
       versionStale: boolean;
     }
@@ -176,6 +185,7 @@ export async function buildTextContentBatchForLanguages(
     translationMap.set(`${item.key}:${item.lang}`, {
       text: row?.translatedText ?? '',
       romanization: row?.romanizedText ?? undefined,
+      ipa: row?.ipaText ?? undefined,
       llmClaimedAt: claim?.claimedAt ?? null,
       versionStale:
         row != null &&
@@ -185,7 +195,7 @@ export async function buildTextContentBatchForLanguages(
   });
 
   // Resolve each audio row's payload through its shared `audioAssets` doc.
-  // One deduped point-read per unique asset per batch — decks repeat
+  // One deduped point-read per unique asset per batch. Decks repeat
   // sentences, so the dedup matters.
   const assetIds = [
     ...new Set(audioResults.flatMap((row) => (row ? [row.assetId] : []))),
@@ -242,10 +252,14 @@ export async function buildTextContentBatchForLanguages(
       // in the DB untouched, but their romanizedText is dropped from the
       // response so the UI doesn't render stale transliteration after the
       // language is flipped off. See ROMANIZATION_LANGUAGES in
-      // lib/languages.ts — it's derived from the Language entries so this
+      // lib/languages.ts. It's derived from the Language entries so this
       // check stays in sync automatically.
       const langNeedsRomanization =
         opts?.rawRomanization || ROMANIZATION_LANGUAGES.has(lang);
+      // Same flag-gate for IPA (no raw escape hatch: the rawRomanization opt
+      // predates IPA and exists only for the review query's historical
+      // romanization behavior).
+      const langNeedsIpa = IPA_LANGUAGES.has(lang);
       if (lang === input.sourceLanguage) {
         return {
           language: lang,
@@ -255,6 +269,7 @@ export async function buildTextContentBatchForLanguages(
           romanization: langNeedsRomanization
             ? input.sourceRomanization
             : undefined,
+          ipa: langNeedsIpa ? input.sourceIpa : undefined,
           retranslating: false,
         };
       }
@@ -268,6 +283,7 @@ export async function buildTextContentBatchForLanguages(
         isBaseLanguage: baseLanguages.includes(lang),
         isTargetLanguage: targetLanguages.includes(lang),
         romanization: langNeedsRomanization ? entry?.romanization : undefined,
+        ipa: langNeedsIpa ? entry?.ipa : undefined,
         // Show the pill only when an LLM retranslation is in flight AND a
         // prior translatedText exists (i.e. this is a *re*translation, not
         // the first-time translation of a new card).
@@ -282,24 +298,29 @@ export async function buildTextContentBatchForLanguages(
       (tr) => tr.language !== input.sourceLanguage && !tr.text,
     );
     const hasMissingAudio = audioRecordings.some((audio) => !audio.url);
-    // Read the STORED romanization, not the projected `tr.romanization`: that
-    // one is a display value, already blanked for languages the caller didn't
-    // ask about. `=== undefined` (not `!stored`) mirrors the schedulers in
-    // decks.ts, which honour the empty-string "tried, failed, leave empty"
-    // sentinel and never re-enqueue those rows. A truthiness test here would
-    // report the card as missing content forever while nothing is willing to
-    // fill it — see `romanizedText` in convex/schema.ts for the tri-state.
-    const hasMissingRomanization = allLanguages.some((lang) => {
-      if (!ROMANIZATION_LANGUAGES.has(lang)) return false;
+    // Read the STORED annotations, not the projected ones: those are display
+    // values, already blanked for languages the caller didn't ask about.
+    // `=== undefined` (not `!stored`) mirrors the schedulers in decks.ts,
+    // which honour the empty-string "tried, failed, leave empty" sentinel
+    // and never re-enqueue those rows. A truthiness test here would report
+    // the card as missing content forever while nothing is willing to fill
+    // it. See `romanizedText` in convex/schema.ts for the tri-state. This
+    // term is what wires both kinds into the client self-heal
+    // (useEnsureContent → ensureCardContent → scheduleMissingContent).
+    const hasMissingAnnotation = allLanguages.some((lang) => {
       const stored =
         lang === input.sourceLanguage
-          ? input.sourceRomanization
-          : translationMap.get(`${input.key}:${lang}`)?.romanization;
-      return stored === undefined;
+          ? { romanization: input.sourceRomanization, ipa: input.sourceIpa }
+          : translationMap.get(`${input.key}:${lang}`);
+      return (
+        (ROMANIZATION_LANGUAGES.has(lang) &&
+          stored?.romanization === undefined) ||
+        (IPA_LANGUAGES.has(lang) && stored?.ipa === undefined)
+      );
     });
     // Legacy audio (generated before Scribe integration) has a URL but no
     // wordTimings. Flag it as missing so useEnsureContent → scheduleMissingContent
-    // triggers a backfill transcription — but only where a backfill can
+    // triggers a backfill transcription, but only where a backfill can
     // actually run. `scheduleTimingsBackfillIfNeeded` skips languages our STT
     // backend can't transcribe, so without this gate those cards would ask for
     // work that is deliberately never done.
@@ -316,7 +337,7 @@ export async function buildTextContentBatchForLanguages(
       hasMissingContent:
         hasMissingTranslation ||
         hasMissingAudio ||
-        hasMissingRomanization ||
+        hasMissingAnnotation ||
         (!opts?.ignoreMissingWordTimings && hasMissingWordTimings),
     });
   }
@@ -332,7 +353,7 @@ export async function buildTextContentBatchForLanguages(
  * `searchableTextLanguages`, so callers can later detect staleness by comparing
  * this array against the current course language list.
  *
- * Pass `text` when the caller already has the doc — avoids a redundant
+ * Pass `text` when the caller already has the doc. Avoids a redundant
  * `ctx.db.get` on the review hot path.
  */
 export async function buildCardSearchableText(
@@ -386,7 +407,7 @@ export interface SearchableTextRebuildCaches {
   /** deck → course languages (null when the deck/course no longer resolves). */
   deckLanguages: Map<Id<'decks'>, string[] | null>;
   /**
-   * Optional memo of built results keyed by (textId, languages) — valid
+   * Optional memo of built results keyed by (textId, languages), valid
    * across cards because the build depends only on those two inputs.
    */
   built?: Map<string, { searchableText: string; searchableTextLanguages: string[] }>;
@@ -397,7 +418,7 @@ export interface SearchableTextRebuildCaches {
  * (`rebuildSearchableTextForText` in features/decks.ts) and the migration
  * (`rebuildCardSearchableText` in migrations.ts): resolve the card's deck →
  * course languages (memoized in the caller-provided cache), build the search
- * string, and return it as a patch — or `undefined` when the deck/course no
+ * string, and return it as a patch, or `undefined` when the deck/course no
  * longer resolves or the stored fields are already current.
  */
 export async function buildSearchableTextPatchForCard(
@@ -440,7 +461,7 @@ export async function buildSearchableTextPatchForCard(
 /**
  * Whether a card's stored search fields already match a freshly built
  * result, so rebuild passes (live fan-out and migration) can skip the write.
- * A card with `searchableTextLanguages` unset is never current — the rebuild
+ * A card with `searchableTextLanguages` unset is never current. The rebuild
  * stamps the field.
  */
 export function isSearchableTextCurrent(

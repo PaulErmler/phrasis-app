@@ -1,5 +1,9 @@
 import { v, Infer } from 'convex/values';
-import { NonRetryableError, vOnCompleteArgs } from '@convex-dev/workpool';
+import {
+  NonRetryableError,
+  vOnCompleteArgs,
+  type WorkId,
+} from '@convex-dev/workpool';
 import {
   internalAction,
   internalMutation,
@@ -30,26 +34,32 @@ import {
 } from '../../lib/languages';
 import { romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
-import { llmPool } from '../lib/workpools';
-import { asVoiceGender } from '../types';
+import { llmPool, llmWarmPool } from '../lib/workpools';
+import {
+  asVoiceGender,
+  llmPriorityValidator,
+  ttsPriorityValidator,
+  type LlmPriority,
+} from '../types';
 import { captureGeneration } from '../lib/posthogAi';
 
 /**
- * LLM translation pipeline, built on the `llmPool` workpool
- * (convex/lib/workpools.ts). Per translation:
+ * LLM translation pipeline, built on the `llmPool` / `llmWarmPool` workpools
+ * (convex/lib/workpools.ts; the tier comes from `llmPriority`, see
+ * `llmPriorityValidator`). Per translation:
  *
  *   1. `claimLlmTranslationIfAvailable` (called from `scheduleMissingContent`
  *      / `flagTranslation`) atomically reserves the (textId, language) slot.
  *   2. `enqueueLlmTranslation` enqueues `processLlmTranslationForCard` into
- *      the pool and stamps the pool's workId onto the claim — the claim now
+ *      the pool and stamps the pool's workId onto the claim: the claim now
  *      lives exactly as long as the pool job.
  *   3. The worker calls `translateTextWithLLM` (with the language's model-
  *      stage fallback chain). On success it writes via
  *      `storeTranslationAndScheduleTTS` (the same mutation the Google path
  *      uses, so romanization/TTS downstream is unchanged). On failure it
- *      THROWS — the pool retries with jittered exponential backoff.
+ *      THROWS: the pool retries with jittered exponential backoff.
  *   4. `onLlmTranslationComplete` (guaranteed to run on success, failure, and
- *      cancellation) releases the claim — or, when the pool's retry budget is
+ *      cancellation) releases the claim: or, when the pool's retry budget is
  *      exhausted, enqueues the Google Translate fallback and re-points the
  *      claim at the fallback job. `onGoogleFallbackComplete` then releases it.
  */
@@ -57,7 +67,7 @@ import { captureGeneration } from '../lib/posthogAi';
 /**
  * Per-(textId, language) LLM claim freshness window. The claim is released by
  * the pool job's onComplete (guaranteed), so staleness is only a catastrophic
- * backstop — e.g. the onComplete handler itself failing. Generous on purpose:
+ * backstop, e.g. the onComplete handler itself failing. Generous on purpose:
  * a pool job (retries included) can legitimately run for several minutes, and
  * a premature "stale" verdict makes a concurrent reconcile double-enqueue.
  * Exported so callers like `scheduleMissingContent` can decide whether to
@@ -96,21 +106,72 @@ const GOOGLE_FALLBACK_RETRY = {
 } as const;
 
 /**
+ * Would `claimLlmTranslationIfAvailable` at `priority` return null against this
+ * claim? The read-only mirror of that function's fresh-vs-takeover rule, split
+ * out so the two can't drift. A fresh claim blocks, EXCEPT a background claim
+ * checked at interactive priority (the takeover case, which would write).
+ */
+function llmClaimBlocksPriority(
+  claim: Doc<'llmTranslationClaims'>,
+  priority: LlmPriority | undefined,
+): boolean {
+  const fresh = isClaimFresh(claim);
+  const takeover =
+    fresh && claim.priority === 'background' && priority !== 'background';
+  return fresh && !takeover;
+}
+
+/**
+ * True when a claim exists that `claimLlmTranslationIfAvailable` at `priority`
+ * would respect (return null against). Used by the probe path in
+ * `scheduleTranslationForLanguage`: a background-held slot probed at
+ * interactive priority must classify as NEEDY, because the real run would take
+ * the claim over (cancel the warm job, re-enqueue interactively), and that is a
+ * write. A priority-blind check would report it handled and leave the user
+ * waiting out `llmWarmPool`'s queue.
+ */
+export async function hasBlockingLlmClaim(
+  ctx: QueryCtx | MutationCtx,
+  textId: Id<'texts'>,
+  targetLanguage: string,
+  priority: LlmPriority | undefined,
+): Promise<boolean> {
+  const existing = await getLlmClaim(ctx, textId, targetLanguage);
+  return existing !== null && llmClaimBlocksPriority(existing, priority);
+}
+
+/**
  * Atomically check-and-insert an LLM translation claim. Returns the new claim's
  * `_id` iff the caller acquired the claim (and should enqueue the job), or null
  * when a fresh claim already holds the slot. Stale claims (older than
  * CLAIM_STALE_MS) are reclaimed.
+ *
+ * One exception to "fresh claim wins", mirroring `claimTtsIfAvailable`: an
+ * interactive caller takes over a fresh claim held at priority 'background'.
+ * The warmup translates exactly the texts a new user hits during onboarding,
+ * so this collision is the normal path, not an edge case, and without takeover
+ * the user's request would no-op and then wait out the low-parallelism warm
+ * pool. The takeover cancels the warm job (a queued one dies; one already
+ * mid-run finishes, but the caller's enqueue re-stamps `workId` in this same
+ * transaction, so the superseded job's ownership-gated completion can't release
+ * the new claim). Background callers never take over anything.
  */
 export async function claimLlmTranslationIfAvailable(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   targetLanguage: string,
+  priority?: LlmPriority,
 ): Promise<Id<'llmTranslationClaims'> | null> {
   const existing = await getLlmClaim(ctx, textId, targetLanguage);
 
   if (existing) {
-    if (isClaimFresh(existing)) {
+    if (llmClaimBlocksPriority(existing, priority)) {
       return null;
+    }
+    // Not blocking = stale, or a fresh background claim this caller takes
+    // over. Only the takeover has a live warm job to cancel.
+    if (isClaimFresh(existing) && existing.workId !== undefined) {
+      await llmWarmPool.cancel(ctx, existing.workId as WorkId);
     }
     await ctx.db.delete(existing._id);
   }
@@ -119,6 +180,7 @@ export async function claimLlmTranslationIfAvailable(
     textId,
     targetLanguage,
     claimedAt: Date.now(),
+    priority,
   });
 }
 
@@ -150,10 +212,31 @@ const llmJobArgsValidator = v.object({
   preferredRegionVariant: v.optional(v.string()),
   // Translation-only mode: forwarded to `storeTranslationAndScheduleTTS` so
   // the landing translation does NOT auto-enqueue TTS. Set by the collection
-  // preview (`requestPreviewTranslations`) — audio there is generated only on
+  // preview (`requestPreviewTranslations`), audio there is generated only on
   // an explicit audio-icon click, or by the normal ensure path once the text
   // becomes a card.
   skipTts: v.optional(v.boolean()),
+  // TTS priority, forwarded to `storeTranslationAndScheduleTTS` so the audio
+  // this translation triggers lands in the tier the content was requested at
+  // (warm sweeps pass 'background'). See ttsPriorityValidator.
+  priority: v.optional(ttsPriorityValidator),
+  // Tier THIS translation runs at, as opposed to `priority` above, which is
+  // about the audio it triggers. Read only by `enqueueLlmTranslation`, to pick
+  // the pool and to stamp the claim; the worker itself makes no scheduling
+  // decisions, so it is deliberately NOT forwarded into the worker's args.
+  // The Google fallback reads its copy from the completion context below.
+  // See llmPriorityValidator.
+  llmPriority: v.optional(llmPriorityValidator),
+  // Wording a user typed when manually editing a curriculum card's
+  // translation, forwarded to the prompt as a fenced, sanitized
+  // <user_suggested_translation> hint. Set only by
+  // `suggestCurriculumFixesForEdit` (features/scheduling.ts).
+  //
+  // Deliberately absent from `llmCompletionContextValidator` below: the
+  // Google Translate fallback has nowhere to put a suggestion, so leaving the
+  // field out of the completion context makes it structurally impossible for
+  // one to leak down that path.
+  userSuggestedTranslation: v.optional(v.string()),
 });
 
 /** onComplete context: everything the Google fallback needs to run. */
@@ -166,6 +249,8 @@ const llmCompletionContextValidator = v.object({
   replaceExisting: v.optional(v.boolean()),
   preferredRegionVariant: v.optional(v.string()),
   skipTts: v.optional(v.boolean()),
+  priority: v.optional(ttsPriorityValidator),
+  llmPriority: v.optional(llmPriorityValidator),
 });
 
 type LlmJobArgs = Infer<typeof llmJobArgsValidator>;
@@ -173,7 +258,7 @@ type LlmJobArgs = Infer<typeof llmJobArgsValidator>;
 // Explicit handler param types throughout this file: handlers reference
 // same-file functions via `internal.…` (enqueue → worker → onComplete), and
 // letting TS infer their types through the generated `internal` object is
-// circular — inference collapses to `any` for every handler in the module.
+// circular. Inference collapses to `any` for every handler in the module.
 type PoolRunResult =
   | { kind: 'success'; returnValue: unknown }
   | { kind: 'failed'; error: string }
@@ -181,14 +266,14 @@ type PoolRunResult =
 
 /**
  * Enqueue an LLM translation into the pool and stamp the pool's workId onto
- * the (textId, language) claim — enqueue and claim update commit atomically,
+ * the (textId, language) claim. Enqueue and claim update commit atomically,
  * so the claim is released exactly when THIS job's onComplete runs and a
  * superseded job's completion can't delete a newer owner's claim. The claim's
  * `_id` also rides along in the worker args (`claimId`) as the single-writer
  * token for the eventual `storeTranslationAndScheduleTTS` write.
  *
  * No-ops when a live pool job already owns the claim (fresh + foreign
- * workId) — see the guard below.
+ * workId), see the guard below.
  *
  * The caller is expected to hold the claim already (via
  * `claimLlmTranslationIfAvailable`, usually in the same transaction).
@@ -209,7 +294,11 @@ export const enqueueLlmTranslation = internalMutation({
       return null;
     }
 
-    const workId: string = await llmPool.enqueueAction(
+    // Priority = pool choice: interactive jobs go to llmPool, warm sweeps to
+    // the low-parallelism llmWarmPool (see workpools.ts). Both pools share
+    // onLlmTranslationComplete, so claim lifetime is identical either way.
+    const pool = args.llmPriority === 'background' ? llmWarmPool : llmPool;
+    const workId: string = await pool.enqueueAction(
       ctx,
       internal.features.llmTranslationQueue.processLlmTranslationForCard,
       {
@@ -223,6 +312,8 @@ export const enqueueLlmTranslation = internalMutation({
         claimId: claim?._id,
         preferredRegionVariant: args.preferredRegionVariant,
         skipTts: args.skipTts,
+        priority: args.priority,
+        userSuggestedTranslation: args.userSuggestedTranslation,
       },
       {
         onComplete:
@@ -236,6 +327,8 @@ export const enqueueLlmTranslation = internalMutation({
           replaceExisting: args.replaceExisting,
           preferredRegionVariant: args.preferredRegionVariant,
           skipTts: args.skipTts,
+          priority: args.priority,
+          llmPriority: args.llmPriority,
         },
       },
     );
@@ -262,7 +355,7 @@ export const processLlmTranslationForCard = internalAction({
   args: llmJobArgsValidator.fields,
   returns: v.null(),
   handler: async (ctx: ActionCtx, args: LlmJobArgs) => {
-    // Read metadata off the texts row — the worker is the single source of
+    // Read metadata off the texts row. The worker is the single source of
     // truth for "what speaker/addressee/referent fields land in the prompt".
     const text = await ctx.runQuery(
       internal.features.llmTranslationQueue.getTextRowForTranslation,
@@ -286,7 +379,7 @@ export const processLlmTranslationForCard = internalAction({
     // Variant pin: prefer (a) the regionVariant already persisted on the
     // existing translation row, then (b) the one captured before a sweep
     // deleted the row (`preferredRegionVariant`), then (c) a fresh
-    // deterministic pick — so a regeneration can never flip the card's
+    // deterministic pick, so a regeneration can never flip the card's
     // dialect out from under existing audio.
     let mixed: ReturnType<typeof resolveMixedVariant> = null;
     if (isMixedLanguage(args.targetLanguage)) {
@@ -314,7 +407,7 @@ export const processLlmTranslationForCard = internalAction({
     const regionVariant = mixed?.regionVariant;
 
     const cfg = getTranslationConfigForLanguage(cfgLanguageCode);
-    // Validate the rule override before passing it through — an unknown
+    // Validate the rule override before passing it through. An unknown
     // string would crash `resolveTranslationStages`. Unknown values silently
     // fall back to the language's normal routing.
     const ruleOverride =
@@ -328,7 +421,7 @@ export const processLlmTranslationForCard = internalAction({
     );
     if (cfg.provider !== 'openrouter' || stages.length === 0) {
       // Misrouted: the pool worker should only ever receive openrouter
-      // languages. Deterministic config error — retrying can't help, so
+      // languages. Deterministic config error, retrying can't help, so
       // NonRetryableError sends it straight to onComplete's Google fallback.
       throw new NonRetryableError(
         `[llmTranslationQueue] non-openrouter language reached worker: ` +
@@ -402,7 +495,7 @@ export const processLlmTranslationForCard = internalAction({
     // AND a flag-specific `ruleOverride` ('retranslation_high' for
     // curriculum texts, 'retranslation_custom' for user-created texts).
     // A future caller that sets `replaceExisting` for some other reason
-    // — e.g. a model-swap migration — must NOT see the "the user flagged
+    // e.g. a model-swap migration. Must NOT see the "the user flagged
     // this as wrong" framing, which would be a lie.
     const FLAG_TRIGGERED_RULES = new Set<string>([
       'retranslation_high',
@@ -444,13 +537,18 @@ export const processLlmTranslationForCard = internalAction({
       formality,
       arcContext,
       previousTranslation,
+      // No gate needed, unlike previousTranslation: this arrives only from
+      // `suggestCurriculumFixesForEdit`, which sets it exactly when the
+      // "a user thinks this is wrong" framing is true. buildPrompt sanitizes
+      // it before it reaches the model.
+      userSuggestedTranslation: args.userSuggestedTranslation,
     } as const;
 
     // Run each stage of the resolved translation rule in order. The first
     // success wins; on truncated / empty / HTTP error we try the next
     // fallback. Track which stage produced the winning result so it can be
-    // persisted as `translationSource`. If the whole chain fails, THROW —
-    // the pool retries this job with backoff, and after the last attempt
+    // persisted as `translationSource`. If the whole chain fails, THROW.
+    // The pool retries this job with backoff, and after the last attempt
     // onComplete schedules Google Translate as the final safety net.
     let result: Awaited<ReturnType<typeof translateTextWithLLM>> | null = null;
     let winningStage: (typeof stages)[number] | null = null;
@@ -469,7 +567,7 @@ export const processLlmTranslationForCard = internalAction({
       if (stage.samples) {
         // Best-of-N stage: several candidate calls + possibly a judge, each
         // reported as its own generation event. `suspect_hidden_reasoning`
-        // flags calls whose output-token count dwarfs the visible text — the
+        // flags calls whose output-token count dwarfs the visible text. The
         // tell for providers that ignore `reasoning: {enabled: false}` and
         // silently bill thinking tokens (observed on Luna's Azure endpoints
         // during the Aug 2026 eval).
@@ -477,7 +575,7 @@ export const processLlmTranslationForCard = internalAction({
         // Capture outside the closure: the `stage.samples` narrowing from
         // the enclosing if doesn't survive into the callback.
         const sampleTotal = stage.samples.total;
-        // Independent captures — fire together instead of serializing up to
+        // Independent captures. Fire together instead of serializing up to
         // N+1 awaited PostHog writes.
         await Promise.all(bo.telemetryList.map(async (t) => {
           const visibleTokenEstimate =
@@ -536,7 +634,7 @@ export const processLlmTranslationForCard = internalAction({
             traceId: result.telemetry.generationId,
             isError: !result.ok,
             error: result.ok ? undefined : result.reason,
-            // Reused by every user who reaches this sentence — see the
+            // Reused by every user who reaches this sentence. See the
             // attribution note on `captureGeneration`.
             sharedContent: true,
             extra: stageExtra,
@@ -630,6 +728,7 @@ export const processLlmTranslationForCard = internalAction({
         // enqueued under has been reclaimed by a newer job mid-flight.
         expectedClaimId: args.claimId,
         skipTts: args.skipTts,
+        priority: args.priority,
       },
     );
     return null;
@@ -646,7 +745,7 @@ export const processLlmTranslationForCard = internalAction({
  *   Google Translate fallback and re-point the claim at the fallback job, so
  *   a concurrent `scheduleMissingContent` can't route the same (textId, lang)
  *   through the LLM again mid-fallback. The fallback fires ONLY while this
- *   job still owns the claim — a superseded job spawning one would race the
+ *   job still owns the claim: a superseded job spawning one would race the
  *   current owner's write and duplicate provider spend.
  */
 export const onLlmTranslationComplete = internalMutation({
@@ -693,7 +792,11 @@ export const onLlmTranslationComplete = internalMutation({
       targetLanguage: context.targetLanguage,
       error: result.error,
     });
-    const fallbackWorkId: string = await llmPool.enqueueAction(
+    // Stay on the tier the LLM attempt ran at: a warm translation's fallback
+    // must not jump onto the interactive pool.
+    const fallbackPool =
+      context.llmPriority === 'background' ? llmWarmPool : llmPool;
+    const fallbackWorkId: string = await fallbackPool.enqueueAction(
       ctx,
       internal.features.decks.processTranslationForCard,
       {
@@ -705,6 +808,7 @@ export const onLlmTranslationComplete = internalMutation({
         replaceExisting: context.replaceExisting,
         preferredRegionVariant: context.preferredRegionVariant,
         skipTts: context.skipTts,
+        priority: context.priority,
         // The claim keeps its _id across the re-point below, so the fallback
         // inherits the same single-writer token.
         claimId: claim._id,
@@ -729,7 +833,7 @@ export const onLlmTranslationComplete = internalMutation({
 
 /**
  * Pool onComplete for the Google fallback (also used by the direct Google
- * path in `scheduleMissingContent`, which holds no claim — the lookup then
+ * path in `scheduleMissingContent`, which holds no claim. The lookup then
  * no-ops).
  *
  * Terminal failure (LLM chain AND Google both failed) deliberately KEEPS the
@@ -773,8 +877,8 @@ export const onGoogleFallbackComplete = internalMutation({
  * Stable male/female pick for legacy rows missing `referentGender`.
  *
  * MUST match the seeding rule of the (since-removed) one-time metadata
- * backfill — `stableCoinFlip(pickSeedKey(doc), 'referent')` in
- * `convex/admin/backfillTextMetadata.ts`, see git history — so a row
+ * backfill. `stableCoinFlip(pickSeedKey(doc), 'referent')` in
+ * `convex/admin/backfillTextMetadata.ts`, see git history, so a row
  * translated pre-backfill and re-translated post-backfill (with a persisted
  * value) lines up on the same gender. The seed key is the row's `externalId`
  * when present (stable across dataset re-uploads), else its `_id`.
@@ -842,7 +946,7 @@ const ARC_WINDOW_FOLLOWING = 3;
 /**
  * Sliding-window arc context. Two bounded indexed range scans (≤ 5 + ≤ 3
  * documents) against `by_collection_arcId_and_rank`. Returns sentences in
- * chronological (collectionRank ASC) order — the target's neighbors but not
+ * chronological (collectionRank ASC) order. The target's neighbors but not
  * the target itself, which the caller wraps with `<target>` in the prompt.
  */
 export const getArcWindowForText = internalQuery({

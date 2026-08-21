@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { dismissConsent, dismissTour, expectSignedIn } from './helpers';
 
 /**
- * Free Study — the writing face of free play (chromium-serial: flips the
+ * Free Study. The writing face of free play (chromium-serial: flips the
  * shared user's review mode; restored at the end of each test).
  *
  * On home, the third start button is mode-dependent: Radio in Shadowing
@@ -38,7 +38,7 @@ async function setHomeReviewMode(page: Page, mode: 'audio' | 'full') {
 test.describe('free study (writing face of free play)', () => {
   test.afterEach(async ({ page }) => {
     // Restore the shared fixture user for downstream specs: review mode back
-    // to Shadowing, AND schedulingMode back to 'learnAndReview' — starting a
+    // to Shadowing, AND schedulingMode back to 'learnAndReview', starting a
     // free-play session persisted 'radio' to courseSettings, which otherwise
     // leaves the next spec's direct /app/learn visit in Radio mode with no
     // rating buttons (broke learning-journey). Clicking Learn & Review is the

@@ -5,12 +5,12 @@
  *    mocked data) with Playwright at device resolution.
  * 2. Composes FIVE style series for the App Store (1320×2868 each) so they
  *    can be compared side by side:
- *      classic   — full device in frame, caption on top (safe baseline)
- *      zoom      — oversized device cropped at the bottom → much larger UI
- *      panorama  — continuous background + connector line spanning all five
+ *      classic: full device in frame, caption on top (safe baseline)
+ *      zoom: oversized device cropped at the bottom → much larger UI
+ *      panorama: continuous background + connector line spanning all five
  *                  frames, tilted devices with neighbors peeking in
- *      minimal   — no device frame, screenshot full-bleed under a caption band
- *      cards     — the logo's stacked-flashcards motif: the phone as the
+ *      minimal: no device frame, screenshot full-bleed under a caption band
+ *      cards: the logo's stacked-flashcards motif: the phone as the
  *                  front card of a fanned pile in the logo's colors
  *    Design grounding (2026 ASO guidance): first 1–3 frames decide installs,
  *    captions must be huge and outcome-framed, cropped/zoomed devices beat
@@ -233,7 +233,7 @@ function composeZoom(ctx: ComposeCtx): string {
 }
 
 /**
- * panorama: one continuous scene sliced into five frames — a background
+ * panorama: one continuous scene sliced into five frames. A background
  * gradient and a dashed connector line run through all of them, neighbor
  * devices peek in at the edges. Every frame still carries its own caption.
  */
@@ -279,7 +279,7 @@ function composePanorama(ctx: ComposeCtx): string {
   </body></html>`;
 }
 
-/** minimal: no bezel — the app itself, full-bleed under a caption band. */
+/** minimal: no bezel. The app itself, full-bleed under a caption band. */
 function composeMinimal(ctx: ComposeCtx): string {
   return `<!DOCTYPE html><html><head><style>${PAGE_BASE(ctx.width, ctx.height)}
     body { ${DARK_BG} display:flex;flex-direction:column; }
@@ -293,7 +293,7 @@ function composeMinimal(ctx: ComposeCtx): string {
 }
 
 /**
- * cards: the logo's own motif — the phone is the front card of a stacked
+ * cards: the logo's own motif. The phone is the front card of a stacked
  * flashcard pile, with the logo's amber and orange cards fanned out behind
  * it. The headline accent dot cycles the stack's colors across the series.
  */

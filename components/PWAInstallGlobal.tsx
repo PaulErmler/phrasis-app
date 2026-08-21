@@ -21,7 +21,7 @@ export function PWAInstallGlobal() {
     // `appinstalled` on window regardless of where the install started (our
     // dialog, the omnibox icon, the browser menu). Pairs with
     // `pwa_install_prompted` to give the dialog a conversion rate. iOS never
-    // fires it — Safari installs stay invisible, which is a platform limit.
+    // fires it. Safari installs stay invisible, which is a platform limit.
     const onInstalled = () => capture(CLIENT_EVENTS.PWA_INSTALLED);
     window.addEventListener('appinstalled', onInstalled);
     return () => window.removeEventListener('appinstalled', onInstalled);

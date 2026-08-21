@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Stats smoke — visits /app/stats and verifies that either a chart or the
+ * Stats smoke. Visits /app/stats and verifies that either a chart or the
  * empty-state mounts. Charts are rendered with Recharts/SVG, so we look
  * for an svg or a "no data" copy.
  */

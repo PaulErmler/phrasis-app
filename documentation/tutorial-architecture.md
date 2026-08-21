@@ -1,4 +1,4 @@
-# Tutorial System Architecture
+# Tutorial system architecture
 
 This document describes the implemented tutorial system, how it works, how to modify existing tutorials, and how to add new ones.
 
@@ -6,31 +6,44 @@ This document describes the implemented tutorial system, how it works, how to mo
 
 ## Overview
 
-The tutorial system uses [driver.js](https://driverjs.com/) to guide users through the app after onboarding. Tutorials are:
+The teaching layer uses [driver.js](https://driverjs.com/) and has two parts
+(since 2026-08, when the onboarding wizard stopped embedding a tutorial
+lesson):
 
-- **Declarative** — each tutorial is a list of `DriveStep` objects in its own file
-- **Persistent** — completion state is stored in `userSettings.completedTutorials` (Convex) and cached in localStorage (`phrasis_completed_tutorials`) to avoid a database call on every load once tutorials have run
-- **Prerequisite-aware** — a tutorial can require another to be completed first
-- **Auto-triggered** — the `useTutorial` hook starts a tutorial automatically when conditions are met
+1. **Tours** (`useTutorial`). Multi-step walkthroughs registered in
+   `registry.ts`. Only `home_tour` remains; the review-mode tours were
+   retired in favour of the tips below.
+2. **Learning-mode tips** (`useMilestoneTips`). One-time popovers inside
+   the real learning session: an intro walkthrough on the first card
+   (persisted PER CONCEPT so switching review modes never re-explains
+   shared concepts) and milestone tips gated on lifetime reviews
+   (card actions @2, chat @5, word tap @8, try-the-other-mode @11,
+   settings @15). A veteran guard silently retires all tips for users whose
+   lifetime review count is already far past the thresholds.
+
+Shared traits:
+
+- **Persistent.** Completion state is stored in `userSettings.completedTutorials` (Convex) and cached in localStorage (`phrasis_completed_tutorials`) to avoid a database call on every load once tutorials have run (shared plumbing: `useCompletedTutorials` in `use-tutorial.ts`)
+- **Prerequisite-aware.** A tour can require another to be completed first
+- **Auto-triggered.** The hooks start automatically when conditions are met
 
 ---
 
-## File Structure
+## File structure
 
 ```
 lib/tutorials/
-├── types.ts               — TutorialDefinition / TutorialFactory / TranslateFn types
-├── tour-step.ts           — tourStep() helper: builds a DriveStep from an i18n key prefix
-├── registry.ts            — Central registry; re-exports TUTORIAL_IDS from convex/features/tutorialIds.ts
-├── use-tutorial.ts        — React hook that manages lifecycle
-├── home-tour.ts           — Home screen overview tour
-├── audio-review-tour.ts   — Audio review learning mode tour
-└── full-review-tour.ts    — Full review learning mode tour
+├── types.ts               # TutorialDefinition / TutorialFactory / TranslateFn types
+├── tour-step.ts           # tourStep() helper: builds a DriveStep from an i18n key prefix
+├── registry.ts            # Central registry (tours only); re-exports TUTORIAL_IDS
+├── use-tutorial.ts        # Tour lifecycle hook + shared useCompletedTutorials
+├── use-milestone-tips.ts  # One-time learning-mode tips (intro concepts + milestones)
+└── home-tour.ts           # Home screen overview tour
 ```
 
 ---
 
-## Core Concepts
+## Core concepts
 
 ### TutorialDefinition (`types.ts`)
 
@@ -43,25 +56,26 @@ interface TutorialDefinition {
 }
 ```
 
-Tutorials are defined as **factories** (`TutorialFactory = (t: TranslateFn) => TutorialDefinition`) so step titles and descriptions come from `next-intl` — `useTutorial` calls `useTranslations('Tutorial')` and passes `t` through to the factory.
+Tutorials are defined as **factories** (`TutorialFactory = (t: TranslateFn) => TutorialDefinition`) so step titles and descriptions come from `next-intl`. `useTutorial` calls `useTranslations('Tutorial')` and passes `t` through to the factory.
 
 ### Registry (`registry.ts`)
 
 All tutorial factories live in a static `tutorialFactories` record (tutorial ID → factory) inside `registry.ts`. The registry exposes:
 
-- `getTutorial(id, t)` — look up the factory for `id` (own keys only, so prototype keys like `toString` never resolve) and invoke it with a translate function; returns the `TutorialDefinition` (or `undefined` for unknown IDs)
-- `TUTORIAL_IDS` — typed constant object for referencing IDs. It lives in `convex/features/tutorialIds.ts` (single source of truth shared with the backend's `tutorialIdValidator`) and is re-exported by `registry.ts`
+- `getTutorial(id, t)`: look up the factory for `id` (own keys only, so prototype keys like `toString` never resolve) and invoke it with a translate function; returns the `TutorialDefinition` (or `undefined` for unknown IDs)
+- `TUTORIAL_IDS`: typed constant object for referencing IDs. It lives in `convex/features/tutorialIds.ts` (single source of truth shared with the backend's `tutorialIdValidator`) and is re-exported by `registry.ts`
 
 ```typescript
 // convex/features/tutorialIds.ts (re-exported by lib/tutorials/registry.ts)
 export const TUTORIAL_IDS = {
   HOME_TOUR: 'home_tour',
-  AUDIO_REVIEW_INTRO: 'audio_review_intro',
-  FULL_REVIEW_INTRO: 'full_review_intro',
+  // retired tour ids kept valid for historical rows, plus the tip_* ids
+  // used by useMilestoneTips; see the file for the full list
+  ...
 } as const;
 ```
 
-### useTutorial Hook (`use-tutorial.ts`)
+### useTutorial hook (`use-tutorial.ts`)
 
 The main integration point. Call it in any component to auto-trigger a tutorial.
 
@@ -87,7 +101,7 @@ The hook uses an effective completed list: Convex `getCompletedTutorials` when a
 1. `enabled` is `true`
 2. The tutorial is not already in the effective completed list
 3. The prerequisite tutorial (if any) is in the effective completed list
-4. Either the Convex query has returned or the localStorage cache has a value (so we don’t start before we know completion state)
+4. Either the Convex query has returned or the localStorage cache has a value (so we don't start before we know completion state)
 
 When Convex returns, the result is written to localStorage. When a tutorial is completed via `completeTutorial`, the mutation runs and the ID is appended to localStorage so the UI stays in sync.
 
@@ -118,7 +132,7 @@ Tutorial completion is stored on the `userSettings` table:
 completedTutorials: v.optional(v.array(v.string()))
 ```
 
-### Mutations & Queries (`convex/features/courses.ts`)
+### Mutations & queries (`convex/features/courses.ts`)
 
 | Endpoint | Type | Purpose |
 |----------|------|---------|
@@ -127,9 +141,9 @@ completedTutorials: v.optional(v.array(v.string()))
 
 ---
 
-## Existing Tutorials
+## Existing tutorials
 
-### Home Tour (`home-tour.ts`)
+### Home tour (`home-tour.ts`)
 
 **ID:** `home_tour`
 **Prerequisite:** none
@@ -137,67 +151,105 @@ completedTutorials: v.optional(v.array(v.string()))
 
 | Step | Element | Description |
 |------|---------|-------------|
-| 1 | *(none — centered popover)* | Welcome message |
+| 1 | *(none, centered popover)* | Welcome message |
 | 2 | `[data-tutorial="collection-carousel"]` | Explains sentence collections |
 | 3 | `[data-tutorial="start-learning"]` | Explains Full Review vs Audio Review (buttons disabled during this step) |
-| 4 | *(none — centered popover)* | Closing message: review difficulty, pick a mode |
+| 4 | *(none, centered popover)* | Closing message: review difficulty, pick a mode |
 
 **Integration:** `components/app/HomeView.tsx` calls `useTutorial(TUTORIAL_IDS.HOME_TOUR)`.
 
-### Audio Review Tour (`audio-review-tour.ts`)
+### Learning-mode tips (`use-milestone-tips.ts`)
 
-**ID:** `audio_review_intro`
-**Prerequisite:** `home_tour`
-**Trigger:** Auto-starts in `LearnView` when `reviewMode === 'audio'` and `state.status === 'reviewing'`.
+**IDs:** `tip_concept_*` (intro concepts) and `tip_card_actions` / `tip_chat`
+/ `tip_word_tap` / `tip_mode_switch` / `tip_settings` (milestones).
+**Trigger:** `LearnView` calls `useMilestoneTips({ enabled, reviewMode, transcribe, … })`
+with `enabled` gated on `state.status === 'reviewing' && !settingsOpen &&
+!isFreePlay && !difficultyDialogOpen` (held back while the one-time
+difficulty-check dialog is up so a popover can't stack on top of it).
 
-| Step | Element | Description |
-|------|---------|-------------|
-| 1 | *(none — centered popover)* | Welcome to Audio Review |
-| 2 | `[data-tutorial="card-content"]` | The card: base and target, optional blur |
-| 3 | `[data-tutorial="target-text-audio"]` | First target text: click to unblur |
-| 4 | `[data-tutorial="rating-buttons"]` | Initial reviews, "Understood" skips them; then Again / Hard / Good / Easy |
-| 5 | `[data-tutorial="settings-button"]` | Audio mode settings (speed, order, auto-advance, blur, etc.) |
-| 6 | `[data-tutorial="chat-button"]` | Chat: grammar, explanations, create cards |
+- The **intro walkthrough** fires on the first card of a mode and shows only
+  concepts not yet persisted: shared concepts (`tip_concept_card`,
+  `tip_concept_autoadd`) appear once ever, mode-specific ones
+  (reveal/audio-controls/rating for Shadowing; shown-translation/input/rating
+  for Writing) per mode. Switching modes later shows a "Switched to …"
+  welcome plus only the new mode's concepts. Concepts can opt out of the
+  Transcribe writing style via `skipWhenTranscribe` (the shown-translation
+  step does: skipped, not persisted, so it still appears if the user later
+  switches to Translate).
+- **Milestone tips** are single popovers gated on
+  `api.features.courses.getLifetimeReviewCount` (the active course's
+  `courseStats.totalRepetitions`, reactive), at most one per card
+  transition, lowest threshold first.
+- **Veteran guard:** if a tip becomes eligible while the lifetime count is
+  already `> 50`, every unseen tip is marked completed silently (no
+  popover, no analytics event). This is what keeps existing users from
+  seeing beginner tips, with no data migration.
+- Popover CSS classes are `phrasis-tip-<id>` (`phrasis-tip-intro_audio` /
+  `phrasis-tip-intro_full` for the intro walkthroughs). E2E helpers map
+  legacy tour ids onto these.
+- Copy lives in the `Tips` namespace of `messages/en.json` / `de.json`.
+- The learn header's Help dialog "restart tutorial" action calls the hook's
+  `restartIntro` (replays the current mode's full intro).
 
-### Full Review Tour (`full-review-tour.ts`)
+### Difficulty check (`useDifficultyCheck.ts`)
 
-**ID:** `full_review_intro`
-**Prerequisite:** `home_tour`
-**Trigger:** Auto-starts in `LearnView` when `reviewMode === 'full'` and `state.status === 'reviewing'`.
+**ID:** `difficulty_check`
+**Trigger:** Before the FIRST auto-add of new cards in the learn view, the
+hook's `pending` signal holds the add (`useLearningMode({ holdAutoAdd })`);
+the `DifficultyCheckDialog` opens when the hold actually intercepts an add.
 
-| Step | Element | Description |
-|------|---------|-------------|
-| 1 | *(none — centered popover)* | Welcome to Full Review |
-| 2 | `[data-tutorial="card-content-full"]` | The card: type translation, get feedback |
-| 3 | `[data-tutorial="base-languages"]` | Base language sentence(s) |
-| 4 | `[data-tutorial="target-input-full"]` | First target input: enter translation |
-| 5 | `[data-tutorial="submit-answer"]` | Submit to get feedback (diff, accuracy) |
-| 6 | `[data-tutorial="rating-buttons"]` | Rate answer: Again, Hard, Good, Easy |
-| 7 | `[data-tutorial="settings-button"]` | Full review settings (target audio, instant proceed, mode switch) |
-| 8 | `[data-tutorial="chat-button"]` | Chat: grammar, explanations, create cards |
+Not a driver.js tour, just a regular dialog whose show-once state rides the
+shared `completedTutorials` mechanism, with the same veteran rule as the
+milestone tips (lifetime reviews past the beginner window retire it
+silently). Skipped entirely, and not marked completed, when the active
+collection isn't a dataset level (custom/chat/legacy CEFR), so the check
+still fires if the user later moves onto one.
 
 ---
 
-## data-tutorial Attributes
+## data-tutorial attributes
 
 These attributes are placed on components to serve as driver.js selectors.
 
+Home (the home tour):
+
 | Attribute | Component | File |
 |-----------|-----------|------|
-| `collection-carousel` | Section wrapper (heading + carousel) | `HomeView.tsx` |
-| `active-collection` | The currently active collection card | `CollectionCarouselUI.tsx` |
+| `collection-carousel` | Section wrapper (heading + carousel) | `SegmentedHomeSection.tsx` |
 | `collection-detail` | Collection detail dialog content | `CollectionDetailDialog.tsx` |
 | `progress-stats` | Progress stats card | `ProgressStatsCard.tsx` |
 | `start-learning` | Learning mode buttons wrapper | `StartLearningButton.tsx` |
+| `learn-and-review` / `learn-new` / `radio-mode` / `free-study-mode` | Individual mode buttons (via the `tutorial:` prop) | `StartLearningButton.tsx` |
+| `review-mode-toggle` | Shadowing↔Writing toggle | `StartLearningButton.tsx` |
+| `due-counts` | Due-count pills | `DueCountsPills.tsx` |
+| `content-source-filter` | Content filter dropdown trigger | `ContentFilterDropdown.tsx` |
+| `projections` | Rotating projection block | `RotatingProjection.tsx` |
+
+Learn view (the in-lesson tips):
+
+| Attribute | Component | File |
+|-----------|-----------|------|
+| `card-flashcard` | Card surface wrapper | `CardShell.tsx` |
+| `base-languages` | Base language texts wrapper | `CardShell.tsx` |
 | `card-content` | Audio review card wrapper | `LearningCardContent.tsx` |
 | `target-text-audio` | First target translation block (click to unblur) | `LearningCardContent.tsx` |
 | `card-content-full` | Full review card wrapper | `FullReviewCardContent.tsx` |
-| `base-languages` | Base language texts wrapper | `CardShell.tsx` |
 | `target-input-full` | First target input wrapper (full review) | `FullReviewCardContent.tsx` |
+| `target-input-and-submit` | First target input + submit row (full review) | `FullReviewCardContent.tsx` |
 | `submit-answer` | Submit-answer button (first target, full review) | `FullReviewCardContent.tsx` |
+| `audio-controls` | Audio controls row | `LearningControls.tsx` |
+| `audio-play` | Play/pause button | `LearningControls.tsx` |
 | `rating-buttons` | Rating buttons row | `LearningControls.tsx` |
-| `chat-button` | Chat open button (mobile) | `LearningControls.tsx` |
+| `undo-restart` | Undo/restart buttons | `LearningControls.tsx` |
+| `chat-button` | Chat open button (mobile) | `LearningMode.tsx` |
 | `settings-button` | Settings button | `LearningHeader.tsx` |
+
+The tips also anchor on selectors outside the `data-tutorial` namespace:
+`[data-coachmark-anchor="card-actions"]` (`CardActionsMenu.tsx`),
+`[data-coachmark-anchor="word-tap"]` (the longest base-language word, tagged
+via `ClickableWords`/`CardShell`), `[data-coachmark-anchor="chat-button-desktop"]`
+(`LearningChatLayout.tsx`), and `[data-testid="first-exposure-answer"]`
+(the shown translation on new cards, `FullReviewCardContent.tsx`).
 
 ---
 
@@ -215,7 +267,7 @@ The driver instance is configured with `stagePadding: 8` and `stageRadius: 8` fo
 
 ---
 
-## How to Add a New Tutorial
+## How to add a new tutorial
 
 ### 1. Create the tour file
 

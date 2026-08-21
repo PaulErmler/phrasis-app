@@ -5,13 +5,17 @@ import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
 import {
-  cardsByState,
-  cardsByDueDate,
   cardsByStateAndDueDate,
-  cardsByOriginStateAndDueDate,
+  TRACK_AGGREGATES,
 } from '../db/stats/cardAggregates';
 import { originsForFilter } from '../lib/collections';
-import { studyContentFilterValidator, type StudyContentFilter } from '../types';
+import {
+  studyContentFilterValidator,
+  reviewModeValidator,
+  type ReviewMode,
+  type StudyContentFilter,
+} from '../types';
+import { studyContextFromSettings } from '../db/reviewLogs';
 import {
   getCourseStats as dbGetCourseStats,
   getTodayInTimezone,
@@ -47,7 +51,7 @@ function isValidYearString(s: string): boolean {
 // ============================================================================
 
 /**
- * Query 1: Small summary data — courseStats, todayStats, hourly distribution, monthly stats.
+ * Query 1: small summary data (courseStats, todayStats, hourly distribution, monthly stats).
  * Loads fast, powers the numbers row, app usage, hourly chart, and line chart (year view).
  */
 export const getStatsPageData = query({
@@ -199,7 +203,7 @@ export const getStatsPageData = query({
 });
 
 /**
- * Query 2: Heavier daily data — heatmap entries + per-language daily stats.
+ * Query 2: Heavier daily data. Heatmap entries + per-language daily stats.
  * Powers the heatmap, line chart (week/month views), and per-language words chart.
  */
 export const getStatsPageDailyData = query({
@@ -509,7 +513,7 @@ export const getSentencesForWord = query({
 
     // The frontend passes a normalized language (e.g. "es"), but userWordTexts
     // stores the raw code from the course (e.g. "es_latam"). Resolve it from
-    // the course's targetLanguages — no extra DB query needed.
+    // the course's targetLanguages, no extra DB query needed.
     const allLangs = [...baseLanguages, ...targetLanguages];
     const lang = allLangs.find(
       (l) => l === args.language || normalizeLanguageCode(l) === args.language,
@@ -548,6 +552,7 @@ export const getSentencesForWord = query({
           sourceText: text.text,
           sourceLanguage: text.language,
           sourceRomanization: text.romanizedText ?? undefined,
+          sourceIpa: text.ipaText ?? undefined,
           userCreated: text.userCreated,
           card: cardDocs[i] ?? null,
         };
@@ -587,7 +592,7 @@ export const getSentencesForWord = query({
 });
 
 // ============================================================================
-// INTERNAL QUERIES — currently unused by the UI but retained for future use
+// INTERNAL QUERIES, currently unused by the UI but retained for future use
 // (e.g. expanded stats views, admin dashboards, data exports).
 // These are internal so they don't pollute the public API surface.
 // ============================================================================
@@ -800,7 +805,14 @@ export const getCollectionLearningProgress = internalQuery({
   },
 });
 
-/** Card distribution across FSRS states (O(log n) via aggregates). */
+/**
+ * Card distribution across FSRS states (O(log n) via aggregates).
+ *
+ * Counted as whole `${deckId}:${state}` namespaces of `cardsByStateAndDueDate`,
+ * which is exactly what a `deckId`-namespaced state aggregate would have held:
+ * the two differ only in whether the due-date bound is applied, and here it
+ * isn't. See `getDueCardCount` for the other half of that equivalence.
+ */
 export const getCardMaturityDistribution = internalQuery({
   args: {},
   handler: async (ctx) => {
@@ -813,16 +825,22 @@ export const getCardMaturityDistribution = internalQuery({
 
     const result: Record<string, number> = {};
     for (const label of STATE_LABELS) {
-      result[label] = await cardsByState.count(ctx, {
-        namespace: deck._id,
-        bounds: { eq: label },
+      result[label] = await cardsByStateAndDueDate.count(ctx, {
+        namespace: `${deck._id}:${label}`,
       });
     }
     return result;
   },
 });
 
-/** Number of cards currently due for review (O(log n) via aggregates). */
+/**
+ * Number of cards currently due for review (O(log n) via aggregates).
+ *
+ * Summed over every state namespace of `cardsByStateAndDueDate` rather than
+ * read from one deck-wide tree. STATE_LABELS is `EXTENDED_STATE_LABELS`, so
+ * `mastered` and `hidden` cards are included exactly as a deck-wide due
+ * aggregate would have included them.
+ */
 export const getDueCardCount = internalQuery({
   args: {},
   handler: async (ctx) => {
@@ -833,12 +851,16 @@ export const getDueCardCount = internalQuery({
     const deck = await getDeckByCourseId(ctx, active.course._id);
     if (!deck) return 0;
 
-    return cardsByDueDate.count(ctx, {
-      namespace: deck._id,
-      bounds: {
-        upper: { key: Date.now(), inclusive: true },
-      },
-    });
+    const dueBounds = { upper: { key: Date.now(), inclusive: true } };
+    const perState = await Promise.all(
+      STATE_LABELS.map((label) =>
+        cardsByStateAndDueDate.count(ctx, {
+          namespace: `${deck._id}:${label}`,
+          bounds: dueBounds,
+        }),
+      ),
+    );
+    return perState.reduce((a, b) => a + b, 0);
   },
 });
 
@@ -853,11 +875,13 @@ async function countDueCardsByState(
   ctx: QueryCtx,
   filter: StudyContentFilter,
   now: number,
+  reviewModeOverride?: ReviewMode,
 ): Promise<{
   new: number;
   learning: number;
   relearning: number;
   review: number;
+  preparingWriting?: boolean;
 } | null> {
   const userId = await getAuthUserId(ctx);
   if (!userId) return null;
@@ -866,11 +890,29 @@ async function countDueCardsByState(
   const deck = await getDeckByCourseId(ctx, active.course._id);
   if (!deck) return null;
 
+  // With separateModeTracking on and the course in Writing mode, the due
+  // queue is the writing track. Count from the matching aggregates so the
+  // home pills and the celebration counts describe the queue the user will
+  // actually be served. The caller may pass its optimistically-updated
+  // reviewMode (same rationale as the explicit `filter` arg: the counts then
+  // flip in the same frame as the Shadowing↔Writing toggle instead of
+  // lagging the settings round-trip); separateModeTracking itself is
+  // server-owned and always read from settings. `face` comes from the same
+  // resolution so the preparingWriting gate below can tell Free Study apart
+  // from the due queue.
+  const settings = await getCourseSettings(ctx, active.course._id);
+  const { face, track } = studyContextFromSettings(
+    settings,
+    reviewModeOverride,
+  );
+  const { state: stateAggregate, originState: originStateAggregate } =
+    TRACK_AGGREGATES[track];
+
   const dueBounds = { upper: { key: now, inclusive: true } };
 
   const countState = async (state: string): Promise<number> => {
     if (filter === 'both') {
-      return cardsByStateAndDueDate.count(ctx, {
+      return stateAggregate.count(ctx, {
         namespace: `${deck._id}:${state}`,
         bounds: dueBounds,
       });
@@ -878,7 +920,7 @@ async function countDueCardsByState(
     const origins = originsForFilter(filter);
     const counts = await Promise.all(
       origins.map((origin) =>
-        cardsByOriginStateAndDueDate.count(ctx, {
+        originStateAggregate.count(ctx, {
           namespace: `${deck._id}:${origin}:${state}`,
           bounds: dueBounds,
         }),
@@ -899,6 +941,24 @@ async function countDueCardsByState(
     learning: learningCount,
     relearning: relearningCount,
     review: reviewCount,
+    // The writing aggregates are filled by the asynchronous enable-time seed,
+    // so until it finishes these counts describe only the already-seeded
+    // prefix. Near-zero at the start on a large deck. Flag that rather than
+    // report a confident 0/0/0/0, which reads as "nothing to study" when the
+    // queue is merely still being built. (getCardForReviewEmptyReason reports
+    // the same state as 'preparing_writing'.)
+    //
+    // `face === null` is load-bearing, exactly as in that query's gate:
+    // schedulingTrackFromSettings ignores schedulingMode, so Free Study
+    // (radio + Writing) also resolves to track 'writing', but free play
+    // serves from the rotation and never reads the writing queue, so flagging
+    // its counts provisional would grey out the pills for a queue the user is
+    // never served.
+    ...(face === null &&
+    track === 'writing' &&
+    settings?.writingSeedDone !== true
+      ? { preparingWriting: true }
+      : {}),
   };
 }
 
@@ -918,6 +978,10 @@ export const getCardCounts = query({
       learning: v.number(),
       relearning: v.number(),
       review: v.number(),
+      // Set while the separateModeTracking writing seed is still filling the
+      // writing aggregates. The counts above are a partial prefix, not a
+      // settled zero. See countDueCardsByState.
+      preparingWriting: v.optional(v.boolean()),
     }),
     v.null(),
   ),
@@ -935,7 +999,7 @@ export const getCardCounts = query({
  * can pass its optimistically-updated filter value and the counts flip in the
  * same frame as the dropdown. `now` is client-supplied per the no-wall-clock
  * query guideline (a stable, minute-quantized value also keeps the query
- * cacheable). A skewed `now` only shifts the caller's own counts — harmless.
+ * cacheable). A skewed `now` only shifts the caller's own counts. Harmless.
  *
  * Semantics mirror `fetchDueCardsWithFilter` (scheduling.ts): 'both' counts
  * everything (including legacy cards without a resolved origin), 'course'
@@ -945,6 +1009,10 @@ export const getFilteredCardCounts = query({
   args: {
     filter: v.optional(studyContentFilterValidator),
     now: v.number(),
+    // Optimistic client value, same contract as `filter`. See
+    // countDueCardsByState. Optional for back-compat (older bundles omit it
+    // and get the settings-derived track).
+    reviewMode: v.optional(reviewModeValidator),
   },
   returns: v.union(
     v.object({
@@ -952,11 +1020,20 @@ export const getFilteredCardCounts = query({
       learning: v.number(),
       relearning: v.number(),
       review: v.number(),
+      // Set while the separateModeTracking writing seed is still filling the
+      // writing aggregates. The counts above are a partial prefix, not a
+      // settled zero. See countDueCardsByState.
+      preparingWriting: v.optional(v.boolean()),
     }),
     v.null(),
   ),
   handler: async (ctx, args) => {
-    return countDueCardsByState(ctx, args.filter ?? 'both', args.now);
+    return countDueCardsByState(
+      ctx,
+      args.filter ?? 'both',
+      args.now,
+      args.reviewMode,
+    );
   },
 });
 
@@ -976,13 +1053,13 @@ function getDateFormatter(timeZone: string): Intl.DateTimeFormat {
 /**
  * Returns the actual word lists for the celebration screen, partitioned into
  * "this session" (highlighted) and "earlier today" (subdued). Words are
- * filtered to the active course's target languages — base languages are the
+ * filtered to the active course's target languages. Base languages are the
  * user's known languages, so they aren't celebrated as new vocabulary.
  *
  * Deduplication: a word is identified by (language, normalized form). If the
  * same word appears multiple times across rows, only the first occurrence is
  * kept. If it appears in both the current session and earlier today, the
- * session bucket wins — earlier-today only ever shows words the session does
+ * session bucket wins. Earlier-today only ever shows words the session does
  * not also contain.
  *
  * Bounded scan: we walk the most-recent userWords for the active course in
@@ -1006,7 +1083,7 @@ export const getNewWordsForCelebration = query({
 
     // userWords' only userId+courseId-scoped indexes also key on language, so
     // iterate the target languages explicitly. Each per-language scan is
-    // bounded — far more than enough to cover a single day at any realistic
+    // bounded. Far more than enough to cover a single day at any realistic
     // pace, with rows older than today being skipped in the dedup loop below.
     const PER_LANG_CAP = 250;
     const perLangRows = await Promise.all(
@@ -1032,7 +1109,7 @@ export const getNewWordsForCelebration = query({
     for (const row of rows) {
       if (!targetLanguages.has(row.language)) continue;
       // Drop anything not from "today" in the user's timezone. Rows are in
-      // desc creation order, but we don't break early — DST edge-cases mean a
+      // desc creation order, but we don't break early. DST edge-cases mean a
       // few stragglers can sit between today and yesterday in row order.
       if (dtf.format(new Date(row._creationTime)) !== todayStr) continue;
       const key = `${row.language}:${row.word}`;
@@ -1045,7 +1122,7 @@ export const getNewWordsForCelebration = query({
           bucket: isSession ? 'session' : 'today',
         });
       } else if (existing.bucket === 'today' && isSession) {
-        // Same word seen later as a session row — promote to session bucket.
+        // Same word seen later as a session row. Promote to session bucket.
         existing.bucket = 'session';
       }
     }

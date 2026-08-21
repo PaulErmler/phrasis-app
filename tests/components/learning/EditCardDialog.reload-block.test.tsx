@@ -7,7 +7,7 @@ import type { Id } from '@/convex/_generated/dataModel';
 import type { CardTranslation } from '@/components/app/learning/types';
 
 /**
- * EditCardDialog registers a reload block while it is open — its draft lives
+ * EditCardDialog registers a reload block while it is open. Its draft lives
  * only in component state, and the dialog can be opened from LibraryView,
  * outside LearnView's blanket block. These tests render the *real* dialog
  * inside the real AppUpdateGate, so the regression they guard is the wiring
@@ -16,7 +16,7 @@ import type { CardTranslation } from '@/components/app/learning/types';
  */
 
 // The only Convex touchpoint is the editCard mutation, which these tests never
-// invoke — the reload block is registered by merely being open.
+// invoke. The reload block is registered by merely being open.
 vi.mock('convex/react', () => ({
   useMutation: () => vi.fn().mockResolvedValue(null),
 }));
@@ -122,8 +122,8 @@ describe('EditCardDialog reload block', () => {
     await renderHarness(true);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-    // A long absence with an update pending would normally reload silently —
-    // the open dialog is the only thing standing in the way.
+    // A long absence with an update pending would normally reload silently.
+    // The open dialog is the only thing standing in the way.
     await goAwayAndReturn(HIDDEN_LONG_ENOUGH_MS);
     expect(reloadMock).not.toHaveBeenCalled();
 
@@ -141,7 +141,7 @@ describe('EditCardDialog reload block', () => {
   });
 
   it('does not block the reload while mounted closed', async () => {
-    // The block must track `open`, not mere presence in the tree — LibraryView
+    // The block must track `open`, not mere presence in the tree. LibraryView
     // keeps the dialog mounted (closed) next to every card row.
     vi.stubGlobal(
       'fetch',

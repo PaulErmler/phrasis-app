@@ -6,7 +6,7 @@ export interface NormalizeOptions {
   ignorePunctuation?: boolean;
 }
 
-/** Every Unicode punctuation category — ASCII marks, the CJK block
+/** Every Unicode punctuation category. ASCII marks, the CJK block
  * (。、「」 at U+3000–303F), full-width ！？, and the Spanish inverted ¿¡.
  * Deliberately not `\p{S}`, which would also eat currency and math symbols. */
 export const PUNCTUATION_RE = /\p{P}/gu;

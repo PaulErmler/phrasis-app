@@ -6,7 +6,7 @@ import { api } from '@/convex/_generated/api';
 /**
  * Client-side gate for admin pages. On reload the Convex client briefly
  * runs queries before the auth token is attached, so gated queries would
- * throw 'Not authorized' — children (and their useQuery calls) must not
+ * throw 'Not authorized'. Children (and their useQuery calls) must not
  * mount until auth is ready AND isAdmin confirms. Server-side requireAdmin
  * remains the real protection.
  */

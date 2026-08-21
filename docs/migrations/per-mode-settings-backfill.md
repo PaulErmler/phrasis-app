@@ -28,23 +28,23 @@ effective value into that mode's field (the settings UI spreads the effective
 map), after which the modes diverge for that field.
 
 The `*Transcribe` / `transcribeAfter*` fields are NOT part of this migration:
-Transcribe shipped after the split, so no user has legacy state there — the
+Transcribe shipped after the split, so no user has legacy state there. The
 `?? *Full` inheritance is the intended default, not a compatibility shim.
 
 New-user defaults (Practice Listening ON, "Only new" = 1) are stamped
 explicitly at courseSettings insert time in `convex/db/courseSettings.ts`
-(`upsertCourseSettings` insert branch) — deliberately NOT via the read-side
+(`upsertCourseSettings` insert branch), deliberately NOT via the read-side
 `DEFAULT_*` constants, which would have flipped existing users.
 
 ## What the migration does
 
 `perModeSettingsBackfill` in `convex/migrations.ts` (built on
-`@convex-dev/migrations` — batched, resumable, state-tracked) walks all
+`@convex-dev/migrations`, so batched, resumable, and state-tracked) walks all
 `courseSettings` docs and stamps, per doc (only where currently `undefined`):
 
 1. Every `*Full` field from the doc's current effective audio value.
 2. `playTargetBeforeBase: false`, `playTargetAfterBase: true`,
-   `targetBeforeOnlyNewReps: 0` — freezing existing users on today's
+   `targetBeforeOnlyNewReps: 0`, freezing existing users on today's
    read-side defaults.
 
 It is idempotent and safely re-runnable (per-field `undefined` guards; user
@@ -93,6 +93,6 @@ removed:
 - Optionally: replace the insert-time stamping of
   `playTargetBeforeBase` / `playTargetAfterBase` / `targetBeforeOnlyNewReps`
   in `convex/db/courseSettings.ts` with flipped `DEFAULT_*` constants
-  (`DEFAULT_PLAY_TARGET_BEFORE_BASE = true`, only-new default 1) — safe only
+  (`DEFAULT_PLAY_TARGET_BEFORE_BASE = true`, only-new default 1), safe only
   because step 2 froze existing users. Never re-run the migration after such
   a flip (it stamps the OLD defaults).

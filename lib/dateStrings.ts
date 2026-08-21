@@ -1,9 +1,9 @@
 /**
  * Pure "YYYY-MM-DD" date-string arithmetic, shared between app code and
- * Convex functions (Convex can import from top-level lib/ — precedent:
+ * Convex functions (Convex can import from top-level lib/, precedent:
  * lib/constants/dailyGoal.ts). All math routes through Date.UTC on the
  * date-string components, so results are immune to the host timezone and
- * DST transitions — same style as convex/lib/dateUtils.ts getNextDay.
+ * DST transitions, same style as convex/lib/dateUtils.ts getNextDay.
  */
 
 const DAY_MS = 86_400_000;

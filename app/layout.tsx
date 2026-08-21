@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     template: '%s | Flexling',
   },
   description:
-    'Vocabulary building made easy. An audio-based flashcard app with a large database of sentences — upload your own or ask AI to create cards.',
+    'Learn a language the way you learned your first. Absorb words in sentences that actually matter to you — type them, import them, or ask AI to create cards.',
   metadataBase: new URL(siteUrl),
   manifest: '/manifest.json',
   icons: {
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Flexling',
     description:
-      'An audio-based flashcard app with a large database of sentences. Upload your own or ask AI to create flashcards — focus on learning instead of preparing cards. Free to start.',
+      'Learn a language the way you learned your first. Absorb words in sentences that actually matter to you. Free to start.',
     url: siteUrl,
     siteName: 'Flexling',
     type: 'website',
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     card: 'summary',
     title: 'Flexling',
     description:
-      'An audio-based flashcard app with a large database of sentences. Upload your own or ask AI to create flashcards — focus on learning instead of preparing cards. Free to start.',
+      'Learn a language the way you learned your first. Absorb words in sentences that actually matter to you. Free to start.',
   },
   appleWebApp: {
     capable: true,
@@ -98,7 +98,7 @@ export default async function RootLayout({
         {/*
           PostHog sits outermost so `usePostHog()` resolves everywhere below,
           including inside the Convex and intl providers. It writes nothing to
-          the device until the banner is answered — see lib/posthog/client.ts.
+          the device until the banner is answered. See lib/posthog/client.ts.
         */}
         <PostHogProvider>
           <ServiceWorkerRegistration />
@@ -109,7 +109,7 @@ export default async function RootLayout({
                 {children}
               </AutumnWrapper>
               <Toaster position="top-center" />
-              {/* Inside NextIntlClientProvider — the banner is translated. */}
+              {/* Inside NextIntlClientProvider. The banner is translated. */}
               <ConsentBanner />
             </Providers>
           </ConvexClientProvider>

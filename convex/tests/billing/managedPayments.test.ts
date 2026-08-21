@@ -7,7 +7,7 @@ import { api } from "../../_generated/api";
 const modules = import.meta.glob("/convex/**/*.ts");
 
 // convex/autumn.ts throws at import when AUTUMN_SECRET_KEY is unset, so the
-// env is stubbed BEFORE the (deliberately dynamic) import — same pattern as
+// env is stubbed BEFORE the (deliberately dynamic) import, same pattern as
 // trialGate.test.ts.
 vi.stubEnv("AUTUMN_SECRET_KEY", "am_sk_test_stub");
 const {
@@ -17,7 +17,7 @@ const {
 
 /**
  * Stripe Managed Payments (merchant of record) is activated by one opaque
- * field forwarded to Stripe — `checkout_session_params.managed_payments`.
+ * field forwarded to Stripe. `checkout_session_params.managed_payments`.
  * Nothing type-checks it end to end and no UI shows it, so the only way a
  * regression surfaces in production is as tax silently no longer being
  * charged, or as a Stripe 400 on every upgrade.
@@ -98,7 +98,7 @@ const paidProduct = {
 /**
  * A real payer's customer payload. NOT `[freeProduct, paidProduct]`: a
  * customer who subscribes to a paid tier no longer holds `free` (verified in
- * the sandbox — documentation/autumn-usage-tracking.md). The earlier fixture
+ * the sandbox, documentation/autumn-usage-tracking.md). The earlier fixture
  * shape masked the cancel-to-Free routing bug: with `free` in `products`,
  * `targetIsHeld` was true and the cancel looked legacy-routed when for real
  * payers it was not.
@@ -117,7 +117,7 @@ const paidProductRecord = {
   properties: { is_free: false },
 };
 
-/** Routes for the upgrade branch — the only one that reaches billing.attach. */
+/** Routes for the upgrade branch. The only one that reaches billing.attach. */
 const upgradeRoutes = {
   "/customers/": { products: [trialingProduct] },
   "/checkout": {
@@ -208,9 +208,9 @@ describe("Managed Payments flag on switchPlanDuringTrial", () => {
     expect(body.redirect_mode).toBe("always");
   });
 
-  it("uses redirect_mode 'always' even with the flag off — never an inline charge", async () => {
+  it("uses redirect_mode 'always' even with the flag off, never an inline charge", async () => {
     // 'if_required' would bill a lapsed subscriber's surviving saved card
-    // directly: no Checkout Session, no confirmation step — and with MoR on,
+    // directly: no Checkout Session, no confirmation step, and with MoR on,
     // a subscription that is silently not merchant-of-record.
     stubAutumn({
       "/customers/": { products: [freeProduct], trials_used: [] },
@@ -273,7 +273,7 @@ describe("attachNewPlan trial policy", () => {
     expect(attachBody().customize).toEqual({ free_trial: null });
   });
 
-  it("refuses a trialing customer — that route is switchPlanDuringTrial", async () => {
+  it("refuses a trialing customer, that route is switchPlanDuringTrial", async () => {
     stubAutumn({ "/customers/": { products: [trialingProduct] } });
     const t = convexTest(schema, modules);
     await expect(
@@ -284,7 +284,7 @@ describe("attachNewPlan trial policy", () => {
     );
   });
 
-  it("refuses an existing payer — that is an in-place subscription update", async () => {
+  it("refuses an existing payer, that is an in-place subscription update", async () => {
     stubAutumn({ "/customers/": payerCustomer });
     const t = convexTest(schema, modules);
     await expect(
@@ -303,7 +303,7 @@ describe("attachNewPlan trial policy", () => {
 
 /**
  * The legacy autumn-js path (convex/autumn.ts `attach`/`checkout`) cannot
- * carry Managed Payments — Autumn's v1.2 handler builds its Stripe client on
+ * carry Managed Payments. Autumn's v1.2 handler builds its Stripe client on
  * a pre-Basil API version. And it isn't just attach: for a card-less
  * customer the v1.2 `/checkout` PREVIEW itself creates the session and
  * autumn-js redirects straight to it. The client routes first purchases to
@@ -322,7 +322,7 @@ describe("legacy-path guard under Managed Payments", () => {
       await expect(
         asUser(t).action(api.autumn[kind], { productId: "pro" }),
       ).rejects.toThrow(/refresh the page/i);
-      // Thrown before anything reached Autumn — only the trial-gate
+      // Thrown before anything reached Autumn, only the trial-gate
       // customer GET may have gone out.
       expect(calls.filter((c) => c.method === "POST")).toHaveLength(0);
     });
@@ -333,7 +333,7 @@ describe("legacy-path guard under Managed Payments", () => {
       });
       const t = convexTest(schema, modules);
       // Downstream the un-guarded call hits the Autumn component, which this
-      // harness doesn't register — all that matters here is that the failure
+      // harness doesn't register. All that matters here is that the failure
       // is NOT the guard's.
       const err = await asUser(t)
         .action(api.autumn[kind], { productId: "pro" })
@@ -367,7 +367,7 @@ describe("legacy-path guard under Managed Payments", () => {
     expect(call?.version).toBe("2.1.0");
   });
 
-  it("routes the payer switch to v2 with the flag off too — no session params", async () => {
+  it("routes the payer switch to v2 with the flag off too, no session params", async () => {
     stubAutumn({
       "/customers/": payerCustomer,
       "/products/ultra": paidProductRecord,
@@ -386,7 +386,7 @@ describe("legacy-path guard under Managed Payments", () => {
     });
     const t = convexTest(schema, modules);
     // Downstream the legacy call hits the Autumn component, which this
-    // harness doesn't register — what matters is that no v2 attach fired.
+    // harness doesn't register. What matters is that no v2 attach fired.
     await asUser(t)
       .action(api.autumn.attach, { productId: paidProduct.id })
       .catch(() => null);
@@ -395,11 +395,11 @@ describe("legacy-path guard under Managed Payments", () => {
     ).toHaveLength(0);
   });
 
-  it("an EXPIRED entry matching the target is not a renew — still reroutes to v2", async () => {
+  it("an EXPIRED entry matching the target is not a renew, still reroutes to v2", async () => {
     // A payer returning to a plan they once held (the old entry lingers as
     // `expired` in the payload) is a cross-plan switch: reading it as a
     // renew would keep the attach on the legacy path, where "no trial" is
-    // silently lost — the 2026-08-09 incident class.
+    // silently lost. The 2026-08-09 incident class.
     stubAutumn({
       "/customers/": {
         products: [
@@ -440,8 +440,8 @@ describe("legacy-path guard under Managed Payments", () => {
   });
 
   it("rejects client-supplied checkoutSessionParams at the validator", async () => {
-    // The component would forward these verbatim onto the Stripe session —
-    // a client could pass managed_payments:{enabled:false} and shift the
+    // The component would forward these verbatim onto the Stripe session.
+    // A client could pass managed_payments:{enabled:false} and shift the
     // sale's tax liability onto us. The public surface must not accept it.
     stubAutumn({
       "/customers/": { products: [freeProduct], trials_used: [] },
@@ -455,9 +455,9 @@ describe("legacy-path guard under Managed Payments", () => {
     ).rejects.toThrow(/checkoutSessionParams/);
   });
 
-  it("rejects productIds at the validator — it would bypass the v2 no-trial routing", async () => {
+  it("rejects productIds at the validator, it would bypass the v2 no-trial routing", async () => {
     // The reroute keys on `productId`; an attach via `productIds` would fall
-    // through to the legacy path, where "no trial" is silently lost — the
+    // through to the legacy path, where "no trial" is silently lost. The
     // exact live incident (2026-08-09) the routing exists to prevent.
     stubAutumn({ "/customers/": payerCustomer });
     const t = convexTest(schema, modules);
@@ -469,7 +469,7 @@ describe("legacy-path guard under Managed Payments", () => {
     expect(calls.filter((c) => c.method === "POST")).toHaveLength(0);
   });
 
-  it("rejects forceCheckout at the validator — a demanded session can never carry MoR", async () => {
+  it("rejects forceCheckout at the validator, a demanded session can never carry MoR", async () => {
     stubAutumn({ "/customers/": payerCustomer });
     const t = convexTest(schema, modules);
     for (const kind of ["attach", "checkout"] as const) {
@@ -488,7 +488,7 @@ describe("legacy-path guard under Managed Payments", () => {
  * The routing decision inside `attach` for customers whose trial is
  * suppressed. The subtlety these pin: a real payer does NOT hold the free
  * plan (sandbox-verified), so "target not held" alone cannot distinguish a
- * cross-plan switch (must go to v2) from a cancel-to-Free (must stay legacy —
+ * cross-plan switch (must go to v2) from a cancel-to-Free (must stay legacy,
  * v2's attach_action has no cancel, and free has no trial to suppress).
  */
 describe("attach routing for trial-suppressed switches", () => {
@@ -499,7 +499,7 @@ describe("attach routing for trial-suppressed switches", () => {
     });
     const t = convexTest(schema, modules);
     // Downstream the legacy call hits the Autumn component, which this
-    // harness doesn't register — what matters is that no v2 attach fired
+    // harness doesn't register. What matters is that no v2 attach fired
     // and the routing consulted the product record.
     await asUser(t)
       .action(api.autumn.attach, { productId: "free" })
@@ -513,7 +513,7 @@ describe("attach routing for trial-suppressed switches", () => {
   it("fails closed when the target's product record cannot be read", async () => {
     // Guessing the route here could either immediate-cancel a paid
     // subscription (v2 on a free target) or hand out a trial (legacy on a
-    // paid target) — refuse instead.
+    // paid target), refuse instead.
     stubAutumn({
       "/customers/": payerCustomer,
       "/products/ultra": { __status: 500, __body: { message: "boom" } },
@@ -537,7 +537,7 @@ describe("attach routing for trial-suppressed switches", () => {
   it("refuses validator-accepted args the v2 reroute cannot forward", async () => {
     // attachViaV2NoTrial sends only productId/options; silently dropping a
     // reward (or entityId, successUrl, …) would report success while the
-    // referral never applies. Nothing in the app sends these — fail loud.
+    // referral never applies. Nothing in the app sends these. Fail loud.
     stubAutumn({
       "/customers/": payerCustomer,
       "/products/ultra": paidProductRecord,
@@ -558,7 +558,7 @@ describe("attach routing for trial-suppressed switches", () => {
 describe("grandfathered free attachments (is_default:false)", () => {
   // Old customers' free-plan rows carry NO default flag on v1.2 (live
   // payload, 2026-08-11). They must still route as FIRST purchases: the
-  // 2026-08-11 incident was exactly this — the flag-less free plan read as
+  // 2026-08-11 incident was exactly this. The flag-less free plan read as
   // a paid plan, the customer was sent down the legacy path, and the
   // cardless preview minted a session the MoR backstop then blocked.
   const grandfatheredFree = {
@@ -597,7 +597,7 @@ describe("grandfathered free attachments (is_default:false)", () => {
 describe("attachNewPlan before the Autumn customer exists", () => {
   it("treats a 404 customer fetch as a brand-new, trial-eligible customer", async () => {
     // A brand-new user's very first checkout can run before any Autumn
-    // customer exists — exactly the flow this action owns. Throwing on the
+    // customer exists. Exactly the flow this action owns. Throwing on the
     // 404 (as any other Autumn error does) would fail every such purchase.
     stubAutumn({
       "/customers/": { __status: 404, __body: { message: "not found" } },
@@ -619,14 +619,14 @@ describe("attachNewPlan before the Autumn customer exists", () => {
 /**
  * The legacy-session backstops behind `guardFirstPurchaseOffLegacyPath`.
  * Autumn's v1.2 endpoints build a Checkout Session whenever they deem the
- * customer cardless — which includes customers whose card was collected on
+ * customer cardless, which includes customers whose card was collected on
  * a MANAGED PAYMENTS session (the trial-start flow): the MoR payment method
  * is not a usable default for new legacy sessions, so even a brand-new
  * trialing customer's next plan click comes back with a session URL that
- * autumn-js would redirect into (a non-MoR sale — live incident,
+ * autumn-js would redirect into (a non-MoR sale, live incident,
  * 2026-08-11).
  *
- * The PREVIEW strips the url — the session-bearing response still carries
+ * The PREVIEW strips the url. The session-bearing response still carries
  * the full dialog payload (probed live 2026-08-11), and the dialog's
  * confirm paths produce MoR-capable sessions. The ATTACH result has no
  * dialog to fall back to, so it refuses instead.
@@ -657,7 +657,7 @@ describe("rejectLegacySessionUnderManagedPayments (attach results)", () => {
     }
   });
 
-  it("is inert while the flag is off — legacy sessions are the normal path there", () => {
+  it("is inert while the flag is off, legacy sessions are the normal path there", () => {
     expect(() =>
       rejectLegacySessionUnderManagedPayments({
         data: { url: "https://checkout.stripe.com/c/pay/x" },
@@ -709,7 +709,7 @@ describe("stripLegacySessionUnderManagedPayments (checkout previews)", () => {
     ).not.toThrow();
   });
 
-  it("is inert while the flag is off — the url is the legitimate legacy redirect", () => {
+  it("is inert while the flag is off, the url is the legitimate legacy redirect", () => {
     const result = {
       data: { url: "https://checkout.stripe.com/c/pay/x" },
       error: null,

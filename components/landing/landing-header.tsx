@@ -32,7 +32,7 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
   }, []);
 
   const navLinks = [
-    { href: '#philosophy', label: t('nav.howItWorks') },
+    { href: '#how', label: t('nav.howItWorks') },
     { href: '#features', label: t('nav.features') },
     { href: '#pricing', label: t('nav.pricing') },
     { href: '#faq', label: t('nav.faq') },

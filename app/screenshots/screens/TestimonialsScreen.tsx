@@ -4,7 +4,7 @@ import { Quote } from 'lucide-react';
 import { TESTIMONIALS } from '../fixtures';
 
 /**
- * "Wall of love" — real user quotes (docs/testimonials.md) styled with the
+ * "Wall of love". Real user quotes (docs/testimonials.md) styled with the
  * app's design tokens. Used as a store screenshot, not an in-app screen.
  * No star ratings: these are community quotes, not store reviews (and Apple
  * flags implied-rating imagery under Guideline 2.3.7).

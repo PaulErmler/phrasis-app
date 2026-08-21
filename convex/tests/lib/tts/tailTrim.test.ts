@@ -37,7 +37,7 @@ function toPcm(samples: Int16Array): Uint8Array {
 const LOUD = 8000; // RMS ≈ 0.24
 const ms = (n: number) => Math.round((n / 1000) * SR); // ms → sample index
 
-describe('analyzeTail — detection', () => {
+describe('analyzeTail: detection', () => {
   it('flags a loud burst after a clear silence gap and cuts inside the gap', () => {
     const s = concat(seg(800, LOUD), seg(250, 0), seg(100, LOUD));
     const { hiccup, cutSample } = analyzeTail(s, SR);
@@ -52,7 +52,7 @@ describe('analyzeTail — detection', () => {
     expect(analyzeTail(s, SR).hiccup).toBe(false);
   });
 
-  it('does NOT clip a quiet (low-energy) word ending — no false gap', () => {
+  it('does NOT clip a quiet (low-energy) word ending, no false gap', () => {
     // A quiet final consonant (just above the silence floor) is bridged into the
     // word, not mistaken for silence + a trailing burst.
     const s = concat(seg(700, LOUD), seg(150, 400));
@@ -72,7 +72,7 @@ describe('analyzeTail — detection', () => {
   });
 });
 
-describe('trimTailHiccup — PCM bytes', () => {
+describe('trimTailHiccup: PCM bytes', () => {
   it('trims the hiccup and returns shorter, even-length PCM', () => {
     const full = concat(seg(800, LOUD), seg(250, 0), seg(100, LOUD));
     const pcm = toPcm(full);

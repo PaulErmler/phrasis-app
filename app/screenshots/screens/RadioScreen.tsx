@@ -16,7 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 
 /**
- * Radio-mode replica: continuous hands-free playback — no rating bar, just
+ * Radio-mode replica: continuous hands-free playback, no rating bar, just
  * the playing card and transport. Sells all-day comprehensible input.
  */
 const QUEUE = [
@@ -100,7 +100,7 @@ export function RadioScreen() {
         </main>
       </div>
 
-      {/* Transport only — radio has no ratings */}
+      {/* Transport only. Radio has no ratings */}
       <div className="relative pb-[max(1rem,var(--safe-bottom))]">
         <div className="border-t">
           <div className="max-w-lg mx-auto px-4 py-4">

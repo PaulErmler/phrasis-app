@@ -55,16 +55,27 @@ export function HomeView({
     // Home stays mounted across tabs (KeepMountedView). Only auto-start
     // when home is actually visible so the overlay doesn't pop over
     // Settings / Library / Learn.
-    enabled: !isHidden,
+    //
+    // Two more gates, both about not burning this one-time tour on a screen
+    // that can't support it. A dismissal marks it complete forever:
+    //   - `hasActiveCourse`: without a course HomeView renders only the
+    //     empty state, so every anchor the tour highlights is absent.
+    //   - `courseSettings != null`: the free-play step is anchored from
+    //     `reviewMode` below, and `usePreloadedQuery` can serve a stale null
+    //     immediately after the onboarding soft nav (see AppDataProvider),
+    //     starting then would show a Writing user the Radio step and
+    //     highlight a button that isn't on screen.
+    enabled: !isHidden && hasActiveCourse && courseSettings != null,
     // Anchors the free-play step to the button that actually renders:
-    // Radio (Shadowing) vs Free Study (Writing).
+    // Radio (Shadowing) vs Free Study (Writing). Matches the face chosen in
+    // StartLearningButton, which sets `data-tutorial` from the same field.
     context: { reviewMode: courseSettings?.reviewMode ?? 'audio' },
   });
 
   useEffect(() => {
     onTutorialReady?.(restartTutorial);
   }, [onTutorialReady, restartTutorial]);
-  // Drives the disabled state of the Radio button on the home screen — radio
+  // Drives the disabled state of the Radio button on the home screen. Radio
   // mode is meaningless on an empty deck. Skipped while HomeView is hidden
   // (e.g. user is mid-LearnView) so the subscription doesn't refire on every
   // radio-mode card advance. While loading we leave the button enabled so the

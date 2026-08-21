@@ -42,7 +42,7 @@ export const convexErrorCode = (error: unknown): string | undefined =>
  * (`assertBillingCurrent` → ConvexError code PAYMENT_PAST_DUE). Handlers
  * swallow this SILENTLY: the error can only occur when `pastDueSince` is
  * already on the quota doc, so the reactive `getMyQuotas` subscription that
- * mounts the payment-overdue dialog is already in flight — a generic error
+ * mounts the payment-overdue dialog is already in flight. A generic error
  * toast or the USAGE_LIMIT upgrade paywall would just flash the wrong
  * surface underneath the block.
  */

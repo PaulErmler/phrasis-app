@@ -42,8 +42,8 @@ interface LearningControlsProps {
   undoDisabled: boolean;
   /**
    * Stepwise back (Left Arrow): revert the last submitted translation if any,
-   * otherwise undo the last review. Returns whether anything was taken back —
-   * the shortcut only consumes the keypress when it acts. The Undo button
+   * otherwise undo the last review. Returns whether anything was taken back.
+   * The shortcut only consumes the keypress when it acts. The Undo button
    * itself stays `onUndo`.
    */
   onBack?: () => boolean;
@@ -56,7 +56,7 @@ interface LearningControlsProps {
   isFullReview?: boolean;
   fullReviewRevealed?: boolean;
   onReveal?: () => void;
-  /** When true, window shortcuts (Space, Enter, arrows, letters, rating keys) are disabled — e.g. settings or edit dialog open. */
+  /** When true, window shortcuts (Space, Enter, arrows, letters, rating keys) are disabled, e.g. settings or edit dialog open. */
   shortcutsDisabled?: boolean;
   /** Audio review: Enter / ArrowRight reveal all blurred targets, then the same keys advance to the next card. */
   isAudioReview?: boolean;
@@ -109,7 +109,7 @@ export function LearningControls({
 
   /**
    * Restart the card's audio from the top. Shared by the `R` shortcut and the
-   * restart-audio button, which the KeyHint labels as `R` — they must not
+   * restart-audio button, which the KeyHint labels as `R`. They must not
    * diverge. Seeking alone leaves a paused card silent at 0:00, so resume too.
    */
   const restartAudio = useCallback(() => {
@@ -126,8 +126,8 @@ export function LearningControls({
       // Overlays own the keyboard. Radix traps focus inside dialogs and
       // menus, so containment catches the help dialog, the card-actions
       // menu, and any future overlay without each one having to be wired
-      // into `shortcutsDisabled`. The driver.js tour has no focus trap —
-      // it's detected via the body class it sets while active (its own
+      // into `shortcutsDisabled`. The driver.js tour has no focus trap.
+      // It's detected via the body class it sets while active (its own
       // arrow-key navigation keeps working; ← must not also undo a review
       // behind the overlay).
       if (document.body.classList.contains('driver-active')) return;
@@ -140,7 +140,7 @@ export function LearningControls({
         return;
       }
       // No session shortcut is a modifier chord, so none of them may shadow a
-      // browser/system one — Cmd+R (reload), Alt+← / Alt+→ (back/forward),
+      // browser/system one. Cmd+R (reload), Alt+← / Alt+→ (back/forward),
       // Ctrl+Enter, and so on. Guarded once here so it covers Space,
       // Enter/→, ← and the letter/digit shortcuts alike; Shift is excluded
       // because Shift+R (restart card) is a real shortcut.
@@ -166,7 +166,7 @@ export function LearningControls({
         return;
       }
       if (e.key === 'Enter' || e.key === 'ArrowRight') {
-        // Held keys auto-repeat ~30×/s — without this guard a held Enter
+        // Held keys auto-repeat ~30×/s, without this guard a held Enter
         // races through reveal + next across several cards.
         if (e.repeat) return;
         if (
@@ -195,7 +195,7 @@ export function LearningControls({
       }
       if (e.key === 'ArrowLeft') {
         if (!onBack || e.repeat) return;
-        // Only consume the key when back actually acts — on the first card
+        // Only consume the key when back actually acts, on the first card
         // with nothing to undo, ← keeps its default behavior instead of
         // being silently swallowed.
         if (onBack()) e.preventDefault();
@@ -326,7 +326,7 @@ export function LearningControls({
                   data-testid="learn-undo"
                   aria-label={t('actions.undo')}
                   // A disabled button emits no pointer events, so the KeyHint
-                  // tooltip can't open — fall back to the native title there.
+                  // tooltip can't open. Fall back to the native title there.
                   title={
                     showKeyHints && !undoDisabled
                       ? undefined
@@ -408,7 +408,7 @@ export function LearningControls({
             </KeyHint>
             {/* One reveal button, two sources: Writing reveals the answer,
              * Shadowing reveals all blurred targets. Only the handler
-             * differs — the ternary computes it so the JSX can't drift. */}
+             * differs. The ternary computes it so the JSX can't drift. */}
             {(() => {
               const revealHandler =
                 isFullReview && !fullReviewRevealed && onReveal

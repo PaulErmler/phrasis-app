@@ -8,9 +8,9 @@ import { NativeShellRedirect } from '@/components/NativeShellRedirect';
 const siteUrl = process.env.SITE_URL ?? 'https://flexling.com';
 
 export const metadata: Metadata = {
-  title: 'Flexling — Vocabulary Building Made Easy',
+  title: 'Flexling — Learn a language the way you learned your first',
   description:
-    'An audio-based flashcard app with a large database of sentences. Upload your own or ask AI to create flashcards — focus on learning instead of preparing cards. Free to start.',
+    'You didn’t learn your first language from vocabulary lists. Absorb words in sentences that actually matter to you. Free to start — no credit card required.',
   alternates: {
     canonical: '/',
   },

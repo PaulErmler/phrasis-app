@@ -71,7 +71,7 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
   });
   // The pricing table's CTA labels come from usePricingTable's per-customer
   // scenarios, cached in SWR. autumn-js's attach() refetches that cache
-  // internally, but the switchPlanDuringTrial path bypasses attach() — so
+  // internally, but the switchPlanDuringTrial path bypasses attach(), so
   // it must refetch the shared cache itself or the table shows the old
   // scenario (e.g. "Cancel" instead of "Plan Scheduled") until a reload.
   const { refetch: refetchPricingTable } = usePricingTable();
@@ -119,13 +119,13 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
   const isFree = checkoutResult?.product.properties?.is_free;
   const isPaid = isFree === false;
 
-  // A currently-trialing user switching plans keeps their running trial —
-  // confirm routes through the Convex action (which schedules downgrades
+  // A currently-trialing user switching plans keeps their running trial.
+  // Confirm routes through the Convex action (which schedules downgrades
   // at trial end and carries the trial over on immediate switches) instead
   // of a plain attach, which the server-side trial gate rejects. This
-  // includes the Free plan — scheduled at trial end like any downgrade
-  // (Autumn classifies a free/default target as "downgrade" or "cancel")
-  // — and "renew", i.e. re-attaching the trialing plan to un-schedule a
+  // includes the Free plan. Scheduled at trial end like any downgrade
+  // (Autumn classifies a free/default target as "downgrade" or "cancel"),
+  // and "renew", i.e. re-attaching the trialing plan to un-schedule a
   // pending switch. Must mirror the scenarios accepted by
   // convex/billing.ts switchPlanDuringTrial.
   const scenario = checkoutResult.product.scenario;
@@ -211,7 +211,7 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
                   });
                   // Failures come back as an `{ error }` container, not a
                   // throw (both the component path and the server's v2
-                  // no-trial branch) — without this, a failed confirm would
+                  // no-trial branch), without this, a failed confirm would
                   // close the dialog as if it had succeeded.
                   throwOnCheckoutError(
                     await attach({
@@ -224,7 +224,7 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
                 }
                 setOpen(false);
               } catch (e) {
-                // Surface the failure — a silently-reset dialog looks like
+                // Surface the failure. A silently-reset dialog looks like
                 // nothing happened (this hid the trial-gate rejection).
                 capture(CLIENT_EVENTS.CHECKOUT_FAILED, {
                   product_id: checkoutResult.product.id,
@@ -304,7 +304,7 @@ function DueAmounts({
     (item) => item.usage_model === "pay_per_use",
   );
 
-  // Plan switch during a running trial: nothing is charged now — the
+  // Plan switch during a running trial: nothing is charged now. The
   // preview's totals/next_cycle can reflect a phantom fresh trial or an
   // immediate charge that won't happen. Billing starts at the (kept)
   // trial end, at the target plan's own price.
@@ -343,7 +343,7 @@ function DueAmounts({
   }
 
   // For period-end-anchored scenarios the customer's own period end is
-  // the reliable date — Autumn's preview reports next_cycle one year
+  // the reliable date. Autumn's preview reports next_cycle one year
   // early for annual plans (see getCheckoutContent).
   const periodEndAnchored =
     product.scenario === "downgrade" ||

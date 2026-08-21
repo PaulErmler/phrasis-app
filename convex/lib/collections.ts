@@ -74,8 +74,8 @@ export function settledCount(
 
 /**
  * Texts still available to add from a collection (never negative). NOTE:
- * "complete" checks deliberately differ between UI and backend — UI requires
- * `totalTexts > 0`, backend treats an empty collection as complete — so
+ * "complete" checks deliberately differ between UI and backend. UI requires
+ * `totalTexts > 0`, backend treats an empty collection as complete, so
  * completeness stays expressed at the call sites via `settledCount`/this.
  *
  * `totalTexts` must already be the EFFECTIVE total (see
@@ -96,7 +96,7 @@ export function collectionRemaining(
  * `datasetMigration_cutoverUser` bakes into `cardsAdded` (and mirrors into
  * `legacyCarryAdded`) so the user doesn't restart each tier from zero.
  *
- * Every completeness check — backend guards and UI denominators alike — must
+ * Every completeness check. Backend guards and UI denominators alike. Must
  * use this instead of the raw `collections.textCount`. Comparing a carried
  * `settledCount` against the raw count declares a level complete
  * `legacyCarryAdded` texts too early, which is exactly how the home view
@@ -113,7 +113,7 @@ export function effectiveTextCount(
 /**
  * Backend completeness: every text either added or deliberately ignored,
  * measured against the carry-widened total. An empty collection counts as
- * complete so auto-advance skips it — the UI's own predicate additionally
+ * complete so auto-advance skips it. The UI's own predicate additionally
  * requires `totalTexts > 0`, see the note on `collectionRemaining`.
  */
 export function isCollectionComplete(
@@ -203,7 +203,7 @@ export function cardOriginPillFields(collection: Doc<'collections'> | null): {
  *
  * Security-relevant: every endpoint that surfaces or acts on a browse text
  * (mark, preview translation/audio, single add) must apply this exact
- * predicate — see `requireAccessibleText` in features/collections.ts for the
+ * predicate. See `requireAccessibleText` in features/collections.ts for the
  * throwing fetch-and-check wrapper.
  */
 export function canUserAccessCollectionText(

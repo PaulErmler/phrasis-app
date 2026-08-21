@@ -322,7 +322,7 @@ export function CourseLanguageSettings({
         )}
 
         {/* Nested overlays live INSIDE SheetContent so their portal events
-            bubble through this Sheet's React tree — otherwise opening them
+            bubble through this Sheet's React tree, otherwise opening them
             registers as a focus/interaction outside this Sheet and Radix
             dismisses it underneath them. */}
         {paywallOpen && (

@@ -31,8 +31,8 @@ import { useIsNativeApp } from "@/hooks/use-native-app";
  * Split into this thin gate and the dialog proper: the inner component only
  * mounts while the block is active, so (a) its state (`confirmingCancel`,
  * `busy`) starts fresh for every dunning episode instead of a later episode
- * reopening on the destructive confirm step, and (b) `useCustomer()` — a
- * real Autumn customer fetch — never runs for healthy users just because
+ * reopening on the destructive confirm step, and (b) `useCustomer()`. A
+ * real Autumn customer fetch, never runs for healthy users just because
  * the gate is mounted app-wide.
  */
 export default function PaymentOverdueDialog() {
@@ -40,7 +40,7 @@ export default function PaymentOverdueDialog() {
   const quotas = useQuery(api.usage.queries.getMyQuotas);
 
   // `pastDue` is exactly `pastDueSince !== undefined` server-side, so reading
-  // the timestamp is the same gate — and it narrows the type for the
+  // the timestamp is the same gate, and it narrows the type for the
   // "overdue since {date}" copy instead of leaving it to a dead fallback.
   const pastDueSince =
     quotas?.pastDue === true ? quotas.pastDueSince : undefined;
@@ -77,12 +77,12 @@ function PaymentOverdueDialogContent({
 }) {
   const t = useTranslations("PaymentOverdue");
   const locale = useLocale();
-  // Store builds must not link out to Stripe (invoice or billing portal) —
-  // they get contact-support instead; the cancel path stays available.
+  // Store builds must not link out to Stripe (invoice or billing portal).
+  // They get contact-support instead; the cancel path stays available.
   const isNative = useIsNativeApp();
   // Same expand (and therefore the same SWR cache key) as the pricing
   // table / paywall / checkout surfaces, so the refetch after a cancel
-  // updates what /app/settings displays — without it the settings page
+  // updates what /app/settings displays, without it the settings page
   // keeps showing the cancelled plan as subscribed until a full reload.
   const { openBillingPortal, refetch } = useCustomer({
     expand: ["trials_used"],
@@ -92,7 +92,7 @@ function PaymentOverdueDialogContent({
   const [busy, setBusy] = useState<"pay" | "portal" | "cancel" | null>(null);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
 
-  // handlePay leaves `busy` set on purpose while the tab navigates away —
+  // handlePay leaves `busy` set on purpose while the tab navigates away,
   // but coming BACK from the Stripe invoice page via the browser's Back
   // button restores this page from bfcache with React state intact, which
   // would leave every button in this hard block disabled forever.

@@ -24,7 +24,7 @@ export type { TtsProvider };
  * `active` gates whether a voice is eligible for selection. Dormant voices
  * stay in VOICE_POOLS (so re-enabling is a one-line flip) but are filtered
  * out of `getVoicesByLanguageCode`. See convex/lib/tts/index.ts for the
- * provider wiring. (Azure TTS was retired in Jul 2026 — its voice pools were
+ * provider wiring. (Azure TTS was retired in Jul 2026, its voice pools were
  * removed with it; Azure Speech remains for STT only.)
  */
 export interface Voice {
@@ -65,7 +65,7 @@ function createChirp3Voice(
  *
  * For languages whose pool spans multiple accents (English: US/GB/AU) the
  * accent can't come from the language code, so the locale is encoded into the
- * apiCode as `"<Name>@<bcp47>"` (e.g. "Kore@en-GB") — mirroring how Google
+ * apiCode as `"<Name>@<bcp47>"` (e.g. "Kore@en-GB"), mirroring how Google
  * embeds the locale in `en-GB-Chirp3-HD-Leda`. The provider in
  * convex/lib/tts/gemini.ts splits on `@`, sends the bare name as the voice, and
  * uses the suffix as the `language_code`. Active by default.
@@ -134,10 +134,10 @@ const CHIRP3_CORE_FEMALES = CHIRP3_STANDARD_FEMALES.slice(0, 4);
 const CHIRP3_CORE_MALES = CHIRP3_STANDARD_MALES.slice(0, 4);
 
 /**
- * MiniMax Speech 2.8 Turbo voices (via OpenRouter — see
+ * MiniMax Speech 2.8 Turbo voices (via OpenRouter, see
  * convex/lib/tts/minimax.ts). The apiCode is the raw MiniMax system voice id;
  * language + dialect are baked into the voice itself (no locale steering).
- * NOTE the ids use a FULLWIDTH opening paren + ASCII closing paren — the
+ * NOTE the ids use a FULLWIDTH opening paren + ASCII closing paren. The
  * all-ASCII form errors upstream (verified live). MiniMax's other Cantonese
  * presets (GentleLady, PlayfulMan, CuteGirl, KindWoman) were skipped as
  * character-flavored; the ProfessionalHost pair are the neutral narrators.
@@ -175,12 +175,12 @@ function buildChirp3Pool(
 // ---------------------------------------------------------------------------
 // Per-language unified voice pools
 //
-// Each entry contains the full curated set — Google Chirp3 voices first (so a
+// Each entry contains the full curated set. Google Chirp3 voices first (so a
 // language can be switched back to `ttsProvider: 'google'` without touching
 // voice config), then any Gemini pools.
 // ---------------------------------------------------------------------------
 
-// English "Mixed" pool — pooled US + GB + AU Chirp3 voices.
+// English "Mixed" pool. Pooled US + GB + AU Chirp3 voices.
 const CHIRP3_EN_MIXED: Voice[] = [
   ...buildChirp3Pool('en-US', 'US'),
   ...buildChirp3Pool('en-GB', 'UK'),
@@ -190,7 +190,7 @@ const CHIRP3_EN_MIXED: Voice[] = [
 export const VOICE_POOLS: Record<string, Voice[]> = {
   // English runs on Gemini (mixed US/GB/AU accents on the default `en`, pinned
   // accent on the dialect codes). Google Chirp3 voices stay listed but go
-  // dormant — the `ttsProvider: 'gemini'` filter excludes them — so a revert
+  // dormant. The `ttsProvider: 'gemini'` filter excludes them, so a revert
   // is a one-line `ttsProvider` flip in lib/languages.ts.
   en: [...CHIRP3_EN_MIXED, ...GEMINI_EN_MIXED],
   en_gb: [...buildChirp3Pool('en-GB', 'UK'), ...GEMINI_EN_GB],
@@ -202,7 +202,7 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   // `getVoicesByLanguageCode` while ttsProvider is gemini) for a one-line revert.
   es: [...GEMINI_CORE, ...buildChirp3Pool('es-ES', 'Spain')],
   es_latam: [...GEMINI_CORE, ...buildChirp3Pool('es-US', 'Latin America')],
-  // Spanish Mixed — accent-tagged Gemini voices (`@es-ES` + `@es-US`, like the
+  // Spanish Mixed. Accent-tagged Gemini voices (`@es-ES` + `@es-US`, like the
   // English accent pools) so the audio-player can pick by the persisted
   // translation `regionVariant` via `getVoiceForLanguageVariant`. The dormant
   // Google Chirp3 pools are kept for revert.
@@ -217,7 +217,7 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   it: [...buildChirp3Pool('it-IT', 'Italy'), ...GEMINI_CORE],
   pt: [...buildChirp3Pool('pt-BR', 'Brazil'), ...GEMINI_CORE],
   // European Portuguese runs on Gemini. Google ships no Chirp3-HD pt-PT voices
-  // (verified against /v1/voices), so there's no Google fallback to list —
+  // (verified against /v1/voices), so there's no Google fallback to list.
   // Gemini is the only pool.
   pt_pt: [...GEMINI_CORE],
   ru: [...buildChirp3Pool('ru-RU', 'Russia', 'core'), ...GEMINI_CORE],
@@ -236,7 +236,7 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   // reinforced by `ttsPromptName: 'Taiwanese Mandarin'`). Azure TTS is retired
   // and Google ships no Chirp3-HD voices for cmn-TW, so Gemini is the only pool.
   zh_traditional: [...GEMINI_CORE],
-  // Cantonese runs on MiniMax (native Cantonese system voices — Gemini has
+  // Cantonese runs on MiniMax (native Cantonese system voices, Gemini has
   // none, and Chirp3-HD misread 唔; see convex/lib/tts/minimax.ts). The
   // Chirp3 yue-HK pool stays listed dormant for a one-line revert. Both
   // script variants share the same audio.
@@ -246,7 +246,7 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   ko: [...buildChirp3Pool('ko-KR', 'Korea'), ...GEMINI_CORE],
   vi: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...GEMINI_CORE],
   // Southern Vietnamese runs on Gemini TTS (vi-VN locale + 'Southern
-  // Vietnamese' named in the prompt — Gemini has no southern locale). The
+  // Vietnamese' named in the prompt, Gemini has no southern locale). The
   // Chirp3 vi-VN pool is listed dormant for a one-line provider revert; it
   // carries no dialect distinction either.
   vi_south: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...GEMINI_CORE],
@@ -263,14 +263,14 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   nl: [...buildChirp3Pool('nl-NL', 'Netherlands'), ...GEMINI_CORE],
   el: [...buildChirp3Pool('el-GR', 'Greece'), ...GEMINI_CORE],
   he: [...buildChirp3Pool('he-IL', 'Israel'), ...GEMINI_CORE],
-  // Jul 2026 expansion wave — all Gemini-only pools (locale pinned via each
+  // Jul 2026 expansion wave. All Gemini-only pools (locale pinned via each
   // language's `geminiBcp47`; no Google Chirp3 pools were verified for these).
   ca: [...GEMINI_CORE],
   hr: [...GEMINI_CORE],
   sl: [...GEMINI_CORE],
   uk: [...GEMINI_CORE],
   sr: [...GEMINI_CORE],
-  // Bulgarian (Aug 2026) — same shape: Gemini-only, locale pinned by `bg-BG`.
+  // Bulgarian (Aug 2026), same shape: Gemini-only, locale pinned by `bg-BG`.
   bg: [...GEMINI_CORE],
   lt: [...GEMINI_CORE],
   lv: [...GEMINI_CORE],
@@ -279,8 +279,8 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   ta: [...GEMINI_CORE],
   te: [...GEMINI_CORE],
   // All Arabic dialects run on Gemini TTS: the global Arabic Gemini voice
-  // (GEMINI_CORE) steered by `geminiBcp47` — `ar-001` for MSA/Saudi/Iraqi/
-  // Levantine and the dedicated `ar-EG` for Egyptian — with each dialect named
+  // (GEMINI_CORE) steered by `geminiBcp47`. `ar-001` for MSA/Saudi/Iraqi/
+  // Levantine and the dedicated `ar-EG` for Egyptian, with each dialect named
   // in the prompt via `ttsPromptName` (lib/languages.ts). The prior Google MSA
   // (`ar-XA`) and Azure Egyptian pools stay listed as a dormant one-line-revert
   // fallback (filtered out by `getVoicesByLanguageCode` while ttsProvider is
@@ -295,7 +295,7 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   fa: [...GEMINI_CORE],
   sw: [...GEMINI_CORE],
   // Tanzanian Swahili runs on Gemini TTS (sw-KE locale + 'Tanzanian Swahili'
-  // named in the prompt — Gemini has no sw-TZ locale).
+  // named in the prompt, Gemini has no sw-TZ locale).
   sw_tz: [...GEMINI_CORE],
 };
 
@@ -304,7 +304,7 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
 // ---------------------------------------------------------------------------
 
 /**
- * Get voices available for synthesis for a language — filtered to the
+ * Get voices available for synthesis for a language. Filtered to the
  * language's currently active TTS provider AND excluding dormant voices.
  * Use `getAllVoicesByLanguageCode` if you need the full curated set
  * across providers (e.g., for a settings UI).
@@ -363,13 +363,13 @@ export function getProviderByApiCode(apiCode: string): TtsProvider | undefined {
  * across languages because callers pass the same resolved value per card.
  *
  * Pass `seed` (typically the text's `_id`) to make the resolution
- * **deterministic** — two concurrent callers for the same text will produce
+ * **deterministic**. Two concurrent callers for the same text will produce
  * the same gender. Without a seed the function falls back to `Math.random()`,
  * which is fine for one-shot creation paths (where the result is stored on
  * insert and never re-flipped) but causes a race for paths that may run
  * multiple times against an already-inserted text (e.g. `scheduleMissingContent`
- * for a text whose `audioSpeakerGender` field hasn't been written yet) —
- * two racing jobs would each flip independently and produce inconsistent
+ * for a text whose `audioSpeakerGender` field hasn't been written yet).
+ * Two racing jobs would each flip independently and produce inconsistent
  * audio rows, triggering an audio-regeneration loop the next time the
  * stored gender is reconciled.
  */
@@ -379,7 +379,7 @@ export function resolveAudioSpeakerGender(
 ): 'male' | 'female' {
   if (speakerGender === 'male' || speakerGender === 'female') return speakerGender;
   if (seed && seed.length > 0) {
-    // FNV-1a — fast and well-distributed for short identifiers like a
+    // FNV-1a. Fast and well-distributed for short identifiers like a
     // Convex `_id`. Last bit picks the gender deterministically.
     let h = 0x811c9dc5;
     for (let i = 0; i < seed.length; i++) {
@@ -407,11 +407,11 @@ export interface SpeakerGenderInput {
  * `<speaker_gender>` tag and the audio voice agree.
  *
  * Three cases (`seed` is the text id, used for a deterministic coin-flip):
- *   1. Definitive `speakerGender` ('male'/'female') — the source of truth; mirror
+ *   1. Definitive `speakerGender` ('male'/'female'): the source of truth; mirror
  *      it into `audioSpeakerGender`, never overwrite `speakerGender`.
- *   2. Custom + neutral/undefined — preserve the LLM's `speakerGender` verdict;
+ *   2. Custom + neutral/undefined: preserve the LLM's `speakerGender` verdict;
  *      only resolve `audioSpeakerGender` (preferring a prior resolution).
- *   3. Premade + neutral/undefined — coin-flip BOTH fields to the same value so
+ *   3. Premade + neutral/undefined: coin-flip BOTH fields to the same value so
  *      the prompt and the voice agree.
  * Prior `audioSpeakerGender` is preserved when present so two runs don't re-roll.
  */

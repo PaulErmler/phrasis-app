@@ -3,7 +3,7 @@
  * bytes. Used for the `audioAssets.spokenTextHash` content key, where a
  * deterministic result in every runtime that touches the key (Convex default
  * runtime mutations, migrations, edge-runtime tests) matters more than raw
- * speed — inputs are sentence-sized.
+ * speed. Inputs are sentence-sized.
  */
 
 // FIPS 180-4 round constants.

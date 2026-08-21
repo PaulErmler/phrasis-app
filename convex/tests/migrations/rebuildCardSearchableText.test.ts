@@ -12,7 +12,7 @@ const modules = import.meta.glob('/convex/**/*.ts');
 // test hook were removed with the decks.ts/migrations.ts dedup).
 
 // The migrateOne logic is exercised directly against a convex-test db (the
-// migrations component itself isn't registered with convex-test — same
+// migrations component itself isn't registered with convex-test, same
 // approach as the other migration suites, which test the extracted patch
 // function).
 

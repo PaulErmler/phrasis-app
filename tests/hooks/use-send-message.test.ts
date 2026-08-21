@@ -153,7 +153,7 @@ describe("useSendMessage payment-overdue handling", () => {
       useSendMessage({ threadId: "t", setStatus, onUsageLimit, onError }),
     );
 
-    // Must resolve — a rethrow here would surface as an unhandled rejection
+    // Must resolve. A rethrow here would surface as an unhandled rejection
     // in callers that fire-and-forget sendMessage.
     await act(async () => {
       await expect(
@@ -176,7 +176,7 @@ describe("useSendMessage payment-overdue handling", () => {
 
   it("still routes USAGE_LIMIT to onUsageLimit with the feature id", async () => {
     // Contrast case: quota exhaustion is recoverable by upgrading, so the
-    // upsell callback must keep firing — the past-due swallow above must not
+    // upsell callback must keep firing. The past-due swallow above must not
     // widen into eating every billing-shaped error.
     mutationMock.mockRejectedValue(
       new ConvexError({ code: "USAGE_LIMIT", featureId: "chat_messages" }),

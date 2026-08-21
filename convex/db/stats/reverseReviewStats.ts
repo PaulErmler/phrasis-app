@@ -15,16 +15,16 @@ import type { StatsReviewMode } from '../../types';
  * Mirror images of `recordReviewStats` / `recordFreePlayStats` for the
  * learn-mode undo feature. Each reversal decrements exactly the counters its
  * counterpart incremented, keyed by the values stored in the review log entry
- * (day key, hour bucket, resolved mode, languages) rather than recomputed —
+ * (day key, hour bucket, resolved mode, languages) rather than recomputed,
  * so an undo after midnight still targets yesterday's rows.
  *
  * Deliberately NOT reversed (the review genuinely happened):
  *   - all timeMs fields (the user really spent that time learning)
  *   - streak / lastActivityDate / freeze fields / activeDays|Weeks|Months
- *   - word tracking (`userWords`, `totalWordCount`, `newWordsCount`) — the
+ *   - word tracking (`userWords`, `totalWordCount`, `newWordsCount`): the
  *     card keeps its `wordsTrackedLanguages` stamp so a re-review can't
  *     double-track either
- *   - `dailyStats.lastCelebratedAtCount` — keeps a re-review from replaying
+ *   - `dailyStats.lastCelebratedAtCount`: keeps a re-review from replaying
  *     an already-shown celebration
  *
  * All decrements clamp at 0 and tolerate missing rows/fields (a stats row can
@@ -39,7 +39,7 @@ import type { StatsReviewMode } from '../../types';
  * convex/tests/features/schedulingUndo.test.ts snapshots every table listed
  * here, runs a review + undo through the real mutations, and fails on any
  * field that changed and is neither restored nor named below. Adding a new
- * stat to the record path therefore forces a decision — reverse it, or add
+ * stat to the record path therefore forces a decision. Reverse it, or add
  * it here explicitly.
  */
 export const UNREVERSED_STAT_FIELDS: Record<string, readonly string[]> = {
@@ -195,7 +195,20 @@ export async function reverseReviewStats(
       ratingCounts = { ...daily.ratingCounts, [rating]: dec(daily.ratingCounts[rating]) };
     }
 
-    const cardStateKey = FSRS_STATE_LABELS[log.prevCard?.fsrsState?.state ?? 0] ?? 'new';
+    // Prefer the bucket stamped at review time: it is the only value that
+    // survives the writing track's lazy-seed path, where the review was
+    // scheduled from a COPY of the shared fsrsState but `prevWriting` records
+    // the true (unset) writing fields that undo has to restore. Re-deriving
+    // there decrements 'new' while the increment landed elsewhere, skewing the
+    // day permanently. The derivation below is the fallback for logs written
+    // before `cardState` existed.
+    const derivedFsrsState =
+      (log.track ?? 'shared') === 'writing'
+        ? log.prevWriting?.writingFsrsState
+        : log.prevCard?.fsrsState;
+    const cardStateIndex =
+      log.statsReversal?.cardState ?? derivedFsrsState?.state ?? 0;
+    const cardStateKey = FSRS_STATE_LABELS[cardStateIndex] ?? 'new';
     const reviewsByCardState = daily.reviewsByCardState
       ? { ...daily.reviewsByCardState, [cardStateKey]: dec(daily.reviewsByCardState[cardStateKey]) }
       : undefined;
@@ -322,7 +335,7 @@ export async function reverseFreePlayStats(
   }
 
   // recordFreePlayStats goes through upsertDailyStats, which bumps reps AND
-  // cardsReviewed for free plays too — mirror both.
+  // cardsReviewed for free plays too. Mirror both.
   const daily = await getDailyStats(ctx, userId, courseId, log.date);
   if (daily) {
     await ctx.db.patch(daily._id, {
@@ -344,7 +357,7 @@ export async function reverseFreePlayStats(
 /**
  * Today's counters after a reversal, matching the shape `reviewCard` returns
  * so the client can sync its local state the same way. Computed for TODAY in
- * the caller's current timezone (not the log's date) — after a day rollover
+ * the caller's current timezone (not the log's date), after a day rollover
  * the reversal targets yesterday's rows and today's counters are unaffected.
  */
 export async function readTodayCounters(
@@ -365,7 +378,7 @@ export async function readTodayCounters(
   const dailyReviewsToday = displayedActiveReviews(daily);
   const dailyTimeMsToday = daily?.timeMs ?? 0;
 
-  // Target-only new-word count — mirrors `recordReviewStats`'s definition of
+  // Target-only new-word count. Mirrors `recordReviewStats`'s definition of
   // `dailyNewWordsToday` (base languages aren't "new vocabulary").
   let dailyNewWordsToday = 0;
   for (const language of new Set(args.targetLanguages)) {

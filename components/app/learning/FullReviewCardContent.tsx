@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/tooltip';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
+import { AnnotationLines } from './AnnotationLines';
 import type { CardOriginPill } from './cardOriginPill';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import {
@@ -19,7 +20,11 @@ import {
   DEFAULT_PLAYBACK_SPEED,
 } from '@/lib/constants/audioPlayback';
 import { DiffDisplay } from './DiffDisplay';
-import { computeAccuracyPair, type AccuracyPair } from '@/lib/textCompare';
+import {
+  computeAccuracy,
+  computeAccuracyPair,
+  type AccuracyPair,
+} from '@/lib/textCompare';
 import { ClickableWords } from './ClickableWords';
 import { useLearningChatToggle } from './LearningChatLayout';
 import {
@@ -104,6 +109,8 @@ interface FullReviewCardContentProps {
   onAccuracyChange?: (summary: WritingAccuracySummary | null) => void;
   bare?: boolean;
   showRomanization?: boolean;
+  /** IPA line toggle (from courseSettings.showIpa; default OFF). */
+  showIpa?: boolean;
   /** Clears submission stack when the reviewed card changes */
   cardId?: Id<'cards'>;
   /**
@@ -185,6 +192,7 @@ export function FullReviewCardContent({
   onAccuracyChange,
   bare = false,
   showRomanization = true,
+  showIpa = false,
   cardId,
   onRegisterRevert,
   firstExposure = false,
@@ -227,7 +235,7 @@ export function FullReviewCardContent({
 
   // `translations` is a fresh array on every render, so keying on the fingerprint
   // rather than the array is what lets the accuracy memo below actually memoize.
-  // Depending on `translations` here is precisely the thing being avoided — the
+  // Depending on `translations` here is precisely the thing being avoided. The
   // disable is load-bearing, not an oversight.
   const targetTranslations = useMemo(
     () => translations.filter((tr) => tr.isTargetLanguage),
@@ -255,7 +263,7 @@ export function FullReviewCardContent({
   const submissionOrderRef = useRef<string[]>([]);
   submissionOrderRef.current = submissionOrder;
   // `inputs` gets a new identity on every keystroke, so the accuracy memo below
-  // re-runs while the learner types the NEXT language — with nothing changed
+  // re-runs while the learner types the NEXT language, with nothing changed
   // about the answers already submitted. Keyed on the actual comparison inputs,
   // so each distinct answer is diffed exactly once. Pure cache (same key always
   // yields the same value), so a StrictMode double render is harmless. Cleared
@@ -291,7 +299,7 @@ export function FullReviewCardContent({
   // gated on `allSubmitted`: the auto-rating needs a running figure as each
   // language lands, and the consumer decides separately when to persist a stat.
   //
-  // Note `ignorePunctuation` is absent from the deps — both variants are always
+  // Note `ignorePunctuation` is absent from the deps, both variants are always
   // computed, so the summary is setting-independent and both stat series can be
   // populated in parallel. The setting only picks which one is acted on.
   const accuracySummary = useMemo<WritingAccuracySummary | null>(() => {
@@ -620,6 +628,7 @@ export function FullReviewCardContent({
         onAudioPlay={onAudioPlay}
         bare={bare}
         showRomanization={showRomanization}
+        showIpa={showIpa}
         highlightEnabled={highlightEnabled}
         flaggedInSession={flaggedInSession}
         activeClip={activeClip}
@@ -641,6 +650,11 @@ export function FullReviewCardContent({
         revealedLanguages={revealedBaseLanguages}
         manuallyRevealedLanguages={manuallyRevealedBase}
         onRevealLanguage={handleRevealBase}
+        // Writing mode's word-tap tip anchor. Audio mode tags its target row
+        // instead (LearningCardContent); here the target row is the answer
+        // and isn't on screen before submit, so the base sentence is the
+        // clickable text the tip is actually about.
+        baseCoachmarkAnchorForLongestWord="word-tap"
       >
         {({ targetTranslations: targets }) => (
           <div className="space-y-4">
@@ -699,6 +713,7 @@ export function FullReviewCardContent({
                   allRevealed={allRevealed}
                   firstExposure={firstExposure}
                   showRomanization={showRomanization}
+                  showIpa={showIpa}
                   ignorePunctuation={ignorePunctuation}
                   highlightEnabled={highlightEnabled}
                   activeClip={activeClip}
@@ -754,6 +769,8 @@ interface TargetLanguageInputProps {
    */
   firstExposure?: boolean;
   showRomanization?: boolean;
+  /** IPA line toggle (from courseSettings.showIpa; default OFF). */
+  showIpa?: boolean;
   ignorePunctuation?: boolean;
   highlightEnabled: boolean;
   activeClip: ButtonPlaybackActive | null;
@@ -798,6 +815,7 @@ function TargetLanguageInput({
   allRevealed = false,
   firstExposure = false,
   showRomanization = true,
+  showIpa = false,
   ignorePunctuation = false,
   highlightEnabled,
   activeClip,
@@ -814,7 +832,7 @@ function TargetLanguageInput({
   const isActive = activeClip?.language === translation.language;
   const t = useTranslations('LearningMode');
   const tChat = useTranslations('Chat');
-  // Nullable — absent outside learning mode (e.g. landing demo); the Discuss
+  // Nullable. Absent outside learning mode (e.g. landing demo); the Discuss
   // button simply doesn't render then.
   const chatContext = useLearningChatToggle();
   const { compositionProps, isComposingEvent } = useImeSafeEnter();
@@ -842,7 +860,7 @@ function TargetLanguageInput({
     }
 
     // A settings change (writing style / target-audio mode) can make an
-    // already-submitted input qualify here while the sheet is open — never
+    // already-submitted input qualify here while the sheet is open, never
     // start audio behind the sheet, and don't queue it for sheet-close.
     if (suppressAutoPlay) {
       autoPlayedRef.current.add(translation.language);
@@ -926,7 +944,7 @@ function TargetLanguageInput({
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // IME users (ja/zh/ko/vi) press Enter to confirm a conversion — that
+    // IME users (ja/zh/ko/vi) press Enter to confirm a conversion. That
     // keystroke is typing, not a submit. See `useImeSafeEnter`.
     if (e.key === 'Enter' && !state.submitted && !isComposingEvent(e)) {
       e.preventDefault();
@@ -962,8 +980,22 @@ function TargetLanguageInput({
     );
   }, [chatContext, state.userText, translation.text, translation.language, tChat]);
 
+  // "Also correct?" exists to dispute an answer the diff marked wrong, at a
+  // displayed 100% there is nothing to dispute, so the button is noise.
+  // `computeAccuracy` is the same rounded score the accuracy footer shows
+  // (including the ignore-punctuation setting), so button and label can't
+  // disagree.
+  const isPerfectAnswer =
+    hasUserText &&
+    computeAccuracy(
+      translation.text,
+      state.userText,
+      translation.language,
+      ignorePunctuation,
+    ) >= 100;
+
   const discussButton =
-    hasUserText && chatContext ? (
+    hasUserText && chatContext && !isPerfectAnswer ? (
       <Button
         type="button"
         variant="ghost"
@@ -991,7 +1023,6 @@ function TargetLanguageInput({
           onButtonStop={onButtonStop}
           speed={speed}
           playSignal={playSignal}
-          wrapAudio
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
           onSpeedCycle={onSpeedCycle}
@@ -1030,11 +1061,12 @@ function TargetLanguageInput({
             className="body-large text-muted-foreground"
           />
         )}
-        {showRomanization && translation.romanization && (
-          <p className="text-xs text-muted-foreground leading-tight">
-            {translation.romanization}
-          </p>
-        )}
+        <AnnotationLines
+          romanization={translation.romanization}
+          ipa={translation.ipa}
+          showRomanization={showRomanization}
+          showIpa={showIpa}
+        />
       </div>
     );
   }
@@ -1054,7 +1086,6 @@ function TargetLanguageInput({
           onButtonStop={onButtonStop}
           speed={speed}
           playSignal={playSignal}
-          wrapAudio
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
           onSpeedCycle={onSpeedCycle}
@@ -1111,11 +1142,12 @@ function TargetLanguageInput({
             {discussButton}
           </div>
         </div>
-        {showRomanization && translation.romanization && (
-          <p className="text-xs text-muted-foreground leading-tight">
-            {translation.romanization}
-          </p>
-        )}
+        <AnnotationLines
+          romanization={translation.romanization}
+          ipa={translation.ipa}
+          showRomanization={showRomanization}
+          showIpa={showIpa}
+        />
       </div>
     );
   }
@@ -1127,7 +1159,7 @@ function TargetLanguageInput({
     >
       {firstExposure ? (
         // First exposure: the answer to copy shares the row with its audio
-        // button (mirrors the audio-mode target-row layout) — the header row
+        // button (mirrors the audio-mode target-row layout), the header row
         // would leave the button floating alone above the sentence.
         <>
           {languageDisplayName && (
@@ -1150,20 +1182,31 @@ function TargetLanguageInput({
                 enabled={highlightEnabled}
                 className="body-large text-muted-foreground"
               />
-              {showRomanization && translation.romanization && (
-                <p className="text-xs text-muted-foreground leading-tight">
-                  {translation.romanization}
-                </p>
+              <AnnotationLines
+                romanization={translation.romanization}
+                ipa={translation.ipa}
+                showRomanization={showRomanization}
+                showIpa={showIpa}
+              />
+            </div>
+            <div className="flex items-center">
+              <AudioButton
+                url={audioUrl}
+                language={translation.language}
+                onPlay={onAudioPlay}
+                onTimeUpdate={onButtonTimeUpdate}
+                onStop={onButtonStop}
+                speed={speed}
+                playSignal={playSignal}
+              />
+              {onSpeedCycle && (
+                <CardSpeedBadge
+                  override={speedOverride}
+                  generalSpeed={generalSpeed}
+                  onCycle={onSpeedCycle}
+                />
               )}
             </div>
-            <AudioButton
-              url={audioUrl}
-              language={translation.language}
-              onPlay={onAudioPlay}
-              onTimeUpdate={onButtonTimeUpdate}
-              onStop={onButtonStop}
-              playSignal={playSignal}
-            />
           </div>
         </>
       ) : (
@@ -1174,10 +1217,11 @@ function TargetLanguageInput({
           onAudioPlay={onAudioPlay}
           onButtonTimeUpdate={onButtonTimeUpdate}
           onButtonStop={onButtonStop}
+          speed={speed}
           playSignal={playSignal}
-          wrapAudio={false}
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
+          onSpeedCycle={onSpeedCycle}
         />
       )}
       <div
@@ -1192,7 +1236,7 @@ function TargetLanguageInput({
           onKeyDown={handleKeyDown}
           {...compositionProps}
           // FSI/PDI-isolate the placeholder: the input's dir follows the
-          // target language, but the placeholder is UI-locale text — for RTL
+          // target language, but the placeholder is UI-locale text, for RTL
           // targets the bidi algorithm would otherwise drag the trailing
           // "..." to the visual start.
           placeholder={`\u{2068}${placeholder}\u{2069}`}
@@ -1228,16 +1272,10 @@ interface TargetRowHeaderProps {
   onAudioPlay?: () => void;
   onButtonTimeUpdate: (language: string, localTime: number) => void;
   onButtonStop: (language: string) => void;
-  /** Effective playback speed; omitted on the input row (AudioButton defaults to 1). */
+  /** Effective playback speed. */
   speed?: number;
   /** Keyboard replay nonce forwarded to the AudioButton (first target only). */
   playSignal?: number;
-  /**
-   * Wrap the audio button in the flex container that also hosts the speed
-   * badge (revealed/submitted rows). The input row renders the bare button
-   * with no badge.
-   */
-  wrapAudio: boolean;
   /** Stored override value, or null when none is stored. */
   speedOverride: number | null;
   /** Course-level general speed for this language. */
@@ -1256,25 +1294,21 @@ function TargetRowHeader({
   onButtonStop,
   speed,
   playSignal,
-  wrapAudio,
   speedOverride,
   generalSpeed,
   onSpeedCycle,
 }: TargetRowHeaderProps) {
-  const audioButton = (
-    <AudioButton
-      url={audioUrl}
-      language={language}
-      onPlay={onAudioPlay}
-      onTimeUpdate={onButtonTimeUpdate}
-      onStop={onButtonStop}
-      speed={speed}
-      playSignal={playSignal}
-    />
-  );
-  const audio = wrapAudio ? (
+  const audio = (
     <div className="flex items-center">
-      {audioButton}
+      <AudioButton
+        url={audioUrl}
+        language={language}
+        onPlay={onAudioPlay}
+        onTimeUpdate={onButtonTimeUpdate}
+        onStop={onButtonStop}
+        speed={speed}
+        playSignal={playSignal}
+      />
       {onSpeedCycle && (
         <CardSpeedBadge
           override={speedOverride}
@@ -1283,8 +1317,6 @@ function TargetRowHeader({
         />
       )}
     </div>
-  ) : (
-    audioButton
   );
   return languageDisplayName ? (
     <div className="flex items-center justify-between">

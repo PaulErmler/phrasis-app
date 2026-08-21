@@ -51,15 +51,15 @@ function fetchRotationByOrigin(
 }
 
 /**
- * The two faces of free play — radio (listening) and freeStudy (writing) —
- * share one round-robin mechanic: no dueDate filter, no FSRS, lowest round
+ * The two faces of free play. Radio (listening) and freeStudy (writing).
+ * Share one round-robin mechanic: no dueDate filter, no FSRS, lowest round
  * counter plays next with a random, re-rolled tiebreak. Each face keeps its
  * OWN per-card rotation fields and indexes so the two shuffles and play
  * counts stay fully independent. Everything face-specific lives in this map;
  * the queue, advance, undo, and content-warming code is shared.
  *
  * Which face is active is derived from `reviewMode` (see `freePlayFace` in
- * convex/types.ts), never stored — free play is a single scheduling mode.
+ * convex/types.ts), never stored. Free play is a single scheduling mode.
  */
 export const FREE_PLAY_MODES = {
   radio: {
@@ -135,7 +135,7 @@ export const FREE_PLAY_MODES = {
         origin,
         take,
       ),
-    // Free study has no listening-limit consumer — a fresh count from 0.
+    // Free study has no listening-limit consumer. A fresh count from 0.
     playCountSeed: (_card: Doc<'cards'>) => 0,
     logSnapshot: (card: Doc<'cards'>) => ({
       prevFreeStudy: {
@@ -158,7 +158,7 @@ export const FREE_PLAY_MODES = {
 } as const;
 
 /**
- * The head of a face's rotation, honouring the study content filter — the
+ * The head of a face's rotation, honouring the study content filter. The
  * single definition of "which cards free play serves next".
  *
  * Both the serving queue (features/scheduling.ts) and the content warmer
@@ -169,8 +169,8 @@ export const FREE_PLAY_MODES = {
  * handed out cards with no pre-generated translation or audio.
  *
  * For a filtered read the per-origin index queries are merged in memory and
- * re-sorted on (counter, orderKey, _creationTime) — the same ordering the
- * single-index path gets for free — then truncated to `take`. Taking `take`
+ * re-sorted on (counter, orderKey, _creationTime), the same ordering the
+ * single-index path gets for free. Then truncated to `take`. Taking `take`
  * from EACH origin before the merge is what makes the truncation safe: the
  * global top-`take` cannot contain a card that wasn't in its own origin's
  * top-`take`.

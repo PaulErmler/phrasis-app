@@ -139,7 +139,7 @@ const getCourseStats = (
       .first(),
   );
 
-describe("features/scheduling — undoLastReview", () => {
+describe("features/scheduling: undoLastReview", () => {
   it("throws unauthenticated; count is 0", async () => {
     const t = convexTest(schema, modules);
     await expect(
@@ -203,7 +203,7 @@ describe("features/scheduling — undoLastReview", () => {
     const { cardId } = await seed(t);
     const asUser = t.withIdentity({ subject: "user_A" });
 
-    // Pre-review 'understood' must NOT count — the "until rated good"
+    // Pre-review 'understood' must NOT count. The "until rated good"
     // strategy only listens to FSRS good/easy.
     await asUser.mutation(api.features.scheduling.reviewCard, {
       cardId,
@@ -213,7 +213,7 @@ describe("features/scheduling — undoLastReview", () => {
     });
     expect((await getCard(t, cardId))?.goodReviewCount).toBeUndefined();
 
-    // 'understood' jumped the card into FSRS review — 'good' counts now.
+    // 'understood' jumped the card into FSRS review, so 'good' counts now.
     await asUser.mutation(api.features.scheduling.reviewCard, {
       cardId,
       rating: "good",
@@ -407,7 +407,7 @@ describe("features/scheduling — undoLastReview", () => {
       expect(card?.schedulingPhase).toBe(expected.schedulingPhase);
     }
 
-    // Depth exhausted — the oldest review's log entry was trimmed away, so
+    // Depth exhausted. The oldest review's log entry was trimmed away, so
     // the very first review can't be undone.
     const res = await asUser.mutation(api.features.scheduling.undoLastReview, {
       timezone: "UTC",
@@ -709,8 +709,8 @@ describe("features/scheduling — undoLastReview", () => {
     const stats = await getCourseStats(t, courseId);
     expect(stats?.totalAccuracySum ?? 0).toBe(0);
     expect(stats?.totalAccuracyCount ?? 0).toBe(0);
-    // The punctuation-split trio must reverse together with the legacy pair —
-    // a stranded sum or count would skew the average permanently.
+    // The punctuation-split trio must reverse together with the legacy pair.
+    // A stranded sum or count would skew the average permanently.
     expect(stats?.totalAccuracyStrictSum ?? 0).toBe(0);
     expect(stats?.totalAccuracyLenientSum ?? 0).toBe(0);
     expect(stats?.totalAccuracyDualCount ?? 0).toBe(0);
@@ -744,7 +744,7 @@ describe("features/scheduling — undoLastReview", () => {
       timezone: "UTC",
     });
 
-    // User B has no active course/stack — nothing to pop, and A's entry
+    // User B has no active course/stack, nothing to pop, and A's entry
     // survives untouched.
     expect(
       await asUserB.query(api.features.scheduling.getUndoableReviewCount, {}),
@@ -760,13 +760,13 @@ describe("features/scheduling — undoLastReview", () => {
   });
 });
 
-describe("features/scheduling — record/reverse drift guard", () => {
+describe("features/scheduling: record/reverse drift guard", () => {
   // Generic mirror check: snapshot every stat table, run a review + undo
   // through the real mutations, and require every field to be back at its
   // pre-review value unless UNREVERSED_STAT_FIELDS (the keep-list exported
   // by reverseReviewStats.ts) names it as deliberately kept. A stat added to
   // recordReviewStats without a matching reversal (or keep-list entry) fails
-  // here — hand-picked field assertions can't catch that.
+  // here. Hand-picked field assertions can't catch that.
   it("undo restores every stat field a review changed, except the documented keep-list", async () => {
     const t = convexTest(schema, modules);
     const { cardId } = await seed(t);
@@ -808,7 +808,7 @@ describe("features/scheduling — record/reverse drift guard", () => {
     const after = await snapshot();
 
     // "Reversed" for a row the review itself created means every counter is
-    // back at zero (recursively — arrays like hourBuckets, nested objects
+    // back at zero (recursively, arrays like hourBuckets, nested objects
     // like reviewsByMode). Strings/booleans on new rows are identity fields
     // (userId, date, week, ...), not counters.
     const isZeroed = (v: unknown): boolean =>
@@ -837,7 +837,7 @@ describe("features/scheduling — record/reverse drift guard", () => {
             continue;
           if (prev) {
             // Reversal may write an explicit zero where the field was absent
-            // before (undefined -> 0, undefined -> {audio:0,full:0}) — that
+            // before (undefined -> 0, undefined -> {audio:0,full:0}), that
             // still counts as restored.
             if (
               JSON.stringify(value) !== JSON.stringify(prev[field]) &&

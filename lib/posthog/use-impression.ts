@@ -8,7 +8,7 @@ import { CLIENT_EVENTS, capture, type ClientEvent } from './events';
  * Fire an event once per transition into `open`, not once per render.
  *
  * The dialogs this is used by re-render whenever an Autumn query settles, so a
- * naive `if (open) capture(...)` inflates the impression count — which is the
+ * naive `if (open) capture(...)` inflates the impression count, which is the
  * denominator of every conversion rate on the monetization dashboard. Edge
  * triggering keeps "shown once" meaning shown once.
  */

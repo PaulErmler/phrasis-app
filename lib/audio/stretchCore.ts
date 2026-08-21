@@ -21,7 +21,7 @@ const BUFFER_SIZE = 4096;
 /**
  * SoundTouchJS's internal `FilterSupport.fillOutputBuffer` bails out as soon
  * as its input buffer can't be topped up to `8192 * 2` frames. At end-of-
- * source that leaves the real tail un-processed — up to ~370 ms of audio
+ * source that leaves the real tail un-processed, up to ~370 ms of audio
  * near the clip end is silently dropped. To force a flush we append trailing
  * silence to the source so the threshold stays met while the real tail is
  * consumed. We then stop extracting at the intended stretched length, so the

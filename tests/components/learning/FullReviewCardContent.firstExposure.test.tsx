@@ -7,7 +7,7 @@ import type { CardTranslation } from '@/components/app/learning/types';
 /**
  * First-exposure copy-through ("Abschreiben"): when LearningMode's
  * `firstExposure` prop is set (driven by the "Show translation on new
- * sentences" setting — predicate unit-tested in
+ * sentences" setting. Predicate unit-tested in
  * tests/unit/components/learning/firstExposure.test.ts), the target sentence
  * is shown next to its audio button above the input so the user copies it.
  * These tests pin the prop contract and that the assist disappears after
@@ -54,13 +54,13 @@ function renderCard(
   );
 }
 
-describe('FullReviewCardContent — first-exposure copy-through', () => {
+describe('FullReviewCardContent: first-exposure copy-through', () => {
   it('shows the target answer while firstExposure is set', () => {
     renderCard();
     expect(screen.getByTestId('first-exposure-answer')).toHaveTextContent(
       'Hola.',
     );
-    // The input is still there — the user types the answer out.
+    // The input is still there. The user types the answer out.
     expect(screen.getByTestId('learn-translation-input')).toBeInTheDocument();
   });
 
@@ -74,7 +74,7 @@ describe('FullReviewCardContent — first-exposure copy-through', () => {
     const input = screen.getByTestId('learn-translation-input');
     fireEvent.change(input, { target: { value: 'Hola.' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    // Submitted branch takes over — the copy assist is gone.
+    // Submitted branch takes over. The copy assist is gone.
     expect(screen.queryByTestId('first-exposure-answer')).toBeNull();
   });
 });

@@ -57,7 +57,7 @@ const EXPECTED_GOOGLE: Record<string, string> = {
   fil: 'tl',
   sw: 'sw',
   sw_tz: 'sw',
-  // Jul 2026 expansion — all pass-through except Norwegian (Google Translate
+  // Jul 2026 expansion. All pass-through except Norwegian (Google Translate
   // v2 catalogs Bokmål under 'no').
   nb: 'no',
   ca: 'ca',

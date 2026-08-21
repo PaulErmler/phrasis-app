@@ -34,7 +34,7 @@ function pcmResponse(byteLength: number): Response {
   } as unknown as Response;
 }
 
-/** A 200 response with an empty body — the intermittent Gemini quirk. */
+/** A 200 response with an empty body. The intermittent Gemini quirk. */
 function emptyResponse(): Response {
   return pcmResponse(0);
 }
@@ -47,13 +47,13 @@ function bodyOf(call: unknown[]): {
   return JSON.parse((call[1] as RequestInit).body as string);
 }
 
-/** The spoken sentence — everything after the "## Transcript: " marker. The
+/** The spoken sentence. Everything after the "## Transcript: " marker. The
  * style instruction (Strategy C) rides ahead of it in a "## Context:" block. */
 function transcriptOf(call: unknown[]): string {
   return bodyOf(call).input.split('## Transcript: ')[1];
 }
 
-describe('geminiTts.speak — empty-response retry', () => {
+describe('geminiTts.speak: empty-response retry', () => {
   const originalKey = process.env.OPENROUTER_API_KEY;
 
   beforeEach(() => {
@@ -155,10 +155,10 @@ describe('geminiTts.speak — empty-response retry', () => {
       .mockResolvedValueOnce(pcmResponse(4096));
     vi.stubGlobal('fetch', fetchMock);
     vi.spyOn(Math, 'random')
-      // attempt 1: front only — front 0.1 (<0.5), end 0.9 (≥0.5)
+      // attempt 1: front only. Front 0.1 (<0.5), end 0.9 (≥0.5)
       .mockReturnValueOnce(0.1)
       .mockReturnValueOnce(0.9)
-      // attempt 2: end only — front 0.9 (≥0.5), end 0.1 (<0.5)
+      // attempt 2: end only. Front 0.9 (≥0.5), end 0.1 (<0.5)
       .mockReturnValueOnce(0.9)
       .mockReturnValueOnce(0.1);
 

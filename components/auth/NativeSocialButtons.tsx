@@ -17,7 +17,7 @@ import { nativePlatform } from '@/lib/native';
  * the browser-redirect buttons from better-auth-ui are hidden in the shell
  * (see AuthUIProvider in app/providers.tsx) and replaced by these: the
  * @capgo/capacitor-social-login plugin obtains an ID token natively and
- * Better Auth signs in with the token directly — no redirect involved.
+ * Better Auth signs in with the token directly, no redirect involved.
  *
  * Renders nothing on the regular website.
  *

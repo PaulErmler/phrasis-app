@@ -5,12 +5,12 @@ import { getLanguageByCode } from '../../../lib/languages';
 import { trimTailHiccup } from './tailTrim';
 
 // Gemini 3.1 Flash TTS, reached through OpenRouter's OpenAI-compatible speech
-// endpoint. OpenRouter emits ONLY raw PCM for this model — its response_format
+// endpoint. OpenRouter emits ONLY raw PCM for this model. Its response_format
 // enum is exactly ["mp3","pcm"], and "mp3" hard-400s with
 // "Gemini TTS only supports response_format=\"pcm\"". (OpenRouter's generic docs
-// imply mp3 works for any model; it does NOT for this one. Verified live —
-// re-run `pnpm tts:probe` if that ever changes.) So we request PCM and transcode
-// to MP3 below — keeping stored audio compact and browser-playable like every
+// imply mp3 works for any model; it does NOT for this one. Verified live.
+// Re-run `pnpm tts:probe` if that ever changes.) So we request PCM and transcode
+// to MP3 below, keeping stored audio compact and browser-playable like every
 // other provider. opus/wav aren't accepted either, and Gemini natively emits
 // only PCM, so the transcode has to happen in the Convex runtime. Reuses the
 // same OPENROUTER_API_KEY as translation (features/translationLLM.ts).
@@ -19,7 +19,7 @@ const ENDPOINT = 'https://openrouter.ai/api/v1/audio/speech';
 
 // Gemini PCM is 24 kHz / 16-bit / mono. 48 kbps mono MP3 keeps speech clear and
 // matches what the retired Azure TTS provider used, which already passed the
-// same Azure STT validation roundtrip — ~25% smaller than 64 kbps and a
+// same Azure STT validation roundtrip. ~25% smaller than 64 kbps and a
 // fraction of the equivalent WAV.
 const PCM_SAMPLE_RATE = 24000;
 const MP3_KBPS = 48;
@@ -39,13 +39,13 @@ function buildStyledInput(text: string, languageName: string): string {
 }
 
 /**
- * Transcode raw little-endian PCM (24 kHz, 16-bit, mono — Gemini's only output
+ * Transcode raw little-endian PCM (24 kHz, 16-bit, mono, Gemini's only output
  * via OpenRouter) to MP3. Pure-JS encoder, so it runs in the Convex runtime
  * (no Node `Buffer` or native addons).
  */
 function pcmToMp3(pcm: Uint8Array): Uint8Array<ArrayBuffer> {
   // 16-bit mono PCM is always an even number of bytes (2 per sample). An odd
-  // length means the stream was truncated/corrupted — fail loudly rather than
+  // length means the stream was truncated/corrupted. Fail loudly rather than
   // silently dropping the trailing byte and emitting garbled audio.
   if (pcm.byteLength % 2 !== 0) {
     throw new Error(
@@ -115,7 +115,7 @@ function parseVoiceApiCode(apiCode: string): {
   }
   if (at === -1) return { voiceName };
   // A trailing "@" with no locale ("Kore@") would become an empty
-  // language_code and hard-400 the OpenRouter request — reject it here.
+  // language_code and hard-400 the OpenRouter request. Reject it here.
   const locale = apiCode.slice(at + 1);
   if (!locale) {
     throw new Error(
@@ -125,12 +125,12 @@ function parseVoiceApiCode(apiCode: string): {
   return { voiceName, locale };
 }
 
-/** One PCM synthesis request. Returns raw headerless PCM (possibly zero-byte —
- * the caller decides whether to retry). Throws on a non-2xx HTTP response. */
+/** One PCM synthesis request. Returns raw headerless PCM (possibly zero-byte.
+ * The caller decides whether to retry). Throws on a non-2xx HTTP response. */
 async function requestGeminiPcm(
   apiKey: string,
   args: {
-    /** Full request text — the "## Context … ## Transcript …" block. */
+    /** Full request text. The "## Context … ## Transcript …" block. */
     input: string;
     voiceName: string;
     languageCode: string;
@@ -155,7 +155,7 @@ async function requestGeminiPcm(
       // rides in the "## Context" block of `input`. Passed through harmlessly.
       speed: args.speed,
       // Provider options: only language_code (base-language / accent steer). The
-      // `prompt` field is NOT sent — OpenRouter drops it for this model, so the
+      // `prompt` field is NOT sent. OpenRouter drops it for this model, so the
       // style instruction lives inside `input` instead (Strategy C).
       provider: {
         options: {
@@ -178,7 +178,7 @@ async function requestGeminiPcm(
 // otherwise-valid request. Padding the input with a space perturbs it just
 // enough to dislodge the empty result, so on an empty response we retry, each
 // time randomly adding a space at the front and/or end (50% chance each). The
-// padding only rides in the API call — the canonical `input.text` used for
+// padding only rides in the API call. The canonical `input.text` used for
 // storage/STT is untouched, and an edge space adds at most a hair of silence.
 const MAX_EMPTY_RETRIES = 2;
 
@@ -205,8 +205,8 @@ export const geminiTts: TTSProvider = {
     // (US)" → "English") since the accent is already pinned by `language_code`
     // above. But some dialects can't be pinned by the locale (e.g. Levantine
     // Arabic → `ar-001`, shared with MSA/Saudi/Iraqi), so they set an explicit
-    // `ttsPromptName` ("Levantine Arabic") to name the dialect in the prose —
-    // the only signal Gemini gets to distinguish it. Falls back to the raw code.
+    // `ttsPromptName` ("Levantine Arabic") to name the dialect in the prose.
+    // The only signal Gemini gets to distinguish it. Falls back to the raw code.
     const lang = getLanguageByCode(input.language);
     const languageName =
       lang?.ttsPromptName ??
@@ -237,7 +237,7 @@ export const geminiTts: TTSProvider = {
 
     // Gemini intermittently appends a short, loud "hiccup" after the sentence,
     // separated by a silence gap (~10% of clips). Strip it on the raw PCM using
-    // only the energy envelope — no STT/word-timings — before transcoding. No-op
+    // only the energy envelope, no STT/word-timings, before transcoding. No-op
     // for the ~90% of clips without one (returns the same bytes). See tailTrim.ts.
     const { pcm: cleaned, trimmed } = trimTailHiccup(pcm, PCM_SAMPLE_RATE);
     if (trimmed) {

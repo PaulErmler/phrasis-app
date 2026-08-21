@@ -5,15 +5,18 @@ import type {
   TranslateFn,
 } from './types';
 import { createHomeTour } from './home-tour';
-import { createAudioReviewTour } from './audio-review-tour';
-import { createFullReviewTour } from './full-review-tour';
 export { TUTORIAL_IDS } from '@/convex/features/tutorialIds';
 
-/** Static factory table — add new tours here, keyed by tutorial ID. */
+/**
+ * Static factory table. Add new tours here, keyed by tutorial ID.
+ *
+ * Only multi-step tours driven by `useTutorial` live here. The one-time
+ * learning-mode tips (`tip_*` ids) are self-contained in
+ * `use-milestone-tips.ts`; the retired `audio_review_intro` /
+ * `full_review_intro` tours were replaced by those tips (2026-08).
+ */
 const tutorialFactories: Record<string, TutorialFactory> = {
   home_tour: createHomeTour,
-  audio_review_intro: createAudioReviewTour,
-  full_review_intro: createFullReviewTour,
 };
 
 export function getTutorial(

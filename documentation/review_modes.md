@@ -1,16 +1,16 @@
-# Review Modes
+# Review modes
 
 The `/learn` page supports two review modes that users can switch between via the settings panel. The active mode is persisted per course in `courseSettings.reviewMode`:
 
-- **Shadowing** (`reviewMode: 'audio'`, the default) — listen, translate in your head, say it aloud.
-- **Writing** (`reviewMode: 'full'`) — type the answer and get diff feedback. Writing further splits into two input styles via `courseSettings.writingInputMode` (see below).
+- **Shadowing** (`reviewMode: 'audio'`, the default). Listen, translate in your head, say it aloud.
+- **Writing** (`reviewMode: 'full'`). Type the answer and get diff feedback. Writing further splits into two input styles via `courseSettings.writingInputMode` (see below).
 
-There is also a *free play* mode at the scheduling level (`courseSettings.schedulingMode: 'radio'`) — an endless round-robin through the whole deck that never touches the FSRS schedule. It is a single scheduling mode with two **faces**, chosen by the review mode rather than stored:
+There is also a *free play* mode at the scheduling level (`courseSettings.schedulingMode: 'radio'`), an endless round-robin through the whole deck that never touches the FSRS schedule. It is a single scheduling mode with two **faces**, chosen by the review mode rather than stored:
 
-- **Radio** (`reviewMode: 'audio'`) — hands-free background playback that loops cards on its own, forcing autoplay and auto-advance regardless of the user's settings.
-- **Free Study** (`reviewMode: 'full'`) — the typing counterpart: same endless shuffle, but user-paced like any other Writing session.
+- **Radio** (`reviewMode: 'audio'`). Hands-free background playback that loops cards on its own, forcing autoplay and auto-advance regardless of the user's settings.
+- **Free Study** (`reviewMode: 'full'`). The typing counterpart: same endless shuffle, but user-paced like any other Writing session.
 
-Flipping the Shadowing/Writing switcher mid-session therefore switches faces live — queue, playback behaviour, card UI and the header pill all follow. The two faces keep **separate per-card rotations** (`cards.radio*` vs `cards.freeStudy*`, one index pair each), so practising a card by listening never counts as having typed it, and vice versa. The active face is derived by `freePlayFace()` in `convex/types.ts`; `reviewLogs.kind` stores it so undo restores the right rotation.
+Flipping the Shadowing/Writing switcher mid-session therefore switches faces live. Queue, playback behaviour, card UI and the header pill all follow. The two faces keep **separate per-card rotations** (`cards.radio*` vs `cards.freeStudy*`, one index pair each), so practising a card by listening never counts as having typed it, and vice versa. The active face is derived by `freePlayFace()` in `convex/types.ts`; `reviewLogs.kind` stores it so undo restores the right rotation.
 
 ## Shadowing (`reviewMode: 'audio'`, default)
 
@@ -28,8 +28,8 @@ The original review experience. The user listens to audio playback of base and t
 ### Scheduling
 
 Cards go through two phases:
-1. **Pre-review** — shown `initialReviewCount` times with binary ratings.
-2. **Review** — scheduled via FSRS with ratings: Again, Hard, Good, Easy.
+1. **Pre-review.** Shown `initialReviewCount` times with binary ratings.
+2. **Review.** Scheduled via FSRS with ratings: Again, Hard, Good, Easy.
 
 ## Writing (`reviewMode: 'full'`)
 
@@ -38,12 +38,12 @@ A text-input-based review where the user types text for each target language and
 ### Input styles: Translate vs Transcribe (`writingInputMode`)
 
 Writing has two input styles, stored in `courseSettings.writingInputMode`
-(`'translate' | 'transcribe'`, optional — see `convex/schema.ts`; ignored in
+(`'translate' | 'transcribe'`, optional; see `convex/schema.ts`, ignored in
 Shadowing):
 
-- **Translate** (default) — base audio plays and the base text is shown; the
+- **Translate** (default). Base audio plays and the base text is shown; the
   user types the translation for each target language.
-- **Transcribe** — target audio plays alone; the user types exactly what they
+- **Transcribe.** Target audio plays alone; the user types exactly what they
   hear (listening-comprehension practice). The diff/accuracy pipeline is the
   same as Translate.
 
@@ -82,7 +82,7 @@ the pending backfill migration) in `docs/migrations/per-mode-settings-backfill.m
      by `WordDiff`. Tags: `equal` / `typo` (partial credit) / `wrong` /
      `missing` / `extra`.
    - Languages **without** word boundaries (zh, zh_traditional, yue,
-     yue_traditional, ja, th — `hasWordBoundaries: false` in
+     yue_traditional, ja, th, all `hasWordBoundaries: false` in
      `lib/languages.ts`) fall back to a
      grapheme-level `charDiff` built on [jsdiff](https://github.com/kpdecker/jsdiff).
    - **Green**: correct. **Amber**: typo. **Red**: wrong or extra.
@@ -100,7 +100,7 @@ the pending backfill migration) in `docs/migrations/per-mode-settings-backfill.m
 5. The audio play button remains visible after submission. The user rates the card difficulty and advances.
    - With **Auto-rate from accuracy** on (the default), the rating is
      preselected from the score instead of always defaulting to "Good". It is
-     only ever *preselected* — nothing auto-submits, and a tap or number key
+     only ever *preselected*. Nothing auto-submits, and a tap or number key
      overrides it. Bands are lower-inclusive and configurable: by default
      below 50% → Again, 50-79% → Hard, 80%+ → Good. "Easy" is never
      auto-selected.
@@ -114,7 +114,7 @@ the pending backfill migration) in `docs/migrations/per-mode-settings-backfill.m
 | Setting | Description |
 |---------|-------------|
 | **Ignore punctuation** | Drop punctuation from the accuracy score. Lives at the end of the Review Settings section, above Auto-rate. |
-| **Auto-rate from accuracy** | Preselect the rating from the score (default on). Its threshold slider is an indented sub-setting — `AutoRateBandSlider`, built on `@radix-ui/react-slider` because the shadcn wrapper hardcodes its Track/Thumb classNames and Radix draws only one Range. Writes on `onValueCommit`, never `onValueChange`, so a drag is one mutation rather than one per pixel. |
+| **Auto-rate from accuracy** | Preselect the rating from the score (default on). Its threshold slider is an indented sub-setting, `AutoRateBandSlider`, built on `@radix-ui/react-slider` because the shadcn wrapper hardcodes its Track/Thumb classNames and Radix draws only one Range. Writes on `onValueCommit`, never `onValueChange`, so a drag is one mutation rather than one per pixel. |
 | **Automatically play Target Audio** | Main toggle controlling whether target language audio plays at all. When off, maps to `never`. Subtitle: "When to play target language audio". |
 | | Two mutually exclusive sub-options (shown when enabled): |
 | | - *After submitting text* (`afterSubmit`, default): target audio plays once automatically after the user submits their text for that language. Not included in the merged audio timeline. |
@@ -124,7 +124,74 @@ the pending backfill migration) in `docs/migrations/per-mode-settings-backfill.m
 
 Cards skip the pre-review phase entirely. All cards are rated using FSRS ratings (Again, Hard, Good, Easy) regardless of how many times they've been seen. The `reviewCard` mutation accepts a `forceReviewPhase` flag to support this.
 
-## Common Settings (both modes)
+## Split scheduling (`separateModeTracking`)
+
+By default both modes share one per-card schedule (`dueDate` / `fsrsState` /
+`schedulingPhase`), so reviewing a card in one mode postpones it in the other.
+The **Separate progress per mode** toggle (`courseSettings.separateModeTracking`,
+default off; rendered inside the mode-description card in the settings sheet,
+right after the Shadowing/Writing blurbs) gives Writing its own independent
+per-card FSRS track:
+
+- **Data model.** Five optional `writing*` fields on `cards`
+  (`writingDueDate`, `writingFsrsState`, `writingIsGraduated`,
+  `writingLastReviewedAt`, `writingGoodReviewCount`; see
+  `cardWritingSchedulingFields` in `convex/types.ts`). The writing track has no
+  pre-review phase. It is always FSRS, matching Writing's `forceReviewPhase`
+  behavior. The pre-existing fields remain the *shared* track, which Shadowing
+  keeps using (and which both modes use while the split is off).
+- **Routing.** `schedulingTrackFromSettings` (convex/types.ts) resolves
+  `'writing'` iff the split is on AND the mode is `'full'`. `reviewCard`,
+  the shared due-queue selector (`fetchTrackDueCards` in
+  convex/lib/dueQueue.ts, one implementation parameterized by track, used by
+  serving, probes, and the content warmer), the due-count aggregates
+  (`cardsByWritingStateAndDueDate` + origin variant) and the undo stack
+  (`reviewLogs.track` / `prevWriting`) are all track-aware. In free play the
+  track still resolves to `'writing'` (it scopes undo), but
+  `getCardForReview` only surfaces writing-track state for due-queue serving
+  (`face === null`). Rotation cards keep their real shared fields.
+- **Enable.** `updateCourseSettings` enqueues
+  `convex/migrations/seedWritingTrack.ts`, a batched, idempotent copy of each
+  card's shared schedule into the writing fields (nothing becomes newly due,
+  the copy happens at enable time, so both tracks start from the current
+  state). Hidden and mastered cards are seeded too: they can be unhidden or
+  demastered later, and the track has to exist by then.
+
+  The sweep carries **no state between batches**. Each batch relocates its own
+  remaining work through the `by_deck_writingDue` index, where an unset
+  `writingDueDate` sorts before every number, so there is no cursor to lose,
+  any kick resumes exactly where the last one stopped, and overlapping sweeps
+  simply find nothing to do. A batch re-enqueues itself whenever it seeded
+  anything; a pass that finds no unseeded card in any deck is what flips
+  `courseSettings.writingSeedDone`.
+
+  Batches run on the `seedPool` workpool rather than the scheduler, for the
+  **guaranteed onComplete**: it runs in its own transaction, so it still fires
+  when a batch throws (the pool does not retry mutations; Convex already
+  retries them on OCC). `onSeedBatchComplete` re-enqueues on failure, counting
+  attempts in `writingSeedAttempts`, and after five consecutive failures gives
+  up and reports via `trackException` instead of looping silently. Settings
+  saves and `reviewCard`'s lazy seed also kick the sweep (debounced via
+  `writingSeedStartedAt`), but those are conveniences. The supervisor is the
+  recovery path.
+
+  While `writingSeedDone` is unset, `getCardForReviewEmptyReason` reports
+  `preparing_writing` instead of a false "all caught up", and
+  `getFilteredCardCounts` flags its counts `preparingWriting` so the home pills
+  don't render a partial prefix as a settled zero. Both are gated on
+  `face === null` / the writing track actually being served. Free play
+  resolves to track `'writing'` too but never reads the writing queue.
+
+  `reviewCard` lazy-seeds any card the sweep hasn't reached; the writing due
+  queries exclude unseeded cards via a `.gte('writingDueDate', 0)` bound. New
+  cards created while the split is on are seeded at insert; there is
+  deliberately NO global deploy-time backfill. Unseeded cards cost nothing and
+  users who never enable the split never get writing fields.
+- **Disable.** Freeze-and-keep: the boolean flips and both modes route back
+  to the shared track. The writing fields stay dormant on the cards, and a
+  re-enable resumes them (the seeder skips already-seeded cards).
+
+## Common settings (both modes)
 
 | Setting | Description |
 |---------|-------------|
@@ -150,21 +217,21 @@ Cards skip the pre-review phase entirely. All cards are rated using FSRS ratings
 Fields added to the `courseSettings` table:
 
 - `reviewMode` (`'audio' | 'full'`, optional, defaults to `'audio'`)
-- `writingInputMode` (`'translate' | 'transcribe'`, optional, defaults to `'translate'`) — Writing input style; ignored in Shadowing
+- `writingInputMode` (`'translate' | 'transcribe'`, optional, defaults to `'translate'`): Writing input style; ignored in Shadowing
 - `fullReviewTargetAudioMode` (`'always' | 'afterSubmit' | 'never'`, optional, defaults to `'afterSubmit'`)
-- `ignorePunctuation` (`boolean`, optional, defaults to `false`) — exclude punctuation from the accuracy score
-- `autoRateFromAccuracy` (`boolean`, optional, defaults to **`true`**) — preselect the rating from the accuracy score
-- `autoRateThresholds` (`{ hard, good, easy? }`, optional, defaults to `{ hard: 50, good: 80 }`) — percent breakpoints, 0-100 integers, validated ascending on write
+- `ignorePunctuation` (`boolean`, optional, defaults to `false`): exclude punctuation from the accuracy score
+- `autoRateFromAccuracy` (`boolean`, optional, defaults to **`true`**): preselect the rating from the accuracy score
+- `autoRateThresholds` (`{ hard, good, easy? }`, optional, defaults to `{ hard: 50, good: 80 }`): percent breakpoints, 0-100 integers, validated ascending on write
 
 Accuracy stats carry both punctuation variants. `courseStats` and `dailyStats`
 each gained `…StrictSum` / `…LenientSum` / `…DualCount` alongside the original
 `accuracySum` / `accuracyCount`. The two sums share one count and are written
-and reversed as a trio — a half-written pair would skew the average
+and reversed as a trio, since a half-written pair would skew the average
 permanently. All fields are optional and no backfill exists (or is possible:
 recomputing a counterfactual score needs the typed text, which `reviewLogs`
 never stored and trims after `UNDO_DEPTH` entries anyway), so the split series
 simply starts at deploy. `reviewDepthAccuracy` was deliberately left on the
-single series — its consumer is an `internalQuery` with no frontend reader.
+single series. Its consumer is an `internalQuery` with no frontend reader.
 
 ### Backend changes
 

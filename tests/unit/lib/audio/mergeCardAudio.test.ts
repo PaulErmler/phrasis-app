@@ -6,7 +6,7 @@ import type {
 import type { CardAudioRecording } from '@/components/app/learning/types';
 
 /**
- * Unit coverage for `mergeCardAudio`'s scheduling — the heart of the
+ * Unit coverage for `mergeCardAudio`'s scheduling. The heart of the
  * "Practice Listening / Speaking" feature (target-before / target-after base).
  *
  * The Web-Audio surface is mocked so the real scheduling code runs unchanged
@@ -133,7 +133,7 @@ const silentCue = (
 
 // --- tests -----------------------------------------------------------------
 
-describe('mergeCardAudio — sequencing', () => {
+describe('mergeCardAudio: sequencing', () => {
   it('after-only (default): base → after-target, all revealing', async () => {
     const r = await mergeCardAudio(
       recs(['en', 'es']),
@@ -200,7 +200,7 @@ describe('mergeCardAudio — sequencing', () => {
   });
 
   it('base reps all zero: the silent base group keeps its surrounding pauses', async () => {
-    // The base language is still in the composition — it just plays 0 times.
+    // The base language is still in the composition. It just plays 0 times.
     // The pauses the user sees around it (pauseT2B, pauseB2T) must still
     // elapse as silence instead of the groups snapping together.
     const r = await mergeCardAudio(
@@ -266,7 +266,7 @@ describe('mergeCardAudio — sequencing', () => {
   });
 
   it('no base in the composition (e.g. transcribe): no phantom pauses added', async () => {
-    // orderedBase empty means base is deliberately excluded — target groups
+    // orderedBase empty means base is deliberately excluded. Target groups
     // are separated by pauseT2T and no base-adjacent silence appears.
     const r = await mergeCardAudio(
       recs(['es']),
@@ -376,12 +376,12 @@ describe('mergeCardAudio — sequencing', () => {
         pauseB2T: 5,
       }),
     );
-    // Each zeroed language keeps its slot — and its share of the surrounding
-    // pauses — so its reveal fires where the clip would have been, not at a
+    // Each zeroed language keeps its slot, and its share of the surrounding
+    // pauses, so its reveal fires where the clip would have been, not at a
     // neighbour's edge.
     expect(r!.languageCues).toEqual([
       // es also plays after base (silently), so the after-base slot owns its
-      // reveal — the learner still gets the guess-then-see flow.
+      // reveal. The learner still gets the guess-then-see flow.
       cue('es', 0, 1, false),
       silentCue('fr', 4, 1, false), // fr is replayed after base → no reveal here
       cue('en', 8, 1, true), // 1.0s es + 3s pauseT2T + silent fr + 4s pauseT2B
@@ -390,7 +390,7 @@ describe('mergeCardAudio — sequencing', () => {
     ]);
     expect(r!.durationSec).toBe(18);
     // es and fr are each audible in exactly one group, so both still land a
-    // speed — the silent slots deliberately write none.
+    // speed. The silent slots deliberately write none.
     expect(r!.speedByLanguage).toEqual({ es: 1, en: 1, fr: 1 });
   });
 
@@ -412,7 +412,7 @@ describe('mergeCardAudio — sequencing', () => {
   });
 });
 
-describe('mergeCardAudio — zero repetitions still reveal', () => {
+describe('mergeCardAudio: zero repetitions still reveal', () => {
   it('un-blurs a zero-rep target where its audio would have played', async () => {
     // The reported bug: repetitions 0 + "auto un-blur when the audio plays"
     // used to drop the language from the merge entirely, so its text stayed
@@ -470,7 +470,7 @@ describe('mergeCardAudio — zero repetitions still reveal', () => {
 
   it('renders the pauses as silence when nothing at all is audible', async () => {
     // Every language muted, but the configured pauses still describe a real
-    // timeline — so it plays as silence and each line un-blurs on schedule.
+    // timeline, so it plays as silence and each line un-blurs on schedule.
     const r = await mergeCardAudio(
       recs(['en', 'es']),
       ['en'],

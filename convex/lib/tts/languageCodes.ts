@@ -9,7 +9,7 @@ import { SUPPORTED_LANGUAGES } from '../../../lib/languages';
  * Covers every `SUPPORTED_LANGUAGES` code that Gemini TTS supports, per
  * https://docs.cloud.google.com/text-to-speech/docs/gemini-tts#available_languages.
  * Codes Gemini does not support (Cantonese `yue`/`yue_traditional`) are omitted
- * and fall through unchanged — Gemini then relies on text auto-detection.
+ * and fall through unchanged. Gemini then relies on text auto-detection.
  * Regional variants for which Gemini has no dedicated locale collapse onto the
  * nearest documented one (Arabic dialects → `ar-001` World Arabic, except
  * Egyptian which has `ar-EG`; `sw_tz` → `sw-KE`; `es_mixed` → `es-ES`;

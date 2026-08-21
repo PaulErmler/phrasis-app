@@ -28,7 +28,7 @@ describe('getWordSegmenter', () => {
   });
 
   it('resolves registry compareLocale for codes whose hyphenated form is invalid BCP-47', () => {
-    // "zh-traditional" / "yue-traditional" have an over-long variant subtag —
+    // "zh-traditional" / "yue-traditional" have an over-long variant subtag.
     // Intl.Segmenter throws RangeError on them, and the tokenizer fallback
     // would swallow a whole unspaced sentence as one token. The registry's
     // compareLocale (zh-TW / yue-Hant-HK) must be used instead.
@@ -37,7 +37,7 @@ describe('getWordSegmenter', () => {
   });
 });
 
-describe('tokenizeText — space-delimited language (en)', () => {
+describe('tokenizeText: space-delimited language (en)', () => {
   it('folds punctuation away, keeping apostrophe words intact', () => {
     expect(originals("Hello, world! Don't stop — it's fine.", 'en')).toEqual([
       'Hello',
@@ -88,7 +88,7 @@ describe('tokenizeText — space-delimited language (en)', () => {
   });
 });
 
-describe('tokenizeText — no-word-boundary language (ja)', () => {
+describe('tokenizeText: no-word-boundary language (ja)', () => {
   it('segments by dictionary and drops the 。', () => {
     expect(originals('今日は暑いですね。', 'ja')).toEqual([
       '今日',
@@ -113,7 +113,7 @@ describe('tokenizeText — no-word-boundary language (ja)', () => {
   });
 });
 
-describe('tokenizeText — Traditional-script codes (zh_traditional / yue_traditional)', () => {
+describe('tokenizeText: Traditional-script codes (zh_traditional / yue_traditional)', () => {
   it('segments Traditional Chinese into words, not one sentence-token', () => {
     expect(originals('你真的體貼', 'zh_traditional')).toEqual([
       '你',
@@ -171,7 +171,7 @@ describe('appendSearchSegments', () => {
   it('returns space-delimited languages unchanged', () => {
     expect(appendSearchSegments('Hello, world!', 'en')).toBe('Hello, world!');
     expect(appendSearchSegments('¿Cómo estás?', 'es')).toBe('¿Cómo estás?');
-    // Korean and Vietnamese use spaces — no segmentation either.
+    // Korean and Vietnamese use spaces, no segmentation either.
     expect(appendSearchSegments('안녕하세요 반갑습니다', 'ko')).toBe(
       '안녕하세요 반갑습니다',
     );
@@ -188,7 +188,7 @@ describe('appendSearchSegments', () => {
   });
 });
 
-describe('tokenizeText — invalid language tag fallback', () => {
+describe('tokenizeText: invalid language tag fallback', () => {
   it('falls back to the Unicode-letter split instead of crashing', () => {
     // A structurally invalid BCP-47 tag makes Intl.Segmenter throw; the regex
     // fallback keeps hyphenated compounds as ONE token (unlike the segmenter).

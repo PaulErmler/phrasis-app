@@ -82,7 +82,7 @@ async function seedHistory(
   });
 }
 
-describe("features/projections — getProjections", () => {
+describe("features/projections: getProjections", () => {
   it("returns null when unauthenticated", async () => {
     const t = convexTest(schema, modules);
     const res = await t.query(api.features.projections.getProjections, {
@@ -124,7 +124,7 @@ describe("features/projections — getProjections", () => {
     await seedHistory(t, courseId, 10);
     const asUser = t.withIdentity({ subject: "user_A" });
     // "<yyyy>-<mm>-00" passes a bare /^\d{4}-\d{2}-\d{2}$/ and resolves to the
-    // last day of the previous month — within the ±1 clamp only when that is
+    // last day of the previous month. Within the ±1 clamp only when that is
     // adjacent to today. Whatever comes back must be a real calendar date, so
     // it can serve as a `dailyStats` index bound and a wordsByDate map key.
     const server = todayUtc();
@@ -191,7 +191,7 @@ describe("features/projections — getProjections", () => {
       });
     };
 
-    // Real daily history, but only 9 minutes on the clock — still locked.
+    // Real daily history, but only 9 minutes on the clock, still locked.
     const locked = await seedWithStudyTime(9 * 60_000);
     expect(locked!.basis).toBe("empty");
     expect(locked!.indicators).toEqual([{ kind: "empty" }]);
@@ -249,7 +249,7 @@ describe("features/projections — getProjections", () => {
 
   it("keeps the newest days when the language-stats window exceeds the row cap", async () => {
     // 7 target languages × 90 days = 630 rows > the 600-row cap. The read is
-    // descending, so truncation must drop the OLDEST days — an ascending
+    // descending, so truncation must drop the OLDEST days. An ascending
     // read would cut exactly the newest days the decayed pace weights most.
     const langs = ["es", "fr", "de", "it", "pt", "nl", "sv"];
     const t = convexTest(schema, modules);

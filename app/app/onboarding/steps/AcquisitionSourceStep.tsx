@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Check } from 'lucide-react';
 import type { AcquisitionSource } from '../types';
+import { shuffleKeepingLast } from '../lib/shuffleKeepingLast';
 import {
   MAX_ONBOARDING_FREE_TEXT_LENGTH,
   ONBOARDING_FREE_TEXT_SHOW_COUNT_REMAINING_THRESHOLD,
@@ -35,6 +37,9 @@ export function AcquisitionSourceStep({
   onFreeText,
 }: Props) {
   const t = useTranslations('Onboarding.acquisition');
+  // Shuffle once per visit so position bias doesn't pile onto the first
+  // tiles. "Other" stays last (bottom-right in the 2-column grid).
+  const [options] = useState(() => shuffleKeepingLast(OPTION_VALUES, 'other'));
   return (
     <div
       data-testid="onboarding-step-acquisition"
@@ -46,7 +51,7 @@ export function AcquisitionSourceStep({
           <p className="text-xs md:text-sm text-muted-foreground mt-1">{t('subtitle')}</p>
         </div>
         <div className="max-w-2xl mx-auto w-full px-4 grid grid-cols-2 gap-2">
-          {OPTION_VALUES.map((value) => {
+          {options.map((value) => {
             const isSelected = selected === value;
             return (
               <button

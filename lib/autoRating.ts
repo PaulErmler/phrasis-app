@@ -4,7 +4,7 @@ import type { FSRSRating } from './scheduling';
  * Accuracy breakpoints that map a writing score to an FSRS rating.
  *
  * Percent points (0-100), lower-inclusive: a score of exactly `hard` rates
- * "hard", a score of exactly `good` rates "good". `easy` is optional — when
+ * "hard", a score of exactly `good` rates "good". `easy` is optional, when
  * unset the top band is "good" and "easy" is only ever chosen manually.
  */
 export interface AutoRateThresholds {
@@ -47,7 +47,7 @@ export function resolveAutoRateThresholds(
  *
  * Bands are lower-inclusive, so with the defaults: 0-49 -> again, 50-79 -> hard,
  * 80-100 -> good. The score is rounded before comparison so the rating always
- * agrees with the percentage shown under the diff — a user who sees "80%" must
+ * agrees with the percentage shown under the diff. A user who sees "80%" must
  * not get "hard" because the raw value was 79.6.
  */
 export function ratingForAccuracy(
@@ -64,8 +64,8 @@ export function ratingForAccuracy(
 }
 
 /**
- * The form call sites use. Returns `null` for "no opinion" — auto-rating off,
- * or no accuracy available yet — which threads through the existing
+ * The form call sites use. Returns `null` for "no opinion". Auto-rating off,
+ * or no accuracy available yet, which threads through the existing
  * `selectedRating ?? autoRating ?? defaultRating` chain without disturbing
  * audio mode or the pre-review phase.
  */
@@ -82,7 +82,7 @@ export function autoRating(opts: {
 /**
  * Reject thresholds the UI could never produce. `resolveAutoRateThresholds`
  * repairs whatever is already stored, but a write is the moment to refuse bad
- * input outright — the settings slider is not the only possible writer.
+ * input outright. The settings slider is not the only possible writer.
  */
 export function validateAutoRateThresholds(value: AutoRateThresholds): void {
   const { hard, good, easy } = value;

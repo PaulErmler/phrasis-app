@@ -28,7 +28,7 @@ describe("renderWelcomeEmail", () => {
     expect(text).toContain("Hi,");
   });
 
-  it("looks like a personal email — no branding, buttons, or links", () => {
+  it("looks like a personal email, no branding, buttons, or links", () => {
     const { html } = renderWelcomeEmail("Anna");
     expect(html).not.toContain("icon-192x192.png");
     expect(html).not.toContain("<a ");
@@ -50,7 +50,7 @@ describe("capture mode (E2E_TEST_HOOKS=1)", () => {
 
     await t.run(async (ctx) => {
       const runCtx = ctx as unknown as AuthEmailCtx;
-      // Mixed-case recipient — capture normalizes to lowercase so the
+      // Mixed-case recipient. Capture normalizes to lowercase so the
       // by_email index lookup in authEmailTesting.ts matches.
       await sendWelcomeEmail(runCtx, { to: "User@Flexling.com", name: "Anna" });
     });

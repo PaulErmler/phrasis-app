@@ -53,6 +53,7 @@ type SeedOpts = {
   withCollectionId?: boolean;
   collectionName?: string;
   collectionOriginField?: Doc<'collections'>['origin'];
+  withWritingTrack?: boolean;
 };
 
 async function seedCard(t: TestConvex<typeof schema>, opts: SeedOpts = {}) {
@@ -93,6 +94,11 @@ async function seedCard(t: TestConvex<typeof schema>, opts: SeedOpts = {}) {
       ...(opts.collectionOrigin
         ? { collectionOrigin: opts.collectionOrigin }
         : {}),
+      // Seeded writing track (separateModeTracking), membership marker for
+      // the writing origin aggregate is `writingDueDate !== undefined`.
+      ...(opts.withWritingTrack
+        ? { writingDueDate: 0, writingIsGraduated: false }
+        : {}),
     });
     return { cardId, deckId, collectionId };
   });
@@ -108,10 +114,10 @@ async function runOne(t: TestConvex<typeof schema>, cardId: Id<'cards'>) {
   });
 }
 
-describe('cardCollectionBackfill — origin-aggregate consistency', () => {
+describe('cardCollectionBackfill: origin-aggregate consistency', () => {
   it('moves the origin-aggregate entry when it stamps collectionOrigin', async () => {
     const t = convexTest(schema, modules);
-    // A legacy CEFR collection with no `origin` field — resolves to 'premade'.
+    // A legacy CEFR collection with no `origin` field. Resolves to 'premade'.
     const { cardId, deckId } = await seedCard(t);
 
     const patch = await runOne(t, cardId);
@@ -126,6 +132,36 @@ describe('cardCollectionBackfill — origin-aggregate consistency', () => {
         from: `${deckId}:none:new`,
         to: `${deckId}:premade:new`,
       },
+    ]);
+  });
+
+  it('moves the WRITING origin-aggregate entry too when the card has a writing track', async () => {
+    const t = convexTest(schema, modules);
+    const { cardId, deckId } = await seedCard(t, { withWritingTrack: true });
+
+    await runOne(t, cardId);
+
+    // Both origin-keyed aggregates namespace on collectionOrigin, so both
+    // entries must move. Without the second move the writing entry is
+    // stranded under ':none:' forever (patchCard/deleteCard address the new
+    // origin from then on) and filtered Writing due counts stay wrong.
+    expect(replaceCalls).toEqual([
+      { from: `${deckId}:none:new`, to: `${deckId}:premade:new` },
+      { from: `${deckId}:none:new`, to: `${deckId}:premade:new` },
+    ]);
+  });
+
+  it('does not touch the writing aggregate for cards without a writing track', async () => {
+    const t = convexTest(schema, modules);
+    const { cardId, deckId } = await seedCard(t);
+
+    await runOne(t, cardId);
+
+    // Exactly one move. The shared origin aggregate. A second call would
+    // insert a phantom entry into the writing aggregate for a card that is
+    // not a member of it.
+    expect(replaceCalls).toEqual([
+      { from: `${deckId}:none:new`, to: `${deckId}:premade:new` },
     ]);
   });
 
@@ -155,7 +191,7 @@ describe('cardCollectionBackfill — origin-aggregate consistency', () => {
 
   it('touches no aggregate when only collectionId is backfilled', async () => {
     const t = convexTest(schema, modules);
-    // Origin already set, id missing — the patch must not carry an origin, so
+    // Origin already set, id missing. The patch must not carry an origin, so
     // the aggregate namespace is unchanged and nothing needs moving.
     const { cardId, collectionId } = await seedCard(t, {
       withCollectionId: false,
@@ -168,7 +204,7 @@ describe('cardCollectionBackfill — origin-aggregate consistency', () => {
     expect(replaceCalls).toEqual([]);
   });
 
-  it('is idempotent — a second pass is a no-op', async () => {
+  it('is idempotent, a second pass is a no-op', async () => {
     const t = convexTest(schema, modules);
     const { cardId } = await seedCard(t);
 
@@ -184,10 +220,9 @@ describe('cardCollectionBackfill — origin-aggregate consistency', () => {
 describe('runAll deploy chain', () => {
   it('no longer schedules a blanket per-deck aggregate rebuild', async () => {
     const mod = await import('../../migrations');
-    // `recalcCardAggregatesAfterBackfills` cleared cardsByState /
-    // cardsByDueDate / cardsByStateAndDueDate — all already correct — for
-    // EVERY deck, so users mid-session saw zeroed due counts while their deck
-    // rebuilt. It is unnecessary now that cardCollectionBackfill moves the one
+    // `recalcCardAggregatesAfterBackfills` cleared cardsByStateAndDueDate,
+    // already correct, for EVERY deck, so users mid-session saw zeroed due
+    // counts while their deck rebuilt. It is unnecessary now that cardCollectionBackfill moves the one
     // namespaced entry itself. `migrations/recalcUserCardAggregates.ts` stays
     // as the per-user repair tool.
     expect('recalcCardAggregatesAfterBackfills' in mod).toBe(false);
@@ -203,8 +238,8 @@ describe('runAll deploy chain', () => {
     const rebuildAt = chain.indexOf('rebuildCardSearchableText');
     // Origins must be final before they are aggregated...
     expect(collectionAt).toBeLessThan(originAt);
-    // ...and the aggregate — which is what un-zeroes getFilteredCardCounts —
-    // must not sit behind the most expensive step in the chain.
+    // ...and the aggregate, which is what un-zeroes getFilteredCardCounts.
+    // Must not sit behind the most expensive step in the chain.
     expect(originAt).toBeLessThan(rebuildAt);
   });
 });

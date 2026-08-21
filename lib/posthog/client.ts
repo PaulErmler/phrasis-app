@@ -19,7 +19,7 @@ let initialized = false;
 
 /**
  * Boot the browser SDK. Idempotent, and a no-op when no project key is
- * configured — local dev and CI builds run without one and must not crash.
+ * configured. Local dev and CI builds run without one and must not crash.
  *
  * Must be called from a client component effect rather than at module scope:
  * `posthog.init` touches `window` and `document`, which do not exist while Next
@@ -30,7 +30,7 @@ export function initPostHogClient(): void {
   if (!POSTHOG_KEY) return;
 
   posthog.init(POSTHOG_KEY, {
-    // First-party path — see the `rewrites` block in next.config.ts. Pointing
+    // First-party path. See the `rewrites` block in next.config.ts. Pointing
     // straight at eu.i.posthog.com would lose every user running an ad blocker.
     api_host: POSTHOG_API_HOST,
     ui_host: POSTHOG_UI_HOST,
@@ -39,7 +39,7 @@ export function initPostHogClient(): void {
     /**
      * No cookies, localStorage or sessionStorage are touched until the user
      * answers the banner. If they reject, PostHog keeps capturing but derives
-     * identity from a daily-rotated server-side hash instead of device storage —
+     * identity from a daily-rotated server-side hash instead of device storage,
      * which is outside TTDSG §25 entirely, so onboarding funnels and error
      * rates stay measurable for people who decline.
      *
@@ -51,7 +51,7 @@ export function initPostHogClient(): void {
     /**
      * Treat the *pending* state (banner shown, not yet answered) the same as
      * an explicit reject: capture cookieless. Without this flag the SDK drops
-     * every event until a choice is made — the banner is non-modal, so all
+     * every event until a choice is made. The banner is non-modal, so all
      * landing traffic and any onboarding steps of users who ignore it would
      * simply not exist in the data. The legal footing is identical to the
      * reject path: nothing is stored on the device, identity is the rotating
@@ -61,7 +61,7 @@ export function initPostHogClient(): void {
     opt_out_capturing_by_default: true,
 
     /**
-     * Anonymous landing-page traffic doesn't need a person profile — those are
+     * Anonymous landing-page traffic doesn't need a person profile. Those are
      * the expensive part of the bill and useless until someone signs up.
      * `identify()` after login upgrades the user to a real profile.
      */
@@ -77,7 +77,7 @@ export function initPostHogClient(): void {
 
     /**
      * Off deliberately (the SDK default is on). Autocapture records every click
-     * on every button, which here means one event per card rating —
+     * on every button, which here means one event per card rating,
      * reintroducing per-review volume through the back door, roughly 9× the
      * event count at the same MAU, for data we already hold in better shape in
      * `dailyStats` / `courseStats` / `reviewDepthAccuracy`.
@@ -85,7 +85,7 @@ export function initPostHogClient(): void {
      * It also captures each element's visible text, which in a flashcard app
      * would sweep up sentence content nobody asked us to send.
      *
-     * Meaningful actions are captured explicitly instead — see
+     * Meaningful actions are captured explicitly instead. See
      * `lib/posthog/events.ts` and `convex/analytics.ts`. Pageviews and
      * pageleaves are unaffected and still fire automatically.
      */
@@ -94,7 +94,7 @@ export function initPostHogClient(): void {
     /**
      * The SDK enables heatmap collection unless told otherwise. Nobody looks
      * at heatmaps for this app, and with autocapture off they would be the
-     * only clickstream data — so turn them off rather than pay to ingest them.
+     * only clickstream data, so turn them off rather than pay to ingest them.
      */
     capture_heatmaps: false,
 

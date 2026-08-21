@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { fetchAuthEmail } from "./helpers";
 
 /**
- * Email/password auth journey — code-based email verification, password
+ * Email/password auth journey. Code-based email verification, password
  * reset, per-address email rate limiting, and enumeration safety. Uses its
  * OWN fresh user (never the shared fixtures) and runs serially: later
  * tests depend on the auth state and email budget earlier tests establish.
@@ -15,8 +15,8 @@ import { fetchAuthEmail } from "./helpers";
  *
  * ORDERING IS SIGNIFICANT for the rate-limit test: the `authEmail` bucket
  * (convex/rateLimiter.ts) holds 5 tokens per address per hour. The journey
- * spends 3 — sign-up code (#1), unverified sign-in re-send (#2),
- * forgot-password link (#3) — and the rate-limit test spends the remaining
+ * spends 3. Sign-up code (#1), unverified sign-in re-send (#2),
+ * forgot-password link (#3), and the rate-limit test spends the remaining
  * 2 before asserting the 6th request sends nothing.
  */
 
@@ -99,8 +99,8 @@ test.describe("email/password auth journey", () => {
   test("unverified sign-in re-sends the code and routes to code entry", async ({ page }) => {
     await signIn(page, creds.email, creds.password);
 
-    // 403 EMAIL_NOT_VERIFIED — better-auth-ui navigates to the code-entry
-    // view; sendOnSignIn re-sends the code (email #2 — same 6 digits as
+    // 403 EMAIL_NOT_VERIFIED. Better-auth-ui navigates to the code-entry
+    // view; sendOnSignIn re-sends the code (email #2, same 6 digits as
     // #1, resendStrategy 'reuse' in convex/auth.ts).
     await page.waitForURL(/\/auth\/email-verification/, { timeout: 30_000 });
     const resent = await fetchAuthEmail(creds.email, "verify", {
@@ -189,8 +189,8 @@ test.describe("email/password auth journey", () => {
     await page.getByLabel(/email/i).first().fill(creds.email);
     await page.getByRole("button", { name: /forgot|reset|send/i }).click();
 
-    // The endpoint still reports success (silent drop in convex/auth.ts) —
-    // no error toast — but no new email is captured.
+    // The endpoint still reports success (silent drop in convex/auth.ts),
+    // no error toast, but no new email is captured.
     await expect(page.getByText(/error|failed/i)).toHaveCount(0);
     await expect(
       fetchAuthEmail(creds.email, "reset", {

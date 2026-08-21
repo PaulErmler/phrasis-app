@@ -562,7 +562,7 @@ describe("features/chat/cardApprovals", () => {
     });
   });
 
-  describe("approveCard — chat collection get-or-create", () => {
+  describe("approveCard: chat collection get-or-create", () => {
     async function seedQuota(t: TestConvex<typeof schema>) {
       await t.run(async (ctx) => {
         await ctx.db.insert("usageQuotas", {

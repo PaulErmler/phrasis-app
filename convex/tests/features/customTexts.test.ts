@@ -10,7 +10,7 @@ vi.mock("@openrouter/ai-sdk-provider", () => ({
   createOpenRouter: () => () => ({}),
 }));
 // Stub the action-retrier so `retrier.run(ctx, fnRef, args)` delegates to
-// `ctx.runAction` instead of the (unregistered) component — needed by the
+// `ctx.runAction` instead of the (unregistered) component. Needed by the
 // tests that replay the scheduled `generateSentenceMetadata` job.
 vi.mock("@convex-dev/action-retrier", () => {
   class ActionRetrier {
@@ -163,7 +163,7 @@ describe("features/customTexts", () => {
               text: "Hola",
               translationSource: "openrouter/some-model-none",
             },
-            // fr deliberately omits translationSource — accepted, and the
+            // fr deliberately omits translationSource. Accepted, and the
             // server fills in the honest provenance (see below).
             { language: "fr", text: "Bonjour" },
           ],
@@ -228,6 +228,9 @@ describe("features/customTexts", () => {
       const jobArgs = metadataJobs[0].args[0] as any;
       // The job carries the text's owner for exception attribution.
       expect(jobArgs.userId).toBe("user_A");
+      // Single-card create stays interactive: the user just typed this
+      // sentence and will likely study it next.
+      expect(jobArgs.priority).toBeUndefined();
 
       await t.action(
         internal.features.sentenceMetadata.generateSentenceMetadata,
@@ -303,7 +306,7 @@ describe("features/customTexts", () => {
           timezone: "UTC",
         }),
       ).rejects.toThrow(/TEXT_TOO_LONG/);
-      // Validation precedes consumeQuota — nothing is charged.
+      // Validation precedes consumeQuota, nothing is charged.
       const quota = await t.run(async (ctx) =>
         ctx.db
           .query("usageQuotas")
@@ -314,7 +317,7 @@ describe("features/customTexts", () => {
     });
   });
 
-  describe("createCustomText — custom collection get-or-create", () => {
+  describe("createCustomText: custom collection get-or-create", () => {
     async function getSettings(
       t: TestConvex<typeof schema>,
       courseId: Awaited<ReturnType<typeof seedActiveCourseWithQuota>>["courseId"],
@@ -486,7 +489,7 @@ describe("features/customTexts", () => {
           targetLanguages: ["es"],
         },
       );
-      // Every autofill row carries a `translationSource` tag now — the
+      // Every autofill row carries a `translationSource` tag now. The
       // autofill model id plus its `none` (no-thinking) reasoning suffix.
       // The exact slug is owned by OPENROUTER_MODELS.translationAutoFill in
       // convex/config/aiModels.ts; we just assert the shape
@@ -593,7 +596,7 @@ describe("features/customTexts", () => {
       );
       expect(collection?.textCount).toBe(3);
 
-      // Bulk-import path is exclusively manual — every inserted translation
+      // Bulk-import path is exclusively manual. Every inserted translation
       // must carry the `'user-provided'` tag so a future strategy swap won't
       // overwrite text the user typed.
       const allTranslations = await t.run(async (ctx) =>
@@ -649,13 +652,28 @@ describe("features/customTexts", () => {
       expect(metadataJobs).toHaveLength(2);
       for (const job of metadataJobs) {
         expect((job.args[0] as any).userId).toBe("user_A");
+        expect((job.args[0] as any).priority).toBe("background");
+        expect((job.args[0] as any).llmPriority).toBe("background");
       }
       // Replay one job through the real action to prove the forwarded args
-      // pass its validator.
+      // pass its validator, and that background priority reaches
+      // prepareCardContent (the TTS enqueue).
       await t.action(
         internal.features.sentenceMetadata.generateSentenceMetadata,
         metadataJobs[0].args[0] as any,
       );
+      const afterReplay = await t.run(async (ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      );
+      const prepJobs = afterReplay.filter((j) =>
+        j.name.includes("prepareCardContent"),
+      );
+      expect(prepJobs.length).toBeGreaterThan(0);
+      for (const job of prepJobs) {
+        expect((job.args[0] as { priority?: string }).priority).toBe(
+          "background",
+        );
+      }
     });
 
     it("returns skipped entries for invalid rows without aborting the batch", async () => {

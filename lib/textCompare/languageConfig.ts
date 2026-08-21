@@ -3,7 +3,7 @@ import { SUPPORTED_LANGUAGES } from '../languages';
 
 /** Subset of CompareConfig that's actually consumed by charDiff/alignWords.
  * Kept separate so callers don't accidentally rely on hasWordBoundaries
- * flowing through those functions (it doesn't — it's a caller-side branch). */
+ * flowing through those functions (it doesn't; it's a caller-side branch). */
 export interface DiffOptions extends Required<
   Pick<
     NormalizeOptions,
@@ -21,7 +21,7 @@ export interface CompareOverrides {
 }
 
 export interface CompareConfig extends DiffOptions {
-  /** Whether the script uses spaces between words. False for zh/ja/th — falls back to char-level diff for short answers. */
+  /** Whether the script uses spaces between words. False for zh/ja/th. Falls back to char-level diff for short answers. */
   hasWordBoundaries: boolean;
 }
 
@@ -37,7 +37,7 @@ const DEFAULT: CompareConfig = {
 // Derived from each Language's `compareLocale` + `hasWordBoundaries` fields
 // (single source of truth in lib/languages.ts). `locale` defaults to the
 // internal code when `compareLocale` is unset; `hasWordBoundaries` is only set
-// when a language opts out (zh/ja/th/yue — no spaces between words).
+// when a language opts out (zh/ja/th/yue, no spaces between words).
 const PER_LANGUAGE: Record<string, Partial<CompareConfig>> = Object.fromEntries(
   SUPPORTED_LANGUAGES.map((l) => {
     const cfg: Partial<CompareConfig> = { locale: l.compareLocale ?? l.code };

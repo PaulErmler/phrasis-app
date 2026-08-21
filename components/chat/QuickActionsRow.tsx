@@ -44,7 +44,7 @@ interface QuickActionsRowProps {
 }
 
 /**
- * The message a quick action sends — language-qualified when the course has
+ * The message a quick action sends. Language-qualified when the course has
  * a single target language. Shared by the row, the grid, and the sender in
  * LearnView so the tooltip/tile text always matches what is sent.
  */

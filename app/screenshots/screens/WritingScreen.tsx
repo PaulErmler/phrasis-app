@@ -23,7 +23,7 @@ import { WordDiff } from '@/components/app/learning/WordDiff';
 
 /**
  * Writing-mode review replica: typed answer + the real WordDiff feedback
- * (imported component — authentic character-level scoring pills).
+ * (imported component, authentic character-level scoring pills).
  */
 export function WritingScreen() {
   const t = useTranslations('LearningMode');

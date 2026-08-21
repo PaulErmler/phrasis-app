@@ -2,7 +2,7 @@
  * PostHog host resolution, shared by `next.config.ts` (which sets up the proxy
  * rewrites) and the browser client (which points `api_host` at the proxy).
  *
- * Deliberately dependency-free — `next.config.ts` imports this, so anything
+ * Deliberately dependency-free. `next.config.ts` imports this, so anything
  * pulled in here has to survive being bundled into the config loader. No
  * `lib/env`, no React, no Convex.
  */
@@ -17,12 +17,12 @@
  */
 export const POSTHOG_PROXY_PATH = '/ph-relay';
 
-/** EU Cloud. Flexling's projects live here — see the privacy policy's "Frankfurt" claim. */
+/** EU Cloud. Flexling's projects live here. See the privacy policy's "Frankfurt" claim. */
 const DEFAULT_INGEST_HOST = 'https://eu.i.posthog.com';
 
 /**
  * Where the proxy forwards to. Read from the environment so a self-hosted or
- * US-region deployment needs no code change, but note that the value has to be
+ * US-region deployment needs no code change, but the value has to be
  * present at **build** time: it is inlined into both the rewrite rules and the
  * client bundle.
  */
@@ -40,7 +40,7 @@ export const POSTHOG_ASSETS_HOST = POSTHOG_INGEST_HOST.replace(
   (_match, scheme: string, region: string) => `${scheme}${region}-assets.i.posthog.com`,
 );
 
-/** What the browser passes as `api_host` — first-party, so ad blockers don't match it. */
+/** What the browser passes as `api_host`. First-party, so ad blockers don't match it. */
 export const POSTHOG_API_HOST = POSTHOG_PROXY_PATH;
 
 /**
@@ -51,7 +51,7 @@ export const POSTHOG_API_HOST = POSTHOG_PROXY_PATH;
  * make every unit test that touches a component importing analytics fail on an
  * unrelated Convex URL. Analytics are optional; the app must run without them.
  *
- * Inlined at build time — on Coolify this has to be a **build** argument, not a
+ * Inlined at build time, on Coolify this has to be a **build** argument, not a
  * runtime variable, or it resolves to undefined in the shipped bundle.
  */
 export const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;

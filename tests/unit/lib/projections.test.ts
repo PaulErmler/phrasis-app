@@ -56,7 +56,7 @@ describe('decayedDailyPace', () => {
     expect(pace).toBeCloseTo(10, 5);
   });
 
-  it('gap days count as zero — a pause lowers the pace', () => {
+  it('gap days count as zero, a pause lowers the pace', () => {
     const active = decayedDailyPace(recentDays(10, 90), TODAY, 400);
     // Same daily value but only the older half of the window is active.
     const paused = decayedDailyPace(recentDays(10, 45, 45), TODAY, 400);
@@ -282,7 +282,7 @@ describe('computeIndicators', () => {
       }),
     );
     expect(basis).toBe('firstSession');
-    // wordsPerDay = 30 words / 1 active day / 7 — the goal no longer scales
+    // wordsPerDay = 30 words / 1 active day / 7. The goal no longer scales
     // the pace; the average actual minutes per active day do.
     const oneYear = byKind(indicators, 'oneYearWords') as { words: number };
     expect(oneYear).toBeDefined();
@@ -296,7 +296,7 @@ describe('computeIndicators', () => {
    * The regression this exists for: the first-session pace was scaled to the
    * DAILY GOAL before the ÷7 dampener. A user with a 5-minute goal who
    * studied 17.5 minutes (27 sentences) had today's output cut 3.5× by the
-   * goal scaling and 7× by the dampener — "A1.1 in ~124 days" rendered next
+   * goal scaling and 7× by the dampener. "A1.1 in ~124 days" rendered next
    * to a day that alone covered a sixth of the level. Pace now extrapolates
    * from the average actual minutes per active day.
    */
@@ -341,7 +341,7 @@ describe('computeIndicators', () => {
 
   /**
    * The regression these exist for: the goal basis took the raw all-time
-   * words-per-minute — for a user who studied 15 minutes and stopped, that is
+   * words-per-minute, for a user who studied 15 minutes and stopped, that is
    * a first-session rate without the first-session dampener, so once the pace
    * window emptied they were promised "10,000+ words in one year" and the
    * ladder walk crowned them C2 by December.
@@ -369,7 +369,7 @@ describe('computeIndicators', () => {
         capped: boolean;
       };
       // Undampened: 45 + (45/15)*20*365 ≈ 21,945 → capped "10,000+".
-      // Dampened (~÷6.7): ≈ 3,300 — plausible, and far below the cap.
+      // Dampened (~÷6.7): ≈ 3,300. Plausible, and far below the cap.
       expect(oneYear).toBeDefined();
       expect(oneYear.capped).toBe(false);
       expect(oneYear.words).toBeLessThan(5000);

@@ -21,7 +21,7 @@ type Indicator = NonNullable<
 
 function useProjections(skip: boolean, cacheSuffix: string) {
   // getUserTimezone falls back to 'UTC' when the browser reports an empty
-  // zone — matching the rest of the app instead of sending '' to the query.
+  // zone, matching the rest of the app instead of sending '' to the query.
   const timezone = getUserTimezone();
   // useNowMinute (not Date.now at render): when the rotation isn't running
   // (reduced motion, or a single frame), nothing else re-renders this
@@ -36,7 +36,7 @@ function useProjections(skip: boolean, cacheSuffix: string) {
   return { data };
 }
 
-/** Midday-UTC Date for a "YYYY-MM-DD" string — safe for date-only display. */
+/** Midday-UTC Date for a "YYYY-MM-DD" string. Safe for date-only display. */
 const toDate = (dateStr: string) => new Date(`${dateStr}T12:00:00Z`);
 
 /** Signed shortest distance from idx to i on a ring of n items. */
@@ -47,7 +47,7 @@ function shortestOffset(i: number, idx: number, n: number): number {
   return d;
 }
 
-/** Half the rotating block's height — the rotation axis sits this far
+/** Half the rotating block's height. The rotation axis sits this far
  * behind the face plane, which makes it read as a solid block, not a card. */
 const BLOCK_HALF_DEPTH = 19;
 
@@ -57,7 +57,7 @@ const BLOCK_HALF_DEPTH = 19;
  * …) computed by `getProjections`. Sits on the right of the daily-goal row.
  *
  * Interaction: auto-advances every 8s while visible; the whole block is a
- * button — tap advances immediately. Clickability is signaled by the pager
+ * button. Tap advances immediately. Clickability is signaled by the pager
  * dots, the chevron, hover surface and press-scale. Auto-rotation is
  * disabled under prefers-reduced-motion (tap still works). `replayKey`
  * restarts the rotation at a fresh indicator on every home visit.
@@ -92,7 +92,7 @@ export function RotatingProjection({
     try {
       return Number(localStorage.getItem(cursorKey)) || 0;
     } catch {
-      // localStorage unavailable (SSR/private mode) — start at 0.
+      // localStorage unavailable (SSR/private mode), start at 0.
       return 0;
     }
   }, [cursorKey]);
@@ -150,7 +150,7 @@ export function RotatingProjection({
   }, [skip, reducedMotion, frames.length, advance, idx]);
 
   if (data == null) {
-    // Query still in flight with no warm `useCachedQuery` entry — i.e. the
+    // Query still in flight with no warm `useCachedQuery` entry, i.e. the
     // first home visit in a given browser profile, where every other tile
     // paints instantly from its own cache and this one has nothing to fall
     // back on. Reserve the slot's footprint instead of collapsing to nothing,
@@ -217,7 +217,7 @@ export function RotatingProjection({
          * actually asked for it. */}
         <span className="sr-only">{`${big} — ${label}`}</span>
         {/* Rotating 3D block: the facts are faces of a solid block turning
-         * around its horizontal axis — one face visible at rest; advancing
+         * around its horizontal axis. One face visible at rest; advancing
          * tips the current face away over the top while the next rolls in
          * from below (face angle = off × -90° around an origin pushed back
          * by half the block depth). */}
@@ -285,7 +285,7 @@ function renderFrame(
     capped ? `${format.number(n)}+` : `~${format.number(n)}`;
   const day = (dateStr: string) =>
     format.dateTime(toDate(dateStr), { month: 'short', day: 'numeric' });
-  // Pace-based ETAs read "at your current speed" — unless the pace is the
+  // Pace-based ETAs read "at your current speed", unless the pace is the
   // goal-conditional fallback (long pause), where that claim would be false.
   const paceLabel =
     basis === 'goal' ? t('goalBasisLabel') : t('atCurrentSpeedLabel');

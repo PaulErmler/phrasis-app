@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { dismissTour } from "./helpers";
 
 /**
- * Add-cards smoke — verifies the EnterTextsView (rendered for the
+ * Add-cards smoke. Verifies the EnterTextsView (rendered for the
  * /app/content/add-cards route) mounts a form. We then attempt an empty
  * submit to check that the form does not silently navigate away.
  *
@@ -53,7 +53,7 @@ test.describe("add cards", () => {
       return; // Disabled while empty — form correctly prevents submission.
     }
 
-    // Real click — `trial: true` only runs actionability checks and would
+    // Real click. `trial: true` only runs actionability checks and would
     // skip the actual submit, making the assertion below a no-op.
     const urlBefore = page.url();
     await submit.click().catch(() => {});

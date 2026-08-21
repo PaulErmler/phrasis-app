@@ -3,11 +3,11 @@ import path from "node:path";
 
 /**
  * Tracks concurrent Playwright invocations by PID so overlapping runs don't
- * unset E2E_TEST_HOOKS out from under each other — a second run's teardown
+ * unset E2E_TEST_HOOKS out from under each other. A second run's teardown
  * once disabled the flag mid-way through a full run, failing every later
  * auth-email fetch and skipping all dependent projects. Best-effort: entries
  * from killed runs are ignored via a liveness check, so a hard-killed run
- * cannot wedge the lock (though, as before, it leaves the flag set — see
+ * cannot wedge the lock (though, as before, it leaves the flag set, see
  * global-setup.ts for the manual cleanup command).
  */
 const LOCK_FILE = path.resolve(__dirname, ".auth", "e2e-run-pids.json");

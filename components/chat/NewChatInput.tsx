@@ -36,7 +36,7 @@ interface NewChatInputProps {
  * - Initial message sending
  * - Navigation to chat page
  *
- * This component is typically used on the home page to start new conversations.
+ * Used on the home page to start new conversations.
  */
 export function NewChatInput({
   className,

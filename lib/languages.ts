@@ -3,7 +3,7 @@
  *
  * This file owns:
  *   - The Language and TtsProvider types + SUPPORTED_LANGUAGES (pure
- *     metadata — no voices)
+ *     metadata: no voices)
  *   - Language-metadata helpers: name lookup, short labels, romanization,
  *     text direction / RTL detection, and mixed-variant resolution
  *     (`resolveMixedVariant` for aggregate codes like `es_mixed`)
@@ -24,7 +24,7 @@
  * Flash TTS via OpenRouter (distinct from 'google' = Google Cloud Chirp3).
  *
  * 'elevenlabs' and 'azure' are retired providers kept only as tombstones so
- * historical stored `ttsProvider` values still validate — no language routes
+ * historical stored `ttsProvider` values still validate, no language routes
  * to them and neither is dispatchable (see convex/lib/tts/index.ts). Azure
  * Speech is still used for STT (convex/lib/stt), just not for synthesis. Do
  * not remove either from this array without first migrating any stored rows
@@ -43,7 +43,7 @@ export type TranslationProvider = 'google' | 'openrouter';
  *
  * Derived from each Language's `regionLabel` field (keyed by displayCode; see
  * `DISPLAY_CODE_TO_REGION` below). Falls back to the region segment of the
- * displayCode, or the bare tag when there's no dash — so a language without an
+ * displayCode, or the bare tag when there's no dash, so a language without an
  * explicit `regionLabel` (e.g. `en`) renders its code rather than a blank.
  */
 function regionLabelFromDisplayCode(displayCode: string): string {
@@ -93,7 +93,7 @@ export interface Language {
    * Whether per-word karaoke highlighting (the blue current-word colour
    * during audio playback) makes sense for this language. False for languages
    * where Intl.Segmenter produces per-morpheme tokens that flicker too fast
-   * to read — currently only Japanese. Click-to-explain popovers are still
+   * to read, currently only Japanese. Click-to-explain popovers are still
    * rendered regardless.
    */
   supportsKaraoke: boolean;
@@ -122,9 +122,9 @@ export interface Language {
    * Named pipeline that decides which OpenRouter model(s) + reasoning levels
    * the translation worker uses for this language, with optional fallbacks
    * on truncation. Defined in TRANSLATION_RULES below. Unset →
-   * `gemini_35_flash_nitro_minimal` (Gemini 3.6 Flash Nitro, minimal
-   * reasoning, one same-config retry). No language currently pins a rule —
-   * set one here only to route a language off the default.
+   * `gemini_35_flash_nitro_minimal` (Gemini 3.7 Flash Nitro, minimal
+   * reasoning, one same-config retry). No language currently pins a rule.
+   * Set one here only to route a language off the default.
    */
   translationRule?: TranslationRuleId;
   /**
@@ -147,7 +147,7 @@ export interface Language {
   /**
    * Per-language requirements injected into the batch autofill translation
    * prompt (convex/features/customTexts.ts) on the line naming this
-   * language — register mappings, script constraints, and vocabulary
+   * language. Register mappings, script constraints, and vocabulary
    * steering that don't fit in a language *name*. Only emitted when the
    * language is part of the request, so keep each note self-contained.
    * The single-sentence pipeline doesn't use this; it pins register/gender
@@ -159,7 +159,7 @@ export interface Language {
    * a native X" instruction (convex/lib/tts/gemini.ts). Defaults to `name` with
    * the region parenthetical stripped ("English (US)" → "English"), since the
    * accent is normally pinned by `geminiBcp47`. Set this when the dialect can't
-   * be pinned by the locale and must be named in the prose instead — e.g.
+   * be pinned by the locale and must be named in the prose instead, e.g.
    * Levantine Arabic, whose `geminiBcp47` collapses to `ar-001` (World Arabic),
    * shared with MSA/Saudi/Iraqi.
    */
@@ -175,7 +175,7 @@ export interface Language {
   /**
    * Post-processing step applied to MACHINE-GENERATED translation output
    * (LLM single-sentence, Google fallback, batch autofill, chat cards)
-   * before storage — never to user-typed text. Unset ⇒ the `default` step
+   * before storage, never to user-typed text. Unset ⇒ the `default` step
    * (strip trailing '_' runs). Set only to route a language onto a
    * different step; consumed via `postProcessTranslation` below.
    */
@@ -193,7 +193,7 @@ export interface Language {
   /**
    * TTS-setup version (defaults to 1 via `getCurrentTtsVersion`). Bump when
    * changing this language's voice pool, Gemini `ttsPromptName`, or provider so
-   * existing audio regenerates lazily — needed for prompt-only changes on an
+   * existing audio regenerates lazily. Needed for prompt-only changes on an
    * already-Gemini language where the provider-mismatch regen wouldn't fire
    * (e.g. pt_pt). See `audioRecordings.ttsVersion` in convex/schema.ts.
    */
@@ -203,7 +203,7 @@ export interface Language {
    * onboarding / course creation / settings (`LanguageSelector` and
    * `DualLanguageEditor`). The entry remains in `SUPPORTED_LANGUAGES` so
    * voice lookups, `getLanguageByCode`, and existing course data referring
-   * to the code keep working — only the *picker* surfaces hide it.
+   * to the code keep working, only the *picker* surfaces hide it.
    *
    * Used today to retire the English sub-variants (`en_gb`, `en_us`,
    * `en_au`) from course-creation UIs while their voice + display metadata
@@ -213,7 +213,7 @@ export interface Language {
   /**
    * When `true`, picker surfaces (`LanguageSelector`) show a user-facing
    * "Experimental" badge next to this language. Independent of the
-   * internal-only `llmSupportTier` — set it on newly added languages while
+   * internal-only `llmSupportTier`. Set it on newly added languages while
    * translation/voice quality is still being tuned, and remove the flag once
    * the language has proven itself.
    */
@@ -234,7 +234,7 @@ export interface Language {
   regionLabel?: string;
   /**
    * BCP-47 locale for Gemini TTS (`toGeminiBcp47`). Omit when Gemini should
-   * auto-detect from the text (Cantonese) — the code passes through unchanged.
+   * auto-detect from the text (Cantonese), the code passes through unchanged.
    */
   geminiBcp47?: string;
   /**
@@ -265,6 +265,15 @@ export interface Language {
    */
   romanizationBackend?: 'local' | 'google-v3';
   /**
+   * espeak-ng voice identifier used to derive an IPA transcription
+   * (`convex/features/ipa.ts`). Presence doubles as the opt-in flag: a
+   * language without `ipaVoice` never gets IPA scheduled, stored rows stop
+   * being served, and the UI hides the toggle (mirrors `needsRomanization`).
+   * Omitted only for `ja` (espeak reads kana, garbles kanji) and `fil`
+   * (no espeak voice).
+   */
+  ipaVoice?: string;
+  /**
    * Locale-keyed display-name overrides (e.g. { de: 'Spanisch (Spanien)' })
    * for codes where Intl.DisplayNames is ambiguous. The `en` value is derived
    * from `name` when the override map is built. Resolution falls back to the
@@ -292,6 +301,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'en-us',
     supportsKaraoke: true,
     supportsStt: true,
     translationPromptNotes: 'No strong British or American spelling bias.',
@@ -311,12 +321,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     category: 'germanic',
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
-    // Pin the accent in the prompt too — `geminiBcp47: 'en-GB'` alone can drift
+    // Pin the accent in the prompt too. `geminiBcp47: 'en-GB'` alone can drift
     // toward Gemini's default American English. ttsVersion bump regenerates
     // existing en_gb audio (prompt-only change on an already-Gemini language).
     ttsPromptName: 'British English',
     ttsVersion: 2,
     needsRomanization: false,
+    ipaVoice: 'en-gb',
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
@@ -338,6 +349,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'en-us',
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
@@ -358,12 +370,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     category: 'germanic',
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
-    // Pin the accent in the prompt too — `geminiBcp47: 'en-AU'` alone can drift
+    // Pin the accent in the prompt too. `geminiBcp47: 'en-AU'` alone can drift
     // toward Gemini's default American English. ttsVersion bump regenerates
     // existing en_au audio (prompt-only change on an already-Gemini language).
     ttsPromptName: 'Australian English',
     ttsVersion: 2,
     needsRomanization: false,
+    ipaVoice: 'en',
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
@@ -386,6 +399,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Castilian Spanish',
     needsRomanization: false,
+    ipaVoice: 'es',
     supportsKaraoke: true,
     supportsStt: true,
     translationPromptNotes: 'vosotros for the informal plural, peninsular vocabulary.',
@@ -412,6 +426,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Latin American Spanish',
     needsRomanization: false,
+    ipaVoice: 'es-419',
     supportsKaraoke: true,
     supportsStt: true,
     translationPromptNotes: 'ustedes for the plural, regionally neutral Latin American vocabulary.',
@@ -419,7 +434,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'es_mixed',
-    // Sentinel displayCode — the LLM-prompt/STT/voice paths special-case `es_mixed`
+    // Sentinel displayCode. The LLM-prompt/STT/voice paths special-case `es_mixed`
     // and expand to es-ES + es-419/es-MX as needed; Intl.DisplayNames is overridden
     // for this code so the displayCode value itself is never user-facing.
     displayCode: 'es',
@@ -440,9 +455,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Runs on Gemini TTS. The per-text accent (Spain vs Latin America) is pinned
     // by the chosen voice's `@es-ES` / `@es-US` locale suffix (see the es_mixed
     // Gemini pool in lib/voices.ts and `getVoiceForLanguageVariant`), so no
-    // single `ttsPromptName` applies here — the locale on the voice carries it.
+    // single `ttsPromptName` applies here. The locale on the voice carries it.
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'es-419',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -459,6 +475,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'fr',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -475,6 +492,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'de',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -491,6 +509,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'it',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -509,6 +528,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'pt-br',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -537,6 +557,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationPromptNotes: 'European Portuguese vocabulary, spelling, and phonetics.',
     translationVersion: 2,
     needsRomanization: false,
+    ipaVoice: 'pt-pt',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -552,6 +573,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'ro',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -571,6 +593,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'ca',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -587,7 +610,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
-    // Cyrillic — karaoke off (non-Latin script policy).
+    ipaVoice: 'ru',
+    // Cyrillic. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
     translationVersion: 2,
@@ -604,6 +628,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'pl',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -620,6 +645,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'sk',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -637,6 +663,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'cs',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -654,6 +681,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'hr',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -670,6 +698,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'sl',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -687,7 +716,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
-    // Cyrillic — karaoke off (non-Latin script policy, matches Russian).
+    ipaVoice: 'uk',
+    // Cyrillic. Karaoke off (non-Latin script policy, matches Russian).
     supportsKaraoke: false,
     supportsStt: true,
   },
@@ -708,15 +738,16 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: true,
-    // Cyrillic — karaoke off (non-Latin script policy).
+    ipaVoice: 'sr',
+    // Cyrillic. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
-    // Serbian is bidigraphic and Latin script dominates web training data —
-    // pin Cyrillic in the prompt, since the whole pipeline (STT locale,
+    // Serbian is bidigraphic and Latin script dominates web training data.
+    // Pin Cyrillic in the prompt, since the whole pipeline (STT locale,
     // romanization, catalog standard above) assumes Cyrillic output.
     translationName: 'Serbian (Cyrillic script)',
     translationPromptNotes: 'Use Cyrillic (ћирилица) exclusively; never the Latin alphabet.',
-    // v2: prompt pins Cyrillic — regenerate pre-existing (possibly
+    // v2: prompt pins Cyrillic. Regenerate pre-existing (possibly
     // Latin-script) translations.
     translationVersion: 2,
   },
@@ -727,7 +758,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     geminiBcp47: 'bg-BG',
     // No `azureSttLocale`: the symmetric default resolves to `bg-BG`, which is
     // in Azure Fast Transcription's supported list. Worth a live probe before
-    // the language ships — the docs table has been wrong before (see sw_tz).
+    // the language ships. The docs table has been wrong before (see sw_tz).
     romanizationBackend: 'google-v3',
     name: 'Bulgarian',
     nativeName: 'Български',
@@ -736,7 +767,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: true,
-    // Cyrillic — karaoke off (non-Latin script policy, matches ru/uk/sr).
+    ipaVoice: 'bg',
+    // Cyrillic. Karaoke off (non-Latin script policy, matches ru/uk/sr).
     supportsKaraoke: false,
     supportsStt: true,
     experimental: true,
@@ -753,6 +785,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'lt',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -768,6 +801,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'lv',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -781,11 +815,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     nativeName: 'Eesti',
     flag: '🇪🇪',
     // Uralic linguistically (like Finnish), but grouped with its Baltic
-    // neighbours in the picker — learners look for it next to lt/lv.
+    // neighbours in the picker. Learners look for it next to lt/lv.
     category: 'baltic',
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'et',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -801,6 +836,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'nl',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -818,6 +854,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'sv',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -837,6 +874,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'nb',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -853,6 +891,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'da',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -864,8 +903,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // `is-IS` is a documented Gemini TTS locale (Preview stage as of Jul 2026).
     geminiBcp47: 'is-IS',
     // No `azureSttLocale`: the symmetric default resolves to `is-IS`, which
-    // Azure Fast Transcription accepts (verified with a live probe, Jul 2026 —
-    // the docs table alone has been wrong before, see sw_tz).
+    // Azure Fast Transcription accepts (verified with a live probe, Jul 2026.
+    // The docs table alone has been wrong before, see sw_tz).
     name: 'Icelandic',
     nativeName: 'Íslenska',
     flag: '🇮🇸',
@@ -873,13 +912,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'is',
     supportsKaraoke: true,
     supportsStt: true,
-    experimental: true,
     // Bumped 1 → 2 with the Aug 2026 switch to the Luna best-of-3 pipeline:
     // native-speaker feedback flagged systematic errors in the existing
-    // Icelandic rows (archaic register, wrong imperatives), so Icelandic —
-    // and only Icelandic — lazily regenerates its existing translations
+    // Icelandic rows (archaic register, wrong imperatives), so Icelandic,
+    // and only Icelandic. Lazily regenerates its existing translations
     // through the new rule.
     translationVersion: 2,
   },
@@ -897,6 +936,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'fi',
     supportsKaraoke: true,
     supportsStt: true,
     translationPromptNotes: 'The formal/informal distinction is minimal; focus on naturalness.',
@@ -916,6 +956,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
+    ipaVoice: 'el',
     supportsKaraoke: false,
     // Azure Fast Transcription doesn't support el-GR; without STT we can't
     // produce per-word timings, so karaoke highlighting will no-op for Greek.
@@ -939,7 +980,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
-    // Devanagari — karaoke off (non-Latin script policy).
+    ipaVoice: 'hi',
+    // Devanagari. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
     translationPromptNotes: 'Informal → तुम form; formal → आप form.',
@@ -964,7 +1006,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // audio; the Chirp3 bn-IN pool stays listed dormant for a one-line revert.
     ttsProvider: 'gemini',
     needsRomanization: true,
-    // Bengali script — karaoke off (non-Latin script policy).
+    ipaVoice: 'bn',
+    // Bengali script. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
     translationVersion: 2,
@@ -983,7 +1026,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: true,
-    // Tamil script — karaoke off (non-Latin script policy).
+    ipaVoice: 'ta',
+    // Tamil script. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
   },
@@ -1001,7 +1045,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: true,
-    // Telugu script — karaoke off (non-Latin script policy).
+    ipaVoice: 'te',
+    // Telugu script. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
   },
@@ -1017,6 +1062,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'tr',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -1029,12 +1075,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Hungarian',
     nativeName: 'Magyar',
     flag: '🇭🇺',
-    // Uralic (like Finnish), but no clean cluster of Uralic learners yet —
-    // grouped with 'other' rather than forced into Germanic.
+    // Uralic (like Finnish), but no clean cluster of Uralic learners yet.
+    // Grouped with 'other' rather than forced into Germanic.
     category: 'other',
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'hu',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -1055,6 +1102,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
+    ipaVoice: 'cmn',
     // Disabled along with other CJK + Thai languages: word-level segmentation
     // produces per-character tokens that flicker too fast to read. Revisit
     // when we have a learner-grade segmenter.
@@ -1087,13 +1135,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Taiwanese Mandarin',
     needsRomanization: true,
+    ipaVoice: 'cmn',
     supportsKaraoke: false,
     supportsStt: true,
-    // Traditional script is also Hong Kong's — name Taiwanese Mandarin
+    // Traditional script is also Hong Kong's. Name Taiwanese Mandarin
     // outright so Taiwan-specific vocabulary (軟體, not 软件/軟件 HK-style)
     // is cued, mirroring ttsPromptName.
     translationName: 'Taiwanese Mandarin (Traditional characters)',
-    // v3: prompt pins Taiwanese Mandarin — regenerate translations made under
+    // v3: prompt pins Taiwanese Mandarin. Regenerate translations made under
     // the bare "Chinese (Traditional)" label.
     translationVersion: 3,
   },
@@ -1111,24 +1160,25 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇭🇰',
     category: 'asian-east',
     llmSupportTier: 'tier2',
-    // MiniMax Speech 2.8 Turbo via OpenRouter — native Cantonese system
+    // MiniMax Speech 2.8 Turbo via OpenRouter. Native Cantonese system
     // voices (Gemini has none; Chirp3-HD misread 唔). See
     // convex/lib/tts/minimax.ts.
     ttsProvider: 'minimax',
-    // v2: Chirp3 → MiniMax switch — regenerate all existing Cantonese audio
+    // v2: Chirp3 → MiniMax switch. Regenerate all existing Cantonese audio
     // (the asset cache key contains neither provider nor voice).
     ttsVersion: 2,
     // Jyutping via to-jyutping (rime-cantonese data), which covers simplified
-    // script as well as traditional — see convex/lib/localRomanization.ts.
+    // script as well as traditional. See convex/lib/localRomanization.ts.
     needsRomanization: true,
+    ipaVoice: 'yue',
     supportsKaraoke: false,
     supportsStt: true,
-    // Pins BOTH the register (spoken vernacular — 係/唔/嘅, not Standard
+    // Pins BOTH the register (spoken vernacular, 係/唔/嘅, not Standard
     // Written Chinese) and the script; a bare "Cantonese" often yields
     // written Chinese that is effectively Mandarin.
     translationName: 'Cantonese (written in Simplified Chinese characters)',
     translationPromptNotes: 'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
-    // v3: prompt pins the spoken-vernacular register — regenerate
+    // v3: prompt pins the spoken-vernacular register. Regenerate
     // translations made under the bare "Cantonese" label.
     translationVersion: 3,
   },
@@ -1147,22 +1197,23 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇭🇰',
     category: 'asian-east',
     llmSupportTier: 'tier2',
-    // MiniMax Speech 2.8 Turbo via OpenRouter — native Cantonese system
+    // MiniMax Speech 2.8 Turbo via OpenRouter. Native Cantonese system
     // voices (Gemini has none; Chirp3-HD misread 唔). See
     // convex/lib/tts/minimax.ts.
     ttsProvider: 'minimax',
-    // v2: Chirp3 → MiniMax switch — regenerate all existing Cantonese audio
+    // v2: Chirp3 → MiniMax switch. Regenerate all existing Cantonese audio
     // (the asset cache key contains neither provider nor voice).
     ttsVersion: 2,
     needsRomanization: true,
+    ipaVoice: 'yue',
     supportsKaraoke: false,
     supportsStt: true,
-    // Pins BOTH the register (spoken vernacular — 係/唔/嘅, not Standard
+    // Pins BOTH the register (spoken vernacular, 係/唔/嘅, not Standard
     // Written Chinese) and the script; a bare "Cantonese" often yields
     // written Chinese that is effectively Mandarin.
     translationName: 'Cantonese (written in Traditional Chinese characters)',
     translationPromptNotes: 'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
-    // v3: prompt pins the spoken-vernacular register — regenerate
+    // v3: prompt pins the spoken-vernacular register. Regenerate
     // translations made under the bare "Cantonese" label.
     translationVersion: 3,
   },
@@ -1181,8 +1232,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
+    // No ipaVoice: espeak-ng only reads kana, so kanji sentences would
+    // come out with gaps/garbage. Revisit if a kanji-aware G2P shows up.
     // Japanese tokenizes per-morpheme; karaoke flickers too fast to read.
-    // Click-to-explain popovers still work — only the current-word colour
+    // Click-to-explain popovers still work, only the current-word colour
     // is gated off.
     supportsKaraoke: false,
     supportsStt: true,
@@ -1203,7 +1256,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
-    // Hangul — karaoke off (non-Latin script policy).
+    ipaVoice: 'ko',
+    // Hangul. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
     translationPromptNotes: 'Informal → 반말; formal → 해요체 or 합쇼체 as appropriate.',
@@ -1227,6 +1281,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // `name` and would fall back to unpinned "Vietnamese".
     ttsPromptName: 'Northern Vietnamese',
     needsRomanization: false,
+    ipaVoice: 'vi',
     supportsKaraoke: true,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1239,8 +1294,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     code: 'vi_south',
     displayCode: 'vi-VN',
     regionLabel: 'Southern Vietnam',
-    // Gemini has no southern-specific locale — `vi-VN` is the only Vietnamese
-    // tag it takes — so the dialect is named in the prompt via `ttsPromptName`
+    // Gemini has no southern-specific locale. `vi-VN` is the only Vietnamese
+    // tag it takes, so the dialect is named in the prompt via `ttsPromptName`
     // (the ar_lev / sw_tz pattern). Azure Fast Transcription likewise only
     // lists `vi-VN`; it transcribes southern speech fine, so STT stays on.
     geminiBcp47: 'vi-VN',
@@ -1258,6 +1313,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Southern Vietnamese',
     needsRomanization: false,
+    ipaVoice: 'vi-vn-x-south',
     supportsKaraoke: true,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1278,10 +1334,11 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     category: 'asian-southeast',
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
-    // Romanization disabled — Google v3 doesn't support Thai, and the
+    // Romanization disabled. Google v3 doesn't support Thai, and the
     // available pure-JS Thai libraries have not yet been evaluated for
     // learner-grade quality. Re-enable once a good lib is wired up.
     needsRomanization: false,
+    ipaVoice: 'th',
     // No spaces between words; per-character karaoke flickers. Disabled
     // alongside CJK; revisit with a learner-grade Thai segmenter.
     supportsKaraoke: false,
@@ -1303,6 +1360,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'id',
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
@@ -1320,6 +1378,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'ms',
     supportsKaraoke: true,
     supportsStt: true,
   },
@@ -1342,9 +1401,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // fil-PH supports Fast Transcription, so STT + karaoke stay on.
     ttsProvider: 'gemini',
     needsRomanization: false,
+    // No ipaVoice: espeak-ng has no Filipino/Tagalog voice.
     supportsKaraoke: true,
     supportsStt: true,
-    // Models index far more data under "Tagalog" than "Filipino" — same
+    // Models index far more data under "Tagalog" than "Filipino", same
     // collapse the legacy path does via `googleTranslateCode: 'tl'`.
     translationName: 'Filipino (Tagalog)',
     translationVersion: 2,
@@ -1369,11 +1429,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Modern Standard Arabic',
     needsRomanization: true,
+    ipaVoice: 'ar',
     // Karaoke disabled for Arabic: ligatures + clitics don't align to STT
     // word timings, producing flickery/mis-positioned per-word highlights.
     supportsKaraoke: false,
     supportsStt: true,
-    // Canonical name in the translation prompt — "Arabic (Modern Standard)"
+    // Canonical name in the translation prompt. "Arabic (Modern Standard)"
     // is a UI label, not how the register appears in training data.
     translationName: 'Modern Standard Arabic',
     translationPromptNotes: 'MSA grammar; when the source does not specify gender, pick a grammatically valid form without letting that choice influence any gender metadata.',
@@ -1399,6 +1460,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Saudi Arabic',
     needsRomanization: true,
+    ipaVoice: 'ar',
     supportsKaraoke: false,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1429,6 +1491,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Egyptian Arabic',
     needsRomanization: true,
+    ipaVoice: 'ar',
     supportsKaraoke: false,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1457,6 +1520,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Iraqi Arabic',
     needsRomanization: true,
+    ipaVoice: 'ar',
     supportsKaraoke: false,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1488,6 +1552,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Levantine Arabic',
     needsRomanization: true,
+    ipaVoice: 'ar',
     supportsKaraoke: false,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1513,7 +1578,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Romanization via the `hebrew-transliteration` package (SBL Academic
     // style), wired in convex/lib/localRomanization.ts.
     needsRomanization: true,
-    // Hebrew script — karaoke off (non-Latin script policy).
+    ipaVoice: 'he',
+    // Hebrew script. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
     // Disambiguates from Biblical Hebrew in the translation prompt.
@@ -1536,15 +1602,16 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Gemini 3 Flash TTS (via OpenRouter); fa-IR is a documented Gemini TTS
     // locale. See VOICE_POOLS in lib/voices.ts (`fa: [...GEMINI_CORE]`).
     ttsProvider: 'gemini',
-    // Perso-Arabic script — romanized locally via `@sindresorhus/transliterate`
+    // Perso-Arabic script. Romanized locally via `@sindresorhus/transliterate`
     // (handles the Persian-specific letters پ/چ/ژ/گ that the Arabic library
     // mangles). Note it's a consonant-skeleton transliteration: Persian script
     // omits short vowels, so they're absent from the output (سلام → "slam").
     // Wired in convex/lib/localRomanization.ts. Google v3 isn't an option here
     // (its romanizeText 400s on `fa`).
     needsRomanization: true,
+    ipaVoice: 'fa',
     romanizationBackend: 'local',
-    // Non-Latin script — karaoke highlighting off (matches Arabic/Hebrew).
+    // Non-Latin script. Karaoke highlighting off (matches Arabic/Hebrew).
     supportsKaraoke: false,
     supportsStt: true,
     translationVersion: 2,
@@ -1564,6 +1631,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
     needsRomanization: false,
+    ipaVoice: 'sw',
     supportsKaraoke: true,
     supportsStt: true,
     translationPromptNotes: 'Standard Kiswahili as spoken in Kenya, Sheng-free.',
@@ -1591,9 +1659,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Tanzanian Swahili',
     needsRomanization: false,
+    ipaVoice: 'sw',
     supportsKaraoke: false,
     // Azure Fast Transcription rejects sw-TZ (May 2026). sw-KE is supported;
-    // sw_tz courses inherit the Greek pattern — no validation roundtrips,
+    // sw_tz courses inherit the Greek pattern, no validation roundtrips,
     // no per-word timings, no karaoke.
     supportsStt: false,
     translationPromptNotes: 'Standard Kiswahili sanifu, Tanzanian vocabulary.',
@@ -1637,7 +1706,7 @@ export function getTtsProviderForLanguage(code: string): TtsProvider {
 }
 
 // ---------------------------------------------------------------------------
-// Content versioning — per-language method/setup versions.
+// Content versioning. Per-language method/setup versions.
 //
 // Each version defaults to 1. Bumping a language's `translationVersion` (a new
 // model/prompt) or `ttsVersion` (a new voice pool / Gemini prompt / provider)
@@ -1645,7 +1714,7 @@ export function getTtsProviderForLanguage(code: string): TtsProvider {
 // rows whose stamped version is strictly LOWER than the current value as stale
 // and regenerate them lazily on next view. The stamp is "undefined === current"
 // at the comparison sites (only a number strictly < current is stale), so rows
-// written before the field existed never mass-regenerate — a one-time backfill
+// written before the field existed never mass-regenerate. A one-time backfill
 // stamped them explicitly. See convex/schema.ts.
 // ---------------------------------------------------------------------------
 
@@ -1669,7 +1738,7 @@ const TRANSLATION_POST_PROCESSORS: Record<
   (text: string) => string
 > = {
   // LLMs occasionally emit a stray trailing underscore (observed on Arabic:
-  // "…متأسفة._" — the Buckwalter-style romanization then carries the same
+  // "…متأسفة._". The Buckwalter-style romanization then carries the same
   // "_"). Strip trailing runs of underscores/whitespace; interior
   // underscores are kept (could be a deliberate blank).
   default: (text) => text.replace(/[\s_]+$/u, ''),
@@ -1679,7 +1748,7 @@ const TRANSLATION_POST_PROCESSORS: Record<
  * Apply the language's post-processing step to machine-generated translation
  * output. Also applied to the derived `romanizedText` (it inherits the same
  * artifacts) and by the `stripTrailingUnderscores` backfill migration.
- * Idempotent — safe to run at both the producer and the storage choke point.
+ * Idempotent. Safe to run at both the producer and the storage choke point.
  */
 export function postProcessTranslation(code: string, text: string): string {
   const id = getLanguageByCode(code)?.translationPostProcess ?? 'default';
@@ -1697,9 +1766,9 @@ export function getCurrentTtsVersion(code: string): number {
  * translation and TTS regen sweeps can't drift apart.
  *
  * Treats `undefined` (a row written before the version field existed, or never
- * backfilled) as "current/unknown — NOT stale". Only a concrete number strictly
+ * backfilled) as "current/unknown, NOT stale". Only a concrete number strictly
  * below `current` is stale. This is what prevents a database-wide regeneration
- * storm the first time a card is viewed after the feature ships — the deciding
+ * storm the first time a card is viewed after the feature ships. The deciding
  * detail of the whole versioning system.
  */
 export function isContentVersionStale(
@@ -1728,7 +1797,7 @@ export function isTranslationVersionStale(
 }
 
 // ---------------------------------------------------------------------------
-// Translation rules — named (model × reasoning × fallback) pipelines.
+// Translation rules. Named (model × reasoning × fallback) pipelines.
 //
 // A rule is a list of length-keyed branches; each branch declares a primary
 // model+reasoning and an ordered fallback chain. The translation worker
@@ -1748,10 +1817,10 @@ export function isTranslationVersionStale(
 /**
  * Reasoning / thinking effort for a translation stage. `undefined` = send no
  * reasoning field at all. `'none'` = explicitly disable thinking
- * (`reasoning: { enabled: false }` on the wire) — required for models like
+ * (`reasoning: { enabled: false }` on the wire), required for models like
  * GPT-5.6 Luna where omitting the field is NOT the same as disabling
  * (standard mode reasons adaptively on some inputs). `'minimal'` is
- * Gemini-3-specific — OpenRouter maps it to Google's `thinkingLevel:
+ * Gemini-3-specific. OpenRouter maps it to Google's `thinkingLevel:
  * 'minimal'`, strictly below `'low'`. The `@openrouter/ai-sdk-provider`
  * types only enumerate `'low' | 'medium' | 'high'`; the cast lives in
  * `translateTextWithLLM`.
@@ -1761,16 +1830,22 @@ export type StageReasoning =
 
 /**
  * OpenRouter provider-routing constraints for a stage. `max_price.completion`
- * caps routing at $N per million output tokens — used to pin promo-priced
+ * caps routing at $N per million output tokens. Used to pin promo-priced
  * models (Luna) to their cheap endpoints and exclude expensive variants
  * (Azure serves Luna at $6.00–6.60/M out and was observed burning ~1k hidden
  * reasoning tokens per call, ~10× the request cost).
  */
 export type StageProviderConstraints = {
   max_price?: { completion: number };
+  /**
+   * OpenRouter `provider.order`. Try these slugs first. With the default
+   * `allow_fallbacks: true`, later endpoints still serve if the preferred
+   * ones are down or don't support the request.
+   */
+  order?: string[];
 };
 
-/** One leg of a translation rule — an OpenRouter model + optional reasoning. */
+/** One leg of a translation rule. An OpenRouter model + optional reasoning. */
 export type ModelStage = {
   /** OpenRouter slug, e.g. `'google/gemini-3.1-flash-lite'`. */
   model: string;
@@ -1788,8 +1863,8 @@ export type ModelStage = {
   provider?: StageProviderConstraints;
   /**
    * Best-of-N sampling. When set, the stage runs `total` candidate calls in
-   * parallel — candidate #1 at temperature 0 (this stage's own config), the
-   * remaining `total - 1` at `extraTemperature` — deduplicates the outputs,
+   * parallel. Candidate #1 at temperature 0 (this stage's own config), the
+   * remaining `total - 1` at `extraTemperature`. Deduplicates the outputs,
    * and (only when >1 unique candidate survives) asks `judge` to pick.
    * Candidate calls fail independently: the stage succeeds as long as one
    * candidate returns usable text; only a full wipe-out advances the rule to
@@ -1802,7 +1877,7 @@ export type ModelStage = {
    * `<context>` block as the translation prompt plus the shuffled unique
    * candidates and returns the id of the best one. Transport failures are
    * retried up to `maxRetries` extra times; exhausted retries or an
-   * unparseable verdict fall back to the temp-0 candidate — the stage still
+   * unparseable verdict fall back to the temp-0 candidate. The stage still
    * succeeds. Ignored when `samples` is unset.
    */
   judge?: {
@@ -1813,9 +1888,9 @@ export type ModelStage = {
   };
 };
 
-// Translation provenance — the source slugs (`google-translate-v2`,
+// Translation provenance. The source slugs (`google-translate-v2`,
 // `user-provided`, `curated-manual`) and the guards that decide whether an
-// automated pass may touch a row — lives in `lib/translationProvenance.ts`.
+// automated pass may touch a row. Lives in `lib/translationProvenance.ts`.
 // Import from there, not from here. Only the tag *format* below stays with the
 // model config.
 
@@ -1871,7 +1946,7 @@ export type TranslationRule = {
 
 // --- Shared model stages (referenced by multiple rules) --------------------
 
-// Gemini 3.5 Flash Lite with `minimal` reasoning — primary for
+// Gemini 3.5 Flash Lite with `minimal` reasoning. Primary for
 // `retranslation_custom` (flagged retranslations of user-created texts).
 // Kept on the Flash Lite tier (vs. Pro Medium for curriculum) on the
 // assumption that custom texts are mostly the user's own content where a
@@ -1887,7 +1962,7 @@ const GEMINI_FLASH_LITE_MINIMAL: ModelStage = {
   reasoning: 'minimal',
   maxOutputTokens: 4_000,
 };
-// Gemini 3.1 Pro with medium reasoning — primary for `retranslation_high`
+// Gemini 3.1 Pro with medium reasoning. Primary for `retranslation_high`
 // (first-flag retranslations of curriculum / premade-dataset texts). A
 // heavier *different* model than the default Flash tier so a flagged row
 // gets a genuine cross-model second opinion. Medium reasoning is the
@@ -1899,8 +1974,8 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
   reasoning: 'medium',
   maxOutputTokens: 8_000,
 };
-// Gemini 3.6 Flash via OpenRouter Nitro routing with `minimal` reasoning —
-// the translation workhorse: primary + retry for
+// Gemini 3.7 Flash via OpenRouter Nitro routing with `minimal` reasoning.
+// The translation workhorse: primary + retry for
 // `gemini_35_flash_nitro_minimal`, the default rule for every language.
 // Nitro prioritizes throughput/latency; minimal thinking keeps quality on
 // par with `low` at much lower cost/latency.
@@ -1908,24 +1983,32 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
 // convex/features/customTexts.ts) stays on the same model + effort as the
 // single-sentence pipeline by construction rather than by comment.
 export const GEMINI_35_FLASH_NITRO_MINIMAL: ModelStage = {
-  model: 'google/gemini-3.6-flash:nitro',
+  model: 'google/gemini-3.7-flash:nitro',
   reasoning: 'minimal',
   maxOutputTokens: 4_000,
 };
 
 /**
- * OpenRouter routing cap shared by every Luna call in the app (translation,
- * autofill, chat): never route to an endpoint charging more than $2 per
- * million output tokens. Keeps OpenAI's own endpoints ($0.30–1.20/M out),
- * excludes the Azure variants ($6.00–6.60/M) — the endpoints that were
- * observed silently burning ~1k hidden reasoning tokens per call during the
- * Aug 2026 eval.
+ * OpenRouter routing shared by every Luna call in the app (translation,
+ * autofill, chat).
+ *
+ * `order` prefers Amazon Bedrock us-east-1 (OpenRouter slug
+ * `amazon-bedrock/us-east-1`; supports tools + reasoning_effort, $1.32/M
+ * out as of 2026-08-15). Fallbacks stay on so a Bedrock outage degrades to
+ * other endpoints under the price cap rather than failing the request.
+ *
+ * `max_price.completion` never routes to an endpoint charging more than $2
+ * per million output tokens. Originally added to exclude Azure variants
+ * that were $6.00–6.60/M and silently burning ~1k hidden reasoning tokens
+ * per call during the Aug 2026 eval; kept as a ceiling if those prices
+ * return.
  */
 export const LUNA_PROVIDER_CONSTRAINTS: StageProviderConstraints = {
   max_price: { completion: 2 },
+  order: ['amazon-bedrock/us-east-1'],
 };
 
-// GPT-5.6 Luna best-of-3 — the translation workhorse since Aug 2026.
+// GPT-5.6 Luna best-of-3. The translation workhorse since Aug 2026.
 // Selected by a multi-round eval (FLORES de/is, native-speaker feedback set,
 // 500 Tatoeba EN→IS with COMET-22 + blind ratings): no-thinking Luna beat
 // Gemini 3.6 Flash minimal on every signal at ~6% of its cost, and the
@@ -1948,28 +2031,31 @@ export const LUNA_BO3: ModelStage = {
 };
 
 /**
- * Maximum number of auto-retranslations triggered by user flags on a single
- * translation row. The first flag enqueues a retranslation via
- * `retranslation_high` / `retranslation_custom`; the second flag (and
- * beyond) only increments `flagCount` for admin triage — at that point the
- * row has already had its one shot at automatic recovery, so further
- * complaints surface as "Flagged" rather than retriggering the pipeline.
- * Surfaced here (rather than inline in `flagTranslation`) so the card
- * queries can also use it to decide between the "Retranslating" pill
- * (under-cap, in flight) and the "Flagged" pill (over-cap, no
- * auto-retranslation will happen).
+ * Maximum number of auto-retranslations a single translation row can accrue
+ * from user complaints. Flags 1 and 2 enqueue a retranslation via
+ * `retranslation_high` / `retranslation_custom`; flag 3 and beyond only
+ * increment `flagCount` for admin triage. By then the row has had both of its
+ * shots at automatic recovery, so further complaints surface as "Flagged"
+ * rather than retriggering the pipeline.
+ *
+ * Two gestures share this counter and this cap, so the ceiling is per row and
+ * not per trigger: the explicit Flag button (`flagTranslation`) and a manual
+ * card edit of a curriculum translation, which flags the shared row and hands
+ * the user's wording to the retranslation as a suggestion
+ * (`suggestCurriculumFixesForEdit` in `convex/features/scheduling.ts`). Both
+ * check the post-increment count against this constant.
  */
-export const FLAG_AUTO_RETRANSLATION_MAX = 1;
+export const FLAG_AUTO_RETRANSLATION_MAX = 2;
 
 export const TRANSLATION_RULES = {
   /**
-   * Default for every language — no entry sets an explicit
+   * Default for every language, no entry sets an explicit
    * `translationRule` anymore (set one only to route a language off this
    * default, e.g. if Luna regresses on it). Used for the initial LLM
    * translation of premade curriculum sentences and placement-test
    * material. Swapped in from `gemini_35_flash_nitro_minimal` in Aug 2026
    * on eval evidence (see `LUNA_BO3`); existing translations are not
-   * mass-regenerated by the rule swap — only new/missing rows (and
+   * mass-regenerated by the rule swap, only new/missing rows (and
    * languages whose `translationVersion` was bumped, currently Icelandic)
    * go through Luna. The Gemini stage stays as the fallback so a Luna
    * outage degrades to the previous production config before the Google
@@ -1977,7 +2063,7 @@ export const TRANSLATION_RULES = {
    */
   luna_bo3: {
     id: 'luna_bo3',
-    label: 'Luna best-of-3 (no thinking, judge) → Gemini 3.6 Flash Nitro (minimal) → Google',
+    label: 'Luna best-of-3 (no thinking, judge) → Gemini 3.7 Flash Nitro (minimal) → Google',
     branches: [
       {
         maxChars: Infinity,
@@ -1993,12 +2079,12 @@ export const TRANSLATION_RULES = {
    */
   gemini_35_flash_nitro_minimal: {
     id: 'gemini_35_flash_nitro_minimal',
-    label: 'Gemini 3.6 Flash Nitro (minimal) → Gemini 3.6 Flash Nitro (minimal, retry) → Google',
+    label: 'Gemini 3.7 Flash Nitro (minimal) → Gemini 3.7 Flash Nitro (minimal, retry) → Google',
     branches: [
       {
         maxChars: Infinity,
         primary: GEMINI_35_FLASH_NITRO_MINIMAL,
-        // Same model + reasoning + cap as the primary — the fallback
+        // Same model + reasoning + cap as the primary. The fallback
         // exists only to retry once on transient HTTP errors before the
         // Google safety net kicks in. Truncation is rare at this thinking
         // level / token cap, so retrying the same config is cheap insurance.
@@ -2010,7 +2096,7 @@ export const TRANSLATION_RULES = {
    * Triggered by `flagTranslation` for flagged retranslations of CURRICULUM
    * (premade-dataset) texts, on flag counts 1 through
    * `FLAG_AUTO_RETRANSLATION_MAX`. Routes through Gemini 3.1 Pro with
-   * medium reasoning — a different (heavier) model than the default Flash
+   * medium reasoning. A different (heavier) model than the default Flash
    * tier, so a flagged curriculum row genuinely gets a cross-model second
    * opinion. The worker also threads the previously-flagged translation
    * into the prompt as `<previous_translation>` context. Custom (user-
@@ -2026,7 +2112,7 @@ export const TRANSLATION_RULES = {
   /**
    * Triggered by `flagTranslation` for flagged retranslations of CUSTOM
    * (user-created) texts. Routes through Gemini 3.5 Flash Lite with
-   * `minimal` reasoning — kept on the Lite tier (vs. Pro Medium
+   * `minimal` reasoning. Kept on the Lite tier (vs. Pro Medium
    * for curriculum) on the assumption that custom texts are mostly the
    * user's own content where a heavyweight cross-model second opinion
    * adds less value than on curated material. Worker behavior
@@ -2050,7 +2136,7 @@ export type TranslationRuleId = keyof typeof TRANSLATION_RULES;
  * the matching branch of the language's rule (or the `luna_bo3` default when
  * the language doesn't set one).
  *
- * `opts.ruleOverride` bypasses the per-language rule lookup — used by
+ * `opts.ruleOverride` bypasses the per-language rule lookup. Used by
  * `flagTranslation` to force the `retranslation_high` chain regardless of the
  * language's normal routing.
  */
@@ -2075,7 +2161,7 @@ export function resolveTranslationStages(
 
 /**
  * Resolved per-language context for the LLM prompt. Drops `model`/`reasoning`
- * — those now come from `resolveTranslationStages` since they depend on
+ * Those now come from `resolveTranslationStages` since they depend on
  * source-text length and may include a fallback chain.
  */
 export type ResolvedTranslationConfig = {
@@ -2084,7 +2170,7 @@ export type ResolvedTranslationConfig = {
   targetLangName: string;                    // English language name
   /**
    * Language name in its native script (e.g. 'Deutsch', '中文（简体）'). Always
-   * injected alongside the English name in LLM prompts — see translationLLM.ts
+   * injected alongside the English name in LLM prompts. See translationLLM.ts
    * and customTexts.ts. Falls back to the English name when the language has
    * no separate native form (e.g. English variants).
    */
@@ -2193,7 +2279,7 @@ export function getLocalizedLanguageName(
   displayCode: string,
   locale: string,
 ): string {
-  // Hard-coded display-code overrides win first — Intl returns "Chinese
+  // Hard-coded display-code overrides win first. Intl returns "Chinese
   // (China)" for zh-CN, but we want script-based naming.
   const override = localizedOverride(displayCode, locale);
   if (override) return override;
@@ -2247,7 +2333,7 @@ const LETTER_RE = /\p{L}/gu;
  * Base direction for free-form text with no language code (chat markdown).
  *
  * HTML `dir="auto"` keys on the FIRST strong character, which misfires on
- * the tutor's most common reply shape — an explanation that opens with a
+ * the tutor's most common reply shape. An explanation that opens with a
  * target-language token («"وإنت" means "And you?" …» flips the entire
  * English paragraph to RTL, moving every period and colon to the wrong
  * side). Counting strong characters keys the base direction to the
@@ -2275,7 +2361,7 @@ export function dominantTextDirection(text: string): 'rtl' | 'ltr' {
  *  - Google v3 romanizeText API: ru, hi, ja, ar (and the Arabic dialects via
  *    GOOGLE_TRANSLATE_CODE_MAP collapsing to "ar"). Google's officially
  *    supported source-language set is small: am/ar/be/bn/gu/hi/ja/kn/my/ru/
- *    sr/ta/te/uk — anything outside that list 400s with "Source language is
+ *    sr/ta/te/uk: anything outside that list 400s with "Source language is
  *    unsupported."
  *  - NOT currently supported (no local lib AND no Google v3): th. The
  *    `Language.needsRomanization` flag is also `false` on that entry so the
@@ -2298,9 +2384,34 @@ export function languageNeedsRomanization(code: string): boolean {
 }
 
 /**
+ * Languages with a working IPA transcription (espeak-ng voice configured).
+ * Derived from `ipaVoice` the same way ROMANIZATION_LANGUAGES is derived
+ * from `needsRomanization`: dropping the field on an entry immediately stops
+ * scheduling (decks.ts / collections.ts), drops stored `ipaText` from query
+ * responses (cardContent.ts), and hides the settings toggle.
+ */
+export const IPA_LANGUAGES = new Set<string>(
+  SUPPORTED_LANGUAGES.filter((l) => l.ipaVoice !== undefined).map(
+    (l) => l.code,
+  ),
+);
+
+export function languageNeedsIpa(code: string): boolean {
+  return IPA_LANGUAGES.has(code);
+}
+
+/**
+ * espeak-ng voice for a language, or null when IPA is unsupported.
+ * Consumed by the Node-runtime IPA action (convex/features/ipa.ts).
+ */
+export function getIpaVoice(code: string): string | null {
+  return getLanguageByCode(code)?.ipaVoice ?? null;
+}
+
+/**
  * Whether per-word karaoke highlighting is enabled for the given language.
  * Karaoke requires word timings, so any language without STT support gets
- * `false` regardless of its declared `supportsKaraoke` — the field is a UX
+ * `false` regardless of its declared `supportsKaraoke`. The field is a UX
  * preference that's only meaningful when timings exist.
  *
  * Defaults to true for unknown codes (so new languages get karaoke unless
@@ -2314,7 +2425,7 @@ export function languageSupportsKaraoke(code: string): boolean {
 /**
  * Whether our STT backend can transcribe audio in this language. Single
  * source of truth gating both TTS validation roundtrips and per-word
- * timings. Defaults to false for unknown codes — Azure Fast Transcription
+ * timings. Defaults to false for unknown codes. Azure Fast Transcription
  * rejects unsupported locales with a 400, so not-trying is the safe default.
  */
 export function languageSupportsStt(code: string): boolean {
@@ -2343,7 +2454,7 @@ const VARIANT_SUFFIX_RE = new RegExp(`_(${VARIANT_SUFFIXES.join('|')})$`);
  * sub-variant per sentence (deterministically seeded by `textId`) and stores
  * both the prose and the picked `regionVariant` on the translations row.
  *
- * Each entry's `variants` array is consumed in order — `resolveMixedVariant`
+ * Each entry's `variants` array is consumed in order. `resolveMixedVariant`
  * does a deterministic 0..variants.length-1 hash mod, so a coin-flip needs
  * exactly two variants. Voice locale prefixes match the apiCode prefix that
  * `getVoiceForLanguageVariant` filters on.
@@ -2367,7 +2478,7 @@ export function isMixedLanguage(code: string): boolean {
 
 /**
  * Deterministic FNV-1a hash for short strings. Used to seed the per-text
- * variant pick for mixed-dialect languages — re-running translation for the
+ * variant pick for mixed-dialect languages. Re-running translation for the
  * same textId always lands on the same variant, so the persisted
  * `regionVariant` and the synthesized voice stay in agreement across retries.
  */
@@ -2382,7 +2493,7 @@ function fnv1a(str: string): number {
 
 /**
  * Resolve the concrete regional sub-variant for a mixed-dialect language.
- * Returns `null` when `code` is not a mixed language — callers should fall
+ * Returns `null` when `code` is not a mixed language. Callers should fall
  * back to the non-mixed translation path in that case.
  *
  * `seed` should be the textId (or any stable per-sentence identifier) so the
@@ -2405,7 +2516,7 @@ export function resolveMixedVariant(
 /**
  * Look up a mixed-dialect language's variant by a previously persisted
  * `regionVariant` (voice-locale prefix, e.g. `'es-US'`). Regeneration paths
- * use this to pin a translation to the variant already stored on its row —
+ * use this to pin a translation to the variant already stored on its row,
  * matching by locale prefix instead of re-hashing keeps the pick immune to
  * reordering or extension of the `variants` array. Returns `null` when `code`
  * isn't a mixed language or the prefix no longer exists; callers fall back to
@@ -2432,7 +2543,7 @@ export function normalizeLanguageCode(code: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Voice helpers — re-exported from lib/voices.ts for backward compat.
+// Voice helpers. Re-exported from lib/voices.ts for backward compat.
 // New code should import these directly from `lib/voices`.
 // ---------------------------------------------------------------------------
 

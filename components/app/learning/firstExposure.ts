@@ -33,7 +33,7 @@ export function isTranscribeMode(
  * would print the answer above the input on every pass of the round-robin,
  * forever. `freeStudyPlayCount` is that face's own per-card play counter, so
  * folding it in with max() lets each face retire the assist on its own
- * exposures without either one double-counting the other — mirroring how the
+ * exposures without either one double-counting the other, mirroring how the
  * listening face folds in `radioPlayCount`.
  *
  * Never in transcribe mode: there the target audio IS the prompt, so printing

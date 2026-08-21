@@ -147,7 +147,7 @@ describe("features/courses", () => {
 
     // completeOnboarding copies this value verbatim onto courseSettings, so
     // an unclamped write here was a side door around updateCourseSettings'
-    // guard — Infinity rendered the home ring as "14 / Infinity min", NaN
+    // guard. Infinity rendered the home ring as "14 / Infinity min", NaN
     // made it claim no goal was ever set.
     it("clamps dailyTimeGoalMinutes into the custom-goal window", async () => {
       const t = convexTest(schema, modules);
@@ -189,9 +189,9 @@ describe("features/courses", () => {
     });
   });
 
-  describe("getTodayStats — client-supplied today", () => {
+  describe("getTodayStats: client-supplied today", () => {
     // The regression this exists for: todayStr came from Date.now() inside
-    // the query, and a query never re-runs because time passed — after local
+    // the query, and a query never re-runs because time passed, after local
     // midnight the ring/streak kept showing yesterday until an unrelated
     // write. The client now passes its own (clamped ±1 day) date.
     async function seedTwoDays(t: TestConvex<typeof schema>) {
@@ -435,7 +435,7 @@ describe("features/courses", () => {
         {},
       );
       expect(settings?.currentSessionId).toBe("session-xyz");
-      // Pre-existing fields survive — the mutation only patches the one field.
+      // Pre-existing fields survive. The mutation only patches the one field.
       expect(settings?.initialReviewCount).toBe(5);
       expect(settings?.autoPlayAudio).toBe(true);
       expect(settings?.studyContentFilter).toBe("custom");
@@ -682,7 +682,7 @@ describe("features/courses", () => {
 
     it("creates a userSettings row when none exists yet", async () => {
       const t = convexTest(schema, modules);
-      // No seed — settings row absent on first call.
+      // No seed. Settings row absent on first call.
       const asUser = t.withIdentity({ subject: "user_A" });
       await asUser.mutation(api.features.courses.updatePinnedCardActions, {
         actions: ["edit"],
@@ -696,7 +696,7 @@ describe("features/courses", () => {
     });
   });
 
-  describe("updateCourseSettings — audio playback", () => {
+  describe("updateCourseSettings: audio playback", () => {
     const makeActiveCourse = async (
       t: TestConvex<typeof schema>,
     ): Promise<{
@@ -781,7 +781,7 @@ describe("features/courses", () => {
       expect(settings?.ignorePunctuation).toBe(false);
     });
 
-    // Daily goal — editable post-onboarding (removed from the validator's
+    // Daily goal. Editable post-onboarding (removed from the validator's
     // omit list), clamped to 1..120, and never touching the frozen
     // onboardingProgress row that preserves the user's original answer.
     it("persists dailyTimeGoalMinutes on first insert and on patch", async () => {
@@ -845,7 +845,7 @@ describe("features/courses", () => {
 
     it("drops non-finite numeric values instead of storing them", async () => {
       // NaN/±Infinity are valid float64s, so they pass v.number() and
-      // survive Math.max/min/round — without the finite guard a NaN goal
+      // survive Math.max/min/round, without the finite guard a NaN goal
       // poisons the daily-goal ring and every projection.
       const t = convexTest(schema, modules);
       const { asUser, courseId } = await makeActiveCourse(t);
@@ -896,7 +896,7 @@ describe("features/courses", () => {
       expect(progress?.dailyTimeGoalMinutes).toBe(20);
     });
 
-    // Same three-place regression class again — validator, PATCHABLE_KEYS and
+    // Same three-place regression class again. Validator, PATCHABLE_KEYS and
     // the hand-written insert object.
     it("persists autoRateFromAccuracy on first insert", async () => {
       const t = convexTest(schema, modules);
@@ -990,7 +990,7 @@ describe("features/courses", () => {
     });
 
     // The other four playback-speed records go through the same clamp loop as
-    // targetBeforePlaybackSpeeds above — pin each one on the insert branch.
+    // targetBeforePlaybackSpeeds above. Pin each one on the insert branch.
     it.each([
       "languagePlaybackSpeeds",
       "languagePlaybackSpeedsFull",
@@ -1104,7 +1104,7 @@ describe("features/courses", () => {
       const t = convexTest(schema, modules);
       const { asUser, courseId } = await makeActiveCourse(t);
       // No courseSettings row yet, so this exercises the INSERT branch (not the
-      // patch branch) — the insert path previously skipped the clamp.
+      // patch branch), the insert path previously skipped the clamp.
       await asUser.mutation(api.features.courses.updateCourseSettings, {
         courseId,
         cardsToAddBatchSize: 999,
@@ -1172,7 +1172,7 @@ describe("features/courses", () => {
     });
   });
 
-  describe("updateCourseSettings — insert/patch field parity", () => {
+  describe("updateCourseSettings: insert/patch field parity", () => {
     const makeCourse = async (t: TestConvex<typeof schema>) =>
       t.run(async (ctx) =>
         ctx.db.insert("courses", {
@@ -1196,7 +1196,7 @@ describe("features/courses", () => {
     // Every updateCourseSettings arg except courseId, each set to an in-range
     // value distinguishable from the schema/server defaults. A field present in
     // the validator + PATCHABLE_KEYS but missing from the hand-written insert
-    // object fails the toMatchObject below — the regression class the comments
+    // object fails the toMatchObject below. The regression class the comments
     // in the describe above call out, guarded here for all fields at once.
     // Clamped fields use in-range values so clamps are no-ops, and
     // playTargetBeforeBase stays true so the both-toggles-off guard is inert.

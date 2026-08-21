@@ -7,7 +7,7 @@ import { isAuthError } from '@/lib/utils';
 interface UsePrefetchedThreadReturn {
   /** Empty thread ready for LearnView, or null until the prefetch lands. */
   prefetchedThreadId: string | null;
-  /** Re-run the prefetch — call after the current thread has been consumed. */
+  /** Re-run the prefetch. Call after the current thread has been consumed. */
   refreshPrefetchedThread: () => void;
   /** The underlying mutation, for callers that need a thread right now. */
   getOrCreateEmptyThread: ReactMutation<
@@ -23,7 +23,7 @@ interface UsePrefetchedThreadReturn {
  * renders children immediately), and Convex sends requests unauthenticated
  * until `setAuth` lands rather than queueing them. The prefetch is one-shot,
  * so racing the handshake used to strand `prefetchedThreadId` at null for the
- * whole session — chat then had to create a thread on demand every time.
+ * whole session. Chat then had to create a thread on demand every time.
  */
 export function usePrefetchedThread(): UsePrefetchedThreadReturn {
   const { isAuthenticated } = useConvexAuth();
@@ -43,12 +43,12 @@ export function usePrefetchedThread(): UsePrefetchedThreadReturn {
       // Reported rather than swallowed, because a persistent failure here is
       // invisible to the user and shows up only as chat feeling slow.
       // Auth errors are excluded: a token expiring (or a sign-out) mid-flight
-      // is expected and already handled by ClientAuthBoundary's redirect —
+      // is expected and already handled by ClientAuthBoundary's redirect,
       // but the one-shot is re-armed so the prefetch retries on the next
       // auth recovery instead of staying stranded for the session.
       // Known residual: a token that expires at execution time (wake-from-
       // sleep) rejects without flipping `isAuthenticated`, so the re-arm has
-      // no trigger in that path — accepted; the client refreshes tokens
+      // no trigger in that path. Accepted; the client refreshes tokens
       // proactively, and LearnView creates a thread on demand anyway.
       .catch((err) => {
         if (isAuthError(err)) {

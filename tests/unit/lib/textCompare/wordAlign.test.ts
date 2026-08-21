@@ -115,7 +115,7 @@ describe('alignWords', () => {
 
   it('never pairs a word with a punctuation mark', () => {
     const r = alignWords('Test.', 'Test');
-    // Word still aligns as equal — the period becomes a `missing` punct entry,
+    // Word still aligns as equal. The period becomes a `missing` punct entry,
     // not a wrong substitution against "Test".
     const wordEntry = r.words.find((w) => w.kind === 'word');
     expect(wordEntry?.tag).toBe('equal');

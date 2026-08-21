@@ -10,20 +10,14 @@ import { driver, type Driver, type DriveStep } from 'driver.js';
 import type { TutorialId } from '@/convex/features/tutorialIds';
 import { getTutorial } from './registry';
 import type { TutorialContext } from './types';
+import {
+  baseDriverConfig,
+  bindTourKeyboard,
+  getDriverOverlayOpacity,
+  resolveStepAnchors,
+} from './driver-common';
 
 const STORAGE_PREFIX = 'phrasis_completed_tutorials';
-
-const DRIVER_OVERLAY_OPACITY_VAR = '--driver-overlay-opacity';
-
-/** Opaque fill + single opacity for driver.js SVG overlay (see app/globals.css). */
-function getDriverOverlayOpacity(): number {
-  if (typeof document === 'undefined') return 0.5;
-  const raw = getComputedStyle(document.documentElement)
-    .getPropertyValue(DRIVER_OVERLAY_OPACITY_VAR)
-    .trim();
-  const n = parseFloat(raw);
-  return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0.5;
-}
 
 let currentUserId: string | null = null;
 
@@ -67,6 +61,16 @@ function getSnapshot(): string[] {
   return cachedSnapshot;
 }
 
+/**
+ * Live read of the completed-tutorial set (localStorage-backed module
+ * store). For effect-time decisions that must not act on a stale render
+ * closure, e.g. `useMilestoneTips` checks this right before scheduling a
+ * tip, after the DB backfill may have merged new completions mid-commit.
+ */
+export function getCompletedTutorialsSnapshot(): string[] {
+  return getSnapshot();
+}
+
 function getServerSnapshot(): string[] {
   return EMPTY;
 }
@@ -95,11 +99,11 @@ function writeCompleted(ids: string[]) {
 /**
  * Why a tour is being torn down. Only the reason decides whether the tour
  * counts as finished:
- *  - `completed` — reached the end, or the user clicked the closing CTA.
- *  - `dismissed` — the user closed it (X / Esc / overlay click). Counts as
+ *  - `completed`: reached the end, or the user clicked the closing CTA.
+ *  - `dismissed`: the user closed it (X / Esc / overlay click). Counts as
  *    finished: re-offering a tour someone deliberately closed is worse than
  *    dropping it.
- *  - `hidden` — the host view disabled the tour mid-flight, or we are stepping
+ *  - `hidden`: the host view disabled the tour mid-flight, or we are stepping
  *    aside for an interactive step / restart / unmount. Does NOT persist, so
  *    the tour can be offered again.
  */
@@ -111,44 +115,18 @@ const TEARDOWN_PERSISTS_COMPLETION: Record<TeardownReason, boolean> = {
   hidden: false,
 };
 
-interface UseTutorialOptions {
-  enabled?: boolean;
-  delayMs?: number;
-  extraSteps?: DriveStep[];
-  onInteractiveStep?: () => void;
-  onComplete?: () => void;
-  /** When the user clicks the highlighted element on this step (0-based index), complete the tutorial and close the driver. */
-  stepCompleteOnClickIndex?: number;
-  /**
-   * Whether clicking the last step's highlighted element completes the tour
-   * (default true — closing steps are usually CTAs that navigate away). Pass
-   * false for tours whose last step highlights an element purely to explain
-   * it: a curiosity click there must not mark the tour finished.
-   */
-  lastStepCompleteOnClick?: boolean;
-  /** Runtime context forwarded to the tour factory (e.g. reviewMode so the
-   *  home tour anchors the Radio vs Free Study button). */
-  context?: TutorialContext;
-}
-
-export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions = {}) {
-  const {
-    enabled = true,
-    delayMs = 800,
-    extraSteps,
-    onInteractiveStep,
-    onComplete,
-    stepCompleteOnClickIndex,
-    lastStepCompleteOnClick = true,
-    context,
-  } = options;
-  const driverRef = useRef<Driver | null>(null);
-  // Guards the re-entrancy of teardown → driver.destroy() → onDestroyStarted
-  // → teardown on driver's internal close paths.
-  const isTearingDownRef = useRef(false);
-  const [isActive, setIsActive] = useState(false);
-  const t = useTranslations('Tutorial');
-
+/**
+ * Shared access to the user's completed-tutorial set: localStorage-first
+ * (per-user key, `useSyncExternalStore` snapshot) with a one-time DB
+ * backfill, plus the persist path (localStorage + Convex mutation +
+ * analytics). Used by `useTutorial` (tours) and `useMilestoneTips` (one-time
+ * learning tips).
+ *
+ * `requiredIds`. The ids this caller cares about. The Convex
+ * `getCompletedTutorials` query stays subscribed only while at least one of
+ * them is missing from localStorage, so fully-synced clients do no reads.
+ */
+export function useCompletedTutorials(requiredIds: readonly string[]) {
   // ---- bind localStorage to the current authenticated user ----
   const authUser = useQuery(api.auth.getAuthUser);
   const authSubject =
@@ -159,31 +137,20 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       : null;
   const userId =
     authSubject != null && authSubject !== '' ? String(authSubject) : null;
-  const prevUserIdRef = useRef(userId);
 
   useEffect(() => {
     setTutorialUser(userId);
-    prevUserIdRef.current = userId;
   }, [userId]);
 
   // ---- localStorage is the primary source of truth for UI decisions ----
   const completed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const isCompleted = completed.includes(tutorialId);
 
-  const tutorial = getTutorial(tutorialId, t, context);
-  const prerequisiteMet = tutorial?.prerequisite
-    ? completed.includes(tutorial.prerequisite)
-    : true;
-
-  const shouldStart = enabled && !isCompleted && prerequisiteMet;
-
-  // ---- Convex: persist completions & one-time sync from DB ----
   const completeMutation = useMutation(api.features.courses.completeTutorial);
 
-  // Only subscribe to the Convex query when localStorage says this tutorial
-  // (or its prerequisite) is NOT yet completed. Once localStorage has the
-  // data we need, skip the query to avoid unnecessary reads.
-  const needsDbSync = !isCompleted || (tutorial?.prerequisite && !prerequisiteMet);
+  // Only subscribe to the Convex query while localStorage is missing an id
+  // the caller cares about. Once localStorage has the data we need, skip the
+  // query to avoid unnecessary reads.
+  const needsDbSync = requiredIds.some((id) => !completed.includes(id));
   const dbCompleted = useQuery(
     api.features.courses.getCompletedTutorials,
     needsDbSync ? {} : 'skip',
@@ -210,6 +177,96 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     }
   }, [dbCompleted, userId]);
 
+  // False while the auth user hasn't resolved OR a needed DB backfill
+  // hasn't answered yet. Gate show-once UI on this so (a) a fresh device
+  // doesn't replay tutorials the user finished elsewhere just because
+  // localStorage started empty, and (b) nothing is evaluated or persisted
+  // against the un-namespaced fallback localStorage key before
+  // `setTutorialUser` has bound the per-user key. Completion state is
+  // per USER (Convex `userSettings.completedTutorials` is the source of
+  // truth; localStorage is only that user's device cache).
+  const isLoaded =
+    authUser !== undefined && (!needsDbSync || dbCompleted !== undefined);
+
+  /**
+   * Persist a completion everywhere: localStorage (immediately, so the UI
+   * can't re-offer it), Convex (fire-and-forget), and PostHog, unless
+   * `captureEvent: false` (silent pre-marking, e.g. the veteran guard) or
+   * the id was already completed (re-runs must not inflate completion
+   * counts).
+   */
+  const markCompleted = useCallback(
+    (tutorialId: TutorialId, opts?: { captureEvent?: boolean }) => {
+      const prev = getSnapshot();
+      if (!prev.includes(tutorialId)) {
+        writeCompleted([...prev, tutorialId]);
+        if (opts?.captureEvent !== false) {
+          capture(CLIENT_EVENTS.TUTORIAL_COMPLETED, { tutorial_id: tutorialId });
+        }
+      }
+      completeMutation({ tutorialId }).catch((e) =>
+        reportError(e, { op: 'tutorial.persistCompletion', tutorialId }),
+      );
+    },
+    [completeMutation],
+  );
+
+  return { completed, markCompleted, isLoaded };
+}
+
+interface UseTutorialOptions {
+  enabled?: boolean;
+  delayMs?: number;
+  extraSteps?: DriveStep[];
+  onInteractiveStep?: () => void;
+  onComplete?: () => void;
+  /** When the user clicks the highlighted element on this step (0-based index), complete the tutorial and close the driver. */
+  stepCompleteOnClickIndex?: number;
+  /**
+   * Whether clicking the last step's highlighted element completes the tour
+   * (default true, closing steps are usually CTAs that navigate away). Pass
+   * false for tours whose last step highlights an element purely to explain
+   * it: a curiosity click there must not mark the tour finished.
+   */
+  lastStepCompleteOnClick?: boolean;
+  /** Runtime context forwarded to the tour factory (e.g. reviewMode so the
+   *  home tour anchors the Radio vs Free Study button). */
+  context?: TutorialContext;
+}
+
+export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions = {}) {
+  const {
+    enabled = true,
+    delayMs = 800,
+    extraSteps,
+    onInteractiveStep,
+    onComplete,
+    stepCompleteOnClickIndex,
+    lastStepCompleteOnClick = true,
+    context,
+  } = options;
+  const driverRef = useRef<Driver | null>(null);
+  const unbindKeyboardRef = useRef<(() => void) | null>(null);
+  // Guards the re-entrancy of teardown → driver.destroy() → onDestroyStarted
+  // → teardown on driver's internal close paths.
+  const isTearingDownRef = useRef(false);
+  const [isActive, setIsActive] = useState(false);
+  const t = useTranslations('Tutorial');
+
+  const tutorial = getTutorial(tutorialId, t, context);
+
+  const requiredIds = tutorial?.prerequisite
+    ? [tutorialId, tutorial.prerequisite]
+    : [tutorialId];
+  const { completed, markCompleted } = useCompletedTutorials(requiredIds);
+
+  const isCompleted = completed.includes(tutorialId);
+  const prerequisiteMet = tutorial?.prerequisite
+    ? completed.includes(tutorial.prerequisite)
+    : true;
+
+  const shouldStart = enabled && !isCompleted && prerequisiteMet;
+
   // ---- callbacks ----
   const onInteractiveStepRef = useRef(onInteractiveStep);
   const onCompleteRef = useRef(onComplete);
@@ -221,30 +278,21 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   });
 
   const completeTutorial = useCallback(() => {
-    const prev = getSnapshot();
-    if (!prev.includes(tutorialId)) {
-      // Only on the first completion — re-running a tutorial should not count
-      // again, or the completion rate can exceed its own start count.
-      writeCompleted([...prev, tutorialId]);
-      capture(CLIENT_EVENTS.TUTORIAL_COMPLETED, { tutorial_id: tutorialId });
-    }
-    completeMutation({ tutorialId }).catch((e) =>
-      reportError(e, { op: 'tutorial.persistCompletion', tutorialId }),
-    );
-  }, [tutorialId, completeMutation]);
+    markCompleted(tutorialId);
+  }, [tutorialId, markCompleted]);
 
   /**
    * Why every teardown goes through one helper.
    *
    * driver.js's public `destroy()` is `g(false)`, which deliberately SKIPS
-   * `onDestroyStarted` (driver.js 1.4.0, dist/driver.js.mjs:594-604 — `g(true)`
+   * `onDestroyStarted` (driver.js 1.4.0, dist/driver.js.mjs:594-604, `g(true)`
    * fires the hook and returns early; `g(false)` does the real teardown). Only
    * driver's own close paths (close button, Esc, overlay click, stepping past
    * the last step) go through `g(true)`.
    *
    * So anything WE call `destroy()` on never runs the hook. Hanging
    * completion-persistence or state cleanup off `onDestroyStarted` therefore
-   * silently no-ops for every teardown the app initiates — which is exactly
+   * silently no-ops for every teardown the app initiates, which is exactly
    * how the home tour ended up never marking itself complete and re-running on
    * every return to Home. `teardown` owns that bookkeeping instead, and
    * `onDestroyStarted` merely delegates to it.
@@ -259,6 +307,8 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
           completeTutorial();
           onCompleteRef.current?.();
         }
+        unbindKeyboardRef.current?.();
+        unbindKeyboardRef.current = null;
         driverRef.current = null;
         setIsActive(false);
         active.destroy();
@@ -279,24 +329,8 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
 
     const allSteps = [...tutorial.steps, ...(extraStepsRef.current ?? [])];
 
-    const resolvedSteps = allSteps.map((step) => {
-      if (typeof step.element !== 'string') return step;
-      const candidates = document.querySelectorAll<HTMLElement>(step.element);
-      for (const el of candidates) {
-        const rect = el.getBoundingClientRect();
-        // `visibility: hidden` keeps its layout box (e.g. the due-count
-        // pills reserve their width while counts load), so a pure rect
-        // check would highlight a blank rectangle — treat it as absent and
-        // let the step degrade to a centered popover instead.
-        if (
-          rect.width > 0 &&
-          rect.height > 0 &&
-          getComputedStyle(el).visibility !== 'hidden'
-        ) {
-          return { ...step, element: el };
-        }
-      }
-      return step;
+    const resolvedSteps = resolveStepAnchors(allSteps, {
+      onMiss: 'keep-selector',
     });
 
     const isInteractiveStep = (stepIndex: number) => {
@@ -316,7 +350,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     // the element the user is invited to click. That click must count as
     // finishing the tour: it often navigates away (e.g. the home tour's
     // Learn + Review CTA opens the learn view), which hides the host and
-    // would otherwise hit the suppress-complete path below — leaving the
+    // would otherwise hit the suppress-complete path below, leaving the
     // tour unfinished and re-running it on every visit. Tours whose last
     // step is explanatory opt out via `lastStepCompleteOnClick: false`.
     if (lastStepCompleteOnClick && resolvedSteps.length > 0) {
@@ -349,17 +383,12 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     });
 
     const d = driver({
-      animate: true,
+      ...baseDriverConfig(),
       showProgress: true,
-      showButtons: ['next', 'previous', 'close'],
-      overlayColor: '#000',
-      overlayOpacity: getDriverOverlayOpacity(),
-      stagePadding: 8,
-      stageRadius: 8,
       popoverClass: `phrasis-tutorial-${tutorialId}`,
       steps: resolvedSteps,
       // Fires only on driver's own close paths (close button, Esc, overlay
-      // click, stepping past the last step) — never on our own destroy()
+      // click, stepping past the last step), never on our own destroy()
       // calls. `d` is passed explicitly so the real teardown still runs even
       // if driverRef was already cleared.
       onDestroyStarted: () => {
@@ -373,6 +402,8 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       },
     });
 
+    unbindKeyboardRef.current?.();
+    unbindKeyboardRef.current = bindTourKeyboard(d);
     driverRef.current = d;
     setIsActive(true);
     d.drive();
@@ -401,7 +432,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   }, [enabled]);
 
   // Never leave an orphaned full-screen overlay behind if the host unmounts
-  // mid-tour. Does not persist completion — the user never finished it.
+  // mid-tour. Does not persist completion. The user never finished it.
   useEffect(
     () => () => {
       teardownRef.current('hidden');
@@ -414,6 +445,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   }, []);
 
   const showCompletionStep = useCallback((title: string, description: string) => {
+    let unbind = () => {};
     const d = driver({
       showButtons: ['close'],
       overlayColor: '#000',
@@ -423,9 +455,11 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
         popover: { title, description },
       }],
       onDestroyStarted: () => {
+        unbind();
         d.destroy();
       },
     });
+    unbind = bindTourKeyboard(d);
     d.drive();
   }, []);
 
@@ -436,6 +470,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
 
   const showChatStep = useCallback(() => {
     const tr = tRef.current;
+    let unbind = () => {};
     const d = driver({
       showButtons: ['close'],
       overlayColor: '#000',
@@ -451,11 +486,13 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
         },
       }],
       onDestroyStarted: () => {
+        unbind();
         completeTutorial();
         onCompleteRef.current?.();
         d.destroy();
       },
     });
+    unbind = bindTourKeyboard(d);
     d.drive();
   }, [completeTutorial]);
 

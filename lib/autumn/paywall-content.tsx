@@ -9,7 +9,7 @@ import { toBillableFeature } from "@/lib/autumn/find-upgrade-product";
  *
  * For boolean / non-metered features (`consumable === undefined`), Convex
  * `included` often reflects a display cap (e.g. 2 languages) while Autumn
- * product items use `included_usage: 1` for the flag — numeric compare would
+ * product items use `included_usage: 1` for the flag. Numeric compare would
  * incorrectly drop every product. Those features only require the item to exist.
  */
 export function filterProductsByFeatureIncrease(
@@ -47,7 +47,7 @@ export function getPaywallTitle(
   const { products } = preview;
   if (products.length === 0) return t("featureUnavailable");
 
-  // "Start trial" only for viewers who can actually get one — the
+  // "Start trial" only for viewers who can actually get one. The
   // product offering a trial is not enough (Autumn only dedupes trials
   // per-plan; see lib/autumn/trial-eligibility.ts).
   const nextProduct = products[0];
