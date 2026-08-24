@@ -39,7 +39,9 @@ import {
   asVoiceGender,
   llmPriorityValidator,
   ttsPriorityValidator,
+  voiceGenderValidator,
   type LlmPriority,
+  type VoiceGender,
 } from '../types';
 import { captureGeneration } from '../lib/posthogAi';
 
@@ -237,6 +239,21 @@ const llmJobArgsValidator = v.object({
   // field out of the completion context makes it structurally impossible for
   // one to leak down that path.
   userSuggestedTranslation: v.optional(v.string()),
+  // ── Gendered-variant mode (speaker-gender preference) ──
+  // When `variantId` is set, this job produces a `translationVariants` row
+  // instead of the base `translations` row: the prompt's <speaker_gender>
+  // is forced to `variantGender` (everything else — register, addressee,
+  // referent, arc context — stays as stored on the text), and the result is
+  // written via `storeTranslationVariantAndScheduleTTS` (decks.ts), which
+  // also chains asset-only TTS at the variant gender. Variant jobs hold no
+  // `llmTranslationClaims` row (the pending variant row is its own claim,
+  // see convex/schema.ts) and never fall back to Google Translate — Google
+  // has no notion of speaker gender, so a failed variant simply stays
+  // missing (readers keep serving the base row) until a later ensure pass
+  // retries. Both fields travel together; `enqueueVariantTranslation` is the
+  // only producer.
+  variantId: v.optional(v.id('translationVariants')),
+  variantGender: v.optional(voiceGenderValidator),
 });
 
 /** onComplete context: everything the Google fallback needs to run. */
@@ -445,10 +462,14 @@ export const processLlmTranslationForCard = internalAction({
         ? text.referentGender
         : legacyReferentGenderFallback(text.externalId, text._id as string);
 
-    const speakerGender =
-      text.speakerGender === 'male' ||
-      text.speakerGender === 'female' ||
-      text.speakerGender === 'neutral'
+    // Gendered-variant jobs force the speaker gender the variant is being
+    // produced for; everything else in the prompt stays as stored so the
+    // variant differs from the base row ONLY along the speaker-gender axis.
+    const speakerGender = args.variantGender
+      ? args.variantGender
+      : text.speakerGender === 'male' ||
+          text.speakerGender === 'female' ||
+          text.speakerGender === 'neutral'
         ? (text.speakerGender as 'male' | 'female' | 'neutral')
         : undefined;
 
@@ -711,6 +732,25 @@ export const processLlmTranslationForCard = internalAction({
       ? getTranslationSourceFromStage(winningStage)
       : undefined;
 
+    // Gendered-variant jobs write the variant row (+ chained asset-only TTS)
+    // and stop: the base `translations` row is not theirs to touch.
+    if (args.variantId !== undefined && args.variantGender !== undefined) {
+      await ctx.runMutation(
+        internal.features.decks.storeTranslationVariantAndScheduleTTS,
+        {
+          variantId: args.variantId,
+          translatedText: result.text,
+          voiceName,
+          romanizedText,
+          romanizationSource,
+          translationSource,
+          regionVariant,
+          priority: args.priority,
+        },
+      );
+      return null;
+    }
+
     await ctx.runMutation(
       internal.features.decks.storeTranslationAndScheduleTTS,
       {
@@ -869,6 +909,155 @@ export const onGoogleFallbackComplete = internalMutation({
     if (claim && (claim.workId === undefined || claim.workId === workId)) {
       await ctx.db.delete(claim._id);
     }
+    return null;
+  },
+});
+
+// ─── Gendered translation variants (speaker-gender preference) ─────────────
+
+/**
+ * Point-read the (textId, targetLanguage, speakerGender) variant row, if any.
+ * Shared by the reader overlay (convex/lib/cardContent.ts) and the scheduler
+ * (`scheduleMissingContent` in decks.ts).
+ */
+export async function getTranslationVariant(
+  ctx: QueryCtx | MutationCtx,
+  textId: Id<'texts'>,
+  targetLanguage: string,
+  speakerGender: VoiceGender,
+): Promise<Doc<'translationVariants'> | null> {
+  return await ctx.db
+    .query('translationVariants')
+    .withIndex('by_text_language_and_gender', (q) =>
+      q
+        .eq('textId', textId)
+        .eq('targetLanguage', targetLanguage)
+        .eq('speakerGender', speakerGender),
+    )
+    .first();
+}
+
+/**
+ * True while a pending variant row's generation claim is fresh. A ready row
+ * (translatedText set) is never "in flight"; a pending row with a stale (or
+ * absent) claimedAt is re-claimable — its worker died or was never enqueued.
+ * Shares CLAIM_STALE_MS with the base-translation claims so the two paths
+ * back off identically.
+ */
+export function isVariantGenerationFresh(
+  variant: Pick<Doc<'translationVariants'>, 'translatedText' | 'claimedAt'>,
+): boolean {
+  if (variant.translatedText !== undefined) return false;
+  return (
+    variant.claimedAt !== undefined &&
+    Date.now() - variant.claimedAt < CLAIM_STALE_MS
+  );
+}
+
+/**
+ * Claim-and-enqueue for one gendered translation variant. The pending
+ * variant row IS the claim (claimedAt/workId live on it — see the schema
+ * comment for why `llmTranslationClaims` can't grow a gender dimension), so
+ * this helper creates or re-claims the row and enqueues the shared worker in
+ * variant mode. Returns true iff a job was enqueued.
+ *
+ * Callers gate on `isVariantGenerationFresh` themselves (the scheduler batch-
+ * reads variant rows); this helper re-checks nothing beyond row existence so
+ * it stays a single-writer under the calling mutation's transaction.
+ */
+export async function claimAndEnqueueVariantTranslation(
+  ctx: MutationCtx,
+  args: {
+    textId: Id<'texts'>;
+    sourceLanguage: string;
+    targetLanguage: string;
+    text: string;
+    variantGender: VoiceGender;
+    existingVariant: Doc<'translationVariants'> | null;
+    priority?: Infer<typeof ttsPriorityValidator>;
+    llmPriority?: LlmPriority;
+  },
+): Promise<boolean> {
+  const variantId =
+    args.existingVariant?._id ??
+    (await ctx.db.insert('translationVariants', {
+      textId: args.textId,
+      targetLanguage: args.targetLanguage,
+      speakerGender: args.variantGender,
+      claimedAt: Date.now(),
+    }));
+  if (args.existingVariant) {
+    await ctx.db.patch(variantId, { claimedAt: Date.now() });
+  }
+
+  const pool = args.llmPriority === 'background' ? llmWarmPool : llmPool;
+  const workId: string = await pool.enqueueAction(
+    ctx,
+    internal.features.llmTranslationQueue.processLlmTranslationForCard,
+    {
+      textId: args.textId,
+      sourceLanguage: args.sourceLanguage,
+      targetLanguage: args.targetLanguage,
+      text: args.text,
+      // Voice pick inside the worker keys off this, so the chained TTS
+      // speaks at the variant's gender.
+      audioSpeakerGender: args.variantGender,
+      priority: args.priority,
+      variantId,
+      variantGender: args.variantGender,
+    },
+    {
+      onComplete:
+        internal.features.llmTranslationQueue.onVariantTranslationComplete,
+      context: { variantId },
+    },
+  );
+  await ctx.db.patch(variantId, { workId });
+  return true;
+}
+
+/**
+ * Pool onComplete for variant-mode `processLlmTranslationForCard` runs.
+ * Success clears nothing (the store mutation already released the claim
+ * fields when it wrote the text). Failure/cancellation releases the claim —
+ * ownership-gated on workId — so a later ensure pass can retry; there is no
+ * Google fallback for variants (see the validator comment).
+ */
+export const onVariantTranslationComplete = internalMutation({
+  args: vOnCompleteArgs(v.object({ variantId: v.id('translationVariants') })),
+  returns: v.null(),
+  handler: async (
+    ctx: MutationCtx,
+    {
+      workId,
+      context,
+      result,
+    }: {
+      workId: string;
+      context: { variantId: Id<'translationVariants'> };
+      result: PoolRunResult;
+    },
+  ) => {
+    if (result.kind === 'success') return null;
+    const variant = await ctx.db.get(context.variantId);
+    if (!variant) return null;
+    if (variant.workId !== undefined && variant.workId !== workId) return null;
+    if (variant.translatedText !== undefined) return null;
+    if (result.kind === 'failed') {
+      console.warn('[llmTranslationQueue] variant translation failed — releasing claim', {
+        variantId: context.variantId,
+        textId: variant.textId,
+        targetLanguage: variant.targetLanguage,
+        speakerGender: variant.speakerGender,
+        error: result.error,
+      });
+    }
+    // Pending row, owned by this job: release the claim fields so the row is
+    // re-claimable. The row itself stays as a marker of the attempt.
+    await ctx.db.patch(context.variantId, {
+      claimedAt: undefined,
+      workId: undefined,
+    });
     return null;
   },
 });

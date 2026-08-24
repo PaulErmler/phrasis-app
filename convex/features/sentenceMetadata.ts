@@ -20,6 +20,8 @@ import {
 } from '../lib/posthogAi';
 import { getLanguageByCode, resolveAudioSpeakerGender } from '../../lib/languages';
 import { isUserCreatedText } from '../../lib/translationProvenance';
+import { preferenceGender } from '../../lib/speakerGender';
+import { getSpeakerGenderPreference } from '../db/users';
 import { retrier } from '../retrier';
 
 const METADATA_SYSTEM_PROMPT = `You analyze a sentence and return strict linguistic metadata as JSON.
@@ -410,11 +412,18 @@ export async function applyTextMetadata(
     const incomingGender = args.metadata?.speakerGender;
 
     // Resolve audioSpeakerGender with a clear precedence:
-    //   1. A definitive male/female from the LLM always wins.
+    //   1. A definitive male/female from the LLM always wins (the sentence
+    //      itself is gendered — this is what keeps an inherently
+    //      female-spoken upload voiced female under any preference).
     //   2. Otherwise, preserve any audioSpeakerGender already on the row
     //      (so a re-run after retry success doesn't re-roll the coin flip
     //      and pointlessly invalidate audio that was just generated).
-    //   3. Otherwise (first call, no definitive gender), coin-flip.
+    //   3. Otherwise, the owner's speaker-gender preference (user-created
+    //      texts only — every live caller creates those; the guard keeps a
+    //      future premade caller from baking one user's preference into a
+    //      shared row).
+    //   4. Otherwise (first call, no definitive gender, no preference),
+    //      coin-flip.
     let audioSpeakerGender: 'male' | 'female';
     if (incomingGender === 'male' || incomingGender === 'female') {
       audioSpeakerGender = incomingGender;
@@ -424,7 +433,14 @@ export async function applyTextMetadata(
     ) {
       audioSpeakerGender = text.audioSpeakerGender;
     } else {
-      audioSpeakerGender = resolveAudioSpeakerGender(incomingGender);
+      const preferredGender =
+        isUserCreatedText(text) && text.userId
+          ? preferenceGender(
+              await getSpeakerGenderPreference(ctx, text.userId),
+            )
+          : null;
+      audioSpeakerGender =
+        preferredGender ?? resolveAudioSpeakerGender(incomingGender);
     }
 
     // Build the metadata patch from whatever the LLM committed to.

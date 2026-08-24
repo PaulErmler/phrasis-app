@@ -1,5 +1,6 @@
 import { v, Infer } from 'convex/values';
 import { TTS_PROVIDERS } from '../lib/languages';
+import { SPEAKER_GENDER_PREFERENCES } from '../lib/speakerGender';
 
 export const learningStyleValidator = v.union(
   v.literal('casual'),
@@ -229,6 +230,17 @@ export const ttsProviderValidator = v.union(
 export const voiceGenderValidator = v.union(
   v.literal('male'),
   v.literal('female'),
+);
+
+// Single source of truth for the preference values is
+// `SPEAKER_GENDER_PREFERENCES` in lib/speakerGender.ts (shared with the
+// client); indexed access keeps the exact string-literal union for `Infer`,
+// mirroring `ttsProviderValidator` above. 'mixed' is the default/no-op value
+// (absent on `userSettings` means 'mixed').
+export const speakerGenderPreferenceValidator = v.union(
+  v.literal(SPEAKER_GENDER_PREFERENCES[0]),
+  v.literal(SPEAKER_GENDER_PREFERENCES[1]),
+  v.literal(SPEAKER_GENDER_PREFERENCES[2]),
 );
 
 /**

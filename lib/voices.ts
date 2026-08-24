@@ -410,14 +410,23 @@ export interface SpeakerGenderInput {
  *   1. Definitive `speakerGender` ('male'/'female'): the source of truth; mirror
  *      it into `audioSpeakerGender`, never overwrite `speakerGender`.
  *   2. Custom + neutral/undefined: preserve the LLM's `speakerGender` verdict;
- *      only resolve `audioSpeakerGender` (preferring a prior resolution).
+ *      only resolve `audioSpeakerGender` (preferring a prior resolution). The
+ *      owner's speaker-gender preference (`preferredGender`), when set,
+ *      replaces the coin-flip here — a user-created text belongs to exactly
+ *      one user, so their preference may be baked into the row. A definitive
+ *      verdict (case 1) still always wins over the preference: that is what
+ *      keeps an inherently female-spoken upload voiced female.
  *   3. Premade + neutral/undefined: coin-flip BOTH fields to the same value so
- *      the prompt and the voice agree.
+ *      the prompt and the voice agree. `preferredGender` is deliberately
+ *      IGNORED here: premade rows are shared across users, so a per-user
+ *      preference must never be written into them (it overlays at read time
+ *      instead, see lib/speakerGender.ts).
  * Prior `audioSpeakerGender` is preserved when present so two runs don't re-roll.
  */
 export function resolveCardSpeakerGenders(
   text: SpeakerGenderInput,
   seed: string,
+  preferredGender?: 'male' | 'female',
 ): {
   audioSpeakerGender: 'male' | 'female';
   genderPatch: { speakerGender?: 'male' | 'female'; audioSpeakerGender?: 'male' | 'female' };
@@ -437,7 +446,7 @@ export function resolveCardSpeakerGenders(
     audioSpeakerGender =
       text.audioSpeakerGender === 'male' || text.audioSpeakerGender === 'female'
         ? text.audioSpeakerGender
-        : resolveAudioSpeakerGender(text.speakerGender, seed);
+        : preferredGender ?? resolveAudioSpeakerGender(text.speakerGender, seed);
     if (text.audioSpeakerGender !== audioSpeakerGender) {
       genderPatch.audioSpeakerGender = audioSpeakerGender;
     }

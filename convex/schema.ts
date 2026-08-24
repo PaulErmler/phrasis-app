@@ -22,6 +22,7 @@ import {
   ttsPriorityValidator,
   llmPriorityValidator,
   voiceGenderValidator,
+  speakerGenderPreferenceValidator,
   featureStateValidator,
   reviewsByModeValidator,
   translationEntriesValidator,
@@ -510,6 +511,65 @@ export default defineSchema({
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'targetLanguage']),
 
+  // Gendered translation variants for the user-level speaker-gender
+  // preference (lib/speakerGender.ts). PREMADE texts and their `translations`
+  // rows are shared across all users, so a "phrase this for a male/female
+  // speaker" preference can't patch them; instead the read path overlays a
+  // row from this table when (a) the viewer's preference is male/female,
+  // (b) the target language's `speakerGenderMarking` isn't 'none',
+  // (c) the sentence can actually change (`textEligibleForGenderVariant`),
+  // and (d) the preferred gender differs from the text's stored
+  // `audioSpeakerGender` (the base row already serves the matching half).
+  // Rows are created lazily, only for cards a preference-holding user
+  // actually views, and are shared by every user with that preference.
+  //
+  // A separate table (not extra `translations` rows) on purpose: the
+  // `translations` uniqueness convention — one row per (textId, language),
+  // read with `.first()` — is relied on at ~30 call sites, and the drift/
+  // version sweeps in `scheduleMissingContent` must keep operating on base
+  // rows only. Variant rows are inert cache to every existing code path.
+  translationVariants: defineTable({
+    textId: v.id('texts'),
+    targetLanguage: v.string(),
+    // The speaker gender this variant is phrased for. In practice always the
+    // opposite of the text's stored `audioSpeakerGender` (see overlay rule
+    // above), but stored explicitly so the key stays valid if the base
+    // assignment is ever re-rolled.
+    speakerGender: voiceGenderValidator,
+    // Undefined while the row is only a pending generation claim (see
+    // claimedAt below); set exactly once when the variant lands. May equal
+    // the base row's text (the sentence turned out not to change) — stored
+    // anyway so eligibility is never re-checked with an LLM call.
+    translatedText: v.optional(v.string()),
+    // Same tri-state semantics as on `translations`.
+    romanizedText: v.optional(v.string()),
+    romanizationSource: v.optional(v.string()),
+    ipaText: v.optional(v.string()),
+    ipaSource: v.optional(v.string()),
+    // Same format as `translations.translationSource`.
+    translationSource: v.optional(v.string()),
+    // Same "undefined === current" semantics as `translations.translationVersion`.
+    translationVersion: v.optional(v.number()),
+    // Copied from the base `translations` row so a mixed-language variant
+    // (es_mixed) keeps the same accent as the base rendering.
+    regionVariant: v.optional(v.string()),
+    // Generation-claim lifecycle, playing the role `llmTranslationClaims`
+    // plays for base rows (that table's (textId, language) key is read with
+    // `.first()` and can't grow a gender dimension without disturbing base
+    // reads). A row with undefined `translatedText` and a fresh `claimedAt`
+    // is in flight; a stale `claimedAt` (worker died) makes the row
+    // re-claimable by the next scheduler pass.
+    claimedAt: v.optional(v.number()),
+    workId: v.optional(v.string()),
+  })
+    .index('by_text_language_and_gender', [
+      'textId',
+      'targetLanguage',
+      'speakerGender',
+    ])
+    // Cascade cleanup when a text is deleted.
+    .index('by_textId', ['textId']),
+
   // Content-addressed audio store. One row per unique
   // (language, voiceGender, regionVariant, spoken string), every text whose
   // audio speaks that exact string points at the same asset via
@@ -635,6 +695,12 @@ export default defineSchema({
     // undefined = never synced, treated as declined. Account-scoped where the
     // browser choice is device-scoped, so the last device to sync wins.
     analyticsConsent: v.optional(v.boolean()),
+    // Speaker-gender preference: sentences are voiced (all languages) and
+    // phrased (languages whose `speakerGenderMarking` isn't 'none') for this
+    // gender. Absent = 'mixed' = today's per-text coin-flip behavior; ALWAYS
+    // read through `resolveSpeakerGenderPreference` (lib/speakerGender.ts),
+    // never directly — that helper is the future global kill-switch point.
+    speakerGenderPreference: v.optional(speakerGenderPreferenceValidator),
   }).index('by_userId', ['userId']),
 
   // Onboarding progress table. Stores the user's onboarding answers.

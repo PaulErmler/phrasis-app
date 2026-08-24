@@ -12,6 +12,7 @@ import {
   learningStyleValidator,
   currentLevelValidator,
   reviewsByModeValidator,
+  speakerGenderPreferenceValidator,
 } from '../types';
 import { tutorialIdValidator } from './tutorialIds';
 import {
@@ -155,6 +156,7 @@ export const getUserSettings = query({
       completedTutorials: v.optional(v.array(v.string())),
       pinnedCardActions: v.optional(v.array(v.string())),
       analyticsConsent: v.optional(v.boolean()),
+      speakerGenderPreference: v.optional(speakerGenderPreferenceValidator),
     }),
     v.null(),
   ),
@@ -1336,6 +1338,40 @@ export const updatePinnedCardActions = mutation({
         userId,
         hasCompletedOnboarding: false,
         pinnedCardActions: normalized,
+      });
+    }
+    return null;
+  },
+});
+
+// ============================================================================
+// SPEAKER-GENDER PREFERENCE
+// ============================================================================
+
+/**
+ * Set the user's speaker-gender preference (lib/speakerGender.ts). 'mixed'
+ * is stored explicitly rather than clearing the field so a later change of
+ * the default can't silently reinterpret older choices. Takes effect on
+ * read paths immediately; content (variant translations / preferred-gender
+ * audio) is generated lazily as cards are viewed.
+ */
+export const setSpeakerGenderPreference = mutation({
+  args: {
+    preference: speakerGenderPreferenceValidator,
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireAuthUserId(ctx);
+    const settings = await dbGetUserSettings(ctx, userId);
+    if (settings) {
+      await ctx.db.patch(settings._id, {
+        speakerGenderPreference: args.preference,
+      });
+    } else {
+      await ctx.db.insert('userSettings', {
+        userId,
+        hasCompletedOnboarding: false,
+        speakerGenderPreference: args.preference,
       });
     }
     return null;

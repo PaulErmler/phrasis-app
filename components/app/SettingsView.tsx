@@ -16,6 +16,7 @@ import PricingTable from '@/components/autumn/pricing-table';
 import { useIsNativeApp } from '@/hooks/use-native-app';
 import { DeleteAccountSection } from '@/components/app/DeleteAccountSection';
 import { ChangePasswordSection } from '@/components/app/ChangePasswordSection';
+import { SpeakerGenderSection } from '@/components/app/SpeakerGenderSection';
 
 const SUPPORT_EMAIL = 'support@flexling.com';
 
@@ -56,6 +57,10 @@ export function SettingsView({ activeView }: { activeView: View }) {
                 <label className="label-form">{t('settings.language')}</label>
                 <LanguageSwitcher />
               </div>
+
+              <Separator />
+
+              <SpeakerGenderSection />
 
               <Separator />
 

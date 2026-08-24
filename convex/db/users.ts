@@ -1,6 +1,10 @@
 import { ConvexError } from 'convex/values';
 import { QueryCtx, MutationCtx, ActionCtx } from '../_generated/server';
 import { Doc } from '../_generated/dataModel';
+import {
+  resolveSpeakerGenderPreference,
+  type SpeakerGenderPreference,
+} from '../../lib/speakerGender';
 
 /**
  * Get the authenticated user ID from the JWT (no session validation).
@@ -37,6 +41,19 @@ export async function getUserSettings(
     .query('userSettings')
     .withIndex('by_userId', (q) => q.eq('userId', userId))
     .first();
+}
+
+/**
+ * The user's effective speaker-gender preference ('mixed' when unset).
+ * Always resolved through `resolveSpeakerGenderPreference` — the single
+ * choke point a future global kill-switch hooks into (lib/speakerGender.ts).
+ */
+export async function getSpeakerGenderPreference(
+  ctx: QueryCtx,
+  userId: string,
+): Promise<SpeakerGenderPreference> {
+  const settings = await getUserSettings(ctx, userId);
+  return resolveSpeakerGenderPreference(settings?.speakerGenderPreference);
 }
 
 /**

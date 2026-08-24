@@ -2,7 +2,7 @@ import { v, ConvexError } from 'convex/values';
 import { paginationOptsValidator } from 'convex/server';
 import { query, mutation, internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
-import { getAuthUserId } from '../db/users';
+import { getAuthUserId, getSpeakerGenderPreference } from '../db/users';
 import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
 import {
   getPremadeLevelCollections,
@@ -247,13 +247,17 @@ export const browseCollectionTexts = query({
       sourceRomanization: row.text.romanizedText ?? undefined,
       sourceIpa: row.text.ipaText ?? undefined,
       userCreated: row.text.userCreated,
+      audioSpeakerGender: row.text.audioSpeakerGender ?? undefined,
     }));
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
       inputs,
       course.baseLanguages,
       course.targetLanguages,
-      { markVersionStale: true },
+      {
+        markVersionStale: true,
+        speakerGenderPreference: await getSpeakerGenderPreference(ctx, userId),
+      },
     );
 
     const page = rows.map((row, i) => {

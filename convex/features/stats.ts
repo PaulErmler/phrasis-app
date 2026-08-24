@@ -1,7 +1,7 @@
 import { v } from 'convex/values';
 import { paginationOptsValidator } from 'convex/server';
 import { query, internalQuery, QueryCtx } from '../_generated/server';
-import { getAuthUserId } from '../db/users';
+import { getAuthUserId, getSpeakerGenderPreference } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
 import {
@@ -554,6 +554,7 @@ export const getSentencesForWord = query({
           sourceRomanization: text.romanizedText ?? undefined,
           sourceIpa: text.ipaText ?? undefined,
           userCreated: text.userCreated,
+          audioSpeakerGender: text.audioSpeakerGender ?? undefined,
           card: cardDocs[i] ?? null,
         };
       })
@@ -564,6 +565,7 @@ export const getSentencesForWord = query({
       inputs,
       baseLanguages,
       targetLanguages,
+      { speakerGenderPreference: await getSpeakerGenderPreference(ctx, userId) },
     );
 
     const sentences = inputs.map((input) => {

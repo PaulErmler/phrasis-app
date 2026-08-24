@@ -138,6 +138,16 @@
         "error": "Could not change the password. Please check your current password."
       },
       "language": "App Language",
+      "speakerGender": {
+        "label": "Speaker gender",
+        "description": "Choose whether sentences are spoken by male or female voices. With Mixed, the voice varies from sentence to sentence.",
+        "options": {
+          "mixed": "Mixed",
+          "female": "Female",
+          "male": "Male"
+        },
+        "affectsPhrasing": "Sentences spoken in the first person are also phrased to match your choice in: {languages}."
+      },
       "contactPrompt": {
         "title": "Need anything?",
         "description": "Questions about your plan, billing, or the app? Let us know—we're happy to help.",

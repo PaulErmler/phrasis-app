@@ -8,7 +8,12 @@ import {
 } from '../../_generated/server';
 import { internal } from '../../_generated/api';
 import type { Doc } from '../../_generated/dataModel';
-import { getAuthUserId, requireAuthUserId } from '../../db/users';
+import {
+  getAuthUserId,
+  requireAuthUserId,
+  getSpeakerGenderPreference,
+} from '../../db/users';
+import { preferenceGender } from '../../../lib/speakerGender';
 import {
   findAudioAssetByKey,
   scheduleBlobSwapDelete,
@@ -55,11 +60,19 @@ import { ttsProviderValidator, voiceGenderValidator } from '../../types';
  * 'unvalidated'; there is no text row for the validate loop's claims).
  */
 
-/** Deterministic per-approval speaker, preferred-first lookup order. */
+/**
+ * Deterministic per-approval speaker, preferred-first lookup order. The
+ * user's speaker-gender preference, when set, IS the primary (their approved
+ * card will be voiced at that gender anyway — `applyTextMetadata` resolves
+ * with the same preference — so the preview pre-pays the right synthesis);
+ * 'mixed' keeps the approval-id coin flip.
+ */
 function approvalGenderCandidates(
   approvalId: string,
+  preferredGender: 'male' | 'female' | null,
 ): ['male' | 'female', 'male' | 'female'] {
-  const primary = resolveAudioSpeakerGender(undefined, approvalId);
+  const primary =
+    preferredGender ?? resolveAudioSpeakerGender(undefined, approvalId);
   return [primary, primary === 'male' ? 'female' : 'male'];
 }
 
@@ -68,8 +81,12 @@ async function findAssetForLine(
   approvalId: string,
   language: string,
   spokenText: string,
+  preferredGender: 'male' | 'female' | null,
 ): Promise<Doc<'audioAssets'> | null> {
-  for (const voiceGender of approvalGenderCandidates(approvalId)) {
+  for (const voiceGender of approvalGenderCandidates(
+    approvalId,
+    preferredGender,
+  )) {
     const asset = await findAudioAssetByKey(ctx, {
       language,
       voiceGender,
@@ -102,6 +119,9 @@ export const getApprovalAudio = query({
     if (!userId) return [];
     const approval = await ctx.db.get(args.approvalId);
     if (!approval || approval.userId !== userId) return [];
+    const preferredGender = preferenceGender(
+      await getSpeakerGenderPreference(ctx, userId),
+    );
 
     return Promise.all(
       approval.translations.map(async (entry) => {
@@ -112,6 +132,7 @@ export const getApprovalAudio = query({
                 args.approvalId,
                 entry.language,
                 entry.text,
+                preferredGender,
               )
             : null;
         return {
@@ -146,11 +167,15 @@ export const requestApprovalAudio = mutation({
     if (!entry) throw new ConvexError('Language not on this card proposal');
     if (entry.text.length === 0) return { scheduled: false };
 
+    const preferredGender = preferenceGender(
+      await getSpeakerGenderPreference(ctx, userId),
+    );
     const existing = await findAssetForLine(
       ctx,
       args.approvalId,
       args.language,
       entry.text,
+      preferredGender,
     );
     if (existing) return { scheduled: false };
 
@@ -174,7 +199,10 @@ export const requestApprovalAudio = mutation({
       },
     });
 
-    const voiceGender = approvalGenderCandidates(args.approvalId)[0];
+    const voiceGender = approvalGenderCandidates(
+      args.approvalId,
+      preferredGender,
+    )[0];
     await ctx.scheduler.runAfter(
       0,
       internal.features.chat.approvalAudio.synthesizeApprovalAudio,

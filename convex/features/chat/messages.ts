@@ -10,6 +10,7 @@ import { paginationOptsValidator } from 'convex/server';
 import { internal, components } from '../../_generated/api';
 import { saveMessages, listUIMessages, syncStreams } from '@convex-dev/agent';
 import { requireAuthUserId, getAuthUserId, getUserSettings } from '../../db/users';
+import { speakerGenderPreferenceValidator } from '../../types';
 import { getActiveCourseForUser } from '../../db/courses';
 import { getCourseSettings } from '../../db/courseSettings';
 import { consumeQuota } from '../../usage/helpers';
@@ -37,8 +38,13 @@ import {
   buildCardContextSection,
   buildDifficultySection,
   buildLanguageSection,
+  buildSpeakerGenderSection,
   type LearnerDifficulty,
 } from './promptSections';
+import {
+  preferenceGender,
+  resolveSpeakerGenderPreference,
+} from '../../../lib/speakerGender';
 import {
   deriveLegacyCefrTier,
   isPremadeLevelCollection,
@@ -114,6 +120,7 @@ export const getCourseLanguagesForUser = internalQuery({
       baseLanguages: v.array(v.string()),
       targetLanguages: v.array(v.string()),
       difficulty: v.union(learnerDifficultyValidator, v.null()),
+      speakerGenderPreference: speakerGenderPreferenceValidator,
     }),
     v.null(),
   ),
@@ -124,6 +131,9 @@ export const getCourseLanguagesForUser = internalQuery({
       baseLanguages: active.course.baseLanguages,
       targetLanguages: active.course.targetLanguages,
       difficulty: await resolveLearnerDifficulty(ctx, active.course),
+      speakerGenderPreference: resolveSpeakerGenderPreference(
+        active.settings.speakerGenderPreference,
+      ),
     };
   },
 });
@@ -238,6 +248,17 @@ export const sendMessage = mutation({
     const difficultySection = difficulty
       ? buildDifficultySection(difficulty)
       : undefined;
+    // Only built for a 'male'/'female' preference; 'mixed' injects nothing.
+    const preferredSpeakerGender = active
+      ? preferenceGender(
+          resolveSpeakerGenderPreference(
+            active.settings.speakerGenderPreference,
+          ),
+        )
+      : null;
+    const speakerGenderSection = preferredSpeakerGender
+      ? buildSpeakerGenderSection(preferredSpeakerGender)
+      : undefined;
 
     if (userMessageCount === 0) {
       await ctx.runMutation(agentComponent.threads.updateThread, {
@@ -270,6 +291,7 @@ export const sendMessage = mutation({
         cardContextSection,
         languageSection,
         difficultySection,
+        speakerGenderSection,
         prompt: args.prompt,
         includeAiContent,
         // Only forwarded when the card context resolved (ownership verified
@@ -377,6 +399,10 @@ export const generateResponse = internalAction({
     cardContextSection: v.optional(v.string()),
     languageSection: v.optional(v.string()),
     difficultySection: v.optional(v.string()),
+    // Built only for a 'male'/'female' speaker-gender preference (see
+    // buildSpeakerGenderSection); absent for 'mixed' users AND for callers
+    // predating the field — the fallback below re-derives it either way.
+    speakerGenderSection: v.optional(v.string()),
     // Passed through from sendMessage purely so the cost event can carry the
     // prompt as `$ai_input`. Re-reading it from the agent component here would
     // cost an extra query for data the caller already had in hand.
@@ -396,7 +422,8 @@ export const generateResponse = internalAction({
     try {
       let languageSection = args.languageSection;
       let difficultySection = args.difficultySection;
-      if (!languageSection || !difficultySection) {
+      let speakerGenderSection = args.speakerGenderSection;
+      if (!languageSection || !difficultySection || !speakerGenderSection) {
         const thread = await ctx.runQuery(agentComponent.threads.getThread, {
           threadId: args.threadId,
         });
@@ -411,6 +438,14 @@ export const generateResponse = internalAction({
           if (!difficultySection && courseLanguages.difficulty) {
             difficultySection = buildDifficultySection(courseLanguages.difficulty);
           }
+          if (!speakerGenderSection) {
+            const preferred = preferenceGender(
+              courseLanguages.speakerGenderPreference,
+            );
+            if (preferred) {
+              speakerGenderSection = buildSpeakerGenderSection(preferred);
+            }
+          }
         }
       }
 
@@ -421,6 +456,9 @@ export const generateResponse = internalAction({
       }
       if (difficultySection) {
         dynamicContextParts.push(difficultySection);
+      }
+      if (speakerGenderSection) {
+        dynamicContextParts.push(speakerGenderSection);
       }
       if (args.cardContextSection) {
         dynamicContextParts.push(args.cardContextSection);

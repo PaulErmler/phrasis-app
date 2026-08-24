@@ -6,7 +6,7 @@ import {
   buildTextContentBatchForLanguages,
 } from '../lib/cardContent';
 import { Id, Doc } from '../_generated/dataModel';
-import { getAuthUserId, requireAuthUserId } from '../db/users';
+import { getAuthUserId, requireAuthUserId, getSpeakerGenderPreference } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getCourseSettings } from '../db/courseSettings';
 import {
@@ -301,6 +301,7 @@ export const getCardForReview = query({
               sourceRomanization: text.romanizedText ?? undefined,
               sourceIpa: text.ipaText ?? undefined,
               userCreated: text.userCreated,
+              audioSpeakerGender: text.audioSpeakerGender ?? undefined,
             },
           ]
         : [];
@@ -310,7 +311,11 @@ export const getCardForReview = query({
       contentInputs,
       course.baseLanguages,
       course.targetLanguages,
-      { rawRomanization: true, ignoreMissingWordTimings: true },
+      {
+        rawRomanization: true,
+        ignoreMissingWordTimings: true,
+        speakerGenderPreference: await getSpeakerGenderPreference(ctx, userId),
+      },
     );
 
     const buildCardResult = (card: Doc<'cards'>, index: number) => {
@@ -1213,6 +1218,16 @@ async function cascadeCleanupTextIfOrphaned(
     .collect();
   for (const tr of translations) {
     await ctx.db.delete(tr._id);
+  }
+  // Gendered variants (speaker-gender preference). User-created texts never
+  // grow any today (variants are premade-only), so this is defensive
+  // bookkeeping in case that invariant ever changes.
+  const variants = await ctx.db
+    .query('translationVariants')
+    .withIndex('by_textId', (q) => q.eq('textId', textId))
+    .collect();
+  for (const variant of variants) {
+    await ctx.db.delete(variant._id);
   }
   const audioRows = await ctx.db
     .query('audioRecordings')

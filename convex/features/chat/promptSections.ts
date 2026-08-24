@@ -161,3 +161,19 @@ export function buildDifficultySection(difficulty: LearnerDifficulty): string {
 The user is currently learning at CEFR ${difficulty.cefrTier}${sublevel}.
 When you create flashcards (createCard), write example sentences at roughly this difficulty: ${guidance}. Stay close to this level — not much simpler (unless the user asks, e.g. a "simpler" request) and not much harder. If the user explicitly asks for easier or harder examples, follow that.`;
 }
+
+/**
+ * Injected only when the user's speaker-gender preference is 'male'/'female'
+ * (lib/speakerGender.ts): first-person example sentences the tutor creates
+ * should be phrased for that speaker in languages that mark it, so the cards
+ * that come out of chat match the rest of the user's gendered content.
+ * 'mixed' (the default) injects nothing — today's behavior. Pure builder,
+ * mirrors `buildDifficultySection`; lives in the uncached dynamic context,
+ * never in the agent's static (prefix-cached) instructions.
+ */
+export function buildSpeakerGenderSection(
+  speakerGender: 'male' | 'female',
+): string {
+  return `Speaker gender:
+The user is ${speakerGender}. When you create flashcards (createCard) or write example sentences with a first-person speaker ("I …"), phrase them as spoken by a ${speakerGender} speaker in every language whose grammar or word choice marks the speaker's gender (adjective/participle agreement, gendered self-reference nouns, kinship terms, gendered particles or pronouns). In languages where nothing marks the speaker's gender, write naturally and ignore this. Sentences about other people are unaffected — this is only about the speaking "I". If the user explicitly asks for a different speaker's perspective, follow their request.`;
+}

@@ -75,6 +75,12 @@ export type LanguageCategory =
 /** Whether tier-1 LLMs reliably handle this language for translation/teaching. */
 export type LlmSupportTier = 'tier1' | 'tier2';
 
+/**
+ * Whether and how sentences in this language change with the SPEAKER's gender.
+ * See the `speakerGenderMarking` field on `Language` below.
+ */
+export type SpeakerGenderMarking = 'none' | 'lexical' | 'grammatical';
+
 export interface Language {
   code: string; // Internal language code (e.g. "en", "es_latam", "zh")
   displayCode: string; // BCP 47 tag for display (e.g. "es-MX", "zh-CN")
@@ -85,6 +91,33 @@ export interface Language {
   category: LanguageCategory;
   /** Whether tier-1 LLMs reliably handle this language. UI may surface a "less supported" badge for tier2. */
   llmSupportTier: LlmSupportTier;
+  /**
+   * Whether and how sentences in this language change with the SPEAKER's
+   * gender — the axis behind the user-level speaker-gender preference
+   * (lib/speakerGender.ts). Gendered translation variants are only ever
+   * generated when this is not 'none'; audio voice gender is independent of
+   * it (every voice pool carries both genders).
+   *
+   * - 'grammatical': morphology agrees with a first-person subject — verbs,
+   *   adjectives, participles ("estoy cansado/cansada", "я устал/устала",
+   *   "אני עובד/עובדת").
+   * - 'lexical': no agreement morphology, but required word choice depends on
+   *   the speaker's gender (German "Ich bin Lehrer/Lehrerin", Korean 형/오빠,
+   *   Thai ครับ/ค่ะ).
+   * - 'none': speaker gender never changes the sentence.
+   *
+   * Required (not optional) so every newly added language declares its
+   * answer explicitly; per-entry comments justify the non-obvious calls.
+   */
+  speakerGenderMarking: SpeakerGenderMarking;
+  /**
+   * Set when speaker-gender marking attaches to nearly every sentence rather
+   * than only first-person ones, so the first-person prefilter in
+   * lib/speakerGender.ts must not gate gendered-variant generation. Today
+   * only Thai: the polite particles ครับ/ค่ะ close most polite sentences
+   * regardless of grammatical person.
+   */
+  speakerGenderPervasive?: true;
   /** Which provider's voices the app uses for this language right now. */
   ttsProvider: TtsProvider;
   /** Whether the script requires Latin transliteration for learners. */
@@ -299,6 +332,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🌎',
     category: 'germanic',
     llmSupportTier: 'tier1',
+    // Speaker gender never inflects English; gendered role nouns (actor/actress) are optional and receding.
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'en-us',
@@ -320,6 +355,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇬🇧',
     category: 'germanic',
     llmSupportTier: 'tier1',
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     // Pin the accent in the prompt too. `geminiBcp47: 'en-GB'` alone can drift
     // toward Gemini's default American English. ttsVersion bump regenerates
@@ -347,6 +383,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇺🇸',
     category: 'germanic',
     llmSupportTier: 'tier1',
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'en-us',
@@ -369,6 +406,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇦🇺',
     category: 'germanic',
     llmSupportTier: 'tier1',
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     // Pin the accent in the prompt too. `geminiBcp47: 'en-AU'` alone can drift
     // toward Gemini's default American English. ttsVersion bump regenerates
@@ -394,6 +432,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇪🇸',
     category: 'romance',
     llmSupportTier: 'tier1',
+    // First-person predicate adjectives/participles agree: estoy cansado/cansada.
+    speakerGenderMarking: 'grammatical',
     // Runs on Gemini TTS (`geminiBcp47: 'es-ES'`), with the Castilian accent
     // named in the prompt so it doesn't drift toward Latin American Spanish.
     ttsProvider: 'gemini',
@@ -423,6 +463,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇲🇽',
     category: 'romance',
     llmSupportTier: 'tier1',
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     ttsPromptName: 'Latin American Spanish',
     needsRomanization: false,
@@ -452,6 +493,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🌎',
     category: 'romance',
     llmSupportTier: 'tier1',
+    speakerGenderMarking: 'grammatical',
     // Runs on Gemini TTS. The per-text accent (Spain vs Latin America) is pinned
     // by the chosen voice's `@es-ES` / `@es-US` locale suffix (see the es_mixed
     // Gemini pool in lib/voices.ts and `getVoiceForLanguageVariant`), so no
@@ -473,6 +515,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇫🇷',
     category: 'romance',
     llmSupportTier: 'tier1',
+    // je suis content/contente; past participles je suis allé/allée.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'fr',
@@ -490,6 +534,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇩🇪',
     category: 'germanic',
     llmSupportTier: 'tier1',
+    // No agreement morphology ("Ich bin müde" is invariant), but self-referential
+    // role nouns are gendered: Ich bin Lehrer/Lehrerin, Übersetzer/Übersetzerin.
+    speakerGenderMarking: 'lexical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'de',
@@ -507,6 +554,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇹',
     category: 'romance',
     llmSupportTier: 'tier1',
+    // sono stanco/stanca; sono andato/andata.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'it',
@@ -526,6 +575,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇧🇷',
     category: 'romance',
     llmSupportTier: 'tier1',
+    // estou cansado/cansada; even obrigado/obrigada.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'pt-br',
@@ -547,6 +598,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇵🇹',
     category: 'romance',
     llmSupportTier: 'tier1',
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     // Name the dialect in the Gemini prompt. `geminiBcp47: 'pt-PT'` alone let
     // Gemini drift to Brazilian (reported); "native European Portuguese speaker"
@@ -571,6 +623,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇷🇴',
     category: 'romance',
     llmSupportTier: 'tier2',
+    // sunt obosit/obosită.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'ro',
@@ -591,6 +645,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇦🇩',
     category: 'romance',
     llmSupportTier: 'tier1',
+    // estic cansat/cansada.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'ca',
@@ -608,6 +664,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇷🇺',
     category: 'slavic',
     llmSupportTier: 'tier1',
+    // Past-tense verbs and short adjectives agree: я устал/устала, я рад/рада.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'ru',
@@ -626,6 +684,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇵🇱',
     category: 'slavic',
     llmSupportTier: 'tier2',
+    // zrobiłem/zrobiłam; jestem zmęczony/zmęczona.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'pl',
@@ -643,6 +703,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇸🇰',
     category: 'slavic',
     llmSupportTier: 'tier2',
+    // urobil som/urobila som.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'sk',
@@ -661,6 +723,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇨🇿',
     category: 'slavic',
     llmSupportTier: 'tier2',
+    // udělal jsem/udělala jsem.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'cs',
@@ -679,6 +743,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇭🇷',
     category: 'slavic',
     llmSupportTier: 'tier2',
+    // radio sam/radila sam; umoran/umorna sam.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'hr',
@@ -696,6 +762,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇸🇮',
     category: 'slavic',
     llmSupportTier: 'tier2',
+    // sem delal/delala.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'sl',
@@ -714,6 +782,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇺🇦',
     category: 'slavic',
     llmSupportTier: 'tier1',
+    // я зробив/зробила.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'uk',
@@ -736,6 +806,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇷🇸',
     category: 'slavic',
     llmSupportTier: 'tier2',
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'sr',
@@ -765,6 +836,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇧🇬',
     category: 'slavic',
     llmSupportTier: 'tier2',
+    // l-participle and adjectives agree: казал/казала съм, уморен/уморена съм.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'bg',
@@ -783,6 +856,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇱🇹',
     category: 'baltic',
     llmSupportTier: 'tier2',
+    // esu pavargęs/pavargusi.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'lt',
@@ -799,6 +874,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇱🇻',
     category: 'baltic',
     llmSupportTier: 'tier2',
+    // esmu noguris/nogurusi.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'lv',
@@ -818,6 +895,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // neighbours in the picker. Learners look for it next to lt/lv.
     category: 'baltic',
     llmSupportTier: 'tier2',
+    // No grammatical gender (Uralic).
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'et',
@@ -834,6 +913,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇳🇱',
     category: 'germanic',
     llmSupportTier: 'tier1',
+    // "Ik ben moe" is invariant, but self-referential role nouns are gendered:
+    // leraar/lerares, vriend/vriendin.
+    speakerGenderMarking: 'lexical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'nl',
@@ -852,6 +934,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇸🇪',
     category: 'germanic',
     llmSupportTier: 'tier1',
+    // Adjectives don't mark natural gender (jag är trött) and profession nouns
+    // are gender-neutral (lärare).
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'sv',
@@ -872,6 +957,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇳🇴',
     category: 'germanic',
     llmSupportTier: 'tier1',
+    // jeg er sliten is invariant; profession nouns are neutral (venn/venninne
+    // is marginal).
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'nb',
@@ -889,6 +977,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇩🇰',
     category: 'germanic',
     llmSupportTier: 'tier2',
+    // Same as sv/nb: no first-person gender marking.
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'da',
@@ -910,6 +1000,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇸',
     category: 'germanic',
     llmSupportTier: 'tier2',
+    // Predicate adjectives agree strongly: ég er þreyttur/þreytt, glaður/glöð.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'is',
@@ -934,6 +1026,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // consistent with Hungarian (the only other Uralic entry in the catalog).
     category: 'other',
     llmSupportTier: 'tier1',
+    // No grammatical gender (Uralic).
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'fi',
@@ -954,6 +1048,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇬🇷',
     category: 'other',
     llmSupportTier: 'tier1',
+    // είμαι κουρασμένος/κουρασμένη.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'el',
@@ -978,6 +1074,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇳',
     category: 'south-asian',
     llmSupportTier: 'tier1',
+    // Verbs agree with a first-person subject: मैं जाता हूँ / जाती हूँ.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'hi',
@@ -1001,6 +1099,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇳',
     category: 'south-asian',
     llmSupportTier: 'tier2',
+    // Unlike Hindi, Bengali has no grammatical gender.
+    speakerGenderMarking: 'none',
     // Gemini 3.1 Flash TTS supports Bengali (`geminiBcp47: 'bn-BD'`).
     // Switching off Google triggers the provider-mismatch regen for existing
     // audio; the Chirp3 bn-IN pool stays listed dormant for a one-line revert.
@@ -1024,6 +1124,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇳',
     category: 'south-asian',
     llmSupportTier: 'tier2',
+    // Verbs mark gender only in the 3rd person; first-person forms
+    // (வருகிறேன்) are invariant.
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'ta',
@@ -1043,6 +1146,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇳',
     category: 'south-asian',
     llmSupportTier: 'tier2',
+    // Same as Tamil: 1st-person verb forms (వస్తాను) don't mark gender.
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'te',
@@ -1060,6 +1165,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇹🇷',
     category: 'other',
     llmSupportTier: 'tier2',
+    // No grammatical gender.
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'tr',
@@ -1079,6 +1186,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Grouped with 'other' rather than forced into Germanic.
     category: 'other',
     llmSupportTier: 'tier2',
+    // No grammatical gender.
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'hu',
@@ -1100,6 +1209,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇨🇳',
     category: 'asian-east',
     llmSupportTier: 'tier1',
+    // 他/她 is a written referent distinction only; nothing depends on the speaker.
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'cmn',
@@ -1127,6 +1238,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇹🇼',
     category: 'asian-east',
     llmSupportTier: 'tier2',
+    speakerGenderMarking: 'none',
     // Gemini 3.1 Flash TTS supports Mandarin; its docs list the bare `cmn`
     // code (no Taiwan regional variant), so the Taiwanese accent is pinned in
     // the prompt via `ttsPromptName` alongside `geminiBcp47: 'cmn-TW'`.
@@ -1160,6 +1272,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇭🇰',
     category: 'asian-east',
     llmSupportTier: 'tier2',
+    speakerGenderMarking: 'none',
     // MiniMax Speech 2.8 Turbo via OpenRouter. Native Cantonese system
     // voices (Gemini has none; Chirp3-HD misread 唔). See
     // convex/lib/tts/minimax.ts.
@@ -1197,6 +1310,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇭🇰',
     category: 'asian-east',
     llmSupportTier: 'tier2',
+    speakerGenderMarking: 'none',
     // MiniMax Speech 2.8 Turbo via OpenRouter. Native Cantonese system
     // voices (Gemini has none; Chirp3-HD misread 唔). See
     // convex/lib/tts/minimax.ts.
@@ -1230,6 +1344,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇯🇵',
     category: 'asian-east',
     llmSupportTier: 'tier1',
+    // No agreement, but casual first-person pronouns and sentence-final particles
+    // are gendered (僕/俺 vs あたし; ~ぞ vs ~わ). Polite です/ます with 私 is
+    // neutral, so effects surface mainly in informal sentences.
+    speakerGenderMarking: 'lexical',
     ttsProvider: 'gemini',
     needsRomanization: true,
     // No ipaVoice: espeak-ng only reads kana, so kanji sentences would
@@ -1254,6 +1372,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇰🇷',
     category: 'asian-east',
     llmSupportTier: 'tier1',
+    // Kinship terms depend on the speaker's gender: a male speaker's older
+    // brother is 형, a female speaker's is 오빠 (누나/언니 likewise).
+    speakerGenderMarking: 'lexical',
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'ko',
@@ -1275,6 +1396,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇻🇳',
     category: 'asian-southeast',
     llmSupportTier: 'tier1',
+    // Relational self-reference pronouns depend on speaker gender (anh vs chị;
+    // 'Anh yêu em' vs 'Em yêu anh'); the neutral tôi limits how often it surfaces.
+    speakerGenderMarking: 'lexical',
     ttsProvider: 'gemini',
     // `vi-VN` can't pin the dialect, so it's named in the prompt. Must be set
     // explicitly: the default strips the "(Northern)" parenthetical from
@@ -1310,6 +1434,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇻🇳',
     category: 'asian-southeast',
     llmSupportTier: 'tier1',
+    speakerGenderMarking: 'lexical',
     ttsProvider: 'gemini',
     ttsPromptName: 'Southern Vietnamese',
     needsRomanization: false,
@@ -1333,6 +1458,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇹🇭',
     category: 'asian-southeast',
     llmSupportTier: 'tier2',
+    // Polite particles are speaker-gendered (ครับ male, ค่ะ/คะ female) and close
+    // most polite sentences, plus first-person pronouns ผม/ดิฉัน.
+    speakerGenderMarking: 'lexical',
+    speakerGenderPervasive: true,
     ttsProvider: 'gemini',
     // Romanization disabled. Google v3 doesn't support Thai, and the
     // available pure-JS Thai libraries have not yet been evaluated for
@@ -1358,6 +1487,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇩',
     category: 'asian-southeast',
     llmSupportTier: 'tier2',
+    // No grammatical gender.
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'id',
@@ -1376,6 +1507,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇲🇾',
     category: 'asian-southeast',
     llmSupportTier: 'tier1',
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'ms',
@@ -1396,6 +1528,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇵🇭',
     category: 'asian-southeast',
     llmSupportTier: 'tier1',
+    // No grammatical gender (siya covers he/she); Spanish loan pairs
+    // (doktor/doktora) are marginal.
+    speakerGenderMarking: 'none',
     // Gemini TTS (fil-PH). See VOICE_POOLS in lib/voices.ts
     // (`fil: [...GEMINI_CORE]`). Latin script, so no romanization; Azure
     // fil-PH supports Fast Transcription, so STT + karaoke stay on.
@@ -1423,6 +1558,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🌎',
     category: 'semitic',
     llmSupportTier: 'tier1',
+    // First-person predicate adjectives and nominals agree: أنا تعبان/تعبانة.
+    speakerGenderMarking: 'grammatical',
     // Runs on Gemini global Arabic (`geminiBcp47: 'ar-001'`); the dialect is
     // conveyed in the prompt via `ttsPromptName`. Switching off Google triggers
     // the provider-mismatch regen (lib/ttsPrecedence.ts) for existing audio.
@@ -1456,6 +1593,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇸🇦',
     category: 'semitic',
     llmSupportTier: 'tier2',
+    speakerGenderMarking: 'grammatical',
     // Runs on Gemini global Arabic (`ar-001`); Saudi dialect named in the prompt.
     ttsProvider: 'gemini',
     ttsPromptName: 'Saudi Arabic',
@@ -1485,6 +1623,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇪🇬',
     category: 'semitic',
     llmSupportTier: 'tier2',
+    speakerGenderMarking: 'grammatical',
     // Egyptian uses Gemini's dedicated Egyptian locale (`geminiBcp47: 'ar-EG'`)
     // plus an explicit prompt. Switching off Azure triggers the provider-mismatch
     // regen (gemini overrides azure) for existing audio.
@@ -1516,6 +1655,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇶',
     category: 'semitic',
     llmSupportTier: 'tier2',
+    speakerGenderMarking: 'grammatical',
     // Runs on Gemini global Arabic (`ar-001`); Iraqi dialect named in the prompt.
     ttsProvider: 'gemini',
     ttsPromptName: 'Iraqi Arabic',
@@ -1545,6 +1685,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇱🇧',
     category: 'semitic',
     llmSupportTier: 'tier2',
+    speakerGenderMarking: 'grammatical',
     // Runs on Gemini TTS. Gemini has no Levantine locale (it collapses to
     // `ar-001` World Arabic, shared with MSA/Saudi/Iraqi), so the voice is the
     // shared/global Arabic Gemini voice and the dialect is named in the prompt
@@ -1574,6 +1715,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🌎',
     category: 'semitic',
     llmSupportTier: 'tier2',
+    // Present-tense verbs agree with the speaker: אני עובד/עובדת.
+    speakerGenderMarking: 'grammatical',
     ttsProvider: 'gemini',
     // Romanization via the `hebrew-transliteration` package (SBL Academic
     // style), wired in convex/lib/localRomanization.ts.
@@ -1599,6 +1742,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇷',
     category: 'other',
     llmSupportTier: 'tier1',
+    // No grammatical gender.
+    speakerGenderMarking: 'none',
     // Gemini 3 Flash TTS (via OpenRouter); fa-IR is a documented Gemini TTS
     // locale. See VOICE_POOLS in lib/voices.ts (`fa: [...GEMINI_CORE]`).
     ttsProvider: 'gemini',
@@ -1629,6 +1774,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇰🇪',
     category: 'african',
     llmSupportTier: 'tier2',
+    // Bantu noun classes, no male/female gender.
+    speakerGenderMarking: 'none',
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'sw',
@@ -1651,6 +1798,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇹🇿',
     category: 'african',
     llmSupportTier: 'tier2',
+    speakerGenderMarking: 'none',
     // Gemini 3.1 Flash TTS supports Swahili at the language level only, and
     // Gemini has no sw-TZ locale (`geminiBcp47` collapses to sw-KE), so the
     // Tanzanian dialect is named in the prompt via `ttsPromptName` (the
@@ -2381,6 +2529,23 @@ export const ROMANIZATION_LANGUAGES = new Set<string>(
 
 export function languageNeedsRomanization(code: string): boolean {
   return ROMANIZATION_LANGUAGES.has(code);
+}
+
+/**
+ * Speaker-gender marking for a language ('none' for unknown codes, so callers
+ * degrade to "gender never changes the sentence" rather than over-generating).
+ */
+export function getSpeakerGenderMarking(code: string): SpeakerGenderMarking {
+  return getLanguageByCode(code)?.speakerGenderMarking ?? 'none';
+}
+
+/**
+ * Whether translations into this language can change with the speaker's
+ * gender at all. Gates the gendered-translation-variant machinery
+ * (lib/speakerGender.ts); audio voice gender is NOT gated by this.
+ */
+export function languageMarksSpeakerGender(code: string): boolean {
+  return getSpeakerGenderMarking(code) !== 'none';
 }
 
 /**

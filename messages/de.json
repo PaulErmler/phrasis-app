@@ -138,6 +138,16 @@
         "error": "Das Passwort konnte nicht geändert werden. Bitte prüfe dein aktuelles Passwort."
       },
       "language": "App-Sprache",
+      "speakerGender": {
+        "label": "Sprechergeschlecht",
+        "description": "Wähle, ob Sätze von männlichen oder weiblichen Stimmen gesprochen werden. Bei Gemischt wechselt die Stimme von Satz zu Satz.",
+        "options": {
+          "mixed": "Gemischt",
+          "female": "Weiblich",
+          "male": "Männlich"
+        },
+        "affectsPhrasing": "Ich-Sätze werden zusätzlich passend zu deiner Wahl formuliert in: {languages}."
+      },
       "contactPrompt": {
         "title": "Brauchst du noch etwas?",
         "description": "Fragen zu deinem Tarif, zur Abrechnung oder zur App? Schreib uns gern – wir helfen dir weiter.",

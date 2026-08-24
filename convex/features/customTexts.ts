@@ -24,7 +24,11 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_MODELS, OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
 import { openrouterCallOptions } from './translationLLM';
 import { EVENTS, track } from '../analytics';
-import { sourcedTranslationEntriesValidator } from '../types';
+import { sourcedTranslationEntriesValidator, asVoiceGender } from '../types';
+import {
+  preferenceGender,
+  resolveSpeakerGenderPreference,
+} from '../../lib/speakerGender';
 import {
   captureGeneration,
   openrouterCostUsd,
@@ -503,7 +507,19 @@ export const createCustomText = mutation({
           // across all target-language translations of this row. Mirrors the
           // logic in applyMetadataAndPrepareCard for the non-auto-fill path.
           referentGender: Math.random() < 0.5 ? 'male' : 'female',
-          audioSpeakerGender: resolveAudioSpeakerGender(args.metadata.speakerGender),
+          // Voice gender: a definitive LLM verdict (the typed sentence is
+          // inherently gendered) always wins; otherwise the owner's
+          // speaker-gender preference replaces the coin flip — this text
+          // belongs to exactly one user, so their preference may be baked
+          // in at creation (see lib/speakerGender.ts).
+          audioSpeakerGender:
+            asVoiceGender(args.metadata.speakerGender) ??
+            preferenceGender(
+              resolveSpeakerGenderPreference(
+                active.settings.speakerGenderPreference,
+              ),
+            ) ??
+            resolveAudioSpeakerGender(args.metadata.speakerGender),
         }
         : {}),
     });

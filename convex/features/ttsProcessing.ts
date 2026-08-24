@@ -249,6 +249,16 @@ async function synthesizeAndValidate(
      * degrade every other text pointing at the asset.
      */
     forceRegen?: boolean;
+    /**
+     * Asset-only synthesis (speaker-gender-preference overlay audio): the
+     * final write upserts the content-addressed asset but never touches the
+     * (textId, language) pointer row — that pointer belongs to the text's
+     * stored gender and repointing it would flip audio for every 'mixed'
+     * viewer. Also skips the attempt-0 early write and the mid-retry quality
+     * patch: both operate through the pointer, which this job must not
+     * create. Readers resolve overlay audio by asset key directly.
+     */
+    assetOnly?: boolean;
     /** Scheduling priority; picks the synthesis-token wait cap below. */
     priority?: TtsPriority;
   },
@@ -313,7 +323,7 @@ async function synthesizeAndValidate(
     const storageId: Id<'_storage'> = await ctx.storage.store(blob);
     lastStorageId = storageId;
 
-    if (attempt === 0 && !args.forceRegen) {
+    if (attempt === 0 && !args.forceRegen && !args.assetOnly) {
       await ctx.runMutation(internal.features.decks.storeAudioRecording, {
         textId: args.textId,
         language: args.language,
@@ -326,7 +336,7 @@ async function synthesizeAndValidate(
         spokenText: args.text,
         regionVariant: args.regionVariant,
       });
-    } else if (attempt > 0) {
+    } else if (attempt > 0 && !args.assetOnly) {
       await ctx.runMutation(
         internal.features.ttsProcessing.updateAudioRecordingQuality,
         {
@@ -478,6 +488,11 @@ const ttsJobArgsValidator = v.object({
   // early write so the shared audio asset keeps its current audio until the
   // final write swaps it in place.
   forceRegen: v.optional(v.boolean()),
+  // Asset-only synthesis (speaker-gender-preference overlay audio): the
+  // worker writes ONLY the content-addressed `audioAssets` row, never the
+  // (textId, language) pointer, which keeps serving the text's stored-gender
+  // audio for 'mixed' viewers. See `synthesizeAndValidate`.
+  assetOnly: v.optional(v.boolean()),
   // Scheduling priority (see ttsPriorityValidator). Picks the pool at
   // enqueue time and the rate-limit wait cap in the worker. Absent =
   // 'interactive'.
@@ -543,6 +558,7 @@ export const processTTSForCard = internalAction({
         wordTimings: validated && wordTimings ? wordTimings : undefined,
         spokenText: args.text,
         regionVariant: args.regionVariant,
+        assetOnly: args.assetOnly,
       });
     } else {
       console.error('[ttsProcess] No storageId produced, audio will be missing', {
@@ -607,6 +623,7 @@ export const enqueueTtsJob = internalMutation({
         speed: args.speed,
         regionVariant: args.regionVariant,
         forceRegen: args.forceRegen,
+        assetOnly: args.assetOnly,
         priority: args.priority,
         provider,
       },

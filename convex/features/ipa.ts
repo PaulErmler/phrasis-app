@@ -146,6 +146,37 @@ export const processIpaForTranslation = internalAction({
 });
 
 /**
+ * IPA for a gendered translation variant (speaker-gender preference).
+ * Mirror of `processIpaForTranslation`, addressed by variant id since
+ * variants sit outside the (textId, language) keyspace; writes via
+ * `storeVariantAnnotation` (decks.ts) with the same sentinel semantics.
+ */
+export const processIpaForTranslationVariant = internalAction({
+  args: {
+    variantId: v.id('translationVariants'),
+    text: v.string(),
+    language: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    let ipa: string;
+    try {
+      ipa = await ipaForText(args.text, args.language);
+    } catch (err) {
+      console.error('Variant IPA error (persisting sentinel):', err);
+      ipa = '';
+    }
+    await ctx.runMutation(internal.features.decks.storeVariantAnnotation, {
+      variantId: args.variantId,
+      kind: 'ipa',
+      value: ipa,
+      source: getIpaSource(args.language),
+    });
+    return null;
+  },
+});
+
+/**
  * IPA for a chat card proposal's entries. Proposals live only on the
  * `cardApprovals` row (no texts/translations rows exist until approval), so
  * they get their own store path. One action per proposal, all entries in one

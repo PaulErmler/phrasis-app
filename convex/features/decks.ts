@@ -24,7 +24,7 @@ import {
   getCourseSettings,
   setActiveCollectionOnSettings,
 } from '../db/courseSettings';
-import { getAuthUserId, requireAuthUserId, getUserSettings } from '../db/users';
+import { getAuthUserId, requireAuthUserId, getUserSettings, getSpeakerGenderPreference } from '../db/users';
 import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
 import {
@@ -89,6 +89,7 @@ import {
   type TtsPriority,
   type LlmPriority,
   voiceGenderValidator,
+  speakerGenderPreferenceValidator,
   asVoiceGender,
   schedulingTrackFromSettings,
   type SchedulingMode,
@@ -103,10 +104,19 @@ import {
 import { languageSupportsStt } from '../../lib/languages';
 import {
   claimLlmTranslationIfAvailable,
+  claimAndEnqueueVariantTranslation,
   getLlmClaim,
+  getTranslationVariant,
   hasBlockingLlmClaim,
   isClaimFresh,
+  isVariantGenerationFresh,
 } from './llmTranslationQueue';
+import {
+  preferenceGender,
+  resolveSpeakerGenderPreference,
+  textEligibleForGenderVariant,
+  type SpeakerGenderPreference,
+} from '../../lib/speakerGender';
 import { llmPool, llmWarmPool } from '../lib/workpools';
 import {
   buildTextContentBatchForLanguages,
@@ -278,6 +288,7 @@ async function enqueueTtsForVoice(
     voiceName,
     regionVariant,
     forceRegen,
+    assetOnly,
     priority,
   }: {
     textId: Id<'texts'>;
@@ -286,6 +297,12 @@ async function enqueueTtsForVoice(
     voiceName: string;
     regionVariant: string | undefined;
     forceRegen?: boolean;
+    /**
+     * Preference-overlay audio: synthesize into the content-addressed asset
+     * store only, never the (textId, language) pointer row. See
+     * `storeAudioRecording`.
+     */
+    assetOnly?: boolean;
     priority?: TtsPriority;
   },
 ): Promise<void> {
@@ -306,6 +323,7 @@ async function enqueueTtsForVoice(
       speed: 1,
       regionVariant,
       forceRegen,
+      assetOnly,
       priority,
     },
   });
@@ -437,19 +455,41 @@ export async function scheduleMissingContent(
      * needy. Completing without the throw means the text needs nothing.
      */
     probe?: boolean;
+    /**
+     * The viewing user's speaker-gender preference (already resolved through
+     * `resolveSpeakerGenderPreference`). 'male'/'female' turns on the overlay
+     * section at the bottom of this sweep: gendered translation variants for
+     * marking languages plus asset-only audio at the preferred gender —
+     * without ever patching the shared text/translation/pointer rows.
+     * 'mixed'/absent = no overlay work (today's behavior). Threaded only
+     * from user-scoped entry points (ensureCardContent and the upcoming-cards
+     * ensure loop via prepareCardContent); warmups and admin sweeps leave it
+     * unset.
+     */
+    speakerGenderPreference?: SpeakerGenderPreference;
   },
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   const sourceLanguage = text.language;
+
+  // The preferred gender the overlay section (and, for user-created texts,
+  // the creation-time resolution below) works toward; null = 'mixed'.
+  const preferredGender = opts?.speakerGenderPreference
+    ? preferenceGender(opts.speakerGenderPreference)
+    : null;
 
   // Resolve gender for both the voice (audioSpeakerGender) and the translation
   // prompt's <speaker_gender> tag so they agree (otherwise we hit the
   // user-facing "voice is the opposite gender" bug). The full case logic
   // (definitive vs custom-neutral vs premade-neutral) lives in
   // `resolveCardSpeakerGenders` (lib/voices.ts), seeded by textId for a
-  // deterministic, retry-stable coin-flip.
+  // deterministic, retry-stable coin-flip. The preference only feeds the
+  // user-created case (a legacy custom text resolved on this sweep instead of
+  // at creation); premade texts keep their deterministic flip and get the
+  // preference as a read-time overlay instead.
   const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
     text,
     textId,
+    preferredGender ?? undefined,
   );
 
   if (Object.keys(genderPatch).length > 0) {
@@ -844,6 +884,167 @@ export async function scheduleMissingContent(
     }
   }
 
+  // ── Speaker-gender-preference overlay (premade texts only) ──────────────
+  //
+  // Fill what a 'male'/'female' preference needs ON TOP of the base content
+  // above, without touching any shared row: gendered translation variants
+  // (`translationVariants`, only for languages whose `speakerGenderMarking`
+  // isn't 'none' and sentences that can actually change) and asset-only
+  // audio at the preferred gender (every language, base or variant wording).
+  // The reader overlay in convex/lib/cardContent.ts serves these when
+  // present and falls back to the base row + pointer audio while they
+  // generate. User-created texts are excluded: their gender is resolved at
+  // creation (see `resolveCardSpeakerGenders` case 2) and their wording is
+  // never regenerated. When the preference matches the text's stored gender
+  // the base content already IS the preferred content, so there is nothing
+  // to do.
+  if (
+    preferredGender !== null &&
+    !isUserCreatedText(text) &&
+    preferredGender !== audioSpeakerGender
+  ) {
+    /**
+     * Ensure the content-addressed store has audio for (lang,
+     * preferredGender, spokenText). No pointer is ever written — 'mixed'
+     * viewers keep the stored-gender audio — so a cache hit needs no work at
+     * all and a miss claims the (textId, lang) TTS slot for an asset-only
+     * synthesis.
+     */
+    const ensureOverlayAudio = async (
+      lang: string,
+      spokenText: string,
+      regionVariant: string | undefined,
+    ): Promise<void> => {
+      const asset = await findReusableAudioAsset(ctx, {
+        language: lang,
+        voiceGender: preferredGender,
+        regionVariant,
+        spokenText,
+      });
+      if (asset) return;
+      if (opts?.probe) {
+        if (await hasBlockingTtsClaim(ctx, textId, lang, opts?.priority)) {
+          return;
+        }
+        throw new ProbeNeedsWork();
+      }
+      const claimed = await claimTtsIfAvailable(
+        ctx,
+        textId,
+        lang,
+        opts?.priority,
+      );
+      if (!claimed) return;
+      const voiceName = regionVariant
+        ? getVoiceForLanguageVariant(lang, regionVariant, preferredGender)
+        : getVoiceForLanguage(lang, preferredGender);
+      await enqueueTtsForVoice(ctx, {
+        textId,
+        text: spokenText,
+        language: lang,
+        voiceName,
+        regionVariant,
+        assetOnly: true,
+        priority: opts?.priority,
+      });
+      audioScheduled++;
+    };
+
+    // Batch-read the variant rows for the languages where wording can change
+    // with the speaker's gender (premade source texts are always English, so
+    // `text.text` is the right input for the first-person prefilter).
+    const variantLangs = langsNeedingTranslation.filter((lang) =>
+      textEligibleForGenderVariant(lang, text.text),
+    );
+    const variantRows = await Promise.all(
+      variantLangs.map((lang) =>
+        getTranslationVariant(ctx, textId, lang, preferredGender),
+      ),
+    );
+    const variantMap = new Map(
+      variantLangs.map((lang, i) => [lang, variantRows[i]]),
+    );
+
+    for (const lang of allRequiredLanguages) {
+      if (lang !== sourceLanguage && variantMap.has(lang)) {
+        // Wording changes with the speaker's gender → the preferred audio
+        // must speak the VARIANT text; base text + preferred voice would be
+        // exactly the voice/grammar mismatch this codebase fights.
+        let variant = variantMap.get(lang) ?? null;
+
+        // Version-stale variant (the language's translation method moved
+        // on): drop it and regenerate below, mirroring the base-row sweep.
+        if (
+          variant?.translatedText !== undefined &&
+          isTranslationVersionStale(lang, variant.translationVersion)
+        ) {
+          if (opts?.probe) throw new ProbeNeedsWork();
+          await ctx.db.delete(variant._id);
+          variant = null;
+        }
+
+        if (variant?.translatedText !== undefined) {
+          // Ready: backfill missing annotations for the variant wording,
+          // then make sure its preferred-gender audio asset exists.
+          for (const kind of missingAnnotationKinds(lang, variant)) {
+            if (opts?.probe) throw new ProbeNeedsWork();
+            const action =
+              kind === 'romanization'
+                ? internal.features.decks.processRomanizationForTranslationVariant
+                : internal.features.ipa.processIpaForTranslationVariant;
+            await ctx.scheduler.runAfter(0, action, {
+              variantId: variant._id,
+              text: variant.translatedText,
+              language: lang,
+            });
+          }
+          await ensureOverlayAudio(
+            lang,
+            variant.translatedText,
+            variant.regionVariant ?? translationMap.get(lang)?.regionVariant,
+          );
+        } else if (!variant || !isVariantGenerationFresh(variant)) {
+          // Missing (or its worker died): claim + enqueue the variant
+          // translation. Gated on the base row existing — the base sweep
+          // above is filling it otherwise, and the variant anchors its
+          // dialect (regionVariant) to the base rendering.
+          const baseRow = translationMap.get(lang);
+          if (!baseRow) continue;
+          if (opts?.probe) throw new ProbeNeedsWork();
+          if (
+            await claimAndEnqueueVariantTranslation(ctx, {
+              textId,
+              sourceLanguage,
+              targetLanguage: lang,
+              text: text.text,
+              variantGender: preferredGender,
+              existingVariant: variant,
+              priority: opts?.priority,
+              llmPriority: opts?.llmPriority,
+            })
+          ) {
+            translationsScheduled++;
+          }
+        }
+        // Pending with a fresh claim: in flight, nothing to do this pass.
+      } else {
+        // Wording is gender-invariant here (source language, or a language
+        // that doesn't mark speaker gender): the preferred audio speaks the
+        // base wording.
+        const spokenText =
+          lang === sourceLanguage
+            ? text.text
+            : translationMap.get(lang)?.translatedText;
+        if (!spokenText) continue;
+        const regionVariant =
+          lang === sourceLanguage
+            ? undefined
+            : translationMap.get(lang)?.regionVariant;
+        await ensureOverlayAudio(lang, spokenText, regionVariant);
+      }
+    }
+  }
+
   return { translationsScheduled, audioScheduled };
 }
 
@@ -909,6 +1110,7 @@ export const getDeckCards = query({
           sourceRomanization: text.romanizedText ?? undefined,
           sourceIpa: text.ipaText ?? undefined,
           userCreated: text.userCreated,
+          audioSpeakerGender: text.audioSpeakerGender ?? undefined,
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -918,6 +1120,7 @@ export const getDeckCards = query({
       inputs,
       course.baseLanguages,
       course.targetLanguages,
+      { speakerGenderPreference: await getSpeakerGenderPreference(ctx, userId) },
     );
 
     const result = cards.map((card, i) => {
@@ -2237,6 +2440,11 @@ export const ensureCardContent = mutation({
       text,
       active.course.baseLanguages,
       active.course.targetLanguages,
+      {
+        speakerGenderPreference: resolveSpeakerGenderPreference(
+          active.settings.speakerGenderPreference,
+        ),
+      },
     );
   },
 });
@@ -2311,6 +2519,13 @@ async function scheduleContentForUpcomingCards(
   cards: Doc<'cards'>[],
 ): Promise<number> {
   let processed = 0;
+  // The deck owner's speaker-gender preference: probed and dispatched with
+  // each card so the overlay section of the sweep participates in the
+  // probe-then-dispatch contract (a probe that ignored it would classify
+  // overlay-needy cards as done and the dispatch would never fill them).
+  const speakerGenderPreference = resolveSpeakerGenderPreference(
+    active.settings.speakerGenderPreference,
+  );
   // Batch-load the texts up front (one concurrent read round, not one
   // sequential get per card) before the sequential probe loop.
   const texts = await Promise.all(cards.map((card) => ctx.db.get(card.textId)));
@@ -2326,7 +2541,7 @@ async function scheduleContentForUpcomingCards(
         text,
         active.course.baseLanguages,
         active.course.targetLanguages,
-        { probe: true },
+        { probe: true, speakerGenderPreference },
       );
     } catch (error) {
       if (error instanceof ProbeNeedsWork) {
@@ -2345,6 +2560,7 @@ async function scheduleContentForUpcomingCards(
         textId: card.textId,
         baseLanguages: active.course.baseLanguages,
         targetLanguages: active.course.targetLanguages,
+        speakerGenderPreference,
       });
       processed++;
     }
@@ -2467,6 +2683,11 @@ export const prepareCardContent = internalMutation({
     targetLanguages: v.array(v.string()),
     priority: v.optional(ttsPriorityValidator),
     llmPriority: v.optional(llmPriorityValidator),
+    // Resolved speaker-gender preference of the user this run works for.
+    // Passed by the per-user ensure dispatchers so the overlay section of
+    // `scheduleMissingContent` runs; creation-time and warmup callers leave
+    // it unset (no overlay work).
+    speakerGenderPreference: v.optional(speakerGenderPreferenceValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -2479,7 +2700,11 @@ export const prepareCardContent = internalMutation({
       text,
       args.baseLanguages,
       args.targetLanguages,
-      { priority: args.priority, llmPriority: args.llmPriority },
+      {
+        priority: args.priority,
+        llmPriority: args.llmPriority,
+        speakerGenderPreference: args.speakerGenderPreference,
+      },
     );
     return null;
   },
@@ -2918,6 +3143,19 @@ export const storeTranslationAndScheduleTTS = internalMutation({
           { keepAsset: true },
         );
       }
+      // A deliberate retranslation obsoletes the gendered variants derived
+      // from the old rendering (speaker-gender preference; at most one per
+      // gender). Drop them so the next ensure pass regenerates against the
+      // new base. Their audio stays in the content-addressed asset cache.
+      for (const gender of ['male', 'female'] as const) {
+        const variant = await getTranslationVariant(
+          ctx,
+          args.textId,
+          args.targetLanguage,
+          gender,
+        );
+        if (variant) await ctx.db.delete(variant._id);
+      }
 
       // Deliberate retranslation: overwrite the translation and its matched
       // metadata. romanizedText and romanizationSource travel as a unit,
@@ -3126,6 +3364,150 @@ export const storeTranslationAndScheduleTTS = internalMutation({
 });
 
 /**
+ * Store a finished gendered translation variant (speaker-gender preference)
+ * and chain its asset-only TTS. The variant-mode sibling of
+ * `storeTranslationAndScheduleTTS` above, with the deliberate differences:
+ *
+ *  - Writes the `translationVariants` row (releasing its claim fields), never
+ *    the base `translations` row.
+ *  - TTS goes through the content-addressed asset store ONLY (`assetOnly`):
+ *    the (textId, language) audio pointer keeps serving stored-gender audio
+ *    to 'mixed' viewers; overlay readers resolve the variant asset by key.
+ *  - No searchableText rebuild: cards are searched by their base content.
+ *  - Last-writer-wins on the variant row (no expectedClaimId gate): variant
+ *    content is deterministic for a given (text, gender), so racing writers
+ *    converge on the same result.
+ */
+export const storeTranslationVariantAndScheduleTTS = internalMutation({
+  args: {
+    variantId: v.id('translationVariants'),
+    translatedText: v.string(),
+    /** Voice the worker picked at the variant's gender, for the chained TTS. */
+    voiceName: v.string(),
+    romanizedText: v.optional(v.string()),
+    romanizationSource: v.optional(v.string()),
+    translationSource: v.optional(v.string()),
+    regionVariant: v.optional(v.string()),
+    priority: v.optional(ttsPriorityValidator),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const variant = await ctx.db.get(args.variantId);
+    if (!variant) return null;
+    // Guard: the text may have been cascade-deleted while this job was in
+    // flight. Drop the orphaned variant row too.
+    const text = await ctx.db.get(variant.textId);
+    if (text === null) {
+      await ctx.db.delete(args.variantId);
+      return null;
+    }
+
+    const translatedText = postProcessTranslation(
+      variant.targetLanguage,
+      args.translatedText,
+    );
+    const romanizedText =
+      args.romanizedText !== undefined
+        ? postProcessTranslation(variant.targetLanguage, args.romanizedText)
+        : undefined;
+
+    await ctx.db.patch(args.variantId, {
+      translatedText,
+      ...(romanizedText !== undefined
+        ? {
+          romanizedText,
+          ...(args.romanizationSource
+            ? { romanizationSource: args.romanizationSource }
+            : {}),
+        }
+        : {}),
+      ...(args.translationSource
+        ? { translationSource: args.translationSource }
+        : {}),
+      ...(args.regionVariant ? { regionVariant: args.regionVariant } : {}),
+      translationVersion: getCurrentTranslationVersion(variant.targetLanguage),
+      // Release the generation claim the row was carrying.
+      claimedAt: undefined,
+      workId: undefined,
+    });
+
+    // Follow-up IPA transcription for the variant wording (espeak lives in
+    // the Node runtime, so it can't run inline here).
+    if (IPA_LANGUAGES.has(variant.targetLanguage)) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.ipa.processIpaForTranslationVariant,
+        {
+          variantId: args.variantId,
+          text: translatedText,
+          language: variant.targetLanguage,
+        },
+      );
+    }
+
+    // Chain asset-only TTS at the variant's gender. The content-addressed
+    // store may already have this exact (language, gender, dialect, string)
+    // from another text or an earlier preference flip — then there is
+    // nothing to do (overlay readers find it by key; no pointer exists).
+    const asset = await findReusableAudioAsset(ctx, {
+      language: variant.targetLanguage,
+      voiceGender: variant.speakerGender,
+      regionVariant: args.regionVariant,
+      spokenText: translatedText,
+    });
+    if (!asset) {
+      const claimed = await claimTtsIfAvailable(
+        ctx,
+        variant.textId,
+        variant.targetLanguage,
+        args.priority,
+      );
+      if (claimed) {
+        await enqueueTtsForVoice(ctx, {
+          textId: variant.textId,
+          text: translatedText,
+          language: variant.targetLanguage,
+          voiceName: args.voiceName,
+          regionVariant: args.regionVariant,
+          assetOnly: true,
+          priority: args.priority,
+        });
+      }
+    }
+
+    return null;
+  },
+});
+
+/**
+ * Store an annotation (romanization or IPA) on a gendered translation
+ * variant. Same `=== undefined` first-write-wins semantics (including the
+ * empty-string "tried, failed" sentinel) as `storeTranslationAnnotation`,
+ * addressed by variant id since variants sit outside the (textId, language)
+ * keyspace.
+ */
+export const storeVariantAnnotation = internalMutation({
+  args: {
+    variantId: v.id('translationVariants'),
+    kind: vAnnotationKind,
+    value: v.string(),
+    source: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const spec = TEXT_ANNOTATIONS[args.kind];
+    const variant = await ctx.db.get(args.variantId);
+    if (variant && variant[spec.textField] === undefined) {
+      const patch: Partial<Record<AnnotationField, string>> = {};
+      patch[spec.textField] = args.value;
+      patch[spec.sourceField] = args.source;
+      await ctx.db.patch(args.variantId, patch);
+    }
+    return null;
+  },
+});
+
+/**
  * Internal action to romanize a source text (in the texts table).
  * (The IPA sibling lives in convex/features/ipa.ts: espeak needs the Node
  * runtime; both write through the generic store mutations below.)
@@ -3152,6 +3534,41 @@ export const processRomanizationForSourceText = internalAction({
     // rows by the source that produced the sentinel.
     await ctx.runMutation(internal.features.decks.storeSourceAnnotation, {
       textId: args.textId,
+      kind: 'romanization',
+      value: romanized,
+      source: getRomanizationSource(args.language),
+    });
+    return null;
+  },
+});
+
+/**
+ * Internal action to romanize a gendered translation variant. Mirror of
+ * `processRomanizationForTranslation` addressed by variant id; writes via
+ * `storeVariantAnnotation` with the same sentinel semantics. Normally the
+ * variant worker romanizes inline before storing; this backfill exists for
+ * rows whose inline attempt was skipped or lost.
+ */
+export const processRomanizationForTranslationVariant = internalAction({
+  args: {
+    variantId: v.id('translationVariants'),
+    text: v.string(),
+    language: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    let romanized: string;
+    try {
+      romanized = await romanizeText(args.text, args.language);
+    } catch (err) {
+      console.error(
+        'Variant romanization error (persisting sentinel):',
+        err instanceof Error ? err.message : err,
+      );
+      romanized = '';
+    }
+    await ctx.runMutation(internal.features.decks.storeVariantAnnotation, {
+      variantId: args.variantId,
       kind: 'romanization',
       value: romanized,
       source: getRomanizationSource(args.language),
@@ -3424,6 +3841,11 @@ export const storeAudioRecording = internalMutation({
     spokenText: v.string(),
     // Dialect pin for mixed-language rows; part of the asset key.
     regionVariant: v.optional(v.string()),
+    // Speaker-gender-preference overlay audio: upsert the content-addressed
+    // asset but do NOT touch the (textId, language) pointer row. The pointer
+    // stays on the text's stored-gender audio for 'mixed' viewers; overlay
+    // readers resolve this asset by key (convex/lib/cardContent.ts).
+    assetOnly: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -3470,7 +3892,9 @@ export const storeAudioRecording = internalMutation({
         ttsVersion: getCurrentTtsVersion(args.language),
       },
     );
-    await upsertAudioPointer(ctx, args.textId, args.language, result.assetId);
+    if (!args.assetOnly) {
+      await upsertAudioPointer(ctx, args.textId, args.language, result.assetId);
+    }
 
     if (result.outcome === 'kept') {
       // The asset already carries completed audio and this was a mid-flight

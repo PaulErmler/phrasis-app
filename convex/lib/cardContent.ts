@@ -11,8 +11,14 @@ import { getLlmClaim, isClaimFresh } from '../features/llmTranslationQueue';
 import { appendSearchSegments } from '../../lib/wordTokenize';
 import {
   audioPayloadFromRowAndAsset,
+  findAudioAssetByKey,
   type ResolvedAudioPayload,
 } from './audioAssets';
+import {
+  preferenceGender,
+  textEligibleForGenderVariant,
+  type SpeakerGenderPreference,
+} from '../../lib/speakerGender';
 
 type ContentCtx = QueryCtx | MutationCtx;
 
@@ -86,6 +92,14 @@ interface TextContentInput {
    * to each caller.
    */
   userCreated: boolean;
+  /**
+   * `texts.audioSpeakerGender` for this row (pass `?? undefined`). Only read
+   * when `opts.speakerGenderPreference` is 'male'/'female': the overlay
+   * applies exactly to premade texts whose stored gender differs from the
+   * preference (a matching stored gender means the base content already IS
+   * the preferred content). Omitting it disables the overlay for the row.
+   */
+  audioSpeakerGender?: string;
 }
 
 export function getCourseLanguages(
@@ -114,9 +128,38 @@ export async function buildTextContentBatchForLanguages(
      * query does not treat legacy timing-less audio as a content gap.
      */
     ignoreMissingWordTimings?: boolean;
+    /**
+     * The viewing user's speaker-gender preference (resolved through
+     * `resolveSpeakerGenderPreference`). 'male'/'female' turns on the
+     * read-time overlay for premade texts whose stored gender differs:
+     * translations come from the gendered `translationVariants` row (only
+     * for languages whose wording changes with the speaker's gender) and
+     * audio from the content-addressed asset store at the preferred gender —
+     * each falling back to the base row / pointer audio while the overlay
+     * content generates, and never mixing one gender's wording with the
+     * other's voice. Missing overlay content is folded into
+     * `hasMissingContent` so the ensure self-heal generates it lazily.
+     */
+    speakerGenderPreference?: SpeakerGenderPreference;
   },
 ): Promise<Map<string, TextContentResult>> {
   const allLanguages = getCourseLanguages(baseLanguages, targetLanguages);
+
+  // The gender the speaker-gender-preference overlay works toward for one
+  // input row, or null when the row keeps its base content: preference unset
+  // or 'mixed', a user-created text (its gender was resolved at creation and
+  // its wording is never regenerated), a text whose gender hasn't been
+  // resolved yet, or a stored gender that already matches the preference.
+  const prefGender = opts?.speakerGenderPreference
+    ? preferenceGender(opts.speakerGenderPreference)
+    : null;
+  const overlayGenderFor = (input: TextContentInput): 'male' | 'female' | null => {
+    if (prefGender === null || input.userCreated) return null;
+    const stored = input.audioSpeakerGender;
+    if (stored !== 'male' && stored !== 'female') return null;
+    return stored !== prefGender ? prefGender : null;
+  };
+
   const translationFetches: Array<{
     key: string;
     lang: string;
@@ -124,8 +167,18 @@ export async function buildTextContentBatchForLanguages(
     userCreated: boolean;
   }> = [];
   const audioFetches: Array<{ key: string; lang: string; textId: Id<'texts'> }> = [];
+  // One fetch per (overlaid input × language whose wording can change with
+  // the speaker's gender): the `translationVariants` row for the preferred
+  // gender, if it exists.
+  const variantFetches: Array<{
+    key: string;
+    lang: string;
+    textId: Id<'texts'>;
+    gender: 'male' | 'female';
+  }> = [];
 
   for (const input of inputs) {
+    const overlayGender = overlayGenderFor(input);
     for (const lang of allLanguages) {
       if (lang !== input.sourceLanguage) {
         translationFetches.push({
@@ -134,40 +187,65 @@ export async function buildTextContentBatchForLanguages(
           textId: input.textId,
           userCreated: input.userCreated,
         });
+        if (
+          overlayGender !== null &&
+          textEligibleForGenderVariant(lang, input.sourceText)
+        ) {
+          variantFetches.push({
+            key: input.key,
+            lang,
+            textId: input.textId,
+            gender: overlayGender,
+          });
+        }
       }
       audioFetches.push({ key: input.key, lang, textId: input.textId });
     }
   }
 
-  const [translationResults, audioResults, claimResults] = await Promise.all([
-    Promise.all(
-      translationFetches.map((item) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', item.textId).eq('targetLanguage', item.lang),
-          )
-          .first(),
+  const [translationResults, audioResults, claimResults, variantResults] =
+    await Promise.all([
+      Promise.all(
+        translationFetches.map((item) =>
+          ctx.db
+            .query('translations')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', item.textId).eq('targetLanguage', item.lang),
+            )
+            .first(),
+        ),
       ),
-    ),
-    Promise.all(
-      audioFetches.map((item) =>
-        ctx.db
-          .query('audioRecordings')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', item.textId).eq('language', item.lang),
-          )
-          .first(),
+      Promise.all(
+        audioFetches.map((item) =>
+          ctx.db
+            .query('audioRecordings')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', item.textId).eq('language', item.lang),
+            )
+            .first(),
+        ),
       ),
-    ),
-    // LLM claim per non-source-language translation slot. A non-stale claim
-    // means a `flagTranslation`-driven LLM retranslation is in flight; the
-    // "Retranslating" pill keys off this so it doesn't fire when the user
-    // clicks "regenerate audio" (no LLM phase, no claim).
-    Promise.all(
-      translationFetches.map((item) => getLlmClaim(ctx, item.textId, item.lang)),
-    ),
-  ]);
+      // LLM claim per non-source-language translation slot. A non-stale claim
+      // means a `flagTranslation`-driven LLM retranslation is in flight; the
+      // "Retranslating" pill keys off this so it doesn't fire when the user
+      // clicks "regenerate audio" (no LLM phase, no claim).
+      Promise.all(
+        translationFetches.map((item) => getLlmClaim(ctx, item.textId, item.lang)),
+      ),
+      Promise.all(
+        variantFetches.map((item) =>
+          ctx.db
+            .query('translationVariants')
+            .withIndex('by_text_language_and_gender', (q) =>
+              q
+                .eq('textId', item.textId)
+                .eq('targetLanguage', item.lang)
+                .eq('speakerGender', item.gender),
+            )
+            .first(),
+        ),
+      ),
+    ]);
 
   const translationMap = new Map<
     string,
@@ -175,6 +253,7 @@ export async function buildTextContentBatchForLanguages(
       text: string;
       romanization?: string;
       ipa?: string;
+      regionVariant?: string;
       llmClaimedAt: number | null;
       versionStale: boolean;
     }
@@ -186,6 +265,7 @@ export async function buildTextContentBatchForLanguages(
       text: row?.translatedText ?? '',
       romanization: row?.romanizedText ?? undefined,
       ipa: row?.ipaText ?? undefined,
+      regionVariant: row?.regionVariant ?? undefined,
       llmClaimedAt: claim?.claimedAt ?? null,
       versionStale:
         row != null &&
@@ -194,23 +274,132 @@ export async function buildTextContentBatchForLanguages(
     });
   });
 
+  const variantMap = new Map<string, Doc<'translationVariants'> | null>();
+  variantFetches.forEach((item, idx) => {
+    variantMap.set(`${item.key}:${item.lang}`, variantResults[idx]);
+  });
+
+  // ── Overlay resolution ──
+  // For every overlaid (input, language), what the preferred-gender content
+  // would be: which wording the audio must speak (the ready variant's for
+  // gender-marking languages, the base wording otherwise) and where its
+  // audio asset would live. Slots whose wording isn't available yet (variant
+  // still generating, base translation missing) get no lookup — the base
+  // content keeps serving and the missing flag below drives generation.
+  type OverlaySlot = {
+    /** Language of this slot (kept here so no key parsing is needed). */
+    lang: string;
+    /** The wording the preferred-gender audio must speak. */
+    spokenText: string;
+    regionVariant: string | undefined;
+    gender: 'male' | 'female';
+    /** Set when this slot swaps the translation text to a ready variant. */
+    variant: Doc<'translationVariants'> | null;
+    /** True when a variant is required but not ready yet. */
+    variantPending: boolean;
+    asset: Doc<'audioAssets'> | null;
+  };
+  const overlayByKeyAndLang = new Map<string, OverlaySlot>();
+  for (const input of inputs) {
+    const overlayGender = overlayGenderFor(input);
+    if (overlayGender === null) continue;
+    for (const lang of allLanguages) {
+      const mapKey = `${input.key}:${lang}`;
+      if (lang === input.sourceLanguage) {
+        overlayByKeyAndLang.set(mapKey, {
+          lang,
+          spokenText: input.sourceText,
+          regionVariant: undefined,
+          gender: overlayGender,
+          variant: null,
+          variantPending: false,
+          asset: null,
+        });
+        continue;
+      }
+      const base = translationMap.get(mapKey);
+      if (variantMap.has(mapKey)) {
+        const variant = variantMap.get(mapKey) ?? null;
+        if (variant?.translatedText !== undefined) {
+          overlayByKeyAndLang.set(mapKey, {
+            lang,
+            spokenText: variant.translatedText,
+            regionVariant: variant.regionVariant ?? base?.regionVariant,
+            gender: overlayGender,
+            variant,
+            variantPending: false,
+            asset: null,
+          });
+        } else {
+          // Variant required but not ready: keep base content, flag pending.
+          overlayByKeyAndLang.set(mapKey, {
+            lang,
+            spokenText: '',
+            regionVariant: undefined,
+            gender: overlayGender,
+            variant: null,
+            variantPending: true,
+            asset: null,
+          });
+        }
+      } else if (base && base.text.length > 0) {
+        overlayByKeyAndLang.set(mapKey, {
+          lang,
+          spokenText: base.text,
+          regionVariant: base.regionVariant,
+          gender: overlayGender,
+          variant: null,
+          variantPending: false,
+          asset: null,
+        });
+      }
+      // Base translation missing entirely: no overlay slot; the ordinary
+      // missing-translation term already drives the ensure sweep.
+    }
+  }
+
   // Resolve each audio row's payload through its shared `audioAssets` doc.
   // One deduped point-read per unique asset per batch. Decks repeat
-  // sentences, so the dedup matters.
+  // sentences, so the dedup matters. The overlay's preferred-gender asset
+  // lookups ride the same round.
   const assetIds = [
     ...new Set(audioResults.flatMap((row) => (row ? [row.assetId] : []))),
   ];
-  const assetDocs = await Promise.all(assetIds.map((id) => ctx.db.get(id)));
+  const overlayLookups = [...overlayByKeyAndLang.entries()].filter(
+    ([, slot]) => slot.spokenText.length > 0,
+  );
+  const [assetDocs, overlayAssets] = await Promise.all([
+    Promise.all(assetIds.map((id) => ctx.db.get(id))),
+    Promise.all(
+      overlayLookups.map(([, slot]) =>
+        findAudioAssetByKey(ctx, {
+          language: slot.lang,
+          voiceGender: slot.gender,
+          regionVariant: slot.regionVariant,
+          spokenText: slot.spokenText,
+        }),
+      ),
+    ),
+  ]);
   const assetById = new Map(assetIds.map((id, i) => [id, assetDocs[i]]));
+  overlayLookups.forEach(([, slot], idx) => {
+    slot.asset = overlayAssets[idx];
+  });
 
   const payloadByKeyAndLang = new Map<string, ResolvedAudioPayload | null>();
   audioFetches.forEach((item, idx) => {
     const row = audioResults[idx];
+    const mapKey = `${item.key}:${item.lang}`;
+    // Preferred-gender overlay audio wins over the pointer when its asset
+    // exists; the pointer stays the fallback while the overlay generates.
+    const overlayAsset = overlayByKeyAndLang.get(mapKey)?.asset ?? null;
     payloadByKeyAndLang.set(
-      `${item.key}:${item.lang}`,
-      row
-        ? audioPayloadFromRowAndAsset(assetById.get(row.assetId) ?? null)
-        : null,
+      mapKey,
+      overlayAsset
+        ? audioPayloadFromRowAndAsset(overlayAsset)
+        : row
+          ? audioPayloadFromRowAndAsset(assetById.get(row.assetId) ?? null)
+          : null,
     );
   });
 
@@ -274,7 +463,16 @@ export async function buildTextContentBatchForLanguages(
         };
       }
       const entry = translationMap.get(`${input.key}:${lang}`);
-      const translatedText = entry?.text ?? '';
+      // Speaker-gender overlay: swap in the gendered variant's wording, but
+      // ONLY when its preferred-gender audio exists too — the swap is atomic
+      // so the card never pairs one gender's wording with the other's voice.
+      // Until both are ready the base row keeps serving.
+      const slot = overlayByKeyAndLang.get(`${input.key}:${lang}`);
+      const servedVariant =
+        slot?.variant && slot.asset !== null ? slot.variant : null;
+      const translatedText = servedVariant
+        ? (servedVariant.translatedText ?? '')
+        : (entry?.text ?? '');
       const claimedAt = entry?.llmClaimedAt ?? null;
       const llmClaimHeld = claimedAt !== null && isClaimFresh({ claimedAt });
       return {
@@ -282,8 +480,16 @@ export async function buildTextContentBatchForLanguages(
         text: translatedText,
         isBaseLanguage: baseLanguages.includes(lang),
         isTargetLanguage: targetLanguages.includes(lang),
-        romanization: langNeedsRomanization ? entry?.romanization : undefined,
-        ipa: langNeedsIpa ? entry?.ipa : undefined,
+        romanization: langNeedsRomanization
+          ? servedVariant
+            ? (servedVariant.romanizedText ?? undefined)
+            : entry?.romanization
+          : undefined,
+        ipa: langNeedsIpa
+          ? servedVariant
+            ? (servedVariant.ipaText ?? undefined)
+            : entry?.ipa
+          : undefined,
         // Show the pill only when an LLM retranslation is in flight AND a
         // prior translatedText exists (i.e. this is a *re*translation, not
         // the first-time translation of a new card).
@@ -323,13 +529,30 @@ export async function buildTextContentBatchForLanguages(
     // triggers a backfill transcription, but only where a backfill can
     // actually run. `scheduleTimingsBackfillIfNeeded` skips languages our STT
     // backend can't transcribe, so without this gate those cards would ask for
-    // work that is deliberately never done.
+    // work that is deliberately never done. Overlay-served audio is excluded:
+    // the timings backfill operates through the (textId, language) pointer,
+    // which a preference-overlay asset deliberately has none of, so flagging
+    // it would ask forever for work no scheduler can do.
     const hasMissingWordTimings = audioRecordings.some(
       (audio) =>
         audio.url !== null &&
         audio.wordTimings === null &&
-        languageSupportsStt(audio.language),
+        languageSupportsStt(audio.language) &&
+        overlayByKeyAndLang.get(`${input.key}:${audio.language}`)?.asset ==
+          null,
     );
+
+    // Speaker-gender overlay gaps: a required gendered variant that hasn't
+    // landed, or preferred-gender audio whose asset doesn't exist yet. Both
+    // are filled lazily by the ensure sweep's overlay section
+    // (`scheduleMissingContent` in decks.ts); until then the base content
+    // above keeps serving.
+    const hasMissingGenderContent = allLanguages.some((lang) => {
+      const slot = overlayByKeyAndLang.get(`${input.key}:${lang}`);
+      if (!slot) return false;
+      if (slot.variantPending) return true;
+      return slot.spokenText.length > 0 && slot.asset === null;
+    });
 
     result.set(input.key, {
       translations,
@@ -338,6 +561,7 @@ export async function buildTextContentBatchForLanguages(
         hasMissingTranslation ||
         hasMissingAudio ||
         hasMissingAnnotation ||
+        hasMissingGenderContent ||
         (!opts?.ignoreMissingWordTimings && hasMissingWordTimings),
     });
   }

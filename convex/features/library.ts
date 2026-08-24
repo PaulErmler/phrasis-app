@@ -1,7 +1,7 @@
 import { v } from 'convex/values';
 import { query } from '../_generated/server';
 import { Doc } from '../_generated/dataModel';
-import { getAuthUserId } from '../db/users';
+import { getAuthUserId, getSpeakerGenderPreference } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId } from '../db/decks';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
@@ -345,6 +345,7 @@ export const getLibraryCards = query({
           sourceRomanization: text.romanizedText ?? undefined,
           sourceIpa: text.ipaText ?? undefined,
           userCreated: text.userCreated,
+          audioSpeakerGender: text.audioSpeakerGender ?? undefined,
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -354,6 +355,7 @@ export const getLibraryCards = query({
       inputs,
       course.baseLanguages,
       course.targetLanguages,
+      { speakerGenderPreference: await getSpeakerGenderPreference(ctx, userId) },
     );
 
     const page = cards
