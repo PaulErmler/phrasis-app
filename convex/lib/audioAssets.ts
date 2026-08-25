@@ -278,3 +278,34 @@ export async function resolveAudioPayload(
 ): Promise<ResolvedAudioPayload | null> {
   return audioPayloadFromRowAndAsset(await ctx.db.get(row.assetId));
 }
+
+/**
+ * Pick the audio to serve out of a (textId, language)'s candidate payloads
+ * (one per pointer row; since the speaker-gender feature there can be one
+ * per voice gender). Progressive fallback so a card is never silent while a
+ * variant regenerates:
+ *   1. gender match AND the asset speaks exactly the text being served
+ *      (voice/wording pairing — the served translation variant),
+ *   2. gender match,
+ *   3. anything with a payload.
+ * On single-row data this returns that row's payload, matching the old
+ * `.first()` behavior.
+ */
+export function pickAudioPayloadVariant(
+  candidates: readonly ResolvedAudioPayload[],
+  effectiveGender: 'male' | 'female',
+  servedText: string | undefined,
+): ResolvedAudioPayload | null {
+  return (
+    (servedText !== undefined
+      ? candidates.find(
+          (p) =>
+            p.voiceGender === effectiveGender &&
+            p.asset.spokenText === servedText,
+        )
+      : undefined) ??
+    candidates.find((p) => p.voiceGender === effectiveGender) ??
+    candidates[0] ??
+    null
+  );
+}

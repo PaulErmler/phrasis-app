@@ -66,6 +66,7 @@ import {
   mayRegenerateTranslation,
 } from '../../lib/translationProvenance';
 import { soundsSame } from '../lib/textComparison';
+import { getDisplayTranslation } from '../lib/contentVariants';
 import {
   deleteAudioRow,
   deleteAudioRowsForTextLanguage,
@@ -909,6 +910,8 @@ export const getDeckCards = query({
           sourceRomanization: text.romanizedText ?? undefined,
           sourceIpa: text.ipaText ?? undefined,
           userCreated: text.userCreated,
+          speakerGender: text.speakerGender,
+          audioSpeakerGender: text.audioSpeakerGender,
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -1250,24 +1253,22 @@ export const getUpcomingSentencesForLevel = query({
       texts.map(async (text, position) => {
         let sourceText = text.text;
         if (sourceLanguage && sourceLanguage !== text.language) {
-          const sourceTranslation = await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', text._id).eq('targetLanguage', sourceLanguage),
-            )
-            .first();
+          const sourceTranslation = await getDisplayTranslation(
+            ctx,
+            text._id,
+            sourceLanguage,
+          );
           if (sourceTranslation) sourceText = sourceTranslation.translatedText;
         }
 
         let targetText: string | undefined;
         let targetRomanization: string | undefined;
         if (targetLanguage && targetLanguage !== text.language) {
-          const targetTranslation = await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', text._id).eq('targetLanguage', targetLanguage),
-            )
-            .first();
+          const targetTranslation = await getDisplayTranslation(
+            ctx,
+            text._id,
+            targetLanguage,
+          );
           if (targetTranslation) {
             targetText = targetTranslation.translatedText;
             // Empty string is the "tried and failed" romanization sentinel.
@@ -2502,12 +2503,11 @@ export const getTranslationForTextLanguage = internalQuery({
     }),
   ),
   handler: async (ctx, args) => {
-    const row = await ctx.db
-      .query('translations')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
-      )
-      .first();
+    const row = await getDisplayTranslation(
+      ctx,
+      args.textId,
+      args.targetLanguage,
+    );
     if (!row) return null;
     return {
       translatedText: row.translatedText,

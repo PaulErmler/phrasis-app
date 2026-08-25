@@ -16,6 +16,7 @@ import {
 } from './tts';
 import { languageSupportsStt } from '../../lib/languages';
 import { textsMatchForLanguage } from '../lib/textComparison';
+import { MAX_AUDIO_POINTER_ROWS } from '../lib/contentVariants';
 import {
   textsMatchSemantic,
   type SemanticValidationTelemetry,
@@ -686,16 +687,20 @@ export const updateAudioRecordingQuality = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const record = await ctx.db
+    // Per-gender pointer rows can coexist; locate the one whose asset this
+    // job owns (the mid-flight 'unknown' one) instead of assuming the first
+    // row is it.
+    const records = await ctx.db
       .query('audioRecordings')
       .withIndex('by_text_and_language', (q) =>
         q.eq('textId', args.textId).eq('language', args.language),
       )
-      .first();
-    if (!record) return null;
-
-    const asset = await ctx.db.get(record.assetId);
-    if (!asset || asset.ttsQuality !== 'unknown') return null;
+      .take(MAX_AUDIO_POINTER_ROWS);
+    const assets = await Promise.all(
+      records.map((row) => ctx.db.get(row.assetId)),
+    );
+    const asset = assets.find((a) => a?.ttsQuality === 'unknown') ?? null;
+    if (!asset) return null;
     if (args.storageId && args.storageId !== asset.storageId) {
       // Same dead-asset guard as storeAudioRecording: never re-point the
       // asset at a blob that no longer exists.
@@ -854,15 +859,19 @@ export const persistBackfilledWordTimings = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const record = await ctx.db
+    // Per-gender pointer rows can coexist; the timings belong to the asset
+    // whose blob was transcribed, so locate by storageId across all rows.
+    const records = await ctx.db
       .query('audioRecordings')
       .withIndex('by_text_and_language', (q) =>
         q.eq('textId', args.textId).eq('language', args.language),
       )
-      .first();
-    if (!record) return null;
-    const asset = await ctx.db.get(record.assetId);
-    if (!asset || asset.storageId !== args.storageId) return null;
+      .take(MAX_AUDIO_POINTER_ROWS);
+    const assets = await Promise.all(
+      records.map((row) => ctx.db.get(row.assetId)),
+    );
+    const asset = assets.find((a) => a?.storageId === args.storageId) ?? null;
+    if (!asset) return null;
     await ctx.db.patch(asset._id, { wordTimings: args.wordTimings });
     return null;
   },

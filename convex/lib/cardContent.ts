@@ -7,12 +7,22 @@ import {
   languageSupportsStt,
 } from '../../lib/languages';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
+import {
+  pickTranslationVariant,
+  resolveEffectiveSpeakerGender,
+  type SpeakerGenderPreference,
+} from '../../lib/speakerGender';
 import { getLlmClaim, isClaimFresh } from '../features/llmTranslationQueue';
 import { appendSearchSegments } from '../../lib/wordTokenize';
 import {
   audioPayloadFromRowAndAsset,
+  pickAudioPayloadVariant,
   type ResolvedAudioPayload,
 } from './audioAssets';
+import {
+  MAX_AUDIO_POINTER_ROWS,
+  MAX_TRANSLATION_VARIANTS,
+} from './contentVariants';
 
 type ContentCtx = QueryCtx | MutationCtx;
 
@@ -86,6 +96,16 @@ interface TextContentInput {
    * to each caller.
    */
   userCreated: boolean;
+  /**
+   * `texts.speakerGender` (linguistic verdict) for this row. Together with
+   * `audioSpeakerGender` it feeds the effective-gender resolution that picks
+   * which translation variant / audio gender to serve. Optional so callers
+   * without the field degrade to the seeded canonical flip; every card-serve
+   * caller should pass both.
+   */
+  speakerGender?: string;
+  /** `texts.audioSpeakerGender` (canonical mixed-mode assignment). */
+  audioSpeakerGender?: string;
 }
 
 export function getCourseLanguages(
@@ -114,9 +134,39 @@ export async function buildTextContentBatchForLanguages(
      * query does not treat legacy timing-less audio as a content gap.
      */
     ignoreMissingWordTimings?: boolean;
+    /**
+     * The course's speaker-gender preference. Male/Female steers which
+     * translation variant and which audio gender is served (with progressive
+     * fallback while a variant is still generating). Absent or 'mixed' =
+     * canonical per-text assignment (today's behavior).
+     */
+    speakerGenderPreference?: SpeakerGenderPreference;
   },
 ): Promise<Map<string, TextContentResult>> {
   const allLanguages = getCourseLanguages(baseLanguages, targetLanguages);
+  // Per input: the gender this user experiences for the text, and the
+  // canonical assignment (needed by the variant pick to interpret legacy
+  // unstamped rows). Identical when no preference is in play.
+  const effectiveGenderByKey = new Map<string, 'male' | 'female'>();
+  const canonicalGenderByKey = new Map<string, 'male' | 'female'>();
+  for (const input of inputs) {
+    const genderInput = {
+      speakerGender: input.speakerGender,
+      audioSpeakerGender: input.audioSpeakerGender,
+    };
+    effectiveGenderByKey.set(
+      input.key,
+      resolveEffectiveSpeakerGender(
+        genderInput,
+        input.textId,
+        opts?.speakerGenderPreference,
+      ),
+    );
+    canonicalGenderByKey.set(
+      input.key,
+      resolveEffectiveSpeakerGender(genderInput, input.textId, undefined),
+    );
+  }
   const translationFetches: Array<{
     key: string;
     lang: string;
@@ -140,6 +190,8 @@ export async function buildTextContentBatchForLanguages(
   }
 
   const [translationResults, audioResults, claimResults] = await Promise.all([
+    // All variant rows per (text, language): up to one per gender slot plus
+    // a legacy unstamped row. The per-user pick happens below.
     Promise.all(
       translationFetches.map((item) =>
         ctx.db
@@ -147,7 +199,7 @@ export async function buildTextContentBatchForLanguages(
           .withIndex('by_text_and_language', (q) =>
             q.eq('textId', item.textId).eq('targetLanguage', item.lang),
           )
-          .first(),
+          .take(MAX_TRANSLATION_VARIANTS),
       ),
     ),
     Promise.all(
@@ -157,7 +209,7 @@ export async function buildTextContentBatchForLanguages(
           .withIndex('by_text_and_language', (q) =>
             q.eq('textId', item.textId).eq('language', item.lang),
           )
-          .first(),
+          .take(MAX_AUDIO_POINTER_ROWS),
       ),
     ),
     // LLM claim per non-source-language translation slot. A non-stale claim
@@ -180,8 +232,17 @@ export async function buildTextContentBatchForLanguages(
     }
   >();
   translationFetches.forEach((item, idx) => {
-    const row = translationResults[idx];
+    const rows = translationResults[idx];
     const claim = claimResults[idx];
+    // Serve the variant matching this user's effective gender, with the
+    // tolerant fallback chain (neutral → legacy carrier → opposite gender)
+    // so the card shows text while a missing variant generates.
+    const { row } = pickTranslationVariant(
+      rows,
+      item.lang,
+      effectiveGenderByKey.get(item.key)!,
+      canonicalGenderByKey.get(item.key)!,
+    );
     translationMap.set(`${item.key}:${item.lang}`, {
       text: row?.translatedText ?? '',
       romanization: row?.romanizedText ?? undefined,
@@ -194,23 +255,43 @@ export async function buildTextContentBatchForLanguages(
     });
   });
 
-  // Resolve each audio row's payload through its shared `audioAssets` doc.
-  // One deduped point-read per unique asset per batch. Decks repeat
+  // Resolve every candidate row's payload through its shared `audioAssets`
+  // doc. One deduped point-read per unique asset per batch. Decks repeat
   // sentences, so the dedup matters.
   const assetIds = [
-    ...new Set(audioResults.flatMap((row) => (row ? [row.assetId] : []))),
+    ...new Set(
+      audioResults.flatMap((rows) => rows.map((row) => row.assetId)),
+    ),
   ];
   const assetDocs = await Promise.all(assetIds.map((id) => ctx.db.get(id)));
   const assetById = new Map(assetIds.map((id, i) => [id, assetDocs[i]]));
 
+  // The picked payload per (key, lang): gender + spoken-text pairing against
+  // the translation variant chosen above (source text for the source
+  // language), with progressive fallback so a card is never silent.
   const payloadByKeyAndLang = new Map<string, ResolvedAudioPayload | null>();
+  const sourceByKey = new Map(
+    inputs.map((input) => [
+      input.key,
+      { text: input.sourceText, language: input.sourceLanguage },
+    ]),
+  );
   audioFetches.forEach((item, idx) => {
-    const row = audioResults[idx];
+    const candidates = audioResults[idx]
+      .map((row) => audioPayloadFromRowAndAsset(assetById.get(row.assetId) ?? null))
+      .filter((p): p is ResolvedAudioPayload => p !== null);
+    const source = sourceByKey.get(item.key);
+    const servedText =
+      source && item.lang === source.language
+        ? source.text
+        : translationMap.get(`${item.key}:${item.lang}`)?.text || undefined;
     payloadByKeyAndLang.set(
       `${item.key}:${item.lang}`,
-      row
-        ? audioPayloadFromRowAndAsset(assetById.get(row.assetId) ?? null)
-        : null,
+      pickAudioPayloadVariant(
+        candidates,
+        effectiveGenderByKey.get(item.key)!,
+        servedText,
+      ),
     );
   });
 
@@ -367,22 +448,26 @@ export async function buildCardSearchableText(
     text !== undefined ? Promise.resolve(text) : ctx.db.get(textId),
     Promise.all(
       courseLanguages.map(async (lang) => {
-        const translation = await ctx.db
+        // ALL gender-variant rows, deliberately: search must match whichever
+        // rendering any user sees ("cansada" should find the card even when
+        // the canonical row says "cansado"). Preference-independent, so a
+        // preference change never dirties searchableText.
+        const rows = await ctx.db
           .query('translations')
           .withIndex('by_text_and_language', (q) =>
             q.eq('textId', textId).eq('targetLanguage', lang),
           )
-          .unique();
-        return translation
-          ? { lang, text: translation.translatedText, romanization: translation.romanizedText }
-          : null;
+          .take(MAX_TRANSLATION_VARIANTS);
+        return rows.map((translation) => ({
+          lang,
+          text: translation.translatedText,
+          romanization: translation.romanizedText,
+        }));
       }),
     ),
   ]);
 
-  const foundTranslations = translationResults.filter(
-    (t): t is NonNullable<typeof t> => t !== null,
-  );
+  const foundTranslations = translationResults.flat();
 
   // CJK/Thai parts get their Intl.Segmenter word tokens appended so Convex's
   // whitespace/punctuation tokenizer can match mid-sentence words (it has no
@@ -398,7 +483,8 @@ export async function buildCardSearchableText(
 
   return {
     searchableText: parts.filter(Boolean).join(' '),
-    searchableTextLanguages: foundTranslations.map((t) => t.lang),
+    // Deduped: with gender variants a language can contribute several rows.
+    searchableTextLanguages: [...new Set(foundTranslations.map((t) => t.lang))],
   };
 }
 

@@ -345,6 +345,8 @@ export const getLibraryCards = query({
           sourceRomanization: text.romanizedText ?? undefined,
           sourceIpa: text.ipaText ?? undefined,
           userCreated: text.userCreated,
+          speakerGender: text.speakerGender,
+          audioSpeakerGender: text.audioSpeakerGender,
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);

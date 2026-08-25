@@ -554,6 +554,8 @@ export const getSentencesForWord = query({
           sourceRomanization: text.romanizedText ?? undefined,
           sourceIpa: text.ipaText ?? undefined,
           userCreated: text.userCreated,
+          speakerGender: text.speakerGender,
+          audioSpeakerGender: text.audioSpeakerGender,
           card: cardDocs[i] ?? null,
         };
       })

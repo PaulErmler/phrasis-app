@@ -6,6 +6,7 @@ import {
   getTodayInTimezone,
   computeStreakUpdate,
 } from '../courseStats';
+import { getDisplayTranslation } from '../../lib/contentVariants';
 import { upsertDailyStats } from './dailyStats';
 import { upsertWeeklyStats, getISOWeekString } from './weeklyStats';
 import { upsertMonthlyStats, getMonthString } from './monthlyStats';
@@ -262,12 +263,11 @@ export async function recordReviewStats(
       }
       for (const lang of untrackedLanguages) {
         if (lang === text.language) continue;
-        const translation = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('targetLanguage', lang),
-          )
-          .first();
+        const translation = await getDisplayTranslation(
+          ctx,
+          card.textId,
+          lang,
+        );
         if (translation) {
           langTexts.push({ language: lang, text: translation.translatedText });
         }

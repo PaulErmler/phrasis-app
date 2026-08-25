@@ -1,5 +1,6 @@
 import type { MutationCtx } from '../../_generated/server';
-import type { Id } from '../../_generated/dataModel';
+import type { Doc, Id } from '../../_generated/dataModel';
+import { pickDisplayTranslationRow } from '../../lib/contentVariants';
 
 /**
  * Look up a card's source text, course-scoped translations, and course
@@ -48,11 +49,23 @@ export async function resolveCardContext(
   const translationRows = await ctx.db
     .query('translations')
     .withIndex('by_textId', (q) => q.eq('textId', card.textId))
-    // Bounded in practice by the number of course languages; the cap is a
-    // pure backstop against an unbounded read.
+    // Bounded in practice by the number of course languages (times up to
+    // four gender-variant rows each); the cap is a pure backstop against an
+    // unbounded read.
     .take(500);
+  // One rendering per language for the prompt: group the gender-variant rows
+  // and display-pick so the model never sees two Spanish lines.
+  const rowsByLanguage = new Map<string, Doc<'translations'>[]>();
+  for (const row of translationRows) {
+    const list = rowsByLanguage.get(row.targetLanguage);
+    if (list) list.push(row);
+    else rowsByLanguage.set(row.targetLanguage, [row]);
+  }
   const textByLanguage = new Map(
-    translationRows.map((t) => [t.targetLanguage, t.translatedText]),
+    [...rowsByLanguage.entries()].map(([lang, rows]) => [
+      lang,
+      pickDisplayTranslationRow(rows)!.translatedText,
+    ]),
   );
   const translations = [...courseLangs]
     .filter((lang) => textByLanguage.has(lang))

@@ -247,6 +247,8 @@ export const browseCollectionTexts = query({
       sourceRomanization: row.text.romanizedText ?? undefined,
       sourceIpa: row.text.ipaText ?? undefined,
       userCreated: row.text.userCreated,
+      speakerGender: row.text.speakerGender,
+      audioSpeakerGender: row.text.audioSpeakerGender,
     }));
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,

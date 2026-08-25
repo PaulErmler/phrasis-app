@@ -5,6 +5,7 @@ import {
   buildCardSearchableText,
   buildTextContentBatchForLanguages,
 } from '../lib/cardContent';
+import { getDisplayTranslation } from '../lib/contentVariants';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -301,6 +302,8 @@ export const getCardForReview = query({
               sourceRomanization: text.romanizedText ?? undefined,
               sourceIpa: text.ipaText ?? undefined,
               userCreated: text.userCreated,
+              speakerGender: text.speakerGender,
+              audioSpeakerGender: text.audioSpeakerGender,
             },
           ]
         : [];
@@ -1944,14 +1947,12 @@ export async function applyCardEdit(
     const nonSourceLanguages = allLanguages.filter(
       (lang) => lang !== sourceLanguage,
     );
+    // Display-pick per language: the row the user saw and is editing
+    // against (gender variants share wording for the vast majority of
+    // sentences; the pick is deterministic either way).
     const existingTranslations = await Promise.all(
       nonSourceLanguages.map((lang) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('targetLanguage', lang),
-          )
-          .first(),
+        getDisplayTranslation(ctx, card.textId, lang),
       ),
     );
     const existingTranslationMap = new Map<string, Doc<'translations'>>();
