@@ -3,6 +3,7 @@ import {
   buildCardContextSection,
   buildDifficultySection,
   buildLanguageSection,
+  buildSpeakerGenderSection,
 } from '../../../features/chat/promptSections';
 
 describe('features/chat/promptSections', () => {
@@ -162,6 +163,57 @@ describe('features/chat/promptSections', () => {
         cefrTier: 'Pre-A1',
       });
       expect(section).toContain('very short, high-frequency survival sentences');
+    });
+  });
+
+  describe('buildSpeakerGenderSection', () => {
+    const ES_COURSE = { baseLanguages: ['en'], targetLanguages: ['es'] };
+
+    it('emits steering for a marked course with a Male/Female preference', () => {
+      const section = buildSpeakerGenderSection(ES_COURSE, 'female');
+      expect(section).toBeDefined();
+      expect(section).toContain('FEMALE speaker');
+      expect(section).toContain('in Spanish (Spain), use female first-person agreement');
+      expect(section).toContain('createCard');
+      // Never force gender where a sentence has none.
+      expect(section).toContain('Do NOT force');
+    });
+
+    it('is silent for Mixed and for an unset preference', () => {
+      expect(buildSpeakerGenderSection(ES_COURSE, 'mixed')).toBeUndefined();
+      expect(buildSpeakerGenderSection(ES_COURSE, undefined)).toBeUndefined();
+    });
+
+    it('is silent when no course language marks speaker gender', () => {
+      expect(
+        buildSpeakerGenderSection(
+          { baseLanguages: ['en'], targetLanguages: ['de'] },
+          'female',
+        ),
+      ).toBeUndefined();
+    });
+
+    it('emits when only the BASE language is marked', () => {
+      const section = buildSpeakerGenderSection(
+        { baseLanguages: ['ru'], targetLanguages: ['de'] },
+        'male',
+      );
+      expect(section).toContain('in Russian, use male first-person agreement');
+      expect(section).not.toContain('German');
+    });
+
+    it('splits guidance by marking tier and names only course languages', () => {
+      const section = buildSpeakerGenderSection(
+        { baseLanguages: ['en'], targetLanguages: ['es', 'ja'] },
+        'male',
+      );
+      expect(section).toContain('in Spanish (Spain), use male first-person agreement');
+      expect(section).toContain(
+        'in Japanese, use the particles, self-reference pronouns and register of a male speaker',
+      );
+      // No global list: marked languages outside the course are never named.
+      expect(section).not.toContain('Russian');
+      expect(section).not.toContain('Thai');
     });
   });
 });

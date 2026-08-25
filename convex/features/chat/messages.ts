@@ -15,7 +15,7 @@ import { getCourseSettings } from '../../db/courseSettings';
 import { consumeQuota } from '../../usage/helpers';
 import { CHAT_CREDIT_USD_STEP, CREDIT_COSTS, FEATURE_IDS } from '../featureIds';
 import { agent, AGENT_TOOLS, createMarkAlsoCorrectTool } from './agent';
-import type { Doc, Id } from '../../_generated/dataModel';
+import type { Doc } from '../../_generated/dataModel';
 import { THREAD_MESSAGE_LIMIT, MAX_MESSAGE_LENGTH } from './constants';
 import { trackEvent } from '../../db/stats/dailyStats';
 import { EVENTS, track, trackException } from '../../analytics';
@@ -37,8 +37,10 @@ import {
   buildCardContextSection,
   buildDifficultySection,
   buildLanguageSection,
+  buildSpeakerGenderSection,
   type LearnerDifficulty,
 } from './promptSections';
+import { speakerGenderPreferenceValidator } from '../../types';
 import {
   deriveLegacyCefrTier,
   isPremadeLevelCollection,
@@ -114,16 +116,19 @@ export const getCourseLanguagesForUser = internalQuery({
       baseLanguages: v.array(v.string()),
       targetLanguages: v.array(v.string()),
       difficulty: v.union(learnerDifficultyValidator, v.null()),
+      speakerGenderPreference: v.optional(speakerGenderPreferenceValidator),
     }),
     v.null(),
   ),
   handler: async (ctx, args) => {
     const active = await getActiveCourseForUser(ctx, args.userId);
     if (!active) return null;
+    const courseSettings = await getCourseSettings(ctx, active.course._id);
     return {
       baseLanguages: active.course.baseLanguages,
       targetLanguages: active.course.targetLanguages,
       difficulty: await resolveLearnerDifficulty(ctx, active.course),
+      speakerGenderPreference: courseSettings?.speakerGenderPreference,
     };
   },
 });
@@ -238,6 +243,18 @@ export const sendMessage = mutation({
     const difficultySection = difficulty
       ? buildDifficultySection(difficulty)
       : undefined;
+    // Resolved here (db access) so card-context turns — where generateResponse
+    // skips its course-languages fallback query — still steer generation by
+    // the user's speaker-gender preference. Undefined = Mixed = no steering.
+    const activeCourseSettings = active
+      ? await getCourseSettings(ctx, active.course._id)
+      : null;
+    const speakerGenderSection = active
+      ? buildSpeakerGenderSection(
+          active.course,
+          activeCourseSettings?.speakerGenderPreference,
+        )
+      : undefined;
 
     if (userMessageCount === 0) {
       await ctx.runMutation(agentComponent.threads.updateThread, {
@@ -270,6 +287,7 @@ export const sendMessage = mutation({
         cardContextSection,
         languageSection,
         difficultySection,
+        speakerGenderSection,
         prompt: args.prompt,
         includeAiContent,
         // Only forwarded when the card context resolved (ownership verified
@@ -377,6 +395,10 @@ export const generateResponse = internalAction({
     cardContextSection: v.optional(v.string()),
     languageSection: v.optional(v.string()),
     difficultySection: v.optional(v.string()),
+    // Speaker-gender steering (undefined = Mixed preference or unmarked
+    // course = no steering). Resolved in sendMessage; the fallback below
+    // rebuilds it only when the course-languages query runs anyway.
+    speakerGenderSection: v.optional(v.string()),
     // Passed through from sendMessage purely so the cost event can carry the
     // prompt as `$ai_input`. Re-reading it from the agent component here would
     // cost an extra query for data the caller already had in hand.
@@ -396,6 +418,7 @@ export const generateResponse = internalAction({
     try {
       let languageSection = args.languageSection;
       let difficultySection = args.difficultySection;
+      let speakerGenderSection = args.speakerGenderSection;
       if (!languageSection || !difficultySection) {
         const thread = await ctx.runQuery(agentComponent.threads.getThread, {
           threadId: args.threadId,
@@ -411,6 +434,10 @@ export const generateResponse = internalAction({
           if (!difficultySection && courseLanguages.difficulty) {
             difficultySection = buildDifficultySection(courseLanguages.difficulty);
           }
+          speakerGenderSection ??= buildSpeakerGenderSection(
+            courseLanguages,
+            courseLanguages.speakerGenderPreference,
+          );
         }
       }
 
@@ -421,6 +448,9 @@ export const generateResponse = internalAction({
       }
       if (difficultySection) {
         dynamicContextParts.push(difficultySection);
+      }
+      if (speakerGenderSection) {
+        dynamicContextParts.push(speakerGenderSection);
       }
       if (args.cardContextSection) {
         dynamicContextParts.push(args.cardContextSection);

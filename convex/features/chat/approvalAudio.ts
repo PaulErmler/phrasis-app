@@ -9,6 +9,9 @@ import {
 import { internal } from '../../_generated/api';
 import type { Doc } from '../../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../../db/users';
+import { getActiveCourseForUser } from '../../db/courses';
+import { getCourseSettings } from '../../db/courseSettings';
+import { SPEAKER_GENDER_FEATURE_ENABLED } from '../../../lib/speakerGender';
 import {
   findAudioAssetByKey,
   scheduleBlobSwapDelete,
@@ -55,12 +58,35 @@ import { ttsProviderValidator, voiceGenderValidator } from '../../types';
  * 'unvalidated'; there is no text row for the validate loop's claims).
  */
 
-/** Deterministic per-approval speaker, preferred-first lookup order. */
+/**
+ * Preferred-first lookup order: the user's speaker-gender preference when one
+ * is set (the preview voice then matches the eventual card voice — the card's
+ * serve-time resolver applies the same preference), else the deterministic
+ * per-approval coin flip.
+ */
 function approvalGenderCandidates(
   approvalId: string,
+  preference: 'male' | 'female' | undefined,
 ): ['male' | 'female', 'male' | 'female'] {
-  const primary = resolveAudioSpeakerGender(undefined, approvalId);
+  const primary =
+    SPEAKER_GENDER_FEATURE_ENABLED && preference
+      ? preference
+      : resolveAudioSpeakerGender(undefined, approvalId);
   return [primary, primary === 'male' ? 'female' : 'male'];
+}
+
+/** The caller's active-course preference, narrowed to a steering value. */
+async function activeSpeakerGenderPreference(
+  ctx: QueryCtx,
+  userId: string,
+): Promise<'male' | 'female' | undefined> {
+  const active = await getActiveCourseForUser(ctx, userId);
+  if (!active) return undefined;
+  const settings = await getCourseSettings(ctx, active.course._id);
+  const preference = settings?.speakerGenderPreference;
+  return preference === 'male' || preference === 'female'
+    ? preference
+    : undefined;
 }
 
 async function findAssetForLine(
@@ -68,8 +94,9 @@ async function findAssetForLine(
   approvalId: string,
   language: string,
   spokenText: string,
+  preference: 'male' | 'female' | undefined,
 ): Promise<Doc<'audioAssets'> | null> {
-  for (const voiceGender of approvalGenderCandidates(approvalId)) {
+  for (const voiceGender of approvalGenderCandidates(approvalId, preference)) {
     const asset = await findAudioAssetByKey(ctx, {
       language,
       voiceGender,
@@ -102,6 +129,7 @@ export const getApprovalAudio = query({
     if (!userId) return [];
     const approval = await ctx.db.get(args.approvalId);
     if (!approval || approval.userId !== userId) return [];
+    const preference = await activeSpeakerGenderPreference(ctx, userId);
 
     return Promise.all(
       approval.translations.map(async (entry) => {
@@ -112,6 +140,7 @@ export const getApprovalAudio = query({
                 args.approvalId,
                 entry.language,
                 entry.text,
+                preference,
               )
             : null;
         return {
@@ -146,11 +175,13 @@ export const requestApprovalAudio = mutation({
     if (!entry) throw new ConvexError('Language not on this card proposal');
     if (entry.text.length === 0) return { scheduled: false };
 
+    const preference = await activeSpeakerGenderPreference(ctx, userId);
     const existing = await findAssetForLine(
       ctx,
       args.approvalId,
       args.language,
       entry.text,
+      preference,
     );
     if (existing) return { scheduled: false };
 
@@ -174,7 +205,7 @@ export const requestApprovalAudio = mutation({
       },
     });
 
-    const voiceGender = approvalGenderCandidates(args.approvalId)[0];
+    const voiceGender = approvalGenderCandidates(args.approvalId, preference)[0];
     await ctx.scheduler.runAfter(
       0,
       internal.features.chat.approvalAudio.synthesizeApprovalAudio,

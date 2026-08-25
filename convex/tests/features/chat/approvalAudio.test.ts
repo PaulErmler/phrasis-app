@@ -6,6 +6,7 @@ import { api, internal } from '../../../_generated/api';
 import type { Id } from '../../../_generated/dataModel';
 import { sha256Hex } from '../../../lib/sha256';
 import { resolveAudioSpeakerGender } from '../../../../lib/voices';
+import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../../../lib/scheduling';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -170,6 +171,92 @@ describe('features/chat/approvalAudio', () => {
           language: 'fr',
         }),
       ).rejects.toThrow(/language/i);
+    });
+
+    it('synthesizes with the course speaker-gender preference, not the coin flip', async () => {
+      const t = convexTest(schema, modules);
+      const approvalId = await seedApproval(t);
+      // Deliberately the OPPOSITE of this approval's deterministic flip, so
+      // passing proves preference precedence rather than a lucky agreement.
+      const preferred =
+        primaryGender(approvalId) === 'male' ? 'female' : 'male';
+      await t.run(async (ctx) => {
+        const courseId = await ctx.db.insert('courses', {
+          userId: 'user_A',
+          baseLanguages: ['en'],
+          targetLanguages: ['es'],
+        });
+        await ctx.db.insert('userSettings', {
+          userId: 'user_A',
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        await ctx.db.insert('courseSettings', {
+          courseId,
+          initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
+          speakerGenderPreference: preferred,
+        });
+      });
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      expect(
+        await asUser.mutation(
+          api.features.chat.approvalAudio.requestApprovalAudio,
+          { approvalId, language: 'es' },
+        ),
+      ).toEqual({ scheduled: true });
+      // The scheduled synthesis (never drained — it would hit the real TTS
+      // provider) must carry the preferred voice gender.
+      const jobs = await t.run(async (ctx) =>
+        ctx.db.system.query('_scheduled_functions').collect(),
+      );
+      const synth = jobs.filter((j) =>
+        j.name.includes('synthesizeApprovalAudio'),
+      );
+      expect(synth.length).toBe(1);
+      expect(
+        (synth[0].args[0] as { voiceGender: string }).voiceGender,
+      ).toBe(preferred);
+    });
+
+    it('still serves a cached sibling-gender asset under a preference', async () => {
+      const t = convexTest(schema, modules);
+      const approvalId = await seedApproval(t);
+      await t.run(async (ctx) => {
+        const courseId = await ctx.db.insert('courses', {
+          userId: 'user_A',
+          baseLanguages: ['en'],
+          targetLanguages: ['es'],
+        });
+        await ctx.db.insert('userSettings', {
+          userId: 'user_A',
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        await ctx.db.insert('courseSettings', {
+          courseId,
+          initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
+          speakerGenderPreference: 'female',
+        });
+      });
+      // Only a MALE asset exists; preference-first lookup must fall back to
+      // it rather than paying for a second synthesis.
+      await insertAsset(t, {
+        language: 'es',
+        voiceGender: 'male',
+        spokenText: SPOKEN_ES,
+      });
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      const lines = await asUser.query(
+        api.features.chat.approvalAudio.getApprovalAudio,
+        { approvalId },
+      );
+      expect(lines.find((l) => l.language === 'es')?.url).toBeTruthy();
+      expect(
+        await asUser.mutation(
+          api.features.chat.approvalAudio.requestApprovalAudio,
+          { approvalId, language: 'es' },
+        ),
+      ).toEqual({ scheduled: false });
     });
   });
 

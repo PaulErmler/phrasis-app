@@ -1,4 +1,8 @@
-import { getLanguageByCode } from '../../../lib/languages';
+import {
+  getLanguageByCode,
+  getSpeakerGenderMarking,
+} from '../../../lib/languages';
+import { courseMarksSpeakerGender } from '../../../lib/speakerGender';
 
 /**
  * Dynamic prompt sections injected (uncached) after the agent's static
@@ -125,6 +129,55 @@ RULES:
 createCard order (one entry per code, exactly this order): ${allLangs.join(', ')}
 Each entry's "text" must be written in the language named above — ${perCodeTextRule}. Never copy one entry's text into another slot.
 Schematic: [${schematic}]`;
+}
+
+/**
+ * Speaker-gender steering for chat generation. Emitted only when the feature
+ * is on, the user chose Male or Female (Mixed = no steering), and a course
+ * language actually marks speaker gender. Names only the COURSE's marked
+ * languages — per-call data, never a global list (speaker-gender spec,
+ * decision 8). Chat cards then pin at generation via morphology (decision 5):
+ * the metadata classifier reads the gendered forms this section requests.
+ */
+export function buildSpeakerGenderSection(
+  courseLanguages: { baseLanguages: string[]; targetLanguages: string[] },
+  preference: string | undefined,
+): string | undefined {
+  if (preference !== 'male' && preference !== 'female') return undefined;
+  if (
+    !courseMarksSpeakerGender(
+      courseLanguages.baseLanguages,
+      courseLanguages.targetLanguages,
+    )
+  ) {
+    return undefined;
+  }
+  const allLangs = [
+    ...new Set([
+      ...courseLanguages.baseLanguages,
+      ...courseLanguages.targetLanguages,
+    ]),
+  ];
+  const grammatical = allLangs.filter(
+    (code) => getSpeakerGenderMarking(code) === 'grammatical',
+  );
+  const stylistic = allLangs.filter(
+    (code) => getSpeakerGenderMarking(code) === 'stylistic',
+  );
+  const clauses: string[] = [];
+  if (grammatical.length > 0) {
+    clauses.push(
+      `in ${joinLanguageNames(grammatical)}, use ${preference} first-person agreement (past-tense verbs, participles, predicate adjectives)`,
+    );
+  }
+  if (stylistic.length > 0) {
+    clauses.push(
+      `in ${joinLanguageNames(stylistic)}, use the particles, self-reference pronouns and register of a ${preference} speaker`,
+    );
+  }
+
+  return `Speaker gender:
+The user has set this course to learn sentences spoken by a ${preference.toUpperCase()} speaker. When you create flashcards (createCard) or write example sentences that have a first-person speaker, write that speaker as ${preference}: ${clauses.join('; ')}. Do NOT force a speaker's gender into sentences that have none (descriptive or third-person sentences stay as they are), and never change the gender of other people a sentence talks about.`;
 }
 
 export type LearnerDifficulty = {

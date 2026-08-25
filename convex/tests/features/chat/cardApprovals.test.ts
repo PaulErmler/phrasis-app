@@ -106,6 +106,196 @@ describe("features/chat/cardApprovals", () => {
       );
       const approval = await t.run(async (ctx) => ctx.db.get(approvalId));
       expect(approval?.status).toBe("pending");
+      // No preference set → generated without steering, nothing recorded.
+      expect(approval?.generationSpeakerGender).toBeUndefined();
+    });
+
+    it("records the speaker-gender preference chat generated under", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedCourse(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
+          speakerGenderPreference: "female",
+        });
+      });
+      const approvalId = await t.mutation(
+        internal.features.chat.cardApprovals.createApprovalRequestInternal,
+        {
+          threadId: "thread_1",
+          messageId: "m1",
+          toolCallId: "tc1",
+          translations: [
+            { language: "en", text: "Hello" },
+            { language: "es", text: "Hola" },
+          ],
+          userId: "user_A",
+        },
+      );
+      const approval = await t.run(async (ctx) => ctx.db.get(approvalId));
+      expect(approval?.generationSpeakerGender).toBe("female");
+    });
+
+    it("records nothing for an explicit Mixed preference", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedCourse(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
+          speakerGenderPreference: "mixed",
+        });
+      });
+      const approvalId = await t.mutation(
+        internal.features.chat.cardApprovals.createApprovalRequestInternal,
+        {
+          threadId: "thread_1",
+          messageId: "m1",
+          toolCallId: "tc1",
+          translations: [
+            { language: "en", text: "Hello" },
+            { language: "es", text: "Hola" },
+          ],
+          userId: "user_A",
+        },
+      );
+      const approval = await t.run(async (ctx) => ctx.db.get(approvalId));
+      expect(approval?.generationSpeakerGender).toBeUndefined();
+    });
+  });
+
+  describe("approveCard: speaker-gender slots", () => {
+    it("slot-stamps machine rows at insert, skips user edits, threads the gender to metadata", async () => {
+      const t = convexTest(schema, modules);
+      // Course with a marked (es) and an unmarked (de) target so both slot
+      // outcomes are visible on one card.
+      await t.run(async (ctx) => {
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["es", "de"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        await ctx.db.insert("usageQuotas", {
+          userId: "user_A",
+          features: {
+            custom_sentences: {
+              balance: 5,
+              included: 5,
+              used: 0,
+              unlimited: false,
+            },
+          },
+          lastSyncedAt: Date.now(),
+        });
+      });
+      const approvalId = await t.run(async (ctx) =>
+        ctx.db.insert("cardApprovals", {
+          threadId: "thread_1",
+          messageId: "m1",
+          toolCallId: "tc1",
+          translations: [
+            { language: "en", text: "I am tired." },
+            { language: "es", text: "Estoy cansada." },
+            { language: "de", text: "Ich bin müde." },
+          ],
+          // The user rewrote the Spanish line: its gender is theirs to
+          // assert, so the insert must NOT stamp it.
+          userEditedLanguages: ["es"],
+          userId: "user_A",
+          status: "pending",
+          generationSpeakerGender: "female",
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      vi.useFakeTimers();
+      const res = await asUser.mutation(
+        api.features.chat.cardApprovals.approveCard,
+        { approvalId },
+      );
+      expect(res.success).toBe(true);
+
+      // BEFORE the metadata job runs: the machine row (de) carries its
+      // explicit slot ('neutral' — German cannot differ), the user-edited
+      // row (es) is deliberately unstamped.
+      const rowsBefore = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_textId", (q) => q.eq("textId", res.textId!))
+          .collect(),
+      );
+      const byLang = (rows: typeof rowsBefore, lang: string) =>
+        rows.find((r) => r.targetLanguage === lang);
+      expect(byLang(rowsBefore, "de")?.speakerGender).toBe("neutral");
+      expect(byLang(rowsBefore, "es")?.speakerGender).toBeUndefined();
+
+      // Drain the metadata chain (LLM mocked to return {}): the
+      // generationSpeakerGender rung fixes the voice, and the stamping loop
+      // finishes the record — the user-edited es row gets the resolved slot.
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      const text = await t.run(async (ctx) => ctx.db.get(res.textId!));
+      expect(text?.audioSpeakerGender).toBe("female");
+      const rowsAfter = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_textId", (q) => q.eq("textId", res.textId!))
+          .collect(),
+      );
+      expect(byLang(rowsAfter, "es")?.speakerGender).toBe("female");
+      expect(byLang(rowsAfter, "de")?.speakerGender).toBe("neutral");
+    });
+
+    it("stamps the machine marked-language row with the generation gender directly", async () => {
+      const t = convexTest(schema, modules);
+      await seedCourse(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("usageQuotas", {
+          userId: "user_A",
+          features: {
+            custom_sentences: {
+              balance: 5,
+              included: 5,
+              used: 0,
+              unlimited: false,
+            },
+          },
+          lastSyncedAt: Date.now(),
+        });
+      });
+      const approvalId = await t.run(async (ctx) =>
+        ctx.db.insert("cardApprovals", {
+          threadId: "thread_1",
+          messageId: "m1",
+          toolCallId: "tc1",
+          translations: [
+            { language: "en", text: "I am tired." },
+            { language: "es", text: "Estoy cansada." },
+          ],
+          userId: "user_A",
+          status: "pending",
+          generationSpeakerGender: "female",
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      vi.useFakeTimers();
+      const res = await asUser.mutation(
+        api.features.chat.cardApprovals.approveCard,
+        { approvalId },
+      );
+      const rows = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_textId", (q) => q.eq("textId", res.textId!))
+          .collect(),
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].speakerGender).toBe("female");
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
     });
   });
 

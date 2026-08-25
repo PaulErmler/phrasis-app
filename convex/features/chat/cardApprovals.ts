@@ -4,9 +4,14 @@ import { internal } from '../../_generated/api';
 import { getAuthUserId } from '../../db/users';
 import { EVENTS, track } from '../../analytics';
 import { getActiveCourseForUser } from '../../db/courses';
+import { getCourseSettings } from '../../db/courseSettings';
 import {
   getOrCreateChatCollection,
 } from '../../db/collections';
+import {
+  SPEAKER_GENDER_FEATURE_ENABLED,
+  translationGenderSlot,
+} from '../../../lib/speakerGender';
 import {
   cardApprovalKindValidator,
   cardApprovalResolutionValidator,
@@ -98,6 +103,16 @@ async function processApproval(
 
   const userEditedLanguages = new Set(approval.userEditedLanguages ?? []);
 
+  // The preference chat generated this proposal under (recorded at proposal
+  // time). When present, the rows can be slot-stamped at insert — the model
+  // was instructed to write that speaker — instead of waiting unstamped for
+  // the metadata pass; a definitive metadata verdict re-stamps if the model
+  // disobeyed. Absent (Mixed / legacy proposal) = today's behavior: rows
+  // land unstamped and `applyTextMetadata` stamps them.
+  const generationGender = SPEAKER_GENDER_FEATURE_ENABLED
+    ? approval.generationSpeakerGender
+    : undefined;
+
   for (let i = 1; i < approval.translations.length; i++) {
     const entry = approval.translations[i];
     // User-edited entries (EditApprovalDialog) are the user's own words:
@@ -117,6 +132,17 @@ async function processApproval(
       translationSource: userEdited
         ? USER_PROVIDED_TRANSLATION_SOURCE
         : chatTranslationSource,
+      // Slot-stamp only what the model was instructed to write; a
+      // user-edited rendering is the user's own words, whose gender only
+      // the metadata pass can assert.
+      ...(generationGender && !userEdited
+        ? {
+            speakerGender: translationGenderSlot(
+              entry.language,
+              generationGender,
+            ),
+          }
+        : {}),
     });
   }
 
@@ -137,6 +163,10 @@ async function processApproval(
       baseLanguages: course.baseLanguages,
       targetLanguages: course.targetLanguages,
       userId,
+      // One rung in the audioSpeakerGender ladder: for a genuinely neutral
+      // sentence the card's voice starts as the chosen speaker rather than
+      // a coin flip. Morphology (the LLM's definitive verdict) still wins.
+      generationSpeakerGender: generationGender,
     },
   );
 
@@ -255,6 +285,19 @@ export const createApprovalRequestInternal = internalMutation({
       i === 0 ? { ...t, text: t.text.slice(0, MAX_CARD_TEXT_LENGTH) } : t,
     );
 
+    // Record the speaker-gender preference in force when chat generated this
+    // proposal (the prompt section instructed this speaker). Read at approval
+    // time — the model just generated under the CURRENT settings; recording
+    // it pins the approval against later preference flips. Absent = Mixed
+    // (no steering was in the prompt).
+    const courseSettings = await getCourseSettings(ctx, active.course._id);
+    const preference = courseSettings?.speakerGenderPreference;
+    const generationSpeakerGender =
+      SPEAKER_GENDER_FEATURE_ENABLED &&
+      (preference === 'male' || preference === 'female')
+        ? preference
+        : undefined;
+
     const approvalId = await ctx.db.insert('cardApprovals', {
       threadId: args.threadId,
       messageId: args.messageId,
@@ -262,6 +305,7 @@ export const createApprovalRequestInternal = internalMutation({
       translations: cappedTranslations,
       userId: args.userId,
       status: 'pending',
+      ...(generationSpeakerGender ? { generationSpeakerGender } : {}),
     });
     await scheduleApprovalIpa(ctx, approvalId, cappedTranslations);
 
