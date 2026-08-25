@@ -1,5 +1,6 @@
 import { v, Infer } from 'convex/values';
 import { TTS_PROVIDERS } from '../lib/languages';
+import { SPEAKER_GENDER_PREFERENCE_VALUES } from '../lib/speakerGender';
 
 export const learningStyleValidator = v.union(
   v.literal('casual'),
@@ -338,6 +339,35 @@ export const proposedCardMetadataValidator = v.object({
   addresseeNumber: v.optional(literalUnion(ADDRESSEE_NUMBER_VALUES)),
   addressesSomeone: v.optional(v.boolean()),
 });
+
+/**
+ * Gender slot a `translations` row occupies (`translations.speakerGender`):
+ * 'male'/'female' = rendering produced for that speaker gender (only ever
+ * written for languages whose config marks speaker gender), 'neutral' =
+ * rendering valid for BOTH genders (always the slot for unmarked languages;
+ * the collapsed slot for gender-invariant sentences in marked languages).
+ * `undefined` on stored rows means only "legacy pre-feature row" and is
+ * never written going forward. Same value set as SPEAKER_GENDER_VALUES —
+ * reused so the two can't drift. See lib/speakerGender.ts.
+ */
+export const translationGenderSlotValidator = literalUnion(
+  SPEAKER_GENDER_VALUES,
+);
+export type TranslationGenderSlotValue = Infer<
+  typeof translationGenderSlotValidator
+>;
+
+/**
+ * Per-course speaker-gender preference
+ * (`courseSettings.speakerGenderPreference`). 'mixed' is stored as an
+ * explicit literal because `updateCourseSettings` skips undefined args —
+ * switching BACK to mixed must be a storable value. Absent = never set =
+ * behaves as mixed. Value list lives in lib/speakerGender.ts (shared with
+ * the client UI).
+ */
+export const speakerGenderPreferenceValidator = literalUnion(
+  SPEAKER_GENDER_PREFERENCE_VALUES,
+);
 
 // Per-feature quota snapshot mirrored from Autumn (usageQuotas.features
 // values). Lives here (not in usage/helpers.ts, which re-exports it) so

@@ -22,6 +22,8 @@ import {
   ttsPriorityValidator,
   llmPriorityValidator,
   voiceGenderValidator,
+  translationGenderSlotValidator,
+  speakerGenderPreferenceValidator,
   featureStateValidator,
   reviewsByModeValidator,
   translationEntriesValidator,
@@ -137,6 +139,17 @@ export const courseSettingsFields = {
   autoRevealBaseOnSubmit: v.optional(v.boolean()), // writing mode: unblur base text once all translations are submitted (default on; sub-setting of hideBaseLanguagesFull)
   showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
   showIpa: v.optional(v.boolean()), // show IPA transcription below sentence text (default OFF, unlike showRomanization)
+  // Per-course speaker-gender preference ('male' | 'female' | 'mixed').
+  // Male/Female pins gendered sentence grammar (for languages whose
+  // `speakerGenderMarking` config marks it, lib/languages.ts) and the TTS
+  // voice gender for ALL languages; 'mixed' — and absent = never set — keeps
+  // the canonical per-text ~50/50 assignment (today's behavior). 'mixed' is
+  // stored explicitly because updateCourseSettings skips undefined args.
+  // Never written into shared texts/translations rows: resolved per read via
+  // lib/speakerGender.ts (resolveEffectiveSpeakerGender). Kill switch:
+  // SPEAKER_GENDER_FEATURE_ENABLED (off → everyone behaves as mixed, stored
+  // values retained).
+  speakerGenderPreference: v.optional(speakerGenderPreferenceValidator),
   // Language order overrides
   baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
   targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages
@@ -415,8 +428,8 @@ export default defineSchema({
     // Linguistic metadata (populated from translation pipeline)
     register: v.optional(v.string()), // formal / informal / neutral
     addresseeNumber: v.optional(v.string()), // singular / plural / not_applicable
-    speakerGender: v.optional(v.string()), // male / female / neutral
-    audioSpeakerGender: v.optional(v.string()), // male / female — resolved voice gender after coin-flip; mirrors speakerGender when male/female
+    speakerGender: v.optional(v.string()), // male / female / neutral — the LINGUISTIC verdict (metadata LLM / morphology); 'neutral' = the sentence itself doesn't fix the speaker's gender. A definitive value pins the card's gender for every user (lib/speakerGender.ts precedence rule).
+    audioSpeakerGender: v.optional(v.string()), // male / female — the CANONICAL (mixed-mode) voice-gender assignment shared by every user: mirrors a definitive speakerGender, else the deterministic per-text coin-flip (resolveCardSpeakerGenders). A user's per-course preference is layered on top at read/schedule time (resolveEffectiveSpeakerGender) and is NEVER written back here — this field must stay preference-free or users would fight over the shared row.
     addresseeGender: v.optional(v.string()), // male / female / neutral / not_applicable
     addressesSomeone: v.optional(v.boolean()), // true if the sentence speaks to a 2nd-person addressee. Gates whether register/addresseeGender are emitted in the translation prompt. Legacy rows: undefined falls back to addresseeNumber === 'not_applicable' as the proxy.
     referentGender: v.optional(v.string()), // 'male' | 'female' — coin-flipped per-text, constant across all target-language translations. Drives gendered-noun agreement (e.g. de Übersetzer/-in, fr traducteur/-rice).
@@ -483,16 +496,24 @@ export default defineSchema({
     // enqueue a stronger model; flags 3+ only increment the counter for
     // later admin triage. Undefined treated as 0 for back-compat.
     flagCount: v.optional(v.number()),
-    // Voice/audio speaker gender ('male' | 'female') the translation was
-    // produced under. The resolved `texts.audioSpeakerGender` at write time,
-    // NOT `texts.speakerGender` (which can be 'neutral' and is what the
-    // translation prompt reads). Recording the voice gender is what lets
-    // `scheduleMissingContent` invalidate translations whose grammar would no
-    // longer agree with the card's current voice gender (e.g. when LLM
-    // metadata analysis lands a definitive gender that overrides the initial
-    // coin-flip). Undefined on legacy rows written before this field existed.
-    // Treated as "unknown, regenerate on next sweep."
-    speakerGender: v.optional(voiceGenderValidator),
+    // Gender SLOT this rendering occupies (the variant key; see
+    // translationGenderSlotValidator in convex/types.ts and
+    // lib/speakerGender.ts):
+    //   'male' / 'female' — rendering produced for that speaker gender. Only
+    //     ever written for languages whose `speakerGenderMarking` config
+    //     marks speaker gender; up to one row per gender per
+    //     (textId, targetLanguage) may coexist.
+    //   'neutral' — rendering valid for BOTH genders: always the slot for
+    //     unmarked languages, and the collapsed slot when a generated
+    //     variant came out textually identical to its sibling
+    //     (gender-invariant sentence).
+    //   undefined — LEGACY row written before the variant model. Read-
+    //     tolerated (canonical-gender carrier on marked languages; neutral
+    //     on unmarked, retired by the stampNeutralOnUnmarkedTranslations
+    //     migration), never written going forward.
+    // Readers pick with pickTranslationVariant; rows are never deleted on
+    // gender grounds (the ensure-variant sweep only ADDS missing slots).
+    speakerGender: v.optional(translationGenderSlotValidator),
     // Version of the translation METHOD this row was produced under, per the
     // language's `translationVersion` in lib/languages.ts (single source of
     // truth). Bumping a language's config version makes `scheduleMissingContent`
@@ -582,10 +603,14 @@ export default defineSchema({
     // post-swap delete re-checks this index at fire time).
     .index('by_storageId', ['storageId']),
 
-  // Audio pointer table: one row per (textId, language), pointing at the
-  // shared `audioAssets` row that owns the actual audio (blob + payload).
-  // Deliberately payload-free. Everything about the audio itself lives on
-  // the asset so an in-place asset swap reaches every pointing text at once.
+  // Audio pointer table: one row per (textId, language, asset voice-gender) —
+  // at most one male and one female pointer per text+language, each pointing
+  // at the shared `audioAssets` row that owns the actual audio (blob +
+  // payload). The gender lives on the pointed asset (audioAssets.voiceGender),
+  // not here; serve-time picks the pointer whose asset matches the user's
+  // effective gender (pickAudioVariant). Deliberately payload-free.
+  // Everything about the audio itself lives on the asset so an in-place
+  // asset swap reaches every pointing text at once.
   audioRecordings: defineTable({
     textId: v.id('texts'),
     language: v.string(), // Base language code (e.g., "en", "es", "de")
@@ -1109,6 +1134,13 @@ export default defineSchema({
     // Metadata changes (speaker gender, register, addressee) proposed by the
     // model for the new phrasing. Applied only on the replace path.
     proposedMetadata: v.optional(proposedCardMetadataValidator),
+    // Speaker-gender preference in force when the chat model generated this
+    // proposal; absent = generated without a preference (mixed). Recorded at
+    // GENERATION time so a preference change before approval doesn't
+    // mislabel the wording. processApproval stamps it onto the created
+    // marked-language translation rows and threads it into sentence-metadata
+    // generation (the generationSpeakerGender rung in applyTextMetadata).
+    generationSpeakerGender: v.optional(voiceGenderValidator),
     // Languages whose text the model actually changed vs. the card.
     // `translations` stores the merged course-language set (so processApproval
     // works unchanged); this drives UI emphasis and, on the replace path, is
@@ -1177,6 +1209,14 @@ export default defineSchema({
     // background-held claim over to interactive demand instead of making a
     // visible card wait out the warm pool's patient backoff.
     priority: v.optional(ttsPriorityValidator),
+    // Voice gender of the audio this claim is generating. Claims are
+    // per-gender: opposite-gender synthesis for the same (text, language)
+    // proceeds in parallel (different rows, no contention). Undefined = a
+    // legacy in-flight claim from before this field existed — it
+    // conservatively blocks BOTH genders until it drains (bounded by the
+    // claim staleness window). Read via the same by_text_and_language index
+    // (≤ a handful of rows per key; filtered in memory, no index change).
+    speakerGender: v.optional(voiceGenderValidator),
   }).index('by_text_and_language', ['textId', 'language']),
 
   // Per-(textId, language) dedup claim. Atomically check-and-insert before
@@ -1196,6 +1236,14 @@ export default defineSchema({
     // user wait out the warm pool's queue. Matters most during onboarding:
     // the warmup translates exactly the texts a new user hits first.
     priority: v.optional(llmPriorityValidator),
+    // Gender slot ('male' | 'female' | 'neutral') of the translation this
+    // claim is generating (see translations.speakerGender). Claims are
+    // per-slot: work on different slots of the same (text, language)
+    // proceeds in parallel. Undefined = a legacy in-flight claim from before
+    // this field — it conservatively blocks ALL slots until it drains
+    // (bounded by CLAIM_STALE_MS). Read via the same by_text_and_language
+    // index and filtered in memory.
+    speakerGender: v.optional(translationGenderSlotValidator),
   }).index('by_text_and_language', ['textId', 'targetLanguage']),
 
   // Daily per-language stats
