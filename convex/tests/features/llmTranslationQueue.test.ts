@@ -94,7 +94,7 @@ describe("features/llmTranslationQueue", () => {
       priority?: "interactive" | "background",
     ) =>
       t.run(async (ctx) =>
-        claimLlmTranslationIfAvailable(ctx as any, textId, "de", priority),
+        claimLlmTranslationIfAvailable(ctx as any, textId, "de", priority, "neutral"),
       );
 
     it("stamps the caller's tier onto the new claim", async () => {
@@ -493,7 +493,11 @@ describe("features/llmTranslationQueue", () => {
       expect(getFunctionName(opts.onComplete)).toBe(
         "features/llmTranslationQueue:onGoogleFallbackComplete",
       );
-      expect(opts.context).toEqual({ textId, targetLanguage: "de" });
+      expect(opts.context).toEqual({
+        textId,
+        targetLanguage: "de",
+        audioSpeakerGender: "male",
+      });
 
       // Claim survives, re-pointed at the fallback job with fresh claimedAt,
       // so a concurrent reconcile can't re-route the row mid-fallback.

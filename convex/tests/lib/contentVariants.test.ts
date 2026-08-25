@@ -151,16 +151,32 @@ describe("variant-tolerant serve (two gender rows per language)", () => {
     expect(mixed.translations).toEqual(none.translations);
   });
 
-  it("definitive text gender pins the served variant against the preference", async () => {
+  it("definitive gender on a USER-CREATED text pins against the preference", async () => {
     const t = convexTest(schema, modules);
     const textId = await seedVariantCard(t);
     await t.run(async (ctx) => {
       await ctx.db.patch(textId, {
+        userCreated: true,
         speakerGender: "female",
         audioSpeakerGender: "female",
       });
     });
     const content = await serve(t, textId, "male");
+    const es = content.translations.find((tr) => tr.language === "es")!;
+    expect(es.text).toBe("Estoy cansada.");
+  });
+
+  it("a PREMADE text's mirrored definitive gender does NOT pin", async () => {
+    const t = convexTest(schema, modules);
+    const textId = await seedVariantCard(t);
+    await t.run(async (ctx) => {
+      // Case-3 bookkeeping shape: both fields carry the canonical flip.
+      await ctx.db.patch(textId, {
+        speakerGender: "male",
+        audioSpeakerGender: "male",
+      });
+    });
+    const content = await serve(t, textId, "female");
     const es = content.translations.find((tr) => tr.language === "es")!;
     expect(es.text).toBe("Estoy cansada.");
   });

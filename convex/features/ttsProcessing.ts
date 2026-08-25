@@ -103,18 +103,43 @@ const TTS_WARM_TOKEN_MAX_WAIT_MS = 1_000;
  */
 const STT_TOKEN_MAX_WAIT_MS = 15_000;
 
-/** Point-read the (textId, language) TTS generation claim, if any. */
-async function getTtsClaim(
+/**
+ * All claims for one (textId, language). Since gender-variant audio there
+ * can be one claim per voice gender plus at most one legacy genderless
+ * claim from the deploy boundary.
+ */
+async function getTtsClaims(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   language: string,
-): Promise<Doc<'ttsGenerationClaims'> | null> {
+): Promise<Doc<'ttsGenerationClaims'>[]> {
   return await ctx.db
     .query('ttsGenerationClaims')
     .withIndex('by_text_and_language', (q) =>
       q.eq('textId', textId).eq('language', language),
     )
-    .first();
+    .take(4);
+}
+
+/**
+ * Point-read the TTS claim for one voice gender of (textId, language). A
+ * legacy genderless claim matches EVERY gender (conservative both-blocking
+ * until it drains). With `voiceGender` omitted, returns any claim (the
+ * language-level "is anything in flight?" sites).
+ */
+async function getTtsClaim(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+  language: string,
+  voiceGender?: VoiceGender,
+): Promise<Doc<'ttsGenerationClaims'> | null> {
+  const claims = await getTtsClaims(ctx, textId, language);
+  if (voiceGender === undefined) return claims[0] ?? null;
+  return (
+    claims.find((c) => c.speakerGender === voiceGender) ??
+    claims.find((c) => c.speakerGender === undefined) ??
+    null
+  );
 }
 
 /**
@@ -140,9 +165,14 @@ export async function claimTtsIfAvailable(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   language: string,
-  priority?: TtsPriority,
+  priority: TtsPriority | undefined,
+  voiceGender: VoiceGender,
 ): Promise<Id<'ttsGenerationClaims'> | null> {
-  const existing = await getTtsClaim(ctx, textId, language);
+  // Claims are per voice gender: opposite-gender synthesis for the same
+  // (text, language) proceeds in parallel. A legacy genderless claim matches
+  // both genders (getTtsClaim), preserving the old blocking behavior until
+  // it drains.
+  const existing = await getTtsClaim(ctx, textId, language, voiceGender);
 
   if (existing) {
     if (ttsClaimBlocksPriority(existing, priority)) {
@@ -162,6 +192,7 @@ export async function claimTtsIfAvailable(
     language,
     claimedAt: Date.now(),
     priority,
+    speakerGender: voiceGender,
   });
 }
 
@@ -195,8 +226,9 @@ export async function hasBlockingTtsClaim(
   textId: Id<'texts'>,
   language: string,
   priority: TtsPriority | undefined,
+  voiceGender?: VoiceGender,
 ): Promise<boolean> {
-  const existing = await getTtsClaim(ctx, textId, language);
+  const existing = await getTtsClaim(ctx, textId, language, voiceGender);
   return existing !== null && ttsClaimBlocksPriority(existing, priority);
 }
 
@@ -208,8 +240,12 @@ export async function hasActiveTtsClaim(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   language: string,
+  voiceGender?: VoiceGender,
 ): Promise<boolean> {
-  const existing = await getTtsClaim(ctx, textId, language);
+  // With `voiceGender`: only that gender's (or a legacy genderless) claim
+  // counts. Without: any in-flight claim for the language (delete-protection
+  // sites where any pending audio write must not be raced).
+  const existing = await getTtsClaim(ctx, textId, language, voiceGender);
   if (!existing) return false;
   return Date.now() - existing.claimedAt < TTS_CLAIM_STALE_MS;
 }
@@ -336,6 +372,7 @@ async function synthesizeAndValidate(
           ttsQuality: 'unknown' as const,
           storageId,
           preserveOldStorage: true,
+          voiceGender: args.voiceGender,
         },
       );
     }
@@ -578,12 +615,17 @@ export const enqueueTtsJob = internalMutation({
     ctx: MutationCtx,
     { provider, args }: { provider: TtsProvider; args: TtsJobArgs },
   ) => {
-    const claim = await getTtsClaim(ctx, args.textId, args.language);
+    const claim = await getTtsClaim(
+      ctx,
+      args.textId,
+      args.language,
+      args.voiceGender,
+    );
     // A fresh claim already stamped with another job's workId means a live
-    // pool job owns this (textId, language): enqueueing again would synthesize
-    // twice and hijack that job's claim. Unreachable from the claim-then-
-    // enqueue callers (their fresh claim is workId-less); kept as a guard
-    // against callers that enqueue without re-claiming.
+    // pool job owns this gender of (textId, language): enqueueing again would
+    // synthesize twice and hijack that job's claim. Unreachable from the
+    // claim-then-enqueue callers (their fresh claim is workId-less); kept as
+    // a guard against callers that enqueue without re-claiming.
     if (
       claim &&
       claim.workId !== undefined &&
@@ -613,7 +655,11 @@ export const enqueueTtsJob = internalMutation({
       },
       {
         onComplete: internal.features.ttsProcessing.onTtsJobComplete,
-        context: { textId: args.textId, language: args.language },
+        context: {
+          textId: args.textId,
+          language: args.language,
+          voiceGender: args.voiceGender,
+        },
       },
     );
 
@@ -633,7 +679,11 @@ export const enqueueTtsJob = internalMutation({
  */
 export const onTtsJobComplete = internalMutation({
   args: vOnCompleteArgs(
-    v.object({ textId: v.id('texts'), language: v.string() }),
+    v.object({
+      textId: v.id('texts'),
+      language: v.string(),
+      voiceGender: v.optional(voiceGenderValidator),
+    }),
   ),
   returns: v.null(),
   handler: async (
@@ -644,7 +694,11 @@ export const onTtsJobComplete = internalMutation({
       result,
     }: {
       workId: string;
-      context: { textId: Id<'texts'>; language: string };
+      context: {
+        textId: Id<'texts'>;
+        language: string;
+        voiceGender?: VoiceGender;
+      };
       result: PoolRunResult;
     },
   ) => {
@@ -658,7 +712,20 @@ export const onTtsJobComplete = internalMutation({
         },
       );
     }
-    const claim = await getTtsClaim(ctx, context.textId, context.language);
+    // Per-gender claims: this job's claim is the one stamped with its
+    // workId; a workId-less claim matching the job's gender is the pre-stamp
+    // window. Never release another gender's claim.
+    const claims = await getTtsClaims(ctx, context.textId, context.language);
+    const claim =
+      claims.find((c) => c.workId === workId) ??
+      claims.find(
+        (c) =>
+          c.workId === undefined &&
+          (context.voiceGender === undefined ||
+            c.speakerGender === context.voiceGender ||
+            c.speakerGender === undefined),
+      ) ??
+      null;
     if (claim && (claim.workId === undefined || claim.workId === workId)) {
       await ctx.db.delete(claim._id);
     }
@@ -684,12 +751,15 @@ export const updateAudioRecordingQuality = internalMutation({
     ttsQuality: ttsQualityValidator,
     storageId: v.optional(v.id('_storage')),
     preserveOldStorage: v.optional(v.boolean()),
+    // Voice gender of the asset this job owns; disambiguates when BOTH
+    // genders have a mid-flight 'unknown' asset for the same (text, language).
+    voiceGender: v.optional(voiceGenderValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     // Per-gender pointer rows can coexist; locate the one whose asset this
-    // job owns (the mid-flight 'unknown' one) instead of assuming the first
-    // row is it.
+    // job owns (the mid-flight 'unknown' one, of this job's gender) instead
+    // of assuming the first row is it.
     const records = await ctx.db
       .query('audioRecordings')
       .withIndex('by_text_and_language', (q) =>
@@ -699,7 +769,12 @@ export const updateAudioRecordingQuality = internalMutation({
     const assets = await Promise.all(
       records.map((row) => ctx.db.get(row.assetId)),
     );
-    const asset = assets.find((a) => a?.ttsQuality === 'unknown') ?? null;
+    const asset =
+      assets.find(
+        (a) =>
+          a?.ttsQuality === 'unknown' &&
+          (args.voiceGender === undefined || a.voiceGender === args.voiceGender),
+      ) ?? null;
     if (!asset) return null;
     if (args.storageId && args.storageId !== asset.storageId) {
       // Same dead-asset guard as storeAudioRecording: never re-point the
@@ -789,6 +864,9 @@ export const backfillWordTimings = internalAction({
     // locale for mixed-dialect languages. Supplied by `scheduleMissingContent`
     // from the translation row when the language is mixed.
     regionVariant: v.optional(v.string()),
+    // Voice gender of the audio row being backfilled; the claim was taken
+    // under it, so the release must target the same gender.
+    voiceGender: v.optional(voiceGenderValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -830,7 +908,11 @@ export const backfillWordTimings = internalAction({
     } finally {
       await ctx.runMutation(
         internal.features.ttsProcessing.releaseTtsClaim,
-        { textId: args.textId, language: args.language },
+        {
+          textId: args.textId,
+          language: args.language,
+          voiceGender: args.voiceGender,
+        },
       );
     }
     return null;
@@ -889,10 +971,18 @@ export const releaseTtsClaim = internalMutation({
   args: {
     textId: v.id('texts'),
     language: v.string(),
+    // The gender the backfill claimed under; omitted by legacy schedulers
+    // (then any workId-less claim is released, the pre-gendering behavior).
+    voiceGender: v.optional(voiceGenderValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const claim = await getTtsClaim(ctx, args.textId, args.language);
+    const claim = await getTtsClaim(
+      ctx,
+      args.textId,
+      args.language,
+      args.voiceGender,
+    );
     if (claim && claim.workId === undefined) {
       await ctx.db.delete(claim._id);
     }

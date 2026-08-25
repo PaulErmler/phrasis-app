@@ -73,15 +73,28 @@ export interface EffectiveGenderInput {
   speakerGender?: string;
   /** Canonical mixed-mode voice assignment: 'male' | 'female' | undefined. */
   audioSpeakerGender?: string;
+  /**
+   * `texts.userCreated`. Load-bearing for the pin rule: on USER-CREATED
+   * texts a male/female `speakerGender` is a real morphology verdict from
+   * the metadata LLM (upload pinning). On PREMADE texts the same field is
+   * just the mirrored canonical coin-flip (`resolveCardSpeakerGenders` case
+   * 3 writes BOTH fields), so treating it as definitive would pin the whole
+   * dataset to its coin-flip and neuter the preference.
+   */
+  userCreated: boolean;
 }
 
 /**
  * Resolve the speaker gender a given user experiences for a text.
  *
  * Precedence:
- *  1. Definitive linguistic gender on the text always wins — this is what
- *     pins user uploads and inherently gendered content ("Estoy cansada")
- *     regardless of the preference.
+ *  1. Definitive linguistic gender on a USER-CREATED text wins — this is
+ *     what pins uploads and inherently gendered user content ("Estoy
+ *     cansada") regardless of the preference. Premade texts never pin: any
+ *     male/female `speakerGender` they carry is the mirrored canonical flip
+ *     (see EffectiveGenderInput.userCreated), and inherently-gendered
+ *     wording ("I am his wife") is preserved by the translation itself, not
+ *     by the tag.
  *  2. A male/female preference (feature on).
  *  3. Canonical default: the stored mixed-mode assignment, else the same
  *     deterministic seeded flip `resolveCardSpeakerGenders` uses. Identical
@@ -95,7 +108,10 @@ export function resolveEffectiveSpeakerGender(
   seed: string,
   preference: SpeakerGenderPreference | undefined,
 ): EffectiveSpeakerGender {
-  if (text.speakerGender === 'male' || text.speakerGender === 'female') {
+  if (
+    text.userCreated &&
+    (text.speakerGender === 'male' || text.speakerGender === 'female')
+  ) {
     return text.speakerGender;
   }
   if (
@@ -103,6 +119,9 @@ export function resolveEffectiveSpeakerGender(
     (preference === 'male' || preference === 'female')
   ) {
     return preference;
+  }
+  if (text.speakerGender === 'male' || text.speakerGender === 'female') {
+    return text.speakerGender;
   }
   if (
     text.audioSpeakerGender === 'male' ||

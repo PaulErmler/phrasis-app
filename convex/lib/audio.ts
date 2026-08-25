@@ -56,7 +56,17 @@ export async function deleteAudioRowsForTextLanguage(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   language: string,
-  opts?: { keepAsset?: boolean },
+  opts?: {
+    keepAsset?: boolean;
+    /**
+     * Delete only pointer rows whose ASSET is of this voice gender. Used
+     * where a change affects a single gender variant (a slot retranslation,
+     * a gender-scoped audio regeneration) so the sibling variant's audio
+     * survives. Omit to delete every row (the pre-variant behavior; correct
+     * when the change affects all genders, e.g. a 'neutral' rewording).
+     */
+    voiceGender?: 'male' | 'female';
+  },
 ): Promise<void> {
   const rows = await ctx.db
     .query('audioRecordings')
@@ -65,7 +75,15 @@ export async function deleteAudioRowsForTextLanguage(
     )
     .take(10);
   for (const row of rows) {
-    await deleteAudioRow(ctx, row, opts);
+    if (opts?.voiceGender !== undefined) {
+      const asset = await ctx.db.get(row.assetId);
+      // A dangling pointer has no gender to test; it is dead weight either
+      // way, so it always goes.
+      if (asset && asset.voiceGender !== opts.voiceGender) continue;
+    }
+    await deleteAudioRow(ctx, row, {
+      keepAsset: opts?.keepAsset,
+    });
   }
 }
 

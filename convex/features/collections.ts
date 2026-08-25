@@ -39,9 +39,18 @@ import {
   TEXT_ANNOTATIONS,
 } from '../lib/textAnnotations';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
-import { deleteAudioRow } from '../lib/audio';
+import { deleteAudioRow, deleteAudioRowsForTextLanguage } from '../lib/audio';
 import { resolveAudioPayload } from '../lib/audioAssets';
 import { hasActiveTtsClaim } from './ttsProcessing';
+import { asVoiceGender } from '../types';
+import {
+  MAX_AUDIO_POINTER_ROWS,
+  MAX_TRANSLATION_VARIANTS,
+} from '../lib/contentVariants';
+import {
+  pickCanonicalTranslationRow,
+  translationGenderSlot,
+} from '../../lib/speakerGender';
 import { getLlmClaim, isClaimFresh } from './llmTranslationQueue';
 import { getCourseSettings } from '../db/courseSettings';
 import type { LlmPriority } from '../types';
@@ -439,14 +448,22 @@ export async function scheduleMissingTranslationsForText(
   }
 
   let scheduled = 0;
+  // The preview ensures the CANONICAL variant (no per-user preference in
+  // this shared path; the ensure sweep handles preference variants once the
+  // text becomes a card). `audioSpeakerGender` here is the canonical
+  // assignment resolveCardSpeakerGenders produced above.
+  const previewGender = asVoiceGender(audioSpeakerGender);
   for (const lang of languages) {
     if (lang === text.language) continue;
-    const existing = await ctx.db
+    const rows = await ctx.db
       .query('translations')
       .withIndex('by_text_and_language', (q) =>
         q.eq('textId', text._id).eq('targetLanguage', lang),
       )
-      .first();
+      .take(MAX_TRANSLATION_VARIANTS);
+    const existing = previewGender
+      ? pickCanonicalTranslationRow(rows, lang, previewGender)
+      : (rows[0] ?? null);
     let preferredRegionVariant: string | undefined;
     if (existing) {
       // Version-stale rows regenerate here too, so browsing a collection
@@ -481,27 +498,32 @@ export async function scheduleMissingTranslationsForText(
       }
       // Mirror the sweep's deferrals: never delete under an active TTS claim
       // (races the pending audio write) or a fresh LLM claim (the in-flight
-      // retranslation overwrites the row anyway).
-      if (await hasActiveTtsClaim(ctx, text._id, lang)) continue;
-      const llmClaim = await getLlmClaim(ctx, text._id, lang);
+      // retranslation overwrites the row anyway). Both scoped to this
+      // (canonical) slot.
+      if (await hasActiveTtsClaim(ctx, text._id, lang, previewGender)) {
+        continue;
+      }
+      const llmClaim = await getLlmClaim(
+        ctx,
+        text._id,
+        lang,
+        previewGender
+          ? translationGenderSlot(lang, previewGender)
+          : undefined,
+      );
       if (llmClaim && isClaimFresh(llmClaim)) {
         continue;
       }
       // Keep mixed-dialect rows on their pinned dialect across regeneration.
       preferredRegionVariant = existing.regionVariant;
       await ctx.db.delete(existing._id);
-      // The old audio was synthesized from the deleted wording. Drop it so
-      // the new translation can't pair with mismatched audio (reference-aware,
-      // like the card sweep's delete).
-      const staleAudio = await ctx.db
-        .query('audioRecordings')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', text._id).eq('language', lang),
-        )
-        .first();
-      if (staleAudio) {
-        await deleteAudioRow(ctx, staleAudio);
-      }
+      // The old audio was synthesized from the deleted wording. Drop the
+      // regenerating slot's rows so the new translation can't pair with
+      // mismatched audio (reference-aware, like the card sweep's delete);
+      // a sibling variant's audio still matches its own text and survives.
+      await deleteAudioRowsForTextLanguage(ctx, text._id, lang, {
+        ...(previewGender ? { voiceGender: previewGender } : {}),
+      });
     }
     if (
       await scheduleTranslationForLanguage(ctx, text, lang, {
@@ -657,12 +679,38 @@ export const requestPreviewAudio = mutation({
       throw new ConvexError('Language not in course');
     }
 
-    const existingAudio = await ctx.db
+    const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
+      text,
+      args.textId,
+    );
+    if (Object.keys(genderPatch).length > 0) {
+      await ctx.db.patch(args.textId, genderPatch);
+    }
+    // "Audio exists" is per gender now: only a row whose asset matches the
+    // gender this click would synthesize counts, the sibling variant's row
+    // must not satisfy the check (the preview would stay silent for this
+    // voice forever).
+    const previewVoiceGender = asVoiceGender(audioSpeakerGender);
+    const audioRows = await ctx.db
       .query('audioRecordings')
       .withIndex('by_text_and_language', (q) =>
         q.eq('textId', args.textId).eq('language', args.language),
       )
-      .first();
+      .take(MAX_AUDIO_POINTER_ROWS);
+    let existingAudio: (typeof audioRows)[number] | null = null;
+    for (const row of audioRows) {
+      if (previewVoiceGender === undefined) {
+        existingAudio = row;
+        break;
+      }
+      const rowAsset = await ctx.db.get(row.assetId);
+      // A dangling row (asset gone) matches any gender: it must reach the
+      // cleanup branch below or the preview wedges forever.
+      if (rowAsset === null || rowAsset.voiceGender === previewVoiceGender) {
+        existingAudio = row;
+        break;
+      }
+    }
     if (existingAudio) {
       // A row only counts as "audio exists" if it still resolves to a
       // playable blob. A dangling pointer. Asset row deleted, or asset
@@ -689,23 +737,26 @@ export const requestPreviewAudio = mutation({
       await deleteAudioRow(ctx, existingAudio, { blobAlreadyGone: true });
     }
 
-    const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
-      text,
-      args.textId,
-    );
-    if (Object.keys(genderPatch).length > 0) {
-      await ctx.db.patch(args.textId, genderPatch);
-    }
-
     const translation =
       args.language === text.language
         ? null
-        : await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', args.textId).eq('targetLanguage', args.language),
-          )
-          .first();
+        : previewVoiceGender
+          ? pickCanonicalTranslationRow(
+              await ctx.db
+                .query('translations')
+                .withIndex('by_text_and_language', (q) =>
+                  q.eq('textId', args.textId).eq('targetLanguage', args.language),
+                )
+                .take(MAX_TRANSLATION_VARIANTS),
+              args.language,
+              previewVoiceGender,
+            )
+          : await ctx.db
+            .query('translations')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', args.textId).eq('targetLanguage', args.language),
+            )
+            .first();
     if (args.language !== text.language && !translation) {
       // Translation still generating. The click raced it. Nothing to
       // synthesize yet; the client retries once the translation row lands.

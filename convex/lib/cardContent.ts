@@ -153,6 +153,7 @@ export async function buildTextContentBatchForLanguages(
     const genderInput = {
       speakerGender: input.speakerGender,
       audioSpeakerGender: input.audioSpeakerGender,
+      userCreated: input.userCreated,
     };
     effectiveGenderByKey.set(
       input.key,

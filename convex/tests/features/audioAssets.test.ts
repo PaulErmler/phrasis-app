@@ -406,7 +406,10 @@ describe("audioAssets content-addressed cache", () => {
       expect(await blobExists(t, blob)).toBe(false);
     });
 
-    it("repointing the last pointer to a different asset cleans up the orphan (delayed blob delete)", async () => {
+    it("a completion under the OTHER gender adds a sibling pointer instead of repointing", async () => {
+      // Since the speaker-gender feature, a (text, language) holds one
+      // pointer PER voice gender: a male completion must not steal the
+      // female row (that would delete the variant a flip-back reuses).
       const t = convexTest(schema, modules);
       const textA = await seedText(t, "Hola");
       const femaleBlob = await storeBlob(t, 1);
@@ -416,9 +419,6 @@ describe("audioAssets content-addressed cache", () => {
         storageId: femaleBlob,
       });
 
-      // A racing job under the male gender key completes for the same
-      // (text, language): the row repoints to the new asset, and the female
-      // asset. Now pointerless. Must not leak.
       const maleBlob = await storeBlob(t, 2);
       await storeFinal(t, {
         textId: textA,
@@ -428,16 +428,56 @@ describe("audioAssets content-addressed cache", () => {
       });
 
       const assets = await getAllAssets(t);
+      expect(assets.length).toBe(2);
+      expect(assets.map((a) => a.voiceGender).sort()).toEqual([
+        "female",
+        "male",
+      ]);
+      const rows = await t.run(async (ctx) =>
+        ctx.db
+          .query("audioRecordings")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textA).eq("language", "es"),
+          )
+          .collect(),
+      );
+      expect(rows.length).toBe(2);
+      expect(await blobExists(t, femaleBlob)).toBe(true);
+      expect(await blobExists(t, maleBlob)).toBe(true);
+    });
+
+    it("repointing the last pointer to a different asset cleans up the orphan (delayed blob delete)", async () => {
+      const t = convexTest(schema, modules);
+      const textA = await seedText(t, "Hola");
+      const oldBlob = await storeBlob(t, 1);
+      await storeFinal(t, {
+        textId: textA,
+        spokenText: "Hola",
+        storageId: oldBlob,
+      });
+
+      // A racing SAME-gender job under a different content key (the wording
+      // changed mid-flight) completes for the same (text, language): the
+      // row repoints to the new asset, and the old asset — now pointerless —
+      // must not leak.
+      const newBlob = await storeBlob(t, 2);
+      await storeFinal(t, {
+        textId: textA,
+        spokenText: "Hola!",
+        storageId: newBlob,
+      });
+
+      const assets = await getAllAssets(t);
       expect(assets.length).toBe(1);
-      expect(assets[0].voiceGender).toBe("male");
+      expect(assets[0].spokenText).toBe("Hola!");
       expect((await getRow(t, textA))?.assetId).toBe(assets[0]._id);
       // The orphan's blob survives the grace window, then goes.
-      expect(await blobExists(t, femaleBlob)).toBe(true);
+      expect(await blobExists(t, oldBlob)).toBe(true);
       await t.mutation(
         internal.features.ttsProcessing.deleteBlobIfUnreferencedJob,
-        { storageId: femaleBlob },
+        { storageId: oldBlob },
       );
-      expect(await blobExists(t, femaleBlob)).toBe(false);
+      expect(await blobExists(t, oldBlob)).toBe(false);
     });
 
     it("repointing away from a still-shared asset leaves it untouched", async () => {

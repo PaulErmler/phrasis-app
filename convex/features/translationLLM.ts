@@ -27,7 +27,7 @@ import { generateText, type JSONValue } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
 import { openrouterCostUsd, openrouterGenerationId } from '../lib/posthogAi';
-import { postProcessTranslation } from '../../lib/languages';
+import { postProcessTranslation, getSpeakerGenderMarking } from '../../lib/languages';
 import type { ModelStage, StageProviderConstraints } from '../../lib/languages';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
 
@@ -96,7 +96,9 @@ export type LlmTranslationResult =
  * Prompt B (XML-structured), extended with a <referent_gender> tag.
  *
  * Conditional rendering (handled in `buildPrompt` below):
- *   - `<speaker_gender>`: always emitted; falls back to 'unspecified'.
+ *   - `<speaker_gender>`: emitted ONLY when the target language's config
+ *     marks speaker gender (`speakerGenderMarking`, lib/languages.ts);
+ *     unmarked targets get neither the tag nor its instruction.
  *   - `<referent_gender>`: always emitted; 'male' or 'female'.
  *   - `<addressee_gender>` and `<register>`: only emitted when
  *     `addressesSomeone === true`. Descriptive sentences omit them entirely.
@@ -105,6 +107,20 @@ export type LlmTranslationResult =
  * so German doesn't default to Sie, French to vous, etc.
  */
 const PROMPT_B_INSTRUCTIONS = `Use the supplied speaker, referent, and (if present) addressee gender for any grammatical agreement (verb conjugation, adjective inflection, pronoun choice, gendered noun forms) the target language requires. The referent_gender drives third-party noun forms like German Übersetzer/-in, French traducteur/-rice, Spanish profesor/-a. Use the requested register: 'informal' and 'neutral' both mean the casual T-form (du/tú/tu/おまえ); only 'formal' means the polite V-form or honorific (Sie/usted/vous/敬語 ます-form). DO NOT default to the polite form when the register is neutral. If the target language does not grammatically encode a given feature, translate naturally and ignore it. Do not output any field as a literal word. Only return one translation. Do not return multiple alternative translations or explanations — when several renderings are possible, silently pick the single most natural one.`;
+
+/**
+ * Per-tier speaker-gender instruction, appended to the instructions only
+ * when the target language's config marks speaker gender AND the caller
+ * supplied a concrete gender (decision: prompts consult the per-language
+ * config per call — no global language lists, no tag on unmarked targets).
+ */
+const SPEAKER_GENDER_INSTRUCTIONS: Record<'grammatical' | 'stylistic', string> =
+  {
+    grammatical:
+      ' The speaker_gender is the gender of the person SAYING the sentence: apply it to first-person morphology (verb forms, predicate adjectives, participles) wherever the target language marks it.',
+    stylistic:
+      ' The speaker_gender is the gender of the person SAYING the sentence: choose speaker-linked particles, self-reference pronouns, and register accordingly (e.g. Thai polite particles, Japanese first-person pronouns). Do not force gender where the sentence has none.',
+  };
 
 export type TranslationPromptArgs = {
   text: string;
@@ -184,9 +200,26 @@ function sanitizeUntrustedForPrompt(raw: string): string {
  * candidates were generated under.
  */
 function buildContextLines(args: TranslationPromptArgs): string[] {
-  const speakerLine = `  <speaker_gender>${args.speakerGender ?? 'unspecified'}</speaker_gender>`;
-  const referentLine = `  <referent_gender>${args.referentGender}</referent_gender>`;
-  const contextLines: string[] = [speakerLine, referentLine];
+  const contextLines: string[] = [];
+  // Speaker gender is emitted ONLY for target languages whose config marks
+  // it (`speakerGenderMarking` in lib/languages.ts) — an unmarked target
+  // (German, Chinese, Turkish…) cannot express it, so the tag would be
+  // noise. The per-language config is the single source of truth; no
+  // language list is baked into the prompt text. Marked targets normally
+  // arrive with a concrete gender (the worker resolves one); 'unspecified'
+  // is the legacy fallback for jobs enqueued before the gender threading.
+  if (speakerGenderTier(args) !== null) {
+    contextLines.push(
+      `  <speaker_gender>${
+        args.speakerGender === 'male' || args.speakerGender === 'female'
+          ? args.speakerGender
+          : 'unspecified'
+      }</speaker_gender>`,
+    );
+  }
+  contextLines.push(
+    `  <referent_gender>${args.referentGender}</referent_gender>`,
+  );
   if (args.addressesSomeone) {
     contextLines.push(
       `  <addressee_gender>${args.addresseeGender ?? 'unspecified'}</addressee_gender>`,
@@ -196,6 +229,27 @@ function buildContextLines(args: TranslationPromptArgs): string[] {
     );
   }
   return contextLines;
+}
+
+/**
+ * The target's speaker-gender marking tier, or null when the tag/instruction
+ * should be omitted entirely (unmarked target). `args.targetLang` is the
+ * resolved sub-code for mixed languages, but the marking is identical across
+ * a mixed language's variants, so either code answers the same.
+ */
+function speakerGenderTier(
+  args: TranslationPromptArgs,
+): 'grammatical' | 'stylistic' | null {
+  const marking = getSpeakerGenderMarking(args.targetLang);
+  return marking === 'none' ? null : marking;
+}
+
+/** Instructions block: base rules + the tier-specific speaker-gender rule. */
+function buildInstructions(args: TranslationPromptArgs): string {
+  const tier = speakerGenderTier(args);
+  return tier === null
+    ? PROMPT_B_INSTRUCTIONS
+    : PROMPT_B_INSTRUCTIONS + SPEAKER_GENDER_INSTRUCTIONS[tier];
 }
 
 /**
@@ -273,7 +327,7 @@ export function buildPrompt(args: TranslationPromptArgs): string {
     ...suggestionBlock,
     ``,
     `<instructions>`,
-    PROMPT_B_INSTRUCTIONS,
+    buildInstructions(args),
     `</instructions>`,
     ``,
     `<source>${args.text}</source>`,

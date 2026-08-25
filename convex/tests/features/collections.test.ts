@@ -614,6 +614,10 @@ describe("features/collections", () => {
           text: "Hello there",
           language: "en",
           userCreated: false,
+          // Explicit canonical gender so the fixture audio (female default)
+          // is the canonical slot's audio and the scoped stale-delete hits.
+          speakerGender: "female",
+          audioSpeakerGender: "female",
           collectionId: collId,
           collectionRank: 2,
         });
@@ -627,6 +631,7 @@ describe("features/collections", () => {
           textId: enTextId,
           language: "es",
           voiceName: "es-ES-test-voice",
+          spokenText: "Hola viejo",
           storageId: await ctx.storage.store(new Blob(["fake-mp3"])),
         });
         const userTextId = await ctx.db.insert("texts", {

@@ -1412,8 +1412,9 @@ describe("features/decks", () => {
             language: "es",
             voiceName: "es-test-voice",
             storageId,
+            spokenText: "Hola", // pairs with the row's wording
             ttsQuality: "validated",
-            ttsProvider: "google",
+            ttsProvider: "gemini", // matches es's current provider
             voiceGender: args.audio.voiceGender,
           });
         }
@@ -1441,27 +1442,72 @@ describe("features/decks", () => {
       });
     }
 
-    it("deletes a stamped translation whose gender drifted from the card's voice gender", async () => {
+    it("KEEPS a stamped opposite-gender row and schedules the missing variant", async () => {
+      // The old destructive gender-drift sweep is gone: a male-stamped row
+      // on a female-canonical card is simply the other VARIANT now. The
+      // sweep leaves it untouched and generates the female slot additively.
       const t = convexTest(schema, modules);
       const { textId } = await seedTextWithSpanish(t, {
-        // Stamped 'male' but the card's audioSpeakerGender is 'female' → drift.
         translation: {
           speakerGender: "male",
           translationSource: "google-translate-v2",
         },
       });
-      expect(await runSweepAndGetSpanish(t, textId)).toBeNull();
+      const { row, result } = await t.run(async (ctx) => {
+        const text = (await ctx.db.get(textId))!;
+        const res = await scheduleMissingContent(ctx, textId, text, ["en"], [
+          "es",
+        ]);
+        return {
+          result: res,
+          row: await ctx.db
+            .query("translations")
+            .withIndex("by_text_and_language", (q) =>
+              q.eq("textId", textId).eq("targetLanguage", "es"),
+            )
+            .first(),
+        };
+      });
+      expect(row).not.toBeNull();
+      expect(row!.speakerGender).toBe("male");
+      // The female slot is missing → a variant translation was scheduled.
+      expect(result.translationsScheduled).toBeGreaterThan(0);
     });
 
-    it("deletes a legacy (unstamped) translation when its audio drifted gender", async () => {
+    it("treats a legacy (unstamped) row as the canonical carrier and keeps drifted-gender audio as a variant", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedTextWithSpanish(t, {
-        // No speakerGender (legacy row) + a male-voiced audio row that drifts
-        // from the female card → the audio-drift signal authorizes deletion.
+        // Legacy row (canonical carrier for the female card) + a male-voiced
+        // audio row: under the variant model the male audio is the sibling
+        // variant, NOT drift evidence — both survive; the sweep schedules
+        // the missing female audio instead.
         translation: { translationSource: "google-translate-v2" },
         audio: { voiceGender: "male" },
       });
-      expect(await runSweepAndGetSpanish(t, textId)).toBeNull();
+      const { row, audioRows, result } = await t.run(async (ctx) => {
+        const text = (await ctx.db.get(textId))!;
+        const res = await scheduleMissingContent(ctx, textId, text, ["en"], [
+          "es",
+        ]);
+        return {
+          result: res,
+          row: await ctx.db
+            .query("translations")
+            .withIndex("by_text_and_language", (q) =>
+              q.eq("textId", textId).eq("targetLanguage", "es"),
+            )
+            .first(),
+          audioRows: await ctx.db
+            .query("audioRecordings")
+            .withIndex("by_text_and_language", (q) =>
+              q.eq("textId", textId).eq("language", "es"),
+            )
+            .collect(),
+        };
+      });
+      expect(row).not.toBeNull();
+      expect(audioRows.length).toBe(1); // the male variant survives
+      expect(result.audioScheduled).toBeGreaterThan(0); // female audio enqueued
     });
 
     it("keeps a legacy translation when there is no audio-drift signal", async () => {
@@ -1510,27 +1556,34 @@ describe("features/decks", () => {
       expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
     });
 
-    // The text is the user's; the voice is ours. Drifted audio on a
-    // user-created card must still be dropped so it can be re-synthesized at
-    // the card's current gender. The guard covers translations only.
-    it("still deletes drifted audio on a user-created card", async () => {
+    // The text is the user's; the voice is ours. Under the variant model a
+    // drifted-gender voice on a user-created card is KEPT as the sibling
+    // variant's cached audio; the card's own (female) voice is scheduled
+    // additively instead of by delete + re-synth.
+    it("keeps drifted-gender audio as a variant and schedules the card's voice", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedTextWithSpanish(t, {
         userCreated: true,
         translation: { translationSource: "google-translate-v2" },
         audio: { voiceGender: "male" },
       });
-      const audio = await t.run(async (ctx) => {
+      const { audioRows, result } = await t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
-        await scheduleMissingContent(ctx, textId, text, ["en"], ["es"]);
-        return ctx.db
-          .query("audioRecordings")
-          .withIndex("by_text_and_language", (q) =>
-            q.eq("textId", textId).eq("language", "es"),
-          )
-          .first();
+        const res = await scheduleMissingContent(ctx, textId, text, ["en"], [
+          "es",
+        ]);
+        return {
+          result: res,
+          audioRows: await ctx.db
+            .query("audioRecordings")
+            .withIndex("by_text_and_language", (q) =>
+              q.eq("textId", textId).eq("language", "es"),
+            )
+            .collect(),
+        };
       });
-      expect(audio).toBeNull();
+      expect(audioRows.length).toBe(1); // the male variant survives
+      expect(result.audioScheduled).toBeGreaterThan(0); // female enqueued
     });
   });
 
@@ -1659,8 +1712,9 @@ describe("features/decks", () => {
           language: "es",
           voiceName: "es-test-voice",
           storageId,
+          spokenText: "Hola", // pairs with the row's wording (real writes always do)
           ttsProvider: "gemini", // matches current → no provider-mismatch regen
-          voiceGender: "female", // matches card → no gender-drift regen
+          voiceGender: "female", // matches card → no wording-orphan regen
         });
         return { textId, trId, audioId };
       });

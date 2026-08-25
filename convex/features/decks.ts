@@ -63,10 +63,21 @@ import {
 import {
   GOOGLE_TRANSLATE_SOURCE,
   isUserCreatedText,
+  mayAddTranslationVariant,
   mayRegenerateTranslation,
 } from '../../lib/translationProvenance';
 import { soundsSame } from '../lib/textComparison';
-import { getDisplayTranslation } from '../lib/contentVariants';
+import {
+  getDisplayTranslation,
+  MAX_AUDIO_POINTER_ROWS,
+  MAX_TRANSLATION_VARIANTS,
+} from '../lib/contentVariants';
+import {
+  pickTranslationVariant,
+  resolveEffectiveSpeakerGender,
+  translationGenderSlot,
+  type SpeakerGenderPreference,
+} from '../../lib/speakerGender';
 import {
   deleteAudioRow,
   deleteAudioRowsForTextLanguage,
@@ -191,13 +202,22 @@ export async function scheduleTranslationForLanguage(
   },
 ): Promise<boolean> {
   const tCfg = getTranslationConfigForLanguage(targetLanguage);
+  // The gender slot this job generates for (see translations.speakerGender):
+  // the requested gender on marked languages, 'neutral' on unmarked. Claims
+  // are per slot so opposite-gender variant work runs in parallel. Callers
+  // always pass the effective gender; the canonical resolution is the
+  // defensive fallback for any legacy caller.
+  const requestedGender =
+    asVoiceGender(opts.audioSpeakerGender) ??
+    resolveEffectiveSpeakerGender(text, text._id, undefined);
+  const genderSlot = translationGenderSlot(targetLanguage, requestedGender);
   if (opts.probe) {
-    // A fresh LLM claim means a job already owns this translation: the real
-    // call would no-op, so it is not "work needed". Priority-aware on purpose:
-    // a fresh 'background' claim probed at interactive priority IS needy,
-    // because the real run would take it over (cancel the warm job, re-enqueue
-    // on llmPool) — a write. Google-path languages are claimless and always
-    // enqueue, hence always needy here.
+    // A fresh LLM claim means a job already owns this translation slot: the
+    // real call would no-op, so it is not "work needed". Priority-aware on
+    // purpose: a fresh 'background' claim probed at interactive priority IS
+    // needy, because the real run would take it over (cancel the warm job,
+    // re-enqueue on llmPool) — a write. Google-path languages are claimless
+    // and always enqueue, hence always needy here.
     if (tCfg.provider === 'openrouter') {
       if (
         await hasBlockingLlmClaim(
@@ -205,6 +225,7 @@ export async function scheduleTranslationForLanguage(
           text._id,
           targetLanguage,
           opts.llmPriority,
+          genderSlot,
         )
       ) {
         return false;
@@ -218,6 +239,7 @@ export async function scheduleTranslationForLanguage(
       text._id,
       targetLanguage,
       opts.llmPriority,
+      genderSlot,
     );
     if (!claimId) return false;
     await ctx.runMutation(
@@ -228,11 +250,12 @@ export async function scheduleTranslationForLanguage(
           sourceLanguage: text.language,
           targetLanguage,
           text: text.text,
-          audioSpeakerGender: opts.audioSpeakerGender,
+          audioSpeakerGender: requestedGender,
           preferredRegionVariant: opts.preferredRegionVariant,
           skipTts: opts.skipTts,
           priority: opts.priority,
           llmPriority: opts.llmPriority,
+          claimId,
         },
       },
     );
@@ -250,7 +273,7 @@ export async function scheduleTranslationForLanguage(
       sourceLanguage: text.language,
       targetLanguage,
       text: text.text,
-      audioSpeakerGender: opts.audioSpeakerGender,
+      audioSpeakerGender: requestedGender,
       preferredRegionVariant: opts.preferredRegionVariant,
       skipTts: opts.skipTts,
       priority: opts.priority,
@@ -346,29 +369,39 @@ export async function scheduleAudioForLanguage(
 ): Promise<boolean> {
   const isSource = language === text.language;
   if (!isSource && !translation) return false;
-  if (opts?.probe) {
-    // A fresh TTS claim the real run would respect means a job is already
-    // filling this slot — not needy. Priority-aware on purpose: a fresh
-    // 'background' claim probed at interactive priority IS needy, because
-    // the real run would take it over (cancel the warm job, re-enqueue on
-    // the interactive pool) — a write. Anything else (cache attach or
-    // claim + enqueue) would write too.
-    if (await hasBlockingTtsClaim(ctx, text._id, language, opts?.priority)) {
-      return false;
-    }
-    throw new ProbeNeedsWork();
-  }
   // For mixed-dialect rows, prefer a voice in the same locale that was
   // picked at translation time and forward the variant to TTS so the
-  // validation roundtrip uses the matching STT locale.
+  // validation roundtrip uses the matching STT locale. Computed before the
+  // probe so the probe can check the GENDER's claim (pure lookups, no
+  // writes).
   const regionVariant = isSource ? undefined : translation!.regionVariant;
   const voiceName = regionVariant
     ? getVoiceForLanguageVariant(language, regionVariant, audioSpeakerGender)
     : getVoiceForLanguage(language, audioSpeakerGender);
+  const voiceGender = getVoiceGenderByApiCode(voiceName);
+  if (opts?.probe) {
+    // A fresh TTS claim the real run would respect means a job is already
+    // filling this gender's slot — not needy. Priority-aware on purpose: a
+    // fresh 'background' claim probed at interactive priority IS needy,
+    // because the real run would take it over (cancel the warm job,
+    // re-enqueue on the interactive pool) — a write. Anything else (cache
+    // attach or claim + enqueue) would write too.
+    if (
+      await hasBlockingTtsClaim(
+        ctx,
+        text._id,
+        language,
+        opts?.priority,
+        voiceGender,
+      )
+    ) {
+      return false;
+    }
+    throw new ProbeNeedsWork();
+  }
   const spokenText = isSource ? text.text : translation!.translatedText;
 
   if (!opts?.forceRegen) {
-    const voiceGender = getVoiceGenderByApiCode(voiceName);
     if (voiceGender !== undefined) {
       const asset = await findReusableAudioAsset(ctx, {
         language,
@@ -383,7 +416,18 @@ export async function scheduleAudioForLanguage(
     }
   }
 
-  const claimed = await claimTtsIfAvailable(ctx, text._id, language, opts?.priority);
+  if (voiceGender === undefined) {
+    throw new Error(
+      `Cannot claim TTS: voice "${voiceName}" for language "${language}" is not in the curated voice list.`,
+    );
+  }
+  const claimed = await claimTtsIfAvailable(
+    ctx,
+    text._id,
+    language,
+    opts?.priority,
+    voiceGender,
+  );
   if (!claimed) return false;
   await enqueueTtsForVoice(ctx, {
     textId: text._id,
@@ -438,6 +482,15 @@ export async function scheduleMissingContent(
      * needy. Completing without the throw means the text needs nothing.
      */
     probe?: boolean;
+    /**
+     * The course's speaker-gender preference. Male/Female makes the sweep
+     * ensure THAT gender's translation variant + audio (additively — other
+     * variants are never deleted on gender grounds). Absent or 'mixed' =
+     * canonical per-text assignment (today's behavior). Threaded from
+     * courseSettings by the ensure/prepare callers; warm/admin callers pass
+     * nothing.
+     */
+    speakerGenderPreference?: SpeakerGenderPreference;
   },
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   const sourceLanguage = text.language;
@@ -479,224 +532,254 @@ export async function scheduleMissingContent(
     (l) => l !== sourceLanguage,
   );
 
+  // The gender THIS sweep ensures content for: the user's preference layered
+  // over the canonical assignment (definitive metadata still pins, see
+  // resolveEffectiveSpeakerGender). The canonical gender stays what
+  // `resolveCardSpeakerGenders` computed above — it is the shared bookkeeping
+  // every user agrees on; the preference is never written back to the text.
+  const effectiveGender = resolveEffectiveSpeakerGender(
+    text,
+    textId,
+    opts?.speakerGenderPreference,
+  );
+  const canonicalGender = audioSpeakerGender === 'male' ||
+    audioSpeakerGender === 'female'
+    ? audioSpeakerGender
+    : effectiveGender;
+
   // Batch load existing translations, audio, AND LLM claims for the
   // needed languages. All three sets in one Promise.all so the read
   // round-trips run in parallel rather than serially inside the loop
-  // below. The claim lookup gates whether `scheduleMissingContent`
-  // should defer a TTS enqueue while an LLM retranslation is in flight;
-  // doing it per-language inline turned a fast O(languages) read into
-  // a serial chain that pushed the mutation past Convex's 1s budget
-  // when called from a batched caller like `ensureContentForCollection`.
-  const [existingTranslations, existingAudio, existingLlmClaims] =
-    await Promise.all([
-      Promise.all(
-        langsNeedingTranslation.map((lang) =>
-          ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('targetLanguage', lang),
-            )
-            .first(),
+  // below. Reads take ALL variant rows per (text, language) — up to one per
+  // gender slot plus a legacy unstamped row — and the effective pick happens
+  // in JS. The claim lookup gates whether `scheduleMissingContent` should
+  // defer a TTS enqueue while an LLM (re)translation for the effective slot
+  // is in flight.
+  const [existingTranslationRows, existingLlmClaims] = await Promise.all([
+    Promise.all(
+      langsNeedingTranslation.map((lang) =>
+        ctx.db
+          .query('translations')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', textId).eq('targetLanguage', lang),
+          )
+          .take(MAX_TRANSLATION_VARIANTS),
+      ),
+    ),
+    Promise.all(
+      langsNeedingTranslation.map((lang) =>
+        getLlmClaim(
+          ctx,
+          textId,
+          lang,
+          translationGenderSlot(lang, effectiveGender),
         ),
       ),
-      Promise.all(
-        allRequiredLanguages.map((lang) =>
-          ctx.db
-            .query('audioRecordings')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('language', lang),
-            )
-            .first(),
-        ),
-      ),
-      Promise.all(
-        langsNeedingTranslation.map((lang) => getLlmClaim(ctx, textId, lang)),
-      ),
-    ]);
+    ),
+  ]);
 
-  // Build lookup maps
-  const translationMap = new Map(
-    langsNeedingTranslation.map((lang, i) => [lang, existingTranslations[i]]),
-  );
-  const audioMap = new Map(
-    allRequiredLanguages.map((lang, i) => [lang, existingAudio[i]]),
+  const translationRowsMap = new Map(
+    langsNeedingTranslation.map((lang, i) => [lang, existingTranslationRows[i]]),
   );
   const llmClaimMap = new Map(
     langsNeedingTranslation.map((lang, i) => [lang, existingLlmClaims[i]]),
   );
 
-  // Tracks languages whose audio was found to have drifted gender, so the
-  // translation sweep below can also invalidate the legacy translation row
-  // (the one without a stamped `speakerGender`) that was generated alongside
-  // the now-stale audio. See the sweep comment for full rationale.
-  const langsWithAudioGenderDrift = new Set<string>();
+  // ── Translation ensure-variant pass ─────────────────────────────────────
+  //
+  // Replaces the old destructive gender-drift sweep: rows are never deleted
+  // on gender grounds any more. Per language, pick the row serving the
+  // effective gender (exact slot → 'neutral' collapse → legacy carrier);
+  // when the effective slot is unsatisfied AND the additive provenance gate
+  // allows, the enqueue loop below generates the missing variant — siblings
+  // stay untouched, so flipping back is free.
+  //
+  // `translationMap` holds the row audio should pair with (null = a
+  // translation job must run first). `sweptRegionVariants` pins the dialect
+  // for regenerations AND for new variants (both genders of a mixed-language
+  // card must keep one dialect).
+  const translationMap = new Map<string, Doc<'translations'> | null>();
+  const sweptRegionVariants = new Map<string, string>();
+  for (const lang of langsNeedingTranslation) {
+    const rows = translationRowsMap.get(lang) ?? [];
+    const pick = pickTranslationVariant(
+      rows,
+      lang,
+      effectiveGender,
+      canonicalGender,
+    );
+    // Dialect pin: any existing row's regionVariant (variants share one).
+    const pinnedVariant = rows.find((r) => r.regionVariant)?.regionVariant;
+    if (pinnedVariant) sweptRegionVariants.set(lang, pinnedVariant);
 
-  // Validate audio rows. Delete stale ones (missing blob, gender drift,
-  // superseded provider, bumped ttsVersion). All checks read the row's
-  // RESOLVED payload (the shared `audioAssets` row). Deleting a pointer row
-  // leaves a still-shared asset untouched; the re-synthesis a stale asset
-  // triggers patches that asset in place, healing every other text sharing
-  // the string at once.
-  // Do not delete while TTS is in flight: `processTTSForCard` may have
-  // attached a row whose URL is not yet resolvable, or concurrent cleanup
-  // would remove the row while later validation updates expect it to exist
-  // (silent no-op).
+    if (!pick.satisfied) {
+      // Missing rendering for the effective gender. A wholly-missing
+      // language is always fillable (that has never been provenance-gated);
+      // ADDING a variant next to an existing row goes through
+      // `mayAddTranslationVariant` (user-created texts and human-authored
+      // rows never get machine siblings — their effective gender is pinned
+      // anyway, so this is defence in depth).
+      const mayGenerate =
+        pick.row === null || mayAddTranslationVariant(text, pick.row);
+      translationMap.set(lang, mayGenerate ? null : pick.row);
+      continue;
+    }
+
+    const row = pick.row;
+    if (row === null) {
+      translationMap.set(lang, null);
+      continue;
+    }
+
+    // Version-stale EFFECTIVE row: the language's `translationVersion`
+    // config was bumped above this row's stamp (a new model/prompt).
+    // Delete + regenerate, exactly as before, but scoped to the effective
+    // row — a sibling variant regenerates when it next becomes effective.
+    // `isTranslationVersionStale` encodes the "undefined === current" rule.
+    // Gated by `mayRegenerateTranslation` (lib/translationProvenance.ts):
+    // user-created cards in full, plus human-authored rows on premade texts.
+    const isVersionStale =
+      mayRegenerateTranslation(text, row) &&
+      isTranslationVersionStale(lang, row.translationVersion);
+    if (!isVersionStale) {
+      translationMap.set(lang, row);
+      continue;
+    }
+    // Defer while audio or a same-slot LLM job is in flight: deleting now
+    // would race the pending write.
+    if (await hasActiveTtsClaim(ctx, textId, lang, effectiveGender)) {
+      translationMap.set(lang, row);
+      continue;
+    }
+    const llmClaim = llmClaimMap.get(lang) ?? null;
+    if (llmClaim && isClaimFresh(llmClaim)) {
+      translationMap.set(lang, row);
+      continue;
+    }
+    if (opts?.probe) throw new ProbeNeedsWork();
+    if (row.regionVariant) {
+      sweptRegionVariants.set(lang, row.regionVariant);
+    }
+    await ctx.db.delete(row._id);
+    // The deleted wording's audio must not outlive it (the regenerated text
+    // would pair with stale speech). Scoped to the regenerating gender —
+    // a sibling variant's audio still matches its own surviving row.
+    // keepAsset: a version bump is a content change; the recording stays in
+    // the content-addressed cache. The audio pass below re-reads rows, so
+    // this delete is safe.
+    await deleteAudioRowsForTextLanguage(ctx, textId, lang, {
+      keepAsset: true,
+      voiceGender: effectiveGender,
+    });
+    translationMap.set(lang, null);
+  }
+
+  // ── Audio validity pass ─────────────────────────────────────────────────
+  //
+  // Iterate ALL pointer rows per language (one per voice gender may exist).
+  // Per row: dangling-pointer / missing-blob / superseded-provider / bumped
+  // ttsVersion deletes are unchanged (true obsolescence applies to every
+  // gender's row). The old `genderMismatch` delete is GONE — a row whose
+  // asset gender differs from the effective gender is simply the other
+  // variant and is kept (flip-back stays free). What replaces it: the
+  // effective slot only counts as "has audio" when a surviving row's asset
+  // matches the effective gender AND speaks exactly the text being served;
+  // a gender-matching row speaking a STALE string (its translation was
+  // replaced) is deleted with keepAsset so the enqueue loop refills it.
+  const audioMap = new Map<string, Doc<'audioRecordings'> | null>();
   const audioPayloadMap = new Map<
     string,
     NonNullable<Awaited<ReturnType<typeof resolveAudioPayload>>>
   >();
-  for (const [lang, audio] of audioMap) {
-    if (!audio) continue;
-    const payload = await resolveAudioPayload(ctx, audio);
-    if (!payload) {
-      // Dangling pointer (asset gone), no usable audio behind this row.
-      // Remove it so the enqueue loop below refills the language.
-      if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
-      if (opts?.probe) throw new ProbeNeedsWork();
-      await deleteAudioRow(ctx, audio, { blobAlreadyGone: true });
-      audioMap.set(lang, null);
-      continue;
-    }
-    // `db.system.get` (metadata point-read), not `storage.getUrl`: presence
-    // is the signal, and the metadata read is far cheaper than minting a
-    // signed URL — this loop runs per (card × language) on the ensure path.
-    const blobExists =
-      (await ctx.db.system.get(payload.storageId)) !== null;
-    if (!blobExists) {
-      if (await hasActiveTtsClaim(ctx, textId, lang)) {
+  for (const lang of allRequiredLanguages) {
+    const rows = await ctx.db
+      .query('audioRecordings')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', textId).eq('language', lang),
+      )
+      .take(MAX_AUDIO_POINTER_ROWS);
+    // The exact string the effective gender should hear. Unknown while the
+    // effective translation is still generating (translationMap null) — the
+    // pairing check is skipped then; no audio is enqueued for the language
+    // this pass anyway.
+    const effectiveText =
+      lang === sourceLanguage
+        ? text.text
+        : (translationMap.get(lang)?.translatedText ?? null);
+
+    let effectiveRow: Doc<'audioRecordings'> | null = null;
+    let effectivePayload:
+      | NonNullable<Awaited<ReturnType<typeof resolveAudioPayload>>>
+      | null = null;
+    for (const row of rows) {
+      const payload = await resolveAudioPayload(ctx, row);
+      if (!payload) {
+        // Dangling pointer (asset gone), no usable audio behind this row.
+        // Remove it so the enqueue loop below can refill the language.
+        if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
+        if (opts?.probe) throw new ProbeNeedsWork();
+        await deleteAudioRow(ctx, row, { blobAlreadyGone: true });
         continue;
       }
-      if (opts?.probe) throw new ProbeNeedsWork();
-      // The blob is gone, nothing left to reference-protect; row (and, for
-      // a last-pointer row, its dead asset) bookkeeping still runs.
-      await deleteAudioRow(ctx, audio, { blobAlreadyGone: true });
-      audioMap.set(lang, null);
-    } else {
-      const genderMismatch =
-        (audioSpeakerGender === 'male' || audioSpeakerGender === 'female') &&
-        payload.voiceGender !== audioSpeakerGender;
+      // `db.system.get` (metadata point-read), not `storage.getUrl`:
+      // presence is the signal, and the metadata read is far cheaper than
+      // minting a signed URL — this loop runs per (card × language × row).
+      const blobExists = (await ctx.db.system.get(payload.storageId)) !== null;
+      if (!blobExists) {
+        if (await hasActiveTtsClaim(ctx, textId, lang, payload.voiceGender)) {
+          continue;
+        }
+        if (opts?.probe) throw new ProbeNeedsWork();
+        // The blob is gone, nothing left to reference-protect; row (and, for
+        // a last-pointer row, its dead asset) bookkeeping still runs.
+        await deleteAudioRow(ctx, row, { blobAlreadyGone: true });
+        continue;
+      }
       // Assets carried over from pre-provider-field audio are legacy Google.
       const existingProvider = payload.ttsProvider ?? 'google';
       const currentProvider = getTtsProviderForLanguage(lang);
-      // Provider regen is now gated by lib/ttsPrecedence.ts, only the
-      // (current, existing) matchups listed there force a delete + re-synth
-      // (e.g. google now overwrites azure, to migrate the Arabic dialects
-      // off Azure). Unlisted pairs keep the existing audio.
+      // Provider regen is gated by lib/ttsPrecedence.ts: only the
+      // (current, existing) matchups listed there force a delete + re-synth.
       const providerMismatch = shouldOverwriteProvider(
         currentProvider,
         existingProvider,
       );
       // Version-stale audio: the language's `ttsVersion` config was bumped
-      // above what this audio was stamped with (a new voice pool / Gemini prompt
-      // / provider). Regenerate. `isTtsVersionStale` encodes the "undefined ===
-      // current" rule so un-backfilled rows never storm.
+      // above what this audio was stamped with. `isTtsVersionStale` encodes
+      // the "undefined === current" rule so un-backfilled rows never storm.
       const versionMismatch = isTtsVersionStale(lang, payload.ttsVersion);
-      if (genderMismatch) {
-        langsWithAudioGenderDrift.add(lang);
-      }
-      if (genderMismatch || providerMismatch || versionMismatch) {
+      // Stale-wording orphan: this row IS the effective gender's audio slot
+      // but speaks a string the effective translation no longer says (its
+      // wording was replaced while the audio survived). Content change, so
+      // the asset (still-correct audio of the old string) stays cached.
+      // `soundsSame`, not equality: a punctuation-only difference is audibly
+      // identical and deliberately keeps its audio (mirrors the
+      // replaceExisting branch in storeTranslationAndScheduleTTS).
+      const wordingMismatch =
+        payload.voiceGender === effectiveGender &&
+        effectiveText !== null &&
+        !soundsSame(payload.asset.spokenText, effectiveText);
+      if (providerMismatch || versionMismatch || wordingMismatch) {
+        if (await hasActiveTtsClaim(ctx, textId, lang, payload.voiceGender)) {
+          continue;
+        }
         if (opts?.probe) throw new ProbeNeedsWork();
-        // Reference-aware delete: a shared asset (or an `editCard`-copied
-        // legacy blob) survives while anything else still points at it.
-        // Gender drift additionally keeps the asset+blob even as the last
-        // pointer: that audio is still CORRECT for this string+voice. It
-        // stays in the content-addressed cache so flipping the gender back
-        // (or any other text with the same sentence) reuses it for free.
-        // Provider/ttsVersion migrations are true obsolescence (a new TTS
-        // system) and keep the full garbage collection.
-        await deleteAudioRow(ctx, audio, {
-          keepAsset: genderMismatch && !providerMismatch && !versionMismatch,
+        await deleteAudioRow(ctx, row, {
+          keepAsset: wordingMismatch && !providerMismatch && !versionMismatch,
         });
-        audioMap.set(lang, null);
-      } else {
-        audioPayloadMap.set(lang, payload);
+        continue;
+      }
+      // Survivor. It fills the effective slot only on a gender match (and,
+      // where the served string is known, an exact text match — implied by
+      // the wordingMismatch delete above).
+      if (payload.voiceGender === effectiveGender && effectiveRow === null) {
+        effectiveRow = row;
+        effectivePayload = payload;
       }
     }
-  }
-
-  // Invalidate translations whose recorded gender no longer matches the card's
-  // current `audioSpeakerGender`. Two cases trigger deletion:
-  //
-  //  1. Post-PR drift: `translation.speakerGender` is stamped and disagrees
-  //     with `audioSpeakerGender`. The card flipped gender (custom-chat path
-  //     when the metadata LLM lands a definitive gender that overrides the
-  //     initial coin-flip; or any future code path that updates the field)
-  //     after the translation was written.
-  //
-  //  2. Legacy drift: `translation.speakerGender` is undefined (row written
-  //     before the field existed) AND the matching audio was just flagged as
-  //     gender-drifted by the validity loop above. Audio drift is the
-  //     retrospective signal that the translation alongside it was almost
-  //     certainly generated under a gender that's now wrong. Without this,
-  //     the audio loop heals the voice but the translation text: produced
-  //     with the wrong grammar: survives and gets stamped as if correct by
-  //     the "fill if missing" path, so the user ends up hearing the right
-  //     voice reading wrong-grammar text.
-  //
-  // Legacy rows without an audio drift signal are left alone. We have no
-  // evidence they're wrong, and a blanket invalidation would cause a regen
-  // storm across the database.
-  //
-  // Content we may not touch is skipped unconditionally. See
-  // `mayRegenerateTranslation` (lib/translationProvenance.ts) for the rule:
-  // user-created cards in full, plus human-authored rows on premade texts.
-  // Note this gates the TEXT only; the audio validity loop above still runs
-  // for those cards, so a user-created card whose speaker gender changed gets
-  // a matching voice while keeping the wording the user chose.
-  //
-  // Skip when TTS is in flight: deleting now would race the pending write
-  // and leave an audio row pointing at no translation. Defer to the next
-  // `scheduleMissingContent` pass.
-  //
-  // regionVariant of each swept row, captured BEFORE the delete (the row is
-  // gone by the time the regen enqueue below runs) so mixed-dialect cards
-  // keep their dialect across regeneration instead of re-rolling it.
-  const sweptRegionVariants = new Map<string, string>();
-  for (const [lang, translation] of translationMap) {
-    if (!translation) continue;
-    // The one provenance gate for all three triggers below. Covers
-    // user-created (custom/chat) cards and human-authored rows alike. Every
-    // regeneration site shares this predicate so none of them can drift out of
-    // agreement with the others.
-    if (!mayRegenerateTranslation(text, translation)) continue;
-
-    const isLegacy = translation.speakerGender === undefined;
-    const isDrifted = !isLegacy && translation.speakerGender !== audioSpeakerGender;
-    const isLegacyAlongsideDriftedAudio = isLegacy && langsWithAudioGenderDrift.has(lang);
-    // Version-stale translation: the language's `translationVersion` config was
-    // bumped above this row's stamp (a new model/prompt). Regenerate.
-    // `isTranslationVersionStale` encodes the "undefined === current" rule.
-    const isVersionStale = isTranslationVersionStale(
-      lang,
-      translation.translationVersion,
-    );
-
-    if (!isDrifted && !isLegacyAlongsideDriftedAudio && !isVersionStale) continue;
-    if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
-    // Defer while an LLM retranslation is in flight. It will overwrite the row
-    // anyway, so deleting now just races the pending write.
-    const llmClaim = llmClaimMap.get(lang) ?? null;
-    if (llmClaim && isClaimFresh(llmClaim)) continue;
-
-    if (opts?.probe) throw new ProbeNeedsWork();
-    if (translation.regionVariant) {
-      sweptRegionVariants.set(lang, translation.regionVariant);
-    }
-    await ctx.db.delete(translation._id);
-    translationMap.set(lang, null);
-    // Audio for the legacy-alongside-drifted case was already deleted by the
-    // validity loop. The block below only fires when the sweep itself owns
-    // the delete, i.e. post-PR drift / version bump where the audio looked fine
-    // to the validity loop but the translation row is now stale. Reference-aware
-    // delete so a blob shared via an `editCard` copy isn't dropped.
-    const staleAudio = audioMap.get(lang);
-    if (staleAudio) {
-      // keepAsset: every trigger here is a CONTENT change (gender drift /
-      // translation-version bump regenerating the text), the recording
-      // itself is still valid audio of the old string, so it stays in the
-      // audioAssets cache instead of being garbage-collected.
-      await deleteAudioRow(ctx, staleAudio, { keepAsset: true });
-      audioMap.set(lang, null);
+    audioMap.set(lang, effectiveRow);
+    if (effectivePayload) {
+      audioPayloadMap.set(lang, effectivePayload);
     }
   }
 
@@ -716,13 +799,30 @@ export async function scheduleMissingContent(
     // a claim on a backfill that's guaranteed to no-op.
     if (!languageSupportsStt(lang)) return;
     if (opts?.probe) {
-      // Claim-held = a job (synthesis or backfill) already owns the slot —
-      // unless it's a background claim the real (priority-less, hence
-      // interactive) claim below would take over, which is a write.
-      if (await hasBlockingTtsClaim(ctx, textId, lang, undefined)) return;
+      // Claim-held = a job (synthesis or backfill) already owns this
+      // gender's slot — unless it's a background claim the real
+      // (priority-less, hence interactive) claim below would take over,
+      // which is a write.
+      if (
+        await hasBlockingTtsClaim(
+          ctx,
+          textId,
+          lang,
+          undefined,
+          payload.voiceGender,
+        )
+      ) {
+        return;
+      }
       throw new ProbeNeedsWork();
     }
-    const claimed = await claimTtsIfAvailable(ctx, textId, lang);
+    const claimed = await claimTtsIfAvailable(
+      ctx,
+      textId,
+      lang,
+      undefined,
+      payload.voiceGender,
+    );
     if (!claimed) return;
     // Forward the persisted regionVariant for mixed-dialect rows so STT runs
     // against the same locale the voice was synthesized in. Undefined for
@@ -731,7 +831,13 @@ export async function scheduleMissingContent(
     await ctx.scheduler.runAfter(
       0,
       internal.features.ttsProcessing.backfillWordTimings,
-      { textId, language: lang, storageId: payload.storageId, regionVariant },
+      {
+        textId,
+        language: lang,
+        storageId: payload.storageId,
+        regionVariant,
+        voiceGender: payload.voiceGender,
+      },
     );
   };
 
@@ -761,7 +867,7 @@ export async function scheduleMissingContent(
             ctx,
             text,
             lang,
-            audioSpeakerGender,
+            effectiveGender,
             null,
             {
               forceRegen: opts?.forceAudioRegen,
@@ -785,7 +891,7 @@ export async function scheduleMissingContent(
         // so downstream (romanization, TTS) doesn't care which provider ran.
         if (
           await scheduleTranslationForLanguage(ctx, text, lang, {
-            audioSpeakerGender,
+            audioSpeakerGender: effectiveGender,
             preferredRegionVariant: sweptRegionVariants.get(lang),
             priority: opts?.priority,
             llmPriority: opts?.llmPriority,
@@ -827,7 +933,7 @@ export async function scheduleMissingContent(
               ctx,
               text,
               lang,
-              audioSpeakerGender,
+              effectiveGender,
               translation,
               {
                 forceRegen: opts?.forceAudioRegen,
@@ -2815,19 +2921,49 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     // not write. The reclaiming job owns the row now, and a late stale result
     // landing after the owner's would silently revert it (worst case: a
     // flag-retranslation's text overwritten while its audio survives).
+    // The gender slot this write lands in (translations.speakerGender):
+    // requested job gender on marked languages, 'neutral' on unmarked. The
+    // caller's gender is authoritative; the canonical resolution is the
+    // fallback for legacy jobs enqueued without one.
+    const requestedGender =
+      args.speakerGender ??
+      resolveEffectiveSpeakerGender(text, args.textId, undefined);
+    const slot = translationGenderSlot(args.targetLanguage, requestedGender);
+
     if (args.expectedClaimId !== undefined) {
-      const llmClaim = await getLlmClaim(ctx, args.textId, args.targetLanguage);
+      const llmClaim = await getLlmClaim(
+        ctx,
+        args.textId,
+        args.targetLanguage,
+        slot,
+      );
       if (llmClaim?._id !== args.expectedClaimId) {
         return null;
       }
     }
 
-    const existing = await ctx.db
+    // Slot upsert: this write owns exactly one variant row. A legacy
+    // unstamped row is the canonical-gender carrier (its wording was
+    // generated under the canonical assignment), so it claims the canonical
+    // slot — the fill-if-missing branch below then stamps it explicitly.
+    // On unmarked languages every write is the 'neutral' slot and a legacy
+    // row always matches.
+    const variantRows = await ctx.db
       .query('translations')
       .withIndex('by_text_and_language', (q) =>
         q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
       )
-      .first();
+      .take(MAX_TRANSLATION_VARIANTS);
+    const canonicalSlot = translationGenderSlot(
+      args.targetLanguage,
+      resolveEffectiveSpeakerGender(text, args.textId, undefined),
+    );
+    const existing =
+      variantRows.find((r) => r.speakerGender === slot) ??
+      (slot === canonicalSlot
+        ? variantRows.find((r) => r.speakerGender === undefined)
+        : undefined) ??
+      null;
 
     // Backstop at the write choke point: no job may overwrite existing wording
     // on a user-created card, whatever enqueued it. Callers already refuse to
@@ -2874,7 +3010,26 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     // Assigned by every branch of the insert/replace/fill structure.
     let ipaMissingAfterWrite: boolean;
 
-    if (!existing) {
+    // Variant collapse: a newly generated gender variant whose wording is
+    // byte-identical to an existing sibling proves the sentence
+    // gender-invariant — re-stamp the sibling 'neutral' (it now serves BOTH
+    // genders) instead of storing a duplicate row. Most sentences are
+    // third-person, so most marked-language cards converge to one 'neutral'
+    // row after at most one extra generation. Audio still proceeds below:
+    // the requested gender needs its own VOICE even when the text is shared.
+    const collapseTwin =
+      !existing && (slot === 'male' || slot === 'female')
+        ? (variantRows.find((r) => r.translatedText === translatedText) ?? null)
+        : null;
+
+    if (collapseTwin) {
+      if (collapseTwin.speakerGender !== 'neutral') {
+        await ctx.db.patch(collapseTwin._id, { speakerGender: 'neutral' });
+      }
+      // Wording unchanged → searchableText unchanged; IPA/romanization live
+      // on the twin already (or its ensure pass will fill them).
+      ipaMissingAfterWrite = collapseTwin.ipaText === undefined;
+    } else if (!existing) {
       await ctx.db.insert('translations', {
         textId: args.textId,
         targetLanguage: args.targetLanguage,
@@ -2895,7 +3050,8 @@ export const storeTranslationAndScheduleTTS = internalMutation({
           ? { translationSource: args.translationSource }
           : {}),
         ...(args.regionVariant ? { regionVariant: args.regionVariant } : {}),
-        ...(args.speakerGender ? { speakerGender: args.speakerGender } : {}),
+        // Explicit slot, never undefined (undefined = legacy-only).
+        speakerGender: slot,
         // Freshly produced row → stamp the language's current method version.
         translationVersion: getCurrentTranslationVersion(args.targetLanguage),
       });
@@ -2911,11 +3067,21 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       if (!audioUnchangedBySound) {
         // keepAsset: a retranslation is a content change. The old recording
         // is still correct audio of the old sentence and stays cached.
+        // Scope: on marked languages only THIS slot's wording changed, so
+        // only pointer rows of the requested gender are dropped (the sibling
+        // variant's audio still matches its own text). 'neutral' slots
+        // (unmarked languages, collapsed rows) speak for both genders, so
+        // every row goes.
         await deleteAudioRowsForTextLanguage(
           ctx,
           args.textId,
           args.targetLanguage,
-          { keepAsset: true },
+          {
+            keepAsset: true,
+            ...(slot === 'male' || slot === 'female'
+              ? { voiceGender: slot }
+              : {}),
+          },
         );
       }
 
@@ -2933,11 +3099,16 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         ipaSource: string | undefined;
         translationSource: string | undefined;
         regionVariant: string | undefined;
-        speakerGender: 'male' | 'female';
+        speakerGender: 'male' | 'female' | 'neutral';
         translationVersion: number;
       }> = {
         translatedText,
-        // A retranslation is freshly produced → stamp the current method version.
+        // A retranslation is freshly produced → stamp the current method
+        // version and the explicit slot (a legacy row gets its stamp here;
+        // a previously collapsed 'neutral' row regenerated under one gender
+        // narrows back to that slot — its sibling re-collapses or fills on
+        // the next ensure pass).
+        speakerGender: slot,
         translationVersion: getCurrentTranslationVersion(args.targetLanguage),
       };
       if (romanizedText !== undefined) {
@@ -2960,11 +3131,6 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       if (args.regionVariant) {
         patch.regionVariant = args.regionVariant;
       }
-      // Update the recorded speakerGender. A retranslation is what fixes a
-      // stale gender, so the new row's gender should reflect the current card.
-      if (args.speakerGender) {
-        patch.speakerGender = args.speakerGender;
-      }
       await ctx.db.patch(existing._id, patch);
       searchableContentChanged = true;
     } else {
@@ -2973,7 +3139,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         romanizationSource: string;
         translationSource: string;
         regionVariant: string;
-        speakerGender: 'male' | 'female';
+        speakerGender: 'male' | 'female' | 'neutral';
         translationVersion: number;
       }> = {};
       // Same `!== undefined` reasoning: persist the sentinel on first write
@@ -2999,12 +3165,12 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       if (args.regionVariant && !existing.regionVariant) {
         patch.regionVariant = args.regionVariant;
       }
-      // Same "fill if missing" pattern as the other metadata fields. Legacy
-      // translation rows written before `speakerGender` existed get stamped
-      // here on the first ensureContent pass that reaches them, so the
-      // gender-mismatch sweep doesn't loop on them forever.
-      if (args.speakerGender && existing.speakerGender === undefined) {
-        patch.speakerGender = args.speakerGender;
+      // Fill-if-missing: a legacy unstamped row claimed the canonical slot
+      // above, so stamp it with that explicit slot value (never the
+      // preference, never undefined). Retires legacy rows one ensure pass
+      // at a time.
+      if (existing.speakerGender === undefined) {
+        patch.speakerGender = slot;
       }
       // Fill-if-missing: stamp legacy rows (written before the field existed) at
       // BASELINE, not the current version. This branch keeps the row's OLD
@@ -3075,21 +3241,33 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       ttsPriority = undefined;
     }
 
-    const existingAudio = await ctx.db
+    // "Audio exists" is now per gender: only a pointer row whose asset is of
+    // THIS job's voice gender counts (the sibling variant's audio doesn't
+    // serve this slot). The rows are ≤ one per gender.
+    const voiceGender = getVoiceGenderByApiCode(args.voiceName);
+    const audioRows = await ctx.db
       .query('audioRecordings')
       .withIndex('by_text_and_language', (q) =>
         q.eq('textId', args.textId).eq('language', args.targetLanguage),
       )
-      .first();
+      .take(MAX_AUDIO_POINTER_ROWS);
+    const audioAssets = await Promise.all(
+      audioRows.map((row) => ctx.db.get(row.assetId)),
+    );
+    const existingAudio =
+      voiceGender === undefined
+        ? (audioRows[0] ?? null)
+        : (audioRows.find(
+            (_, i) => audioAssets[i]?.voiceGender === voiceGender,
+          ) ?? null);
 
     if (!existingAudio) {
       // A translation just landed. Check the content-addressed store before
       // spending synthesis: another text with this exact string (same
       // language, gender, dialect) may already have fresh audio, in which
       // case attaching the pointer is all that's needed. Any drift the
-      // existing-audio skip above leaves behind (e.g. a stale gender) is the
+      // existing-audio skip above leaves behind (e.g. stale wording) is the
       // sweep's job, which reads through the same asset payload.
-      const voiceGender = getVoiceGenderByApiCode(args.voiceName);
       const asset =
         voiceGender !== undefined
           ? await findReusableAudioAsset(ctx, {
@@ -3106,8 +3284,14 @@ export const storeTranslationAndScheduleTTS = internalMutation({
           args.targetLanguage,
           asset._id,
         );
-      } else {
-        const claimed = await claimTtsIfAvailable(ctx, args.textId, args.targetLanguage, ttsPriority);
+      } else if (voiceGender !== undefined) {
+        const claimed = await claimTtsIfAvailable(
+          ctx,
+          args.textId,
+          args.targetLanguage,
+          ttsPriority,
+          voiceGender,
+        );
         if (claimed) {
           await enqueueTtsForVoice(ctx, {
             textId: args.textId,
@@ -3230,6 +3414,7 @@ export const processRomanizationForTranslation = internalAction({
       kind: 'romanization',
       value: romanized,
       source: getRomanizationSource(args.language),
+      forText: args.text,
     });
     return null;
   },
@@ -3247,16 +3432,30 @@ export const storeTranslationAnnotation = internalMutation({
     kind: vAnnotationKind,
     value: v.string(),
     source: v.string(),
+    // The translated string the annotation was computed FROM. Gender-variant
+    // rows carry different wording, so the value must land on the row whose
+    // text it annotates — never on "the first row". Absent on jobs scheduled
+    // before this field existed; those fall back to the first row still
+    // missing the annotation.
+    forText: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const spec = TEXT_ANNOTATIONS[args.kind];
-    const translation = await ctx.db
+    const rows = await ctx.db
       .query('translations')
       .withIndex('by_text_and_language', (q) =>
         q.eq('textId', args.textId).eq('targetLanguage', args.language),
       )
-      .first();
+      .take(MAX_TRANSLATION_VARIANTS);
+    const translation =
+      args.forText !== undefined
+        ? (rows.find(
+            (r) =>
+              r.translatedText === args.forText &&
+              r[spec.textField] === undefined,
+          ) ?? null)
+        : (rows.find((r) => r[spec.textField] === undefined) ?? null);
     if (translation && translation[spec.textField] === undefined) {
       const patch: Partial<Record<AnnotationField, string>> = {};
       patch[spec.textField] = args.value;

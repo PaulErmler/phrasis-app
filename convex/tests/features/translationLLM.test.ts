@@ -143,10 +143,46 @@ describe("features/translationLLM", () => {
       );
     });
 
-    it("always emits <speaker_gender> and <referent_gender>", () => {
-      const p = buildPrompt({ ...baseArgs, addressesSomeone: false });
-      expect(p).toMatch(/<speaker_gender>.+<\/speaker_gender>/);
-      expect(p).toContain("<referent_gender>male</referent_gender>");
+    it("emits <speaker_gender> only for gender-marking targets; <referent_gender> always", () => {
+      // The per-language config (speakerGenderMarking, lib/languages.ts) is
+      // the single source of truth: a marked target gets the tag + the
+      // tier-specific instruction, an unmarked one gets neither.
+      const markedArgs = {
+        ...baseArgs,
+        targetLang: "es",
+        targetLangName: "Spanish (Spain)",
+        targetLangNativeName: "Español (España)",
+        targetRegion: "Spain",
+      };
+      const marked = buildPrompt({
+        ...markedArgs,
+        addressesSomeone: false,
+        speakerGender: "female",
+      });
+      expect(marked).toContain("<speaker_gender>female</speaker_gender>");
+      expect(marked).toContain("<referent_gender>male</referent_gender>");
+      expect(marked).toContain("person SAYING the sentence");
+
+      // baseArgs targets German — unmarked: no tag, no instruction.
+      const unmarked = buildPrompt({
+        ...baseArgs,
+        addressesSomeone: false,
+        speakerGender: "female",
+      });
+      expect(unmarked).not.toContain("<speaker_gender>");
+      expect(unmarked).not.toContain("person SAYING the sentence");
+      expect(unmarked).toContain("<referent_gender>male</referent_gender>");
+
+      // A marked target without a concrete gender keeps the legacy
+      // 'unspecified' fallback (jobs enqueued before the gender threading).
+      const unspecified = buildPrompt({
+        ...markedArgs,
+        addressesSomeone: false,
+        speakerGender: undefined,
+      });
+      expect(unspecified).toContain(
+        "<speaker_gender>unspecified</speaker_gender>",
+      );
     });
 
     it("OMITS <addressee_gender> and <register> when addressesSomeone=false", () => {

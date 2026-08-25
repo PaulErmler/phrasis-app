@@ -661,11 +661,10 @@ describe("features/chat/alsoCorrect", () => {
       );
       expect(prepareJobs.length).toBeGreaterThan(0);
 
-      // …and running it hits the payload-mismatch branch: the female-voiced
-      // audio POINTER for es is detached so it regenerates with the male
-      // voice, while the asset + blob stay in the audioAssets cache (the
-      // recording is still correct for this string+voice; only the
-      // regenerate button and TTS-system migrations fully delete audio).
+      // …and running it leaves the female-voiced pointer in place as the
+      // sibling VARIANT (the ensure sweep never deletes on gender grounds
+      // any more) while the male voice is scheduled additively; the asset +
+      // blob stay in the audioAssets cache either way.
       await t.mutation(internal.features.decks.prepareCardContent, {
         textId,
         baseLanguages: ["en"],
@@ -679,7 +678,7 @@ describe("features/chat/alsoCorrect", () => {
           )
           .collect(),
       );
-      expect(audioRows).toHaveLength(0);
+      expect(audioRows).toHaveLength(1);
       const cached = await t.run(async (ctx) => ({
         asset: await ctx.db.get(assetId),
         blobUrl: await ctx.storage.getUrl(blobId),

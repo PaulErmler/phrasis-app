@@ -140,6 +140,7 @@ export const processIpaForTranslation = internalAction({
       kind: 'ipa',
       value: ipa,
       source: getIpaSource(args.language),
+      forText: args.text,
     });
     return null;
   },
@@ -240,6 +241,7 @@ export const backfillIpaBatch = internalAction({
             kind: 'ipa',
             value: ipa,
             source: getIpaSource(item.language),
+            forText: item.text,
           },
         );
       }

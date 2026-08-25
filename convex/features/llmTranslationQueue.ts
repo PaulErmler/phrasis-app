@@ -37,11 +37,13 @@ import { getRomanizationSource } from '../lib/localRomanization';
 import { llmPool, llmWarmPool } from '../lib/workpools';
 import {
   asVoiceGender,
+  type TranslationGenderSlotValue,
   llmPriorityValidator,
   ttsPriorityValidator,
   type LlmPriority,
 } from '../types';
 import { captureGeneration } from '../lib/posthogAi';
+import { translationGenderSlot } from '../../lib/speakerGender';
 
 /**
  * LLM translation pipeline, built on the `llmPool` / `llmWarmPool` workpools
@@ -75,18 +77,45 @@ import { captureGeneration } from '../lib/posthogAi';
  */
 export const CLAIM_STALE_MS = 10 * 60 * 1000;
 
-/** Point-read the (textId, targetLanguage) LLM translation claim, if any. */
-export async function getLlmClaim(
+/**
+ * All claims for one (textId, targetLanguage). Since gender-variant
+ * generation there can be one claim per gender SLOT ('male' / 'female' /
+ * 'neutral', see translations.speakerGender) plus at most one legacy
+ * genderless claim from the deploy boundary.
+ */
+async function getLlmClaims(
   ctx: QueryCtx | MutationCtx,
   textId: Id<'texts'>,
   targetLanguage: string,
-): Promise<Doc<'llmTranslationClaims'> | null> {
+): Promise<Doc<'llmTranslationClaims'>[]> {
   return await ctx.db
     .query('llmTranslationClaims')
     .withIndex('by_text_and_language', (q) =>
       q.eq('textId', textId).eq('targetLanguage', targetLanguage),
     )
-    .first();
+    .take(4);
+}
+
+/**
+ * Point-read the LLM translation claim for one gender slot of
+ * (textId, targetLanguage). A legacy genderless claim matches EVERY slot
+ * (conservative both-blocking until it drains within CLAIM_STALE_MS). With
+ * `slot` omitted, returns any claim (per-language "is anything in flight?"
+ * sites like the retranslating pill's language-level fallback).
+ */
+export async function getLlmClaim(
+  ctx: QueryCtx | MutationCtx,
+  textId: Id<'texts'>,
+  targetLanguage: string,
+  slot?: TranslationGenderSlotValue,
+): Promise<Doc<'llmTranslationClaims'> | null> {
+  const claims = await getLlmClaims(ctx, textId, targetLanguage);
+  if (slot === undefined) return claims[0] ?? null;
+  return (
+    claims.find((c) => c.speakerGender === slot) ??
+    claims.find((c) => c.speakerGender === undefined) ??
+    null
+  );
 }
 
 /** True while the claim is inside its CLAIM_STALE_MS freshness window. */
@@ -135,8 +164,9 @@ export async function hasBlockingLlmClaim(
   textId: Id<'texts'>,
   targetLanguage: string,
   priority: LlmPriority | undefined,
+  slot: TranslationGenderSlotValue,
 ): Promise<boolean> {
-  const existing = await getLlmClaim(ctx, textId, targetLanguage);
+  const existing = await getLlmClaim(ctx, textId, targetLanguage, slot);
   return existing !== null && llmClaimBlocksPriority(existing, priority);
 }
 
@@ -160,9 +190,13 @@ export async function claimLlmTranslationIfAvailable(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   targetLanguage: string,
-  priority?: LlmPriority,
+  priority: LlmPriority | undefined,
+  slot: TranslationGenderSlotValue,
 ): Promise<Id<'llmTranslationClaims'> | null> {
-  const existing = await getLlmClaim(ctx, textId, targetLanguage);
+  // Claims are per gender slot: work on different slots of the same
+  // (text, language) proceeds in parallel. A legacy genderless claim matches
+  // every slot (getLlmClaim), so it blocks/hands over exactly like before.
+  const existing = await getLlmClaim(ctx, textId, targetLanguage, slot);
 
   if (existing) {
     if (llmClaimBlocksPriority(existing, priority)) {
@@ -181,6 +215,7 @@ export async function claimLlmTranslationIfAvailable(
     targetLanguage,
     claimedAt: Date.now(),
     priority,
+    speakerGender: slot,
   });
 }
 
@@ -284,10 +319,19 @@ export const enqueueLlmTranslation = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx: MutationCtx, { args }: { args: LlmJobArgs }) => {
-    const claim = await getLlmClaim(ctx, args.textId, args.targetLanguage);
+    // Locate this caller's claim: by id when supplied (the claim-then-enqueue
+    // callers pass the claim they just acquired — required now that several
+    // per-slot claims can coexist on one key), else by slot lookup.
+    const requestedGender = asVoiceGender(args.audioSpeakerGender);
+    const slot = requestedGender
+      ? translationGenderSlot(args.targetLanguage, requestedGender)
+      : undefined;
+    const claim = args.claimId
+      ? await ctx.db.get(args.claimId)
+      : await getLlmClaim(ctx, args.textId, args.targetLanguage, slot);
     // A fresh claim already stamped with another job's workId means a live
-    // pool job owns this (textId, language): enqueueing again would run the
-    // translation twice and hijack that job's claim. Unreachable from the
+    // pool job owns this slot: enqueueing again would run the translation
+    // twice and hijack that job's claim. Unreachable from the
     // claim-then-enqueue callers (their fresh claim is workId-less); kept as
     // a guard against callers that enqueue without re-claiming.
     if (claim && claim.workId !== undefined && isClaimFresh(claim)) {
@@ -309,7 +353,7 @@ export const enqueueLlmTranslation = internalMutation({
         audioSpeakerGender: args.audioSpeakerGender,
         replaceExisting: args.replaceExisting,
         ruleOverride: args.ruleOverride,
-        claimId: claim?._id,
+        claimId: claim?._id ?? args.claimId,
         preferredRegionVariant: args.preferredRegionVariant,
         skipTts: args.skipTts,
         priority: args.priority,
@@ -445,12 +489,21 @@ export const processLlmTranslationForCard = internalAction({
         ? text.referentGender
         : legacyReferentGenderFallback(text.externalId, text._id as string);
 
+    // Prompt speaker gender: the gender THIS JOB was asked to render (the
+    // variant slot / voice gender carried in the args) wins over the shared
+    // text row's fields — a female-variant job on a text whose canonical
+    // bookkeeping says male must still translate as a female speaker. The
+    // row's verdict is only the fallback for legacy jobs enqueued without
+    // the arg. Unmarked target languages never see the tag either way
+    // (buildContextLines gates on the language config).
+    const requestedSpeakerGender = asVoiceGender(args.audioSpeakerGender);
     const speakerGender =
-      text.speakerGender === 'male' ||
+      requestedSpeakerGender ??
+      (text.speakerGender === 'male' ||
       text.speakerGender === 'female' ||
       text.speakerGender === 'neutral'
         ? (text.speakerGender as 'male' | 'female' | 'neutral')
-        : undefined;
+        : undefined);
 
     const addresseeGender =
       addressesSomeone &&
@@ -763,7 +816,28 @@ export const onLlmTranslationComplete = internalMutation({
       result: PoolRunResult;
     },
   ) => {
-    const claim = await getLlmClaim(ctx, context.textId, context.targetLanguage);
+    // Per-slot claims: this job's claim is the one stamped with its workId
+    // (enqueue stamps atomically); a workId-less claim for the job's slot is
+    // the pre-stamp window. Never touch another slot's claim.
+    const claims = await getLlmClaims(
+      ctx,
+      context.textId,
+      context.targetLanguage,
+    );
+    const contextGender = asVoiceGender(context.audioSpeakerGender);
+    const contextSlot = contextGender
+      ? translationGenderSlot(context.targetLanguage, contextGender)
+      : undefined;
+    const claim =
+      claims.find((c) => c.workId === workId) ??
+      claims.find(
+        (c) =>
+          c.workId === undefined &&
+          (contextSlot === undefined ||
+            c.speakerGender === contextSlot ||
+            c.speakerGender === undefined),
+      ) ??
+      null;
     const ownsClaim =
       claim !== null && (claim.workId === undefined || claim.workId === workId);
 
@@ -820,6 +894,7 @@ export const onLlmTranslationComplete = internalMutation({
         context: {
           textId: context.textId,
           targetLanguage: context.targetLanguage,
+          audioSpeakerGender: context.audioSpeakerGender,
         },
       },
     );
@@ -842,7 +917,11 @@ export const onLlmTranslationComplete = internalMutation({
  */
 export const onGoogleFallbackComplete = internalMutation({
   args: vOnCompleteArgs(
-    v.object({ textId: v.id('texts'), targetLanguage: v.string() }),
+    v.object({
+      textId: v.id('texts'),
+      targetLanguage: v.string(),
+      audioSpeakerGender: v.optional(v.string()),
+    }),
   ),
   returns: v.null(),
   handler: async (
@@ -853,7 +932,11 @@ export const onGoogleFallbackComplete = internalMutation({
       result,
     }: {
       workId: string;
-      context: { textId: Id<'texts'>; targetLanguage: string };
+      context: {
+        textId: Id<'texts'>;
+        targetLanguage: string;
+        audioSpeakerGender?: string;
+      };
       result: PoolRunResult;
     },
   ) => {
@@ -865,7 +948,26 @@ export const onGoogleFallbackComplete = internalMutation({
       });
       return null;
     }
-    const claim = await getLlmClaim(ctx, context.textId, context.targetLanguage);
+    // Same per-slot claim location rule as onLlmTranslationComplete.
+    const claims = await getLlmClaims(
+      ctx,
+      context.textId,
+      context.targetLanguage,
+    );
+    const gender = asVoiceGender(context.audioSpeakerGender);
+    const slot = gender
+      ? translationGenderSlot(context.targetLanguage, gender)
+      : undefined;
+    const claim =
+      claims.find((c) => c.workId === workId) ??
+      claims.find(
+        (c) =>
+          c.workId === undefined &&
+          (slot === undefined ||
+            c.speakerGender === slot ||
+            c.speakerGender === undefined),
+      ) ??
+      null;
     if (claim && (claim.workId === undefined || claim.workId === workId)) {
       await ctx.db.delete(claim._id);
     }

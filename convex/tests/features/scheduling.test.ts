@@ -878,6 +878,7 @@ describe("features/scheduling", () => {
           // the asset (payload travels with it), not the regen logic.
           voiceName: "Kore",
           storageId,
+          spokenText: "Hej", // pairs with the wording (real writes always do)
           ttsQuality: "validated",
           ttsProvider: "gemini",
           voiceGender: "female",
@@ -1231,6 +1232,7 @@ describe("features/scheduling", () => {
           language: "en",
           voiceName: "Kore",
           storageId,
+          spokenText: "Hello", // pairs with the row's wording
           ttsQuality: "validated",
           ttsProvider: "gemini",
           voiceGender: "male",
@@ -1301,26 +1303,39 @@ describe("features/scheduling", () => {
 
       const after = await t.run(async (ctx) => {
         const text = (await ctx.db.get(newTextId))!;
-        await scheduleMissingContent(ctx, newTextId, text, ["en"], ["sv"]);
+        const result = await scheduleMissingContent(
+          ctx,
+          newTextId,
+          text,
+          ["en"],
+          ["sv"],
+        );
+        const audioRows = await ctx.db
+          .query("audioRecordings")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", newTextId).eq("language", "en"),
+          )
+          .collect();
         return {
+          result,
           translation: await ctx.db
             .query("translations")
             .withIndex("by_text_and_language", (q) =>
               q.eq("textId", newTextId).eq("targetLanguage", "en"),
             )
             .first(),
-          audio: await ctx.db
-            .query("audioRecordings")
-            .withIndex("by_text_and_language", (q) =>
-              q.eq("textId", newTextId).eq("language", "en"),
-            )
-            .first(),
+          audioAssets: await Promise.all(
+            audioRows.map((row) => ctx.db.get(row.assetId)),
+          ),
         };
       });
 
-      // Wording kept; the wrong-gender voice still dropped for re-synthesis.
+      // Wording kept. Under the variant model the wrong-gender voice is no
+      // longer deleted — it survives as the other gender's cached variant
+      // (the female voice fills in additively via the ensure machinery; its
+      // enqueue may be deferred here by claims the edit flow still holds).
       expect(after.translation?.translatedText).toBe("Hello");
-      expect(after.audio).toBeNull();
+      expect(after.audioAssets.map((a) => a?.voiceGender)).toEqual(["male"]);
     });
   });
 
@@ -1625,6 +1640,7 @@ describe("features/scheduling", () => {
           storageId: await ctx.storage.store(
             new Blob([new Uint8Array([1, 2, 3])]),
           ),
+          spokenText: "Hej", // pairs with the wording
           ttsQuality: "validated",
           ttsProvider: "gemini",
           voiceGender: "female",
@@ -1638,6 +1654,7 @@ describe("features/scheduling", () => {
           storageId: await ctx.storage.store(
             new Blob([new Uint8Array([4, 5, 6])]),
           ),
+          spokenText: "Hello", // pairs with the wording
           ttsQuality: "validated",
           ttsProvider: "gemini",
           voiceGender: "female",

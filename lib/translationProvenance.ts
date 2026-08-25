@@ -116,3 +116,31 @@ export function mayRegenerateTranslation(
   if (isUserCreatedText(text)) return false;
   return !isProtectedTranslationSource(translation.translationSource);
 }
+
+/**
+ * The additive counterpart of `mayRegenerateTranslation`: may the
+ * ensure-variant sweep generate a NEW gender-variant row for this
+ * (text, language), given the row currently carrying the rendering?
+ *
+ * Adding a variant never touches existing wording, so it could be more
+ * permissive — but it deliberately is not:
+ *   - user-created texts (uploads, manual entry, chat cards) are pinned to
+ *     their detected/generated gender in v1: no variants, ever. Their
+ *     effective gender always equals the pinned/canonical one anyway, so a
+ *     variant request cannot arise from the resolver; this gate is the
+ *     defense in depth (and the single line the future chat-flippable slice
+ *     would relax for chat-machine rows).
+ *   - a human-authored base row (`user-provided` / `curated-manual`) is THE
+ *     rendering; generating a machine sibling would put a machine rendering
+ *     next to a human one and serve it to half the users.
+ */
+export function mayAddTranslationVariant(
+  text: TextProvenance,
+  baseRow: TranslationProvenance | null,
+): boolean {
+  if (isUserCreatedText(text)) return false;
+  if (baseRow && isProtectedTranslationSource(baseRow.translationSource)) {
+    return false;
+  }
+  return true;
+}

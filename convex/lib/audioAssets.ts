@@ -178,10 +178,13 @@ export async function upsertAudioAsset(
 }
 
 /**
- * Upsert the (textId, language) pointer row → `assetId`. When the row was
- * pointing at a DIFFERENT asset (racing jobs under different keys), the old
- * asset is cleaned up if this row was its last pointer, nothing else
- * garbage-collects a pointerless asset.
+ * Upsert the (textId, language, voice-gender) pointer row → `assetId`. Since
+ * the speaker-gender feature a text can hold one pointer PER voice gender:
+ * the row this write replaces is the one whose current asset shares the new
+ * asset's gender; a row of the other gender is the sibling variant and is
+ * left untouched. When the replaced row pointed at a DIFFERENT asset (racing
+ * jobs under different keys), the old asset is cleaned up if this row was
+ * its last pointer — nothing else garbage-collects a pointerless asset.
  */
 export async function upsertAudioPointer(
   ctx: MutationCtx,
@@ -189,12 +192,31 @@ export async function upsertAudioPointer(
   language: string,
   assetId: Id<'audioAssets'>,
 ): Promise<void> {
-  const existing = await ctx.db
+  const newAsset = await ctx.db.get(assetId);
+  const rows = await ctx.db
     .query('audioRecordings')
     .withIndex('by_text_and_language', (q) =>
       q.eq('textId', textId).eq('language', language),
     )
-    .first();
+    .take(4);
+  let existing: Doc<'audioRecordings'> | null = null;
+  if (newAsset) {
+    for (const row of rows) {
+      if (row.assetId === assetId) {
+        existing = row;
+        break;
+      }
+      const rowAsset = await ctx.db.get(row.assetId);
+      // A dangling row (asset gone) is claimable by any gender — replacing
+      // it both attaches the new audio and heals the dead pointer.
+      if (rowAsset === null || rowAsset.voiceGender === newAsset.voiceGender) {
+        existing = row;
+        break;
+      }
+    }
+  } else {
+    existing = rows[0] ?? null;
+  }
   if (!existing) {
     await ctx.db.insert('audioRecordings', { textId, language, assetId });
     return;

@@ -3,6 +3,10 @@ import { internalMutation } from '../_generated/server';
 import { deleteAudioRow } from '../lib/audio';
 import { resolveAudioPayload } from '../lib/audioAssets';
 import { clearedAnnotationFields } from '../lib/textAnnotations';
+import {
+  resolveEffectiveSpeakerGender,
+  translationGenderSlot,
+} from '../../lib/speakerGender';
 
 const SPANISH_VOICE_PREFIXES: Record<string, string> = {
   es: 'es-ES',
@@ -127,24 +131,45 @@ export const batchUpsertTranslations = internalMutation({
       }
 
       for (const tr of item.translations) {
-        const existing = await ctx.db
+        // Slot-aware seed upsert: the seed's rendering is the CANONICAL one.
+        // It updates the canonical-slot row (legacy unstamped rows count as
+        // that slot); when the wording changes, sibling gender-variant rows
+        // are stale renderings of the OLD sentence and are dropped — the
+        // ensure sweep regenerates them against the new wording on demand.
+        const rows = await ctx.db
           .query('translations')
           .withIndex('by_text_and_language', (q) =>
             q.eq('textId', textId).eq('targetLanguage', tr.language),
           )
-          .first();
+          .take(4);
+        const seedGender = resolveEffectiveSpeakerGender(
+          { ...textDoc, speakerGender: item.speakerGender },
+          textId,
+          undefined,
+        );
+        const seedSlot = translationGenderSlot(tr.language, seedGender);
+        const existing =
+          rows.find((r) => r.speakerGender === seedSlot) ??
+          rows.find((r) => r.speakerGender === 'neutral') ??
+          rows.find((r) => r.speakerGender === undefined) ??
+          null;
 
         if (!existing) {
           await ctx.db.insert('translations', {
             textId,
             targetLanguage: tr.language,
             translatedText: tr.text,
+            speakerGender: seedSlot,
             ...(tr.translationSource
               ? { translationSource: tr.translationSource }
               : {}),
           });
           stats.translationsInserted++;
         } else if (existing.translatedText !== tr.text) {
+          for (const sibling of rows) {
+            if (sibling._id === existing._id) continue;
+            await ctx.db.delete(sibling._id);
+          }
           // Text changed. Clear the annotations + their sources (next
           // ensureContent regenerates under the current methods). For `translationSource`:
           // only overwrite when the seed explicitly declares a new tag. If the
@@ -160,14 +185,15 @@ export const batchUpsertTranslations = internalMutation({
           });
           stats.translationsUpdated++;
 
-          // Translation text changed. Delete audio so it regenerates on demand
-          const audio = await ctx.db
+          // Translation text changed. Delete ALL audio rows (every gender's
+          // audio spoke the old wording) so they regenerate on demand.
+          const audioRows = await ctx.db
             .query('audioRecordings')
             .withIndex('by_text_and_language', (q) =>
               q.eq('textId', textId).eq('language', tr.language),
             )
-            .first();
-          if (audio) {
+            .take(10);
+          for (const audio of audioRows) {
             await deleteAudioRow(ctx, audio);
             stats.audioInvalidated++;
           }

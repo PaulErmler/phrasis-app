@@ -6,6 +6,10 @@ import {
   buildTextContentBatchForLanguages,
 } from '../lib/cardContent';
 import { getDisplayTranslation } from '../lib/contentVariants';
+import {
+  resolveEffectiveSpeakerGender,
+  translationGenderSlot,
+} from '../../lib/speakerGender';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -1564,8 +1568,18 @@ async function enqueueFlagRetranslation(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   targetLanguage: string,
+  /**
+   * The gender the retranslation is generated under — the flagged row's own
+   * variant slot (its stamp, or the canonical assignment for legacy/neutral
+   * rows). A flag applies to the (text, language) pair, so `flagTranslation`
+   * calls this once per variant row, each under its own gender.
+   */
+  slotGender: 'male' | 'female',
   opts?: {
     userSuggestedTranslation?: string;
+    /** 'background' for non-effective sibling variants so their refresh
+     * never queues ahead of user-facing work. */
+    llmPriority?: 'interactive' | 'background';
     /** Runs after the claim is acquired and before the job is enqueued.
      * `flagTranslation` bills its one quota unit here so a depleted user
      * throws before any pool work is created, rather than relying on the
@@ -1577,6 +1591,8 @@ async function enqueueFlagRetranslation(
     ctx,
     text._id,
     targetLanguage,
+    opts?.llmPriority,
+    translationGenderSlot(targetLanguage, slotGender),
   );
   if (!claimId) return false;
 
@@ -1590,11 +1606,13 @@ async function enqueueFlagRetranslation(
         sourceLanguage: text.language,
         targetLanguage,
         text: text.text,
-        audioSpeakerGender: text.audioSpeakerGender,
+        audioSpeakerGender: slotGender,
         ruleOverride: 'retranslation_high',
         // Deliberate retranslation. Overwrite the existing translation
         // row (and its romanization) once the LLM lands.
         replaceExisting: true,
+        llmPriority: opts?.llmPriority,
+        claimId,
         ...(opts?.userSuggestedTranslation
           ? { userSuggestedTranslation: opts.userSuggestedTranslation }
           : {}),
@@ -1657,9 +1675,21 @@ async function suggestCurriculumFixesForEdit(
     flagged.push(lang);
     if (nextCount > FLAG_AUTO_RETRANSLATION_MAX) continue;
 
-    await enqueueFlagRetranslation(ctx, originalText, lang, {
-      userSuggestedTranslation: submittedMap.get(lang),
-    });
+    await enqueueFlagRetranslation(
+      ctx,
+      originalText,
+      lang,
+      existing.speakerGender === 'male' || existing.speakerGender === 'female'
+        ? existing.speakerGender
+        : resolveEffectiveSpeakerGender(
+            originalText,
+            originalText._id,
+            undefined,
+          ),
+      {
+        userSuggestedTranslation: submittedMap.get(lang),
+      },
+    );
   }
 
   return flagged;
@@ -1717,9 +1747,12 @@ export const flagTranslation = mutation({
       return { retranslated: false };
     }
 
-    // Parallel indexed reads. One per language, each O(1) via the
-    // composite index. Faster than a single `by_textId` collect + JS
-    // filter when only a subset of the text's translations matter.
+    // Parallel indexed reads. One per language, each O(rows) via the
+    // composite index. A flag applies to the (text, language) PAIR: every
+    // gender-variant row of a flagged language is bumped and retranslated —
+    // a bad rendering is almost always bad in both variants (same model,
+    // same prompt), and a fix that only reached the variant the flagging
+    // user happened to see would leave the sibling wrong.
     const fetched = await Promise.all(
       cardLanguages.map((lang) =>
         ctx.db
@@ -1727,15 +1760,13 @@ export const flagTranslation = mutation({
           .withIndex('by_text_and_language', (q) =>
             q.eq('textId', card.textId).eq('targetLanguage', lang),
           )
-          .first(),
+          .take(4),
       ),
     );
 
     // Drop languages with no translation row (the card simply doesn't
     // have a translation in that language yet, nothing to flag).
-    const nonSourceTranslations = fetched.filter(
-      (tr): tr is NonNullable<typeof tr> => tr !== null,
-    );
+    const nonSourceTranslations = fetched.flat();
 
     if (nonSourceTranslations.length === 0) {
       return { retranslated: false };
@@ -1782,12 +1813,27 @@ export const flagTranslation = mutation({
     let anyEnqueued = false;
     let quotaCharged = false;
 
+    // Each row retranslates under ITS OWN gender slot (per-slot claims run
+    // in parallel). The canonical variant rides the interactive pool; a
+    // sibling variant's refresh is background work nobody is staring at.
+    const flagCanonicalGender = resolveEffectiveSpeakerGender(
+      text,
+      card.textId,
+      undefined,
+    );
     for (const { tr } of enqueueable) {
+      const rowGender =
+        tr.speakerGender === 'male' || tr.speakerGender === 'female'
+          ? tr.speakerGender
+          : flagCanonicalGender;
       const enqueued = await enqueueFlagRetranslation(
         ctx,
         text,
         tr.targetLanguage,
+        rowGender,
         {
+          llmPriority:
+            rowGender === flagCanonicalGender ? undefined : 'background',
           // Charge once total, on the first successful claim. If the user is
           // depleted this throws USAGE_LIMIT from inside the helper, before
           // that language's job is enqueued, and the whole mutation rolls
@@ -1843,8 +1889,19 @@ export const regenerateCardAudio = mutation({
     const allLanguages = [
       ...new Set([...course.baseLanguages, ...course.targetLanguages]),
     ];
+    // Only the CURRENT (effective) gender's audio is regenerated: the user
+    // is asking for a fresh take on what they hear, not on the sibling
+    // variant's cached audio (decision: audio regens affect only the
+    // current gender).
+    const regenGender = resolveEffectiveSpeakerGender(
+      text,
+      card.textId,
+      undefined,
+    );
     for (const lang of allLanguages) {
-      await deleteAudioRowsForTextLanguage(ctx, card.textId, lang);
+      await deleteAudioRowsForTextLanguage(ctx, card.textId, lang, {
+        voiceGender: regenGender,
+      });
     }
 
     // forceAudioRegen: bypass the audioAssets cache (a hit would hand back

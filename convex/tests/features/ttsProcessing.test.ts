@@ -112,7 +112,7 @@ const baseJobArgs = (textId: Id<"texts">) => ({
 describe("features/ttsProcessing", () => {
   describe("claimTtsIfAvailable", () => {
     const claim = (t: TestConvex<typeof schema>, textId: Id<"texts">) =>
-      t.run(async (ctx) => claimTtsIfAvailable(ctx as any, textId, "es"));
+      t.run(async (ctx) => claimTtsIfAvailable(ctx as any, textId, "es", undefined, "female"));
 
     it("acquires and returns the new claim's id when none exists", async () => {
       const t = convexTest(schema, modules);
@@ -188,7 +188,7 @@ describe("features/ttsProcessing", () => {
         });
       });
       const result = await t.run(async (ctx) =>
-        claimTtsIfAvailable(ctx as any, textId, "es", "background"),
+        claimTtsIfAvailable(ctx as any, textId, "es", "background", "female"),
       );
       expect(result).toBeNull();
       expect(mockWarmCancel).not.toHaveBeenCalled();
@@ -372,7 +372,11 @@ describe("features/ttsProcessing", () => {
       expect(getFunctionName(opts.onComplete)).toBe(
         "features/ttsProcessing:onTtsJobComplete",
       );
-      expect(opts.context).toEqual({ textId, language: "es" });
+      expect(opts.context).toEqual({
+        textId,
+        language: "es",
+        voiceGender: "female",
+      });
 
       // The pool's workId is stamped onto the claim (same transaction) with a
       // fresh claimedAt, so the claim lives exactly as long as this pool job.
