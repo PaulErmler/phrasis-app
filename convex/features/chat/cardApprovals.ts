@@ -542,6 +542,7 @@ export const replaceCardFromApproval = mutation({
       cardId: previousCardId,
       translations: translationsToWrite,
       timezone: args.timezone,
+      auditKind: 'chat_also_correct',
       ensureUserOwnedText: metadata !== undefined,
       skipQuota: true,
       // A definitive proposed gender must reach the text row BEFORE the
