@@ -39,8 +39,11 @@ import {
   asVoiceGender,
   llmPriorityValidator,
   ttsPriorityValidator,
+  translationReasonValidator,
+  isRetranslationReason,
   type LlmPriority,
 } from '../types';
+import { resolveRetranslation } from './cardEditAudit';
 import { captureGeneration } from '../lib/posthogAi';
 
 /**
@@ -237,6 +240,18 @@ const llmJobArgsValidator = v.object({
   // field out of the completion context makes it structurally impossible for
   // one to leak down that path.
   userSuggestedTranslation: v.optional(v.string()),
+  // WHY this translation was requested. The worker branches on it for the
+  // "the user says this is wrong" prompt block, which previously had to be
+  // reconstructed from `replaceExisting` + a rules-slug allowlist — a
+  // conjunction that conflated the storage semantic with the user's intent.
+  // Absent means 'fill' (jobs enqueued before this field existed).
+  translationReason: v.optional(translationReasonValidator),
+  // The `cardEditRetranslations` row this job resolves, so the write choke
+  // point can record which outcome this attempt reached. A reason is a
+  // category; resolving an audit row needs the instance, since two users can
+  // each queue an attempt against the same (text, language) and only one wins
+  // the claim. Absent on every ordinary fill.
+  retranslationAuditId: v.optional(v.id('cardEditRetranslations')),
 });
 
 /** onComplete context: everything the Google fallback needs to run. */
@@ -251,6 +266,12 @@ const llmCompletionContextValidator = v.object({
   skipTts: v.optional(v.boolean()),
   priority: v.optional(ttsPriorityValidator),
   llmPriority: v.optional(llmPriorityValidator),
+  // Carried so the completion handler can resolve the audit row itself — a
+  // fallback handoff and a terminal failure both land here, never in the
+  // worker. (`userSuggestedTranslation` is deliberately still absent; see the
+  // note on it above.)
+  translationReason: v.optional(translationReasonValidator),
+  retranslationAuditId: v.optional(v.id('cardEditRetranslations')),
 });
 
 type LlmJobArgs = Infer<typeof llmJobArgsValidator>;
@@ -314,6 +335,8 @@ export const enqueueLlmTranslation = internalMutation({
         skipTts: args.skipTts,
         priority: args.priority,
         userSuggestedTranslation: args.userSuggestedTranslation,
+        translationReason: args.translationReason,
+        retranslationAuditId: args.retranslationAuditId,
       },
       {
         onComplete:
@@ -329,6 +352,8 @@ export const enqueueLlmTranslation = internalMutation({
           skipTts: args.skipTts,
           priority: args.priority,
           llmPriority: args.llmPriority,
+          translationReason: args.translationReason,
+          retranslationAuditId: args.retranslationAuditId,
         },
       },
     );
@@ -489,24 +514,15 @@ export const processLlmTranslationForCard = internalAction({
       }
     }
 
-    // Gate the "previous translation" prompt block to flag-triggered
-    // retranslations only. `flagTranslation` is the unique caller that
-    // sets BOTH `replaceExisting: true` (the storage-overwrite semantic)
-    // AND a flag-specific `ruleOverride` ('retranslation_high' for
-    // curriculum texts, 'retranslation_custom' for user-created texts).
-    // A future caller that sets `replaceExisting` for some other reason
-    // e.g. a model-swap migration. Must NOT see the "the user flagged
-    // this as wrong" framing, which would be a lie.
-    const FLAG_TRIGGERED_RULES = new Set<string>([
-      'retranslation_high',
-      'retranslation_custom',
-    ]);
+    // Gate the "previous translation" prompt block to the retranslations a
+    // USER asked for. Read straight off `translationReason` rather than
+    // reconstructed from `replaceExisting` (a storage semantic) plus a
+    // rules-slug allowlist (a model-routing choice): neither says anything
+    // about intent, so a future caller that overwrote a row for some other
+    // reason — a model-swap migration, say — would have inherited the "the
+    // user flagged this as wrong" framing, which would be a lie.
     let previousTranslation: string | undefined;
-    if (
-      args.replaceExisting &&
-      args.ruleOverride &&
-      FLAG_TRIGGERED_RULES.has(args.ruleOverride)
-    ) {
+    if (isRetranslationReason(args.translationReason)) {
       const existing = await ctx.runQuery(
         internal.features.decks.getTranslationForTextLanguage,
         {
@@ -729,6 +745,9 @@ export const processLlmTranslationForCard = internalAction({
         expectedClaimId: args.claimId,
         skipTts: args.skipTts,
         priority: args.priority,
+        // Resolved at the write choke point, which is the only place that
+        // knows which of its several outcomes this attempt actually reached.
+        retranslationAuditId: args.retranslationAuditId,
       },
     );
     return null;
@@ -784,6 +803,13 @@ export const onLlmTranslationComplete = internalMutation({
         targetLanguage: context.targetLanguage,
         error: result.error,
       });
+      // Same verdict the write choke point would have reached had this job got
+      // that far: a newer job owns the row, so this attempt is dead.
+      await resolveRetranslation(
+        ctx,
+        context.retranslationAuditId,
+        'dropped_superseded',
+      );
       return null;
     }
 
@@ -792,6 +818,15 @@ export const onLlmTranslationComplete = internalMutation({
       targetLanguage: context.targetLanguage,
       error: result.error,
     });
+    // An intermediate state: if Google succeeds, the write choke point
+    // overwrites this with the real outcome; if it fails too,
+    // `onGoogleFallbackComplete` lands 'failed'. A row still reading
+    // 'fell_back_to_google' means the fallback never reported either way.
+    await resolveRetranslation(
+      ctx,
+      context.retranslationAuditId,
+      'fell_back_to_google',
+    );
     // Stay on the tier the LLM attempt ran at: a warm translation's fallback
     // must not jump onto the interactive pool.
     const fallbackPool =
@@ -812,6 +847,7 @@ export const onLlmTranslationComplete = internalMutation({
         // The claim keeps its _id across the re-point below, so the fallback
         // inherits the same single-writer token.
         claimId: claim._id,
+        retranslationAuditId: context.retranslationAuditId,
       },
       {
         retry: GOOGLE_FALLBACK_RETRY,
@@ -820,6 +856,7 @@ export const onLlmTranslationComplete = internalMutation({
         context: {
           textId: context.textId,
           targetLanguage: context.targetLanguage,
+          retranslationAuditId: context.retranslationAuditId,
         },
       },
     );
@@ -842,7 +879,11 @@ export const onLlmTranslationComplete = internalMutation({
  */
 export const onGoogleFallbackComplete = internalMutation({
   args: vOnCompleteArgs(
-    v.object({ textId: v.id('texts'), targetLanguage: v.string() }),
+    v.object({
+      textId: v.id('texts'),
+      targetLanguage: v.string(),
+      retranslationAuditId: v.optional(v.id('cardEditRetranslations')),
+    }),
   ),
   returns: v.null(),
   handler: async (
@@ -853,7 +894,11 @@ export const onGoogleFallbackComplete = internalMutation({
       result,
     }: {
       workId: string;
-      context: { textId: Id<'texts'>; targetLanguage: string };
+      context: {
+        textId: Id<'texts'>;
+        targetLanguage: string;
+        retranslationAuditId?: Id<'cardEditRetranslations'>;
+      };
       result: PoolRunResult;
     },
   ) => {
@@ -863,6 +908,7 @@ export const onGoogleFallbackComplete = internalMutation({
         targetLanguage: context.targetLanguage,
         error: result.error,
       });
+      await resolveRetranslation(ctx, context.retranslationAuditId, 'failed');
       return null;
     }
     const claim = await getLlmClaim(ctx, context.textId, context.targetLanguage);

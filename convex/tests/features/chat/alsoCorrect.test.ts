@@ -295,6 +295,22 @@ describe("features/chat/alsoCorrect", () => {
           .first(),
       );
       expect(quota?.features.card_edits.balance).toBe(9);
+
+      // Audited under its own kind, and with no retranslation children: this
+      // path deliberately omits `suggestCurriculumFix`, so accepting the
+      // tutor's phrasing never spends a shared row's capped retranslations.
+      const edits = await t.run(async (ctx) =>
+        ctx.db.query("cardEdits").collect(),
+      );
+      expect(edits).toHaveLength(1);
+      expect(edits[0].kind).toBe("chat_also_correct");
+      expect(edits[0].path).toBe("in_place");
+      expect(edits[0].changes.map((c) => c.language)).toEqual(["es"]);
+      expect(
+        await t.run(async (ctx) =>
+          ctx.db.query("cardEditRetranslations").collect(),
+        ),
+      ).toEqual([]);
     });
 
     it("Path B: a shared/dataset text is copied to a user-owned one", async () => {
@@ -541,6 +557,13 @@ describe("features/chat/alsoCorrect", () => {
       expect(newText?.speakerGender).toBe("female");
       expect(newText?.audioSpeakerGender).toBe("female");
       expect(newText?.register).toBe("informal");
+
+      // No wording changed, so this is a card replacement but not an edit. The
+      // audit log is a before/after record of wording; a changeless row in it
+      // would only be noise.
+      expect(
+        await t.run(async (ctx) => ctx.db.query("cardEdits").collect()),
+      ).toEqual([]);
     });
 
     it("text + gender replace enqueues the re-synthesis with the PROPOSED voice gender", async () => {

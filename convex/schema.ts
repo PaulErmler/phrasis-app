@@ -25,6 +25,11 @@ import {
   featureStateValidator,
   reviewsByModeValidator,
   translationEntriesValidator,
+  collectionOriginValidator,
+  cardEditKindValidator,
+  cardEditPathValidator,
+  cardEditLanguageRoleValidator,
+  retranslationStatusValidator,
 } from './types';
 
 
@@ -363,9 +368,7 @@ export default defineSchema({
     // 'premade' = dataset-uploaded; 'custom' = user-typed; 'chat' = chat-approved.
     // Backfilled for all existing rows; optional only in the validator. Treat
     // as required for new writes.
-    origin: v.optional(
-      v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
-    ),
+    origin: v.optional(collectionOriginValidator),
   })
     .index('by_name', ['name'])
     .index('by_datasetId_and_order', ['datasetId', 'order'])
@@ -688,9 +691,7 @@ export default defineSchema({
     collectionId: v.optional(v.id('collections')), // Reference to the source collection. Backfilled for all existing cards; treat as required for new writes.
     // Denormalized from collections.origin at insert time. Powers the content-source filter
     // index lookups in getCardForReview. Backfilled for all existing cards; treat as required for new writes.
-    collectionOrigin: v.optional(
-      v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
-    ),
+    collectionOrigin: v.optional(collectionOriginValidator),
     // Scheduling + free-play rotation state mutated by reviewCard /
     // advanceFreePlayCard (one rotation per face). Shared with the `reviewLogs`
     // undo snapshots. Definitions and field comments live in convex/types.ts.
@@ -1144,6 +1145,95 @@ export default defineSchema({
     // Account purge: enumerate a user's approvals without knowing their
     // threads (the agent component owns those and is purged separately).
     .index('by_userId', ['userId']),
+
+  // ==========================================================================
+  // Card-edit audit log. One row per gesture that changes (or disputes) card
+  // wording, plus a child row per retranslation the gesture triggered. Exists
+  // so the quality of user edits — and of the retranslations they spend LLM
+  // budget on — can be reviewed after the fact; nothing else in the app
+  // retains the before/after text. Written by convex/features/cardEditAudit.ts.
+  // ==========================================================================
+  cardEdits: defineTable({
+    userId: v.string(),
+    courseId: v.id('courses'),
+    kind: cardEditKindValidator,
+    path: cardEditPathValidator,
+    // Card identity before/after. The fork path replaces the card document, so
+    // these differ; on the in-place and flag paths they are equal.
+    cardIdBefore: v.id('cards'),
+    cardIdAfter: v.id('cards'),
+    textIdBefore: v.id('texts'),
+    textIdAfter: v.id('texts'),
+    // Provenance of what was edited. Separates "a user corrected our
+    // curriculum" from "a user fixed their own sentence" — different QC
+    // questions, and only the first can trigger a curriculum retranslation.
+    collectionOrigin: v.optional(collectionOriginValidator),
+    textWasUserCreated: v.boolean(),
+    sourceLanguage: v.string(), // texts.language
+    sourceText: v.string(), // the sentence itself, for QC context
+    // Course language config snapshotted at edit time. See
+    // `cardEditLanguageRoleValidator` for why this is not a join.
+    baseLanguages: v.array(v.string()),
+    targetLanguages: v.array(v.string()),
+    // One entry per language this gesture touched. Bounded by the course's
+    // language count (single digits), so an inline array is safe: it cannot
+    // grow after the row is written.
+    changes: v.array(
+      v.object({
+        language: v.string(),
+        role: cardEditLanguageRoleValidator,
+        isSourceLanguage: v.boolean(),
+        before: v.string(),
+        // Absent for `kind: 'flag'` — the user asserted "this is wrong"
+        // without proposing any wording.
+        after: v.optional(v.string()),
+        beforeTranslationSource: v.optional(v.string()),
+        beforeFlagCount: v.optional(v.number()),
+        // Punctuation/'_'-only change (`soundsSame`): the audio was kept.
+        // Absent for flags, which change no text and so have nothing to
+        // compare — not the same statement as `false`.
+        soundsSame: v.optional(v.boolean()),
+      }),
+    ),
+  })
+    .index('by_userId', ['userId'])
+    // Convex appends _creationTime, so this also orders within a kind.
+    .index('by_kind', ['kind']),
+
+  // One row per retranslation a `cardEdits` gesture triggered, from enqueue to
+  // resolution. A child table rather than an array on the parent: the outcome
+  // lands asynchronously, minutes later, from a mutation
+  // (`storeTranslationAndScheduleTTS`) that knows nothing about the edit, and a
+  // targeted patch there beats a read-modify-write of the whole parent.
+  cardEditRetranslations: defineTable({
+    cardEditId: v.id('cardEdits'),
+    // Denormalized from the parent purely so the account-deletion drain is one
+    // indexed read instead of a join through every one of the user's edits.
+    userId: v.string(),
+    language: v.string(),
+    role: cardEditLanguageRoleValidator,
+    // The row being retranslated. On the fork path this is the SHARED
+    // curriculum text, NOT the private copy the user's card now points at —
+    // the distinction QC cares about most, since this write lands for every
+    // other learner studying the sentence.
+    textId: v.id('texts'),
+    sourceLanguage: v.string(),
+    sourceText: v.string(),
+    beforeText: v.string(),
+    beforeTranslationSource: v.optional(v.string()),
+    userSuggestion: v.optional(v.string()), // wording handed to the prompt
+    flagCountAfter: v.number(),
+    // Model policy requested (e.g. 'retranslation_high'). The *reason* is not
+    // duplicated here — the parent row's `kind` determines it.
+    rule: v.optional(v.string()),
+    status: retranslationStatusValidator,
+    afterText: v.optional(v.string()),
+    afterTranslationSource: v.optional(v.string()),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index('by_cardEditId', ['cardEditId'])
+    .index('by_userId', ['userId'])
+    .index('by_status', ['status']),
 
   // TTS mismatches. Stores audio that failed validation for later analysis
   ttsMismatches: defineTable({

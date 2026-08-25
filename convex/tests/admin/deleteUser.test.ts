@@ -396,6 +396,43 @@ async function seedFixture(t: TestConvex<typeof schema>): Promise<Fixture> {
       createdAt: now,
       searchText: `${VICTIM_EMAIL} victim`,
     });
+    const victimCardEditId = await ctx.db.insert('cardEdits', {
+      userId: VICTIM,
+      courseId,
+      kind: 'manual_edit',
+      path: 'fork',
+      cardIdBefore: customCard,
+      cardIdAfter: customCard,
+      textIdBefore: premadeText,
+      textIdAfter: premadeText,
+      textWasUserCreated: false,
+      sourceLanguage: 'en',
+      sourceText: 'My cat',
+      baseLanguages: ['en'],
+      targetLanguages: ['es'],
+      changes: [
+        {
+          language: 'es',
+          role: 'target',
+          isSourceLanguage: false,
+          before: 'Mi gato',
+          after: 'Mi gata',
+          soundsSame: false,
+        },
+      ],
+    });
+    await ctx.db.insert('cardEditRetranslations', {
+      cardEditId: victimCardEditId,
+      userId: VICTIM,
+      language: 'es',
+      role: 'target',
+      textId: premadeText,
+      sourceLanguage: 'en',
+      sourceText: 'My cat',
+      beforeText: 'Mi gato',
+      flagCountAfter: 1,
+      status: 'enqueued',
+    });
     await ctx.db.insert('cardApprovals', {
       threadId: 'thread_1',
       messageId: 'msg_1',

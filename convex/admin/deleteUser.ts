@@ -119,6 +119,13 @@ export const USER_TABLES = [
   'billingTestOverrides',
   'admins',
   'userProfiles',
+  // Card-edit audit log. The rows carry the user's own typed sentences, so
+  // they purge with the account rather than surviving as a QC record: the
+  // quality signal is not worth retaining text from a deleted account.
+  // `cardEditRetranslations` denormalizes `userId` from its parent precisely
+  // so it can be drained here by one indexed read.
+  'cardEdits',
+  'cardEditRetranslations',
 ] as const;
 type UserTable = (typeof USER_TABLES)[number];
 
@@ -174,6 +181,10 @@ const USER_TABLE_DRAINS: Record<UserTable, UserTableDrain> = {
     ids(await ctx.db.query('admins').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
   userProfiles: async (ctx, u) =>
     ids(await ctx.db.query('userProfiles').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+  cardEdits: async (ctx, u) =>
+    ids(await ctx.db.query('cardEdits').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+  cardEditRetranslations: async (ctx, u) =>
+    ids(await ctx.db.query('cardEditRetranslations').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
 };
 
 export interface PurgeInventory {

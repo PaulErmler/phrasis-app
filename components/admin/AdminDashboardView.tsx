@@ -10,6 +10,7 @@ import { formatTimeMs } from '@/lib/formatTime';
 import { TimeSeriesCard } from './TimeSeriesCard';
 import { DistributionCard } from './DistributionCard';
 import { UsersTable } from './UsersTable';
+import { CardEditsBrowser } from './CardEditsBrowser';
 import { AdminGuard } from './AdminGuard';
 
 const RANGES = [30, 60, 90] as const;
@@ -45,6 +46,7 @@ function AdminDashboardContent() {
           <TabsList className="mb-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="card-edits">Card edits</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-3">
@@ -159,6 +161,10 @@ function AdminDashboardContent() {
 
           <TabsContent value="users">
             <UsersTable />
+          </TabsContent>
+
+          <TabsContent value="card-edits">
+            <CardEditsBrowser />
           </TabsContent>
         </Tabs>
       </div>

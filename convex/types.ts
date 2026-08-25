@@ -305,6 +305,111 @@ export const cardApprovalResolutionValidator = v.union(
   v.literal('replaced'),
 );
 
+// Content provenance of a collection, denormalized onto `cards` and the
+// `cardEdits` audit rows. Kept here so the three schema sites can't drift.
+export const collectionOriginValidator = v.union(
+  v.literal('premade'),
+  v.literal('custom'),
+  v.literal('chat'),
+);
+
+// ============================================================================
+// Card-edit audit log (convex/features/cardEditAudit.ts)
+// ============================================================================
+
+/**
+ * Which gesture produced a `cardEdits` row. Kept as an explicit discriminator
+ * rather than inferred from the row's shape: the three gestures have different
+ * retranslation policies and are the unit later analytics will group by.
+ */
+export const cardEditKindValidator = v.union(
+  v.literal('manual_edit'), // the Edit Card dialog (features/scheduling:editCard)
+  v.literal('chat_also_correct'), // chat replace (chat/cardApprovals)
+  v.literal('flag'), // the Flag button (features/scheduling:flagTranslation)
+);
+export type CardEditKind = Infer<typeof cardEditKindValidator>;
+
+/**
+ * Copy-on-write path `applyCardEdit` took. 'fork' means the card document was
+ * replaced (new `_id`) because the underlying text is shared; 'none' is a flag,
+ * which writes no text at all.
+ */
+export const cardEditPathValidator = v.union(
+  v.literal('in_place'),
+  v.literal('fork'),
+  v.literal('none'),
+);
+
+/**
+ * A language's role in the course AT EDIT TIME. Snapshotted rather than joined:
+ * `courses.baseLanguages` / `targetLanguages` are user-editable, so a later
+ * course change would silently rewrite the history of every past edit. A
+ * language can sit in both arrays, hence 'both'.
+ */
+export const cardEditLanguageRoleValidator = v.union(
+  v.literal('base'),
+  v.literal('target'),
+  v.literal('both'),
+);
+export type CardEditLanguageRole = Infer<typeof cardEditLanguageRoleValidator>;
+
+/**
+ * Lifecycle of one retranslation an edit or flag triggered. Every value maps to
+ * a specific, reachable outcome in the pipeline:
+ *
+ *   enqueued               claim won, job handed to the workpool
+ *   applied                storeTranslationAndScheduleTTS wrote the new wording
+ *   applied_audio_kept     ditto, but `soundsSame` so the audio was retained
+ *   skipped_capped         flagCount past FLAG_AUTO_RETRANSLATION_MAX
+ *   skipped_claim_contested  another job already owned (textId, language)
+ *   dropped_superseded     expectedClaimId mismatch: a reclaim won the row
+ *   dropped_text_deleted   the text was cascade-deleted mid-flight
+ *   refused_user_created   the user-created provenance backstop refused it
+ *   fell_back_to_google    the LLM exhausted its retries; Google took over
+ *   failed                 terminal: the fallback failed too
+ */
+export const retranslationStatusValidator = v.union(
+  v.literal('enqueued'),
+  v.literal('applied'),
+  v.literal('applied_audio_kept'),
+  v.literal('skipped_capped'),
+  v.literal('skipped_claim_contested'),
+  v.literal('dropped_superseded'),
+  v.literal('dropped_text_deleted'),
+  v.literal('refused_user_created'),
+  v.literal('fell_back_to_google'),
+  v.literal('failed'),
+);
+export type RetranslationStatus = Infer<typeof retranslationStatusValidator>;
+
+/**
+ * Why a translation job was requested. Threaded through the LLM job args so the
+ * worker can branch on the REASON instead of reconstructing it from a
+ * conjunction of unrelated flags (`replaceExisting` + a rules-slug allowlist),
+ * which conflated the storage semantic with the user's intent and could not
+ * tell "a user flagged this as wrong" from "a user retyped it as X".
+ *
+ * Absent means 'fill' — the value for jobs enqueued before this field existed
+ * and still in flight across a deploy.
+ */
+export const translationReasonValidator = v.union(
+  v.literal('fill'), // fill or regenerate a missing/stale language
+  v.literal('flag'), // the user flagged the translation as wrong
+  v.literal('curriculum_fix'), // the user retyped a curriculum translation
+);
+export type TranslationReason = Infer<typeof translationReasonValidator>;
+
+/**
+ * The two reasons that mean "a user is telling us this translation is wrong".
+ * Both carry the user's own wording and want the previous translation in the
+ * prompt; 'fill' wants neither.
+ */
+export function isRetranslationReason(
+  reason: TranslationReason | undefined,
+): boolean {
+  return reason === 'flag' || reason === 'curriculum_fix';
+}
+
 // Metadata changes the chat model proposes with markAlsoCorrect, only the
 // fields the new phrasing actually changes are present. Applied on the
 // replace path via the applyMetadataAndPrepareCard mechanism (so a speaker

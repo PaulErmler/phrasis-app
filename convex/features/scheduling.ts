@@ -37,6 +37,13 @@ import {
 } from '../db/stats/dailyStats';
 import { patchCard, insertCard, deleteCard } from '../db/stats/cardAggregates';
 import {
+  languageRole,
+  recordCardEdit,
+  recordRetranslationAttempt,
+  setCardEditResult,
+  type CardEditChange,
+} from './cardEditAudit';
+import {
   scheduleCard,
   getValidRatings,
   DEFAULT_INITIAL_REVIEW_COUNT,
@@ -56,6 +63,7 @@ import {
   type SchedulingTrack,
   type StudyContentFilter,
   type FreePlayFace,
+  type CardEditLanguageRole,
 } from '../types';
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
 import {
@@ -1561,7 +1569,21 @@ async function enqueueFlagRetranslation(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   targetLanguage: string,
-  opts?: {
+  opts: {
+    /** Why this retranslation was asked for. Threaded to the worker, which
+     * branches on it for the "the user says this is wrong" prompt block. */
+    reason: 'flag' | 'curriculum_fix';
+    /** The audit gesture this belongs to, plus the before-state a reviewer
+     * needs. The child row is written HERE because this is the only place
+     * that can tell an enqueue from a lost claim. */
+    audit: {
+      cardEditId: Id<'cardEdits'>;
+      userId: string;
+      role: CardEditLanguageRole;
+      beforeText: string;
+      beforeTranslationSource?: string;
+      flagCountAfter: number;
+    };
     userSuggestedTranslation?: string;
     /** Runs after the claim is acquired and before the job is enqueued.
      * `flagTranslation` bills its one quota unit here so a depleted user
@@ -1570,14 +1592,44 @@ async function enqueueFlagRetranslation(
     onClaimed?: () => Promise<void>;
   },
 ): Promise<boolean> {
+  const RULE = 'retranslation_high';
+  const auditFields = {
+    cardEditId: opts.audit.cardEditId,
+    userId: opts.audit.userId,
+    language: targetLanguage,
+    role: opts.audit.role,
+    textId: text._id,
+    sourceLanguage: text.language,
+    sourceText: text.text,
+    beforeText: opts.audit.beforeText,
+    beforeTranslationSource: opts.audit.beforeTranslationSource,
+    userSuggestion: opts.userSuggestedTranslation,
+    flagCountAfter: opts.audit.flagCountAfter,
+    rule: RULE,
+  };
+
   const claimId = await claimLlmTranslationIfAvailable(
     ctx,
     text._id,
     targetLanguage,
   );
-  if (!claimId) return false;
+  if (!claimId) {
+    // Something else owns this (text, language). This request — and any
+    // suggestion it carried — is dropped, which is exactly the outcome a
+    // reviewer wondering "why didn't my edit change anything?" needs to see.
+    await recordRetranslationAttempt(ctx, {
+      ...auditFields,
+      status: 'skipped_claim_contested',
+    });
+    return false;
+  }
 
-  await opts?.onClaimed?.();
+  await opts.onClaimed?.();
+
+  const retranslationAuditId = await recordRetranslationAttempt(ctx, {
+    ...auditFields,
+    status: 'enqueued',
+  });
 
   await ctx.runMutation(
     internal.features.llmTranslationQueue.enqueueLlmTranslation,
@@ -1588,11 +1640,13 @@ async function enqueueFlagRetranslation(
         targetLanguage,
         text: text.text,
         audioSpeakerGender: text.audioSpeakerGender,
-        ruleOverride: 'retranslation_high',
+        ruleOverride: RULE,
+        translationReason: opts.reason,
+        retranslationAuditId,
         // Deliberate retranslation. Overwrite the existing translation
         // row (and its romanization) once the LLM lands.
         replaceExisting: true,
-        ...(opts?.userSuggestedTranslation
+        ...(opts.userSuggestedTranslation
           ? { userSuggestedTranslation: opts.userSuggestedTranslation }
           : {}),
       },
@@ -1631,6 +1685,7 @@ async function suggestCurriculumFixesForEdit(
   changedLanguages: Set<string>,
   submittedMap: Map<string, string>,
   existingTranslationMap: Map<string, Doc<'translations'>>,
+  audit: { cardEditId: Id<'cardEdits'>; userId: string; course: Doc<'courses'> },
 ): Promise<string[]> {
   const flagged: string[] = [];
 
@@ -1652,9 +1707,41 @@ async function suggestCurriculumFixesForEdit(
     const nextCount = (existing.flagCount ?? 0) + 1;
     await ctx.db.patch(existing._id, { flagCount: nextCount });
     flagged.push(lang);
-    if (nextCount > FLAG_AUTO_RETRANSLATION_MAX) continue;
+
+    const auditCommon = {
+      cardEditId: audit.cardEditId,
+      userId: audit.userId,
+      language: lang,
+      role: languageRole(audit.course, lang),
+      textId: originalText._id,
+      sourceLanguage: originalText.language,
+      sourceText: originalText.text,
+      beforeText: existing.translatedText,
+      beforeTranslationSource: existing.translationSource,
+      userSuggestion: submittedMap.get(lang),
+      flagCountAfter: nextCount,
+    };
+
+    if (nextCount > FLAG_AUTO_RETRANSLATION_MAX) {
+      // Counter rose but no work was created. Logged so the QC view can tell
+      // "we declined to spend on this" from "nothing happened".
+      await recordRetranslationAttempt(ctx, {
+        ...auditCommon,
+        status: 'skipped_capped',
+      });
+      continue;
+    }
 
     await enqueueFlagRetranslation(ctx, originalText, lang, {
+      reason: 'curriculum_fix',
+      audit: {
+        cardEditId: audit.cardEditId,
+        userId: audit.userId,
+        role: auditCommon.role,
+        beforeText: existing.translatedText,
+        beforeTranslationSource: existing.translationSource,
+        flagCountAfter: nextCount,
+      },
       userSuggestedTranslation: submittedMap.get(lang),
     });
   }
@@ -1749,6 +1836,36 @@ export const flagTranslation = mutation({
       await ctx.db.patch(tr._id, { flagCount: nextCount });
     }
 
+    // Audit row for the gesture itself, written now that we know which
+    // languages it actually touched. Deliberately before the two policy
+    // short-circuits below: a flag that deliberately produces no retranslation
+    // is exactly the case QC needs to see, and `textWasUserCreated` on this row
+    // is what explains the user-created one.
+    const cardEditId = await recordCardEdit(ctx, {
+      userId,
+      course,
+      kind: 'flag',
+      path: 'none',
+      cardIdBefore: args.cardId,
+      cardIdAfter: args.cardId,
+      textIdBefore: card.textId,
+      textIdAfter: card.textId,
+      collectionOrigin: card.collectionOrigin,
+      textWasUserCreated: text.userCreated,
+      sourceLanguage: text.language,
+      sourceText: text.text,
+      // No `after`/`soundsSame`: a flag disputes the wording without proposing
+      // a replacement, so there is nothing to diff.
+      changes: withCounts.map(({ tr, nextCount }) => ({
+        language: tr.targetLanguage,
+        role: languageRole(course, tr.targetLanguage),
+        isSourceLanguage: false,
+        before: tr.translatedText,
+        beforeTranslationSource: tr.translationSource,
+        beforeFlagCount: nextCount - 1,
+      })),
+    });
+
     // Custom-text flag policy: increment counters but never auto-retranslate.
     // Custom texts have no curated source of truth. The LLM would only be
     // second-guessing the user's own content. Flagging surfaces them in the
@@ -1766,6 +1883,26 @@ export const flagTranslation = mutation({
       ({ nextCount }) => nextCount <= FLAG_AUTO_RETRANSLATION_MAX,
     );
 
+    // Over-cap rows: the counter rose but we declined to spend on another
+    // retranslation. Logged so the QC view distinguishes that from a language
+    // the flag never reached.
+    for (const { tr, nextCount } of withCounts) {
+      if (nextCount <= FLAG_AUTO_RETRANSLATION_MAX) continue;
+      await recordRetranslationAttempt(ctx, {
+        cardEditId,
+        userId,
+        language: tr.targetLanguage,
+        role: languageRole(course, tr.targetLanguage),
+        textId: card.textId,
+        sourceLanguage: text.language,
+        sourceText: text.text,
+        beforeText: tr.translatedText,
+        beforeTranslationSource: tr.translationSource,
+        flagCountAfter: nextCount,
+        status: 'skipped_capped',
+      });
+    }
+
     if (enqueueable.length === 0) {
       // Everything was over-cap. Counters incremented, no quota charge,
       // no retranslations.
@@ -1779,12 +1916,21 @@ export const flagTranslation = mutation({
     let anyEnqueued = false;
     let quotaCharged = false;
 
-    for (const { tr } of enqueueable) {
+    for (const { tr, nextCount } of enqueueable) {
       const enqueued = await enqueueFlagRetranslation(
         ctx,
         text,
         tr.targetLanguage,
         {
+          reason: 'flag',
+          audit: {
+            cardEditId,
+            userId,
+            role: languageRole(course, tr.targetLanguage),
+            beforeText: tr.translatedText,
+            beforeTranslationSource: tr.translationSource,
+            flagCountAfter: nextCount,
+          },
           // Charge once total, on the first successful claim. If the user is
           // depleted this throws USAGE_LIMIT from inside the helper, before
           // that language's job is enqueued, and the whole mutation rolls
@@ -1910,6 +2056,10 @@ export async function applyCardEdit(
      * not, since an alternative phrasing the tutor offered is not a claim
      * that the curriculum translation is wrong. */
     suggestCurriculumFix?: boolean;
+    /** Which gesture this edit is, for the `cardEdits` audit row. Required:
+     * the two callers are the whole point of the discriminator, so a new one
+     * should have to state which it is rather than inherit a default. */
+    auditKind: 'manual_edit' | 'chat_also_correct';
   },
 ): Promise<{
   textId: Id<'texts'>;
@@ -2027,6 +2177,55 @@ export async function applyCardEdit(
 
     // Track card edit event
     await trackEvent(ctx, { userId, courseId: course._id, timezone: args.timezone, field: 'cardsEdited' });
+
+    // Audit row, written before the paths diverge: Path B's curriculum-fix
+    // enqueue needs its id and runs before the replacement card exists. The
+    // after-ids therefore start as the before-ids and are corrected at the end
+    // (`setCardEditResult`), on the fork path only.
+    //
+    // Skipped when no wording changed. `ensureUserOwnedText` reaches here with
+    // an empty diff (the metadata-only "also correct" replace, which forks
+    // purely to get a user-owned row): a real card replacement, but not an
+    // edit, and logging it as one would put a changeless row in a feed whose
+    // whole subject is before/after wording.
+    const auditChanges: CardEditChange[] = [...changedLanguages].map((lang) => {
+      const isSourceLanguage = lang === sourceLanguage;
+      const existing = existingTranslationMap.get(lang);
+      return {
+        language: lang,
+        role: languageRole(course, lang),
+        isSourceLanguage,
+        before: isSourceLanguage
+          ? text.text
+          : (existing?.translatedText ?? ''),
+        after: submittedMap.get(lang)!,
+        ...(isSourceLanguage
+          ? {}
+          : {
+            beforeTranslationSource: existing?.translationSource,
+            beforeFlagCount: existing?.flagCount,
+          }),
+        soundsSame: !audioChangedLanguages.has(lang),
+      };
+    });
+    let cardEditId: Id<'cardEdits'> | undefined;
+    if (auditChanges.length > 0) {
+      cardEditId = await recordCardEdit(ctx, {
+        userId,
+        course,
+        kind: args.auditKind,
+        path: isUserOwned ? 'in_place' : 'fork',
+        cardIdBefore: args.cardId,
+        cardIdAfter: args.cardId,
+        textIdBefore: card.textId,
+        textIdAfter: card.textId,
+        collectionOrigin: card.collectionOrigin,
+        textWasUserCreated: text.userCreated,
+        sourceLanguage,
+        sourceText: text.text,
+        changes: auditChanges,
+      });
+    }
 
     let resolvedTextId: Id<'texts'>;
     // Languages whose shared curriculum row this edit flagged, for the
@@ -2201,13 +2400,18 @@ export async function applyCardEdit(
       // Skipped entirely when the source line changed: the user's target text
       // is then a translation of THEIR source sentence, not the curriculum's,
       // so offering it as a correction would compare two different sentences.
-      if (args.suggestCurriculumFix && !changedLanguages.has(sourceLanguage)) {
+      if (
+        args.suggestCurriculumFix &&
+        !changedLanguages.has(sourceLanguage) &&
+        cardEditId !== undefined
+      ) {
         flaggedLanguages = await suggestCurriculumFixesForEdit(
           ctx,
           text,
           changedLanguages,
           submittedMap,
           existingTranslationMap,
+          { cardEditId, userId, course },
         );
       }
     }
@@ -2351,6 +2555,18 @@ export async function applyCardEdit(
       course.targetLanguages,
     );
 
+    // Path B pointed the card and text at brand-new rows; the audit row still
+    // holds the before-ids for both. Path A never moved either.
+    if (
+      cardEditId !== undefined &&
+      (resolvedCardId !== args.cardId || resolvedTextId !== card.textId)
+    ) {
+      await setCardEditResult(ctx, cardEditId, {
+        cardIdAfter: resolvedCardId,
+        textIdAfter: resolvedTextId,
+      });
+    }
+
     await trackCardAction(ctx, userId, 'edit', card, {
       changed_languages: [...changedLanguages],
       // Present only when the edit doubled as a curriculum complaint. Keeps
@@ -2386,7 +2602,11 @@ export const editCard = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await applyCardEdit(ctx, { ...args, suggestCurriculumFix: true });
+    await applyCardEdit(ctx, {
+      ...args,
+      suggestCurriculumFix: true,
+      auditKind: 'manual_edit',
+    });
     return null;
   },
 });

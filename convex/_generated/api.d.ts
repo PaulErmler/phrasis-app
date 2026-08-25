@@ -10,6 +10,7 @@
 
 import type * as admin_activateDataset from "../admin/activateDataset.js";
 import type * as admin_backfillIpa from "../admin/backfillIpa.js";
+import type * as admin_cardEdits from "../admin/cardEdits.js";
 import type * as admin_dashboard from "../admin/dashboard.js";
 import type * as admin_deleteUser from "../admin/deleteUser.js";
 import type * as admin_lib from "../admin/lib.js";
@@ -51,6 +52,7 @@ import type * as db_userProfiles from "../db/userProfiles.js";
 import type * as db_users from "../db/users.js";
 import type * as features_accountDeletion from "../features/accountDeletion.js";
 import type * as features_authEmailTesting from "../features/authEmailTesting.js";
+import type * as features_cardEditAudit from "../features/cardEditAudit.js";
 import type * as features_chat_agent from "../features/chat/agent.js";
 import type * as features_chat_approvalAudio from "../features/chat/approvalAudio.js";
 import type * as features_chat_cardApprovals from "../features/chat/cardApprovals.js";
@@ -146,6 +148,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   "admin/activateDataset": typeof admin_activateDataset;
   "admin/backfillIpa": typeof admin_backfillIpa;
+  "admin/cardEdits": typeof admin_cardEdits;
   "admin/dashboard": typeof admin_dashboard;
   "admin/deleteUser": typeof admin_deleteUser;
   "admin/lib": typeof admin_lib;
@@ -187,6 +190,7 @@ declare const fullApi: ApiFromModules<{
   "db/users": typeof db_users;
   "features/accountDeletion": typeof features_accountDeletion;
   "features/authEmailTesting": typeof features_authEmailTesting;
+  "features/cardEditAudit": typeof features_cardEditAudit;
   "features/chat/agent": typeof features_chat_agent;
   "features/chat/approvalAudio": typeof features_chat_approvalAudio;
   "features/chat/cardApprovals": typeof features_chat_cardApprovals;

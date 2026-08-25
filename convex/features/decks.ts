@@ -66,6 +66,7 @@ import {
   mayRegenerateTranslation,
 } from '../../lib/translationProvenance';
 import { soundsSame } from '../lib/textComparison';
+import { resolveRetranslation } from './cardEditAudit';
 import {
   deleteAudioRow,
   deleteAudioRowsForTextLanguage,
@@ -2565,6 +2566,12 @@ export const processTranslationForCard = internalAction({
     skipTts: v.optional(v.boolean()),
     /** TTS priority, forwarded to `storeTranslationAndScheduleTTS`. */
     priority: v.optional(ttsPriorityValidator),
+    /**
+     * Card-edit audit row this job resolves, forwarded from the LLM fallback
+     * dispatch. Absent on the direct Google path, which no user gesture
+     * triggers.
+     */
+    retranslationAuditId: v.optional(v.id('cardEditRetranslations')),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -2697,6 +2704,7 @@ export const processTranslationForCard = internalAction({
         expectedClaimId: args.claimId,
         skipTts: args.skipTts,
         priority: args.priority,
+        retranslationAuditId: args.retranslationAuditId,
       },
     );
 
@@ -2797,6 +2805,14 @@ export const storeTranslationAndScheduleTTS = internalMutation({
      * lands in the tier the content was requested at.
      */
     priority: v.optional(ttsPriorityValidator),
+    /**
+     * The `cardEditRetranslations` row this write resolves, when the job was
+     * triggered by a user gesture (a flag, or a manual edit of a curriculum
+     * translation). This mutation is the only place that knows which of its
+     * outcomes an attempt reached, so it owns the resolution. Absent on every
+     * ordinary fill, which is the overwhelming majority of calls.
+     */
+    retranslationAuditId: v.optional(v.id('cardEditRetranslations')),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -2807,6 +2823,11 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     // No-op in normal flow (text always exists).
     const text = await ctx.db.get(args.textId);
     if (text === null) {
+      await resolveRetranslation(
+        ctx,
+        args.retranslationAuditId,
+        'dropped_text_deleted',
+      );
       return null;
     }
 
@@ -2818,6 +2839,11 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     if (args.expectedClaimId !== undefined) {
       const llmClaim = await getLlmClaim(ctx, args.textId, args.targetLanguage);
       if (llmClaim?._id !== args.expectedClaimId) {
+        await resolveRetranslation(
+          ctx,
+          args.retranslationAuditId,
+          'dropped_superseded',
+        );
         return null;
       }
     }
@@ -2843,6 +2869,11 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     // by the time that lands, the row it meant to replace may have been swept,
     // and refusing then would leave the card with no translation at all.
     if (existing && args.replaceExisting && isUserCreatedText(text)) {
+      await resolveRetranslation(
+        ctx,
+        args.retranslationAuditId,
+        'refused_user_created',
+      );
       return null;
     }
 
@@ -2901,6 +2932,13 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       });
       searchableContentChanged = true;
       ipaMissingAfterWrite = true;
+      // A retranslation whose row vanished under it (a sweep deleted it while
+      // the job was in flight). The new wording still landed, so it counts as
+      // applied; there is simply no `before` to have kept audio for.
+      await resolveRetranslation(ctx, args.retranslationAuditId, 'applied', {
+        afterText: translatedText,
+        afterTranslationSource: args.translationSource,
+      });
     } else if (args.replaceExisting) {
       // Audio decision for retranslations, made here where old and new text
       // are both in hand: a punctuation/'_'-only change sounds identical, so
@@ -2967,6 +3005,17 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       }
       await ctx.db.patch(existing._id, patch);
       searchableContentChanged = true;
+      // The outcome a reviewer is actually after: what the model produced, and
+      // whether it differed audibly enough to be worth re-synthesizing.
+      await resolveRetranslation(
+        ctx,
+        args.retranslationAuditId,
+        audioUnchangedBySound ? 'applied_audio_kept' : 'applied',
+        {
+          afterText: translatedText,
+          afterTranslationSource: args.translationSource,
+        },
+      );
     } else {
       const patch: Partial<{
         romanizedText: string;
