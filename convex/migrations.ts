@@ -9,7 +9,10 @@ import {
   DEFAULT_PAUSE_BASE_TO_TARGET,
   DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
 } from '../lib/constants/audioPlayback';
-import { postProcessTranslation } from '../lib/languages';
+import {
+  languageMarksSpeakerGender,
+  postProcessTranslation,
+} from '../lib/languages';
 import {
   getRomanizationSource,
   romanizeLocal,
@@ -419,6 +422,39 @@ export function recomputeRomanizationPatch(
 }
 
 /**
+ * Stamp `speakerGender: 'neutral'` on every translations row whose target
+ * language cannot mark speaker gender (`speakerGenderMarking: 'none'` in
+ * lib/languages.ts). See docs/migrations/stamp-neutral-unmarked-translations.md.
+ *
+ * Hygiene for the tri-state variant-slot semantics (speaker-gender feature):
+ * on unmarked languages a rendering serves BOTH genders by definition, which
+ * the explicit `'neutral'` stamp records. Before this feature, rows on
+ * unmarked languages were either unstamped or blanket-stamped with the
+ * text's gender by the old metadata loop — both meaningless there, and both
+ * normalized to `'neutral'` here (whatever the row held before, per spec).
+ * MARKED-language legacy rows are deliberately untouched: `undefined` there
+ * means "canonical carrier", healed lazily by fill-if-missing (explicit
+ * canonical-gender stamp) or variant collapse (`'neutral'`), never by a
+ * blanket pass that cannot know which gender the wording actually renders.
+ *
+ * Deployment does NOT depend on it: every reader treats an unmarked-language
+ * row identically whatever its stamp (`pickTranslationVariant` ignores stamps
+ * on unmarked languages). Idempotent — a second pass patches nothing.
+ */
+export function stampNeutralOnUnmarkedTranslationsPatch(
+  doc: Pick<Doc<'translations'>, 'targetLanguage' | 'speakerGender'>,
+): { speakerGender: 'neutral' } | undefined {
+  if (languageMarksSpeakerGender(doc.targetLanguage)) return undefined;
+  if (doc.speakerGender === 'neutral') return undefined;
+  return { speakerGender: 'neutral' };
+}
+
+export const stampNeutralOnUnmarkedTranslations = migrations.define({
+  table: 'translations',
+  migrateOne: (_ctx, doc) => stampNeutralOnUnmarkedTranslationsPatch(doc),
+});
+
+/**
  * Everything a deploy needs, in order. Completed migrations are skipped.
  *
  * Ordering rationale:
@@ -447,4 +483,5 @@ export const runAll = migrations.runner([
   internal.migrations.resetStaleCantoneseTranslationRomanization,
   internal.migrations.recomputeTextRomanization,
   internal.migrations.recomputeTranslationRomanization,
+  internal.migrations.stampNeutralOnUnmarkedTranslations,
 ]);
