@@ -414,6 +414,11 @@ export interface SpeakerGenderInput {
  *   3. Premade + neutral/undefined: coin-flip BOTH fields to the same value so
  *      the prompt and the voice agree.
  * Prior `audioSpeakerGender` is preserved when present so two runs don't re-roll.
+ *
+ * The output is the CANONICAL (mixed-mode) gender assignment — the per-text
+ * ~50/50 default every user shares. A user's per-course preference is layered
+ * on top at read/schedule time by `resolveEffectiveSpeakerGender` in
+ * lib/speakerGender.ts and is never written back into the shared text row.
  */
 export function resolveCardSpeakerGenders(
   text: SpeakerGenderInput,

@@ -18,6 +18,9 @@ import {
   languageNeedsRomanization,
   getIpaVoice,
   IPA_LANGUAGES,
+  languageMarksSpeakerGender,
+  getSpeakerGenderMarking,
+  SPEAKER_GENDER_MARKING_LANGUAGES,
   normalizeLanguageCode,
   ROMANIZATION_LANGUAGES,
   resolveMixedVariant,
@@ -283,6 +286,52 @@ describe('IPA helpers', () => {
     expect(getIpaVoice('ar_eg')).toBe('ar');
     expect(getIpaVoice('vi_south')).toBe('vi-vn-x-south');
     expect(getIpaVoice('ja')).toBeNull();
+  });
+});
+
+describe('speakerGenderMarking config', () => {
+  it('every language carries an explicit marking (no undefined state)', () => {
+    for (const lang of SUPPORTED_LANGUAGES) {
+      expect(
+        ['grammatical', 'stylistic', 'none'],
+        `speakerGenderMarking missing/invalid on ${lang.code}`,
+      ).toContain(lang.speakerGenderMarking);
+    }
+  });
+
+  it('matches the reviewed classification exactly', () => {
+    // The full classification from the feature spec
+    // (.scratch/speaker-gender-preference/spec.md). Asserted exhaustively so
+    // a new language, a typo, or an accidental tier change can't slip
+    // through: any diff here must be a deliberate linguistic decision.
+    const grammatical = SUPPORTED_LANGUAGES.filter(
+      (l) => l.speakerGenderMarking === 'grammatical',
+    ).map((l) => l.code);
+    const stylistic = SUPPORTED_LANGUAGES.filter(
+      (l) => l.speakerGenderMarking === 'stylistic',
+    ).map((l) => l.code);
+    expect(grammatical.sort()).toEqual(
+      [
+        'ar', 'ar_eg', 'ar_iq', 'ar_lev', 'ar_sa', 'bg', 'ca', 'cs', 'el',
+        'es', 'es_latam', 'es_mixed', 'fr', 'he', 'hi', 'hr', 'is', 'it',
+        'lt', 'lv', 'pl', 'pt', 'pt_pt', 'ro', 'ru', 'sk', 'sl', 'sr', 'uk',
+      ].sort(),
+    );
+    expect(stylistic.sort()).toEqual(['ja', 'ko', 'th', 'vi', 'vi_south']);
+  });
+
+  it('derived set and predicates follow the field', () => {
+    expect(languageMarksSpeakerGender('ru')).toBe(true);
+    expect(languageMarksSpeakerGender('th')).toBe(true);
+    expect(languageMarksSpeakerGender('de')).toBe(false);
+    expect(languageMarksSpeakerGender('en')).toBe(false);
+    expect(languageMarksSpeakerGender('xx')).toBe(false);
+    expect(SPEAKER_GENDER_MARKING_LANGUAGES.has('es_mixed')).toBe(true);
+    expect(SPEAKER_GENDER_MARKING_LANGUAGES.has('zh')).toBe(false);
+    expect(getSpeakerGenderMarking('he')).toBe('grammatical');
+    expect(getSpeakerGenderMarking('ja')).toBe('stylistic');
+    expect(getSpeakerGenderMarking('tr')).toBe('none');
+    expect(getSpeakerGenderMarking('xx')).toBe('none');
   });
 });
 
