@@ -1,6 +1,6 @@
 # 01 — Language config + resolution layer
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 
 Zero behavior change. Read `../spec.md` first (sections: Language
@@ -34,3 +34,7 @@ classification, Architecture → Resolution layer).
 
 ## Done when
 `tsc --noEmit`, lint, unit tests green; no runtime code path changed.
+
+## Answer
+
+Implemented in commit `2860ddc` on `claude/gender-card-translation-plan-3vnuk5`; suites green (typecheck, convex + app vitest).

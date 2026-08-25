@@ -1,6 +1,6 @@
 # 06 — Classifier gold dataset + eval runner + baseline
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 Blocked by: 01 (needs the config for the marked-language list)
 
@@ -36,3 +36,7 @@ code changes; landable in parallel with 02–05.
 ## Done when
 Dataset + README + runner committed; baseline report generated and committed;
 every entry carries a sourceUrl and named marker.
+
+## Answer
+
+Implemented in commit `cc46964` on `claude/gender-card-translation-plan-3vnuk5`; suites green (typecheck, convex + app vitest). Baseline eval run still pending an OPENROUTER_API_KEY (see data_preparation/gender_eval/README.md).

@@ -1,6 +1,6 @@
 # 05 — Settings UI + preference threading (feature goes live)
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 Blocked by: 04
 
@@ -38,3 +38,7 @@ Read `../spec.md` (Settings UI + i18n; Pipeline → threading; Kill switch).
 
 ## Done when
 Feature works end-to-end on dev per the manual script; suites green; deployed.
+
+## Answer
+
+Implemented in commit `c85be1f` on `claude/gender-card-translation-plan-3vnuk5`; suites green (typecheck, convex + app vitest).

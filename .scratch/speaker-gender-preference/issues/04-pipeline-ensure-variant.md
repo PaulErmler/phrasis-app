@@ -1,6 +1,6 @@
 # 04 — Pipeline: ensure-variant sweep + slot writes
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 Blocked by: 03 (must be soaked in prod first)
 
@@ -53,3 +53,7 @@ omits `<speaker_gender>` for unmarked targets; kill-switch-off ≡ baseline.
 ## Done when
 `tsc`, lint, unit + convex-test green; deployed; prod logs show no new sweep
 deletions; behavior identical for users (canonical everywhere).
+
+## Answer
+
+Implemented in commit `37b2d65` on `claude/gender-card-translation-plan-3vnuk5`; suites green (typecheck, convex + app vitest).

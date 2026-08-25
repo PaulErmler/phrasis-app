@@ -1,6 +1,6 @@
 # 08 — Chat: generate in the chosen gender
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 Blocked by: 05, 07
 
@@ -35,3 +35,7 @@ in a marked language pins via morphology (existing case-1 path).
 ## Done when
 Suites green; manual: chat-created card's text + preview + final audio all
 match the preference; deployed.
+
+## Answer
+
+Implemented in commit `61966f8` on `claude/gender-card-translation-plan-3vnuk5`; suites green (typecheck, convex + app vitest).

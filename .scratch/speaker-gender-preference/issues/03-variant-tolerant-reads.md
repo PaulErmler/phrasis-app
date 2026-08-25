@@ -1,6 +1,6 @@
 # 03 — Variant-tolerant reads (readers before writers)
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 Blocked by: 01, 02
 
@@ -35,3 +35,7 @@ row from canonical-pick sites and never throw.
 
 ## Done when
 `tsc`, lint, unit + convex-test green; deployed; no user-visible change.
+
+## Answer
+
+Implemented in commit `ed10413` on `claude/gender-card-translation-plan-3vnuk5`; suites green (typecheck, convex + app vitest).

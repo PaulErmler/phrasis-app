@@ -1,6 +1,6 @@
 # 09 — Cleanup migration: explicit 'neutral' stamps
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 Blocked by: 04
 
@@ -24,3 +24,7 @@ Read `../spec.md` (Schema changes → Migration) and
 ## Done when
 Migration runs clean on dev (spot-check rows before/after); doc committed;
 `runAll` includes it; suites green.
+
+## Answer
+
+Implemented in commit `5e29b3c` on `claude/gender-card-translation-plan-3vnuk5`; suites green (typecheck, convex + app vitest).

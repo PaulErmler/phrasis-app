@@ -1,6 +1,6 @@
 # 02 — Schema fields + validators
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 Blocked by: 01
 
@@ -31,3 +31,7 @@ Zero behavior change. Read `../spec.md` (section: Schema changes). Read
 ## Done when
 `tsc --noEmit` + convex codegen clean; deploy dry-run passes; no behavior
 change (fields unused until later slices).
+
+## Answer
+
+Implemented in commit `87a4484` on `claude/gender-card-translation-plan-3vnuk5`; suites green (typecheck, convex + app vitest).

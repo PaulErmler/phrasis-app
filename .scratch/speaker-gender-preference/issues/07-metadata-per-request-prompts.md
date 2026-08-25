@@ -1,6 +1,6 @@
 # 07 — Metadata: per-request prompts + preference rung
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 Blocked by: 04, 06 (baseline report must exist for the before/after comparison)
 
@@ -34,3 +34,7 @@ determinism; stamping slots.
 ## Done when
 Suites green; eval comparison shows no regression (or regressions fixed via
 prompt notes); deployed.
+
+## Answer
+
+Implemented in commit `6e3b19c` on `claude/gender-card-translation-plan-3vnuk5`; suites green (typecheck, convex + app vitest). The before/after eval comparison is pending the same key (run at cc46964 for "before").
