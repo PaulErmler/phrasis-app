@@ -117,6 +117,40 @@ export async function setCardEditResult(
 }
 
 /**
+ * The identity bundle every `recordRetranslationAttempt` call carries: who
+ * edited what, which translation row was targeted, and what stood there
+ * before. Built in one place so the three enqueue paths in scheduling.ts
+ * can't drift; callers add `status` (and `rule` where one applies) on top.
+ * The text-row trio (`textId`, `sourceLanguage`, `sourceText`) is derived
+ * from the doc rather than hand-copied.
+ */
+export function retranslationAuditFields(opts: {
+  cardEditId: Id<'cardEdits'>;
+  userId: string;
+  language: string;
+  role: CardEditLanguageRole;
+  text: Doc<'texts'>;
+  beforeText: string;
+  beforeTranslationSource?: string;
+  userSuggestion?: string;
+  flagCountAfter: number;
+}) {
+  return {
+    cardEditId: opts.cardEditId,
+    userId: opts.userId,
+    language: opts.language,
+    role: opts.role,
+    textId: opts.text._id,
+    sourceLanguage: opts.text.language,
+    sourceText: opts.text.text,
+    beforeText: opts.beforeText,
+    beforeTranslationSource: opts.beforeTranslationSource,
+    userSuggestion: opts.userSuggestion,
+    flagCountAfter: opts.flagCountAfter,
+  };
+}
+
+/**
  * Record one retranslation this gesture triggered, at whatever status it
  * reached synchronously: 'enqueued' when the job is on its way, or a terminal
  * skip ('skipped_capped', 'skipped_claim_contested') when it never ran.

@@ -40,6 +40,7 @@ import {
   languageRole,
   recordCardEdit,
   recordRetranslationAttempt,
+  retranslationAuditFields,
   setCardEditResult,
   type CardEditChange,
 } from './cardEditAudit';
@@ -1595,17 +1596,17 @@ async function enqueueFlagRetranslation(
 ): Promise<boolean> {
   const RULE = 'retranslation_high';
   const auditFields = {
-    cardEditId: opts.audit.cardEditId,
-    userId: opts.audit.userId,
-    language: targetLanguage,
-    role: opts.audit.role,
-    textId: text._id,
-    sourceLanguage: text.language,
-    sourceText: text.text,
-    beforeText: opts.audit.beforeText,
-    beforeTranslationSource: opts.audit.beforeTranslationSource,
-    userSuggestion: opts.userSuggestedTranslation,
-    flagCountAfter: opts.audit.flagCountAfter,
+    ...retranslationAuditFields({
+      cardEditId: opts.audit.cardEditId,
+      userId: opts.audit.userId,
+      language: targetLanguage,
+      role: opts.audit.role,
+      text,
+      beforeText: opts.audit.beforeText,
+      beforeTranslationSource: opts.audit.beforeTranslationSource,
+      userSuggestion: opts.userSuggestedTranslation,
+      flagCountAfter: opts.audit.flagCountAfter,
+    }),
     rule: RULE,
   };
 
@@ -1709,19 +1710,17 @@ async function suggestCurriculumFixesForEdit(
     await ctx.db.patch(existing._id, { flagCount: nextCount });
     flagged.push(lang);
 
-    const auditCommon = {
+    const auditCommon = retranslationAuditFields({
       cardEditId: audit.cardEditId,
       userId: audit.userId,
       language: lang,
       role: languageRole(audit.course, lang),
-      textId: originalText._id,
-      sourceLanguage: originalText.language,
-      sourceText: originalText.text,
+      text: originalText,
       beforeText: existing.translatedText,
       beforeTranslationSource: existing.translationSource,
       userSuggestion: submittedMap.get(lang),
       flagCountAfter: nextCount,
-    };
+    });
 
     if (nextCount > FLAG_AUTO_RETRANSLATION_MAX) {
       // Counter rose but no work was created. Logged so the QC view can tell
@@ -1886,16 +1885,16 @@ export const flagTranslation = mutation({
     for (const { tr, nextCount } of withCounts) {
       if (nextCount <= FLAG_AUTO_RETRANSLATION_MAX) continue;
       await recordRetranslationAttempt(ctx, {
-        cardEditId,
-        userId,
-        language: tr.targetLanguage,
-        role: languageRole(course, tr.targetLanguage),
-        textId: card.textId,
-        sourceLanguage: text.language,
-        sourceText: text.text,
-        beforeText: tr.translatedText,
-        beforeTranslationSource: tr.translationSource,
-        flagCountAfter: nextCount,
+        ...retranslationAuditFields({
+          cardEditId,
+          userId,
+          language: tr.targetLanguage,
+          role: languageRole(course, tr.targetLanguage),
+          text,
+          beforeText: tr.translatedText,
+          beforeTranslationSource: tr.translationSource,
+          flagCountAfter: nextCount,
+        }),
         status: 'skipped_capped',
       });
     }

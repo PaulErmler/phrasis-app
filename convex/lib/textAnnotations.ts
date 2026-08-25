@@ -65,6 +65,17 @@ type AnnotationAction = FunctionReference<
   null
 >;
 
+/** Args shape shared by the per-kind approval actions (ipa.ts / furigana.ts). */
+type ApprovalAnnotationAction = FunctionReference<
+  'action',
+  'internal',
+  {
+    approvalId: Id<'cardApprovals'>;
+    entries: Array<{ language: string; text: string }>;
+  },
+  null
+>;
+
 export interface TextAnnotationSpec {
   /** Value field on `texts` / `translations` rows (tri-state, see above). */
   textField: 'romanizedText' | 'ipaText' | 'furiganaText';
@@ -76,6 +87,14 @@ export interface TextAnnotationSpec {
   sourceTextAction: AnnotationAction;
   /** Action that annotates a translation (writes via storeTranslationAnnotation). */
   translationAction: AnnotationAction;
+  /**
+   * Action that annotates a chat approval's proposed entries before they are
+   * stored rows (scheduleApprovalAnnotations in chat/cardApprovals.ts).
+   * Absent for kinds the approval card doesn't precompute.
+   */
+  approvalAction?: ApprovalAnnotationAction;
+  /** Key this kind occupies on projected card content (lib/cardContent.ts). */
+  projectedField: 'romanization' | 'ipa' | 'furigana';
   /**
    * Whether a landed value belongs in cards' `searchableText`. True for
    * romanization (users type Latin to find cards); false for IPA (nobody
@@ -91,6 +110,7 @@ export const TEXT_ANNOTATIONS: Record<AnnotationKind, TextAnnotationSpec> = {
     supports: (language) => ROMANIZATION_LANGUAGES.has(language),
     sourceTextAction: internal.features.decks.processRomanizationForSourceText,
     translationAction: internal.features.decks.processRomanizationForTranslation,
+    projectedField: 'romanization',
     inSearchableText: true,
   },
   ipa: {
@@ -99,6 +119,8 @@ export const TEXT_ANNOTATIONS: Record<AnnotationKind, TextAnnotationSpec> = {
     supports: (language) => IPA_LANGUAGES.has(language),
     sourceTextAction: internal.features.ipa.processIpaForSourceText,
     translationAction: internal.features.ipa.processIpaForTranslation,
+    approvalAction: internal.features.ipa.processIpaForApproval,
+    projectedField: 'ipa',
     inSearchableText: false,
   },
   furigana: {
@@ -108,6 +130,8 @@ export const TEXT_ANNOTATIONS: Record<AnnotationKind, TextAnnotationSpec> = {
     sourceTextAction: internal.features.furigana.processFuriganaForSourceText,
     translationAction:
       internal.features.furigana.processFuriganaForTranslation,
+    approvalAction: internal.features.furigana.processFuriganaForApproval,
+    projectedField: 'furigana',
     // The annotation is the sentence itself plus bracketed readings, so
     // indexing it would duplicate every Japanese sentence in the search
     // string for no gain — the bare sentence is already indexed.

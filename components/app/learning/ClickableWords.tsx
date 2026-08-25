@@ -15,12 +15,8 @@ import {
   matchRatio,
 } from '@/lib/audio/alignTimings';
 import { getTextDirection, languageSupportsKaraoke } from '@/lib/languages';
-import {
-  hasReadings,
-  parseFurigana,
-  splitFuriganaByRanges,
-  type FuriganaSegment,
-} from '@/lib/furigana';
+import { splitFuriganaByRanges, type FuriganaSegment } from '@/lib/furigana';
+import { useFuriganaDisplay } from './useFuriganaDisplay';
 import { Ruby } from './Ruby';
 import { useKaraokeIndex, type ClockBinding } from '@/hooks/use-karaoke-index';
 import { useLearningChatToggle } from './LearningChatLayout';
@@ -222,11 +218,9 @@ export function ClickableWords({
     [text, wordTimings, language],
   );
 
-  // null = no furigana to render (absent, or stale: parseFurigana validates
-  // that the annotation still reconstructs `text` after edits).
-  const furiganaSegments = useMemo(
-    () => (furigana ? parseFurigana(furigana, text) : null),
-    [furigana, text],
+  const { segments: furiganaSegments, rubyClass } = useFuriganaDisplay(
+    furigana,
+    text,
   );
 
   // Furigana chunk per aligned token's `display`, cut from the sentence-wide
@@ -304,9 +298,7 @@ export function ClickableWords({
     className,
     dir === 'rtl' && 'text-left',
     // Extra leading so the reading line doesn't collide with the row above.
-    // Gated on actual readings, not parse success: a readings-free parse
-    // must not reserve headroom no ruby will use.
-    hasReadings(furiganaSegments) && 'has-furigana',
+    rubyClass,
   );
 
   if (!interactive || aligned.length === 0 || !chatContext) {

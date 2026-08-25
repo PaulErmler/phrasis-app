@@ -24,11 +24,13 @@ import { resolveCardContext } from './cardContext';
 import { MAX_CARD_TEXT_LENGTH } from '../../../lib/constants/learning';
 import { trackEvent } from '../../db/stats/dailyStats';
 import {
-  FURIGANA_LANGUAGES,
   getTranslationSource,
-  IPA_LANGUAGES,
   postProcessTranslation,
 } from '../../../lib/languages';
+import {
+  ANNOTATION_KINDS,
+  TEXT_ANNOTATIONS,
+} from '../../lib/textAnnotations';
 import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
 import { OPENROUTER_CHAT_REASONING, OPENROUTER_MODELS } from '../../config/aiModels';
 
@@ -165,34 +167,17 @@ async function scheduleApprovalAnnotations(
   approvalId: Id<'cardApprovals'>,
   translations: Array<{ language: string; text: string }>,
 ): Promise<void> {
-  const ipaEntries = translations.filter(
-    (t) => IPA_LANGUAGES.has(t.language) && t.text.length > 0,
-  );
-  if (ipaEntries.length > 0) {
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.ipa.processIpaForApproval,
-      {
-        approvalId,
-        entries: ipaEntries.map((t) => ({ language: t.language, text: t.text })),
-      },
-    );
-  }
-  const furiganaEntries = translations.filter(
-    (t) => FURIGANA_LANGUAGES.has(t.language) && t.text.length > 0,
-  );
-  if (furiganaEntries.length > 0) {
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.furigana.processFuriganaForApproval,
-      {
-        approvalId,
-        entries: furiganaEntries.map((t) => ({
-          language: t.language,
-          text: t.text,
-        })),
-      },
-    );
+  for (const kind of ANNOTATION_KINDS) {
+    const spec = TEXT_ANNOTATIONS[kind];
+    if (!spec.approvalAction) continue;
+    const entries = translations
+      .filter((t) => spec.supports(t.language) && t.text.length > 0)
+      .map((t) => ({ language: t.language, text: t.text }));
+    if (entries.length === 0) continue;
+    await ctx.scheduler.runAfter(0, spec.approvalAction, {
+      approvalId,
+      entries,
+    });
   }
 }
 

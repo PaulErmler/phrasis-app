@@ -8,7 +8,7 @@ import {
   normalise,
 } from '@/lib/audio/alignTimings';
 import { highlightWord } from '@/lib/wordCloud';
-import { hasReadings, parseFurigana } from '@/lib/furigana';
+import { useFuriganaDisplay } from './useFuriganaDisplay';
 import { HighlightedRuby } from './Ruby';
 import { getTextDirection, languageSupportsKaraoke } from '@/lib/languages';
 import { useKaraokeIndex, type ClockBinding } from '@/hooks/use-karaoke-index';
@@ -85,11 +85,9 @@ export function HighlightedText({
     [text, wordTimings, language],
   );
 
-  // null = nothing to render as ruby (absent, or stale after an edit:
-  // parseFurigana validates the annotation still reconstructs `text`).
-  const furiganaSegments = useMemo(
-    () => (furigana ? parseFurigana(furigana, text) : null),
-    [furigana, text],
+  const { segments: furiganaSegments, rubyClass } = useFuriganaDisplay(
+    furigana,
+    text,
   );
 
   const canHighlight = useMemo(() => {
@@ -168,7 +166,7 @@ export function HighlightedText({
     className,
     dir === 'rtl' && 'text-left',
     // Extra leading so the reading line doesn't collide with the row above.
-    hasReadings(furiganaSegments) && 'has-furigana',
+    rubyClass,
   );
 
   if (!enabled || !canHighlight) {

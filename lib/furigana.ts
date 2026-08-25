@@ -168,6 +168,32 @@ export function hasReadings(
   );
 }
 
+export interface FuriganaDisplay {
+  /** null = nothing to render as ruby (annotation absent, or stale). */
+  segments: FuriganaSegment[] | null;
+  /** Line-height class for cn(), present only when ruby will actually show. */
+  rubyClass: 'has-furigana' | undefined;
+}
+
+/**
+ * The display-side ritual every surface that renders a stored annotation
+ * needs: parse it against the CURRENT text (stale annotations come back as
+ * null segments, see parseFurigana) and derive the `has-furigana` headroom
+ * class from actual readings (see hasReadings). Living here keeps the
+ * reject-stale rule in one place; React surfaces memoize it via
+ * useFuriganaDisplay.
+ */
+export function furiganaDisplay(
+  furigana: string | null | undefined,
+  text: string,
+): FuriganaDisplay {
+  const segments = furigana ? parseFurigana(furigana, text) : null;
+  return {
+    segments,
+    rubyClass: hasReadings(segments) ? 'has-furigana' : undefined,
+  };
+}
+
 /**
  * Segments → the stored bracket string. Inverse of `parseFurigana`.
  *

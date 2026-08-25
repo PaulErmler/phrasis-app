@@ -1,12 +1,14 @@
 import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import {
-  ROMANIZATION_LANGUAGES,
-  IPA_LANGUAGES,
-  FURIGANA_LANGUAGES,
   isTranslationVersionStale,
   languageSupportsStt,
 } from '../../lib/languages';
+import {
+  ANNOTATION_KINDS,
+  TEXT_ANNOTATIONS,
+  type AnnotationKind,
+} from './textAnnotations';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { getLlmClaim, isClaimFresh } from '../features/llmTranslationQueue';
 import { appendSearchSegments } from '../../lib/wordTokenize';
@@ -260,21 +262,20 @@ export async function buildTextContentBatchForLanguages(
     });
 
     const translations = allLanguages.map((lang) => {
-      // Gate stored romanization on the language's current
-      // `needsRomanization` flag. Rows written while the flag was on stay
-      // in the DB untouched, but their romanizedText is dropped from the
-      // response so the UI doesn't render stale transliteration after the
-      // language is flipped off. See ROMANIZATION_LANGUAGES in
-      // lib/languages.ts. It's derived from the Language entries so this
-      // check stays in sync automatically.
+      // Gate each stored annotation on its kind's CURRENT language set
+      // (spec.supports, derived from the Language entries so the check stays
+      // in sync automatically). Rows written while a language was in the set
+      // stay in the DB untouched, but their value is dropped from the
+      // response so the UI doesn't render stale annotations after the
+      // language is flipped off.
+      const supports = (kind: AnnotationKind) =>
+        TEXT_ANNOTATIONS[kind].supports(lang);
+      // rawRomanization is the review query's historical escape hatch; it
+      // predates IPA/furigana, which have no raw variant.
       const langNeedsRomanization =
-        opts?.rawRomanization || ROMANIZATION_LANGUAGES.has(lang);
-      // Same flag-gate for IPA (no raw escape hatch: the rawRomanization opt
-      // predates IPA and exists only for the review query's historical
-      // romanization behavior).
-      const langNeedsIpa = IPA_LANGUAGES.has(lang);
-      // And for furigana (also no raw escape hatch).
-      const langNeedsFurigana = FURIGANA_LANGUAGES.has(lang);
+        opts?.rawRomanization || supports('romanization');
+      const langNeedsIpa = supports('ipa');
+      const langNeedsFurigana = supports('furigana');
       if (lang === input.sourceLanguage) {
         return {
           language: lang,
@@ -333,11 +334,10 @@ export async function buildTextContentBatchForLanguages(
               furigana: input.sourceFurigana,
             }
           : translationMap.get(`${input.key}:${lang}`);
-      return (
-        (ROMANIZATION_LANGUAGES.has(lang) &&
-          stored?.romanization === undefined) ||
-        (IPA_LANGUAGES.has(lang) && stored?.ipa === undefined) ||
-        (FURIGANA_LANGUAGES.has(lang) && stored?.furigana === undefined)
+      return ANNOTATION_KINDS.some(
+        (kind) =>
+          TEXT_ANNOTATIONS[kind].supports(lang) &&
+          stored?.[TEXT_ANNOTATIONS[kind].projectedField] === undefined,
       );
     });
     // Legacy audio (generated before Scribe integration) has a URL but no

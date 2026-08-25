@@ -22,7 +22,7 @@ import { useCourseLanguages } from '@/hooks/use-course-languages';
 import { cn } from '@/lib/utils';
 import { EditApprovalDialog } from './EditApprovalDialog';
 import { Ruby } from '@/components/app/learning/Ruby';
-import { hasReadings, parseFurigana } from '@/lib/furigana';
+import { furiganaDisplay } from '@/lib/furigana';
 import {
   ApprovalErrorAlert,
   ApprovalStreamingSkeleton,
@@ -112,18 +112,16 @@ export function EntryLines({
     textClass: string,
   ) => {
     const ipa = showIpa ? ipaByLanguage?.[entry.language] : undefined;
-    // Ruby readings over the proposed sentence. parseFurigana returns null
-    // for the '' sentinel and for annotations that no longer reconstruct an
-    // edited text, so both fall back to the plain sentence.
-    const furiganaRaw = showFurigana
-      ? furiganaByLanguage?.[entry.language]
-      : undefined;
-    const furiganaSegments = furiganaRaw
-      ? parseFurigana(furiganaRaw, entry.text)
-      : null;
+    // Ruby readings over the proposed sentence. The '' sentinel and
+    // annotations that no longer reconstruct an edited text both come back
+    // with null segments, so both fall back to the plain sentence.
+    const { segments: furiganaSegments, rubyClass } = furiganaDisplay(
+      showFurigana ? furiganaByLanguage?.[entry.language] : undefined,
+      entry.text,
+    );
     const line = (
       <div key={audio ? undefined : key}>
-        <p className={cn(textClass, hasReadings(furiganaSegments) && 'has-furigana')}>
+        <p className={cn(textClass, rubyClass)}>
           <Lang code={entry.language} />{' '}
           {/* Own dir-scoped span: the Latin language label shares this <p>,
               so the sentence needs its own bidi context for RTL languages. */}
