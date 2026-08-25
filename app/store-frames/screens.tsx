@@ -367,7 +367,6 @@ export function ProgressScreen() {
             dailyReviewsToday={74}
             dailyTimeMsToday={21 * 60 * 1000}
             dailyNewWordsToday={20}
-            schedulingMode={'learnAndReview' as never}
             reviewMode="audio"
             autoAdvance={false}
             onContinue={noop}

@@ -111,6 +111,8 @@ interface FullReviewCardContentProps {
   showRomanization?: boolean;
   /** IPA line toggle (from courseSettings.showIpa; default OFF). */
   showIpa?: boolean;
+  /** Furigana ruby over kanji (courseSettings.showFurigana; default ON). */
+  showFurigana?: boolean;
   /** Clears submission stack when the reviewed card changes */
   cardId?: Id<'cards'>;
   /**
@@ -193,6 +195,7 @@ export function FullReviewCardContent({
   bare = false,
   showRomanization = true,
   showIpa = false,
+  showFurigana = true,
   cardId,
   onRegisterRevert,
   firstExposure = false,
@@ -629,6 +632,7 @@ export function FullReviewCardContent({
         bare={bare}
         showRomanization={showRomanization}
         showIpa={showIpa}
+        showFurigana={showFurigana}
         highlightEnabled={highlightEnabled}
         flaggedInSession={flaggedInSession}
         activeClip={activeClip}
@@ -714,6 +718,7 @@ export function FullReviewCardContent({
                   firstExposure={firstExposure}
                   showRomanization={showRomanization}
                   showIpa={showIpa}
+                  showFurigana={showFurigana}
                   ignorePunctuation={ignorePunctuation}
                   highlightEnabled={highlightEnabled}
                   activeClip={activeClip}
@@ -771,6 +776,8 @@ interface TargetLanguageInputProps {
   showRomanization?: boolean;
   /** IPA line toggle (from courseSettings.showIpa; default OFF). */
   showIpa?: boolean;
+  /** Furigana ruby over kanji (courseSettings.showFurigana; default ON). */
+  showFurigana?: boolean;
   ignorePunctuation?: boolean;
   highlightEnabled: boolean;
   activeClip: ButtonPlaybackActive | null;
@@ -816,6 +823,7 @@ function TargetLanguageInput({
   firstExposure = false,
   showRomanization = true,
   showIpa = false,
+  showFurigana = true,
   ignorePunctuation = false,
   highlightEnabled,
   activeClip,
@@ -1037,6 +1045,7 @@ function TargetLanguageInput({
                 hideAccuracy={false}
                 hideErrors={showClean}
                 ignorePunctuation={ignorePunctuation}
+                furigana={showFurigana ? translation.furigana : undefined}
               />
             </div>
             <div className="flex shrink-0 flex-col items-end gap-2 pt-0.5">
@@ -1058,6 +1067,7 @@ function TargetLanguageInput({
             clockBinding={isActive ? clockBinding : undefined}
             isActive={isActive}
             enabled={highlightEnabled}
+            furigana={showFurigana ? translation.furigana : undefined}
             className="body-large text-muted-foreground"
           />
         )}
@@ -1100,6 +1110,7 @@ function TargetLanguageInput({
                 hideAccuracy={false}
                 hideErrors={showClean}
                 ignorePunctuation={ignorePunctuation}
+                furigana={showFurigana ? translation.furigana : undefined}
               />
             ) : (
               <ClickableWords
@@ -1110,6 +1121,7 @@ function TargetLanguageInput({
                 clockBinding={isActive ? clockBinding : undefined}
                 isActive={isActive}
                 enabled={highlightEnabled}
+                furigana={showFurigana ? translation.furigana : undefined}
                 className="body-large text-muted-foreground"
               />
             )}
@@ -1180,6 +1192,7 @@ function TargetLanguageInput({
                 clockBinding={isActive ? clockBinding : undefined}
                 isActive={isActive}
                 enabled={highlightEnabled}
+                furigana={showFurigana ? translation.furigana : undefined}
                 className="body-large text-muted-foreground"
               />
               <AnnotationLines

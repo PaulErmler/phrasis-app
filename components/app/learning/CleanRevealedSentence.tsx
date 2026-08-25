@@ -31,6 +31,8 @@ interface CleanRevealedSentenceProps {
   /** 0–100. */
   accuracy: number;
   hideAccuracy?: boolean;
+  /** Bracketed furigana for `text` (lib/furigana.ts); ruby over kanji. */
+  furigana?: string;
 }
 
 /**
@@ -44,6 +46,7 @@ export function CleanRevealedSentence({
   language,
   accuracy,
   hideAccuracy = false,
+  furigana,
 }: CleanRevealedSentenceProps) {
   return (
     <div>
@@ -54,6 +57,7 @@ export function CleanRevealedSentence({
         localTime={0}
         isActive={false}
         enabled={false}
+        furigana={furigana}
         className="leading-relaxed text-foreground"
       />
       <AccuracyFooter accuracy={accuracy} hideAccuracy={hideAccuracy} />

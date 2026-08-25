@@ -133,3 +133,43 @@ vi.mock('@echogarden/espeak-ng-emscripten', () => ({
     },
   }),
 }));
+
+/**
+ * Stub the lindera WASM tokenizer (furigana annotation) for the same reason
+ * as the espeak stub above: the real module is a ~13 MB WASM binary the
+ * edge-runtime environment can't load, and draining the scheduler after a
+ * Japanese translation lands executes `processFuriganaFor*`. The stub speaks
+ * real IPADIC shapes (katakana `reading` per token) for one known sentence so
+ * the fitReading/serialize pipeline in features/furigana.ts stays exercised;
+ * every other input yields a reading-less token, which the action converts
+ * into the '' failure sentinel. Real-engine coverage lives in the
+ * node-environment suite (tests/node/lindera-furigana.test.ts).
+ */
+vi.mock('lindera-wasm-nodejs-ipadic', () => {
+  const CANNED: Record<
+    string,
+    { surface: string; reading: string }[]
+  > = {
+    '毎朝七時に起きます。': [
+      { surface: '毎朝', reading: 'マイアサ' },
+      { surface: '七', reading: 'ナナ' },
+      { surface: '時', reading: 'ジ' },
+      { surface: 'に', reading: 'ニ' },
+      { surface: '起きます', reading: 'オキマス' },
+      { surface: '。', reading: '' },
+    ],
+  };
+  class Tokenizer {
+    tokenize(text: string): { surface: string; reading: string }[] {
+      return CANNED[text] ?? [{ surface: text, reading: '' }];
+    }
+  }
+  class TokenizerBuilder {
+    setDictionary(_uri: string): void {}
+    setKeepWhitespace(_keep: boolean): void {}
+    build(): Tokenizer {
+      return new Tokenizer();
+    }
+  }
+  return { TokenizerBuilder };
+});

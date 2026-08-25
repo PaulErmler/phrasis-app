@@ -45,6 +45,11 @@ export const translationValidator = v.object({
   /** IPA transcription (espeak-ng); same display semantics as romanization. */
   ipa: v.optional(v.string()),
   /**
+   * Bracketed furigana (lib/furigana.ts format), rendered as ruby over the
+   * sentence rather than as a line under it.
+   */
+  furigana: v.optional(v.string()),
+  /**
    * True iff an LLM retranslation is currently in flight for this language:
    * a non-stale row exists in `llmTranslationClaims` for (textId, lang) AND
    * a `translatedText` is already on file (so it's a *re*translation, not

@@ -373,6 +373,26 @@ describe('Persian (fa) language record', () => {
   });
 });
 
+describe('Telugu (te) language record', () => {
+  const te = getLanguageByCode('te');
+
+  it('romanizes locally because Google v3 400s on te', () => {
+    expect(te?.needsRomanization).toBe(true);
+    expect(te?.romanizationBackend).toBe('local');
+    expect(languageNeedsRomanization('te')).toBe(true);
+  });
+});
+
+describe('Bulgarian (bg) language record', () => {
+  const bg = getLanguageByCode('bg');
+
+  it('romanizes locally because Google v3 has no bg', () => {
+    expect(bg?.needsRomanization).toBe(true);
+    expect(bg?.romanizationBackend).toBe('local');
+    expect(languageNeedsRomanization('bg')).toBe(true);
+  });
+});
+
 describe('content versioning', () => {
   describe('isContentVersionStale (the "undefined === current" rule)', () => {
     it('treats undefined as current, NOT stale (prevents a regen storm)', () => {

@@ -285,6 +285,24 @@
     @apply text-xs text-muted-foreground/75 leading-tight mt-0.5;
   }
 
+  /* Furigana ruby (Ruby.tsx). The reading sits ABOVE the line, so the
+     paragraph needs looser leading or it collides with the row above; rt
+     inherits the text color faded rather than the romanization grey so it
+     reads as part of the sentence, not as a second annotation line. */
+  .has-furigana {
+    @apply leading-loose;
+  }
+  .has-furigana ruby {
+    ruby-position: over;
+  }
+  .has-furigana rt {
+    @apply text-muted-foreground;
+    font-size: 0.5em;
+    font-weight: 400;
+    line-height: 1;
+    text-align: center;
+  }
+
   /* Cards & surfaces */
   .card-surface {
     @apply rounded-xl border bg-card shadow-sm;

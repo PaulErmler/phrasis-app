@@ -24,6 +24,7 @@ import { resolveCardContext } from './cardContext';
 import { MAX_CARD_TEXT_LENGTH } from '../../../lib/constants/learning';
 import { trackEvent } from '../../db/stats/dailyStats';
 import {
+  FURIGANA_LANGUAGES,
   getTranslationSource,
   IPA_LANGUAGES,
   postProcessTranslation,
@@ -153,24 +154,46 @@ async function processApproval(
  * Internal mutation to create approval request from tool handler.
  */
 /**
- * Schedule IPA transcription for a proposal's entries (espeak lives in the
- * Node runtime, so it can't run inline here). Only languages with an espeak
- * voice are sent; rows with none simply never get an `entryIpa` key, and the
- * approval card renders nothing for them.
+ * Schedule the annotation actions for a proposal's entries (espeak and the
+ * furigana analyzer live in the Node runtime, so neither can run inline
+ * here). Each kind only receives the languages it supports; rows outside a
+ * kind's language set simply never get an `entryIpa` / `entryFurigana` key,
+ * and the approval card renders nothing for them.
  */
-async function scheduleApprovalIpa(
+async function scheduleApprovalAnnotations(
   ctx: MutationCtx,
   approvalId: Id<'cardApprovals'>,
   translations: Array<{ language: string; text: string }>,
 ): Promise<void> {
-  const entries = translations.filter(
+  const ipaEntries = translations.filter(
     (t) => IPA_LANGUAGES.has(t.language) && t.text.length > 0,
   );
-  if (entries.length === 0) return;
-  await ctx.scheduler.runAfter(0, internal.features.ipa.processIpaForApproval, {
-    approvalId,
-    entries: entries.map((t) => ({ language: t.language, text: t.text })),
-  });
+  if (ipaEntries.length > 0) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.ipa.processIpaForApproval,
+      {
+        approvalId,
+        entries: ipaEntries.map((t) => ({ language: t.language, text: t.text })),
+      },
+    );
+  }
+  const furiganaEntries = translations.filter(
+    (t) => FURIGANA_LANGUAGES.has(t.language) && t.text.length > 0,
+  );
+  if (furiganaEntries.length > 0) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.furigana.processFuriganaForApproval,
+      {
+        approvalId,
+        entries: furiganaEntries.map((t) => ({
+          language: t.language,
+          text: t.text,
+        })),
+      },
+    );
+  }
 }
 
 /**
@@ -206,6 +229,44 @@ export const storeApprovalEntryIpa = internalMutation({
     }
     if (changed) {
       await ctx.db.patch(args.approvalId, { entryIpa });
+    }
+    return null;
+  },
+});
+
+/**
+ * Store furigana results on an approval row. Same drop-if-edited contract as
+ * storeApprovalEntryIpa above: results whose language has since been edited
+ * to different wording are discarded so a slow action can never overwrite a
+ * fresher proposal.
+ */
+export const storeApprovalEntryFurigana = internalMutation({
+  args: {
+    approvalId: v.id('cardApprovals'),
+    results: v.array(
+      v.object({
+        language: v.string(),
+        forText: v.string(),
+        furigana: v.string(),
+      }),
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const approval = await ctx.db.get(args.approvalId);
+    if (!approval) return null; // resolved + cleaned up while in flight
+    const currentByLanguage = new Map(
+      approval.translations.map((t) => [t.language, t.text]),
+    );
+    const entryFurigana = { ...(approval.entryFurigana ?? {}) };
+    let changed = false;
+    for (const result of args.results) {
+      if (currentByLanguage.get(result.language) !== result.forText) continue;
+      entryFurigana[result.language] = result.furigana;
+      changed = true;
+    }
+    if (changed) {
+      await ctx.db.patch(args.approvalId, { entryFurigana });
     }
     return null;
   },
@@ -263,7 +324,7 @@ export const createApprovalRequestInternal = internalMutation({
       userId: args.userId,
       status: 'pending',
     });
-    await scheduleApprovalIpa(ctx, approvalId, cappedTranslations);
+    await scheduleApprovalAnnotations(ctx, approvalId, cappedTranslations);
 
     return approvalId;
   },
@@ -401,7 +462,7 @@ export const createAlsoCorrectApprovalInternal = internalMutation({
       proposedMetadata: metadata,
       ...(replaceOnly ? { replaceOnly: true } : {}),
     });
-    await scheduleApprovalIpa(ctx, approvalId, merged);
+    await scheduleApprovalAnnotations(ctx, approvalId, merged);
 
     return { status: 'created' as const, approvalId };
   },
@@ -677,8 +738,9 @@ export const updateApprovalTranslations = mutation({
       }
     }
 
-    // Drop IPA for languages whose wording changed (it no longer matches)
-    // and recompute against the new text. Unchanged languages keep theirs.
+    // Drop annotations (IPA, furigana) for languages whose wording changed
+    // (they no longer match) and recompute against the new text. Unchanged
+    // languages keep theirs.
     const changedNow = cappedTranslations.filter(
       (entry) => previousTextByLanguage.get(entry.language) !== entry.text,
     );
@@ -687,13 +749,19 @@ export const updateApprovalTranslations = mutation({
       entryIpa = { ...entryIpa };
       for (const entry of changedNow) delete entryIpa[entry.language];
     }
+    let entryFurigana = approval.entryFurigana;
+    if (entryFurigana && changedNow.length > 0) {
+      entryFurigana = { ...entryFurigana };
+      for (const entry of changedNow) delete entryFurigana[entry.language];
+    }
 
     await ctx.db.patch(args.approvalId, {
       translations: cappedTranslations,
       userEditedLanguages: [...userEditedLanguages],
       ...(entryIpa !== approval.entryIpa ? { entryIpa } : {}),
+      ...(entryFurigana !== approval.entryFurigana ? { entryFurigana } : {}),
     });
-    await scheduleApprovalIpa(ctx, args.approvalId, changedNow);
+    await scheduleApprovalAnnotations(ctx, args.approvalId, changedNow);
 
     return { success: true };
   },
@@ -750,6 +818,7 @@ export const getApprovalsByThread = query({
       toolCallId: v.string(),
       translations: translationEntriesValidator,
       entryIpa: v.optional(v.record(v.string(), v.string())),
+      entryFurigana: v.optional(v.record(v.string(), v.string())),
       status: cardApprovalStatusValidator,
       kind: v.optional(cardApprovalKindValidator),
       cardId: v.optional(v.id('cards')),
@@ -775,6 +844,7 @@ export const getApprovalsByThread = query({
       toolCallId: a.toolCallId,
       translations: a.translations,
       entryIpa: a.entryIpa,
+      entryFurigana: a.entryFurigana,
       status: a.status,
       kind: a.kind,
       cardId: a.cardId,

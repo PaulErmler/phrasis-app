@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -68,9 +68,8 @@ function fixtureEmail(): string {
   return creds.email;
 }
 
-/** Open the edit dialog for the first card in the library list. */
-async function openEditDialog(page: Page): Promise<void> {
-  const card = page.getByTestId('library-card').first();
+/** Open the edit dialog for one specific library card. */
+async function openEditDialog(page: Page, card: Locator): Promise<void> {
   await expect(card).toBeVisible({ timeout: 20_000 });
 
   // "Edit" is a surface button when the user has pinned it, otherwise it
@@ -132,11 +131,18 @@ test.describe('curriculum edit flags the shared translation', () => {
     const search = page.getByTestId('library-search').first();
     await expect(search).toBeVisible({ timeout: 20_000 });
     await search.fill(p.targetText);
-    await expect(page.getByTestId('library-card').first()).toBeVisible({
-      timeout: 20_000,
-    });
 
-    await openEditDialog(page);
+    // Address the ARMED card by id, never `.first()` of the list. The search
+    // is debounced, so the pre-filter list still satisfies "a card is
+    // visible" and the first row is then some unrelated card: the edit lands
+    // on it, the shared row it flags is not the one armProbe parked, and the
+    // poll below waits out its timeout against an untouched counter.
+    const card = page.locator(
+      `[data-testid="library-card"][data-card-id="${p.cardId}"]`,
+    );
+    await expect(card).toBeVisible({ timeout: 20_000 });
+
+    await openEditDialog(page, card);
 
     // Edit ONLY the target-language line. The curriculum's own source line
     // stays untouched: changing it would (deliberately) suppress flagging,

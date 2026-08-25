@@ -48,7 +48,12 @@ import {
 } from '@/lib/constants/audioPlayback';
 import { MAX_CARDS_PER_BATCH } from '@/lib/constants/learning';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
-import { languageNeedsIpa, languageNeedsRomanization } from '@/lib/languages';
+import {
+  getLanguageByCode,
+  languageNeedsFurigana,
+  languageNeedsIpa,
+  languageNeedsRomanization,
+} from '@/lib/languages';
 
 interface LearningModeSettingsProps {
   open: boolean;
@@ -63,6 +68,13 @@ interface SettingSwitchRowProps {
   label: string;
   /** When omitted, the row renders the Label directly (no space-y-0.5 wrapper). */
   description?: string;
+  /**
+   * Display names of the course languages this setting applies to, shown as
+   * chips under the description. Used by the language-specific section, where
+   * a setting stays a single course-wide switch but the user needs to see
+   * which of their languages it affects.
+   */
+  languages?: string[];
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   /** Visually indent as a sub-setting. */
@@ -74,10 +86,24 @@ function SettingSwitchRow({
   id,
   label,
   description,
+  languages,
   checked,
   onCheckedChange,
   indented,
 }: SettingSwitchRowProps) {
+  const languageChips =
+    languages !== undefined && languages.length > 0 ? (
+      <div className="flex flex-wrap gap-1 pt-1">
+        {languages.map((name) => (
+          <span
+            key={name}
+            className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+          >
+            {name}
+          </span>
+        ))}
+      </div>
+    ) : null;
   return (
     <div
       className={
@@ -92,11 +118,15 @@ function SettingSwitchRow({
             {label}
           </Label>
           <p className="text-muted-xs">{description}</p>
+          {languageChips}
         </div>
       ) : (
-        <Label htmlFor={id} className="text-sm font-medium">
-          {label}
-        </Label>
+        <div>
+          <Label htmlFor={id} className="text-sm font-medium">
+            {label}
+          </Label>
+          {languageChips}
+        </div>
       )}
       <Switch
         id={id}
@@ -262,12 +292,19 @@ export function LearningModeSettings({
     targetProp,
   );
   // Computed from the raw props rather than the resolved order: these are the
-  // course's actual language lists, so the gate can't be affected by a future
-  // change to how ordering is resolved.
-  const courseSupportsRomanization = [...baseProp, ...targetProp].some(
+  // course's actual language lists, so the gates can't be affected by a future
+  // change to how ordering is resolved. Each list drives one row of the
+  // language-specific section: the row renders only when at least one course
+  // language supports the setting, and the list itself is shown as chips so
+  // the user can see which of their languages the switch affects.
+  const courseLanguages = [...new Set([...baseProp, ...targetProp])];
+  const romanizationLanguages = courseLanguages.filter(
     languageNeedsRomanization,
   );
-  const courseSupportsIpa = [...baseProp, ...targetProp].some(languageNeedsIpa);
+  const ipaLanguages = courseLanguages.filter(languageNeedsIpa);
+  const furiganaLanguages = courseLanguages.filter(languageNeedsFurigana);
+  const toLanguageNames = (codes: string[]) =>
+    codes.map((code) => getLanguageByCode(code)?.name ?? code);
 
   // ---- existing setting handlers ----
 
@@ -392,6 +429,13 @@ export function LearningModeSettings({
     await updateSettings({
       courseId: courseSettings.courseId,
       showIpa: checked,
+    });
+  };
+
+  const handleShowFuriganaChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      showFurigana: checked,
     });
   };
 
@@ -1659,38 +1703,6 @@ export function LearningModeSettings({
             </div>
           )}
 
-          {/* Show romanization, only when a language on this course actually
-              has a Latin transliteration to show. Hiding the control leaves the
-              stored value untouched: course languages are editable from this
-              same sheet, so clearing it would silently reset the preference
-              every time a language was removed and re-added. A stale `true` is
-              inert anyway. Every consumer is gated on the translation
-              carrying a `romanization`, which the server only ever populates
-              for romanized languages. */}
-          {courseSupportsRomanization && (
-            <SettingSwitchRow
-              id="showRomanization"
-              label={t('showRomanization')}
-              description={t('showRomanizationDescription')}
-              checked={courseSettings.showRomanization ?? true}
-              onCheckedChange={handleShowRomanizationChange}
-            />
-          )}
-
-          {/* Show IPA. Same hide-don't-clear reasoning as romanization above.
-              Nearly every language has an espeak voice, so in practice this
-              row shows for all courses except pure ja/fil ones. Defaults OFF,
-              IPA is a specialist aid and shouldn't appear unasked. */}
-          {courseSupportsIpa && (
-            <SettingSwitchRow
-              id="showIpa"
-              label={t('showIpa')}
-              description={t('showIpaDescription')}
-              checked={courseSettings.showIpa ?? false}
-              onCheckedChange={handleShowIpaChange}
-            />
-          )}
-
           {/* Show progress bar */}
           <SettingSwitchRow
             id="showProgressBar"
@@ -1708,6 +1720,67 @@ export function LearningModeSettings({
             checked={courseSettings.showCardOrigin ?? false}
             onCheckedChange={handleShowCardOriginChange}
           />
+
+          {/* ================================================================
+              LANGUAGE-SPECIFIC SETTINGS
+              ================================================================
+              One row per script/pronunciation aid, rendered only when at
+              least one course language supports it; the supporting languages
+              are shown as chips on the row (each setting stays a single
+              course-wide switch — see SettingSwitchRowProps.languages).
+              Absent entirely when no course language has any.
+
+              Hide-don't-clear: a hidden row leaves the stored value
+              untouched. Course languages are editable from this same sheet,
+              so clearing would silently reset the preference every time a
+              language was removed and re-added. A stale `true` is inert
+              anyway — every consumer is gated on the translation actually
+              carrying the annotation, which the server only populates for
+              supported languages.
+
+              IPA defaults OFF: it is a specialist aid and shouldn't appear
+              unasked. Romanization and furigana default ON — they are the
+              expected reading help for their scripts. */}
+          {romanizationLanguages.length > 0 ||
+          ipaLanguages.length > 0 ||
+          furiganaLanguages.length > 0 ? (
+            <>
+              <Separator />
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                {t('languageSettings')}
+              </p>
+              {romanizationLanguages.length > 0 && (
+                <SettingSwitchRow
+                  id="showRomanization"
+                  label={t('showRomanization')}
+                  description={t('showRomanizationDescription')}
+                  languages={toLanguageNames(romanizationLanguages)}
+                  checked={courseSettings.showRomanization ?? true}
+                  onCheckedChange={handleShowRomanizationChange}
+                />
+              )}
+              {ipaLanguages.length > 0 && (
+                <SettingSwitchRow
+                  id="showIpa"
+                  label={t('showIpa')}
+                  description={t('showIpaDescription')}
+                  languages={toLanguageNames(ipaLanguages)}
+                  checked={courseSettings.showIpa ?? false}
+                  onCheckedChange={handleShowIpaChange}
+                />
+              )}
+              {furiganaLanguages.length > 0 && (
+                <SettingSwitchRow
+                  id="showFurigana"
+                  label={t('showFurigana')}
+                  description={t('showFuriganaDescription')}
+                  languages={toLanguageNames(furiganaLanguages)}
+                  checked={courseSettings.showFurigana ?? true}
+                  onCheckedChange={handleShowFuriganaChange}
+                />
+              )}
+            </>
+          ) : null}
 
         </div>
 

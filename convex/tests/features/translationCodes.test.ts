@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { describe, it, expect } from 'vitest';
-import { toGoogleTranslateCode } from '../../features/translation';
+import { toGoogleTranslateCode, GOOGLE_V3_ROMANIZE_SUPPORTED } from '../../features/translation';
 import { SUPPORTED_LANGUAGES } from '../../../lib/languages';
 
 /**
@@ -92,5 +92,21 @@ describe('toGoogleTranslateCode', () => {
 
   it('passes unknown codes through unchanged', () => {
     expect(toGoogleTranslateCode('zz')).toBe('zz');
+  });
+});
+
+describe('google-v3 catalog vs live allowlist', () => {
+  it('never marks a language google-v3 unless Google romanizeText actually accepts it', () => {
+    // bg shipped as google-v3 while `bg` is absent from the live set; the
+    // worker then threw "Romanization not configured" and persisted ''.
+    const mismatches = SUPPORTED_LANGUAGES.filter(
+      (l) => l.romanizationBackend === 'google-v3',
+    ).filter(
+      (l) => !GOOGLE_V3_ROMANIZE_SUPPORTED.has(toGoogleTranslateCode(l.code)),
+    ).map((l) => l.code);
+    expect(
+      mismatches,
+      `google-v3 languages missing from GOOGLE_V3_ROMANIZE_SUPPORTED: ${mismatches.join(', ')}`,
+    ).toEqual([]);
   });
 });

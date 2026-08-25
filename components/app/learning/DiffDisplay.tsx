@@ -17,6 +17,12 @@ interface DiffDisplayProps {
   hideErrors?: boolean;
   /** `courseSettings.ignorePunctuation`. Drop punctuation from the score. */
   ignorePunctuation?: boolean;
+  /**
+   * Bracketed furigana for `expected` (lib/furigana.ts). Only the clean
+   * reveal renders it — diff chips stay bare, readings over struck-through
+   * fragments would be noise.
+   */
+  furigana?: string;
 }
 
 // Lives in lib/textCompare/accuracy.ts so non-React code (and the auto-rating
@@ -31,6 +37,7 @@ export function DiffDisplay({
   omitAccuracy = false,
   hideErrors = false,
   ignorePunctuation = false,
+  furigana,
 }: DiffDisplayProps) {
   const cfg = getCompareConfig(language);
 
@@ -44,6 +51,7 @@ export function DiffDisplay({
         omitAccuracy={omitAccuracy}
         hideErrors={hideErrors}
         ignorePunctuation={ignorePunctuation}
+        furigana={furigana}
       />
     );
   }
@@ -57,6 +65,7 @@ export function DiffDisplay({
       omitAccuracy={omitAccuracy}
       hideErrors={hideErrors}
       ignorePunctuation={ignorePunctuation}
+      furigana={furigana}
     />
   );
 }
@@ -69,6 +78,7 @@ interface CharDiffViewProps {
   omitAccuracy: boolean;
   hideErrors: boolean;
   ignorePunctuation: boolean;
+  furigana?: string;
 }
 
 function CharDiffView({
@@ -79,6 +89,7 @@ function CharDiffView({
   omitAccuracy,
   hideErrors,
   ignorePunctuation,
+  furigana,
 }: CharDiffViewProps) {
   const diffOpts = useMemo(
     () => toDiffOptions(getCompareConfig(language, { ignorePunctuation })),
@@ -101,6 +112,7 @@ function CharDiffView({
         language={language}
         accuracy={accuracyPct}
         hideAccuracy={hideAccuracy}
+        furigana={furigana}
       />
     );
   }

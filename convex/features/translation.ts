@@ -6,7 +6,7 @@
  * No Convex function exports; just plain async helpers.
  *
  * Uses Google Cloud Translation API v2 (API key) for translations,
- * v3 (service account OAuth2) for romanization of ru/hi/ja,
+ * v3 (service account OAuth2) for romanization of ru/hi/ja/bn/ta/uk/sr,
  * chinese-to-pinyin for Chinese romanization,
  * es-hangul for Korean (Revised Romanization),
  * and greek-utils for Greek phonetic Latin.
@@ -177,15 +177,19 @@ export async function translateText(
  * supports. The endpoint 400s with "Source language is unsupported" for
  * source languages outside this set.
  *
- * Keep this list in sync with
- * https://docs.cloud.google.com/translate/docs/advanced/romanize-text
- * Map our internal codes via GOOGLE_TRANSLATE_CODE_MAP first, then check
- * membership.
+ * Keep this list in sync with the *live* endpoint, not only the docs table
+ * at https://docs.cloud.google.com/translate/docs/languages#roman — Google
+ * still lists `te` there but romanizeText 400s "Source language is
+ * unsupported" for it (2026-08). Map our internal codes via
+ * GOOGLE_TRANSLATE_CODE_MAP first, then check membership.
  */
-const GOOGLE_V3_ROMANIZE_SUPPORTED = new Set([
+export const GOOGLE_V3_ROMANIZE_SUPPORTED = new Set([
   'am', 'ar', 'be', 'bn', 'gu', 'hi', 'ja',
-  'kn', 'my', 'ru', 'sr', 'ta', 'te', 'uk',
+  'kn', 'my', 'ru', 'sr', 'ta', 'uk',
 ]);
+
+/** 4xx other than 429 will not become the empty-result flake on retry. */
+const ROMANIZE_NON_RETRYABLE_STATUS = /\bGoogle romanize API error: (400|401|403|404)\b/;
 
 /** Max attempts when calling Google v3 romanizeText. The endpoint
  * occasionally returns `200 {"romanizations":[{}]}` for short inputs
@@ -290,6 +294,8 @@ async function romanizeViaGoogleV3Once(
  *   - Korean: es-hangul (Revised Romanization, pronunciation-based)
  *   - Hebrew: hebrew-transliteration (SBL Academic)
  *   - Arabic (incl. ar_sa / ar_eg / ar_iq / ar_lev): arabic-transliterate (IJMES)
+ *   - Telugu: sanscript, ISO 15919 scheme (Google v3 400s on `te`)
+ *   - Bulgarian: 2009 Streamlined System (Google v3 has no `bg`)
  *   - everything else in `ROMANIZATION_LANGUAGES`: Google Cloud Translation
  *     v3 romanizeText, retried up to `ROMANIZE_MAX_ATTEMPTS` times.
  *
@@ -327,13 +333,17 @@ export async function romanizeText(
       );
     } catch (err) {
       lastError = err;
+      const detail = err instanceof Error ? err.message : String(err);
+      if (ROMANIZE_NON_RETRYABLE_STATUS.test(detail)) {
+        break;
+      }
       if (attempt < ROMANIZE_MAX_ATTEMPTS) {
         console.warn('[translation] romanizeText retrying', {
           sourceLanguage,
           googleLang,
           attempt,
           maxAttempts: ROMANIZE_MAX_ATTEMPTS,
-          detail: err instanceof Error ? err.message : String(err),
+          detail,
         });
       }
     }

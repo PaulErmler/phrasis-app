@@ -57,6 +57,9 @@ async function seedCard(
         ? { romanizedText: args.sourceRomanizedText }
         : {}),
       ...(sourceIpa !== null ? { ipaText: sourceIpa } : {}),
+      // Same reasoning for furigana, but only ja carries the field: a
+      // complete Japanese row has one since the furigana feature landed.
+      ...(args.sourceLanguage === "ja" ? { furiganaText: "ふりがな" } : {}),
     });
 
     for (const tr of args.translations) {
@@ -114,6 +117,8 @@ async function hasMissingContent(
           sourceRomanization:
             (await ctx.db.get(textId))!.romanizedText ?? undefined,
           sourceIpa: (await ctx.db.get(textId))!.ipaText ?? undefined,
+          sourceFurigana:
+            (await ctx.db.get(textId))!.furiganaText ?? undefined,
           userCreated: false,
         },
       ],

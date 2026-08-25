@@ -28,7 +28,7 @@ export function createHomeTour(
     freePlayStep,
     tourStep(t, 'home.reviewModeToggle', '[data-tutorial="review-mode-toggle"]', 'bottom', 'center'),
     tourStep(t, 'home.contentSource', '[data-tutorial="content-source-filter"]', 'bottom', 'center'),
-    // The new/learning/review pills next to the content-source filter.
+    // The new/review pills next to the content-source filter.
     tourStep(t, 'home.dueCounts', '[data-tutorial="due-counts"]', 'bottom', 'center'),
     // The rotating forecast in the progress card ("by the end of the year…").
     tourStep(t, 'home.projections', '[data-tutorial="projections"]', 'bottom', 'center'),

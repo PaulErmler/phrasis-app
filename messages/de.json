@@ -380,7 +380,6 @@
     },
     "dueCounts": {
       "new": "{count} neu",
-      "learning": "{count} lernen",
       "review": "{count} wiederholen"
     },
     "dailyGoal": {
@@ -548,7 +547,6 @@
       "newWordsToday": "neue Wörter heute",
       "comingUp": "Als Nächstes:",
       "stateNew": "neu",
-      "stateLearning": "lernend",
       "stateReview": "Wiederholung",
       "continue": "Weiter",
       "pause": "Automatisches Weiterleiten pausieren",
@@ -620,6 +618,9 @@
       "showRomanizationDescription": "Lateinische Aussprache unter nicht-lateinischem Text anzeigen",
       "showIpa": "IPA anzeigen",
       "showIpaDescription": "Phonetische Transkription (Internationales Phonetisches Alphabet) unter Sätzen anzeigen",
+      "languageSettings": "Sprachspezifische Einstellungen",
+      "showFurigana": "Furigana anzeigen",
+      "showFuriganaDescription": "Kana-Lesungen über Kanji anzeigen",
       "autoAdvance": "Automatisch weiter",
       "autoAdvanceDescription": "Zum nächsten Satz wechseln, nachdem das Audio fertig ist",
       "pauseBeforeAutoAdvance": "Vor dem Weitergehen",
@@ -1299,7 +1300,7 @@
       },
       "dueCounts": {
         "title": "Was auf dich wartet",
-        "description": "Diese Pillen zeigen, wie viele Sätze bei deiner aktuellen Inhaltsauswahl neu sind, gerade gelernt werden und zur Wiederholung anstehen."
+        "description": "Diese Pillen zeigen, wie viele Sätze bei deiner aktuellen Inhaltsauswahl neu sind und wie viele zur Wiederholung anstehen."
       },
       "projections": {
         "title": "Deine Prognose",

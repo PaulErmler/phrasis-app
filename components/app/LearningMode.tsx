@@ -372,7 +372,6 @@ export function LearningMode({
           dailyReviewsToday={state.dailyReviewsToday}
           dailyTimeMsToday={state.dailyTimeMsToday}
           dailyNewWordsToday={state.dailyNewWordsToday}
-          schedulingMode={state.schedulingMode}
           reviewMode={state.reviewMode}
           autoAdvance={state.autoAdvance}
           ready={state.progressDisplayReady}
@@ -585,6 +584,7 @@ export function LearningMode({
         onAccuracyChange={setWritingAccuracy}
         showRomanization={state.courseSettings.showRomanization ?? true}
         showIpa={state.courseSettings.showIpa ?? false}
+        showFurigana={state.courseSettings.showFurigana ?? true}
         cardId={state.cardId}
         onRegisterRevert={registerRevertHandler}
         resetSignal={cardResetNonce}
@@ -646,6 +646,7 @@ export function LearningMode({
         revealedLanguages={audio.revealedLanguages}
         showRomanization={state.courseSettings.showRomanization ?? true}
         showIpa={state.courseSettings.showIpa ?? false}
+        showFurigana={state.courseSettings.showFurigana ?? true}
         revealAllSignal={audioRevealNonce}
         resetSignal={cardResetNonce}
         replayTargetSignal={targetReplayNonce}

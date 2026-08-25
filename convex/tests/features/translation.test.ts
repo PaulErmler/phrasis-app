@@ -117,6 +117,40 @@ describe("features/translation helpers", () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
+    it("romanizes Telugu locally (no network call) because Google v3 400s on te", async () => {
+      // Production: romanizeText v3 returns 400 "Source language is unsupported"
+      // for `te` even though Google's docs still list it. Same trap as `fa`.
+      const fetchMock = vi.fn(async () => {
+        throw new Error(
+          "romanizeText hit the network for Telugu — local path regressed",
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      try {
+        const out = await romanizeText("నమస్కారం", "te");
+        expect(out).toBe("namaskāraṁ");
+      } finally {
+        vi.unstubAllGlobals();
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("romanizes Bulgarian locally (no network call) because Google v3 has no bg", async () => {
+      const fetchMock = vi.fn(async () => {
+        throw new Error(
+          "romanizeText hit the network for Bulgarian — local path regressed",
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      try {
+        const out = await romanizeText("България", "bg");
+        expect(out).toBe("Bulgaria");
+      } finally {
+        vi.unstubAllGlobals();
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it("Arabic dialect codes (ar_sa / ar_eg / ar_iq / ar_lev) also use the local path", async () => {
       const fetchMock = vi.fn(async () => {
         throw new Error(
@@ -255,6 +289,58 @@ describe("features/translation helpers", () => {
         vi.unstubAllEnvs();
       }
       expect(romanizeCalls).toBe(2);
+    });
+
+    it("does not retry Google v3 400 INVALID_ARGUMENT (unsupported source language)", async () => {
+      // Telugu originally burned ROMANIZE_MAX_ATTEMPTS on a deterministic 400.
+      // Client errors are not the empty-result flake the retry exists for.
+      const { privateKey } = generateKeyPairSync("rsa", {
+        modulusLength: 2048,
+        privateKeyEncoding: { type: "pkcs8", format: "pem" },
+        publicKeyEncoding: { type: "spki", format: "pem" },
+      });
+      const serviceAccount = {
+        client_email: "tester@example.iam.gserviceaccount.com",
+        private_key: privateKey as unknown as string,
+        project_id: "test-project",
+      };
+      vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_KEY", JSON.stringify(serviceAccount));
+
+      let romanizeCalls = 0;
+      const fetchMock = vi.fn(async (url: string | URL | Request) => {
+        const u = typeof url === "string" ? url : url.toString();
+        if (u.includes("oauth2.googleapis.com")) {
+          return new Response(JSON.stringify({ access_token: "fake-token" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (u.includes("translation.googleapis.com")) {
+          romanizeCalls++;
+          return new Response(
+            JSON.stringify({
+              error: {
+                code: 400,
+                message: "Source language is unsupported.",
+                status: "INVALID_ARGUMENT",
+              },
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        throw new Error(`Unexpected fetch to ${u}`);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      try {
+        await expect(romanizeText("привет", "ru")).rejects.toThrow(
+          /Google romanize API error: 400/,
+        );
+      } finally {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+      }
+      expect(romanizeCalls).toBe(1);
     });
   });
 });

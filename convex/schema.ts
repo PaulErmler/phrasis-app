@@ -137,6 +137,7 @@ export const courseSettingsFields = {
   autoRevealBaseOnSubmit: v.optional(v.boolean()), // writing mode: unblur base text once all translations are submitted (default on; sub-setting of hideBaseLanguagesFull)
   showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
   showIpa: v.optional(v.boolean()), // show IPA transcription below sentence text (default OFF, unlike showRomanization)
+  showFurigana: v.optional(v.boolean()), // furigana ruby over kanji for Japanese (default ON; language-specific section in settings)
   // Language order overrides
   baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
   targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages
@@ -403,6 +404,15 @@ export default defineSchema({
     // "espeak-ng-emscripten-0.3.5-v1"). Same invalidate-by-source migration
     // pattern as `romanizationSource`.
     ipaSource: v.optional(v.string()),
+    // Furigana: the sentence with kana readings bracketed after each kanji
+    // run ("毎朝[まいあさ]七時[しちじ]に起[お]きます。"). Japanese only. Same
+    // undefined / '' / non-empty tri-state as `romanizedText` above, same
+    // `=== undefined` rule. Format and parser live in lib/furigana.ts.
+    furiganaText: v.optional(v.string()),
+    // Identifier of the analyzer build that produced `furiganaText` (e.g.
+    // "lindera-ipadic-2.0.0-v1"). Same invalidate-by-source migration pattern
+    // as `romanizationSource`.
+    furiganaSource: v.optional(v.string()),
     // Debounce marker for the searchableText rebuild fan-out: timestamp until
     // which a scheduled `rebuildSearchableTextForText` is already pending for
     // this text. Content stores within that window skip re-scheduling. See
@@ -461,6 +471,10 @@ export default defineSchema({
     ipaText: v.optional(v.string()),
     // Engine identifier for `ipaText`, mirroring `texts.ipaSource`.
     ipaSource: v.optional(v.string()),
+    // Bracketed furigana. Same tri-state as `texts.furiganaText`; see there.
+    furiganaText: v.optional(v.string()),
+    // Analyzer identifier for `furiganaText`, mirroring `texts.furiganaSource`.
+    furiganaSource: v.optional(v.string()),
     // Identifier of the translation method that produced `translatedText`.
     // Format: "<model-slug>-<reasoning|none>" for LLM translations (e.g.
     // "google/gemini-3.1-flash-lite-high"), "google-translate-v2"
@@ -1098,6 +1112,12 @@ export default defineSchema({
     // Entries are dropped when the user edits the proposed text and
     // recomputed against the new wording.
     entryIpa: v.optional(v.record(v.string(), v.string())),
+    // Bracketed furigana for the Japanese entries of `translations`, keyed by
+    // language (in practice only 'ja'). Same lifecycle as `entryIpa` above:
+    // computed by a scheduled Node action right after the proposal lands,
+    // absent = not (yet) computed, '' = nothing to annotate / engine failed,
+    // dropped + recomputed when the user edits the proposed text.
+    entryFurigana: v.optional(v.record(v.string(), v.string())),
     userId: v.string(),
     status: cardApprovalStatusValidator,
     // Absent = 'createCard' (rows predate the field). 'alsoCorrect' rows are

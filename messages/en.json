@@ -380,7 +380,6 @@
     },
     "dueCounts": {
       "new": "{count} new",
-      "learning": "{count} learning",
       "review": "{count} review"
     },
     "dailyGoal": {
@@ -548,7 +547,6 @@
       "newWordsToday": "new words today",
       "comingUp": "Upcoming cards:",
       "stateNew": "new",
-      "stateLearning": "learning",
       "stateReview": "review",
       "continue": "Continue",
       "pause": "Pause auto-advance",
@@ -620,6 +618,9 @@
       "showRomanizationDescription": "Display Latin script pronunciation below non-Latin text",
       "showIpa": "Show IPA",
       "showIpaDescription": "Display the phonetic transcription (International Phonetic Alphabet) below sentences",
+      "languageSettings": "Language Specific Settings",
+      "showFurigana": "Show furigana",
+      "showFuriganaDescription": "Display kana readings above kanji",
       "autoAdvance": "Auto-advance",
       "autoAdvanceDescription": "Advance to next card after audio finishes",
       "pauseBeforeAutoAdvance": "Before Advancing",
@@ -1299,7 +1300,7 @@
       },
       "dueCounts": {
         "title": "What’s waiting for you",
-        "description": "These pills show how many sentences are new, currently being learned, and due for review with your current content selection."
+        "description": "These pills show how many sentences are new and how many are due for review with your current content selection."
       },
       "projections": {
         "title": "Your forecast",

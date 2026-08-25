@@ -21,18 +21,24 @@ import { getJyutpingList } from 'to-jyutping';
 // @ts-expect-error no type declarations for arabic-transliterate (pure JS, ~74KB, zero deps)
 import arabictransliterate from 'arabic-transliterate';
 import transliterate from '@sindresorhus/transliterate';
+import Sanscript from '@indic-transliteration/sanscript';
+import { transliterateBulgarian } from './bulgarianTranslit';
 import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 
 /**
  * Languages we can romanize locally without a network call. Derived from each
  * Language's `romanizationBackend === 'local'` flag (single source of truth in
- * lib/languages.ts); languages on `'google-v3'` (ru/hi/bn/ja) are excluded.
+ * lib/languages.ts); languages on `'google-v3'` (ru/hi/bn/ja/ta) are excluded.
  *
  * Arabic was moved here off the Google v3 path after a regression where the
  * romanizeText endpoint started returning `{"romanizations":[{}]}` for short
  * Arabic strings (200 OK, empty entry, the Vyshantha/arabic-transliterate
  * library produces a deterministic IJMES romanization with zero deps, fine
- * for the Convex V8 runtime).
+ * for the Convex V8 runtime). Telugu followed after the same endpoint 400d
+ * "Source language is unsupported" for `te`, and now goes through sanscript's
+ * ISO 15919 scheme. Bulgarian was never on Google's romanize list at all; it
+ * was catalogued as google-v3 by mistake, and runs on the vendored
+ * Streamlined-System mapper in ./bulgarianTranslit.
  */
 export const LOCAL_ROMANIZATION_LANGUAGES = new Set(
   SUPPORTED_LANGUAGES.filter((l) => l.romanizationBackend === 'local').map(
@@ -61,6 +67,10 @@ export const ROMANIZATION_SOURCES = {
   toJyutping: 'to-jyutping-v1',
   arabicTransliterate: 'arabic-transliterate-v1',
   sindresorhusTransliterate: 'sindresorhus-transliterate-v1',
+  sanscriptIso15919: 'sanscript-iso15919-v1',
+  // v2: the 2009 Act's exception rules (word-final -ия → -ia, България →
+  // Bulgaria) and all-caps digraphs, none of which v1's letter walk applied.
+  bulgarianStreamlined: 'bulgarian-streamlined-v2',
   googleV3: 'google-v3-v1',
 } as const;
 
@@ -93,8 +103,10 @@ export function getRomanizationSource(language: string): RomanizationSource {
     return ROMANIZATION_SOURCES.arabicTransliterate;
   }
   if (language === 'fa') return ROMANIZATION_SOURCES.sindresorhusTransliterate;
-  // Everything else in ROMANIZATION_LANGUAGES (ru, hi, ja, bn) routes
-  // through Google v3. See `romanizeText` in convex/features/translation.ts.
+  if (language === 'te') return ROMANIZATION_SOURCES.sanscriptIso15919;
+  if (language === 'bg') return ROMANIZATION_SOURCES.bulgarianStreamlined;
+  // Everything else in ROMANIZATION_LANGUAGES (ru, hi, ja, bn, ta, uk, sr)
+  // routes through Google v3. See `romanizeText` in convex/features/translation.ts.
   return ROMANIZATION_SOURCES.googleV3;
 }
 
@@ -155,6 +167,8 @@ export function romanizeLocal(text: string, language: string): string | null {
     // which flags combining marks like U+0654/U+0670 inside `[...]`.
     return transliterate(text).replace(/\u200C|\u0654|\u0670/g, '');
   }
+  if (language === 'te') return romanizeTelugu(text);
+  if (language === 'bg') return transliterateBulgarian(text);
   return null;
 }
 
@@ -264,4 +278,43 @@ function romanizeCantonese(text: string): string {
   if (buffer.length > 0) segments.push(buffer);
 
   return joinRomanizedSegments(segments);
+}
+
+
+/**
+ * Telugu → ISO 15919 via `@indic-transliteration/sanscript` (its `iso`
+ * scheme). Google v3 romanizeText 400s on `te`, and
+ * `@sindresorhus/transliterate` leaves Telugu codepoints untouched.
+ *
+ * ISO 15919 rather than IAST because Telugu contrasts short and long e/o and
+ * IAST cannot write that contrast: it renders నేను and a short-e word alike
+ * as "nenu", and falls back to a grave accent for short e ("tèlugu"). The
+ * ASCII schemes (ITRANS, Harvard-Kyoto) encode length as capitals — "nEnu",
+ * "namaskAraM" — which reads as shouting mid-sentence. ISO also keeps ఌ and
+ * ళ apart (l̥ vs ḷ), where IAST collapses both onto ḷ.
+ */
+
+/**
+ * The three Telugu-specific letters sanscript has no mapping for; left alone
+ * they would survive the ISO pass as raw Telugu codepoints in a line that is
+ * supposed to be Latin. Rewritten to their modern equivalents first, which
+ * take vowel signs and viramas identically (a private-use sentinel does not:
+ * the following vowel sign loses its consonant, so "ౘు" comes back as "u").
+ *
+ * ౘ/ౙ are archaic spellings of the /ts/ and /dz/ that modern Telugu writes
+ * with చ/జ, so this folds that distinction away — an acceptable trade for
+ * letters deprecated in current orthography. ౚ is a true alias for ఱ.
+ */
+const TELUGU_ARCHAIC_LETTERS: Array<[RegExp, string]> = [
+  [/ౘ/g, 'చ'],
+  [/ౙ/g, 'జ'],
+  [/ౚ/g, 'ఱ'],
+];
+
+function romanizeTelugu(text: string): string {
+  const modernized = TELUGU_ARCHAIC_LETTERS.reduce(
+    (acc, [pattern, replacement]) => acc.replace(pattern, replacement),
+    text,
+  );
+  return Sanscript.t(modernized, 'telugu', 'iso');
 }

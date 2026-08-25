@@ -274,6 +274,17 @@ export interface Language {
    */
   ipaVoice?: string;
   /**
+   * Opt-in flag for furigana: the kana reading rendered above each kanji run
+   * (`convex/features/furigana.ts`). Same role as `ipaVoice` for IPA — a
+   * language without it never gets furigana scheduled, stored rows stop being
+   * served, and the settings toggle hides.
+   *
+   * Japanese only today. The pipeline itself is script-agnostic, so a future
+   * ruby-annotated language (pinyin over hanzi) sets this flag and supplies an
+   * engine branch rather than growing a second annotation kind.
+   */
+  supportsFurigana?: true;
+  /**
    * Locale-keyed display-name overrides (e.g. { de: 'Spanisch (Spanien)' })
    * for codes where Intl.DisplayNames is ambiguous. The `en` value is derived
    * from `name` when the override map is built. Resolution falls back to the
@@ -759,7 +770,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // No `azureSttLocale`: the symmetric default resolves to `bg-BG`, which is
     // in Azure Fast Transcription's supported list. Worth a live probe before
     // the language ships. The docs table has been wrong before (see sw_tz).
-    romanizationBackend: 'google-v3',
+    romanizationBackend: 'local',
     name: 'Bulgarian',
     nativeName: 'Български',
     flag: '🇧🇬',
@@ -768,7 +779,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'bg',
-    // Cyrillic. Karaoke off (non-Latin script policy, matches ru/uk/sr).
+    // Cyrillic. Google v3 romanizeText has no `bg` (ru/uk/sr/be only), so
+    // the 2009 Streamlined System is produced locally in
+    // convex/lib/bulgarianTranslit.ts. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
     experimental: true,
@@ -1037,16 +1050,19 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     regionLabel: 'India',
     geminiBcp47: 'te-IN',
     azureSttLocale: 'te-IN',
-    romanizationBackend: 'google-v3',
+    romanizationBackend: 'local',
     name: 'Telugu',
     nativeName: 'తెలుగు',
     flag: '🇮🇳',
     category: 'south-asian',
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
+    // Telugu script. Google v3 romanizeText 400s on `te` ("Source language
+    // is unsupported") despite still listing it in the docs table; ISO 15919
+    // is produced locally via sanscript in convex/lib/localRomanization.ts.
+    // Karaoke off (non-Latin script policy).
     needsRomanization: true,
     ipaVoice: 'te',
-    // Telugu script. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
   },
@@ -1234,6 +1250,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     // No ipaVoice: espeak-ng only reads kana, so kanji sentences would
     // come out with gaps/garbage. Revisit if a kanji-aware G2P shows up.
+    // Furigana covers the same need better here: it puts the reading on the
+    // kanji itself rather than transcribing the sentence to a second line.
+    supportsFurigana: true,
     // Japanese tokenizes per-morpheme; karaoke flickers too fast to read.
     // Click-to-explain popovers still work, only the current-word colour
     // is gated off.
@@ -2357,12 +2376,12 @@ export function dominantTextDirection(text: string): 'rtl' | 'ltr' {
  *
  * Coverage matrix:
  *  - Local libraries (sync, no network): zh, zh_traditional, el, ko, he,
- *    yue, yue_traditional.
- *  - Google v3 romanizeText API: ru, hi, ja, ar (and the Arabic dialects via
- *    GOOGLE_TRANSLATE_CODE_MAP collapsing to "ar"). Google's officially
- *    supported source-language set is small: am/ar/be/bn/gu/hi/ja/kn/my/ru/
- *    sr/ta/te/uk: anything outside that list 400s with "Source language is
- *    unsupported."
+ *    yue, yue_traditional, ar (and dialects), fa, te, bg.
+ *  - Google v3 romanizeText API: ru, hi, bn, ja, ta, uk, sr. Google's
+ *    documented source-language set is am/ar/be/bn/gu/hi/ja/kn/my/ru/sr/ta/
+ *    te/uk, but the live endpoint 400s "Source language is unsupported" for
+ *    `te` (and historically `fa`); `bg` was never on the list. Those three
+ *    are local instead.
  *  - NOT currently supported (no local lib AND no Google v3): th. The
  *    `Language.needsRomanization` flag is also `false` on that entry so the
  *    UI doesn't render a romanization slot for it. To enable, wire a
@@ -2398,6 +2417,22 @@ export const IPA_LANGUAGES = new Set<string>(
 
 export function languageNeedsIpa(code: string): boolean {
   return IPA_LANGUAGES.has(code);
+}
+
+/**
+ * Languages that get furigana (kana readings over kanji runs). Derived from
+ * `supportsFurigana` exactly as IPA_LANGUAGES is derived from `ipaVoice`:
+ * dropping the flag stops scheduling (decks.ts / collections.ts), drops stored
+ * `furiganaText` from query responses (cardContent.ts), and hides the toggle.
+ */
+export const FURIGANA_LANGUAGES = new Set<string>(
+  SUPPORTED_LANGUAGES.filter((l) => l.supportsFurigana === true).map(
+    (l) => l.code,
+  ),
+);
+
+export function languageNeedsFurigana(code: string): boolean {
+  return FURIGANA_LANGUAGES.has(code);
 }
 
 /**

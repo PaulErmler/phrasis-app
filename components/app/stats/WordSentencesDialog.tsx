@@ -57,6 +57,7 @@ export function WordSentencesDialog({
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords === true;
   const showIpa = courseSettings?.showIpa === true;
+  const showFurigana = courseSettings?.showFurigana ?? true;
   const buttonPlayback = useButtonPlayback();
 
   // Ephemeral per-card per-language speed overrides. This dialog is a
@@ -298,6 +299,7 @@ export function WordSentencesDialog({
                               localTime={buttonPlayback.active?.localTime ?? 0}
                               isActive={isActive}
                               enabled={highlightEnabled}
+                              furigana={showFurigana ? tr.furigana : undefined}
                               className="text-sm font-medium leading-relaxed"
                               highlightTerm={isWordLanguage ? word : undefined}
                             />
@@ -357,6 +359,7 @@ export function WordSentencesDialog({
                               localTime={buttonPlayback.active?.localTime ?? 0}
                               isActive={isActive}
                               enabled={highlightEnabled}
+                              furigana={showFurigana ? tr.furigana : undefined}
                               className="text-sm leading-relaxed"
                               highlightTerm={isWordLanguage ? word : undefined}
                             />

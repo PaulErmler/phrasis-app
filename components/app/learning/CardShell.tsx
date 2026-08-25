@@ -51,6 +51,8 @@ interface CardShellProps {
   showRomanization?: boolean;
   /** IPA line toggle (from courseSettings.showIpa; default OFF). */
   showIpa?: boolean;
+  /** Furigana ruby over kanji (courseSettings.showFurigana; default ON). */
+  showFurigana?: boolean;
   /** Karaoke word highlighting toggle (from courseSettings). */
   highlightEnabled?: boolean;
   /** Active per-language playback from an AudioButton; null when none. */
@@ -140,6 +142,7 @@ export function CardShell({
   bare = false,
   showRomanization = true,
   showIpa = false,
+  showFurigana = true,
   highlightEnabled = false,
   activeClip = null,
   clockBinding,
@@ -299,6 +302,7 @@ export function CardShell({
                     clockBinding={isActive ? clockBinding : undefined}
                     isActive={!!isActive}
                     enabled={highlightEnabled}
+                    furigana={showFurigana ? translation.furigana : undefined}
                     interactive={!isBlurred}
                     className={`${baseTextClass} ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
                     coachmarkAnchorForLongestWord={

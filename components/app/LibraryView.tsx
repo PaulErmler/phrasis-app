@@ -534,11 +534,18 @@ export function LibraryView({
         {!isLoading && hasResults && (
           <>
             {displayCards.map(({ card, isMastered, isHidden }) => (
-              <div key={card._id} data-testid="library-card">
+              <div
+                key={card._id}
+                data-testid="library-card"
+                // Lets a spec address one specific card instead of
+                // `.first()` racing the debounced search filter.
+                data-card-id={card._id}
+              >
                 <LearningCardContent
                   bare
                   compact
                   showIpa={courseSettings?.showIpa === true}
+                  showFurigana={courseSettings?.showFurigana ?? true}
                   preReviewCount={card.preReviewCount}
                   schedulingPhase={card.schedulingPhase}
                   fsrsState={card.fsrsState}

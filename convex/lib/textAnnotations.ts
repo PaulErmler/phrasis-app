@@ -1,17 +1,21 @@
 /**
  * Registry for per-sentence "annotation" fields: derived text stored beside
  * a sentence (on `texts`) and beside each translation (on `translations`),
- * generated lazily by a scheduled action, displayed as a muted line under
- * the sentence.
+ * generated lazily by a scheduled action and rendered alongside the sentence.
  *
- * Two kinds exist today:
+ * Three kinds exist today:
  *   - romanization: Latin transliteration for non-Latin scripts
  *     (`romanizedText` / `romanizationSource`, sync V8 libraries + Google v3;
  *     see convex/lib/localRomanization.ts).
  *   - ipa: IPA transcription via espeak-ng
  *     (`ipaText` / `ipaSource`, Node runtime; see convex/features/ipa.ts).
+ *   - furigana: kana readings over kanji runs, Japanese only
+ *     (`furiganaText` / `furiganaSource`, Node runtime; see
+ *     convex/features/furigana.ts). The one kind that does NOT render as a
+ *     line under the sentence — it is ruby laid over the sentence itself, so
+ *     the client reads it through lib/furigana.ts instead of AnnotationLines.
  *
- * Both share the tri-state contract documented on `texts.romanizedText` in
+ * All three share the tri-state contract documented on `texts.romanizedText` in
  * convex/schema.ts: `undefined` = never attempted (schedulers enqueue),
  * `''` = attempted and failed (sentinel, never re-enqueued), non-empty =
  * done. Always test `=== undefined`.
@@ -24,22 +28,29 @@ import { v } from 'convex/values';
 import type { FunctionReference } from 'convex/server';
 import { internal } from '../_generated/api';
 import type { Id } from '../_generated/dataModel';
-import { IPA_LANGUAGES, ROMANIZATION_LANGUAGES } from '../../lib/languages';
+import {
+  FURIGANA_LANGUAGES,
+  IPA_LANGUAGES,
+  ROMANIZATION_LANGUAGES,
+} from '../../lib/languages';
 
-export const ANNOTATION_KINDS = ['romanization', 'ipa'] as const;
+export const ANNOTATION_KINDS = ['romanization', 'ipa', 'furigana'] as const;
 export type AnnotationKind = (typeof ANNOTATION_KINDS)[number];
 
 /** Args validator for the generic store mutations in decks.ts. */
 export const vAnnotationKind = v.union(
   v.literal('romanization'),
   v.literal('ipa'),
+  v.literal('furigana'),
 );
 
 export type AnnotationField =
   | 'romanizedText'
   | 'romanizationSource'
   | 'ipaText'
-  | 'ipaSource';
+  | 'ipaSource'
+  | 'furiganaText'
+  | 'furiganaSource';
 
 /** Both process actions of a kind take the same args (see decks.ts / ipa.ts). */
 type AnnotationActionArgs = {
@@ -56,9 +67,9 @@ type AnnotationAction = FunctionReference<
 
 export interface TextAnnotationSpec {
   /** Value field on `texts` / `translations` rows (tri-state, see above). */
-  textField: 'romanizedText' | 'ipaText';
+  textField: 'romanizedText' | 'ipaText' | 'furiganaText';
   /** Provenance tag field, written together with the value. */
-  sourceField: 'romanizationSource' | 'ipaSource';
+  sourceField: 'romanizationSource' | 'ipaSource' | 'furiganaSource';
   /** Whether this language gets the annotation at all. */
   supports: (language: string) => boolean;
   /** Action that annotates a source text (writes via storeSourceAnnotation). */
@@ -90,9 +101,21 @@ export const TEXT_ANNOTATIONS: Record<AnnotationKind, TextAnnotationSpec> = {
     translationAction: internal.features.ipa.processIpaForTranslation,
     inSearchableText: false,
   },
+  furigana: {
+    textField: 'furiganaText',
+    sourceField: 'furiganaSource',
+    supports: (language) => FURIGANA_LANGUAGES.has(language),
+    sourceTextAction: internal.features.furigana.processFuriganaForSourceText,
+    translationAction:
+      internal.features.furigana.processFuriganaForTranslation,
+    // The annotation is the sentence itself plus bracketed readings, so
+    // indexing it would duplicate every Japanese sentence in the search
+    // string for no gain — the bare sentence is already indexed.
+    inSearchableText: false,
+  },
 };
 
-/** Row shape the helpers below need: just the four annotation fields. */
+/** Row shape the helpers below need: just the annotation value/source fields. */
 export type AnnotationFields = Partial<Record<AnnotationField, string>>;
 
 /**
@@ -123,6 +146,8 @@ export function clearedAnnotationFields(): Record<AnnotationField, undefined> {
     romanizationSource: undefined,
     ipaText: undefined,
     ipaSource: undefined,
+    furiganaText: undefined,
+    furiganaSource: undefined,
   };
 }
 
@@ -162,4 +187,22 @@ export type IpaSource = (typeof IPA_SOURCES)[keyof typeof IPA_SOURCES];
 /** All IPA today comes from the one espeak build; mirror of getRomanizationSource. */
 export function getIpaSource(_language: string): IpaSource {
   return IPA_SOURCES.espeakNg;
+}
+
+/**
+ * Stable identifiers for the furigana engine, persisted as `furiganaSource`.
+ * Same invalidate-by-source contract as IPA_SOURCES above: bump the `-v<n>`
+ * suffix when the analyzer, its dictionary, or the reading-fitting rules
+ * change in a way that should regenerate existing rows.
+ */
+export const FURIGANA_SOURCES = {
+  linderaIpadic: 'lindera-ipadic-2.0.0-v1',
+} as const;
+
+export type FuriganaSource =
+  (typeof FURIGANA_SOURCES)[keyof typeof FURIGANA_SOURCES];
+
+/** All furigana comes from the one analyzer build; mirror of getIpaSource. */
+export function getFuriganaSource(_language: string): FuriganaSource {
+  return FURIGANA_SOURCES.linderaIpadic;
 }

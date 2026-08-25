@@ -111,6 +111,7 @@ export function CollectionDetailDialog({
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords === true;
   const showIpa = courseSettings?.showIpa === true;
+  const showFurigana = courseSettings?.showFurigana ?? true;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   // Scroll preservation: remember which row sits at the top of the viewport
@@ -409,6 +410,7 @@ export function CollectionDetailDialog({
                   {visibleEarlierRows.map((row) => (
                     <PreviewTextRow
                       showIpa={showIpa}
+                      showFurigana={showFurigana}
                       key={row._id}
                       row={row}
                       highlightEnabled={highlightEnabled}
@@ -431,6 +433,7 @@ export function CollectionDetailDialog({
                   {visibleRows.map((row) => (
                     <PreviewTextRow
                       showIpa={showIpa}
+                      showFurigana={showFurigana}
                       key={row._id}
                       row={row}
                       highlightEnabled={highlightEnabled}
@@ -475,12 +478,14 @@ function PreviewTextRow({
   row,
   highlightEnabled,
   showIpa,
+  showFurigana,
   browse,
   sentencesRemaining,
 }: {
   row: BrowseTextRow;
   highlightEnabled: boolean;
   showIpa: boolean;
+  showFurigana: boolean;
   browse: CollectionBrowse;
   sentencesRemaining?: number | null;
 }) {
@@ -516,6 +521,7 @@ function PreviewTextRow({
             localTime={buttonPlayback.active?.localTime ?? 0}
             isActive={isActiveLine}
             enabled={highlightEnabled}
+            furigana={showFurigana ? translation.furigana : undefined}
             className={cn(
               'text-sm leading-relaxed',
               isBase && 'font-medium',

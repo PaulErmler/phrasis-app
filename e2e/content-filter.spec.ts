@@ -29,7 +29,15 @@ test.describe("content filter: subtle dropdown on home", () => {
   test("dropdown renders with the default value visible", async ({ page }) => {
     await page.goto("/app");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("content-filter-trigger")).toBeVisible({
+    // `.first()`, not the bare locator: for a few frames after hydration the
+    // home view's subtree can be present twice, and a strict locator throws
+    // "resolved to 2 elements" rather than retrying past it. The duplicate
+    // clears itself within milliseconds, so the first match is the real row
+    // once it settles. Reproduced at ~4% under 8 parallel workers;
+    // learning-journey.spec.ts already guards the same trigger this way.
+    await expect(
+      page.getByTestId("content-filter-trigger").first(),
+    ).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -43,9 +51,12 @@ test.describe("due-count pills on home", () => {
     await page.waitForLoadState("domcontentloaded");
     // Pills render once getFilteredCardCounts resolves (even all-zero counts
     // return an object). They share a row with the filter dropdown.
-    await expect(page.getByTestId("due-counts-pills")).toBeVisible({
+    // `.first()` for the post-hydration double-render, see above.
+    await expect(page.getByTestId("due-counts-pills").first()).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByTestId("content-filter-trigger")).toBeVisible();
+    await expect(
+      page.getByTestId("content-filter-trigger").first(),
+    ).toBeVisible();
   });
 });

@@ -16,6 +16,7 @@ import {
   ROMANIZATION_SOURCES,
 } from './lib/localRomanization';
 import { isProtectedTranslationSource } from '../lib/translationProvenance';
+import { FURIGANA_LANGUAGES } from '../lib/languages';
 import { buildSearchableTextPatchForCard } from './lib/cardContent';
 import type { Id } from './_generated/dataModel';
 import { isPremadeLevelCollection } from './lib/collections';
@@ -346,6 +347,91 @@ export const resetStaleCantoneseTranslationRomanization = migrations.define({
     }),
 });
 
+/**
+ * Clear a language's attempted romanization back to "never attempted" so the
+ * lazy pipeline re-runs with a new local mapper. Failed Google rows carry
+ * `romanizedText: ''` and would otherwise never retry.
+ *
+ * Language-keyed, current-source-exempt: rows the new local path already
+ * wrote between deploy and this migration stay; never-attempted `undefined`
+ * stays for the scheduler; everything else on `language` is unset.
+ */
+function unsetStaleLocalRomanization(
+  doc: {
+    language: string;
+    romanizedText?: string;
+    romanizationSource?: string;
+  },
+  language: string,
+  currentSource: string,
+):
+  | { romanizedText: undefined; romanizationSource: undefined }
+  | undefined {
+  if (doc.language !== language) return undefined;
+  if (doc.romanizedText === undefined) return undefined;
+  if (doc.romanizationSource === currentSource) return undefined;
+  return { romanizedText: undefined, romanizationSource: undefined };
+}
+
+/**
+ * Clear Telugu romanization sentinels (and any google-v3 output) so the lazy
+ * pipeline re-runs with the local ISO 15919 mapper. Google v3 400s on `te`,
+ * so failed rows carry `romanizedText: ''` and would otherwise never retry.
+ */
+export function resetStaleTeluguRomanizationPatch(doc: {
+  language: string;
+  romanizedText?: string;
+  romanizationSource?: string;
+}):
+  | { romanizedText: undefined; romanizationSource: undefined }
+  | undefined {
+  return unsetStaleLocalRomanization(doc, 'te', ROMANIZATION_SOURCES.sanscriptIso15919);
+}
+
+export const resetStaleTeluguTextRomanization = migrations.define({
+  table: 'texts',
+  migrateOne: (_ctx, doc) => resetStaleTeluguRomanizationPatch(doc),
+});
+
+export const resetStaleTeluguTranslationRomanization = migrations.define({
+  table: 'translations',
+  migrateOne: (_ctx, doc) =>
+    resetStaleTeluguRomanizationPatch({
+      language: doc.targetLanguage,
+      romanizedText: doc.romanizedText,
+      romanizationSource: doc.romanizationSource,
+    }),
+});
+
+export function resetStaleBulgarianRomanizationPatch(doc: {
+  language: string;
+  romanizedText?: string;
+  romanizationSource?: string;
+}):
+  | { romanizedText: undefined; romanizationSource: undefined }
+  | undefined {
+  return unsetStaleLocalRomanization(
+    doc,
+    'bg',
+    ROMANIZATION_SOURCES.bulgarianStreamlined,
+  );
+}
+
+export const resetStaleBulgarianTextRomanization = migrations.define({
+  table: 'texts',
+  migrateOne: (_ctx, doc) => resetStaleBulgarianRomanizationPatch(doc),
+});
+
+export const resetStaleBulgarianTranslationRomanization = migrations.define({
+  table: 'translations',
+  migrateOne: (_ctx, doc) =>
+    resetStaleBulgarianRomanizationPatch({
+      language: doc.targetLanguage,
+      romanizedText: doc.romanizedText,
+      romanizationSource: doc.romanizationSource,
+    }),
+});
+
 export const recomputeTextRomanization = migrations.define({
   table: 'texts',
   migrateOne: (_ctx, doc) =>
@@ -419,6 +505,76 @@ export function recomputeRomanizationPatch(
 }
 
 /**
+ * Furigana backfill: schedule the Node-runtime annotation action for every
+ * Japanese row that has never been attempted (`furiganaText === undefined`).
+ *
+ * The engine (lindera WASM, convex/features/furigana.ts) can only run in the
+ * Node runtime, and `migrations.define` handlers are V8 mutations — so unlike
+ * `recompute*Romanization` above this cannot write the value in place. It
+ * schedules the same per-row actions the lazy view-time pipeline uses, which
+ * write through the store mutations' `=== undefined` idempotence guard: a
+ * lazy fill racing the backfill is harmless, and re-running the migration
+ * after the actions land schedules nothing.
+ *
+ * The `''` failure sentinel is honoured (not "missing"), so a re-run never
+ * resurrects rows the engine already gave up on.
+ */
+export const backfillTextFurigana = migrations.define({
+  table: 'texts',
+  migrateOne: async (ctx, doc) => {
+    if (!needsFuriganaBackfill(doc.language, doc.furiganaText, doc.text)) {
+      return;
+    }
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.furigana.processFuriganaForSourceText,
+      { textId: doc._id, text: doc.text, language: doc.language },
+    );
+  },
+});
+
+export const backfillTranslationFurigana = migrations.define({
+  table: 'translations',
+  migrateOne: async (ctx, doc) => {
+    if (
+      !needsFuriganaBackfill(
+        doc.targetLanguage,
+        doc.furiganaText,
+        doc.translatedText,
+      )
+    ) {
+      return;
+    }
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.furigana.processFuriganaForTranslation,
+      {
+        textId: doc.textId,
+        text: doc.translatedText,
+        language: doc.targetLanguage,
+      },
+    );
+  },
+});
+
+/**
+ * @param text what the annotation would be derived from — empty for
+ *   translation rows whose translation hasn't landed yet; those rows get
+ *   their furigana from the lazy pipeline once the text exists.
+ */
+export function needsFuriganaBackfill(
+  language: string,
+  furiganaText: string | undefined,
+  text: string,
+): boolean {
+  return (
+    FURIGANA_LANGUAGES.has(language) &&
+    furiganaText === undefined &&
+    text.length > 0
+  );
+}
+
+/**
  * Everything a deploy needs, in order. Completed migrations are skipped.
  *
  * Ordering rationale:
@@ -445,6 +601,12 @@ export const runAll = migrations.runner([
   internal.migrations.rebuildCardSearchableText,
   internal.migrations.resetStaleCantoneseTextRomanization,
   internal.migrations.resetStaleCantoneseTranslationRomanization,
+  internal.migrations.resetStaleTeluguTextRomanization,
+  internal.migrations.resetStaleTeluguTranslationRomanization,
+  internal.migrations.resetStaleBulgarianTextRomanization,
+  internal.migrations.resetStaleBulgarianTranslationRomanization,
   internal.migrations.recomputeTextRomanization,
   internal.migrations.recomputeTranslationRomanization,
+  internal.migrations.backfillTextFurigana,
+  internal.migrations.backfillTranslationFurigana,
 ]);

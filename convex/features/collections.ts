@@ -246,6 +246,7 @@ export const browseCollectionTexts = query({
       sourceLanguage: row.text.language,
       sourceRomanization: row.text.romanizedText ?? undefined,
       sourceIpa: row.text.ipaText ?? undefined,
+      sourceFurigana: row.text.furiganaText ?? undefined,
       userCreated: row.text.userCreated,
     }));
     const contentMap = await buildTextContentBatchForLanguages(
@@ -290,6 +291,7 @@ export const browseCollectionTexts = query({
             missingAnnotationKinds(tr.language, {
               romanizedText: tr.romanization,
               ipaText: tr.ipa,
+              furiganaText: tr.furigana,
             }).length > 0,
         );
       return {

@@ -26,6 +26,8 @@ interface WordDiffProps {
   hideErrors?: boolean;
   /** User setting. Punctuation is still shown, just neutral and unscored. */
   ignorePunctuation?: boolean;
+  /** Bracketed furigana for `expected`; rendered only by the clean reveal. */
+  furigana?: string;
 }
 
 export function computeWordAccuracy(
@@ -249,6 +251,7 @@ export function WordDiff({
   omitAccuracy = false,
   hideErrors = false,
   ignorePunctuation = false,
+  furigana,
 }: WordDiffProps) {
   const diffOpts = useMemo(
     () => toDiffOptions(getCompareConfig(language, { ignorePunctuation })),
@@ -274,6 +277,7 @@ export function WordDiff({
         language={language}
         accuracy={accuracy}
         hideAccuracy={hideAccuracy}
+        furigana={furigana}
       />
     );
   }

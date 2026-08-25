@@ -20,6 +20,11 @@ export interface CardTranslation {
   /** IPA transcription (espeak-ng); same display semantics as romanization. */
   ipa?: string;
   /**
+   * Bracketed furigana (lib/furigana.ts format). Rendered as ruby OVER the
+   * sentence text by ClickableWords, not as an annotation line under it.
+   */
+  furigana?: string;
+  /**
    * True while an LLM retranslation is in flight for this language
    * (server-driven, keyed off `llmTranslationClaims`). Excludes the
    * "regenerate audio" flow, which has no LLM phase. Drives the warning-
@@ -123,6 +128,8 @@ export interface CourseSettings {
   showRomanization?: boolean;
   /** IPA transcription line below sentences. Default OFF (`?? false`). */
   showIpa?: boolean;
+  /** Furigana ruby over kanji (Japanese). Default ON (`?? true`). */
+  showFurigana?: boolean;
   // Instant proceed on rating
   instantProceedAudio?: boolean;
   instantProceedFull?: boolean;

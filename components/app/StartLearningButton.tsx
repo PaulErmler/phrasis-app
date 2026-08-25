@@ -136,7 +136,7 @@ export function StartLearningButton({
         ))}
       </div>
 
-      {/* Deck triad + source filter, below the toggle: one line when there's
+      {/* Deck counts + source filter, below the toggle: one line when there's
        * room (pills left, dropdown pinned right), otherwise the dropdown
        * wraps under them. This row spans the full width, so. Unlike the
        * earlier nested flex-grow layout. There's no leftover-width

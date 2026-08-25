@@ -59,6 +59,8 @@ interface LearningCardContentProps {
   showRomanization?: boolean;
   /** IPA line toggle (from courseSettings.showIpa; default OFF). */
   showIpa?: boolean;
+  /** Furigana ruby over kanji (courseSettings.showFurigana; default ON). */
+  showFurigana?: boolean;
   /** Karaoke word highlighting toggle (defaults true; pass false to force off). */
   highlightEnabled?: boolean;
   /**
@@ -123,6 +125,7 @@ export function LearningCardContent({
   bare = false,
   showRomanization = true,
   showIpa = false,
+  showFurigana = true,
   highlightEnabled = true,
   mergedPlayback,
   languagePlaybackSpeeds,
@@ -239,6 +242,7 @@ export function LearningCardContent({
         bare={bare}
         showRomanization={showRomanization}
         showIpa={showIpa}
+        showFurigana={showFurigana}
         highlightEnabled={highlightEnabled}
         activeClip={activeClip}
         clockBinding={clockBinding}
@@ -296,6 +300,7 @@ export function LearningCardContent({
                       clockBinding={isActive ? clockBinding : undefined}
                       isActive={!!isActive}
                       enabled={highlightEnabled}
+                      furigana={showFurigana ? translation.furigana : undefined}
                       interactive={!isBlurred}
                       className={`${compact ? 'text-base leading-relaxed' : 'body-large'} ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
                       // Onboarding's word-tap tutorial targets the longest

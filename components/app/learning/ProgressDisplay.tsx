@@ -22,8 +22,6 @@ import {
   setupMediaSession,
   setMediaSessionPlaybackState,
 } from '@/lib/audio/mediaSession';
-import type { SchedulingMode } from '@/convex/types';
-
 type CardCounts = {
   new: number;
   learning: number;
@@ -41,7 +39,6 @@ interface ProgressDisplayProps {
   dailyReviewsToday: number;
   dailyTimeMsToday: number;
   dailyNewWordsToday: number;
-  schedulingMode: SchedulingMode;
   /** Auto-advance + auto-advance bar are audio-mode only. */
   reviewMode: 'audio' | 'full';
   /** Mirrors `courseSettings.autoAdvance`. Even in audio mode, the
@@ -260,7 +257,6 @@ function CelebrationContent({
   dailyReviewsToday,
   dailyTimeMsToday,
   dailyNewWordsToday,
-  schedulingMode,
   reviewMode,
   autoAdvance,
   onContinue,
@@ -572,7 +568,7 @@ function CelebrationContent({
           </motion.div>
         )}
 
-        {/* Anki-style state pills. Shown when we have card counts. The slot
+        {/* New vs review pills. Shown when we have card counts. The slot
             collapses entirely when counts are unavailable (no active deck). */}
         {cardCounts && (
           <motion.div
@@ -587,18 +583,15 @@ function CelebrationContent({
                 colorClass="text-accent-orange"
               />
               <StatePill
-                label={t('stateLearning')}
-                value={cardCounts.learning + cardCounts.relearning}
-                colorClass="text-primary"
+                label={t('stateReview')}
+                value={
+                  cardCounts.learning +
+                  cardCounts.relearning +
+                  cardCounts.review
+                }
+                colorClass="text-success"
+                cap={REVIEWS_CAP}
               />
-              {schedulingMode !== 'learn_new' && (
-                <StatePill
-                  label={t('stateReview')}
-                  value={cardCounts.review}
-                  colorClass="text-success"
-                  cap={REVIEWS_CAP}
-                />
-              )}
             </div>
           </motion.div>
         )}
@@ -721,7 +714,7 @@ function StatePill({
   const display = cap != null && value > cap ? `${cap}+` : String(value);
   // `min-w` enforces label separation. Relying on row-level `gap-x-*` alone
   // is fragile because each pill's intrinsic width tracks its label
-  // ("learning" ≈ 52 px, "new" ≈ 28 px), so the gap is between label edges
+  // ("review" ≈ 44 px, "new" ≈ 28 px), so the gap is between label edges
   // not pill centers, and long labels can run together regardless of gap.
   return (
     <div className="flex flex-col items-center gap-0.5 min-w-24">

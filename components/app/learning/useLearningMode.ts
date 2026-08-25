@@ -1353,7 +1353,7 @@ export function useLearningMode(
 
   // Cross-cutting fields shared by every state, including the progress
   // display (so a milestone hit on the last card survives the transition to
-  // `noCardsDue`) and `schedulingMode` (used by the celebration UI).
+  // `noCardsDue`). `schedulingMode` is for the header and free-play face.
   const base = {
     settingsOpen,
     setSettingsOpen,

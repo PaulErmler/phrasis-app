@@ -19,6 +19,7 @@ export type ApprovalData = {
   /** IPA per language (espeak), shown under the proposed sentences when the
    * course's showIpa setting is on. '' = engine failed for that entry. */
   entryIpa?: Record<string, string>;
+  entryFurigana?: Record<string, string>;
   status: CardApprovalStatus;
   // Absent = 'createCard' (rows predate the field).
   kind?: CardApprovalKind;

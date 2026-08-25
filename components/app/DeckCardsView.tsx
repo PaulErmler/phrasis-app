@@ -28,7 +28,7 @@ import {
 import { Layers, Languages } from 'lucide-react';
 import { AudioButton } from '@/components/app/learning/AudioButton';
 import { CardSpeedBadge } from '@/components/app/learning/CardSpeedBadge';
-import { getLanguageShortLabel, getTextDirection } from '@/lib/languages';
+import { getLanguageShortLabel } from '@/lib/languages';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import type { Id } from '@/convex/_generated/dataModel';
 
@@ -41,6 +41,7 @@ export function DeckCardsView() {
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords === true;
   const showIpa = courseSettings?.showIpa === true;
+  const showFurigana = courseSettings?.showFurigana ?? true;
   const languagePlaybackSpeeds = courseSettings?.languagePlaybackSpeeds ?? {};
   const buttonPlayback = useButtonPlayback();
 
@@ -162,26 +163,43 @@ export function DeckCardsView() {
                           {index + 1}.
                         </span>
                         <div className="flex-1">
-                          <p
-                            dir={getTextDirection(
-                              baseTranslation?.language || card.sourceLanguage,
-                            )}
+                          {/* HighlightedText in its plain state (no timings,
+                              highlighting off): same <p dir> output as the raw
+                              paragraph this replaced, plus furigana ruby. */}
+                          <HighlightedText
+                            text={baseTranslation?.text || card.sourceText}
+                            language={
+                              baseTranslation?.language || card.sourceLanguage
+                            }
+                            wordTimings={null}
+                            localTime={0}
+                            isActive={false}
+                            enabled={false}
+                            furigana={
+                              showFurigana ? baseTranslation?.furigana : undefined
+                            }
                             className="font-medium text-sm leading-relaxed text-left"
-                          >
-                            {baseTranslation?.text || card.sourceText}
-                          </p>
+                          />
                           <AnnotationLines
                             romanization={baseTranslation?.romanization}
                             ipa={baseTranslation?.ipa}
                             showIpa={showIpa}
                           />
                           {targetTranslation?.text && (
-                            <p
-                              dir={getTextDirection(targetTranslation.language)}
+                            <HighlightedText
+                              text={targetTranslation.text}
+                              language={targetTranslation.language}
+                              wordTimings={null}
+                              localTime={0}
+                              isActive={false}
+                              enabled={false}
+                              furigana={
+                                showFurigana
+                                  ? targetTranslation.furigana
+                                  : undefined
+                              }
                               className="text-muted-sm mt-1 leading-relaxed text-left"
-                            >
-                              {targetTranslation.text}
-                            </p>
+                            />
                           )}
                           <AnnotationLines
                             romanization={targetTranslation?.romanization}
@@ -219,6 +237,11 @@ export function DeckCardsView() {
                               localTime={buttonPlayback.active?.localTime ?? 0}
                               isActive={isActive}
                               enabled={highlightEnabled}
+                              furigana={
+                                showFurigana
+                                  ? baseTranslation?.furigana
+                                  : undefined
+                              }
                               className="text-sm"
                             />
                           );
@@ -294,6 +317,11 @@ export function DeckCardsView() {
                                   localTime={buttonPlayback.active?.localTime ?? 0}
                                   isActive={isActive}
                                   enabled={highlightEnabled}
+                                  furigana={
+                                    showFurigana
+                                      ? targetTranslation.furigana
+                                      : undefined
+                                  }
                                   className="text-sm"
                                 />
                               );

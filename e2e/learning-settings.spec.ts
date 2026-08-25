@@ -911,7 +911,9 @@ test.describe("learning settings", () => {
       // --- Home pills survive the track flip ------------------------------
       await page.goto("/app");
       await page.waitForLoadState("domcontentloaded");
-      const pills = page.getByTestId("due-counts-pills");
+      // `.first()`: the home subtree can be momentarily duplicated after
+      // hydration, and a strict locator throws instead of retrying.
+      const pills = page.getByTestId("due-counts-pills").first();
       await expect(pills).toBeVisible({ timeout: 15_000 });
       // Flip the home Shadowing/Writing toggle: the counts re-query against
       // the other track's aggregates and the row must stay rendered (never

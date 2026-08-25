@@ -278,8 +278,10 @@ describe("features/scheduling", () => {
             ? { romanizedText: sourceRomanization }
             : {}),
           // A "complete" card includes an IPA transcription (part of
-          // hasMissingContent since the annotations refactor).
+          // hasMissingContent since the annotations refactor), and furigana
+          // where the language gets it (ja).
           ipaText: `ipa-${sourceLanguage}`,
+          ...(sourceLanguage === "ja" ? { furiganaText: "ふりがな" } : {}),
           userCreated: true,
           userId: "user_A",
           collectionId,
@@ -289,7 +291,14 @@ describe("features/scheduling", () => {
         for (const tr of translations) {
           translationIds[tr.targetLanguage] = await ctx.db.insert(
             "translations",
-            { textId, ipaText: `ipa-${tr.targetLanguage}`, ...tr },
+            {
+              textId,
+              ipaText: `ipa-${tr.targetLanguage}`,
+              ...(tr.targetLanguage === "ja"
+                ? { furiganaText: "ふりがな" }
+                : {}),
+              ...tr,
+            },
           );
         }
         const audioIds: Record<string, Id<"audioRecordings">> = {};

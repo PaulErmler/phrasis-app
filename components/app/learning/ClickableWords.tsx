@@ -15,6 +15,8 @@ import {
   matchRatio,
 } from '@/lib/audio/alignTimings';
 import { getTextDirection, languageSupportsKaraoke } from '@/lib/languages';
+import { parseFurigana, splitFuriganaByRanges } from '@/lib/furigana';
+import { Ruby } from './Ruby';
 import { useKaraokeIndex, type ClockBinding } from '@/hooks/use-karaoke-index';
 import { useLearningChatToggle } from './LearningChatLayout';
 import type { WordTiming } from './types';
@@ -34,6 +36,14 @@ interface Props {
   isActive: boolean;
   /** User setting, when false, karaoke is off but words remain clickable. */
   enabled: boolean;
+  /**
+   * Bracketed furigana annotation for `text` (lib/furigana.ts format).
+   * When set AND it still reconstructs `text` exactly, kanji runs render as
+   * <ruby> with their kana reading above; otherwise (stale annotation after
+   * an edit, no annotation) the sentence renders plain. Word popovers,
+   * karaoke, and direction handling are unchanged either way.
+   */
+  furigana?: string;
   className?: string;
   /** When false, renders plain text without popovers (e.g. blurred translations). */
   interactive?: boolean;
@@ -196,6 +206,7 @@ export function ClickableWords({
   clockBinding,
   isActive,
   enabled,
+  furigana,
   className,
   interactive = true,
 }: Props) {
@@ -205,6 +216,46 @@ export function ClickableWords({
     () => alignWordTimings(text, wordTimings, language),
     [text, wordTimings, language],
   );
+
+  // null = no furigana to render (absent, or stale: parseFurigana validates
+  // that the annotation still reconstructs `text` after edits).
+  const furiganaSegments = useMemo(
+    () => (furigana ? parseFurigana(furigana, text) : null),
+    [furigana, text],
+  );
+
+  // Furigana chunk per aligned token's `display`, cut from the sentence-wide
+  // segments by code-point ranges ([leading, display] per token + the final
+  // trailing run — together exactly reconstructing `text`). Where the two
+  // tokenizations disagree about a boundary inside a kanji compound, the
+  // whole ruby unit lands in the token containing its start and the next
+  // token's chunk comes back empty; adjacent rendering keeps the sentence
+  // intact (see splitFuriganaByRanges).
+  const tokenFurigana = useMemo(() => {
+    if (furiganaSegments === null || aligned.length === 0) return null;
+    const lengths: number[] = [];
+    for (const w of aligned) {
+      lengths.push([...w.leading].length, [...w.display].length);
+    }
+    lengths.push([...aligned[aligned.length - 1].trailing].length);
+    const chunks = splitFuriganaByRanges(furiganaSegments, lengths);
+    return aligned.map((_, i) => chunks[i * 2 + 1]);
+  }, [furiganaSegments, aligned]);
+
+  // A token's display, with ruby when furigana applies to it. Whenever the
+  // chunk mapping exists it is the ONLY source of this token's text: a ruby
+  // unit spanning an Intl.Segmenter boundary (Intl cuts 天気|予報 where the
+  // analyzer annotated 天気予報 as one unit) lands whole in the first token
+  // and leaves the next token's chunk short or empty — falling back to
+  // w.display there would render the swallowed characters twice.
+  const renderDisplay = (w: { display: string }, i: number) => {
+    const chunk = tokenFurigana?.[i];
+    if (!chunk) return w.display;
+    if (!chunk.some((seg) => seg.reading !== undefined)) {
+      return chunk.map((seg) => seg.text).join('');
+    }
+    return <Ruby segments={chunk} />;
+  };
 
   const canKaraoke = useMemo(() => {
     if (!languageSupportsKaraoke(language)) return false;
@@ -232,11 +283,24 @@ export function ClickableWords({
   // right-alignment `dir="rtl"` would otherwise apply, keeping RTL sentences
   // flush with the rest of the LTR layout.
   const dir = getTextDirection(language);
-  const dirClassName = cn(className, dir === 'rtl' && 'text-left');
+  const dirClassName = cn(
+    className,
+    dir === 'rtl' && 'text-left',
+    // Extra leading so the reading line doesn't collide with the row above.
+    furiganaSegments !== null && 'has-furigana',
+  );
 
   if (!interactive || aligned.length === 0 || !chatContext) {
     if (!canKaraoke || !isActive) {
-      return <p dir={dir} className={dirClassName}>{text}</p>;
+      return (
+        <p dir={dir} className={dirClassName}>
+          {furiganaSegments !== null ? (
+            <Ruby segments={furiganaSegments} />
+          ) : (
+            text
+          )}
+        </p>
+      );
     }
     return (
       <p dir={dir} className={dirClassName}>
@@ -249,7 +313,7 @@ export function ClickableWords({
               )}
             >
               {w.leading}
-              {w.display}
+              {renderDisplay(w, i)}
             </span>
             {w.trailing}
           </Fragment>
@@ -296,7 +360,7 @@ export function ClickableWords({
               openIndex === i && 'text-warning hover:bg-transparent',
             )}
           >
-            {w.display}
+            {renderDisplay(w, i)}
           </AskAboutWord>
           {w.trailing}
         </Fragment>
