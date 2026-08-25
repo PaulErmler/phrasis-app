@@ -303,6 +303,24 @@ describe('romanizeLocal: Bulgarian (bg)', () => {
     expect(romanizeLocal('Здравей, OK? 3', 'bg')).toBe('Zdravey, OK? 3');
   });
 
+  it('treats combining stress marks as transparent', () => {
+    // Learner-facing text carries combining U+0301 on stressed vowels
+    // (written as escapes here: a precomposed \u00e1 is a different code
+    // point and the comparison is not normalized). A mark after я must
+    // not make a mid-word ия look word-final (the upstream bug all over
+    // again), and a word-final ия still collapses with the stress on it.
+    expect(romanizeLocal('Мария́та', 'bg')).toBe('Mariya\u0301ta');
+    expect(romanizeLocal('Мария́', 'bg')).toBe('Maria\u0301');
+    // A mark inside an all-caps run doesn't break the run either.
+    expect(romanizeLocal('ЩА́СТИЕ', 'bg')).toBe('SHTA\u0301STIE');
+  });
+
+  it('title-cases an isolated capital digraph letter (an initial)', () => {
+    // Neutral neighbors (space, period) are not evidence of an all-caps run.
+    expect(romanizeLocal('Иван Ц. Петров', 'bg')).toBe('Ivan Ts. Petrov');
+    expect(romanizeLocal('Ч', 'bg')).toBe('Ch');
+  });
+
   it('emits only Latin for a native sentence', () => {
     const out = romanizeLocal('Тя живее в София от три години.', 'bg');
     expect(out).toBe('Tya zhivee v Sofia ot tri godini.');

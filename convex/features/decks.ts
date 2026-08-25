@@ -53,6 +53,7 @@ import {
 import {
   ROMANIZATION_LANGUAGES,
   IPA_LANGUAGES,
+  FURIGANA_LANGUAGES,
   DEFAULT_CONTENT_VERSION,
   getCurrentTranslationVersion,
   getCurrentTtsVersion,
@@ -66,7 +67,10 @@ import {
   mayRegenerateTranslation,
 } from '../../lib/translationProvenance';
 import { soundsSame } from '../lib/textComparison';
-import { resolveRetranslation } from './cardEditAudit';
+import {
+  resolveRetranslation,
+  resolveRetranslationIfPending,
+} from './cardEditAudit';
 import {
   deleteAudioRow,
   deleteAudioRowsForTextLanguage,
@@ -909,6 +913,7 @@ export const getDeckCards = query({
           sourceLanguage: text.language,
           sourceRomanization: text.romanizedText ?? undefined,
           sourceIpa: text.ipaText ?? undefined,
+          sourceFurigana: text.furiganaText ?? undefined,
           userCreated: text.userCreated,
         };
       })
@@ -2904,6 +2909,12 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     // (convex/features/ipa.ts), so it's scheduled as a follow-up below.
     // Assigned by every branch of the insert/replace/fill structure.
     let ipaMissingAfterWrite: boolean;
+    // Same contract for furigana: like IPA it is Node-runtime compute
+    // (convex/features/furigana.ts), so a replace must clear the pair here
+    // and schedule regeneration below — leaving the old wording's furigana
+    // on the new text would park a stale annotation the lazy pipeline never
+    // revisits (non-undefined) and the client always rejects.
+    let furiganaMissingAfterWrite: boolean;
 
     if (!existing) {
       await ctx.db.insert('translations', {
@@ -2932,6 +2943,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       });
       searchableContentChanged = true;
       ipaMissingAfterWrite = true;
+      furiganaMissingAfterWrite = true;
       // A retranslation whose row vanished under it (a sweep deleted it while
       // the job was in flight). The new wording still landed, so it counts as
       // applied; there is simply no `before` to have kept audio for.
@@ -2969,6 +2981,8 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         romanizationSource: string | undefined;
         ipaText: string | undefined;
         ipaSource: string | undefined;
+        furiganaText: string | undefined;
+        furiganaSource: string | undefined;
         translationSource: string | undefined;
         regionVariant: string | undefined;
         speakerGender: 'male' | 'female';
@@ -2992,6 +3006,10 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       patch.ipaText = undefined;
       patch.ipaSource = undefined;
       ipaMissingAfterWrite = true;
+      // Furigana: same reasoning as IPA, same follow-up.
+      patch.furiganaText = undefined;
+      patch.furiganaSource = undefined;
+      furiganaMissingAfterWrite = true;
       if (args.translationSource) {
         patch.translationSource = args.translationSource;
       }
@@ -3078,6 +3096,18 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       // Legacy row this job merely filled metadata on: schedule IPA only
       // when the row never had one (`=== undefined` honors the sentinel).
       ipaMissingAfterWrite = existing.ipaText === undefined;
+      furiganaMissingAfterWrite = existing.furiganaText === undefined;
+      // Unreachable for audit-carrying jobs today (they all set
+      // `replaceExisting`), but the args are independent, so close the
+      // outcome matrix: an attempt that landed here did NOT overwrite the
+      // row, and leaving its audit row 'enqueued' would read as "still in
+      // flight" in the admin QC view forever. Guarded so a resolved row is
+      // never downgraded.
+      await resolveRetranslationIfPending(
+        ctx,
+        args.retranslationAuditId,
+        'dropped_superseded',
+      );
     }
 
     if (searchableContentChanged) {
@@ -3093,6 +3123,20 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       await ctx.scheduler.runAfter(
         0,
         internal.features.ipa.processIpaForTranslation,
+        {
+          textId: args.textId,
+          text: translatedText,
+          language: args.targetLanguage,
+        },
+      );
+    }
+    if (
+      furiganaMissingAfterWrite &&
+      FURIGANA_LANGUAGES.has(args.targetLanguage)
+    ) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.furigana.processFuriganaForTranslation,
         {
           textId: args.textId,
           text: translatedText,
@@ -3204,6 +3248,7 @@ export const processRomanizationForSourceText = internalAction({
       kind: 'romanization',
       value: romanized,
       source: getRomanizationSource(args.language),
+      forText: args.text,
     });
     return null;
   },
@@ -3225,11 +3270,21 @@ export const storeSourceAnnotation = internalMutation({
     kind: vAnnotationKind,
     value: v.string(),
     source: v.string(),
+    // The text the annotation was computed FROM. The row's wording can change
+    // between the action reading it and this mutation running (a backfill
+    // racing a retranslation); a mismatched annotation must not land — the
+    // field stays undefined so the lazy pipeline regenerates against the
+    // current wording. Optional only for in-flight jobs enqueued before the
+    // field existed. Mirror of `forText` in storeApprovalEntryFurigana.
+    forText: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const spec = TEXT_ANNOTATIONS[args.kind];
     const text = await ctx.db.get(args.textId);
+    if (args.forText !== undefined && text && text.text !== args.forText) {
+      return null;
+    }
     if (text && text[spec.textField] === undefined) {
       const patch: Partial<Record<AnnotationField, string>> = {};
       patch[spec.textField] = args.value;
@@ -3279,6 +3334,7 @@ export const processRomanizationForTranslation = internalAction({
       kind: 'romanization',
       value: romanized,
       source: getRomanizationSource(args.language),
+      forText: args.text,
     });
     return null;
   },
@@ -3296,6 +3352,8 @@ export const storeTranslationAnnotation = internalMutation({
     kind: vAnnotationKind,
     value: v.string(),
     source: v.string(),
+    // See storeSourceAnnotation: skip when the row's wording moved on.
+    forText: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -3306,6 +3364,13 @@ export const storeTranslationAnnotation = internalMutation({
         q.eq('textId', args.textId).eq('targetLanguage', args.language),
       )
       .first();
+    if (
+      args.forText !== undefined &&
+      translation &&
+      translation.translatedText !== args.forText
+    ) {
+      return null;
+    }
     if (translation && translation[spec.textField] === undefined) {
       const patch: Partial<Record<AnnotationField, string>> = {};
       patch[spec.textField] = args.value;

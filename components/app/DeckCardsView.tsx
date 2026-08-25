@@ -31,6 +31,7 @@ import { CardSpeedBadge } from '@/components/app/learning/CardSpeedBadge';
 import { getLanguageShortLabel } from '@/lib/languages';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import type { Id } from '@/convex/_generated/dataModel';
+import { resolveShowFurigana } from '@/lib/furigana';
 
 export function DeckCardsView() {
   const t = useTranslations('AppPage.deckCards');
@@ -41,7 +42,7 @@ export function DeckCardsView() {
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords === true;
   const showIpa = courseSettings?.showIpa === true;
-  const showFurigana = courseSettings?.showFurigana ?? true;
+  const showFurigana = resolveShowFurigana(courseSettings);
   const languagePlaybackSpeeds = courseSettings?.languagePlaybackSpeeds ?? {};
   const buttonPlayback = useButtonPlayback();
 

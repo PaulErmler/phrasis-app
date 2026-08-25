@@ -1,5 +1,9 @@
 import { v } from 'convex/values';
-import { paginationOptsValidator, paginationResultValidator } from 'convex/server';
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+  type PaginationOptions,
+} from 'convex/server';
 import type { Doc } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
 import { adminQuery } from './lib';
@@ -9,6 +13,8 @@ import {
   cardEditLanguageRoleValidator,
   collectionOriginValidator,
   retranslationStatusValidator,
+  type CardEditKind,
+  type RetranslationStatus,
 } from '../types';
 
 /**
@@ -121,27 +127,35 @@ async function hydrateRetranslations(ctx: QueryCtx, edit: Doc<'cardEdits'>) {
  * `_creationTime` appended, so a filtered feed is still an ordered index scan
  * and never returns short pages.
  */
+// Handler exported for convex-test (the adminQuery gate needs a live Better
+// Auth component the test harness does not register); the gate itself stays
+// structural via adminQuery below.
+export async function listCardEditsHandler(
+  ctx: QueryCtx,
+  args: { paginationOpts: PaginationOptions; kind?: CardEditKind },
+) {
+  // Bound to a local so the narrowing survives into the index closure.
+  const kind = args.kind;
+  const query =
+    kind === undefined
+      ? ctx.db.query('cardEdits')
+      : ctx.db.query('cardEdits').withIndex('by_kind', (q) => q.eq('kind', kind));
+  const result = await query.order('desc').paginate(args.paginationOpts);
+  return {
+    ...result,
+    page: await Promise.all(
+      result.page.map((edit) => hydrateRetranslations(ctx, edit)),
+    ),
+  };
+}
+
 export const listCardEdits = adminQuery({
   args: {
     paginationOpts: paginationOptsValidator,
     kind: v.optional(cardEditKindValidator),
   },
   returns: paginationResultValidator(cardEditRowValidator),
-  handler: async (ctx, args) => {
-    // Bound to a local so the narrowing survives into the index closure.
-    const kind = args.kind;
-    const query =
-      kind === undefined
-        ? ctx.db.query('cardEdits')
-        : ctx.db.query('cardEdits').withIndex('by_kind', (q) => q.eq('kind', kind));
-    const result = await query.order('desc').paginate(args.paginationOpts);
-    return {
-      ...result,
-      page: await Promise.all(
-        result.page.map((edit) => hydrateRetranslations(ctx, edit)),
-      ),
-    };
-  },
+  handler: listCardEditsHandler,
 });
 
 /**
@@ -150,23 +164,11 @@ export const listCardEdits = adminQuery({
  * this log exists for: what failed, what is stuck in flight, what did we refuse
  * to spend on.
  */
-export const listRetranslations = adminQuery({
-  args: {
-    paginationOpts: paginationOptsValidator,
-    status: v.optional(retranslationStatusValidator),
-  },
-  returns: paginationResultValidator(
-    v.object({
-      ...retranslationRowValidator.fields,
-      sourceLanguage: v.string(),
-      sourceText: v.string(),
-      // Absent only if the parent was purged out from under the child, which
-      // the account-deletion drain does in one pass — a transient state.
-      kind: v.optional(cardEditKindValidator),
-      userId: v.optional(v.string()),
-    }),
-  ),
-  handler: async (ctx, args) => {
+/** See listCardEditsHandler for why this is exported. */
+export async function listRetranslationsHandler(
+  ctx: QueryCtx,
+  args: { paginationOpts: PaginationOptions; status?: RetranslationStatus },
+) {
     const status = args.status;
     const query =
       status === undefined
@@ -185,10 +187,31 @@ export const listRetranslations = adminQuery({
             sourceLanguage: row.sourceLanguage,
             sourceText: row.sourceText,
             kind: parent?.kind,
-            userId: parent?.userId,
+            // From the child row, not the parent: userId is denormalized onto
+            // it precisely so the row stays attributable while a deletion
+            // drain has already removed the parent batch.
+            userId: row.userId,
           };
         }),
       ),
     };
+}
+
+export const listRetranslations = adminQuery({
+  args: {
+    paginationOpts: paginationOptsValidator,
+    status: v.optional(retranslationStatusValidator),
   },
+  returns: paginationResultValidator(
+    v.object({
+      ...retranslationRowValidator.fields,
+      sourceLanguage: v.string(),
+      sourceText: v.string(),
+      // Absent only if the parent was purged out from under the child, which
+      // the account-deletion drain does in one pass — a transient state.
+      kind: v.optional(cardEditKindValidator),
+      userId: v.optional(v.string()),
+    }),
+  ),
+  handler: listRetranslationsHandler,
 });

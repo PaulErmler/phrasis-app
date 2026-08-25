@@ -8,6 +8,7 @@ import { api } from '@/convex/_generated/api';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { useNowMinute } from '@/hooks/use-now-minute';
 import { cn } from '@/lib/utils';
+import { REVIEWS_CAP } from '@/lib/constants/dueCounts';
 
 type Counts = {
   new: number;
@@ -58,6 +59,9 @@ export function DueCountsPills({ skip }: { skip?: boolean }) {
   const review = display
     ? display.learning + display.relearning + display.review
     : 0;
+  // Same ceiling as the learning-mode progress pill (StatePill's cap), so
+  // the two surfaces showing this number can never disagree at the margin.
+  const reviewDisplay = review > REVIEWS_CAP ? `${REVIEWS_CAP}+` : review;
 
   // Reserve pill width while the first fetch is in flight so the
   // Shadowing/Writing toggle beside us doesn't reflow (and animate via
@@ -83,7 +87,7 @@ export function DueCountsPills({ skip }: { skip?: boolean }) {
       <span
         className={cn(pillClass, 'bg-success/10 text-success')}
       >
-        {t('review', { count: review })}
+        {t('review', { count: reviewDisplay })}
       </span>
     </div>
   );

@@ -22,6 +22,7 @@ import {
   setupMediaSession,
   setMediaSessionPlaybackState,
 } from '@/lib/audio/mediaSession';
+import { REVIEWS_CAP } from '@/lib/constants/dueCounts';
 type CardCounts = {
   new: number;
   learning: number;
@@ -53,7 +54,6 @@ interface ProgressDisplayProps {
   ready?: boolean;
 }
 
-const REVIEWS_CAP = 100;
 const NEW_WORDS_CAP = 200;
 
 /**
@@ -700,7 +700,8 @@ function StatCell({
   );
 }
 
-function StatePill({
+// Exported for the due-counts cap tests; only this file renders it.
+export function StatePill({
   label,
   value,
   colorClass,

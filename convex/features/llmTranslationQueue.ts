@@ -43,7 +43,10 @@ import {
   isRetranslationReason,
   type LlmPriority,
 } from '../types';
-import { resolveRetranslation } from './cardEditAudit';
+import {
+  resolveRetranslation,
+  resolveRetranslationIfPending,
+} from './cardEditAudit';
 import { captureGeneration } from '../lib/posthogAi';
 
 /**
@@ -789,6 +792,21 @@ export const onLlmTranslationComplete = internalMutation({
     if (result.kind !== 'failed') {
       if (claim && ownsClaim) {
         await ctx.db.delete(claim._id);
+      }
+      // A success normally resolved the audit row at the write choke point
+      // already (the guard makes this a no-op then). Two ways a job lands
+      // here with the row still 'enqueued': the worker returned success
+      // without reaching the choke point because the text row was
+      // cascade-deleted mid-flight, or the job was canceled (no cancel site
+      // carries an audit id today, but the pool API allows it). Without this,
+      // the row reads as "still in flight" in the admin QC view forever.
+      if (context.retranslationAuditId !== undefined) {
+        const textGone = (await ctx.db.get(context.textId)) === null;
+        await resolveRetranslationIfPending(
+          ctx,
+          context.retranslationAuditId,
+          textGone ? 'dropped_text_deleted' : 'failed',
+        );
       }
       return null;
     }

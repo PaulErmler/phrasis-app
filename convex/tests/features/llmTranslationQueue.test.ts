@@ -924,4 +924,160 @@ describe("features/llmTranslationQueue", () => {
     });
   });
 
+  describe("retranslation audit resolution at the completion tail", () => {
+    /**
+     * A pending cardEditRetranslations row plus the minimum scaffolding its
+     * schema demands. Hand-inserted rather than driven through editCard: these
+     * tests exercise the pool's onComplete handlers in isolation, and the
+     * write choke point's own resolution paths are covered in
+     * cardEditAudit.test.ts.
+     */
+    async function seedAuditRow(
+      t: TestConvex<typeof schema>,
+      textId: Id<"texts">,
+      status: "enqueued" | "applied" = "enqueued",
+    ) {
+      return t.run(async (ctx) => {
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["de"],
+        });
+        const deckId = await ctx.db.insert("decks", {
+          courseId,
+          name: "d",
+          cardCount: 1,
+        });
+        const cardId = await ctx.db.insert("cards", {
+          deckId,
+          textId,
+          dueDate: Date.now(),
+          isMastered: false,
+          isHidden: false,
+          schedulingPhase: "preReview",
+          preReviewCount: 0,
+        });
+        const cardEditId = await ctx.db.insert("cardEdits", {
+          userId: "user_A",
+          courseId,
+          kind: "manual_edit",
+          path: "in_place",
+          cardIdBefore: cardId,
+          cardIdAfter: cardId,
+          textIdBefore: textId,
+          textIdAfter: textId,
+          textWasUserCreated: false,
+          sourceLanguage: "en",
+          sourceText: "Hi.",
+          baseLanguages: ["en"],
+          targetLanguages: ["de"],
+          changes: [],
+        });
+        const auditId = await ctx.db.insert("cardEditRetranslations", {
+          cardEditId,
+          userId: "user_A",
+          language: "de",
+          role: "target",
+          textId,
+          sourceLanguage: "en",
+          sourceText: "Hi.",
+          beforeText: "Hallo.",
+          flagCountAfter: 1,
+          status,
+        });
+        return auditId;
+      });
+    }
+
+    const complete = (
+      t: TestConvex<typeof schema>,
+      textId: Id<"texts">,
+      auditId: Id<"cardEditRetranslations">,
+      result:
+        | { kind: "success"; returnValue: null }
+        | { kind: "failed"; error: string }
+        | { kind: "canceled" },
+    ) =>
+      t.mutation(
+        internal.features.llmTranslationQueue.onLlmTranslationComplete,
+        {
+          workId: "llm-w-1" as WorkId,
+          context: {
+            textId,
+            sourceLanguage: "en",
+            targetLanguage: "de",
+            text: "Hi.",
+            audioSpeakerGender: "male",
+            retranslationAuditId: auditId,
+          },
+          result,
+        },
+      );
+
+    const getStatus = (
+      t: TestConvex<typeof schema>,
+      auditId: Id<"cardEditRetranslations">,
+    ) => t.run(async (ctx) => (await ctx.db.get(auditId))?.status);
+
+    it("resolves a still-pending row as dropped_text_deleted when the text vanished mid-flight", async () => {
+      // The worker returns SUCCESS for a cascade-deleted text without ever
+      // reaching the write choke point, so the row would otherwise read
+      // "still in flight" in the admin QC view forever.
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const auditId = await seedAuditRow(t, textId);
+      await t.run(async (ctx) => ctx.db.delete(textId));
+
+      await complete(t, textId, auditId, {
+        kind: "success",
+        returnValue: null,
+      });
+
+      expect(await getStatus(t, auditId)).toBe("dropped_text_deleted");
+    });
+
+    it("resolves a still-pending row as failed when the job was canceled", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const auditId = await seedAuditRow(t, textId);
+
+      await complete(t, textId, auditId, { kind: "canceled" });
+
+      expect(await getStatus(t, auditId)).toBe("failed");
+    });
+
+    it("never overwrites the verdict the write choke point already recorded", async () => {
+      // The normal success path: storeTranslationAndScheduleTTS stamped
+      // 'applied' before this onComplete ran. The tail cleanup must be a
+      // no-op, not a downgrade to 'failed'.
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const auditId = await seedAuditRow(t, textId, "applied");
+
+      await complete(t, textId, auditId, {
+        kind: "success",
+        returnValue: null,
+      });
+
+      expect(await getStatus(t, auditId)).toBe("applied");
+    });
+
+    it("resolves failed on terminal Google-fallback failure", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const auditId = await seedAuditRow(t, textId);
+
+      await t.mutation(
+        internal.features.llmTranslationQueue.onGoogleFallbackComplete,
+        {
+          workId: "google-w-1" as WorkId,
+          context: { textId, targetLanguage: "de", retranslationAuditId: auditId },
+          result: { kind: "failed", error: "quota" },
+        },
+      );
+
+      expect(await getStatus(t, auditId)).toBe("failed");
+    });
+  });
+
 });

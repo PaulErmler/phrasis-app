@@ -38,6 +38,7 @@ import {
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import { Loader2 } from 'lucide-react';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
+import { resolveShowFurigana } from '@/lib/furigana';
 
 export function WordSentencesDialog({
   word,
@@ -57,7 +58,7 @@ export function WordSentencesDialog({
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords === true;
   const showIpa = courseSettings?.showIpa === true;
-  const showFurigana = courseSettings?.showFurigana ?? true;
+  const showFurigana = resolveShowFurigana(courseSettings);
   const buttonPlayback = useButtonPlayback();
 
   // Ephemeral per-card per-language speed overrides. This dialog is a

@@ -22,7 +22,7 @@ import { useCourseLanguages } from '@/hooks/use-course-languages';
 import { cn } from '@/lib/utils';
 import { EditApprovalDialog } from './EditApprovalDialog';
 import { Ruby } from '@/components/app/learning/Ruby';
-import { parseFurigana } from '@/lib/furigana';
+import { hasReadings, parseFurigana } from '@/lib/furigana';
 import {
   ApprovalErrorAlert,
   ApprovalStreamingSkeleton,
@@ -123,7 +123,7 @@ export function EntryLines({
       : null;
     const line = (
       <div key={audio ? undefined : key}>
-        <p className={cn(textClass, furiganaSegments && 'has-furigana')}>
+        <p className={cn(textClass, hasReadings(furiganaSegments) && 'has-furigana')}>
           <Lang code={entry.language} />{' '}
           {/* Own dir-scoped span: the Latin language label shares this <p>,
               so the sentence needs its own bidi context for RTL languages. */}

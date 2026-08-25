@@ -110,6 +110,7 @@ import type * as lib_sha256 from "../lib/sha256.js";
 import type * as lib_stt_azure from "../lib/stt/azure.js";
 import type * as lib_stt_index from "../lib/stt/index.js";
 import type * as lib_stt_languageCodes from "../lib/stt/languageCodes.js";
+import type * as lib_testHooks from "../lib/testHooks.js";
 import type * as lib_textAnnotations from "../lib/textAnnotations.js";
 import type * as lib_textComparison from "../lib/textComparison.js";
 import type * as lib_tts_gemini from "../lib/tts/gemini.js";
@@ -251,6 +252,7 @@ declare const fullApi: ApiFromModules<{
   "lib/stt/azure": typeof lib_stt_azure;
   "lib/stt/index": typeof lib_stt_index;
   "lib/stt/languageCodes": typeof lib_stt_languageCodes;
+  "lib/testHooks": typeof lib_testHooks;
   "lib/textAnnotations": typeof lib_textAnnotations;
   "lib/textComparison": typeof lib_textComparison;
   "lib/tts/gemini": typeof lib_tts_gemini;

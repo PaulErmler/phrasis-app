@@ -113,6 +113,63 @@ describe('parseFurigana', () => {
       { text: 'ひらがなだけ。' },
     ]);
   });
+
+  it('does not absorb punctuation before a base into the ruby target', () => {
+    // Regression: the scan back from the bracket used to walk over anything
+    // non-kana, so the 、 (a plain segment from its own token) ended up under
+    // the reading — and no text is lost, so the reconstruction check passed.
+    expect(parseFurigana('今日[きょう]、天気[てんき]がいい', '今日、天気がいい')).toEqual([
+      { text: '今日', reading: 'きょう' },
+      { text: '、' },
+      { text: '天気', reading: 'てんき' },
+      { text: 'がいい' },
+    ]);
+    expect(parseFurigana('「日本[にほん]」', '「日本」')).toEqual([
+      { text: '「' },
+      { text: '日本', reading: 'にほん' },
+      { text: '」' },
+    ]);
+  });
+
+  it('does not absorb digits or latin before a base into the ruby target', () => {
+    expect(parseFurigana('3時[じ]', '3時')).toEqual([
+      { text: '3' },
+      { text: '時', reading: 'じ' },
+    ]);
+    expect(parseFurigana('AI技術[ぎじゅつ]', 'AI技術')).toEqual([
+      { text: 'AI' },
+      { text: '技術', reading: 'ぎじゅつ' },
+    ]);
+  });
+
+  it('round-trips a bare kanji run directly before an annotated one via the ｜ marker', () => {
+    // Kanji-kanji adjacency is genuinely ambiguous in the bare bracket
+    // format (the analyzer failed to fit 勉強 but fitted 漢字), so the
+    // serializer marks where the base starts and the parser consumes it.
+    const segments: FuriganaSegment[] = [
+      { text: '勉強' },
+      { text: '漢字', reading: 'かんじ' },
+    ];
+    const annotated = serializeFurigana(segments);
+    expect(annotated).toBe('勉強｜漢字[かんじ]');
+    expect(parseFurigana(annotated, '勉強漢字')).toEqual(segments);
+  });
+
+  it('round-trips a base containing non-kanji characters via the ｜ marker', () => {
+    const segments: FuriganaSegment[] = [
+      { text: '第1章', reading: 'だいいっしょう' },
+    ];
+    const annotated = serializeFurigana(segments);
+    expect(annotated).toBe('｜第1章[だいいっしょう]');
+    expect(parseFurigana(annotated, '第1章')).toEqual(segments);
+  });
+
+  it('handles astral kanji as whole code points', () => {
+    expect(parseFurigana('𠮟[しか]る', '𠮟る')).toEqual([
+      { text: '𠮟', reading: 'しか' },
+      { text: 'る' },
+    ]);
+  });
 });
 
 describe('splitFuriganaByRanges', () => {

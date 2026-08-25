@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
 import {
   Sheet,
@@ -48,8 +48,9 @@ import {
 } from '@/lib/constants/audioPlayback';
 import { MAX_CARDS_PER_BATCH } from '@/lib/constants/learning';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
+import { resolveShowFurigana } from '@/lib/furigana';
 import {
-  getLanguageByCode,
+  getLocalizedLanguageNameByCode,
   languageNeedsFurigana,
   languageNeedsIpa,
   languageNeedsRomanization,
@@ -279,6 +280,7 @@ export function LearningModeSettings({
   targetLanguages: targetProp,
 }: LearningModeSettingsProps) {
   const t = useTranslations('LearningMode.settingsPanel');
+  const locale = useLocale();
   const [courseSettingsOpen, setCourseSettingsOpen] = useState(false);
   const updateSettings = useUpdateCourseSettings();
 
@@ -304,7 +306,7 @@ export function LearningModeSettings({
   const ipaLanguages = courseLanguages.filter(languageNeedsIpa);
   const furiganaLanguages = courseLanguages.filter(languageNeedsFurigana);
   const toLanguageNames = (codes: string[]) =>
-    codes.map((code) => getLanguageByCode(code)?.name ?? code);
+    codes.map((code) => getLocalizedLanguageNameByCode(code, locale));
 
   // ---- existing setting handlers ----
 
@@ -1775,7 +1777,7 @@ export function LearningModeSettings({
                   label={t('showFurigana')}
                   description={t('showFuriganaDescription')}
                   languages={toLanguageNames(furiganaLanguages)}
-                  checked={courseSettings.showFurigana ?? true}
+                  checked={resolveShowFurigana(courseSettings)}
                   onCheckedChange={handleShowFuriganaChange}
                 />
               )}

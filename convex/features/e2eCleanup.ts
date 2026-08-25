@@ -6,6 +6,7 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { isE2EFixtureAddress } from '../lib/authEmails';
+import { assertTestHooksEnabled } from '../lib/testHooks';
 import { autumnFetchRaw } from '../usage/autumnClient';
 
 /**
@@ -55,14 +56,6 @@ type PurgeResult = {
   scanTruncated: boolean;
 };
 
-function assertTestHooksEnabled(): void {
-  if (process.env.E2E_TEST_HOOKS !== '1') {
-    throw new Error(
-      'E2E test hooks are disabled (set E2E_TEST_HOOKS=1 on a dev deployment)',
-    );
-  }
-}
-
 /**
  * Fixture accounts still on the deployment, oldest signup first.
  *
@@ -72,7 +65,15 @@ function assertTestHooksEnabled(): void {
  * scan saw, so the caller knows how much is left without a second query.
  */
 export const listFixtureUsers = internalQuery({
-  args: { limit: v.optional(v.number()), offset: v.optional(v.number()) },
+  args: {
+    limit: v.optional(v.number()),
+    // Accounts the caller has given up on this sweep (they refused to purge).
+    // Explicit exclusion rather than an offset: an offset presumed the scan
+    // order stable across calls and failed rows compacted to the head, which
+    // nothing enforced — a changed ordering would silently skip purgeable
+    // accounts while retrying wedged ones.
+    excludeEmails: v.optional(v.array(v.string())),
+  },
   returns: v.object({
     users: v.array(v.object({ userId: v.string(), email: v.string() })),
     matched: v.number(),
@@ -81,7 +82,7 @@ export const listFixtureUsers = internalQuery({
   handler: async (ctx, args) => {
     assertTestHooksEnabled();
     const limit = Math.max(1, Math.min(args.limit ?? DEFAULT_BATCH, 64));
-    const offset = Math.max(0, args.offset ?? 0);
+    const excluded = new Set(args.excludeEmails ?? []);
 
     const profiles = await ctx.db
       .query('userProfiles')
@@ -92,10 +93,12 @@ export const listFixtureUsers = internalQuery({
     let matched = 0;
     for (const profile of profiles) {
       if (!isE2EFixtureAddress(profile.email)) continue;
+      // `matched` counts excluded fixtures too: it reports what is ON the
+      // deployment, and the caller compares it against its own exclusion
+      // list to decide when the sweep is done.
       matched += 1;
-      // `offset` lets the caller step past accounts that refuse to purge, so
-      // one wedged fixture cannot head-of-line block the whole sweep.
-      if (matched > offset && users.length < limit) {
+      if (excluded.has(profile.email)) continue;
+      if (users.length < limit) {
         users.push({ userId: profile.userId, email: profile.email });
       }
     }
@@ -192,7 +195,8 @@ async function deleteAutumnCustomer(
 export const purgeFixtureUsers = internalAction({
   args: {
     limit: v.optional(v.number()),
-    offset: v.optional(v.number()),
+    // See listFixtureUsers: accounts a previous pass failed to purge.
+    excludeEmails: v.optional(v.array(v.string())),
     dryRun: v.optional(v.boolean()),
   },
   returns: v.object({
@@ -209,7 +213,7 @@ export const purgeFixtureUsers = internalAction({
     // which TypeScript cannot resolve while still inferring it.
     const batch: ListResult = await ctx.runQuery(
       internal.features.e2eCleanup.listFixtureUsers,
-      { limit: args.limit, offset: args.offset },
+      { limit: args.limit, excludeEmails: args.excludeEmails },
     );
 
     if (args.dryRun) {

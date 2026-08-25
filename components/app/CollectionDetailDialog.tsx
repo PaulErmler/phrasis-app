@@ -38,6 +38,7 @@ import { usePreloadedQuery } from 'convex/react';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { AnnotationLines } from '@/components/app/learning/AnnotationLines';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
+import { resolveShowFurigana } from '@/lib/furigana';
 import {
   COLLECTION_PREVIEW_SIZE,
   collectionRemaining,
@@ -111,7 +112,7 @@ export function CollectionDetailDialog({
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords === true;
   const showIpa = courseSettings?.showIpa === true;
-  const showFurigana = courseSettings?.showFurigana ?? true;
+  const showFurigana = resolveShowFurigana(courseSettings);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   // Scroll preservation: remember which row sits at the top of the viewport

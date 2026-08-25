@@ -72,7 +72,17 @@ async function getTokenizer(): Promise<LinderaTokenizer> {
     builder.setKeepWhitespace(true);
     return builder.build() as LinderaTokenizer;
   })();
-  return tokenizerPromise;
+  try {
+    return await tokenizerPromise;
+  } catch (err) {
+    // Never cache a failed build: with the rejection memoized, every later
+    // invocation in this warm instance would fail too, and each failure
+    // persists a permanent `''` sentinel — one transient hiccup loading the
+    // ~13 MB dictionary would silently strip furigana from every row this
+    // instance touches. Clearing lets the next invocation rebuild.
+    tokenizerPromise = undefined;
+    throw err;
+  }
 }
 
 /**
@@ -163,6 +173,7 @@ export const processFuriganaForSourceText = internalAction({
       kind: 'furigana',
       value: furigana,
       source: getFuriganaSource(args.language),
+      forText: args.text,
     });
     return null;
   },
@@ -235,6 +246,7 @@ export const processFuriganaForTranslation = internalAction({
       kind: 'furigana',
       value: furigana,
       source: getFuriganaSource(args.language),
+      forText: args.text,
     });
     return null;
   },

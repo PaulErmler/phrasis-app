@@ -8,8 +8,12 @@
  * globals.css sizes and colors readings so every surface matches.
  */
 import { Fragment } from 'react';
-import { splitFuriganaByRanges, type FuriganaSegment } from '@/lib/furigana';
-import { getWordSegmenter } from '@/lib/wordTokenize';
+import { type FuriganaSegment } from '@/lib/furigana';
+import {
+  getWordMatchMask,
+  HighlightSpan,
+  renderMaskedText,
+} from '@/lib/wordCloud/highlight';
 
 export function Ruby({ segments }: { segments: FuriganaSegment[] }) {
   return (
@@ -31,11 +35,18 @@ export function Ruby({ segments }: { segments: FuriganaSegment[] }) {
 /**
  * Ruby composed with the word-cloud term highlight (HighlightedText's
  * `highlightTerm`): the sentence renders with its readings AND the matched
- * word in accent-orange, instead of having to pick one. Splits the furigana
- * segments at Intl.Segmenter word boundaries (mirroring `highlightWord` in
- * lib/wordCloud) and wraps matching words. Ruby units are atomic, so a unit
- * spanning a boundary stays whole in the piece containing its start and the
- * following piece renders its (possibly empty) remainder — never duplicated.
+ * word in accent-orange, instead of having to pick one. The matching rule
+ * and highlight styling are shared with `highlightWord`
+ * (lib/wordCloud/highlight) via a per-code-point match mask.
+ *
+ * Walks the furigana segments against the mask directly: plain runs split
+ * at mask transitions exactly like the plain-text renderer, while a ruby
+ * unit is atomic — it highlights whole when ANY of its characters match.
+ * Unit granularity is the best ruby can do, and it fails toward showing the
+ * highlight: a term inside an analyzer compound (予報 in 天気予報[...])
+ * lights up the whole compound instead of nothing. The earlier
+ * split-by-piece approach lost the highlight entirely whenever the unit
+ * landed in a different segmenter piece than the matching term.
  */
 export function HighlightedRuby({
   segments,
@@ -50,41 +61,31 @@ export function HighlightedRuby({
   term?: string;
 }) {
   if (!term) return <Ruby segments={segments} />;
-  const target = term.toLowerCase().normalize('NFC');
-  let pieces: { text: string; match: boolean }[];
-  try {
-    const segmenter = getWordSegmenter(language);
-    pieces = [...segmenter.segment(text)].map((seg) => ({
-      text: seg.segment,
-      match:
-        (seg.isWordLike ?? false) &&
-        seg.segment.toLowerCase().normalize('NFC') === target,
-    }));
-  } catch {
-    // Invalid locale: highlight-less ruby beats no ruby.
-    return <Ruby segments={segments} />;
-  }
-  const chunks = splitFuriganaByRanges(
-    segments,
-    pieces.map((piece) => [...piece.text].length),
-  );
+  const mask = getWordMatchMask(text, term, language);
+  // Invalid locale: highlight-less ruby beats no ruby.
+  if (mask === null) return <Ruby segments={segments} />;
+
+  let offset = 0;
   return (
     <>
-      {pieces.map((piece, i) =>
-        piece.match ? (
-          <span
-            key={i}
-            className="font-medium"
-            style={{ color: 'var(--accent-orange)' }}
-          >
-            <Ruby segments={chunks[i]} />
-          </span>
+      {segments.map((seg, i) => {
+        const length = [...seg.text].length;
+        const segMask = mask.slice(offset, offset + length);
+        offset += length;
+        if (seg.reading === undefined) {
+          return (
+            <Fragment key={i}>
+              {renderMaskedText(seg.text, segMask, `${i}-`)}
+            </Fragment>
+          );
+        }
+        const unit = <Ruby segments={[seg]} />;
+        return segMask.some(Boolean) ? (
+          <HighlightSpan key={i}>{unit}</HighlightSpan>
         ) : (
-          <Fragment key={i}>
-            <Ruby segments={chunks[i]} />
-          </Fragment>
-        ),
-      )}
+          <Fragment key={i}>{unit}</Fragment>
+        );
+      })}
     </>
   );
 }

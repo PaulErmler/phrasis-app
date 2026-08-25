@@ -197,11 +197,37 @@ async function scheduleApprovalAnnotations(
 }
 
 /**
- * Store IPA results on an approval row. Each result carries the text it was
- * computed FOR; results whose language has since been edited to different
- * wording are dropped (the edit path re-schedules against the new text), so
- * a slow espeak action can never overwrite a fresher proposal.
+ * Shared body of the per-kind approval-annotation store mutations below.
+ * Each result carries the text it was computed FOR; results whose language
+ * has since been edited to different wording are dropped (the edit path
+ * re-schedules against the new text), so a slow annotation action can never
+ * overwrite a fresher proposal.
  */
+async function storeApprovalEntryValues(
+  ctx: MutationCtx,
+  approvalId: Id<'cardApprovals'>,
+  field: 'entryIpa' | 'entryFurigana',
+  results: Array<{ language: string; forText: string; value: string }>,
+): Promise<null> {
+  const approval = await ctx.db.get(approvalId);
+  if (!approval) return null; // resolved + cleaned up while in flight
+  const currentByLanguage = new Map(
+    approval.translations.map((t) => [t.language, t.text]),
+  );
+  const values = { ...(approval[field] ?? {}) };
+  let changed = false;
+  for (const result of results) {
+    if (currentByLanguage.get(result.language) !== result.forText) continue;
+    values[result.language] = result.value;
+    changed = true;
+  }
+  if (changed) {
+    await ctx.db.patch(approvalId, { [field]: values });
+  }
+  return null;
+}
+
+/** Store IPA results on an approval row (see storeApprovalEntryValues). */
 export const storeApprovalEntryIpa = internalMutation({
   args: {
     approvalId: v.id('cardApprovals'),
@@ -214,32 +240,16 @@ export const storeApprovalEntryIpa = internalMutation({
     ),
   },
   returns: v.null(),
-  handler: async (ctx, args) => {
-    const approval = await ctx.db.get(args.approvalId);
-    if (!approval) return null; // resolved + cleaned up while in flight
-    const currentByLanguage = new Map(
-      approval.translations.map((t) => [t.language, t.text]),
-    );
-    const entryIpa = { ...(approval.entryIpa ?? {}) };
-    let changed = false;
-    for (const result of args.results) {
-      if (currentByLanguage.get(result.language) !== result.forText) continue;
-      entryIpa[result.language] = result.ipa;
-      changed = true;
-    }
-    if (changed) {
-      await ctx.db.patch(args.approvalId, { entryIpa });
-    }
-    return null;
-  },
+  handler: async (ctx, args) =>
+    storeApprovalEntryValues(
+      ctx,
+      args.approvalId,
+      'entryIpa',
+      args.results.map((r) => ({ ...r, value: r.ipa })),
+    ),
 });
 
-/**
- * Store furigana results on an approval row. Same drop-if-edited contract as
- * storeApprovalEntryIpa above: results whose language has since been edited
- * to different wording are discarded so a slow action can never overwrite a
- * fresher proposal.
- */
+/** Store furigana results on an approval row (see storeApprovalEntryValues). */
 export const storeApprovalEntryFurigana = internalMutation({
   args: {
     approvalId: v.id('cardApprovals'),
@@ -252,24 +262,13 @@ export const storeApprovalEntryFurigana = internalMutation({
     ),
   },
   returns: v.null(),
-  handler: async (ctx, args) => {
-    const approval = await ctx.db.get(args.approvalId);
-    if (!approval) return null; // resolved + cleaned up while in flight
-    const currentByLanguage = new Map(
-      approval.translations.map((t) => [t.language, t.text]),
-    );
-    const entryFurigana = { ...(approval.entryFurigana ?? {}) };
-    let changed = false;
-    for (const result of args.results) {
-      if (currentByLanguage.get(result.language) !== result.forText) continue;
-      entryFurigana[result.language] = result.furigana;
-      changed = true;
-    }
-    if (changed) {
-      await ctx.db.patch(args.approvalId, { entryFurigana });
-    }
-    return null;
-  },
+  handler: async (ctx, args) =>
+    storeApprovalEntryValues(
+      ctx,
+      args.approvalId,
+      'entryFurigana',
+      args.results.map((r) => ({ ...r, value: r.furigana })),
+    ),
 });
 
 export const createApprovalRequestInternal = internalMutation({
@@ -745,16 +744,16 @@ export const updateApprovalTranslations = mutation({
     const changedNow = cappedTranslations.filter(
       (entry) => previousTextByLanguage.get(entry.language) !== entry.text,
     );
-    let entryIpa = approval.entryIpa;
-    if (entryIpa && changedNow.length > 0) {
-      entryIpa = { ...entryIpa };
-      for (const entry of changedNow) delete entryIpa[entry.language];
-    }
-    let entryFurigana = approval.entryFurigana;
-    if (entryFurigana && changedNow.length > 0) {
-      entryFurigana = { ...entryFurigana };
-      for (const entry of changedNow) delete entryFurigana[entry.language];
-    }
+    const dropChanged = (
+      values: Record<string, string> | undefined,
+    ): Record<string, string> | undefined => {
+      if (!values || changedNow.length === 0) return values;
+      const next = { ...values };
+      for (const entry of changedNow) delete next[entry.language];
+      return next;
+    };
+    const entryIpa = dropChanged(approval.entryIpa);
+    const entryFurigana = dropChanged(approval.entryFurigana);
 
     await ctx.db.patch(args.approvalId, {
       translations: cappedTranslations,

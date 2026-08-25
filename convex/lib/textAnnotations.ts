@@ -196,7 +196,10 @@ export function getIpaSource(_language: string): IpaSource {
  * change in a way that should regenerate existing rows.
  */
 export const FURIGANA_SOURCES = {
-  linderaIpadic: 'lindera-ipadic-2.0.0-v1',
+  // v2: serializer emits the ｜ base-boundary marker for ambiguous adjacency
+  // (lib/furigana.ts); v1 strings parse but can mis-scope a reading when an
+  // un-annotated kanji run directly precedes an annotated one.
+  linderaIpadic: 'lindera-ipadic-2.0.0-v2',
 } as const;
 
 export type FuriganaSource =

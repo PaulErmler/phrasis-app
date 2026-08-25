@@ -1,5 +1,6 @@
 import { v } from 'convex/values';
 import { internalMutation, internalQuery } from '../_generated/server';
+import { assertTestHooksEnabled } from '../lib/testHooks';
 
 /**
  * E2E test hooks for transactional auth emails (verification + password
@@ -13,14 +14,6 @@ import { internalMutation, internalQuery } from '../_generated/server';
  * `pnpm exec convex run features/authEmailTesting:latestAuthEmail '<json>'`
  * (see fetchAuthEmail in e2e/helpers.ts).
  */
-
-function assertTestHooksEnabled(): void {
-  if (process.env.E2E_TEST_HOOKS !== '1') {
-    throw new Error(
-      'E2E test hooks are disabled (set E2E_TEST_HOOKS=1 on a dev deployment)',
-    );
-  }
-}
 
 /**
  * Capture hook for lib/authEmails.ts: the Better Auth send callbacks run

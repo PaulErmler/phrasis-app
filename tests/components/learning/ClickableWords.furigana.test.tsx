@@ -95,4 +95,60 @@ describe('ClickableWords: furigana', () => {
     clone.querySelectorAll('rt').forEach((rt) => rt.remove());
     expect(clone.textContent).toBe(TEXT);
   });
+
+  it('keeps every word when the sentence has mid-sentence punctuation', () => {
+    // Regression for two stacked bugs. parseFurigana used to glue the 、
+    // onto the following base (reading over 、天気), which then started the
+    // ruby unit inside 天気's LEADING chunk — and the leading chunks were
+    // computed but never rendered, so 天気 vanished from the card entirely:
+    // the render read 今日、がいい.
+    const { container } = render(
+      <ClickableWords
+        text="今日、天気がいい"
+        language="ja"
+        wordTimings={null}
+        localTime={0}
+        isActive={false}
+        enabled={false}
+        furigana="今日[きょう]、天気[てんき]がいい"
+      />,
+    );
+    const clone = container.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('rt').forEach((rt) => rt.remove());
+    expect(clone.textContent).toBe('今日、天気がいい');
+    // And the readings sit over their own bases, not over punctuation.
+    const rubies = [...container.querySelectorAll('ruby')].map((ruby) => {
+      const rt = ruby.querySelector('rt');
+      const reading = rt?.textContent;
+      rt?.remove();
+      return { base: ruby.textContent, reading };
+    });
+    expect(rubies).toEqual([
+      { base: '今日', reading: 'きょう' },
+      { base: '天気', reading: 'てんき' },
+    ]);
+  });
+
+  it('renders text from the chunk mapping when a ruby unit starts in a leading run', () => {
+    // Even with a correct parse, a leading run must render from its computed
+    // chunk: if the raw string rendered instead, a unit swallowed into a
+    // neighboring chunk would print twice or not at all.
+    const { container } = render(
+      <ClickableWords
+        text="「日本」が好き"
+        language="ja"
+        wordTimings={null}
+        localTime={0}
+        isActive={false}
+        enabled={false}
+        furigana="「日本[にほん]」が好[す]き"
+      />,
+    );
+    const clone = container.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('rt').forEach((rt) => rt.remove());
+    expect(clone.textContent).toBe('「日本」が好き');
+    expect(
+      [...container.querySelectorAll('ruby rt')].map((rt) => rt.textContent),
+    ).toEqual(['にほん', 'す']);
+  });
 });

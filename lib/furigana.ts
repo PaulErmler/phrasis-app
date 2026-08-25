@@ -5,6 +5,9 @@
  *
  *   毎朝[まいあさ]七時[しちじ]に起[お]きます。
  *
+ * A ruby base whose start the reader could not otherwise locate is prefixed
+ * with the ｜ marker (Aozora bunko convention): ｜第1章[だいいっしょう].
+ *
  * Chosen over a JSON segment array because it is readable in the Convex
  * dashboard and costs ~1.5x the sentence length rather than ~4x — this field
  * is read on every card fetch for a Japanese course, so the bandwidth matters.
@@ -47,6 +50,28 @@ function isKana(ch: string): boolean {
 export function hasKanji(text: string): boolean {
   return /\p{Script=Han}/u.test(text);
 }
+
+/**
+ * Characters that can be part of a ruby base (the text under a reading):
+ * Han-script characters (kanji, 々, 〆, 〇) plus the counter kana ヶ/ヵ that
+ * `isKana` deliberately excludes. Punctuation, quotes, digits, and latin are
+ * NOT included — they never start a reading on their own (`fitTokenReading`
+ * only annotates tokens containing kanji), so the parser must not swallow
+ * them off the end of a neighboring plain run.
+ */
+function isRubyBase(ch: string): boolean {
+  if (ch === 'ヶ' || ch === 'ヵ') return true;
+  return /\p{Script=Han}/u.test(ch);
+}
+
+/**
+ * Explicit base-boundary marker (the Aozora bunko convention): serialized
+ * before a ruby base exactly when the parser's fallback scan would misjudge
+ * where the base starts — an un-annotated kanji run directly before an
+ * annotated one, or a base containing non-Han characters (第1章). Never
+ * rendered; `parseFurigana` consumes it.
+ */
+const BASE_MARKER = '｜';
 
 /** Katakana → hiragana. Morphological analyzers return readings in katakana. */
 export function katakanaToHiragana(text: string): string {
@@ -117,13 +142,55 @@ export function fitReading(
   );
 }
 
-/** Segments → the stored bracket string. Inverse of `parseFurigana`. */
+/**
+ * The furigana user setting, defaulted: ON unless the course settings say
+ * otherwise. The single definition of the default — every surface that used
+ * to inline `courseSettings?.showFurigana ?? true` resolves through this, so
+ * a future default change is one edit.
+ */
+export function resolveShowFurigana(
+  settings: { showFurigana?: boolean } | null | undefined,
+): boolean {
+  return settings?.showFurigana ?? true;
+}
+
+/**
+ * Whether parsed segments carry at least one reading. The `has-furigana`
+ * line-height class keys off this, not off parse success: an annotation whose
+ * every run is plain would otherwise reserve reading headroom above a line
+ * that shows no ruby, visibly misaligning it with its neighbors.
+ */
+export function hasReadings(
+  segments: FuriganaSegment[] | null | undefined,
+): boolean {
+  return (
+    segments != null && segments.some((seg) => seg.reading !== undefined)
+  );
+}
+
+/**
+ * Segments → the stored bracket string. Inverse of `parseFurigana`.
+ *
+ * A ruby base is prefixed with `｜` when the parser could not otherwise
+ * recover its start: the preceding character is itself a ruby-base character
+ * (an un-annotated kanji run right before an annotated one would be absorbed
+ * into the base), or the base contains a non-base character (第1章 — the
+ * fallback scan would stop at the digit and under-cut).
+ */
 export function serializeFurigana(segments: FuriganaSegment[]): string {
-  return segments
-    .map((seg) =>
-      seg.reading === undefined ? seg.text : `${seg.text}[${seg.reading}]`,
-    )
-    .join('');
+  let out = '';
+  for (const seg of segments) {
+    if (seg.reading === undefined) {
+      out += seg.text;
+      continue;
+    }
+    const prev = [...out].pop();
+    const ambiguous =
+      (prev !== undefined && (isRubyBase(prev) || prev === BASE_MARKER)) ||
+      [...seg.text].some((ch) => !isRubyBase(ch));
+    out += `${ambiguous ? BASE_MARKER : ''}${seg.text}[${seg.reading}]`;
+  }
+  return out;
 }
 
 /**
@@ -154,11 +221,28 @@ export function parseFurigana(
     if (chars[i] === '[') {
       const close = chars.indexOf(']', i + 1);
       const body = close === -1 ? '' : chars.slice(i + 1, close).join('');
-      // The ruby target is the maximal non-kana run immediately before the
-      // bracket — exactly what `fitReading` emits a reading for.
-      let cut = pending.length;
       const pendingChars = [...pending];
-      while (cut > 0 && !isKana(pendingChars[cut - 1])) cut--;
+      // The ruby target: everything after the last ｜ marker in the maximal
+      // non-kana run before the bracket, when the writer left one; otherwise
+      // the maximal run of ruby-base characters (kanji, 々, ヶ/ヵ). The old
+      // "maximal non-kana run" scan swallowed neighboring punctuation
+      // (今日[きょう]、天気[てんき] put the reading over 、天気), which the
+      // reconstruction check cannot catch because no text is lost.
+      let runStart = pendingChars.length;
+      while (runStart > 0 && !isKana(pendingChars[runStart - 1])) runStart--;
+      const markerIdx = pendingChars
+        .slice(runStart)
+        .lastIndexOf(BASE_MARKER);
+      let cut: number;
+      let hasMarker: boolean;
+      if (markerIdx !== -1) {
+        cut = runStart + markerIdx + 1;
+        hasMarker = true;
+      } else {
+        cut = pendingChars.length;
+        while (cut > 0 && isRubyBase(pendingChars[cut - 1])) cut--;
+        hasMarker = false;
+      }
       const target = pendingChars.slice(cut).join('');
 
       if (
@@ -167,7 +251,10 @@ export function parseFurigana(
         target.length > 0 &&
         [...body].every(isKana)
       ) {
-        const plain = pendingChars.slice(0, cut).join('');
+        // The marker is format, not sentence text: drop it from the plain run.
+        const plain = pendingChars
+          .slice(0, hasMarker ? cut - 1 : cut)
+          .join('');
         if (plain.length > 0) segments.push({ text: plain });
         segments.push({ text: target, reading: body });
         pending = '';

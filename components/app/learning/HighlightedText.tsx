@@ -8,7 +8,7 @@ import {
   normalise,
 } from '@/lib/audio/alignTimings';
 import { highlightWord } from '@/lib/wordCloud';
-import { parseFurigana } from '@/lib/furigana';
+import { hasReadings, parseFurigana } from '@/lib/furigana';
 import { HighlightedRuby } from './Ruby';
 import { getTextDirection, languageSupportsKaraoke } from '@/lib/languages';
 import { useKaraokeIndex, type ClockBinding } from '@/hooks/use-karaoke-index';
@@ -168,7 +168,7 @@ export function HighlightedText({
     className,
     dir === 'rtl' && 'text-left',
     // Extra leading so the reading line doesn't collide with the row above.
-    furiganaSegments !== null && 'has-furigana',
+    hasReadings(furiganaSegments) && 'has-furigana',
   );
 
   if (!enabled || !canHighlight) {

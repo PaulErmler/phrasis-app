@@ -32,6 +32,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { buttonVariants } from '@/components/ui/button';
+import { resolveShowFurigana } from '@/lib/furigana';
 
 type ActiveFilter = 'mastered' | 'hidden' | 'favorites' | null;
 type SourceFilter = 'custom' | 'premade' | null;
@@ -545,7 +546,7 @@ export function LibraryView({
                   bare
                   compact
                   showIpa={courseSettings?.showIpa === true}
-                  showFurigana={courseSettings?.showFurigana ?? true}
+                  showFurigana={resolveShowFurigana(courseSettings)}
                   preReviewCount={card.preReviewCount}
                   schedulingPhase={card.schedulingPhase}
                   fsrsState={card.fsrsState}

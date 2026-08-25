@@ -107,6 +107,28 @@ const NAMED_EXCEPTIONS: Record<string, string> = {
 const WORD_CHAR = /[\p{L}\p{N}]/u;
 
 /**
+ * Combining marks (the stress accents learner-facing Bulgarian text carries:
+ * а́ = а + U+0301). Transparent to every look-around below — a mark neither
+ * ends a word (Мария́та must keep its mid-word `ия`) nor breaks an all-caps
+ * run (ЩА́СТИЕ) — because it modifies the letter it follows rather than
+ * occupying a position of its own.
+ */
+const COMBINING_MARK = /\p{M}/u;
+
+/** Nearest character in the given direction that isn't a combining mark. */
+function neighborSkippingMarks(
+  chars: string[],
+  idx: number,
+  step: -1 | 1,
+): string | undefined {
+  let j = idx + step;
+  while (j >= 0 && j < chars.length && COMBINING_MARK.test(chars[j]!)) {
+    j += step;
+  }
+  return chars[j];
+}
+
+/**
  * Word-boundary-aware so Art. 6 can match whole words only: `България` is
  * replaced, but a longer word merely containing it is left to the table.
  */
@@ -116,13 +138,14 @@ const NAMED_EXCEPTION_PATTERN = new RegExp(
 );
 
 /**
- * `true` when `ch` participates in the all-caps rule: an uppercase Cyrillic
- * letter we map, or a non-letter (so "ЩАСТИЕ!" and "ЩАСТИЕ" agree).
+ * `true` when `ch` is positive evidence of an all-caps run: an uppercase
+ * Cyrillic letter we map. Neutral characters (undefined, punctuation,
+ * spaces) are deliberately NOT evidence — the earlier "anything non-letter
+ * counts" version turned an isolated initial into an all-caps run and
+ * rendered "Иван Ц. Петров" as "Ivan TS. Petrov".
  */
-function continuesUpperRun(ch: string | undefined): boolean {
-  if (ch === undefined) return true;
-  if (UPPER[ch] !== undefined) return true;
-  return !WORD_CHAR.test(ch);
+function isUpperMapped(ch: string | undefined): boolean {
+  return ch !== undefined && UPPER[ch] !== undefined;
 }
 
 function transliterateRun(text: string): string {
@@ -137,12 +160,15 @@ function transliterateRun(text: string): string {
       continue;
     }
 
-    // Art. 5(2): `ия` only collapses to `ia` at a true word end.
+    // Art. 5(2): `ия` only collapses to `ia` at a true word end. A combining
+    // stress mark after the я is not a word character, and one after that
+    // position must be looked past: Мария́ still ends in `ия`, while
+    // Мария́та does not.
     const next = chars[i + 1];
     if (next !== undefined) {
       const token = IA_TOKEN[ch + next];
       if (token !== undefined) {
-        const after = chars[i + 2];
+        const after = neighborSkippingMarks(chars, i + 1, 1);
         if (after === undefined || !WORD_CHAR.test(after)) {
           out += token;
           i++;
@@ -151,11 +177,15 @@ function transliterateRun(text: string): string {
       }
     }
 
-    // All-caps run: capitalise the whole digraph rather than title-casing it.
+    // All-caps run: capitalise the whole digraph rather than title-casing
+    // it — but only next to an actual uppercase letter (marks transparent),
+    // so ЖИВОТ → ZHIVOT while an isolated initial Ц. stays "Ts.".
     const upperRun = UPPER_RUN[ch];
     if (upperRun !== undefined) {
-      const prev = chars[i - 1];
-      if (continuesUpperRun(next) && continuesUpperRun(prev)) {
+      if (
+        isUpperMapped(neighborSkippingMarks(chars, i, -1)) ||
+        isUpperMapped(neighborSkippingMarks(chars, i, 1))
+      ) {
         out += upperRun;
         continue;
       }

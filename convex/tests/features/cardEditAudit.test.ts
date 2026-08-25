@@ -451,6 +451,69 @@ describe('features/cardEditAudit', () => {
       expect(row?.status).toBe('dropped_text_deleted');
     });
 
+    it('marks a result refused by the user-created backstop', async () => {
+      const t = convexTest(schema, modules);
+      const { textId, translationId, auditId, claimId } =
+        await seedPendingRetranslation(t);
+      // The text became user-created while the job was in flight (no live
+      // path enqueues against one, so this simulates the defence-in-depth
+      // case the backstop exists for).
+      await t.run(async (ctx) =>
+        ctx.db.patch(textId, { userCreated: true, userId: 'user_A' }),
+      );
+
+      await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
+        textId,
+        targetLanguage: 'en',
+        translatedText: 'Overwrite attempt',
+        voiceName: TEST_VOICE,
+        replaceExisting: true,
+        expectedClaimId: claimId,
+        retranslationAuditId: auditId,
+      });
+
+      const row = await t.run(async (ctx) => ctx.db.get(auditId));
+      expect(row?.status).toBe('refused_user_created');
+      expect(row?.afterText).toBeUndefined();
+      // And the user's wording survived.
+      const translation = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(translation?.translatedText).toBe('Hello');
+    });
+
+    it('records skipped_claim_contested when another job owns the claim', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId } = await seedCurriculumCard(t);
+      // A fresh foreign claim on (textId, 'en'): the edit's retranslation
+      // request must be dropped, and dropped VISIBLY — the audit row is how
+      // a reviewer tells "we declined to race" from "nothing happened".
+      await t.run(async (ctx) => {
+        await ctx.db.insert('llmTranslationClaims', {
+          textId,
+          targetLanguage: 'en',
+          claimedAt: Date.now(),
+          workId: 'foreign-owner',
+        });
+      });
+
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: 'sv', text: 'Hej' },
+          { language: 'en', text: 'Hi there' },
+        ],
+        timezone: 'UTC',
+      });
+
+      const [row] = await listRetranslations(t);
+      expect(row.status).toBe('skipped_claim_contested');
+      expect(row.resolvedAt).toEqual(expect.any(Number));
+      // No job was enqueued for the contested language.
+      expect(
+        llmEnqueues().filter((e) => e.targetLanguage === 'en'),
+      ).toHaveLength(0);
+    });
+
     it('survives an audit row that was purged while the job was in flight', async () => {
       const t = convexTest(schema, modules);
       const { textId, auditId, claimId } = await seedPendingRetranslation(t);

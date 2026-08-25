@@ -26,14 +26,20 @@ const ANNOTATED = '毎朝[まいあさ]七[なな]時[じ]に起[お]きます�
 // while the test context is alive (see drainScheduler docblock).
 drainSchedulerAfterEach();
 
-async function seedText(t: ReturnType<typeof convexTest>, language = 'ja') {
+async function seedText(
+  t: ReturnType<typeof convexTest>,
+  language = 'ja',
+  // Must match the `text` the action is later called with: the store
+  // mutations' `forText` guard drops results computed for other wording.
+  text = SENTENCE,
+) {
   return t.run(async (ctx) => {
     const collId = await ctx.db.insert('collections', {
       name: 'A1',
       textCount: 1,
     });
     const textId = await ctx.db.insert('texts', {
-      text: SENTENCE,
+      text,
       language,
       userCreated: false,
       collectionId: collId,
@@ -94,7 +100,7 @@ describe('processFuriganaFor* actions (stubbed engine)', () => {
 
   it("persists the '' sentinel quietly for kana-only sentences", async () => {
     const t = convexTest(schema, modules);
-    const { textId } = await seedText(t);
+    const { textId } = await seedText(t, 'ja', 'ひらがなだけ。');
 
     // No kanji → nothing to annotate → furiganaForText returns '' directly
     // (no error path) and the action stores it as "done, empty".
@@ -110,7 +116,7 @@ describe('processFuriganaFor* actions (stubbed engine)', () => {
 
   it("persists the '' sentinel when kanji exist but no reading fits", async () => {
     const t = convexTest(schema, modules);
-    const { textId } = await seedText(t);
+    const { textId } = await seedText(t, 'ja', '謎の漢字');
 
     // Unknown to the stub → reading-less token despite the kanji → zero
     // annotations → furiganaForText throws → the action persists ''.
@@ -126,7 +132,7 @@ describe('processFuriganaFor* actions (stubbed engine)', () => {
 
   it("persists the '' sentinel for a non-furigana language", async () => {
     const t = convexTest(schema, modules);
-    const { textId } = await seedText(t, 'de');
+    const { textId } = await seedText(t, 'de', 'Guten Morgen');
 
     await t.action(internal.features.furigana.processFuriganaForSourceText, {
       textId,

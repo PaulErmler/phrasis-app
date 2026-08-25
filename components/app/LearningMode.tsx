@@ -49,6 +49,7 @@ import {
 import { buttonVariants } from '@/components/ui/button';
 import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
 import { PROGRESS_SOUND_URL } from '@/lib/constants/learning';
+import { resolveShowFurigana } from '@/lib/furigana';
 
 interface LearningModeProps {
   state: LearningState;
@@ -584,7 +585,7 @@ export function LearningMode({
         onAccuracyChange={setWritingAccuracy}
         showRomanization={state.courseSettings.showRomanization ?? true}
         showIpa={state.courseSettings.showIpa ?? false}
-        showFurigana={state.courseSettings.showFurigana ?? true}
+        showFurigana={resolveShowFurigana(state.courseSettings)}
         cardId={state.cardId}
         onRegisterRevert={registerRevertHandler}
         resetSignal={cardResetNonce}
@@ -646,7 +647,7 @@ export function LearningMode({
         revealedLanguages={audio.revealedLanguages}
         showRomanization={state.courseSettings.showRomanization ?? true}
         showIpa={state.courseSettings.showIpa ?? false}
-        showFurigana={state.courseSettings.showFurigana ?? true}
+        showFurigana={resolveShowFurigana(state.courseSettings)}
         revealAllSignal={audioRevealNonce}
         resetSignal={cardResetNonce}
         replayTargetSignal={targetReplayNonce}

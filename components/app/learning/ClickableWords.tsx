@@ -15,7 +15,12 @@ import {
   matchRatio,
 } from '@/lib/audio/alignTimings';
 import { getTextDirection, languageSupportsKaraoke } from '@/lib/languages';
-import { parseFurigana, splitFuriganaByRanges } from '@/lib/furigana';
+import {
+  hasReadings,
+  parseFurigana,
+  splitFuriganaByRanges,
+  type FuriganaSegment,
+} from '@/lib/furigana';
 import { Ruby } from './Ruby';
 import { useKaraokeIndex, type ClockBinding } from '@/hooks/use-karaoke-index';
 import { useLearningChatToggle } from './LearningChatLayout';
@@ -231,30 +236,42 @@ export function ClickableWords({
   // whole ruby unit lands in the token containing its start and the next
   // token's chunk comes back empty; adjacent rendering keeps the sentence
   // intact (see splitFuriganaByRanges).
-  const tokenFurigana = useMemo(() => {
+  const furiganaChunks = useMemo(() => {
     if (furiganaSegments === null || aligned.length === 0) return null;
     const lengths: number[] = [];
     for (const w of aligned) {
       lengths.push([...w.leading].length, [...w.display].length);
     }
     lengths.push([...aligned[aligned.length - 1].trailing].length);
-    const chunks = splitFuriganaByRanges(furiganaSegments, lengths);
-    return aligned.map((_, i) => chunks[i * 2 + 1]);
+    return splitFuriganaByRanges(furiganaSegments, lengths);
   }, [furiganaSegments, aligned]);
 
-  // A token's display, with ruby when furigana applies to it. Whenever the
-  // chunk mapping exists it is the ONLY source of this token's text: a ruby
-  // unit spanning an Intl.Segmenter boundary (Intl cuts 天気|予報 where the
-  // analyzer annotated 天気予報 as one unit) lands whole in the first token
-  // and leaves the next token's chunk short or empty — falling back to
-  // w.display there would render the swallowed characters twice.
-  const renderDisplay = (w: { display: string }, i: number) => {
-    const chunk = tokenFurigana?.[i];
-    if (!chunk) return w.display;
+  // A chunk of the sentence, with ruby when furigana applies to it. Whenever
+  // the chunk mapping exists it is the ONLY source of text — for leading and
+  // trailing runs too, not just displays: a ruby unit spanning a boundary
+  // (Intl cuts 天気|予報 where the analyzer annotated 天気予報 as one unit,
+  // or a unit starts inside a token's leading run) lands whole in the chunk
+  // containing its start and leaves the next chunk short or empty. Falling
+  // back to the raw string for ANY chunk would render the swallowed
+  // characters twice — or, for an empty chunk, drop them entirely.
+  const renderChunk = (chunk: FuriganaSegment[] | undefined) => {
+    if (chunk === undefined || chunk.length === 0) return null;
     if (!chunk.some((seg) => seg.reading !== undefined)) {
       return chunk.map((seg) => seg.text).join('');
     }
     return <Ruby segments={chunk} />;
+  };
+  // Chunk layout mirrors the lengths above: [leading, display] per token,
+  // then one final trailing chunk for the last token.
+  const renderLeading = (w: { leading: string }, i: number) =>
+    furiganaChunks ? renderChunk(furiganaChunks[i * 2]) : w.leading;
+  const renderDisplay = (w: { display: string }, i: number) =>
+    furiganaChunks ? renderChunk(furiganaChunks[i * 2 + 1]) : w.display;
+  const renderTrailing = (w: { trailing: string }, i: number) => {
+    if (!furiganaChunks) return w.trailing;
+    return i === aligned.length - 1
+      ? renderChunk(furiganaChunks[aligned.length * 2])
+      : null;
   };
 
   const canKaraoke = useMemo(() => {
@@ -287,7 +304,9 @@ export function ClickableWords({
     className,
     dir === 'rtl' && 'text-left',
     // Extra leading so the reading line doesn't collide with the row above.
-    furiganaSegments !== null && 'has-furigana',
+    // Gated on actual readings, not parse success: a readings-free parse
+    // must not reserve headroom no ruby will use.
+    hasReadings(furiganaSegments) && 'has-furigana',
   );
 
   if (!interactive || aligned.length === 0 || !chatContext) {
@@ -312,10 +331,10 @@ export function ClickableWords({
                 i === currentIndex && 'text-primary',
               )}
             >
-              {w.leading}
+              {renderLeading(w, i)}
               {renderDisplay(w, i)}
             </span>
-            {w.trailing}
+            {renderTrailing(w, i)}
           </Fragment>
         ))}
       </p>
@@ -345,7 +364,7 @@ export function ClickableWords({
         // and hover/click never fired on the actual word. Inline children of
         // the <p> participate directly in the parent bidi context.
         <Fragment key={i}>
-          {w.leading}
+          {renderLeading(w, i)}
           <AskAboutWord
             word={w.display}
             language={language}
@@ -362,7 +381,7 @@ export function ClickableWords({
           >
             {renderDisplay(w, i)}
           </AskAboutWord>
-          {w.trailing}
+          {renderTrailing(w, i)}
         </Fragment>
       ))}
     </p>

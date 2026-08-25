@@ -1735,14 +1735,10 @@ async function suggestCurriculumFixesForEdit(
 
     await enqueueFlagRetranslation(ctx, originalText, lang, {
       reason: 'curriculum_fix',
-      audit: {
-        cardEditId: audit.cardEditId,
-        userId: audit.userId,
-        role: auditCommon.role,
-        beforeText: existing.translatedText,
-        beforeTranslationSource: existing.translationSource,
-        flagCountAfter: nextCount,
-      },
+      // The superset is fine: the helper reads only the fields its opts type
+      // names and derives the rest itself. One constructed object, no
+      // hand-copied field list to drift.
+      audit: auditCommon,
       userSuggestedTranslation: submittedMap.get(lang),
     });
   }

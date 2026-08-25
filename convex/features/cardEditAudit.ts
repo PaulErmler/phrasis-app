@@ -190,3 +190,21 @@ export async function resolveRetranslation(
       : {}),
   });
 }
+
+/**
+ * Resolve a retranslation only if nothing has resolved it yet. For cleanup
+ * sites that run AFTER the write choke point had its chance — the pool's
+ * onComplete sees every job, including ones `storeTranslationAndScheduleTTS`
+ * already stamped with a real outcome, and must not overwrite that verdict
+ * with its own coarser one.
+ */
+export async function resolveRetranslationIfPending(
+  ctx: MutationCtx,
+  retranslationAuditId: Id<'cardEditRetranslations'> | undefined,
+  status: RetranslationStatus,
+): Promise<void> {
+  if (retranslationAuditId === undefined) return;
+  const row = await ctx.db.get(retranslationAuditId);
+  if (!row || row.status !== 'enqueued') return;
+  await resolveRetranslation(ctx, retranslationAuditId, status);
+}

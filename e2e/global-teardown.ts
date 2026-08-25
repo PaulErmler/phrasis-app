@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 
+import { extractJsonResult } from "./cli-json-output";
 import { unregisterRun } from "./run-lock";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -25,16 +26,7 @@ function convexRun(fn: string, args: Record<string, unknown>): unknown {
     ["exec", "convex", "run", fn, JSON.stringify(args)],
     { cwd: REPO_ROOT, encoding: "utf8" },
   );
-  const lines = out.trim().split('\n');
-  for (let i = lines.length - 1; i >= 0; i--) {
-    if (!lines[i].trim()) continue;
-    try {
-      return JSON.parse(lines.slice(i).join('\n'));
-    } catch {
-      /* keep scanning upwards */
-    }
-  }
-  return undefined;
+  return extractJsonResult(out);
 }
 
 /**
@@ -61,9 +53,11 @@ function purgeFixtureUsers(): void {
     return;
   }
 
-  // Accounts that refuse to purge stay at the head of the list, so step the
-  // offset past them; otherwise one wedged fixture blocks every later pass.
-  let offset = 0;
+  // Accounts that refuse to purge go on an explicit exclusion list, so one
+  // wedged fixture cannot head-of-line block later passes. By email, not by
+  // scan position: an offset would presume the backend's scan order stable
+  // across calls, which nothing enforces.
+  const excluded: string[] = [];
   let totalPurged = 0;
 
   for (let pass = 0; pass < MAX_PASSES; pass++) {
@@ -71,7 +65,7 @@ function purgeFixtureUsers(): void {
     try {
       result = convexRun("features/e2eCleanup:purgeFixtureUsers", {
         limit: PURGE_BATCH,
-        offset,
+        excludeEmails: excluded,
       }) as PurgeResult;
     } catch (error) {
       console.warn("Fixture-account cleanup failed — skipping:", error);
@@ -85,19 +79,19 @@ function purgeFixtureUsers(): void {
     totalPurged += result.purged.length;
     for (const failure of result.failed) {
       console.warn(`Could not purge ${failure.email}: ${failure.error}`);
+      excluded.push(failure.email);
     }
-    offset += result.failed.length;
 
-    // `remaining` still counts the wedged accounts, so compare against the
-    // offset rather than zero.
-    if (result.remaining <= offset) break;
+    // `remaining` still counts the excluded accounts, so compare against the
+    // exclusion list rather than zero.
+    if (result.remaining <= excluded.length) break;
     if (result.purged.length === 0 && result.failed.length === 0) break;
   }
 
   console.log(`Purged ${totalPurged} Playwright fixture account(s).`);
-  if (offset > 0) {
+  if (excluded.length > 0) {
     console.warn(
-      `${offset} fixture account(s) refused to purge — retry with ` +
+      `${excluded.length} fixture account(s) refused to purge — retry with ` +
         "`pnpm exec convex run features/e2eCleanup:purgeFixtureUsers`.",
     );
   }

@@ -8,6 +8,7 @@ import type { ApprovalActionResult } from '@/hooks/use-card-approvals';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Shimmer } from '@/components/ai-elements/shimmer';
+import { resolveShowFurigana } from '@/lib/furigana';
 
 /**
  * Pieces shared by the two inline approval boxes (`CardApproval` for
@@ -33,13 +34,12 @@ export function useShowIpa(): boolean {
 
 /**
  * The course's furigana setting, for the `showFurigana` prop on `EntryLines`.
- * Defaults ON (matching `courseSettings.showFurigana ?? true` everywhere
- * else). Same lives-on-the-boxes reasoning as `useShowIpa` above.
+ * Defaults ON via the shared `resolveShowFurigana` (lib/furigana). Same lives-on-the-boxes reasoning as `useShowIpa` above.
  */
 export function useShowFurigana(): boolean {
   const { preloadedCourseSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
-  return courseSettings?.showFurigana ?? true;
+  return resolveShowFurigana(courseSettings);
 }
 
 /**

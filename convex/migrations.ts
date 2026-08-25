@@ -17,6 +17,7 @@ import {
 } from './lib/localRomanization';
 import { isProtectedTranslationSource } from '../lib/translationProvenance';
 import { FURIGANA_LANGUAGES } from '../lib/languages';
+import { getFuriganaSource } from './lib/textAnnotations';
 import { buildSearchableTextPatchForCard } from './lib/cardContent';
 import type { Id } from './_generated/dataModel';
 import { isPremadeLevelCollection } from './lib/collections';
@@ -519,6 +520,32 @@ export function recomputeRomanizationPatch(
  * The `''` failure sentinel is honoured (not "missing"), so a re-run never
  * resurrects rows the engine already gave up on.
  */
+/**
+ * Clear furigana produced by a stale engine version so the backfills below
+ * re-schedule it. Same invalidate-by-source contract as the romanization
+ * resets above; the current version lives in FURIGANA_SOURCES
+ * (convex/lib/textAnnotations.ts). Sentinel rows (`''`) reset too: a failure
+ * under the old engine deserves one retry under the new one.
+ */
+export function resetStaleFuriganaPatch(doc: {
+  furiganaText?: string;
+  furiganaSource?: string;
+}): { furiganaText: undefined; furiganaSource: undefined } | undefined {
+  if (doc.furiganaText === undefined) return undefined;
+  if (doc.furiganaSource === getFuriganaSource('ja')) return undefined;
+  return { furiganaText: undefined, furiganaSource: undefined };
+}
+
+export const resetStaleTextFurigana = migrations.define({
+  table: 'texts',
+  migrateOne: (_ctx, doc) => resetStaleFuriganaPatch(doc),
+});
+
+export const resetStaleTranslationFurigana = migrations.define({
+  table: 'translations',
+  migrateOne: (_ctx, doc) => resetStaleFuriganaPatch(doc),
+});
+
 export const backfillTextFurigana = migrations.define({
   table: 'texts',
   migrateOne: async (ctx, doc) => {
@@ -607,6 +634,8 @@ export const runAll = migrations.runner([
   internal.migrations.resetStaleBulgarianTranslationRomanization,
   internal.migrations.recomputeTextRomanization,
   internal.migrations.recomputeTranslationRomanization,
+  internal.migrations.resetStaleTextFurigana,
+  internal.migrations.resetStaleTranslationFurigana,
   internal.migrations.backfillTextFurigana,
   internal.migrations.backfillTranslationFurigana,
 ]);
