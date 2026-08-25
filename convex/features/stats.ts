@@ -561,11 +561,15 @@ export const getSentencesForWord = query({
       })
       .filter((input): input is NonNullable<typeof input> => input !== null);
 
+    const statsSettings = await getCourseSettings(ctx, courseId);
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
       inputs,
       baseLanguages,
       targetLanguages,
+      {
+        speakerGenderPreference: statsSettings?.speakerGenderPreference,
+      },
     );
 
     const sentences = inputs.map((input) => {

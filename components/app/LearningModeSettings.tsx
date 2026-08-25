@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
 import {
   Sheet,
@@ -48,7 +50,14 @@ import {
 } from '@/lib/constants/audioPlayback';
 import { MAX_CARDS_PER_BATCH } from '@/lib/constants/learning';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
-import { languageNeedsIpa, languageNeedsRomanization } from '@/lib/languages';
+import {
+  languageNeedsIpa,
+  languageNeedsRomanization,
+  languageMarksSpeakerGender,
+  getLocalizedLanguageNameByCode,
+} from '@/lib/languages';
+import { courseMarksSpeakerGender } from '@/lib/speakerGender';
+import { capture, CLIENT_EVENTS } from '@/lib/posthog/events';
 
 interface LearningModeSettingsProps {
   open: boolean;
@@ -251,6 +260,10 @@ export function LearningModeSettings({
   const t = useTranslations('LearningMode.settingsPanel');
   const [courseSettingsOpen, setCourseSettingsOpen] = useState(false);
   const updateSettings = useUpdateCourseSettings();
+  const locale = useLocale();
+  const ensureUpcomingAllModes = useMutation(
+    api.features.decks.ensureUpcomingCardsContentAllModes,
+  );
 
   if (!courseSettings) return null;
   const baseLanguages = resolveLanguageOrder(
@@ -268,8 +281,37 @@ export function LearningModeSettings({
     languageNeedsRomanization,
   );
   const courseSupportsIpa = [...baseProp, ...targetProp].some(languageNeedsIpa);
+  // Speaker-gender preference: offered only when a course language actually
+  // marks speaker gender (config-driven; also carries the feature kill
+  // switch). Same hide-don't-clear reasoning as romanization above.
+  const courseSupportsSpeakerGender = courseMarksSpeakerGender(
+    baseProp,
+    targetProp,
+  );
+  const speakerGenderLanguageNames = [
+    ...new Set(
+      [...baseProp, ...targetProp]
+        .filter(languageMarksSpeakerGender)
+        .map((code) => getLocalizedLanguageNameByCode(code, locale)),
+    ),
+  ];
 
   // ---- existing setting handlers ----
+
+  const handleSpeakerGenderChange = async (value: string) => {
+    if (value !== 'male' && value !== 'female' && value !== 'mixed') return;
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      speakerGenderPreference: value,
+    });
+    capture(CLIENT_EVENTS.SPEAKER_GENDER_CHANGED, { preference: value });
+    // Regenerate the upcoming-card window right away so the next reviews
+    // already match the new voice/grammar; everything else fills lazily as
+    // cards are prepared (both variants stay cached, so switching back is
+    // free). Fire-and-forget: a failure just means the ensure pass on the
+    // next learn-view mount does the same work.
+    void ensureUpcomingAllModes({}).catch(() => {});
+  };
 
   const handleBatchSizeChange = async (value: number) => {
     if (value < 1 || value > MAX_CARDS_PER_BATCH) return;
@@ -1689,6 +1731,62 @@ export function LearningModeSettings({
               checked={courseSettings.showIpa ?? false}
               onCheckedChange={handleShowIpaChange}
             />
+          )}
+
+          {/* Speaker-gender preference. Only when a course language marks
+              speaker gender (see speakerGenderMarking in lib/languages.ts);
+              Mixed = the per-sentence 50/50 default. Sentences the user
+              added themselves keep their detected speaker (never rewritten),
+              which the scope note spells out. */}
+          {courseSupportsSpeakerGender && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium">
+                    {t('speakerGender')}
+                  </Label>
+                  <p className="text-muted-xs">
+                    {t('speakerGenderDescription')}
+                  </p>
+                </div>
+                <RadioGroup
+                  value={courseSettings.speakerGenderPreference ?? 'mixed'}
+                  onValueChange={handleSpeakerGenderChange}
+                  className="space-y-2"
+                >
+                  {(
+                    [
+                      ['mixed', 'speakerGenderMixed', 'speakerGenderMixedDescription'],
+                      ['female', 'speakerGenderFemale', 'speakerGenderFemaleDescription'],
+                      ['male', 'speakerGenderMale', 'speakerGenderMaleDescription'],
+                    ] as const
+                  ).map(([value, labelKey, descriptionKey]) => (
+                    <div key={value} className="flex items-start gap-3">
+                      <RadioGroupItem
+                        value={value}
+                        id={`speakerGender-${value}`}
+                        className="mt-0.5"
+                      />
+                      <div className="space-y-0.5">
+                        <Label
+                          htmlFor={`speakerGender-${value}`}
+                          className="text-sm font-medium"
+                        >
+                          {t(labelKey)}
+                        </Label>
+                        <p className="text-muted-xs">{t(descriptionKey)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </RadioGroup>
+                <p className="text-muted-xs">
+                  {t('speakerGenderScopeNote', {
+                    languages: speakerGenderLanguageNames.join(', '),
+                  })}
+                </p>
+              </div>
+            </>
           )}
 
           {/* Show progress bar */}

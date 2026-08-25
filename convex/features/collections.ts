@@ -42,14 +42,15 @@ import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { deleteAudioRow, deleteAudioRowsForTextLanguage } from '../lib/audio';
 import { resolveAudioPayload } from '../lib/audioAssets';
 import { hasActiveTtsClaim } from './ttsProcessing';
-import { asVoiceGender } from '../types';
 import {
   MAX_AUDIO_POINTER_ROWS,
   MAX_TRANSLATION_VARIANTS,
 } from '../lib/contentVariants';
 import {
   pickCanonicalTranslationRow,
+  resolveEffectiveSpeakerGender,
   translationGenderSlot,
+  type SpeakerGenderPreference,
 } from '../../lib/speakerGender';
 import { getLlmClaim, isClaimFresh } from './llmTranslationQueue';
 import { getCourseSettings } from '../db/courseSettings';
@@ -259,12 +260,16 @@ export const browseCollectionTexts = query({
       speakerGender: row.text.speakerGender,
       audioSpeakerGender: row.text.audioSpeakerGender,
     }));
+    const browseSettings = await getCourseSettings(ctx, course._id);
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
       inputs,
       course.baseLanguages,
       course.targetLanguages,
-      { markVersionStale: true },
+      {
+        markVersionStale: true,
+        speakerGenderPreference: browseSettings?.speakerGenderPreference,
+      },
     );
 
     const page = rows.map((row, i) => {
@@ -426,12 +431,14 @@ export async function scheduleMissingTranslationsForText(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   languages: string[],
-  opts?: { llmPriority?: LlmPriority },
+  opts?: {
+    llmPriority?: LlmPriority;
+    /** The requesting course's speaker-gender preference: the preview
+     * ensures the gender the user will actually study. Absent = canonical. */
+    speakerGenderPreference?: SpeakerGenderPreference;
+  },
 ): Promise<number> {
-  const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
-    text,
-    text._id,
-  );
+  const { genderPatch } = resolveCardSpeakerGenders(text, text._id);
   if (Object.keys(genderPatch).length > 0) {
     await ctx.db.patch(text._id, genderPatch);
   }
@@ -448,11 +455,15 @@ export async function scheduleMissingTranslationsForText(
   }
 
   let scheduled = 0;
-  // The preview ensures the CANONICAL variant (no per-user preference in
-  // this shared path; the ensure sweep handles preference variants once the
-  // text becomes a card). `audioSpeakerGender` here is the canonical
-  // assignment resolveCardSpeakerGenders produced above.
-  const previewGender = asVoiceGender(audioSpeakerGender);
+  // The gender this preview ensures: the requesting user's effective gender
+  // (their preference over the canonical assignment; definitive metadata
+  // still pins). The genderPatch above already wrote the canonical
+  // bookkeeping, so `text` fields are current for the resolution.
+  const previewGender: 'male' | 'female' = resolveEffectiveSpeakerGender(
+    text,
+    text._id,
+    opts?.speakerGenderPreference,
+  );
   for (const lang of languages) {
     if (lang === text.language) continue;
     const rows = await ctx.db
@@ -461,9 +472,7 @@ export async function scheduleMissingTranslationsForText(
         q.eq('textId', text._id).eq('targetLanguage', lang),
       )
       .take(MAX_TRANSLATION_VARIANTS);
-    const existing = previewGender
-      ? pickCanonicalTranslationRow(rows, lang, previewGender)
-      : (rows[0] ?? null);
+    const existing = pickCanonicalTranslationRow(rows, lang, previewGender);
     let preferredRegionVariant: string | undefined;
     if (existing) {
       // Version-stale rows regenerate here too, so browsing a collection
@@ -507,9 +516,7 @@ export async function scheduleMissingTranslationsForText(
         ctx,
         text._id,
         lang,
-        previewGender
-          ? translationGenderSlot(lang, previewGender)
-          : undefined,
+        translationGenderSlot(lang, previewGender),
       );
       if (llmClaim && isClaimFresh(llmClaim)) {
         continue;
@@ -522,12 +529,12 @@ export async function scheduleMissingTranslationsForText(
       // mismatched audio (reference-aware, like the card sweep's delete);
       // a sibling variant's audio still matches its own text and survives.
       await deleteAudioRowsForTextLanguage(ctx, text._id, lang, {
-        ...(previewGender ? { voiceGender: previewGender } : {}),
+        voiceGender: previewGender,
       });
     }
     if (
       await scheduleTranslationForLanguage(ctx, text, lang, {
-        audioSpeakerGender,
+        audioSpeakerGender: previewGender,
         preferredRegionVariant,
         skipTts: true,
         // Warm work. If the landing translation still triggers TTS (a card
@@ -575,6 +582,8 @@ export const requestPreviewTranslations = mutation({
       course.baseLanguages,
       course.targetLanguages,
     );
+    const previewSettings = await getCourseSettings(ctx, course._id);
+    const speakerGenderPreference = previewSettings?.speakerGenderPreference;
 
     let translationsScheduled = 0;
     for (const textId of textIds) {
@@ -589,6 +598,7 @@ export const requestPreviewTranslations = mutation({
         ctx,
         text,
         languages,
+        { speakerGenderPreference },
       );
     }
 
@@ -679,18 +689,20 @@ export const requestPreviewAudio = mutation({
       throw new ConvexError('Language not in course');
     }
 
-    const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
-      text,
-      args.textId,
-    );
+    const { genderPatch } = resolveCardSpeakerGenders(text, args.textId);
     if (Object.keys(genderPatch).length > 0) {
       await ctx.db.patch(args.textId, genderPatch);
     }
-    // "Audio exists" is per gender now: only a row whose asset matches the
-    // gender this click would synthesize counts, the sibling variant's row
-    // must not satisfy the check (the preview would stay silent for this
-    // voice forever).
-    const previewVoiceGender = asVoiceGender(audioSpeakerGender);
+    // The gender this click synthesizes: the user's effective gender. "Audio
+    // exists" is per gender — only a row whose asset matches this gender
+    // counts, the sibling variant's row must not satisfy the check (the
+    // preview would stay silent for this voice forever).
+    const audioPreviewSettings = await getCourseSettings(ctx, course._id);
+    const previewVoiceGender: 'male' | 'female' = resolveEffectiveSpeakerGender(
+      text,
+      args.textId,
+      audioPreviewSettings?.speakerGenderPreference,
+    );
     const audioRows = await ctx.db
       .query('audioRecordings')
       .withIndex('by_text_and_language', (q) =>
@@ -699,10 +711,6 @@ export const requestPreviewAudio = mutation({
       .take(MAX_AUDIO_POINTER_ROWS);
     let existingAudio: (typeof audioRows)[number] | null = null;
     for (const row of audioRows) {
-      if (previewVoiceGender === undefined) {
-        existingAudio = row;
-        break;
-      }
       const rowAsset = await ctx.db.get(row.assetId);
       // A dangling row (asset gone) matches any gender: it must reach the
       // cleanup branch below or the preview wedges forever.
@@ -740,23 +748,16 @@ export const requestPreviewAudio = mutation({
     const translation =
       args.language === text.language
         ? null
-        : previewVoiceGender
-          ? pickCanonicalTranslationRow(
-              await ctx.db
-                .query('translations')
-                .withIndex('by_text_and_language', (q) =>
-                  q.eq('textId', args.textId).eq('targetLanguage', args.language),
-                )
-                .take(MAX_TRANSLATION_VARIANTS),
-              args.language,
-              previewVoiceGender,
-            )
-          : await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', args.textId).eq('targetLanguage', args.language),
-            )
-            .first();
+        : pickCanonicalTranslationRow(
+            await ctx.db
+              .query('translations')
+              .withIndex('by_text_and_language', (q) =>
+                q.eq('textId', args.textId).eq('targetLanguage', args.language),
+              )
+              .take(MAX_TRANSLATION_VARIANTS),
+            args.language,
+            previewVoiceGender,
+          );
     if (args.language !== text.language && !translation) {
       // Translation still generating. The click raced it. Nothing to
       // synthesize yet; the client retries once the translation row lands.
@@ -767,7 +768,7 @@ export const requestPreviewAudio = mutation({
       ctx,
       text,
       args.language,
-      audioSpeakerGender,
+      previewVoiceGender,
       translation,
     );
     return { scheduled };

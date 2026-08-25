@@ -98,6 +98,7 @@ import {
   ttsProviderValidator,
   ttsPriorityValidator,
   llmPriorityValidator,
+  speakerGenderPreferenceValidator,
   type TtsPriority,
   type LlmPriority,
   voiceGenderValidator,
@@ -1022,11 +1023,15 @@ export const getDeckCards = query({
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
 
+    const deckSettings = await getCourseSettings(ctx, course._id);
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
       inputs,
       course.baseLanguages,
       course.targetLanguages,
+      {
+        speakerGenderPreference: deckSettings?.speakerGenderPreference,
+      },
     );
 
     const result = cards.map((card, i) => {
@@ -2338,12 +2343,16 @@ export const ensureCardContent = mutation({
     const text = await ctx.db.get(args.textId);
     if (!text) return { translationsScheduled: 0, audioScheduled: 0 };
 
+    const ensureSettings = await getCourseSettings(ctx, active.course._id);
     return scheduleMissingContent(
       ctx,
       args.textId,
       text,
       active.course.baseLanguages,
       active.course.targetLanguages,
+      {
+        speakerGenderPreference: ensureSettings?.speakerGenderPreference,
+      },
     );
   },
 });
@@ -2418,6 +2427,10 @@ async function scheduleContentForUpcomingCards(
   cards: Doc<'cards'>[],
 ): Promise<number> {
   let processed = 0;
+  // The probe and the dispatched mutation must judge the SAME effective
+  // gender, so the preference is read once here and threaded into both.
+  const upcomingSettings = await getCourseSettings(ctx, active.course._id);
+  const speakerGenderPreference = upcomingSettings?.speakerGenderPreference;
   // Batch-load the texts up front (one concurrent read round, not one
   // sequential get per card) before the sequential probe loop.
   const texts = await Promise.all(cards.map((card) => ctx.db.get(card.textId)));
@@ -2433,7 +2446,7 @@ async function scheduleContentForUpcomingCards(
         text,
         active.course.baseLanguages,
         active.course.targetLanguages,
-        { probe: true },
+        { probe: true, speakerGenderPreference },
       );
     } catch (error) {
       if (error instanceof ProbeNeedsWork) {
@@ -2452,6 +2465,7 @@ async function scheduleContentForUpcomingCards(
         textId: card.textId,
         baseLanguages: active.course.baseLanguages,
         targetLanguages: active.course.targetLanguages,
+        speakerGenderPreference,
       });
       processed++;
     }
@@ -2574,6 +2588,11 @@ export const prepareCardContent = internalMutation({
     targetLanguages: v.array(v.string()),
     priority: v.optional(ttsPriorityValidator),
     llmPriority: v.optional(llmPriorityValidator),
+    // The course's speaker-gender preference at scheduling time. A change
+    // between scheduling and execution is harmless: this pass ensures the
+    // old preference's (cached-forever) variant and the next ensure pass
+    // covers the new one.
+    speakerGenderPreference: v.optional(speakerGenderPreferenceValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -2586,7 +2605,11 @@ export const prepareCardContent = internalMutation({
       text,
       args.baseLanguages,
       args.targetLanguages,
-      { priority: args.priority, llmPriority: args.llmPriority },
+      {
+        priority: args.priority,
+        llmPriority: args.llmPriority,
+        speakerGenderPreference: args.speakerGenderPreference,
+      },
     );
     return null;
   },

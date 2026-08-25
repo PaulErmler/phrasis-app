@@ -5,6 +5,7 @@ import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId } from '../db/decks';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
+import { getCourseSettings } from '../db/courseSettings';
 import { cardOriginPillFields } from '../lib/collections';
 import { searchSegments } from '../../lib/wordTokenize';
 import {
@@ -351,11 +352,15 @@ export const getLibraryCards = query({
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
 
+    const librarySettings = await getCourseSettings(ctx, course._id);
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
       inputs,
       course.baseLanguages,
       course.targetLanguages,
+      {
+        speakerGenderPreference: librarySettings?.speakerGenderPreference,
+      },
     );
 
     const page = cards

@@ -317,7 +317,11 @@ export const getCardForReview = query({
       contentInputs,
       course.baseLanguages,
       course.targetLanguages,
-      { rawRomanization: true, ignoreMissingWordTimings: true },
+      {
+        rawRomanization: true,
+        ignoreMissingWordTimings: true,
+        speakerGenderPreference: settings?.speakerGenderPreference,
+      },
     );
 
     const buildCardResult = (card: Doc<'cards'>, index: number) => {
@@ -1816,10 +1820,11 @@ export const flagTranslation = mutation({
     // Each row retranslates under ITS OWN gender slot (per-slot claims run
     // in parallel). The canonical variant rides the interactive pool; a
     // sibling variant's refresh is background work nobody is staring at.
+    const flagSettings = await getCourseSettings(ctx, course._id);
     const flagCanonicalGender = resolveEffectiveSpeakerGender(
       text,
       card.textId,
-      undefined,
+      flagSettings?.speakerGenderPreference,
     );
     for (const { tr } of enqueueable) {
       const rowGender =
@@ -1893,10 +1898,11 @@ export const regenerateCardAudio = mutation({
     // is asking for a fresh take on what they hear, not on the sibling
     // variant's cached audio (decision: audio regens affect only the
     // current gender).
+    const regenSettings = await getCourseSettings(ctx, course._id);
     const regenGender = resolveEffectiveSpeakerGender(
       text,
       card.textId,
-      undefined,
+      regenSettings?.speakerGenderPreference,
     );
     for (const lang of allLanguages) {
       await deleteAudioRowsForTextLanguage(ctx, card.textId, lang, {
@@ -1914,7 +1920,10 @@ export const regenerateCardAudio = mutation({
       text,
       course.baseLanguages,
       course.targetLanguages,
-      { forceAudioRegen: true },
+      {
+        forceAudioRegen: true,
+        speakerGenderPreference: regenSettings?.speakerGenderPreference,
+      },
     );
 
     await trackCardAction(ctx, userId, 'regenerate_audio', card);

@@ -14,43 +14,90 @@ const SEED = 'text_abc123';
 const CANONICAL_FOR_SEED = resolveAudioSpeakerGender(undefined, SEED);
 
 describe('resolveEffectiveSpeakerGender', () => {
-  it('definitive text gender always wins, even against a preference', () => {
-    // The pin rule: uploads and inherently gendered content keep their
-    // gender no matter what the user prefers.
+  it('definitive gender on a USER-CREATED text pins against a preference', () => {
+    // The pin rule: uploads and inherently gendered user content keep their
+    // morphology-detected gender no matter what the user prefers.
     expect(
       resolveEffectiveSpeakerGender(
-        { speakerGender: 'female', audioSpeakerGender: 'female' },
+        {
+          speakerGender: 'female',
+          audioSpeakerGender: 'female',
+          userCreated: true,
+        },
         SEED,
         'male',
       ),
     ).toBe('female');
     expect(
-      resolveEffectiveSpeakerGender({ speakerGender: 'male' }, SEED, 'female'),
+      resolveEffectiveSpeakerGender(
+        { speakerGender: 'male', userCreated: true },
+        SEED,
+        'female',
+      ),
+    ).toBe('male');
+  });
+
+  it('a PREMADE text never pins: its speakerGender is the mirrored coin-flip', () => {
+    // resolveCardSpeakerGenders case 3 writes the flip into BOTH fields on
+    // premade texts, so male/female there is canonical bookkeeping, not a
+    // morphology verdict — the preference must win.
+    expect(
+      resolveEffectiveSpeakerGender(
+        {
+          speakerGender: 'male',
+          audioSpeakerGender: 'male',
+          userCreated: false,
+        },
+        SEED,
+        'female',
+      ),
+    ).toBe('female');
+    // Without a preference the mirrored value IS the canonical assignment.
+    expect(
+      resolveEffectiveSpeakerGender(
+        {
+          speakerGender: 'male',
+          audioSpeakerGender: 'male',
+          userCreated: false,
+        },
+        SEED,
+        'mixed',
+      ),
     ).toBe('male');
   });
 
   it('preference applies to neutral/unclassified texts', () => {
     expect(
       resolveEffectiveSpeakerGender(
-        { speakerGender: 'neutral', audioSpeakerGender: 'male' },
+        {
+          speakerGender: 'neutral',
+          audioSpeakerGender: 'male',
+          userCreated: true,
+        },
         SEED,
         'female',
       ),
     ).toBe('female');
-    expect(resolveEffectiveSpeakerGender({}, SEED, 'male')).toBe('male');
+    expect(
+      resolveEffectiveSpeakerGender({ userCreated: false }, SEED, 'male'),
+    ).toBe('male');
   });
 
   it('mixed / no preference resolves to the canonical assignment', () => {
     expect(
       resolveEffectiveSpeakerGender(
-        { speakerGender: 'neutral', audioSpeakerGender: 'male' },
+        {
+          speakerGender: 'neutral',
+          audioSpeakerGender: 'male',
+          userCreated: false,
+        },
         SEED,
         'mixed',
       ),
     ).toBe('male');
     expect(
       resolveEffectiveSpeakerGender(
-        { audioSpeakerGender: 'female' },
+        { audioSpeakerGender: 'female', userCreated: true },
         SEED,
         undefined,
       ),
@@ -58,29 +105,39 @@ describe('resolveEffectiveSpeakerGender', () => {
   });
 
   it('falls back to the deterministic seeded flip when nothing is stored', () => {
-    expect(resolveEffectiveSpeakerGender({}, SEED, 'mixed')).toBe(
-      CANONICAL_FOR_SEED,
-    );
-    expect(resolveEffectiveSpeakerGender({}, SEED, undefined)).toBe(
-      CANONICAL_FOR_SEED,
-    );
+    expect(
+      resolveEffectiveSpeakerGender({ userCreated: false }, SEED, 'mixed'),
+    ).toBe(CANONICAL_FOR_SEED);
+    expect(
+      resolveEffectiveSpeakerGender({ userCreated: false }, SEED, undefined),
+    ).toBe(CANONICAL_FOR_SEED);
     // Same seed, same answer — concurrent callers must agree.
-    expect(resolveEffectiveSpeakerGender({}, SEED, undefined)).toBe(
-      resolveEffectiveSpeakerGender({}, SEED, undefined),
+    expect(
+      resolveEffectiveSpeakerGender({ userCreated: false }, SEED, undefined),
+    ).toBe(
+      resolveEffectiveSpeakerGender({ userCreated: false }, SEED, undefined),
     );
   });
 
   it('ignores junk values in the loose text fields', () => {
     expect(
       resolveEffectiveSpeakerGender(
-        { speakerGender: 'unknown', audioSpeakerGender: 'weird' },
+        {
+          speakerGender: 'unknown',
+          audioSpeakerGender: 'weird',
+          userCreated: true,
+        },
         SEED,
         'female',
       ),
     ).toBe('female');
     expect(
       resolveEffectiveSpeakerGender(
-        { speakerGender: 'unknown', audioSpeakerGender: 'weird' },
+        {
+          speakerGender: 'unknown',
+          audioSpeakerGender: 'weird',
+          userCreated: false,
+        },
         SEED,
         'mixed',
       ),

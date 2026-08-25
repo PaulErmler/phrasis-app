@@ -57,6 +57,9 @@ export interface CourseSettings {
   cardsToAddBatchSize?: number;
   autoAddCards?: boolean;
   dailyTimeGoalMinutes?: number;
+  // Speaker-gender preference ('male' | 'female' | 'mixed'; absent = mixed).
+  // See courseSettings.speakerGenderPreference in convex/schema.ts.
+  speakerGenderPreference?: 'male' | 'female' | 'mixed';
   // Audio playback settings
   highlightWords?: boolean;
   autoPlayAudio?: boolean;

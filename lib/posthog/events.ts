@@ -58,6 +58,10 @@ export const CLIENT_EVENTS = {
   ONBOARDING_FAILED: 'onboarding_failed',
   PLACEMENT_CONTENT_RETRY: 'placement_content_retry',
 
+  /** The course's speaker-gender preference changed. Carries `preference`.
+   *  Watch for toggle-farming before considering a quota (spec §cost). */
+  SPEAKER_GENDER_CHANGED: 'speaker_gender_preference_changed',
+
   TUTORIAL_STARTED: 'tutorial_started',
   TUTORIAL_COMPLETED: 'tutorial_completed',
   LOCALE_CHANGED: 'locale_changed',
