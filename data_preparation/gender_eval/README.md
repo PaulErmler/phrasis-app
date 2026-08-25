@@ -131,8 +131,9 @@ On demand only (API cost) — not part of CI.
 ## Baseline
 
 **Pending: run `scripts/evalSentenceMetadata.mjs`** — this environment has no
-`OPENROUTER_API_KEY`, so the baseline report on the current classifier prompt
-has not been generated yet. Run it once before landing classifier prompt
-changes (and again after) so the comparison is on record. Languages scoring
-below ~90% should get targeted per-language prompt notes (the
+`OPENROUTER_API_KEY`, so no report has been generated yet. The per-request
+prompt builder landed before any baseline run, so for the before/after
+comparison of that change, run the eval once at commit `cc46964` (the last
+commit with the old static prompt) and once at HEAD. Languages scoring below
+~90% should get targeted per-language prompt notes (the
 `translationPromptNotes` pattern) and a re-run.

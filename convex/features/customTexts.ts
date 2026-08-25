@@ -31,6 +31,8 @@ import {
   openrouterGenerationId,
 } from '../lib/posthogAi';
 import { resolveAudioSpeakerGender } from '../../lib/languages';
+import { translationGenderSlot } from '../../lib/speakerGender';
+import { buildAutofillSpeakerGenderRule } from './sentenceMetadataPrompt';
 import { validateSentenceMetadata } from './sentenceMetadata';
 
 export const consumeAutoFillQuota = internalMutation({
@@ -76,7 +78,15 @@ function autofillMaxOutputTokens(targetLanguageCount: number): number {
   return Math.max(2_000, 200 * targetLanguageCount);
 }
 
-const TRANSLATION_SYSTEM_PROMPT = `You are an expert multilingual translator for a language-learning app. You will receive one or more sentences that the user has already written in specific languages, plus a list of target language codes that still need translations.
+/**
+ * The autofill system prompt for a request over these languages (sources +
+ * resolved targets). The speakerGender rule is assembled per request from the
+ * language config — no global gender-language list lives in any prompt (see
+ * `buildAutofillSpeakerGenderRule` in sentenceMetadataPrompt.ts).
+ */
+const buildAutofillSystemPrompt = (
+  languages: string[],
+): string => `You are an expert multilingual translator for a language-learning app. You will receive one or more sentences that the user has already written in specific languages, plus a list of target language codes that still need translations.
 
 Translate the given sentence(s) into every requested target language AND return linguistic metadata describing the sentence.
 
@@ -98,7 +108,7 @@ After producing the translations, infer linguistic metadata from the source AND 
 
 - register: "formal" | "informal" | "neutral" — the politeness/formality of the sentence as a whole.
 - addresseeNumber: "singular" | "plural" | "not_applicable" — how many people the sentence speaks to. "not_applicable" if the sentence has no addressee (e.g. "It is raining.").
-- speakerGender: "male" | "female" | "neutral" — return "male" or "female" ONLY when at least one rendering grammatically marks the speaker's gender (Spanish/Italian/French/Portuguese past participles or adjectives, Russian/Polish/Czech past tense, Arabic/Hebrew/Hindi verb agreement, etc.). Otherwise return "neutral". Never guess from topic or stereotype.
+${buildAutofillSpeakerGenderRule(languages)}
 - addresseeGender: "male" | "female" | "neutral" | "not_applicable" — same rule, for the addressee. "not_applicable" if there is no addressee.
 - addressesSomeone: true | false — true if the sentence speaks to a 2nd-person addressee (imperatives, direct questions, vocatives, sentences containing "you"/"your", commands, requests, greetings). false otherwise (descriptive/narrative sentences like "It is raining.", first-person statements with no second-person reference). When addressesSomeone is false, addresseeNumber should be "not_applicable" and addresseeGender should be "not_applicable".
 
@@ -296,9 +306,17 @@ export const autoFillTranslations = action({
     // Reasoning + Luna price cap via the shared mapping in translationLLM so
     // `'none'` is correctly sent as `reasoning: {enabled: false}`.
     const providerOptions = openrouterCallOptions(AUTOFILL_REASONING, LUNA_BO3.provider);
+    // Languages of THIS request (sources + resolved targets), so the prompt's
+    // speaker-gender rule names exactly the marked subset involved.
+    const requestLanguages = [
+      ...args.texts.map((t) => t.language),
+      ...targetLanguages.map(
+        (code) => resolutionByRequested.get(code)!.resolved,
+      ),
+    ];
     const { text, usage, providerMetadata } = await generateText({
       model: openrouter(OPENROUTER_MODELS.translationAutoFill),
-      system: TRANSLATION_SYSTEM_PROMPT,
+      system: buildAutofillSystemPrompt(requestLanguages),
       prompt: userPrompt,
       maxOutputTokens: autofillMaxOutputTokens(targetLanguages.length),
       ...(providerOptions ? { providerOptions } : {}),
@@ -485,6 +503,14 @@ export const createCustomText = mutation({
     const mainEntry = args.translations[0];
     const nextRank = collection.textCount + 1;
 
+    // Resolved once: written onto the text AND used to slot-stamp the
+    // translation rows below (the auto-fill path never reaches
+    // `applyTextMetadata`, so its rows would otherwise stay unstamped —
+    // decision 9 says explicit slots are always written going forward).
+    const autofillAudioSpeakerGender = args.metadata
+      ? resolveAudioSpeakerGender(args.metadata.speakerGender)
+      : undefined;
+
     const textId = await ctx.db.insert('texts', {
       text: mainEntry.text,
       language: mainEntry.language,
@@ -503,7 +529,7 @@ export const createCustomText = mutation({
           // across all target-language translations of this row. Mirrors the
           // logic in applyMetadataAndPrepareCard for the non-auto-fill path.
           referentGender: Math.random() < 0.5 ? 'male' : 'female',
-          audioSpeakerGender: resolveAudioSpeakerGender(args.metadata.speakerGender),
+          audioSpeakerGender: autofillAudioSpeakerGender,
         }
         : {}),
     });
@@ -523,6 +549,18 @@ export const createCustomText = mutation({
         // output to every provenance guard.
         translationSource:
           entry.translationSource ?? USER_PROVIDED_TRANSLATION_SOURCE,
+        // Explicit tri-state slot in the auto-fill path (the card's resolved
+        // gender on marked languages, 'neutral' on unmarked). The manual
+        // path leaves rows unstamped here; `applyTextMetadata` stamps them
+        // the same way once the metadata LLM resolves the gender.
+        ...(autofillAudioSpeakerGender
+          ? {
+            speakerGender: translationGenderSlot(
+              entry.language,
+              autofillAudioSpeakerGender,
+            ),
+          }
+          : {}),
       });
     }
 

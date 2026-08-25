@@ -6,6 +6,7 @@ import {
   sourcedTranslationEntriesValidator,
   ttsPriorityValidator,
   llmPriorityValidator,
+  voiceGenderValidator,
   type TtsPriority,
   type LlmPriority,
 } from '../types';
@@ -19,10 +20,14 @@ import {
   openrouterGenerationId,
 } from '../lib/posthogAi';
 import { resolveAudioSpeakerGender } from '../../lib/languages';
+import {
+  SPEAKER_GENDER_FEATURE_ENABLED,
+  translationGenderSlot,
+} from '../../lib/speakerGender';
 import { isUserCreatedText } from '../../lib/translationProvenance';
 import { retrier } from '../retrier';
 import {
-  METADATA_SYSTEM_PROMPT,
+  buildMetadataSystemPrompt,
   buildMetadataUserPrompt,
 } from './sentenceMetadataPrompt';
 
@@ -183,6 +188,11 @@ const metadataJobArgs = v.object({
   // Absent = interactive (single-card create, chat approval).
   priority: v.optional(ttsPriorityValidator),
   llmPriority: v.optional(llmPriorityValidator),
+  // The speaker-gender preference in force when CHAT generated this text
+  // (cardApprovals threads it; nothing else does — custom texts keep pure
+  // inference, decision 6). One rung in the audioSpeakerGender ladder:
+  // consulted only when neither the LLM nor a prior row commits a gender.
+  generationSpeakerGender: v.optional(voiceGenderValidator),
 });
 
 /**
@@ -218,6 +228,7 @@ export const generateSentenceMetadata = internalAction({
           targetLanguages: args.targetLanguages,
           priority: args.priority,
           llmPriority: args.llmPriority,
+          generationSpeakerGender: args.generationSpeakerGender,
         },
       );
 
@@ -237,6 +248,7 @@ export const generateSentenceMetadata = internalAction({
           userId: args.userId,
           priority: args.priority,
           llmPriority: args.llmPriority,
+          generationSpeakerGender: args.generationSpeakerGender,
         },
       );
 
@@ -276,6 +288,11 @@ export const fetchSentenceMetadata = internalAction({
       }
 
       const userPrompt = buildMetadataUserPrompt(args.translations);
+      // Assembled per request from the renderings' languages: the prompt
+      // names exactly the marked subset of THIS request (decision 8).
+      const systemPrompt = buildMetadataSystemPrompt(
+        args.translations.map((t) => t.language),
+      );
 
       const openrouter = createOpenRouter({
         apiKey: process.env.OPENROUTER_API_KEY,
@@ -285,7 +302,7 @@ export const fetchSentenceMetadata = internalAction({
       const startedAt = Date.now();
       const { text, usage, providerMetadata } = await generateText({
         model: openrouter(OPENROUTER_MODELS.sentenceMetadata),
-        system: METADATA_SYSTEM_PROMPT,
+        system: systemPrompt,
         prompt: userPrompt,
       });
 
@@ -316,6 +333,7 @@ export const fetchSentenceMetadata = internalAction({
           targetLanguages: args.targetLanguages,
           priority: args.priority,
           llmPriority: args.llmPriority,
+          generationSpeakerGender: args.generationSpeakerGender,
         },
       );
 
@@ -364,6 +382,7 @@ export async function applyTextMetadata(
     targetLanguages: string[];
     priority?: TtsPriority;
     llmPriority?: LlmPriority;
+    generationSpeakerGender?: 'male' | 'female';
   },
 ): Promise<null> {
     const text = await ctx.db.get(args.textId);
@@ -376,7 +395,12 @@ export async function applyTextMetadata(
     //   2. Otherwise, preserve any audioSpeakerGender already on the row
     //      (so a re-run after retry success doesn't re-roll the coin flip
     //      and pointlessly invalidate audio that was just generated).
-    //   3. Otherwise (first call, no definitive gender), coin-flip.
+    //   3. Otherwise, the speaker-gender preference chat generated under
+    //      (cardApprovals threads it; feature-gated so the kill switch
+    //      restores pure coin-flip behavior).
+    //   4. Otherwise (first call, no definitive gender), coin-flip — seeded
+    //      by the text id, so the unblock call and a concurrent writer land
+    //      the same gender instead of racing on Math.random.
     let audioSpeakerGender: 'male' | 'female';
     if (incomingGender === 'male' || incomingGender === 'female') {
       audioSpeakerGender = incomingGender;
@@ -385,8 +409,16 @@ export async function applyTextMetadata(
       text.audioSpeakerGender === 'female'
     ) {
       audioSpeakerGender = text.audioSpeakerGender;
+    } else if (
+      SPEAKER_GENDER_FEATURE_ENABLED &&
+      args.generationSpeakerGender !== undefined
+    ) {
+      audioSpeakerGender = args.generationSpeakerGender;
     } else {
-      audioSpeakerGender = resolveAudioSpeakerGender(incomingGender);
+      audioSpeakerGender = resolveAudioSpeakerGender(
+        incomingGender,
+        args.textId,
+      );
     }
 
     // Build the metadata patch from whatever the LLM committed to.
@@ -447,42 +479,42 @@ export async function applyTextMetadata(
       ...metadataPatch,
     });
 
-    // Finish the record this step owns: stamp the resolved gender onto the
-    // translations that were inserted alongside the text.
+    // Finish the record this step owns: stamp the resolved gender's SLOT onto
+    // the translations that were inserted alongside the text.
     //
     // Chat approval and custom-text creation write their translation rows
-    // BEFORE any gender exists, so they landed unstamped, "legacy" to every
+    // BEFORE any gender exists, so they landed unstamped — "legacy" to every
     // consumer of `translations.speakerGender`. That is not what legacy means:
     // these rows are current, and their gender is precisely the one resolved
     // here (for chat cards the metadata LLM *infers* the gender by reading
-    // these very translations). Leaving them unstamped is what let the
-    // gender-drift sweep treat them as suspect.
+    // these very translations). Explicit slots per tri-state semantics: the
+    // resolved gender on languages that mark speaker gender, 'neutral' on
+    // languages that cannot differ (translationGenderSlot never returns
+    // undefined).
     //
     // Re-stamped on every call, so the retry that lands a definitive gender
-    // keeps text and translations in agreement instead of turning "legacy"
-    // rows into "drifted" ones. Only rows that disagree are patched, so the
-    // common re-run writes nothing.
+    // keeps text and translations in agreement. Only rows that disagree are
+    // patched, so the common re-run writes nothing.
     //
-    // Restricted to user-created cards, whose wording is never regenerated.
-    // There the stamp records the card's gender rather than licensing a
-    // rewrite. On a PREMADE text the same stamp would be actively harmful: it
-    // clears both `isLegacy` and `isDrifted` for rows that really were written
-    // under the old gender, suppressing the `isLegacyAlongsideDriftedAudio`
-    // heal path in `scheduleMissingContent`. The audio gets re-voiced while
-    // the wrong-grammar text survives, which is the exact failure that branch
-    // exists to prevent. Every caller creates user-created cards today, so
-    // this is a guard on an invariant rather than a live branch; it is here so
-    // a future premade caller fails safe instead of silently mislabelling.
+    // Restricted to user-created cards, whose wording is never regenerated —
+    // the stamp records the card's gender rather than licensing a rewrite.
+    // On a PREMADE text the stamp would be wrong: its variant rows are
+    // slot-managed by the ensure-variant pipeline (`scheduleMissingContent`),
+    // and blanket-stamping them with this text's canonical gender could
+    // mislabel a sibling variant. Every caller creates user-created cards
+    // today, so this is a guard on an invariant rather than a live branch.
     if (isUserCreatedText(text)) {
       const translations = await ctx.db
         .query('translations')
         .withIndex('by_textId', (q) => q.eq('textId', args.textId))
         .collect();
       for (const translation of translations) {
-        if (translation.speakerGender !== audioSpeakerGender) {
-          await ctx.db.patch(translation._id, {
-            speakerGender: audioSpeakerGender,
-          });
+        const slot = translationGenderSlot(
+          translation.targetLanguage,
+          audioSpeakerGender,
+        );
+        if (translation.speakerGender !== slot) {
+          await ctx.db.patch(translation._id, { speakerGender: slot });
         }
       }
     }
@@ -521,6 +553,7 @@ export const applyMetadataAndPrepareCard = internalMutation({
     targetLanguages: v.array(v.string()),
     priority: v.optional(ttsPriorityValidator),
     llmPriority: v.optional(llmPriorityValidator),
+    generationSpeakerGender: v.optional(voiceGenderValidator),
   },
   returns: v.null(),
   handler: applyTextMetadata,

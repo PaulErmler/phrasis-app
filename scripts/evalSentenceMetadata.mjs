@@ -31,7 +31,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import {
-  METADATA_SYSTEM_PROMPT,
+  buildMetadataSystemPrompt,
   buildMetadataUserPrompt,
 } from '../convex/features/sentenceMetadataPrompt.ts';
 import { OPENROUTER_MODELS } from '../convex/config/aiModels.ts';
@@ -161,7 +161,9 @@ async function classify(entry, apiKey) {
   const body = {
     model: OPENROUTER_MODELS.sentenceMetadata,
     messages: [
-      { role: 'system', content: METADATA_SYSTEM_PROMPT },
+      // Per-request system prompt, exactly as production builds it for a
+      // request whose only rendering is this entry's language.
+      { role: 'system', content: buildMetadataSystemPrompt([entry.language]) },
       {
         role: 'user',
         content: buildMetadataUserPrompt([

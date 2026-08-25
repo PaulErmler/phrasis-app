@@ -29,6 +29,7 @@ import { api, internal } from "../../../_generated/api";
 import type { Id } from "../../../_generated/dataModel";
 import type { ProposedCardMetadata } from "../../../types";
 import { insertAudioFixture } from "../../lib/audioFixtures";
+import { translationGenderSlot } from "../../../../lib/speakerGender";
 // Module-mocked globally (tests/convexTestSetup.ts), used to assert on the
 // voice the replace path enqueues and to prove it enqueues no retranslation.
 import { ttsPool, llmPool } from "../../../lib/workpools";
@@ -640,7 +641,10 @@ describe("features/chat/alsoCorrect", () => {
         { approvalId, timezone: "UTC" },
       );
 
-      // Transactional effects: text + translation stamps flipped to male.
+      // Transactional effects: the text flips to male and every translation
+      // row is re-stamped with its explicit tri-state slot — the male slot on
+      // languages that mark speaker gender, 'neutral' where the rendering
+      // serves both genders (the English row here).
       const text = await t.run(async (ctx) => ctx.db.get(textId));
       expect(text?.audioSpeakerGender).toBe("male");
       expect(text?.speakerGender).toBe("male");
@@ -650,7 +654,12 @@ describe("features/chat/alsoCorrect", () => {
           .withIndex("by_textId", (q) => q.eq("textId", textId))
           .collect(),
       );
-      expect(stamps.every((row) => row.speakerGender === "male")).toBe(true);
+      expect(stamps.length).toBeGreaterThan(0);
+      for (const row of stamps) {
+        expect(row.speakerGender).toBe(
+          translationGenderSlot(row.targetLanguage, "male"),
+        );
+      }
 
       // The re-voice pass was scheduled…
       const jobs = await t.run(async (ctx) =>

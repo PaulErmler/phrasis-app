@@ -26,6 +26,7 @@ import { generateText } from "ai";
 import schema from "../../schema";
 import { internal } from "../../_generated/api";
 import { validateSentenceMetadata } from "../../features/sentenceMetadata";
+import { resolveAudioSpeakerGender } from "../../../lib/languages";
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
@@ -477,19 +478,26 @@ describe("features/sentenceMetadata", () => {
 
     // Chat approval and custom-text creation insert their translations before
     // any gender exists, leaving them unstamped. Indistinguishable from the
-    // pre-field "legacy" rows the gender-drift sweep treats as suspect. The
-    // metadata step now finishes the record.
-    it("stamps the resolved gender onto translations inserted before it ran", async () => {
+    // pre-field "legacy" rows. The metadata step now finishes the record with
+    // explicit tri-state slots: the resolved gender on languages that mark
+    // speaker gender, 'neutral' on languages that cannot differ.
+    it("stamps explicit slots onto translations inserted before it ran", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
-      const translationId = await t.run(async (ctx) =>
-        ctx.db.insert("translations", {
+      const { unmarkedId, markedId } = await t.run(async (ctx) => ({
+        unmarkedId: await ctx.db.insert("translations", {
           textId,
           targetLanguage: "en",
           translatedText: "Hello",
           translationSource: "openai/gpt-5-chat-none",
         }),
-      );
+        markedId: await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "fr",
+          translatedText: "Salut",
+          translationSource: "openai/gpt-5-chat-none",
+        }),
+      }));
 
       await t.mutation(
         internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
@@ -507,21 +515,25 @@ describe("features/sentenceMetadata", () => {
         },
       );
 
-      const row = await t.run(async (ctx) => ctx.db.get(translationId));
-      expect(row?.speakerGender).toBe("female");
+      const unmarked = await t.run(async (ctx) => ctx.db.get(unmarkedId));
+      const marked = await t.run(async (ctx) => ctx.db.get(markedId));
+      // English cannot differ by speaker gender → 'neutral', never the
+      // resolved gender; French marks it → the resolved gender.
+      expect(unmarked?.speakerGender).toBe("neutral");
+      expect(marked?.speakerGender).toBe("female");
     });
 
     // The retrier's second call can land a definitive gender that overturns
-    // the first call's coin flip. Text and translations must move together,
-    // otherwise the stamp would turn a "legacy" row into a "drifted" one.
+    // the first call's coin flip. Text and translations must move together —
+    // visible on a marked-language row, whose slot follows the gender.
     it("re-stamps translations when a later definitive gender overturns the coin flip", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
       const translationId = await t.run(async (ctx) =>
         ctx.db.insert("translations", {
           textId,
-          targetLanguage: "en",
-          translatedText: "Hello",
+          targetLanguage: "fr",
+          translatedText: "Salut",
           translationSource: "openai/gpt-5-chat-none",
         }),
       );
@@ -563,12 +575,9 @@ describe("features/sentenceMetadata", () => {
 
     // Every caller of this mutation creates user-created cards, so the premade
     // case is unreachable today, but stamping there would be silently wrong,
-    // not merely useless. An unstamped row on a premade text is genuinely
-    // "legacy" (written before the field existed, plausibly under the other
-    // gender); marking it as agreeing with the newly-resolved gender clears
-    // both `isLegacy` and `isDrifted`, which suppresses the
-    // `isLegacyAlongsideDriftedAudio` heal path in `scheduleMissingContent`
-    // and leaves wrong-grammar text paired with re-voiced audio.
+    // not merely useless: a premade text's variant rows are slot-managed by
+    // the ensure-variant pipeline, and a blanket stamp with this text's
+    // canonical gender could mislabel a sibling variant.
     it("leaves translations on a premade text unstamped", async () => {
       const t = convexTest(schema, modules);
       const { textId, translationId } = await t.run(async (ctx) => {
@@ -616,6 +625,106 @@ describe("features/sentenceMetadata", () => {
       // stamp is withheld.
       expect(text?.audioSpeakerGender).toBe("female");
       expect(row?.speakerGender).toBeUndefined();
+    });
+
+    // ── audioSpeakerGender ladder: the generationSpeakerGender rung ──
+    // LLM definitive → prior row → generationSpeakerGender (chat) → seeded
+    // flip. The rung lets chat-created cards start in the user's chosen
+    // gender instead of a coin flip, without ever overriding morphology.
+
+    it("uses generationSpeakerGender when neither the LLM nor a prior row commits", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: undefined,
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+          generationSpeakerGender: "female",
+        },
+      );
+      const text = await t.run(async (ctx) => ctx.db.get(textId));
+      expect(text?.audioSpeakerGender).toBe("female");
+    });
+
+    it("a definitive LLM gender beats generationSpeakerGender", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: {
+            register: "neutral",
+            addresseeNumber: "singular",
+            speakerGender: "male",
+            addresseeGender: "neutral",
+          },
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+          generationSpeakerGender: "female",
+        },
+      );
+      const text = await t.run(async (ctx) => ctx.db.get(textId));
+      expect(text?.audioSpeakerGender).toBe("male");
+    });
+
+    it("a prior committed gender beats generationSpeakerGender (no re-roll)", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      // First call commits a gender without any preference in play.
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: undefined,
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        },
+      );
+      const first = (await t.run(async (ctx) => ctx.db.get(textId)))
+        ?.audioSpeakerGender;
+      const opposite = first === "male" ? "female" : "male";
+      // A later call carrying the opposite preference must not flip it —
+      // audio for the committed gender may already exist.
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: undefined,
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+          generationSpeakerGender: opposite,
+        },
+      );
+      const text = await t.run(async (ctx) => ctx.db.get(textId));
+      expect(text?.audioSpeakerGender).toBe(first);
+    });
+
+    it("the fallback coin flip is seeded by the text id (deterministic)", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: undefined,
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        },
+      );
+      const text = await t.run(async (ctx) => ctx.db.get(textId));
+      // Exactly the FNV-1a flip for this id — not Math.random.
+      expect(text?.audioSpeakerGender).toBe(
+        resolveAudioSpeakerGender(undefined, textId),
+      );
     });
   });
 });
