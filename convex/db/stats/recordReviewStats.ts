@@ -84,7 +84,10 @@ export async function recordReviewStats(
 
   const stats = await getCourseStatsForMutation(ctx, userId, deck.courseId);
   if (!stats) {
-    throw new ConvexError('Course stats not found');
+    throw new ConvexError({
+      code: 'NOT_FOUND',
+      message: 'Course stats not found',
+    });
   }
 
   const todayDate = getTodayInTimezone(args.timezone);

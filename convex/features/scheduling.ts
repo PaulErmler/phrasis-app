@@ -2,7 +2,6 @@ import { v, ConvexError } from 'convex/values';
 import { mutation, query, MutationCtx, QueryCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import {
-  buildCardSearchableText,
   buildTextContentBatchForLanguages,
   type CardAlternativeContent,
 } from '../lib/cardContent';
@@ -10,15 +9,10 @@ import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getCourseSettings } from '../db/courseSettings';
-import {
-  carriedAnnotationFields,
-  clearedAnnotationFields,
-} from '../lib/textAnnotations';
 import { getCollectionProgress } from '../db/collections';
 import { getDeckByCourseId } from '../db/decks';
 import { trackEvent } from '../db/stats/dailyStats';
 import { EVENTS, track } from '../analytics';
-import { updateWordTextsForEdit } from '../db/stats/wordTracking';
 import { recordReviewStats } from '../db/stats/recordReviewStats';
 import { recordFreePlayStats } from '../db/stats/recordFreePlayStats';
 import {
@@ -31,13 +25,8 @@ import {
   takeUndoableLogs,
   studyContextFromSettings,
 } from '../db/reviewLogs';
-import { insertReviewHistory } from '../db/reviewHistory';
+import { reviewTimeUndoPatch } from '../lib/reviewTimeStats';
 import {
-  reviewTimeApplyPatch,
-  reviewTimeUndoPatch,
-} from '../lib/reviewTimeStats';
-import {
-  getDailyStats,
   floorToCelebration,
   displayedActiveReviews,
 } from '../db/stats/dailyStats';
@@ -48,23 +37,14 @@ import {
   recordRetranslationAttempt,
   retranslationAuditFields,
   setCardEditResult,
-  type CardEditChange,
   type RetranslationAuditFields,
 } from './cardEditAudit';
-import {
-  scheduleCard,
-  getValidRatings,
-  DEFAULT_INITIAL_REVIEW_COUNT,
-  type CardSchedulingState,
-} from '../../lib/scheduling';
+import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import {
   fsrsStateValidator,
   translationValidator,
   audioRecordingValidator,
   schedulingPhaseValidator,
-  reviewRatingValidator,
-  reviewModeValidator,
-  asVoiceGender,
   freePlayFace,
   schedulingTrackFromSettings,
   type SchedulingMode,
@@ -73,7 +53,6 @@ import {
   type FreePlayFace,
   type CardEditLanguageRole,
 } from '../types';
-import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
 import {
   cardOriginPillFields,
   isCollectionComplete,
@@ -90,30 +69,41 @@ import {
   deleteAudioRow,
   deleteAudioRowsForTextLanguage,
 } from '../lib/audio';
-import { soundsSame } from '../lib/textComparison';
 import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
 import {
   isUserCreatedText,
   mayRegenerateTranslation,
-  USER_PROVIDED_TRANSLATION_SOURCE,
 } from '../../lib/translationProvenance';
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
-import { scheduleMissingContent } from './decks';
-import {
-  maybeScheduleWritingSeed,
-  writingSeedPatch,
-} from '../migrations/seedWritingTrack';
+import { scheduleMissingContent } from '../lib/contentScheduling';
 import { fetchTrackDueCards } from '../lib/dueQueue';
 import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
-import {
-  MAX_CARD_TEXT_LENGTH,
-  WRITING_ALTERNATIVES_MAX,
-} from '../../lib/constants/learning';
+import { WRITING_ALTERNATIVES_MAX } from '../../lib/constants/learning';
 import {
   CARD_OVERRIDE_SPEED_MIN,
   CARD_OVERRIDE_SPEED_MAX,
 } from '../../lib/constants/audioPlayback';
+import {
+  resolveCardEditPlan,
+  assertTranslationLengths,
+  recordCardEditAuditStart,
+  applyInPlaceTextEdit,
+  forkSharedTextForEdit,
+  repointCardAtEditedText,
+  propagateEditToDerivedContent,
+} from './cardEditPipeline';
+import {
+  reviewCardArgsFields,
+  resolveWritingBaseline,
+  resolveValidatedPhase,
+  applyFsrsTransition,
+  resolveSearchableTextRefresh,
+  applyReviewPatchToCard,
+  recordReviewHistoryRow,
+  logReviewForUndo,
+  resolveCelebrationVerdict,
+} from './reviewPipeline';
 
 
 /**
@@ -126,14 +116,14 @@ async function authorizeCardAccess(ctx: MutationCtx, cardId: Id<'cards'>) {
   const userId = await requireAuthUserId(ctx);
 
   const card = await ctx.db.get(cardId);
-  if (!card) throw new ConvexError('Card not found');
+  if (!card) throw new ConvexError({ code: 'NOT_FOUND', message: 'Card not found' });
 
   const deck = await ctx.db.get(card.deckId);
-  if (!deck) throw new ConvexError('Deck not found');
+  if (!deck) throw new ConvexError({ code: 'NOT_FOUND', message: 'Deck not found' });
 
   const course = await ctx.db.get(deck.courseId);
   if (!course || course.userId !== userId)
-    throw new ConvexError('Unauthorized');
+    throw new ConvexError({ code: 'FORBIDDEN', message: 'Unauthorized' });
 
   return { userId, card, deck, course };
 }
@@ -655,22 +645,7 @@ export const getCardForReviewEmptyReason = query({
  * and patches the card document with the new scheduling state.
  */
 export const reviewCard = mutation({
-  args: {
-    cardId: v.id('cards'),
-    rating: reviewRatingValidator,
-    timeSpentMs: v.optional(v.number()),
-    timezone: v.string(),
-    forceReviewPhase: v.optional(v.boolean()),
-    reviewMode: v.optional(reviewModeValidator),
-    accuracy: v.optional(v.number()),
-    // Same review scored both ways, so stats keep both series regardless of
-    // the learner's `ignorePunctuation` setting. Only recorded when both are
-    // present. See recordReviewStats.
-    accuracyStrict: v.optional(v.number()),
-    accuracyLenient: v.optional(v.number()),
-    wasDefaultRating: v.optional(v.boolean()),
-    sessionId: v.optional(v.string()),
-  },
+  args: reviewCardArgsFields,
   returns: v.object({
     schedulingPhase: schedulingPhaseValidator,
     preReviewCount: v.number(),
@@ -697,114 +672,27 @@ export const reviewCard = mutation({
       reviewMode: args.reviewMode,
     });
 
-    // Lazy seed: a writing-track review of a card the enable-time backfill
-    // hasn't reached yet (or one created while the split was off) starts from
-    // a copy of the shared schedule. Exactly what the backfill would have
-    // written. The undo snapshot below still records the true prior (unset)
-    // writing fields, so undoing returns the card to its unseeded state.
-    const writingUnseeded =
-      track === 'writing' && card.writingDueDate === undefined;
-    // An unseeded card reaching a writing review means the enable-time sweep
-    // hasn't finished (or died mid-chain), re-kick it. Debounced inside the
-    // helper, and the sweep fast-skips already-seeded cards, so this is cheap
-    // and only fires during the (normally short) backfill window.
-    if (writingUnseeded && reviewSettings) {
-      await maybeScheduleWritingSeed(ctx, reviewSettings);
-    }
-    // The baseline this review schedules FROM: for an unseeded card, exactly
-    // the patch the backfill sweep would have written. The same helper, so
-    // the two seeding paths share one formula and cannot diverge.
-    const writingBaseline = writingUnseeded ? writingSeedPatch(card) : card;
-    const priorWritingFsrsState = writingBaseline.writingFsrsState;
-    const priorWritingGraduated = writingBaseline.writingIsGraduated ?? false;
-    const priorWritingGoodCount = writingBaseline.writingGoodReviewCount ?? 0;
+    // Writing-track baseline with the lazy seed resolved (see
+    // resolveWritingBaseline); phase + args validation; FSRS transition.
+    const writing = await resolveWritingBaseline(ctx, card, reviewSettings, track);
+    const phase = resolveValidatedPhase(card, track, args);
+    const transition = applyFsrsTransition({
+      card,
+      track,
+      writing,
+      phase,
+      rating: args.rating,
+      initialReviewCount,
+    });
+    const { result, dueDateWithJitter } = transition;
 
-    // When forceReviewPhase is true (full review mode), treat the card as
-    // being in the 'review' phase so FSRS ratings are accepted directly.
-    // The writing track has no pre-review phase at all.
-    const phase =
-      args.forceReviewPhase || track === 'writing'
-        ? ('review' as const)
-        : card.schedulingPhase;
-    const validRatings = getValidRatings(phase);
-    if (!validRatings.includes(args.rating)) {
-      throw new ConvexError(
-        `Invalid rating "${args.rating}" for ${phase} phase. Valid ratings: ${validRatings.join(', ')}`,
-      );
-    }
-
-    const assertAccuracy = (value: number | undefined, name: string) => {
-      if (value != null && (value < 0 || value > 1 || !Number.isFinite(value))) {
-        throw new ConvexError(`Invalid ${name} value, must be between 0 and 1`);
-      }
-    };
-    assertAccuracy(args.accuracy, 'accuracy');
-    assertAccuracy(args.accuracyStrict, 'accuracyStrict');
-    assertAccuracy(args.accuracyLenient, 'accuracyLenient');
-
-    // Build current scheduling state from the reviewed track
-    const cardState: CardSchedulingState =
-      track === 'writing'
-        ? {
-            schedulingPhase: 'review',
-            preReviewCount: 0,
-            dueDate: writingBaseline.writingDueDate ?? card.dueDate,
-            fsrsState: priorWritingFsrsState ?? null,
-          }
-        : {
-            schedulingPhase: phase,
-            preReviewCount: card.preReviewCount,
-            dueDate: card.dueDate,
-            fsrsState: card.fsrsState ?? null,
-          };
-
-    // Run the shared scheduling algorithm
-    const result = scheduleCard(cardState, args.rating, initialReviewCount);
-
-    // Add a random jitter of 0–60 seconds to spread cards apart in the queue.
-    const jitterMs = (Math.random()-0.5) * 60_000;
-    const dueDateWithJitter = result.dueDate + jitterMs;
-
-    // Rebuild searchableText only when the card's cached languages don't match
-    // the current course languages (new language added, or card predates this field) or translation were generated after card was added.
-    const courseLanguages = [...course.baseLanguages, ...course.targetLanguages];
-    const courseLanguageSet = new Set(courseLanguages);
-    const cached = card.searchableTextLanguages;
-    const searchableTextIsStale =
-      cached === undefined ||
-      cached.length !== courseLanguages.length ||
-      cached.some((l) => !courseLanguageSet.has(l));
-
-    // Determine whether word tracking will need the text doc (saves us
-    // re-fetching it inside recordReviewStats).
-    const trackedSet = new Set(card.wordsTrackedLanguages ?? []);
-    const allCourseLanguagesUnique = [...new Set(courseLanguages)];
-    const hasUntrackedLanguages = allCourseLanguagesUnique.some(
-      (l) => !trackedSet.has(l),
+    // Stale searchable-text refresh; also fetches the text doc once when
+    // word tracking (inside recordReviewStats) will need it.
+    const { text, searchableTextPatch } = await resolveSearchableTextRefresh(
+      ctx,
+      card,
+      course,
     );
-
-    // Fetch the text exactly once if either branch needs it.
-    const text =
-      searchableTextIsStale || hasUntrackedLanguages
-        ? await ctx.db.get(card.textId)
-        : null;
-
-    let searchableTextPatch: { searchableText: string; searchableTextLanguages: string[] } | undefined;
-    if (searchableTextIsStale && text) {
-      searchableTextPatch = await buildCardSearchableText(
-        ctx,
-        card.textId,
-        text.text,
-        courseLanguages,
-        text,
-      );
-    }
-
-    // Flip isGraduated once the card reaches FSRS Review state (one-way flag)
-    const isGraduatedPatch =
-      !(card.isGraduated ?? false) && result.fsrsState && result.fsrsState.state >= 2
-        ? { isGraduated: true as const }
-        : {};
 
     // Record stats first so we can fold the new wordsTrackedLanguages stamp
     // into the single patchCard call below. `recordReviewStats` reads `card`
@@ -834,7 +722,7 @@ export const reviewCard = mutation({
       // raw writingFsrsState.
       priorFsrsState:
         track === 'writing'
-          ? priorWritingFsrsState ?? null
+          ? writing.priorFsrsState ?? null
           : card.fsrsState ?? null,
       rating: args.rating,
       accuracy: args.accuracy,
@@ -845,223 +733,58 @@ export const reviewCard = mutation({
       sessionId: args.sessionId,
     });
 
-    // Patch the card (via aggregate-aware helper). We pass `card` as oldDoc so
-    // patchCard can skip both the pre- and post-patch reads. Only the reviewed
-    // track's scheduling fields are written, under separateModeTracking the
-    // other track's schedule is untouched.
-    // Per-mode review counter. Keyed by what the user actually did
-    // (args.reviewMode), independent of the track the review wrote, so it
-    // counts correctly with the split on or off. Same 'audio' default as
-    // statsReversal.reviewModeForStats; decremented symmetrically on undo.
-    const prevModeCounts = card.reviewCountByMode ?? { audio: 0, full: 0 };
-    const reviewModeKey = args.reviewMode ?? 'audio';
-    const nonSchedulingPatch = {
-      ...searchableTextPatch,
-      ...(newWordsTrackedLanguages
-        ? { wordsTrackedLanguages: newWordsTrackedLanguages }
-        : {}),
-      reviewCountByMode: {
-        ...prevModeCounts,
-        [reviewModeKey]: prevModeCounts[reviewModeKey] + 1,
-      },
-      // Per-card running time-per-review average for this mode. Reversed on
-      // undo from the history row's raw sample (reviewTimeUndoPatch).
-      ...reviewTimeApplyPatch(card, reviewModeKey, args.timeSpentMs),
-    };
-    if (track === 'writing') {
-      await patchCard(
-        ctx,
-        args.cardId,
-        {
-          writingDueDate: dueDateWithJitter,
-          writingLastReviewedAt: Date.now(),
-          // `lastReviewedAt` is the track-agnostic activity timestamp (the
-          // Library sorts and displays it; even free-play stamps it), so a
-          // writing review updates it too. Like free play, undo does not
-          // restore it, prevWriting snapshots only the writing schedule.
-          lastReviewedAt: Date.now(),
-          // Writing-track counterpart of goodReviewCount. On a lazy seed the
-          // copied baseline is persisted even for non-good ratings, so the
-          // review is indistinguishable from backfill-then-review.
-          ...(args.rating === 'good' || args.rating === 'easy'
-            ? { writingGoodReviewCount: priorWritingGoodCount + 1 }
-            : writingUnseeded && card.goodReviewCount !== undefined
-              ? { writingGoodReviewCount: priorWritingGoodCount }
-              : {}),
-          ...(result.fsrsState && { writingFsrsState: result.fsrsState }),
-          // Always write the flag (never leave it undefined): the learn_new
-          // writing index matches on eq(writingIsGraduated, false), which an
-          // undefined field would silently fall out of. One-way like
-          // isGraduated.
-          writingIsGraduated:
-            priorWritingGraduated ||
-            (result.fsrsState !== null && result.fsrsState.state >= 2),
-          ...nonSchedulingPatch,
-        },
-        card,
-      );
-    } else {
-      await patchCard(
-        ctx,
-        args.cardId,
-        {
-          schedulingPhase: result.schedulingPhase,
-          preReviewCount: result.preReviewCount,
-          dueDate: dueDateWithJitter,
-          lastReviewedAt: Date.now(),
-          // Only FSRS good/easy count (never pre-review "understood"), drives
-          // the "until rated good" Practice-Listening strategy.
-          ...(args.rating === 'good' || args.rating === 'easy'
-            ? { goodReviewCount: (card.goodReviewCount ?? 0) + 1 }
-            : {}),
-          ...(result.fsrsState && { fsrsState: result.fsrsState }),
-          ...isGraduatedPatch,
-          ...nonSchedulingPatch,
-        },
-        card,
-      );
-    }
+    // Persist the transition on the card via the aggregate-aware patch
+    // (only the reviewed track's scheduling fields are written).
+    await applyReviewPatchToCard(ctx, {
+      card,
+      track,
+      rating: args.rating,
+      reviewMode: args.reviewMode,
+      timeSpentMs: args.timeSpentMs,
+      transition,
+      writing,
+      searchableTextPatch,
+      newWordsTrackedLanguages,
+    });
 
     // Permanent per-review history row (append-only, unlike the capped undo
-    // stack below). Snapshots the scheduling transition on the reviewed
-    // track: prev* is the state the review was scheduled FROM — on the
-    // lazy-seed path that's the copied shared baseline (`cardState`), which
-    // is what retrospective schedule reconstruction needs; the card's raw
-    // pre-review fields stay in the undo snapshot below.
-    const historyId = await insertReviewHistory(ctx, {
+    // stack below).
+    const historyId = await recordReviewHistoryRow(ctx, {
       userId,
       courseId: deck.courseId,
-      cardId: args.cardId,
-      reviewedAt: Date.now(),
-      date: todayDate,
-      timezone: args.timezone,
+      card,
+      args,
       track,
-      reviewMode: args.reviewMode,
       phase,
-      rating: args.rating,
-      timeSpentMs: args.timeSpentMs,
-      wasDefaultRating: args.wasDefaultRating,
+      transition,
+      todayDate,
       wasFirstReview,
-      accuracy: args.accuracy,
-      // Mirrors the both-present gate in recordReviewStats.
-      ...(args.accuracyStrict != null && args.accuracyLenient != null
-        ? {
-            accuracyStrict: args.accuracyStrict,
-            accuracyLenient: args.accuracyLenient,
-          }
-        : {}),
-      sessionId: args.sessionId,
-      prevDueDate: cardState.dueDate,
-      newDueDate: dueDateWithJitter,
-      ...(track === 'shared'
-        ? { prevPreReviewCount: card.preReviewCount }
-        : {}),
-      prevFsrsState: cardState.fsrsState ?? undefined,
-      newFsrsState: result.fsrsState ?? undefined,
-      ...(result.phaseTransitioned ? { phaseTransitioned: true } : {}),
-      ...(writingUnseeded ? { lazySeededWriting: true } : {}),
+      writingUnseeded: writing.writingUnseeded,
     });
 
-    // Log the review for the learn-mode undo stack: the pre-patch card
-    // snapshot plus the keys `reverseReviewStats` needs to decrement the
-    // right stat buckets. The study context stamps scope undo to the settings
-    // the review happened under.
-    await logReview(ctx, {
+    // Log the review for the learn-mode undo stack (pre-patch snapshot +
+    // stat-reversal keys), then resolve the milestone-celebration verdict.
+    await logReviewForUndo(ctx, {
       userId,
       courseId: deck.courseId,
-      cardId: args.cardId,
-      reviewedAt: Date.now(),
-      timezone: args.timezone,
-      kind: 'review',
-      date: todayDate,
-      schedulingMode: reviewSettings?.schedulingMode ?? 'learnAndReview',
-      studyContentFilter: reviewSettings?.studyContentFilter ?? 'both',
+      card,
+      args,
+      reviewSettings,
       track,
       historyId,
-      // Snapshot the reviewed track's TRUE prior fields (for a lazy seed
-      // that's all-undefined), so undo restores exactly what was overwritten.
-      ...(track === 'writing'
-        ? {
-            prevWriting: {
-              writingDueDate: card.writingDueDate,
-              writingFsrsState: card.writingFsrsState,
-              writingIsGraduated: card.writingIsGraduated,
-              writingLastReviewedAt: card.writingLastReviewedAt,
-              writingGoodReviewCount: card.writingGoodReviewCount,
-            },
-          }
-        : {
-            prevCard: {
-              dueDate: card.dueDate,
-              schedulingPhase: card.schedulingPhase,
-              preReviewCount: card.preReviewCount,
-              fsrsState: card.fsrsState,
-              isGraduated: card.isGraduated,
-              lastReviewedAt: card.lastReviewedAt,
-              goodReviewCount: card.goodReviewCount,
-            },
-          }),
-      statsReversal: {
-        hourOfDay,
-        rating: args.rating,
-        reviewModeForStats: args.reviewMode ?? 'audio',
-        reviewModeRaw: args.reviewMode,
-        wasFirstReview,
-        wasDefaultRating: args.wasDefaultRating,
-        accuracy: args.accuracy,
-        // Mirrors the both-present gate in recordReviewStats so undo reverses
-        // exactly what was written.
-        ...(args.accuracyStrict != null && args.accuracyLenient != null
-          ? {
-              accuracyStrict: args.accuracyStrict,
-              accuracyLenient: args.accuracyLenient,
-            }
-          : {}),
-        // Must mirror recordReviewStats' formula per track, including the
-        // lazy-seed resolution (priorWritingFsrsState, not the raw card).
-        reviewDepth:
-          args.accuracy != null
-            ? track === 'writing'
-              ? (priorWritingFsrsState?.reps ?? 0) + 1
-              : card.preReviewCount + (card.fsrsState?.reps ?? 0) + 1
-            : undefined,
-        // Same rule, same reason, for the reviewsByCardState bucket: stamp the
-        // state the review was scheduled FROM. `prevWriting` below snapshots
-        // the card's true (on a lazy seed, unset) writing fields because undo
-        // must restore them, so it is NOT a valid source for the stat bucket,
-        // and re-deriving from it would decrement 'new' for a review counted
-        // under the copied shared state.
-        cardState:
-          (track === 'writing' ? priorWritingFsrsState : card.fsrsState)
-            ?.state ?? 0,
-        languages,
-        collectionId: card.collectionId,
-      },
+      writing,
+      stats: { todayDate, hourOfDay, languages, wasFirstReview },
     });
 
-    // Server-side milestone verdict: client just respects this. Opt-out
-    // setting defaults to enabled when undefined (matches the UI check
-    // `progressDisplayEnabled !== false`). The `lastCelebratedAtCount`
-    // high-water mark keeps an undo + re-review from replaying a celebration:
-    // the count must EXCEED the mark, and undo never lowers it.
-    const progressDisplayEnabled = reviewSettings?.progressDisplayEnabled !== false;
-    let celebrationHighWater = lastCelebratedAtCount;
-    let triggerCelebration =
-      progressDisplayEnabled &&
-      dailyReviewsToday > 0 &&
-      dailyReviewsToday % PROGRESS_DISPLAY_INTERVAL === 0 &&
-      dailyReviewsToday > lastCelebratedAtCount;
-    if (triggerCelebration) {
-      const todayStats = await getDailyStats(ctx, userId, deck.courseId, todayDate);
-      if (todayStats) {
-        await ctx.db.patch(todayStats._id, {
-          lastCelebratedAtCount: dailyReviewsToday,
-        });
-        celebrationHighWater = dailyReviewsToday;
-      } else {
-        triggerCelebration = false;
-      }
-    }
+    const { triggerCelebration, celebrationHighWater } =
+      await resolveCelebrationVerdict(ctx, {
+        userId,
+        courseId: deck.courseId,
+        reviewSettings,
+        dailyReviewsToday,
+        lastCelebratedAtCount,
+        todayDate,
+      });
 
     return {
       schedulingPhase: result.schedulingPhase,
@@ -1457,7 +1180,7 @@ async function advanceFreePlayCardImpl(
   if (!face) {
     // The client only calls this from a free-play session; landing here means
     // the mode changed underneath it, so there is no rotation to advance.
-    throw new ConvexError('Not in free play');
+    throw new ConvexError({ code: 'INVALID_STATE', message: 'Not in free play' });
   }
   const cfg = FREE_PLAY_MODES[face];
 
@@ -1625,9 +1348,10 @@ export const setCardAudioSpeedOverride = mutation({
         args.speed < CARD_OVERRIDE_SPEED_MIN ||
         args.speed > CARD_OVERRIDE_SPEED_MAX
       ) {
-        throw new ConvexError(
-          `audioSpeedOverride must be between ${CARD_OVERRIDE_SPEED_MIN} and ${CARD_OVERRIDE_SPEED_MAX}`,
-        );
+        throw new ConvexError({
+          code: 'INVALID_ARGUMENT',
+          message: `audioSpeedOverride must be between ${CARD_OVERRIDE_SPEED_MIN} and ${CARD_OVERRIDE_SPEED_MAX}`,
+        });
       }
     }
     const current = card.audioSpeedOverrides ?? {};
@@ -1902,7 +1626,7 @@ export const flagTranslation = mutation({
     const { userId, card, course } = await authorizeCardAccess(ctx, args.cardId);
 
     const text = await ctx.db.get(card.textId);
-    if (!text) throw new ConvexError('Text not found');
+    if (!text) throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
 
     // Languages we need translations for: every base + target language in
     // the user's course except the source. Dedupe in case a language is
@@ -2067,7 +1791,7 @@ export const regenerateCardAudio = mutation({
     const { userId, card, course } = await authorizeCardAccess(ctx, args.cardId);
 
     const text = await ctx.db.get(card.textId);
-    if (!text) throw new ConvexError('Text not found');
+    if (!text) throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
 
     await consumeQuota(ctx, userId, FEATURE_IDS.AUDIO_REGENERATIONS);
     await trackEvent(ctx, {
@@ -2168,101 +1892,26 @@ export async function applyCardEdit(
     const { userId, card, course } = await authorizeCardAccess(ctx, args.cardId);
 
     const text = await ctx.db.get(card.textId);
-    if (!text) throw new ConvexError('Text not found');
+    if (!text) throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
 
-    // Narrow the card's resolved voice gender once for stamping onto the
-    // translation rows below. `texts.audioSpeakerGender` is typed as a loose
-    // string but is always 'male' | 'female' in practice; the stamped
-    // `translations.speakerGender` field is strict. A proposed gender wins.
-    // The re-stamped rows must agree with the voice the edit enqueues.
-    const audioGenderStamp = asVoiceGender(
-      args.proposedAudioSpeakerGender ?? text.audioSpeakerGender,
-    );
-
-    const sourceLanguage = text.language;
-    const allLanguages = [
-      ...new Set([...course.baseLanguages, ...course.targetLanguages]),
-    ];
-
-    // Load existing translations for non-source languages
-    const nonSourceLanguages = allLanguages.filter(
-      (lang) => lang !== sourceLanguage,
-    );
-    const existingTranslations = await Promise.all(
-      nonSourceLanguages.map((lang) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('targetLanguage', lang),
-          )
-          .first(),
-      ),
-    );
-    const existingTranslationMap = new Map<string, Doc<'translations'>>();
-    nonSourceLanguages.forEach((lang, i) => {
-      if (existingTranslations[i]) {
-        existingTranslationMap.set(lang, existingTranslations[i]!);
-      }
+    // Diff plan: which languages changed (audibly or not), which path the
+    // edit takes, and the gender stamp for written rows. A no-op diff
+    // without a demanded fork returns before validation/billing, as before.
+    const plan = await resolveCardEditPlan(ctx, {
+      userId,
+      card,
+      text,
+      course,
+      translations: args.translations,
+      ensureUserOwnedText: args.ensureUserOwnedText,
+      proposedAudioSpeakerGender: args.proposedAudioSpeakerGender,
     });
-
-    // Build a map of submitted texts
-    const submittedMap = new Map<string, string>();
-    for (const t of args.translations) {
-      submittedMap.set(t.language, t.text);
-    }
-
-    // Diff: determine which languages actually changed
-    const changedLanguages = new Set<string>();
-    for (const lang of allLanguages) {
-      const submitted = submittedMap.get(lang);
-      if (submitted === undefined) continue;
-      if (lang === sourceLanguage) {
-        if (submitted !== text.text) changedLanguages.add(lang);
-      } else {
-        const existing = existingTranslationMap.get(lang);
-        if (submitted !== (existing?.translatedText ?? '')) changedLanguages.add(lang);
-      }
-    }
-
-    const isUserOwned = text.userCreated && text.userId === userId;
-    // Path B must also run for a no-text-change call that requires ownership
-    // (metadata-only "also correct" replace on a shared text): the pure
-    // logical copy gives the caller a user-owned row to patch.
-    const needsCopy =
-      !isUserOwned &&
-      (changedLanguages.size > 0 || args.ensureUserOwnedText === true);
-    if (changedLanguages.size === 0 && !needsCopy) {
+    const { changedLanguages } = plan;
+    if (changedLanguages.size === 0 && !plan.needsCopy) {
       return { textId: card.textId, cardId: args.cardId, changed: false, course };
     }
 
-    // Audio-relevant subset of the diff: an edit that only touches
-    // punctuation/'_' (`soundsSame`) sounds identical spoken aloud, so the
-    // language keeps its audio. Path A skips the delete, Path B copies the
-    // rows like an unchanged language (word timings still align; the words
-    // are the same). Text/romanization writes keep using the full
-    // `changedLanguages` set.
-    const audioChangedLanguages = new Set<string>();
-    for (const lang of changedLanguages) {
-      const oldText =
-        lang === sourceLanguage
-          ? text.text
-          : (existingTranslationMap.get(lang)?.translatedText ?? '');
-      if (!soundsSame(submittedMap.get(lang)!, oldText)) {
-        audioChangedLanguages.add(lang);
-      }
-    }
-
-    // Validate text lengths
-    for (const { language, text } of args.translations) {
-      if (text.length > MAX_CARD_TEXT_LENGTH) {
-        throw new ConvexError({
-          code: 'TEXT_TOO_LONG',
-          message: `Text for language "${language}" exceeds the maximum length of ${MAX_CARD_TEXT_LENGTH} characters.`,
-          language,
-          maxLength: MAX_CARD_TEXT_LENGTH,
-        });
-      }
-    }
+    assertTranslationLengths(args.translations);
 
     // Consume quota before making changes
     if (!args.skipQuota) {
@@ -2272,221 +1921,37 @@ export async function applyCardEdit(
     // Track card edit event
     await trackEvent(ctx, { userId, courseId: course._id, timezone: args.timezone, field: 'cardsEdited' });
 
-    // Audit row, written before the paths diverge: Path B's curriculum-fix
-    // enqueue needs its id and runs before the replacement card exists. The
-    // after-ids therefore start as the before-ids and are corrected at the end
-    // (`setCardEditResult`), on the fork path only.
-    //
-    // Skipped when no wording changed. `ensureUserOwnedText` reaches here with
-    // an empty diff (the metadata-only "also correct" replace, which forks
-    // purely to get a user-owned row): a real card replacement, but not an
-    // edit, and logging it as one would put a changeless row in a feed whose
-    // whole subject is before/after wording.
-    const auditChanges: CardEditChange[] = [...changedLanguages].map((lang) => {
-      const isSourceLanguage = lang === sourceLanguage;
-      const existing = existingTranslationMap.get(lang);
-      return {
-        language: lang,
-        role: languageRole(course, lang),
-        isSourceLanguage,
-        before: isSourceLanguage
-          ? text.text
-          : (existing?.translatedText ?? ''),
-        after: submittedMap.get(lang)!,
-        ...(isSourceLanguage
-          ? {}
-          : {
-            beforeTranslationSource: existing?.translationSource,
-            beforeFlagCount: existing?.flagCount,
-          }),
-        soundsSame: !audioChangedLanguages.has(lang),
-      };
+    // Audit row, written before the paths diverge (Path B's curriculum-fix
+    // enqueue needs its id). See `recordCardEditAuditStart` for why a
+    // changeless fork is not logged.
+    const cardEditId = await recordCardEditAuditStart(ctx, {
+      userId,
+      course,
+      card,
+      text,
+      plan,
+      auditKind: args.auditKind,
     });
-    let cardEditId: Id<'cardEdits'> | undefined;
-    if (auditChanges.length > 0) {
-      cardEditId = await recordCardEdit(ctx, {
-        userId,
-        course,
-        kind: args.auditKind,
-        path: isUserOwned ? 'in_place' : 'fork',
-        cardIdBefore: args.cardId,
-        cardIdAfter: args.cardId,
-        textIdBefore: card.textId,
-        textIdAfter: card.textId,
-        collectionOrigin: card.collectionOrigin,
-        textWasUserCreated: text.userCreated,
-        sourceLanguage,
-        sourceText: text.text,
-        changes: auditChanges,
-      });
-    }
 
     let resolvedTextId: Id<'texts'>;
     // Languages whose shared curriculum row this edit flagged, for the
     // analytics event at the end. Only ever non-empty on Path B.
     let flaggedLanguages: string[] = [];
 
-    if (isUserOwned) {
+    if (plan.isUserOwned) {
       // Path A: modify in place
       resolvedTextId = card.textId;
-
-      if (changedLanguages.has(sourceLanguage)) {
-        // Annotation values and their provenance tags travel as units. The
-        // old transliteration/IPA no longer matches the new text, so the
-        // tags go with them (mirrors the translation branch below).
-        await ctx.db.patch(text._id, {
-          text: submittedMap.get(sourceLanguage)!,
-          ...clearedAnnotationFields(),
-        });
-      }
-
-      for (const lang of allLanguages) {
-        if (lang === sourceLanguage) continue;
-        if (!changedLanguages.has(lang)) continue;
-        const existing = existingTranslationMap.get(lang);
-        if (existing) {
-          // User edited an existing translation. Drop the annotations (they
-          // don't match the new text), drop their source tags, and re-tag
-          // as user-provided so a future strategy swap doesn't overwrite
-          // the user's edit.
-          await ctx.db.patch(existing._id, {
-            translatedText: submittedMap.get(lang)!,
-            ...clearedAnnotationFields(),
-            translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
-            // Stamp with the card's current gender so the mismatch sweep in
-            // `scheduleMissingContent` sees agreement (the user-provided
-            // branch is already skipped by the sweep, but keeping this in
-            // sync avoids relying on that skip).
-            ...(audioGenderStamp
-              ? { speakerGender: audioGenderStamp }
-              : {}),
-          });
-        } else {
-          await ctx.db.insert('translations', {
-            textId: card.textId,
-            targetLanguage: lang,
-            translatedText: submittedMap.get(lang)!,
-            translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
-            ...(audioGenderStamp
-              ? { speakerGender: audioGenderStamp }
-              : {}),
-          });
-        }
-      }
-
-      // Detach audio pointers for audibly-changed languages only.
-      // Punctuation-only edits keep their audio. keepAsset: the old audio is
-      // still correct for the old sentence, so it stays in the audioAssets
-      // cache (only the regenerate button and TTS-system migrations fully
-      // delete audio).
-      for (const lang of audioChangedLanguages) {
-        await deleteAudioRowsForTextLanguage(ctx, card.textId, lang, {
-          keepAsset: true,
-        });
-      }
+      await applyInPlaceTextEdit(ctx, { card, text, plan });
     } else {
-      // Path B: create new textId, copy unchanged content
-      const submittedSource = submittedMap.get(sourceLanguage);
-      const sourceChanged = changedLanguages.has(sourceLanguage);
-      const newTextId = await ctx.db.insert('texts', {
-        text: sourceChanged && submittedSource ? submittedSource : text.text,
-        language: text.language,
-        // Annotations (romanization, IPA) travel with their source tags:
-        // copy when unchanged (so we keep pointing at whichever engine
-        // produced the carried-over text); drop when changed (next
-        // ensureContent regenerates and re-tags).
-        ...(sourceChanged ? {} : carriedAnnotationFields(text)),
-        userCreated: true,
+      // Path B: fork the shared text into a user-owned logical copy.
+      resolvedTextId = await forkSharedTextForEdit(ctx, {
         userId,
-        collectionId: text.collectionId,
-        collectionRank: text.collectionRank,
-        // This row is a logical copy of `text`. The user only edited
-        // translations, not the source, so preserve all pipeline-derived
-        // metadata rather than regenerating it. speakerGender specifically
-        // also prevents the downstream `scheduleMissingContent` sweep from
-        // coin-flipping a new gender that disagrees with the copied audio
-        // rows and deletes them.
-        speakerGender: text.speakerGender,
-        audioSpeakerGender: text.audioSpeakerGender,
-        register: text.register,
-        addresseeNumber: text.addresseeNumber,
-        addresseeGender: text.addresseeGender,
-        addressesSomeone: text.addressesSomeone,
-        referentGender: text.referentGender,
-        tenseAspect: text.tenseAspect,
-        sentenceType: text.sentenceType,
-        literalFigurative: text.literalFigurative,
+        card,
+        text,
+        plan,
       });
-      resolvedTextId = newTextId;
 
-      // Create translations rows for all non-source languages.
-      // Sources travel with their values:
-      //   - User-edited rows: tag as `'user-provided'`; carry no annotations.
-      //   - Unchanged rows: copy `translatedText` + `translationSource` +
-      //     every present annotation pair (romanization, IPA) so we don't
-      //     lose the original tags on the logical-copy operation.
-      for (const lang of allLanguages) {
-        if (lang === sourceLanguage) continue;
-        const existing = existingTranslationMap.get(lang);
-        const changed = changedLanguages.has(lang);
-        await ctx.db.insert('translations', {
-          textId: newTextId,
-          targetLanguage: lang,
-          translatedText: changed
-            ? (submittedMap.get(lang) ?? '')
-            : (existing?.translatedText ?? ''),
-          ...(changed
-            ? { translationSource: USER_PROVIDED_TRANSLATION_SOURCE }
-            : existing?.translationSource
-              ? { translationSource: existing.translationSource }
-              : {}),
-          ...(changed || !existing ? {} : carriedAnnotationFields(existing)),
-          // Copy the prior row's speakerGender on the carry-over path so the
-          // logical copy doesn't trigger a gender-mismatch regeneration on
-          // the new text. For user-edited (changed) rows, stamp with the
-          // new text's current gender (which copies `text.audioSpeakerGender`
-          // a few lines above).
-          ...(changed
-            ? audioGenderStamp
-              ? { speakerGender: audioGenderStamp }
-              : {}
-            : existing?.speakerGender
-              ? { speakerGender: existing.speakerGender }
-              : {}),
-          // Carry the source row's translationVersion on the unchanged carry-over
-          // branch so the logical copy is faithful (matching the audio copy and
-          // the stamping done everywhere else). User-edited rows are tagged
-          // user-provided and left unstamped (user-owned). Benign today since the
-          // version sweep exempts userCreated + user-provided rows, but this keeps
-          // the copy honest if those exemptions ever change.
-          ...(!changed && existing?.translationVersion !== undefined
-            ? { translationVersion: existing.translationVersion }
-            : {}),
-        });
-      }
-
-      // Copy audio recordings for languages whose audio is still valid.
-      // Unchanged ones AND punctuation-only edits (audibly identical).
-      for (const lang of allLanguages) {
-        if (audioChangedLanguages.has(lang)) continue;
-        const audioRows = await ctx.db
-          .query('audioRecordings')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('language', lang),
-          )
-          .take(20);
-        for (const row of audioRows) {
-          // The copy shares the same asset. Staleness (the asset's
-          // ttsVersion stamp) travels with the asset itself.
-          await ctx.db.insert('audioRecordings', {
-            textId: newTextId,
-            language: row.language,
-            assetId: row.assetId,
-          });
-        }
-      }
-
-      // The fork above is now the user's private copy. `text` and
+      // The fork above is now the user's private copy. `text` and the plan's
       // `existingTranslationMap` still describe the untouched shared rows, so
       // this is the one place with both the original rows and the user's
       // wording in hand.
@@ -2496,15 +1961,15 @@ export async function applyCardEdit(
       // so offering it as a correction would compare two different sentences.
       if (
         args.suggestCurriculumFix &&
-        !changedLanguages.has(sourceLanguage) &&
+        !changedLanguages.has(plan.sourceLanguage) &&
         cardEditId !== undefined
       ) {
         flaggedLanguages = await suggestCurriculumFixesForEdit(
           ctx,
           text,
           changedLanguages,
-          submittedMap,
-          existingTranslationMap,
+          plan.submittedMap,
+          plan.existingTranslationMap,
           { cardEditId, userId, course },
         );
       }
@@ -2524,75 +1989,29 @@ export async function applyCardEdit(
       });
     }
 
-    // Build searchable text for the new card
-    const resolvedText = await ctx.db.get(resolvedTextId);
-    if (!resolvedText) throw new ConvexError('Resolved text not found');
-
-    const courseLanguages = [...course.baseLanguages, ...course.targetLanguages];
-    const { searchableText, searchableTextLanguages } =
-      await buildCardSearchableText(ctx, resolvedTextId, resolvedText.text, courseLanguages);
-
-    // Both paths leave the SAME card document in place: Path A edited its
-    // existing text row, Path B forked the shared text into a private copy
-    // and re-points the card at it (for Path A `resolvedTextId` is the
-    // card's current `textId`, so that part of the patch is a no-op). An
-    // edit used to REPLACE the card on Path B (insert + delete), which
-    // demanded a hand-carried list of every progress field, −1ms due-date
-    // tiebreak tricks to keep the queue position, an alternatives
-    // migration, and sibling-approval retargeting — and still left
-    // `reviewHistory.cardId` dangling. Patching in place keeps `_id`,
-    // `_creationTime` and `dueDate`, so all of that machinery is
-    // unnecessary: every by-id reference (accepted writing alternatives,
-    // pending approvals, reviewHistory, the audit log, the undo stack)
-    // stays valid by construction.
+    // Re-point the card at the resolved text (in place — see
+    // `repointCardAtEditedText` for why the card id never changes) and
+    // refresh its searchable text.
     const resolvedCardId: Id<'cards'> = args.cardId;
-    await patchCard(
-      ctx,
-      args.cardId,
-      {
-        textId: resolvedTextId,
-        searchableText,
-        searchableTextLanguages,
-        // Backfill defaults for cards predating these fields, applied on
-        // edit as before.
-        isGraduated: card.isGraduated ?? false,
-        radioRoundCounter: card.radioRoundCounter ?? 0,
-        radioOrderKey: card.radioOrderKey ?? randomOrderKey(),
-        freeStudyRoundCounter: card.freeStudyRoundCounter ?? 0,
-        freeStudyOrderKey: card.freeStudyOrderKey ?? randomOrderKey(),
-      },
+    const resolvedText = await repointCardAtEditedText(ctx, {
       card,
-    );
+      course,
+      resolvedTextId,
+    });
     // Defensive cleanup: if the edit left the old text orphaned and user-created
     // (path A reuses the textId, so the new card normally still references it.
     // This is a no-op then), drop its now-unreferenced translations/audio/blobs.
     await cascadeCleanupTextIfOrphaned(ctx, card.textId);
 
-    // Update word-text links for changed languages (only if words were previously tracked)
-    if (card.wordsTrackedLanguages && card.wordsTrackedLanguages.length > 0) {
-      const changedLangTexts: Array<{ language: string; text: string }> = [];
-      for (const lang of changedLanguages) {
-        const submitted = submittedMap.get(lang);
-        if (submitted) changedLangTexts.push({ language: lang, text: submitted });
-      }
-      if (changedLangTexts.length > 0) {
-        await updateWordTextsForEdit(ctx, {
-          userId,
-          courseId: course._id,
-          textId: resolvedTextId,
-          languages: changedLangTexts,
-        });
-      }
-    }
-
-    // Trigger TTS + romanization for changed languages
-    await scheduleMissingContent(
-      ctx,
+    // Word re-tracking + TTS/romanization for the changed languages.
+    await propagateEditToDerivedContent(ctx, {
+      userId,
+      course,
+      card,
+      plan,
       resolvedTextId,
       resolvedText,
-      course.baseLanguages,
-      course.targetLanguages,
-    );
+    });
 
     // Path B forked the text row; the audit row still holds the before-id.
     // The card id never changes (in-place patch) — recorded anyway so the

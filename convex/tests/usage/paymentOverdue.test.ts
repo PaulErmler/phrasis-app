@@ -521,7 +521,9 @@ describe("usage: quota used-clamp and sync-guard errors", () => {
         const { releaseQuota } = await import("../../usage/helpers");
         return releaseQuota(ctx as never, "user_A", "courses", 1);
       }),
-    ).rejects.toThrow(/No quota entry for feature "courses"/);
+    // The structured ConvexError's message arrives JSON-stringified, so the
+    // inner quotes around the feature id are escaped.
+    ).rejects.toThrow(/No quota entry for feature \\?"courses\\?"/);
   });
 
   it("a release larger than used clamps used to 0 while still crediting balance", async () => {

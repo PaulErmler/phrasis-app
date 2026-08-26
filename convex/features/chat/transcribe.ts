@@ -110,9 +110,14 @@ export const transcribeAudio = action({
         message: error instanceof Error ? error.message : String(error),
       });
       console.error('Transcription error:', error);
-      throw new ConvexError(
-        error instanceof Error ? error.message : 'Failed to transcribe audio',
-      );
+      // Structured errors (e.g. RATE_LIMITED from the STT slot reservation)
+      // pass through with their code intact.
+      if (error instanceof ConvexError) throw error;
+      throw new ConvexError({
+        code: 'UPSTREAM_ERROR',
+        message:
+          error instanceof Error ? error.message : 'Failed to transcribe audio',
+      });
     }
   },
 });

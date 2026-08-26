@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { action, type ActionCtx } from "./_generated/server";
 import { Autumn } from "@useautumn/convex";
@@ -128,7 +128,10 @@ export async function gateTrialArgs<T extends { freeTrial?: boolean }>(
   }
   if (!res.ok) {
     console.error(`Autumn trial-gate customer fetch failed (${res.status}): ${res.text}`);
-    throw new Error('Could not verify trial eligibility — please retry');
+    throw new ConvexError({
+      code: 'UPSTREAM_ERROR',
+      message: 'Could not verify trial eligibility — please retry',
+    });
   }
   const customer = res.json as {
     products?: unknown;
@@ -138,9 +141,10 @@ export async function gateTrialArgs<T extends { freeTrial?: boolean }>(
   const state = getTrialState(customer);
   if (state.trialEligible) return { gated: args, state, customer };
   if (state.onTrial && kind === 'attach') {
-    throw new Error(
-      'Plan switches during a trial must go through switchPlanDuringTrial',
-    );
+    throw new ConvexError({
+      code: 'INVALID_STATE',
+      message: 'Plan switches during a trial must go through switchPlanDuringTrial',
+    });
   }
   return { gated: { ...args, freeTrial: false }, state, customer };
 }
@@ -238,7 +242,10 @@ function guardFirstPurchaseOffLegacyPath(state: TrialState | null): void {
     // incident was opaque without it), the error string alone says nothing
     // about WHY the customer was classified this way.
     console.warn('Blocked a first purchase off the legacy path', { state });
-    throw new Error('Checkout has been updated — please refresh the page');
+    throw new ConvexError({
+      code: 'INVALID_STATE',
+      message: 'Checkout has been updated — please refresh the page',
+    });
   }
 }
 
@@ -261,8 +268,16 @@ async function attachViaV2NoTrial(
   args: { productId?: string; options?: { featureId: string; quantity: number }[] },
 ) {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new Error('Not authenticated');
-  if (!args.productId) throw new Error('productId is required');
+  if (!identity)
+    throw new ConvexError({
+      code: 'UNAUTHENTICATED',
+      message: 'Not authenticated',
+    });
+  if (!args.productId)
+    throw new ConvexError({
+      code: 'INVALID_ARGUMENT',
+      message: 'productId is required',
+    });
 
   const res = await autumnFetchRaw(
     'POST',
@@ -331,7 +346,10 @@ async function isFreeProduct(productId: string): Promise<boolean> {
   );
   if (!res.ok) {
     console.error(`Autumn product fetch failed (${res.status}): ${res.text}`);
-    throw new Error('Could not verify the selected plan — please retry');
+    throw new ConvexError({
+      code: 'UPSTREAM_ERROR',
+      message: 'Could not verify the selected plan — please retry',
+    });
   }
   const product = res.json as {
     is_default?: boolean;
@@ -361,9 +379,10 @@ function rejectArgsUnsupportedOnV2(args: Record<string, unknown>): void {
     (key) => args[key] !== undefined,
   );
   if (present.length > 0) {
-    throw new Error(
-      `Not supported on this plan switch: ${present.join(', ')}`,
-    );
+    throw new ConvexError({
+      code: 'INVALID_ARGUMENT',
+      message: `Not supported on this plan switch: ${present.join(', ')}`,
+    });
   }
 }
 
@@ -392,9 +411,11 @@ export function rejectLegacySessionUnderManagedPayments(
       'Refused a legacy attach that returned a checkout session under Managed Payments',
       { state },
     );
-    throw new Error(
-      'No usable payment method on file — please update your payment details in the billing portal, then try again',
-    );
+    throw new ConvexError({
+      code: 'INVALID_STATE',
+      message:
+        'No usable payment method on file — please update your payment details in the billing portal, then try again',
+    });
   }
 }
 

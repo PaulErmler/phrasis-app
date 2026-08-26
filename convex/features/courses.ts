@@ -88,9 +88,9 @@ async function validateLanguageLimits(
   existing?: { baseLanguages: string[]; targetLanguages: string[] },
 ) {
   if (baseLanguages.length === 0)
-    throw new ConvexError('At least one base language is required');
+    throw new ConvexError({ code: 'INVALID_ARGUMENT', message: 'At least one base language is required' });
   if (targetLanguages.length === 0)
-    throw new ConvexError('At least one target language is required');
+    throw new ConvexError({ code: 'INVALID_ARGUMENT', message: 'At least one target language is required' });
 
   const { available: hasMultiLang, synced: multiLangSynced } =
     await hasFeatureAccess(ctx, userId, FEATURE_IDS.MULTIPLE_LANGUAGES);
@@ -486,11 +486,11 @@ export const setActiveCourse = mutation({
     const userId = await requireAuthUserId(ctx);
 
     const course = await ctx.db.get(args.courseId);
-    if (!course) throw new ConvexError('Course not found');
+    if (!course) throw new ConvexError({ code: 'NOT_FOUND', message: 'Course not found' });
     if (course.userId !== userId)
-      throw new ConvexError('Course does not belong to user');
+      throw new ConvexError({ code: 'FORBIDDEN', message: 'Course does not belong to user' });
     if (course.isArchived === true)
-      throw new ConvexError('Cannot select an archived course');
+      throw new ConvexError({ code: 'INVALID_STATE', message: 'Cannot select an archived course' });
 
     const existingSettings = await dbGetUserSettings(ctx, userId);
     if (existingSettings) {
@@ -519,11 +519,11 @@ export const archiveCourse = mutation({
     const userId = await requireAuthUserId(ctx);
 
     const course = await ctx.db.get(args.courseId);
-    if (!course) throw new ConvexError('Course not found');
+    if (!course) throw new ConvexError({ code: 'NOT_FOUND', message: 'Course not found' });
     if (course.userId !== userId)
-      throw new ConvexError('Course does not belong to user');
+      throw new ConvexError({ code: 'FORBIDDEN', message: 'Course does not belong to user' });
     if (course.isArchived === true)
-      throw new ConvexError('Course is already archived');
+      throw new ConvexError({ code: 'INVALID_STATE', message: 'Course is already archived' });
 
     await ctx.db.patch(args.courseId, {
       isArchived: true,
@@ -571,11 +571,11 @@ export const unarchiveCourse = mutation({
     const userId = await requireAuthUserId(ctx);
 
     const course = await ctx.db.get(args.courseId);
-    if (!course) throw new ConvexError('Course not found');
+    if (!course) throw new ConvexError({ code: 'NOT_FOUND', message: 'Course not found' });
     if (course.userId !== userId)
-      throw new ConvexError('Course does not belong to user');
+      throw new ConvexError({ code: 'FORBIDDEN', message: 'Course does not belong to user' });
     if (course.isArchived !== true)
-      throw new ConvexError('Course is not archived');
+      throw new ConvexError({ code: 'INVALID_STATE', message: 'Course is not archived' });
 
     // Cooldown is anti-churn protection only for single-course plans
     // (free/basic). Multi-course plans gate on quota alone, so they can
@@ -666,17 +666,19 @@ export const saveOnboardingProgress = mutation({
       args.acquisitionSourceFreeText &&
       args.acquisitionSourceFreeText.length > MAX_ONBOARDING_FREE_TEXT_LENGTH
     ) {
-      throw new ConvexError(
-        `acquisitionSourceFreeText exceeds ${MAX_ONBOARDING_FREE_TEXT_LENGTH} characters`,
-      );
+      throw new ConvexError({
+        code: 'INVALID_ARGUMENT',
+        message: `acquisitionSourceFreeText exceeds ${MAX_ONBOARDING_FREE_TEXT_LENGTH} characters`,
+      });
     }
     if (
       args.learningGoalFreeText &&
       args.learningGoalFreeText.length > MAX_ONBOARDING_FREE_TEXT_LENGTH
     ) {
-      throw new ConvexError(
-        `learningGoalFreeText exceeds ${MAX_ONBOARDING_FREE_TEXT_LENGTH} characters`,
-      );
+      throw new ConvexError({
+        code: 'INVALID_ARGUMENT',
+        message: `learningGoalFreeText exceeds ${MAX_ONBOARDING_FREE_TEXT_LENGTH} characters`,
+      });
     }
 
     // Same clamp window as updateCourseSettings, completeOnboarding copies
@@ -721,8 +723,9 @@ export const saveOnboardingProgress = mutation({
     }
 
     const progress = await ctx.db.get(progressId);
+    // Invariant: the row was just inserted/patched above. Logs audience.
     if (!progress)
-      throw new ConvexError('Failed to retrieve onboarding progress');
+      throw new Error('Failed to retrieve onboarding progress');
     return progress;
   },
 });
@@ -839,7 +842,7 @@ export const completeOnboarding = mutation({
     }
 
     if (!progress) {
-      throw new ConvexError('Onboarding progress not found');
+      throw new ConvexError({ code: 'NOT_FOUND', message: 'Onboarding progress not found' });
     }
 
     const targetLanguages = progress.targetLanguages || [];
@@ -908,7 +911,8 @@ export const completeOnboarding = mutation({
       if (textsToAdd.length > 0) {
         const deck = await ctx.db.get(deckId);
         const course = await ctx.db.get(courseId);
-        if (!deck || !course) throw new ConvexError('Failed to load deck or course');
+        // Invariant: both were created earlier in this mutation. Logs audience.
+        if (!deck || !course) throw new Error('Failed to load deck or course');
 
         // deck.cardCount is maintained by `insertCard` inside
         // `createCardsFromTexts`, in the same transaction as each row insert.
@@ -982,9 +986,9 @@ export const updateCourseLanguages = mutation({
     const userId = await requireAuthUserId(ctx);
 
     const course = await ctx.db.get(args.courseId);
-    if (!course) throw new ConvexError('Course not found');
+    if (!course) throw new ConvexError({ code: 'NOT_FOUND', message: 'Course not found' });
     if (course.userId !== userId)
-      throw new ConvexError('Course does not belong to user');
+      throw new ConvexError({ code: 'FORBIDDEN', message: 'Course does not belong to user' });
 
     await validateLanguageLimits(
       ctx,
@@ -1007,7 +1011,10 @@ export const updateCourseLanguages = mutation({
     ]);
     for (const code of existingCodes) {
       if (!newCodes.has(code)) {
-        throw new ConvexError(`Cannot remove existing language: ${code}`);
+        throw new ConvexError({
+          code: 'INVALID_ARGUMENT',
+          message: `Cannot remove existing language: ${code}`,
+        });
       }
     }
 
@@ -1063,9 +1070,9 @@ export const setCurrentSessionId = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
     const course = await ctx.db.get(args.courseId);
-    if (!course) throw new ConvexError('Course not found');
+    if (!course) throw new ConvexError({ code: 'NOT_FOUND', message: 'Course not found' });
     if (course.userId !== userId) {
-      throw new ConvexError('Course does not belong to user');
+      throw new ConvexError({ code: 'FORBIDDEN', message: 'Course does not belong to user' });
     }
 
     const existing = await dbGetCourseSettings(ctx, args.courseId);
@@ -1111,9 +1118,9 @@ export const updateCourseSettings = mutation({
     }
 
     const course = await ctx.db.get(args.courseId);
-    if (!course) throw new ConvexError('Course not found');
+    if (!course) throw new ConvexError({ code: 'NOT_FOUND', message: 'Course not found' });
     if (course.userId !== userId)
-      throw new ConvexError('Course does not belong to user');
+      throw new ConvexError({ code: 'FORBIDDEN', message: 'Course does not belong to user' });
 
     // Build patch object with only provided fields
     const existing = await dbGetCourseSettings(ctx, args.courseId);
@@ -1297,7 +1304,7 @@ export const completeTutorial = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
     const settings = await dbGetUserSettings(ctx, userId);
-    if (!settings) throw new ConvexError('User settings not found');
+    if (!settings) throw new ConvexError({ code: 'NOT_FOUND', message: 'User settings not found' });
 
     const existing = settings.completedTutorials ?? [];
     if (!existing.includes(args.tutorialId)) {

@@ -1,6 +1,6 @@
 "use node";
 
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 import { action } from './_generated/server';
 import {
   hasUnpaidInvoice,
@@ -53,7 +53,11 @@ export const switchPlanDuringTrial = action({
   }),
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error('Not authenticated');
+    if (!identity)
+      throw new ConvexError({
+        code: 'UNAUTHENTICATED',
+        message: 'Not authenticated',
+      });
     const customerId = identity.subject;
 
     // Server-side verification, never trust the client's trial state.
@@ -69,13 +73,19 @@ export const switchPlanDuringTrial = action({
       normalizePlans(customer),
     ).find((p) => !p.isDefault && !p.isAddOn && p.isTrialing);
     if (!trialing) {
-      throw new Error('No active trial — use the regular checkout flow');
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message: 'No active trial — use the regular checkout flow',
+      });
     }
     // v1.2 reports the trial end via current_period_end and leaves
     // trial_ends_at null while trialing; normalizePlans absorbs that.
     const trialEndsAt = trialing.trialEndsAt ?? null;
     if (!trialEndsAt || trialEndsAt <= Date.now()) {
-      throw new Error('Trial end date unavailable or already passed');
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message: 'Trial end date unavailable or already passed',
+      });
     }
 
     const preview = await autumnFetch<{
@@ -93,7 +103,10 @@ export const switchPlanDuringTrial = action({
     let paymentUrl: string | null = null;
 
     if (trialing.planId === args.productId && scenario !== 'renew') {
-      throw new Error('Already trialing this plan');
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message: 'Already trialing this plan',
+      });
     }
     if (
       targetIsFree &&
@@ -101,9 +114,10 @@ export const switchPlanDuringTrial = action({
       scenario !== 'cancel' &&
       scenario !== 'renew'
     ) {
-      throw new Error(
-        `Plan switch not applicable during trial (scenario: ${scenario ?? 'unknown'})`,
-      );
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message: `Plan switch not applicable during trial (scenario: ${scenario ?? 'unknown'})`,
+      });
     }
 
     if (scenario === 'renew') {
@@ -167,9 +181,10 @@ export const switchPlanDuringTrial = action({
       paymentUrl = result?.payment_url ?? null;
       mode = 'immediate';
     } else {
-      throw new Error(
-        `Plan switch not applicable during trial (scenario: ${scenario ?? 'unknown'})`,
-      );
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message: `Plan switch not applicable during trial (scenario: ${scenario ?? 'unknown'})`,
+      });
     }
 
     await syncQuotasForUser(ctx, customerId);
@@ -216,7 +231,11 @@ export const attachNewPlan = action({
   returns: v.object({ paymentUrl: v.union(v.string(), v.null()) }),
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error('Not authenticated');
+    if (!identity)
+      throw new ConvexError({
+        code: 'UNAUTHENTICATED',
+        message: 'Not authenticated',
+      });
     const customerId = identity.subject;
 
     // 404 = customer not created in Autumn yet. A brand-new user's very
@@ -236,9 +255,10 @@ export const attachNewPlan = action({
     );
     const state = getTrialState(customer);
     if (state.onTrial) {
-      throw new Error(
-        'Plan switches during a trial must go through switchPlanDuringTrial',
-      );
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message: 'Plan switches during a trial must go through switchPlanDuringTrial',
+      });
     }
     // A customer who already pays would take Autumn's in-place subscription
     // update, which this action's redirect handling isn't built for, and which
@@ -246,7 +266,10 @@ export const attachNewPlan = action({
     // Free has no paid plan and is welcome here, whether or not a card
     // survived (see the redirect_mode note below).
     if (state.hasPaidPlan) {
-      throw new Error('Already on a paid plan — use the regular checkout flow');
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message: 'Already on a paid plan — use the regular checkout flow',
+      });
     }
 
     const result = await autumnFetch<{ payment_url?: string | null }>(
@@ -321,7 +344,11 @@ export const cancelOverdueSubscription = action({
   }),
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error('Not authenticated');
+    if (!identity)
+      throw new ConvexError({
+        code: 'UNAUTHENTICATED',
+        message: 'Not authenticated',
+      });
     const customerId = identity.subject;
 
     // One fetch carries both signals: the plan list (is anything past due?)

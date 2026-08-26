@@ -346,10 +346,428 @@ export const enqueueLlmTranslation = internalMutation({
   },
 });
 
+/** The text-row projection `getTextRowForTranslation` hands the worker. */
+type TextRowForTranslation = {
+  _id: Id<'texts'>;
+  externalId?: string;
+  text: string;
+  addressesSomeone?: boolean;
+  addresseeNumber?: string;
+  speakerGender?: string;
+  addresseeGender?: string;
+  register?: string;
+  referentGender?: string;
+  collectionId: Id<'collections'>;
+  collectionRank: number;
+  arcId?: string;
+};
+
+type TranslationStage = ReturnType<typeof resolveTranslationStages>[number];
+
+/** The prompt payload shared by every stage attempt of one worker run. */
+type LlmPromptArgs = {
+  text: string;
+  sourceLang: string;
+  targetLang: string;
+  targetLangName: string;
+  targetLangNativeName: string;
+  targetRegion: ReturnType<
+    typeof getTranslationConfigForLanguage
+  >['targetRegion'];
+  addressesSomeone: boolean;
+  referentGender: 'male' | 'female';
+  speakerGender: 'male' | 'female' | 'neutral' | undefined;
+  addresseeGender: 'male' | 'female' | undefined;
+  formality: 'formal' | 'informal' | 'neutral' | undefined;
+  arcContext: { preceding: string[]; following: string[] } | undefined;
+  previousTranslation: string | undefined;
+  userSuggestedTranslation: string | undefined;
+};
+
+/**
+ * Resolve the concrete dialect pin for a mixed-language target (today:
+ * es_mixed). The LLM prompt is built using the sub-variant's config so the
+ * model gets accurate region instructions, and the persisted regionVariant
+ * lets the audio player synthesize with the matching accent.
+ *
+ * Variant pin: prefer (a) the regionVariant already persisted on the
+ * existing translation row, then (b) the one captured before a sweep
+ * deleted the row (`preferredRegionVariant`), then (c) a fresh
+ * deterministic pick, so a regeneration can never flip the card's
+ * dialect out from under existing audio. Non-mixed targets resolve to the
+ * target language itself with no variant.
+ */
+async function resolveMixedVariantPin(
+  ctx: ActionCtx,
+  args: LlmJobArgs,
+): Promise<{ cfgLanguageCode: string; regionVariant: string | undefined }> {
+  let mixed: ReturnType<typeof resolveMixedVariant> = null;
+  if (isMixedLanguage(args.targetLanguage)) {
+    const existingRow: { regionVariant?: string } | null = await ctx.runQuery(
+      internal.features.decks.getTranslationForTextLanguage,
+      { textId: args.textId, targetLanguage: args.targetLanguage },
+    );
+    if (existingRow?.regionVariant) {
+      mixed = getMixedVariantByRegion(
+        args.targetLanguage,
+        existingRow.regionVariant,
+      );
+    }
+    if (!mixed && args.preferredRegionVariant) {
+      mixed = getMixedVariantByRegion(
+        args.targetLanguage,
+        args.preferredRegionVariant,
+      );
+    }
+    if (!mixed) {
+      mixed = resolveMixedVariant(args.targetLanguage, args.textId as string);
+    }
+  }
+  return {
+    cfgLanguageCode: mixed ? mixed.subCode : args.targetLanguage,
+    regionVariant: mixed?.regionVariant,
+  };
+}
+
+/**
+ * Resolve the speaker/addressee/referent metadata, the arc-sibling window,
+ * and the previous-translation block into the prompt payload. The worker is
+ * the single source of truth for "what metadata fields land in the prompt".
+ */
+async function resolvePromptMetadata(
+  ctx: ActionCtx,
+  args: LlmJobArgs,
+  text: TextRowForTranslation,
+  cfg: ReturnType<typeof getTranslationConfigForLanguage>,
+  cfgLanguageCode: string,
+): Promise<LlmPromptArgs> {
+  // addressesSomeone: prefer the explicit boolean; fall back to
+  // (addresseeNumber !== 'not_applicable') for legacy rows.
+  const addressesSomeone =
+    text.addressesSomeone ??
+    (text.addresseeNumber !== 'not_applicable');
+
+  // referentGender: fall back to a deterministic coin-flip seeded the same
+  // way the backfill seeds it (`externalId || _id`, salt `'referent'`), so
+  // a row translated pre-backfill and again post-backfill ends up on the
+  // same gender.
+  const referentGender: 'male' | 'female' =
+    text.referentGender === 'male' || text.referentGender === 'female'
+      ? text.referentGender
+      : legacyReferentGenderFallback(text.externalId, text._id as string);
+
+  const speakerGender =
+    text.speakerGender === 'male' ||
+    text.speakerGender === 'female' ||
+    text.speakerGender === 'neutral'
+      ? (text.speakerGender as 'male' | 'female' | 'neutral')
+      : undefined;
+
+  const addresseeGender =
+    addressesSomeone &&
+    (text.addresseeGender === 'male' || text.addresseeGender === 'female')
+      ? (text.addresseeGender as 'male' | 'female')
+      : undefined;
+
+  const formality =
+    addressesSomeone &&
+    (text.register === 'formal' ||
+      text.register === 'informal' ||
+      text.register === 'neutral')
+      ? (text.register as 'formal' | 'informal' | 'neutral')
+      : undefined;
+
+  // Fetch the sliding window of arc siblings (≤ 5 preceding + ≤ 3
+  // following), but only when this text has an arcId. Custom/chat and
+  // legacy rows skip the lookup entirely, so they pay no extra cost.
+  let arcContext:
+    | { preceding: string[]; following: string[] }
+    | undefined;
+  if (text.arcId && text.arcId.length > 0) {
+    arcContext = await ctx.runQuery(
+      internal.features.llmTranslationQueue.getArcWindowForText,
+      {
+        collectionId: text.collectionId,
+        arcId: text.arcId,
+        targetRank: text.collectionRank,
+      },
+    );
+    if (
+      arcContext.preceding.length === 0 &&
+      arcContext.following.length === 0
+    ) {
+      arcContext = undefined;
+    }
+  }
+
+  // Gate the "previous translation" prompt block to the retranslations a
+  // USER asked for. Read straight off `translationReason` rather than
+  // reconstructed from `replaceExisting` (a storage semantic) plus a
+  // rules-slug allowlist (a model-routing choice): neither says anything
+  // about intent, so a future caller that overwrote a row for some other
+  // reason — a model-swap migration, say — would have inherited the "the
+  // user flagged this as wrong" framing, which would be a lie.
+  let previousTranslation: string | undefined;
+  if (isRetranslationReason(args.translationReason)) {
+    const existing: { translatedText: string } | null = await ctx.runQuery(
+      internal.features.decks.getTranslationForTextLanguage,
+      {
+        textId: args.textId,
+        targetLanguage: args.targetLanguage,
+      },
+    );
+    if (existing && existing.translatedText.length > 0) {
+      previousTranslation = existing.translatedText;
+    }
+  }
+
+  return {
+    text: text.text,
+    sourceLang: args.sourceLanguage,
+    // For mixed languages, expose the resolved sub-code to the LLM (e.g.
+    // 'es' or 'es_latam' rather than 'es_mixed'). The persisted row still
+    // uses the mixed code as targetLanguage; only the prompt's region
+    // context comes from the sub-variant.
+    targetLang: cfgLanguageCode,
+    targetLangName: cfg.targetLangName,
+    targetLangNativeName: cfg.targetLangNativeName,
+    targetRegion: cfg.targetRegion,
+    addressesSomeone,
+    referentGender,
+    speakerGender,
+    addresseeGender,
+    formality,
+    arcContext,
+    previousTranslation,
+    // No gate needed, unlike previousTranslation: this arrives only from
+    // `suggestCurriculumFixesForEdit`, which sets it exactly when the
+    // "a user thinks this is wrong" framing is true. buildPrompt sanitizes
+    // it before it reaches the model.
+    userSuggestedTranslation: args.userSuggestedTranslation,
+  };
+}
+
+/**
+ * Run each stage of the resolved translation rule in order. The first
+ * success wins; on truncated / empty / HTTP error we try the next fallback.
+ * Every attempt (best-of-N candidates included) reports its own PostHog
+ * generation event, failures included: a stage that truncates still burned
+ * tokens, and the failure rate of the cheap first stage is exactly what
+ * decides whether the fallback chain is worth its price.
+ *
+ * Returns the winning text plus the stage that produced it (persisted as
+ * `translationSource`). If the whole chain fails, THROWS: the pool retries
+ * this job with backoff, and after the last attempt onComplete schedules
+ * Google Translate as the final safety net.
+ */
+async function runTranslationStageChain(
+  ctx: ActionCtx,
+  args: LlmJobArgs,
+  stages: TranslationStage[],
+  promptArgs: LlmPromptArgs,
+): Promise<{ translatedText: string; winningStage: TranslationStage }> {
+  let result: Awaited<ReturnType<typeof translateTextWithLLM>> | null = null;
+  let winningStage: TranslationStage | null = null;
+  for (let i = 0; i < stages.length; i++) {
+    const stage = stages[i];
+
+    // Shared PostHog dimensions for every capture this stage produces.
+    const stageExtra = {
+      text_id: args.textId,
+      target_language: args.targetLanguage,
+      stage_index: i,
+      stage_count: stages.length,
+      reasoning: stage.reasoning ?? 'none',
+    };
+
+    if (stage.samples) {
+      // Best-of-N stage: several candidate calls + possibly a judge, each
+      // reported as its own generation event. `suspect_hidden_reasoning`
+      // flags calls whose output-token count dwarfs the visible text. The
+      // tell for providers that ignore `reasoning: {enabled: false}` and
+      // silently bill thinking tokens (observed on Luna's Azure endpoints
+      // during the Aug 2026 eval).
+      const bo = await translateBestOfN({ ...promptArgs, stage });
+      // Capture outside the closure: the `stage.samples` narrowing from
+      // the enclosing if doesn't survive into the callback.
+      const sampleTotal = stage.samples.total;
+      // Independent captures. Fire together instead of serializing up to
+      // N+1 awaited PostHog writes.
+      await Promise.all(bo.telemetryList.map(async (t) => {
+        const visibleTokenEstimate =
+          t.visibleTextLength !== undefined
+            ? Math.max(16, Math.ceil(t.visibleTextLength / 2))
+            : undefined;
+        await captureGeneration(ctx, {
+          feature: 'translation',
+          model: t.model,
+          provider: 'openrouter',
+          latencyMs: t.latencyMs,
+          inputTokens: t.inputTokens,
+          outputTokens: t.outputTokens,
+          costUsd: t.costUsd,
+          traceId: t.generationId,
+          isError: t.error !== undefined,
+          error: t.error,
+          sharedContent: true,
+          extra: {
+            ...stageExtra,
+            strategy: `bo${sampleTotal}`,
+            role: t.role,
+            candidate_index: t.candidateIndex,
+            judge_attempt: t.judgeAttempt,
+            n_unique: bo.meta.nUnique,
+            judge_fallback: bo.meta.judgeFallback,
+            suspect_hidden_reasoning:
+              visibleTokenEstimate !== undefined &&
+              t.outputTokens > 4 * visibleTokenEstimate,
+          },
+        });
+      }));
+      result = bo.result;
+    } else {
+      result = await translateTextWithLLM({
+        ...promptArgs,
+        model: stage.model,
+        reasoning: stage.reasoning as ReasoningEffort | undefined,
+        maxOutputTokens: stage.maxOutputTokens,
+        provider: stage.provider,
+      });
+      // One cost event per stage attempt, failures included.
+      // `translateTextWithLLM` has no ctx of its own, so it hands the
+      // numbers back and the capture happens here.
+      if (result.telemetry) {
+        await captureGeneration(ctx, {
+          feature: 'translation',
+          model: result.telemetry.model,
+          provider: 'openrouter',
+          latencyMs: result.telemetry.latencyMs,
+          inputTokens: result.telemetry.inputTokens,
+          outputTokens: result.telemetry.outputTokens,
+          costUsd: result.telemetry.costUsd,
+          traceId: result.telemetry.generationId,
+          isError: !result.ok,
+          error: result.ok ? undefined : result.reason,
+          // Reused by every user who reaches this sentence. See the
+          // attribution note on `captureGeneration`.
+          sharedContent: true,
+          extra: stageExtra,
+        });
+      }
+    }
+    if (result.ok) {
+      winningStage = stage;
+      break;
+    }
+    if (i < stages.length - 1) {
+      const next = stages[i + 1];
+      console.warn('[llmTranslationQueue] stage failed — retrying with next stage', {
+        textId: args.textId,
+        targetLanguage: args.targetLanguage,
+        stageIndex: i,
+        stageModel: stage.model,
+        stageReasoning: stage.reasoning,
+        reason: result.reason,
+        nextStageModel: next.model,
+        nextStageReasoning: next.reasoning,
+      });
+    }
+  }
+  if (!result) throw new Error('Unreachable: stages.length >= 1');
+
+  if (!result.ok) {
+    // Truncation / empty / HTTP error across the whole stage chain.
+    throw new Error(
+      `[llmTranslationQueue] LLM stage chain failed for ${args.targetLanguage}: ` +
+        `${result.reason}${result.detail ? ` — ${result.detail}` : ''}`,
+    );
+  }
+  // `result.ok` implies the loop broke with `winningStage = stage`.
+  return { translatedText: result.text, winningStage: winningStage! };
+}
+
+/**
+ * Success tail: optionally romanize the translation, resolve the voice and
+ * the source stamps, and write via `storeTranslationAndScheduleTTS` (same
+ * path as Google).
+ */
+async function storeLlmTranslationResult(
+  ctx: ActionCtx,
+  args: LlmJobArgs,
+  pin: { cfgLanguageCode: string; regionVariant: string | undefined },
+  translatedText: string,
+  winningStage: TranslationStage,
+): Promise<void> {
+  // `romanizeText` already retries up to 3 times internally; on full
+  // exhaustion we persist an empty-string sentinel so ensureContent
+  // doesn't reschedule another burst on every call.
+  let romanizedText: string | undefined;
+  if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
+    try {
+      romanizedText = await romanizeText(translatedText, args.targetLanguage);
+    } catch (err) {
+      console.error(
+        `[llmTranslationQueue] Romanization failed for ${args.targetLanguage} (persisting sentinel):`,
+        err instanceof Error ? err.message : err,
+      );
+      romanizedText = '';
+    }
+  }
+
+  // For mixed languages, pick a voice matching the resolved regional
+  // variant so the synthesized audio agrees with the persisted
+  // `regionVariant`. Non-mixed languages fall through to the simple picker.
+  const voiceName = pin.regionVariant
+    ? getVoiceForLanguageVariant(
+      args.targetLanguage,
+      pin.regionVariant,
+      args.audioSpeakerGender,
+    )
+    : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
+
+  // Source resolved from `cfgLanguageCode` (the sub-code for mixed
+  // dialects) so the recorded source matches what `romanizeText` ran on.
+  const romanizationSource =
+    romanizedText !== undefined
+      ? getRomanizationSource(pin.cfgLanguageCode)
+      : undefined;
+
+  // Translation source: derived from the stage that actually produced
+  // the result (not the primary), so a row that succeeded on a fallback
+  // is tagged with the fallback's model/reasoning.
+  const translationSource = getTranslationSourceFromStage(winningStage);
+
+  await ctx.runMutation(
+    internal.features.decks.storeTranslationAndScheduleTTS,
+    {
+      textId: args.textId,
+      targetLanguage: args.targetLanguage,
+      translatedText,
+      voiceName,
+      romanizedText,
+      romanizationSource,
+      translationSource,
+      regionVariant: pin.regionVariant,
+      replaceExisting: args.replaceExisting,
+      speakerGender: asVoiceGender(args.audioSpeakerGender),
+      // Single-writer gate: skip the write if the claim this job was
+      // enqueued under has been reclaimed by a newer job mid-flight.
+      expectedClaimId: args.claimId,
+      skipTts: args.skipTts,
+      priority: args.priority,
+      // Resolved at the write choke point, which is the only place that
+      // knows which of its several outcomes this attempt actually reached.
+      retranslationAuditId: args.retranslationAuditId,
+    },
+  );
+}
+
 /**
  * Worker action: read the texts row for metadata, call the LLM (running the
  * language's model-stage fallback chain in-call), and write the result via
- * `storeTranslationAndScheduleTTS` (same path as Google).
+ * `storeTranslationAndScheduleTTS` (same path as Google). Reads as the
+ * orchestration of the named steps above: dialect pin → stage resolution →
+ * prompt metadata → stage chain → store.
  *
  * Failure contract: THROW on any failure. The pool retries with backoff up to
  * its budget; the final failure lands in `onLlmTranslationComplete`, which
@@ -376,43 +794,9 @@ export const processLlmTranslationForCard = internalAction({
       return null;
     }
 
-    // Mixed-dialect targets (today: es_mixed) resolve to a concrete sub-
-    // variant per text. The LLM prompt is built using the sub-variant's
-    // config so the model gets accurate region instructions, and the
-    // persisted regionVariant lets the audio player synthesize with the
-    // matching accent.
-    //
-    // Variant pin: prefer (a) the regionVariant already persisted on the
-    // existing translation row, then (b) the one captured before a sweep
-    // deleted the row (`preferredRegionVariant`), then (c) a fresh
-    // deterministic pick, so a regeneration can never flip the card's
-    // dialect out from under existing audio.
-    let mixed: ReturnType<typeof resolveMixedVariant> = null;
-    if (isMixedLanguage(args.targetLanguage)) {
-      const existingRow = await ctx.runQuery(
-        internal.features.decks.getTranslationForTextLanguage,
-        { textId: args.textId, targetLanguage: args.targetLanguage },
-      );
-      if (existingRow?.regionVariant) {
-        mixed = getMixedVariantByRegion(
-          args.targetLanguage,
-          existingRow.regionVariant,
-        );
-      }
-      if (!mixed && args.preferredRegionVariant) {
-        mixed = getMixedVariantByRegion(
-          args.targetLanguage,
-          args.preferredRegionVariant,
-        );
-      }
-      if (!mixed) {
-        mixed = resolveMixedVariant(args.targetLanguage, args.textId as string);
-      }
-    }
-    const cfgLanguageCode = mixed ? mixed.subCode : args.targetLanguage;
-    const regionVariant = mixed?.regionVariant;
+    const pin = await resolveMixedVariantPin(ctx, args);
 
-    const cfg = getTranslationConfigForLanguage(cfgLanguageCode);
+    const cfg = getTranslationConfigForLanguage(pin.cfgLanguageCode);
     // Validate the rule override before passing it through. An unknown
     // string would crash `resolveTranslationStages`. Unknown values silently
     // fall back to the language's normal routing.
@@ -421,7 +805,7 @@ export const processLlmTranslationForCard = internalAction({
         ? (args.ruleOverride as TranslationRuleId)
         : undefined;
     const stages = resolveTranslationStages(
-      cfgLanguageCode,
+      pin.cfgLanguageCode,
       text.text.length,
       ruleOverride ? { ruleOverride } : undefined,
     );
@@ -431,306 +815,26 @@ export const processLlmTranslationForCard = internalAction({
       // NonRetryableError sends it straight to onComplete's Google fallback.
       throw new NonRetryableError(
         `[llmTranslationQueue] non-openrouter language reached worker: ` +
-          `${args.targetLanguage} (resolved ${cfgLanguageCode}, ${stages.length} stages)`,
+          `${args.targetLanguage} (resolved ${pin.cfgLanguageCode}, ${stages.length} stages)`,
       );
     }
 
-    // ── Resolve metadata for the prompt ──
-    // addressesSomeone: prefer the explicit boolean; fall back to
-    // (addresseeNumber !== 'not_applicable') for legacy rows.
-    const addressesSomeone =
-      text.addressesSomeone ??
-      (text.addresseeNumber !== 'not_applicable');
-
-    // referentGender: fall back to a deterministic coin-flip seeded the same
-    // way the backfill seeds it (`externalId || _id`, salt `'referent'`), so
-    // a row translated pre-backfill and again post-backfill ends up on the
-    // same gender.
-    const referentGender: 'male' | 'female' =
-      text.referentGender === 'male' || text.referentGender === 'female'
-        ? text.referentGender
-        : legacyReferentGenderFallback(text.externalId, text._id as string);
-
-    const speakerGender =
-      text.speakerGender === 'male' ||
-      text.speakerGender === 'female' ||
-      text.speakerGender === 'neutral'
-        ? (text.speakerGender as 'male' | 'female' | 'neutral')
-        : undefined;
-
-    const addresseeGender =
-      addressesSomeone &&
-      (text.addresseeGender === 'male' || text.addresseeGender === 'female')
-        ? (text.addresseeGender as 'male' | 'female')
-        : undefined;
-
-    const formality =
-      addressesSomeone &&
-      (text.register === 'formal' ||
-        text.register === 'informal' ||
-        text.register === 'neutral')
-        ? (text.register as 'formal' | 'informal' | 'neutral')
-        : undefined;
-
-    // Fetch the sliding window of arc siblings (≤ 5 preceding + ≤ 3
-    // following), but only when this text has an arcId. Custom/chat and
-    // legacy rows skip the lookup entirely, so they pay no extra cost.
-    let arcContext:
-      | { preceding: string[]; following: string[] }
-      | undefined;
-    if (text.arcId && text.arcId.length > 0) {
-      arcContext = await ctx.runQuery(
-        internal.features.llmTranslationQueue.getArcWindowForText,
-        {
-          collectionId: text.collectionId,
-          arcId: text.arcId,
-          targetRank: text.collectionRank,
-        },
-      );
-      if (
-        arcContext.preceding.length === 0 &&
-        arcContext.following.length === 0
-      ) {
-        arcContext = undefined;
-      }
-    }
-
-    // Gate the "previous translation" prompt block to the retranslations a
-    // USER asked for. Read straight off `translationReason` rather than
-    // reconstructed from `replaceExisting` (a storage semantic) plus a
-    // rules-slug allowlist (a model-routing choice): neither says anything
-    // about intent, so a future caller that overwrote a row for some other
-    // reason — a model-swap migration, say — would have inherited the "the
-    // user flagged this as wrong" framing, which would be a lie.
-    let previousTranslation: string | undefined;
-    if (isRetranslationReason(args.translationReason)) {
-      const existing = await ctx.runQuery(
-        internal.features.decks.getTranslationForTextLanguage,
-        {
-          textId: args.textId,
-          targetLanguage: args.targetLanguage,
-        },
-      );
-      if (existing && existing.translatedText.length > 0) {
-        previousTranslation = existing.translatedText;
-      }
-    }
-
-    const promptArgs = {
-      text: text.text,
-      sourceLang: args.sourceLanguage,
-      // For mixed languages, expose the resolved sub-code to the LLM (e.g.
-      // 'es' or 'es_latam' rather than 'es_mixed'). The persisted row still
-      // uses the mixed code as targetLanguage; only the prompt's region
-      // context comes from the sub-variant.
-      targetLang: cfgLanguageCode,
-      targetLangName: cfg.targetLangName,
-      targetLangNativeName: cfg.targetLangNativeName,
-      targetRegion: cfg.targetRegion,
-      addressesSomeone,
-      referentGender,
-      speakerGender,
-      addresseeGender,
-      formality,
-      arcContext,
-      previousTranslation,
-      // No gate needed, unlike previousTranslation: this arrives only from
-      // `suggestCurriculumFixesForEdit`, which sets it exactly when the
-      // "a user thinks this is wrong" framing is true. buildPrompt sanitizes
-      // it before it reaches the model.
-      userSuggestedTranslation: args.userSuggestedTranslation,
-    } as const;
-
-    // Run each stage of the resolved translation rule in order. The first
-    // success wins; on truncated / empty / HTTP error we try the next
-    // fallback. Track which stage produced the winning result so it can be
-    // persisted as `translationSource`. If the whole chain fails, THROW.
-    // The pool retries this job with backoff, and after the last attempt
-    // onComplete schedules Google Translate as the final safety net.
-    let result: Awaited<ReturnType<typeof translateTextWithLLM>> | null = null;
-    let winningStage: (typeof stages)[number] | null = null;
-    for (let i = 0; i < stages.length; i++) {
-      const stage = stages[i];
-
-      // Shared PostHog dimensions for every capture this stage produces.
-      const stageExtra = {
-        text_id: args.textId,
-        target_language: args.targetLanguage,
-        stage_index: i,
-        stage_count: stages.length,
-        reasoning: stage.reasoning ?? 'none',
-      };
-
-      if (stage.samples) {
-        // Best-of-N stage: several candidate calls + possibly a judge, each
-        // reported as its own generation event. `suspect_hidden_reasoning`
-        // flags calls whose output-token count dwarfs the visible text. The
-        // tell for providers that ignore `reasoning: {enabled: false}` and
-        // silently bill thinking tokens (observed on Luna's Azure endpoints
-        // during the Aug 2026 eval).
-        const bo = await translateBestOfN({ ...promptArgs, stage });
-        // Capture outside the closure: the `stage.samples` narrowing from
-        // the enclosing if doesn't survive into the callback.
-        const sampleTotal = stage.samples.total;
-        // Independent captures. Fire together instead of serializing up to
-        // N+1 awaited PostHog writes.
-        await Promise.all(bo.telemetryList.map(async (t) => {
-          const visibleTokenEstimate =
-            t.visibleTextLength !== undefined
-              ? Math.max(16, Math.ceil(t.visibleTextLength / 2))
-              : undefined;
-          await captureGeneration(ctx, {
-            feature: 'translation',
-            model: t.model,
-            provider: 'openrouter',
-            latencyMs: t.latencyMs,
-            inputTokens: t.inputTokens,
-            outputTokens: t.outputTokens,
-            costUsd: t.costUsd,
-            traceId: t.generationId,
-            isError: t.error !== undefined,
-            error: t.error,
-            sharedContent: true,
-            extra: {
-              ...stageExtra,
-              strategy: `bo${sampleTotal}`,
-              role: t.role,
-              candidate_index: t.candidateIndex,
-              judge_attempt: t.judgeAttempt,
-              n_unique: bo.meta.nUnique,
-              judge_fallback: bo.meta.judgeFallback,
-              suspect_hidden_reasoning:
-                visibleTokenEstimate !== undefined &&
-                t.outputTokens > 4 * visibleTokenEstimate,
-            },
-          });
-        }));
-        result = bo.result;
-      } else {
-        result = await translateTextWithLLM({
-          ...promptArgs,
-          model: stage.model,
-          reasoning: stage.reasoning as ReasoningEffort | undefined,
-          maxOutputTokens: stage.maxOutputTokens,
-          provider: stage.provider,
-        });
-        // One cost event per stage attempt, failures included: a stage that
-        // truncates still burned tokens, and the failure rate of the cheap first
-        // stage is exactly what decides whether the fallback chain is worth its
-        // price. `translateTextWithLLM` has no ctx of its own, so it hands the
-        // numbers back and the capture happens here.
-        if (result.telemetry) {
-          await captureGeneration(ctx, {
-            feature: 'translation',
-            model: result.telemetry.model,
-            provider: 'openrouter',
-            latencyMs: result.telemetry.latencyMs,
-            inputTokens: result.telemetry.inputTokens,
-            outputTokens: result.telemetry.outputTokens,
-            costUsd: result.telemetry.costUsd,
-            traceId: result.telemetry.generationId,
-            isError: !result.ok,
-            error: result.ok ? undefined : result.reason,
-            // Reused by every user who reaches this sentence. See the
-            // attribution note on `captureGeneration`.
-            sharedContent: true,
-            extra: stageExtra,
-          });
-        }
-      }
-      if (result.ok) {
-        winningStage = stage;
-        break;
-      }
-      if (i < stages.length - 1) {
-        const next = stages[i + 1];
-        console.warn('[llmTranslationQueue] stage failed — retrying with next stage', {
-          textId: args.textId,
-          targetLanguage: args.targetLanguage,
-          stageIndex: i,
-          stageModel: stage.model,
-          stageReasoning: stage.reasoning,
-          reason: result.reason,
-          nextStageModel: next.model,
-          nextStageReasoning: next.reasoning,
-        });
-      }
-    }
-    if (!result) throw new Error('Unreachable: stages.length >= 1');
-
-    if (!result.ok) {
-      // Truncation / empty / HTTP error across the whole stage chain.
-      throw new Error(
-        `[llmTranslationQueue] LLM stage chain failed for ${args.targetLanguage}: ` +
-          `${result.reason}${result.detail ? ` — ${result.detail}` : ''}`,
-      );
-    }
-
-    // Success: optionally romanize the translation, then write.
-    // `romanizeText` already retries up to 3 times internally; on full
-    // exhaustion we persist an empty-string sentinel so ensureContent
-    // doesn't reschedule another burst on every call.
-    let romanizedText: string | undefined;
-    if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
-      try {
-        romanizedText = await romanizeText(result.text, args.targetLanguage);
-      } catch (err) {
-        console.error(
-          `[llmTranslationQueue] Romanization failed for ${args.targetLanguage} (persisting sentinel):`,
-          err instanceof Error ? err.message : err,
-        );
-        romanizedText = '';
-      }
-    }
-
-    // For mixed languages, pick a voice matching the resolved regional
-    // variant so the synthesized audio agrees with the persisted
-    // `regionVariant`. Non-mixed languages fall through to the simple picker.
-    const voiceName = regionVariant
-      ? getVoiceForLanguageVariant(
-        args.targetLanguage,
-        regionVariant,
-        args.audioSpeakerGender,
-      )
-      : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
-
-    // Source resolved from `cfgLanguageCode` (the sub-code for mixed
-    // dialects) so the recorded source matches what `romanizeText` ran on.
-    const romanizationSource =
-      romanizedText !== undefined
-        ? getRomanizationSource(cfgLanguageCode)
-        : undefined;
-
-    // Translation source: derived from the stage that actually produced
-    // the result (not the primary), so a row that succeeded on a fallback
-    // is tagged with the fallback's model/reasoning.
-    const translationSource = winningStage
-      ? getTranslationSourceFromStage(winningStage)
-      : undefined;
-
-    await ctx.runMutation(
-      internal.features.decks.storeTranslationAndScheduleTTS,
-      {
-        textId: args.textId,
-        targetLanguage: args.targetLanguage,
-        translatedText: result.text,
-        voiceName,
-        romanizedText,
-        romanizationSource,
-        translationSource,
-        regionVariant,
-        replaceExisting: args.replaceExisting,
-        speakerGender: asVoiceGender(args.audioSpeakerGender),
-        // Single-writer gate: skip the write if the claim this job was
-        // enqueued under has been reclaimed by a newer job mid-flight.
-        expectedClaimId: args.claimId,
-        skipTts: args.skipTts,
-        priority: args.priority,
-        // Resolved at the write choke point, which is the only place that
-        // knows which of its several outcomes this attempt actually reached.
-        retranslationAuditId: args.retranslationAuditId,
-      },
+    const promptArgs = await resolvePromptMetadata(
+      ctx,
+      args,
+      text,
+      cfg,
+      pin.cfgLanguageCode,
     );
+
+    const { translatedText, winningStage } = await runTranslationStageChain(
+      ctx,
+      args,
+      stages,
+      promptArgs,
+    );
+
+    await storeLlmTranslationResult(ctx, args, pin, translatedText, winningStage);
     return null;
   },
 });

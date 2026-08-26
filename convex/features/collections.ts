@@ -23,7 +23,11 @@ import {
   scheduleMissingContent,
   scheduleTranslationForLanguage,
   scheduleAudioForLanguage,
-} from './decks';
+} from '../lib/contentScheduling';
+import {
+  isCollectionAccessible,
+  requireAccessibleText,
+} from '../lib/collectionAccess';
 import {
   COLLECTION_PREVIEW_SIZE,
   MAX_PREVIEW_PAGE_SIZE,
@@ -43,73 +47,19 @@ import { deleteAudioRow } from '../lib/audio';
 import { resolveAudioPayload } from '../lib/audioAssets';
 import { hasActiveTtsClaim } from './ttsProcessing';
 import { getLlmClaim, isClaimFresh } from './llmTranslationQueue';
-import { getCourseSettings } from '../db/courseSettings';
 import {
   translationValidator,
   audioRecordingValidator,
   type LlmPriority,
 } from '../types';
-import type { Doc, Id } from '../_generated/dataModel';
-import type { MutationCtx, QueryCtx } from '../_generated/server';
+import type { Doc } from '../_generated/dataModel';
+import type { MutationCtx } from '../_generated/server';
 
-export async function isCollectionAccessible(
-  ctx: QueryCtx,
-  collectionId: Id<'collections'>,
-  courseId: Id<'courses'>,
-): Promise<boolean> {
-  const collection = await ctx.db.get(collectionId);
-  if (!collection) return false;
-
-  if (isPremadeLevelCollection(collection)) return true;
-
-  const courseSettings = await getCourseSettings(ctx, courseId);
-  if (!courseSettings) return false;
-
-  if (courseSettings.chatCollectionId?.toString() === collectionId.toString()) return true;
-  if (courseSettings.customCollectionId?.toString() === collectionId.toString()) return true;
-  if (
-    (courseSettings.activeCustomCollectionIds ?? []).some(
-      (id) => id.toString() === collectionId.toString(),
-    )
-  )
-    return true;
-
-  return false;
-}
-
-/**
- * Fetch a text and enforce the full access chain for user-facing text
- * endpoints: the text exists, its collection is accessible to the course, and
- * the text itself is within the user's scope (`canUserAccessCollectionText`.
- * Curriculum rows for premade collections, the owner's texts for custom/chat).
- * Throws the same ConvexErrors the previously-inlined checks did.
- */
-export async function requireAccessibleText(
-  ctx: QueryCtx,
-  textId: Id<'texts'>,
-  courseId: Id<'courses'>,
-  userId: string,
-): Promise<{
-  text: Doc<'texts'>;
-  collection: Doc<'collections'>;
-  isLevelCollection: boolean;
-}> {
-  const text = await ctx.db.get(textId);
-  if (!text) throw new ConvexError('Text not found');
-  if (!(await isCollectionAccessible(ctx, text.collectionId, courseId))) {
-    throw new ConvexError('Collection not accessible');
-  }
-  const collection = await ctx.db.get(text.collectionId);
-  if (!collection) throw new ConvexError('Collection not found');
-  if (!canUserAccessCollectionText(collection, text, userId)) {
-    throw new ConvexError('Text not accessible');
-  }
-  return {
-    text,
-    collection,
-    isLevelCollection: isPremadeLevelCollection(collection),
-  };
-}
+// The accessibility predicates were historically defined (and exported) here;
+// they now live in convex/lib/collectionAccess.ts so features/decks.ts can
+// share them without importing this module (which formed the backend's only
+// import cycle). Re-exported to keep this module's public surface stable.
+export { isCollectionAccessible, requireAccessibleText } from '../lib/collectionAccess';
 
 // ============================================================================
 // QUERIES
@@ -375,7 +325,11 @@ export const setCollectionTextMark = mutation({
     const deck = await getDeckByCourseId(ctx, courseId);
     if (deck) {
       const card = await getCardByDeckAndText(ctx, deck._id, args.textId);
-      if (card) throw new ConvexError('Text is already in the deck');
+      if (card)
+        throw new ConvexError({
+          code: 'INVALID_STATE',
+          message: 'Text is already in the deck',
+        });
     }
 
     const existing = await getMark(ctx, userId, courseId, args.textId);
@@ -681,7 +635,10 @@ export const requestPreviewAudio = mutation({
       ...course.targetLanguages,
     ]);
     if (!courseLanguages.has(args.language)) {
-      throw new ConvexError('Language not in course');
+      throw new ConvexError({
+        code: 'INVALID_LANGUAGES',
+        message: 'Language not in course',
+      });
     }
 
     const existingAudio = await ctx.db

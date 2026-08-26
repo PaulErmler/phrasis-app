@@ -177,7 +177,10 @@ export const sendMessage = mutation({
     });
 
     if (!thread || thread.userId !== userId) {
-      throw new ConvexError('Thread not found or access denied');
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'Thread not found or access denied',
+      });
     }
 
     // Count across ALL pages: a single tool-call-heavy turn stores many

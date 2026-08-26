@@ -164,7 +164,10 @@ export const autoFillTranslations = action({
     const userId = await requireAuthUserId(ctx);
 
     if (args.texts.length === 0) {
-      throw new ConvexError('At least one source text is required');
+      throw new ConvexError({
+        code: 'INVALID_ARGUMENT',
+        message: 'At least one source text is required',
+      });
     }
 
     const courseCtx = await ctx.runQuery(
@@ -172,7 +175,10 @@ export const autoFillTranslations = action({
       { userId },
     );
     if (!courseCtx) {
-      throw new ConvexError('No active course found');
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'No active course found',
+      });
     }
     const allowed = new Set(courseCtx.allowedLanguages);
 
@@ -185,7 +191,11 @@ export const autoFillTranslations = action({
         });
       }
       if (entry.text.trim().length === 0) {
-        throw new ConvexError('Source texts must be non-empty');
+        throw new ConvexError({
+          code: 'EMPTY_TEXT',
+          message: 'Source texts must be non-empty',
+          language: entry.language,
+        });
       }
       sourceLangs.add(entry.language);
     }
@@ -207,7 +217,10 @@ export const autoFillTranslations = action({
     }
 
     if (targetLanguages.length === 0) {
-      throw new ConvexError('At least one target language is required for auto-fill');
+      throw new ConvexError({
+        code: 'INVALID_ARGUMENT',
+        message: 'At least one target language is required for auto-fill',
+      });
     }
 
     await ctx.runMutation(
@@ -326,14 +339,23 @@ export const autoFillTranslations = action({
     try {
       parsed = JSON.parse(cleaned);
     } catch {
-      throw new ConvexError('Failed to parse translation response');
+      throw new ConvexError({
+        code: 'UPSTREAM_ERROR',
+        message: 'Failed to parse translation response',
+      });
     }
 
     if (!parsed.translations || typeof parsed.translations !== 'object') {
-      throw new ConvexError('Translation response missing "translations" object');
+      throw new ConvexError({
+        code: 'UPSTREAM_ERROR',
+        message: 'Translation response missing "translations" object',
+      });
     }
     if (!parsed.metadata || typeof parsed.metadata !== 'object') {
-      throw new ConvexError('Translation response missing "metadata" object');
+      throw new ConvexError({
+        code: 'UPSTREAM_ERROR',
+        message: 'Translation response missing "metadata" object',
+      });
     }
 
     // Source identifier for every translation in this batch. Single LLM
@@ -357,7 +379,10 @@ export const autoFillTranslations = action({
       const translation =
         parsed.translations[resolved] ?? parsed.translations[lang];
       if (typeof translation !== 'string' || translation.trim().length === 0) {
-        throw new ConvexError(`Missing translation for language: ${lang}`);
+        throw new ConvexError({
+          code: 'UPSTREAM_ERROR',
+          message: `Missing translation for language: ${lang}`,
+        });
       }
       results.push({
         language: lang,
@@ -373,11 +398,13 @@ export const autoFillTranslations = action({
     try {
       metadata = validateSentenceMetadata(parsed.metadata);
     } catch (err) {
-      throw new ConvexError(
-        err instanceof Error
-          ? err.message
-          : 'Invalid translation response metadata',
-      );
+      throw new ConvexError({
+        code: 'UPSTREAM_ERROR',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Invalid translation response metadata',
+      });
     }
 
     return { translations: results, metadata };
@@ -465,7 +492,11 @@ export const createCustomText = mutation({
     }
 
     const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) throw new ConvexError('No active course found');
+    if (!active)
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'No active course found',
+      });
     const { course } = active;
 
     const validationError = validateTranslationSet(course, args.translations);
@@ -617,7 +648,11 @@ export const createCustomTextsBatch = mutation({
     }
 
     const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) throw new ConvexError('No active course found');
+    if (!active)
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'No active course found',
+      });
     const { course } = active;
 
     const skipped: { index: number; code: string; message: string }[] = [];

@@ -1,3 +1,4 @@
+import { ConvexError } from 'convex/values';
 import type { ActionCtx } from '../_generated/server';
 import { rateLimiter } from '../rateLimiter';
 
@@ -35,14 +36,24 @@ export async function reserveRateLimitToken(
         projectedWait != null
           ? `try again in ${Math.ceil(projectedWait / 1000)}s`
           : 'try again shortly';
-      throw new Error(`Rate limit ${name} busy — ${retryHint}`);
+      // Structured so the throw keeps its meaning when it reaches a client
+      // (e.g. via the chat voice-input action); workpool workers treat it
+      // like any other failure and back off.
+      throw new ConvexError({
+        code: 'RATE_LIMITED',
+        message: `Rate limit ${name} busy — ${retryHint}`,
+        ...(projectedWait != null ? { retryAfter: projectedWait } : {}),
+      });
     }
   }
 
   const result = await rateLimiter.limit(ctx, name, { reserve: true });
   if (!result.ok) {
     // Only reachable if `maxReserved` is ever configured on the bucket.
-    throw new Error(`Rate limit ${name} reservation pool full — try again later`);
+    throw new ConvexError({
+      code: 'RATE_LIMITED',
+      message: `Rate limit ${name} reservation pool full — try again later`,
+    });
   }
   const wait = result.retryAfter ?? 0;
   if (wait > 0) {

@@ -184,7 +184,11 @@ async function decrementQuotaForDoc(
   amount: number,
 ): Promise<number> {
   if (!doc) {
-    throw new ConvexError(`No quota doc for user. Sync quotas first.`);
+    throw new ConvexError({
+      code: 'QUOTA_NOT_SYNCED',
+      message: `No quota doc for user. Sync quotas first.`,
+      featureId,
+    });
   }
   const { targetFeatureId, targetAmount } = resolveQuotaTarget(
     doc,
@@ -193,7 +197,11 @@ async function decrementQuotaForDoc(
   );
   const feature = doc.features[targetFeatureId];
   if (!feature) {
-    throw new ConvexError(`No quota entry for feature "${targetFeatureId}". Sync quotas first.`);
+    throw new ConvexError({
+      code: 'QUOTA_NOT_SYNCED',
+      message: `No quota entry for feature "${targetFeatureId}". Sync quotas first.`,
+      featureId: targetFeatureId,
+    });
   }
   const newBalance = feature.balance - targetAmount;
   const newUsed = feature.used + targetAmount;
@@ -217,7 +225,11 @@ async function incrementQuota(
 ): Promise<number> {
   const doc = await getQuotaDoc(ctx, userId);
   if (!doc) {
-    throw new ConvexError(`No quota doc for user. Sync quotas first.`);
+    throw new ConvexError({
+      code: 'QUOTA_NOT_SYNCED',
+      message: `No quota doc for user. Sync quotas first.`,
+      featureId,
+    });
   }
   const { targetFeatureId, targetAmount } = resolveQuotaTarget(
     doc,
@@ -226,7 +238,11 @@ async function incrementQuota(
   );
   const feature = doc.features[targetFeatureId];
   if (!feature) {
-    throw new ConvexError(`No quota entry for feature "${targetFeatureId}". Sync quotas first.`);
+    throw new ConvexError({
+      code: 'QUOTA_NOT_SYNCED',
+      message: `No quota entry for feature "${targetFeatureId}". Sync quotas first.`,
+      featureId: targetFeatureId,
+    });
   }
   const newBalance = feature.balance + targetAmount;
   const newUsed = Math.max(feature.used - targetAmount, 0);

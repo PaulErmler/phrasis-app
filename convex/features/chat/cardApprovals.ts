@@ -57,10 +57,15 @@ async function getAuthenticatedPendingApproval(
   userId: string,
 ): Promise<Doc<'cardApprovals'>> {
   const approval = await ctx.db.get(approvalId);
-  if (!approval) throw new ConvexError('Approval not found');
-  if (approval.userId !== userId) throw new ConvexError('Not authorized');
+  if (!approval)
+    throw new ConvexError({ code: 'NOT_FOUND', message: 'Approval not found' });
+  if (approval.userId !== userId)
+    throw new ConvexError({ code: 'FORBIDDEN', message: 'Not authorized' });
   if (approval.status !== 'pending')
-    throw new ConvexError('Approval already processed');
+    throw new ConvexError({
+      code: 'INVALID_STATE',
+      message: 'Approval already processed',
+    });
   return approval;
 }
 
@@ -75,7 +80,11 @@ async function processApproval(
   userId: string,
 ): Promise<Id<'texts'>> {
   const active = await getActiveCourseForUser(ctx, userId);
-  if (!active) throw new ConvexError('No active course found');
+  if (!active)
+    throw new ConvexError({
+      code: 'NOT_FOUND',
+      message: 'No active course found',
+    });
   const { course } = active;
 
   const chatCollection = await getOrCreateChatCollection(ctx, course._id);
@@ -468,7 +477,10 @@ export const replaceCardFromApproval = mutation({
       userId,
     );
     if ((approval.kind ?? 'createCard') !== 'alsoCorrect' || !approval.cardId) {
-      throw new ConvexError('Approval does not support replacing a card');
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message: 'Approval does not support replacing a card',
+      });
     }
     const previousCardId = approval.cardId;
 
@@ -605,7 +617,10 @@ export const storeAlternativeFromApproval = mutation({
       userId,
     );
     if ((approval.kind ?? 'createCard') !== 'alsoCorrect' || !approval.cardId) {
-      throw new ConvexError('Approval does not support storing an alternative');
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message: 'Approval does not support storing an alternative',
+      });
     }
     const previousCardId = approval.cardId;
     if ((await ctx.db.get(previousCardId)) === null) {
@@ -633,7 +648,7 @@ export const storeAlternativeFromApproval = mutation({
     // proposal). resolveCardContext re-checks ownership as a side effect.
     const context = await resolveCardContext(ctx, resolvedCardId, userId);
     if (!context) {
-      throw new ConvexError('Card not found');
+      throw new ConvexError({ code: 'NOT_FOUND', message: 'Card not found' });
     }
     const primaryByLanguage = new Map(
       context.translations.map((t) => [t.language, t.text]),
@@ -714,9 +729,11 @@ export const approveCard = mutation({
     // server-side enforcement. Throwing rolls the whole mutation back,
     // including the quota consumed above.
     if (approval.replaceOnly === true) {
-      throw new ConvexError(
-        'This version can only replace the card — it is missing text for some course languages.',
-      );
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message:
+          'This version can only replace the card — it is missing text for some course languages.',
+      });
     }
 
     const textId = await processApproval(ctx, approval, userId);
@@ -769,12 +786,18 @@ export const updateApprovalTranslations = mutation({
       existingLanguages.size !== incomingLanguages.size ||
       [...existingLanguages].some((l) => !incomingLanguages.has(l))
     ) {
-      throw new ConvexError('Translation languages must match the original set');
+      throw new ConvexError({
+        code: 'INVALID_ARGUMENT',
+        message: 'Translation languages must match the original set',
+      });
     }
 
     for (const { text } of args.translations) {
       if (text.trim().length === 0) {
-        throw new ConvexError('Translation text must not be empty');
+        throw new ConvexError({
+          code: 'INVALID_ARGUMENT',
+          message: 'Translation text must not be empty',
+        });
       }
     }
 

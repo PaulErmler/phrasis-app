@@ -138,12 +138,19 @@ export const requestApprovalAudio = mutation({
     const userId = await requireAuthUserId(ctx);
     const approval = await ctx.db.get(args.approvalId);
     if (!approval || approval.userId !== userId) {
-      throw new ConvexError('Approval not found');
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'Approval not found',
+      });
     }
     const entry = approval.translations.find(
       (t) => t.language === args.language,
     );
-    if (!entry) throw new ConvexError('Language not on this card proposal');
+    if (!entry)
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'Language not on this card proposal',
+      });
     if (entry.text.length === 0) return { scheduled: false };
 
     const existing = await findAssetForLine(

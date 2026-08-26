@@ -29,7 +29,11 @@ export async function getActiveCourseForUser(
 export async function requireActiveCourse(ctx: QueryCtx) {
   const userId = await requireAuthUserId(ctx);
   const result = await getActiveCourseForUser(ctx, userId);
-  if (!result) throw new ConvexError('No active course found');
+  if (!result)
+    throw new ConvexError({
+      code: 'NOT_FOUND',
+      message: 'No active course found',
+    });
   return { userId, ...result };
 }
 
