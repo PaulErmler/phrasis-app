@@ -1,12 +1,10 @@
 'use client';
 
-import { useState } from 'react';
 import { Lock, MicIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { PromptInputButton } from '@/components/ai-elements/prompt-input';
-import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
+import { useFeatureLock } from '@/components/feature_tracking/useFeatureLock';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
-import UsageLimitDialog from '@/components/autumn/usage-limit-dialog';
 
 interface VoiceRecordButtonProps {
   isRecording: boolean;
@@ -20,15 +18,14 @@ export function VoiceRecordButton({
   onClick,
 }: VoiceRecordButtonProps) {
   const t = useTranslations('Chat.voice');
-  const { isAvailable, isLoading } = useFeatureQuota(FEATURE_IDS.TRANSCRIPTIONS);
-  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
-
-  const isLocked = !isAvailable && !isLoading;
+  const { isLocked, openLimitDialog, limitDialog } = useFeatureLock(
+    FEATURE_IDS.TRANSCRIPTIONS,
+  );
 
   return (
     <>
       <PromptInputButton
-        onClick={isLocked ? () => setLimitDialogOpen(true) : onClick}
+        onClick={isLocked ? openLimitDialog : onClick}
         variant="ghost"
         disabled={isTranscribing}
         className={isRecording ? 'text-red-500' : ''}
@@ -44,13 +41,7 @@ export function VoiceRecordButton({
         {isRecording && <span className="ml-2 text-xs">{t('recording')}</span>}
         {isTranscribing && <span className="ml-2 text-xs">{t('transcribing')}</span>}
       </PromptInputButton>
-      {limitDialogOpen && (
-        <UsageLimitDialog
-          open={limitDialogOpen}
-          setOpen={setLimitDialogOpen}
-          featureId={FEATURE_IDS.TRANSCRIPTIONS}
-        />
-      )}
+      {limitDialog}
     </>
   );
 }

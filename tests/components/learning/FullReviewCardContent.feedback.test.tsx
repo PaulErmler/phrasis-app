@@ -7,18 +7,35 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
  * override when the grader accepts an alternative.
  */
 
-const gradeMock = vi.fn();
+const { gradeMock, editCardMock, toastErrorMock } = vi.hoisted(() => ({
+  gradeMock: vi.fn(),
+  editCardMock: vi.fn(),
+  toastErrorMock: vi.fn(),
+}));
 
 vi.mock('convex/react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('convex/react')>();
-  return { ...actual, useAction: () => gradeMock, useMutation: () => vi.fn() };
+  return {
+    ...actual,
+    useAction: () => gradeMock,
+    useMutation: () => editCardMock,
+  };
 });
 vi.mock('@/components/feature_tracking/useFeatureQuota', () => ({
   useFeatureQuota: () => ({ isAvailable: true, isLoading: false }),
 }));
 vi.mock('@/components/autumn/usage-limit-dialog', () => ({
-  default: () => null,
+  default: ({ featureId }: { featureId: string }) => (
+    <div data-testid="usage-limit-dialog" data-feature={featureId} />
+  ),
 }));
+vi.mock('sonner', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('sonner')>();
+  return {
+    ...actual,
+    toast: { ...actual.toast, error: toastErrorMock },
+  };
+});
 
 import { FullReviewCardContent } from '@/components/app/learning/FullReviewCardContent';
 import type {
@@ -70,6 +87,8 @@ function lastSummary(fn: ReturnType<typeof vi.fn>): WritingAccuracySummary {
 describe('FullReviewCardContent: AI writing feedback', () => {
   beforeEach(() => {
     gradeMock.mockReset();
+    editCardMock.mockReset();
+    toastErrorMock.mockReset();
   });
 
   it('resolves a punctuation-only difference locally without calling the action', async () => {
@@ -222,6 +241,40 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(gradeMock).not.toHaveBeenCalled();
     expect(screen.queryByTestId('writing-feedback-pending')).not.toBeInTheDocument();
+  });
+
+  it('routes a card_edits USAGE_LIMIT from make-default to the upgrade dialog, not the retry toast', async () => {
+    gradeMock.mockResolvedValue({
+      verdict: 'alsoCorrect',
+      corrected: 'Me gustaría un café.',
+      notes: [{ type: 'naturalness', text: 'Equally natural phrasing.' }],
+      savedAlternative: true,
+    });
+    const { ConvexError } = await import('convex/values');
+    editCardMock.mockRejectedValue(new ConvexError({ code: 'USAGE_LIMIT' }));
+    renderCard();
+    submitAnswer('Me gustaría un café, por favor.');
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('writing-feedback-make-default-confirm'),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByTestId('writing-feedback-make-default-confirm'));
+    // A spent card_edits balance opens the paywall (same routing as
+    // EditCardDialog) — the generic "please try again" toast would invite a
+    // retry that can never succeed.
+    await waitFor(() =>
+      expect(screen.getByTestId('usage-limit-dialog')).toHaveAttribute(
+        'data-feature',
+        'card_edits',
+      ),
+    );
+    expect(toastErrorMock).not.toHaveBeenCalled();
+    // The coach card's button resets so a post-upgrade attempt works.
+    expect(
+      screen.getByTestId('writing-feedback-make-default-confirm'),
+    ).toBeEnabled();
   });
 
   it('discards a stale in-flight grade after revert + resubmit (request-sequence guard)', async () => {

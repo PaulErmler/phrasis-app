@@ -89,6 +89,32 @@ describe('WritingFeedbackCard', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('resets the make-default button to idle when the edit rejects', async () => {
+    // The caller surfaces the error (toast or paywall); this card only
+    // resets its prompt so a later attempt (e.g. post-upgrade) still works.
+    const onMakeDefault = vi.fn().mockRejectedValue(new Error('USAGE_LIMIT'));
+    const feedback: RowFeedback = {
+      status: 'done',
+      result: {
+        verdict: 'alsoCorrect',
+        corrected: 'Me gustaría un café.',
+        notes: [{ type: 'register', text: 'Same meaning, slightly softer.' }],
+        savedAlternative: true,
+      },
+    };
+    render(
+      <WritingFeedbackCard feedback={feedback} onMakeDefault={onMakeDefault} />,
+    );
+    await userEvent.click(
+      screen.getByTestId('writing-feedback-make-default-confirm'),
+    );
+    const button = screen.getByTestId('writing-feedback-make-default-confirm');
+    expect(button).toBeEnabled();
+    expect(
+      screen.queryByTestId('writing-feedback-make-default-done'),
+    ).not.toBeInTheDocument();
+  });
+
   it('hides the make-default button for non-alsoCorrect verdicts', () => {
     const onMakeDefault = vi.fn();
     const wrong: RowFeedback = {

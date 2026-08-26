@@ -34,6 +34,8 @@ import { getUserTimezone } from '@/lib/timezone';
 import { convexErrorCode, isPaymentPastDueError } from '@/lib/utils';
 import { WritingFeedbackCard, type RowFeedback } from './WritingFeedbackCard';
 import { WritingVoiceButton } from './WritingVoiceButton';
+import { useLimitDialog } from '@/components/feature_tracking/useFeatureLock';
+import { FEATURE_IDS } from '@/convex/features/featureIds';
 import {
   getLanguageByCode,
   getLocalizedLanguageNameByCode,
@@ -727,6 +729,8 @@ export function FullReviewCardContent({
   // The answer stays a stored accepted alternative either way. Rethrows so
   // the coach card's prompt resets instead of showing a false success.
   const editCardMutation = useMutation(api.features.scheduling.editCard);
+  const cardEditsLock = useLimitDialog(FEATURE_IDS.CARD_EDITS);
+  const openCardEditsLimitDialog = cardEditsLock.openLimitDialog;
   const handleMakeDefault = useCallback(
     async (language: string, text: string) => {
       if (!cardId) return;
@@ -737,13 +741,18 @@ export function FullReviewCardContent({
           timezone: getUserTimezone(),
         });
       } catch (error) {
-        if (!isPaymentPastDueError(error)) {
+        // A spent card_edits balance is the upgrade path, not a retry: the
+        // generic "please try again" toast would misdirect (retrying cannot
+        // succeed). Same routing as EditCardDialog, the other editCard caller.
+        if (convexErrorCode(error) === 'USAGE_LIMIT') {
+          openCardEditsLimitDialog();
+        } else if (!isPaymentPastDueError(error)) {
           toast.error(t('feedback.makeDefaultError'));
         }
         throw error;
       }
     },
-    [cardId, editCardMutation, t],
+    [cardId, editCardMutation, openCardEditsLimitDialog, t],
   );
 
   // Kick-off runs as an effect over committed state (not inside handleSubmit)
@@ -977,6 +986,8 @@ export function FullReviewCardContent({
           </div>
         )}
       </CardShell>
+      {/* card_edits paywall for make-default (opened from handleMakeDefault). */}
+      {cardEditsLock.limitDialog}
     </div>
   );
 }

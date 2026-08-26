@@ -1,13 +1,12 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Loader2, Lock, MicIcon, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useVoiceRecording } from '@/hooks/use-voice-recording';
-import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
+import { useFeatureLock } from '@/components/feature_tracking/useFeatureLock';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
-import UsageLimitDialog from '@/components/autumn/usage-limit-dialog';
 
 /** Auto-stop cap for a dictated answer; answers are single sentences. */
 const MAX_RECORDING_MS = 30_000;
@@ -33,8 +32,9 @@ export function WritingVoiceButton({
   disabled = false,
 }: WritingVoiceButtonProps) {
   const t = useTranslations('Chat.voice');
-  const { isAvailable, isLoading } = useFeatureQuota(FEATURE_IDS.TRANSCRIPTIONS);
-  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+  const { isLocked, openLimitDialog, limitDialog } = useFeatureLock(
+    FEATURE_IDS.TRANSCRIPTIONS,
+  );
 
   // The hook captures its callback when recording STARTS; routing through a
   // ref makes the async transcript land on the freshest handler, so a row
@@ -44,11 +44,10 @@ export function WritingVoiceButton({
 
   const { isRecording, isTranscribing, handleVoiceClick } = useVoiceRecording(
     (text) => onTranscriptRef.current(text),
-    () => setLimitDialogOpen(true),
+    openLimitDialog,
     { language, maxDurationMs: MAX_RECORDING_MS, quiet: true },
   );
 
-  const isLocked = !isAvailable && !isLoading;
   const label = isRecording ? t('stopRecording') : t('startRecording');
 
   return (
@@ -58,7 +57,7 @@ export function WritingVoiceButton({
         variant="outline"
         size="icon"
         disabled={disabled || isTranscribing}
-        onClick={isLocked ? () => setLimitDialogOpen(true) : handleVoiceClick}
+        onClick={isLocked ? openLimitDialog : handleVoiceClick}
         className={`h-9 w-9 shrink-0 ${
           isRecording ? 'border-destructive text-destructive' : ''
         }`}
@@ -75,13 +74,7 @@ export function WritingVoiceButton({
           <MicIcon className="h-4 w-4" />
         )}
       </Button>
-      {limitDialogOpen && (
-        <UsageLimitDialog
-          open={limitDialogOpen}
-          setOpen={setLimitDialogOpen}
-          featureId={FEATURE_IDS.TRANSCRIPTIONS}
-        />
-      )}
+      {limitDialog}
     </>
   );
 }

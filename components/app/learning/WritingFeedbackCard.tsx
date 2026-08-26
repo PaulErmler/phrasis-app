@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Check, CircleAlert, CircleX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
-import UsageLimitDialog from '@/components/autumn/usage-limit-dialog';
+import { useLimitDialog } from '@/components/feature_tracking/useFeatureLock';
 import type { WritingFeedbackResult } from '@/convex/features/writingFeedback';
 
 /**
@@ -74,7 +74,9 @@ export function WritingFeedbackCard({
   onMakeDefault,
 }: WritingFeedbackCardProps) {
   const t = useTranslations('LearningMode.feedback');
-  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+  const { openLimitDialog, limitDialog } = useLimitDialog(
+    FEATURE_IDS.AI_FEEDBACK,
+  );
   const [makeDefault, setMakeDefault] = useState<'idle' | 'saving' | 'done'>(
     'idle',
   );
@@ -108,7 +110,7 @@ export function WritingFeedbackCard({
             size="sm"
             className="h-7 px-2.5 text-xs"
             data-testid="writing-feedback-upgrade"
-            onClick={() => setLimitDialogOpen(true)}
+            onClick={openLimitDialog}
           >
             {t('limitUpgrade')}
           </Button>
@@ -125,13 +127,7 @@ export function WritingFeedbackCard({
             </Button>
           )}
         </div>
-        {limitDialogOpen && (
-          <UsageLimitDialog
-            open={limitDialogOpen}
-            setOpen={setLimitDialogOpen}
-            featureId={FEATURE_IDS.AI_FEEDBACK}
-          />
-        )}
+        {limitDialog}
       </div>
     );
   }
