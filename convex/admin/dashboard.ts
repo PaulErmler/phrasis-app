@@ -3,7 +3,8 @@ import { query } from '../_generated/server';
 import { adminQuery, getAdminContext } from './lib';
 import { authComponent } from '../auth';
 import { deriveStreakDisplay } from '../db/courseStats';
-import { getTodayInTimezone, getPreviousDay, daysSince } from '../lib/dateUtils';
+import { getPreviousDay, resolveClientNow } from '../lib/dateUtils';
+import { dateInTimezone, daysBetween } from '../../lib/dateStrings';
 import { featureStateValidator } from '../usage/helpers';
 
 // Bounded-read caps. Convex hard-fails any query execution that scans more
@@ -37,6 +38,7 @@ function summarizeCourseStats(
     timezone?: string;
     streakFreezeUsedDate?: string;
   }>,
+  now: number,
 ): Map<string, ActivitySummary> {
   const byUser = new Map<string, ActivitySummary>();
   for (const stats of rows) {
@@ -45,7 +47,7 @@ function summarizeCourseStats(
     };
     const derived = deriveStreakDisplay(
       stats.lastActivityDate,
-      getTodayInTimezone(stats.timezone ?? 'UTC'),
+      dateInTimezone(now, stats.timezone ?? 'UTC'),
       stats.currentStreak,
       stats.streakFreezeUsedDate,
     );
@@ -87,7 +89,9 @@ export const isAdmin = query({
  * pipeline. Also sums review volume and study time per day for free.
  */
 export const getDauSeries = adminQuery({
-  args: { days: v.number() },
+  // `now` per the no-wall-clock query guideline; optional for back-compat
+  // (absent → server clock). See resolveClientNow.
+  args: { days: v.number(), now: v.optional(v.number()) },
   returns: v.array(
     v.object({
       date: v.string(),
@@ -103,7 +107,7 @@ export const getDauSeries = adminQuery({
     const perDayCap = Math.floor(12000 / days);
 
     const dates: string[] = [];
-    let d = getTodayInTimezone('UTC');
+    let d = dateInTimezone(resolveClientNow(args.now), 'UTC');
     for (let i = 0; i < days; i++) {
       dates.push(d);
       d = getPreviousDay(d);
@@ -135,14 +139,17 @@ export const getDauSeries = adminQuery({
  * bucketing of Better Auth signup timestamps), plus the total user count.
  */
 export const getSignupSeries = adminQuery({
-  args: { days: v.number() },
+  // `now` per the no-wall-clock query guideline; optional for back-compat
+  // (absent → server clock). See resolveClientNow.
+  args: { days: v.number(), now: v.optional(v.number()) },
   returns: v.object({
     totalUsers: v.number(),
     series: v.array(v.object({ date: v.string(), signups: v.number() })),
   }),
   handler: async (ctx, args) => {
     const days = Math.max(1, Math.min(120, Math.floor(args.days)));
-    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    const now = resolveClientNow(args.now);
+    const cutoff = now - days * 24 * 60 * 60 * 1000;
 
     const recent = await ctx.db
       .query('userProfiles')
@@ -155,7 +162,7 @@ export const getSignupSeries = adminQuery({
     }
 
     const series = [];
-    let d = getTodayInTimezone('UTC');
+    let d = dateInTimezone(now, 'UTC');
     for (let i = 0; i < days; i++) {
       series.push({ date: d, signups: counts.get(d) ?? 0 });
       d = getPreviousDay(d);
@@ -316,6 +323,10 @@ export const listUsers = adminQuery({
     sortBy: v.optional(
       v.union(v.literal('newest'), v.literal('streak'), v.literal('last_active')),
     ),
+    // `now` per the no-wall-clock query guideline (drives the activity
+    // filters and live streak derivation); optional for back-compat
+    // (absent → server clock). See resolveClientNow.
+    now: v.optional(v.number()),
   },
   returns: v.object({
     rows: v.array(
@@ -340,6 +351,8 @@ export const listUsers = adminQuery({
   }),
   handler: async (ctx, args) => {
     const limit = Math.max(1, Math.min(200, Math.floor(args.limit)));
+    const now = resolveClientNow(args.now);
+    const todayUtc = dateInTimezone(now, 'UTC');
 
     const search = args.search?.trim().toLowerCase();
     const profiles = search
@@ -356,7 +369,7 @@ export const listUsers = adminQuery({
     const quotaDocs = await ctx.db.query('usageQuotas').take(MAX_SCAN);
     const quotaByUser = new Map(quotaDocs.map((doc) => [doc.userId, doc]));
     const statsDocs = await ctx.db.query('courseStats').take(MAX_SCAN);
-    const summaryByUser = summarizeCourseStats(statsDocs);
+    const summaryByUser = summarizeCourseStats(statsDocs, now);
 
     const planIds = args.planIds?.length ? new Set(args.planIds) : null;
     const filtered = profiles.filter((profile) => {
@@ -368,13 +381,13 @@ export const listUsers = adminQuery({
         const last = summaryByUser.get(profile.userId)?.lastActivityDate;
         switch (args.activity) {
         case 'active_7d':
-          if (!last || daysSince(last) >= 7) return false;
+          if (!last || daysBetween(last, todayUtc) >= 7) return false;
           break;
         case 'inactive_7d':
-          if (last && daysSince(last) < 7) return false;
+          if (last && daysBetween(last, todayUtc) < 7) return false;
           break;
         case 'inactive_30d':
-          if (last && daysSince(last) < 30) return false;
+          if (last && daysBetween(last, todayUtc) < 30) return false;
           break;
         case 'never':
           if (last) return false;
@@ -454,7 +467,9 @@ const courseDetailValidator = v.object({
  * answers.
  */
 export const getUserDetail = adminQuery({
-  args: { userId: v.string() },
+  // `now` per the no-wall-clock query guideline (live streak derivation);
+  // optional for back-compat (absent → server clock). See resolveClientNow.
+  args: { userId: v.string(), now: v.optional(v.number()) },
   returns: v.union(
     v.null(),
     v.object({
@@ -534,7 +549,7 @@ export const getUserDetail = adminQuery({
         const streak = stats
           ? deriveStreakDisplay(
             stats.lastActivityDate,
-            getTodayInTimezone(stats.timezone ?? 'UTC'),
+            dateInTimezone(resolveClientNow(args.now), stats.timezone ?? 'UTC'),
             stats.currentStreak,
             stats.streakFreezeUsedDate,
           )

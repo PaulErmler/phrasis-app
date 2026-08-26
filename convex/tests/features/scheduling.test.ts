@@ -84,6 +84,7 @@ async function seedCardWithCourseAndStats(t: TestConvex<typeof schema>) {
       deckId,
       textId,
       collectionId,
+      collectionOrigin: "premade",
       dueDate: Date.now() - 1000,
       isMastered: false,
       isHidden: false,
@@ -127,6 +128,7 @@ async function seedCardWithCourse(t: TestConvex<typeof schema>) {
       deckId,
       textId,
       collectionId,
+      collectionOrigin: "premade",
       dueDate: Date.now() - 1000,
       isMastered: false,
       isHidden: false,
@@ -159,6 +161,46 @@ describe("features/scheduling", () => {
       const res = await asUser.query(api.features.scheduling.getCardForReview, {});
       expect(res?._id).toBe(cardId);
       expect(res?.sourceText).toBe("Hola");
+    });
+
+    it("honors an explicit client `now` for the due bound and the derived today", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, courseId } = await seedCardWithCourse(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      // At a `now` before the card's dueDate, nothing is due.
+      const dueDate = await t.run(
+        async (ctx) => (await ctx.db.get(cardId))!.dueDate,
+      );
+      expect(
+        await asUser.query(api.features.scheduling.getCardForReview, {
+          now: dueDate - 60_000,
+        }),
+      ).toBeNull();
+
+      // At a fixed historical `now` past the dueDate the card IS served, and
+      // the dailyReviewsToday side-channel reads the dailyStats row for that
+      // instant's calendar date, not the server clock's.
+      const fixedNow = Date.UTC(2024, 0, 15, 12, 0, 0);
+      await t.run(async (ctx) => {
+        await ctx.db.patch(cardId, { dueDate: fixedNow - 1000 });
+        await ctx.db.insert("dailyStats", {
+          userId: "user_A",
+          courseId,
+          date: "2024-01-15",
+          reps: 6,
+          newCards: 0,
+          timeMs: 0,
+          cardsReviewed: 6,
+          reviewsByMode: { audio: 4, full: 2, radio: 0 },
+        });
+      });
+      const res = await asUser.query(api.features.scheduling.getCardForReview, {
+        timezone: "UTC",
+        now: fixedNow,
+      });
+      expect(res?._id).toBe(cardId);
+      expect(res?.dailyReviewsToday).toBe(6);
     });
 
     it("returns dailyReviewsToday = 0 when timezone is omitted (opt-out)", async () => {
@@ -322,6 +364,7 @@ describe("features/scheduling", () => {
           deckId,
           textId,
           collectionId,
+          collectionOrigin: "premade",
           dueDate: Date.now() - 1000,
           isMastered: false,
           isHidden: false,
@@ -750,6 +793,7 @@ describe("features/scheduling", () => {
           deckId,
           textId,
           collectionId: first!.collectionId,
+          collectionOrigin: "premade",
           dueDate: Date.now() - 1000,
           isMastered: false,
           isHidden: false,
@@ -805,6 +849,7 @@ describe("features/scheduling", () => {
             deckId,
             textId: otherTextId,
             collectionId: (await ctx.db.get(textId))!.collectionId,
+            collectionOrigin: "premade",
             dueDate: Date.now() - 1000,
             isMastered: false,
             isHidden: false,
@@ -851,6 +896,53 @@ describe("features/scheduling", () => {
         {},
       );
       expect(res).toBeNull();
+    });
+
+    it("decrements the deck's cardCount, flooring at 0 on a drifted-low counter", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, deckId } = await seedCardWithCourse(t); // seeds cardCount: 1
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.scheduling.deleteCardPermanently, {
+        cardId,
+      });
+      // Counter maintained by `deleteCard` in the same transaction.
+      expect(
+        (await t.run(async (ctx) => ctx.db.get(deckId)))?.cardCount,
+      ).toBe(0);
+
+      // Drifted-low counter (pre-repair state): delete clamps at 0 instead
+      // of going negative.
+      const secondCardId = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A2",
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Adiós",
+          language: "es",
+          userCreated: true,
+          userId: "user_A",
+          collectionId,
+          collectionRank: 1,
+        });
+        return ctx.db.insert("cards", {
+          deckId,
+          textId,
+          collectionId,
+          collectionOrigin: "premade",
+          dueDate: Date.now() - 1000,
+          isMastered: false,
+          isHidden: false,
+          schedulingPhase: "preReview",
+          preReviewCount: 0,
+        });
+      });
+      await asUser.mutation(api.features.scheduling.deleteCardPermanently, {
+        cardId: secondCardId,
+      });
+      expect(
+        (await t.run(async (ctx) => ctx.db.get(deckId)))?.cardCount,
+      ).toBe(0);
     });
   });
 
@@ -920,6 +1012,7 @@ describe("features/scheduling", () => {
           deckId,
           textId,
           collectionId,
+          collectionOrigin: "premade",
           dueDate: Date.now() - 1000,
           isMastered: false,
           isHidden: false,
@@ -1160,6 +1253,7 @@ describe("features/scheduling", () => {
           deckId,
           textId,
           collectionId,
+          collectionOrigin: "premade",
           dueDate: Date.now() - 1000,
           isMastered: false,
           isHidden: false,
@@ -1308,6 +1402,7 @@ describe("features/scheduling", () => {
           deckId,
           textId,
           collectionId,
+          collectionOrigin: "premade",
           dueDate: Date.now() - 1000,
           isMastered: false,
           isHidden: false,
@@ -1449,6 +1544,7 @@ describe("features/scheduling", () => {
           deckId,
           textId,
           collectionId,
+          collectionOrigin: "premade",
           dueDate: Date.now() - 1000,
           isMastered: false,
           isHidden: false,
@@ -1716,6 +1812,7 @@ describe("features/scheduling", () => {
           deckId,
           textId,
           collectionId,
+          collectionOrigin: "premade",
           dueDate,
           isMastered: false,
           isHidden: false,
@@ -2121,6 +2218,7 @@ describe("features/scheduling", () => {
             deckId,
             textId: newTextId,
             collectionId,
+            collectionOrigin: "premade",
             dueDate: Date.now() - 1000,
             isMastered: false,
             isHidden: false,
@@ -2223,6 +2321,7 @@ describe("features/scheduling", () => {
             deckId,
             textId,
             collectionId,
+            collectionOrigin: "premade",
             // dueDate is irrelevant for radio picking. Default is a distinct
             // past value so rows insert cleanly; tests that exercise the
             // "plays even when not due" guarantee pass an explicit future
@@ -2992,6 +3091,7 @@ describe("features/scheduling", () => {
           deckId,
           textId,
           collectionId,
+          collectionOrigin: "premade",
           dueDate: Date.now() - 1000,
           isMastered: false,
           isHidden: false,
@@ -3140,6 +3240,7 @@ describe("features/scheduling", () => {
           deckId,
           textId,
           collectionId,
+          collectionOrigin: "premade",
           dueDate: Date.now() - 1000,
           isMastered: false,
           isHidden: false,
@@ -3389,6 +3490,7 @@ describe("features/scheduling", () => {
           deckId,
           textId,
           collectionId,
+          collectionOrigin: "premade",
           dueDate: Date.now() - 1000,
           isMastered: false,
           isHidden: false,

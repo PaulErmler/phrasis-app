@@ -45,6 +45,23 @@ export function resolveClientToday(timezone: string, clientToday?: string): stri
   return canonical;
 }
 
+/**
+ * Resolve the client-supplied `now` for a query (no-wall-clock query
+ * guideline: pass time in as an argument so identical args keep the query
+ * cacheable and results can't go stale between reruns). Optional for
+ * back-compat: already-shipped bundles that omit it keep the historical
+ * server-clock behavior. Fails closed to the server clock on a non-finite
+ * value (Convex numbers admit NaN/Infinity, and a resolved `now` often feeds
+ * Intl date formatting, which throws on those). A skewed-but-finite `now`
+ * only shifts the caller's own view; harmless, same stance as
+ * getFilteredCardCounts.
+ */
+export function resolveClientNow(clientNow: number | undefined): number {
+  return clientNow !== undefined && Number.isFinite(clientNow)
+    ? clientNow
+    : Date.now();
+}
+
 /** True if `timezone` is an IANA zone accepted by Intl.DateTimeFormat. */
 export function isValidTimezone(timezone: string): boolean {
   if (typeof timezone !== 'string' || timezone.length === 0) return false;

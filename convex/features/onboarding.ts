@@ -29,6 +29,7 @@ import {
 } from '../../lib/constants/dailyGoal';
 import { getCourseSettings } from '../db/courseSettings';
 import { scheduleMissingContent } from './decks';
+import { rateLimiter } from '../rateLimiter';
 import type { TtsPriority } from '../types';
 
 /**
@@ -41,6 +42,57 @@ import type { TtsPriority } from '../types';
  *   that pre-translates the same content for every language upfront.
  */
 
+const SUPPORTED_LANGUAGE_CODES: ReadonlySet<string> = new Set(
+  SUPPORTED_LANGUAGES.map((l) => l.code),
+);
+
+/**
+ * Reject unsupported language codes on the public warmup mutations. Both fan
+ * out translation + TTS scheduling over the whole placement corpus, and an
+ * unknown code would default into the Google pipeline and burn real spend on
+ * content nothing can ever read. `sourceLanguage` is validated too: it becomes
+ * a translation target in `processPlacementSentences` and the base language of
+ * the level-collection warmup. Hidden-from-picker codes stay accepted —
+ * they're still real languages carried by existing courses.
+ */
+function assertSupportedLanguagePair(
+  sourceLanguage: string,
+  targetLanguage: string,
+): void {
+  for (const code of [sourceLanguage, targetLanguage]) {
+    if (!SUPPORTED_LANGUAGE_CODES.has(code)) {
+      throw new ConvexError({
+        code: 'UNSUPPORTED_LANGUAGE',
+        message: `'${code}' is not a supported language code`,
+      });
+    }
+  }
+}
+
+/**
+ * Per-user token gate over the public warmup fan-outs. Sized (see
+ * `onboardingContentWarmup` in convex/rateLimiter.ts) so the real onboarding
+ * flow — a handful of calls while picking/switching languages, plus the
+ * placement test's missing-content safety net — never hits it.
+ */
+async function consumeContentWarmupBudget(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<void> {
+  const { ok, retryAfter } = await rateLimiter.limit(
+    ctx,
+    'onboardingContentWarmup',
+    { key: userId },
+  );
+  if (!ok) {
+    throw new ConvexError({
+      code: 'RATE_LIMITED',
+      message: 'Too many content-preparation requests. Please retry shortly.',
+      retryAfter,
+    });
+  }
+}
+
 export const prepareLanguagePair = mutation({
   args: {
     sourceLanguage: v.string(),
@@ -49,7 +101,8 @@ export const prepareLanguagePair = mutation({
   returns: v.null(),
   handler: async (ctx, { sourceLanguage, targetLanguage }) => {
     const userId = await requireAuthUserId(ctx);
-    void userId;
+    assertSupportedLanguagePair(sourceLanguage, targetLanguage);
+    await consumeContentWarmupBudget(ctx, userId);
 
     // Warm up the first few sentences in every level collection so the
     // placement test (which samples across levels) and any subsequent
@@ -290,7 +343,8 @@ export const ensurePlacementTranslations = mutation({
   returns: v.object({ enqueued: v.number() }),
   handler: async (ctx, { targetLanguage, sourceLanguage }) => {
     const userId = await requireAuthUserId(ctx);
-    void userId;
+    assertSupportedLanguagePair(sourceLanguage, targetLanguage);
+    await consumeContentWarmupBudget(ctx, userId);
     return sweepAndCountEnqueued(ctx, { targetLanguage, sourceLanguage });
   },
 });
@@ -388,14 +442,15 @@ export const warmupOnboardingTranslations = internalMutation({
     batches: v.number(),
   }),
   handler: async (ctx, args) => {
-    const supportedCodes = new Set(SUPPORTED_LANGUAGES.map((l) => l.code));
     const languages =
       args.languages !== undefined
         ? args.languages
         : SUPPORTED_LANGUAGES.filter((l) => !l.hiddenFromPicker).map(
           (l) => l.code,
         );
-    const unknown = languages.filter((code) => !supportedCodes.has(code));
+    const unknown = languages.filter(
+      (code) => !SUPPORTED_LANGUAGE_CODES.has(code),
+    );
     if (unknown.length > 0) {
       throw new ConvexError(
         `Unknown language code(s): ${unknown.join(', ')}`,

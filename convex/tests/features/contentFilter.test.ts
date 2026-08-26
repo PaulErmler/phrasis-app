@@ -309,6 +309,21 @@ describe("content-source filter: getCardForReviewEmptyReason", () => {
     expect(reason.reason).toBe("no_cards");
   });
 
+  it("honors an explicit client `now`: cards due on the wall clock are not due at an earlier now", async () => {
+    const t = convexTest(schema, modules);
+    await seedFilterFixture(t);
+    const asUser = t.withIdentity({ subject: "user_F" });
+
+    // Fixture cards go due 1–4s before the wall-clock now; at a `now` two
+    // minutes earlier none of them are due yet, so the deck reads as caught
+    // up at that instant.
+    const reason = await asUser.query(
+      api.features.scheduling.getCardForReviewEmptyReason,
+      { now: Date.now() - 120_000 },
+    );
+    expect(reason.reason).toBe("all_caught_up");
+  });
+
   it("returns all_caught_up when filter is 'both' and nothing is due", async () => {
     const t = convexTest(schema, modules);
     const f = await seedFilterFixture(t);

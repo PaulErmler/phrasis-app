@@ -84,7 +84,8 @@ import {
   fetchFreePlayRotation,
   randomOrderKey,
 } from '../lib/freePlay';
-import { getTodayInTimezone } from '../lib/dateUtils';
+import { getTodayInTimezone, resolveClientNow } from '../lib/dateUtils';
+import { dateInTimezone } from '../../lib/dateStrings';
 import {
   deleteAudioRow,
   deleteAudioRowsForTextLanguage,
@@ -247,7 +248,15 @@ export const getCardForReview = query({
   // today's active review count via this single query, no separate
   // `getTodayReviewCount` subscription, and updates flow in live whether they
   // come from a local mutation or another device.
-  args: { timezone: v.optional(v.string()) },
+  //
+  // `now` follows the no-wall-clock query guideline like getCardCounts
+  // (stats.ts): a stable, minute-quantized client value keeps the app's
+  // hottest query cacheable and bounds the due queue deterministically. It
+  // stays OPTIONAL for back-compat: already-shipped bundles call without it
+  // and keep the historical wall-clock behavior. The daily-count
+  // side-channel's "today" is derived from the same `now` so the two can
+  // never disagree. A skewed `now` only shifts the caller's own queue.
+  args: { timezone: v.optional(v.string()), now: v.optional(v.number()) },
   returns: v.union(
     v.object({
       ...cardResultFields,
@@ -281,7 +290,7 @@ export const getCardForReview = query({
     const studyContext = studyContextFromSettings(settings);
     const { schedulingMode, studyContentFilter } = studyContext;
 
-    const now = Date.now();
+    const now = resolveClientNow(args.now);
 
     // Fetch the current + peeked-next due cards so the client can pre-merge
     // audio for the upcoming card while the user is still on the current one.
@@ -435,7 +444,7 @@ export const getCardForReview = query({
     // avoid a second `getTodayReviewCount` subscription on the hot path.
     let dailyReviewsToday = 0;
     if (args.timezone) {
-      const today = getTodayInTimezone(args.timezone);
+      const today = dateInTimezone(now, args.timezone);
       const todayStats = await ctx.db
         .query('dailyStats')
         .withIndex('by_userId_and_courseId_and_date', (q) =>
@@ -507,7 +516,9 @@ async function hasPendingCustomCardsToAdd(
 }
 
 export const getCardForReviewEmptyReason = query({
-  args: {},
+  // `now` bounds the due-card probes; same optional back-compat contract as
+  // getCardForReview above (no-wall-clock query guideline).
+  args: { now: v.optional(v.number()) },
   returns: v.union(
     v.object({ reason: v.literal('no_session') }),
     v.object({ reason: v.literal('no_cards') }),
@@ -527,7 +538,7 @@ export const getCardForReviewEmptyReason = query({
     // nothing about the user's actual due state.
     v.object({ reason: v.literal('preparing_writing') }),
   ),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return { reason: 'no_session' as const };
 
@@ -540,7 +551,7 @@ export const getCardForReviewEmptyReason = query({
     const settings = await getCourseSettings(ctx, active.course._id);
     const { schedulingMode, studyContentFilter, face, track } =
       studyContextFromSettings(settings);
-    const now = Date.now();
+    const now = resolveClientNow(args.now);
 
     // Cheap probe: any usable (non-hidden, non-mastered) card in the deck?
     // Using the (deckId, isHidden, isMastered) index so a deck of all-hidden

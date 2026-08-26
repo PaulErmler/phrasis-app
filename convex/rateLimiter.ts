@@ -98,6 +98,25 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: HOUR,
     capacity: 20,
   },
+  // Public onboarding content-warmup mutations (features/onboarding.ts:
+  // `prepareLanguagePair` + `ensurePlacementTranslations`), keyed per user.
+  // Each call fans translation + TTS scheduling out over the ~100-sentence
+  // placement corpus plus the level-collection previews, so a scripted loop
+  // would multiply real pipeline reads/spend. The legitimate flow is sparse:
+  // the wizard fires `prepareLanguagePair` once per language-pair pick, and
+  // the placement test fires `ensurePlacementTranslations` at most once per
+  // mount plus one auto-retry (reloads re-fire it only while content is
+  // still missing — a window of a few minutes on a cold language). A full
+  // burst of 10 covers even a pair-churning, reload-happy signup; the
+  // 1-per-6-min refill keeps the stuck-content retry path alive, and the
+  // sweeps are idempotent server-side, so a capped user loses nothing but a
+  // redundant re-kick of work already queued.
+  onboardingContentWarmup: {
+    kind: 'token bucket',
+    rate: 10,
+    period: HOUR,
+    capacity: 10,
+  },
 });
 
 // Partial because 'azure' and 'elevenlabs' linger in `TtsProvider` only as

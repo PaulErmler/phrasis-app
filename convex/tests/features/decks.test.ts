@@ -108,6 +108,7 @@ describe("features/decks", () => {
           deckId,
           textId: text!._id,
           collectionId: collA1,
+          collectionOrigin: "premade",
           dueDate: Date.now(),
           isMastered: false,
           isHidden: false,
@@ -641,6 +642,7 @@ describe("features/decks", () => {
           deckId,
           textId: textIds[0],
           collectionId,
+          collectionOrigin: "premade",
           dueDate: Date.now(),
           isMastered: false,
           isHidden: false,
@@ -769,6 +771,20 @@ describe("features/decks", () => {
         );
         expect(cards.length).toBe(res.cardsAdded);
         expect(res.totalCardsInDeck).toBe(cards.length);
+        // Single-writer counter: `insertCard` maintained the stored count in
+        // the same transaction; the mutation no longer patches it separately.
+        const deckAfterAdd = await t.run(async (ctx) => ctx.db.get(deckId));
+        expect(deckAfterAdd?.cardCount).toBe(cards.length);
+
+        // Permanent deletes walk it back to the pre-add baseline (0), so the
+        // counter can no longer drift up across an insert→delete round trip.
+        for (const card of cards) {
+          await asUser.mutation(api.features.scheduling.deleteCardPermanently, {
+            cardId: card._id,
+          });
+        }
+        const deckAfterDelete = await t.run(async (ctx) => ctx.db.get(deckId));
+        expect(deckAfterDelete?.cardCount).toBe(0);
       } finally {
         vi.useRealTimers();
         vi.unstubAllGlobals();
@@ -1733,6 +1749,7 @@ describe("features/decks", () => {
           deckId,
           textId,
           collectionId,
+          collectionOrigin: "premade",
           dueDate: Date.now() - 1000,
           isMastered: false,
           isHidden: false,
@@ -1938,6 +1955,7 @@ describe("features/decks", () => {
             deckId,
             textId,
             collectionId,
+            collectionOrigin: "premade",
             dueDate: i + 1,
             isMastered: false,
             isHidden: false,
@@ -2299,6 +2317,7 @@ describe("features/decks", () => {
           deckId,
           textId,
           collectionId: deckCollectionId,
+          collectionOrigin: "premade",
           dueDate: 0,
           isMastered: false,
           isHidden: false,

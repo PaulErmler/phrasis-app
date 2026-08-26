@@ -2,7 +2,12 @@
 import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 
-import { getCardStateLabel, patchCard } from "../../../db/stats/cardAggregates";
+import {
+  getCardStateLabel,
+  patchCard,
+  insertCard,
+  deleteCard,
+} from "../../../db/stats/cardAggregates";
 import schema from "../../../schema";
 import type { Doc, Id } from "../../../_generated/dataModel";
 
@@ -153,6 +158,7 @@ async function seedLegacyMasteryFixture(
       deckId,
       textId,
       collectionId: legacyA1,
+      collectionOrigin: "premade",
       dueDate: Date.now(),
       isMastered: false,
       isHidden: false,
@@ -282,6 +288,7 @@ describe("patchCard → bumpCardsMastered legacy redirect", () => {
           deckId,
           textId,
           collectionId: newL02,
+          collectionOrigin: "premade",
           dueDate: Date.now(),
           isMastered: false,
           isHidden: false,
@@ -368,6 +375,7 @@ describe("patchCard → bumpCardsMastered legacy redirect", () => {
         deckId,
         textId,
         collectionId: customA1,
+        collectionOrigin: "custom",
         dueDate: Date.now(),
         isMastered: false,
         isHidden: false,
@@ -415,5 +423,102 @@ describe("patchCard → bumpCardsMastered legacy redirect", () => {
     // `legacy: true` flag. This test pins the current behavior; revisit if
     // the `legacy` flag ever starts being written.
     expect(custom?.cardsMastered).toBe(0);
+  });
+});
+
+// --- insertCard / deleteCard: decks.cardCount single writer -----------------
+
+describe("insertCard / deleteCard: decks.cardCount maintenance", () => {
+  async function seedDeck(t: TestConvex<typeof schema>, cardCount: number) {
+    return t.run(async (ctx) => {
+      const collectionId = await ctx.db.insert("collections", {
+        name: "A1",
+        textCount: 0,
+      });
+      const courseId = await ctx.db.insert("courses", {
+        userId: "user_A",
+        baseLanguages: ["en"],
+        targetLanguages: ["es"],
+      });
+      const deckId = await ctx.db.insert("decks", {
+        courseId,
+        name: "d",
+        cardCount,
+      });
+      const textId = await ctx.db.insert("texts", {
+        text: "Hola",
+        language: "es",
+        userCreated: true,
+        userId: "user_A",
+        collectionId,
+        collectionRank: 1,
+      });
+      return { deckId, textId, collectionId };
+    });
+  }
+
+  function cardData(
+    deckId: Id<"decks">,
+    textId: Id<"texts">,
+    collectionId: Id<"collections">,
+  ) {
+    return {
+      deckId,
+      textId,
+      collectionId,
+      collectionOrigin: "premade" as const,
+      dueDate: 0,
+      isMastered: false,
+      isHidden: false,
+      schedulingPhase: "preReview" as const,
+      preReviewCount: 0,
+    };
+  }
+
+  async function getCardCount(t: TestConvex<typeof schema>, deckId: Id<"decks">) {
+    return t.run(async (ctx) => (await ctx.db.get(deckId))?.cardCount);
+  }
+
+  it("insert → delete returns the counter to its baseline", async () => {
+    const t = convexTest(schema, modules);
+    const { deckId, textId, collectionId } = await seedDeck(t, 0);
+
+    const cardId = await t.run(async (ctx) =>
+      insertCard(ctx, cardData(deckId, textId, collectionId)),
+    );
+    expect(await getCardCount(t, deckId)).toBe(1);
+
+    const secondId = await t.run(async (ctx) =>
+      insertCard(ctx, cardData(deckId, textId, collectionId)),
+    );
+    expect(await getCardCount(t, deckId)).toBe(2);
+
+    await t.run(async (ctx) => deleteCard(ctx, cardId));
+    expect(await getCardCount(t, deckId)).toBe(1);
+    await t.run(async (ctx) => deleteCard(ctx, secondId));
+    expect(await getCardCount(t, deckId)).toBe(0);
+  });
+
+  it("a repeat delete of the same card id is a counter no-op", async () => {
+    const t = convexTest(schema, modules);
+    const { deckId, textId, collectionId } = await seedDeck(t, 0);
+    const cardId = await t.run(async (ctx) =>
+      insertCard(ctx, cardData(deckId, textId, collectionId)),
+    );
+    await t.run(async (ctx) => deleteCard(ctx, cardId));
+    await t.run(async (ctx) => deleteCard(ctx, cardId));
+    expect(await getCardCount(t, deckId)).toBe(0);
+  });
+
+  it("deleteCard floors at 0 when the counter had drifted low", async () => {
+    const t = convexTest(schema, modules);
+    const { deckId, textId, collectionId } = await seedDeck(t, 0);
+    // Bypass insertCard (the pre-repair drift shape): a row exists but the
+    // counter reads 0. Deleting must clamp, not go to -1.
+    const cardId = await t.run(async (ctx) =>
+      ctx.db.insert("cards", cardData(deckId, textId, collectionId)),
+    );
+    await t.run(async (ctx) => deleteCard(ctx, cardId));
+    expect(await getCardCount(t, deckId)).toBe(0);
   });
 });

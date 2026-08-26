@@ -30,6 +30,7 @@ const BATCH_SIZE = 75;
  */
 export const run = internalMutation({
   args: { userId: v.string() },
+  returns: v.object({ status: v.literal('started'), deckCount: v.number() }),
   handler: async (ctx, args) => {
     const courses = await ctx.db
       .query('courses')
@@ -53,7 +54,7 @@ export const run = internalMutation({
       );
     }
 
-    return { status: 'started', deckCount: deckIds.length };
+    return { status: 'started' as const, deckCount: deckIds.length };
   },
 });
 
@@ -79,6 +80,7 @@ export const processBatch = internalMutation({
     cursor: v.optional(v.string()),
     clearPhase: v.optional(v.union(v.literal('writing'), v.literal('done'))),
   },
+  returns: v.object({ processed: v.number(), isDone: v.boolean() }),
   handler: async (ctx, args) => {
     if (args.deckIdx >= args.deckIds.length) {
       return { processed: 0, isDone: true };

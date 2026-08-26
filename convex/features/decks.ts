@@ -1365,9 +1365,20 @@ export async function createCardsFromTexts(
   // cards inserted from them get `collectionOrigin: undefined` and never
   // match the 'course' filter even though the UI treats them as course content.
   const collection = await ctx.db.get(collectionId);
-  const collectionOrigin: 'premade' | 'custom' | 'chat' | undefined =
+  const maybeOrigin: 'premade' | 'custom' | 'chat' | undefined =
     collection?.origin
     ?? (collection && isPremadeLevelCollection(collection) ? 'premade' : undefined);
+  // `cards.collectionOrigin` is a required field: every collection carries
+  // `origin` since the one-time backfill (and all insert paths stamp it), so
+  // this only fires for a dangling collectionId or an unbackfilled legacy
+  // row — cases where the card insert below would fail schema validation
+  // anyway. Fail fast with a diagnosable error instead.
+  if (maybeOrigin === undefined) {
+    throw new Error(
+      `createCardsFromTexts: collection ${collectionId} is missing or has no resolvable origin; cannot insert cards`,
+    );
+  }
+  const collectionOrigin: 'premade' | 'custom' | 'chat' = maybeOrigin;
 
   // With separateModeTracking on, seed the writing track at creation (a new
   // card's writing schedule is identical to its shared one) so the card is
@@ -1914,10 +1925,9 @@ export const addCardsFromCollection = mutation({
         if (quota.balance > 0) {
           remainingBatch = quota.balance;
         } else {
-          // No sentences left. Skip Phase 2 entirely, return Phase 1 results
-          if (totalCardsInserted > 0) {
-            await ctx.db.patch(deck._id, { cardCount: deck.cardCount + totalCardsInserted });
-          }
+          // No sentences left. Skip Phase 2 entirely, return Phase 1 results.
+          // `insertCard` maintained deck.cardCount per insert; `deck` is the
+          // pre-insert snapshot, so add this call's inserts for the report.
           return {
             cardsAdded: totalCardsInserted,
             totalCardsInDeck: deck.cardCount + totalCardsInserted,
@@ -2002,10 +2012,10 @@ export const addCardsFromCollection = mutation({
       }
     }
 
-    // Update deck card count
-    if (totalCardsInserted > 0) {
-      await ctx.db.patch(deck._id, { cardCount: deck.cardCount + totalCardsInserted });
-    }
+    // deck.cardCount is maintained by `insertCard` (db/stats/cardAggregates),
+    // one increment per inserted row, in the same transaction as the insert.
+    // `deck` below is the pre-insert snapshot, so snapshot + inserts equals
+    // the stored count for the reported totals.
 
     // One event per batch with a count, not one per card. Adding 50 cards is
     // a single user decision, and modelling it as 50 events would both distort
@@ -2134,7 +2144,6 @@ export const addSingleTextFromCollection = mutation({
       await updateCollectionProgress(ctx, userId, courseId, text.collectionId, {
         addedDelta: cardsInserted,
       });
-      await ctx.db.patch(deck._id, { cardCount: deck.cardCount + cardsInserted });
       await maybeAutoAdvanceActiveCollection(ctx, userId, courseId, text.collectionId);
     }
 

@@ -951,6 +951,10 @@ describe("features/llmTranslationQueue", () => {
         const cardId = await ctx.db.insert("cards", {
           deckId,
           textId,
+          // The card's collection is whatever collection the text was seeded
+          // into (required field since the collection-origin narrowing).
+          collectionId: (await ctx.db.get(textId))!.collectionId,
+          collectionOrigin: "premade",
           dueDate: Date.now(),
           isMastered: false,
           isHidden: false,

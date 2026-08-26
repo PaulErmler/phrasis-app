@@ -910,13 +910,11 @@ export const completeOnboarding = mutation({
         const course = await ctx.db.get(courseId);
         if (!deck || !course) throw new ConvexError('Failed to load deck or course');
 
+        // deck.cardCount is maintained by `insertCard` inside
+        // `createCardsFromTexts`, in the same transaction as each row insert.
         const { cardsInserted, newLastRank } = await createCardsFromTexts(
           ctx, textsToAdd, deck, collection._id, course,
         );
-
-        if (cardsInserted > 0) {
-          await ctx.db.patch(deckId, { cardCount: deck.cardCount + cardsInserted });
-        }
 
         await consumeQuota(ctx, userId, FEATURE_IDS.SENTENCES, textsToAdd.length);
         await updateCollectionProgress(

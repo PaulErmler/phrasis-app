@@ -46,6 +46,7 @@ async function seedAlternative(
       deckId,
       textId,
       collectionId,
+      collectionOrigin: 'premade',
       dueDate: 0,
       isMastered: false,
       isHidden: false,

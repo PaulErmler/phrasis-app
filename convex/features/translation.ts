@@ -13,6 +13,7 @@
  */
 
 import { romanizeLocal } from '../lib/localRomanization';
+import { requireEnv } from '../lib/env';
 import { SignJWT, importPKCS8 } from 'jose';
 import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 
@@ -60,8 +61,7 @@ interface ServiceAccountCredentials {
 }
 
 function getServiceAccountCredentials(): ServiceAccountCredentials {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY not configured');
+  const raw = requireEnv('GOOGLE_SERVICE_ACCOUNT_KEY');
   const json = raw.trimStart().startsWith('{') ? raw : atob(raw);
   return JSON.parse(json);
 }
@@ -114,8 +114,7 @@ export async function translateText(
   sourceLang: string,
   targetLang: string,
 ): Promise<string> {
-  const apiKey = process.env.GOOGLE_TRANSLATE_API_KEY;
-  if (!apiKey) throw new Error('Translation service not configured');
+  const apiKey = requireEnv('GOOGLE_TRANSLATE_API_KEY');
 
   const googleSource = toGoogleTranslateCode(sourceLang);
   const googleTarget = toGoogleTranslateCode(targetLang);

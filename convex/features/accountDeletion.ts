@@ -1,4 +1,4 @@
-import { ConvexError } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 import { mutation } from '../_generated/server';
 import { authComponent } from '../auth';
 import { rateLimiter } from '../rateLimiter';
@@ -16,6 +16,7 @@ import { resend } from '../lib/resendClient';
 
 export const requestAccountDeletion = mutation({
   args: {},
+  returns: v.null(),
   handler: async (ctx) => {
     const user = await authComponent.safeGetAuthUser(ctx);
     if (!user) throw new ConvexError('Unauthenticated');
@@ -64,5 +65,6 @@ export const requestAccountDeletion = mutation({
         'Promised to the user: deletion within 30 days.',
       ].join('\n'),
     });
+    return null;
   },
 });

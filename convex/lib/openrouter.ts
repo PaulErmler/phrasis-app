@@ -1,5 +1,6 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
+import { optionalEnv } from './env';
 
 /**
  * The one place OPENROUTER_API_KEY becomes an OpenRouter provider, so the
@@ -32,7 +33,7 @@ export function getOpenRouter(
 export function tryGetOpenRouter(
   extraBody: Record<string, unknown> = OPENROUTER_USAGE_ACCOUNTING,
 ): ReturnType<typeof createOpenRouter> | null {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = optionalEnv('OPENROUTER_API_KEY');
   if (!apiKey) return null;
   return createOpenRouter({ apiKey, extraBody });
 }

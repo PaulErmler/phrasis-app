@@ -1,4 +1,5 @@
 import type { SpeakInput, SpeakResult, TTSProvider } from './types';
+import { requireEnv } from '../env';
 
 // MiniMax Speech 2.8 Turbo, reached through OpenRouter's OpenAI-compatible
 // speech endpoint, same endpoint + OPENROUTER_API_KEY as the Gemini provider,
@@ -47,8 +48,7 @@ function retryDelayMs(response: Response, attempt: number): number {
 export const minimaxTts: TTSProvider = {
   id: 'minimax',
   async speak(input: SpeakInput): Promise<SpeakResult> {
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) throw new Error('OPENROUTER_API_KEY is not configured');
+    const apiKey = requireEnv('OPENROUTER_API_KEY');
 
     let lastError = '';
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {

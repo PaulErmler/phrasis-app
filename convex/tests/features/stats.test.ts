@@ -652,5 +652,34 @@ describe("features/stats", () => {
       expect(res.session.map((w) => w.display)).toEqual(["hola"]);
       expect(res.today).toEqual([]);
     });
+
+    it("honors an explicit client `today`: rows created now don't belong to tomorrow", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedActiveCourse(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("userWords", {
+          userId: "user_A",
+          courseId,
+          language: "es",
+          word: "hola",
+          displayWord: "hola",
+          sessionId: "session-current",
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      // +1 day is inside resolveClientToday's ±1-day acceptance window, so
+      // the client-supplied date is used as-is and the just-created row
+      // (whose _creationTime formats to the server's today) drops out.
+      const tomorrow = new Date(Date.now() + 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+      const res = await asUser.query(
+        api.features.stats.getNewWordsForCelebration,
+        { sessionId: "session-current", timezone: "UTC", today: tomorrow },
+      );
+      expect(res.session).toEqual([]);
+      expect(res.today).toEqual([]);
+    });
   });
 });

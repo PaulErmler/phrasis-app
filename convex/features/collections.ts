@@ -1,5 +1,5 @@
 import { v, ConvexError } from 'convex/values';
-import { paginationOptsValidator } from 'convex/server';
+import { paginationOptsValidator, paginationResultValidator } from 'convex/server';
 import { query, mutation, internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { getAuthUserId } from '../db/users';
@@ -44,7 +44,11 @@ import { resolveAudioPayload } from '../lib/audioAssets';
 import { hasActiveTtsClaim } from './ttsProcessing';
 import { getLlmClaim, isClaimFresh } from './llmTranslationQueue';
 import { getCourseSettings } from '../db/courseSettings';
-import type { LlmPriority } from '../types';
+import {
+  translationValidator,
+  audioRecordingValidator,
+  type LlmPriority,
+} from '../types';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 
@@ -144,6 +148,29 @@ export const browseCollectionTexts = query({
     direction: v.union(v.literal('after'), v.literal('upTo')),
     paginationOpts: paginationOptsValidator,
   },
+  returns: paginationResultValidator(
+    v.object({
+      _id: v.id('texts'),
+      text: v.string(),
+      sourceLanguage: v.string(),
+      collectionRank: v.number(),
+      status: v.union(
+        v.literal('added'),
+        v.literal('prioritized'),
+        v.literal('ignored'),
+        v.literal('none'),
+      ),
+      // This query opts into markVersionStale, so non-source-language
+      // entries additionally carry `versionStale` (see the tri-state note
+      // on CardTranslationContent in convex/lib/cardContent.ts).
+      translations: v.array(
+        translationValidator.extend({ versionStale: v.optional(v.boolean()) }),
+      ),
+      audioRecordings: v.array(audioRecordingValidator),
+      missingTranslationLanguages: v.array(v.string()),
+      needsAnnotationBackfill: v.boolean(),
+    }),
+  ),
   handler: async (ctx, args) => {
     const emptyPage = { page: [], isDone: true, continueCursor: '' };
     const userId = await getAuthUserId(ctx);

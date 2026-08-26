@@ -134,6 +134,7 @@ function insertCardFor(
       deckId,
       textId,
       collectionId: collId,
+      collectionOrigin: "premade",
       dueDate: Date.now(),
       isMastered: false,
       isHidden: false,

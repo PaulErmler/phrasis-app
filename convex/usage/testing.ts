@@ -6,7 +6,7 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { normalizePlans } from '../../lib/autumn/customer-shape';
-import { AUTUMN_API } from './autumnClient';
+import { AUTUMN_API, getSecretKey } from './autumnClient';
 import {
   assertTestHooksEnabled,
   requireUserIdByEmail,
@@ -167,8 +167,7 @@ export const relinkStripeCustomer = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     assertTestHooksEnabled();
-    const key = process.env.AUTUMN_SECRET_KEY;
-    if (!key) throw new Error('AUTUMN_SECRET_KEY is not set');
+    const key = getSecretKey();
     const headers = {
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
@@ -232,8 +231,7 @@ export const legacyAttachPlan = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     assertTestHooksEnabled();
-    const key = process.env.AUTUMN_SECRET_KEY;
-    if (!key) throw new Error('AUTUMN_SECRET_KEY is not set');
+    const key = getSecretKey();
     const userId: string = await ctx.runQuery(
       internal.usage.testing.resolveUserId,
       { email: args.email },
@@ -285,8 +283,7 @@ export const cancelPlanNow = internalAction({
   returns: v.string(),
   handler: async (ctx, args) => {
     assertTestHooksEnabled();
-    const key = process.env.AUTUMN_SECRET_KEY;
-    if (!key) throw new Error('AUTUMN_SECRET_KEY is not set');
+    const key = getSecretKey();
     const userId: string = await ctx.runQuery(
       internal.usage.testing.resolveUserId,
       { email: args.email },
@@ -338,8 +335,7 @@ export const getBillingDebugState = internalAction({
   ),
   handler: async (ctx, args) => {
     assertTestHooksEnabled();
-    const key = process.env.AUTUMN_SECRET_KEY;
-    if (!key) throw new Error('AUTUMN_SECRET_KEY is not set');
+    const key = getSecretKey();
     const userId: string = await ctx.runQuery(
       internal.usage.testing.resolveUserId,
       { email: args.email },

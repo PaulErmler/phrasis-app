@@ -204,6 +204,38 @@ export interface PurgeInventory {
   isAdmin: boolean;
 }
 
+const purgeInventoryValidator = v.object({
+  courses: v.number(),
+  decks: v.number(),
+  cards: v.number(),
+  texts: v.number(),
+  chatApprovals: v.number(),
+  customCollections: v.number(),
+  hasQuotaRow: v.boolean(),
+  isAdmin: v.boolean(),
+});
+
+/** `accountDeletions.status` (schema union), or null when no row exists. */
+const deletionRequestStatusValidator = v.union(
+  v.literal('requested'),
+  v.literal('running'),
+  v.literal('completed'),
+  v.null(),
+);
+
+/** The PHASES tuple above, as literals (validators need the spelled-out union). */
+const purgePhaseValidator = v.union(
+  v.literal('cards'),
+  v.literal('aggregates'),
+  v.literal('texts'),
+  v.literal('approvals'),
+  v.literal('collections'),
+  v.literal('userTables'),
+  v.literal('courses'),
+  v.literal('auth'),
+  v.literal('done'),
+);
+
 // Explicit result shapes for the same-file ctx.run* calls in `run`; without
 // them TypeScript trips over the internal.admin.deleteUser type circularity.
 interface PreflightResult {
@@ -251,6 +283,13 @@ export type RunResult =
  */
 export const preflight = internalQuery({
   args: { userId: v.string(), email: v.string() },
+  returns: v.object({
+    authOk: v.boolean(),
+    emailMatches: v.boolean(),
+    authEmail: v.union(v.string(), v.null()),
+    requestStatus: deletionRequestStatusValidator,
+    inventory: purgeInventoryValidator,
+  }),
   handler: async (ctx, args) => {
     const email = args.email.trim().toLowerCase();
     const authUser = await authComponent.getAnyUserById(ctx, args.userId);
@@ -352,6 +391,7 @@ export const beginPurge = internalMutation({
     email: v.string(),
     overrideNoRequest: v.optional(v.boolean()),
   },
+  returns: v.object({ email: v.string(), authEmail: v.string() }),
   handler: async (ctx, args) => {
     const email = args.email.trim().toLowerCase();
     const authUser = await authComponent.getAnyUserById(ctx, args.userId);
@@ -447,6 +487,12 @@ export const beginPurge = internalMutation({
  */
 export const purgeBatch = internalMutation({
   args: { userId: v.string(), email: v.string() },
+  returns: v.object({
+    phase: purgePhaseValidator,
+    deleted: v.number(),
+    totalDeleted: v.number(),
+    done: v.boolean(),
+  }),
   handler: async (ctx, args) => {
     const row = await ctx.db
       .query('accountDeletions')
@@ -836,6 +882,7 @@ async function purgeAuth(
 
 export const markCompleted = internalMutation({
   args: { userId: v.string() },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db
       .query('accountDeletions')
@@ -857,6 +904,24 @@ export const markCompleted = internalMutation({
 /** Status of a purge, for the e2e spec and for checking on a resumed run. */
 export const purgeStatus = internalQuery({
   args: { userId: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      status: v.union(
+        v.literal('requested'),
+        v.literal('running'),
+        v.literal('completed'),
+      ),
+      // Schema stores phase as a plain optional string (values are the
+      // PHASES tuple, but historical rows aren't re-validated), so string
+      // here rather than purgePhaseValidator.
+      phase: v.union(v.string(), v.null()),
+      docsDeleted: v.number(),
+      requestedAt: v.union(v.number(), v.null()),
+      completedAt: v.union(v.number(), v.null()),
+      overrideNoRequest: v.boolean(),
+    }),
+  ),
   handler: async (ctx, args) => {
     const row = await ctx.db
       .query('accountDeletions')
@@ -946,6 +1011,25 @@ export const run = internalAction({
     dryRun: v.optional(v.boolean()),
     overrideNoRequest: v.optional(v.boolean()),
   },
+  returns: v.union(
+    v.object({
+      dryRun: v.literal(true),
+      wouldRun: v.boolean(),
+      authUserFound: v.boolean(),
+      emailMatches: v.boolean(),
+      authEmail: v.union(v.string(), v.null()),
+      deletionRequest: deletionRequestStatusValidator,
+      inventory: purgeInventoryValidator,
+    }),
+    v.object({
+      dryRun: v.literal(false),
+      deleted: v.literal(true),
+      docsDeleted: v.number(),
+      batches: v.number(),
+      autumnCustomerExisted: v.boolean(),
+      cancelledProductIds: v.array(v.string()),
+    }),
+  ),
   handler: async (ctx, args): Promise<RunResult> => {
     const email = args.email.trim().toLowerCase();
     const check: PreflightResult = await ctx.runQuery(

@@ -637,8 +637,7 @@ export default defineSchema({
     rarestWord: v.optional(v.string()),
     ogteId: v.optional(v.string()),  // Traceability back to the source OGTE row
   })
-    .index('by_level_and_position', ['level', 'position'])
-    .index('by_textId', ['textId']),
+    .index('by_level_and_position', ['level', 'position']),
 
   // User settings table - stores user preferences and onboarding status
   userSettings: defineTable({
@@ -717,10 +716,16 @@ export default defineSchema({
   cards: defineTable({
     deckId: v.id('decks'), // Reference to the deck
     textId: v.id('texts'), // Reference to the text/sentence
-    collectionId: v.optional(v.id('collections')), // Reference to the source collection. Backfilled for all existing cards; treat as required for new writes.
-    // Denormalized from collections.origin at insert time. Powers the content-source filter
-    // index lookups in getCardForReview. Backfilled for all existing cards; treat as required for new writes.
-    collectionOrigin: v.optional(collectionOriginValidator),
+    // Reference to the source collection. Required since the one-time
+    // backfill (admin/backfillCollectionOrigin, retired) completed; the
+    // runAll-chained `cardCollectionBackfill` safety net keeps the guarantee
+    // durable (expects to patch 0 docs). Deploy note: this narrowing only
+    // deploys once every prod row carries the field.
+    collectionId: v.id('collections'),
+    // Denormalized from collections.origin at insert time. Powers the
+    // content-source filter index lookups in getCardForReview. Required —
+    // same backfill + safety net as collectionId above.
+    collectionOrigin: collectionOriginValidator,
     // Scheduling + free-play rotation state mutated by reviewCard /
     // advanceFreePlayCard (one rotation per face). Shared with the `reviewLogs`
     // undo snapshots. Definitions and field comments live in convex/types.ts.
@@ -763,6 +768,16 @@ export default defineSchema({
     wordsTrackedLanguages: v.optional(v.array(v.string())), // Languages for which words have been counted in stats
     audioSpeedOverrides: v.optional(v.record(v.string(), v.number())), // Per-card per-language playback speed override (range CARD_OVERRIDE_SPEED_MIN-CARD_OVERRIDE_SPEED_MAX, see lib/constants/audioPlayback). Missing entry = use general courseSettings.languagePlaybackSpeeds.
   })
+    // INDEX BUDGET — read before adding an index here. This table carries 23
+    // database indexes (limit 32) and EVERY card write pays for updating all
+    // of them, so each addition taxes reviewCard and every other card
+    // mutation. Audited 2026-08-26: all 23 have live query references (see
+    // lib/dueQueue.ts, lib/freePlay.ts, features/library.ts,
+    // features/scheduling.ts). When adding one, declare it staged —
+    // `.index('by_field', { fields: ['field'], staged: true })` — so the
+    // backfill runs async instead of blocking the deploy on this large
+    // table, then remove the `staged` flag in a later deploy before
+    // querying it.
     .index('by_deckId', ['deckId'])
     .index('by_deckId_and_textId', ['deckId', 'textId'])
     .index('by_textId', ['textId'])
@@ -1148,8 +1163,7 @@ export default defineSchema({
       'userId',
       'courseId',
       'reviewedAt',
-    ])
-    .index('by_cardId_and_reviewedAt', ['cardId', 'reviewedAt']),
+    ]),
 
   // Collection progress table - per (user, course, collection) monotonic
   // counters used by the home view. Counters are strictly monotonic: incremented

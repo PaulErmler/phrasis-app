@@ -1,5 +1,5 @@
 import { v } from 'convex/values';
-import { paginationOptsValidator } from 'convex/server';
+import { paginationOptsValidator, paginationResultValidator } from 'convex/server';
 import { query, QueryCtx } from '../_generated/server';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -9,13 +9,14 @@ import { originsForFilter } from '../lib/collections';
 import {
   studyContentFilterValidator,
   reviewModeValidator,
+  translationValidator,
+  audioRecordingValidator,
   type ReviewMode,
   type StudyContentFilter,
 } from '../types';
 import { studyContextFromSettings, type StudyContext } from '../db/reviewLogs';
 import {
   getCourseStats as dbGetCourseStats,
-  getTodayInTimezone,
   deriveStreakDisplay,
 } from '../db/courseStats';
 import { isValidTimezone, resolveClientToday } from '../lib/dateUtils';
@@ -58,6 +59,11 @@ function isValidMonthString(s: string): boolean {
 export const getStatsPageData = query({
   args: {
     timezone: v.string(),
+    // Client-supplied "today" per the no-wall-clock query guideline (same
+    // contract as getCourseStats: validated and clamped to ±1 day of the
+    // server's view in resolveClientToday). Optional for back-compat:
+    // already-shipped bundles omit it and keep the server-clock behavior.
+    today: v.optional(v.string()),
     startDate: v.string(),
     endDate: v.string(),
     startMonth: v.string(),
@@ -65,6 +71,62 @@ export const getStatsPageData = query({
     startWeek: v.optional(v.string()),
     endWeek: v.optional(v.string()),
   },
+  returns: v.union(
+    v.null(),
+    v.object({
+      courseStats: v.union(
+        v.object({
+          totalRepetitions: v.number(),
+          totalTimeMs: v.number(),
+          totalCards: v.number(),
+          currentStreak: v.number(),
+          streakState: v.union(
+            v.literal('active'),
+            v.literal('pending'),
+            v.literal('frozen'),
+            v.literal('broken'),
+            v.literal('none'),
+          ),
+          totalWordCount: v.number(),
+          totalChatMessages: v.number(),
+          totalChatCardsApproved: v.number(),
+          totalCardsAddedManually: v.number(),
+          totalAccuracySum: v.number(),
+          totalAccuracyCount: v.number(),
+          totalAccuracyStrictSum: v.number(),
+          totalAccuracyLenientSum: v.number(),
+          totalAccuracyDualCount: v.number(),
+        }),
+        v.null(),
+      ),
+      ignorePunctuation: v.boolean(),
+      todayReps: v.number(),
+      todayNewCards: v.number(),
+      todayTimeMs: v.number(),
+      hourlyDistribution: v.array(v.number()),
+      monthlyStats: v.array(
+        v.object({
+          month: v.string(),
+          totalRepetitions: v.number(),
+          totalNewCards: v.number(),
+          totalTimeMs: v.number(),
+        }),
+      ),
+      weeklyStats: v.array(
+        v.object({
+          week: v.string(),
+          totalRepetitions: v.number(),
+          totalNewCards: v.number(),
+          totalTimeMs: v.number(),
+        }),
+      ),
+      baseLanguages: v.array(v.string()),
+      targetLanguages: v.array(v.string()),
+      languageWordCounts: v.array(
+        v.object({ language: v.string(), words: v.number() }),
+      ),
+    }),
+  ),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
@@ -79,7 +141,7 @@ export const getStatsPageData = query({
     const courseSettings = await getCourseSettings(ctx, courseId);
 
     // todayStats
-    const todayStr = getTodayInTimezone(args.timezone);
+    const todayStr = resolveClientToday(args.timezone, args.today);
     const todayDaily = await getDailyStats(ctx, userId, courseId, todayStr);
 
     // hourly distribution (aggregate from dailyStats)
@@ -212,6 +274,23 @@ export const getStatsPageDailyData = query({
     startDate: v.string(),
     endDate: v.string(),
   },
+  returns: v.object({
+    heatmapData: v.array(
+      v.object({
+        date: v.string(),
+        reps: v.number(),
+        timeMs: v.number(),
+        newCards: v.number(),
+      }),
+    ),
+    languageDailyData: v.array(
+      v.object({
+        date: v.string(),
+        language: v.string(),
+        newWordsCount: v.number(),
+      }),
+    ),
+  }),
   handler: async (ctx, args) => {
     if (!isValidDateString(args.startDate) || !isValidDateString(args.endDate)) {
       return { heatmapData: [], languageDailyData: [] };
@@ -294,6 +373,9 @@ function normalizeSearchTerm(raw: string): string {
  */
 export const getRecentWords = query({
   args: {},
+  returns: v.array(
+    v.object({ language: v.string(), words: v.array(v.string()) }),
+  ),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
@@ -348,6 +430,7 @@ export const getRecentWordsForLanguage = query({
     language: v.string(),
     limit: v.optional(v.number()),
   },
+  returns: v.array(v.string()),
   handler: async (ctx, { language, limit }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
@@ -395,6 +478,7 @@ export const searchWordsForLanguage = query({
     language: v.string(),
     searchQuery: v.string(),
   },
+  returns: v.array(v.string()),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
@@ -447,6 +531,13 @@ export const searchWords = query({
   args: {
     searchQuery: v.string(),
   },
+  returns: v.array(
+    v.object({
+      word: v.string(),
+      displayWord: v.string(),
+      language: v.string(),
+    }),
+  ),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
@@ -498,6 +589,19 @@ export const getSentencesForWord = query({
     language: v.string(),
     paginationOpts: paginationOptsValidator,
   },
+  returns: paginationResultValidator(
+    v.object({
+      textId: v.id('texts'),
+      translations: v.array(translationValidator),
+      audioRecordings: v.array(audioRecordingValidator),
+      hasMissingContent: v.boolean(),
+      cardId: v.union(v.id('cards'), v.null()),
+      isMastered: v.boolean(),
+      isHidden: v.boolean(),
+      isFavorite: v.boolean(),
+      reviewCount: v.number(),
+    }),
+  ),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return { page: [], isDone: true, continueCursor: '' };
@@ -1060,7 +1164,15 @@ function getDateFormatter(timeZone: string): Intl.DateTimeFormat {
  * since they can't belong to today regardless of timezone.
  */
 export const getNewWordsForCelebration = query({
-  args: { sessionId: v.string(), timezone: v.string() },
+  // `today` is client-supplied per the no-wall-clock query guideline (same
+  // contract as getStatsPageData above: validated and clamped to ±1 day of
+  // the server's view in resolveClientToday). Optional for back-compat:
+  // already-shipped bundles omit it and keep the server-clock behavior.
+  args: {
+    sessionId: v.string(),
+    timezone: v.string(),
+    today: v.optional(v.string()),
+  },
   returns: v.object({
     session: v.array(v.object({ language: v.string(), display: v.string() })),
     today: v.array(v.object({ language: v.string(), display: v.string() })),
@@ -1071,7 +1183,7 @@ export const getNewWordsForCelebration = query({
     const active = await getActiveCourseForUser(ctx, userId);
     if (!active) return { session: [], today: [] };
     const targetLanguages = new Set(active.course.targetLanguages);
-    const todayStr = getTodayInTimezone(args.timezone);
+    const todayStr = resolveClientToday(args.timezone, args.today);
 
     // userWords' only userId+courseId-scoped indexes also key on language, so
     // iterate the target languages explicitly. Each per-language scan is

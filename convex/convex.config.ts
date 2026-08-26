@@ -11,10 +11,47 @@ import workpool from '@convex-dev/workpool/convex.config';
 import migrations from '@convex-dev/migrations/convex.config';
 import resend from '@convex-dev/resend/convex.config';
 
+/**
+ * Every app-provided environment variable read anywhere under convex/ is
+ * declared here (platform vars CONVEX_SITE_URL / CONVEX_CLOUD_URL are
+ * provided automatically and must NOT be declared). Function code reads
+ * these through the typed accessors in `convex/lib/env.ts`, whose allowed
+ * names derive from this object — an undeclared name is a type error.
+ *
+ * All app vars are declared optional so a deploy never blocks on one being
+ * set; each call site decides whether a missing key throws (requireEnv) or
+ * degrades (optionalEnv). POSTHOG_PROJECT_TOKEN stays required because the
+ * posthog component below is bound to it by reference.
+ */
 const app = defineApp({
   env: {
     POSTHOG_PROJECT_TOKEN: v.string(),
     POSTHOG_HOST: v.optional(v.string()),
+    // Better Auth (convex/auth.ts)
+    SITE_URL: v.optional(v.string()),
+    GOOGLE_CLIENT_ID: v.optional(v.string()),
+    GOOGLE_CLIENT_SECRET: v.optional(v.string()),
+    APPLE_CLIENT_ID: v.optional(v.string()),
+    APPLE_TEAM_ID: v.optional(v.string()),
+    APPLE_KEY_ID: v.optional(v.string()),
+    APPLE_PRIVATE_KEY: v.optional(v.string()),
+    APPLE_APP_BUNDLE_IDENTIFIER: v.optional(v.string()),
+    // Billing (convex/autumn.ts, convex/usage/*)
+    AUTUMN_SECRET_KEY: v.optional(v.string()),
+    // LLM + TTS via OpenRouter (convex/lib/openrouter.ts, convex/lib/tts/*)
+    OPENROUTER_API_KEY: v.optional(v.string()),
+    // Google Cloud translation / romanization / TTS
+    GOOGLE_TRANSLATE_API_KEY: v.optional(v.string()),
+    GOOGLE_SERVICE_ACCOUNT_KEY: v.optional(v.string()),
+    GOOGLE_TTS_API_KEY: v.optional(v.string()),
+    // Azure Speech-to-Text (convex/lib/stt/azure.ts)
+    AZURE_SPEECH_API_KEY: v.optional(v.string()),
+    AZURE_SPEECH_REGION: v.optional(v.string()),
+    // Non-prod email labeling (convex/lib/emailEnv.ts)
+    EMAIL_ENV: v.optional(v.string()),
+    // Ops flags (read as raw process.env where noted at the call site)
+    FF_NEW_COURSE_CUTOVER: v.optional(v.string()),
+    E2E_TEST_HOOKS: v.optional(v.string()),
   },
 });
 app.use(betterAuth);

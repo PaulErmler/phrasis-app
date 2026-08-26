@@ -128,7 +128,33 @@ export const cardsByOriginWritingStateAndDueDate = new TableAggregate<{
 // ============================================================================
 
 /**
- * Insert a card and update both aggregates.
+ * Move `decks.cardCount` by `delta`, floored at 0.
+ *
+ * The denormalized counter (readers: admin dashboard, admin/deleteUser
+ * preflight, features/projections fallback) is maintained ONLY here, in the
+ * same transaction as the card-row write — the same single-writer contract
+ * the aggregates above follow — so it cannot drift from the actual rows.
+ * Before this lived here, four call sites incremented it and nothing
+ * decremented, so every permanent delete inflated it forever; the one-shot
+ * `migrations:recountDeckCardCounts` repairs that historical drift. The floor
+ * guards decrements against counters that drifted LOW before the repair ran
+ * (and against double-deletes); a missing deck (bulk purge mid-flight) is a
+ * no-op.
+ */
+async function adjustDeckCardCount(
+  ctx: MutationCtx,
+  deckId: Id<'decks'>,
+  delta: 1 | -1,
+): Promise<void> {
+  const deck = await ctx.db.get(deckId);
+  if (!deck) return;
+  await ctx.db.patch(deckId, {
+    cardCount: Math.max(0, deck.cardCount + delta),
+  });
+}
+
+/**
+ * Insert a card, update both aggregates, and bump the deck's `cardCount`.
  */
 export async function insertCard(
   ctx: MutationCtx,
@@ -142,6 +168,7 @@ export async function insertCard(
     await cardsByWritingStateAndDueDate.insertIfDoesNotExist(ctx, doc);
     await cardsByOriginWritingStateAndDueDate.insertIfDoesNotExist(ctx, doc);
   }
+  await adjustDeckCardCount(ctx, data.deckId, 1);
   return id;
 }
 
@@ -396,7 +423,7 @@ export async function clearAggregatesForDeck(
 }
 
 /**
- * Delete a card and update both aggregates.
+ * Delete a card, update both aggregates, and decrement the deck's `cardCount`.
  */
 export async function deleteCard(
   ctx: MutationCtx,
@@ -404,6 +431,7 @@ export async function deleteCard(
 ): Promise<void> {
   const oldDoc = await ctx.db.get(cardId);
   if (!oldDoc) return;
+  await adjustDeckCardCount(ctx, oldDoc.deckId, -1);
   await cardsByStateAndDueDate.deleteIfExists(ctx, oldDoc);
   await cardsByOriginStateAndDueDate.deleteIfExists(ctx, oldDoc);
   if (hasWritingTrack(oldDoc)) {

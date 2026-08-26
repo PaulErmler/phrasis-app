@@ -59,7 +59,7 @@ async function seedLibrary(
         deckId,
         textId,
         collectionId,
-        collectionOrigin: seed.origin,
+        collectionOrigin: seed.origin ?? "premade",
         dueDate: 0,
         isMastered: seed.isMastered ?? false,
         isHidden: seed.isHidden ?? false,
@@ -196,21 +196,26 @@ describe("features/library", () => {
       ]);
     });
 
-    it("cards without collectionOrigin appear under source undefined only", async () => {
+    it("every card carries an origin, so no filter can strand a card", async () => {
+      // `cards.collectionOrigin` is a required field since the narrowing
+      // (origin-less legacy rows are no longer representable — the old
+      // "appear under source undefined only" behavior is unreachable), so a
+      // seed without an explicit origin is a premade card like any other and
+      // must show up under both the unfiltered view and its origin filter.
       const t = convexTest(schema, modules);
       await seedLibrary(t, [
-        { sourceText: "legacy", lastReviewedAt: 1 },
+        { sourceText: "defaulted", lastReviewedAt: 1 },
         { sourceText: "curated", origin: "premade", lastReviewedAt: 2 },
       ]);
       const asUser = t.withIdentity({ subject: "user_A" });
 
       const all = await asUser.query(api.features.library.getLibraryCards, {});
-      expect(sourceTexts(all)).toEqual(["curated", "legacy"]);
+      expect(sourceTexts(all)).toEqual(["curated", "defaulted"]);
 
       const premade = await asUser.query(api.features.library.getLibraryCards, {
         sourceFilter: "premade",
       });
-      expect(sourceTexts(premade)).toEqual(["curated"]);
+      expect(sourceTexts(premade)).toEqual(["curated", "defaulted"]);
 
       const custom = await asUser.query(api.features.library.getLibraryCards, {
         sourceFilter: "custom",

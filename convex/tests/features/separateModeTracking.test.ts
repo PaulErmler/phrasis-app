@@ -96,6 +96,8 @@ async function seedCourse(
           deckId,
           textId,
           collectionId,
+          // Default; a spec's own collectionOrigin (spread below) wins.
+          collectionOrigin: 'premade',
           dueDate: Date.now() - 1000,
           isMastered: false,
           isHidden: false,

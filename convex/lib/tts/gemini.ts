@@ -1,4 +1,5 @@
 import type { SpeakInput, SpeakResult, TTSProvider } from './types';
+import { requireEnv } from '../env';
 import { Mp3Encoder } from '@breezystack/lamejs';
 import { toGeminiBcp47 } from './languageCodes';
 import { getLanguageByCode } from '../../../lib/languages';
@@ -193,8 +194,7 @@ function padRandomSpaces(text: string): string {
 export const geminiTts: TTSProvider = {
   id: 'gemini',
   async speak(input: SpeakInput): Promise<SpeakResult> {
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) throw new Error('OPENROUTER_API_KEY is not configured');
+    const apiKey = requireEnv('OPENROUTER_API_KEY');
 
     const { voiceName, locale } = parseVoiceApiCode(input.voiceApiCode);
     // Accent locale comes from the voice apiCode suffix when present (English

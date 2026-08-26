@@ -15,6 +15,7 @@
  */
 
 import type { ActionCtx } from '../../_generated/server';
+import { requireEnv } from '../env';
 import { reserveRateLimitToken } from '../rateLimitReserve';
 import { buildAutoDetectLocales, toAzureSttLocales } from './languageCodes';
 
@@ -94,10 +95,8 @@ export async function transcribeAudio(
   internalLanguageCode?: string,
   opts: TranscribeOptions = {},
 ): Promise<{ text: string; wordTimings: WordTiming[]; audioDurationMs?: number }> {
-  const apiKey = process.env.AZURE_SPEECH_API_KEY;
-  const region = process.env.AZURE_SPEECH_REGION;
-  if (!apiKey) throw new Error('AZURE_SPEECH_API_KEY is not configured');
-  if (!region) throw new Error('AZURE_SPEECH_REGION is not configured');
+  const apiKey = requireEnv('AZURE_SPEECH_API_KEY');
+  const region = requireEnv('AZURE_SPEECH_REGION');
 
   const locales = internalLanguageCode
     ? toAzureSttLocales(internalLanguageCode, opts.regionVariant)

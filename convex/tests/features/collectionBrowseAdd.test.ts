@@ -344,6 +344,11 @@ describe("collection browse add flows", () => {
       progress = await getProgress(t, courseId, collId);
       expect(progress?.cardsAdded).toBe(3); // exactly the number of cards
       expect((await getDeckCards(t, deckId)).length).toBe(3);
+      // deck.cardCount is maintained by `insertCard` across BOTH add paths
+      // (single direct-add + batch add), no per-mutation patching left.
+      expect(
+        (await t.run(async (ctx) => ctx.db.get(deckId)))?.cardCount,
+      ).toBe(3);
     });
   });
 

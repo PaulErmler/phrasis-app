@@ -143,7 +143,7 @@ async function seedFreePlayDeck(
         freeStudyOrderKey: orderKey ?? i,
         ...(radioCounter != null ? { radioRoundCounter: radioCounter } : {}),
         ...(radioOrderKey != null ? { radioOrderKey } : {}),
-        ...(origin != null ? { collectionOrigin: origin } : {}),
+        collectionOrigin: origin ?? "premade",
       });
       cardIds.push(cardId);
     }

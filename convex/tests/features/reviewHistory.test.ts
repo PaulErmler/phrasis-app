@@ -85,6 +85,7 @@ async function seed(
       deckId,
       textId,
       collectionId,
+      collectionOrigin: 'premade',
       dueDate: Date.now() - 1000,
       isMastered: false,
       isHidden: false,

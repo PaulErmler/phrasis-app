@@ -1,6 +1,7 @@
 import { v, ConvexError } from 'convex/values';
 import { internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
+import { optionalEnv } from '../lib/env';
 
 /**
  * Activate a dataset. Flips its `isActive` to true and deactivates any other
@@ -48,7 +49,7 @@ export const activateDataset = internalMutation({
     // production activation can land first and the cutover can be triggered
     // separately during a low-traffic window.
     let cutoverScheduled = false;
-    const cutoverFlag = (process.env.FF_NEW_COURSE_CUTOVER ?? '').toLowerCase();
+    const cutoverFlag = (optionalEnv('FF_NEW_COURSE_CUTOVER') ?? '').toLowerCase();
     const flagEnabled = cutoverFlag === '1' || cutoverFlag === 'true';
     if (args.runCutover && flagEnabled) {
       await ctx.scheduler.runAfter(
@@ -81,7 +82,7 @@ export const runCutoverNow = internalMutation({
     const dataset = await ctx.db.get(args.datasetId);
     if (!dataset) throw new ConvexError(`Dataset ${args.datasetId} not found`);
 
-    const cutoverFlag = (process.env.FF_NEW_COURSE_CUTOVER ?? '').toLowerCase();
+    const cutoverFlag = (optionalEnv('FF_NEW_COURSE_CUTOVER') ?? '').toLowerCase();
     const flagEnabled = cutoverFlag === '1' || cutoverFlag === 'true';
     if (!flagEnabled) {
       throw new ConvexError(

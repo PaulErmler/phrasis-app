@@ -76,6 +76,7 @@ async function seedCard(
       deckId,
       textId,
       collectionId,
+      collectionOrigin: 'premade',
       dueDate: 0,
       isMastered: false,
       isHidden: false,

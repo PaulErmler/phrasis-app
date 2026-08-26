@@ -1,4 +1,5 @@
 import type { SpeakInput, SpeakResult, TTSProvider } from './types';
+import { requireEnv } from '../env';
 
 interface GoogleTTSResponse {
   audioContent: string;
@@ -11,8 +12,7 @@ function extractLanguageCode(voiceName: string): string {
 export const googleTts: TTSProvider = {
   id: 'google',
   async speak(input: SpeakInput): Promise<SpeakResult> {
-    const apiKey = process.env.GOOGLE_TTS_API_KEY;
-    if (!apiKey) throw new Error('TTS service not configured');
+    const apiKey = requireEnv('GOOGLE_TTS_API_KEY');
 
     const languageCode = extractLanguageCode(input.voiceApiCode);
 

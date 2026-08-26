@@ -62,6 +62,8 @@ async function seedEdit(
     const cardId = await ctx.db.insert('cards', {
       deckId,
       textId,
+      collectionId,
+      collectionOrigin: 'premade',
       dueDate: Date.now(),
       isMastered: false,
       isHidden: false,

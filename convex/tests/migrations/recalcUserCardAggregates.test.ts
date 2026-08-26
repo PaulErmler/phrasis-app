@@ -78,6 +78,7 @@ async function seedUserWithDecksAndCards(
           deckId,
           textId,
           collectionId,
+          collectionOrigin: "premade",
           dueDate: Date.now(),
           isMastered: false,
           isHidden: false,

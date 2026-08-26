@@ -8,13 +8,11 @@ import {
   managedPaymentsCheckoutParams,
   managedPaymentsEnabled,
 } from "../lib/autumn/managed-payments";
-import { autumnFetchRaw } from "./usage/autumnClient";
+import { autumnFetchRaw, getSecretKey } from "./usage/autumnClient";
 
-const secretKey = (() => {
-  const key = process.env.AUTUMN_SECRET_KEY;
-  if (!key) throw new Error('Missing required Convex environment variable: AUTUMN_SECRET_KEY');
-  return key;
-})();
+// Module-scope on purpose: the Autumn component client below needs the key
+// at construction, so a key-less deployment fails at import/analysis time.
+const secretKey = getSecretKey();
 
 // Managed Payments params ride only on v2 `/billing.attach` calls, namely
 // convex/billing.ts (attachNewPlan, switchPlanDuringTrial) and
@@ -175,6 +173,10 @@ export const check = action({
     customerData: v.optional(customerDataValidator),
     entityData: v.optional(v.any()),
   },
+  // Autumn API passthrough: the component's `{ data, error }` payloads are
+  // version-dependent external shapes (preview lines, scenarios, ...), so
+  // `v.any()` is the tightest honest validator here.
+  returns: v.any(),
   handler: async (ctx, args) => {
     return await autumn.check(ctx, { ...args, sendEvent: false });
   },
@@ -398,6 +400,9 @@ export function rejectLegacySessionUnderManagedPayments(
 
 export const attach = action({
   args: { ...checkoutSharedArgs, metadata: v.optional(v.object({})) },
+  // Autumn API passthrough (`{ data, error }` container from either the
+  // component client or the v2 reroute); see `check` above.
+  returns: v.any(),
   handler: async (ctx, args) => {
     const { gated, state, customer } = await gateTrialArgs(ctx, 'attach', args);
     guardFirstPurchaseOffLegacyPath(state);
@@ -463,6 +468,8 @@ export function stripLegacySessionUnderManagedPayments(
 
 export const checkout = action({
   args: checkoutSharedArgs,
+  // Autumn API passthrough; see `check` above.
+  returns: v.any(),
   handler: async (ctx, args) => {
     const { gated, state } = await gateTrialArgs(ctx, 'checkout', args);
     guardFirstPurchaseOffLegacyPath(state);

@@ -19,6 +19,7 @@ export const cutoverAllUsers = internalMutation({
     datasetId: v.id('datasets'),
     cursor: v.optional(v.string()),
   },
+  returns: v.object({ processed: v.number(), isDone: v.boolean() }),
   handler: async (ctx, args) => {
     const result = await ctx.db.query('courses').paginate({
       cursor: args.cursor ?? null,
@@ -67,6 +68,10 @@ export const cutoverUser = internalMutation({
     courseId: v.id('courses'),
     datasetId: v.id('datasets'),
   },
+  returns: v.union(
+    v.object({ skipped: v.literal(true), reason: v.literal('already-reconciled') }),
+    v.object({ skipped: v.literal(false), rolled: v.number() }),
+  ),
   handler: async (ctx, args) => {
     // --- Idempotency check ------------------------------------------------
     const settings = await ctx.db
@@ -74,7 +79,7 @@ export const cutoverUser = internalMutation({
       .withIndex('by_courseId', (q) => q.eq('courseId', args.courseId))
       .first();
     if (settings?.reconciledDatasetId === args.datasetId) {
-      return { skipped: true, reason: 'already-reconciled' };
+      return { skipped: true, reason: 'already-reconciled' } as const;
     }
 
     // --- Resolve legacy → new collection ids ------------------------------
@@ -243,6 +248,6 @@ export const cutoverUser = internalMutation({
       });
     }
 
-    return { skipped: false, rolled };
+    return { skipped: false as const, rolled };
   },
 });

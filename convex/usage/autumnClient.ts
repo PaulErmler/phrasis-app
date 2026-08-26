@@ -14,12 +14,12 @@
  * both runtimes.
  */
 
+import { requireEnv } from '../lib/env';
+
 export const AUTUMN_API = 'https://api.useautumn.com/v1';
 
 export function getSecretKey(): string {
-  const key = process.env.AUTUMN_SECRET_KEY;
-  if (!key) throw new Error('AUTUMN_SECRET_KEY environment variable is not set');
-  return key;
+  return requireEnv('AUTUMN_SECRET_KEY');
 }
 
 export interface AutumnRawResponse {

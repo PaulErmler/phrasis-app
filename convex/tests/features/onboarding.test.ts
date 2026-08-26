@@ -1,10 +1,37 @@
 /// <reference types="vite/client" />
 import { convexTest, type TestConvex } from "convex-test";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { ConvexError } from "convex/values";
 
+// Mock the rate limiter at the module boundary. The real component would need
+// `t.registerComponent` (flagged fragile in this project). Permissive default
+// is (re)installed in the beforeEach below; the limiter-exceeded tests
+// override `mockRateLimit` per test. Same precedent as
+// tests/features/ttsProcessing.test.ts.
+vi.mock("../../rateLimiter", () => ({
+  rateLimiter: {
+    limit: vi.fn(),
+    check: vi.fn(),
+    reset: vi.fn(),
+  },
+  TTS_RATE_LIMIT_BY_PROVIDER: {
+    google: "googleTts",
+    gemini: "geminiTts",
+    minimax: "minimaxTts",
+  },
+}));
+
+import { rateLimiter } from "../../rateLimiter";
 import schema from "../../schema";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
+
+const mockRateLimit = vi.mocked(rateLimiter.limit);
+
+beforeEach(() => {
+  mockRateLimit.mockReset();
+  mockRateLimit.mockResolvedValue({ ok: true, retryAfter: 0 });
+});
 import {
   ONBOARDING_INITIAL_SEED_CARDS,
   ONBOARDING_CARDS_BATCH_SIZE,
@@ -221,6 +248,10 @@ describe("completeOnboarding", () => {
     // Onboarding seeds the initial-seed count upfront; the first lesson runs
     // longer (10 reviews) and the gap is filled by the auto-add path.
     expect(cards.length).toBe(ONBOARDING_INITIAL_SEED_CARDS);
+    // deck.cardCount is maintained per-insert by `insertCard` (the mutation
+    // no longer patches it itself) and must match the seeded rows.
+    const deck = await t.run(async (ctx) => ctx.db.get(deckId));
+    expect(deck?.cardCount).toBe(ONBOARDING_INITIAL_SEED_CARDS);
 
     const settings = await t.run(async (ctx) =>
       ctx.db
@@ -1192,5 +1223,141 @@ describe("prepareLanguagePair", () => {
     expect(backstop!.scheduledTime).toBeLessThanOrEqual(after + 60_000);
 
     await drainScheduled(t);
+  });
+
+  it("consumes the per-user onboardingContentWarmup budget", async () => {
+    const t = convexTest(schema, modules);
+    const asUser = t.withIdentity({ subject: "user_A" });
+    await asUser.mutation(api.features.onboarding.prepareLanguagePair, {
+      sourceLanguage: "en",
+      targetLanguage: "es",
+    });
+    expect(mockRateLimit).toHaveBeenCalledWith(
+      expect.anything(),
+      "onboardingContentWarmup",
+      expect.objectContaining({ key: expect.any(String) }),
+    );
+    await drainScheduled(t);
+  });
+});
+
+/**
+ * Assert a mutation rejects with a structured ConvexError carrying `code`,
+ * and return the error data for further checks.
+ */
+async function expectStructuredRejection(
+  promise: Promise<unknown>,
+  code: string,
+): Promise<Record<string, unknown>> {
+  try {
+    await promise;
+  } catch (e) {
+    expect(e).toBeInstanceOf(ConvexError);
+    // convex-test re-serializes ConvexError data to a JSON string across the
+    // harness boundary (real clients get the structured value back).
+    const raw = (e as { data: unknown }).data;
+    const data = (
+      typeof raw === "string" ? JSON.parse(raw) : raw
+    ) as Record<string, unknown>;
+    expect(data.code).toBe(code);
+    return data;
+  }
+  throw new Error(`expected a ConvexError with code ${code}`);
+}
+
+async function scheduledCount(t: TestConvex<typeof schema>): Promise<number> {
+  const rows = await t.run(async (ctx) =>
+    ctx.db.system.query("_scheduled_functions").collect(),
+  );
+  return rows.length;
+}
+
+describe("public warmup guards (prepareLanguagePair + ensurePlacementTranslations)", () => {
+  it("rejects an unsupported target language with UNSUPPORTED_LANGUAGE and schedules nothing", async () => {
+    const t = convexTest(schema, modules);
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    await expectStructuredRejection(
+      asUser.mutation(api.features.onboarding.prepareLanguagePair, {
+        sourceLanguage: "en",
+        targetLanguage: "xx_nope",
+      }),
+      "UNSUPPORTED_LANGUAGE",
+    );
+    await expectStructuredRejection(
+      asUser.mutation(api.features.onboarding.ensurePlacementTranslations, {
+        sourceLanguage: "en",
+        targetLanguage: "xx_nope",
+      }),
+      "UNSUPPORTED_LANGUAGE",
+    );
+    expect(await scheduledCount(t)).toBe(0);
+  });
+
+  it("rejects an unsupported SOURCE language too (it becomes a translation target)", async () => {
+    const t = convexTest(schema, modules);
+    const asUser = t.withIdentity({ subject: "user_A" });
+    await expectStructuredRejection(
+      asUser.mutation(api.features.onboarding.prepareLanguagePair, {
+        sourceLanguage: "klingon",
+        targetLanguage: "es",
+      }),
+      "UNSUPPORTED_LANGUAGE",
+    );
+    expect(await scheduledCount(t)).toBe(0);
+  });
+
+  it("still accepts a hidden-from-picker (but supported) code", async () => {
+    const t = convexTest(schema, modules);
+    const asUser = t.withIdentity({ subject: "user_A" });
+    // en_gb is hiddenFromPicker in SUPPORTED_LANGUAGES yet remains a real
+    // language existing courses use; the guard must not reject it.
+    await asUser.mutation(api.features.onboarding.prepareLanguagePair, {
+      sourceLanguage: "en_gb",
+      targetLanguage: "es",
+    });
+    expect(await scheduledCount(t)).toBe(3);
+    await drainScheduled(t);
+  });
+
+  it("throws a structured RATE_LIMITED error and schedules nothing when the budget is spent", async () => {
+    const t = convexTest(schema, modules);
+    const asUser = t.withIdentity({ subject: "user_A" });
+    mockRateLimit.mockResolvedValue({ ok: false, retryAfter: 120_000 });
+
+    const data = await expectStructuredRejection(
+      asUser.mutation(api.features.onboarding.prepareLanguagePair, {
+        sourceLanguage: "en",
+        targetLanguage: "es",
+      }),
+      "RATE_LIMITED",
+    );
+    expect(data.retryAfter).toBe(120_000);
+
+    await expectStructuredRejection(
+      asUser.mutation(api.features.onboarding.ensurePlacementTranslations, {
+        sourceLanguage: "en",
+        targetLanguage: "es",
+      }),
+      "RATE_LIMITED",
+    );
+    expect(await scheduledCount(t)).toBe(0);
+  });
+
+  it("ensurePlacementTranslations still works for a legitimate call", async () => {
+    const t = convexTest(schema, modules);
+    const asUser = t.withIdentity({ subject: "user_A" });
+    // Empty placement corpus → a clean no-op sweep; the point is that the
+    // guards let the real flow through.
+    const res = await asUser.mutation(
+      api.features.onboarding.ensurePlacementTranslations,
+      { sourceLanguage: "en", targetLanguage: "es" },
+    );
+    expect(res).toEqual({ enqueued: 0 });
+    expect(mockRateLimit).toHaveBeenCalledWith(
+      expect.anything(),
+      "onboardingContentWarmup",
+      expect.objectContaining({ key: expect.any(String) }),
+    );
   });
 });

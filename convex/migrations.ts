@@ -1,7 +1,8 @@
 import { Migrations } from '@convex-dev/migrations';
+import { v } from 'convex/values';
 import { components, internal } from './_generated/api';
 import type { DataModel } from './_generated/dataModel';
-import type { MutationCtx } from './_generated/server';
+import { internalMutation, type MutationCtx } from './_generated/server';
 import type { Doc } from './_generated/dataModel';
 import {
   DEFAULT_AUTO_PLAY,
@@ -610,6 +611,95 @@ export function needsFuriganaBackfill(
 }
 
 /**
+ * One-shot repair of `decks.cardCount`: recount every deck from its actual
+ * card rows.
+ *
+ * Until 2026-08-26 the counter was incremented at four call sites but never
+ * decremented — `deleteCard` removed the row + aggregate entries without
+ * touching the deck — so it drifted up by one for every permanent delete.
+ * Counter maintenance now lives in `insertCard`/`deleteCard`
+ * (db/stats/cardAggregates.ts), a single writer in the same transaction as
+ * the row write, and this pass repairs the historical drift.
+ *
+ * Batching: decks are cheap but their card fan-out is not, so `batchSize: 5`
+ * bounds one component transaction at 5 decks × ≤ DECK_RECOUNT_PAGE card
+ * reads. A deck whose first page doesn't finish (over DECK_RECOUNT_PAGE
+ * cards) is handed to the self-continuing `recountDeckCardCountContinue`
+ * chain, one page per transaction — the recalcUserCardAggregates pattern —
+ * and patched when its last page lands. For those oversized decks the count
+ * spans transactions, so cards inserted/deleted mid-chain can skew the final
+ * value by that in-flight delta; single-writer maintenance keeps it stable
+ * from then on, and the drift it replaces was unbounded.
+ */
+export const DECK_RECOUNT_PAGE = 500;
+
+export async function recountDeckCardCountOne(
+  ctx: MutationCtx,
+  deck: Doc<'decks'>,
+): Promise<Partial<Doc<'decks'>> | undefined> {
+  const page = await ctx.db
+    .query('cards')
+    .withIndex('by_deckId', (q) => q.eq('deckId', deck._id))
+    .paginate({ cursor: null, numItems: DECK_RECOUNT_PAGE });
+  if (!page.isDone) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.migrations.recountDeckCardCountContinue,
+      {
+        deckId: deck._id,
+        countedSoFar: page.page.length,
+        cursor: page.continueCursor,
+      },
+    );
+    return undefined;
+  }
+  return page.page.length === deck.cardCount
+    ? undefined
+    : { cardCount: page.page.length };
+}
+
+export const recountDeckCardCounts = migrations.define({
+  table: 'decks',
+  batchSize: 5,
+  migrateOne: (ctx, doc) => recountDeckCardCountOne(ctx, doc),
+});
+
+/**
+ * Self-continuing tail of `recountDeckCardCounts` for decks over
+ * DECK_RECOUNT_PAGE cards: one page per transaction, patch once the index
+ * range is exhausted. A deck deleted mid-chain (account purge) ends the
+ * chain silently.
+ */
+export const recountDeckCardCountContinue = internalMutation({
+  args: {
+    deckId: v.id('decks'),
+    countedSoFar: v.number(),
+    cursor: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query('cards')
+      .withIndex('by_deckId', (q) => q.eq('deckId', args.deckId))
+      .paginate({ cursor: args.cursor, numItems: DECK_RECOUNT_PAGE });
+    const counted = args.countedSoFar + page.page.length;
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.migrations.recountDeckCardCountContinue,
+        { deckId: args.deckId, countedSoFar: counted, cursor: page.continueCursor },
+      );
+      return null;
+    }
+    const deck = await ctx.db.get(args.deckId);
+    if (deck && deck.cardCount !== counted) {
+      await ctx.db.patch(args.deckId, { cardCount: counted });
+    }
+    return null;
+  },
+});
+
+/**
  * Everything a deploy needs, in order. Completed migrations are skipped.
  *
  * Ordering rationale:
@@ -648,4 +738,5 @@ export const runAll = migrations.runner([
   internal.migrations.resetStaleTranslationFurigana,
   internal.migrations.backfillTextFurigana,
   internal.migrations.backfillTranslationFurigana,
+  internal.migrations.recountDeckCardCounts,
 ]);
