@@ -105,6 +105,7 @@ export const USER_TABLES = [
   'courseStats',
   'dailyStats',
   'reviewLogs',
+  'reviewHistory',
   'collectionProgress',
   'collectionTextMarks',
   'dailyLanguageStats',
@@ -153,6 +154,8 @@ const USER_TABLE_DRAINS: Record<UserTable, UserTableDrain> = {
     ids(await ctx.db.query('dailyStats').withIndex('by_userId_and_courseId_and_date', (q) => q.eq('userId', u)).take(ROW_BATCH)),
   reviewLogs: async (ctx, u) =>
     ids(await ctx.db.query('reviewLogs').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+  reviewHistory: async (ctx, u) =>
+    ids(await ctx.db.query('reviewHistory').withIndex('by_userId_and_courseId_and_reviewedAt', (q) => q.eq('userId', u)).take(ROW_BATCH)),
   collectionProgress: async (ctx, u) =>
     ids(await ctx.db.query('collectionProgress').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
   collectionTextMarks: async (ctx, u) =>

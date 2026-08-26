@@ -30,6 +30,11 @@ import {
   takeUndoableLogs,
   studyContextFromSettings,
 } from '../db/reviewLogs';
+import { insertReviewHistory } from '../db/reviewHistory';
+import {
+  reviewTimeApplyPatch,
+  reviewTimeUndoPatch,
+} from '../lib/reviewTimeStats';
 import {
   getDailyStats,
   floorToCelebration,
@@ -853,6 +858,9 @@ export const reviewCard = mutation({
         ...prevModeCounts,
         [reviewModeKey]: prevModeCounts[reviewModeKey] + 1,
       },
+      // Per-card running time-per-review average for this mode. Reversed on
+      // undo from the history row's raw sample (reviewTimeUndoPatch).
+      ...reviewTimeApplyPatch(card, reviewModeKey, args.timeSpentMs),
     };
     if (track === 'writing') {
       await patchCard(
@@ -908,6 +916,46 @@ export const reviewCard = mutation({
       );
     }
 
+    // Permanent per-review history row (append-only, unlike the capped undo
+    // stack below). Snapshots the scheduling transition on the reviewed
+    // track: prev* is the state the review was scheduled FROM — on the
+    // lazy-seed path that's the copied shared baseline (`cardState`), which
+    // is what retrospective schedule reconstruction needs; the card's raw
+    // pre-review fields stay in the undo snapshot below.
+    const historyId = await insertReviewHistory(ctx, {
+      userId,
+      courseId: deck.courseId,
+      cardId: args.cardId,
+      reviewedAt: Date.now(),
+      date: todayDate,
+      timezone: args.timezone,
+      track,
+      reviewMode: args.reviewMode,
+      phase,
+      rating: args.rating,
+      timeSpentMs: args.timeSpentMs,
+      wasDefaultRating: args.wasDefaultRating,
+      wasFirstReview,
+      accuracy: args.accuracy,
+      // Mirrors the both-present gate in recordReviewStats.
+      ...(args.accuracyStrict != null && args.accuracyLenient != null
+        ? {
+            accuracyStrict: args.accuracyStrict,
+            accuracyLenient: args.accuracyLenient,
+          }
+        : {}),
+      sessionId: args.sessionId,
+      prevDueDate: cardState.dueDate,
+      newDueDate: dueDateWithJitter,
+      ...(track === 'shared'
+        ? { prevPreReviewCount: card.preReviewCount }
+        : {}),
+      prevFsrsState: cardState.fsrsState ?? undefined,
+      newFsrsState: result.fsrsState ?? undefined,
+      ...(result.phaseTransitioned ? { phaseTransitioned: true } : {}),
+      ...(writingUnseeded ? { lazySeededWriting: true } : {}),
+    });
+
     // Log the review for the learn-mode undo stack: the pre-patch card
     // snapshot plus the keys `reverseReviewStats` needs to decrement the
     // right stat buckets. The study context stamps scope undo to the settings
@@ -923,6 +971,7 @@ export const reviewCard = mutation({
       schedulingMode: reviewSettings?.schedulingMode ?? 'learnAndReview',
       studyContentFilter: reviewSettings?.studyContentFilter ?? 'both',
       track,
+      historyId,
       // Snapshot the reviewed track's TRUE prior fields (for a lazy seed
       // that's all-undefined), so undo restores exactly what was overwritten.
       ...(track === 'writing'
@@ -1089,10 +1138,23 @@ export const undoLastReview = mutation({
       if (!card) {
         // Card deleted since the review, nothing to restore, and deletion
         // never reverses stat contributions elsewhere either. Discard and
-        // fall through to the next entry.
+        // fall through to the next entry. The permanent reviewHistory row
+        // (if any) deliberately survives: the review happened, and its stat
+        // contributions are kept on this path too.
         await ctx.db.delete(log._id);
         continue;
       }
+
+      // The permanent history row this undo would revoke (only 'review'
+      // entries carry one). Resolved up front so both track branches can fold
+      // the per-card time-average reversal into their single patchCard call;
+      // the row itself is deleted after the branch actually undoes the review
+      // (the malformed-entry discards below leave it standing).
+      const history =
+        log.kind === 'review' && log.historyId
+          ? await ctx.db.get(log.historyId)
+          : null;
+      const timeUndoPatch = history ? reviewTimeUndoPatch(card, history) : {};
 
       if (
         log.kind === 'review' &&
@@ -1114,6 +1176,7 @@ export const undoLastReview = mutation({
             writingLastReviewedAt: log.prevWriting.writingLastReviewedAt,
             writingGoodReviewCount: log.prevWriting.writingGoodReviewCount,
             ...reviewCountUndoPatch(card, log),
+            ...timeUndoPatch,
           },
           card,
         );
@@ -1137,6 +1200,7 @@ export const undoLastReview = mutation({
             lastReviewedAt: log.prevCard.lastReviewedAt,
             goodReviewCount: log.prevCard.goodReviewCount,
             ...reviewCountUndoPatch(card, log),
+            ...timeUndoPatch,
           },
           card,
         );
@@ -1159,6 +1223,14 @@ export const undoLastReview = mutation({
         // Malformed entry (kind without its snapshot), discard defensively.
         await ctx.db.delete(log._id);
         continue;
+      }
+
+      // Revoke the permanent history row for the undone review. Free-play
+      // entries never carry one, and the malformed-entry discards above
+      // `continue` before reaching here, so a standing history row always
+      // reflects a review that actually counts.
+      if (history) {
+        await ctx.db.delete(history._id);
       }
 
       // Consume the entry so it can't be undone twice.

@@ -9,9 +9,11 @@ import {
   cardApprovalResolutionValidator,
   proposedCardMetadataValidator,
   schedulingModeValidator,
+  schedulingPhaseValidator,
   studyContentFilterValidator,
   autoRateThresholdsValidator,
   reviewRatingValidator,
+  fsrsStateValidator,
   cardSchedulingSnapshotFields,
   cardWritingSchedulingFields,
   cardRadioSnapshotFields,
@@ -733,6 +735,20 @@ export default defineSchema({
     reviewCountByMode: v.optional(
       v.object({ audio: v.number(), full: v.number() }),
     ),
+    // Running per-mode averages of time spent on this card's graded reviews
+    // (samples clamped to [0, REVIEW_TIME_CLAMP_MAX_MS] before folding, the
+    // same cap as the daily-stats time accounting, so an idle open screen
+    // can't skew the mean). `count` makes the undo reversal exact arithmetic
+    // and keeps a later switch to EMA possible.
+    // Absent until the first timed review in that mode; no backfill exists
+    // (per-review timings weren't retained before reviewHistory). Like
+    // reviewCountByMode this is keyed by the review's MODE, not its track.
+    reviewTimeStats: v.optional(
+      v.object({
+        audio: v.optional(v.object({ avgMs: v.number(), count: v.number() })),
+        full: v.optional(v.object({ avgMs: v.number(), count: v.number() })),
+      }),
+    ),
     ...cardRadioSnapshotFields,
     ...cardFreeStudySnapshotFields,
     isMastered: v.boolean(), // Whether the card has been mastered
@@ -1013,6 +1029,11 @@ export default defineSchema({
     // toggle/mode flip fences off older entries, and selector for which
     // snapshot below to restore.
     track: v.optional(schedulingTrackValidator),
+    // kind === 'review': the permanent reviewHistory row this undo entry would
+    // revoke. undoLastReview deletes that row (and reverses the card's
+    // reviewTimeStats from its timeSpentMs) when the review is undone.
+    // Optional: absent on pre-feature logs and on free-play entries.
+    historyId: v.optional(v.id('reviewHistory')),
 
     // kind === 'review', track 'shared': pre-review card scheduling state
     // (shared field set with the cards table, see convex/types.ts).
@@ -1067,6 +1088,57 @@ export default defineSchema({
       }),
     ),
   }).index('by_userId_and_courseId', ['userId', 'courseId']),
+
+  // Append-only per-review event log, one row per GRADED review (both phases,
+  // both tracks; free-play radio/freeStudy plays are excluded — they never
+  // grade or reschedule). Unlike reviewLogs (a depth-UNDO_DEPTH undo stack),
+  // rows here are permanent: the raw material for retrospective analyses,
+  // forecast-model calibration, and per-user FSRS parameter optimization. No
+  // backfill exists or is possible — history starts the day this table ships.
+  //
+  // prev* fields snapshot the state the review was SCHEDULED FROM. On the
+  // writing track's lazy-seed path that is the copied shared baseline
+  // (flagged via lazySeededWriting), which is what schedule reconstruction
+  // needs; the card's raw pre-review fields live in reviewLogs.prevCard /
+  // prevWriting for undo. An undone review deletes its row (undoLastReview);
+  // a deleted CARD does not cascade here (cardId may dangle — the learning
+  // still happened, matching how stats survive card deletion). User deletion
+  // drains this table via USER_TABLES in convex/admin/deleteUser.ts.
+  reviewHistory: defineTable({
+    userId: v.string(), // Links to auth user
+    courseId: v.id('courses'),
+    cardId: v.id('cards'), // May dangle after card deletion (see above)
+    reviewedAt: v.number(),
+    date: v.string(), // "YYYY-MM-DD" in `timezone`, same day key as dailyStats
+    timezone: v.string(),
+    track: schedulingTrackValidator, // which per-card schedule the review wrote
+    reviewMode: v.optional(reviewModeValidator), // raw args.reviewMode (undefined = legacy client)
+    phase: schedulingPhaseValidator, // phase the grade was given in (writing / forceReviewPhase resolve to 'review')
+    rating: reviewRatingValidator,
+    timeSpentMs: v.optional(v.number()), // raw, unclamped (stats + reviewTimeStats clamp separately)
+    wasDefaultRating: v.optional(v.boolean()),
+    wasFirstReview: v.boolean(),
+    accuracy: v.optional(v.number()),
+    accuracyStrict: v.optional(v.number()), // pair-gated like recordReviewStats
+    accuracyLenient: v.optional(v.number()),
+    sessionId: v.optional(v.string()),
+    // Scheduling transition on the reviewed track:
+    prevDueDate: v.number(), // scheduled-from due (lazy seed: the copied baseline)
+    newDueDate: v.number(), // as persisted, jitter included
+    prevPreReviewCount: v.optional(v.number()), // shared track only
+    prevFsrsState: v.optional(fsrsStateValidator), // scheduled-from; absent while in preReview
+    newFsrsState: v.optional(fsrsStateValidator), // absent while still preReview
+    phaseTransitioned: v.optional(v.boolean()),
+    // True when this writing-track review lazily seeded the track (prev* are
+    // the copied shared baseline; the card's own writing fields were unset).
+    lazySeededWriting: v.optional(v.boolean()),
+  })
+    .index('by_userId_and_courseId_and_reviewedAt', [
+      'userId',
+      'courseId',
+      'reviewedAt',
+    ])
+    .index('by_cardId_and_reviewedAt', ['cardId', 'reviewedAt']),
 
   // Collection progress table - per (user, course, collection) monotonic
   // counters used by the home view. Counters are strictly monotonic: incremented

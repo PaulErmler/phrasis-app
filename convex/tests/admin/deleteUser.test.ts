@@ -300,6 +300,20 @@ async function seedFixture(t: TestConvex<typeof schema>): Promise<Fixture> {
       schedulingMode: 'learnAndReview',
       studyContentFilter: 'both',
     });
+    await ctx.db.insert('reviewHistory', {
+      userId: VICTIM,
+      courseId,
+      cardId: customCard,
+      reviewedAt: now,
+      date: '2026-08-20',
+      timezone: 'UTC',
+      track: 'shared',
+      phase: 'preReview',
+      rating: 'stillLearning',
+      wasFirstReview: true,
+      prevDueDate: now - 1000,
+      newDueDate: now + 60_000,
+    });
     await ctx.db.insert('collectionProgress', {
       userId: VICTIM,
       courseId,

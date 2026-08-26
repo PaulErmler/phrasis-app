@@ -15,8 +15,9 @@ import { upsertLanguageStats } from './languageStats';
 import { upsertReviewDepthAccuracy } from './reviewDepthAccuracy';
 import { trackNewWords } from './wordTracking';
 import type { SchedulingTrack } from '../../types';
-
-const MAX_TIME_PER_CARD_MS = 180_000; // 3 minutes
+// Shared with the per-card running averages (cards.reviewTimeStats) so the
+// daily time series and the per-card means clamp samples identically.
+import { REVIEW_TIME_CLAMP_MAX_MS as MAX_TIME_PER_CARD_MS } from '../../lib/reviewTimeStats';
 
 /**
  * Record all statistics for a card review: course stats, daily/weekly/monthly/yearly
