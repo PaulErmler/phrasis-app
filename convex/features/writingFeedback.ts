@@ -186,8 +186,9 @@ export const getGradingContext = internalQuery({
     } else {
       const row = await ctx.db
         .query('translations')
-        .withIndex('by_textId', (q) => q.eq('textId', card.textId))
-        .filter((q) => q.eq(q.field('targetLanguage'), language))
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', card.textId).eq('targetLanguage', language),
+        )
         .first();
       expected = row?.translatedText ?? null;
     }
