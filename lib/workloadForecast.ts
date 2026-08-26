@@ -75,8 +75,10 @@ const SECONDS_PER_REVIEW_MAX = 120;
  * every estimated return or fresh add) runs its short learning steps the
  * same day. The young multiplier is a documented constant for now —
  * `reviewHistory` accumulates the data to calibrate it per user later.
+ * Exported so the chart's display-only time weights reuse the same number
+ * instead of restating it.
  */
-const YOUNG_EVENTS_PER_SIGHTING = 1.5;
+export const YOUNG_EVENTS_PER_SIGHTING = 1.5;
 
 /** Representative current stabilities (days) for mature cards due inside a
  * 7-day window, used to derive the mature return kernel. Cards due soon skew
@@ -482,23 +484,6 @@ function memoizedResponses(
     };
   }
   return responsesCache.responses;
-}
-
-/**
- * Where the load of ONE card added (and studied) today lands over the next
- * WORKLOAD_DAYS, as fractional card-sightings per day. kernel[0] = 1: the
- * card is studied today (its same-day pre-review/learning repeats live in
- * the per-class event multipliers, not the kernel); the rest is the young
- * response — graduation landing plus its mature-generation echoes.
- */
-export function deriveAddKernel(opts: {
-  initialReviewCount: number;
-  rates: RatingRates;
-}): number[] {
-  const responses = expandResponses(deriveReturnKernels(opts));
-  const kernel = [...responses.young];
-  kernel[0] = 1;
-  return kernel;
 }
 
 function applyRating(

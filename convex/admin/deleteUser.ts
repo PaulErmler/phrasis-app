@@ -49,8 +49,11 @@ const CARD_BATCH = 40;
 const TEXT_BATCH = 25;
 const ROW_BATCH = 200;
 // Backstop on the action's mutation loop. At the batch sizes above this is
-// ~1M rows, far past any real account; hitting it means something is not
-// draining and the run should stop rather than spin.
+// ~1M rows across all tables; hitting it means something is not draining
+// and the run should stop rather than spin. reviewHistory is the one table
+// that grows without bound (~75k rows/year for a heavy user — see its
+// schema note), so a multi-year power account consumes a real share of
+// this budget; raise it before it becomes the limiting factor.
 const MAX_BATCHES = 5000;
 
 /**

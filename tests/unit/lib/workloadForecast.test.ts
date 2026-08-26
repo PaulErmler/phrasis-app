@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildWorkloadForecast,
-  deriveAddKernel,
   deriveRatingRates,
   deriveReturnKernels,
   deriveSecondsPerReview,
@@ -109,7 +108,9 @@ describe('kernels', () => {
   const rates = deriveRatingRates(emptyHistory().ratingCounts);
 
   it('add kernel starts at 1 today and spreads a graduation echo into days 1..6', () => {
-    const kernel = deriveAddKernel({ initialReviewCount: 5, rates });
+    // The kernel ships on the forecast itself (makeData uses the same
+    // priors and initialReviewCount: 5 this test used to pass directly).
+    const kernel = buildWorkloadForecast(makeData(), params).addKernel;
     expect(kernel).toHaveLength(WORKLOAD_DAYS);
     expect(kernel[0]).toBe(1);
     const echo = kernel.slice(1).reduce((a, b) => a + b, 0);

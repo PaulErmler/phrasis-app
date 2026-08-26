@@ -1100,6 +1100,13 @@ export default defineSchema({
   // forecast-model calibration, and per-user FSRS parameter optimization. No
   // backfill exists or is possible — history starts the day this table ships.
   //
+  // Retention is a DECISION, not an omission: keep forever, no TTL, no
+  // pruning cron. At ~300-500 B/row a heavy user (200 reviews/day) writes
+  // roughly 75k rows ≈ 25-35 MB/year — acceptable storage for the
+  // calibration payoff. Nothing reads the table in production yet; the only
+  // drains are undo and account deletion. Revisit (archival, sampling) only
+  // if per-user row counts start pressuring deleteUser's batch budget.
+  //
   // prev* fields snapshot the state the review was SCHEDULED FROM. On the
   // writing track's lazy-seed path that is the copied shared baseline
   // (flagged via lazySeededWriting), which is what schedule reconstruction

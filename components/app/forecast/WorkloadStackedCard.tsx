@@ -11,6 +11,7 @@ import { formatTimeMs } from '@/lib/formatTime';
 import {
   WHAT_IF_ADD_MAX,
   WHAT_IF_ADD_MIN,
+  YOUNG_EVENTS_PER_SIGHTING,
   type WorkloadDay,
   type WorkloadForecast,
 } from '@/lib/workloadForecast';
@@ -37,14 +38,17 @@ const PLOT_HEIGHT = 104;
 
 /** Same-day event weight per displayed segment class, used only to
  * proportion a day's stack in time mode (the day TOTAL is the model's
- * estimatedMinutes; these split it). Young-ish classes repeat more, matching
- * the model's event multipliers; backlog blends young and mature. */
+ * estimatedMinutes; these split it). Young-ish classes share the model's
+ * YOUNG_EVENTS_PER_SIGHTING multiplier; `mature` approximates the model's
+ * live `1 + pAgain` with the prior pAgain (display split only — the exact
+ * per-day minutes still come from the model), and `backlog` blends the
+ * two. */
 const SEGMENT_TIME_WEIGHT = {
   backlog: 1.35,
-  young: 1.5,
+  young: YOUNG_EVENTS_PER_SIGHTING,
   mature: 1.1,
-  returns: 1.5,
-  whatIf: 1.5,
+  returns: YOUNG_EVENTS_PER_SIGHTING,
+  whatIf: YOUNG_EVENTS_PER_SIGHTING,
 } as const;
 
 type SegmentKey = keyof typeof SEGMENT_TIME_WEIGHT;

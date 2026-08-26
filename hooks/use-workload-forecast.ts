@@ -105,6 +105,10 @@ export function useWorkloadForecast({
       effective
         ? buildWorkloadForecast(effective, {
             addCount,
+            // Deliberately off in the shipped card: the model supports
+            // continuing the user's typical adds/day on future days
+            // (estimated.typicalAdds; unit-tested), kept as a future
+            // toggle rather than wired to UI.
             includeTypicalAdds: false,
             reviewMode,
           })

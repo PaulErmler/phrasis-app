@@ -8,8 +8,10 @@ import { Doc } from '../_generated/dataModel';
  * reviewCountByMode / statsReversal.reviewModeForStats), independent of which
  * track it wrote. Samples are clamped exactly like the daily-stats time
  * accounting so the two series stay comparable; the raw value is preserved in
- * `reviewHistory.timeSpentMs`, which is also what drives the exact arithmetic
- * reversal on undo (re-apply the same clamp, subtract from the mean).
+ * `reviewHistory.timeSpentMs`, which is also what drives the arithmetic
+ * reversal on undo (re-apply the same clamp, subtract from the mean —
+ * exact up to floating-point rounding; repeated apply/undo cycles can
+ * drift `avgMs` by ulps, harmless for a display/model input).
  */
 
 /** Hard cap per review time sample. Shared with recordReviewStats' daily time
@@ -50,8 +52,9 @@ export function reviewTimeApplyPatch(
 }
 
 /**
- * Exact reversal of `reviewTimeApplyPatch` for undo, driven by the undone
- * review's history row (raw `timeSpentMs`, re-clamped identically). The last
+ * Reversal of `reviewTimeApplyPatch` for undo (exact up to floating-point
+ * rounding — see the module header), driven by the undone review's history
+ * row (raw `timeSpentMs`, re-clamped identically). The last
  * sample of a mode removes that mode's entry entirely, returning the card to
  * its pre-first-timed-review shape. Empty patch when there is nothing to
  * reverse (untimed review, or the counter was reset/migrated in between —

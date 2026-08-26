@@ -31,7 +31,10 @@ import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import type { Doc } from '../_generated/dataModel';
 import { getDailyStats } from '../db/stats/dailyStats';
 import { getCourseSettings } from '../db/courseSettings';
-import { EXTENDED_STATE_LABELS as STATE_LABELS } from '../lib/fsrsStates';
+import {
+  EXTENDED_STATE_LABELS as STATE_LABELS,
+  type FsrsStateLabel,
+} from '../lib/fsrsStates';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
 import { normalizeLanguageCode } from '../../lib/languages';
 import { getTargetLanguageWordCounts } from '../db/stats/languageStats';
@@ -1076,8 +1079,15 @@ const workloadDayStateCountsValidator = v.object({
 });
 
 /** The four states the workload forecast buckets (mastered/hidden excluded,
- * matching the serving queue — same set countDueCardsByState counts). */
-const WORKLOAD_STATES = ['new', 'learning', 'relearning', 'review'] as const;
+ * matching the serving queue — same set countDueCardsByState counts).
+ * FSRS_STATE_LABELS' vocabulary, reordered to match the destructure at the
+ * `prefixFor` call site; `satisfies` pins every entry to the shared type. */
+const WORKLOAD_STATES = [
+  'new',
+  'learning',
+  'relearning',
+  'review',
+] as const satisfies readonly FsrsStateLabel[];
 
 /**
  * Exact per-day scheduled due counts for the next WORKLOAD_DAYS days, plus a
@@ -1097,7 +1107,8 @@ const WORKLOAD_STATES = ['new', 'learning', 'relearning', 'review'] as const;
  * Cost: 4 states × 8 bounds × (1 namespace, or 2 for filter 'custom') =
  * 32–64 O(log n) aggregate counts, +3 unbounded state counts for
  * `startedCards`, + ≤ ~20 dailyStats rows. `now` is
- * client-supplied and minute-quantized (no wall clock in queries; identical
+ * client-supplied and minute-quantized (the only wall-clock read is
+ * resolveClientToday's ±1-day validation of `today`; identical
  * args keep the query cacheable across subscribers). If this query ever
  * shows up in insights, the trim ladder is: drop the `laterToday` split
  * (−4/−8 counts), then restrict `filter` support to 'both'.
