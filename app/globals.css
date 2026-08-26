@@ -288,7 +288,12 @@
   /* Furigana ruby (Ruby.tsx). The reading sits ABOVE the line, so the
      paragraph needs looser leading or it collides with the row above; rt
      inherits the text color faded rather than the romanization grey so it
-     reads as part of the sentence, not as a second annotation line. */
+     reads as part of the sentence, not as a second annotation line.
+
+     The reading itself is painted from the rt's data-reading attribute via
+     ::before: generated content is not document text, so copying the
+     sentence never captures the readings (an rt text node would interleave
+     them — 毎朝まいあさ…). select-none is cosmetic belt-and-braces on top. */
   .has-furigana {
     @apply leading-loose;
   }
@@ -296,11 +301,14 @@
     ruby-position: over;
   }
   .has-furigana rt {
-    @apply text-muted-foreground;
+    @apply text-muted-foreground select-none;
     font-size: 0.5em;
     font-weight: 400;
     line-height: 1;
     text-align: center;
+  }
+  .has-furigana rt::before {
+    content: attr(data-reading);
   }
 
   /* Cards & surfaces */

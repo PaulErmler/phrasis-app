@@ -31,7 +31,7 @@ describe('HighlightedText: furigana', () => {
   it('renders ruby readings over kanji runs', () => {
     const { container } = renderText({ furigana: FURIGANA });
     expect(
-      [...container.querySelectorAll('ruby rt')].map((rt) => rt.textContent),
+      [...container.querySelectorAll('ruby rt')].map((rt) => rt.getAttribute('data-reading')),
     ).toEqual(['にほんご', 'べんきょう']);
     expect(container.querySelector('p')?.className).toContain('has-furigana');
   });
@@ -52,15 +52,16 @@ describe('HighlightedText: furigana', () => {
       el.getAttribute('style')?.includes('--accent-orange'),
     );
     expect(orange).toBeDefined();
-    expect(orange!.querySelector('rt')?.textContent).toBe('べんきょう');
+    expect(orange!.querySelector('rt')?.getAttribute('data-reading')).toBe(
+      'べんきょう',
+    );
     // The rest of the sentence keeps its ruby too.
     expect(
-      [...container.querySelectorAll('ruby rt')].map((rt) => rt.textContent),
+      [...container.querySelectorAll('ruby rt')].map((rt) => rt.getAttribute('data-reading')),
     ).toEqual(['にほんご', 'べんきょう']);
-    // Sentence stays lossless with readings stripped.
-    const clone = container.cloneNode(true) as HTMLElement;
-    clone.querySelectorAll('rt').forEach((rt) => rt.remove());
-    expect(clone.textContent).toBe(TEXT);
+    // Readings are attribute-painted, so the document text (= what copy
+    // yields) is exactly the sentence.
+    expect(container.textContent).toBe(TEXT);
   });
 
   it('keeps the plain highlight behavior when no furigana is given', () => {

@@ -40,7 +40,7 @@ describe('ClickableWords: furigana', () => {
   it('renders ruby readings over kanji runs', () => {
     const { container } = renderWords(FURIGANA);
     const readings = [...container.querySelectorAll('ruby rt')].map(
-      (rt) => rt.textContent,
+      (rt) => rt.getAttribute('data-reading'),
     );
     expect(readings).toEqual(['まいあさ', 'しちじ', 'お']);
     // Kana runs stay bare, and the paragraph reserves reading headroom.
@@ -80,20 +80,20 @@ describe('ClickableWords: furigana', () => {
         furigana="天気予報[てんきよほう]です。"
       />,
     );
-    const clone = container.cloneNode(true) as HTMLElement;
-    clone.querySelectorAll('rt').forEach((rt) => rt.remove());
-    expect(clone.textContent).toBe('天気予報です。');
+    // Readings are attribute-painted (rt::before), so the document text —
+    // what select-and-copy yields — is exactly the sentence.
+    expect(container.textContent).toBe('天気予報です。');
     expect(
-      [...container.querySelectorAll('ruby rt')].map((rt) => rt.textContent),
+      [...container.querySelectorAll('ruby rt')].map((rt) => rt.getAttribute('data-reading')),
     ).toEqual(['てんきよほう']);
   });
 
   it('keeps the full sentence intact with ruby on', () => {
     const { container } = renderWords(FURIGANA);
-    // Strip the rt reading text; what remains must be exactly the sentence.
-    const clone = container.cloneNode(true) as HTMLElement;
-    clone.querySelectorAll('rt').forEach((rt) => rt.remove());
-    expect(clone.textContent).toBe(TEXT);
+    // Readings live in data-reading attributes (painted via rt::before), so
+    // the document text — what select-and-copy yields — is the sentence
+    // alone, with no interleaved readings.
+    expect(container.textContent).toBe(TEXT);
   });
 
   it('keeps every word when the sentence has mid-sentence punctuation', () => {
@@ -113,16 +113,12 @@ describe('ClickableWords: furigana', () => {
         furigana="今日[きょう]、天気[てんき]がいい"
       />,
     );
-    const clone = container.cloneNode(true) as HTMLElement;
-    clone.querySelectorAll('rt').forEach((rt) => rt.remove());
-    expect(clone.textContent).toBe('今日、天気がいい');
+    expect(container.textContent).toBe('今日、天気がいい');
     // And the readings sit over their own bases, not over punctuation.
-    const rubies = [...container.querySelectorAll('ruby')].map((ruby) => {
-      const rt = ruby.querySelector('rt');
-      const reading = rt?.textContent;
-      rt?.remove();
-      return { base: ruby.textContent, reading };
-    });
+    const rubies = [...container.querySelectorAll('ruby')].map((ruby) => ({
+      base: ruby.textContent,
+      reading: ruby.querySelector('rt')?.getAttribute('data-reading'),
+    }));
     expect(rubies).toEqual([
       { base: '今日', reading: 'きょう' },
       { base: '天気', reading: 'てんき' },
@@ -144,11 +140,9 @@ describe('ClickableWords: furigana', () => {
         furigana="「日本[にほん]」が好[す]き"
       />,
     );
-    const clone = container.cloneNode(true) as HTMLElement;
-    clone.querySelectorAll('rt').forEach((rt) => rt.remove());
-    expect(clone.textContent).toBe('「日本」が好き');
+    expect(container.textContent).toBe('「日本」が好き');
     expect(
-      [...container.querySelectorAll('ruby rt')].map((rt) => rt.textContent),
+      [...container.querySelectorAll('ruby rt')].map((rt) => rt.getAttribute('data-reading')),
     ).toEqual(['にほん', 'す']);
   });
 });
