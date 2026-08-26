@@ -3275,7 +3275,7 @@ export const storeSourceAnnotation = internalMutation({
     // racing a retranslation); a mismatched annotation must not land — the
     // field stays undefined so the lazy pipeline regenerates against the
     // current wording. Optional only for in-flight jobs enqueued before the
-    // field existed. Mirror of `forText` in storeApprovalEntryFurigana.
+    // field existed. Mirror of `forText` in storeApprovalEntryAnnotations.
     forText: v.optional(v.string()),
   },
   returns: v.null(),

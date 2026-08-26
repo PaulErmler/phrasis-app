@@ -31,7 +31,6 @@
 
 import { v } from 'convex/values';
 import { internalAction } from '../_generated/server';
-import { internal } from '../_generated/api';
 import { FURIGANA_LANGUAGES } from '../../lib/languages';
 import {
   fitReading,
@@ -40,7 +39,12 @@ import {
   serializeFurigana,
   type FuriganaSegment,
 } from '../../lib/furigana';
-import { getFuriganaSource } from '../lib/textAnnotations';
+import {
+  getFuriganaSource,
+  runApprovalAnnotation,
+  runSourceAnnotation,
+  runTranslationAnnotation,
+} from '../lib/textAnnotations';
 
 /** Shape of the token objects the analyzer returns (camelCase per its docs). */
 interface LinderaToken {
@@ -143,10 +147,13 @@ function fitTokenReading(token: LinderaToken): FuriganaSegment[] | null {
   return fitReading(token.surface, katakanaToHiragana(reading));
 }
 
-/**
- * Furigana for a source text (texts table). Mirror of
- * processIpaForSourceText in features/ipa.ts.
- */
+// The three process actions share the generic try/generate/sentinel/store
+// bodies in convex/lib/textAnnotations.ts (runSourceAnnotation and friends);
+// this file only declares the Node runtime and supplies the lindera engine.
+// Note the sentinel doubles as a legitimate durable answer here: a kana-only
+// sentence "fails" into '' by design (nothing to annotate, never re-check).
+
+/** Furigana for a source text (texts table). */
 export const processFuriganaForSourceText = internalAction({
   args: {
     textId: v.id('texts'),
@@ -154,77 +161,28 @@ export const processFuriganaForSourceText = internalAction({
     language: v.string(),
   },
   returns: v.null(),
-  handler: async (ctx, args) => {
-    let furigana: string;
-    try {
-      furigana = await furiganaForText(args.text, args.language);
-    } catch (err) {
-      // Persist the empty-string sentinel so scheduleMissingContent doesn't
-      // re-enqueue the same failing input on every ensureContent call. A
-      // kana-only sentence lands here too, and correctly: there is nothing
-      // to annotate, and re-checking it forever would be pure waste.
-      console.error('Source furigana error (persisting sentinel):', err);
-      furigana = '';
-    }
-    // Source recorded even on failure: lets an engine swap target failed
-    // rows by the source that produced the sentinel.
-    await ctx.runMutation(internal.features.decks.storeSourceAnnotation, {
-      textId: args.textId,
-      kind: 'furigana',
-      value: furigana,
-      source: getFuriganaSource(args.language),
-      forText: args.text,
-    });
-    return null;
-  },
+  handler: (ctx, args) =>
+    runSourceAnnotation(
+      ctx,
+      'furigana',
+      args,
+      furiganaForText,
+      getFuriganaSource(args.language),
+    ),
 });
 
-/**
- * Furigana for a chat card proposal's entries. Mirror of
- * processIpaForApproval in features/ipa.ts: proposals live only on the
- * `cardApprovals` row (no texts/translations rows exist until approval), so
- * they get their own store path. Results carry the text they were computed
- * for; the store mutation drops any whose entry has since been edited (see
- * storeApprovalEntryFurigana in chat/cardApprovals.ts).
- */
+/** Furigana for a chat card proposal's entries (see runApprovalAnnotation). */
 export const processFuriganaForApproval = internalAction({
   args: {
     approvalId: v.id('cardApprovals'),
     entries: v.array(v.object({ language: v.string(), text: v.string() })),
   },
   returns: v.null(),
-  handler: async (ctx, args) => {
-    const results: Array<{
-      language: string;
-      forText: string;
-      furigana: string;
-    }> = [];
-    for (const entry of args.entries) {
-      let furigana: string;
-      try {
-        furigana = await furiganaForText(entry.text, entry.language);
-      } catch (err) {
-        console.error(
-          `Approval furigana error for ${entry.language} (persisting sentinel):`,
-          err,
-        );
-        furigana = '';
-      }
-      results.push({ language: entry.language, forText: entry.text, furigana });
-    }
-    if (results.length > 0) {
-      await ctx.runMutation(
-        internal.features.chat.cardApprovals.storeApprovalEntryFurigana,
-        { approvalId: args.approvalId, results },
-      );
-    }
-    return null;
-  },
+  handler: (ctx, args) =>
+    runApprovalAnnotation(ctx, 'furigana', args, furiganaForText),
 });
 
-/**
- * Furigana for a translation row. Mirror of processIpaForTranslation.
- */
+/** Furigana for a translation row. */
 export const processFuriganaForTranslation = internalAction({
   args: {
     textId: v.id('texts'),
@@ -232,22 +190,12 @@ export const processFuriganaForTranslation = internalAction({
     language: v.string(),
   },
   returns: v.null(),
-  handler: async (ctx, args) => {
-    let furigana: string;
-    try {
-      furigana = await furiganaForText(args.text, args.language);
-    } catch (err) {
-      console.error('Translation furigana error (persisting sentinel):', err);
-      furigana = '';
-    }
-    await ctx.runMutation(internal.features.decks.storeTranslationAnnotation, {
-      textId: args.textId,
-      language: args.language,
-      kind: 'furigana',
-      value: furigana,
-      source: getFuriganaSource(args.language),
-      forText: args.text,
-    });
-    return null;
-  },
+  handler: (ctx, args) =>
+    runTranslationAnnotation(
+      ctx,
+      'furigana',
+      args,
+      furiganaForText,
+      getFuriganaSource(args.language),
+    ),
 });

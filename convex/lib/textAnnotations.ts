@@ -93,6 +93,8 @@ export interface TextAnnotationSpec {
    * Absent for kinds the approval card doesn't precompute.
    */
   approvalAction?: ApprovalAnnotationAction;
+  /** Record field on `cardApprovals` the kind's approval results land in. */
+  approvalEntryField?: 'entryIpa' | 'entryFurigana';
   /** Key this kind occupies on projected card content (lib/cardContent.ts). */
   projectedField: 'romanization' | 'ipa' | 'furigana';
   /**
@@ -120,6 +122,7 @@ export const TEXT_ANNOTATIONS: Record<AnnotationKind, TextAnnotationSpec> = {
     sourceTextAction: internal.features.ipa.processIpaForSourceText,
     translationAction: internal.features.ipa.processIpaForTranslation,
     approvalAction: internal.features.ipa.processIpaForApproval,
+    approvalEntryField: 'entryIpa',
     projectedField: 'ipa',
     inSearchableText: false,
   },
@@ -131,6 +134,7 @@ export const TEXT_ANNOTATIONS: Record<AnnotationKind, TextAnnotationSpec> = {
     translationAction:
       internal.features.furigana.processFuriganaForTranslation,
     approvalAction: internal.features.furigana.processFuriganaForApproval,
+    approvalEntryField: 'entryFurigana',
     projectedField: 'furigana',
     // The annotation is the sentence itself plus bracketed readings, so
     // indexing it would duplicate every Japanese sentence in the search
@@ -232,4 +236,114 @@ export type FuriganaSource =
 /** All furigana comes from the one analyzer build; mirror of getIpaSource. */
 export function getFuriganaSource(_language: string): FuriganaSource {
   return FURIGANA_SOURCES.linderaIpadic;
+}
+
+// ---------------------------------------------------------------------------
+// Generic action bodies. The per-kind Node actions (ipa.ts, furigana.ts) were
+// verbatim clones of each other with the nouns swapped — the same
+// try/generate/sentinel/store shape, which meant every fix (e.g. the forText
+// staleness guard) had to be applied to six bodies. Each action now declares
+// runtime + engine and delegates here. V8-safe: the engine arrives as a
+// callback, this module never imports one.
+
+type AnnotationActionCtx = {
+  runMutation: (
+    ref: FunctionReference<'mutation', 'internal', Record<string, unknown>, null>,
+    args: Record<string, unknown>,
+  ) => Promise<null>;
+};
+
+/** Generate + store for a source text row; failures persist the '' sentinel. */
+export async function runSourceAnnotation(
+  ctx: AnnotationActionCtx,
+  kind: AnnotationKind,
+  args: AnnotationActionArgs,
+  generate: (text: string, language: string) => Promise<string>,
+  source: string,
+): Promise<null> {
+  let value: string;
+  try {
+    value = await generate(args.text, args.language);
+  } catch (err) {
+    // Persist the empty-string sentinel so scheduleMissingContent doesn't
+    // re-enqueue the same failing input on every ensureContent call.
+    console.error(`Source ${kind} error (persisting sentinel):`, err);
+    value = '';
+  }
+  // Source recorded even on failure: lets an engine swap target failed
+  // rows by the source that produced the sentinel.
+  await ctx.runMutation(internal.features.decks.storeSourceAnnotation, {
+    textId: args.textId,
+    kind,
+    value,
+    source,
+    forText: args.text,
+  });
+  return null;
+}
+
+/** Generate + store for a translation row; failures persist the '' sentinel. */
+export async function runTranslationAnnotation(
+  ctx: AnnotationActionCtx,
+  kind: AnnotationKind,
+  args: AnnotationActionArgs,
+  generate: (text: string, language: string) => Promise<string>,
+  source: string,
+): Promise<null> {
+  let value: string;
+  try {
+    value = await generate(args.text, args.language);
+  } catch (err) {
+    console.error(`Translation ${kind} error (persisting sentinel):`, err);
+    value = '';
+  }
+  await ctx.runMutation(internal.features.decks.storeTranslationAnnotation, {
+    textId: args.textId,
+    language: args.language,
+    kind,
+    value,
+    source,
+    forText: args.text,
+  });
+  return null;
+}
+
+/**
+ * Generate + store for a chat approval's proposed entries. Proposals live
+ * only on the `cardApprovals` row (no texts/translations rows exist until
+ * approval), so they get their own store path. One action per proposal, all
+ * entries in one pass. Results carry the text they were computed for; the
+ * store mutation drops any whose entry has since been edited.
+ */
+export async function runApprovalAnnotation(
+  ctx: AnnotationActionCtx,
+  kind: AnnotationKind,
+  args: {
+    approvalId: Id<'cardApprovals'>;
+    entries: Array<{ language: string; text: string }>;
+  },
+  generate: (text: string, language: string) => Promise<string>,
+): Promise<null> {
+  const results: Array<{ language: string; forText: string; value: string }> =
+    [];
+  for (const entry of args.entries) {
+    let value: string;
+    try {
+      value = await generate(entry.text, entry.language);
+    } catch (err) {
+      console.error(
+        `Approval ${kind} error for ${entry.language} (persisting sentinel):`,
+        err,
+      );
+      value = '';
+    }
+    results.push({ language: entry.language, forText: entry.text, value });
+  }
+  if (results.length > 0) {
+    await ctx.runMutation(
+      internal.features.chat.cardApprovals.storeApprovalEntryAnnotations,
+      { approvalId: args.approvalId, kind, results },
+    );
+  }
+  return null;
 }

@@ -25,8 +25,7 @@ import {
   deriveApprovalToolState,
   useApprovalAudio,
   useOptimisticApprovalAction,
-  useShowFurigana,
-  useShowIpa,
+  useApprovalDisplaySettings,
 } from './approvalCommon';
 
 export interface AlsoCorrectApprovalProps {
@@ -81,8 +80,7 @@ export function AlsoCorrectApproval({
   processingApprovals,
 }: AlsoCorrectApprovalProps) {
   const t = useTranslations('Chat.alsoCorrect');
-  const showIpa = useShowIpa();
-  const showFurigana = useShowFurigana();
+  const { showIpa, showFurigana } = useApprovalDisplaySettings();
   // Optimistic-with-rollback + paywall machine, shared with CardApproval
   // (approvalCommon.tsx).
   const { optimisticState, paywallFeature, setPaywallFeature, runAction } =
