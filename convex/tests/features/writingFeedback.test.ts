@@ -128,6 +128,16 @@ describe('features/writingFeedback', () => {
         writingAnswersMatch('Quisiera un café.', 'Quisiera un cafe.', 'es'),
       ).toBe(false);
     });
+
+    it('matches zh homophone-character swaps via romanized equality', () => {
+      // 在 and 再 both romanize to zài — the whole reason the function is
+      // more than plain normalized equality.
+      expect(writingAnswersMatch('我在家。', '我再家。', 'zh')).toBe(true);
+    });
+
+    it('still rejects real zh differences after romanization', () => {
+      expect(writingAnswersMatch('我在家。', '我在学校。', 'zh')).toBe(false);
+    });
   });
 
   describe('parseFeedbackResponse', () => {
@@ -394,6 +404,94 @@ describe('features/writingFeedback', () => {
         }),
       ).rejects.toThrow(/USAGE_LIMIT/);
       expect(mockedGenerateText).not.toHaveBeenCalled();
+    });
+
+    it('grades against the base-language row when the graded language IS the base', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCard(t);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      // Expected comes from the texts row, not a translations row: an exact
+      // copy resolves in the free local gate rather than 404ing.
+      const result = await asUser.action(
+        api.features.writingFeedback.gradeWritingAnswer,
+        { cardId, language: 'en', userAnswer: 'I would like a coffee, please.' },
+      );
+      expect(result).toEqual({ verdict: 'correct', matched: 'primary' });
+      expect(mockedGenerateText).not.toHaveBeenCalled();
+    });
+
+    it('reports NOT_FOUND for a language the card has no translation for', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCard(t);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      await expect(
+        asUser.action(api.features.writingFeedback.gradeWritingAnswer, {
+          cardId,
+          language: 'fr',
+          userAnswer: 'Je voudrais un café.',
+        }),
+      ).rejects.toThrow(/not found/i);
+    });
+
+    it('does not self-heal when the account has no quota doc at all', async () => {
+      // No usageQuotas row = QUOTA_NOT_SYNCED territory, not the
+      // missing-feature-entry state the backfill exists for: the original
+      // error surfaces and Autumn is never called.
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      try {
+        const t = convexTest(schema, modules);
+        const { cardId } = await seedCard(t);
+        await t.run(async (ctx) => {
+          const doc = await ctx.db
+            .query('usageQuotas')
+            .withIndex('by_userId', (q) => q.eq('userId', 'user_A'))
+            .unique();
+          await ctx.db.delete(doc!._id);
+        });
+        const asUser = t.withIdentity({ subject: 'user_A' });
+        await expect(
+          asUser.action(api.features.writingFeedback.gradeWritingAnswer, {
+            cardId,
+            language: 'es',
+            userAnswer: 'Dame un café',
+          }),
+        ).rejects.toThrow();
+        expect(fetchMock).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('mirrors the healed grant only once under a concurrent double-heal', async () => {
+      const t = convexTest(schema, modules);
+      await seedCard(t, { withoutAiFeedbackEntry: true });
+      await t.mutation(
+        internal.features.writingFeedback.mirrorAiFeedbackGrant,
+        { userId: 'user_A', included: 200 },
+      );
+      await t.mutation(
+        internal.features.writingFeedback.mirrorAiFeedbackGrant,
+        { userId: 'user_A', included: 200 },
+      );
+      expect(await aiFeedbackBalance(t)).toBe(200);
+    });
+  });
+
+  describe('quotaErrorCode (usage/helpers)', () => {
+    it('reads all three shapes the runMutation boundary produces', async () => {
+      const { quotaErrorCode } = await import('../../usage/helpers');
+      const { ConvexError } = await import('convex/values');
+      expect(quotaErrorCode(new ConvexError({ code: 'USAGE_LIMIT' }))).toBe(
+        'USAGE_LIMIT',
+      );
+      expect(quotaErrorCode({ data: { code: 'QUOTA_NOT_SYNCED' } })).toBe(
+        'QUOTA_NOT_SYNCED',
+      );
+      expect(
+        quotaErrorCode(new Error('Uncaught ConvexError: {"code":"USAGE_LIMIT"}')),
+      ).toBe('USAGE_LIMIT');
+      expect(quotaErrorCode(new Error('something else'))).toBeUndefined();
     });
   });
 

@@ -243,6 +243,39 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     expect(screen.queryByTestId('writing-feedback-pending')).not.toBeInTheDocument();
   });
 
+  it('clears on-screen feedback rows when the setting turns off mid-card', async () => {
+    // The quota line's "Turn off" flips the setting while rows are showing;
+    // stale pending/limit rows must not linger until the next card.
+    gradeMock.mockReturnValue(new Promise(() => {}));
+    const props = {
+      preReviewCount: 0,
+      sourceText: 'I would like a coffee.',
+      translations: TRANSLATIONS,
+      audioRecordings: [],
+      isFavorite: false,
+      isPendingMaster: false,
+      isPendingHide: false,
+      onMaster: vi.fn(),
+      onHide: vi.fn(),
+      onFavorite: vi.fn(),
+      targetAudioMode: 'never' as const,
+      cardId: CARD_ID,
+    };
+    const { rerender } = render(
+      <FullReviewCardContent {...props} aiFeedbackEnabled />,
+    );
+    submitAnswer('algo muy diferente');
+    await waitFor(() =>
+      expect(screen.getByTestId('writing-feedback-pending')).toBeInTheDocument(),
+    );
+    rerender(<FullReviewCardContent {...props} aiFeedbackEnabled={false} />);
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId('writing-feedback-pending'),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
   it('sends a long-sentence one-char typo to the grader instead of rounding it to correct', async () => {
     // The local gate is exact-normalized EQUALITY (mirror of the server's
     // writingAnswersMatch), not a rounded accuracy >= 100: with enough words,
