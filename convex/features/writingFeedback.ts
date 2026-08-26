@@ -8,7 +8,7 @@ import { internal } from '../_generated/api';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { requireAuthUserId } from '../db/users';
-import { consumeQuota } from '../usage/helpers';
+import { consumeQuota, releaseQuota } from '../usage/helpers';
 import {
   AI_FEEDBACK_FREE_GRANT,
   AI_FEEDBACK_PAID_GRANT,
@@ -221,6 +221,22 @@ export const consumeAiFeedbackQuota = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     await consumeQuota(ctx, args.userId, FEATURE_IDS.AI_FEEDBACK, 1);
+    return null;
+  },
+});
+
+/**
+ * Compensation for the consume-before-call ordering: when the grader call
+ * itself fails (provider outage, timeout), the user got nothing and the unit
+ * comes back. Deliberately NOT called for an unparseable reply — the model
+ * did run on the user's answer, so that unit stays spent (see the grade
+ * action's parse-failure branch).
+ */
+export const refundAiFeedbackQuota = internalMutation({
+  args: { userId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await releaseQuota(ctx, args.userId, FEATURE_IDS.AI_FEEDBACK, 1);
     return null;
   },
 });
@@ -565,6 +581,17 @@ ANSWER>>>`;
       }));
     } catch (error) {
       console.error('writingFeedback: LLM call failed', error);
+      // Transport failure: the user got nothing, so the unit consumed above
+      // comes back. The parse-failure branch below deliberately does NOT
+      // refund — there the model ran on the answer, it just replied garbage.
+      try {
+        await ctx.runMutation(
+          internal.features.writingFeedback.refundAiFeedbackQuota,
+          { userId },
+        );
+      } catch (refundError) {
+        console.error('writingFeedback: quota refund failed', refundError);
+      }
       await captureGeneration(ctx, {
         distinctId: userId,
         feature: 'writing_feedback',

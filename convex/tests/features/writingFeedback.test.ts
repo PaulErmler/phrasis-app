@@ -304,8 +304,24 @@ describe('features/writingFeedback', () => {
         { cardId, language: 'es', userAnswer: 'Dame un café' },
       );
       expect(result.verdict).toBe('error');
-      // Quota was consumed; the model ran, it just replied garbage.
+      // Deliberate policy (review 2026-08): the unit stays spent here — the
+      // model ran on the answer, it just replied garbage. Only TRANSPORT
+      // failures refund (next test).
       expect(await aiFeedbackBalance(t)).toBe(9);
+    });
+
+    it('refunds the quota unit when the LLM call itself fails', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCard(t);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      mockedGenerateText.mockRejectedValueOnce(new Error('upstream 500'));
+      const result = await asUser.action(
+        api.features.writingFeedback.gradeWritingAnswer,
+        { cardId, language: 'es', userAnswer: 'Dame un café' },
+      );
+      expect(result.verdict).toBe('error');
+      // Consume-then-refund: the user got nothing, the balance is whole again.
+      expect(await aiFeedbackBalance(t)).toBe(10);
     });
 
     it('self-heals an account whose quota doc predates the feature', async () => {
