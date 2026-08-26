@@ -459,6 +459,32 @@ export function expandResponses(kernels: ReturnKernels): ReturnResponses {
 }
 
 /**
+ * `buildWorkloadForecast` runs on every payload identity change — once a
+ * minute via the hook's quantized `now` arg, twice per render with the
+ * what-if baseline — but the responses depend only on `initialReviewCount`
+ * and the rate distribution, which change rarely. A single cached entry
+ * covers the one home screen / one rate set that exists in practice, so
+ * the dozens of real `scheduleCard` runs behind the kernels don't repeat
+ * every tick.
+ */
+let responsesCache: { key: string; responses: ReturnResponses } | null = null;
+function memoizedResponses(
+  initialReviewCount: number,
+  rates: RatingRates,
+): ReturnResponses {
+  const key = `${initialReviewCount}|${rates.pAgain}|${rates.pHard}|${rates.pGood}|${rates.pEasy}`;
+  if (responsesCache?.key !== key) {
+    responsesCache = {
+      key,
+      responses: expandResponses(
+        deriveReturnKernels({ initialReviewCount, rates }),
+      ),
+    };
+  }
+  return responsesCache.responses;
+}
+
+/**
  * Where the load of ONE card added (and studied) today lands over the next
  * WORKLOAD_DAYS, as fractional card-sightings per day. kernel[0] = 1: the
  * card is studied today (its same-day pre-review/learning repeats live in
@@ -520,9 +546,7 @@ export function buildWorkloadForecast(
   const { history } = data;
   const rates = deriveRatingRates(history.ratingCounts);
   const secondsPerReview = deriveSecondsPerReview(history, params.reviewMode);
-  const responses = expandResponses(
-    deriveReturnKernels({ initialReviewCount: data.initialReviewCount, rates }),
-  );
+  const responses = memoizedResponses(data.initialReviewCount, rates);
   const addKernel = [...responses.young];
   addKernel[0] = 1; // an added card is studied the day it's added
 

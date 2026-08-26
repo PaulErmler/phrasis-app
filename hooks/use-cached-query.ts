@@ -39,12 +39,24 @@ export function useCachedQuery<F extends FunctionReference<'query'>>(
   }, [cacheKey]);
 
   const prevLive = useRef(live);
+  // Convex returns a fresh payload identity on every re-subscription (e.g.
+  // a minute-quantized `now` arg) even when the content is unchanged, so
+  // remember what was last written and skip byte-identical writes — the
+  // forecast payload is the largest thing going through this hook.
+  const lastWritten = useRef<{ key: string; json: string } | null>(null);
   useEffect(() => {
     if (live !== undefined && live !== prevLive.current) {
       prevLive.current = live;
       setCached(live);
       try {
-        localStorage.setItem(cacheKey, JSON.stringify(live));
+        const json = JSON.stringify(live);
+        if (
+          lastWritten.current?.key !== cacheKey ||
+          lastWritten.current.json !== json
+        ) {
+          lastWritten.current = { key: cacheKey, json };
+          localStorage.setItem(cacheKey, json);
+        }
       } catch {
         // ignore storage errors
       }

@@ -153,11 +153,17 @@ export function WorkloadStackedCard({
       new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }),
     [locale],
   );
-  const dayLabel = (offset: number) => {
-    if (offset === 0) return t('today');
-    const [y, m, d] = addDays(today, offset).split('-').map(Number);
-    return weekdayFormatter.format(new Date(Date.UTC(y, m - 1, d)));
-  };
+  // One label per day, memoized: each render otherwise re-derives every
+  // label twice (aria + visible) through addDays + an Intl format call.
+  const dayLabels = React.useMemo(
+    () =>
+      days.map((day) => {
+        if (day.offset === 0) return t('today');
+        const [y, m, d] = addDays(today, day.offset).split('-').map(Number);
+        return weekdayFormatter.format(new Date(Date.UTC(y, m - 1, d)));
+      }),
+    [days, today, weekdayFormatter, t],
+  );
 
   const totals = days.map((day) => dayTotal(day, unit));
   // Emptiness is a property of the REAL data: scheduled cards, their
@@ -252,19 +258,21 @@ export function WorkloadStackedCard({
               </div>
             ))}
             <div className="flex" style={{ height: PLOT_HEIGHT + 22 + 24 }}>
-              {days.map((day) => {
+              {days.map((day, i) => {
                 const segs = segmentValues(day, unit);
                 const total = dayTotal(day, unit);
                 const cardsTotal =
                   day.scheduled.total + day.estimated.total;
-                const showCap =
-                  day.offset === 0 || (day.offset === peakIndex && total > 0);
+                // Compared by ARRAY index — peakIndex indexes `totals`,
+                // and leaning on the days[i].offset === i invariant here
+                // would break silently if the model ever changed it.
+                const showCap = i === 0 || (i === peakIndex && total > 0);
                 return (
                   <div
                     key={day.offset}
                     role="img"
                     aria-label={t('dayAria', {
-                      day: dayLabel(day.offset),
+                      day: dayLabels[i],
                       scheduled: day.scheduled.total,
                       estimated: day.estimated.total,
                       minutes: day.estimatedMinutes,
@@ -325,7 +333,7 @@ export function WorkloadStackedCard({
                           : 'text-muted-foreground',
                       )}
                     >
-                      {dayLabel(day.offset)}
+                      {dayLabels[i]}
                     </span>
                     <span className="mt-[3px] text-[9px] leading-none tabular-nums text-muted-foreground">
                       {isTime
