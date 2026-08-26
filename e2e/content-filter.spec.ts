@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { showDueCounts } from "./helpers";
 
 /**
  * Content-source filter. Smoke tests for the SegmentedHomeSection tab
@@ -47,6 +48,9 @@ test.describe("due-count pills on home", () => {
   test("filter-aware pills render next to the content filter", async ({
     page,
   }) => {
+    // New accounts hide due counts by default; this spec is about the
+    // pills themselves, so turn them back on first.
+    await showDueCounts(page);
     await page.goto("/app");
     await page.waitForLoadState("domcontentloaded");
     // Pills render once getFilteredCardCounts resolves (even all-zero counts

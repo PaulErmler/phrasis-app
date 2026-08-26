@@ -209,6 +209,10 @@ export const courseSettingsFields = {
   // Show which collection each card came from (e.g. "A1.2") as a pill in the
   // card header while learning. Unset = false = hidden.
   showCardOrigin: v.optional(v.boolean()),
+  // Writing mode: grade non-matching answers with the LLM and show a coach
+  // card under the diff (verdict, notes, corrected sentence). Unset = true
+  // (on by default); exact/alternative matches never call the LLM either way.
+  aiWritingFeedback: v.optional(v.boolean()),
   chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
   customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
   activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
@@ -652,6 +656,11 @@ export default defineSchema({
     // undefined = never synced, treated as declined. Account-scoped where the
     // browser choice is device-scoped, so the last device to sync wins.
     analyticsConsent: v.optional(v.boolean()),
+    // Hide the "N new / N review" pills on home and the coming-up counts on
+    // in-session progress reports. New rows default true (insertUserSettings);
+    // unset on existing rows means show, so current users keep seeing counts
+    // until they opt in from Preferences.
+    hideDueCounts: v.optional(v.boolean()),
   }).index('by_userId', ['userId']),
 
   // Onboarding progress table. Stores the user's onboarding answers.
@@ -870,6 +879,33 @@ export default defineSchema({
       searchField: 'searchableText',
       filterFields: ['deckId', 'isHidden', 'isMastered', 'isFavorite', 'collectionOrigin'],
     }),
+
+  // Per-user accepted alternative answers for writing mode, written by the AI
+  // feedback grader when it judges a non-matching answer a valid alternative
+  // with the same register/gender/addressee as the card (verdict 'alsoCorrect'
+  // + altOk). Capped at WRITING_ALTERNATIVES_MAX per (cardId, language) in
+  // features/writingFeedback.ts; matching against these skips the LLM (and
+  // the ai_feedback quota) on later reviews. Deliberately per-card rather
+  // than on the shared translation row: curriculum translations are shared
+  // across users, and one user's accepted phrasing must not grade another
+  // user's answer. Never affects what the card displays.
+  writingAlternatives: defineTable({
+    userId: v.string(), // Links to auth user (owner of the card's deck)
+    cardId: v.id('cards'),
+    language: v.string(),
+    text: v.string(),
+    // Annotations, generated async on store (features/writingAlternatives.ts)
+    // with the same tri-state contract as translations rows: undefined =
+    // never attempted, '' = attempted and failed/inapplicable, non-empty =
+    // value. Rendered in the accepted-answers list and under the diff when
+    // the diff targets this alternative.
+    romanizedText: v.optional(v.string()),
+    ipaText: v.optional(v.string()),
+    furiganaText: v.optional(v.string()),
+    // Shared content-addressed audio (audioAssets), synthesized on store
+    // unless an asset for (language, gender, text) already exists.
+    audioAssetId: v.optional(v.id('audioAssets')),
+  }).index('by_cardId_and_language', ['cardId', 'language']),
 
   // Course stats table - tracks learning statistics per course
   courseStats: defineTable({

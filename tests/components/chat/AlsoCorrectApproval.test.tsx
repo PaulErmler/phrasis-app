@@ -167,7 +167,7 @@ describe("AlsoCorrectApproval", () => {
       await user.click(screen.getByTestId("also-correct-replace"));
       await waitFor(() =>
         expect(screen.getByTestId("also-correct-resolved")).toHaveTextContent(
-          "replaced",
+          "savedAsAlternative",
         ),
       );
     });
@@ -184,17 +184,15 @@ describe("AlsoCorrectApproval", () => {
       expect(screen.queryByTestId("paywall")).not.toBeInTheDocument();
     });
 
-    it("rolls back AND opens the paywall for the quota that action spends", async () => {
+    it("rolls back without a paywall on usage_limit (saving an alternative is free)", async () => {
       const user = userEvent.setup();
       renderBox({ onReplace: vi.fn(async () => "usage_limit" as const) });
       await user.click(screen.getByTestId("also-correct-replace"));
       await waitFor(() =>
-        expect(screen.getByTestId("paywall")).toHaveAttribute(
-          "data-feature",
-          "card_edits",
-        ),
+        expect(screen.getByTestId("also-correct-replace")).toBeInTheDocument(),
       );
       expect(screen.queryByTestId("also-correct-resolved")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("paywall")).not.toBeInTheDocument();
     });
 
     it("with the quota already exhausted, the click paywalls instead of calling the mutation", async () => {

@@ -770,6 +770,13 @@ export function LearningModeSettings({
     });
   };
 
+  const handleAiWritingFeedbackChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      aiWritingFeedback: checked,
+    });
+  };
+
   const handleAutoRateFromAccuracyChange = async (checked: boolean) => {
     await updateSettings({
       courseId: courseSettings.courseId,
@@ -1221,6 +1228,14 @@ export function LearningModeSettings({
                 description={t('ignorePunctuationDescription')}
                 checked={courseSettings.ignorePunctuation ?? false}
                 onCheckedChange={handleIgnorePunctuationChange}
+              />
+
+              <SettingSwitchRow
+                id="aiWritingFeedback"
+                label={t('aiWritingFeedback')}
+                description={t('aiWritingFeedbackDescription')}
+                checked={courseSettings.aiWritingFeedback ?? true}
+                onCheckedChange={handleAiWritingFeedbackChange}
               />
 
               <div className="space-y-0">

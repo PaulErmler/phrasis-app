@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import {
   alignWords,
   charDiff,
@@ -28,6 +28,8 @@ interface WordDiffProps {
   ignorePunctuation?: boolean;
   /** Bracketed furigana for `expected`; rendered only by the clean reveal. */
   furigana?: string;
+  /** Romanization/IPA, rendered under the sentence and above the accuracy line. */
+  afterText?: ReactNode;
 }
 
 export function computeWordAccuracy(
@@ -252,6 +254,7 @@ export function WordDiff({
   hideErrors = false,
   ignorePunctuation = false,
   furigana,
+  afterText,
 }: WordDiffProps) {
   const diffOpts = useMemo(
     () => toDiffOptions(getCompareConfig(language, { ignorePunctuation })),
@@ -278,6 +281,7 @@ export function WordDiff({
         accuracy={accuracy}
         hideAccuracy={hideAccuracy}
         furigana={furigana}
+        afterText={afterText}
       />
     );
   }
@@ -314,6 +318,7 @@ export function WordDiff({
           </AskAboutWord>
         ))}
       </p>
+      {afterText}
       {!omitAccuracy && (
         <AccuracyFooter accuracy={accuracy} hideAccuracy={hideAccuracy} />
       )}

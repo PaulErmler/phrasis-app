@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useQuery } from 'convex/react';
+import { usePreloadedQuery, useQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
 
 import { api } from '@/convex/_generated/api';
@@ -30,7 +30,9 @@ type Counts = {
  * ProgressDisplay's card counts).
  */
 export function DueCountsPills({ skip }: { skip?: boolean }) {
-  const { courseSettings: settings } = useAppData();
+  const { courseSettings: settings, preloadedSettings } = useAppData();
+  const userSettings = usePreloadedQuery(preloadedSettings);
+  const hideDueCounts = userSettings?.hideDueCounts === true;
   const t = useTranslations('AppPage.dueCounts');
 
   const filter = settings?.studyContentFilter ?? 'both';
@@ -38,10 +40,10 @@ export function DueCountsPills({ skip }: { skip?: boolean }) {
   // the one the adjacent Shadowing/Writing toggle optimistically writes, so
   // with separateModeTracking on the counts flip tracks in the same frame.
   const reviewMode = settings?.reviewMode;
-  const now = useNowMinute(skip);
+  const now = useNowMinute(skip || hideDueCounts);
   const counts = useQuery(
     api.features.stats.getFilteredCardCounts,
-    skip || !settings ? 'skip' : { filter, now, reviewMode },
+    skip || hideDueCounts || !settings ? 'skip' : { filter, now, reviewMode },
   );
 
   // While the separateModeTracking writing seed is still running, the writing
@@ -55,6 +57,8 @@ export function DueCountsPills({ skip }: { skip?: boolean }) {
   const lastCountsRef = React.useRef<Counts | null>(null);
   if (counts != null && !isProvisional) lastCountsRef.current = counts;
   const display = (isProvisional ? null : counts) ?? lastCountsRef.current;
+
+  if (hideDueCounts) return null;
 
   const review = display
     ? display.learning + display.relearning + display.review

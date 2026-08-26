@@ -30,6 +30,7 @@ describe("setAnalyticsConsent", () => {
     expect(settings?.analyticsConsent).toBe(true);
     // Only finalizeOnboarding may flip this true.
     expect(settings?.hasCompletedOnboarding).toBe(false);
+    expect(settings?.hideDueCounts).toBe(true);
   });
 
   it("updates an existing row in place and supports withdrawal", async () => {

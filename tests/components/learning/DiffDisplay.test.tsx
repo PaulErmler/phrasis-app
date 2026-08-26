@@ -137,3 +137,49 @@ describe('DiffDisplay: ignorePunctuation rendering', () => {
     expect(mark?.className).toContain('text-muted-foreground');
   });
 });
+
+describe('DiffDisplay: afterText', () => {
+  function orderOf(haystack: string, needles: string[]): number[] {
+    return needles.map((n) => haystack.indexOf(n));
+  }
+
+  it('renders romanization between the sentence and accuracy (char path)', () => {
+    const { container } = render(
+      <DiffDisplay
+        expected="やあ、みんな。"
+        actual="やあ"
+        language="ja"
+        afterText={<p>Yā, min'na.</p>}
+      />,
+    );
+    const text = container.textContent ?? '';
+    const [sentence, romanization, accuracy] = orderOf(text, [
+      'やあ',
+      "Yā, min'na.",
+      'accuracy',
+    ]);
+    expect(sentence).toBeGreaterThanOrEqual(0);
+    expect(romanization).toBeGreaterThan(sentence);
+    expect(accuracy).toBeGreaterThan(romanization);
+  });
+
+  it('renders romanization between the sentence and accuracy (word path)', () => {
+    const { container } = render(
+      <DiffDisplay
+        expected="Das Wetter ist schön."
+        actual="Das Wetter"
+        language="de"
+        afterText={<p>romanization-slot</p>}
+      />,
+    );
+    const text = container.textContent ?? '';
+    const [sentence, slot, accuracy] = orderOf(text, [
+      'Wetter',
+      'romanization-slot',
+      'accuracy',
+    ]);
+    expect(sentence).toBeGreaterThanOrEqual(0);
+    expect(slot).toBeGreaterThan(sentence);
+    expect(accuracy).toBeGreaterThan(slot);
+  });
+});

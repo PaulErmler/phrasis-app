@@ -2,6 +2,21 @@ import { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
+// The writing card now wires AI feedback (useAction) and the voice button
+// (useFeatureQuota); neither is under test here, so the Convex-backed hooks
+// are stubbed the way other component tests do it.
+vi.mock('convex/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('convex/react')>();
+  return { ...actual, useAction: () => vi.fn(), useMutation: () => vi.fn() };
+});
+vi.mock('@/components/feature_tracking/useFeatureQuota', () => ({
+  useFeatureQuota: () => ({ isAvailable: true, isLoading: false }),
+}));
+vi.mock('@/components/autumn/usage-limit-dialog', () => ({
+  default: () => null,
+}));
+
+
 // Spy on the real implementation (values unchanged) so a test can assert an
 // already-submitted answer is diffed once rather than once per keystroke.
 vi.mock('@/lib/textCompare', async (importOriginal) => {

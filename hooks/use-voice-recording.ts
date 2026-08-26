@@ -23,6 +23,22 @@ interface UseVoiceRecordingReturn {
   handleVoiceClick: () => void;
 }
 
+interface UseVoiceRecordingOptions {
+  /**
+   * Pin transcription to one language (internal code) instead of the default
+   * course-wide auto-detect. Writing-mode dictation knows the row's target
+   * language, and a single locale gives Azure its best accuracy.
+   */
+  language?: string;
+  /** Auto-stop the recording after this long (and transcribe what's there). */
+  maxDurationMs?: number;
+  /**
+   * Skip the success toast. Writing mode drops the transcript straight into
+   * the answer input, so a toast on every dictated answer is noise.
+   */
+  quiet?: boolean;
+}
+
 /**
  * Custom hook for managing voice recording and transcription
  * Handles MediaRecorder setup, audio capture, and transcription
@@ -30,11 +46,14 @@ interface UseVoiceRecordingReturn {
 export function useVoiceRecording(
   onTranscript: (transcript: string) => void,
   onUsageLimit?: () => void,
+  options?: UseVoiceRecordingOptions,
 ): UseVoiceRecordingReturn {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const maxDurationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { language, maxDurationMs, quiet } = options ?? {};
 
   const transcribeAudio = useAction(
     api.features.chat.transcribe.transcribeAudio,
@@ -66,6 +85,10 @@ export function useVoiceRecording(
       };
 
       mediaRecorder.onstop = async () => {
+        if (maxDurationTimerRef.current) {
+          clearTimeout(maxDurationTimerRef.current);
+          maxDurationTimerRef.current = null;
+        }
         stream.getTracks().forEach((track) => track.stop());
         const actualMimeType = mediaRecorder.mimeType || chosenMime;
 
@@ -80,10 +103,11 @@ export function useVoiceRecording(
             const transcript = await transcribeAudio({
               audio: arrayBuffer as ArrayBuffer,
               mimeType: actualMimeType,
+              ...(language ? { language } : {}),
             });
 
             onTranscript(transcript);
-            toast.success(SUCCESS_MESSAGES.VOICE_TRANSCRIBED);
+            if (!quiet) toast.success(SUCCESS_MESSAGES.VOICE_TRANSCRIBED);
           } catch (error) {
             if (isPaymentPastDueError(error)) {
               // Silent: the reactive payment-overdue dialog is the
@@ -102,11 +126,19 @@ export function useVoiceRecording(
 
       mediaRecorder.start();
       setIsRecording(true);
+      if (maxDurationMs) {
+        maxDurationTimerRef.current = setTimeout(() => {
+          if (mediaRecorderRef.current?.state === 'recording') {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+          }
+        }, maxDurationMs);
+      }
     } catch (error) {
       console.error('Error starting recording:', error);
       toast.error(ERROR_MESSAGES.MICROPHONE_ACCESS);
     }
-  }, [transcribeAudio, onTranscript, onUsageLimit]);
+  }, [transcribeAudio, onTranscript, onUsageLimit, language, maxDurationMs, quiet]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {

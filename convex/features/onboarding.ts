@@ -12,6 +12,7 @@ import {
   requireAuthUserId,
   getAuthUserId,
   getOnboardingProgress,
+  insertUserSettings,
 } from '../db/users';
 import {
   PLACEMENT_BATCH_MAX_ATTEMPTS,
@@ -573,7 +574,7 @@ export const finalizeOnboarding = mutation({
         hasCompletedOnboarding: true,
       });
     } else {
-      await ctx.db.insert('userSettings', {
+      await insertUserSettings(ctx, {
         userId,
         hasCompletedOnboarding: true,
       });

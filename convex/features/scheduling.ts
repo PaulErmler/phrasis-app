@@ -98,7 +98,10 @@ import {
 } from '../migrations/seedWritingTrack';
 import { fetchTrackDueCards } from '../lib/dueQueue';
 import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
-import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
+import {
+  MAX_CARD_TEXT_LENGTH,
+  WRITING_ALTERNATIVES_MAX,
+} from '../../lib/constants/learning';
 import {
   CARD_OVERRIDE_SPEED_MIN,
   CARD_OVERRIDE_SPEED_MAX,
@@ -323,6 +326,52 @@ export const getCardForReview = query({
       { rawRomanization: true, ignoreMissingWordTimings: true },
     );
 
+    // AI-feedback accepted alternatives, card-scoped (unlike the shared text
+    // content above): the writing card diffs against the closest of primary +
+    // alternatives and lists the others with their own annotations + audio.
+    // Usually-empty indexed reads, at most 2 cards x target languages.
+    type AlternativePayload = {
+      text: string;
+      romanization?: string;
+      ipa?: string;
+      furigana?: string;
+      audioUrl?: string | null;
+    };
+    const alternativesByCardLang = new Map<string, AlternativePayload[]>();
+    await Promise.all(
+      dueCards.flatMap((card, i) =>
+        course.targetLanguages.map(async (lang) => {
+          const rows = await ctx.db
+            .query('writingAlternatives')
+            .withIndex('by_cardId_and_language', (q) =>
+              q.eq('cardId', card._id).eq('language', lang),
+            )
+            .take(WRITING_ALTERNATIVES_MAX);
+          if (rows.length === 0) return;
+          alternativesByCardLang.set(
+            `${i}:${lang}`,
+            await Promise.all(
+              rows.map(async (r) => {
+                const asset = r.audioAssetId
+                  ? await ctx.db.get(r.audioAssetId)
+                  : null;
+                return {
+                  text: r.text,
+                  // '' is the attempted-and-failed sentinel; hide it.
+                  ...(r.romanizedText ? { romanization: r.romanizedText } : {}),
+                  ...(r.ipaText ? { ipa: r.ipaText } : {}),
+                  ...(r.furiganaText ? { furigana: r.furiganaText } : {}),
+                  ...(asset
+                    ? { audioUrl: await ctx.storage.getUrl(asset.storageId) }
+                    : {}),
+                };
+              }),
+            ),
+          );
+        }),
+      ),
+    );
+
     const buildCardResult = (card: Doc<'cards'>, index: number) => {
       const text = texts[index];
       const content = contentByKey.get(String(index));
@@ -350,7 +399,12 @@ export const getCardForReview = query({
         textId: card.textId,
         sourceText: text.text,
         sourceLanguage: text.language,
-        translations: content.translations,
+        translations: content.translations.map((tr) => {
+          const alternatives = alternativesByCardLang.get(
+            `${index}:${tr.language}`,
+          );
+          return alternatives ? { ...tr, alternatives } : tr;
+        }),
         audioRecordings: content.audioRecordings,
         dueDate: writingTrack ? card.writingDueDate ?? card.dueDate : card.dueDate,
         isMastered: card.isMastered,

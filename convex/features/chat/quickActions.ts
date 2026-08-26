@@ -30,6 +30,13 @@ export const vQuickAction = v.union(
     userAnswer: v.string(),
     expected: v.string(),
     language: v.string(),
+    /**
+     * Compact summary of what the writing grader already told the user
+     * (verdict + notes + corrected form), built client-side from the coach
+     * card. Lets the chat build on that feedback instead of repeating or
+     * contradicting it. Absent when feedback was off/errored.
+     */
+    aiFeedback: v.optional(v.string()),
   }),
 );
 
@@ -63,7 +70,8 @@ export function assertQuickActionWithinLimits(action: QuickAction): void {
       action.language.length > MAX_QUICK_ACTION_LANGUAGE_LENGTH) ||
     ('userAnswer' in action &&
       (action.userAnswer.length > MAX_MESSAGE_LENGTH ||
-        action.expected.length > MAX_MESSAGE_LENGTH));
+        action.expected.length > MAX_MESSAGE_LENGTH ||
+        (action.aiFeedback?.length ?? 0) > MAX_MESSAGE_LENGTH));
   if (tooLong) {
     throw new ConvexError({
       code: 'MESSAGE_TOO_LONG',
@@ -214,6 +222,10 @@ export function expandQuickAction(action: QuickAction, ctx: QuickActionContext):
         ctx.targetLanguages,
       )}${replyNote}`;
     case 'discussAnswer':
-      return `${header} The user is practicing writing. The expected ${languageName(action.language)} sentence was: "${action.expected}". The user wrote: "${action.userAnswer}". Judge whether the user's version is ALSO a correct, natural way to express the same thing. If fully correct: say so clearly, point out any nuance or register differences from the expected sentence, and call the markAlsoCorrect tool exactly once — pass the full corrected sentence for every language whose text changes (keep the user's wording; fix only punctuation/capitalization/diacritics) plus any card-metadata fields the version changes (speaker gender, register, addressee); the app then offers to save it, so do not ask. If partially correct: identify exactly which parts are right and which are off, and why — do NOT call markAlsoCorrect. If incorrect: explain every error (grammar, vocabulary, word order, spelling/diacritics) concretely, quoting the exact words, and give the corrected form. If you spot a recurring error pattern, create 1-2 flashcards (createCard) with fresh example sentences that train exactly that pattern — otherwise create no cards for this reply, and never createCard the user's variant itself.${replyNote}`;
+      return `${header} The user is practicing writing. The expected ${languageName(action.language)} sentence was: "${action.expected}". The user wrote: "${action.userAnswer}". Judge whether the user's version is ALSO a correct, natural way to express the same thing. If fully correct: say so clearly, point out any nuance or register differences from the expected sentence, and call the markAlsoCorrect tool exactly once — pass the full corrected sentence for every language whose text changes (keep the user's wording; fix only punctuation/capitalization/diacritics) plus any card-metadata fields the version changes (speaker gender, register, addressee); the app then offers to save it, so do not ask. If partially correct: identify exactly which parts are right and which are off, and why — do NOT call markAlsoCorrect. If incorrect: explain every error (grammar, vocabulary, word order, spelling/diacritics) concretely, quoting the exact words, and give the corrected form. If you spot a recurring error pattern, create 1-2 flashcards (createCard) with fresh example sentences that train exactly that pattern — otherwise create no cards for this reply, and never createCard the user's variant itself.${
+        action.aiFeedback
+          ? ` The app's quick grader already showed the user this feedback: <graderFeedback>${action.aiFeedback}</graderFeedback> Do not repeat it verbatim — go deeper: expand on the WHY, add examples or related patterns, and if your judgment disagrees with the grader's, say so explicitly and explain.`
+          : ''
+      }${replyNote}`;
   }
 }

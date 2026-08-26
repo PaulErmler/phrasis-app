@@ -782,4 +782,69 @@ describe("features/chat/alsoCorrect", () => {
       expect(res[0].proposedMetadata).toEqual({ register: "formal" });
     });
   });
+  describe("storeAlternativeFromApproval", () => {
+    it("stores the wording as an alternative on a user-owned card, text untouched", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId } = await seedOwnedCard(t);
+      const approvalId = await createApproval(t, cardId, [
+        { language: "es", text: "Quisiera un caf\u00e9." },
+      ]);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.mutation(
+        api.features.chat.cardApprovals.storeAlternativeFromApproval,
+        { approvalId, timezone: "UTC" },
+      );
+      expect(res.success).toBe(true);
+      // Path A pass-through: user-owned card keeps its id and its text.
+      expect(res.cardId).toBe(cardId);
+      await t.run(async (ctx) => {
+        const text = await ctx.db.get(textId);
+        expect(text?.text).toBe("Quiero un caf\u00e9.");
+        const alts = await ctx.db
+          .query("writingAlternatives")
+          .withIndex("by_cardId_and_language", (q) =>
+            q.eq("cardId", cardId).eq("language", "es"),
+          )
+          .collect();
+        expect(alts.map((a) => a.text)).toEqual(["Quisiera un caf\u00e9."]);
+        const approval = await ctx.db.get(approvalId);
+        expect(approval?.status).toBe("approved");
+        expect(approval?.resolution).toBe("alternative");
+      });
+    });
+
+    it("forks a curriculum card to user-owned and attaches the alternative to the fork", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedOwnedCard(t, { userCreated: false });
+      const approvalId = await createApproval(t, cardId, [
+        { language: "es", text: "Quisiera un caf\u00e9." },
+      ]);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.mutation(
+        api.features.chat.cardApprovals.storeAlternativeFromApproval,
+        { approvalId, timezone: "UTC" },
+      );
+      expect(res.success).toBe(true);
+      expect(res.cardId).not.toBe(cardId);
+      await t.run(async (ctx) => {
+        // Old card replaced by the fork; the fork's text is user-owned but
+        // reads identically (alternatives never change the sentence).
+        expect(await ctx.db.get(cardId)).toBeNull();
+        const newCard = await ctx.db.get(res.cardId);
+        expect(newCard).not.toBeNull();
+        const newText = await ctx.db.get(newCard!.textId);
+        expect(newText?.userCreated).toBe(true);
+        expect(newText?.userId).toBe("user_A");
+        expect(newText?.text).toBe("Quiero un caf\u00e9.");
+        const alts = await ctx.db
+          .query("writingAlternatives")
+          .withIndex("by_cardId_and_language", (q) =>
+            q.eq("cardId", res.cardId).eq("language", "es"),
+          )
+          .collect();
+        expect(alts.map((a) => a.text)).toEqual(["Quisiera un caf\u00e9."]);
+      });
+    });
+  });
+
 });

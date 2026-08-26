@@ -138,6 +138,11 @@
         "error": "Could not change the password. Please check your current password."
       },
       "language": "App Language",
+      "uiSettings": {
+        "title": "UI Settings",
+        "hideDueCounts": "Hide remaining reviews",
+        "hideDueCountsDescription": "Don't show how many sentences are new or waiting. Useful if a large queue feels discouraging."
+      },
       "contactPrompt": {
         "title": "Need anything?",
         "description": "Questions about your plan, billing, or the app? Let us know—we're happy to help.",
@@ -654,11 +659,42 @@
       "autoRevealBaseOnSubmitDescription": "Unblur base text once all translations are submitted",
       "ignorePunctuation": "Ignore punctuation",
       "ignorePunctuationDescription": "Don't count commas, full stops and other punctuation towards the accuracy score",
+      "aiWritingFeedback": "AI feedback on answers",
+      "aiWritingFeedbackDescription": "After you submit, an AI tutor checks answers that don't match, explains slips, and accepts valid alternatives",
       "autoRateFromAccuracy": "Auto-rate from accuracy",
       "autoRateFromAccuracyDescription": "Preselect a rating based on your writing score. You can still change it before continuing.",
       "autoRateBoundary": "Boundary between {lower} and {upper}",
       "instantProceed": "Instant proceed on rating",
       "instantProceedDescription": "Advance to the next sentence immediately when a rating button is clicked"
+    },
+    "feedback": {
+      "checking": "Checking your answer…",
+      "limitReached": "AI feedback limit reached",
+      "limitUpgrade": "Upgrade",
+      "limitTurnOff": "Turn off AI feedback",
+      "matchedAlternative": "Matches one of your accepted answers.",
+      "alsoAccepted": "Also accepted:",
+      "savedAlternative": "Saved as an accepted answer.",
+      "makeDefaultConfirm": "Make default",
+      "makeDefaultSaving": "Saving…",
+      "makeDefaultDone": "Card updated. The audio will regenerate.",
+      "makeDefaultError": "Could not update the card. Please try again.",
+      "discussInDetail": "Discuss in detail",
+      "verdict": {
+        "correct": "Correct",
+        "alsoCorrect": "Also correct",
+        "minor": "Almost right",
+        "partial": "Partly right",
+        "wrong": "Different meaning"
+      },
+      "noteType": {
+        "grammar": "Grammar",
+        "vocab": "Vocabulary",
+        "spelling": "Spelling",
+        "register": "Register",
+        "wordOrder": "Word order",
+        "naturalness": "Naturalness"
+      }
     }
   },
   "Footer": {
@@ -832,7 +868,10 @@
         "not_applicable": "n/a",
         "true": "yes",
         "false": "no"
-      }
+      },
+      "alternativeButton": "Save as alternative",
+      "alternativeHint": "Saves this wording as one of your accepted answers. The card's sentence stays as it is.",
+      "savedAsAlternative": "Saved as alternative"
     },
     "threadLimit": {
       "reached": "You've reached the message limit for this conversation.",
@@ -894,6 +933,12 @@
     },
     "translationAutoFill": {
       "name": "translation auto-fill"
+    },
+    "aiFeedback": {
+      "name": "AI feedback",
+      "pricingLabel": "{count, plural, one {# AI-graded answer} other {# AI-graded answers}} per month",
+      "pricingLabelOneOff": "{count, plural, one {# AI-graded answer} other {# AI-graded answers}} to start",
+      "pricingLabelUnlimited": "Unlimited AI feedback"
     },
     "audioRegenerations": {
       "name": "audio regenerations"

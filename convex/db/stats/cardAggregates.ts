@@ -410,5 +410,14 @@ export async function deleteCard(
     await cardsByWritingStateAndDueDate.deleteIfExists(ctx, oldDoc);
     await cardsByOriginWritingStateAndDueDate.deleteIfExists(ctx, oldDoc);
   }
+  // AI-feedback accepted alternatives are keyed by card; they die with it.
+  // Bounded: WRITING_ALTERNATIVES_MAX per language, a handful of languages.
+  const alternatives = await ctx.db
+    .query('writingAlternatives')
+    .withIndex('by_cardId_and_language', (q) => q.eq('cardId', cardId))
+    .take(100);
+  for (const alt of alternatives) {
+    await ctx.db.delete(alt._id);
+  }
   await ctx.db.delete(cardId);
 }

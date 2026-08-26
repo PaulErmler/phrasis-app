@@ -50,6 +50,25 @@ export const translationValidator = v.object({
    */
   furigana: v.optional(v.string()),
   /**
+   * The user's stored AI-feedback accepted alternatives for this card +
+   * language (writingAlternatives table, max WRITING_ALTERNATIVES_MAX).
+   * Only populated by getCardForReview — alternatives are card-scoped, so
+   * text-scoped queries (decks/library) never carry them. The writing card
+   * diffs against the closest of primary + alternatives and lists the rest
+   * with their own annotations + audio.
+   */
+  alternatives: v.optional(
+    v.array(
+      v.object({
+        text: v.string(),
+        romanization: v.optional(v.string()),
+        ipa: v.optional(v.string()),
+        furigana: v.optional(v.string()),
+        audioUrl: v.optional(v.union(v.string(), v.null())),
+      }),
+    ),
+  ),
+  /**
    * True iff an LLM retranslation is currently in flight for this language:
    * a non-stale row exists in `llmTranslationClaims` for (textId, lang) AND
    * a `translatedText` is already on file (so it's a *re*translation, not
@@ -308,6 +327,10 @@ export const cardApprovalKindValidator = v.union(
 export const cardApprovalResolutionValidator = v.union(
   v.literal('newCard'),
   v.literal('replaced'),
+  // Stored as a writingAlternatives row (card forked to user-owned, text
+  // unchanged). The default accept path since alternatives exist; 'replaced'
+  // remains for rows resolved before that and for the server mutation.
+  v.literal('alternative'),
 );
 
 // Content provenance of a collection, denormalized onto `cards` and the

@@ -69,6 +69,10 @@ describe('USER_TABLES coverage checklist', () => {
     'courses', // courses phase
     'cardApprovals', // approvals phase
     'accountDeletions', // audit row, survives on purpose
+    // Cards phase: every card deletion routes through `deleteCard`
+    // (convex/db/stats/cardAggregates.ts), which drains the card's
+    // writingAlternatives rows in the same transaction.
+    'writingAlternatives',
   ]);
 
   it('every schema table with a userId field is purged (or explicitly audit-exempt)', () => {

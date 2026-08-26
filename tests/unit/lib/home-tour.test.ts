@@ -52,3 +52,20 @@ describe('createHomeTour: mode-dependent free-play step', () => {
     expect(differing).toEqual(['[data-tutorial="radio-mode"]']);
   });
 });
+
+describe('createHomeTour: due-counts step', () => {
+  it('includes the due-counts step when counts are visible', () => {
+    expect(elementsOf({ reviewMode: 'audio' })).toContain(
+      '[data-tutorial="due-counts"]',
+    );
+  });
+
+  it('omits the due-counts step when the user hides remaining reviews', () => {
+    const elements = elementsOf({
+      reviewMode: 'audio',
+      hideDueCounts: true,
+    });
+    expect(elements).not.toContain('[data-tutorial="due-counts"]');
+    expect(elements).toContain('[data-tutorial="projections"]');
+  });
+});

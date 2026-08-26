@@ -27,6 +27,13 @@ import {
 } from '@/lib/textCompare';
 import { ClickableWords } from './ClickableWords';
 import { useLearningChatToggle } from './LearningChatLayout';
+import { useAction, useMutation } from 'convex/react';
+import { toast } from 'sonner';
+import { api } from '@/convex/_generated/api';
+import { getUserTimezone } from '@/lib/timezone';
+import { convexErrorCode, isPaymentPastDueError } from '@/lib/utils';
+import { WritingFeedbackCard, type RowFeedback } from './WritingFeedbackCard';
+import { WritingVoiceButton } from './WritingVoiceButton';
 import {
   getLanguageByCode,
   getLocalizedLanguageNameByCode,
@@ -39,6 +46,7 @@ import type { ClockBinding } from '@/hooks/use-karaoke-index';
 import { useCardPlayback, displayReviewCount } from './useCardPlayback';
 import type {
   CardTranslation,
+  CardTranslationAlternative,
   CardAudioRecording,
   WritingAccuracySummary,
 } from './types';
@@ -89,6 +97,17 @@ interface FullReviewCardContentProps {
   autoRevealBaseOnSubmit?: boolean;
   /** Exclude punctuation from the accuracy score ("Ignore punctuation"). */
   ignorePunctuation?: boolean;
+  /**
+   * "AI feedback on answers" (courseSettings.aiWritingFeedback): grade
+   * non-matching submitted answers with the LLM and show a coach card under
+   * the diff. Requires `cardId`; suppressed internally for transcribe mode.
+   */
+  aiFeedbackEnabled?: boolean;
+  /**
+   * Turns the aiWritingFeedback course setting off. Offered on the
+   * quota-reached line as the alternative to upgrading.
+   */
+  onDisableAiFeedback?: () => void;
   /**
    * Post-submit playback settings ("Translation Entered" timeline group), per
    * language. Missing entry = 1 play; speed falls back to the per-language
@@ -185,6 +204,8 @@ export function FullReviewCardContent({
   hideBaseLanguages = false,
   autoRevealBaseOnSubmit = true,
   ignorePunctuation = false,
+  aiFeedbackEnabled = false,
+  onDisableAiFeedback,
   afterSubmitRepetitions,
   afterSubmitRepetitionPauses,
   afterSubmitPlaybackSpeeds,
@@ -247,6 +268,29 @@ export function FullReviewCardContent({
   );
   const showLanguageLabel = targetTranslations.length > 1;
 
+  // Accepted alternatives per target language. DELIBERATELY outside
+  // `translationKey`: storing a new alternative mid-card must not trip the
+  // key-change reset that wipes typed answers and feedback. Own fingerprint,
+  // so a freshly stored alternative still flows in reactively. Empty in
+  // transcribe mode — there the answer must match the audio, alternatives
+  // must not grant credit.
+  const alternativesKey = transcribeMode
+    ? ''
+    : translations
+      .map((tr) => `${tr.language}\u0000${JSON.stringify(tr.alternatives ?? [])}`)
+      .join('|');
+  const alternativesByLanguage = useMemo(() => {
+    const map = new Map<string, CardTranslationAlternative[]>();
+    if (transcribeMode) return map;
+    for (const tr of translations) {
+      if (tr.isTargetLanguage && tr.alternatives && tr.alternatives.length > 0) {
+        map.set(tr.language, tr.alternatives);
+      }
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alternativesKey]);
+
   const [inputs, setInputs] = useState<Map<string, LanguageInputState>>(
     () => new Map(targetTranslations.map((tr) => [tr.language, { submitted: false, userText: '' }])),
   );
@@ -256,6 +300,12 @@ export function FullReviewCardContent({
   // with "Hide base languages" on).
   const [manuallyRevealedBase, setManuallyRevealedBase] = useState<Set<string>>(
     () => new Set(),
+  );
+  // AI feedback per submitted language row. An entry existing (any status)
+  // marks the row as handled, so the kick-off effect below never double-fires
+  // a request. Cleared on card change, reset, and per-row revert.
+  const [feedback, setFeedback] = useState<Map<string, RowFeedback>>(
+    () => new Map(),
   );
 
   const autoPlayedRef = useRef<Set<string>>(new Set());
@@ -281,12 +331,14 @@ export function FullReviewCardContent({
     );
     setSubmissionOrder([]);
     setManuallyRevealedBase(new Set());
+    setFeedback(new Map());
     autoPlayedRef.current = new Set();
     pairCacheRef.current.clear();
   }
 
   useEffect(() => {
     setSubmissionOrder([]);
+    setFeedback(new Map());
   }, [cardId]);
 
   const allSubmitted = targetTranslations.length > 0 &&
@@ -311,13 +363,40 @@ export function FullReviewCardContent({
     const pairs = targetTranslations
       .filter((tr) => inputs.get(tr.language)?.submitted)
       .map((tr) => {
+        // AI grader accepted the answer as a valid alternative (either fresh
+        // this submit, or a stored one the server matched): the row counts as
+        // fully correct so auto-rating doesn't punish a legitimate answer.
+        const fb = feedback.get(tr.language);
+        if (
+          fb?.status === 'done' &&
+          (fb.result?.verdict === 'alsoCorrect' ||
+            (fb.result?.verdict === 'correct' &&
+              fb.result.matched === 'alternative'))
+        ) {
+          return { withPunctuation: 100, withoutPunctuation: 100 };
+        }
         const userText = inputs.get(tr.language)?.userText ?? '';
-        const cacheKey = `${tr.language}\u0000${tr.text}\u0000${userText}`;
-        const cached = pairCacheRef.current.get(cacheKey);
-        if (cached) return cached;
-        const pair = computeAccuracyPair(tr.text, userText, tr.language);
-        pairCacheRef.current.set(cacheKey, pair);
-        return pair;
+        // Best pair across the primary and every accepted alternative: a
+        // stored alternative is a correct answer, so it must score like one.
+        // The winner is picked by the lenient score (mirroring the
+        // closest-answer diff in TargetLanguageInput); its full pair is used.
+        const candidates = [
+          tr.text,
+          ...(alternativesByLanguage.get(tr.language) ?? []).map((a) => a.text),
+        ];
+        let best: AccuracyPair | null = null;
+        for (const candidate of candidates) {
+          const cacheKey = `${tr.language}\u0000${candidate}\u0000${userText}`;
+          let pair = pairCacheRef.current.get(cacheKey);
+          if (!pair) {
+            pair = computeAccuracyPair(candidate, userText, tr.language);
+            pairCacheRef.current.set(cacheKey, pair);
+          }
+          if (!best || pair.withoutPunctuation > best.withoutPunctuation) {
+            best = pair;
+          }
+        }
+        return best!;
       });
 
     const base = {
@@ -347,7 +426,7 @@ export function FullReviewCardContent({
       minWithPunctuation: Math.min(...strict),
       minWithoutPunctuation: Math.min(...lenient),
     };
-  }, [allSubmitted, inputs, targetTranslations]);
+  }, [allSubmitted, inputs, targetTranslations, feedback, alternativesByLanguage]);
 
   const onAccuracyChangeRef = useRef(onAccuracyChange);
   onAccuracyChangeRef.current = onAccuracyChange;
@@ -492,6 +571,14 @@ export function FullReviewCardContent({
       next.set(language, { submitted: false, userText: '' });
       return next;
     });
+    // Drop the row's AI feedback; an in-flight grade sees the missing entry
+    // and discards its result instead of resurrecting it.
+    setFeedback((prev) => {
+      if (!prev.has(language)) return prev;
+      const next = new Map(prev);
+      next.delete(language);
+      return next;
+    });
     autoPlayedRef.current.delete(language);
     requestAnimationFrame(() => {
       inputRefsByLanguage.current[language]?.focus({ preventScroll: true });
@@ -554,6 +641,7 @@ export function FullReviewCardContent({
     );
     setSubmissionOrder([]);
     setManuallyRevealedBase(new Set());
+    setFeedback(new Map());
     autoPlayedRef.current = new Set();
     const raf = requestAnimationFrame(() => {
       firstInputRef.current?.focus({ preventScroll: true });
@@ -596,6 +684,125 @@ export function FullReviewCardContent({
     });
     setSubmissionOrder((prev) => [...prev, language]);
   }, []);
+
+  // ----- AI writing feedback -------------------------------------------------
+  // Off for transcribe mode only (the answer must match the audio, "also
+  // correct" has no meaning there). First-exposure copy-typing rows stay ON:
+  // a fresh course is ALL first-exposure cards, and an exact copy resolves in
+  // the free local gate anyway, so only mistyped copies reach the LLM — which
+  // is exactly when a note helps.
+  const feedbackActive = aiFeedbackEnabled && !!cardId && !transcribeMode;
+  const gradeWritingAnswer = useAction(
+    api.features.writingFeedback.gradeWritingAnswer,
+  );
+  const cardIdForFeedbackRef = useRef(cardId);
+  cardIdForFeedbackRef.current = cardId;
+
+  // Turning the setting off mid-card (e.g. via the quota line's "Turn off"
+  // button) clears what's already on screen instead of leaving stale
+  // limit/pending rows around until the next card.
+  useEffect(() => {
+    if (!feedbackActive) {
+      setFeedback((prev) => (prev.size > 0 ? new Map() : prev));
+    }
+  }, [feedbackActive]);
+
+  // "Make default" on an alsoCorrect result: replace the card's sentence for
+  // that language with the grader's corrected text through the normal edit
+  // flow (audit log, curriculum fork, audio regeneration, card_edits quota).
+  // The answer stays a stored accepted alternative either way. Rethrows so
+  // the coach card's prompt resets instead of showing a false success.
+  const editCardMutation = useMutation(api.features.scheduling.editCard);
+  const handleMakeDefault = useCallback(
+    async (language: string, text: string) => {
+      if (!cardId) return;
+      try {
+        await editCardMutation({
+          cardId,
+          translations: [{ language, text }],
+          timezone: getUserTimezone(),
+        });
+      } catch (error) {
+        if (!isPaymentPastDueError(error)) {
+          toast.error(t('feedback.makeDefaultError'));
+        }
+        throw error;
+      }
+    },
+    [cardId, editCardMutation, t],
+  );
+
+  // Kick-off runs as an effect over committed state (not inside handleSubmit)
+  // so the voice path — onInputChange immediately followed by onSubmit — sees
+  // the final text. An existing `feedback` entry marks a row as handled.
+  useEffect(() => {
+    if (!feedbackActive || !cardId) return;
+    for (const tr of targetTranslations) {
+      const state = inputs.get(tr.language);
+      if (!state?.submitted || feedback.has(tr.language)) continue;
+      const answer = state.userText.trim();
+      if (!answer) continue;
+
+      const language = tr.language;
+      // Local gate: a lenient (punctuation-ignoring) 100 against the primary
+      // OR any stored accepted alternative needs no grader.
+      const localMatch = [
+        { text: tr.text, matched: 'primary' as const },
+        ...(alternativesByLanguage.get(language) ?? []).map((a) => ({
+          text: a.text,
+          matched: 'alternative' as const,
+        })),
+      ].find(
+        (c) =>
+          computeAccuracyPair(c.text, answer, language).withoutPunctuation >=
+          100,
+      );
+      if (localMatch) {
+        setFeedback((prev) =>
+          new Map(prev).set(language, {
+            status: 'done',
+            result: { verdict: 'correct', matched: localMatch.matched },
+          }),
+        );
+        continue;
+      }
+
+      setFeedback((prev) => new Map(prev).set(language, { status: 'pending' }));
+      const requestCardId = cardId;
+      gradeWritingAnswer({ cardId, language, userAnswer: answer })
+        .then((result) => {
+          if (cardIdForFeedbackRef.current !== requestCardId) return;
+          setFeedback((prev) => {
+            // Reverted (entry deleted) while in flight: discard.
+            if (!prev.has(language)) return prev;
+            return new Map(prev).set(language, {
+              status: result.verdict === 'error' ? 'error' : 'done',
+              result,
+            });
+          });
+        })
+        .catch((error) => {
+          if (cardIdForFeedbackRef.current !== requestCardId) return;
+          if (!isPaymentPastDueError(error)) {
+            console.error('AI feedback failed:', error);
+          }
+          const status: RowFeedback['status'] =
+            convexErrorCode(error) === 'USAGE_LIMIT' ? 'limit' : 'error';
+          setFeedback((prev) => {
+            if (!prev.has(language)) return prev;
+            return new Map(prev).set(language, { status });
+          });
+        });
+    }
+  }, [
+    feedbackActive,
+    cardId,
+    inputs,
+    feedback,
+    targetTranslations,
+    alternativesByLanguage,
+    gradeWritingAnswer,
+  ]);
 
   const assignInputRef = useCallback(
     (language: string, index: number) => (el: HTMLInputElement | null) => {
@@ -696,6 +903,12 @@ export function FullReviewCardContent({
                   audioUrl={audio?.url ?? null}
                   wordTimings={audio?.wordTimings ?? null}
                   state={state}
+                  feedback={feedback.get(translation.language) ?? null}
+                  alternatives={
+                    alternativesByLanguage.get(translation.language) ?? []
+                  }
+                  onDisableAiFeedback={onDisableAiFeedback}
+                  onMakeDefault={handleMakeDefault}
                   targetAudioMode={targetAudioMode}
                   autoPlayedRef={autoPlayedRef}
                   onInputChange={handleInputChange}
@@ -750,6 +963,14 @@ interface TargetLanguageInputProps {
   audioUrl: string | null;
   wordTimings: CardAudioRecording['wordTimings'];
   state: LanguageInputState;
+  /** AI feedback for this row; null = none requested (yet). */
+  feedback: RowFeedback | null;
+  /** Accepted alternatives for this language (empty in transcribe mode). */
+  alternatives: CardTranslationAlternative[];
+  /** Turns the aiWritingFeedback setting off (quota-reached line). */
+  onDisableAiFeedback?: () => void;
+  /** Replaces the card's sentence for a language (alsoCorrect make-default). */
+  onMakeDefault?: (language: string, text: string) => Promise<void>;
   targetAudioMode: TargetAudioMode;
   autoPlayedRef: React.RefObject<Set<string>>;
   onInputChange: (language: string, text: string) => void;
@@ -803,6 +1024,10 @@ function TargetLanguageInput({
   audioUrl,
   wordTimings,
   state,
+  feedback,
+  alternatives,
+  onDisableAiFeedback,
+  onMakeDefault,
   targetAudioMode,
   autoPlayedRef,
   onInputChange,
@@ -977,33 +1202,105 @@ function TargetLanguageInput({
     // so it can never trip the message length limit.
     const attemptLabel =
       attempt.length > 120 ? `${attempt.slice(0, 120)}…` : attempt;
+    // What the grader already told the user, so the chat builds on it
+    // instead of repeating or contradicting it. Bounded by construction
+    // (verdict + <=2 capped notes + a card-length corrected sentence).
+    const graded =
+      feedback?.status === 'done' &&
+      feedback.result &&
+      feedback.result.verdict !== 'error' &&
+      feedback.result.verdict !== 'correct'
+        ? feedback.result
+        : undefined;
+    const aiFeedback = graded
+      ? [
+          `verdict: ${graded.verdict}`,
+          graded.corrected ? `corrected: "${graded.corrected}"` : null,
+          ...(graded.notes ?? []).map((n) => `note (${n.type}): ${n.text}`),
+        ]
+          .filter(Boolean)
+          .join('; ')
+      : undefined;
     chatContext.openChatWithAction(
       {
         kind: 'discussAnswer',
         userAnswer: attempt,
         expected: translation.text,
         language: translation.language,
+        ...(aiFeedback ? { aiFeedback } : {}),
       },
       tChat('discuss.message', { attempt: attemptLabel }),
     );
-  }, [chatContext, state.userText, translation.text, translation.language, tChat]);
+  }, [
+    chatContext,
+    state.userText,
+    translation.text,
+    translation.language,
+    feedback,
+    tChat,
+  ]);
 
   // "Also correct?" exists to dispute an answer the diff marked wrong, at a
   // displayed 100% there is nothing to dispute, so the button is noise.
   // `computeAccuracy` is the same rounded score the accuracy footer shows
   // (including the ignore-punctuation setting), so button and label can't
   // disagree.
+  // Everything the answer may legitimately be diffed against: the card's
+  // sentence, the stored accepted alternatives, and (once graded) the
+  // model's corrected form. The diff runs against whichever is CLOSEST to
+  // what the user typed, so a learner who produced a valid alternative sees
+  // their slips against that alternative — not a wall of red against a
+  // sentence they weren't attempting.
+  const gradedCorrected =
+    feedback?.status === 'done' ? feedback.result?.corrected : undefined;
+  const diffCandidates = useMemo(() => {
+    const list = [translation.text, ...alternatives.map((a) => a.text)];
+    if (gradedCorrected) list.push(gradedCorrected);
+    return [...new Set(list)];
+  }, [translation.text, alternatives, gradedCorrected]);
+  const closestExpected = useMemo(() => {
+    if (!hasUserText || diffCandidates.length === 1) return translation.text;
+    let best = diffCandidates[0];
+    let bestScore = -1;
+    for (const candidate of diffCandidates) {
+      const score = computeAccuracy(
+        candidate,
+        state.userText,
+        translation.language,
+        ignorePunctuation,
+      );
+      if (score > bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+    return best;
+  }, [
+    diffCandidates,
+    hasUserText,
+    state.userText,
+    translation.text,
+    translation.language,
+    ignorePunctuation,
+  ]);
+
   const isPerfectAnswer =
     hasUserText &&
     computeAccuracy(
-      translation.text,
+      closestExpected,
       state.userText,
       translation.language,
       ignorePunctuation,
     ) >= 100;
 
+  // The coach card carries its own "Discuss in detail" button; the standalone
+  // link only remains for rows without feedback (off, errored, or over quota).
+  const feedbackHandled =
+    feedback?.status === 'pending' ||
+    (feedback?.status === 'done' && feedback.result?.verdict !== 'error');
+
   const discussButton =
-    hasUserText && chatContext && !isPerfectAnswer ? (
+    hasUserText && chatContext && !isPerfectAnswer && !feedbackHandled ? (
       <Button
         type="button"
         variant="ghost"
@@ -1015,6 +1312,17 @@ function TargetLanguageInput({
         {tChat('discuss.label')}
       </Button>
     ) : null;
+
+  // Kept in the sentence column (under the text/diff, above accuracy) so
+  // the action buttons and coach card can't push it down the card.
+  const annotations = (
+    <AnnotationLines
+      romanization={translation.romanization}
+      ipa={translation.ipa}
+      showRomanization={showRomanization}
+      showIpa={showIpa}
+    />
+  );
 
   if (allRevealed && !state.submitted) {
     return (
@@ -1046,6 +1354,7 @@ function TargetLanguageInput({
                 hideErrors={showClean}
                 ignorePunctuation={ignorePunctuation}
                 furigana={showFurigana ? translation.furigana : undefined}
+                afterText={annotations}
               />
             </div>
             <div className="flex shrink-0 flex-col items-end gap-2 pt-0.5">
@@ -1059,27 +1368,71 @@ function TargetLanguageInput({
             </div>
           </div>
         ) : (
-          <ClickableWords
-            text={translation.text || '...'}
-            language={translation.language}
-            wordTimings={wordTimings}
-            localTime={activeClip?.localTime ?? 0}
-            clockBinding={isActive ? clockBinding : undefined}
-            isActive={isActive}
-            enabled={highlightEnabled}
-            furigana={showFurigana ? translation.furigana : undefined}
-            className="body-large text-muted-foreground"
-          />
+          <>
+            <ClickableWords
+              text={translation.text || '...'}
+              language={translation.language}
+              wordTimings={wordTimings}
+              localTime={activeClip?.localTime ?? 0}
+              clockBinding={isActive ? clockBinding : undefined}
+              isActive={isActive}
+              enabled={highlightEnabled}
+              furigana={showFurigana ? translation.furigana : undefined}
+              className="body-large text-muted-foreground"
+            />
+            {annotations}
+          </>
         )}
-        <AnnotationLines
-          romanization={translation.romanization}
-          ipa={translation.ipa}
-          showRomanization={showRomanization}
-          showIpa={showIpa}
-        />
       </div>
     );
   }
+
+  // While corrections are shown, diff against the closest accepted/corrected
+  // form; the ShowCleanToggle still flips to the CARD's clean sentence.
+  const correctedForDiff =
+    !showClean && closestExpected !== translation.text ? closestExpected : null;
+
+  // Every accepted answer with its display content: the card's sentence
+  // (annotations from the translation row) plus the stored alternatives
+  // (annotations generated onto their rows). Drives both the list under the
+  // row and the annotation swap when the diff targets an alternative.
+  const acceptedItems: CardTranslationAlternative[] = [
+    {
+      text: translation.text,
+      romanization: translation.romanization,
+      ipa: translation.ipa,
+      furigana: translation.furigana,
+      audioUrl,
+    },
+    ...alternatives,
+  ];
+  const diffTargetItem = correctedForDiff
+    ? (acceptedItems.find((item) => item.text === correctedForDiff) ?? null)
+    : null;
+  // Annotations follow the sentence the diff is showing: the matched
+  // alternative's when the diff targets one, none for an unstored grader
+  // correction (its romanization doesn't exist), the card's otherwise.
+  const diffAnnotations = correctedForDiff ? (
+    diffTargetItem ? (
+      <AnnotationLines
+        romanization={diffTargetItem.romanization}
+        ipa={diffTargetItem.ipa}
+        showRomanization={showRomanization}
+        showIpa={showIpa}
+      />
+    ) : null
+  ) : (
+    annotations
+  );
+
+  // The accepted answers the diff is NOT currently showing, listed under the
+  // row (each with its own audio + annotations) so the learner sees the
+  // card's sentence and their other stored phrasings at a glance.
+  const otherAccepted = state.submitted
+    ? acceptedItems.filter(
+        (item) => item.text !== (correctedForDiff ?? translation.text),
+      )
+    : [];
 
   if (state.submitted) {
     return (
@@ -1104,26 +1457,36 @@ function TargetLanguageInput({
           <div className="flex-1 min-w-0">
             {hasUserText ? (
               <DiffDisplay
-                expected={translation.text}
+                expected={correctedForDiff ?? translation.text}
                 actual={state.userText}
                 language={translation.language}
                 hideAccuracy={false}
                 hideErrors={showClean}
                 ignorePunctuation={ignorePunctuation}
-                furigana={showFurigana ? translation.furigana : undefined}
+                furigana={
+                  showFurigana
+                    ? correctedForDiff
+                      ? diffTargetItem?.furigana
+                      : translation.furigana
+                    : undefined
+                }
+                afterText={diffAnnotations}
               />
             ) : (
-              <ClickableWords
-                text={translation.text || '...'}
-                language={translation.language}
-                wordTimings={wordTimings}
-                localTime={activeClip?.localTime ?? 0}
-                clockBinding={isActive ? clockBinding : undefined}
-                isActive={isActive}
-                enabled={highlightEnabled}
-                furigana={showFurigana ? translation.furigana : undefined}
-                className="body-large text-muted-foreground"
-              />
+              <>
+                <ClickableWords
+                  text={translation.text || '...'}
+                  language={translation.language}
+                  wordTimings={wordTimings}
+                  localTime={activeClip?.localTime ?? 0}
+                  clockBinding={isActive ? clockBinding : undefined}
+                  isActive={isActive}
+                  enabled={highlightEnabled}
+                  furigana={showFurigana ? translation.furigana : undefined}
+                  className="body-large text-muted-foreground"
+                />
+                {annotations}
+              </>
             )}
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2 pt-0.5">
@@ -1154,12 +1517,61 @@ function TargetLanguageInput({
             {discussButton}
           </div>
         </div>
-        <AnnotationLines
-          romanization={translation.romanization}
-          ipa={translation.ipa}
-          showRomanization={showRomanization}
-          showIpa={showIpa}
-        />
+        {otherAccepted.length > 0 && (
+          <div
+            className="flex flex-col gap-1.5 pt-1"
+            data-testid="writing-feedback-other-accepted"
+          >
+            {otherAccepted.map((item) => (
+              <div key={item.text} className="flex items-start gap-2">
+                <div className="flex-1 min-w-0">
+                  <ClickableWords
+                    text={item.text}
+                    language={translation.language}
+                    wordTimings={null}
+                    localTime={0}
+                    isActive={false}
+                    enabled={false}
+                    furigana={showFurigana ? item.furigana : undefined}
+                    className="text-sm text-muted-foreground"
+                  />
+                  <AnnotationLines
+                    romanization={item.romanization}
+                    ipa={item.ipa}
+                    showRomanization={showRomanization}
+                    showIpa={showIpa}
+                  />
+                </div>
+                <AudioButton
+                  url={item.audioUrl ?? null}
+                  language={translation.language}
+                  onPlay={onAudioPlay}
+                  onTimeUpdate={onButtonTimeUpdate}
+                  onStop={onButtonStop}
+                  speed={speed}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        {feedback && hasUserText && (
+          <WritingFeedbackCard
+            feedback={feedback}
+            onDiscuss={chatContext ? handleDiscuss : undefined}
+            onTurnOff={onDisableAiFeedback}
+            onMakeDefault={
+              onMakeDefault &&
+              feedback.status === 'done' &&
+              feedback.result?.corrected
+                ? () =>
+                    onMakeDefault(
+                      translation.language,
+                      feedback.result!.corrected!,
+                    )
+                : undefined
+            }
+          />
+        )}
       </div>
     );
   }
@@ -1195,12 +1607,7 @@ function TargetLanguageInput({
                 furigana={showFurigana ? translation.furigana : undefined}
                 className="body-large text-muted-foreground"
               />
-              <AnnotationLines
-                romanization={translation.romanization}
-                ipa={translation.ipa}
-                showRomanization={showRomanization}
-                showIpa={showIpa}
-              />
+              {annotations}
             </div>
             <div className="flex items-center">
               <AudioButton
@@ -1261,6 +1668,18 @@ function TargetLanguageInput({
           autoCapitalize="sentences"
           spellCheck={false}
           {...(isFirstTarget ? { 'data-testid': 'learn-translation-input' } : {})}
+        />
+        <WritingVoiceButton
+          language={translation.language}
+          onTranscript={(text) => {
+            // Stop = submit: the transcript fills the input and submits in
+            // one gesture. Both land as committed state before the AI
+            // feedback kick-off effect reads them. A row the user already
+            // submitted by keyboard mid-transcription keeps their answer.
+            if (state.submitted) return;
+            onInputChange(translation.language, text);
+            onSubmit(translation.language);
+          }}
         />
         <Button
           variant="outline"

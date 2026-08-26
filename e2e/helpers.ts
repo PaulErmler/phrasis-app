@@ -389,6 +389,24 @@ export async function gotoAuthedApp(
 }
 
 /**
+ * Turn off "Hide remaining reviews" so home due-count pills render.
+ * E2E fixtures walk real onboarding, so new accounts hide the pills by
+ * default; specs that assert on them must opt back in first.
+ */
+export async function showDueCounts(page: Page): Promise<void> {
+  await page.goto('/app/settings');
+  await page.waitForLoadState('domcontentloaded');
+  const sw = page.locator('#hideDueCounts');
+  await expect(sw).toBeVisible({ timeout: 15_000 });
+  if ((await sw.getAttribute('aria-checked')) === 'true') {
+    await sw.click();
+    await expect
+      .poll(async () => sw.getAttribute('aria-checked'), { timeout: 8_000 })
+      .toBe('false');
+  }
+}
+
+/**
  * Best-effort dismissal of the cookie-consent banner. The banner is fixed,
  * bottom-anchored and z-100, so while visible it intercepts clicks on any
  * bottom-of-viewport control (the import wizard's Next/Submit, the learn

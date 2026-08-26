@@ -87,11 +87,10 @@ export function AlsoCorrectApproval({
   // (approvalCommon.tsx).
   const { optimisticState, paywallFeature, setPaywallFeature, runAction } =
     useOptimisticApprovalAction<
-      'newCard' | 'replaced' | 'rejected',
+      'newCard' | 'replaced' | 'alternative' | 'rejected',
       'custom_sentences' | 'card_edits'
     >();
   const { isAvailable: addAvailable } = useFeatureQuota('custom_sentences');
-  const { isAvailable: replaceAvailable } = useFeatureQuota('card_edits');
 
   const toolCallId = toolPart.toolCallId?.trim();
   const tool = toolPart as MarkAlsoCorrectToolPart & {
@@ -135,11 +134,10 @@ export function AlsoCorrectApproval({
       available: addAvailable,
     });
 
-  const handleReplace = () =>
-    runAction(approvalId, 'replaced', onReplace, {
-      paywall: 'card_edits',
-      available: replaceAvailable,
-    });
+  // Accepting stores the wording as one of the user's accepted alternatives
+  // (writingAlternatives) and forks the card user-owned; the card's own text
+  // is untouched. Free, so no paywall/quota gate on this action.
+  const handleReplace = () => runAction(approvalId, 'alternative', onReplace);
 
   const handleReject = () => runAction(approvalId, 'rejected', onReject);
 
@@ -176,7 +174,9 @@ export function AlsoCorrectApproval({
     ? t('dismissed')
     : resolution === 'replaced'
       ? t('replaced')
-      : t('added');
+      : resolution === 'alternative'
+        ? t('savedAsAlternative')
+        : t('added');
 
   return (
     <Alert
@@ -219,23 +219,21 @@ export function AlsoCorrectApproval({
             >
               {t('dismissButton')}
             </Button>
-            {/* Dismiss stays left; the accepting actions sit right. Each
-                carries the badge for the quota IT spends. Replace bills
-                card_edits, Add bills custom_sentences, so the number next to
-                a button always describes that button. */}
+            {/* Dismiss stays left; the accepting actions sit right. Saving
+                as an alternative is free (no badge); Add bills
+                custom_sentences, so the number next to it describes that
+                button. */}
             <div className="ml-auto flex flex-wrap items-center gap-2">
-              <FeatureBadge featureId="card_edits" />
               <Button
                 onClick={handleReplace}
                 disabled={isProcessing || !approvalId}
                 variant="outline"
                 size="sm"
                 className="h-8 gap-1.5 px-3 text-sm"
-                title={t('replaceHint')}
+                title={t('alternativeHint')}
                 data-testid="also-correct-replace"
               >
-                {!replaceAvailable && <Lock className="h-3.5 w-3.5" />}
-                {t('replaceButton')}
+                {t('alternativeButton')}
               </Button>
               {/* Replace-only proposal: the card is still missing text for at
                   least one course language, so adding it as a new card would

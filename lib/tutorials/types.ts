@@ -25,6 +25,8 @@ export interface TutorialDefinition {
  */
 export interface TutorialContext {
   reviewMode?: 'audio' | 'full';
+  /** When true, skip the due-counts tour step — those pills are not on screen. */
+  hideDueCounts?: boolean;
 }
 
 export type TutorialFactory = (

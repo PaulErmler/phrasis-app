@@ -88,8 +88,11 @@ export function useCardApprovals(
   const rejectCard = useMutation(
     api.features.chat.cardApprovals.rejectCard,
   );
-  const replaceCardFromApproval = useMutation(
-    api.features.chat.cardApprovals.replaceCardFromApproval,
+  // "Accept" on an alsoCorrect proposal stores the wording as an accepted
+  // alternative (and forks the card user-owned) rather than replacing the
+  // card's text; replaceCardFromApproval remains server-side for old clients.
+  const storeAlternativeFromApproval = useMutation(
+    api.features.chat.cardApprovals.storeAlternativeFromApproval,
   );
   const [processingApprovals, setProcessingApprovals] = useState<Set<string>>(
     new Set(),
@@ -190,12 +193,16 @@ export function useCardApprovals(
     async (approvalId: Id<'cardApprovals'>) => {
       const { result, value } = await runApprovalAction(
         approvalId,
-        'replace card',
-        () => replaceCardFromApproval({ approvalId, timezone: getUserTimezone() }),
+        'store alternative',
+        () =>
+          storeAlternativeFromApproval({
+            approvalId,
+            timezone: getUserTimezone(),
+          }),
       );
       return { result, cardId: value?.cardId };
     },
-    [runApprovalAction, replaceCardFromApproval],
+    [runApprovalAction, storeAlternativeFromApproval],
   );
 
   return {

@@ -316,6 +316,17 @@ export function LearningMode({
   const handleReplayTarget = useCallback(() => {
     setTargetReplayNonce((n) => n + 1);
   }, []);
+  // "Turn off AI feedback" from the quota-reached line under an answer. Same
+  // write as the settings-sheet toggle, offered where the limit actually
+  // bites so the user isn't forced to either upgrade or dig through settings.
+  const updateSettings = useUpdateCourseSettings();
+  const handleDisableAiFeedback = useCallback(async () => {
+    if (state.status !== 'reviewing') return;
+    await updateSettings({
+      courseId: state.courseSettings.courseId,
+      aiWritingFeedback: false,
+    });
+  }, [state, updateSettings]);
   // Restart the current card from scratch: re-blur everything, drop typed and
   // submitted translations, clear the picked rating, and replay the merged
   // audio from 0 (deliberately unconditional, like the R shortcut, the user
@@ -579,6 +590,8 @@ export function LearningMode({
           state.courseSettings.autoRevealBaseOnSubmit ?? true
         }
         ignorePunctuation={state.courseSettings.ignorePunctuation ?? false}
+        aiFeedbackEnabled={state.courseSettings.aiWritingFeedback ?? true}
+        onDisableAiFeedback={handleDisableAiFeedback}
         suppressAutoPlay={state.settingsOpen}
         allRevealed={fullReviewRevealed}
         onAllSubmittedChange={setAllSubmitted}

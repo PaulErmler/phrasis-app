@@ -20,6 +20,7 @@ import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
 import { applyCardEdit } from '../scheduling';
 import { applyTextMetadata } from '../sentenceMetadata';
+import { storeWritingAlternative } from '../writingAlternatives';
 import { resolveCardContext } from './cardContext';
 import { MAX_CARD_TEXT_LENGTH } from '../../../lib/constants/learning';
 import { trackEvent } from '../../db/stats/dailyStats';
@@ -611,6 +612,131 @@ export const replaceCardFromApproval = mutation({
     });
 
     return { success: true, cardId: replacementCardId };
+  },
+});
+
+/**
+ * Accept an "also correct" proposal by storing the model's wording as an
+ * accepted ALTERNATIVE (writingAlternatives) instead of replacing the card's
+ * text — the default accept path since alternatives exist. The card still
+ * becomes user-owned first (`ensureUserOwnedText`, Path B fork when it was
+ * curriculum): alternatives are private to this user, so they must not hang
+ * off a card whose text rows other users share. Free: no card text changes
+ * hand-off to QC, and the grader's own alternative store is free too.
+ */
+export const storeAlternativeFromApproval = mutation({
+  args: {
+    approvalId: v.id('cardApprovals'),
+    timezone: v.string(),
+  },
+  // Same contract as replaceCardFromApproval: `cardId` is the card the fork
+  // LEFT BEHIND, which the learn view needs for thread-rotation suppression.
+  returns: v.object({
+    success: v.boolean(),
+    cardId: v.id('cards'),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await requireUser(ctx);
+
+    const approval = await getAuthenticatedPendingApproval(
+      ctx,
+      args.approvalId,
+      userId,
+    );
+    if ((approval.kind ?? 'createCard') !== 'alsoCorrect' || !approval.cardId) {
+      throw new ConvexError('Approval does not support storing an alternative');
+    }
+    const previousCardId = approval.cardId;
+    if ((await ctx.db.get(previousCardId)) === null) {
+      throw new ConvexError({
+        code: 'CARD_REPLACED',
+        message: 'This card has changed since the suggestion was made.',
+      });
+    }
+
+    // Fork to user-owned with the text UNCHANGED (empty diff +
+    // ensureUserOwnedText): annotations, translations, and audio pointers are
+    // carried verbatim, no audit row is written, and a card that is already
+    // user-owned passes through with its id intact.
+    const { textId, cardId: resolvedCardId } = await applyCardEdit(ctx, {
+      cardId: previousCardId,
+      translations: [],
+      timezone: args.timezone,
+      auditKind: 'chat_also_correct',
+      ensureUserOwnedText: true,
+      skipQuota: true,
+    });
+
+    // Current primaries, read from the resolved card so the dedupe compares
+    // against what the card says NOW (it may have been edited since the
+    // proposal). resolveCardContext re-checks ownership as a side effect.
+    const context = await resolveCardContext(ctx, resolvedCardId, userId);
+    if (!context) {
+      throw new ConvexError('Card not found');
+    }
+    const primaryByLanguage = new Map(
+      context.translations.map((t) => [t.language, t.text]),
+    );
+    // The text row's own language isn't in `translations`; its sentence is
+    // the primary for that language (cards whose source text IS the target).
+    primaryByLanguage.set(context.sourceLanguage, context.sourceText);
+
+    const changed = new Set(approval.changedLanguages ?? []);
+    const entries =
+      approval.changedLanguages === undefined
+        ? approval.translations
+        : approval.translations.filter((t) => changed.has(t.language));
+    let storedCount = 0;
+    for (const entry of entries) {
+      const primary = primaryByLanguage.get(entry.language);
+      // A language the card doesn't carry has no primary to be an
+      // alternative OF; those proposals only make sense via Replace.
+      if (primary === undefined) continue;
+      const stored = await storeWritingAlternative(ctx, {
+        userId,
+        cardId: resolvedCardId,
+        language: entry.language,
+        text: entry.text,
+        primary,
+      });
+      if (stored !== null) storedCount += 1;
+    }
+
+    await ctx.db.patch(approval._id, {
+      status: 'approved',
+      resolution: 'alternative',
+      processedAt: Date.now(),
+      textId,
+      cardId: resolvedCardId,
+    });
+
+    // Same retargeting as replaceCardFromApproval: a Path B fork replaced the
+    // card document, so sibling pending proposals must follow it.
+    if (resolvedCardId !== previousCardId) {
+      const siblings = await ctx.db
+        .query('cardApprovals')
+        .withIndex('by_thread_and_user', (q) =>
+          q.eq('threadId', approval.threadId).eq('userId', userId),
+        )
+        .take(500);
+      for (const sibling of siblings) {
+        if (sibling._id === approval._id) continue;
+        if (sibling.status !== 'pending') continue;
+        if (sibling.cardId !== previousCardId) continue;
+        await ctx.db.patch(sibling._id, { cardId: resolvedCardId });
+      }
+    }
+
+    await track(ctx, userId, EVENTS.CHAT_CARD_APPROVAL, {
+      outcome: 'approved',
+      kind: 'alsoCorrect',
+      resolution: 'alternative',
+      thread_id: approval.threadId,
+      changed_languages: approval.changedLanguages ?? [],
+      stored_count: storedCount,
+    });
+
+    return { success: true, cardId: resolvedCardId };
   },
 });
 

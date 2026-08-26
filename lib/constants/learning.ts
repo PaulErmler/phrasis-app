@@ -29,6 +29,11 @@ export const ENSURE_CONTENT_MAX_RETRIES = 3;
 /** Maximum character length for any single translation text (editing and creating cards). */
 export const MAX_CARD_TEXT_LENGTH = 150;
 
+/** Max stored AI-feedback accepted alternatives per (card, language). Shared
+ * by the store mutation (convex/features/writingFeedback.ts) and the
+ * getCardForReview payload that ships them to the writing card. */
+export const WRITING_ALTERNATIVES_MAX = 5;
+
 /** In custom text entry, show n/max only when this many or fewer characters remain (or over limit). */
 export const CARD_TEXT_SHOW_COUNT_REMAINING_THRESHOLD = 20;
 

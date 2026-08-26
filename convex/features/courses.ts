@@ -19,6 +19,7 @@ import {
   requireAuthUserId,
   getUserSettings as dbGetUserSettings,
   getOnboardingProgress as dbGetOnboardingProgress,
+  insertUserSettings,
 } from '../db/users';
 import {
   getCoursesForUser,
@@ -155,6 +156,7 @@ export const getUserSettings = query({
       completedTutorials: v.optional(v.array(v.string())),
       pinnedCardActions: v.optional(v.array(v.string())),
       analyticsConsent: v.optional(v.boolean()),
+      hideDueCounts: v.optional(v.boolean()),
     }),
     v.null(),
   ),
@@ -490,7 +492,7 @@ export const setActiveCourse = mutation({
         activeCourseId: args.courseId,
       });
     } else {
-      await ctx.db.insert('userSettings', {
+      await insertUserSettings(ctx, {
         userId,
         hasCompletedOnboarding: true,
         activeCourseId: args.courseId,
@@ -712,7 +714,7 @@ export const saveOnboardingProgress = mutation({
 
     const existingSettings = await dbGetUserSettings(ctx, userId);
     if (!existingSettings) {
-      await ctx.db.insert('userSettings', {
+      await insertUserSettings(ctx, {
         userId,
         hasCompletedOnboarding: false,
       });
@@ -948,7 +950,7 @@ export const completeOnboarding = mutation({
 
     let settingsId;
     if (!existingSettings) {
-      settingsId = await ctx.db.insert('userSettings', {
+      settingsId = await insertUserSettings(ctx, {
         userId,
         ...settingsPatch,
       });
@@ -1332,10 +1334,42 @@ export const updatePinnedCardActions = mutation({
     if (settings) {
       await ctx.db.patch(settings._id, { pinnedCardActions: normalized });
     } else {
-      await ctx.db.insert('userSettings', {
+      await insertUserSettings(ctx, {
         userId,
         hasCompletedOnboarding: false,
         pinnedCardActions: normalized,
+      });
+    }
+    return null;
+  },
+});
+
+/**
+ * Patch account-level preferences (cross-course). Missing fields are left
+ * unchanged. Creates a settings row if the user has none yet, with the
+ * same new-user defaults as other insert paths.
+ */
+export const updateUserSettings = mutation({
+  args: {
+    hideDueCounts: v.optional(v.boolean()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireAuthUserId(ctx);
+    const patch: { hideDueCounts?: boolean } = {};
+    if (args.hideDueCounts !== undefined) {
+      patch.hideDueCounts = args.hideDueCounts;
+    }
+    if (Object.keys(patch).length === 0) return null;
+
+    const settings = await dbGetUserSettings(ctx, userId);
+    if (settings) {
+      await ctx.db.patch(settings._id, patch);
+    } else {
+      await insertUserSettings(ctx, {
+        userId,
+        hasCompletedOnboarding: false,
+        ...patch,
       });
     }
     return null;

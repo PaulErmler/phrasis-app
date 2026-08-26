@@ -32,6 +32,10 @@ test.describe("settings", () => {
     // sign-out, etc.).
     const control = page.getByRole("button").first();
     await expect(control).toBeVisible({ timeout: 15_000 });
+
+    await expect(page.locator("#hideDueCounts")).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test("change password via the settings dialog", async ({ page }) => {

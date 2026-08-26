@@ -5,6 +5,7 @@ import {
   dismissTour,
   gotoAuthedApp,
   isSelectedTestId,
+  showDueCounts,
   waitForInViewport,
 } from "./helpers";
 
@@ -909,6 +910,9 @@ test.describe("learning settings", () => {
       ).toContain(writingCardText.split("\n")[0]?.trim() ?? "");
 
       // --- Home pills survive the track flip ------------------------------
+      // New accounts hide due counts; this assertion is about the pills
+      // staying mounted across the Shadowing/Writing toggle.
+      await showDueCounts(page);
       await page.goto("/app");
       await page.waitForLoadState("domcontentloaded");
       // `.first()`: the home subtree can be momentarily duplicated after

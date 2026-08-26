@@ -15,7 +15,8 @@ export type AiFeature =
   | 'tts_synthesis'
   | 'tts_validation_stt'
   | 'tts_validation_judge'
-  | 'machine_translation';
+  | 'machine_translation'
+  | 'writing_feedback';
 
 export type CaptureGenerationArgs = {
   /**

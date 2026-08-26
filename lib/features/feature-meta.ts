@@ -29,6 +29,10 @@ export const FEATURE_META: Record<
   [FEATURE_IDS.TRANSLATION_AUTO_FILL]: { i18nKey: 'translationAutoFill', consumable: true, hidden: true },
   [FEATURE_IDS.AUDIO_REGENERATIONS]: { i18nKey: 'audioRegenerations', consumable: true, hidden: true },
   [FEATURE_IDS.TRANSLATION_FLAGS]: { i18nKey: 'translationFlags', consumable: true, hidden: true },
+  // 20k/month on paid plans is an abuse guard, not a real allowance; the
+  // pricing table renders anything >= 19000 with displayAsUnlimited as
+  // "Unlimited". Free's 200 one-off shows as the real number.
+  [FEATURE_IDS.AI_FEEDBACK]: { i18nKey: 'aiFeedback', consumable: true, displayAsUnlimited: true },
   [FEATURE_IDS.CREDITS]: { i18nKey: 'credits', consumable: true },
 };
 

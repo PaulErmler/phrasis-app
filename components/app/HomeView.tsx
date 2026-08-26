@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useMutation, useQuery } from 'convex/react';
+import { usePreloadedQuery, useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
 import { HomeChatInput } from '@/components/chat/HomeChatInput';
@@ -47,7 +47,8 @@ export function HomeView({
 }) {
   const t = useTranslations('AppPage');
 
-  const { courseSettings } = useAppData();
+  const { courseSettings, preloadedSettings } = useAppData();
+  const userSettings = usePreloadedQuery(preloadedSettings);
 
   const { restartTutorial } = useTutorial(TUTORIAL_IDS.HOME_TOUR, {
     delayMs: 1200,
@@ -69,7 +70,11 @@ export function HomeView({
     // Anchors the free-play step to the button that actually renders:
     // Radio (Shadowing) vs Free Study (Writing). Matches the face chosen in
     // StartLearningButton, which sets `data-tutorial` from the same field.
-    context: { reviewMode: courseSettings?.reviewMode ?? 'audio' },
+    // `hideDueCounts` drops the pills step when those pills are not on screen.
+    context: {
+      reviewMode: courseSettings?.reviewMode ?? 'audio',
+      hideDueCounts: userSettings?.hideDueCounts === true,
+    },
   });
 
   useEffect(() => {

@@ -11,6 +11,15 @@ export const DEFAULT_BATCH_SIZE = 5;
 // Shared types for card data returned by Convex queries
 // ============================================================================
 
+/** One stored accepted alternative, with its own generated content. */
+export interface CardTranslationAlternative {
+  text: string;
+  romanization?: string;
+  ipa?: string;
+  furigana?: string;
+  audioUrl?: string | null;
+}
+
 export interface CardTranslation {
   language: string;
   text: string;
@@ -24,6 +33,13 @@ export interface CardTranslation {
    * sentence text by ClickableWords, not as an annotation line under it.
    */
   furigana?: string;
+  /**
+   * AI-feedback accepted alternatives for this card + language (max
+   * WRITING_ALTERNATIVES_MAX). Writing mode diffs against the closest of
+   * primary + alternatives and lists the others under the answer with
+   * their own annotations + audio.
+   */
+  alternatives?: CardTranslationAlternative[];
   /**
    * True while an LLM retranslation is in flight for this language
    * (server-driven, keyed off `llmTranslationClaims`). Excludes the
@@ -142,6 +158,8 @@ export interface CourseSettings {
   writingInputMode?: 'translate' | 'transcribe';
   /** Writing mode: exclude punctuation from the accuracy score. Default false. */
   ignorePunctuation?: boolean;
+  /** Writing mode: AI-grade non-matching answers and show a coach card. Default true. */
+  aiWritingFeedback?: boolean;
   /** Writing mode: preselect the rating from the accuracy score. Default true. */
   autoRateFromAccuracy?: boolean;
   /** Accuracy breakpoints for the above. Default 50 / 80. */

@@ -143,6 +143,7 @@ describe("features/courses", () => {
         {},
       );
       expect(settings?.hasCompletedOnboarding).toBe(false);
+      expect(settings?.hideDueCounts).toBe(true);
     });
 
     // completeOnboarding copies this value verbatim onto courseSettings, so
@@ -692,6 +693,72 @@ describe("features/courses", () => {
         {},
       );
       expect(settings?.pinnedCardActions).toEqual(["edit"]);
+      expect(settings?.hasCompletedOnboarding).toBe(false);
+      expect(settings?.hideDueCounts).toBe(true);
+    });
+  });
+
+  describe("updateUserSettings", () => {
+    it("rejects unauthenticated calls", async () => {
+      const t = convexTest(schema, modules);
+      await expect(
+        t.mutation(api.features.courses.updateUserSettings, {
+          hideDueCounts: true,
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("patches hideDueCounts on an existing row without backfilling other fields", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) =>
+        ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.updateUserSettings, {
+        hideDueCounts: true,
+      });
+      const settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      expect(settings?.hideDueCounts).toBe(true);
+      expect(settings?.hasCompletedOnboarding).toBe(true);
+    });
+
+    it("lets an existing user turn counts back on", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) =>
+        ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          hideDueCounts: true,
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.updateUserSettings, {
+        hideDueCounts: false,
+      });
+      const settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      expect(settings?.hideDueCounts).toBe(false);
+    });
+
+    it("creates a settings row when none exists yet", async () => {
+      const t = convexTest(schema, modules);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.updateUserSettings, {
+        hideDueCounts: false,
+      });
+      const settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      expect(settings?.hideDueCounts).toBe(false);
       expect(settings?.hasCompletedOnboarding).toBe(false);
     });
   });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { charDiff, getCompareConfig, toDiffOptions } from '@/lib/textCompare';
 import { WordDiff } from './WordDiff';
 import { AccuracyFooter, CleanRevealedSentence } from './CleanRevealedSentence';
@@ -23,6 +23,8 @@ interface DiffDisplayProps {
    * fragments would be noise.
    */
   furigana?: string;
+  /** Romanization/IPA, rendered under the sentence and above the accuracy line. */
+  afterText?: ReactNode;
 }
 
 // Lives in lib/textCompare/accuracy.ts so non-React code (and the auto-rating
@@ -38,6 +40,7 @@ export function DiffDisplay({
   hideErrors = false,
   ignorePunctuation = false,
   furigana,
+  afterText,
 }: DiffDisplayProps) {
   const cfg = getCompareConfig(language);
 
@@ -52,6 +55,7 @@ export function DiffDisplay({
         hideErrors={hideErrors}
         ignorePunctuation={ignorePunctuation}
         furigana={furigana}
+        afterText={afterText}
       />
     );
   }
@@ -66,6 +70,7 @@ export function DiffDisplay({
       hideErrors={hideErrors}
       ignorePunctuation={ignorePunctuation}
       furigana={furigana}
+      afterText={afterText}
     />
   );
 }
@@ -79,6 +84,7 @@ interface CharDiffViewProps {
   hideErrors: boolean;
   ignorePunctuation: boolean;
   furigana?: string;
+  afterText?: ReactNode;
 }
 
 function CharDiffView({
@@ -90,6 +96,7 @@ function CharDiffView({
   hideErrors,
   ignorePunctuation,
   furigana,
+  afterText,
 }: CharDiffViewProps) {
   const diffOpts = useMemo(
     () => toDiffOptions(getCompareConfig(language, { ignorePunctuation })),
@@ -113,6 +120,7 @@ function CharDiffView({
         accuracy={accuracyPct}
         hideAccuracy={hideAccuracy}
         furigana={furigana}
+        afterText={afterText}
       />
     );
   }
@@ -160,6 +168,7 @@ function CharDiffView({
           );
         })}
       </p>
+      {afterText}
       {!omitAccuracy && (
         <AccuracyFooter accuracy={accuracyPct} hideAccuracy={hideAccuracy} />
       )}

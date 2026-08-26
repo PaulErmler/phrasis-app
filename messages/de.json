@@ -138,6 +138,11 @@
         "error": "Das Passwort konnte nicht geändert werden. Bitte prüfe dein aktuelles Passwort."
       },
       "language": "App-Sprache",
+      "uiSettings": {
+        "title": "UI-Einstellungen",
+        "hideDueCounts": "Ausstehende Wiederholungen ausblenden",
+        "hideDueCountsDescription": "Die Anzahl neuer und fälliger Sätze nicht anzeigen. Hilfreich, wenn eine große Warteschlange entmutigend wirkt."
+      },
       "contactPrompt": {
         "title": "Brauchst du noch etwas?",
         "description": "Fragen zu deinem Tarif, zur Abrechnung oder zur App? Schreib uns gern – wir helfen dir weiter.",
@@ -654,11 +659,42 @@
       "autoRevealBaseOnSubmitDescription": "Basistext einblenden, sobald alle Übersetzungen abgesendet sind",
       "ignorePunctuation": "Satzzeichen ignorieren",
       "ignorePunctuationDescription": "Kommas, Punkte und andere Satzzeichen nicht in die Genauigkeit einrechnen",
+      "aiWritingFeedback": "KI-Feedback zu Antworten",
+      "aiWritingFeedbackDescription": "Nach dem Absenden prüft ein KI-Tutor abweichende Antworten, erklärt Fehler und erkennt gültige Alternativen an",
       "autoRateFromAccuracy": "Automatisch nach Genauigkeit bewerten",
       "autoRateFromAccuracyDescription": "Wählt anhand deiner Schreibgenauigkeit eine Bewertung vor. Du kannst sie vor dem Weitergehen weiterhin ändern.",
       "autoRateBoundary": "Grenze zwischen {lower} und {upper}",
       "instantProceed": "Sofort weiter bei Bewertung",
       "instantProceedDescription": "Zum nächsten Satz wechseln, sobald eine Bewertung angeklickt wird"
+    },
+    "feedback": {
+      "checking": "Antwort wird geprüft…",
+      "limitReached": "KI-Feedback-Limit erreicht",
+      "limitUpgrade": "Upgraden",
+      "limitTurnOff": "KI-Feedback ausschalten",
+      "matchedAlternative": "Entspricht einer deiner akzeptierten Antworten.",
+      "alsoAccepted": "Ebenfalls akzeptiert:",
+      "savedAlternative": "Als akzeptierte Antwort gespeichert.",
+      "makeDefaultConfirm": "Als Standard übernehmen",
+      "makeDefaultSaving": "Wird gespeichert…",
+      "makeDefaultDone": "Karte aktualisiert. Das Audio wird neu erstellt.",
+      "makeDefaultError": "Karte konnte nicht aktualisiert werden. Bitte erneut versuchen.",
+      "discussInDetail": "Im Detail besprechen",
+      "verdict": {
+        "correct": "Richtig",
+        "alsoCorrect": "Auch richtig",
+        "minor": "Fast richtig",
+        "partial": "Teilweise richtig",
+        "wrong": "Andere Bedeutung"
+      },
+      "noteType": {
+        "grammar": "Grammatik",
+        "vocab": "Wortschatz",
+        "spelling": "Rechtschreibung",
+        "register": "Register",
+        "wordOrder": "Wortstellung",
+        "naturalness": "Natürlichkeit"
+      }
     }
   },
   "Footer": {
@@ -832,7 +868,10 @@
         "not_applicable": "k. A.",
         "true": "ja",
         "false": "nein"
-      }
+      },
+      "alternativeButton": "Als Alternative speichern",
+      "alternativeHint": "Speichert diese Formulierung als eine deiner akzeptierten Antworten. Der Satz der Karte bleibt unverändert.",
+      "savedAsAlternative": "Als Alternative gespeichert"
     },
     "threadLimit": {
       "reached": "Du hast das Nachrichtenlimit für diese Konversation erreicht.",
@@ -894,6 +933,12 @@
     },
     "translationAutoFill": {
       "name": "Automatische Übersetzung"
+    },
+    "aiFeedback": {
+      "name": "KI-Feedback",
+      "pricingLabel": "{count, plural, one {# KI-bewertete Antwort} other {# KI-bewertete Antworten}} pro Monat",
+      "pricingLabelOneOff": "{count, plural, one {# KI-bewertete Antwort} other {# KI-bewertete Antworten}} zum Start",
+      "pricingLabelUnlimited": "Unbegrenztes KI-Feedback"
     },
     "audioRegenerations": {
       "name": "Audio-Neugenerierungen"

@@ -13,13 +13,16 @@ import { REVIEWS_CAP } from '@/lib/constants/dueCounts';
  */
 
 const useQueryMock = vi.fn();
+let userSettingsValue: { hideDueCounts?: boolean } | null = {};
 vi.mock('convex/react', () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
+  usePreloadedQuery: () => userSettingsValue,
 }));
 
 vi.mock('@/components/app/AppDataProvider', () => ({
   useAppData: () => ({
     courseSettings: { studyContentFilter: 'both', reviewMode: 'full' },
+    preloadedSettings: {},
   }),
 }));
 
@@ -45,6 +48,7 @@ const counts = (overrides: Partial<Record<string, number>> = {}) => ({
 
 beforeEach(() => {
   useQueryMock.mockReset();
+  userSettingsValue = {};
 });
 
 describe('DueCountsPills', () => {
@@ -69,6 +73,17 @@ describe('DueCountsPills', () => {
     );
     render(<DueCountsPills />);
     expect(screen.getByText(`${REVIEWS_CAP} review`)).toBeTruthy();
+  });
+
+  it('renders nothing and skips the counts query when hideDueCounts is on', () => {
+    userSettingsValue = { hideDueCounts: true };
+    useQueryMock.mockReturnValue(counts());
+    render(<DueCountsPills />);
+    expect(screen.queryByTestId('due-counts-pills')).toBeNull();
+    expect(useQueryMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'skip',
+    );
   });
 });
 

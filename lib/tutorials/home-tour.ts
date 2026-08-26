@@ -28,8 +28,13 @@ export function createHomeTour(
     freePlayStep,
     tourStep(t, 'home.reviewModeToggle', '[data-tutorial="review-mode-toggle"]', 'bottom', 'center'),
     tourStep(t, 'home.contentSource', '[data-tutorial="content-source-filter"]', 'bottom', 'center'),
-    // The new/review pills next to the content-source filter.
-    tourStep(t, 'home.dueCounts', '[data-tutorial="due-counts"]', 'bottom', 'center'),
+    // The new/review pills next to the content-source filter. Omitted when
+    // the user hides due counts (the default for new accounts), otherwise
+    // this step highlights an empty slot and talks about pills that aren't
+    // there.
+    ...(ctx?.hideDueCounts === true
+      ? []
+      : [tourStep(t, 'home.dueCounts', '[data-tutorial="due-counts"]', 'bottom', 'center')]),
     // The rotating forecast in the progress card ("by the end of the year…").
     tourStep(t, 'home.projections', '[data-tutorial="projections"]', 'bottom', 'center'),
     tourStep(t, 'home.difficultySelection', '[data-tutorial="collection-carousel"]', 'top', 'center'),

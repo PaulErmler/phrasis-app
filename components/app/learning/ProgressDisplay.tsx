@@ -190,7 +190,12 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
   // Minute-stable `now` per the no-wall-clock query guideline; the re-subscribe
   // gap on a minute tick is bridged by the lastCardCountsRef cache below.
   const now = useNowMinute();
-  const cardCountsQuery = useQuery(api.features.stats.getCardCounts, { now });
+  const userSettings = useQuery(api.features.courses.getUserSettings);
+  const hideDueCounts = userSettings?.hideDueCounts === true;
+  const cardCountsQuery = useQuery(
+    api.features.stats.getCardCounts,
+    hideDueCounts ? 'skip' : { now },
+  );
   const celebrationWordsQuery = useQuery(
     api.features.stats.getNewWordsForCelebration,
     { sessionId: props.sessionId, timezone },
@@ -220,8 +225,9 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
     lastCardCountsRef.current = cardCountsQuery;
   if (celebrationWordsQuery !== undefined) lastWordsRef.current = celebrationWordsQuery;
 
-  const effectiveCardCounts =
-    cardCountsQuery !== undefined
+  const effectiveCardCounts = hideDueCounts
+    ? null
+    : cardCountsQuery !== undefined
       ? isProvisional
         ? lastCardCountsRef.current ?? null
         : cardCountsQuery
@@ -232,9 +238,12 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
       : lastWordsRef.current;
 
   // `getCardCounts` returns `null` for unauthenticated / no-active-deck users.
-  // That's a resolved value too (we just won't render the pills).
+  // That's a resolved value too (we just won't render the pills). When the
+  // user hides due counts we skip that query entirely and treat counts as
+  // resolved-null so the celebration doesn't wait on a number we won't show.
   const queriesResolved =
-    effectiveCardCounts !== undefined && effectiveWords !== undefined;
+    (hideDueCounts || effectiveCardCounts !== undefined) &&
+    effectiveWords !== undefined;
 
   if (!ready || !queriesResolved) {
     // Empty placeholder of identical size, no sound, no bar movement,
