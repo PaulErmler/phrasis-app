@@ -1900,6 +1900,14 @@ export type StageProviderConstraints = {
    * ones are down or don't support the request.
    */
   order?: string[];
+  /**
+   * OpenRouter `provider.require_parameters`. Only route to endpoints that
+   * support every parameter in the request. Set it when a parameter is
+   * load-bearing rather than advisory — a `response_format` schema silently
+   * dropped by a fallback endpoint yields prose where the caller expects
+   * JSON.
+   */
+  require_parameters?: boolean;
 };
 
 /** One leg of a translation rule. An OpenRouter model + optional reasoning. */
