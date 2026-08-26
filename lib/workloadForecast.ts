@@ -24,6 +24,7 @@ import {
   type FSRSRating,
   type FsrsCardState,
 } from './scheduling';
+import { mergedDueCount } from './constants/dueCounts';
 
 export const WORKLOAD_DAYS = 7;
 export const WORKLOAD_HISTORY_WINDOW_DAYS = 14;
@@ -140,10 +141,15 @@ export type WorkloadDay = {
   offset: number;
   /** EXACT scheduled counts from the aggregates. */
   scheduled: {
-    /** Day 0 only: everything already available now (overdue backlog + new). */
+    /** Day 0 only: the overdue/due-now backlog — learning + relearning +
+     * review cards already available (the `mergedDueCount` rule the due
+     * pills use). Never-studied 'new' cards are NOT backlog: the pills call
+     * them "new", so labeling them "overdue" here would contradict the
+     * pills in the same viewport. They count as young instead. */
     backlog: number;
     /** Ungraduated load: learning + relearning + 'new'-state cards (day 0:
-     * from the later-today bucket; future days: the whole day). */
+     * available-now new cards plus the later-today bucket; future days: the
+     * whole day). */
     young: number;
     /** Graduated Review-state cards. */
     mature: number;
@@ -190,7 +196,6 @@ const clamp = (v: number, lo: number, hi: number) =>
   Math.min(Math.max(v, lo), hi);
 
 const youngOf = (c: DayStateCounts) => c.new + c.learning + c.relearning;
-const totalOf = (c: DayStateCounts) => youngOf(c) + c.review;
 
 const zeroDayCounts = (): DayStateCounts => ({
   new: 0,
@@ -530,8 +535,11 @@ export function buildWorkloadForecast(
   // structure; future days are their state split.
   const scheduledDays = [
     {
-      backlog: totalOf(data.availableNow),
-      young: youngOf(data.laterToday),
+      // Overdue = the pills' merged due rule; available-now 'new' cards are
+      // young (see the WorkloadDay field docs). Day-0 total is unchanged by
+      // the split — new cards just move between segments.
+      backlog: mergedDueCount(data.availableNow),
+      young: data.availableNow.new + youngOf(data.laterToday),
       mature: data.laterToday.review,
       // Young/mature across the WHOLE day drive the return composition.
       dayYoung: youngOf(data.availableNow) + youngOf(data.laterToday),

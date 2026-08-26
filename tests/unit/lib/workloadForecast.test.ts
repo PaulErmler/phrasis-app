@@ -176,9 +176,11 @@ describe('buildWorkloadForecast', () => {
       }),
       params,
     );
+    // Backlog follows the pills' mergedDueCount rule (learning + relearning
+    // + review); the 3 available-now new cards count as young instead.
     expect(f.days[0].scheduled).toEqual({
-      backlog: 12,
-      young: 2,
+      backlog: 9,
+      young: 5,
       mature: 6,
       total: 20,
     });
@@ -188,6 +190,18 @@ describe('buildWorkloadForecast', () => {
       mature: 8,
       total: 14,
     });
+  });
+
+  it('never counts never-studied cards as overdue backlog', () => {
+    const f = buildWorkloadForecast(
+      makeData({
+        availableNow: { new: 50, learning: 0, relearning: 0, review: 0 },
+      }),
+      params,
+    );
+    expect(f.days[0].scheduled.backlog).toBe(0);
+    expect(f.days[0].scheduled.young).toBe(50);
+    expect(f.days[0].scheduled.total).toBe(50);
   });
 
   it('today’s young cards inflate tomorrow via the second wave, decaying after', () => {
