@@ -150,6 +150,11 @@ export function retranslationAuditFields(opts: {
   };
 }
 
+/** The bundle above as a type, so consumers can't re-list the fields. */
+export type RetranslationAuditFields = ReturnType<
+  typeof retranslationAuditFields
+>;
+
 /**
  * Record one retranslation this gesture triggered, at whatever status it
  * reached synchronously: 'enqueued' when the job is on its way, or a terminal
@@ -160,18 +165,7 @@ export function retranslationAuditFields(opts: {
  */
 export async function recordRetranslationAttempt(
   ctx: MutationCtx,
-  args: {
-    cardEditId: Id<'cardEdits'>;
-    userId: string;
-    language: string;
-    role: CardEditLanguageRole;
-    textId: Id<'texts'>;
-    sourceLanguage: string;
-    sourceText: string;
-    beforeText: string;
-    beforeTranslationSource?: string;
-    userSuggestion?: string;
-    flagCountAfter: number;
+  args: RetranslationAuditFields & {
     rule?: string;
     status: RetranslationStatus;
   },

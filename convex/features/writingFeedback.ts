@@ -23,11 +23,10 @@ import {
   MAX_CARD_TEXT_LENGTH,
   WRITING_ALTERNATIVES_MAX,
 } from '../../lib/constants/learning';
-import { normalizeForComparison } from '../lib/textComparison';
 import {
-  romanizeLocal,
-  shouldRomanizeForTtsMatch,
-} from '../lib/localRomanization';
+  normalizeForComparison,
+  textsMatchForLanguage,
+} from '../lib/textComparison';
 import {
   captureGeneration,
   openrouterCostUsd,
@@ -120,26 +119,22 @@ export type WritingFeedbackResult = Infer<typeof writingFeedbackResultValidator>
 /**
  * "Same answer" for the local gate: punctuation/case/whitespace-insensitive
  * equality, plus romanized equality for zh/ko so homophone-character swaps
- * (在 vs 再) count as matches, mirroring `textsMatchForLanguage`. Deliberately
- * NOT edit-distance tolerant: a one-character typo should reach the LLM and
- * come back as a 'minor' verdict with the typo named, not silently pass.
+ * (在 vs 再) count as matches — `textsMatchForLanguage`'s romanize flow with
+ * an exact-equality leaf. Deliberately NOT edit-distance tolerant: a
+ * one-character typo should reach the LLM and come back as a 'minor'
+ * verdict with the typo named, not silently pass.
  */
 export function writingAnswersMatch(
   expected: string,
   answer: string,
   language: string,
 ): boolean {
-  if (normalizeForComparison(expected) === normalizeForComparison(answer)) {
-    return true;
-  }
-  if (shouldRomanizeForTtsMatch(language)) {
-    const a = romanizeLocal(expected, language);
-    const b = romanizeLocal(answer, language);
-    if (a !== null && b !== null) {
-      return normalizeForComparison(a) === normalizeForComparison(b);
-    }
-  }
-  return false;
+  return textsMatchForLanguage(
+    expected,
+    answer,
+    language,
+    (a, b) => normalizeForComparison(a) === normalizeForComparison(b),
+  );
 }
 
 /**
