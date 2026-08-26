@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   render,
   screen,
@@ -42,6 +42,10 @@ vi.mock('sonner', async (importOriginal) => {
     toast: { ...actual.toast, error: toastErrorMock },
   };
 });
+vi.mock('@/lib/audio/peakCache', () => ({
+  getPeak: vi.fn().mockResolvedValue(1),
+  computeAttenuation: () => 1,
+}));
 
 import { FullReviewCardContent } from '@/components/app/learning/FullReviewCardContent';
 import type {
@@ -96,11 +100,55 @@ function lastSummary(fn: ReturnType<typeof vi.fn>): WritingAccuracySummary {
   return fn.mock.calls.at(-1)?.[0];
 }
 
+class AutoPlayFakeAudio {
+  static srcs: string[] = [];
+  static last: AutoPlayFakeAudio | null = null;
+  paused = true;
+  currentTime = 0;
+  playbackRate = 1;
+  preservesPitch = true;
+  muted = false;
+  loop = false;
+  onended: (() => void) | null = null;
+  #src: string;
+  constructor(src: string) {
+    this.#src = src;
+    AutoPlayFakeAudio.srcs.push(src);
+    AutoPlayFakeAudio.last = this;
+  }
+  defaultPlaybackRate = 1;
+  get src() {
+    return this.#src;
+  }
+  set src(value: string) {
+    this.#src = value;
+    AutoPlayFakeAudio.srcs.push(value);
+    // Browsers run the media load algorithm on src assignment, which resets
+    // playbackRate to defaultPlaybackRate. A rate set before src is lost.
+    this.playbackRate = this.defaultPlaybackRate;
+  }
+  play = vi.fn(async () => {
+    this.paused = false;
+  });
+  pause = vi.fn(() => {
+    this.paused = true;
+  });
+}
+
+function playedClips() {
+  return AutoPlayFakeAudio.srcs.filter((src) => !src.startsWith('data:'));
+}
+
 describe('FullReviewCardContent: AI writing feedback', () => {
   beforeEach(() => {
     gradeMock.mockReset();
     editCardMock.mockReset();
     toastErrorMock.mockReset();
+    AutoPlayFakeAudio.srcs = [];
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('resolves a punctuation-only difference locally without calling the action', async () => {
@@ -153,6 +201,25 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     const summary = lastSummary(onAccuracyChange);
     expect(summary.minWithPunctuation).toBe(100);
     expect(summary.minWithoutPunctuation).toBe(100);
+  });
+
+  it('returns keyboard focus to the card after feedback so Enter can go to the next card', async () => {
+    gradeMock.mockResolvedValue({
+      verdict: 'alsoCorrect',
+      corrected: 'Me gustaría un café.',
+      notes: [
+        { type: 'naturalness', text: 'More everyday than the card sentence.' },
+      ],
+      savedAlternative: true,
+    });
+    renderCard();
+    submitAnswer('Me gustaría un café.');
+    await waitFor(() =>
+      expect(screen.getByText('verdict.alsoCorrect')).toBeInTheDocument(),
+    );
+    expect(document.activeElement).toBe(
+      screen.getByTestId('writing-review-card'),
+    );
   });
 
   it('rescored against the corrected sentence once a partial verdict lands, matching the diff', async () => {
@@ -264,6 +331,384 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     // below as another accepted answer.
     const others = screen.getByTestId('writing-feedback-other-accepted');
     expect(others).toHaveTextContent('Quisiera un café.');
+  });
+
+  it('plays the shown alternative on the header speaker and the card sentence on the list speaker', async () => {
+    const withAlternatives: CardTranslation[] = [
+      TRANSLATIONS[0],
+      {
+        ...TRANSLATIONS[1],
+        alternatives: [
+          {
+            text: 'Me gustaría un café.',
+            audioUrl: 'https://cdn.example/alt.mp3',
+          },
+        ],
+      },
+    ];
+    render(
+      <FullReviewCardContent
+        presentation={makePresentation({
+          cardId: CARD_ID,
+          sourceText: 'I would like a coffee.',
+          translations: withAlternatives,
+          audioRecordings: [
+            {
+              language: 'es',
+              voiceName: null,
+              url: 'https://cdn.example/primary.mp3',
+              wordTimings: null,
+              ttsQuality: null,
+            },
+          ],
+        })}
+        targetAudioMode="never"
+        aiFeedbackEnabled
+      />,
+    );
+    submitAnswer('Me gustaría un café.');
+    await waitFor(() =>
+      expect(screen.getByTestId('shown-sentence-audio')).toHaveAttribute(
+        'data-audio-url',
+        'https://cdn.example/alt.mp3',
+      ),
+    );
+    expect(screen.getByTestId('accepted-audio')).toHaveAttribute(
+      'data-audio-url',
+      'https://cdn.example/primary.mp3',
+    );
+  });
+
+  it('auto-plays the matching alternative clip on reveal, not the card sentence', async () => {
+    AutoPlayFakeAudio.srcs = [];
+    vi.stubGlobal('Audio', AutoPlayFakeAudio);
+    const withAlternatives: CardTranslation[] = [
+      TRANSLATIONS[0],
+      {
+        ...TRANSLATIONS[1],
+        alternatives: [
+          {
+            text: 'Me gustaría un café.',
+            audioUrl: 'https://cdn.example/alt.mp3',
+          },
+        ],
+      },
+    ];
+    render(
+      <FullReviewCardContent
+        presentation={makePresentation({
+          cardId: CARD_ID,
+          sourceText: 'I would like a coffee.',
+          translations: withAlternatives,
+          audioRecordings: [
+            {
+              language: 'es',
+              voiceName: null,
+              url: 'https://cdn.example/primary.mp3',
+              wordTimings: null,
+              ttsQuality: null,
+            },
+          ],
+        })}
+        targetAudioMode="afterSubmit"
+        aiFeedbackEnabled
+      />,
+    );
+    submitAnswer('Me gustaría un café.');
+    await waitFor(() => {
+      expect(playedClips()).toContain('https://cdn.example/alt.mp3');
+      // Local match sets feedback to `done`; that used to pause this
+      // element in the play-effect cleanup and then skip the replay.
+      expect(AutoPlayFakeAudio.last?.paused).toBe(false);
+    });
+    expect(playedClips()).not.toContain('https://cdn.example/primary.mp3');
+  });
+
+  it('keeps the card-sentence clip playing after the local-match grade settles', async () => {
+    AutoPlayFakeAudio.srcs = [];
+    vi.stubGlobal('Audio', AutoPlayFakeAudio);
+    render(
+      <FullReviewCardContent
+        presentation={makePresentation({
+          cardId: CARD_ID,
+          sourceText: 'I would like a coffee.',
+          translations: TRANSLATIONS,
+          audioRecordings: [
+            {
+              language: 'es',
+              voiceName: null,
+              url: 'https://cdn.example/primary.mp3',
+              wordTimings: null,
+              ttsQuality: null,
+            },
+          ],
+        })}
+        targetAudioMode="afterSubmit"
+        aiFeedbackEnabled
+      />,
+    );
+    submitAnswer('Quisiera un café.');
+    await waitFor(() =>
+      expect(playedClips()).toContain('https://cdn.example/primary.mp3'),
+    );
+    // The parent's kick-off effect sets `feedback: done` for the local match
+    // one commit after the clip starts; that state change used to tear the
+    // clip down in the play-effect cleanup and skip the replay.
+    expect(gradeMock).not.toHaveBeenCalled();
+    expect(AutoPlayFakeAudio.last?.paused).toBe(false);
+    expect(AutoPlayFakeAudio.last?.pause).not.toHaveBeenCalled();
+    expect(playedClips()).toEqual(['https://cdn.example/primary.mp3']);
+  });
+
+  it('plays the first run of a clip at the configured after-submit speed', async () => {
+    AutoPlayFakeAudio.srcs = [];
+    vi.stubGlobal('Audio', AutoPlayFakeAudio);
+    render(
+      <FullReviewCardContent
+        presentation={makePresentation({
+          cardId: CARD_ID,
+          sourceText: 'I would like a coffee.',
+          translations: TRANSLATIONS,
+          audioRecordings: [
+            {
+              language: 'es',
+              voiceName: null,
+              url: 'https://cdn.example/primary.mp3',
+              wordTimings: null,
+              ttsQuality: null,
+            },
+          ],
+        })}
+        targetAudioMode="afterSubmit"
+        afterSubmitPlaybackSpeeds={{ es: 0.8 }}
+        aiFeedbackEnabled
+      />,
+    );
+    submitAnswer('Quisiera un café.');
+    await waitFor(() =>
+      expect(playedClips()).toContain('https://cdn.example/primary.mp3'),
+    );
+    // Assigning src resets playbackRate to defaultPlaybackRate (modeled by
+    // the fake); the rate must be applied after src or the first play runs
+    // at 1x.
+    expect(AutoPlayFakeAudio.last?.playbackRate).toBe(0.8);
+  });
+
+  it('does not start a clip when toggling between corrections and the clean sentence', async () => {
+    AutoPlayFakeAudio.srcs = [];
+    vi.stubGlobal('Audio', AutoPlayFakeAudio);
+    const withAlternatives: CardTranslation[] = [
+      TRANSLATIONS[0],
+      {
+        ...TRANSLATIONS[1],
+        alternatives: [
+          {
+            text: 'Me gustaría un café.',
+            audioUrl: 'https://cdn.example/alt.mp3',
+          },
+        ],
+      },
+    ];
+    render(
+      <FullReviewCardContent
+        presentation={makePresentation({
+          cardId: CARD_ID,
+          sourceText: 'I would like a coffee.',
+          translations: withAlternatives,
+          audioRecordings: [
+            {
+              language: 'es',
+              voiceName: null,
+              url: 'https://cdn.example/primary.mp3',
+              wordTimings: null,
+              ttsQuality: null,
+            },
+          ],
+        })}
+        targetAudioMode="afterSubmit"
+        aiFeedbackEnabled
+      />,
+    );
+    submitAnswer('Me gustaría un café.');
+    await waitFor(() =>
+      expect(playedClips()).toContain('https://cdn.example/alt.mp3'),
+    );
+    const before = playedClips().length;
+    // "Show sentence" retargets the header speaker to the card sentence;
+    // that must not auto-play it (the autoplay clip is derived from the
+    // submission, not from the toggle).
+    fireEvent.click(screen.getByRole('button', { name: 'showSentence' }));
+    expect(playedClips().length).toBe(before);
+    fireEvent.click(screen.getByRole('button', { name: 'showCorrections' }));
+    expect(playedClips().length).toBe(before);
+  });
+
+  it('plays the card clip for a graded-with-corrections answer instead of spinning forever', async () => {
+    AutoPlayFakeAudio.srcs = [];
+    vi.stubGlobal('Audio', AutoPlayFakeAudio);
+    let resolveGrade!: (value: unknown) => void;
+    gradeMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveGrade = resolve;
+        }),
+    );
+    render(
+      <FullReviewCardContent
+        presentation={makePresentation({
+          cardId: CARD_ID,
+          sourceText: 'I would like a coffee.',
+          translations: TRANSLATIONS,
+          audioRecordings: [
+            {
+              language: 'es',
+              voiceName: null,
+              url: 'https://cdn.example/primary.mp3',
+              wordTimings: null,
+              ttsQuality: null,
+            },
+          ],
+        })}
+        targetAudioMode="afterSubmit"
+        aiFeedbackEnabled
+      />,
+    );
+    submitAnswer('Quisera un cafe.');
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('writing-feedback-pending'),
+      ).toBeInTheDocument(),
+    );
+    expect(playedClips()).toEqual([]);
+
+    await act(async () => {
+      resolveGrade({
+        verdict: 'minor',
+        corrected: 'Quisiera un café.',
+        notes: [{ type: 'spelling', text: 'Watch the accents.' }],
+      });
+    });
+    // The corrected sentence is never stored as an alternative, so no clip
+    // will ever arrive for it; the header speaker falls back to the card's
+    // own clip and autoplay plays it.
+    await waitFor(() =>
+      expect(playedClips()).toContain('https://cdn.example/primary.mp3'),
+    );
+    expect(screen.getByTestId('shown-sentence-audio')).toHaveAttribute(
+      'data-audio-url',
+      'https://cdn.example/primary.mp3',
+    );
+  });
+
+  it('does not auto-play the card sentence while the grader may still accept an alternative', async () => {
+    AutoPlayFakeAudio.srcs = [];
+    vi.stubGlobal('Audio', AutoPlayFakeAudio);
+    gradeMock.mockReturnValue(new Promise(() => {}));
+    render(
+      <FullReviewCardContent
+        presentation={makePresentation({
+          cardId: CARD_ID,
+          sourceText: 'I would like a coffee.',
+          translations: TRANSLATIONS,
+          audioRecordings: [
+            {
+              language: 'es',
+              voiceName: null,
+              url: 'https://cdn.example/primary.mp3',
+              wordTimings: null,
+              ttsQuality: null,
+            },
+          ],
+        })}
+        targetAudioMode="afterSubmit"
+        aiFeedbackEnabled
+      />,
+    );
+    submitAnswer('Me gustaría un café.');
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('writing-feedback-pending'),
+      ).toBeInTheDocument(),
+    );
+    expect(playedClips()).toEqual([]);
+  });
+
+  it('auto-plays the alternative once its clip lands after an alsoCorrect grade', async () => {
+    AutoPlayFakeAudio.srcs = [];
+    vi.stubGlobal('Audio', AutoPlayFakeAudio);
+    let resolveGrade!: (value: unknown) => void;
+    gradeMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveGrade = resolve;
+        }),
+    );
+    const basePresentation = {
+      cardId: CARD_ID,
+      sourceText: 'I would like a coffee.',
+      translations: TRANSLATIONS,
+      audioRecordings: [
+        {
+          language: 'es',
+          voiceName: null,
+          url: 'https://cdn.example/primary.mp3',
+          wordTimings: null,
+          ttsQuality: null,
+        },
+      ],
+    };
+    const props = {
+      presentation: makePresentation(basePresentation),
+      targetAudioMode: 'afterSubmit' as const,
+      aiFeedbackEnabled: true,
+    };
+    const { rerender } = render(<FullReviewCardContent {...props} />);
+    submitAnswer('Me gustaría un café.');
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('writing-feedback-pending'),
+      ).toBeInTheDocument(),
+    );
+    expect(playedClips()).toEqual([]);
+
+    await act(async () => {
+      resolveGrade({
+        verdict: 'alsoCorrect',
+        corrected: 'Me gustaría un café.',
+        notes: [],
+        savedAlternative: true,
+      });
+    });
+    await waitFor(() =>
+      expect(screen.getByText('verdict.alsoCorrect')).toBeInTheDocument(),
+    );
+    expect(playedClips()).toEqual([]);
+
+    const withAudio: CardTranslation[] = [
+      TRANSLATIONS[0],
+      {
+        ...TRANSLATIONS[1],
+        alternatives: [
+          {
+            text: 'Me gustaría un café.',
+            audioUrl: 'https://cdn.example/alt.mp3',
+          },
+        ],
+      },
+    ];
+    rerender(
+      <FullReviewCardContent
+        {...props}
+        presentation={makePresentation({
+          ...basePresentation,
+          translations: withAudio,
+        })}
+      />,
+    );
+    await waitFor(() =>
+      expect(playedClips()).toContain('https://cdn.example/alt.mp3'),
+    );
+    expect(playedClips()).not.toContain('https://cdn.example/primary.mp3');
   });
 
   it('does nothing when the setting is off', async () => {

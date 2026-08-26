@@ -65,6 +65,12 @@ app.use(aggregate, { name: 'cardsByOriginStateAndDueDate' });
 // extra aggregate writes.
 app.use(aggregate, { name: 'cardsByWritingStateAndDueDate' });
 app.use(aggregate, { name: 'cardsByOriginWritingStateAndDueDate' });
+// Mature (Review-state) cards by stability bucket, keyed on dueDate. Feeds
+// the workload forecast's observed stability mix (see
+// db/stats/cardAggregates.ts). Members are Review-state cards only, so the
+// write cost lands on mature reviews / lapses / graduations, never on
+// same-day learning loops.
+app.use(aggregate, { name: 'cardsByStabilityBucketAndDueDate' });
 app.use(actionRetrier);
 app.use(rateLimiter);
 // Content-generation pools (LLM translation / TTS synthesis). Separate

@@ -190,7 +190,7 @@ export function HomeView({
     <div className="scroll-view" style={{ scrollbarGutter: 'stable' }}>
       <div className="app-view">
         <ProgressStatsCard
-          key={courseSettings?.courseId}
+          key={`progress-${courseSettings?.courseId}`}
           onStartLearn={handleStartLearn}
           onReviewModeChange={handleReviewModeChange}
           animateEntrance={animateEntrance}
@@ -201,9 +201,13 @@ export function HomeView({
 
         {/* 7-day workload forecast. Hidden with the due-count pills
             (hideDueCounts); pauses its subscription while home is hidden.
-            Keyed like ProgressStatsCard so a course switch remounts it —
-            resetting the what-if stepper instead of carrying it over. */}
-        <WorkloadForecastCard key={courseSettings?.courseId} skip={isHidden} />
+            Keyed on courseId (distinct prefix from ProgressStatsCard —
+            siblings must not share a key) so a course switch remounts it
+            and resets the what-if stepper instead of carrying it over. */}
+        <WorkloadForecastCard
+          key={`workload-${courseSettings?.courseId}`}
+          skip={isHidden}
+        />
 
         {/* Content actions */}
         <div className="card-surface space-y-2 p-3">

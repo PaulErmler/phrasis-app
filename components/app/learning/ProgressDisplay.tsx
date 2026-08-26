@@ -22,6 +22,7 @@ import { getUserTimezone } from '@/lib/timezone';
 import { Button } from '@/components/ui/button';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { cn } from '@/lib/utils';
+import { isComposingKeyEvent } from '@/hooks/use-ime-safe-enter';
 import { ConfettiBurst } from '@/components/effects/ConfettiBurst';
 import {
   PROGRESS_DISPLAY_DURATION_MS,
@@ -402,6 +403,27 @@ function CelebrationContent({
   useEffect(() => {
     onContinueRef.current = onContinue;
   }, [onContinue]);
+
+  // LearningMode unmounts LearningControls while this screen is up, so
+  // Enter/→ have nowhere else to go. Same keys as next-card.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' && e.key !== 'ArrowRight') return;
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isComposingKeyEvent(e)) return;
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        target.closest('button, a, input, textarea, select')
+      ) {
+        return;
+      }
+      e.preventDefault();
+      onContinueRef.current();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // The celebration only auto-advances when the underlying review flow
   // does (audio mode + the user's `autoAdvance` setting). In every other

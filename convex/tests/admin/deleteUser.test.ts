@@ -681,8 +681,8 @@ describe('admin/deleteUser purge', () => {
     });
 
     // Aggregates: both tracks cleared for the victim's deck (30 shared +
-    // 30 writing namespaces).
-    expect(aggregateCalls.clears.length).toBe(60);
+    // 30 writing namespaces + 4 stability buckets).
+    expect(aggregateCalls.clears.length).toBe(64);
     expect(
       aggregateCalls.clears.every((c) => c.namespace.startsWith(fx.deckId)),
     ).toBe(true);

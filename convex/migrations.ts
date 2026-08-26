@@ -25,7 +25,9 @@ import { isPremadeLevelCollection } from './lib/collections';
 import {
   cardsByOriginStateAndDueDate,
   cardsByOriginWritingStateAndDueDate,
+  cardsByStabilityBucketAndDueDate,
   hasWritingTrack,
+  isStabilityBucketMember,
 } from './db/stats/cardAggregates';
 
 // App-wide migrations via @convex-dev/migrations: batched, resumable, with
@@ -305,6 +307,25 @@ export const cardOriginAggregateBackfill = migrations.define({
   table: 'cards',
   migrateOne: async (ctx, doc) => {
     await cardsByOriginStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+    return undefined;
+  },
+});
+
+/**
+ * Backfill for `cardsByStabilityBucketAndDueDate` (the workload forecast's
+ * observed stability mix): insert every existing Review-state card.
+ * Idempotent via insertIfDoesNotExist; new/changed cards are kept in sync by
+ * the live write helpers, so this only has to cover the pre-deploy stock.
+ * Until it completes, `getWorkloadForecast`'s cold-start guard sees the
+ * bucket counts read low against the exact review-due count and keeps the
+ * prior mix — no flag needed.
+ */
+export const stabilityBucketAggregateBackfill = migrations.define({
+  table: 'cards',
+  migrateOne: async (ctx, doc) => {
+    if (isStabilityBucketMember(doc)) {
+      await cardsByStabilityBucketAndDueDate.insertIfDoesNotExist(ctx, doc);
+    }
     return undefined;
   },
 });
@@ -758,4 +779,5 @@ export const runAll = migrations.runner([
   internal.migrations.backfillTextFurigana,
   internal.migrations.backfillTranslationFurigana,
   internal.migrations.recountDeckCardCounts,
+  internal.migrations.stabilityBucketAggregateBackfill,
 ]);

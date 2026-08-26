@@ -19,6 +19,8 @@ import type { CardTranslation } from '@/components/app/learning/types';
 // invoke. The reload block is registered by merely being open.
 vi.mock('convex/react', () => ({
   useMutation: () => vi.fn().mockResolvedValue(null),
+  // The dialog's accepted-alternatives list; empty is fine here.
+  useQuery: () => [],
 }));
 
 const reloadMock = vi.fn();

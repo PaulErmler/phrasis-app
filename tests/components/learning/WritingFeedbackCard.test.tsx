@@ -16,7 +16,13 @@ import {
 describe('WritingFeedbackCard', () => {
   it('renders a skeleton while pending', () => {
     render(<WritingFeedbackCard feedback={{ status: 'pending' }} />);
-    expect(screen.getByTestId('writing-feedback-pending')).toBeInTheDocument();
+    const pending = screen.getByTestId('writing-feedback-pending');
+    expect(pending).toBeInTheDocument();
+    expect(pending).toHaveAttribute('aria-label', 'checking');
+    expect(pending).toHaveClass('rounded-md', 'border');
+    expect(
+      screen.queryByText('checking', { selector: ':not([aria-label])' }),
+    ).not.toBeInTheDocument();
   });
 
   it('renders nothing for an errored grade', () => {

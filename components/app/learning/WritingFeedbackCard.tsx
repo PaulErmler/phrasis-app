@@ -69,9 +69,36 @@ const VERDICT_STYLE: Record<
   },
 };
 
+/** One pending note: type pill + a text line that fills left to right. */
+function PendingNoteRow({
+  delay,
+  pillClassName,
+  lineClassName,
+}: {
+  delay: string;
+  pillClassName: string;
+  lineClassName: string;
+}) {
+  return (
+    <li className="flex items-center text-sm">
+      <span
+        className={`mr-1.5 inline-block h-4 shrink-0 rounded bg-muted ${pillClassName}`}
+      />
+      <span
+        className={`relative inline-block h-3.5 overflow-hidden rounded bg-muted/50 ${lineClassName}`}
+      >
+        <span
+          className="absolute inset-0 origin-left animate-note-fill bg-muted-foreground/20 motion-reduce:animate-none"
+          style={{ animationDelay: delay }}
+        />
+      </span>
+    </li>
+  );
+}
+
 /**
  * Coach card rendered under the diff of a submitted writing answer (prototype
- * B of the design review). Compact by construction: verdict chip, at most two
+ * B of the design review). Compact by construction: verdict chip, at most three
  * typed notes, the corrected sentence when it differs, and a
  * "Discuss in detail" escalation into chat.
  */
@@ -94,13 +121,31 @@ export function WritingFeedbackCard({
   if (feedback.status === 'pending') {
     return (
       <div
-        className="mt-2 flex flex-col gap-2"
+        className="mt-2 overflow-hidden rounded-md border border-border bg-card"
         role="status"
         aria-label={t('checking')}
         data-testid="writing-feedback-pending"
+        // Behavior hook, not a test id: LearningControls queries this to let
+        // Enter/ArrowRight mean next-card while the grader is thinking (focus
+        // is parked on a button after submit and would swallow the shortcut).
+        data-writing-feedback-pending=""
       >
-        <div className="h-5 w-28 animate-pulse rounded-full bg-muted" />
-        <div className="h-3 w-4/5 animate-pulse rounded bg-muted" />
+        <div className="h-0.5 bg-muted" />
+        <div className="flex flex-col gap-2 px-3 py-2.5">
+          <span className="inline-flex h-[22px] w-28 rounded-full bg-muted" />
+          <ul className="flex flex-col gap-1.5">
+            <PendingNoteRow
+              delay="0s"
+              pillClassName="w-14"
+              lineClassName="w-[72%]"
+            />
+            <PendingNoteRow
+              delay="0.45s"
+              pillClassName="w-10"
+              lineClassName="w-[58%]"
+            />
+          </ul>
+        </div>
       </div>
     );
   }

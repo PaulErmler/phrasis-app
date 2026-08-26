@@ -359,6 +359,7 @@
     },
     "workload": {
       "title": "Demnächst fällig",
+      "locked": "Lerne weiter, um deinen Lernplan freizuschalten",
       "today": "Heute",
       "approxToday": "≈ {value} heute",
       "cardsToday": "{count} heute ≈ {time}",
@@ -366,23 +367,19 @@
       "cardsShort": "{count} Karten",
       "axisMinutes": "{value}m",
       "approxShort": "≈{value}",
-      "overdue": "{count} überfällig",
-      "overdueTime": "≈ {value} überfällig",
       "paceLine": "übliches Pensum {value}/Tag",
-      "legendOverdue": "Überfällig",
-      "legendYoung": "Jung",
-      "legendMature": "Gefestigt",
-      "legendReturns": "Gesch. Rückkehrer",
+      "goalLine": "Tagesziel {value}",
       "legendWhatIf": "+{count} neu",
       "legendPace": "Übliches Pensum (14-Tage-Schnitt)",
+      "legendGoal": "Tagesziel",
       "stepperLabel": "Hinzufügen von Karten simulieren",
       "stepperFewer": "Weniger Karten",
       "stepperMore": "Mehr Karten",
-      "stepperValue": "+{count} Karten",
+      "stepperValue": "+{count} neue Karten",
       "whatIfHint": "Erhöhe den Wert, um zusätzliche Last zu sehen",
       "whatIfNote": "≈ +{reviews} Wiederholungen · +{time} diese Woche",
       "empty": "Noch nichts geplant — füge ein paar Sätze hinzu, um zu starten.",
-      "dayAria": "{day}: {scheduled} Karten geplant, etwa {estimated} weitere geschätzt, etwa {minutes} Minuten"
+      "dayAria": "{day}: {cards} Karten, etwa {minutes} Minuten"
     },
     "dailyGoal": {
       "label": "Tagesziel",
@@ -701,8 +698,10 @@
       },
       "noteType": {
         "grammar": "Grammatik",
-        "vocab": "Wortschatz",
+        "wordChoice": "Wortwahl",
+        "vocab": "Wortwahl",
         "spelling": "Rechtschreibung",
+        "punctuation": "Zeichensetzung",
         "register": "Register",
         "wordOrder": "Wortstellung",
         "naturalness": "Natürlichkeit"
@@ -1365,7 +1364,7 @@
       },
       "workload": {
         "title": "Deine Woche im Blick",
-        "description": "Dieses Diagramm zeigt, wie viel Wiederholungszeit die nächsten sieben Tage bringen — und was das Hinzufügen weiterer Sätze daran ändern würde."
+        "description": "Diese Karte fasst zusammen, wie viel Wiederholungszeit die nächsten sieben Tage bringen — tippe sie an, um das Diagramm zu öffnen und zu sehen, was neue Sätze ändern würden."
       },
       "projections": {
         "title": "Deine Prognose",
@@ -1492,7 +1491,10 @@
     "title": "Satz bearbeiten",
     "cancel": "Abbrechen",
     "save": "Speichern",
-    "saving": "Speichern..."
+    "saving": "Speichern...",
+    "alternativesLabel": "Alternative Antworten",
+    "deleteAlternative": "Alternative Antwort löschen",
+    "undoDeleteAlternative": "Alternative Antwort behalten"
   },
   "EditCardApproval": {
     "title": "Satz bearbeiten",

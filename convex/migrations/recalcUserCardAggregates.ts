@@ -5,9 +5,11 @@ import { Id } from '../_generated/dataModel';
 import {
   cardsByStateAndDueDate,
   cardsByOriginStateAndDueDate,
+  cardsByStabilityBucketAndDueDate,
   cardsByWritingStateAndDueDate,
   cardsByOriginWritingStateAndDueDate,
   hasWritingTrack,
+  isStabilityBucketMember,
   clearAggregatesForDeck,
 } from '../db/stats/cardAggregates';
 
@@ -111,6 +113,9 @@ export const processBatch = internalMutation({
     for (const doc of result.page) {
       await cardsByStateAndDueDate.insertIfDoesNotExist(ctx, doc);
       await cardsByOriginStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+      if (isStabilityBucketMember(doc)) {
+        await cardsByStabilityBucketAndDueDate.insertIfDoesNotExist(ctx, doc);
+      }
       if (hasWritingTrack(doc)) {
         await cardsByWritingStateAndDueDate.insertIfDoesNotExist(ctx, doc);
         await cardsByOriginWritingStateAndDueDate.insertIfDoesNotExist(

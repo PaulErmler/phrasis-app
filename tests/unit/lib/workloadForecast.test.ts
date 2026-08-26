@@ -1,11 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildWorkloadForecast,
+  deriveNewCardEvents,
   deriveRatingRates,
   deriveReturnKernels,
   deriveSecondsPerReview,
+  deriveStabilityMix,
   isWorkloadForecastData,
   MIN_RATING_SAMPLE,
+  MIN_STABILITY_SAMPLE,
+  stabilityBucketKey,
   WHAT_IF_ADD_MAX,
   WORKLOAD_DAYS,
   type DayStateCounts,
@@ -88,22 +92,33 @@ describe('deriveRatingRates', () => {
 describe('deriveSecondsPerReview', () => {
   it('prefers the per-mode window, falls back to overall, then to priors', () => {
     const h = emptyHistory();
-    expect(deriveSecondsPerReview(h, 'audio')).toBe(15);
-    expect(deriveSecondsPerReview(h, 'full')).toBe(35);
+    expect(deriveSecondsPerReview(h, 'audio')).toBe(20);
+    expect(deriveSecondsPerReview(h, 'full')).toBe(45);
 
-    h.reps = 10;
-    h.timeMs = 100_000; // overall 10s/review
+    h.reps = 20;
+    h.timeMs = 200_000; // overall 10s/review
     expect(deriveSecondsPerReview(h, 'full')).toBeCloseTo(10, 6);
 
-    h.reviewsByMode.full = 4;
-    h.timeMsByMode.full = 120_000; // full mode 30s/review
+    h.reviewsByMode.full = 10;
+    h.timeMsByMode.full = 300_000; // full mode 30s/review
     expect(deriveSecondsPerReview(h, 'full')).toBeCloseTo(30, 6);
     expect(deriveSecondsPerReview(h, 'audio')).toBeCloseTo(10, 6);
   });
 
+  it('a thin window cannot outvote the prior — a couple of left-open cards stay noise', () => {
+    const h = emptyHistory();
+    // Two 100s reviews (cards left open) — below MIN_PACE_SAMPLE, so the
+    // 20s prior holds instead of a 100s "pace".
+    h.reps = 2;
+    h.timeMs = 200_000;
+    h.reviewsByMode.audio = 2;
+    h.timeMsByMode.audio = 200_000;
+    expect(deriveSecondsPerReview(h, 'audio')).toBe(20);
+  });
+
   it('clamps degenerate windows', () => {
     const h = emptyHistory();
-    h.reps = 1;
+    h.reps = 10;
     h.timeMs = 100_000_000;
     expect(deriveSecondsPerReview(h, 'audio')).toBe(120);
     h.timeMs = 1;
@@ -155,14 +170,15 @@ describe('isWorkloadForecastData', () => {
     const noHistory = { ...makeData() } as Record<string, unknown>;
     delete noHistory.history;
     expect(isWorkloadForecastData(noHistory)).toBe(false);
-    // A payload cached before startedCards existed must be discarded, not
-    // rendered with an undefined gate value.
-    const preGate = { ...makeData() } as Record<string, unknown>;
-    delete preGate.startedCards;
-    expect(isWorkloadForecastData(preGate)).toBe(false);
     const badCounts = makeData();
     (badCounts.availableNow as Record<string, unknown>).review = 'many';
     expect(isWorkloadForecastData(badCounts)).toBe(false);
+
+    // A payload cached before the gate field existed must be discarded, not
+    // rendered as an unlocked card with an undefined startedCards.
+    const preGate = { ...makeData() } as Record<string, unknown>;
+    delete preGate.startedCards;
+    expect(isWorkloadForecastData(preGate)).toBe(false);
   });
 });
 
@@ -334,15 +350,133 @@ describe('buildWorkloadForecast', () => {
     }
   });
 
-  it('repeatFactor clamps to [1, 3] and pace averages derive from active days', () => {
+  it('pace averages derive from graded reviews per active day, free play excluded', () => {
     const history = emptyHistory();
     history.activeDays = 5;
-    history.reps = 100;
-    history.cardsReviewed = 10; // raw factor 10 → clamped 3
-    history.timeMs = 25 * 60_000;
+    // Raw reps/timeMs include free play; the pace line must not.
+    history.reps = 300;
+    history.timeMs = 90 * 60_000;
+    history.reviewsByMode = { audio: 80, full: 20 };
+    history.timeMsByMode = { audio: 20 * 60_000, full: 5 * 60_000 };
     const f = buildWorkloadForecast(makeData({ history }), params);
-    expect(f.rates.repeatFactor).toBe(3);
     expect(f.rates.avgDailyReviews).toBeCloseTo(20, 6);
     expect(f.rates.avgDailyMinutes).toBeCloseTo(5, 6);
+  });
+
+  it('week minutes are rounded once from unrounded events, not summed day floors', () => {
+    // One mature card a day: each day rounds up to the 1-minute floor, so a
+    // per-day sum would claim ≥7 min. The real load is ~a dozen seconds a
+    // day; the week total must reflect that.
+    const data = makeData({
+      availableNow: { ...zeroCounts(), review: 1 },
+      futureDays: Array.from({ length: 6 }, () => ({
+        ...zeroCounts(),
+        review: 1,
+      })),
+    });
+    const f = buildWorkloadForecast(data, params);
+    const dayFloorSum = f.days.reduce((s, d) => s + d.estimatedMinutes, 0);
+    expect(dayFloorSum).toBeGreaterThanOrEqual(7);
+    expect(f.weekMinutes).toBeLessThan(dayFloorSum);
+    expect(f.weekMinutes).toBeGreaterThan(0);
+  });
+
+  it('initialReviewCount now moves the forecast in audio mode, not in writing', () => {
+    const data = { availableNow: { ...zeroCounts(), review: 5 } };
+    const at = (initialReviewCount: number, reviewMode: 'audio' | 'full') =>
+      buildWorkloadForecast(makeData({ ...data, initialReviewCount }), {
+        addCount: 10,
+        includeTypicalAdds: false,
+        reviewMode,
+      }).weekReviews;
+    // Shadowing: a new card runs its pre-review steps, so more initial reps
+    // cost more same-day events.
+    expect(at(10, 'audio')).toBeGreaterThan(at(2, 'audio'));
+    // Writing has no pre-review phase — the setting must not matter there.
+    expect(at(10, 'full')).toBe(at(2, 'full'));
+  });
+});
+
+describe('deriveNewCardEvents', () => {
+  const counts = emptyHistory().ratingCounts;
+
+  it('writing mode is a flat 2 (no pre-review phase)', () => {
+    expect(deriveNewCardEvents('full', 10, counts)).toBe(2);
+    expect(deriveNewCardEvents('full', 2, counts)).toBe(2);
+  });
+
+  it('audio scales with initialReviewCount at the 0.5 prior and clamps to [2, irc]', () => {
+    expect(deriveNewCardEvents('audio', 2, counts)).toBe(2);
+    expect(deriveNewCardEvents('audio', 6, counts)).toBe(4); // 2 + 4 × 0.5
+  });
+
+  it('a high observed Understood rate cuts the pre-review cost', () => {
+    const eager = { ...counts, stillLearning: 2, understood: 38 };
+    const stuck = { ...counts, stillLearning: 38, understood: 2 };
+    expect(deriveNewCardEvents('audio', 6, eager)).toBeLessThan(
+      deriveNewCardEvents('audio', 6, stuck),
+    );
+    expect(deriveNewCardEvents('audio', 6, stuck)).toBeLessThanOrEqual(6);
+  });
+});
+
+describe('stability mix', () => {
+  const rates = deriveRatingRates(emptyHistory().ratingCounts);
+
+  it('bucketKey covers the whole stability line', () => {
+    expect(stabilityBucketKey(0)).toBe('s0');
+    expect(stabilityBucketKey(3.4)).toBe('s0');
+    expect(stabilityBucketKey(5)).toBe('s1');
+    expect(stabilityBucketKey(12)).toBe('s2');
+    expect(stabilityBucketKey(1000)).toBe('s3');
+  });
+
+  it('falls back to the prior when counts are absent or the sample is thin', () => {
+    const prior = deriveStabilityMix(undefined);
+    expect(prior.reduce((s, m) => s + m.weight, 0)).toBeCloseTo(1, 6);
+    const thin = deriveStabilityMix({
+      s0: MIN_STABILITY_SAMPLE - 1,
+      s1: 0,
+      s2: 0,
+      s3: 0,
+    });
+    expect(thin).toEqual(prior);
+  });
+
+  it('normalizes observed counts into weights over the bucket representatives', () => {
+    const mix = deriveStabilityMix({ s0: 0, s1: 5, s2: 10, s3: 5 });
+    expect(mix).toHaveLength(3); // empty buckets dropped
+    expect(mix.reduce((s, m) => s + m.weight, 0)).toBeCloseTo(1, 6);
+    expect(mix[1]).toEqual({ stabilityDays: 12, weight: 0.5 });
+  });
+
+  it('a stable observed deck produces a smaller second wave than the young prior', () => {
+    const youngKernels = deriveReturnKernels({ initialReviewCount: 5, rates });
+    const stableKernels = deriveReturnKernels({
+      initialReviewCount: 5,
+      rates,
+      stabilityMix: deriveStabilityMix({ s0: 0, s1: 0, s2: 5, s3: 45 }),
+    });
+    const sum = (a: number[]) => a.reduce((s, v) => s + v, 0);
+    expect(sum(stableKernels.mature)).toBeLessThan(sum(youngKernels.mature));
+  });
+
+  it('observed counts flow through the payload into a smaller forecast', () => {
+    const scheduled = {
+      availableNow: { ...zeroCounts(), review: 20 },
+      futureDays: Array.from({ length: 6 }, () => ({
+        ...zeroCounts(),
+        review: 20,
+      })),
+    };
+    const young = buildWorkloadForecast(makeData(scheduled), params);
+    const settled = buildWorkloadForecast(
+      makeData({
+        ...scheduled,
+        matureStabilityCounts: { s0: 0, s1: 10, s2: 60, s3: 70 },
+      }),
+      params,
+    );
+    expect(settled.weekReviews).toBeLessThan(young.weekReviews);
   });
 });

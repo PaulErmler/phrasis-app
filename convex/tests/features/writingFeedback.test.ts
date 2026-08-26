@@ -16,6 +16,7 @@ import { generateText } from 'ai';
 import schema from '../../schema';
 import { api, internal } from '../../_generated/api';
 import {
+  GRADER_SYSTEM_PROMPT,
   parseFeedbackResponse,
   writingAnswersMatch,
   WRITING_ALTERNATIVES_MAX,
@@ -41,6 +42,7 @@ async function seedCard(
     /** Omit the ai_feedback entry entirely (account predating the feature). */
     withoutAiFeedbackEntry?: boolean;
     planId?: string;
+    baseLanguages?: string[];
   } = {},
 ) {
   const userId = opts.userId ?? 'user_A';
@@ -51,7 +53,7 @@ async function seedCard(
     });
     const courseId = await ctx.db.insert('courses', {
       userId,
-      baseLanguages: ['en'],
+      baseLanguages: opts.baseLanguages ?? ['en'],
       targetLanguages: ['es'],
     });
     const deckId = await ctx.db.insert('decks', {
@@ -149,7 +151,7 @@ describe('features/writingFeedback', () => {
   });
 
   describe('parseFeedbackResponse', () => {
-    it('parses a fenced reply and clamps notes to two', () => {
+    it('parses a fenced reply and clamps notes to three', () => {
       const parsed = parseFeedbackResponse(
         '```json\n' +
           JSON.stringify({
@@ -159,13 +161,19 @@ describe('features/writingFeedback', () => {
               { type: 'grammar', text: 'a' },
               { type: 'vocab', text: 'b' },
               { type: 'spelling', text: 'c' },
+              { type: 'punctuation', text: 'd' },
             ],
             altOk: false,
           }) +
           '\n```',
       );
       expect(parsed?.verdict).toBe('partial');
-      expect(parsed?.notes).toHaveLength(2);
+      expect(parsed?.notes).toHaveLength(3);
+      expect(parsed?.notes.map((n) => n.type)).toEqual([
+        'grammar',
+        'wordChoice',
+        'spelling',
+      ]);
     });
 
     it('repairs the observed dropped-text-key malformation', () => {
@@ -193,6 +201,103 @@ describe('features/writingFeedback', () => {
         parseFeedbackResponse(JSON.stringify({ verdict: 'great' })),
       ).toBeNull();
       expect(parseFeedbackResponse('not json')).toBeNull();
+    });
+
+    it('accepts wordChoice and aliases the old vocab type onto it', () => {
+      const asWordChoice = parseFeedbackResponse(
+        JSON.stringify({
+          verdict: 'alsoCorrect',
+          notes: [
+            {
+              type: 'wordChoice',
+              text: 'Uses "Hallo zusammen" instead of "Hi Leute".',
+            },
+          ],
+        }),
+      );
+      expect(asWordChoice?.notes[0].type).toBe('wordChoice');
+
+      const asVocab = parseFeedbackResponse(
+        JSON.stringify({
+          verdict: 'alsoCorrect',
+          notes: [
+            {
+              type: 'vocab',
+              text: 'Uses "Hallo zusammen" instead of "Hi Leute".',
+            },
+          ],
+        }),
+      );
+      expect(asVocab?.notes[0].type).toBe('wordChoice');
+    });
+
+    it('accepts punctuation notes', () => {
+      const parsed = parseFeedbackResponse(
+        JSON.stringify({
+          verdict: 'alsoCorrect',
+          notes: [
+            {
+              type: 'punctuation',
+              text: 'Space before the comma in "okay ,".',
+            },
+          ],
+        }),
+      );
+      expect(parsed?.notes[0].type).toBe('punctuation');
+    });
+  });
+
+  describe('GRADER_SYSTEM_PROMPT', () => {
+    it('tells the model that a different greeting is wordChoice, not wordOrder', () => {
+      expect(GRADER_SYSTEM_PROMPT).toContain('"wordChoice"');
+      expect(GRADER_SYSTEM_PROMPT).toMatch(/Hallo zusammen/);
+      expect(GRADER_SYSTEM_PROMPT).toMatch(/Hi Leute/);
+      expect(GRADER_SYSTEM_PROMPT).toMatch(
+        /wordOrder: the same words in a different sequence/i,
+      );
+    });
+
+    it('asks for a punctuation note when spacing around marks differs', () => {
+      expect(GRADER_SYSTEM_PROMPT).toContain('"punctuation"');
+      expect(GRADER_SYSTEM_PROMPT).toMatch(/okay , sorge/);
+      expect(GRADER_SYSTEM_PROMPT).toMatch(/at most 3 entries/);
+    });
+
+    it("tells the model to write notes in the learner's first base language", () => {
+      expect(GRADER_SYSTEM_PROMPT).toMatch(
+        /NOTES: the language of the note prose/,
+      );
+      expect(GRADER_SYSTEM_PROMPT).toMatch(/Quote and explain TARGET words/);
+      expect(GRADER_SYSTEM_PROMPT).toMatch(
+        /Never offer a BASE phrase as what they should have typed/,
+      );
+    });
+
+    it('asks alsoCorrect notes to judge naturalness against the expected translation', () => {
+      expect(GRADER_SYSTEM_PROMPT).toMatch(
+        /Default note type for "alsoCorrect"/,
+      );
+      expect(GRADER_SYSTEM_PROMPT).toMatch(/Prefer type "naturalness"/);
+      expect(GRADER_SYSTEM_PROMPT).toMatch(
+        /Do not list synonym swaps with no naturalness judgment/,
+      );
+    });
+
+    it('teaches TARGET wording, not a BASE-language stand-in', () => {
+      expect(GRADER_SYSTEM_PROMPT).toMatch(/Excuse me/);
+      expect(GRADER_SYSTEM_PROMPT).toMatch(
+        /Do not tell them to write "Entschuldigung"/,
+      );
+    });
+
+    it('forbids bare swap labels and requires a meaning explanation', () => {
+      expect(GRADER_SYSTEM_PROMPT).toMatch(/Never a bare swap label/);
+      expect(GRADER_SYSTEM_PROMPT).toMatch(/"me" statt "you"/);
+      expect(GRADER_SYSTEM_PROMPT).toMatch(/And me you\?/);
+      expect(GRADER_SYSTEM_PROMPT).toMatch(
+        /what the TARGET answer currently means and what the expected TARGET wording needed/,
+      );
+      expect(GRADER_SYSTEM_PROMPT).not.toMatch(/at most 15 words/);
     });
   });
 
@@ -246,6 +351,89 @@ describe('features/writingFeedback', () => {
       expect(result).toEqual({ verdict: 'correct', matched: 'primary' });
       expect(mockedGenerateText).not.toHaveBeenCalled();
       expect(await aiFeedbackBalance(t)).toBe(10);
+    });
+
+    it('asks the grader to write notes in the first course base language', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCard(t, { baseLanguages: ['de', 'en'] });
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      mockGraderReply(
+        JSON.stringify({
+          verdict: 'alsoCorrect',
+          corrected: 'Me gustaría un café, por favor.',
+          notes: [{ type: 'register', text: 'Beide sind höfliche Bitten.' }],
+          altOk: true,
+        }),
+      );
+
+      await asUser.action(api.features.writingFeedback.gradeWritingAnswer, {
+        cardId,
+        language: 'es',
+        userAnswer: 'Me gustaría un café, por favor',
+      });
+
+      expect(mockedGenerateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: expect.stringContaining(
+            "Write each note's prose in German. Quote and explain TARGET words.",
+          ),
+          system: expect.stringMatching(/Quote and explain TARGET words/),
+        }),
+      );
+      expect(mockedGenerateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: expect.stringContaining(
+            'BASE language (source sentence): English',
+          ),
+        }),
+      );
+      expect(mockedGenerateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: expect.stringContaining(
+            'TARGET language (what the learner must write): Spanish',
+          ),
+        }),
+      );
+      expect(mockedGenerateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: expect.stringContaining(
+            'Source sentence (BASE): I would like a coffee, please.',
+          ),
+        }),
+      );
+    });
+
+    it('routes the grader through Groq first', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCard(t);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      mockGraderReply(
+        JSON.stringify({
+          verdict: 'minor',
+          corrected: 'Quisiera un café, por favor.',
+          notes: [{ type: 'spelling', text: 'Missing accent on café.' }],
+          altOk: false,
+        }),
+      );
+
+      await asUser.action(api.features.writingFeedback.gradeWritingAnswer, {
+        cardId,
+        language: 'es',
+        userAnswer: 'Quisiera un cafe, por favor.',
+      });
+
+      expect(mockedGenerateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maxOutputTokens: 2_000,
+          providerOptions: {
+            openrouter: expect.objectContaining({
+              provider: expect.objectContaining({
+                order: ['groq'],
+              }),
+            }),
+          },
+        }),
+      );
     });
 
     it('grades via the LLM, consumes quota, and stores the accepted alternative', async () => {

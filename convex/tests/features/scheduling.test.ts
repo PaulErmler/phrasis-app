@@ -1865,6 +1865,40 @@ describe('features/scheduling', () => {
       });
     }
 
+    it('drops a stored alternative that the edit turns into the primary sentence', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedOwnedCardWithAudio(t);
+      const { dupId, keptId } = await t.run(async (ctx) => ({
+        // Normalizes equal to the new primary below (punctuation/case).
+        dupId: await ctx.db.insert('writingAlternatives', {
+          userId: 'user_A',
+          cardId,
+          language: 'sv',
+          text: 'hej då!',
+        }),
+        keptId: await ctx.db.insert('writingAlternatives', {
+          userId: 'user_A',
+          cardId,
+          language: 'sv',
+          text: 'Tjena',
+        }),
+      }));
+      const asUser = t.withIdentity({ subject: 'user_A' });
+
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [{ language: 'sv', text: 'Hej då' }],
+        timezone: 'UTC',
+      });
+
+      await t.run(async (ctx) => {
+        // The store path would never have created a row equal to the
+        // primary; the edit sweep removes the one it just made equal.
+        expect(await ctx.db.get(dupId)).toBeNull();
+        expect(await ctx.db.get(keptId)).not.toBeNull();
+      });
+    });
+
     it('keeps the textId and patches the translation row in place on a target-language edit', async () => {
       const t = convexTest(schema, modules);
       const { cardId, textId, translationId, svAudioId, enAudioId, dueDate } =

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 import { ProgressDisplay } from '@/components/app/learning/ProgressDisplay';
 
@@ -63,7 +63,7 @@ const cardCounts = {
   review: 4,
 };
 
-function renderProgress() {
+function renderProgress(onContinue: () => void = () => {}) {
   return render(
     <ProgressDisplay
       sessionId="session-1"
@@ -72,7 +72,7 @@ function renderProgress() {
       dailyNewWordsToday={2}
       reviewMode="full"
       autoAdvance={false}
-      onContinue={() => {}}
+      onContinue={onContinue}
       ready
     />,
   );
@@ -105,5 +105,35 @@ describe('ProgressDisplay due-count pills', () => {
     expect(useQueryMock.mock.calls.some((call) => call[1] === 'skip')).toBe(
       true,
     );
+  });
+});
+
+describe('ProgressDisplay keyboard', () => {
+  it('Enter and ArrowRight dismiss the celebration', () => {
+    const onContinue = vi.fn();
+    renderProgress(onContinue);
+    fireEvent.keyDown(window, { key: 'Enter' });
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(onContinue).toHaveBeenCalledTimes(2);
+  });
+
+  it('Enter on the pause button does not dismiss', () => {
+    const onContinue = vi.fn();
+    render(
+      <ProgressDisplay
+        sessionId="session-1"
+        dailyReviewsToday={10}
+        dailyTimeMsToday={60_000}
+        dailyNewWordsToday={2}
+        reviewMode="audio"
+        autoAdvance
+        onContinue={onContinue}
+        ready
+      />,
+    );
+    fireEvent.keyDown(screen.getByTestId('progress-display-play-pause'), {
+      key: 'Enter',
+    });
+    expect(onContinue).not.toHaveBeenCalled();
   });
 });

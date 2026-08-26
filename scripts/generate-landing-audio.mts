@@ -124,6 +124,11 @@ interface LandingBundle {
     contextCard?: DemoCard;
     scenarios?: Partial<Record<'grammar' | 'simpler' | 'restaurant', DemoScenario>>;
   };
+  writingCompare?: {
+    // Spanish demo sentences (deliberately untranslated in every bundle).
+    expected?: string;
+    typed?: string;
+  };
 }
 
 function pushPair(out: Pair[], text: string | undefined, lang: keyof typeof LANDING_VOICES) {
@@ -148,6 +153,10 @@ function extractFromBundle(json: LandingBundle, baseLang: 'en' | 'de'): Pair[] {
     pushPair(out, mock.es, 'es');
     pushPair(out, mock.fr, 'fr');
   }
+
+  // writingCompare — the "Expected answer" card in the compare section.
+  // `typed` gets no clip: it renders as the learner's answer, not a speaker.
+  pushPair(out, json.writingCompare?.expected, 'es');
 
   const chat = json.chatDemo;
   if (chat) {

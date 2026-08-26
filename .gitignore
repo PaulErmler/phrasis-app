@@ -91,6 +91,18 @@ e2e/.auth/
 # OGTE dataset (data files only — scripts are committed)
 data_preparation/ogte-dataset/data/
 
+# Local generator artifacts (exist only on machines that ran the scripts)
+scripts/voice-samples/
+scripts/tts-samples/
+scripts/_tmp-tagalog-sample.ts
+tagalog-sample/
+
+# Capacitor-generated nested ignore files (recreated by cap sync)
+android/.gitignore
+android/app/.gitignore
+ios/.gitignore
+ios/App/CapApp-SPM/.gitignore
+
 .claude/scheduled_tasks.lock
 
 # Local Claude Code worktrees — never commit

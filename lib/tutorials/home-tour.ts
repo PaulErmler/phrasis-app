@@ -96,10 +96,8 @@ export function createHomeTour(
     // comes after both progress-card steps — the tour scrolls monotonically
     // instead of jumping down and back up. Gated on the card's OWN
     // preference (not hideDueCounts — the pills hide by default for new
-    // accounts, the forecast doesn't); the card also hides itself below the
-    // minimum-activity gate (MIN_STARTED_CARDS_FOR_FORECAST), which lives
-    // in query data this factory can't see, so the step additionally drops
-    // at launch when the card isn't mounted.
+    // accounts, the forecast doesn't). skipIfMissing is a safety net if the
+    // card isn't mounted when the tour launches.
     ...(ctx?.hideWorkloadForecast === true
       ? []
       : [

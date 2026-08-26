@@ -14,6 +14,10 @@ import { ReviewModeSwitcher } from '@/components/app/learning/ReviewModeSwitcher
 import { LandingLearningCardContent } from '@/components/landing/LandingLearningCardContent';
 import { LandingCardShell } from '@/components/landing/LandingCardShell';
 import { DiffDisplay } from '@/components/app/learning/DiffDisplay';
+import {
+  WritingFeedbackCard,
+  type RowFeedback,
+} from '@/components/app/learning/WritingFeedbackCard';
 import { LandingAudioButton } from '@/components/landing/LandingAudioButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,16 +56,51 @@ function usePrefersReducedMotion() {
   return reduced;
 }
 
+const FEEDBACK_PENDING_MS = 800;
+const FEEDBACK_DWELL_MS = 4000;
+
+function landingWritingDemoFeedback(
+  code: string,
+  t: ReturnType<typeof useTranslations>,
+): NonNullable<RowFeedback['result']> {
+  if (code === 'fr') {
+    return {
+      verdict: 'minor',
+      corrected: t('mock.fr'),
+      notes: [{ type: 'punctuation', text: t('mock.feedbackFrPunctuation') }],
+    };
+  }
+  return {
+    verdict: 'minor',
+    corrected: t('mock.es'),
+    notes: [
+      { type: 'spelling', text: t('mock.feedbackEsSpelling') },
+      { type: 'punctuation', text: t('mock.feedbackEsPunctuation') },
+    ],
+  };
+}
+
 type FullReviewAnimPhase = 'typing' | 'cursorMoving' | 'cursorPressing';
 
 function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
   const locale = useLocale();
   const primaryBaseLang = locale.startsWith('de') ? 'de' : 'en';
 
+  // Resolve the strings BEFORE memoizing so the deps are value-compared.
+  // `t` itself is a fresh function per render under the test stub (and one
+  // refactor away from it in the app); keying the memo on it rebuilds
+  // `fullTargets` every render, and the reset effect below then loops
+  // setState forever.
+  const base = t('mock.base');
+  const es = t('mock.es');
+  const fr = t('mock.fr');
+  const typedEs = t('mock.typedEs');
+  const typedFr = t('mock.typedFr');
+
   return useMemo(() => {
     const basePrimary: CardTranslation = {
       language: primaryBaseLang,
-      text: t('mock.base'),
+      text: base,
       isBaseLanguage: true,
       isTargetLanguage: false,
     };
@@ -69,7 +108,7 @@ function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
     if (!multi) {
       const target: CardTranslation = {
         language: 'es',
-        text: t('mock.es'),
+        text: es,
         isBaseLanguage: false,
         isTargetLanguage: true,
       };
@@ -81,9 +120,7 @@ function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
         wordTimings: null,
         ttsQuality: null,
       }));
-      const fullTargets = [
-        { code: 'es', expected: t('mock.es'), typed: t('mock.typedEs') },
-      ];
+      const fullTargets = [{ code: 'es', expected: es, typed: typedEs }];
       return {
         translations,
         audioRecordings,
@@ -94,26 +131,20 @@ function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
 
     // Multi-language demo: 1 base + 2 targets, matching the Pro plan's
     // "up to 3 languages per course" cap.
-    const basePrimaryForMulti: CardTranslation = {
-      language: primaryBaseLang,
-      text: t('mock.base'),
-      isBaseLanguage: true,
-      isTargetLanguage: false,
-    };
     const targetEs: CardTranslation = {
       language: 'es',
-      text: t('mock.es'),
+      text: es,
       isBaseLanguage: false,
       isTargetLanguage: true,
     };
     const targetFr: CardTranslation = {
       language: 'fr',
-      text: t('mock.fr'),
+      text: fr,
       isBaseLanguage: false,
       isTargetLanguage: true,
     };
 
-    const translations = [basePrimaryForMulti, targetEs, targetFr];
+    const translations = [basePrimary, targetEs, targetFr];
     const audioRecordings: CardAudioRecording[] = translations.map((tr) => ({
       language: tr.language,
       voiceName: null,
@@ -122,8 +153,8 @@ function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
       ttsQuality: null,
     }));
     const fullTargets = [
-      { code: 'es', expected: t('mock.es'), typed: t('mock.typedEs') },
-      { code: 'fr', expected: t('mock.fr'), typed: t('mock.typedFr') },
+      { code: 'es', expected: es, typed: typedEs },
+      { code: 'fr', expected: fr, typed: typedFr },
     ];
     return {
       translations,
@@ -131,7 +162,7 @@ function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
       fullTargets,
       showRomanization: false,
     };
-  }, [t, multi, primaryBaseLang]);
+  }, [multi, primaryBaseLang, base, es, fr, typedEs, typedFr]);
 }
 
 export function ReviewModesDemo() {
@@ -144,9 +175,17 @@ export function ReviewModesDemo() {
 
   const { translations, audioRecordings, fullTargets, showRomanization } =
     useMockCard(t, multi);
+  // Read inside effects via ref: `t` is not referentially stable, and
+  // putting it in an effect's deps re-runs the reset/feedback effects every
+  // render (see useMockCard).
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const [typedMap, setTypedMap] = useState<Record<string, string>>({});
   const [submittedMap, setSubmittedMap] = useState<Record<string, boolean>>({});
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, RowFeedback>>(
+    {},
+  );
   const [fullAnimPhase, setFullAnimPhase] =
     useState<FullReviewAnimPhase>('typing');
   const [activeLangIdx, setActiveLangIdx] = useState(0);
@@ -175,6 +214,17 @@ export function ReviewModesDemo() {
       setSubmittedMap(
         Object.fromEntries(fullTargets.map((x) => [x.code, true])),
       );
+      setFeedbackMap(
+        Object.fromEntries(
+          fullTargets.map((x) => [
+            x.code,
+            {
+              status: 'done' as const,
+              result: landingWritingDemoFeedback(x.code, tRef.current),
+            },
+          ]),
+        ),
+      );
       setActiveLangIdx(0);
       setFullAnimPhase('typing');
       setCursorPath(null);
@@ -186,6 +236,7 @@ export function ReviewModesDemo() {
 
     setTypedMap(emptyTyped);
     setSubmittedMap(emptySub);
+    setFeedbackMap({});
     setActiveLangIdx(0);
     setFullAnimPhase('typing');
     setCursorPath(null);
@@ -254,10 +305,10 @@ export function ReviewModesDemo() {
         cursorMoveAdvanceRef.current = false;
         cursorPressAdvanceRef.current = false;
         setSubmittedMap((prev) => ({ ...prev, [code]: true }));
-        if (activeLangIdx + 1 < fullTargets.length) {
-          setActiveLangIdx((i) => i + 1);
-          setFullAnimPhase('typing');
-        }
+        setFeedbackMap((prev) => ({
+          ...prev,
+          [code]: { status: 'pending' },
+        }));
       }
       return;
     }
@@ -283,15 +334,43 @@ export function ReviewModesDemo() {
     const tgt = fullTargets[activeLangIdx];
     if (!tgt) return;
     setSubmittedMap((prev) => ({ ...prev, [tgt.code]: true }));
+    setFeedbackMap((prev) => ({
+      ...prev,
+      [tgt.code]: { status: 'pending' },
+    }));
     setCursorPath(null);
     setPressPos(null);
     cursorMoveAdvanceRef.current = false;
     cursorPressAdvanceRef.current = false;
-    if (activeLangIdx + 1 < fullTargets.length) {
-      setActiveLangIdx((i) => i + 1);
-      setFullAnimPhase('typing');
-    }
   }, [fullTargets, activeLangIdx]);
+
+  useEffect(() => {
+    if (reviewMode !== 'full') return;
+    const pending = Object.entries(feedbackMap).find(
+      ([, row]) => row.status === 'pending',
+    );
+    if (!pending) return;
+    const [code] = pending;
+    const delay = reducedMotion ? 0 : FEEDBACK_PENDING_MS;
+    const id = window.setTimeout(() => {
+      setFeedbackMap((prev) => {
+        if (prev[code]?.status !== 'pending') return prev;
+        return {
+          ...prev,
+          [code]: {
+            status: 'done',
+            result: landingWritingDemoFeedback(code, tRef.current),
+          },
+        };
+      });
+      const idx = fullTargets.findIndex((x) => x.code === code);
+      if (idx >= 0 && idx + 1 < fullTargets.length) {
+        setActiveLangIdx(idx + 1);
+        setFullAnimPhase('typing');
+      }
+    }, delay);
+    return () => window.clearTimeout(id);
+  }, [reviewMode, feedbackMap, reducedMotion, fullTargets]);
 
   const prevMulti = useRef(multi);
   useEffect(() => {
@@ -309,16 +388,19 @@ export function ReviewModesDemo() {
     prevMode.current = reviewMode;
   }, [reviewMode]);
 
-  const allSubmitted =
+  const allFeedbackDone =
     reviewMode === 'full' &&
     fullTargets.length > 0 &&
-    fullTargets.every((x) => submittedMap[x.code]);
+    fullTargets.every((x) => feedbackMap[x.code]?.status === 'done');
 
   useEffect(() => {
-    if (!allSubmitted) return;
-    const id = window.setTimeout(() => setPlayKey((k) => k + 1), 3000);
+    if (!allFeedbackDone) return;
+    const id = window.setTimeout(
+      () => setPlayKey((k) => k + 1),
+      FEEDBACK_DWELL_MS,
+    );
     return () => clearTimeout(id);
-  }, [allSubmitted]);
+  }, [allFeedbackDone]);
 
   // Audio review demo plays exactly once per mount (or per Replay click) and
   // then stops, no auto-loop. The hands-free Radio panel below covers the
@@ -438,10 +520,7 @@ export function ReviewModesDemo() {
                 />
               </div>
             ) : (
-              <div
-                ref={fullReviewWrapRef}
-                className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
-              >
+              <div ref={fullReviewWrapRef} className="relative flex flex-col">
                 <LandingCardShell
                   bare
                   reviewCount={2}
@@ -524,6 +603,11 @@ export function ReviewModesDemo() {
                                 </div>
                               )}
                             </div>
+                            {submitted && feedbackMap[tr.language] ? (
+                              <WritingFeedbackCard
+                                feedback={feedbackMap[tr.language]}
+                              />
+                            ) : null}
                           </div>
                         );
                       })}
