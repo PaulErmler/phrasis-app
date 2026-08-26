@@ -18,6 +18,8 @@ import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { convexErrorCode } from '@/lib/utils';
 import type { CollectionProgressItem } from './CollectionCarouselUI';
 
+import { reportError } from '@/lib/report-error';
+
 export type CollectionTextMark = 'prioritized' | 'ignored';
 
 export type BrowseTextRow = FunctionReturnType<
@@ -384,7 +386,7 @@ export function useCollectionDetail({
       collectionId: openCollectionId as Id<'collections'>,
       textIds: batch,
     }).catch((error) => {
-      console.error('Failed to request preview translations:', error);
+      reportError(error, { op: 'requestPreviewTranslations' });
       for (const id of batch) requestedTranslationsRef.current.delete(id);
     });
   }, [forwardRowsRaw, earlierRowsRaw, anchorReady, openCollectionId, requestTranslations]);
@@ -409,7 +411,7 @@ export function useCollectionDetail({
       collectionId: openCollectionId as Id<'collections'>,
       afterRank: lastRank,
     }).catch((error) => {
-      console.error('Failed to prewarm preview translations:', error);
+      reportError(error, { op: 'prewarmPreviewTranslations' });
       prewarmedRef.current.delete(key);
     });
   }, [forwardRowsRaw, forward.status, anchorReady, openCollectionId, anchor, prewarmTranslations]);
@@ -501,7 +503,7 @@ export function useCollectionDetail({
       } else if (code === 'QUOTA_NOT_SYNCED') {
         toast.error(t('failedToAdd'));
       } else {
-        console.error('Failed to add cards:', error);
+        reportError(error, { op: 'addCardsFromCollection' });
         toast.error(t('failedToAdd'));
       }
     } finally {
@@ -514,7 +516,7 @@ export function useCollectionDetail({
       try {
         await setMarkMutation({ textId: textId as Id<'texts'>, mark });
       } catch (error) {
-        console.error('Failed to set collection text mark:', error);
+        reportError(error, { op: 'setCollectionTextMark' });
         toast.error(t('detail.failedToMark'));
       }
     },
@@ -535,7 +537,7 @@ export function useCollectionDetail({
         } else if (code === 'USAGE_LIMIT') {
           setUsageLimitHit(true);
         } else {
-          console.error('Failed to add sentence:', error);
+          reportError(error, { op: 'addSentenceToCollection' });
           toast.error(t('failedToAdd'));
         }
       } finally {

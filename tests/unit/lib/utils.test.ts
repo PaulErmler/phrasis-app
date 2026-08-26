@@ -26,6 +26,14 @@ describe('isAuthError', () => {
     expect(isAuthError(new ConvexError('Unauthenticated'))).toBe(true);
   });
 
+  it('detects a ConvexError carrying code UNAUTHENTICATED', () => {
+    expect(isAuthError(new ConvexError({ code: 'UNAUTHENTICATED' }))).toBe(true);
+  });
+
+  it('returns false for other structured codes', () => {
+    expect(isAuthError(new ConvexError({ code: 'FORBIDDEN' }))).toBe(false);
+  });
+
   it('detects Error with "Not authenticated" message', () => {
     expect(isAuthError(new Error('Not authenticated'))).toBe(true);
   });

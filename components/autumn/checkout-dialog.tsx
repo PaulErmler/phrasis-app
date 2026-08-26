@@ -40,6 +40,8 @@ import {
   useCheckoutErrorToast,
 } from "@/hooks/use-checkout-error";
 
+import { reportError } from '@/lib/report-error';
+
 export interface CheckoutDialogProps {
 	open: boolean;
 	setOpen: (open: boolean) => void;
@@ -566,12 +568,12 @@ const PrepaidItem = ({
       });
 
       if (error) {
-        console.error(error);
+        reportError(error, { op: 'checkoutOptionsUpdate' });
         return;
       }
       setCheckoutResult(data!);
     } catch (error) {
-      console.error(error);
+      reportError(error, { op: 'checkoutOptionsUpdate' });
     } finally {
       setLoading(false);
       setOpen(false);

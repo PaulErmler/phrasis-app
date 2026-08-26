@@ -13,7 +13,7 @@ import {
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
 import { AnnotationLines } from './AnnotationLines';
-import type { CardOriginPill } from './cardOriginPill';
+import type { CardPresentation } from './cardPresentation';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import {
   DEFAULT_PAUSE_BETWEEN_REPETITIONS,
@@ -33,6 +33,7 @@ import { useAction, useMutation } from 'convex/react';
 import { toast } from 'sonner';
 import { api } from '@/convex/_generated/api';
 import { getUserTimezone } from '@/lib/timezone';
+import { reportError } from '@/lib/report-error';
 import { convexErrorCode, isPaymentPastDueError } from '@/lib/utils';
 import { WritingFeedbackCard, type RowFeedback } from './WritingFeedbackCard';
 import { WritingVoiceButton } from './WritingVoiceButton';
@@ -46,7 +47,6 @@ import {
 } from '@/lib/languages';
 import { useImeSafeEnter } from '@/hooks/use-ime-safe-enter';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
-import type { MergedPlayback } from '@/hooks/use-active-cue';
 import type { ClockBinding } from '@/hooks/use-karaoke-index';
 import { useCardPlayback, displayReviewCount } from './useCardPlayback';
 import type {
@@ -55,8 +55,6 @@ import type {
   CardAudioRecording,
   WritingAccuracySummary,
 } from './types';
-import type { Id } from '@/convex/_generated/dataModel';
-import type { PinnableCardAction } from '@/lib/cardActions';
 import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 
 type TargetAudioMode = 'always' | 'afterSubmit' | 'never';
@@ -67,30 +65,12 @@ interface LanguageInputState {
 }
 
 interface FullReviewCardContentProps {
-  preReviewCount: number;
-  /** When in FSRS phase, total reviews = preReviewCount + fsrsState.reps */
-  schedulingPhase?: 'preReview' | 'review';
-  fsrsState?: { reps: number } | null;
-  /** Source-collection pill ("A1.2"); absent/null = hidden. */
-  originPill?: CardOriginPill | null;
-  sourceText: string;
-  translations: CardTranslation[];
-  audioRecordings: CardAudioRecording[];
-  isFavorite: boolean;
-  isPendingMaster: boolean;
-  isPendingHide: boolean;
-  onMaster: () => void;
-  onHide: () => void;
-  onFavorite: () => void;
-  onEdit?: () => void;
-  onDelete?: () => void;
-  onFlag?: () => void;
-  onRegenerateAudio?: () => void;
-  pinnedActions?: readonly string[];
-  onUpdatePinnedActions?: (actions: PinnableCardAction[]) => void;
-  /** Per-action quota state forwarded to CardActionsMenu. */
-  quotaState?: import('./CardActionsMenu').CardActionsMenuProps['quotaState'];
-  onAudioPlay?: () => void;
+  /**
+   * Shared card presentation: identity/content, flags, annotation toggles,
+   * action callbacks + quota state, and the merged-audio bundle. See
+   * `cardPresentation.ts`.
+   */
+  presentation: CardPresentation;
   targetAudioMode: TargetAudioMode;
   /**
    * Transcribe writing style: the merged target audio is the prompt and the
@@ -133,13 +113,6 @@ interface FullReviewCardContentProps {
   onAllSubmittedChange?: (allSubmitted: boolean) => void;
   onAccuracyChange?: (summary: WritingAccuracySummary | null) => void;
   bare?: boolean;
-  showRomanization?: boolean;
-  /** IPA line toggle (from courseSettings.showIpa; default OFF). */
-  showIpa?: boolean;
-  /** Furigana ruby over kanji (courseSettings.showFurigana; default ON). */
-  showFurigana?: boolean;
-  /** Clears submission stack when the reviewed card changes */
-  cardId?: Id<'cards'>;
   /**
    * Registers a "revert one submitted translation" handler with the parent
    * for the stepwise-back shortcut (Left Arrow). The handler returns true
@@ -155,56 +128,14 @@ interface FullReviewCardContentProps {
    * there) so onboarding and the main app share one predicate.
    */
   firstExposure?: boolean;
-  /** Restart-card signal: any change clears typed/submitted translations and manual base reveals. */
-  resetSignal?: number;
-  /** Replay-target signal (T shortcut): any change replays the first target-language clip. */
-  replayTargetSignal?: number;
   /** Karaoke word highlighting toggle (defaults true). */
   highlightEnabled?: boolean;
-  /** Client-only session flag: did the viewer click flag on this card? */
-  flaggedInSession?: boolean;
-  /**
-   * Merged-audio state from useAudioPlayer; used when merged playback is
-   * active. Per-frame time lives in `clock`, not React state.
-   */
-  mergedPlayback?: MergedPlayback;
   /** Course-level per-language general speed. */
   languagePlaybackSpeeds?: Record<string, number>;
-  /** Per-card per-language speed override. Absent entry = use general. */
-  audioSpeedOverrides?: Record<string, number>;
-  /** Cycle handler for the speed badge; null clears the override. */
-  onSpeedCycle?: (language: string, next: number | null) => void;
-  /** Merged-audio playback for the slim progress bar at the card's bottom edge. */
-  audioRef?: React.RefObject<HTMLAudioElement | null>;
-  durationSec?: number;
-  isPlaying?: boolean;
-  isMerging?: boolean;
-  onSeek?: (seconds: number) => void;
-  showProgressBar?: boolean;
 }
 
 export function FullReviewCardContent({
-  preReviewCount,
-  schedulingPhase,
-  fsrsState,
-  originPill,
-  sourceText,
-  translations,
-  audioRecordings,
-  isFavorite,
-  isPendingMaster,
-  isPendingHide,
-  onMaster,
-  onHide,
-  onFavorite,
-  onEdit,
-  onDelete,
-  onFlag,
-  onRegenerateAudio,
-  pinnedActions,
-  onUpdatePinnedActions,
-  quotaState,
-  onAudioPlay,
+  presentation,
   targetAudioMode,
   transcribeMode = false,
   hideBaseLanguages = false,
@@ -220,27 +151,28 @@ export function FullReviewCardContent({
   onAllSubmittedChange,
   onAccuracyChange,
   bare = false,
-  showRomanization = true,
-  showIpa = false,
-  showFurigana = true,
-  cardId,
   onRegisterRevert,
   firstExposure = false,
-  resetSignal,
-  replayTargetSignal,
   highlightEnabled = true,
-  flaggedInSession = false,
-  mergedPlayback,
   languagePlaybackSpeeds,
-  audioSpeedOverrides,
-  onSpeedCycle,
-  audioRef,
-  durationSec,
-  isPlaying,
-  isMerging,
-  onSeek,
-  showProgressBar,
 }: FullReviewCardContentProps) {
+  const {
+    cardId,
+    preReviewCount,
+    schedulingPhase,
+    fsrsState,
+    translations,
+    audioRecordings,
+    onAudioPlay,
+    showRomanization = true,
+    showIpa = false,
+    showFurigana = true,
+    mergedPlayback,
+    audioSpeedOverrides,
+    onSpeedCycle,
+    resetSignal,
+    replayTargetSignal,
+  } = presentation;
   const t = useTranslations('LearningMode');
   const locale = useLocale();
 
@@ -548,6 +480,8 @@ export function FullReviewCardContent({
           raf = requestAnimationFrame(tick);
         })
         .catch((err) => {
+          // Deliberately not reportError: autoplay-policy rejections are an
+          // expected browser state, not an exception (see lib/report-error).
           if (err.name !== 'AbortError') console.error('Reveal auto-play failed:', err);
           stopTracking();
           idx++;
@@ -819,11 +753,14 @@ export function FullReviewCardContent({
         })
         .catch((error) => {
           if (isStale()) return;
-          if (!isPaymentPastDueError(error)) {
-            console.error('AI feedback failed:', error);
-          }
           const status: RowFeedback['status'] =
             convexErrorCode(error) === 'USAGE_LIMIT' ? 'limit' : 'error';
+          // USAGE_LIMIT and payment-past-due are expected product states
+          // with their own surfaces (quota line / overdue dialog), not
+          // exceptions.
+          if (status === 'error' && !isPaymentPastDueError(error)) {
+            reportError(error, { op: 'gradeWritingAnswer', language });
+          }
           setFeedback((prev) => {
             if (!prev.has(language)) return prev;
             return new Map(prev).set(language, { status });
@@ -853,45 +790,15 @@ export function FullReviewCardContent({
   return (
     <div data-tutorial={TUTORIAL_ANCHORS.cardContentFull} className="flex flex-col flex-1 min-h-0">
       <CardShell
+        presentation={presentation}
         reviewCount={displayReviewCount(preReviewCount, schedulingPhase, fsrsState)}
-        originPill={originPill}
-        sourceText={sourceText}
-        translations={translations}
-        audioRecordings={audioRecordings}
-        isFavorite={isFavorite}
-        isPendingMaster={isPendingMaster}
-        isPendingHide={isPendingHide}
-        onMaster={onMaster}
-        onHide={onHide}
-        onFavorite={onFavorite}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onFlag={onFlag}
-        onRegenerateAudio={onRegenerateAudio}
-        pinnedActions={pinnedActions}
-        onUpdatePinnedActions={onUpdatePinnedActions}
-        quotaState={quotaState}
-        onAudioPlay={onAudioPlay}
         bare={bare}
-        showRomanization={showRomanization}
-        showIpa={showIpa}
-        showFurigana={showFurigana}
         highlightEnabled={highlightEnabled}
-        flaggedInSession={flaggedInSession}
         activeClip={activeClip}
         clockBinding={clockBinding}
         onButtonTimeUpdate={buttonPlayback.onTimeUpdate}
         onButtonStop={buttonPlayback.onStop}
         languagePlaybackSpeeds={languagePlaybackSpeeds}
-        audioSpeedOverrides={audioSpeedOverrides}
-        onSpeedCycle={onSpeedCycle}
-        audioRef={audioRef}
-        durationSec={durationSec}
-        isPlaying={isPlaying}
-        isMerging={isMerging}
-        onSeek={onSeek}
-        showProgressBar={showProgressBar}
-        languageCues={mergedPlayback?.languageCues}
         hideBaseLanguages={hideBaseLanguages}
         autoRevealBaseLanguages={true}
         revealedLanguages={revealedBaseLanguages}
@@ -1175,6 +1082,7 @@ function TargetLanguageInput({
               raf = requestAnimationFrame(tick);
             })
             .catch((err) => {
+              // Autoplay-policy path; excluded from reportError by design.
               if (err.name !== 'AbortError')
                 console.error('Auto-play failed:', err);
             });
@@ -1187,6 +1095,7 @@ function TargetLanguageInput({
         raf = requestAnimationFrame(tick);
       })
       .catch((err) => {
+        // Autoplay-policy path; excluded from reportError by design.
         if (err.name !== 'AbortError') console.error('Auto-play failed:', err);
       });
 

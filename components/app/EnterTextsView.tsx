@@ -28,6 +28,8 @@ import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { useCourseLanguages } from '@/hooks/use-course-languages';
 import { cn, isPaymentPastDueError } from '@/lib/utils';
 
+import { reportError } from '@/lib/report-error';
+
 interface EnterTextsViewProps {
   onBack: () => void;
   hideHeader?: boolean;
@@ -211,7 +213,7 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
         setPaywallOpen(true);
         return;
       }
-      console.error('Auto-fill failed:', err);
+      reportError(err, { op: 'autoFillTranslations' });
       toast.error(t('autoFillError'));
     } finally {
       setIsAutoFilling(false);
@@ -280,7 +282,7 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
           return;
         }
       }
-      console.error('Save failed:', err);
+      reportError(err, { op: 'saveCustomTexts' });
       toast.error(t('saveError'));
     } finally {
       setIsSaving(false);

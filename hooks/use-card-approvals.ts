@@ -12,6 +12,8 @@ import type {
 } from '@/convex/types';
 import { getUserTimezone } from '@/lib/timezone';
 
+import { reportError } from '@/lib/report-error';
+
 export type ApprovalData = {
   _id: Id<'cardApprovals'>;
   toolCallId: string;
@@ -154,7 +156,7 @@ export function useCardApprovals(
         if (convexErrorCode(error) === 'CARD_REPLACED') {
           return { result: 'card_replaced' };
         }
-        console.error(`Failed to ${label}:`, error);
+        reportError(error, { op: 'cardApproval', action: label });
         return { result: 'error' };
       } finally {
         setProcessingApprovals((prev) => {

@@ -25,10 +25,12 @@ import { Archive, Check, Lock, Plus, Settings, X } from 'lucide-react';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/app/ConfirmDialog';
+import { useAppData } from '@/components/app/AppDataProvider';
 import { CreateCourseDialog } from '@/components/course/CreateCourseDialog';
 import { CourseLanguageSettings } from '@/components/course/CourseLanguageSettings';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
+import { reportError } from '@/lib/report-error';
 
 interface CourseMenuProps {
   open: boolean;
@@ -44,7 +46,10 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
   const t = useTranslations('AppPage');
   const locale = useLocale();
   const courses = useQuery(api.features.courses.getUserCourses);
-  const activeCourse = useQuery(api.features.courses.getActiveCourse);
+  // Through AppDataProvider (B25): the provider owns the always-warm
+  // getActiveCourse subscription; the optimistic update below writes the
+  // same query key, so switches still flip instantly.
+  const { activeCourse } = useAppData();
   const quotaInfo = useQuery(api.features.courses.getCourseQuotaInfo);
   const setActiveCourse = useMutation(api.features.courses.setActiveCourse);
   const unarchiveCourseMutation = useMutation(api.features.courses.unarchiveCourse);
@@ -77,7 +82,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
     try {
       await setActiveCourseOptimistic({ courseId });
     } catch (error) {
-      console.error('Error setting active course:', error);
+      reportError(error, { op: 'setActiveCourse', courseId });
     }
   };
 
@@ -110,7 +115,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
         setPaywallOpen(true);
       }
     } catch (e: unknown) {
-      console.error('Unarchive error:', e);
+      reportError(e, { op: 'unarchiveCourse' });
     }
   };
 

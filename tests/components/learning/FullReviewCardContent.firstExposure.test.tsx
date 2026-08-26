@@ -18,6 +18,7 @@ vi.mock('@/components/autumn/usage-limit-dialog', () => ({
 
 import { FullReviewCardContent } from '@/components/app/learning/FullReviewCardContent';
 import type { CardTranslation } from '@/components/app/learning/types';
+import { makePresentation } from './cardPresentationStub';
 
 /**
  * First-exposure copy-through ("Abschreiben"): when LearningMode's
@@ -51,17 +52,11 @@ function renderCard(
 ) {
   render(
     <FullReviewCardContent
-      preReviewCount={0}
-      schedulingPhase="review"
-      sourceText="Hello."
-      translations={TRANSLATIONS}
-      audioRecordings={[]}
-      isFavorite={false}
-      isPendingMaster={false}
-      isPendingHide={false}
-      onMaster={vi.fn()}
-      onHide={vi.fn()}
-      onFavorite={vi.fn()}
+      presentation={makePresentation({
+        schedulingPhase: 'review',
+        sourceText: 'Hello.',
+        translations: TRANSLATIONS,
+      })}
       targetAudioMode="never"
       firstExposure
       {...overrides}

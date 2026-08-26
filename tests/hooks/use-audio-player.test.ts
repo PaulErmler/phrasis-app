@@ -204,9 +204,10 @@ describe('useAudioPlayer', () => {
         await Promise.resolve();
       });
       expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      // reportError's console signature: (error, context).
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Audio play failed:',
         expect.objectContaining({ name: 'NotSupportedError' }),
+        { op: 'audioPlay', label: 'Audio play failed:' },
       );
       expect(result.current.isPlaying).toBe(false);
     });

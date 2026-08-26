@@ -139,75 +139,80 @@ vi.mock('@/components/app/NoCourseEmptyState', () => ({
 // button regardless of pin state; the stub also surfaces `pinnedActions` via a
 // `data-pinned` attribute so tests can assert what was pinned.
 vi.mock('@/components/app/learning/LearningCardContent', () => ({
-  LearningCardContent: (props: {
-    sourceText: string;
-    isMastered?: boolean;
-    isHidden?: boolean;
-    onMaster: () => void;
-    onHide: () => void;
-    onEdit?: () => void;
-    onDelete?: () => void;
-    onFlag?: () => void;
-    onRegenerateAudio?: () => void;
-    onUpdatePinnedActions?: (actions: string[]) => void;
-    pinnedActions?: readonly string[];
+  LearningCardContent: ({
+    presentation,
+  }: {
+    /** Structural subset of CardPresentation; only what the stub renders. */
+    presentation: {
+      sourceText: string;
+      isMastered?: boolean;
+      isHidden?: boolean;
+      onMaster: () => void;
+      onHide: () => void;
+      onEdit?: () => void;
+      onDelete?: () => void;
+      onFlag?: () => void;
+      onRegenerateAudio?: () => void;
+      onUpdatePinnedActions?: (actions: string[]) => void;
+      pinnedActions?: readonly string[];
+    };
   }) => (
     <div
-      data-testid={`card-${props.sourceText}`}
-      data-mastered={String(props.isMastered ?? false)}
-      data-hidden={String(props.isHidden ?? false)}
-      data-pinned={(props.pinnedActions ?? []).join(',')}
+      data-testid={`card-${presentation.sourceText}`}
+      data-mastered={String(presentation.isMastered ?? false)}
+      data-hidden={String(presentation.isHidden ?? false)}
+      data-pinned={(presentation.pinnedActions ?? []).join(',')}
     >
       <button
-        data-testid={`master-${props.sourceText}`}
-        onClick={props.onMaster}
+        data-testid={`master-${presentation.sourceText}`}
+        onClick={presentation.onMaster}
       >
         master
       </button>
       <button
-        data-testid={`hide-${props.sourceText}`}
-        onClick={props.onHide}
+        data-testid={`hide-${presentation.sourceText}`}
+        onClick={presentation.onHide}
       >
         hide
       </button>
-      {props.onEdit && (
+      {presentation.onEdit && (
         <button
-          data-testid={`edit-${props.sourceText}`}
-          onClick={props.onEdit}
+          data-testid={`edit-${presentation.sourceText}`}
+          onClick={presentation.onEdit}
         >
           edit
         </button>
       )}
-      {props.onDelete && (
+      {presentation.onDelete && (
         <button
-          data-testid={`delete-${props.sourceText}`}
-          onClick={props.onDelete}
+          data-testid={`delete-${presentation.sourceText}`}
+          onClick={presentation.onDelete}
         >
           delete
         </button>
       )}
-      {props.onFlag && (
+      {presentation.onFlag && (
         <button
-          data-testid={`flag-${props.sourceText}`}
-          onClick={props.onFlag}
+          data-testid={`flag-${presentation.sourceText}`}
+          onClick={presentation.onFlag}
         >
           flag
         </button>
       )}
-      {props.onRegenerateAudio && (
+      {presentation.onRegenerateAudio && (
         <button
-          data-testid={`regen-${props.sourceText}`}
-          onClick={props.onRegenerateAudio}
+          data-testid={`regen-${presentation.sourceText}`}
+          onClick={presentation.onRegenerateAudio}
         >
           regen
         </button>
       )}
-      {props.onUpdatePinnedActions && (
+      {presentation.onUpdatePinnedActions && (
         <button
-          data-testid={`pin-flag-${props.sourceText}`}
+          data-testid={`pin-flag-${presentation.sourceText}`}
           onClick={() =>
-            props.onUpdatePinnedActions?.([
-              ...(props.pinnedActions ?? []),
+            presentation.onUpdatePinnedActions?.([
+              ...(presentation.pinnedActions ?? []),
               'flag',
             ])
           }

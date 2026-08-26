@@ -22,6 +22,7 @@ vi.mock('@/components/autumn/usage-limit-dialog', () => ({
 import { FullReviewCardContent } from '@/components/app/learning/FullReviewCardContent';
 import type { CardTranslation } from '@/components/app/learning/types';
 import type { Id } from '@/convex/_generated/dataModel';
+import { makePresentation } from './cardPresentationStub';
 
 const CARD_ID = 'card_1' as Id<'cards'>;
 
@@ -32,18 +33,12 @@ function renderWithTarget(language: string, text: string) {
   ];
   render(
     <FullReviewCardContent
-      preReviewCount={0}
-      sourceText="Good morning."
-      translations={translations}
-      audioRecordings={[]}
-      isFavorite={false}
-      isPendingMaster={false}
-      isPendingHide={false}
-      onMaster={vi.fn()}
-      onHide={vi.fn()}
-      onFavorite={vi.fn()}
+      presentation={makePresentation({
+        cardId: CARD_ID,
+        sourceText: 'Good morning.',
+        translations,
+      })}
       targetAudioMode="never"
-      cardId={CARD_ID}
       aiFeedbackEnabled
     />,
   );

@@ -18,6 +18,7 @@ vi.mock('@/components/autumn/usage-limit-dialog', () => ({
 
 import { FullReviewCardContent } from '@/components/app/learning/FullReviewCardContent';
 import type { CardTranslation } from '@/components/app/learning/types';
+import { makePresentation } from './cardPresentationStub';
 
 /**
  * The bug this guards: pressing Enter to confirm a Japanese IME conversion
@@ -37,16 +38,10 @@ function renderCard() {
   const onAccuracyChange = vi.fn();
   render(
     <FullReviewCardContent
-      preReviewCount={0}
-      sourceText="It is hot today."
-      translations={TRANSLATIONS}
-      audioRecordings={[]}
-      isFavorite={false}
-      isPendingMaster={false}
-      isPendingHide={false}
-      onMaster={vi.fn()}
-      onHide={vi.fn()}
-      onFavorite={vi.fn()}
+      presentation={makePresentation({
+        sourceText: 'It is hot today.',
+        translations: TRANSLATIONS,
+      })}
       targetAudioMode="never"
       onAccuracyChange={onAccuracyChange}
     />,
@@ -172,16 +167,10 @@ describe('FullReviewCardContent: ignorePunctuation', () => {
     const onAccuracyChange = vi.fn();
     render(
       <FullReviewCardContent
-        preReviewCount={0}
-        sourceText="It is hot today."
-        translations={TRANSLATIONS}
-        audioRecordings={[]}
-        isFavorite={false}
-        isPendingMaster={false}
-        isPendingHide={false}
-        onMaster={vi.fn()}
-        onHide={vi.fn()}
-        onFavorite={vi.fn()}
+        presentation={makePresentation({
+          sourceText: 'It is hot today.',
+          translations: TRANSLATIONS,
+        })}
         targetAudioMode="never"
         ignorePunctuation={ignorePunctuation}
         onAccuracyChange={onAccuracyChange}

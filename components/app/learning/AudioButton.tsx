@@ -6,6 +6,8 @@ import { Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { getLanguageShortLabel } from '@/lib/languages';
 import { computeAttenuation, getPeak } from '@/lib/audio/peakCache';
 
+import { reportError } from '@/lib/report-error';
+
 /**
  * How long a generate click may hold the spinner while waiting for the URL.
  * TTS can fail terminally without any signal reaching this component (the
@@ -236,7 +238,7 @@ export function AudioButton({
         resetGenerating(true);
       }
     } catch (error) {
-      console.error('Error requesting audio generation:', error);
+      reportError(error, { op: 'generateCardAudio' });
       resetGenerating(true);
     }
     // On success we stay in the generating state. The reactive query
@@ -317,6 +319,8 @@ export function AudioButton({
       isPlayingRef.current = true;
       setIsPlaying(true);
     } catch (error) {
+      // Deliberately not reportError: `play()` rejections here are the
+      // autoplay-policy/interruption class (see lib/report-error).
       console.error('Error playing audio:', error);
     } finally {
       playInFlightRef.current = false;

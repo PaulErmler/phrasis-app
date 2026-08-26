@@ -5,6 +5,8 @@ import { api } from '@/convex/_generated/api';
 import { toast } from 'sonner';
 import { isAuthError } from '@/lib/utils';
 
+import { reportError } from '@/lib/report-error';
+
 interface UseThreadOptions {
   autoCreate?: boolean;
   threadId?: string;
@@ -60,7 +62,7 @@ export function useThread({
         setThreadId(id);
       })
       .catch((error) => {
-        console.error('Failed to auto-create thread:', error);
+        reportError(error, { op: 'autoCreateThread' });
         // A sign-out mid-flight redirects to sign-in on its own; a toast about
         // it would be noise the user can't act on. Re-arm the one-shot so a
         // transient token failure retries on the next auth recovery instead
@@ -94,7 +96,7 @@ export function useThread({
       setThreadId(id);
       return id;
     } catch (error) {
-      console.error('Failed to get or create thread:', error);
+      reportError(error, { op: 'getOrCreateEmptyThread' });
       if (!isAuthError(error)) {
         toast.error(t('failedToCreateThread'));
       }

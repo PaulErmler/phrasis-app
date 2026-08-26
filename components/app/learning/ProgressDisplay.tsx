@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from 'convex/react';
+import { useQuery, usePreloadedQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
 import { BookOpen, ChevronRight, Clock, Pause, Play, RotateCcw } from 'lucide-react';
@@ -9,9 +9,11 @@ import { api } from '@/convex/_generated/api';
 import { useAnimatedCounter } from '@/hooks/use-animated-counter';
 import { useNowMinute } from '@/hooks/use-now-minute';
 import { formatTimeMs } from '@/lib/formatTime';
+import { dateInTimezone } from '@/lib/dateStrings';
 import { getLanguageByCode } from '@/lib/languages';
 import { getUserTimezone } from '@/lib/timezone';
 import { Button } from '@/components/ui/button';
+import { useAppData } from '@/components/app/AppDataProvider';
 import { cn } from '@/lib/utils';
 import { ConfettiBurst } from '@/components/effects/ConfettiBurst';
 import {
@@ -195,7 +197,10 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
   // Minute-stable `now` per the no-wall-clock query guideline; the re-subscribe
   // gap on a minute tick is bridged by the lastCardCountsRef cache below.
   const now = useNowMinute();
-  const userSettings = useQuery(api.features.courses.getUserSettings);
+  // Through AppDataProvider's SSR-seeded handle (B25); shares the app-wide
+  // getUserSettings subscription instead of re-subscribing ad hoc.
+  const { preloadedSettings } = useAppData();
+  const userSettings = usePreloadedQuery(preloadedSettings);
   const hideDueCounts = userSettings?.hideDueCounts === true;
   const cardCountsQuery = useQuery(
     api.features.stats.getCardCounts,
@@ -203,7 +208,10 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
   );
   const celebrationWordsQuery = useQuery(
     api.features.stats.getNewWordsForCelebration,
-    { sessionId: props.sessionId, timezone },
+    // `today` derived from the same minute-quantized `now` (no-wall-clock
+    // query guideline, same derivation as the getCourseStats caller); the
+    // re-subscribe gap on a tick is bridged by lastWordsRef below.
+    { sessionId: props.sessionId, timezone, today: dateInTimezone(now, timezone) },
   );
 
   // Cache the most-recent resolved query results so a Convex re-subscription

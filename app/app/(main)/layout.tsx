@@ -12,6 +12,7 @@ import { useAppData } from '@/components/app/AppDataProvider';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, MessageSquarePlus, PanelLeft } from 'lucide-react';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import { useNowMinute } from '@/hooks/use-now-minute';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { getUserTimezone } from '@/lib/timezone';
 import { usePrefetchedThread } from '@/hooks/use-prefetched-thread';
@@ -26,6 +27,7 @@ import { LearnView } from '@/components/app/learning/LearnView';
 import { SimplifiedChatView } from '@/components/app/SimplifiedChatView';
 import { HelpDialog } from '@/components/app/HelpDialog';
 import { ViewErrorBoundary } from '@/components/app/ViewErrorBoundary';
+import { reportError } from '@/lib/report-error';
 
 const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
   home: '/app',
@@ -134,11 +136,14 @@ export default function MainLayout({
 
   // Warm the getCardForReview Convex subscription before learn opens;
   // skip once learn is open since useLearningMode manages its own subscription.
-  // Match the hook's args (timezone) so we hit the same subscription cache
-  // entry and the warm subscription survives the handoff.
+  // Match the hook's args (timezone + minute-quantized `now`) byte-identically
+  // so we hit the same subscription cache entry and the warm subscription
+  // survives the handoff. Paused while learn is open (query is skipped then;
+  // useNowMinute re-quantizes on unpause).
+  const warmupNow = useNowMinute(isLearnOpen);
   useQuery(
     api.features.scheduling.getCardForReview,
-    !isLearnOpen ? { timezone: getUserTimezone() } : 'skip',
+    !isLearnOpen ? { timezone: getUserTimezone(), now: warmupNow } : 'skip',
   );
 
   const threads = useQuery(
@@ -192,7 +197,7 @@ export default function MainLayout({
       const newThreadId = await getOrCreateEmptyThread({});
       handleOpenChat(newThreadId);
     } catch (err) {
-      console.error('Failed to create new chat:', err);
+      reportError(err, { op: 'newChatThread' });
     }
   }, [getOrCreateEmptyThread, handleOpenChat]);
 

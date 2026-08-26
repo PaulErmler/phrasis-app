@@ -68,7 +68,27 @@ vi.mock('convex/react', () => ({
   }),
   useQuery: (ref: string, args?: unknown) =>
     args === 'skip' ? undefined : harness.queryValues.get(ref),
+  // Preloaded handles are string refs here too (see the AppDataProvider mock
+  // below). Never `undefined`: mirrors the real hook, which always has at
+  // least the SSR-preloaded value.
+  usePreloadedQuery: (ref: string) => harness.queryValues.get(ref) ?? null,
   useMutation: (ref: string) => harness.mutationFor(ref),
+}));
+
+// The hook reads activeCourse/courseSettings (live values) and the
+// getUserSettings preloaded handle from AppDataProvider. Source them from
+// the same harness map, with the provider's never-`undefined` contract
+// (missing entry → null, as for a user without a course).
+vi.mock('@/components/app/AppDataProvider', () => ({
+  useAppData: () => ({
+    preloadedSettings: harness.REFS.getUserSettings,
+    preloadedCourseSettings: harness.REFS.getActiveCourseSettings,
+    preloadedActiveCourse: harness.REFS.getActiveCourse,
+    preloadedHomeSummary: 'home.getHomeSummary',
+    activeCourse: harness.queryValues.get(harness.REFS.getActiveCourse) ?? null,
+    courseSettings:
+      harness.queryValues.get(harness.REFS.getActiveCourseSettings) ?? null,
+  }),
 }));
 
 // Force distinct query/mutation refs (the generated api proxy has no stable
@@ -249,19 +269,21 @@ describe('useLearningMode', () => {
       expect(state.sourceText).toBe('Hola');
     });
 
-    it('keeps serving the last course settings while getActiveCourseSettings refetches', () => {
+    // Course settings and the active course now come from AppDataProvider
+    // (never `undefined`; the provider owns the always-warm subscription), so
+    // only the card query can refetch to `undefined`. `null` settings mean
+    // "no course yet" — that must NOT be masked by stickiness.
+    it('a provider-null courseSettings reads as noCollection, not a sticky reviewing state', () => {
       const { result, rerender } = renderHook(() => useLearningMode());
       expect(result.current.status).toBe('reviewing');
 
       harness.queryValues.delete(REFS.getActiveCourseSettings);
       rerender();
 
-      const state = reviewing(result);
-      expect(state.courseSettings.courseId).toBe('course1');
-      expect(state.reviewMode).toBe('audio');
+      expect(result.current.status).toBe('noCollection');
     });
 
-    it('keeps serving the last active course while getActiveCourse refetches', () => {
+    it('keeps reviewing (with empty language orders) when the provider has no active course', () => {
       const { result, rerender } = renderHook(() => useLearningMode());
       expect(result.current.status).toBe('reviewing');
 
@@ -269,20 +291,8 @@ describe('useLearningMode', () => {
       rerender();
 
       const state = reviewing(result);
-      expect(state.baseLanguages).toEqual(['en']);
-      expect(state.targetLanguages).toEqual(['es']);
-    });
-
-    it('stays reviewing when all three queries refetch at once', () => {
-      const { result, rerender } = renderHook(() => useLearningMode());
-      expect(result.current.status).toBe('reviewing');
-
-      harness.queryValues.delete(REFS.getCardForReview);
-      harness.queryValues.delete(REFS.getActiveCourseSettings);
-      harness.queryValues.delete(REFS.getActiveCourse);
-      rerender();
-
-      expect(reviewing(result).cardId).toBe('card1');
+      expect(state.baseLanguages).toEqual([]);
+      expect(state.targetLanguages).toEqual([]);
     });
 
     it('resets sticky values on sign-out and does not revive them on re-auth', () => {
@@ -370,8 +380,8 @@ describe('useLearningMode', () => {
       expect(reviewing(result).isExiting).toBe(false);
       expect(reviewing(result).isReviewing).toBe(false);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to delete card:',
         expect.any(Error),
+        { op: 'deleteCard' },
       );
     });
 
@@ -435,8 +445,8 @@ describe('useLearningMode', () => {
       expect(reviewing(result).isExiting).toBe(false);
       expect(reviewing(result).isReviewing).toBe(false);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to master card:',
         expect.any(Error),
+        { op: 'masterCard' },
       );
     });
 
@@ -467,8 +477,8 @@ describe('useLearningMode', () => {
       expect(reviewing(result).isExiting).toBe(false);
       expect(reviewing(result).isReviewing).toBe(false);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to hide card:',
         expect.any(Error),
+        { op: 'hideCard' },
       );
     });
   });
@@ -522,8 +532,8 @@ describe('useLearningMode', () => {
       expect(reviewing(result).isExiting).toBe(false);
       expect(reviewing(result).isReviewing).toBe(false);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to advance free-play card:',
         expect.any(Error),
+        { op: 'advanceFreePlayCard' },
       );
     });
 
@@ -621,8 +631,8 @@ describe('useLearningMode', () => {
       expect(reviewing(result).isReviewing).toBe(false);
       expect(result.current.sessionCardCount).toBe(0);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to review card:',
         expect.any(Error),
+        expect.objectContaining({ op: 'reviewCard' }),
       );
     });
   });

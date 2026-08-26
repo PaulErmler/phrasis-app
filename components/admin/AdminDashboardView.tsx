@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { useNowMinute } from '@/hooks/use-now-minute';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { languageName } from '@/lib/languages';
@@ -26,8 +27,11 @@ export function AdminDashboardView() {
 function AdminDashboardContent() {
   const [days, setDays] = useState<number>(30);
 
-  const dau = useQuery(api.admin.dashboard.getDauSeries, { days });
-  const signups = useQuery(api.admin.dashboard.getSignupSeries, { days });
+  // Minute-quantized `now` per the no-wall-clock query guideline so the
+  // series' "today" bucket stays live without churning the subscription.
+  const now = useNowMinute();
+  const dau = useQuery(api.admin.dashboard.getDauSeries, { days, now });
+  const signups = useQuery(api.admin.dashboard.getSignupSeries, { days, now });
   const plans = useQuery(api.admin.dashboard.getPlanDistribution, {});
   const languages = useQuery(api.admin.dashboard.getLanguageStats, {});
   const funnel = useQuery(api.admin.dashboard.getOnboardingFunnel, {});

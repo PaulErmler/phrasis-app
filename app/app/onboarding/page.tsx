@@ -13,6 +13,7 @@ import {
   Authenticated,
   AuthLoading,
   useMutation,
+  usePreloadedQuery,
   useQuery,
   useAction,
   useConvexAuth,
@@ -26,6 +27,7 @@ import { toast } from 'sonner';
 import { ConvexError } from 'convex/values';
 import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import { reportError } from '@/lib/report-error';
+import { useAppData } from '@/components/app/AppDataProvider';
 import { convexErrorCode } from '@/lib/utils';
 import { shouldAdvanceOnEnter } from './lib/enterToAdvance';
 
@@ -157,7 +159,11 @@ export default function OnboardingPage() {
 
 function OnboardingContent() {
   const router = useRouter();
-  const userSettings = useQuery(api.features.courses.getUserSettings);
+  // Through AppDataProvider's SSR-seeded handle (B25; the onboarding page
+  // renders inside app/app/layout.tsx's provider). Same getUserSettings
+  // query key, so the finalize optimistic update below still reaches it.
+  const { preloadedSettings } = useAppData();
+  const userSettings = usePreloadedQuery(preloadedSettings);
   const onboardingProgress = useQuery(api.features.courses.getOnboardingProgress);
   const saveProgress = useMutation(api.features.courses.saveOnboardingProgress);
   const completeOnboarding = useMutation(api.features.courses.completeOnboarding);
@@ -431,7 +437,7 @@ function OnboardingWizard({
         const fd = dataRef.current;
         const stepNum = PROGRESS_STEP_ORDER.indexOf(stepIdRef.current) + 1;
         saveProgress(buildProgressPayload(fd, Math.max(1, stepNum)))
-          .catch((err) => console.error('Failed to save progress:', err));
+          .catch((err) => reportError(err, { op: 'saveOnboardingProgress' }));
       }, 250);
     },
     [saveProgress],
@@ -450,7 +456,7 @@ function OnboardingWizard({
     const stepNum = PROGRESS_STEP_ORDER.indexOf(step) + 1;
     if (stepNum > 0) {
       saveProgress(buildProgressPayload(dataRef.current, stepNum))
-        .catch((err) => console.error(`Failed to save ${label} step:`, err));
+        .catch((err) => reportError(err, { op: 'saveOnboardingProgress', step: label }));
     }
   }, [saveProgress]);
 

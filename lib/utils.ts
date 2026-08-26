@@ -7,6 +7,10 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const isAuthError = (error: unknown) => {
+  // Structured convention: ConvexError with { code: 'UNAUTHENTICATED' }.
+  if (convexErrorCode(error) === 'UNAUTHENTICATED') return true;
+  // Legacy bare-string payloads/messages, kept for backends not yet on the
+  // structured code.
   const message =
     (error instanceof ConvexError && typeof error.data === 'string' && error.data) ||
     (error instanceof Error && error.message) ||

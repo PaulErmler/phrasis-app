@@ -17,6 +17,8 @@ import { useImportValidation } from './useImportValidation';
 import { autoMapColumns, detectHasHeader } from './importHeuristics';
 import type { ColumnMapping, ImportDelimiter, RowStatus } from './types';
 
+import { reportError } from '@/lib/report-error';
+
 export interface ImportController {
   // course
   courseLanguages: string[];
@@ -327,7 +329,7 @@ export function useImportController(onSuccess?: () => void): ImportController {
         setPaywallOpen(true);
         return;
       }
-      console.error('Bulk import failed:', err);
+      reportError(err, { op: 'bulkImportTexts' });
       toast.error(t('failure'));
     } finally {
       setIsSubmitting(false);

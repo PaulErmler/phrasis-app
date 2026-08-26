@@ -31,6 +31,8 @@ import { Loader2 } from 'lucide-react';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
 import { resolveShowFurigana } from '@/lib/furigana';
 
+import { reportError } from '@/lib/report-error';
+
 export function WordSentencesDialog({
   word,
   displayWord,
@@ -180,7 +182,7 @@ export function WordSentencesDialog({
       try {
         await toggleFavorite({ cardId });
       } catch (error) {
-        console.error('Failed to toggle favorite:', error);
+        reportError(error, { op: 'toggleFavoriteCard', cardId });
         setFavoriteOverride((prev) => {
           const next = new Map(prev);
           next.set(cardId, currentlyFavorite);
@@ -198,7 +200,7 @@ export function WordSentencesDialog({
     try {
       await deleteCard({ cardId });
     } catch (error) {
-      console.error('Failed to delete card:', error);
+      reportError(error, { op: 'deleteCard', cardId });
     }
   }, [deletingCardId, deleteCard]);
 

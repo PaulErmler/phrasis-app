@@ -10,6 +10,8 @@ import { authClient } from '@/lib/auth-client';
 import { useIsNativeApp } from '@/hooks/use-native-app';
 import { nativePlatform } from '@/lib/native';
 
+import { reportError } from '@/lib/report-error';
+
 /**
  * Social sign-in for the Capacitor store-app shell.
  *
@@ -97,7 +99,7 @@ export function NativeSocialButtons() {
       router.push('/app/onboarding');
       router.refresh();
     } catch (err) {
-      console.error(`Native ${provider} sign-in failed:`, err);
+      reportError(err, { op: 'nativeSocialSignIn', provider });
       toast.error(t('SOCIAL_SIGN_IN_FAILED'));
       setBusy(null);
     }

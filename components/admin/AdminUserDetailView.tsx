@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { useNowMinute } from '@/hooks/use-now-minute';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { languageName } from '@/lib/languages';
@@ -25,7 +26,10 @@ export function AdminUserDetailView({ userId }: { userId: string }) {
 }
 
 function AdminUserDetailContent({ userId }: { userId: string }) {
-  const detail = useQuery(api.admin.dashboard.getUserDetail, { userId });
+  // Minute-quantized `now` per the no-wall-clock query guideline (live
+  // streak derivation).
+  const now = useNowMinute();
+  const detail = useQuery(api.admin.dashboard.getUserDetail, { userId, now });
 
   if (detail === undefined) {
     return (

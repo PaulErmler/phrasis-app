@@ -8,6 +8,12 @@ let userSettingsValue: { hideDueCounts?: boolean } | null = {};
 const useQueryMock = vi.fn();
 vi.mock('convex/react', () => ({
   useQuery: (query: unknown, args?: unknown) => useQueryMock(query, args),
+  // getUserSettings arrives via AppDataProvider's preloaded handle now.
+  usePreloadedQuery: () => userSettingsValue,
+}));
+
+vi.mock('@/components/app/AppDataProvider', () => ({
+  useAppData: () => ({ preloadedSettings: 'preloadedSettings' }),
 }));
 
 vi.mock('@/hooks/use-now-minute', () => ({

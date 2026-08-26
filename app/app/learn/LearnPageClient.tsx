@@ -6,6 +6,8 @@ import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { LearnView } from '@/components/app/learning/LearnView';
 
+import { reportError } from '@/lib/report-error';
+
 export function LearnPageClient() {
   const router = useRouter();
   const getOrCreateEmptyThread = useMutation(
@@ -21,7 +23,7 @@ export function LearnPageClient() {
       const threadId = await getOrCreateEmptyThread({});
       router.push(`/app/chat/${threadId}`);
     } catch (err) {
-      console.error('Failed to open chat from standalone learn page:', err);
+      reportError(err, { op: 'openChatFromLearn' });
       router.push('/app');
     }
   }, [getOrCreateEmptyThread, router]);

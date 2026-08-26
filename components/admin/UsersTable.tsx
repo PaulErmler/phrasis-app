@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useDebounce } from '@/hooks/use-debounce';
+import { useNowMinute } from '@/hooks/use-now-minute';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -108,12 +109,16 @@ export function UsersTable() {
   }, [debouncedSearch, selectedPlans, activity, sortBy]);
 
   const planDistribution = useQuery(api.admin.dashboard.getPlanDistribution, {});
+  // Minute-quantized `now` per the no-wall-clock query guideline (drives the
+  // activity filters and live streak derivation).
+  const now = useNowMinute();
   const result = useQuery(api.admin.dashboard.listUsers, {
     limit,
     search: debouncedSearch.trim() || undefined,
     planIds: selectedPlans.length > 0 ? selectedPlans : undefined,
     activity: activity === 'all' ? undefined : activity,
     sortBy,
+    now,
   });
 
   const planOptions = planDistribution?.plans ?? [];

@@ -20,6 +20,8 @@ import { useCustomer } from "autumn-js/react";
 import { toast } from "sonner";
 import { useIsNativeApp } from "@/hooks/use-native-app";
 
+import { reportError } from '@/lib/report-error';
+
 /**
  * App-wide dunning popup. Mounted once in BillingGate (from the /app layout)
  * so it covers every route including the standalone /app/learn page; opens
@@ -132,11 +134,11 @@ function PaymentOverdueDialogContent({
     try {
       const res = await openBillingPortal({ returnUrl: window.location.href });
       if (res.error) {
-        console.error("Billing portal failed:", res.error);
+        reportError(res.error, { op: 'openBillingPortal' });
         toast.error(t("portalError"));
       }
     } catch (e) {
-      console.error("Billing portal failed:", e);
+      reportError(e, { op: 'openBillingPortal' });
       toast.error(t("portalError"));
     } finally {
       setBusy(null);
@@ -157,7 +159,7 @@ function PaymentOverdueDialogContent({
         res.outcome === "recovered" ? t("paymentReceived") : t("cancelSuccess"),
       );
     } catch (e) {
-      console.error("Cancel failed:", e);
+      reportError(e, { op: 'cancelPastDueSubscription' });
       toast.error(t("cancelError"));
     } finally {
       setBusy(null);

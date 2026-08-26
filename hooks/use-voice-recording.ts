@@ -5,6 +5,8 @@ import { convexErrorCode, isPaymentPastDueError } from '@/lib/utils';
 import { api } from '@/convex/_generated/api';
 import { toast } from 'sonner';
 
+import { reportError } from '@/lib/report-error';
+
 function detectDefaultMime(): string {
   if (
     typeof navigator !== 'undefined' &&
@@ -117,7 +119,7 @@ export function useVoiceRecording(
             } else if (convexErrorCode(error) === 'USAGE_LIMIT') {
               onUsageLimit?.();
             } else {
-              console.error('Transcription error:', error);
+              reportError(error, { op: 'transcribeAudio' });
               toast.error(tErrors('failedToTranscribe'));
             }
           } finally {
@@ -137,6 +139,9 @@ export function useVoiceRecording(
         }, maxDurationMs);
       }
     } catch (error) {
+      // Deliberately not reportError: this is overwhelmingly the user
+      // denying mic permission (NotAllowedError) — an expected state like
+      // autoplay rejection, with the toast as its surface.
       console.error('Error starting recording:', error);
       toast.error(tErrors('microphoneAccess'));
     }

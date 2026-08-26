@@ -22,6 +22,8 @@ import {
 } from '@/lib/audio/playbackClock';
 import type { CardAudioRecording } from '@/components/app/learning/types';
 
+import { reportError } from '@/lib/report-error';
+
 export interface UseAudioPlayerOptions {
   cardId: string | null;
   audioRecordings: CardAudioRecording[];
@@ -79,11 +81,11 @@ export interface AudioPlayerState {
 
 // Shared catch handler for `audio.play()` promises: interruption/autoplay-
 // policy rejections (AbortError/NotAllowedError) are expected and silently
-// ignored; anything else is logged under the given label.
+// ignored; anything else is a real playback failure worth the exception feed.
 function ignorePlayInterrupt(label: string) {
   return (err: { name?: string }) => {
     if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
-    console.error(label, err);
+    reportError(err, { op: 'audioPlay', label });
   };
 }
 
@@ -717,7 +719,7 @@ export function useAudioPlayer(
         whenMetadataReady(audio, doResume);
       } catch (err) {
         if (!cancelled && !(err instanceof DOMException && err.name === 'AbortError')) {
-          console.error('Audio merge failed:', err);
+          reportError(err, { op: 'audioMerge' });
         }
         if (!cancelled) setIsMerging(false);
       }
@@ -819,7 +821,7 @@ export function useAudioPlayer(
         }
       } catch (err) {
         if (!cancelled && !(err instanceof DOMException && err.name === 'AbortError')) {
-          console.error('Audio prefetch failed:', err);
+          reportError(err, { op: 'audioPrefetch' });
         }
       }
     };

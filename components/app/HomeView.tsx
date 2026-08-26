@@ -18,6 +18,8 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import type { ReviewMode, SchedulingMode } from '@/convex/types';
 
+import { reportError } from '@/lib/report-error';
+
 // Module-level guard so the all-modes content warm fires at most once per
 // course per page session (not on every HomeView re-render or remount). Keyed
 // by courseId so switching the active course re-warms.
@@ -110,7 +112,7 @@ export function HomeView({
 
     warmedCourseIds.add(courseId);
     ensureAllModesContent().catch((error) => {
-      console.error('Failed to ensure upcoming cards content:', error);
+      reportError(error, { op: 'ensureAllModesContent' });
       warmedCourseIds.delete(courseId);
     });
   }, [isHidden, courseId, ensureAllModesContent]);
@@ -126,7 +128,7 @@ export function HomeView({
       const threadId = await getOrCreateEmptyThread({});
       onChatOpen(threadId);
     } catch (error) {
-      console.error('Failed to open chat:', error);
+      reportError(error, { op: 'openChatFromHome' });
       toast.error(t('content.chat.openError'));
     } finally {
       setIsChatNavigating(false);
@@ -150,7 +152,7 @@ export function HomeView({
             schedulingMode,
           });
         } catch (error) {
-          console.error('Failed to update scheduling mode:', error);
+          reportError(error, { op: 'updateSchedulingMode' });
         }
       }
 
@@ -169,7 +171,7 @@ export function HomeView({
           courseId: courseSettings.courseId,
           reviewMode: mode,
         }).catch((error) => {
-          console.error('Failed to update review mode:', error);
+          reportError(error, { op: 'updateReviewMode' });
         });
       }
     },

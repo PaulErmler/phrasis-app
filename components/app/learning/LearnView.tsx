@@ -40,6 +40,8 @@ import { useDifficultyCheck } from '@/components/app/learning/useDifficultyCheck
 import { DifficultyCheckDialog } from '@/components/app/learning/DifficultyCheckDialog';
 import type { Id } from '@/convex/_generated/dataModel';
 
+import { reportError } from '@/lib/report-error';
+
 function WrappedChatPanel({
   threadId,
   cardId,
@@ -351,7 +353,7 @@ function LearnViewInner({
   const handleNewChat = useCallback(() => {
     resetThreadMessages();
     getOrCreateEmptyThread().catch((err) =>
-      console.error('Failed to start a new chat:', err),
+      reportError(err, { op: 'newChatThread' }),
     );
   }, [getOrCreateEmptyThread, resetThreadMessages]);
 

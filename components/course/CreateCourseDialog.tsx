@@ -26,6 +26,8 @@ import {
   DAILY_TIME_CUSTOM_MAX,
 } from '@/lib/constants/dailyGoal';
 
+import { reportError } from '@/lib/report-error';
+
 interface CreateCourseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -153,7 +155,7 @@ export function CreateCourseDialog({
           try {
             await archiveCourse({ courseId: remembered.courseId });
           } catch (archiveError) {
-            console.error('Error archiving orphaned course:', archiveError);
+            reportError(archiveError, { op: 'archiveOrphanedCourse' });
           }
           createdCourseRef.current = null;
         }
@@ -182,7 +184,7 @@ export function CreateCourseDialog({
       handleClose(false);
       resetForm();
     } catch (error) {
-      console.error('Error creating course:', error);
+      reportError(error, { op: 'createCourse' });
       toast.error(t('error'));
       setIsSubmitting(false);
     }

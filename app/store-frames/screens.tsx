@@ -35,6 +35,7 @@ import * as fx from './fixtures';
 
 const noop = () => {};
 
+/** Shared CardPresentation stub; spread with per-screen card content. */
 const cardStubs = {
   isFavorite: false,
   isPendingMaster: false,
@@ -45,7 +46,6 @@ const cardStubs = {
   preReviewCount: 3,
   schedulingPhase: 'review' as const,
   fsrsState: { reps: 6 },
-  bare: true as const,
 };
 
 /** Canned app data so home's stats card can mount outside /app. */
@@ -96,10 +96,13 @@ export function LearnScreen() {
         <LearningHeader onBack={noop} onSettingsOpen={noop} ratingCount={4} />
         <main className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden px-4">
           <LearningCardContent
-            {...cardStubs}
-            sourceText={fx.shadowCard.sourceText}
-            translations={fx.shadowCard.translations}
-            audioRecordings={fx.shadowCard.audioRecordings}
+            bare
+            presentation={{
+              ...cardStubs,
+              sourceText: fx.shadowCard.sourceText,
+              translations: fx.shadowCard.translations,
+              audioRecordings: fx.shadowCard.audioRecordings,
+            }}
           />
         </main>
         <LearningControls
@@ -324,10 +327,13 @@ export function WriteScreen() {
         <LearningHeader onBack={noop} onSettingsOpen={noop} reviewMode="full" ratingCount={4} />
         <main className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden px-4">
           <FullReviewCardContent
-            {...cardStubs}
-            sourceText={fx.writeCard.sourceText}
-            translations={fx.writeCard.translations}
-            audioRecordings={fx.writeCard.audioRecordings}
+            bare
+            presentation={{
+              ...cardStubs,
+              sourceText: fx.writeCard.sourceText,
+              translations: fx.writeCard.translations,
+              audioRecordings: fx.writeCard.audioRecordings,
+            }}
             targetAudioMode="afterSubmit"
           />
         </main>
@@ -358,6 +364,8 @@ export function WriteScreen() {
 export function ProgressScreen() {
   return (
     <MockConvex>
+    {/* ProgressDisplay reads getUserSettings via AppDataProvider. */}
+    <WithAppData>
     <WithChatContext>
       <div className="absolute inset-0 flex flex-col bg-background text-foreground pt-4">
         <LearningHeader onBack={noop} onSettingsOpen={noop} ratingCount={4} />
@@ -375,6 +383,7 @@ export function ProgressScreen() {
         </div>
       </div>
     </WithChatContext>
+    </WithAppData>
     </MockConvex>
   );
 }

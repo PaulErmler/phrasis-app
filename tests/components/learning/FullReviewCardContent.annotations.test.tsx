@@ -14,6 +14,7 @@ vi.mock('@/components/autumn/usage-limit-dialog', () => ({
 
 import { FullReviewCardContent } from '@/components/app/learning/FullReviewCardContent';
 import type { CardTranslation } from '@/components/app/learning/types';
+import { makePresentation } from './cardPresentationStub';
 
 /**
  * Romanization belongs under the sentence/corrections, not after the
@@ -41,16 +42,10 @@ const TRANSLATIONS: CardTranslation[] = [
 function renderCard() {
   return render(
     <FullReviewCardContent
-      preReviewCount={0}
-      sourceText="Hey, everyone."
-      translations={TRANSLATIONS}
-      audioRecordings={[]}
-      isFavorite={false}
-      isPendingMaster={false}
-      isPendingHide={false}
-      onMaster={vi.fn()}
-      onHide={vi.fn()}
-      onFavorite={vi.fn()}
+      presentation={makePresentation({
+        sourceText: 'Hey, everyone.',
+        translations: TRANSLATIONS,
+      })}
       targetAudioMode="never"
     />,
   );

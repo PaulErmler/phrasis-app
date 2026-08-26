@@ -278,9 +278,10 @@ describe('BillingGate', () => {
       // a best-effort refresh. Vitest fails this test on any unhandled
       // rejection, so reaching these assertions IS the no-throw proof.
       expect(syncQuotasMock).toHaveBeenCalledTimes(1);
+      // reportError's console signature: (error, context).
       expect(consoleError).toHaveBeenCalledWith(
-        'Failed to sync quotas:',
         expect.any(Error),
+        { op: 'syncQuotas' },
       );
 
       // finally{} must release the in-flight latch even on error, otherwise

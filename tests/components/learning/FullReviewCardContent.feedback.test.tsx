@@ -44,6 +44,7 @@ import type {
 } from '@/components/app/learning/types';
 import { computeAccuracyPair } from '@/lib/textCompare';
 import type { Id } from '@/convex/_generated/dataModel';
+import { makePresentation } from './cardPresentationStub';
 
 const TRANSLATIONS: CardTranslation[] = [
   { language: 'en', text: 'I would like a coffee.', isBaseLanguage: true, isTargetLanguage: false },
@@ -56,18 +57,12 @@ function renderCard(opts: { aiFeedbackEnabled?: boolean } = {}) {
   const onAccuracyChange = vi.fn();
   render(
     <FullReviewCardContent
-      preReviewCount={0}
-      sourceText="I would like a coffee."
-      translations={TRANSLATIONS}
-      audioRecordings={[]}
-      isFavorite={false}
-      isPendingMaster={false}
-      isPendingHide={false}
-      onMaster={vi.fn()}
-      onHide={vi.fn()}
-      onFavorite={vi.fn()}
+      presentation={makePresentation({
+        cardId: CARD_ID,
+        sourceText: 'I would like a coffee.',
+        translations: TRANSLATIONS,
+      })}
       targetAudioMode="never"
-      cardId={CARD_ID}
       aiFeedbackEnabled={opts.aiFeedbackEnabled ?? true}
       onAccuracyChange={onAccuracyChange}
     />,
@@ -196,18 +191,12 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     const onAccuracyChange = vi.fn();
     render(
       <FullReviewCardContent
-        preReviewCount={0}
-        sourceText="I would like a coffee."
-        translations={TRANSLATIONS}
-        audioRecordings={[]}
-        isFavorite={false}
-        isPendingMaster={false}
-        isPendingHide={false}
-        onMaster={vi.fn()}
-        onHide={vi.fn()}
-        onFavorite={vi.fn()}
+        presentation={makePresentation({
+          cardId: CARD_ID,
+          sourceText: 'I would like a coffee.',
+          translations: TRANSLATIONS,
+        })}
         targetAudioMode="never"
-        cardId={CARD_ID}
         aiFeedbackEnabled
         firstExposure
         onAccuracyChange={onAccuracyChange}
@@ -233,18 +222,12 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     const onAccuracyChange = vi.fn();
     render(
       <FullReviewCardContent
-        preReviewCount={0}
-        sourceText="I would like a coffee."
-        translations={withAlternatives}
-        audioRecordings={[]}
-        isFavorite={false}
-        isPendingMaster={false}
-        isPendingHide={false}
-        onMaster={vi.fn()}
-        onHide={vi.fn()}
-        onFavorite={vi.fn()}
+        presentation={makePresentation({
+          cardId: CARD_ID,
+          sourceText: 'I would like a coffee.',
+          translations: withAlternatives,
+        })}
         targetAudioMode="never"
-        cardId={CARD_ID}
         aiFeedbackEnabled
         onAccuracyChange={onAccuracyChange}
       />,
@@ -278,18 +261,12 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     // stale pending/limit rows must not linger until the next card.
     gradeMock.mockReturnValue(new Promise(() => {}));
     const props = {
-      preReviewCount: 0,
-      sourceText: 'I would like a coffee.',
-      translations: TRANSLATIONS,
-      audioRecordings: [],
-      isFavorite: false,
-      isPendingMaster: false,
-      isPendingHide: false,
-      onMaster: vi.fn(),
-      onHide: vi.fn(),
-      onFavorite: vi.fn(),
+      presentation: makePresentation({
+        cardId: CARD_ID,
+        sourceText: 'I would like a coffee.',
+        translations: TRANSLATIONS,
+      }),
       targetAudioMode: 'never' as const,
-      cardId: CARD_ID,
     };
     const { rerender } = render(
       <FullReviewCardContent {...props} aiFeedbackEnabled />,
@@ -331,18 +308,12 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     ];
     render(
       <FullReviewCardContent
-        preReviewCount={0}
-        sourceText="I would like a coffee."
-        translations={longTranslations}
-        audioRecordings={[]}
-        isFavorite={false}
-        isPendingMaster={false}
-        isPendingHide={false}
-        onMaster={vi.fn()}
-        onHide={vi.fn()}
-        onFavorite={vi.fn()}
+        presentation={makePresentation({
+          cardId: CARD_ID,
+          sourceText: 'I would like a coffee.',
+          translations: longTranslations,
+        })}
         targetAudioMode="never"
-        cardId={CARD_ID}
         aiFeedbackEnabled
       />,
     );

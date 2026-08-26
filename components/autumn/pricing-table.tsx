@@ -29,6 +29,8 @@ import { useIsNativeApp } from "@/hooks/use-native-app";
 import { useNewPlanCheckout } from "@/hooks/use-new-plan-checkout";
 import { useCheckoutErrorToast } from "@/hooks/use-checkout-error";
 
+import { reportError } from '@/lib/report-error';
+
 /** Sort key for plan cards: Free first, then paid plans by ascending price. */
 function productSortPrice(product: Product): number {
   if (product.properties?.is_free) return -1;
@@ -763,7 +765,7 @@ export const PricingCardButton = React.forwardRef<
     try {
       await onClick?.(e);
     } catch (error) {
-      console.error(error);
+      reportError(error, { op: 'pricingTableAction' });
     } finally {
       setLoading(false);
     }

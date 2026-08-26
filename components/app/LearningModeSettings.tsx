@@ -53,6 +53,8 @@ import {
   languageNeedsRomanization,
 } from '@/lib/languages';
 
+import { reportError } from '@/lib/report-error';
+
 interface LearningModeSettingsProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -328,7 +330,7 @@ export function LearningModeSettings({
     try {
       await updateSettings({ courseId: courseSettings.courseId, ...fields });
     } catch (error) {
-      console.error('Failed to update course settings:', error);
+      reportError(error, { op: 'updateCourseSettings' });
       toast.error(tSaveError('saveFailed'));
     }
   };

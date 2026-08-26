@@ -25,6 +25,8 @@ import LowQuotaDialog from '@/components/autumn/low-quota-dialog';
 import UsageLimitDialog from '@/components/autumn/usage-limit-dialog';
 import { cn, convexErrorCode, isPaymentPastDueError } from '@/lib/utils';
 
+import { reportError } from '@/lib/report-error';
+
 /**
  * Compact single-row chat-input surface used on the home view. Matches the
  * "prototype J" design: Sparkles prefix → text input → voice button → send
@@ -114,7 +116,7 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
         setIsProcessing(false);
         return;
       }
-      console.error('Failed to start chat:', error);
+      reportError(error, { op: 'startChatFromHome' });
       toast.error(tErrors('failedToCreateThread'));
       setIsProcessing(false);
     }

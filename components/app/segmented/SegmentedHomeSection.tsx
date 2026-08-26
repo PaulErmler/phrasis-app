@@ -31,6 +31,8 @@ import { FEATURE_IDS } from '@/convex/features/featureIds';
 import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import { CEFR_COLORS, CEFR_ORDER, isCefr, type Cefr } from './cefr';
 
+import { reportError } from '@/lib/report-error';
+
 type HomeSummary = NonNullable<
   ReturnType<typeof useQuery<typeof api.features.home.getHomeSummary>>
 >;
@@ -200,7 +202,7 @@ function PremadeTab({ summary }: { summary: HomeSummary }) {
       try {
         await setActiveCollection({ collectionId });
       } catch (error) {
-        console.error('Error setting active collection:', error);
+        reportError(error, { op: 'setActiveCollection' });
         toast.error(convexErrorMessage(error) ?? t('failedToSelect'));
       } finally {
         setOptimisticActiveId(null);

@@ -30,6 +30,7 @@ import type {
   CardTranslation,
   WritingAccuracySummary,
 } from '@/components/app/learning/types';
+import { makePresentation } from './cardPresentationStub';
 
 const computeAccuracyPairSpy = vi.mocked(computeAccuracyPair);
 
@@ -51,16 +52,10 @@ function renderCard(translations: CardTranslation[]) {
   const onAccuracyChange = vi.fn();
   render(
     <FullReviewCardContent
-      preReviewCount={0}
-      sourceText="The weather is nice."
-      translations={translations}
-      audioRecordings={[]}
-      isFavorite={false}
-      isPendingMaster={false}
-      isPendingHide={false}
-      onMaster={vi.fn()}
-      onHide={vi.fn()}
-      onFavorite={vi.fn()}
+      presentation={makePresentation({
+        sourceText: 'The weather is nice.',
+        translations,
+      })}
       targetAudioMode="never"
       onAccuracyChange={onAccuracyChange}
     />,
@@ -175,16 +170,10 @@ describe('FullReviewCardContent: accuracy summary across target languages', () =
           {/* Reading the state ties the re-render to the stored object. */}
           <span data-testid="submitted-count">{summary?.submittedCount ?? -1}</span>
           <FullReviewCardContent
-            preReviewCount={0}
-            sourceText="The weather is nice."
-            translations={TWO_TARGETS}
-            audioRecordings={[]}
-            isFavorite={false}
-            isPendingMaster={false}
-            isPendingHide={false}
-            onMaster={vi.fn()}
-            onHide={vi.fn()}
-            onFavorite={vi.fn()}
+            presentation={makePresentation({
+              sourceText: 'The weather is nice.',
+              translations: TWO_TARGETS,
+            })}
             targetAudioMode="never"
             onAccuracyChange={(s) => {
               emissions(s);

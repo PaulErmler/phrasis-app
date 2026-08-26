@@ -34,6 +34,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
+import { convexErrorMessage } from '@/lib/utils';
 import { DualLanguageEditor } from '@/components/course/DualLanguageEditor';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
@@ -170,7 +171,15 @@ export function CourseLanguageSettings({
       await archiveCourse({ courseId: course._id });
       handleClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to archive course');
+      // Structured server errors ({ code, message }) stringify to a JSON
+      // blob via `e.message`. Surface the payload's clean message when it
+      // carries one (plain-string data, or a structured `message` field),
+      // else the generic localized copy.
+      const data =
+        e instanceof ConvexError ? (e.data as { message?: unknown }) : undefined;
+      const structuredMessage =
+        typeof data?.message === 'string' ? data.message : undefined;
+      setError(convexErrorMessage(e) ?? structuredMessage ?? t('saveFailed'));
     } finally {
       setArchiving(false);
       setArchiveConfirmOpen(false);
