@@ -49,7 +49,9 @@ export const activateDataset = internalMutation({
     // production activation can land first and the cutover can be triggered
     // separately during a low-traffic window.
     let cutoverScheduled = false;
-    const cutoverFlag = (optionalEnv('FF_NEW_COURSE_CUTOVER') ?? '').toLowerCase();
+    const cutoverFlag = (
+      optionalEnv('FF_NEW_COURSE_CUTOVER') ?? ''
+    ).toLowerCase();
     const flagEnabled = cutoverFlag === '1' || cutoverFlag === 'true';
     if (args.runCutover && flagEnabled) {
       await ctx.scheduler.runAfter(
@@ -82,7 +84,9 @@ export const runCutoverNow = internalMutation({
     const dataset = await ctx.db.get(args.datasetId);
     if (!dataset) throw new ConvexError(`Dataset ${args.datasetId} not found`);
 
-    const cutoverFlag = (optionalEnv('FF_NEW_COURSE_CUTOVER') ?? '').toLowerCase();
+    const cutoverFlag = (
+      optionalEnv('FF_NEW_COURSE_CUTOVER') ?? ''
+    ).toLowerCase();
     const flagEnabled = cutoverFlag === '1' || cutoverFlag === 'true';
     if (!flagEnabled) {
       throw new ConvexError(

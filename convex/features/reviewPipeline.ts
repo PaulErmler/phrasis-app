@@ -121,7 +121,11 @@ export function resolveValidatedPhase(
   track: SchedulingTrack,
   args: Pick<
     ReviewCardArgs,
-    'forceReviewPhase' | 'rating' | 'accuracy' | 'accuracyStrict' | 'accuracyLenient'
+    | 'forceReviewPhase'
+    | 'rating'
+    | 'accuracy'
+    | 'accuracyStrict'
+    | 'accuracyLenient'
   >,
 ): SchedulingPhase {
   // When forceReviewPhase is true (full review mode), treat the card as
@@ -197,7 +201,7 @@ export function applyFsrsTransition(params: {
   const result = scheduleCard(cardState, rating, initialReviewCount);
 
   // Add a random jitter of 0–60 seconds to spread cards apart in the queue.
-  const jitterMs = (Math.random()-0.5) * 60_000;
+  const jitterMs = (Math.random() - 0.5) * 60_000;
   const dueDateWithJitter = result.dueDate + jitterMs;
 
   return { cardState, result, dueDateWithJitter };
@@ -243,7 +247,9 @@ export async function resolveSearchableTextRefresh(
       ? await ctx.db.get(card.textId)
       : null;
 
-  let searchableTextPatch: { searchableText: string; searchableTextLanguages: string[] } | undefined;
+  let searchableTextPatch:
+    | { searchableText: string; searchableTextLanguages: string[] }
+    | undefined;
   if (searchableTextIsStale && text) {
     searchableTextPatch = await buildCardSearchableText(
       ctx,
@@ -292,7 +298,9 @@ export async function applyReviewPatchToCard(
 
   // Flip isGraduated once the card reaches FSRS Review state (one-way flag)
   const isGraduatedPatch =
-    !(card.isGraduated ?? false) && result.fsrsState && result.fsrsState.state >= 2
+    !(card.isGraduated ?? false) &&
+    result.fsrsState &&
+    result.fsrsState.state >= 2
       ? { isGraduated: true as const }
       : {};
 
@@ -397,7 +405,17 @@ export async function recordReviewHistoryRow(
     writingUnseeded: boolean;
   },
 ): Promise<Id<'reviewHistory'>> {
-  const { userId, courseId, card, args, track, phase, todayDate, wasFirstReview, writingUnseeded } = params;
+  const {
+    userId,
+    courseId,
+    card,
+    args,
+    track,
+    phase,
+    todayDate,
+    wasFirstReview,
+    writingUnseeded,
+  } = params;
   const { cardState, result, dueDateWithJitter } = params.transition;
 
   return insertReviewHistory(ctx, {
@@ -425,9 +443,7 @@ export async function recordReviewHistoryRow(
     sessionId: args.sessionId,
     prevDueDate: cardState.dueDate,
     newDueDate: dueDateWithJitter,
-    ...(track === 'shared'
-      ? { prevPreReviewCount: card.preReviewCount }
-      : {}),
+    ...(track === 'shared' ? { prevPreReviewCount: card.preReviewCount } : {}),
     prevFsrsState: cardState.fsrsState ?? undefined,
     newFsrsState: result.fsrsState ?? undefined,
     ...(result.phaseTransitioned ? { phaseTransitioned: true } : {}),
@@ -460,7 +476,17 @@ export async function logReviewForUndo(
     };
   },
 ): Promise<void> {
-  const { userId, courseId, card, args, reviewSettings, track, historyId, writing, stats } = params;
+  const {
+    userId,
+    courseId,
+    card,
+    args,
+    reviewSettings,
+    track,
+    historyId,
+    writing,
+    stats,
+  } = params;
 
   await logReview(ctx, {
     userId,
@@ -554,9 +580,17 @@ export async function resolveCelebrationVerdict(
     todayDate: string;
   },
 ): Promise<{ triggerCelebration: boolean; celebrationHighWater: number }> {
-  const { userId, courseId, reviewSettings, dailyReviewsToday, lastCelebratedAtCount, todayDate } = params;
+  const {
+    userId,
+    courseId,
+    reviewSettings,
+    dailyReviewsToday,
+    lastCelebratedAtCount,
+    todayDate,
+  } = params;
 
-  const progressDisplayEnabled = reviewSettings?.progressDisplayEnabled !== false;
+  const progressDisplayEnabled =
+    reviewSettings?.progressDisplayEnabled !== false;
   let celebrationHighWater = lastCelebratedAtCount;
   let triggerCelebration =
     progressDisplayEnabled &&

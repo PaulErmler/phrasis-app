@@ -65,10 +65,7 @@ import {
 } from '../lib/freePlay';
 import { getTodayInTimezone, resolveClientNow } from '../lib/dateUtils';
 import { dateInTimezone } from '../../lib/dateStrings';
-import {
-  deleteAudioRow,
-  deleteAudioRowsForTextLanguage,
-} from '../lib/audio';
+import { deleteAudioRow, deleteAudioRowsForTextLanguage } from '../lib/audio';
 import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
 import {
   isUserCreatedText,
@@ -105,7 +102,6 @@ import {
   resolveCelebrationVerdict,
 } from './reviewPipeline';
 
-
 /**
  * Authenticate the user and verify ownership of a card via deck → course.
  * Throws ConvexError on failure. Every card-mutating entry point shares this
@@ -116,10 +112,12 @@ async function authorizeCardAccess(ctx: MutationCtx, cardId: Id<'cards'>) {
   const userId = await requireAuthUserId(ctx);
 
   const card = await ctx.db.get(cardId);
-  if (!card) throw new ConvexError({ code: 'NOT_FOUND', message: 'Card not found' });
+  if (!card)
+    throw new ConvexError({ code: 'NOT_FOUND', message: 'Card not found' });
 
   const deck = await ctx.db.get(card.deckId);
-  if (!deck) throw new ConvexError({ code: 'NOT_FOUND', message: 'Deck not found' });
+  if (!deck)
+    throw new ConvexError({ code: 'NOT_FOUND', message: 'Deck not found' });
 
   const course = await ctx.db.get(deck.courseId);
   if (!course || course.userId !== userId)
@@ -228,7 +226,15 @@ async function fetchDueCardsWithFilter(
   if (face) {
     return fetchFreePlayRotation(ctx, deckId, face, filter, take);
   }
-  return fetchTrackDueCards(ctx, deckId, schedulingMode, filter, track, now, take);
+  return fetchTrackDueCards(
+    ctx,
+    deckId,
+    schedulingMode,
+    filter,
+    track,
+    now,
+    take,
+  );
 }
 
 export const getCardForReview = query({
@@ -276,7 +282,8 @@ export const getCardForReview = query({
 
     // Load settings (initialReviewCount + schedulingMode + studyContentFilter) from the courseSettings table
     const settings = await getCourseSettings(ctx, course._id);
-    const initialReviewCount = settings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
+    const initialReviewCount =
+      settings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
     const studyContext = studyContextFromSettings(settings);
     const { schedulingMode, studyContentFilter } = studyContext;
 
@@ -300,7 +307,9 @@ export const getCardForReview = query({
     // and `ignoreMissingWordTimings` keep this query's long-standing semantics:
     // it surfaces stored romanization for every language and does not treat
     // legacy timing-less audio as a content gap.
-    const texts = await Promise.all(dueCards.map((card) => ctx.db.get(card.textId)));
+    const texts = await Promise.all(
+      dueCards.map((card) => ctx.db.get(card.textId)),
+    );
     // Source collections for the card-origin pill (max 2 point reads).
     const collections = await Promise.all(
       dueCards.map((card) =>
@@ -405,14 +414,19 @@ export const getCardForReview = query({
           return alternatives ? { ...tr, alternatives } : tr;
         }),
         audioRecordings: content.audioRecordings,
-        dueDate: writingTrack ? card.writingDueDate ?? card.dueDate : card.dueDate,
+        dueDate: writingTrack
+          ? (card.writingDueDate ?? card.dueDate)
+          : card.dueDate,
         isMastered: card.isMastered,
         isHidden: card.isHidden,
         isFavorite: card.isFavorite ?? false,
-        schedulingPhase: writingTrack ? ('review' as const) : card.schedulingPhase,
+        schedulingPhase: writingTrack
+          ? ('review' as const)
+          : card.schedulingPhase,
         preReviewCount: writingTrack ? 0 : card.preReviewCount,
         initialReviewCount,
-        fsrsState: (writingTrack ? card.writingFsrsState : card.fsrsState) ?? null,
+        fsrsState:
+          (writingTrack ? card.writingFsrsState : card.fsrsState) ?? null,
         radioPlayCount: card.radioPlayCount,
         freeStudyPlayCount: card.freeStudyPlayCount,
         goodReviewCount: card.goodReviewCount,
@@ -447,7 +461,12 @@ export const getCardForReview = query({
     // Undo stack depth under the CURRENT study context. Shares
     // takeUndoableLogs with undoLastReview so the button and the mutation
     // can't disagree.
-    const undoable = await takeUndoableLogs(ctx, userId, course._id, studyContext);
+    const undoable = await takeUndoableLogs(
+      ctx,
+      userId,
+      course._id,
+      studyContext,
+    );
 
     return {
       ...current,
@@ -591,9 +610,10 @@ export const getCardForReviewEmptyReason = query({
     //      the long run.
     //   2. Does the OTHER source have any DUE card right now? If yes, we
     //      can offer the one-tap unblock.
-    const currentOrigins = studyContentFilter === 'custom'
-      ? (['custom', 'chat'] as const)
-      : (['premade'] as const);
+    const currentOrigins =
+      studyContentFilter === 'custom'
+        ? (['custom', 'chat'] as const)
+        : (['premade'] as const);
     let currentSourceHasAnyCards = false;
     for (const origin of currentOrigins) {
       const probe = await ctx.db
@@ -612,7 +632,8 @@ export const getCardForReviewEmptyReason = query({
       }
     }
 
-    const otherFilter: StudyContentFilter = studyContentFilter === 'custom' ? 'course' : 'custom';
+    const otherFilter: StudyContentFilter =
+      studyContentFilter === 'custom' ? 'course' : 'custom';
     const otherCards = await fetchDueCardsWithFilter(
       ctx,
       deck._id,
@@ -658,10 +679,14 @@ export const reviewCard = mutation({
     triggerCelebration: v.boolean(),
   }),
   handler: async (ctx, args) => {
-    const { userId, card, deck, course } = await authorizeCardAccess(ctx, args.cardId);
+    const { userId, card, deck, course } = await authorizeCardAccess(
+      ctx,
+      args.cardId,
+    );
 
     const reviewSettings = await getCourseSettings(ctx, deck.courseId);
-    const initialReviewCount = reviewSettings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
+    const initialReviewCount =
+      reviewSettings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
 
     // Which per-card schedule this review writes: the writing track iff the
     // course has separateModeTracking on AND the review happened in Writing
@@ -674,7 +699,12 @@ export const reviewCard = mutation({
 
     // Writing-track baseline with the lazy seed resolved (see
     // resolveWritingBaseline); phase + args validation; FSRS transition.
-    const writing = await resolveWritingBaseline(ctx, card, reviewSettings, track);
+    const writing = await resolveWritingBaseline(
+      ctx,
+      card,
+      reviewSettings,
+      track,
+    );
     const phase = resolveValidatedPhase(card, track, args);
     const transition = applyFsrsTransition({
       card,
@@ -722,8 +752,8 @@ export const reviewCard = mutation({
       // raw writingFsrsState.
       priorFsrsState:
         track === 'writing'
-          ? writing.priorFsrsState ?? null
-          : card.fsrsState ?? null,
+          ? (writing.priorFsrsState ?? null)
+          : (card.fsrsState ?? null),
       rating: args.rating,
       accuracy: args.accuracy,
       accuracyStrict: args.accuracyStrict,
@@ -792,7 +822,10 @@ export const reviewCard = mutation({
       dueDate: dueDateWithJitter,
       phaseTransitioned: result.phaseTransitioned,
       fsrsState: result.fsrsState,
-      dailyReviewsToday: floorToCelebration(dailyReviewsToday, celebrationHighWater),
+      dailyReviewsToday: floorToCelebration(
+        dailyReviewsToday,
+        celebrationHighWater,
+      ),
       dailyTimeMsToday,
       dailyNewWordsToday,
       triggerCelebration,
@@ -860,7 +893,12 @@ export const undoLastReview = mutation({
     const settings = await getCourseSettings(ctx, course._id);
     const studyContext = studyContextFromSettings(settings);
 
-    const undoable = await takeUndoableLogs(ctx, userId, course._id, studyContext);
+    const undoable = await takeUndoableLogs(
+      ctx,
+      userId,
+      course._id,
+      studyContext,
+    );
 
     for (const log of undoable) {
       const card = await ctx.db.get(log.cardId);
@@ -1180,7 +1218,10 @@ async function advanceFreePlayCardImpl(
   if (!face) {
     // The client only calls this from a free-play session; landing here means
     // the mode changed underneath it, so there is no rotation to advance.
-    throw new ConvexError({ code: 'INVALID_STATE', message: 'Not in free play' });
+    throw new ConvexError({
+      code: 'INVALID_STATE',
+      message: 'Not in free play',
+    });
   }
   const cfg = FREE_PLAY_MODES[face];
 
@@ -1204,7 +1245,9 @@ async function advanceFreePlayCardImpl(
   // or another tab advanced concurrently), `lowestTwo[0]` may differ from
   // `card`; in that case the floor is whichever of the two is not `card`.
   const floorCard = lowestTwo.find((c) => c._id !== card._id) ?? null;
-  const floorCounter = floorCard ? (floorCard[cfg.counterField] ?? 0) : pickedCounter;
+  const floorCounter = floorCard
+    ? (floorCard[cfg.counterField] ?? 0)
+    : pickedCounter;
   // Land strictly above the floor so the played card cannot tie with the
   // rest of the round; combined with ascending counter ordering this rules
   // out an immediate repeat as long as ≥1 other playable card exists.
@@ -1214,7 +1257,8 @@ async function advanceFreePlayCardImpl(
   // catch-up jump above): a true +1-per-play count. The seed for cards that
   // predate the field is face-specific. See `playCountSeed` in
   // convex/lib/freePlay.ts.
-  const newPlayCount = (card[cfg.playCountField] ?? cfg.playCountSeed(card)) + 1;
+  const newPlayCount =
+    (card[cfg.playCountField] ?? cfg.playCountSeed(card)) + 1;
 
   const patch: Partial<Doc<'cards'>> = { lastReviewedAt: Date.now() };
   patch[cfg.counterField] = newCounter;
@@ -1378,7 +1422,12 @@ export const toggleFavoriteCard = mutation({
     const { userId, card } = await authorizeCardAccess(ctx, args.cardId);
     const nextFavorite = !(card.isFavorite ?? false);
     await patchCard(ctx, args.cardId, { isFavorite: nextFavorite }, card);
-    await trackCardAction(ctx, userId, nextFavorite ? 'favorite' : 'unfavorite', card);
+    await trackCardAction(
+      ctx,
+      userId,
+      nextFavorite ? 'favorite' : 'unfavorite',
+      card,
+    );
     return null;
   },
 });
@@ -1552,7 +1601,11 @@ async function suggestCurriculumFixesForEdit(
   changedLanguages: Set<string>,
   submittedMap: Map<string, string>,
   existingTranslationMap: Map<string, Doc<'translations'>>,
-  audit: { cardEditId: Id<'cardEdits'>; userId: string; course: Doc<'courses'> },
+  audit: {
+    cardEditId: Id<'cardEdits'>;
+    userId: string;
+    course: Doc<'courses'>;
+  },
 ): Promise<string[]> {
   const flagged: string[] = [];
 
@@ -1623,10 +1676,14 @@ export const flagTranslation = mutation({
     retranslated: v.boolean(),
   }),
   handler: async (ctx, args) => {
-    const { userId, card, course } = await authorizeCardAccess(ctx, args.cardId);
+    const { userId, card, course } = await authorizeCardAccess(
+      ctx,
+      args.cardId,
+    );
 
     const text = await ctx.db.get(card.textId);
-    if (!text) throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
+    if (!text)
+      throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
 
     // Languages we need translations for: every base + target language in
     // the user's course except the source. Dedupe in case a language is
@@ -1788,10 +1845,14 @@ export const regenerateCardAudio = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, card, course } = await authorizeCardAccess(ctx, args.cardId);
+    const { userId, card, course } = await authorizeCardAccess(
+      ctx,
+      args.cardId,
+    );
 
     const text = await ctx.db.get(card.textId);
-    if (!text) throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
+    if (!text)
+      throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
 
     await consumeQuota(ctx, userId, FEATURE_IDS.AUDIO_REGENERATIONS);
     await trackEvent(ctx, {
@@ -1889,151 +1950,162 @@ export async function applyCardEdit(
    * also-correct replace) don't repeat the card → deck → course reads. */
   course: Doc<'courses'>;
 }> {
-    const { userId, card, course } = await authorizeCardAccess(ctx, args.cardId);
+  const { userId, card, course } = await authorizeCardAccess(ctx, args.cardId);
 
-    const text = await ctx.db.get(card.textId);
-    if (!text) throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
+  const text = await ctx.db.get(card.textId);
+  if (!text)
+    throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
 
-    // Diff plan: which languages changed (audibly or not), which path the
-    // edit takes, and the gender stamp for written rows. A no-op diff
-    // without a demanded fork returns before validation/billing, as before.
-    const plan = await resolveCardEditPlan(ctx, {
+  // Diff plan: which languages changed (audibly or not), which path the
+  // edit takes, and the gender stamp for written rows. A no-op diff
+  // without a demanded fork returns before validation/billing, as before.
+  const plan = await resolveCardEditPlan(ctx, {
+    userId,
+    card,
+    text,
+    course,
+    translations: args.translations,
+    ensureUserOwnedText: args.ensureUserOwnedText,
+    proposedAudioSpeakerGender: args.proposedAudioSpeakerGender,
+  });
+  const { changedLanguages } = plan;
+  if (changedLanguages.size === 0 && !plan.needsCopy) {
+    return { textId: card.textId, cardId: args.cardId, changed: false, course };
+  }
+
+  assertTranslationLengths(args.translations);
+
+  // Consume quota before making changes
+  if (!args.skipQuota) {
+    await consumeQuota(ctx, userId, FEATURE_IDS.CARD_EDITS);
+  }
+
+  // Track card edit event
+  await trackEvent(ctx, {
+    userId,
+    courseId: course._id,
+    timezone: args.timezone,
+    field: 'cardsEdited',
+  });
+
+  // Audit row, written before the paths diverge (Path B's curriculum-fix
+  // enqueue needs its id). See `recordCardEditAuditStart` for why a
+  // changeless fork is not logged.
+  const cardEditId = await recordCardEditAuditStart(ctx, {
+    userId,
+    course,
+    card,
+    text,
+    plan,
+    auditKind: args.auditKind,
+  });
+
+  let resolvedTextId: Id<'texts'>;
+  // Languages whose shared curriculum row this edit flagged, for the
+  // analytics event at the end. Only ever non-empty on Path B.
+  let flaggedLanguages: string[] = [];
+
+  if (plan.isUserOwned) {
+    // Path A: modify in place
+    resolvedTextId = card.textId;
+    await applyInPlaceTextEdit(ctx, { card, text, plan });
+  } else {
+    // Path B: fork the shared text into a user-owned logical copy.
+    resolvedTextId = await forkSharedTextForEdit(ctx, {
       userId,
-      card,
-      text,
-      course,
-      translations: args.translations,
-      ensureUserOwnedText: args.ensureUserOwnedText,
-      proposedAudioSpeakerGender: args.proposedAudioSpeakerGender,
-    });
-    const { changedLanguages } = plan;
-    if (changedLanguages.size === 0 && !plan.needsCopy) {
-      return { textId: card.textId, cardId: args.cardId, changed: false, course };
-    }
-
-    assertTranslationLengths(args.translations);
-
-    // Consume quota before making changes
-    if (!args.skipQuota) {
-      await consumeQuota(ctx, userId, FEATURE_IDS.CARD_EDITS);
-    }
-
-    // Track card edit event
-    await trackEvent(ctx, { userId, courseId: course._id, timezone: args.timezone, field: 'cardsEdited' });
-
-    // Audit row, written before the paths diverge (Path B's curriculum-fix
-    // enqueue needs its id). See `recordCardEditAuditStart` for why a
-    // changeless fork is not logged.
-    const cardEditId = await recordCardEditAuditStart(ctx, {
-      userId,
-      course,
       card,
       text,
       plan,
-      auditKind: args.auditKind,
     });
 
-    let resolvedTextId: Id<'texts'>;
-    // Languages whose shared curriculum row this edit flagged, for the
-    // analytics event at the end. Only ever non-empty on Path B.
-    let flaggedLanguages: string[] = [];
-
-    if (plan.isUserOwned) {
-      // Path A: modify in place
-      resolvedTextId = card.textId;
-      await applyInPlaceTextEdit(ctx, { card, text, plan });
-    } else {
-      // Path B: fork the shared text into a user-owned logical copy.
-      resolvedTextId = await forkSharedTextForEdit(ctx, {
-        userId,
-        card,
+    // The fork above is now the user's private copy. `text` and the plan's
+    // `existingTranslationMap` still describe the untouched shared rows, so
+    // this is the one place with both the original rows and the user's
+    // wording in hand.
+    //
+    // Skipped entirely when the source line changed: the user's target text
+    // is then a translation of THEIR source sentence, not the curriculum's,
+    // so offering it as a correction would compare two different sentences.
+    if (
+      args.suggestCurriculumFix &&
+      !changedLanguages.has(plan.sourceLanguage) &&
+      cardEditId !== undefined
+    ) {
+      flaggedLanguages = await suggestCurriculumFixesForEdit(
+        ctx,
         text,
-        plan,
-      });
-
-      // The fork above is now the user's private copy. `text` and the plan's
-      // `existingTranslationMap` still describe the untouched shared rows, so
-      // this is the one place with both the original rows and the user's
-      // wording in hand.
-      //
-      // Skipped entirely when the source line changed: the user's target text
-      // is then a translation of THEIR source sentence, not the curriculum's,
-      // so offering it as a correction would compare two different sentences.
-      if (
-        args.suggestCurriculumFix &&
-        !changedLanguages.has(plan.sourceLanguage) &&
-        cardEditId !== undefined
-      ) {
-        flaggedLanguages = await suggestCurriculumFixesForEdit(
-          ctx,
-          text,
-          changedLanguages,
-          plan.submittedMap,
-          plan.existingTranslationMap,
-          { cardEditId, userId, course },
-        );
-      }
+        changedLanguages,
+        plan.submittedMap,
+        plan.existingTranslationMap,
+        { cardEditId, userId, course },
+      );
     }
+  }
 
-    // Metadata-before-scheduling: land the proposed gender on the resolved
-    // text row now, so `scheduleMissingContent` below (which resolves the
-    // voice from this row and claims the synthesis) already speaks with the
-    // right voice. See the arg's doc comment for why afterwards is too late.
-    // Both fields: `resolveCardSpeakerGenders` gives the definitive
-    // linguistic `speakerGender` precedence over `audioSpeakerGender` and
-    // would flip a lone audio-gender patch straight back.
-    if (args.proposedAudioSpeakerGender !== undefined) {
-      await ctx.db.patch(resolvedTextId, {
-        speakerGender: args.proposedAudioSpeakerGender,
-        audioSpeakerGender: args.proposedAudioSpeakerGender,
-      });
-    }
-
-    // Re-point the card at the resolved text (in place — see
-    // `repointCardAtEditedText` for why the card id never changes) and
-    // refresh its searchable text.
-    const resolvedCardId: Id<'cards'> = args.cardId;
-    const resolvedText = await repointCardAtEditedText(ctx, {
-      card,
-      course,
-      resolvedTextId,
+  // Metadata-before-scheduling: land the proposed gender on the resolved
+  // text row now, so `scheduleMissingContent` below (which resolves the
+  // voice from this row and claims the synthesis) already speaks with the
+  // right voice. See the arg's doc comment for why afterwards is too late.
+  // Both fields: `resolveCardSpeakerGenders` gives the definitive
+  // linguistic `speakerGender` precedence over `audioSpeakerGender` and
+  // would flip a lone audio-gender patch straight back.
+  if (args.proposedAudioSpeakerGender !== undefined) {
+    await ctx.db.patch(resolvedTextId, {
+      speakerGender: args.proposedAudioSpeakerGender,
+      audioSpeakerGender: args.proposedAudioSpeakerGender,
     });
-    // Defensive cleanup: if the edit left the old text orphaned and user-created
-    // (path A reuses the textId, so the new card normally still references it.
-    // This is a no-op then), drop its now-unreferenced translations/audio/blobs.
-    await cascadeCleanupTextIfOrphaned(ctx, card.textId);
+  }
 
-    // Word re-tracking + TTS/romanization for the changed languages.
-    await propagateEditToDerivedContent(ctx, {
-      userId,
-      course,
-      card,
-      plan,
-      resolvedTextId,
-      resolvedText,
+  // Re-point the card at the resolved text (in place — see
+  // `repointCardAtEditedText` for why the card id never changes) and
+  // refresh its searchable text.
+  const resolvedCardId: Id<'cards'> = args.cardId;
+  const resolvedText = await repointCardAtEditedText(ctx, {
+    card,
+    course,
+    resolvedTextId,
+  });
+  // Defensive cleanup: if the edit left the old text orphaned and user-created
+  // (path A reuses the textId, so the new card normally still references it.
+  // This is a no-op then), drop its now-unreferenced translations/audio/blobs.
+  await cascadeCleanupTextIfOrphaned(ctx, card.textId);
+
+  // Word re-tracking + TTS/romanization for the changed languages.
+  await propagateEditToDerivedContent(ctx, {
+    userId,
+    course,
+    card,
+    plan,
+    resolvedTextId,
+    resolvedText,
+  });
+
+  // Path B forked the text row; the audit row still holds the before-id.
+  // The card id never changes (in-place patch) — recorded anyway so the
+  // log stays explicit about it.
+  if (cardEditId !== undefined && resolvedTextId !== card.textId) {
+    await setCardEditResult(ctx, cardEditId, {
+      cardIdAfter: resolvedCardId,
+      textIdAfter: resolvedTextId,
     });
+  }
 
-    // Path B forked the text row; the audit row still holds the before-id.
-    // The card id never changes (in-place patch) — recorded anyway so the
-    // log stays explicit about it.
-    if (cardEditId !== undefined && resolvedTextId !== card.textId) {
-      await setCardEditResult(ctx, cardEditId, {
-        cardIdAfter: resolvedCardId,
-        textIdAfter: resolvedTextId,
-      });
-    }
+  await trackCardAction(ctx, userId, 'edit', card, {
+    changed_languages: [...changedLanguages],
+    // Present only when the edit doubled as a curriculum complaint. Keeps
+    // the quality signal `flag_translation` provides on this path too, since
+    // it charges no TRANSLATION_FLAGS unit and fires no flag event.
+    ...(flaggedLanguages.length > 0
+      ? { flagged_languages: flaggedLanguages }
+      : {}),
+  });
 
-    await trackCardAction(ctx, userId, 'edit', card, {
-      changed_languages: [...changedLanguages],
-      // Present only when the edit doubled as a curriculum complaint. Keeps
-      // the quality signal `flag_translation` provides on this path too, since
-      // it charges no TRANSLATION_FLAGS unit and fires no flag event.
-      ...(flaggedLanguages.length > 0
-        ? { flagged_languages: flaggedLanguages }
-        : {}),
-    });
-
-    return { textId: resolvedTextId, cardId: resolvedCardId, changed: true, course };
+  return {
+    textId: resolvedTextId,
+    cardId: resolvedCardId,
+    changed: true,
+    course,
+  };
 }
 
 /**

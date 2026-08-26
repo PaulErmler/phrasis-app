@@ -75,14 +75,25 @@ export const createCardTool = createTool({
     }
 
     const requiredLanguages = [
-      ...new Set([...courseLanguages.baseLanguages, ...courseLanguages.targetLanguages]),
+      ...new Set([
+        ...courseLanguages.baseLanguages,
+        ...courseLanguages.targetLanguages,
+      ]),
     ];
     const providedLanguages = args.translations.map((t) => t.language);
 
-    const missing = requiredLanguages.filter((lang) => !providedLanguages.includes(lang));
-    const extras = providedLanguages.filter((lang) => !requiredLanguages.includes(lang));
+    const missing = requiredLanguages.filter(
+      (lang) => !providedLanguages.includes(lang),
+    );
+    const extras = providedLanguages.filter(
+      (lang) => !requiredLanguages.includes(lang),
+    );
 
-    if (missing.length > 0 || extras.length > 0 || new Set(providedLanguages).size !== providedLanguages.length) {
+    if (
+      missing.length > 0 ||
+      extras.length > 0 ||
+      new Set(providedLanguages).size !== providedLanguages.length
+    ) {
       throw new Error(
         `Invalid translations for createCard. Missing: ${JSON.stringify(missing)}. Extra: ${JSON.stringify(extras)}. Please retry with exactly these languages: ${JSON.stringify(requiredLanguages)}.`,
       );
@@ -108,7 +119,11 @@ export const createCardTool = createTool({
  * never sees document ids). Registered by generateResponse only on turns that
  * carry a cardId. See the tools override in messages.ts.
  */
-export const createMarkAlsoCorrectTool = ({ cardId }: { cardId: Id<'cards'> }) =>
+export const createMarkAlsoCorrectTool = ({
+  cardId,
+}: {
+  cardId: Id<'cards'>;
+}) =>
   createTool({
     description:
       "Call when an alternative phrasing, word choice, or verb form the user proposed for the CURRENT card's sentence is fully correct and natural. Pass the full corrected sentence for every course language whose text changes (usually just the target language; include a base language only if its rendering shifts too). Preserve the user's wording — fix only punctuation, capitalization, and diacritics. Never call this for partially-correct proposals. The app then offers the user to save the version as a new card or replace the card's text.",
@@ -140,7 +155,9 @@ export const createMarkAlsoCorrectTool = ({ cardId }: { cardId: Id<'cards'> }) =
         throw new Error('Missing context for creating also-correct approval.');
       }
 
-      const optionsWithId = options as ToolCallOptions & { toolCallId?: string };
+      const optionsWithId = options as ToolCallOptions & {
+        toolCallId?: string;
+      };
       const toolCallId = optionsWithId?.toolCallId;
       if (!toolCallId) {
         throw new Error('No toolCallId provided by framework.');

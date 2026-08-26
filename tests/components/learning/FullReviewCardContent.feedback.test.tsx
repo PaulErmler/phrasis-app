@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from '@testing-library/react';
 
 /**
  * AI writing feedback wiring in FullReviewCardContent: the kick-off effect
@@ -47,8 +53,18 @@ import type { Id } from '@/convex/_generated/dataModel';
 import { makePresentation } from './cardPresentationStub';
 
 const TRANSLATIONS: CardTranslation[] = [
-  { language: 'en', text: 'I would like a coffee.', isBaseLanguage: true, isTargetLanguage: false },
-  { language: 'es', text: 'Quisiera un café.', isBaseLanguage: false, isTargetLanguage: true },
+  {
+    language: 'en',
+    text: 'I would like a coffee.',
+    isBaseLanguage: true,
+    isTargetLanguage: false,
+  },
+  {
+    language: 'es',
+    text: 'Quisiera un café.',
+    isBaseLanguage: false,
+    isTargetLanguage: true,
+  },
 ];
 
 const CARD_ID = 'card_1' as Id<'cards'>;
@@ -178,7 +194,9 @@ describe('FullReviewCardContent: AI writing feedback', () => {
         screen.queryByTestId('writing-feedback-pending'),
       ).not.toBeInTheDocument(),
     );
-    expect(screen.queryByTestId('writing-feedback-card')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('writing-feedback-card'),
+    ).not.toBeInTheDocument();
   });
 
   it('still grades on first-exposure copy-typing rows (regression: a fresh course is all first-exposure)', async () => {
@@ -253,7 +271,9 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     submitAnswer('algo muy diferente');
     await new Promise((r) => setTimeout(r, 10));
     expect(gradeMock).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('writing-feedback-pending')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('writing-feedback-pending'),
+    ).not.toBeInTheDocument();
   });
 
   it('clears on-screen feedback rows when the setting turns off mid-card', async () => {
@@ -273,7 +293,9 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     );
     submitAnswer('algo muy diferente');
     await waitFor(() =>
-      expect(screen.getByTestId('writing-feedback-pending')).toBeInTheDocument(),
+      expect(
+        screen.getByTestId('writing-feedback-pending'),
+      ).toBeInTheDocument(),
     );
     rerender(<FullReviewCardContent {...props} aiFeedbackEnabled={false} />);
     await waitFor(() =>
@@ -304,7 +326,12 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     });
     const longTranslations: CardTranslation[] = [
       TRANSLATIONS[0],
-      { language: 'es', text: primary, isBaseLanguage: false, isTargetLanguage: true },
+      {
+        language: 'es',
+        text: primary,
+        isBaseLanguage: false,
+        isTargetLanguage: true,
+      },
     ];
     render(
       <FullReviewCardContent
@@ -341,7 +368,9 @@ describe('FullReviewCardContent: AI writing feedback', () => {
       ).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByTestId('writing-feedback-make-default-confirm'));
+    fireEvent.click(
+      screen.getByTestId('writing-feedback-make-default-confirm'),
+    );
     // A spent card_edits balance opens the paywall (same routing as
     // EditCardDialog) — the generic "please try again" toast would invite a
     // retry that can never succeed.
@@ -367,10 +396,16 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     let resolveSecond!: (v: unknown) => void;
     gradeMock
       .mockImplementationOnce(
-        () => new Promise((resolve) => { resolveFirst = resolve; }),
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve;
+          }),
       )
       .mockImplementationOnce(
-        () => new Promise((resolve) => { resolveSecond = resolve; }),
+        () =>
+          new Promise((resolve) => {
+            resolveSecond = resolve;
+          }),
       );
     renderCard();
 

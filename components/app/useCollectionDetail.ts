@@ -83,7 +83,11 @@ function optimisticallySetRowStatus(
 function optimisticallyAdjustCollectionCounters(
   localStore: OptimisticLocalStore,
   collectionId: string,
-  delta: { cardsAdded?: number; prioritizedCount?: number; ignoredCount?: number },
+  delta: {
+    cardsAdded?: number;
+    prioritizedCount?: number;
+    ignoredCount?: number;
+  },
 ): void {
   const summary = localStore.getQuery(api.features.home.getHomeSummary, {});
   if (!summary) return;
@@ -94,23 +98,32 @@ function optimisticallyAdjustCollectionCounters(
       prioritizedCount: number;
       ignoredCount: number;
     },
-  >(entry: T): T =>
-      entry.collectionId === collectionId
-        ? {
+  >(
+    entry: T,
+  ): T =>
+    entry.collectionId === collectionId
+      ? {
           ...entry,
           cardsAdded: Math.max(0, entry.cardsAdded + (delta.cardsAdded ?? 0)),
           prioritizedCount: Math.max(
             0,
             entry.prioritizedCount + (delta.prioritizedCount ?? 0),
           ),
-          ignoredCount: Math.max(0, entry.ignoredCount + (delta.ignoredCount ?? 0)),
+          ignoredCount: Math.max(
+            0,
+            entry.ignoredCount + (delta.ignoredCount ?? 0),
+          ),
         }
-        : entry;
-  localStore.setQuery(api.features.home.getHomeSummary, {}, {
-    ...summary,
-    levels: summary.levels.map(apply),
-    customCollections: summary.customCollections.map(apply),
-  });
+      : entry;
+  localStore.setQuery(
+    api.features.home.getHomeSummary,
+    {},
+    {
+      ...summary,
+      levels: summary.levels.map(apply),
+      customCollections: summary.customCollections.map(apply),
+    },
+  );
 }
 
 export interface CollectionBrowse {
@@ -157,7 +170,9 @@ export function useCollectionDetail({
   // browse queries only run once the snapshot matches the open collection,
   // and never shift range mid-session (that's what keeps just-added rows in
   // the list until reopen).
-  const [anchor, setAnchor] = useState<{ id: string; rank: number } | null>(null);
+  const [anchor, setAnchor] = useState<{ id: string; rank: number } | null>(
+    null,
+  );
   const [showAdded, setShowAdded] = useState(false);
   const [showIgnored, setShowIgnored] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
@@ -170,7 +185,9 @@ export function useCollectionDetail({
   const [sessionActedIds, setSessionActedIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const sessionStatusRef = useRef<Map<string, BrowseTextRow['status']>>(new Map());
+  const sessionStatusRef = useRef<Map<string, BrowseTextRow['status']>>(
+    new Map(),
+  );
   // Below-anchor rows are only in the forward feed because their mark row is
   // injected into page 1. Adding one deletes that mark in-transaction, so
   // the reactive re-run drops the row entirely instead of flipping it to
@@ -209,7 +226,12 @@ export function useCollectionDetail({
   ).withOptimisticUpdate((localStore, args) => {
     const next = args.mark ?? 'none';
     const prev = optimisticallySetRowStatus(localStore, args.textId, next);
-    if (!openCollectionId || prev === null || prev === next || prev === 'added') {
+    if (
+      !openCollectionId ||
+      prev === null ||
+      prev === next ||
+      prev === 'added'
+    ) {
       return;
     }
     optimisticallyAdjustCollectionCounters(localStore, openCollectionId, {
@@ -224,7 +246,9 @@ export function useCollectionDetail({
   const prewarmTranslations = useMutation(
     api.features.collections.prewarmPreviewTranslations,
   );
-  const requestAudio = useMutation(api.features.collections.requestPreviewAudio);
+  const requestAudio = useMutation(
+    api.features.collections.requestPreviewAudio,
+  );
 
   const openedCollection = collections?.find(
     (c) => c.collectionId === openCollectionId,
@@ -274,10 +298,10 @@ export function useCollectionDetail({
     api.features.collections.browseCollectionTexts,
     anchorReady
       ? {
-        collectionId: anchor.id as Id<'collections'>,
-        anchorRank: anchor.rank,
-        direction: 'after' as const,
-      }
+          collectionId: anchor.id as Id<'collections'>,
+          anchorRank: anchor.rank,
+          direction: 'after' as const,
+        }
       : 'skip',
     { initialNumItems: MAX_PREVIEW_PAGE_SIZE },
   );
@@ -287,10 +311,10 @@ export function useCollectionDetail({
     api.features.collections.browseCollectionTexts,
     anchorReady && showAdded && anchor.rank > 0
       ? {
-        collectionId: anchor.id as Id<'collections'>,
-        anchorRank: anchor.rank,
-        direction: 'upTo' as const,
-      }
+          collectionId: anchor.id as Id<'collections'>,
+          anchorRank: anchor.rank,
+          direction: 'upTo' as const,
+        }
       : 'skip',
     { initialNumItems: MAX_PREVIEW_PAGE_SIZE },
   );
@@ -389,7 +413,13 @@ export function useCollectionDetail({
       reportError(error, { op: 'requestPreviewTranslations' });
       for (const id of batch) requestedTranslationsRef.current.delete(id);
     });
-  }, [forwardRowsRaw, earlierRowsRaw, anchorReady, openCollectionId, requestTranslations]);
+  }, [
+    forwardRowsRaw,
+    earlierRowsRaw,
+    anchorReady,
+    openCollectionId,
+    requestTranslations,
+  ]);
 
   // Prewarm one page AHEAD of what's loaded (translations only, no audio):
   // fires when page 1 lands (i.e. on open, warming rows 26-50) and again
@@ -414,7 +444,14 @@ export function useCollectionDetail({
       reportError(error, { op: 'prewarmPreviewTranslations' });
       prewarmedRef.current.delete(key);
     });
-  }, [forwardRowsRaw, forward.status, anchorReady, openCollectionId, anchor, prewarmTranslations]);
+  }, [
+    forwardRowsRaw,
+    forward.status,
+    anchorReady,
+    openCollectionId,
+    anchor,
+    prewarmTranslations,
+  ]);
 
   // Reveal gate: rows loaded by "show more" stay hidden (button keeps its
   // spinner) until each one either has all translations or is an added row,
@@ -433,7 +470,8 @@ export function useCollectionDetail({
       return; // otherwise: page still loading
     }
     const allReady = hidden.every(
-      (row) => row.status === 'added' || row.missingTranslationLanguages.length === 0,
+      (row) =>
+        row.status === 'added' || row.missingTranslationLanguages.length === 0,
     );
     if (allReady) {
       setRevealBoundary(null);
@@ -459,57 +497,67 @@ export function useCollectionDetail({
     ? COLLECTION_PREVIEW_SIZE
     : Math.min(COLLECTION_PREVIEW_SIZE, Math.max(0, sentencesQuota.balance));
 
-  const handleAddCards = useCallback(async (targetCollectionId?: string) => {
-    const collectionId = targetCollectionId ?? openCollectionId;
-    if (!collectionId) return;
+  const handleAddCards = useCallback(
+    async (targetCollectionId?: string) => {
+      const collectionId = targetCollectionId ?? openCollectionId;
+      if (!collectionId) return;
 
-    setIsAdding(true);
-    setUsageLimitHit(false);
-    try {
-      const args = {
-        collectionId: collectionId as Id<'collections'>,
-        batchSize: effectiveBatchSize > 0 ? effectiveBatchSize : COLLECTION_PREVIEW_SIZE,
-        exclusive: true,
-      };
-      let result = await addCardsFromCollection(args);
-      // A 0-card result with scanIncomplete means the scan burned its per-call
-      // read budget on an ignored/direct-added streak; the frontier already
-      // advanced, so re-calling continues past it. Bounded retries.
-      let attempts = 1;
-      while (result.cardsAdded === 0 && result.scanIncomplete && attempts < 5) {
-        result = await addCardsFromCollection(args);
-        attempts++;
-      }
-
-      if (result.cardsAdded === 0) {
-        if (result.quotaLimited) {
-          // Out of sentences, not out of collection, "nothing left to add"
-          // would be wrong. Surface the same quota dialog as a thrown
-          // USAGE_LIMIT does.
-          setUsageLimitHit(true);
-        } else {
-          toast.info(t('noCardsToAdd'));
+      setIsAdding(true);
+      setUsageLimitHit(false);
+      try {
+        const args = {
+          collectionId: collectionId as Id<'collections'>,
+          batchSize:
+            effectiveBatchSize > 0
+              ? effectiveBatchSize
+              : COLLECTION_PREVIEW_SIZE,
+          exclusive: true,
+        };
+        let result = await addCardsFromCollection(args);
+        // A 0-card result with scanIncomplete means the scan burned its per-call
+        // read budget on an ignored/direct-added streak; the frontier already
+        // advanced, so re-calling continues past it. Bounded retries.
+        let attempts = 1;
+        while (
+          result.cardsAdded === 0 &&
+          result.scanIncomplete &&
+          attempts < 5
+        ) {
+          result = await addCardsFromCollection(args);
+          attempts++;
         }
-      } else {
-        toast.success(t('cardsAdded', { count: result.cardsAdded }));
+
+        if (result.cardsAdded === 0) {
+          if (result.quotaLimited) {
+            // Out of sentences, not out of collection, "nothing left to add"
+            // would be wrong. Surface the same quota dialog as a thrown
+            // USAGE_LIMIT does.
+            setUsageLimitHit(true);
+          } else {
+            toast.info(t('noCardsToAdd'));
+          }
+        } else {
+          toast.success(t('cardsAdded', { count: result.cardsAdded }));
+        }
+      } catch (error) {
+        const code = convexErrorCode(error);
+        if (code === 'PAYMENT_PAST_DUE') {
+          // Silent: the reactive payment-overdue dialog is the canonical
+          // surface for this state.
+        } else if (code === 'USAGE_LIMIT') {
+          setUsageLimitHit(true);
+        } else if (code === 'QUOTA_NOT_SYNCED') {
+          toast.error(t('failedToAdd'));
+        } else {
+          reportError(error, { op: 'addCardsFromCollection' });
+          toast.error(t('failedToAdd'));
+        }
+      } finally {
+        setIsAdding(false);
       }
-    } catch (error) {
-      const code = convexErrorCode(error);
-      if (code === 'PAYMENT_PAST_DUE') {
-        // Silent: the reactive payment-overdue dialog is the canonical
-        // surface for this state.
-      } else if (code === 'USAGE_LIMIT') {
-        setUsageLimitHit(true);
-      } else if (code === 'QUOTA_NOT_SYNCED') {
-        toast.error(t('failedToAdd'));
-      } else {
-        reportError(error, { op: 'addCardsFromCollection' });
-        toast.error(t('failedToAdd'));
-      }
-    } finally {
-      setIsAdding(false);
-    }
-  }, [openCollectionId, addCardsFromCollection, t, effectiveBatchSize]);
+    },
+    [openCollectionId, addCardsFromCollection, t, effectiveBatchSize],
+  );
 
   const handleSetMark = useCallback(
     async (textId: string, mark: CollectionTextMark | null) => {
@@ -587,8 +635,8 @@ export function useCollectionDetail({
     const rows =
       resurrected.length > 0
         ? [...resurrected, ...visibleForward].sort(
-          (a, b) => a.collectionRank - b.collectionRank,
-        )
+            (a, b) => a.collectionRank - b.collectionRank,
+          )
         : visibleForward;
     // Below-anchor marked texts exist in BOTH feeds: injected into the
     // forward first page (or resurrected above) and returned by the 'upTo'
@@ -617,8 +665,7 @@ export function useCollectionDetail({
       onRequestAudio: handleRequestAudio,
       pendingAddTextIds,
     };
-  },
-  [
+  }, [
     forwardRowsRaw,
     forward.status,
     handleLoadMore,
@@ -634,8 +681,7 @@ export function useCollectionDetail({
     handleAddSingle,
     handleRequestAudio,
     pendingAddTextIds,
-  ],
-  );
+  ]);
 
   return {
     openCollectionId,

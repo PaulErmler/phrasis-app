@@ -280,7 +280,10 @@ export function isWorkloadForecastData(
  * nothing about lapse behaviour. */
 export function deriveRatingRates(ratingCounts: RatingCounts): RatingRates {
   const total =
-    ratingCounts.again + ratingCounts.hard + ratingCounts.good + ratingCounts.easy;
+    ratingCounts.again +
+    ratingCounts.hard +
+    ratingCounts.good +
+    ratingCounts.easy;
   if (total < MIN_RATING_SAMPLE) return { ...PRIOR_RATES };
   return {
     pAgain: ratingCounts.again / total,
@@ -318,7 +321,12 @@ function advanceToFirstDayOut(
   let cur = state;
   let now = t0;
   for (let i = 0; i < 12; i++) {
-    const r = scheduleCard(cur, cur.schedulingPhase === 'preReview' ? 'understood' : 'good', initialReviewCount, now);
+    const r = scheduleCard(
+      cur,
+      cur.schedulingPhase === 'preReview' ? 'understood' : 'good',
+      initialReviewCount,
+      now,
+    );
     cur = {
       schedulingPhase: r.schedulingPhase,
       preReviewCount: r.preReviewCount,
@@ -386,7 +394,12 @@ export function deriveReturnKernels(opts: {
   const young = new Array<number>(WORKLOAD_DAYS).fill(0);
   const fresh = advanceToFirstDayOut(
     // FSRS-phase card with no state yet ≈ a card mid learning steps.
-    { schedulingPhase: 'review', preReviewCount: initialReviewCount, dueDate: t0, fsrsState: null },
+    {
+      schedulingPhase: 'review',
+      preReviewCount: initialReviewCount,
+      dueDate: t0,
+      fsrsState: null,
+    },
     t0,
     initialReviewCount,
   );
@@ -413,7 +426,10 @@ export function deriveReturnKernels(opts: {
       mature[againNext.offset] += rates.pAgain * weight;
     }
     for (const rating of ['hard', 'good', 'easy'] as const) {
-      const p = rates[rating === 'hard' ? 'pHard' : rating === 'good' ? 'pGood' : 'pEasy'];
+      const p =
+        rates[
+          rating === 'hard' ? 'pHard' : rating === 'good' ? 'pGood' : 'pEasy'
+        ];
       if (p <= 0) continue;
       const next = ratingOffset(state, rating, t0, 0, initialReviewCount);
       if (next) mature[next.offset] += p * weight;
@@ -503,7 +519,10 @@ function applyRating(
 
 /** A Review-state ts-fsrs card with the given stability, due exactly now
  * (elapsed = its whole scheduled interval). */
-function makeMatureFsrsState(stabilityDays: number, now: number): FsrsCardState {
+function makeMatureFsrsState(
+  stabilityDays: number,
+  now: number,
+): FsrsCardState {
   return {
     due: now,
     stability: stabilityDays,
@@ -638,7 +657,9 @@ export function buildWorkloadForecast(
         // Sum of the ROUNDED parts (not the rounded raw sum), so a bar
         // built from the displayed segments always adds up to this total.
         total:
-          Math.round(returns) + Math.round(whatIfAdds) + Math.round(typicalAdds),
+          Math.round(returns) +
+          Math.round(whatIfAdds) +
+          Math.round(typicalAdds),
       },
       estimatedReviews,
       estimatedMinutes,

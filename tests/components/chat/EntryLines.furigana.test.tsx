@@ -20,7 +20,10 @@ vi.mock('@/components/feature_tracking/FeatureBadge', () => ({
 }));
 vi.mock('@/components/autumn/paywall-dialog', () => ({ default: () => null }));
 vi.mock('@/hooks/use-course-languages', () => ({
-  useCourseLanguages: () => ({ baseLanguages: ['en'], targetLanguages: ['ja'] }),
+  useCourseLanguages: () => ({
+    baseLanguages: ['en'],
+    targetLanguages: ['ja'],
+  }),
 }));
 vi.mock('@/components/chat/EditApprovalDialog', () => ({
   EditApprovalDialog: () => null,
@@ -49,7 +52,9 @@ describe('EntryLines: furigana', () => {
       />,
     );
     expect(
-      [...container.querySelectorAll('ruby rt')].map((rt) => rt.getAttribute('data-reading')),
+      [...container.querySelectorAll('ruby rt')].map((rt) =>
+        rt.getAttribute('data-reading'),
+      ),
     ).toEqual(['まいあさ', 'しちじ', 'お']);
     expect(container.textContent).toContain('I get up at seven.');
   });

@@ -102,8 +102,8 @@ describe('ProgressDisplay due-count pills', () => {
     userSettingsValue = { hideDueCounts: true };
     renderProgress();
     expect(screen.queryByText('comingUp')).toBeNull();
-    expect(
-      useQueryMock.mock.calls.some((call) => call[1] === 'skip'),
-    ).toBe(true);
+    expect(useQueryMock.mock.calls.some((call) => call[1] === 'skip')).toBe(
+      true,
+    );
   });
 });

@@ -32,7 +32,9 @@ export function ImportTextsView({ onBack, headerSlot }: ImportTextsViewProps) {
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
-            <h1 className="font-semibold text-base truncate flex-1">{tEnter('title')}</h1>
+            <h1 className="font-semibold text-base truncate flex-1">
+              {tEnter('title')}
+            </h1>
           </div>
         </header>
 

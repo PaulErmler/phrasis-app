@@ -233,7 +233,9 @@ export function RotatingProjection({
             if (Math.abs(off) > 1) return null;
             // The front face was already rendered for the aria/sr-only text.
             const face =
-              i === currentIndex ? current : renderFrame(f, data.basis, t, format);
+              i === currentIndex
+                ? current
+                : renderFrame(f, data.basis, t, format);
             return (
               <div
                 key={`${f.kind}-${i}`}

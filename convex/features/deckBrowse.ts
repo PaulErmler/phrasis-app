@@ -177,11 +177,14 @@ export async function getCollectionProgressQueryHandler(ctx: QueryCtx): Promise<
   // Items with `order` set always sort before legacy items to keep new
   // dataset on top once it's loaded.
   const legacyPosition = (name: string) => {
-    const idx = LEGACY_LEVEL_ORDER.indexOf(name as (typeof LEGACY_LEVEL_ORDER)[number]);
+    const idx = LEGACY_LEVEL_ORDER.indexOf(
+      name as (typeof LEGACY_LEVEL_ORDER)[number],
+    );
     return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
   };
   result.sort((a, b) => {
-    if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+    if (a.order !== undefined && b.order !== undefined)
+      return a.order - b.order;
     if (a.order !== undefined) return -1;
     if (b.order !== undefined) return 1;
     return legacyPosition(a.collectionName) - legacyPosition(b.collectionName);
@@ -258,9 +261,15 @@ export async function getUpcomingSentencesForLevelHandler(
 
   const frontier = progress?.lastRankProcessed ?? 0;
   const count = Math.min(Math.max(args.count ?? 5, 1), 10);
-  const texts = await getNextTextsFromRank(ctx, collection._id, frontier, count, {
-    onlyCurriculum: true,
-  });
+  const texts = await getNextTextsFromRank(
+    ctx,
+    collection._id,
+    frontier,
+    count,
+    {
+      onlyCurriculum: true,
+    },
+  );
 
   const sourceLanguage = course.baseLanguages[0];
   const targetLanguage = course.targetLanguages[0];

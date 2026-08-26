@@ -1,12 +1,12 @@
-import { execFileSync } from "node:child_process";
-import path from "node:path";
+import { execFileSync } from 'node:child_process';
+import path from 'node:path';
 
-import { extractJsonResult } from "./cli-json-output";
-import { unregisterRun } from "./run-lock";
-import { assertDevDeployment } from "./deployment-guard";
-import type { PurgeResult } from "../convex/features/e2eCleanup";
+import { extractJsonResult } from './cli-json-output';
+import { unregisterRun } from './run-lock';
+import { assertDevDeployment } from './deployment-guard';
+import type { PurgeResult } from '../convex/features/e2eCleanup';
 
-const REPO_ROOT = path.resolve(__dirname, "..");
+const REPO_ROOT = path.resolve(__dirname, '..');
 
 /** Accounts purged per `convex run`; the loop below re-invokes until dry. */
 const PURGE_BATCH = 8;
@@ -16,11 +16,11 @@ const MAX_PASSES = 40;
 /** Run a Convex function on the dev deployment and parse its JSON result. */
 function convexRun(fn: string, args: Record<string, unknown>): unknown {
   // The purge deletes accounts; never issue it toward anything but dev.
-  assertDevDeployment("global-teardown");
+  assertDevDeployment('global-teardown');
   const out = execFileSync(
-    "pnpm",
-    ["exec", "convex", "run", fn, JSON.stringify(args)],
-    { cwd: REPO_ROOT, encoding: "utf8" },
+    'pnpm',
+    ['exec', 'convex', 'run', fn, JSON.stringify(args)],
+    { cwd: REPO_ROOT, encoding: 'utf8' },
   );
   return extractJsonResult(out);
 }
@@ -44,8 +44,8 @@ function convexRun(fn: string, args: Record<string, unknown>): unknown {
  * Best-effort throughout: a failure here must not turn a green suite red.
  */
 function purgeFixtureUsers(): void {
-  if (process.env.E2E_SKIP_USER_CLEANUP === "1") {
-    console.log("E2E_SKIP_USER_CLEANUP=1 — leaving fixture accounts in place.");
+  if (process.env.E2E_SKIP_USER_CLEANUP === '1') {
+    console.log('E2E_SKIP_USER_CLEANUP=1 — leaving fixture accounts in place.');
     return;
   }
 
@@ -59,16 +59,16 @@ function purgeFixtureUsers(): void {
   for (let pass = 0; pass < MAX_PASSES; pass++) {
     let result: PurgeResult;
     try {
-      result = convexRun("features/e2eCleanup:purgeFixtureUsers", {
+      result = convexRun('features/e2eCleanup:purgeFixtureUsers', {
         limit: PURGE_BATCH,
         excludeEmails: excluded,
       }) as PurgeResult;
     } catch (error) {
-      console.warn("Fixture-account cleanup failed — skipping:", error);
+      console.warn('Fixture-account cleanup failed — skipping:', error);
       return;
     }
-    if (!result || typeof result.remaining !== "number") {
-      console.warn("Fixture-account cleanup returned no result — skipping.");
+    if (!result || typeof result.remaining !== 'number') {
+      console.warn('Fixture-account cleanup returned no result — skipping.');
       return;
     }
 
@@ -88,7 +88,7 @@ function purgeFixtureUsers(): void {
   if (excluded.length > 0) {
     console.warn(
       `${excluded.length} fixture account(s) refused to purge — retry with ` +
-        "`pnpm exec convex run features/e2eCleanup:purgeFixtureUsers`.",
+        '`pnpm exec convex run features/e2eCleanup:purgeFixtureUsers`.',
     );
   }
 }
@@ -102,10 +102,10 @@ function purgeFixtureUsers(): void {
  * Best-effort. A failure here must not turn a green suite red.
  */
 export default function globalTeardown() {
-  assertDevDeployment("global-teardown");
+  assertDevDeployment('global-teardown');
   if (!unregisterRun()) {
     console.log(
-      "Leaving E2E_TEST_HOOKS set — another Playwright run is still active.",
+      'Leaving E2E_TEST_HOOKS set — another Playwright run is still active.',
     );
     return;
   }
@@ -114,17 +114,17 @@ export default function globalTeardown() {
 
   try {
     execFileSync(
-      "pnpm",
-      ["exec", "convex", "env", "remove", "E2E_TEST_HOOKS"],
+      'pnpm',
+      ['exec', 'convex', 'env', 'remove', 'E2E_TEST_HOOKS'],
       {
         cwd: REPO_ROOT,
-        stdio: "inherit",
+        stdio: 'inherit',
       },
     );
   } catch (error) {
     console.warn(
-      "Failed to remove E2E_TEST_HOOKS after the test run — remove it " +
-        "manually with `pnpm exec convex env remove E2E_TEST_HOOKS`:",
+      'Failed to remove E2E_TEST_HOOKS after the test run — remove it ' +
+        'manually with `pnpm exec convex env remove E2E_TEST_HOOKS`:',
       error,
     );
   }

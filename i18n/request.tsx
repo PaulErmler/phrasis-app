@@ -21,7 +21,9 @@ export default getRequestConfig(async () => {
     messages: {
       ...mainMessages,
       ...(Object.keys(authMessages).length > 0 && { Auth: authMessages.Auth }),
-      ...(Object.keys(landingMessages).length > 0 && { LandingPage: landingMessages }),
+      ...(Object.keys(landingMessages).length > 0 && {
+        LandingPage: landingMessages,
+      }),
     },
     timeZone: 'UTC',
   };

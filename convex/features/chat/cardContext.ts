@@ -39,7 +39,10 @@ export async function resolveCardContext(
   const text = await ctx.db.get(card.textId);
   if (!text) return null;
 
-  const courseLangs = new Set([...course.baseLanguages, ...course.targetLanguages]);
+  const courseLangs = new Set([
+    ...course.baseLanguages,
+    ...course.targetLanguages,
+  ]);
   courseLangs.delete(text.language);
 
   // One indexed read for the whole text instead of one query per course

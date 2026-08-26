@@ -36,10 +36,8 @@ vi.mock('@/hooks/use-now-minute', () => ({
 
 // The global stub drops params; the pill text IS the params, so re-mock.
 vi.mock('next-intl', () => ({
-  useTranslations:
-    () =>
-    (key: string, params?: Record<string, unknown>) =>
-      params && 'count' in params ? `${params.count} ${key}` : key,
+  useTranslations: () => (key: string, params?: Record<string, unknown>) =>
+    params && 'count' in params ? `${params.count} ${key}` : key,
 }));
 
 const counts = (overrides: Partial<Record<string, number>> = {}) => ({
@@ -84,10 +82,7 @@ describe('DueCountsPills', () => {
     useQueryMock.mockReturnValue(counts());
     render(<DueCountsPills />);
     expect(screen.queryByTestId('due-counts-pills')).toBeNull();
-    expect(useQueryMock).toHaveBeenCalledWith(
-      expect.anything(),
-      'skip',
-    );
+    expect(useQueryMock).toHaveBeenCalledWith(expect.anything(), 'skip');
   });
 });
 

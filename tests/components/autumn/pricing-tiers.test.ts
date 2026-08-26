@@ -9,7 +9,10 @@ vi.mock('autumn-js/react', () => ({
   usePricingTable: () => ({}),
 }));
 
-import { previousTier, itemsAddedOver } from '@/components/autumn/pricing-table';
+import {
+  previousTier,
+  itemsAddedOver,
+} from '@/components/autumn/pricing-table';
 import {
   free as freePlan,
   basic as basicPlan,
@@ -30,10 +33,14 @@ const included = (
   const item = plan.items?.find(
     (i) =>
       i.featureId === featureId &&
-      (resetInterval ? i.reset?.interval === resetInterval : i.reset === undefined),
+      (resetInterval
+        ? i.reset?.interval === resetInterval
+        : i.reset === undefined),
   );
   if (item?.included === undefined) {
-    throw new Error(`Plan "${plan.id}" grants no ${resetInterval ?? 'unreset'} ${featureId}`);
+    throw new Error(
+      `Plan "${plan.id}" grants no ${resetInterval ?? 'unreset'} ${featureId}`,
+    );
   }
   return item.included;
 };
@@ -47,7 +54,8 @@ const monthlyPrice = (plan: Plan): number => {
 
 const annualPrice = (variant: Variant): number => {
   const amount = variant.customize?.price?.amount;
-  if (amount === undefined) throw new Error(`Variant "${variant.id}" has no price`);
+  if (amount === undefined)
+    throw new Error(`Variant "${variant.id}" has no price`);
   return amount;
 };
 
@@ -74,7 +82,13 @@ function makePlan(
     name: id,
     items: opts.isFree
       ? opts.items
-      : [price(opts.price ?? 0, opts.intervalGroup === 'year' ? 'year' : 'month'), ...opts.items],
+      : [
+          price(
+            opts.price ?? 0,
+            opts.intervalGroup === 'year' ? 'year' : 'month',
+          ),
+          ...opts.items,
+        ],
     properties: {
       is_free: opts.isFree ?? false,
       interval_group: opts.intervalGroup,
@@ -177,7 +191,9 @@ describe('itemsAddedOver', () => {
     expect(added.map((i) => i.feature_id)).toEqual(['credits']);
     // "Everything from Pro, plus N credits". Pro's total is already counted
     // by the line above, so only the delta up to Ultra's grant is listed.
-    expect(added[0].included_usage).toBe(monthlyCredits(ultraPlan) - monthlyCredits(proPlan));
+    expect(added[0].included_usage).toBe(
+      monthlyCredits(ultraPlan) - monthlyCredits(proPlan),
+    );
   });
 
   // The grants are tuned so every step reads as a round number, and they
@@ -189,9 +205,18 @@ describe('itemsAddedOver', () => {
       )?.included_usage;
 
     const steps = [
-      [creditsAdded(basic, free), monthlyCredits(basicPlan) - monthlyCredits(freePlan)],
-      [creditsAdded(pro, basic), monthlyCredits(proPlan) - monthlyCredits(basicPlan)],
-      [creditsAdded(ultra, pro), monthlyCredits(ultraPlan) - monthlyCredits(proPlan)],
+      [
+        creditsAdded(basic, free),
+        monthlyCredits(basicPlan) - monthlyCredits(freePlan),
+      ],
+      [
+        creditsAdded(pro, basic),
+        monthlyCredits(proPlan) - monthlyCredits(basicPlan),
+      ],
+      [
+        creditsAdded(ultra, pro),
+        monthlyCredits(ultraPlan) - monthlyCredits(proPlan),
+      ],
     ] as const;
     for (const [rendered, configDelta] of steps) {
       expect(rendered).toBe(configDelta);
@@ -239,9 +264,9 @@ describe('itemsAddedOver', () => {
     expect(itemsAddedOver(paidItems(unlimited), basic)).toHaveLength(1);
     expect(itemsAddedOver(paidItems(unlimited), unlimited)).toHaveLength(0);
     // A finite allowance never "adds" over an unlimited one.
-    expect(itemsAddedOver(paidItems(basic), unlimited).map((i) => i.feature_id)).not.toContain(
-      'sentences',
-    );
+    expect(
+      itemsAddedOver(paidItems(basic), unlimited).map((i) => i.feature_id),
+    ).not.toContain('sentences');
   });
 
   it('returns every item when there is no tier below', () => {

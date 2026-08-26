@@ -192,7 +192,10 @@ export function FullReviewCardContent({
   // swap base/target roles with their text unchanged, and the key has to move
   // for that (it also has to rebuild the inputs map, which it now does).
   const translationKey = translations
-    .map((tr) => `${tr.language}\u0000${tr.isTargetLanguage ? 'T' : 'B'}\u0000${tr.text}`)
+    .map(
+      (tr) =>
+        `${tr.language}\u0000${tr.isTargetLanguage ? 'T' : 'B'}\u0000${tr.text}`,
+    )
     .join('|');
 
   // `translations` is a fresh array on every render, so keying on the fingerprint
@@ -215,13 +218,20 @@ export function FullReviewCardContent({
   const alternativesKey = transcribeMode
     ? ''
     : translations
-      .map((tr) => `${tr.language}\u0000${JSON.stringify(tr.alternatives ?? [])}`)
-      .join('|');
+        .map(
+          (tr) =>
+            `${tr.language}\u0000${JSON.stringify(tr.alternatives ?? [])}`,
+        )
+        .join('|');
   const alternativesByLanguage = useMemo(() => {
     const map = new Map<string, CardTranslationAlternative[]>();
     if (transcribeMode) return map;
     for (const tr of translations) {
-      if (tr.isTargetLanguage && tr.alternatives && tr.alternatives.length > 0) {
+      if (
+        tr.isTargetLanguage &&
+        tr.alternatives &&
+        tr.alternatives.length > 0
+      ) {
         map.set(tr.language, tr.alternatives);
       }
     }
@@ -230,7 +240,13 @@ export function FullReviewCardContent({
   }, [alternativesKey]);
 
   const [inputs, setInputs] = useState<Map<string, LanguageInputState>>(
-    () => new Map(targetTranslations.map((tr) => [tr.language, { submitted: false, userText: '' }])),
+    () =>
+      new Map(
+        targetTranslations.map((tr) => [
+          tr.language,
+          { submitted: false, userText: '' },
+        ]),
+      ),
   );
 
   const [submissionOrder, setSubmissionOrder] = useState<string[]>([]);
@@ -250,7 +266,9 @@ export function FullReviewCardContent({
   const revealAudioRef = useRef<HTMLAudioElement | null>(null);
   const revealAbortedRef = useRef(false);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
-  const inputRefsByLanguage = useRef<Record<string, HTMLInputElement | null>>({});
+  const inputRefsByLanguage = useRef<Record<string, HTMLInputElement | null>>(
+    {},
+  );
   const submissionOrderRef = useRef<string[]>([]);
   submissionOrderRef.current = submissionOrder;
   // `inputs` gets a new identity on every keystroke, so the accuracy memo below
@@ -272,7 +290,12 @@ export function FullReviewCardContent({
   if (translationKey !== prevTranslationKey) {
     setPrevTranslationKey(translationKey);
     setInputs(
-      new Map(targetTranslations.map((tr) => [tr.language, { submitted: false, userText: '' }])),
+      new Map(
+        targetTranslations.map((tr) => [
+          tr.language,
+          { submitted: false, userText: '' },
+        ]),
+      ),
     );
     setSubmissionOrder([]);
     setManuallyRevealedBase(new Set());
@@ -289,7 +312,8 @@ export function FullReviewCardContent({
     setFeedback(new Map());
   }, [cardId]);
 
-  const allSubmitted = targetTranslations.length > 0 &&
+  const allSubmitted =
+    targetTranslations.length > 0 &&
     targetTranslations.every((tr) => inputs.get(tr.language)?.submitted);
 
   const onAllSubmittedChangeRef = useRef(onAllSubmittedChange);
@@ -375,7 +399,13 @@ export function FullReviewCardContent({
       minWithPunctuation: Math.min(...strict),
       minWithoutPunctuation: Math.min(...lenient),
     };
-  }, [allSubmitted, inputs, targetTranslations, feedback, alternativesByLanguage]);
+  }, [
+    allSubmitted,
+    inputs,
+    targetTranslations,
+    feedback,
+    alternativesByLanguage,
+  ]);
 
   const onAccuracyChangeRef = useRef(onAccuracyChange);
   onAccuracyChangeRef.current = onAccuracyChange;
@@ -414,15 +444,20 @@ export function FullReviewCardContent({
     if (!allRevealed) return;
     // In afterSubmit mode, target clips play only from TargetLanguageInput on submit (see docs/review_modes).
     // A reveal sweep here duplicates that audio (e.g. last submit + full sequence). never disables target auto-play.
-    if (targetAudioMode === 'afterSubmit' || targetAudioMode === 'never') return;
+    if (targetAudioMode === 'afterSubmit' || targetAudioMode === 'never')
+      return;
 
     const unsubmittedAudio = targetTranslations
       .filter((tr) => !inputs.get(tr.language)?.submitted)
       .map((tr) => ({
         language: tr.language,
-        url: audioRecordings.find((a) => a.language === tr.language)?.url ?? null,
+        url:
+          audioRecordings.find((a) => a.language === tr.language)?.url ?? null,
       }))
-      .filter((entry): entry is { language: string; url: string } => entry.url != null);
+      .filter(
+        (entry): entry is { language: string; url: string } =>
+          entry.url != null,
+      );
 
     if (unsubmittedAudio.length === 0) return;
 
@@ -482,7 +517,8 @@ export function FullReviewCardContent({
         .catch((err) => {
           // Deliberately not reportError: autoplay-policy rejections are an
           // expected browser state, not an exception (see lib/report-error).
-          if (err.name !== 'AbortError') console.error('Reveal auto-play failed:', err);
+          if (err.name !== 'AbortError')
+            console.error('Reveal auto-play failed:', err);
           stopTracking();
           idx++;
           playNext();
@@ -578,7 +614,10 @@ export function FullReviewCardContent({
   // revealAllSignal in LearningCardContent).
   const lastResetSignalRef = useRef(resetSignal);
   useEffect(() => {
-    if (resetSignal === undefined || resetSignal === lastResetSignalRef.current) {
+    if (
+      resetSignal === undefined ||
+      resetSignal === lastResetSignalRef.current
+    ) {
       return;
     }
     lastResetSignalRef.current = resetSignal;
@@ -612,10 +651,10 @@ export function FullReviewCardContent({
     () =>
       revealBaseAll
         ? new Set(
-          translations
-            .filter((tr) => tr.isBaseLanguage)
-            .map((tr) => tr.language),
-        )
+            translations
+              .filter((tr) => tr.isBaseLanguage)
+              .map((tr) => tr.language),
+          )
         : new Set<string>(),
     [revealBaseAll, translations],
   );
@@ -730,8 +769,7 @@ export function FullReviewCardContent({
 
       setFeedback((prev) => new Map(prev).set(language, { status: 'pending' }));
       const requestCardId = cardId;
-      const requestSeq =
-        (feedbackRequestSeqRef.current.get(language) ?? 0) + 1;
+      const requestSeq = (feedbackRequestSeqRef.current.get(language) ?? 0) + 1;
       feedbackRequestSeqRef.current.set(language, requestSeq);
       // Stale = the card changed, or a revert+resubmit issued a newer request
       // for this row. Checked at resolution time so the slower of two
@@ -788,10 +826,17 @@ export function FullReviewCardContent({
   );
 
   return (
-    <div data-tutorial={TUTORIAL_ANCHORS.cardContentFull} className="flex flex-col flex-1 min-h-0">
+    <div
+      data-tutorial={TUTORIAL_ANCHORS.cardContentFull}
+      className="flex flex-col flex-1 min-h-0"
+    >
       <CardShell
         presentation={presentation}
-        reviewCount={displayReviewCount(preReviewCount, schedulingPhase, fsrsState)}
+        reviewCount={displayReviewCount(
+          preReviewCount,
+          schedulingPhase,
+          fsrsState,
+        )}
         bare={bare}
         highlightEnabled={highlightEnabled}
         activeClip={activeClip}
@@ -1106,7 +1151,16 @@ function TargetLanguageInput({
       audio.currentTime = 0;
       onButtonStop(translation.language);
     };
-  }, [state.submitted, targetAudioMode, audioUrl, translation.language, autoPlayedRef, suppressAutoPlay, onButtonTimeUpdate, onButtonStop]);
+  }, [
+    state.submitted,
+    targetAudioMode,
+    audioUrl,
+    translation.language,
+    autoPlayedRef,
+    suppressAutoPlay,
+    onButtonTimeUpdate,
+    onButtonStop,
+  ]);
 
   // Keep an already-running afterSubmit auto-play element in sync when its
   // speed changes mid-playback. Mirrors the pattern in AudioButton; without
@@ -1608,7 +1662,9 @@ function TargetLanguageInput({
           autoCorrect="off"
           autoCapitalize="sentences"
           spellCheck={false}
-          {...(isFirstTarget ? { 'data-testid': 'learn-translation-input' } : {})}
+          {...(isFirstTarget
+            ? { 'data-testid': 'learn-translation-input' }
+            : {})}
         />
         {/* Azure Fast Transcription rejects some locales outright (el-GR,
             sw-TZ — the supportsStt:false languages); rendering the mic there

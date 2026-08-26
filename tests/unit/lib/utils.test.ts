@@ -27,7 +27,9 @@ describe('isAuthError', () => {
   });
 
   it('detects a ConvexError carrying code UNAUTHENTICATED', () => {
-    expect(isAuthError(new ConvexError({ code: 'UNAUTHENTICATED' }))).toBe(true);
+    expect(isAuthError(new ConvexError({ code: 'UNAUTHENTICATED' }))).toBe(
+      true,
+    );
   });
 
   it('returns false for other structured codes', () => {
@@ -63,9 +65,9 @@ describe('isPaymentPastDueError', () => {
   });
 
   it('returns false for a ConvexError with another code', () => {
-    expect(isPaymentPastDueError(new ConvexError({ code: 'USAGE_LIMIT' }))).toBe(
-      false,
-    );
+    expect(
+      isPaymentPastDueError(new ConvexError({ code: 'USAGE_LIMIT' })),
+    ).toBe(false);
     expect(isPaymentPastDueError(new ConvexError('PAYMENT_PAST_DUE'))).toBe(
       false,
     );

@@ -23,7 +23,11 @@ describe('bestCandidate', () => {
 
   it('keeps the earlier candidate on a full tie (the primary is listed first)', () => {
     const answer = 'algo completamente distinto';
-    const picked = bestCandidate(['Uno dos tres.', 'Uno dos tres.'], answer, 'es');
+    const picked = bestCandidate(
+      ['Uno dos tres.', 'Uno dos tres.'],
+      answer,
+      'es',
+    );
     expect(picked.text).toBe('Uno dos tres.');
   });
 

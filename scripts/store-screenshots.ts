@@ -61,7 +61,8 @@ const SCREENS: ScreenSpec[] = [
   {
     slug: 'home',
     headline: 'Vocabulary building made easy.',
-    subline: '20,000 sentences sorted by difficulty — the 10,000 most common words, learned in order.',
+    subline:
+      '20,000 sentences sorted by difficulty — the 10,000 most common words, learned in order.',
     theme: 'dark',
   },
   {
@@ -73,31 +74,36 @@ const SCREENS: ScreenSpec[] = [
   {
     slug: 'custom',
     headline: 'Built around your life.',
-    subline: 'Add the sentences you’ll actually say — AI handles translation and audio.',
+    subline:
+      'Add the sentences you’ll actually say — AI handles translation and audio.',
     theme: 'dark',
   },
   {
     slug: 'review',
     headline: 'Speak from day one.',
-    subline: 'Shadow native speakers hands-free — on your commute, your run, your couch.',
+    subline:
+      'Shadow native speakers hands-free — on your commute, your run, your couch.',
     theme: 'dark',
   },
   {
     slug: 'writing',
     headline: 'Every skill, trained.',
-    subline: 'Listening, speaking, translation, transcription — with instant feedback.',
+    subline:
+      'Listening, speaking, translation, transcription — with instant feedback.',
     theme: 'dark',
   },
   {
     slug: 'radio',
     headline: 'Immersion on tap.',
-    subline: 'Radio mode streams your sentences like a podcast — comprehensible input all day.',
+    subline:
+      'Radio mode streams your sentences like a podcast — comprehensible input all day.',
     theme: 'dark',
   },
   {
     slug: 'chat',
     headline: 'One app, not five.',
-    subline: 'Ask the AI tutor anything — answers become flashcards, ready to practice.',
+    subline:
+      'Ask the AI tutor anything — answers become flashcards, ready to practice.',
     theme: 'dark',
   },
   {
@@ -173,7 +179,9 @@ function device(opts: {
   const radius = opts.radius ?? 110;
   const statusH = 96;
   const screenH = Math.round((opts.width - 2 * bezel) * SCREEN_ASPECT);
-  const height = opts.contain ? `height:${2 * bezel + statusH + screenH}px;` : '';
+  const height = opts.contain
+    ? `height:${2 * bezel + statusH + screenH}px;`
+    : '';
   const rounding = opts.contain
     ? `border-radius:${radius}px;`
     : `border-radius:${radius}px ${radius}px 0 0;border-bottom:none;`;
@@ -186,7 +194,10 @@ function device(opts: {
     </div>`;
 }
 
-function caption(ctx: ComposeCtx, opts?: { align?: 'center' | 'left'; padTop?: number }): string {
+function caption(
+  ctx: ComposeCtx,
+  opts?: { align?: 'center' | 'left'; padTop?: number },
+): string {
   const align = opts?.align ?? 'center';
   const padTop = opts?.padTop ?? 130;
   return `
@@ -264,7 +275,7 @@ function composePanorama(ctx: ComposeCtx): string {
   </style></head><body>
     <div style="position:absolute;left:${offset}px;top:0;width:${fullW}px;height:100%;
                 background:
-                  radial-gradient(40% 30% at ${(ctx.width / 2 - offset) / fullW * 100}% 12%, ${accentGlow(0.25)}, transparent 70%),
+                  radial-gradient(40% 30% at ${((ctx.width / 2 - offset) / fullW) * 100}% 12%, ${accentGlow(0.25)}, transparent 70%),
                   linear-gradient(100deg, ${BRAND.bgTop} 0%, #0e1b24 22%, ${BRAND.bgBottom} 48%, #0c141c 74%, ${BRAND.bgTop} 100%);"></div>
     <svg style="position:absolute;left:${offset}px;top:0;" width="${fullW}" height="${ctx.height}">
       <line x1="0" y1="${lineY}" x2="${fullW}" y2="${lineY}" stroke="${BRAND.accent}" stroke-width="5" stroke-dasharray="4 36" stroke-linecap="round" opacity="0.75"/>
@@ -303,7 +314,12 @@ function composeCards(ctx: ComposeCtx): string {
   const cardW = deviceW + 40;
   const cardH = 2100;
   const cardTop = 780;
-  const card = (color: string, rotate: number, offsetX: number, offsetY: number) => `
+  const card = (
+    color: string,
+    rotate: number,
+    offsetX: number,
+    offsetY: number,
+  ) => `
     <div style="position:absolute;top:${cardTop + offsetY}px;left:50%;width:${cardW}px;height:${cardH}px;
                 transform:translateX(calc(-50% + ${offsetX}px)) rotate(${rotate}deg);
                 background:${color};border-radius:96px;
@@ -363,8 +379,17 @@ function featureGraphicHtml(logoDataUri: string): string {
 </body></html>`;
 }
 
-async function renderHtml(browser: Browser, html: string, width: number, height: number, outFile: string) {
-  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+async function renderHtml(
+  browser: Browser,
+  html: string,
+  width: number,
+  height: number,
+  outFile: string,
+) {
+  const page = await browser.newPage({
+    viewport: { width, height },
+    deviceScaleFactor: 1,
+  });
   await page.setContent(html, { waitUntil: 'networkidle' });
   await page.waitForTimeout(150);
   await page.screenshot({ path: outFile });
@@ -373,13 +398,16 @@ async function renderHtml(browser: Browser, html: string, width: number, height:
 
 async function main() {
   const dirs = [OUT, RAW, join(OUT, 'android'), join(OUT, 'common')];
-  for (const style of Object.keys(STYLES)) dirs.push(join(OUT, 'series', style));
+  for (const style of Object.keys(STYLES))
+    dirs.push(join(OUT, 'series', style));
   for (const dir of dirs) mkdirSync(dir, { recursive: true });
 
   try {
     await fetch(`${BASE_URL}/screenshots/home`, { method: 'HEAD' });
   } catch {
-    console.error(`Cannot reach ${BASE_URL} — start the app first (pnpm dev) or set BASE_URL.`);
+    console.error(
+      `Cannot reach ${BASE_URL} — start the app first (pnpm dev) or set BASE_URL.`,
+    );
     process.exit(1);
   }
 
@@ -393,7 +421,9 @@ async function main() {
       colorScheme: spec.theme,
     });
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto(`${BASE_URL}/screenshots/${spec.slug}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE_URL}/screenshots/${spec.slug}`, {
+      waitUntil: 'networkidle',
+    });
     await page.addStyleTag({
       content: [
         '*, *::before, *::after { animation: none !important; transition: none !important; caret-color: transparent !important; }',
@@ -408,15 +438,22 @@ async function main() {
     console.log(`raw: ${rawPath}`);
   }
 
-  const rawBuffers = SCREENS.map((s) => readFileSync(join(RAW, `${s.slug}-${s.theme}.png`)));
-  const raws = rawBuffers.map((b) => `data:image/png;base64,${b.toString('base64')}`);
+  const rawBuffers = SCREENS.map((s) =>
+    readFileSync(join(RAW, `${s.slug}-${s.theme}.png`)),
+  );
+  const raws = rawBuffers.map(
+    (b) => `data:image/png;base64,${b.toString('base64')}`,
+  );
 
   // Status-bar color sampled from the first capture (all screens share the
   // app background).
-  const { data } = await sharp(rawBuffers[0]).raw().toBuffer({ resolveWithObject: true });
+  const { data } = await sharp(rawBuffers[0])
+    .raw()
+    .toBuffer({ resolveWithObject: true });
   const [r, g, b] = [data[0], data[1], data[2]];
   const statusBg = `rgb(${r},${g},${b})`;
-  const statusFg = (r * 0.299 + g * 0.587 + b * 0.114) > 140 ? '#111827' : '#f0f6fc';
+  const statusFg =
+    r * 0.299 + g * 0.587 + b * 0.114 > 140 ? '#111827' : '#f0f6fc';
 
   // ---- 2. iOS: five style series ----------------------------------------
   for (const [style, compose] of Object.entries(STYLES)) {
@@ -430,7 +467,12 @@ async function main() {
         statusBg,
         statusFg,
       });
-      const outFile = join(OUT, 'series', style, `${String(i + 1).padStart(2, '0')}-${spec.slug}.png`);
+      const outFile = join(
+        OUT,
+        'series',
+        style,
+        `${String(i + 1).padStart(2, '0')}-${spec.slug}.png`,
+      );
       await renderHtml(browser, html, IOS.width, IOS.height, outFile);
       console.log(`${style}: ${outFile}`);
     }
@@ -447,7 +489,11 @@ async function main() {
       statusBg,
       statusFg,
     });
-    const outFile = join(OUT, 'android', `${String(i + 1).padStart(2, '0')}-${spec.slug}.png`);
+    const outFile = join(
+      OUT,
+      'android',
+      `${String(i + 1).padStart(2, '0')}-${spec.slug}.png`,
+    );
     await renderHtml(browser, html, ANDROID.width, ANDROID.height, outFile);
     console.log(`android: ${outFile}`);
   }
@@ -456,10 +502,15 @@ async function main() {
   const logo = readFileSync(join(process.cwd(), 'assets', 'logo.png'));
   const iconOn = async (px: number, file: string) => {
     const inner = await sharp(logo)
-      .resize(Math.round(px * 0.82), Math.round(px * 0.82), { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
+      .resize(Math.round(px * 0.82), Math.round(px * 0.82), {
+        fit: 'contain',
+        background: { r: 255, g: 255, b: 255, alpha: 0 },
+      })
       .png()
       .toBuffer();
-    await sharp({ create: { width: px, height: px, channels: 3, background: '#ffffff' } })
+    await sharp({
+      create: { width: px, height: px, channels: 3, background: '#ffffff' },
+    })
       .composite([{ input: inner, gravity: 'centre' }])
       .png()
       .toFile(file);
@@ -478,7 +529,9 @@ async function main() {
   console.log('feature graphic done');
 
   await browser.close();
-  console.log(`\nAll assets in ${OUT} — pick a series from store-assets/series/`);
+  console.log(
+    `\nAll assets in ${OUT} — pick a series from store-assets/series/`,
+  );
 }
 
 main().catch((err) => {

@@ -55,7 +55,7 @@ export function dailySeries() {
   const rand = seededRandom(42);
   return lastDays(61).map((date, i) => {
     const ramp = 0.6 + (i / 61) * 0.7;
-    const weekly = 0.8 + 0.4 * Math.sin((i % 7) / 7 * Math.PI);
+    const weekly = 0.8 + 0.4 * Math.sin(((i % 7) / 7) * Math.PI);
     const reps = Math.round((90 + rand() * 110) * ramp * weekly);
     return {
       date,
@@ -72,20 +72,33 @@ export function languageDailySeries() {
   const days = lastDays(61);
   return days.map((date, i) => {
     const ramp = 0.6 + (i / 61) * 0.8;
-    return { date, language: 'es', newWordsCount: Math.round((22 + rand() * 26) * ramp) };
+    return {
+      date,
+      language: 'es',
+      newWordsCount: Math.round((22 + rand() * 26) * ramp),
+    };
   });
 }
 
 /** Aggregate the daily series into ISO-week buckets for the year view. */
 export function weeklySeries() {
   const daily = dailySeries();
-  const byWeek = new Map<string, { totalRepetitions: number; totalNewCards: number; totalTimeMs: number }>();
+  const byWeek = new Map<
+    string,
+    { totalRepetitions: number; totalNewCards: number; totalTimeMs: number }
+  >();
   for (const d of daily) {
     const dt = new Date(`${d.date}T12:00:00Z`);
     const jan1 = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
-    const week = Math.ceil((((dt.getTime() - jan1.getTime()) / 86400000) + jan1.getUTCDay() + 1) / 7);
+    const week = Math.ceil(
+      ((dt.getTime() - jan1.getTime()) / 86400000 + jan1.getUTCDay() + 1) / 7,
+    );
     const key = `${dt.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
-    const agg = byWeek.get(key) ?? { totalRepetitions: 0, totalNewCards: 0, totalTimeMs: 0 };
+    const agg = byWeek.get(key) ?? {
+      totalRepetitions: 0,
+      totalNewCards: 0,
+      totalTimeMs: 0,
+    };
     agg.totalRepetitions += d.reps;
     agg.totalNewCards += d.newCards;
     agg.totalTimeMs += d.timeMs;
@@ -96,8 +109,8 @@ export function weeklySeries() {
 
 /** Reviews by hour of day. Commute + evening peaks (hands-free story). */
 export const HOURLY_DISTRIBUTION = [
-  0, 0, 0, 0, 0, 2, 14, 38, 52, 24, 12, 9,
-  16, 11, 7, 9, 14, 31, 46, 58, 41, 22, 8, 2,
+  0, 0, 0, 0, 0, 2, 14, 38, 52, 24, 12, 9, 16, 11, 7, 9, 14, 31, 46, 58, 41, 22,
+  8, 2,
 ];
 
 export const CHAT_THREAD = {

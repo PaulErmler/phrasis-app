@@ -9,7 +9,11 @@ import {
 import { paginationOptsValidator } from 'convex/server';
 import { internal, components } from '../../_generated/api';
 import { saveMessages, listUIMessages, syncStreams } from '@convex-dev/agent';
-import { requireAuthUserId, getAuthUserId, getUserSettings } from '../../db/users';
+import {
+  requireAuthUserId,
+  getAuthUserId,
+  getUserSettings,
+} from '../../db/users';
 import { getActiveCourseForUser } from '../../db/courses';
 import { getCourseSettings } from '../../db/courseSettings';
 import { consumeQuota } from '../../usage/helpers';
@@ -70,8 +74,7 @@ function difficultyFromCollection(
   collection: Doc<'collections'>,
 ): LearnerDifficulty | null {
   if (!isPremadeLevelCollection(collection)) return null;
-  const cefrTier =
-    collection.cefrTier ?? deriveLegacyCefrTier(collection.name);
+  const cefrTier = collection.cefrTier ?? deriveLegacyCefrTier(collection.name);
   if (!cefrTier) return null;
   return {
     label: collection.displayName ?? collection.name,
@@ -127,7 +130,6 @@ export const getCourseLanguagesForUser = internalQuery({
   },
 });
 
-
 /**
  * Expand a quick action into its steering prompt, resolving the language
  * context from the reviewed card when present, else from the active course.
@@ -139,7 +141,8 @@ function buildQuickActionSteering(
 ): string {
   return expandQuickAction(quickAction, {
     card: cardData,
-    baseLanguages: cardData?.baseLanguages ?? active?.course.baseLanguages ?? [],
+    baseLanguages:
+      cardData?.baseLanguages ?? active?.course.baseLanguages ?? [],
     targetLanguages:
       cardData?.targetLanguages ?? active?.course.targetLanguages ?? [],
   });
@@ -195,17 +198,21 @@ export const sendMessage = mutation({
         page: { message?: { role?: string } }[];
         isDone: boolean;
         continueCursor: string;
-      } = await ctx.runQuery(
-        agentComponent.messages.listMessagesByThreadId,
-        { threadId: args.threadId, order: 'asc', paginationOpts: { cursor, numItems: 300 } },
-      );
+      } = await ctx.runQuery(agentComponent.messages.listMessagesByThreadId, {
+        threadId: args.threadId,
+        order: 'asc',
+        paginationOpts: { cursor, numItems: 300 },
+      });
       userMessageCount += existingMessages.page.filter(
         (m) => m.message?.role === 'user',
       ).length;
       cursor = existingMessages.isDone ? null : existingMessages.continueCursor;
     } while (cursor !== null && userMessageCount < THREAD_MESSAGE_LIMIT);
     if (userMessageCount >= THREAD_MESSAGE_LIMIT) {
-      throw new ConvexError({ code: 'THREAD_MESSAGE_LIMIT', message: 'Thread message limit reached' });
+      throw new ConvexError({
+        code: 'THREAD_MESSAGE_LIMIT',
+        message: 'Thread message limit reached',
+      });
     }
 
     const cardData = args.cardId
@@ -221,21 +228,27 @@ export const sendMessage = mutation({
     // message immediately BEFORE the visible label, so the model reads the
     // detailed request in place on this and every later turn while the UI
     // (which filters system messages) shows only the short label bubble.
-    const { messages: savedMessages } = await saveMessages(ctx, agentComponent, {
-      threadId: args.threadId,
-      messages: [
-        ...(steering !== undefined
-          ? [{ role: 'system' as const, content: steering }]
-          : []),
-        { role: 'user' as const, content: args.prompt },
-      ],
-    });
+    const { messages: savedMessages } = await saveMessages(
+      ctx,
+      agentComponent,
+      {
+        threadId: args.threadId,
+        messages: [
+          ...(steering !== undefined
+            ? [{ role: 'system' as const, content: steering }]
+            : []),
+          { role: 'user' as const, content: args.prompt },
+        ],
+      },
+    );
     const messageId = savedMessages[savedMessages.length - 1]._id;
 
     const cardContextSection = cardData
       ? buildCardContextSection(cardData)
       : undefined;
-    const languageSection = cardData ? buildLanguageSection(cardData) : undefined;
+    const languageSection = cardData
+      ? buildLanguageSection(cardData)
+      : undefined;
     const difficulty = await resolveLearnerDifficulty(ctx, active?.course);
     const difficultySection = difficulty
       ? buildDifficultySection(difficulty)
@@ -282,7 +295,11 @@ export const sendMessage = mutation({
 
     // Track chat message event
     if (active) {
-      await trackEvent(ctx, { userId, courseId: active.course._id, field: 'chatMessagesSent' });
+      await trackEvent(ctx, {
+        userId,
+        courseId: active.course._id,
+        field: 'chatMessagesSent',
+      });
     }
 
     // Captured server-side rather than from the composer: the browser can be
@@ -404,14 +421,16 @@ export const generateResponse = internalAction({
         });
         const courseLanguages = thread?.userId
           ? await ctx.runQuery(
-            internal.features.chat.messages.getCourseLanguagesForUser,
-            { userId: thread.userId },
-          )
+              internal.features.chat.messages.getCourseLanguagesForUser,
+              { userId: thread.userId },
+            )
           : null;
         if (courseLanguages) {
           languageSection ??= buildLanguageSection(courseLanguages);
           if (!difficultySection && courseLanguages.difficulty) {
-            difficultySection = buildDifficultySection(courseLanguages.difficulty);
+            difficultySection = buildDifficultySection(
+              courseLanguages.difficulty,
+            );
           }
         }
       }
@@ -534,7 +553,7 @@ export const generateResponse = internalAction({
             : {}),
         },
         {
-          saveStreamDeltas: { chunking: "word", throttleMs: 500 },
+          saveStreamDeltas: { chunking: 'word', throttleMs: 500 },
           usageHandler: async (
             _usageCtx,
             { userId, providerMetadata, usage, model, provider },

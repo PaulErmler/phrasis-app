@@ -38,8 +38,18 @@ const NEWER_BUILD = 'newer-build';
 
 const CARD_ID = 'card-1' as Id<'cards'>;
 const TRANSLATIONS: CardTranslation[] = [
-  { language: 'en', text: 'hello', isBaseLanguage: true, isTargetLanguage: false },
-  { language: 'es', text: 'hola', isBaseLanguage: false, isTargetLanguage: true },
+  {
+    language: 'en',
+    text: 'hello',
+    isBaseLanguage: true,
+    isTargetLanguage: false,
+  },
+  {
+    language: 'es',
+    text: 'hola',
+    isBaseLanguage: false,
+    isTargetLanguage: true,
+  },
 ];
 
 function mockVersionResponse(buildId: string) {

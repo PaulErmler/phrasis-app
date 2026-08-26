@@ -24,13 +24,9 @@ export function LandingFooter() {
                 width={32}
                 height={32}
               />
-              <h3 className="text-2xl font-bold text-primary">
-                  Flexling
-              </h3>
+              <h3 className="text-2xl font-bold text-primary">Flexling</h3>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {t('tagline')}
-            </p>
+            <p className="text-sm text-muted-foreground">{t('tagline')}</p>
           </div>
 
           {/* Column 2: Product */}
@@ -125,7 +121,7 @@ export function LandingFooter() {
         {/* Bottom copyright */}
         <div className="mt-12 pt-8 border-t border-border text-center">
           <p className="text-sm text-muted-foreground/70">
-              &copy; {new Date().getFullYear()} Flexling.
+            &copy; {new Date().getFullYear()} Flexling.
           </p>
         </div>
       </div>

@@ -188,7 +188,9 @@ export async function fetchFreePlayRotation(
   }
   const allowedOrigins = originsForFilter(filter);
   const perOrigin = await Promise.all(
-    allowedOrigins.map((origin) => cfg.fetchByOrigin(ctx, deckId, origin, take)),
+    allowedOrigins.map((origin) =>
+      cfg.fetchByOrigin(ctx, deckId, origin, take),
+    ),
   );
   const merged = perOrigin.flat();
   merged.sort((a, b) => {

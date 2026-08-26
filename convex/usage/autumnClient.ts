@@ -89,7 +89,9 @@ export async function autumnFetch<T>(
   const raw = await autumnFetchRaw(method, path, body, apiVersion);
   if (opts?.nullOn404 && raw.status === 404) return null;
   if (!raw.ok) {
-    console.error(`Autumn ${method} ${path} failed (${raw.status}): ${raw.text}`);
+    console.error(
+      `Autumn ${method} ${path} failed (${raw.status}): ${raw.text}`,
+    );
     const err = raw.json as { message?: string; code?: string } | null;
     throw new Error(
       `Autumn request failed: ${err?.message ?? err?.code ?? raw.status}`,

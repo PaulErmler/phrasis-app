@@ -352,10 +352,13 @@ async function synthesizeAndValidate(
 
     const sttStartedAt = Date.now();
     try {
-      const { text: transcribed, wordTimings, audioDurationMs } =
-        await transcribeAudio(blob, args.language, {
-          regionVariant: args.regionVariant,
-        });
+      const {
+        text: transcribed,
+        wordTimings,
+        audioDurationMs,
+      } = await transcribeAudio(blob, args.language, {
+        regionVariant: args.regionVariant,
+      });
 
       // Every synthesized clip is round-tripped through Azure to validate it.
       // That makes this one of the largest spend lines in the app and, until
@@ -386,7 +389,11 @@ async function synthesizeAndValidate(
       // regenerate if both say no. Gemini errors fall back to the strict
       // verdict (already "no match" at this point), so a flaky LLM can't
       // let bad audio through.
-      let isMatch = textsMatchForLanguage(args.text, transcribed, args.language);
+      let isMatch = textsMatchForLanguage(
+        args.text,
+        transcribed,
+        args.language,
+      );
       if (!isMatch) {
         // Only reached on a near-miss, so its volume is itself a signal: a
         // spike here means TTS quality regressed for some language.
@@ -534,7 +541,9 @@ export const processTTSForCard = internalAction({
         language: args.language,
         voiceName: args.voiceName,
         storageId: lastStorageId,
-        ttsQuality: validated ? ('validated' as const) : ('unvalidated' as const),
+        ttsQuality: validated
+          ? ('validated' as const)
+          : ('unvalidated' as const),
         ttsProvider: args.provider,
         voiceGender: args.voiceGender,
         speed: args.speed,
@@ -545,10 +554,13 @@ export const processTTSForCard = internalAction({
         regionVariant: args.regionVariant,
       });
     } else {
-      console.error('[ttsProcess] No storageId produced, audio will be missing', {
-        textId: args.textId,
-        language: args.language,
-      });
+      console.error(
+        '[ttsProcess] No storageId produced, audio will be missing',
+        {
+          textId: args.textId,
+          language: args.language,
+        },
+      );
     }
 
     return null;
@@ -823,10 +835,10 @@ export const backfillWordTimings = internalAction({
         error: err,
       });
     } finally {
-      await ctx.runMutation(
-        internal.features.ttsProcessing.releaseTtsClaim,
-        { textId: args.textId, language: args.language },
-      );
+      await ctx.runMutation(internal.features.ttsProcessing.releaseTtsClaim, {
+        textId: args.textId,
+        language: args.language,
+      });
     }
     return null;
   },

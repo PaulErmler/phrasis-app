@@ -82,7 +82,12 @@ describe('buildProgressPayload', () => {
 
   it('drops empty arrays (targetLanguages, baseLanguages, learningGoals)', () => {
     const payload = buildProgressPayload(
-      { ...FULL_DATA, targetLanguages: [], baseLanguages: [], learningGoals: [] },
+      {
+        ...FULL_DATA,
+        targetLanguages: [],
+        baseLanguages: [],
+        learningGoals: [],
+      },
       3,
     );
     expect(payload.targetLanguages).toBeUndefined();

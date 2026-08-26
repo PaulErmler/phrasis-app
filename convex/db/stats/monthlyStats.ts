@@ -21,7 +21,10 @@ export async function upsertMonthlyStats(
   const existing = await ctx.db
     .query('monthlyStats')
     .withIndex('by_userId_and_courseId_and_month', (q) =>
-      q.eq('userId', args.userId).eq('courseId', args.courseId).eq('month', args.month),
+      q
+        .eq('userId', args.userId)
+        .eq('courseId', args.courseId)
+        .eq('month', args.month),
     )
     .first();
 
@@ -35,9 +38,15 @@ export async function upsertMonthlyStats(
       totalNewCards: existing.totalNewCards + (args.isNewCard ? 1 : 0),
       totalTimeMs: existing.totalTimeMs + args.timeMs,
       activeDays: existing.activeDays + (args.isFirstActivityToday ? 1 : 0),
-      activeWeeks: existing.activeWeeks + (args.isFirstActivityThisWeek ? 1 : 0),
+      activeWeeks:
+        existing.activeWeeks + (args.isFirstActivityThisWeek ? 1 : 0),
       ...(args.reviewMode
-        ? { reviewsByMode: { ...prevMode, [args.reviewMode]: prevMode[args.reviewMode] + 1 } }
+        ? {
+            reviewsByMode: {
+              ...prevMode,
+              [args.reviewMode]: prevMode[args.reviewMode] + 1,
+            },
+          }
         : {}),
     });
     return { isFirstActivityThisMonth: false };
@@ -54,11 +63,11 @@ export async function upsertMonthlyStats(
     activeWeeks: 1,
     ...(args.reviewMode
       ? {
-        reviewsByMode: {
-          ...EMPTY_MODE_COUNTS(),
-          [args.reviewMode]: 1,
-        },
-      }
+          reviewsByMode: {
+            ...EMPTY_MODE_COUNTS(),
+            [args.reviewMode]: 1,
+          },
+        }
       : {}),
   });
   return { isFirstActivityThisMonth: true };

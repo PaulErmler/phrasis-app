@@ -9,8 +9,10 @@ import { FeatureBadge } from './FeatureBadge';
 import { useFeatureQuota } from './useFeatureQuota';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 
-interface FeatureGatedButtonProps
-  extends Omit<ComponentProps<typeof Button>, 'onClick'> {
+interface FeatureGatedButtonProps extends Omit<
+  ComponentProps<typeof Button>,
+  'onClick'
+> {
   featureId: string;
   onAction: () => void;
   /** Label shown when the feature limit is reached. Defaults to "Upgrade". */

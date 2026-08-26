@@ -35,7 +35,14 @@ describe.each([
   },
 ])(
   '$name reset patch (migrateOne logic)',
-  ({ patch, language, otherLanguage, currentSource, localOutput, staleOutput }) => {
+  ({
+    patch,
+    language,
+    otherLanguage,
+    currentSource,
+    localOutput,
+    staleOutput,
+  }) => {
     it('clears the empty-string sentinel left by google-v3', () => {
       expect(
         patch({

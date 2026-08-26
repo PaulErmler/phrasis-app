@@ -279,20 +279,24 @@ describe('resolveAudioSettings: "Only new" limit mapping', () => {
   it('maps undefined / 0 to Infinity (always), and 1-10 to the number', () => {
     expect(resolveAudioSettings(null).beforeOnlyNewReps).toBe(Infinity);
     expect(
-      resolveAudioSettings(cs({ targetBeforeOnlyNewReps: 0 })).beforeOnlyNewReps,
+      resolveAudioSettings(cs({ targetBeforeOnlyNewReps: 0 }))
+        .beforeOnlyNewReps,
     ).toBe(Infinity);
     expect(
-      resolveAudioSettings(cs({ targetBeforeOnlyNewReps: 3 })).beforeOnlyNewReps,
+      resolveAudioSettings(cs({ targetBeforeOnlyNewReps: 3 }))
+        .beforeOnlyNewReps,
     ).toBe(3);
   });
 
   it('infers the strategy for legacy docs: positive rep window → onlyNew, 0/unset (old ∞) → continuous', () => {
     expect(resolveAudioSettings(null).listeningStrategy).toBe('continuous');
     expect(
-      resolveAudioSettings(cs({ targetBeforeOnlyNewReps: 0 })).listeningStrategy,
+      resolveAudioSettings(cs({ targetBeforeOnlyNewReps: 0 }))
+        .listeningStrategy,
     ).toBe('continuous');
     expect(
-      resolveAudioSettings(cs({ targetBeforeOnlyNewReps: 3 })).listeningStrategy,
+      resolveAudioSettings(cs({ targetBeforeOnlyNewReps: 3 }))
+        .listeningStrategy,
     ).toBe('onlyNew');
   });
 
@@ -308,7 +312,10 @@ describe('resolveAudioSettings: "Only new" limit mapping', () => {
     expect(u.beforeUntilGoodReps).toBe(3);
     expect(
       resolveAudioSettings(
-        cs({ targetBeforeListeningStrategy: 'continuous', targetBeforeOnlyNewReps: 3 }),
+        cs({
+          targetBeforeListeningStrategy: 'continuous',
+          targetBeforeOnlyNewReps: 3,
+        }),
       ).listeningStrategy,
     ).toBe('continuous');
     // untilGood reps default to 1 when unset.
@@ -340,8 +347,12 @@ describe('applyOnlyNewListening', () => {
 
   it('keeps Practice Listening on while the card is still new (count < limit)', () => {
     const s = withLimit(3);
-    expect(applyOnlyNewListening(s, { reviewCount: 0 }).playTargetBefore).toBe(true);
-    expect(applyOnlyNewListening(s, { reviewCount: 2 }).playTargetBefore).toBe(true);
+    expect(applyOnlyNewListening(s, { reviewCount: 0 }).playTargetBefore).toBe(
+      true,
+    );
+    expect(applyOnlyNewListening(s, { reviewCount: 2 }).playTargetBefore).toBe(
+      true,
+    );
   });
 
   it('graduates the card once count reaches the limit (before off, after unchanged)', () => {
@@ -386,7 +397,10 @@ describe('applyOnlyNewListening', () => {
 });
 
 describe('applyOnlyNewListening: "until rated good" strategy', () => {
-  const untilGood = (reps: number, overrides: Record<string, unknown> = {}) => ({
+  const untilGood = (
+    reps: number,
+    overrides: Record<string, unknown> = {},
+  ) => ({
     ...resolveAudioSettings(
       cs({
         playTargetBeforeBase: true,
@@ -399,28 +413,47 @@ describe('applyOnlyNewListening: "until rated good" strategy', () => {
 
   it('keeps Practice Listening on until the card has enough good/easy ratings', () => {
     const s = untilGood(2);
-    expect(applyOnlyNewListening(s, { reviewCount: 99, goodReviewCount: 0 }).playTargetBefore).toBe(true);
-    expect(applyOnlyNewListening(s, { reviewCount: 99, goodReviewCount: 1 }).playTargetBefore).toBe(true);
-    expect(applyOnlyNewListening(s, { reviewCount: 99, goodReviewCount: 2 }).playTargetBefore).toBe(false);
+    expect(
+      applyOnlyNewListening(s, { reviewCount: 99, goodReviewCount: 0 })
+        .playTargetBefore,
+    ).toBe(true);
+    expect(
+      applyOnlyNewListening(s, { reviewCount: 99, goodReviewCount: 1 })
+        .playTargetBefore,
+    ).toBe(true);
+    expect(
+      applyOnlyNewListening(s, { reviewCount: 99, goodReviewCount: 2 })
+        .playTargetBefore,
+    ).toBe(false);
   });
 
   it('treats a missing good count as 0 (pre-field cards stay in listening practice)', () => {
     const s = untilGood(1);
-    expect(applyOnlyNewListening(s, { reviewCount: 99 }).playTargetBefore).toBe(true);
+    expect(applyOnlyNewListening(s, { reviewCount: 99 }).playTargetBefore).toBe(
+      true,
+    );
   });
 
   it('ignores the review count and the onlyNew limit entirely', () => {
     // onlyNew limit of 1 would have graduated this card long ago; the
     // strategy switch makes the good count the only signal.
     const s = untilGood(1, { targetBeforeOnlyNewReps: 1 });
-    expect(applyOnlyNewListening(s, { reviewCount: 50, goodReviewCount: 0 }).playTargetBefore).toBe(true);
-    expect(applyOnlyNewListening(s, { reviewCount: 0, goodReviewCount: 1 }).playTargetBefore).toBe(false);
+    expect(
+      applyOnlyNewListening(s, { reviewCount: 50, goodReviewCount: 0 })
+        .playTargetBefore,
+    ).toBe(true);
+    expect(
+      applyOnlyNewListening(s, { reviewCount: 0, goodReviewCount: 1 })
+        .playTargetBefore,
+    ).toBe(false);
   });
 
   it('still requires both Practice groups on', () => {
     const s = untilGood(1, { playTargetAfterBase: false });
     expect(s.playTargetAfter).toBe(false);
-    expect(applyOnlyNewListening(s, { reviewCount: 0, goodReviewCount: 5 })).toBe(s);
+    expect(
+      applyOnlyNewListening(s, { reviewCount: 0, goodReviewCount: 5 }),
+    ).toBe(s);
   });
 });
 

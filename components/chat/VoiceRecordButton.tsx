@@ -39,7 +39,9 @@ export function VoiceRecordButton({
           {isRecording ? t('stopRecording') : t('startRecording')}
         </span>
         {isRecording && <span className="ml-2 text-xs">{t('recording')}</span>}
-        {isTranscribing && <span className="ml-2 text-xs">{t('transcribing')}</span>}
+        {isTranscribing && (
+          <span className="ml-2 text-xs">{t('transcribing')}</span>
+        )}
       </PromptInputButton>
       {limitDialog}
     </>

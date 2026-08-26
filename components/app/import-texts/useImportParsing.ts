@@ -16,7 +16,10 @@ export interface UseImportParsingOptions {
   delimiter?: ImportDelimiter;
 }
 
-export function parseSheet({ input, delimiter = 'auto' }: UseImportParsingOptions): ParsedSheet {
+export function parseSheet({
+  input,
+  delimiter = 'auto',
+}: UseImportParsingOptions): ParsedSheet {
   if (!input || input.trim().length === 0) return EMPTY;
 
   // Strip BOM so the first cell is clean.
@@ -33,7 +36,8 @@ export function parseSheet({ input, delimiter = 'auto' }: UseImportParsingOption
   });
 
   const rows = (result.data ?? []).filter(
-    (row): row is string[] => Array.isArray(row) && row.some((cell) => cell.length > 0),
+    (row): row is string[] =>
+      Array.isArray(row) && row.some((cell) => cell.length > 0),
   );
 
   const columnCount = rows.reduce((max, row) => Math.max(max, row.length), 0);
@@ -54,7 +58,9 @@ export function parseSheet({ input, delimiter = 'auto' }: UseImportParsingOption
   };
 }
 
-export function useImportParsing(options: UseImportParsingOptions): ParsedSheet {
+export function useImportParsing(
+  options: UseImportParsingOptions,
+): ParsedSheet {
   const { input, delimiter } = options;
   return useMemo(() => parseSheet({ input, delimiter }), [input, delimiter]);
 }

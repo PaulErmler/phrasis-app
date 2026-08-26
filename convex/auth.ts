@@ -221,31 +221,32 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
       optionalEnv('APPLE_KEY_ID') &&
       optionalEnv('APPLE_PRIVATE_KEY')
         ? {
-          apple: async () => {
-            // Better Auth resolves ALL providers together, if this throws,
-            // Google/email sign-in break too. A bad Apple key must only
-            // disable Apple (returning null skips the provider).
-            try {
-              return {
-                clientId: requireEnv('APPLE_CLIENT_ID'),
-                clientSecret: await appleClientSecret(),
-                // Audience of identity tokens minted by the native iOS app
-                // (the Capacitor shell signs in with an idToken, not a
-                // browser redirect).
-                appBundleIdentifier:
-                    optionalEnv('APPLE_APP_BUNDLE_IDENTIFIER') ?? 'com.flexling.app',
-              };
-            } catch (err) {
-              console.error(
-                'Sign in with Apple disabled: client secret generation failed ' +
-                  '(check APPLE_PRIVATE_KEY formatting):',
-                err,
-              );
-              // `enabled: false` makes Better Auth skip the provider.
-              return { enabled: false, clientId: '', clientSecret: '' };
-            }
-          },
-        }
+            apple: async () => {
+              // Better Auth resolves ALL providers together, if this throws,
+              // Google/email sign-in break too. A bad Apple key must only
+              // disable Apple (returning null skips the provider).
+              try {
+                return {
+                  clientId: requireEnv('APPLE_CLIENT_ID'),
+                  clientSecret: await appleClientSecret(),
+                  // Audience of identity tokens minted by the native iOS app
+                  // (the Capacitor shell signs in with an idToken, not a
+                  // browser redirect).
+                  appBundleIdentifier:
+                    optionalEnv('APPLE_APP_BUNDLE_IDENTIFIER') ??
+                    'com.flexling.app',
+                };
+              } catch (err) {
+                console.error(
+                  'Sign in with Apple disabled: client secret generation failed ' +
+                    '(check APPLE_PRIVATE_KEY formatting):',
+                  err,
+                );
+                // `enabled: false` makes Better Auth skip the provider.
+                return { enabled: false, clientId: '', clientSecret: '' };
+              }
+            },
+          }
         : {}),
     },
     plugins: [

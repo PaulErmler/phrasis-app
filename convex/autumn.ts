@@ -1,14 +1,17 @@
-import { ConvexError, v } from "convex/values";
-import { components, internal } from "./_generated/api";
-import { action, type ActionCtx } from "./_generated/server";
-import { Autumn } from "@useautumn/convex";
-import { getTrialState, type TrialState } from "../lib/autumn/trial-eligibility";
-import { currentPlans, normalizePlans } from "../lib/autumn/customer-shape";
+import { ConvexError, v } from 'convex/values';
+import { components, internal } from './_generated/api';
+import { action, type ActionCtx } from './_generated/server';
+import { Autumn } from '@useautumn/convex';
+import {
+  getTrialState,
+  type TrialState,
+} from '../lib/autumn/trial-eligibility';
+import { currentPlans, normalizePlans } from '../lib/autumn/customer-shape';
 import {
   managedPaymentsCheckoutParams,
   managedPaymentsEnabled,
-} from "../lib/autumn/managed-payments";
-import { autumnFetchRaw, getSecretKey } from "./usage/autumnClient";
+} from '../lib/autumn/managed-payments';
+import { autumnFetchRaw, getSecretKey } from './usage/autumnClient';
 
 // Module-scope on purpose: the Autumn component client below needs the key
 // at construction, so a key-less deployment fails at import/analysis time.
@@ -30,7 +33,7 @@ export const autumn = new Autumn(components.autumn, {
     auth: { getUserIdentity: () => Promise<Record<string, unknown> | null> };
   }) => {
     const user = await ctx.auth.getUserIdentity();
-    if (!user) return null
+    if (!user) return null;
 
     return {
       customerId: user.subject as string,
@@ -127,7 +130,9 @@ export async function gateTrialArgs<T extends { freeTrial?: boolean }>(
     return { gated: args, state: getTrialState(null), customer: null };
   }
   if (!res.ok) {
-    console.error(`Autumn trial-gate customer fetch failed (${res.status}): ${res.text}`);
+    console.error(
+      `Autumn trial-gate customer fetch failed (${res.status}): ${res.text}`,
+    );
     throw new ConvexError({
       code: 'UPSTREAM_ERROR',
       message: 'Could not verify trial eligibility — please retry',
@@ -143,7 +148,8 @@ export async function gateTrialArgs<T extends { freeTrial?: boolean }>(
   if (state.onTrial && kind === 'attach') {
     throw new ConvexError({
       code: 'INVALID_STATE',
-      message: 'Plan switches during a trial must go through switchPlanDuringTrial',
+      message:
+        'Plan switches during a trial must go through switchPlanDuringTrial',
     });
   }
   return { gated: { ...args, freeTrial: false }, state, customer };
@@ -265,7 +271,10 @@ function guardFirstPurchaseOffLegacyPath(state: TrialState | null): void {
  */
 async function attachViaV2NoTrial(
   ctx: ActionCtx,
-  args: { productId?: string; options?: { featureId: string; quantity: number }[] },
+  args: {
+    productId?: string;
+    options?: { featureId: string; quantity: number }[];
+  },
 ) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity)
@@ -303,7 +312,11 @@ async function attachViaV2NoTrial(
   );
   const json =
     typeof res.json === 'object' && res.json !== null
-      ? (res.json as { payment_url?: string | null; message?: string; code?: string })
+      ? (res.json as {
+          payment_url?: string | null;
+          message?: string;
+          code?: string;
+        })
       : { message: res.text.slice(0, 200) };
   if (!res.ok) {
     console.error(`Autumn v2 attach failed (${res.status}): ${res.text}`);
@@ -403,10 +416,7 @@ export function rejectLegacySessionUnderManagedPayments(
   const data = (
     result as { data?: { url?: unknown; checkout_url?: unknown } | null } | null
   )?.data;
-  if (
-    typeof data?.url === 'string' ||
-    typeof data?.checkout_url === 'string'
-  ) {
+  if (typeof data?.url === 'string' || typeof data?.checkout_url === 'string') {
     console.warn(
       'Refused a legacy attach that returned a checkout session under Managed Payments',
       { state },

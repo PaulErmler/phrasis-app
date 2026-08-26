@@ -8,7 +8,11 @@ interface AppUsageStatsProps {
   chatMessages: number;
 }
 
-export function AppUsageStats({ manualCards, chatCards, chatMessages }: AppUsageStatsProps) {
+export function AppUsageStats({
+  manualCards,
+  chatCards,
+  chatMessages,
+}: AppUsageStatsProps) {
   const t = useTranslations('StatsPage');
 
   return (

@@ -170,7 +170,9 @@ describe('PaymentOverdueDialog', () => {
     render(<PaymentOverdueDialog />);
 
     // Autumn-style soft failure: resolves with an error payload.
-    openBillingPortalMock.mockResolvedValue({ error: { message: 'no stripe' } });
+    openBillingPortalMock.mockResolvedValue({
+      error: { message: 'no stripe' },
+    });
     await userEvent.click(screen.getByTestId('payment-overdue-pay'));
     await waitFor(() =>
       expect(toastErrorMock).toHaveBeenCalledWith('portalError'),
@@ -215,9 +217,9 @@ describe('PaymentOverdueDialog', () => {
     render(<PaymentOverdueDialog />);
 
     await userEvent.click(screen.getByTestId('payment-overdue-cancel'));
-    expect(screen.getByTestId('payment-overdue-cancel-warning').textContent).toBe(
-      'cancelWarningNoCourses',
-    );
+    expect(
+      screen.getByTestId('payment-overdue-cancel-warning').textContent,
+    ).toBe('cancelWarningNoCourses');
   });
 
   it('refetches the Autumn customer only after the cancel settled', async () => {
@@ -237,7 +239,10 @@ describe('PaymentOverdueDialog', () => {
     expect(refetchMock).not.toHaveBeenCalled();
 
     await act(async () => {
-      resolveCancel({ outcome: 'cancelled', cancelledProductId: 'basic_annual' });
+      resolveCancel({
+        outcome: 'cancelled',
+        cancelledProductId: 'basic_annual',
+      });
     });
     expect(refetchMock).toHaveBeenCalled();
     expect(toastSuccessMock).toHaveBeenCalledWith('cancelSuccess');

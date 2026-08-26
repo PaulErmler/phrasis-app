@@ -1,5 +1,8 @@
 import { v, ConvexError } from 'convex/values';
-import { paginationOptsValidator, paginationResultValidator } from 'convex/server';
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from 'convex/server';
 import { query, mutation, internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { getAuthUserId } from '../db/users';
@@ -18,7 +21,10 @@ import {
   listMarksForCollection,
   MARK_READ_LIMIT,
 } from '../db/collectionTextMarks';
-import { buildTextContentBatchForLanguages, getCourseLanguages } from '../lib/cardContent';
+import {
+  buildTextContentBatchForLanguages,
+  getCourseLanguages,
+} from '../lib/cardContent';
 import {
   scheduleMissingContent,
   scheduleTranslationForLanguage,
@@ -59,7 +65,10 @@ import type { MutationCtx } from '../_generated/server';
 // they now live in convex/lib/collectionAccess.ts so features/decks.ts can
 // share them without importing this module (which formed the backend's only
 // import cycle). Re-exported to keep this module's public surface stable.
-export { isCollectionAccessible, requireAccessibleText } from '../lib/collectionAccess';
+export {
+  isCollectionAccessible,
+  requireAccessibleText,
+} from '../lib/collectionAccess';
 
 // ============================================================================
 // QUERIES
@@ -150,29 +159,29 @@ export const browseCollectionTexts = query({
     const isAfter = args.direction === 'after';
     const result = isLevelCollection
       ? await ctx.db
-        .query('texts')
-        .withIndex('by_collection_and_userCreated_and_rank', (q) => {
-          const base = q
-            .eq('collectionId', args.collectionId)
-            .eq('userCreated', false);
-          return isAfter
-            ? base.gt('collectionRank', args.anchorRank)
-            : base.lte('collectionRank', args.anchorRank);
-        })
-        .order(isAfter ? 'asc' : 'desc')
-        .paginate(paginationOpts)
+          .query('texts')
+          .withIndex('by_collection_and_userCreated_and_rank', (q) => {
+            const base = q
+              .eq('collectionId', args.collectionId)
+              .eq('userCreated', false);
+            return isAfter
+              ? base.gt('collectionRank', args.anchorRank)
+              : base.lte('collectionRank', args.anchorRank);
+          })
+          .order(isAfter ? 'asc' : 'desc')
+          .paginate(paginationOpts)
       : await ctx.db
-        .query('texts')
-        .withIndex('by_collection_and_userId_and_rank', (q) => {
-          const base = q
-            .eq('collectionId', args.collectionId)
-            .eq('userId', userId);
-          return isAfter
-            ? base.gt('collectionRank', args.anchorRank)
-            : base.lte('collectionRank', args.anchorRank);
-        })
-        .order(isAfter ? 'asc' : 'desc')
-        .paginate(paginationOpts);
+          .query('texts')
+          .withIndex('by_collection_and_userId_and_rank', (q) => {
+            const base = q
+              .eq('collectionId', args.collectionId)
+              .eq('userId', userId);
+            return isAfter
+              ? base.gt('collectionRank', args.anchorRank)
+              : base.lte('collectionRank', args.anchorRank);
+          })
+          .order(isAfter ? 'asc' : 'desc')
+          .paginate(paginationOpts);
 
     // First page of the main stream: surface the user's marked texts that
     // sit at/below the anchor (the scan passed over them; the range above
@@ -185,17 +194,26 @@ export const browseCollectionTexts = query({
       const markTypes = ['ignored', 'prioritized', 'readd'] as const;
       const perType = await Promise.all(
         markTypes.map((mark) =>
-          listMarksForCollection(ctx, userId, course._id, args.collectionId, mark, {
-            maxRank: args.anchorRank,
-            limit: MARK_READ_LIMIT,
-          }),
+          listMarksForCollection(
+            ctx,
+            userId,
+            course._id,
+            args.collectionId,
+            mark,
+            {
+              maxRank: args.anchorRank,
+              limit: MARK_READ_LIMIT,
+            },
+          ),
         ),
       );
       const markDocs = perType
         .flat()
         .sort((a, b) => a.collectionRank - b.collectionRank)
         .slice(0, MARK_READ_LIMIT);
-      const texts = await Promise.all(markDocs.map((m) => ctx.db.get(m.textId)));
+      const texts = await Promise.all(
+        markDocs.map((m) => ctx.db.get(m.textId)),
+      );
       injectedTexts = texts.filter((t): t is Doc<'texts'> => t !== null);
     }
 
@@ -205,7 +223,9 @@ export const browseCollectionTexts = query({
     const [cards, marks] = await Promise.all([
       Promise.all(
         combined.map((t) =>
-          deck ? getCardByDeckAndText(ctx, deck._id, t._id) : Promise.resolve(null),
+          deck
+            ? getCardByDeckAndText(ctx, deck._id, t._id)
+            : Promise.resolve(null),
         ),
       ),
       Promise.all(combined.map((t) => getMark(ctx, userId, course._id, t._id))),
@@ -214,7 +234,11 @@ export const browseCollectionTexts = query({
     // No server-side filtering. Every row ships with its status and the
     // client decides visibility (session persistence + the show-added /
     // show-ignored toggles are pure client concerns).
-    const rows = combined.map((text, i) => ({ text, card: cards[i], mark: marks[i] }));
+    const rows = combined.map((text, i) => ({
+      text,
+      card: cards[i],
+      mark: marks[i],
+    }));
 
     const inputs = rows.map((row, i) => ({
       key: String(i),
@@ -282,7 +306,11 @@ export const browseCollectionTexts = query({
           ? 'added'
           : row.mark?.mark === 'readd'
             ? 'none'
-            : row.mark?.mark ?? 'none') as 'added' | 'prioritized' | 'ignored' | 'none',
+            : (row.mark?.mark ?? 'none')) as
+          | 'added'
+          | 'prioritized'
+          | 'ignored'
+          | 'none',
         translations: content.translations,
         audioRecordings: content.audioRecordings,
         missingTranslationLanguages,
@@ -318,7 +346,12 @@ export const setCollectionTextMark = mutation({
 
     // Full access chain, without the scope check, prioritizing another
     // user's fork text would later make the drain add it to this user's deck.
-    const { text } = await requireAccessibleText(ctx, args.textId, courseId, userId);
+    const { text } = await requireAccessibleText(
+      ctx,
+      args.textId,
+      courseId,
+      userId,
+    );
 
     // Marks exist only for texts that aren't cards yet. The preview hides
     // these buttons on added rows; this guards direct calls.
@@ -538,7 +571,10 @@ export const requestPreviewTranslations = mutation({
     let translationsScheduled = 0;
     for (const textId of textIds) {
       const text = await ctx.db.get(textId);
-      if (!text || text.collectionId.toString() !== args.collectionId.toString()) {
+      if (
+        !text ||
+        text.collectionId.toString() !== args.collectionId.toString()
+      ) {
         continue;
       }
       if (!canUserAccessCollectionText(collection, text, userId)) {
@@ -658,9 +694,7 @@ export const requestPreviewAudio = mutation({
       // and the preview never runs it. Preview rows are usually not cards.
       // Mirrors that sweep's checks in convex/features/decks.ts.
       const payload = await resolveAudioPayload(ctx, existingAudio);
-      const url = payload
-        ? await ctx.storage.getUrl(payload.storageId)
-        : null;
+      const url = payload ? await ctx.storage.getUrl(payload.storageId) : null;
       if (url !== null) return { scheduled: false };
       // Don't race an in-flight job: `processTTSForCard` attaches its row
       // before the blob is necessarily resolvable, and deleting it here
@@ -685,11 +719,11 @@ export const requestPreviewAudio = mutation({
       args.language === text.language
         ? null
         : await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', args.textId).eq('targetLanguage', args.language),
-          )
-          .first();
+            .query('translations')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', args.textId).eq('targetLanguage', args.language),
+            )
+            .first();
     if (args.language !== text.language && !translation) {
       // Translation still generating. The click raced it. Nothing to
       // synthesize yet; the client retries once the translation row lands.
@@ -800,4 +834,3 @@ export const ensureFirstSentencesForCollection = internalMutation({
     return null;
   },
 });
-

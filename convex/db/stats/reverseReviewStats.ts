@@ -108,7 +108,10 @@ async function reversePeriodRollups(
   const weekly = await ctx.db
     .query('weeklyStats')
     .withIndex('by_userId_and_courseId_and_week', (q) =>
-      q.eq('userId', args.userId).eq('courseId', args.courseId).eq('week', getISOWeekString(args.date)),
+      q
+        .eq('userId', args.userId)
+        .eq('courseId', args.courseId)
+        .eq('week', getISOWeekString(args.date)),
     )
     .first();
   if (weekly) await ctx.db.patch(weekly._id, reversalPatch(weekly));
@@ -116,7 +119,10 @@ async function reversePeriodRollups(
   const monthly = await ctx.db
     .query('monthlyStats')
     .withIndex('by_userId_and_courseId_and_month', (q) =>
-      q.eq('userId', args.userId).eq('courseId', args.courseId).eq('month', getMonthString(args.date)),
+      q
+        .eq('userId', args.userId)
+        .eq('courseId', args.courseId)
+        .eq('month', getMonthString(args.date)),
     )
     .first();
   if (monthly) await ctx.db.patch(monthly._id, reversalPatch(monthly));
@@ -124,7 +130,10 @@ async function reversePeriodRollups(
   const yearly = await ctx.db
     .query('yearlyStats')
     .withIndex('by_userId_and_courseId_and_year', (q) =>
-      q.eq('userId', args.userId).eq('courseId', args.courseId).eq('year', getYearString(args.date)),
+      q
+        .eq('userId', args.userId)
+        .eq('courseId', args.courseId)
+        .eq('year', getYearString(args.date)),
     )
     .first();
   if (yearly) await ctx.db.patch(yearly._id, reversalPatch(yearly));
@@ -163,20 +172,34 @@ export async function reverseReviewStats(
       totalRepetitions: dec(stats.totalRepetitions),
       ...(wasFirstReview ? { totalCards: dec(stats.totalCards) } : {}),
       ...(reviewModeRaw
-        ? { totalReviewsByMode: decModeCount(stats.totalReviewsByMode, reviewModeRaw) }
+        ? {
+            totalReviewsByMode: decModeCount(
+              stats.totalReviewsByMode,
+              reviewModeRaw,
+            ),
+          }
         : {}),
       ...(accuracy != null
         ? {
-          totalAccuracySum: Math.max(0, (stats.totalAccuracySum ?? 0) - accuracy),
-          totalAccuracyCount: dec(stats.totalAccuracyCount),
-        }
+            totalAccuracySum: Math.max(
+              0,
+              (stats.totalAccuracySum ?? 0) - accuracy,
+            ),
+            totalAccuracyCount: dec(stats.totalAccuracyCount),
+          }
         : {}),
       ...(accuracyStrict != null && accuracyLenient != null
         ? {
-          totalAccuracyStrictSum: Math.max(0, (stats.totalAccuracyStrictSum ?? 0) - accuracyStrict),
-          totalAccuracyLenientSum: Math.max(0, (stats.totalAccuracyLenientSum ?? 0) - accuracyLenient),
-          totalAccuracyDualCount: dec(stats.totalAccuracyDualCount),
-        }
+            totalAccuracyStrictSum: Math.max(
+              0,
+              (stats.totalAccuracyStrictSum ?? 0) - accuracyStrict,
+            ),
+            totalAccuracyLenientSum: Math.max(
+              0,
+              (stats.totalAccuracyLenientSum ?? 0) - accuracyLenient,
+            ),
+            totalAccuracyDualCount: dec(stats.totalAccuracyDualCount),
+          }
         : {}),
     });
   }
@@ -192,7 +215,10 @@ export async function reverseReviewStats(
 
     let ratingCounts: Doc<'dailyStats'>['ratingCounts'];
     if (daily.ratingCounts && rating in daily.ratingCounts) {
-      ratingCounts = { ...daily.ratingCounts, [rating]: dec(daily.ratingCounts[rating]) };
+      ratingCounts = {
+        ...daily.ratingCounts,
+        [rating]: dec(daily.ratingCounts[rating]),
+      };
     }
 
     // Prefer the bucket stamped at review time: it is the only value that
@@ -210,7 +236,10 @@ export async function reverseReviewStats(
       log.statsReversal?.cardState ?? derivedFsrsState?.state ?? 0;
     const cardStateKey = FSRS_STATE_LABELS[cardStateIndex] ?? 'new';
     const reviewsByCardState = daily.reviewsByCardState
-      ? { ...daily.reviewsByCardState, [cardStateKey]: dec(daily.reviewsByCardState[cardStateKey]) }
+      ? {
+          ...daily.reviewsByCardState,
+          [cardStateKey]: dec(daily.reviewsByCardState[cardStateKey]),
+        }
       : undefined;
 
     await ctx.db.patch(daily._id, {
@@ -223,16 +252,22 @@ export async function reverseReviewStats(
       reviewsByMode: decModeCount(daily.reviewsByMode, reviewModeForStats),
       ...(accuracy != null
         ? {
-          accuracySum: Math.max(0, (daily.accuracySum ?? 0) - accuracy),
-          accuracyCount: dec(daily.accuracyCount),
-        }
+            accuracySum: Math.max(0, (daily.accuracySum ?? 0) - accuracy),
+            accuracyCount: dec(daily.accuracyCount),
+          }
         : {}),
       ...(accuracyStrict != null && accuracyLenient != null
         ? {
-          accuracyStrictSum: Math.max(0, (daily.accuracyStrictSum ?? 0) - accuracyStrict),
-          accuracyLenientSum: Math.max(0, (daily.accuracyLenientSum ?? 0) - accuracyLenient),
-          accuracyDualCount: dec(daily.accuracyDualCount),
-        }
+            accuracyStrictSum: Math.max(
+              0,
+              (daily.accuracyStrictSum ?? 0) - accuracyStrict,
+            ),
+            accuracyLenientSum: Math.max(
+              0,
+              (daily.accuracyLenientSum ?? 0) - accuracyLenient,
+            ),
+            accuracyDualCount: dec(daily.accuracyDualCount),
+          }
         : {}),
       ...(wasDefaultRating === true
         ? { defaultRatingUsed: dec(daily.defaultRatingUsed) }
@@ -258,7 +293,11 @@ export async function reverseReviewStats(
     const dailyLang = await ctx.db
       .query('dailyLanguageStats')
       .withIndex('by_userId_and_courseId_and_language_and_date', (q) =>
-        q.eq('userId', userId).eq('courseId', courseId).eq('language', language).eq('date', log.date),
+        q
+          .eq('userId', userId)
+          .eq('courseId', courseId)
+          .eq('language', language)
+          .eq('date', log.date),
       )
       .first();
     if (dailyLang) {
@@ -270,13 +309,18 @@ export async function reverseReviewStats(
     const langStats = await ctx.db
       .query('languageStats')
       .withIndex('by_userId_and_courseId_and_language', (q) =>
-        q.eq('userId', userId).eq('courseId', courseId).eq('language', language),
+        q
+          .eq('userId', userId)
+          .eq('courseId', courseId)
+          .eq('language', language),
       )
       .first();
     if (langStats) {
       await ctx.db.patch(langStats._id, {
         totalRepetitions: dec(langStats.totalRepetitions),
-        ...(wasFirstReview ? { totalNewCards: dec(langStats.totalNewCards) } : {}),
+        ...(wasFirstReview
+          ? { totalNewCards: dec(langStats.totalNewCards) }
+          : {}),
       });
     }
   }
@@ -286,7 +330,10 @@ export async function reverseReviewStats(
     const depthRow = await ctx.db
       .query('reviewDepthAccuracy')
       .withIndex('by_userId_and_courseId_and_reviewNumber', (q) =>
-        q.eq('userId', userId).eq('courseId', courseId).eq('reviewNumber', reviewDepth),
+        q
+          .eq('userId', userId)
+          .eq('courseId', courseId)
+          .eq('reviewNumber', reviewDepth),
       )
       .first();
     if (depthRow) {
@@ -303,7 +350,10 @@ export async function reverseReviewStats(
     const progress = await ctx.db
       .query('collectionProgress')
       .withIndex('by_userId_and_courseId_and_collectionId', (q) =>
-        q.eq('userId', userId).eq('courseId', courseId).eq('collectionId', collectionId),
+        q
+          .eq('userId', userId)
+          .eq('courseId', courseId)
+          .eq('collectionId', collectionId),
       )
       .first();
     if (progress) {
@@ -385,7 +435,11 @@ export async function readTodayCounters(
     const row = await ctx.db
       .query('dailyLanguageStats')
       .withIndex('by_userId_and_courseId_and_language_and_date', (q) =>
-        q.eq('userId', args.userId).eq('courseId', args.courseId).eq('language', language).eq('date', today),
+        q
+          .eq('userId', args.userId)
+          .eq('courseId', args.courseId)
+          .eq('language', language)
+          .eq('date', today),
       )
       .first();
     dailyNewWordsToday += row?.newWordsCount ?? 0;

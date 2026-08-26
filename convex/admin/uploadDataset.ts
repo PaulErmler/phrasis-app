@@ -146,7 +146,10 @@ export const batchUpsertDatasetTexts = internalMutation({
           .unique(),
       ),
     );
-    const existingByExternalId = new Map<string, (typeof existingResults)[number]>();
+    const existingByExternalId = new Map<
+      string,
+      (typeof existingResults)[number]
+    >();
     for (let i = 0; i < args.texts.length; i++) {
       const row = existingResults[i];
       if (row) existingByExternalId.set(args.texts[i].externalId, row);
@@ -162,11 +165,14 @@ export const batchUpsertDatasetTexts = internalMutation({
         t.addressesSomeone === null ? undefined : t.addressesSomeone;
       // Treat empty string as "clear" so descriptive rows don't carry a stale addressee_gender.
       const addresseeGender =
-        t.addresseeGender === null || t.addresseeGender === '' ? undefined : t.addresseeGender;
+        t.addresseeGender === null || t.addresseeGender === ''
+          ? undefined
+          : t.addresseeGender;
       const referentGender =
-        t.referentGender === null || t.referentGender === '' ? undefined : t.referentGender;
-      const arcId =
-        t.arcId === null || t.arcId === '' ? undefined : t.arcId;
+        t.referentGender === null || t.referentGender === ''
+          ? undefined
+          : t.referentGender;
+      const arcId = t.arcId === null || t.arcId === '' ? undefined : t.arcId;
       const existing = existingByExternalId.get(t.externalId);
       if (existing) {
         await ctx.db.patch(existing._id, {

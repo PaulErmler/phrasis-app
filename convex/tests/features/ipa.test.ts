@@ -135,13 +135,14 @@ describe('processIpaFor* actions (stubbed engine)', () => {
       text: 'Bonjour le monde',
       language: 'fr',
     });
-    const row = await t.run(async (ctx) =>
-      (await ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', textId).eq('targetLanguage', 'fr'),
-        )
-        .unique())!,
+    const row = await t.run(
+      async (ctx) =>
+        (await ctx.db
+          .query('translations')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', textId).eq('targetLanguage', 'fr'),
+          )
+          .unique())!,
     );
     expect(row.ipaText).toBe(MOCK_IPA);
     expect(row.ipaSource).toBe(IPA_SOURCES.espeakNg);

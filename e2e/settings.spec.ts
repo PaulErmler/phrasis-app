@@ -1,7 +1,7 @@
-import { test, expect } from "@playwright/test";
-import fs from "node:fs";
-import path from "node:path";
-import { neutralizeTours } from "./helpers";
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+import { neutralizeTours } from './helpers';
 
 /**
  * Settings smoke. Verifies the SettingsView mounts and exposes at least
@@ -14,113 +14,113 @@ import { neutralizeTours } from "./helpers";
  * chromium-serial) because changePassword uses revokeOtherSessions and
  * must not race other shared-fixture specs.
  */
-test.describe("settings", () => {
+test.describe('settings', () => {
   // driver.js tours can mount at any moment after hydration and their
   // overlay intercepts pointer events page-wide (see helpers.ts).
   test.beforeEach(async ({ page }) => {
     await neutralizeTours(page);
   });
 
-  test("settings page renders with sections", async ({ page }) => {
-    await page.goto("/app/settings");
-    await page.waitForLoadState("domcontentloaded");
+  test('settings page renders with sections', async ({ page }) => {
+    await page.goto('/app/settings');
+    await page.waitForLoadState('domcontentloaded');
 
-    const heading = page.getByRole("heading").first();
+    const heading = page.getByRole('heading').first();
     await expect(heading).toBeVisible({ timeout: 15_000 });
 
     // At least one button or switch should be present (theme, language,
     // sign-out, etc.).
-    const control = page.getByRole("button").first();
+    const control = page.getByRole('button').first();
     await expect(control).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.locator("#hideDueCounts")).toBeVisible({
+    await expect(page.locator('#hideDueCounts')).toBeVisible({
       timeout: 10_000,
     });
   });
 
-  test("the workload forecast has its own visibility switch, independent of due counts", async ({
+  test('the workload forecast has its own visibility switch, independent of due counts', async ({
     page,
   }) => {
     // Ensure a known starting state: both preferences off. (Fixture users
     // walk real onboarding, which defaults hideDueCounts to true.)
-    await page.goto("/app/settings");
-    const dueToggle = page.locator("#hideDueCounts");
-    const forecastToggle = page.locator("#hideWorkloadForecast");
+    await page.goto('/app/settings');
+    const dueToggle = page.locator('#hideDueCounts');
+    const forecastToggle = page.locator('#hideWorkloadForecast');
     await expect(dueToggle).toBeVisible({ timeout: 15_000 });
     await expect(forecastToggle).toBeVisible();
     for (const toggle of [dueToggle, forecastToggle]) {
-      if ((await toggle.getAttribute("aria-checked")) === "true") {
+      if ((await toggle.getAttribute('aria-checked')) === 'true') {
         await toggle.click();
         await expect
-          .poll(async () => toggle.getAttribute("aria-checked"), {
+          .poll(async () => toggle.getAttribute('aria-checked'), {
             timeout: 8_000,
           })
-          .toBe("false");
+          .toBe('false');
       }
     }
 
     // The forecast card's presence also depends on the minimum-activity
     // gate (data, not preference), so record it rather than assume it —
     // the invariant under test is that hideDueCounts does NOT change it.
-    await page.goto("/app");
-    await expect(page.getByTestId("due-counts-pills")).toBeVisible({
+    await page.goto('/app');
+    await expect(page.getByTestId('due-counts-pills')).toBeVisible({
       timeout: 20_000,
     });
     const forecastShown =
-      (await page.getByTestId("workload-forecast").count()) > 0;
+      (await page.getByTestId('workload-forecast').count()) > 0;
 
     // Hiding due counts hides the pills but leaves the forecast alone.
-    await page.goto("/app/settings");
+    await page.goto('/app/settings');
     await dueToggle.click();
-    await page.goto("/app");
-    await expect(page.getByTestId("due-counts-pills")).toHaveCount(0, {
+    await page.goto('/app');
+    await expect(page.getByTestId('due-counts-pills')).toHaveCount(0, {
       timeout: 15_000,
     });
-    await expect(page.getByTestId("workload-forecast")).toHaveCount(
+    await expect(page.getByTestId('workload-forecast')).toHaveCount(
       forecastShown ? 1 : 0,
     );
 
     // The forecast's own switch removes the card (whatever the gate says).
-    await page.goto("/app/settings");
+    await page.goto('/app/settings');
     await expect(forecastToggle).toBeVisible({ timeout: 15_000 });
     await forecastToggle.click();
-    await page.goto("/app");
-    await expect(page.getByTestId("workload-forecast")).toHaveCount(0, {
+    await page.goto('/app');
+    await expect(page.getByTestId('workload-forecast')).toHaveCount(0, {
       timeout: 15_000,
     });
 
     // Restore both preferences so downstream shared-fixture specs see the
     // state this spec started from (same courtesy as the change-password
     // test).
-    await page.goto("/app/settings");
+    await page.goto('/app/settings');
     await expect(dueToggle).toBeVisible({ timeout: 15_000 });
     await dueToggle.click();
     await forecastToggle.click();
-    await page.goto("/app");
-    await expect(page.getByTestId("due-counts-pills")).toBeVisible({
+    await page.goto('/app');
+    await expect(page.getByTestId('due-counts-pills')).toBeVisible({
       timeout: 15_000,
     });
   });
 
-  test("change password via the settings dialog", async ({ page }) => {
+  test('change password via the settings dialog', async ({ page }) => {
     // Three live better-auth round trips (wrong password, change, change
     // back) plus the consent-banner wait don't reliably fit the 30s default.
     test.setTimeout(60_000);
 
     // The shared fixture user was created by auth.setup.ts, which saves
     // its credentials next to the storage state.
-    const credsPath = path.resolve(__dirname, ".auth/credentials-a.json");
-    const { password } = JSON.parse(fs.readFileSync(credsPath, "utf8")) as {
+    const credsPath = path.resolve(__dirname, '.auth/credentials-a.json');
+    const { password } = JSON.parse(fs.readFileSync(credsPath, 'utf8')) as {
       password: string;
     };
     const tempPassword = `${password}X1`;
 
     // Locale-proof: field/toast copy is translated, so drive the dialog by
     // testids and input ids.
-    const currentField = () => page.locator("#current-password");
-    const newField = () => page.locator("#new-password");
-    const confirmField = () => page.locator("#confirm-password");
-    const save = () => page.getByTestId("settings-change-password-save");
+    const currentField = () => page.locator('#current-password');
+    const newField = () => page.locator('#new-password');
+    const confirmField = () => page.locator('#confirm-password');
+    const save = () => page.getByTestId('settings-change-password-save');
 
     const changePassword = async (from: string, to: string) => {
       // The dialog has a 200ms exit animation and Radix keeps the content
@@ -129,7 +129,7 @@ test.describe("settings", () => {
       // stuck. The click lands, but the content never re-mounts. Wait for
       // the previous instance to be fully gone before re-opening.
       await expect(currentField()).toBeHidden({ timeout: 10_000 });
-      await page.getByTestId("settings-change-password").click();
+      await page.getByTestId('settings-change-password').click();
       await expect(currentField()).toBeVisible({ timeout: 10_000 });
       await currentField().fill(from);
       await newField().fill(to);
@@ -142,9 +142,9 @@ test.describe("settings", () => {
       await expect(currentField()).toBeHidden({ timeout: 10_000 });
     };
 
-    await page.goto("/app/settings");
-    await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("settings-change-password")).toBeVisible({
+    await page.goto('/app/settings');
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.getByTestId('settings-change-password')).toBeVisible({
       timeout: 15_000,
     });
 
@@ -152,14 +152,14 @@ test.describe("settings", () => {
     // on the dialog's footer buttons when it mounts (PostHog boots async.
     // Bounded wait, same pattern as auth.setup.ts). Accepting here also
     // persists the decision into the storageState saved below.
-    const acceptCookies = page.getByTestId("consent-accept").first();
+    const acceptCookies = page.getByTestId('consent-accept').first();
     await acceptCookies
-      .waitFor({ state: "visible", timeout: 5_000 })
+      .waitFor({ state: 'visible', timeout: 5_000 })
       .then(() => acceptCookies.click())
       .catch(() => {}); // no banner: PostHog key absent or already answered
 
     // Wrong current password → error toast, dialog stays open.
-    await page.getByTestId("settings-change-password").click();
+    await page.getByTestId('settings-change-password').click();
     await currentField().fill(`wrong-${password}`);
     await newField().fill(tempPassword);
     await confirmField().fill(tempPassword);
@@ -169,7 +169,7 @@ test.describe("settings", () => {
     ).toBeVisible({ timeout: 15_000 });
     await expect(currentField()).toBeVisible();
     // Close and retry cleanly with the real password.
-    await page.keyboard.press("Escape");
+    await page.keyboard.press('Escape');
 
     await changePassword(password, tempPassword);
     // Change it back so the saved credentials stay valid.
@@ -181,48 +181,49 @@ test.describe("settings", () => {
     // fresh session over it. This file runs in the settings-serial project
     // (after chromium-serial) so the revoke cannot race concurrent live specs.
     await page.context().storageState({
-      path: path.resolve(__dirname, ".auth/user.json"),
+      path: path.resolve(__dirname, '.auth/user.json'),
     });
   });
 
-  test("locale switch toggles UI text", async ({ page }) => {
-    await page.goto("/app/settings");
-    await page.waitForLoadState("domcontentloaded");
+  test('locale switch toggles UI text', async ({ page }) => {
+    await page.goto('/app/settings');
+    await page.waitForLoadState('domcontentloaded');
 
-    const langControl = page.getByTestId("language-switcher").first();
+    const langControl = page.getByTestId('language-switcher').first();
     await expect(
       langControl,
-      "language-switcher Select should render on /app/settings",
+      'language-switcher Select should render on /app/settings',
     ).toBeVisible({ timeout: 10_000 });
 
     // Capture the current locale so we can revert and not leak German UI
     // to downstream specs that assert English strings.
     const initialValue = (await langControl.innerText()).toLowerCase();
     const switchingToGerman =
-      /english|englisch/.test(initialValue) && !/deutsch|german/.test(initialValue);
+      /english|englisch/.test(initialValue) &&
+      !/deutsch|german/.test(initialValue);
 
     await langControl.click();
     const targetOption = page
-      .getByRole("option", {
+      .getByRole('option', {
         name: switchingToGerman ? /deutsch|german/i : /english|englisch/i,
       })
       .first();
     await targetOption.click();
 
     // Page should not crash after switching.
-    await expect(page.getByRole("heading").first()).toBeVisible({
+    await expect(page.getByRole('heading').first()).toBeVisible({
       timeout: 10_000,
     });
 
     // Revert to the original locale for hygiene.
     await langControl.click();
     const revertOption = page
-      .getByRole("option", {
+      .getByRole('option', {
         name: switchingToGerman ? /english|englisch/i : /deutsch|german/i,
       })
       .first();
     await revertOption.click();
-    await expect(page.getByRole("heading").first()).toBeVisible({
+    await expect(page.getByRole('heading').first()).toBeVisible({
       timeout: 10_000,
     });
   });

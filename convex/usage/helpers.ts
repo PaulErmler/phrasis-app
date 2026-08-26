@@ -2,7 +2,11 @@ import { v, ConvexError } from 'convex/values';
 import { MutationCtx, QueryCtx, internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Doc } from '../_generated/dataModel';
-import { CREDIT_COSTS, FEATURE_IDS, type FeatureId } from '../features/featureIds';
+import {
+  CREDIT_COSTS,
+  FEATURE_IDS,
+  type FeatureId,
+} from '../features/featureIds';
 import { getActiveCourses } from '../db/courses';
 import { getUserSettings } from '../db/users';
 import { featureStateValidator, type FeatureState } from '../types';
@@ -419,20 +423,20 @@ export const syncAllFeatures = internalMutation({
     const billingFields = args.productsMissing
       ? {}
       : {
-        ...(args.planId !== undefined
-          ? {
-            planId: args.planId,
-            planName: args.planName,
-            planStatus: effectiveStatus,
-          }
-          : {}),
-        pastDueSince: pastDue ? (doc?.pastDueSince ?? now) : undefined,
-        // Keep the last known URL while still past due. A later sync that
-        // didn't expand invoices shouldn't blank the pay button.
-        pastDueInvoiceUrl: pastDue
-          ? (args.pastDueInvoiceUrl ?? doc?.pastDueInvoiceUrl)
-          : undefined,
-      };
+          ...(args.planId !== undefined
+            ? {
+                planId: args.planId,
+                planName: args.planName,
+                planStatus: effectiveStatus,
+              }
+            : {}),
+          pastDueSince: pastDue ? (doc?.pastDueSince ?? now) : undefined,
+          // Keep the last known URL while still past due. A later sync that
+          // didn't expand invoices shouldn't blank the pay button.
+          pastDueInvoiceUrl: pastDue
+            ? (args.pastDueInvoiceUrl ?? doc?.pastDueInvoiceUrl)
+            : undefined,
+        };
 
     if (doc) {
       await ctx.db.patch(doc._id, {
@@ -577,7 +581,6 @@ type PlanIdentity = {
   plan_status?: string;
 };
 
-
 function planLabel(p: PlanIdentity): string {
   if (p.plan_id === undefined) return 'none';
   return `${p.plan_name ?? p.plan_id} (${p.plan_status ?? 'unknown'})`;
@@ -595,7 +598,9 @@ export function describePlanChange(
     previous.plan_id !== undefined && previous.plan_id !== FREE_PLAN_ID;
   const toPaid = next.plan_id !== undefined && next.plan_id !== FREE_PLAN_ID;
   if (!fromPaid && toPaid) {
-    return next.plan_status === 'trialing' ? 'Trial started' : 'New subscription';
+    return next.plan_status === 'trialing'
+      ? 'Trial started'
+      : 'New subscription';
   }
   if (fromPaid && !toPaid) return 'Subscription cancelled';
   if (fromPaid && toPaid && previous.plan_id !== next.plan_id) {
@@ -604,7 +609,6 @@ export function describePlanChange(
   // Same plan, status flip: trial conversion, past_due, recovery, ...
   return 'Plan status changed';
 }
-
 
 /**
  * ConvexError code from an error thrown across a `ctx.runMutation` boundary —

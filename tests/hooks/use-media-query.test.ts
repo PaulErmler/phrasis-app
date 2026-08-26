@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
-import { useMediaQuery } from "@/hooks/use-media-query";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+import { useMediaQuery } from '@/hooks/use-media-query';
 
 type Listener = (e: MediaQueryListEvent) => void;
 
@@ -12,7 +12,7 @@ function installMatchMedia(matches: boolean) {
       listener = l;
     },
     removeEventListener: vi.fn(),
-    media: "(min-width: 600px)",
+    media: '(min-width: 600px)',
     onchange: null,
     addListener: vi.fn(),
     removeListener: vi.fn(),
@@ -27,20 +27,20 @@ function installMatchMedia(matches: boolean) {
   };
 }
 
-describe("useMediaQuery", () => {
+describe('useMediaQuery', () => {
   beforeEach(() => {
     installMatchMedia(false);
   });
 
-  it("returns initial matches", () => {
+  it('returns initial matches', () => {
     installMatchMedia(true);
-    const { result } = renderHook(() => useMediaQuery("(min-width: 600px)"));
+    const { result } = renderHook(() => useMediaQuery('(min-width: 600px)'));
     expect(result.current).toBe(true);
   });
 
-  it("updates when media query changes", () => {
+  it('updates when media query changes', () => {
     const ctrl = installMatchMedia(false);
-    const { result } = renderHook(() => useMediaQuery("(min-width: 600px)"));
+    const { result } = renderHook(() => useMediaQuery('(min-width: 600px)'));
     expect(result.current).toBe(false);
     act(() => {
       ctrl.trigger(true);
@@ -48,9 +48,9 @@ describe("useMediaQuery", () => {
     expect(result.current).toBe(true);
   });
 
-  it("returns false initially for non-matching query", () => {
+  it('returns false initially for non-matching query', () => {
     installMatchMedia(false);
-    const { result } = renderHook(() => useMediaQuery("(min-width: 9999px)"));
+    const { result } = renderHook(() => useMediaQuery('(min-width: 9999px)'));
     expect(result.current).toBe(false);
   });
 });

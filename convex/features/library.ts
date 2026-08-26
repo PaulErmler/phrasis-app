@@ -19,11 +19,7 @@ import {
 // ============================================================================
 
 const activeFilterValidator = v.optional(
-  v.union(
-    v.literal('mastered'),
-    v.literal('hidden'),
-    v.literal('favorites'),
-  ),
+  v.union(v.literal('mastered'), v.literal('hidden'), v.literal('favorites')),
 );
 
 // 'custom' includes both 'custom' and 'chat' origins (anything the user
@@ -231,14 +227,12 @@ export const getLibraryCards = query({
       const fetchOrigin = (origin: Origin) =>
         ctx.db
           .query('cards')
-          .withIndex(
-            'by_deckId_isHidden_mastered_origin_lastReviewedAt',
-            (q) =>
-              q
-                .eq('deckId', deck._id)
-                .eq('isHidden', false)
-                .eq('isMastered', true)
-                .eq('collectionOrigin', origin),
+          .withIndex('by_deckId_isHidden_mastered_origin_lastReviewedAt', (q) =>
+            q
+              .eq('deckId', deck._id)
+              .eq('isHidden', false)
+              .eq('isMastered', true)
+              .eq('collectionOrigin', origin),
           )
           .order('desc')
           .take(LIBRARY_LIMIT);
@@ -261,14 +255,12 @@ export const getLibraryCards = query({
       const fetchOrigin = (origin: Origin) =>
         ctx.db
           .query('cards')
-          .withIndex(
-            'by_deckId_isHidden_favorite_origin_lastReviewedAt',
-            (q) =>
-              q
-                .eq('deckId', deck._id)
-                .eq('isHidden', false)
-                .eq('isFavorite', true)
-                .eq('collectionOrigin', origin),
+          .withIndex('by_deckId_isHidden_favorite_origin_lastReviewedAt', (q) =>
+            q
+              .eq('deckId', deck._id)
+              .eq('isHidden', false)
+              .eq('isFavorite', true)
+              .eq('collectionOrigin', origin),
           )
           .order('desc')
           .take(LIBRARY_LIMIT);

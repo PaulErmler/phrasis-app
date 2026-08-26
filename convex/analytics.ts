@@ -118,7 +118,11 @@ export async function trackException(
   additionalProperties?: Record<string, unknown>,
 ): Promise<void> {
   try {
-    await posthog.captureException(ctx, { error, distinctId, additionalProperties });
+    await posthog.captureException(ctx, {
+      error,
+      distinctId,
+      additionalProperties,
+    });
   } catch (captureError) {
     console.error('[analytics] failed to capture exception', captureError);
   }

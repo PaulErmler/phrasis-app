@@ -35,7 +35,8 @@ const trialState = (over: Partial<TrialState> = {}): TrialState => ({
 
 const Dialog = () => null;
 
-const renderCheckout = () => renderHook(() => useNewPlanCheckout()).result.current;
+const renderCheckout = () =>
+  renderHook(() => useNewPlanCheckout()).result.current;
 
 const realLocation = window.location;
 
@@ -81,14 +82,22 @@ describe('useNewPlanCheckout', () => {
       expect(isFirstPurchase(trialState())).toBe(true);
       // A lapsed customer (trialed before, nothing attached now) buys "first" again.
       expect(
-        isFirstPurchase(trialState({ everTrialed: true, trialEligible: false })),
+        isFirstPurchase(
+          trialState({ everTrialed: true, trialEligible: false }),
+        ),
       ).toBe(true);
       expect(
-        isFirstPurchase(trialState({ hasPaidPlan: true, trialEligible: false })),
+        isFirstPurchase(
+          trialState({ hasPaidPlan: true, trialEligible: false }),
+        ),
       ).toBe(false);
       expect(
         isFirstPurchase(
-          trialState({ onTrial: true, everTrialed: true, trialEligible: false }),
+          trialState({
+            onTrial: true,
+            everTrialed: true,
+            trialEligible: false,
+          }),
         ),
       ).toBe(false);
     });
@@ -114,7 +123,9 @@ describe('useNewPlanCheckout', () => {
     });
 
     it("labels the flow 'purchase' for a first buyer who is no longer trial-eligible", async () => {
-      attachNewPlanMock.mockResolvedValue({ paymentUrl: 'https://stripe.test/x' });
+      attachNewPlanMock.mockResolvedValue({
+        paymentUrl: 'https://stripe.test/x',
+      });
       captureHref();
       const { startNewPlanCheckout } = renderCheckout();
 
@@ -146,7 +157,9 @@ describe('useNewPlanCheckout', () => {
 
   describe('purchasePlan', () => {
     it('routes a first purchase through the v2 endpoint, never checkout()', async () => {
-      attachNewPlanMock.mockResolvedValue({ paymentUrl: 'https://stripe.test/s' });
+      attachNewPlanMock.mockResolvedValue({
+        paymentUrl: 'https://stripe.test/s',
+      });
       captureHref();
       const checkout = vi.fn();
 
@@ -193,7 +206,10 @@ describe('useNewPlanCheckout', () => {
         dialog: Dialog,
       });
 
-      expect(checkout).toHaveBeenCalledWith({ productId: 'pro', dialog: Dialog });
+      expect(checkout).toHaveBeenCalledWith({
+        productId: 'pro',
+        dialog: Dialog,
+      });
     });
 
     it('treats a Free-plan target as cancel/downgrade: checkout() even for a first-time buyer', async () => {
@@ -207,7 +223,10 @@ describe('useNewPlanCheckout', () => {
         freeTarget: true,
       });
 
-      expect(checkout).toHaveBeenCalledWith({ productId: 'free', dialog: Dialog });
+      expect(checkout).toHaveBeenCalledWith({
+        productId: 'free',
+        dialog: Dialog,
+      });
       expect(attachNewPlanMock).not.toHaveBeenCalled();
     });
 

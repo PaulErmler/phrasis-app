@@ -46,28 +46,28 @@ vi.mock('convex/react', () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
   useMutation: (ref: { __mockKey?: string }) => {
     switch (ref.__mockKey) {
-    case 'masterCard':
-      return masterCardFn;
-    case 'unmasterCard':
-      return unmasterCardFn;
-    case 'hideCard':
-      return hideCardFn;
-    case 'unhideCard':
-      return unhideCardFn;
-    case 'toggleFavoriteCard':
-      return toggleFavoriteFn;
-    case 'deleteCardPermanently':
-      return deleteCardFn;
-    case 'editCard':
-      return editCardFn;
-    case 'regenerateCardAudio':
-      return regenerateCardAudioFn;
-    case 'flagTranslation':
-      return flagTranslationFn;
-    case 'updatePinnedCardActions':
-      return updatePinnedActionsFn;
-    default:
-      return vi.fn();
+      case 'masterCard':
+        return masterCardFn;
+      case 'unmasterCard':
+        return unmasterCardFn;
+      case 'hideCard':
+        return hideCardFn;
+      case 'unhideCard':
+        return unhideCardFn;
+      case 'toggleFavoriteCard':
+        return toggleFavoriteFn;
+      case 'deleteCardPermanently':
+        return deleteCardFn;
+      case 'editCard':
+        return editCardFn;
+      case 'regenerateCardAudio':
+        return regenerateCardAudioFn;
+      case 'flagTranslation':
+        return flagTranslationFn;
+      case 'updatePinnedCardActions':
+        return updatePinnedActionsFn;
+      default:
+        return vi.fn();
     }
   },
   usePreloadedQuery: (handle: { __preloadKey?: string }) => {
@@ -272,7 +272,9 @@ type Card = {
   hasMissingContent: boolean;
 };
 
-function makeCard(overrides: Partial<Card> & { _id: string; sourceText: string }): Card {
+function makeCard(
+  overrides: Partial<Card> & { _id: string; sourceText: string },
+): Card {
   return {
     _creationTime: 0,
     textId: `t-${overrides._id}`,
@@ -298,9 +300,7 @@ function makeFlaggableCard(
   overrides: Partial<Card> & { _id: string; sourceText: string },
 ): Card {
   return makeCard({
-    translations: [
-      { language: 'en', text: 'hello', isTargetLanguage: true },
-    ],
+    translations: [{ language: 'en', text: 'hello', isTargetLanguage: true }],
     ...overrides,
   });
 }
@@ -497,9 +497,7 @@ describe('LibraryView sticky-card behavior', () => {
 describe('LibraryView edit flow', () => {
   it('opens the edit dialog when clicking edit on a card', async () => {
     const user = userEvent.setup();
-    useQueryMock.mockReturnValue([
-      makeCard({ _id: 'c1', sourceText: 'hola' }),
-    ]);
+    useQueryMock.mockReturnValue([makeCard({ _id: 'c1', sourceText: 'hola' })]);
 
     render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
 
@@ -510,9 +508,7 @@ describe('LibraryView edit flow', () => {
 
   it('closes the edit dialog when the dialog requests close', async () => {
     const user = userEvent.setup();
-    useQueryMock.mockReturnValue([
-      makeCard({ _id: 'c1', sourceText: 'hola' }),
-    ]);
+    useQueryMock.mockReturnValue([makeCard({ _id: 'c1', sourceText: 'hola' })]);
 
     render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
 
@@ -526,9 +522,7 @@ describe('LibraryView edit flow', () => {
 describe('LibraryView delete flow', () => {
   it('does not call deleteCard when the confirm dialog is cancelled', async () => {
     const user = userEvent.setup();
-    useQueryMock.mockReturnValue([
-      makeCard({ _id: 'c1', sourceText: 'hola' }),
-    ]);
+    useQueryMock.mockReturnValue([makeCard({ _id: 'c1', sourceText: 'hola' })]);
 
     render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
 

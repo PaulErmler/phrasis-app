@@ -32,10 +32,17 @@ interface UseChatReturn {
  * Unified chat hook that composes message retrieval, sending, and voice recording
  * into a single interface for easy consumption by chat UI components.
  */
-export function useChat({ threadId, cardId, onUsageLimit, onThreadLimit }: UseChatOptions): UseChatReturn {
+export function useChat({
+  threadId,
+  cardId,
+  onUsageLimit,
+  onThreadLimit,
+}: UseChatOptions): UseChatReturn {
   const [text, setText] = useState('');
 
-  const { messages, status, setStatus, isLoading } = useChatMessages({ threadId });
+  const { messages, status, setStatus, isLoading } = useChatMessages({
+    threadId,
+  });
 
   const { sendMessage: sendMessageRaw } = useSendMessage({
     threadId,

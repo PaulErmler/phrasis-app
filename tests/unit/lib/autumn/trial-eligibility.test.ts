@@ -26,8 +26,18 @@ const paid = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const freePlan = { id: 'free', status: 'active', is_default: true, is_add_on: false };
-const addOn = { id: 'extra', status: 'active', is_default: false, is_add_on: true };
+const freePlan = {
+  id: 'free',
+  status: 'active',
+  is_default: true,
+  is_add_on: false,
+};
+const addOn = {
+  id: 'extra',
+  status: 'active',
+  is_default: false,
+  is_add_on: true,
+};
 
 describe('getTrialState', () => {
   it('a brand-new customer with only the free plan is trial-eligible', () => {
@@ -50,7 +60,9 @@ describe('getTrialState', () => {
     // v1.2 leaves trial_ends_at null while trialing and reports the end via
     // current_period_end. The exact quirk this helper exists to absorb.
     const state = getTrialState({
-      products: [paid({ status: 'trialing', current_period_end: 1785687307000 })],
+      products: [
+        paid({ status: 'trialing', current_period_end: 1785687307000 }),
+      ],
       trials_used: [],
     });
     expect(state.onTrial).toBe(true);
@@ -63,7 +75,11 @@ describe('getTrialState', () => {
   it('prefers trial_ends_at when Autumn does populate it', () => {
     const state = getTrialState({
       products: [
-        paid({ status: 'trialing', trial_ends_at: 111, current_period_end: 222 }),
+        paid({
+          status: 'trialing',
+          trial_ends_at: 111,
+          current_period_end: 222,
+        }),
       ],
       trials_used: [],
     });
@@ -83,7 +99,10 @@ describe('getTrialState', () => {
   });
 
   it('an existing paying customer is not trial-eligible', () => {
-    const state = getTrialState({ products: [freePlan, paid()], trials_used: [] });
+    const state = getTrialState({
+      products: [freePlan, paid()],
+      trials_used: [],
+    });
     expect(state.hasPaidPlan).toBe(true);
     expect(state.onTrial).toBe(false);
     expect(state.trialEligible).toBe(false);
@@ -145,7 +164,8 @@ describe('getTrialState', () => {
 
   it('ignores the free plan and add-ons when deciding hasPaidPlan', () => {
     expect(
-      getTrialState({ products: [freePlan, addOn], trials_used: [] }).hasPaidPlan,
+      getTrialState({ products: [freePlan, addOn], trials_used: [] })
+        .hasPaidPlan,
     ).toBe(false);
   });
 
@@ -175,7 +195,9 @@ describe('findCurrentPaidProduct', () => {
   });
 
   it('excludes expired plans', () => {
-    expect(findCurrentPaidProduct([paid({ status: 'expired' })])).toBeUndefined();
+    expect(
+      findCurrentPaidProduct([paid({ status: 'expired' })]),
+    ).toBeUndefined();
   });
 
   it('prefers the active plan over a scheduled one regardless of array order', () => {
@@ -188,7 +210,8 @@ describe('findCurrentPaidProduct', () => {
 
   it('falls back to the scheduled plan when it is the only candidate', () => {
     expect(
-      findCurrentPaidProduct([paid({ id: 'next', status: 'scheduled' })])?.planId,
+      findCurrentPaidProduct([paid({ id: 'next', status: 'scheduled' })])
+        ?.planId,
     ).toBe('next');
   });
 

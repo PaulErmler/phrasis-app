@@ -12,7 +12,9 @@ export const isAuthError = (error: unknown) => {
   // Legacy bare-string payloads/messages, kept for backends not yet on the
   // structured code.
   const message =
-    (error instanceof ConvexError && typeof error.data === 'string' && error.data) ||
+    (error instanceof ConvexError &&
+      typeof error.data === 'string' &&
+      error.data) ||
     (error instanceof Error && error.message) ||
     '';
   return message === 'Unauthenticated' || message === 'Not authenticated';

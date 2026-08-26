@@ -10,7 +10,16 @@ import { useEnsureContent } from '@/hooks/use-ensure-content';
 import { useDebounce } from '@/hooks/use-debounce';
 import { Input } from '@/components/ui/input';
 import { Toggle } from '@/components/ui/toggle';
-import { Search, Star, EyeOff, CircleCheck, X, Loader2, PenLine, BookOpen } from 'lucide-react';
+import {
+  Search,
+  Star,
+  EyeOff,
+  CircleCheck,
+  X,
+  Loader2,
+  PenLine,
+  BookOpen,
+} from 'lucide-react';
 import { LearningCardContent } from '@/components/app/learning/LearningCardContent';
 import { buildCardOriginPill } from '@/components/app/learning/cardOriginPill';
 import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
@@ -30,7 +39,9 @@ import { resolveShowFurigana } from '@/lib/furigana';
 type ActiveFilter = 'mastered' | 'hidden' | 'favorites' | null;
 type SourceFilter = 'custom' | 'premade' | null;
 
-type LibraryCard = FunctionReturnType<typeof api.features.library.getLibraryCards>[number];
+type LibraryCard = FunctionReturnType<
+  typeof api.features.library.getLibraryCards
+>[number];
 
 type StickyEntry = {
   card: LibraryCard;
@@ -299,7 +310,9 @@ export function LibraryView({
 
   const hasResults = displayCards.length > 0;
   const hasActiveFilters =
-    debouncedSearch.length > 0 || activeFilter !== null || sourceFilter !== null;
+    debouncedSearch.length > 0 ||
+    activeFilter !== null ||
+    sourceFilter !== null;
 
   if (!hasActiveCourse) {
     return (
@@ -313,7 +326,10 @@ export function LibraryView({
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-20" style={{ scrollbarGutter: 'stable' }}>
+    <div
+      className="flex-1 min-h-0 overflow-y-auto px-4 pb-20"
+      style={{ scrollbarGutter: 'stable' }}
+    >
       {/* Sticky search + filters card. -mx-4/px-4 makes the opaque background
           span the scroll container's horizontal padding too, otherwise card
           edges slide past in the gutters beside the sticky block. */}
@@ -423,9 +439,7 @@ export function LibraryView({
           <div className="card-surface p-4 flex items-center justify-center h-[180px]">
             <div className="flex flex-col items-center gap-2 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-xs font-medium">
-                {t('loadingCards')}
-              </span>
+              <span className="text-xs font-medium">{t('loadingCards')}</span>
             </div>
           </div>
         )}
@@ -435,12 +449,16 @@ export function LibraryView({
             {hasActiveFilters ? (
               <>
                 <p className="font-medium">{t('emptySearchTitle')}</p>
-                <p className="text-sm text-muted-foreground">{t('emptySearchDescription')}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t('emptySearchDescription')}
+                </p>
               </>
             ) : (
               <>
                 <p className="font-medium">{t('emptyTitle')}</p>
-                <p className="text-sm text-muted-foreground">{t('emptyDescription')}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t('emptyDescription')}
+                </p>
               </>
             )}
           </div>

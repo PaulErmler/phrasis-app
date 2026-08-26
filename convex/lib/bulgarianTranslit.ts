@@ -30,37 +30,37 @@
  * carries the phonetics for anyone who turns it on.
  */
 const LOWER: Record<string, string> = {
-  'а': 'a',
-  'б': 'b',
-  'в': 'v',
-  'г': 'g',
-  'д': 'd',
-  'е': 'e',
-  'ж': 'zh',
-  'з': 'z',
-  'и': 'i',
-  'ѝ': 'i',
-  'й': 'y',
-  'к': 'k',
-  'л': 'l',
-  'м': 'm',
-  'н': 'n',
-  'о': 'o',
-  'п': 'p',
-  'р': 'r',
-  'с': 's',
-  'т': 't',
-  'у': 'u',
-  'ф': 'f',
-  'х': 'h',
-  'ц': 'ts',
-  'ч': 'ch',
-  'ш': 'sh',
-  'щ': 'sht',
-  'ъ': 'a',
-  'ь': 'y',
-  'ю': 'yu',
-  'я': 'ya',
+  а: 'a',
+  б: 'b',
+  в: 'v',
+  г: 'g',
+  д: 'd',
+  е: 'e',
+  ж: 'zh',
+  з: 'z',
+  и: 'i',
+  ѝ: 'i',
+  й: 'y',
+  к: 'k',
+  л: 'l',
+  м: 'm',
+  н: 'n',
+  о: 'o',
+  п: 'p',
+  р: 'r',
+  с: 's',
+  т: 't',
+  у: 'u',
+  ф: 'f',
+  х: 'h',
+  ц: 'ts',
+  ч: 'ch',
+  ш: 'sh',
+  щ: 'sht',
+  ъ: 'a',
+  ь: 'y',
+  ю: 'yu',
+  я: 'ya',
 };
 
 /** Title-case forms, e.g. Ж → "Zh". Used when the run is not all-caps. */
@@ -83,10 +83,10 @@ const UPPER_RUN: Record<string, string> = Object.fromEntries(
 
 /** Art. 5(2) — the combination `ия` at the end of a word is written `ia`. */
 const IA_TOKEN: Record<string, string> = {
-  'ия': 'ia',
-  'Ия': 'Ia',
-  'иЯ': 'iA',
-  'ИЯ': 'IA',
+  ия: 'ia',
+  Ия: 'Ia',
+  иЯ: 'iA',
+  ИЯ: 'IA',
 };
 
 /**
@@ -94,9 +94,9 @@ const IA_TOKEN: Record<string, string> = {
  * than the by-the-table "Balgaria".
  */
 const NAMED_EXCEPTIONS: Record<string, string> = {
-  'България': 'Bulgaria',
-  'БЪЛГАРИЯ': 'BULGARIA',
-  'българия': 'bulgaria',
+  България: 'Bulgaria',
+  БЪЛГАРИЯ: 'BULGARIA',
+  българия: 'bulgaria',
 };
 
 /**
@@ -185,7 +185,8 @@ function transliterateRun(text: string): string {
         const after = neighborSkippingMarks(chars, yaIdx, 1);
         if (after === undefined || !WORD_CHAR.test(after)) {
           // Marks stay attached to the `i` they modify: и́я → "ía".
-          out += token[0]! + chars.slice(i + 1, yaIdx).join('') + token.slice(1);
+          out +=
+            token[0]! + chars.slice(i + 1, yaIdx).join('') + token.slice(1);
           i = yaIdx;
           continue;
         }

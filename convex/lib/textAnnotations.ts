@@ -111,7 +111,8 @@ export const TEXT_ANNOTATIONS: Record<AnnotationKind, TextAnnotationSpec> = {
     sourceField: 'romanizationSource',
     supports: (language) => ROMANIZATION_LANGUAGES.has(language),
     sourceTextAction: internal.features.decks.processRomanizationForSourceText,
-    translationAction: internal.features.decks.processRomanizationForTranslation,
+    translationAction:
+      internal.features.decks.processRomanizationForTranslation,
     projectedField: 'romanization',
     inSearchableText: true,
   },
@@ -131,8 +132,7 @@ export const TEXT_ANNOTATIONS: Record<AnnotationKind, TextAnnotationSpec> = {
     sourceField: 'furiganaSource',
     supports: (language) => FURIGANA_LANGUAGES.has(language),
     sourceTextAction: internal.features.furigana.processFuriganaForSourceText,
-    translationAction:
-      internal.features.furigana.processFuriganaForTranslation,
+    translationAction: internal.features.furigana.processFuriganaForTranslation,
     approvalAction: internal.features.furigana.processFuriganaForApproval,
     approvalEntryField: 'entryFurigana',
     projectedField: 'furigana',
@@ -184,7 +184,9 @@ export function clearedAnnotationFields(): Record<AnnotationField, undefined> {
  * (scheduling.ts Path B). Values travel with their source tags; pairs the
  * row never had stay absent so the lazy pipeline fills them on the copy.
  */
-export function carriedAnnotationFields(row: AnnotationFields): AnnotationFields {
+export function carriedAnnotationFields(
+  row: AnnotationFields,
+): AnnotationFields {
   const out: AnnotationFields = {};
   for (const kind of ANNOTATION_KINDS) {
     const spec = TEXT_ANNOTATIONS[kind];
@@ -248,7 +250,12 @@ export function getFuriganaSource(_language: string): FuriganaSource {
 
 type AnnotationActionCtx = {
   runMutation: (
-    ref: FunctionReference<'mutation', 'internal', Record<string, unknown>, null>,
+    ref: FunctionReference<
+      'mutation',
+      'internal',
+      Record<string, unknown>,
+      null
+    >,
     args: Record<string, unknown>,
   ) => Promise<null>;
 };

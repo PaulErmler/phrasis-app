@@ -1,7 +1,11 @@
 import { QueryCtx, MutationCtx } from '../_generated/server';
 import { Id, Doc } from '../_generated/dataModel';
 import { getNextDay, getPreviousDay } from '../lib/dateUtils';
-export { getTodayInTimezone, getPreviousDay, getNextDay } from '../lib/dateUtils';
+export {
+  getTodayInTimezone,
+  getPreviousDay,
+  getNextDay,
+} from '../lib/dateUtils';
 
 /**
  * Create the courseStats row for a given user + course.
@@ -55,7 +59,6 @@ export async function getCourseStatsForMutation(
     )
     .first();
 }
-
 
 export interface StreakUpdateResult {
   newStreak: number;
@@ -198,8 +201,7 @@ export function deriveStreakDisplay(
 ): StreakDisplayResult {
   const freezeAvailable =
     !streakFreezeUsedDate ||
-    (!!lastActivityDate &&
-      lastActivityDate > getNextDay(streakFreezeUsedDate));
+    (!!lastActivityDate && lastActivityDate > getNextDay(streakFreezeUsedDate));
 
   if (!lastActivityDate) {
     return { displayStreak: 0, state: 'none', freezeAvailable };

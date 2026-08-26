@@ -55,7 +55,10 @@ function summarizeCourseStats(
       derived.state !== 'none' &&
       derived.displayStreak >= summary.streak.displayStreak
     ) {
-      summary.streak = { displayStreak: derived.displayStreak, state: derived.state };
+      summary.streak = {
+        displayStreak: derived.displayStreak,
+        state: derived.state,
+      };
     }
     if (
       stats.lastActivityDate &&
@@ -218,8 +221,12 @@ export const getPlanDistribution = adminQuery({
 export const getLanguageStats = adminQuery({
   args: {},
   returns: v.object({
-    targetLanguages: v.array(v.object({ language: v.string(), count: v.number() })),
-    baseLanguages: v.array(v.object({ language: v.string(), count: v.number() })),
+    targetLanguages: v.array(
+      v.object({ language: v.string(), count: v.number() }),
+    ),
+    baseLanguages: v.array(
+      v.object({ language: v.string(), count: v.number() }),
+    ),
     levels: v.array(v.object({ level: v.string(), count: v.number() })),
   }),
   handler: async (ctx) => {
@@ -243,8 +250,14 @@ export const getLanguageStats = adminQuery({
         .map(([key, count]) => ({ key, count }))
         .sort((a, b) => b.count - a.count);
     return {
-      targetLanguages: toSorted(target).map(({ key, count }) => ({ language: key, count })),
-      baseLanguages: toSorted(base).map(({ key, count }) => ({ language: key, count })),
+      targetLanguages: toSorted(target).map(({ key, count }) => ({
+        language: key,
+        count,
+      })),
+      baseLanguages: toSorted(base).map(({ key, count }) => ({
+        language: key,
+        count,
+      })),
       levels: toSorted(levels).map(({ key, count }) => ({ level: key, count })),
     };
   },
@@ -259,8 +272,12 @@ export const getOnboardingFunnel = adminQuery({
   returns: v.object({
     total: v.number(),
     completed: v.number(),
-    inProgressBySteps: v.array(v.object({ step: v.number(), count: v.number() })),
-    acquisitionSources: v.array(v.object({ source: v.string(), count: v.number() })),
+    inProgressBySteps: v.array(
+      v.object({ step: v.number(), count: v.number() }),
+    ),
+    acquisitionSources: v.array(
+      v.object({ source: v.string(), count: v.number() }),
+    ),
     learningGoals: v.array(v.object({ goal: v.string(), count: v.number() })),
   }),
   handler: async (ctx) => {
@@ -276,7 +293,10 @@ export const getOnboardingFunnel = adminQuery({
         steps.set(row.step, (steps.get(row.step) ?? 0) + 1);
       }
       if (row.acquisitionSource) {
-        sources.set(row.acquisitionSource, (sources.get(row.acquisitionSource) ?? 0) + 1);
+        sources.set(
+          row.acquisitionSource,
+          (sources.get(row.acquisitionSource) ?? 0) + 1,
+        );
       }
       for (const goal of row.learningGoals ?? []) {
         goals.set(goal, (goals.get(goal) ?? 0) + 1);
@@ -321,7 +341,11 @@ export const listUsers = adminQuery({
       ),
     ),
     sortBy: v.optional(
-      v.union(v.literal('newest'), v.literal('streak'), v.literal('last_active')),
+      v.union(
+        v.literal('newest'),
+        v.literal('streak'),
+        v.literal('last_active'),
+      ),
     ),
     // `now` per the no-wall-clock query guideline (drives the activity
     // filters and live streak derivation); optional for back-compat
@@ -357,14 +381,16 @@ export const listUsers = adminQuery({
     const search = args.search?.trim().toLowerCase();
     const profiles = search
       ? await ctx.db
-        .query('userProfiles')
-        .withSearchIndex('search_users', (q) => q.search('searchText', search))
-        .take(200)
+          .query('userProfiles')
+          .withSearchIndex('search_users', (q) =>
+            q.search('searchText', search),
+          )
+          .take(200)
       : await ctx.db
-        .query('userProfiles')
-        .withIndex('by_createdAt')
-        .order('desc')
-        .take(MAX_SCAN);
+          .query('userProfiles')
+          .withIndex('by_createdAt')
+          .order('desc')
+          .take(MAX_SCAN);
 
     const quotaDocs = await ctx.db.query('usageQuotas').take(MAX_SCAN);
     const quotaByUser = new Map(quotaDocs.map((doc) => [doc.userId, doc]));
@@ -380,18 +406,18 @@ export const listUsers = adminQuery({
       if (args.activity) {
         const last = summaryByUser.get(profile.userId)?.lastActivityDate;
         switch (args.activity) {
-        case 'active_7d':
-          if (!last || daysBetween(last, todayUtc) >= 7) return false;
-          break;
-        case 'inactive_7d':
-          if (last && daysBetween(last, todayUtc) < 7) return false;
-          break;
-        case 'inactive_30d':
-          if (last && daysBetween(last, todayUtc) < 30) return false;
-          break;
-        case 'never':
-          if (last) return false;
-          break;
+          case 'active_7d':
+            if (!last || daysBetween(last, todayUtc) >= 7) return false;
+            break;
+          case 'inactive_7d':
+            if (last && daysBetween(last, todayUtc) < 7) return false;
+            break;
+          case 'inactive_30d':
+            if (last && daysBetween(last, todayUtc) < 30) return false;
+            break;
+          case 'never':
+            if (last) return false;
+            break;
         }
       }
       return true;
@@ -496,7 +522,6 @@ export const getUserDetail = adminQuery({
     }),
   ),
   handler: async (ctx, args) => {
-
     const profile = await ctx.db
       .query('userProfiles')
       .withIndex('by_userId', (q) => q.eq('userId', args.userId))
@@ -548,11 +573,14 @@ export const getUserDetail = adminQuery({
           .first();
         const streak = stats
           ? deriveStreakDisplay(
-            stats.lastActivityDate,
-            dateInTimezone(resolveClientNow(args.now), stats.timezone ?? 'UTC'),
-            stats.currentStreak,
-            stats.streakFreezeUsedDate,
-          )
+              stats.lastActivityDate,
+              dateInTimezone(
+                resolveClientNow(args.now),
+                stats.timezone ?? 'UTC',
+              ),
+              stats.currentStreak,
+              stats.streakFreezeUsedDate,
+            )
           : null;
         return {
           courseId: course._id,
@@ -587,11 +615,11 @@ export const getUserDetail = adminQuery({
       courses: courseDetails,
       onboarding: onboarding
         ? {
-          completedAt: onboarding.completedAt,
-          acquisitionSource: onboarding.acquisitionSource,
-          learningGoals: onboarding.learningGoals,
-          dailyTimeGoalMinutes: onboarding.dailyTimeGoalMinutes,
-        }
+            completedAt: onboarding.completedAt,
+            acquisitionSource: onboarding.acquisitionSource,
+            learningGoals: onboarding.learningGoals,
+            dailyTimeGoalMinutes: onboarding.dailyTimeGoalMinutes,
+          }
         : undefined,
     };
   },

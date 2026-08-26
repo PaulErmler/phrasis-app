@@ -1,7 +1,11 @@
 import type { RunMutationCtx } from '@convex-dev/better-auth/utils';
 import { internal } from '../_generated/api';
 import type { DataModel } from '../_generated/dataModel';
-import { emailEnvLabel, formatEmailEnvLabel, withEmailEnvSubject } from './emailEnv';
+import {
+  emailEnvLabel,
+  formatEmailEnvLabel,
+  withEmailEnvSubject,
+} from './emailEnv';
 import { resend } from './resendClient';
 
 /**
@@ -71,8 +75,10 @@ export function escapeHtml(value: string): string {
 // All styles inline. Email clients strip <style> blocks. Simple div layout
 // (no tables) renders fine in Gmail/Apple Mail/Outlook.com for a
 // single-column card.
-const bodyStyle = 'color:#4b5563;font-size:14px;line-height:1.6;margin:0 0 20px;';
-const headingStyle = 'color:#111827;font-size:20px;font-weight:700;margin:0 0 12px;';
+const bodyStyle =
+  'color:#4b5563;font-size:14px;line-height:1.6;margin:0 0 20px;';
+const headingStyle =
+  'color:#111827;font-size:20px;font-weight:700;margin:0 0 12px;';
 const buttonStyle =
   `background:${BRAND_COLOR};border-radius:8px;color:#ffffff;display:inline-block;` +
   'font-size:14px;font-weight:600;padding:12px 24px;text-decoration:none;';

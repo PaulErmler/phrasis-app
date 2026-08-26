@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useCallback, useState, useSyncExternalStore } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -145,7 +152,11 @@ export function useCompletedTutorials(requiredIds: readonly string[]) {
   }, [userId]);
 
   // ---- localStorage is the primary source of truth for UI decisions ----
-  const completed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const completed = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
 
   const completeMutation = useMutation(api.features.courses.completeTutorial);
 
@@ -203,7 +214,9 @@ export function useCompletedTutorials(requiredIds: readonly string[]) {
       if (!prev.includes(tutorialId)) {
         writeCompleted([...prev, tutorialId]);
         if (opts?.captureEvent !== false) {
-          capture(CLIENT_EVENTS.TUTORIAL_COMPLETED, { tutorial_id: tutorialId });
+          capture(CLIENT_EVENTS.TUTORIAL_COMPLETED, {
+            tutorial_id: tutorialId,
+          });
         }
       }
       completeMutation({ tutorialId }).catch((e) =>
@@ -236,7 +249,10 @@ interface UseTutorialOptions {
   context?: TutorialContext;
 }
 
-export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions = {}) {
+export function useTutorial(
+  tutorialId: TutorialId,
+  options: UseTutorialOptions = {},
+) {
   const {
     enabled = true,
     delayMs = 800,
@@ -348,7 +364,11 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
 
     const isInteractiveStep = (stepIndex: number) => {
       const step = resolvedSteps[stepIndex];
-      return step?.popover && 'popoverClass' in step.popover && step.popover.popoverClass === 'tutorial-try-card';
+      return (
+        step?.popover &&
+        'popoverClass' in step.popover &&
+        step.popover.popoverClass === 'tutorial-try-card'
+      );
     };
 
     const completeOnClickIndices = new Set<number>();
@@ -457,24 +477,29 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     teardownRef.current('hidden');
   }, []);
 
-  const showCompletionStep = useCallback((title: string, description: string) => {
-    let unbind = () => {};
-    const d = driver({
-      showButtons: ['close'],
-      overlayColor: '#000',
-      overlayOpacity: getDriverOverlayOpacity(),
-      popoverClass: 'phrasis-tutorial-completion',
-      steps: [{
-        popover: { title, description },
-      }],
-      onDestroyStarted: () => {
-        unbind();
-        d.destroy();
-      },
-    });
-    unbind = bindTourKeyboard(d);
-    d.drive();
-  }, []);
+  const showCompletionStep = useCallback(
+    (title: string, description: string) => {
+      let unbind = () => {};
+      const d = driver({
+        showButtons: ['close'],
+        overlayColor: '#000',
+        overlayOpacity: getDriverOverlayOpacity(),
+        popoverClass: 'phrasis-tutorial-completion',
+        steps: [
+          {
+            popover: { title, description },
+          },
+        ],
+        onDestroyStarted: () => {
+          unbind();
+          d.destroy();
+        },
+      });
+      unbind = bindTourKeyboard(d);
+      d.drive();
+    },
+    [],
+  );
 
   const tRef = useRef(t);
   useLayoutEffect(() => {
@@ -489,15 +514,17 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       overlayColor: '#000',
       overlayOpacity: getDriverOverlayOpacity(),
       popoverClass: 'phrasis-tutorial-chat',
-      steps: [{
-        element: tutorialSelector(TUTORIAL_ANCHORS.chatButton),
-        popover: {
-          title: tr('chat.title'),
-          description: tr('chat.description'),
-          side: 'top' as const,
-          align: 'center' as const,
+      steps: [
+        {
+          element: tutorialSelector(TUTORIAL_ANCHORS.chatButton),
+          popover: {
+            title: tr('chat.title'),
+            description: tr('chat.description'),
+            side: 'top' as const,
+            align: 'center' as const,
+          },
         },
-      }],
+      ],
       onDestroyStarted: () => {
         unbind();
         completeTutorial();

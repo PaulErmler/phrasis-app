@@ -78,7 +78,10 @@ export const batchUpsertTranslations = internalMutation({
       audioInvalidated: 0,
     };
     const notFoundDatasetSentenceIds: number[] = [];
-    const notFoundItems: Array<{ datasetSentenceId: number; textEnPreview: string }> = [];
+    const notFoundItems: Array<{
+      datasetSentenceId: number;
+      textEnPreview: string;
+    }> = [];
 
     for (const item of args.items) {
       const textDoc = await ctx.db

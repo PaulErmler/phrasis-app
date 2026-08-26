@@ -180,20 +180,14 @@ export function HomeView({
 
   if (!hasActiveCourse) {
     return (
-      <div
-        className="scroll-view"
-        style={{ scrollbarGutter: 'stable' }}
-      >
+      <div className="scroll-view" style={{ scrollbarGutter: 'stable' }}>
         <NoCourseEmptyState onOpenCourseMenu={onOpenCourseMenu} />
       </div>
     );
   }
 
   return (
-    <div
-      className="scroll-view"
-      style={{ scrollbarGutter: 'stable' }}
-    >
+    <div className="scroll-view" style={{ scrollbarGutter: 'stable' }}>
       <div className="app-view">
         <ProgressStatsCard
           key={courseSettings?.courseId}
@@ -209,10 +203,7 @@ export function HomeView({
             (hideDueCounts); pauses its subscription while home is hidden.
             Keyed like ProgressStatsCard so a course switch remounts it —
             resetting the what-if stepper instead of carrying it over. */}
-        <WorkloadForecastCard
-          key={courseSettings?.courseId}
-          skip={isHidden}
-        />
+        <WorkloadForecastCard key={courseSettings?.courseId} skip={isHidden} />
 
         {/* Content actions */}
         <div className="card-surface space-y-2 p-3">
@@ -253,7 +244,6 @@ export function HomeView({
             onNavigateToChat={onNavigateToChat}
           />
         </div>
-
       </div>
     </div>
   );

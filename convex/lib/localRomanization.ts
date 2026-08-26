@@ -123,7 +123,9 @@ export function getRomanizationSource(language: string): RomanizationSource {
  * phonetic.
  */
 export const TTS_ROMANIZATION_LANGUAGES = new Set([
-  'zh', 'zh_traditional', 'ko',
+  'zh',
+  'zh_traditional',
+  'ko',
 ]);
 
 export function shouldRomanizeForTtsMatch(code: string): boolean {

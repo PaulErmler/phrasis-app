@@ -49,15 +49,23 @@ describe('ratingForAccuracy', () => {
 
   it('returns easy only when an easy threshold is configured', () => {
     expect(ratingForAccuracy(100)).toBe('good');
-    expect(ratingForAccuracy(100, { hard: 50, good: 80, easy: 97 })).toBe('easy');
-    expect(ratingForAccuracy(96, { hard: 50, good: 80, easy: 97 })).toBe('good');
+    expect(ratingForAccuracy(100, { hard: 50, good: 80, easy: 97 })).toBe(
+      'easy',
+    );
+    expect(ratingForAccuracy(96, { hard: 50, good: 80, easy: 97 })).toBe(
+      'good',
+    );
   });
 });
 
 describe('resolveAutoRateThresholds', () => {
   it('falls back to the defaults for missing or unusable input', () => {
-    expect(resolveAutoRateThresholds(undefined)).toEqual(DEFAULT_AUTO_RATE_THRESHOLDS);
-    expect(resolveAutoRateThresholds(null)).toEqual(DEFAULT_AUTO_RATE_THRESHOLDS);
+    expect(resolveAutoRateThresholds(undefined)).toEqual(
+      DEFAULT_AUTO_RATE_THRESHOLDS,
+    );
+    expect(resolveAutoRateThresholds(null)).toEqual(
+      DEFAULT_AUTO_RATE_THRESHOLDS,
+    );
     expect(resolveAutoRateThresholds({ hard: NaN, good: NaN })).toEqual(
       DEFAULT_AUTO_RATE_THRESHOLDS,
     );
@@ -82,11 +90,13 @@ describe('resolveAutoRateThresholds', () => {
   });
 
   it('never lets easy fall below good', () => {
-    expect(resolveAutoRateThresholds({ hard: 50, good: 80, easy: 60 })).toEqual({
-      hard: 50,
-      good: 80,
-      easy: 80,
-    });
+    expect(resolveAutoRateThresholds({ hard: 50, good: 80, easy: 60 })).toEqual(
+      {
+        hard: 50,
+        good: 80,
+        easy: 80,
+      },
+    );
   });
 });
 
@@ -110,8 +120,14 @@ describe('autoRating', () => {
 
   it('tolerates a partial or corrupt stored threshold object', () => {
     expect(
-      autoRating({ enabled: true, accuracy: 65, thresholds: { hard: 90, good: 20 } }),
+      autoRating({
+        enabled: true,
+        accuracy: 65,
+        thresholds: { hard: 90, good: 20 },
+      }),
     ).toBe('hard');
-    expect(autoRating({ enabled: true, accuracy: 65, thresholds: {} })).toBe('hard');
+    expect(autoRating({ enabled: true, accuracy: 65, thresholds: {} })).toBe(
+      'hard',
+    );
   });
 });

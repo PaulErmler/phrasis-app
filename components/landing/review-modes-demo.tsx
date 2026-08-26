@@ -1,6 +1,13 @@
 'use client';
 
-import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useCallback,
+} from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { motion, AnimatePresence } from 'motion/react';
 import { ReviewModeSwitcher } from '@/components/app/learning/ReviewModeSwitcher';
@@ -12,14 +19,25 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import type { CardTranslation, CardAudioRecording } from '@/components/app/learning/types';
+import type {
+  CardTranslation,
+  CardAudioRecording,
+} from '@/components/app/learning/types';
 import type { ReviewMode } from '@/convex/types';
 import { getLandingAudioUrl } from '@/lib/landing/audio';
 import {
   getLanguageShortLabel,
   getLocalizedLanguageNameByCode,
 } from '@/lib/languages';
-import { Check, Ear, Languages, MousePointer2, NotebookPen, Radio, RefreshCw } from 'lucide-react';
+import {
+  Check,
+  Ear,
+  Languages,
+  MousePointer2,
+  NotebookPen,
+  Radio,
+  RefreshCw,
+} from 'lucide-react';
 import { useLandingDemo } from '@/components/landing/landing-demo-context';
 
 function usePrefersReducedMotion() {
@@ -66,7 +84,12 @@ function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
       const fullTargets = [
         { code: 'es', expected: t('mock.es'), typed: t('mock.typedEs') },
       ];
-      return { translations, audioRecordings, fullTargets, showRomanization: false };
+      return {
+        translations,
+        audioRecordings,
+        fullTargets,
+        showRomanization: false,
+      };
     }
 
     // Multi-language demo: 1 base + 2 targets, matching the Pro plan's
@@ -102,7 +125,12 @@ function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
       { code: 'es', expected: t('mock.es'), typed: t('mock.typedEs') },
       { code: 'fr', expected: t('mock.fr'), typed: t('mock.typedFr') },
     ];
-    return { translations, audioRecordings, fullTargets, showRomanization: false };
+    return {
+      translations,
+      audioRecordings,
+      fullTargets,
+      showRomanization: false,
+    };
   }, [t, multi, primaryBaseLang]);
 }
 
@@ -114,18 +142,22 @@ export function ReviewModesDemo() {
   const [playKey, setPlayKey] = useState(0);
   const reducedMotion = usePrefersReducedMotion();
 
-  const { translations, audioRecordings, fullTargets, showRomanization } = useMockCard(t, multi);
+  const { translations, audioRecordings, fullTargets, showRomanization } =
+    useMockCard(t, multi);
 
   const [typedMap, setTypedMap] = useState<Record<string, string>>({});
   const [submittedMap, setSubmittedMap] = useState<Record<string, boolean>>({});
-  const [fullAnimPhase, setFullAnimPhase] = useState<FullReviewAnimPhase>('typing');
+  const [fullAnimPhase, setFullAnimPhase] =
+    useState<FullReviewAnimPhase>('typing');
   const [activeLangIdx, setActiveLangIdx] = useState(0);
   const fullReviewWrapRef = useRef<HTMLDivElement>(null);
   const [cursorPath, setCursorPath] = useState<{
     from: { x: number; y: number };
     to: { x: number; y: number };
   } | null>(null);
-  const [pressPos, setPressPos] = useState<{ x: number; y: number } | null>(null);
+  const [pressPos, setPressPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const cursorMoveAdvanceRef = useRef(false);
   const cursorPressAdvanceRef = useRef(false);
 
@@ -137,8 +169,12 @@ export function ReviewModesDemo() {
     const emptySub = Object.fromEntries(codes.map((c) => [c, false]));
 
     if (reducedMotion) {
-      setTypedMap(Object.fromEntries(fullTargets.map((x) => [x.code, x.typed])));
-      setSubmittedMap(Object.fromEntries(fullTargets.map((x) => [x.code, true])));
+      setTypedMap(
+        Object.fromEntries(fullTargets.map((x) => [x.code, x.typed])),
+      );
+      setSubmittedMap(
+        Object.fromEntries(fullTargets.map((x) => [x.code, true])),
+      );
       setActiveLangIdx(0);
       setFullAnimPhase('typing');
       setCursorPath(null);
@@ -192,7 +228,14 @@ export function ReviewModesDemo() {
       cancelled = true;
       timeouts.forEach(clearTimeout);
     };
-  }, [reviewMode, fullAnimPhase, activeLangIdx, fullTargets, playKey, reducedMotion]);
+  }, [
+    reviewMode,
+    fullAnimPhase,
+    activeLangIdx,
+    fullTargets,
+    playKey,
+    reducedMotion,
+  ]);
 
   useLayoutEffect(() => {
     if (reviewMode !== 'full' || reducedMotion) return;
@@ -227,7 +270,14 @@ export function ReviewModesDemo() {
         y: br.top - wr.top + br.height / 2 - 4,
       },
     });
-  }, [reviewMode, fullAnimPhase, activeLangIdx, fullTargets, reducedMotion, playKey]);
+  }, [
+    reviewMode,
+    fullAnimPhase,
+    activeLangIdx,
+    fullTargets,
+    reducedMotion,
+    playKey,
+  ]);
 
   const finishFullRowSubmit = useCallback(() => {
     const tgt = fullTargets[activeLangIdx];
@@ -281,10 +331,17 @@ export function ReviewModesDemo() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <ReviewModeSwitcher value={reviewMode} onChange={setReviewMode} />
         <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2">
-          <Label htmlFor="landing-multi-lang" className="text-sm font-medium cursor-pointer">
+          <Label
+            htmlFor="landing-multi-lang"
+            className="text-sm font-medium cursor-pointer"
+          >
             {t('multiLabel')}
           </Label>
-          <Switch id="landing-multi-lang" checked={multi} onCheckedChange={setMulti} />
+          <Switch
+            id="landing-multi-lang"
+            checked={multi}
+            onCheckedChange={setMulti}
+          />
         </div>
       </div>
 
@@ -293,7 +350,9 @@ export function ReviewModesDemo() {
           {reviewMode === 'audio' ? (
             <>
               <h3 className="text-lg font-semibold">{t('audioTitle')}</h3>
-              <p className="text-muted-foreground leading-relaxed">{t('audioBody')}</p>
+              <p className="text-muted-foreground leading-relaxed">
+                {t('audioBody')}
+              </p>
               {/* Two callouts framing the in-app scheduling choices that
                   pair with audio playback: Review mode (FSRS-driven) and
                   Radio mode (passive, no FSRS). Both live inside the audio
@@ -316,7 +375,9 @@ export function ReviewModesDemo() {
           ) : (
             <>
               <h3 className="text-lg font-semibold">{t('fullTitle')}</h3>
-              <p className="text-muted-foreground leading-relaxed">{t('fullBody')}</p>
+              <p className="text-muted-foreground leading-relaxed">
+                {t('fullBody')}
+              </p>
               {/* Three callouts framing the writing styles that pair with the
                   typing exercise: Translate (base audio → type the
                   translation), Transcribe (target audio → type what you
@@ -400,7 +461,9 @@ export function ReviewModesDemo() {
                       {targetTranslations.map((tr) => {
                         const submitted = submittedMap[tr.language] ?? false;
                         const typed = typedMap[tr.language] ?? '';
-                        const ft = fullTargets.find((x) => x.code === tr.language);
+                        const ft = fullTargets.find(
+                          (x) => x.code === tr.language,
+                        );
                         const label = showLanguageLabel
                           ? getLocalizedLanguageNameByCode(tr.language, locale)
                           : null;
@@ -431,7 +494,12 @@ export function ReviewModesDemo() {
                              * and were clipped by a fixed 36px box. */}
                             <div className="min-h-9">
                               {submitted && ft ? (
-                                <DiffDisplay expected={ft.expected} actual={typed} language={tr.language} omitAccuracy />
+                                <DiffDisplay
+                                  expected={ft.expected}
+                                  actual={typed}
+                                  language={tr.language}
+                                  omitAccuracy
+                                />
                               ) : (
                                 <div className="flex items-center gap-2">
                                   <Input
@@ -464,58 +532,70 @@ export function ReviewModesDemo() {
                 </LandingCardShell>
 
                 <AnimatePresence mode="wait">
-                  {fullAnimPhase === 'cursorMoving' && cursorPath && !reducedMotion && (
-                    <motion.div
-                      key="full-review-cursor-move"
-                      className="pointer-events-none absolute left-0 top-0 z-30"
-                      initial={{
-                        x: cursorPath.from.x,
-                        y: cursorPath.from.y,
-                        opacity: 0,
-                        scale: 0.85,
-                      }}
-                      animate={{
-                        x: cursorPath.to.x,
-                        y: cursorPath.to.y,
-                        opacity: 1,
-                        scale: 1,
-                      }}
-                      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.08 } }}
-                      transition={{ duration: 0.85, ease: [0.4, 0, 0.2, 1] }}
-                      onAnimationComplete={() => {
-                        if (cursorMoveAdvanceRef.current || !cursorPath) return;
-                        cursorMoveAdvanceRef.current = true;
-                        setPressPos({ x: cursorPath.to.x, y: cursorPath.to.y });
-                        setFullAnimPhase('cursorPressing');
-                      }}
-                    >
-                      <MousePointer2 className="h-9 w-9 fill-primary text-primary drop-shadow-lg" />
-                    </motion.div>
-                  )}
-                  {fullAnimPhase === 'cursorPressing' && pressPos && !reducedMotion && (
-                    <motion.div
-                      key="full-review-cursor-press"
-                      className="pointer-events-none absolute left-0 top-0 z-30"
-                      initial={{
-                        x: pressPos.x,
-                        y: pressPos.y,
-                        opacity: 1,
-                        scale: 1,
-                      }}
-                      animate={{
-                        opacity: 0,
-                        scale: 0.86,
-                      }}
-                      transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-                      onAnimationComplete={() => {
-                        if (cursorPressAdvanceRef.current) return;
-                        cursorPressAdvanceRef.current = true;
-                        finishFullRowSubmit();
-                      }}
-                    >
-                      <MousePointer2 className="h-9 w-9 fill-primary text-primary drop-shadow-lg" />
-                    </motion.div>
-                  )}
+                  {fullAnimPhase === 'cursorMoving' &&
+                    cursorPath &&
+                    !reducedMotion && (
+                      <motion.div
+                        key="full-review-cursor-move"
+                        className="pointer-events-none absolute left-0 top-0 z-30"
+                        initial={{
+                          x: cursorPath.from.x,
+                          y: cursorPath.from.y,
+                          opacity: 0,
+                          scale: 0.85,
+                        }}
+                        animate={{
+                          x: cursorPath.to.x,
+                          y: cursorPath.to.y,
+                          opacity: 1,
+                          scale: 1,
+                        }}
+                        exit={{
+                          opacity: 0,
+                          scale: 0.95,
+                          transition: { duration: 0.08 },
+                        }}
+                        transition={{ duration: 0.85, ease: [0.4, 0, 0.2, 1] }}
+                        onAnimationComplete={() => {
+                          if (cursorMoveAdvanceRef.current || !cursorPath)
+                            return;
+                          cursorMoveAdvanceRef.current = true;
+                          setPressPos({
+                            x: cursorPath.to.x,
+                            y: cursorPath.to.y,
+                          });
+                          setFullAnimPhase('cursorPressing');
+                        }}
+                      >
+                        <MousePointer2 className="h-9 w-9 fill-primary text-primary drop-shadow-lg" />
+                      </motion.div>
+                    )}
+                  {fullAnimPhase === 'cursorPressing' &&
+                    pressPos &&
+                    !reducedMotion && (
+                      <motion.div
+                        key="full-review-cursor-press"
+                        className="pointer-events-none absolute left-0 top-0 z-30"
+                        initial={{
+                          x: pressPos.x,
+                          y: pressPos.y,
+                          opacity: 1,
+                          scale: 1,
+                        }}
+                        animate={{
+                          opacity: 0,
+                          scale: 0.86,
+                        }}
+                        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                        onAnimationComplete={() => {
+                          if (cursorPressAdvanceRef.current) return;
+                          cursorPressAdvanceRef.current = true;
+                          finishFullRowSubmit();
+                        }}
+                      >
+                        <MousePointer2 className="h-9 w-9 fill-primary text-primary drop-shadow-lg" />
+                      </motion.div>
+                    )}
                 </AnimatePresence>
               </div>
             )}

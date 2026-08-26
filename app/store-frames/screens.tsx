@@ -129,7 +129,12 @@ export function LearnScreen() {
 
 // ------------------------------------------------------------------- chat
 
-function msg(id: string, role: 'user' | 'assistant', text: string, order: number): never {
+function msg(
+  id: string,
+  role: 'user' | 'assistant',
+  text: string,
+  order: number,
+): never {
   return {
     id,
     key: id,
@@ -156,7 +161,9 @@ function ApprovalBox({
   return (
     <Alert
       className={`my-3 flex flex-col gap-3 ${
-        approved ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950' : ''
+        approved
+          ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950'
+          : ''
       }`}
     >
       <AlertDescription>
@@ -167,7 +174,12 @@ function ApprovalBox({
       </AlertDescription>
       <div className="flex w-full items-center gap-2">
         {approved ? (
-          <Button disabled variant="ghost" size="sm" className="h-9 px-3 text-base font-semibold text-green-700">
+          <Button
+            disabled
+            variant="ghost"
+            size="sm"
+            className="h-9 px-3 text-base font-semibold text-green-700"
+          >
             Sentence added!
           </Button>
         ) : (
@@ -228,7 +240,12 @@ function ChatScreen({
       <TutorHeader />
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-3">
         <div className={`${chatHeight} shrink-0 overflow-hidden`}>
-          <ChatMessages messages={thread} isLoading={false} threadId="demo" status="ready" />
+          <ChatMessages
+            messages={thread}
+            isLoading={false}
+            threadId="demo"
+            status="ready"
+          />
         </div>
         <div className="min-h-0 flex-1 overflow-hidden px-1">{children}</div>
       </div>
@@ -240,11 +257,19 @@ function ChatScreen({
 }
 
 /** An answer that ends in a card the learner has already accepted. */
-export function ChatAnswerScreen({ sampleIndex = 0 }: { sampleIndex?: number }) {
+export function ChatAnswerScreen({
+  sampleIndex = 0,
+}: {
+  sampleIndex?: number;
+}) {
   const sample = SAMPLES[sampleIndex];
   return (
     <ChatScreen sampleIndex={sampleIndex}>
-      <ApprovalBox base={sample.card.base} target={sample.card.target} approved />
+      <ApprovalBox
+        base={sample.card.base}
+        target={sample.card.target}
+        approved
+      />
       <ApprovalBox base="I did it because of you." target="Lo hice por ti." />
     </ChatScreen>
   );
@@ -261,7 +286,12 @@ export function ChatCardsScreen() {
       <TutorHeader />
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-3">
         <div className="h-[112px] shrink-0 overflow-hidden">
-          <ChatMessages messages={thread} isLoading={false} threadId="demo" status="ready" />
+          <ChatMessages
+            messages={thread}
+            isLoading={false}
+            threadId="demo"
+            status="ready"
+          />
         </div>
         <div className="min-h-0 flex-1 overflow-hidden px-1">
           <ApprovalBox {...REJECT_SAMPLE.cards[0]} approved />
@@ -282,22 +312,26 @@ export function ChatCardsScreen() {
 export function HomeProjectionScreen() {
   return (
     <MockConvex>
-    <div className="absolute inset-0 flex flex-col bg-background text-foreground">
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-3 pt-6">
-        <NumbersRow {...fx.numbers} />
-        <CumulativeLineChart
-          dailyData={fx.dailyData}
-          monthlyData={fx.monthlyData}
-          weeklyData={fx.weeklyData}
-          languageDailyData={fx.languageDailyData}
-          timezone={fx.TZ}
-        />
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <WordCloudSection />
+      <div className="absolute inset-0 flex flex-col bg-background text-foreground">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-3 pt-6">
+          <NumbersRow {...fx.numbers} />
+          <CumulativeLineChart
+            dailyData={fx.dailyData}
+            monthlyData={fx.monthlyData}
+            weeklyData={fx.weeklyData}
+            languageDailyData={fx.languageDailyData}
+            timezone={fx.TZ}
+          />
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <WordCloudSection />
+          </div>
         </div>
+        <BottomNav
+          currentView={'stats' as never}
+          onViewChange={noop}
+          onLearnOpen={noop}
+        />
       </div>
-      <BottomNav currentView={'stats' as never} onViewChange={noop} onLearnOpen={noop} />
-    </div>
     </MockConvex>
   );
 }
@@ -309,10 +343,21 @@ export function DifficultyScreen() {
       <WithAppData>
         <div className="absolute inset-0 flex flex-col bg-background text-foreground">
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-3 pt-6">
-            <ProgressStatsCard onStartLearn={noop} onReviewModeChange={noop} hasPlayableCards />
-            <SegmentedHomeSection onNavigateToContent={noop} onNavigateToChat={noop} />
+            <ProgressStatsCard
+              onStartLearn={noop}
+              onReviewModeChange={noop}
+              hasPlayableCards
+            />
+            <SegmentedHomeSection
+              onNavigateToContent={noop}
+              onNavigateToChat={noop}
+            />
           </div>
-          <BottomNav currentView={'home' as never} onViewChange={noop} onLearnOpen={noop} />
+          <BottomNav
+            currentView={'home' as never}
+            onViewChange={noop}
+            onLearnOpen={noop}
+          />
         </div>
       </WithAppData>
     </MockConvex>
@@ -324,7 +369,12 @@ export function WriteScreen() {
   return (
     <WithChatContext>
       <div className="absolute inset-0 flex flex-col bg-background text-foreground pt-4">
-        <LearningHeader onBack={noop} onSettingsOpen={noop} reviewMode="full" ratingCount={4} />
+        <LearningHeader
+          onBack={noop}
+          onSettingsOpen={noop}
+          reviewMode="full"
+          ratingCount={4}
+        />
         <main className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden px-4">
           <FullReviewCardContent
             bare
@@ -364,26 +414,30 @@ export function WriteScreen() {
 export function ProgressScreen() {
   return (
     <MockConvex>
-    {/* ProgressDisplay reads getUserSettings via AppDataProvider. */}
-    <WithAppData>
-    <WithChatContext>
-      <div className="absolute inset-0 flex flex-col bg-background text-foreground pt-4">
-        <LearningHeader onBack={noop} onSettingsOpen={noop} ratingCount={4} />
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <ProgressDisplay
-            sessionId="store-session"
-            dailyReviewsToday={74}
-            dailyTimeMsToday={21 * 60 * 1000}
-            dailyNewWordsToday={20}
-            reviewMode="audio"
-            autoAdvance={false}
-            onContinue={noop}
-            ready
-          />
-        </div>
-      </div>
-    </WithChatContext>
-    </WithAppData>
+      {/* ProgressDisplay reads getUserSettings via AppDataProvider. */}
+      <WithAppData>
+        <WithChatContext>
+          <div className="absolute inset-0 flex flex-col bg-background text-foreground pt-4">
+            <LearningHeader
+              onBack={noop}
+              onSettingsOpen={noop}
+              ratingCount={4}
+            />
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <ProgressDisplay
+                sessionId="store-session"
+                dailyReviewsToday={74}
+                dailyTimeMsToday={21 * 60 * 1000}
+                dailyNewWordsToday={20}
+                reviewMode="audio"
+                autoAdvance={false}
+                onContinue={noop}
+                ready
+              />
+            </div>
+          </div>
+        </WithChatContext>
+      </WithAppData>
     </MockConvex>
   );
 }
@@ -395,14 +449,23 @@ export function WordCloudScreen() {
       <div className="min-h-0 flex-1 overflow-hidden p-4 pt-8">
         <LandingWordCloud />
       </div>
-      <BottomNav currentView={'stats' as never} onViewChange={noop} onLearnOpen={noop} />
+      <BottomNav
+        currentView={'stats' as never}
+        onViewChange={noop}
+        onLearnOpen={noop}
+      />
     </div>
   );
 }
 
 // ------------------------------------------------------------------ posters
 
-const BRAND = { clay: '#D45C2B', sky: '#2BB5D4', amber: '#FFB300', ink: '#0B2A35' };
+const BRAND = {
+  clay: '#D45C2B',
+  sky: '#2BB5D4',
+  amber: '#FFB300',
+  ink: '#0B2A35',
+};
 
 const PILLARS = [
   {
@@ -425,14 +488,42 @@ const PILLARS = [
   },
 ];
 
-function Wordmark({ color = '#fff', size = 130 }: { color?: string; size?: number }) {
+function Wordmark({
+  color = '#fff',
+  size = 130,
+}: {
+  color?: string;
+  size?: number;
+}) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 38 }}>
-      <div style={{ background: '#fff', borderRadius: 46, padding: 18, flex: '0 0 auto' }}>
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 46,
+          padding: 18,
+          flex: '0 0 auto',
+        }}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icons/icon-512x512.png" alt="" width={size} height={size} style={{ display: 'block' }} />
+        <img
+          src="/icons/icon-512x512.png"
+          alt=""
+          width={size}
+          height={size}
+          style={{ display: 'block' }}
+        />
       </div>
-      <p style={{ margin: 0, fontSize: size * 0.82, fontWeight: 800, letterSpacing: '-0.04em', color, lineHeight: 1 }}>
+      <p
+        style={{
+          margin: 0,
+          fontSize: size * 0.82,
+          fontWeight: 800,
+          letterSpacing: '-0.04em',
+          color,
+          lineHeight: 1,
+        }}
+      >
         Flexling
       </p>
     </div>
@@ -474,8 +565,21 @@ function HeroPoster({
   cards: { label: string; line: string; color: string }[];
 }) {
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: '#EEF4F6' }}>
-      <div style={{ background: heroBg, padding: wordmark ? '104px 84px 84px' : '116px 84px 92px' }}>
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        background: '#EEF4F6',
+      }}
+    >
+      <div
+        style={{
+          background: heroBg,
+          padding: wordmark ? '104px 84px 84px' : '116px 84px 92px',
+        }}
+      >
         {wordmark && <Wordmark size={140} />}
         <p
           style={{
@@ -491,7 +595,15 @@ function HeroPoster({
           {heading}
         </p>
       </div>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 24, padding: '40px 84px 76px' }}>
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 24,
+          padding: '40px 84px 76px',
+        }}
+      >
         {cards.map((c) => (
           <div
             key={c.label}
@@ -517,7 +629,16 @@ function HeroPoster({
             >
               {c.label}
             </span>
-            <p style={{ margin: 0, fontSize: 58, fontWeight: 700, letterSpacing: '-0.026em', lineHeight: 1.14, color: '#0D1416' }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 58,
+                fontWeight: 700,
+                letterSpacing: '-0.026em',
+                lineHeight: 1.14,
+                color: '#0D1416',
+              }}
+            >
               {c.line}
             </p>
           </div>
@@ -529,7 +650,14 @@ function HeroPoster({
 
 /** Opening frame. */
 export function OpenerScreen() {
-  return <HeroPoster heroBg={BRAND.sky} heading={TAGLINE} wordmark cards={PILLARS_COPY} />;
+  return (
+    <HeroPoster
+      heroBg={BRAND.sky}
+      heading={TAGLINE}
+      wordmark
+      cards={PILLARS_COPY}
+    />
+  );
 }
 
 /** The three ways one card can be practised. */
@@ -580,21 +708,33 @@ export const SCREENS: Record<string, () => ReactNode> = {
  * Five ways to show the catalogue. All read from SUPPORTED_LANGUAGES, so the
  * names, flags and counts are whatever the app actually ships.
  */
-function LangHead({
-  color = '#fff',
-  sub,
-}: {
-  color?: string;
-  sub: string;
-}) {
+function LangHead({ color = '#fff', sub }: { color?: string; sub: string }) {
   return (
     <>
-      <p style={{ margin: 0, fontSize: 104, lineHeight: 1.02, fontWeight: 800, letterSpacing: '-0.038em', color }}>
+      <p
+        style={{
+          margin: 0,
+          fontSize: 104,
+          lineHeight: 1.02,
+          fontWeight: 800,
+          letterSpacing: '-0.038em',
+          color,
+        }}
+      >
         One method.
         <br />
         {COUNTS.languages}+ languages.
       </p>
-      <p style={{ margin: '26px 0 0', fontSize: 46, lineHeight: 1.32, color, opacity: 0.82, maxWidth: '26ch' }}>
+      <p
+        style={{
+          margin: '26px 0 0',
+          fontSize: 46,
+          lineHeight: 1.32,
+          color,
+          opacity: 0.82,
+          maxWidth: '26ch',
+        }}
+      >
         {sub}
       </p>
     </>
@@ -666,10 +806,15 @@ export function LangsScreen() {
         }}
       >
         {BASE_LANGS.map((l) => (
-          <Pill key={l.code} l={l} bg="rgba(255,255,255,.18)" fg="#fff" size={54} />
+          <Pill
+            key={l.code}
+            l={l}
+            bg="rgba(255,255,255,.18)"
+            fg="#fff"
+            size={54}
+          />
         ))}
       </div>
     </Poster>
   );
 }
-

@@ -6,7 +6,15 @@
 
 export type Cefr = 'Pre-A1' | 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
 
-export const CEFR_ORDER: Cefr[] = ['Pre-A1', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+export const CEFR_ORDER: Cefr[] = [
+  'Pre-A1',
+  'A1',
+  'A2',
+  'B1',
+  'B2',
+  'C1',
+  'C2',
+];
 
 /**
  * Each tier is a stop along a blue → yellow → orange gradient using the

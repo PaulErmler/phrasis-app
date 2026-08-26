@@ -16,7 +16,10 @@ export const metadata: Metadata = {
 };
 
 export default function StoreFramesPage() {
-  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_STORE_SCREENS !== '1') {
+  if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.ENABLE_STORE_SCREENS !== '1'
+  ) {
     notFound();
   }
   return <StoreFramesClient />;

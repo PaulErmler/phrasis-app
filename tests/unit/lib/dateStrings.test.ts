@@ -120,7 +120,11 @@ describe('dateStrings', () => {
     it('day lengths over a DST-spanning range are always 23/24/25 hours', () => {
       for (const tz of ['Europe/Berlin', 'America/Los_Angeles']) {
         let prev = startOfDayMs('2026-03-01', tz);
-        for (let d = addDays('2026-03-01', 1); d <= '2026-04-15'; d = addDays(d, 1)) {
+        for (
+          let d = addDays('2026-03-01', 1);
+          d <= '2026-04-15';
+          d = addDays(d, 1)
+        ) {
           const cur = startOfDayMs(d, tz);
           expect([23 * HOUR, 24 * HOUR, 25 * HOUR], `${tz} ${d}`).toContain(
             cur - prev,

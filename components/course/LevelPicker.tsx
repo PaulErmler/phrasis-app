@@ -142,18 +142,20 @@ export function LevelSamplePreview({
     <Card>
       <CardContent className="p-4 md:p-6 space-y-2">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">
-          {t('samplesHeading', { level: ogteLevel.toString().padStart(2, '0') })}
+          {t('samplesHeading', {
+            level: ogteLevel.toString().padStart(2, '0'),
+          })}
         </div>
         {byLevel === null
           ? PREVIEW_POSITIONS.map((p) => <SampleLoadingRow key={p} />)
           : PREVIEW_POSITIONS.map((p) => (
-            <SampleRow
-              key={p}
-              sentence={levelRows?.find((row) => row.position === p) ?? null}
-              sourceLanguage={sourceLanguage}
-              targetLanguage={targetLanguage}
-            />
-          ))}
+              <SampleRow
+                key={p}
+                sentence={levelRows?.find((row) => row.position === p) ?? null}
+                sourceLanguage={sourceLanguage}
+                targetLanguage={targetLanguage}
+              />
+            ))}
       </CardContent>
     </Card>
   );

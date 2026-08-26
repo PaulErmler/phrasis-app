@@ -1,8 +1,8 @@
-import { execFileSync } from "node:child_process";
-import path from "node:path";
+import { execFileSync } from 'node:child_process';
+import path from 'node:path';
 
-import { registerRun } from "./run-lock";
-import { assertDevDeployment } from "./deployment-guard";
+import { registerRun } from './run-lock';
+import { assertDevDeployment } from './deployment-guard';
 
 /**
  * Enable E2E test hooks on the dev deployment for the duration of the test
@@ -20,10 +20,14 @@ import { assertDevDeployment } from "./deployment-guard";
 export default function globalSetup() {
   // Before anything else: E2E_TEST_HOOKS reroutes real auth emails, so
   // setting it on the wrong deployment is a live login outage.
-  assertDevDeployment("global-setup");
+  assertDevDeployment('global-setup');
   registerRun();
-  execFileSync("pnpm", ["exec", "convex", "env", "set", "E2E_TEST_HOOKS", "1"], {
-    cwd: path.resolve(__dirname, ".."),
-    stdio: "inherit",
-  });
+  execFileSync(
+    'pnpm',
+    ['exec', 'convex', 'env', 'set', 'E2E_TEST_HOOKS', '1'],
+    {
+      cwd: path.resolve(__dirname, '..'),
+      stdio: 'inherit',
+    },
+  );
 }

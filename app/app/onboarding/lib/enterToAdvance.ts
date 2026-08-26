@@ -1,4 +1,7 @@
-import { isComposingKeyEvent, isEditableTarget } from '@/hooks/use-ime-safe-enter';
+import {
+  isComposingKeyEvent,
+  isEditableTarget,
+} from '@/hooks/use-ime-safe-enter';
 
 /**
  * Should this keydown advance the onboarding wizard?

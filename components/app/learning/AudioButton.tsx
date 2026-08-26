@@ -307,7 +307,10 @@ export function AudioButton({
           peakTarget.volume = computeAttenuation(peak);
         }
       } catch (peakErr) {
-        console.warn('Peak measurement failed; playing at native volume', peakErr);
+        console.warn(
+          'Peak measurement failed; playing at native volume',
+          peakErr,
+        );
       }
       // Always start from the beginning. Rewinding only when `ended` left the
       // interrupted case broken: an element paused mid-clip (by the toggle, by
@@ -428,7 +431,9 @@ export function AudioButton({
         className="gap-1 text-muted-foreground"
       >
         <Loader2 className="h-3 w-3 animate-spin" />
-        <span className="text-xs">Generating {getLanguageShortLabel(language)}...</span>
+        <span className="text-xs">
+          Generating {getLanguageShortLabel(language)}...
+        </span>
       </Button>
     );
   }

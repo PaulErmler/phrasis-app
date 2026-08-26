@@ -64,7 +64,9 @@ export function ChatInput({
   useEffect(() => {
     if (!autoFocus) return;
     requestAnimationFrame(() => {
-      containerRef.current?.querySelector<HTMLTextAreaElement>('textarea')?.focus();
+      containerRef.current
+        ?.querySelector<HTMLTextAreaElement>('textarea')
+        ?.focus();
     });
   }, [autoFocus]);
 
@@ -79,7 +81,7 @@ export function ChatInput({
   const items = suggestions ?? defaultPrompts;
 
   return (
-    <div ref={containerRef} className={cn("w-full min-w-0", className ?? "")}>
+    <div ref={containerRef} className={cn('w-full min-w-0', className ?? '')}>
       <div className="w-full min-w-0">
         {showSuggestions && (
           <div className="w-full min-w-0 mb-3 flex items-center gap-2">
@@ -120,8 +122,10 @@ export function ChatInput({
                 {showCounter && (
                   <span
                     className={cn(
-                      "text-xs tabular-nums",
-                      isOverLimit ? "text-destructive" : "text-muted-foreground",
+                      'text-xs tabular-nums',
+                      isOverLimit
+                        ? 'text-destructive'
+                        : 'text-muted-foreground',
                     )}
                   >
                     {text.length}/{MAX_MESSAGE_LENGTH}

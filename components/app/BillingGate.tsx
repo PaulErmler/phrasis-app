@@ -114,7 +114,10 @@ export function BillingGate() {
         return;
       }
       const lastSyncedAt = lastSyncedAtRef.current;
-      if (lastSyncedAt !== undefined && Date.now() - lastSyncedAt < STALE_AFTER_MS) {
+      if (
+        lastSyncedAt !== undefined &&
+        Date.now() - lastSyncedAt < STALE_AFTER_MS
+      ) {
         return;
       }
       void sync();

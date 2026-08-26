@@ -54,11 +54,22 @@ export const BASE_LANGS: LangPill[] = (() => {
 
 export const GROUPED: { group: string; langs: LangPill[] }[] = (() => {
   const order = [
-    'Romance', 'Germanic', 'Slavic', 'Baltic & Nordic', 'East Asian',
-    'Southeast Asian', 'South Asian', 'Middle East', 'African', 'Other',
+    'Romance',
+    'Germanic',
+    'Slavic',
+    'Baltic & Nordic',
+    'East Asian',
+    'Southeast Asian',
+    'South Asian',
+    'Middle East',
+    'African',
+    'Other',
   ];
   return order
-    .map((group) => ({ group, langs: BASE_LANGS.filter((l) => l.group === group) }))
+    .map((group) => ({
+      group,
+      langs: BASE_LANGS.filter((l) => l.group === group),
+    }))
     .filter((g) => g.langs.length > 0);
 })();
 

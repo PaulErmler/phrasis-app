@@ -39,10 +39,7 @@ import {
   normalizePinnedCardActions,
   type PinnableCardAction,
 } from '@/lib/cardActions';
-import {
-  COACHMARK_ANCHORS,
-  TUTORIAL_ANCHORS,
-} from '@/lib/tutorials/anchors';
+import { COACHMARK_ANCHORS, TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 
 export interface ActionQuotaState {
   /** Remaining usage. `unlimited` overrides this. */
@@ -241,36 +238,42 @@ export function CardActionsMenu({
 
   const toneClassesForButton = (tone: ActionConfig['activeTone']) => {
     switch (tone) {
-    case 'favorite':
-      return 'text-favorite hover:text-favorite/80 hover:bg-favorite/10';
-    case 'success':
-      return 'text-success hover:text-success/80 hover:bg-success/10';
-    case 'destructive':
-      return 'text-destructive hover:text-destructive/80 hover:bg-destructive/10';
-    default:
-      return 'text-muted-foreground hover:text-foreground hover:bg-muted';
+      case 'favorite':
+        return 'text-favorite hover:text-favorite/80 hover:bg-favorite/10';
+      case 'success':
+        return 'text-success hover:text-success/80 hover:bg-success/10';
+      case 'destructive':
+        return 'text-destructive hover:text-destructive/80 hover:bg-destructive/10';
+      default:
+        return 'text-muted-foreground hover:text-foreground hover:bg-muted';
     }
   };
 
   const toneClassForMenuIcon = (tone: ActionConfig['activeTone']) => {
     switch (tone) {
-    case 'favorite':
-      return 'text-favorite fill-current';
-    case 'success':
-      return 'text-success';
-    case 'destructive':
-      return 'text-destructive';
-    default:
-      return undefined;
+      case 'favorite':
+        return 'text-favorite fill-current';
+      case 'success':
+        return 'text-success';
+      case 'destructive':
+        return 'text-destructive';
+      default:
+        return undefined;
     }
   };
 
   const renderSurfaceButton = (cfg: ActionConfig) => {
     const depleted = isQuotaDepleted(cfg);
     const low = isQuotaLow(cfg);
-    const tone = depleted ? undefined : cfg.isActive ? cfg.activeTone : undefined;
+    const tone = depleted
+      ? undefined
+      : cfg.isActive
+        ? cfg.activeTone
+        : undefined;
     const iconExtra =
-      cfg.isActive && tone === 'favorite' && !depleted ? 'fill-current' : undefined;
+      cfg.isActive && tone === 'favorite' && !depleted
+        ? 'fill-current'
+        : undefined;
     const tooltip = depleted
       ? t('actions.quotaExhausted', { label: cfg.label })
       : low

@@ -1,0 +1,28 @@
+# Generated code — formatting is owned by the generators
+convex/_generated/
+next-env.d.ts
+
+# Native platform projects and their build output
+android/
+ios/
+native/
+
+# Vendored / third-party-shaped trees
+components/ai-elements/
+patches/
+
+# Data & asset trees (not app code)
+public/
+data_preparation/
+sample-imports/
+content/
+data/
+assets/
+
+# Build artifacts and local state
+.next/
+coverage/
+playwright-report/
+test-results/
+.convex-snapshots/
+.claude/worktrees/

@@ -21,10 +21,7 @@ import {
 import { KeyChips } from '@/components/app/learning/KeyChips';
 import { isEditableTarget } from '@/hooks/use-ime-safe-enter';
 import { useMediaQuery } from '@/hooks/use-media-query';
-import {
-  COACHMARK_ANCHORS,
-  TUTORIAL_ANCHORS,
-} from '@/lib/tutorials/anchors';
+import { COACHMARK_ANCHORS, TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import type { ReviewRating } from '@/lib/scheduling';
 
 interface LearningControlsProps {
@@ -315,8 +312,14 @@ export function LearningControls({
           )}
 
           {/* Undo + Restart + Play + Next row */}
-          <div className="flex gap-2" data-tutorial={TUTORIAL_ANCHORS.audioControls}>
-            <div className="flex gap-2" data-tutorial={TUTORIAL_ANCHORS.undoRestart}>
+          <div
+            className="flex gap-2"
+            data-tutorial={TUTORIAL_ANCHORS.audioControls}
+          >
+            <div
+              className="flex gap-2"
+              data-tutorial={TUTORIAL_ANCHORS.undoRestart}
+            >
               <KeyHint
                 enabled={showKeyHints}
                 label={t('actions.undo')}

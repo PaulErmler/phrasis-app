@@ -45,7 +45,10 @@ export function useEnsureContent(
             result.translationsScheduled === 0 &&
             result.audioScheduled === 0
           ) {
-            setTimeout(() => ensuredGlobal.delete(card.textId), ENSURE_CONTENT_RETRY_MS);
+            setTimeout(
+              () => ensuredGlobal.delete(card.textId),
+              ENSURE_CONTENT_RETRY_MS,
+            );
           }
         })
         .catch(() => {

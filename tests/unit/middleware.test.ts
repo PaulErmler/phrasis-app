@@ -32,7 +32,6 @@ describe('middleware: PostHog proxy cookie stripping', () => {
     expect(config.matcher).toContain(`${POSTHOG_PROXY_PATH}/:path*`);
   });
 
-
   it('strips the cookie header from ph-relay requests', async () => {
     const res = await middleware(relayRequest());
 
@@ -45,7 +44,9 @@ describe('middleware: PostHog proxy cookie stripping', () => {
   it('keeps the headers PostHog needs', async () => {
     const res = await middleware(relayRequest());
 
-    expect(res.headers.get('x-middleware-request-content-type')).toBe('application/json');
+    expect(res.headers.get('x-middleware-request-content-type')).toBe(
+      'application/json',
+    );
   });
 
   it('continues rather than redirecting, even without a session', async () => {
@@ -56,7 +57,9 @@ describe('middleware: PostHog proxy cookie stripping', () => {
   });
 
   it('still redirects unauthenticated /app requests to sign-in', async () => {
-    const res = await middleware(new NextRequest('https://flexling.app/app/home'));
+    const res = await middleware(
+      new NextRequest('https://flexling.app/app/home'),
+    );
 
     expect(res.status).toBeGreaterThanOrEqual(300);
     expect(res.status).toBeLessThan(400);

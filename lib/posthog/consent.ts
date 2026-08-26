@@ -70,7 +70,11 @@ function getServerSnapshot(): ConsentStatus {
 }
 
 export function useConsentStatus(): ConsentStatus {
-  return useSyncExternalStore(subscribeToConsent, getSnapshot, getServerSnapshot);
+  return useSyncExternalStore(
+    subscribeToConsent,
+    getSnapshot,
+    getServerSnapshot,
+  );
 }
 
 /**
@@ -120,7 +124,8 @@ export function resetPreservingConsent(): void {
   const status = posthog.get_explicit_consent_status();
   posthog.reset();
   // Not a fresh opt-in, just restoring the record. Don't re-fire `$opt_in`.
-  if (status === 'granted') posthog.opt_in_capturing({ captureEventName: null });
+  if (status === 'granted')
+    posthog.opt_in_capturing({ captureEventName: null });
   else if (status === 'denied') posthog.opt_out_capturing();
   notify();
 }

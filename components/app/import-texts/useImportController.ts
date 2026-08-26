@@ -86,7 +86,9 @@ export function useImportController(onSuccess?: () => void): ImportController {
   const locale = useLocale();
   const { baseLanguages, targetLanguages } = useCourseLanguages();
   const quota = useFeatureQuota(FEATURE_IDS.CUSTOM_SENTENCES);
-  const createBatch = useMutation(api.features.customTexts.createCustomTextsBatch);
+  const createBatch = useMutation(
+    api.features.customTexts.createCustomTextsBatch,
+  );
 
   const courseLanguages = useMemo(
     () => [
@@ -107,7 +109,9 @@ export function useImportController(onSuccess?: () => void): ImportController {
   /** Cell overrides keyed by `${absoluteRowIndex}:${colIndex}`. */
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   /** Absolute parsed-row indices that the user has deleted from the import. */
-  const [deletedAbsoluteRows, setDeletedAbsoluteRows] = useState<Set<number>>(new Set());
+  const [deletedAbsoluteRows, setDeletedAbsoluteRows] = useState<Set<number>>(
+    new Set(),
+  );
 
   /** Becomes `true` once the user has manually edited hasHeader. */
   const headerTouchedRef = useRef(false);
@@ -118,7 +122,9 @@ export function useImportController(onSuccess?: () => void): ImportController {
 
   // Auto-detect hasHeader and auto-map columns when the input changes, unless
   // the user has manually touched these controls.
-  const parsedRowsSignature = parsed.rows.map((r) => r.join('\u0001')).join('\u0002');
+  const parsedRowsSignature = parsed.rows
+    .map((r) => r.join('\u0001'))
+    .join('\u0002');
   useEffect(() => {
     if (parsed.rows.length === 0) return;
     const wantsHeader = detectHasHeader(parsed.rows[0], locale);
@@ -215,7 +221,10 @@ export function useImportController(onSuccess?: () => void): ImportController {
       const absolute = dataRowAbsolute[dataRowIndex];
       const colIndex = mapping[language];
       if (absolute === undefined || colIndex === undefined) return;
-      setOverrides((prev) => ({ ...prev, [`${absolute}:${colIndex}`]: newText }));
+      setOverrides((prev) => ({
+        ...prev,
+        [`${absolute}:${colIndex}`]: newText,
+      }));
     },
     [dataRowAbsolute, mapping],
   );
@@ -243,27 +252,30 @@ export function useImportController(onSuccess?: () => void): ImportController {
     setInput(s);
   }, []);
 
-  const onFileSelected = useCallback(async (file: File) => {
-    if (file.size > MAX_IMPORT_FILE_BYTES) {
-      const maxMb = Math.round(MAX_IMPORT_FILE_BYTES / (1024 * 1024));
-      toast.error(t('file.tooLarge', { maxMb }));
-      return;
-    }
-    let text: string;
-    try {
-      text = await file.text();
-    } catch {
-      toast.error(t('file.readError'));
-      return;
-    }
-    headerTouchedRef.current = false;
-    mappingTouchedRef.current = false;
-    setMapping({});
-    setOverrides({});
-    setDeletedAbsoluteRows(new Set());
-    setInput(text);
-    setFileName(file.name);
-  }, [t]);
+  const onFileSelected = useCallback(
+    async (file: File) => {
+      if (file.size > MAX_IMPORT_FILE_BYTES) {
+        const maxMb = Math.round(MAX_IMPORT_FILE_BYTES / (1024 * 1024));
+        toast.error(t('file.tooLarge', { maxMb }));
+        return;
+      }
+      let text: string;
+      try {
+        text = await file.text();
+      } catch {
+        toast.error(t('file.readError'));
+        return;
+      }
+      headerTouchedRef.current = false;
+      mappingTouchedRef.current = false;
+      setMapping({});
+      setOverrides({});
+      setDeletedAbsoluteRows(new Set());
+      setInput(text);
+      setFileName(file.name);
+    },
+    [t],
+  );
 
   const reset = useCallback(() => {
     headerTouchedRef.current = false;
@@ -282,9 +294,7 @@ export function useImportController(onSuccess?: () => void): ImportController {
 
     const items = validation.statuses
       .filter(
-        (
-          s,
-        ): s is Extract<RowStatus, { kind: 'valid' | 'warning' }> =>
+        (s): s is Extract<RowStatus, { kind: 'valid' | 'warning' }> =>
           s.kind === 'valid' || s.kind === 'warning',
       )
       .map((s) => ({ translations: s.translations }));
@@ -305,9 +315,7 @@ export function useImportController(onSuccess?: () => void): ImportController {
       if (skipped === 0) {
         toast.success(t('success', { count: imported }));
       } else {
-        toast.warning(
-          t('partialSuccess', { count: imported, total, skipped }),
-        );
+        toast.warning(t('partialSuccess', { count: imported, total, skipped }));
       }
       if (imported > 0) {
         reset();

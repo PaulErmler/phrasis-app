@@ -192,7 +192,15 @@ describe('LearningControls: window shortcuts', () => {
     const handlers = makeHandlers();
     renderControls(handlers);
     const input = screen.getByTestId('outside-input');
-    for (const key of [' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'r', 't', '1']) {
+    for (const key of [
+      ' ',
+      'Enter',
+      'ArrowLeft',
+      'ArrowRight',
+      'r',
+      't',
+      '1',
+    ]) {
       fireEvent.keyDown(input, { key });
     }
     expect(handlers.onPlay).not.toHaveBeenCalled();

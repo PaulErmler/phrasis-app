@@ -17,7 +17,10 @@ import type { TtsProvider } from './languages';
 // only appear as EXISTING audio, never as the current provider. Their entries
 // stay because this Record is keyed by the full TtsProvider union, and 'azure'
 // must stay in gemini's list so legacy Azure audio regenerates on Gemini.
-export const TTS_PROVIDER_OVERRIDES: Record<TtsProvider, readonly TtsProvider[]> = {
+export const TTS_PROVIDER_OVERRIDES: Record<
+  TtsProvider,
+  readonly TtsProvider[]
+> = {
   google: ['azure'],
   elevenlabs: [],
   azure: ['elevenlabs'],

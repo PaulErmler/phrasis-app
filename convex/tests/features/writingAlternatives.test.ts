@@ -158,10 +158,10 @@ describe('features/writingAlternatives generation pipeline', () => {
       ),
     ).resolves.toBeNull();
     await expect(
-      t.mutation(
-        internal.features.writingAlternatives.attachAlternativeAudio,
-        { alternativeId: a.alternativeId, assetId },
-      ),
+      t.mutation(internal.features.writingAlternatives.attachAlternativeAudio, {
+        alternativeId: a.alternativeId,
+        assetId,
+      }),
     ).resolves.toBeNull();
     // The late save no-ops on the row but must not corrupt the asset store.
     await saveAudio(t, a.alternativeId, 'Frase efímera.');

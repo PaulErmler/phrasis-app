@@ -54,13 +54,20 @@ function makeData(
   };
 }
 
-const params = { addCount: 0, includeTypicalAdds: false, reviewMode: 'audio' as const };
+const params = {
+  addCount: 0,
+  includeTypicalAdds: false,
+  reviewMode: 'audio' as const,
+};
 
 describe('deriveRatingRates', () => {
   it('uses priors below the sample floor and never yields NaN', () => {
     const rates = deriveRatingRates(emptyHistory().ratingCounts);
     expect(rates.pAgain).toBeGreaterThan(0);
-    expect(rates.pAgain + rates.pHard + rates.pGood + rates.pEasy).toBeCloseTo(1, 6);
+    expect(rates.pAgain + rates.pHard + rates.pGood + rates.pEasy).toBeCloseTo(
+      1,
+      6,
+    );
   });
 
   it('uses the observed distribution once the sample is large enough', () => {
@@ -120,7 +127,10 @@ describe('kernels', () => {
   });
 
   it('return kernels: young echoes early, mature scales with the again rate', () => {
-    const { young, mature } = deriveReturnKernels({ initialReviewCount: 5, rates });
+    const { young, mature } = deriveReturnKernels({
+      initialReviewCount: 5,
+      rates,
+    });
     expect(young[0]).toBe(0); // same-day repeats live in the event multipliers
     expect(young.slice(1).reduce((a, b) => a + b, 0)).toBeGreaterThan(0.5);
 

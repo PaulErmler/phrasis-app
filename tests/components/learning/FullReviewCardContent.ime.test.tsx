@@ -15,7 +15,6 @@ vi.mock('@/components/autumn/usage-limit-dialog', () => ({
   default: () => null,
 }));
 
-
 import { FullReviewCardContent } from '@/components/app/learning/FullReviewCardContent';
 import type { CardTranslation } from '@/components/app/learning/types';
 import { makePresentation } from './cardPresentationStub';
@@ -30,8 +29,18 @@ import { makePresentation } from './cardPresentationStub';
  */
 
 const TRANSLATIONS: CardTranslation[] = [
-  { language: 'en', text: 'It is hot today.', isBaseLanguage: true, isTargetLanguage: false },
-  { language: 'ja', text: '今日は暑いですね。', isBaseLanguage: false, isTargetLanguage: true },
+  {
+    language: 'en',
+    text: 'It is hot today.',
+    isBaseLanguage: true,
+    isTargetLanguage: false,
+  },
+  {
+    language: 'ja',
+    text: '今日は暑いですね。',
+    isBaseLanguage: false,
+    isTargetLanguage: true,
+  },
 ];
 
 function renderCard() {

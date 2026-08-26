@@ -206,11 +206,7 @@ export function NoCardsDueState({
       </div>
       <div className="flex flex-col items-center gap-2">
         {isLimitReached ? (
-          <Button
-            size="lg"
-            onClick={onUpgrade}
-            className="gap-2"
-          >
+          <Button size="lg" onClick={onUpgrade} className="gap-2">
             <Lock className="h-4 w-4" />
             {tFeature('upgrade')}
           </Button>

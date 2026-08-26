@@ -84,12 +84,8 @@ export interface UseCardApprovalsReturn {
 export function useCardApprovals(
   threadId: string | null,
 ): UseCardApprovalsReturn {
-  const approveCard = useMutation(
-    api.features.chat.cardApprovals.approveCard,
-  );
-  const rejectCard = useMutation(
-    api.features.chat.cardApprovals.rejectCard,
-  );
+  const approveCard = useMutation(api.features.chat.cardApprovals.approveCard);
+  const rejectCard = useMutation(api.features.chat.cardApprovals.rejectCard);
   // "Accept" on an alsoCorrect proposal stores the wording as an accepted
   // alternative (and forks the card user-owned) rather than replacing the
   // card's text; replaceCardFromApproval remains server-side for old clients.
@@ -133,7 +129,7 @@ export function useCardApprovals(
   // drifted (reject silently lacked it). The result value is the caller's
   // contract for rolling back optimistic UI (see ApprovalActionResult).
   const runApprovalAction = useCallback(
-    async <T,>(
+    async <T>(
       approvalId: Id<'cardApprovals'>,
       label: string,
       fn: () => Promise<T>,

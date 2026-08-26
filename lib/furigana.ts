@@ -162,12 +162,8 @@ export function resolveShowFurigana(
  * every run is plain would otherwise reserve reading headroom above a line
  * that shows no ruby, visibly misaligning it with its neighbors.
  */
-function hasReadings(
-  segments: FuriganaSegment[] | null | undefined,
-): boolean {
-  return (
-    segments != null && segments.some((seg) => seg.reading !== undefined)
-  );
+function hasReadings(segments: FuriganaSegment[] | null | undefined): boolean {
+  return segments != null && segments.some((seg) => seg.reading !== undefined);
 }
 
 export interface FuriganaDisplay {
@@ -258,9 +254,7 @@ export function parseFurigana(
       // reconstruction check cannot catch because no text is lost.
       let runStart = pendingChars.length;
       while (runStart > 0 && !isKana(pendingChars[runStart - 1])) runStart--;
-      const markerIdx = pendingChars
-        .slice(runStart)
-        .lastIndexOf(BASE_MARKER);
+      const markerIdx = pendingChars.slice(runStart).lastIndexOf(BASE_MARKER);
       let cut: number;
       let hasMarker: boolean;
       if (markerIdx !== -1) {
@@ -280,9 +274,7 @@ export function parseFurigana(
         [...body].every(isKana)
       ) {
         // The marker is format, not sentence text: drop it from the plain run.
-        const plain = pendingChars
-          .slice(0, hasMarker ? cut - 1 : cut)
-          .join('');
+        const plain = pendingChars.slice(0, hasMarker ? cut - 1 : cut).join('');
         if (plain.length > 0) segments.push({ text: plain });
         segments.push({ text: target, reading: body });
         pending = '';

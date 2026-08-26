@@ -36,15 +36,23 @@ interface EnterTextsViewProps {
   headerSlot?: ReactNode;
 }
 
-export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: EnterTextsViewProps) {
+export function EnterTextsView({
+  onBack,
+  hideHeader = false,
+  headerSlot,
+}: EnterTextsViewProps) {
   const t = useTranslations('EnterTexts');
   const locale = useLocale();
   const { baseLanguages, targetLanguages } = useCourseLanguages();
   const saveQuota = useFeatureQuota(FEATURE_IDS.CUSTOM_SENTENCES);
   const autoFillQuota = useFeatureQuota(FEATURE_IDS.TRANSLATION_AUTO_FILL);
 
-  const createCustomText = useMutation(api.features.customTexts.createCustomText);
-  const autoFillTranslations = useAction(api.features.customTexts.autoFillTranslations);
+  const createCustomText = useMutation(
+    api.features.customTexts.createCustomText,
+  );
+  const autoFillTranslations = useAction(
+    api.features.customTexts.autoFillTranslations,
+  );
 
   type SentenceMetadata = {
     register: 'formal' | 'informal' | 'neutral';
@@ -55,8 +63,11 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
   };
 
   const [texts, setTexts] = useState<Record<string, string>>({});
-  const [userEditedLangs, setUserEditedLangs] = useState<Set<string>>(new Set());
-  const [autoFillMetadata, setAutoFillMetadata] = useState<SentenceMetadata | null>(null);
+  const [userEditedLangs, setUserEditedLangs] = useState<Set<string>>(
+    new Set(),
+  );
+  const [autoFillMetadata, setAutoFillMetadata] =
+    useState<SentenceMetadata | null>(null);
   // Region variants returned by the autofill action for mixed-dialect targets
   // (today: `es_mixed` → e.g. `'es-US'`). Kept in lockstep with `texts`: when
   // a user manually edits a row we drop its variant so we don't persist a
@@ -90,9 +101,12 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
   const hasLanguages = orderedLanguages.length > 0;
 
   const sourceLangs = orderedLanguages.filter(
-    (lang) => userEditedLangs.has(lang) && (texts[lang] ?? '').trim().length > 0,
+    (lang) =>
+      userEditedLangs.has(lang) && (texts[lang] ?? '').trim().length > 0,
   );
-  const emptyLanguages = orderedLanguages.filter((lang) => (texts[lang] ?? '').trim().length === 0);
+  const emptyLanguages = orderedLanguages.filter(
+    (lang) => (texts[lang] ?? '').trim().length === 0,
+  );
 
   const hasOverLimit = Object.values(texts).some(
     (text) => text.length > MAX_CARD_TEXT_LENGTH,
@@ -112,7 +126,8 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
   const hasAnythingToReset =
     userEditedLangs.size > 0 ||
     orderedLanguages.some((lang) => (texts[lang] ?? '').trim().length > 0);
-  const canReset = hasLanguages && hasAnythingToReset && !isSaving && !isAutoFilling;
+  const canReset =
+    hasLanguages && hasAnythingToReset && !isSaving && !isAutoFilling;
 
   // An unsaved draft lives in component state only. A reload would silently
   // discard whatever the user has typed.
@@ -287,7 +302,16 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
     } finally {
       setIsSaving(false);
     }
-  }, [saveQuota.isAvailable, orderedLanguages, texts, regionVariants, translationSources, createCustomText, t, autoFillMetadata]);
+  }, [
+    saveQuota.isAvailable,
+    orderedLanguages,
+    texts,
+    regionVariants,
+    translationSources,
+    createCustomText,
+    t,
+    autoFillMetadata,
+  ]);
 
   return (
     <>
@@ -304,7 +328,9 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
-              <h1 className="font-semibold text-base truncate flex-1">{t('title')}</h1>
+              <h1 className="font-semibold text-base truncate flex-1">
+                {t('title')}
+              </h1>
             </div>
           </header>
         )}
@@ -411,8 +437,7 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
                   className="flex-1 gap-2"
                   onAction={handleSave}
                   disabled={
-                    saveQuota.isLoading ||
-                    (saveQuota.isAvailable && !canSave)
+                    saveQuota.isLoading || (saveQuota.isAvailable && !canSave)
                   }
                 >
                   {isSaving ? (

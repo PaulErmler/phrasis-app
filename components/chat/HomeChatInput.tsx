@@ -68,7 +68,9 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
 
   const { isRecording, isTranscribing, handleVoiceClick } = useVoiceRecording(
     (transcript) => {
-      setText((prev) => (prev ? `${prev.trimEnd()} ${transcript}` : transcript));
+      setText((prev) =>
+        prev ? `${prev.trimEnd()} ${transcript}` : transcript,
+      );
     },
   );
 
@@ -179,9 +181,7 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
             data-testid="chat-submit"
             className={cn(
               'rounded-md p-1.5 text-primary-foreground transition-colors',
-              canSubmit
-                ? 'bg-primary hover:bg-primary/90'
-                : 'bg-primary/40',
+              canSubmit ? 'bg-primary hover:bg-primary/90' : 'bg-primary/40',
             )}
           >
             {isProcessing ? (
@@ -250,7 +250,9 @@ function HomeVoiceButton({
   disabled?: boolean;
 }) {
   const t = useTranslations('Chat.voice');
-  const { isAvailable, isLoading } = useFeatureQuota(FEATURE_IDS.TRANSCRIPTIONS);
+  const { isAvailable, isLoading } = useFeatureQuota(
+    FEATURE_IDS.TRANSCRIPTIONS,
+  );
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
 
   const isLocked = !isAvailable && !isLoading;

@@ -42,8 +42,16 @@ const VERDICT_STYLE: Record<
   string,
   { bar: string; chip: string; icon: 'check' | 'alert' | 'x' }
 > = {
-  correct: { bar: 'bg-success', chip: 'bg-success/10 text-success', icon: 'check' },
-  alsoCorrect: { bar: 'bg-primary', chip: 'bg-primary/10 text-primary', icon: 'check' },
+  correct: {
+    bar: 'bg-success',
+    chip: 'bg-success/10 text-success',
+    icon: 'check',
+  },
+  alsoCorrect: {
+    bar: 'bg-primary',
+    chip: 'bg-primary/10 text-primary',
+    icon: 'check',
+  },
   minor: {
     bar: 'bg-accent-orange',
     chip: 'bg-accent-orange/10 text-accent-orange',
@@ -144,9 +152,15 @@ export function WritingFeedbackCard({
 
   const style = VERDICT_STYLE[result.verdict];
   const Icon =
-    style.icon === 'check' ? Check : style.icon === 'alert' ? CircleAlert : CircleX;
+    style.icon === 'check'
+      ? Check
+      : style.icon === 'alert'
+        ? CircleAlert
+        : CircleX;
 
-  const verdictLabel = t(`verdict.${result.verdict}` as Parameters<typeof t>[0]);
+  const verdictLabel = t(
+    `verdict.${result.verdict}` as Parameters<typeof t>[0],
+  );
 
   return (
     <div
@@ -182,7 +196,10 @@ export function WritingFeedbackCard({
           </p>
         )}
         {makeDefault === 'done' && (
-          <p className="text-xs text-success" data-testid="writing-feedback-make-default-done">
+          <p
+            className="text-xs text-success"
+            data-testid="writing-feedback-make-default-done"
+          >
             ✓ {t('makeDefaultDone')}
           </p>
         )}

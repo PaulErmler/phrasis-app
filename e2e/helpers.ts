@@ -456,9 +456,7 @@ export async function dismissTour(
   waitMs = 2500,
 ): Promise<void> {
   const selector = id
-    ? TOUR_POPOVER_CLASSES[id]
-      .map((cls) => `.driver-popover.${cls}`)
-      .join(', ')
+    ? TOUR_POPOVER_CLASSES[id].map((cls) => `.driver-popover.${cls}`).join(', ')
     : '.driver-popover';
 
   const nukeOverlays = () =>

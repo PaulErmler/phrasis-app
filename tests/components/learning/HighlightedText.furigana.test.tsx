@@ -31,7 +31,9 @@ describe('HighlightedText: furigana', () => {
   it('renders ruby readings over kanji runs', () => {
     const { container } = renderText({ furigana: FURIGANA });
     expect(
-      [...container.querySelectorAll('ruby rt')].map((rt) => rt.getAttribute('data-reading')),
+      [...container.querySelectorAll('ruby rt')].map((rt) =>
+        rt.getAttribute('data-reading'),
+      ),
     ).toEqual(['にほんご', 'べんきょう']);
     expect(container.querySelector('p')?.className).toContain('has-furigana');
   });
@@ -57,7 +59,9 @@ describe('HighlightedText: furigana', () => {
     );
     // The rest of the sentence keeps its ruby too.
     expect(
-      [...container.querySelectorAll('ruby rt')].map((rt) => rt.getAttribute('data-reading')),
+      [...container.querySelectorAll('ruby rt')].map((rt) =>
+        rt.getAttribute('data-reading'),
+      ),
     ).toEqual(['にほんご', 'べんきょう']);
     // Readings are attribute-painted, so the document text (= what copy
     // yields) is exactly the sentence.

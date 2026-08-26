@@ -23,7 +23,11 @@ import { assertTestHooksEnabled } from '../lib/testHooks';
 export const captureAuthEmail = internalMutation({
   args: {
     email: v.string(),
-    kind: v.union(v.literal('verify'), v.literal('reset'), v.literal('welcome')),
+    kind: v.union(
+      v.literal('verify'),
+      v.literal('reset'),
+      v.literal('welcome'),
+    ),
     url: v.optional(v.string()),
     otp: v.optional(v.string()),
     subject: v.string(),
@@ -50,7 +54,11 @@ export const captureAuthEmail = internalMutation({
 export const latestAuthEmail = internalQuery({
   args: {
     email: v.string(),
-    kind: v.union(v.literal('verify'), v.literal('reset'), v.literal('welcome')),
+    kind: v.union(
+      v.literal('verify'),
+      v.literal('reset'),
+      v.literal('welcome'),
+    ),
   },
   returns: v.union(
     v.null(),

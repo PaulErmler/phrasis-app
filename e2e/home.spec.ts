@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from '@playwright/test';
 
 /**
  * Public landing page smoke test.
@@ -12,31 +12,31 @@ import { test, expect } from "@playwright/test";
 // CTAs when a Better Auth session cookie is present.
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test.describe("public landing page", () => {
-  test("renders hero, pricing CTA, and footer", async ({ page }) => {
-    await page.goto("/");
+test.describe('public landing page', () => {
+  test('renders hero, pricing CTA, and footer', async ({ page }) => {
+    await page.goto('/');
 
     // Hero. There is a single h1 on the landing page.
-    const hero = page.getByRole("heading", { level: 1 }).first();
+    const hero = page.getByRole('heading', { level: 1 }).first();
     await expect(hero).toBeVisible({ timeout: 15_000 });
 
     // Primary CTA should be present (sign-up/sign-in/start-learning button).
     const cta = page
-      .getByRole("link", { name: /sign|start|get started|try/i })
+      .getByRole('link', { name: /sign|start|get started|try/i })
       .first();
     await expect(cta).toBeVisible();
 
     // Pricing section. Scroll into view then match the section heading.
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     const pricing = page
-      .getByRole("heading", { name: /pric|free|plan|tier/i })
+      .getByRole('heading', { name: /pric|free|plan|tier/i })
       .first();
     await expect(pricing).toBeVisible({ timeout: 10_000 });
 
     // FAQ anchor link exists in the top nav. Asserts the FAQ section is
     // wired up without requiring a specific footer landmark (the landing
     // page does not render a <footer role="contentinfo">).
-    const faqLink = page.getByRole("link", { name: /faq/i }).first();
+    const faqLink = page.getByRole('link', { name: /faq/i }).first();
     await expect(faqLink).toBeAttached();
   });
 });

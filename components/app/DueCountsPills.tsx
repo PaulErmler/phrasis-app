@@ -64,7 +64,9 @@ export function DueCountsPills({ skip }: { skip?: boolean }) {
   // Merge rule and display ceiling shared with the learning-mode progress
   // pill (lib/constants/dueCounts), so the two surfaces showing this number
   // can never disagree at the margin.
-  const reviewDisplay = formatCappedCount(display ? mergedDueCount(display) : 0);
+  const reviewDisplay = formatCappedCount(
+    display ? mergedDueCount(display) : 0,
+  );
 
   // Reserve pill width while the first fetch is in flight so the
   // Shadowing/Writing toggle beside us doesn't reflow (and animate via
@@ -82,14 +84,10 @@ export function DueCountsPills({ skip }: { skip?: boolean }) {
       data-testid="due-counts-pills"
       data-tutorial={TUTORIAL_ANCHORS.dueCounts}
     >
-      <span
-        className={cn(pillClass, 'bg-primary/10 text-primary')}
-      >
+      <span className={cn(pillClass, 'bg-primary/10 text-primary')}>
         {t('new', { count: display?.new ?? 0 })}
       </span>
-      <span
-        className={cn(pillClass, 'bg-success/10 text-success')}
-      >
+      <span className={cn(pillClass, 'bg-success/10 text-success')}>
         {t('review', { count: reviewDisplay })}
       </span>
     </div>

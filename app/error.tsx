@@ -22,9 +22,7 @@ export default function Error({
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4 text-center">
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">{t('title')}</h2>
-        <p className="text-muted-foreground max-w-md">
-          {t('description')}
-        </p>
+        <p className="text-muted-foreground max-w-md">{t('description')}</p>
       </div>
       <button
         onClick={reset}

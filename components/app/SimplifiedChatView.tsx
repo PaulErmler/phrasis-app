@@ -7,11 +7,7 @@ import { ChatHistorySidebar } from '@/components/chat/ChatHistorySidebar';
 import { createCardToolRenderer } from '@/components/chat/tools/CardToolRenderer';
 import { createAlsoCorrectToolRenderer } from '@/components/chat/tools/AlsoCorrectToolRenderer';
 import { useCardApprovals } from '@/hooks/use-card-approvals';
-import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { useTranslations } from 'next-intl';
 import type { Thread } from '@/lib/types/chat';
@@ -74,7 +70,14 @@ export function SimplifiedChatView({
         isLoaded: approvalsLoaded,
       }),
     }),
-    [approvalsByToolCallId, processingApprovals, handleApprove, handleReject, replaceOnly, approvalsLoaded],
+    [
+      approvalsByToolCallId,
+      processingApprovals,
+      handleApprove,
+      handleReject,
+      replaceOnly,
+      approvalsLoaded,
+    ],
   );
 
   const handleThreadSelect = (id: string) => {
@@ -129,10 +132,7 @@ export function SimplifiedChatView({
 
       {/* Mobile sheet sidebar */}
       {!isDesktop && (
-        <Sheet
-          open={sidebarOpen}
-          onOpenChange={onSidebarOpenChange}
-        >
+        <Sheet open={sidebarOpen} onOpenChange={onSidebarOpenChange}>
           <SheetContent
             side="left"
             className="w-[280px] min-w-0 max-w-[280px] overflow-x-hidden p-0"

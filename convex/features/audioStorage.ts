@@ -82,7 +82,11 @@ export async function storeAudioRecordingHandler(
   if ((await ctx.db.system.get(args.storageId)) === null) {
     console.error(
       '[storeAudioRecording] blob already deleted — refusing to write a dead asset',
-      { textId: args.textId, language: args.language, storageId: args.storageId },
+      {
+        textId: args.textId,
+        language: args.language,
+        storageId: args.storageId,
+      },
     );
     return null;
   }

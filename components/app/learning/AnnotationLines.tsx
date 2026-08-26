@@ -31,9 +31,7 @@ export function AnnotationLines({
       {showRomanization && romanization && (
         <p className={`text-romanization${suffix}`}>{romanization}</p>
       )}
-      {showIpa && ipa && (
-        <p className={`text-ipa${suffix}`}>/{ipa}/</p>
-      )}
+      {showIpa && ipa && <p className={`text-ipa${suffix}`}>/{ipa}/</p>}
     </>
   );
 }

@@ -87,7 +87,7 @@ const completedIds = (): string[] =>
 
 // The hook module caches its completed-tutorials snapshot at module level,
 // so each test gets a fresh module instance (vi.resetModules in beforeEach).
-let useTutorial: typeof import('@/lib/tutorials/use-tutorial')['useTutorial'];
+let useTutorial: (typeof import('@/lib/tutorials/use-tutorial'))['useTutorial'];
 
 function renderTour(props: { enabled: boolean }) {
   return renderHook(
@@ -133,9 +133,10 @@ describe('useTutorial: completion semantics', () => {
 
     const steps = lastConfig!.steps;
     const lastStep = steps[steps.length - 1];
-    expect(lastStep.onHighlighted, 'final step must carry the click-complete wiring').toBeTypeOf(
-      'function',
-    );
+    expect(
+      lastStep.onHighlighted,
+      'final step must carry the click-complete wiring',
+    ).toBeTypeOf('function');
 
     // Simulate driver highlighting the closing CTA, then the user clicking it.
     const cta = document.createElement('button');
@@ -261,7 +262,9 @@ describe('useTutorial: completion semantics', () => {
     await startTour();
 
     await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      );
     });
 
     expect(lastDriver!.moveNext).toHaveBeenCalledOnce();

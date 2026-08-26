@@ -7,10 +7,7 @@ import {
 import { internal } from '../_generated/api';
 import { normalizePlans } from '../../lib/autumn/customer-shape';
 import { AUTUMN_API, getSecretKey } from './autumnClient';
-import {
-  assertTestHooksEnabled,
-  requireUserIdByEmail,
-} from '../lib/testHooks';
+import { assertTestHooksEnabled, requireUserIdByEmail } from '../lib/testHooks';
 
 /**
  * E2E test hooks for the payment-overdue (dunning) flow. Every function
@@ -315,7 +312,9 @@ export const cancelPlanNow = internalAction({
     });
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`Autumn cancel failed (${res.status}): ${body.slice(0, 300)}`);
+      throw new Error(
+        `Autumn cancel failed (${res.status}): ${body.slice(0, 300)}`,
+      );
     }
     return plan.planId;
   },

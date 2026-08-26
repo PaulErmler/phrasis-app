@@ -10,10 +10,7 @@ import {
   PopoverContent,
 } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import {
-  alignWordTimings,
-  matchRatio,
-} from '@/lib/audio/alignTimings';
+import { alignWordTimings, matchRatio } from '@/lib/audio/alignTimings';
 import { getTextDirection, languageSupportsKaraoke } from '@/lib/languages';
 import { splitFuriganaByRanges, type FuriganaSegment } from '@/lib/furigana';
 import { useFuriganaDisplay } from './useFuriganaDisplay';
@@ -339,12 +336,12 @@ export function ClickableWords({
   // typically the source paragraph, which is the wrong thing to highlight.
   const longestWordIndex = coachmarkAnchorForLongestWord
     ? aligned.reduce<{ idx: number; len: number }>(
-      (best, w, i) => {
-        const cleanedLen = cleanWord(w.display).length;
-        return cleanedLen > best.len ? { idx: i, len: cleanedLen } : best;
-      },
-      { idx: -1, len: 0 },
-    ).idx
+        (best, w, i) => {
+          const cleanedLen = cleanWord(w.display).length;
+          return cleanedLen > best.len ? { idx: i, len: cleanedLen } : best;
+        },
+        { idx: -1, len: 0 },
+      ).idx
     : -1;
 
   return (

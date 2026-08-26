@@ -162,7 +162,10 @@ function CharDiffView({
             );
           }
           return (
-            <span key={i} className="bg-success/15 text-success rounded-sm px-0.5">
+            <span
+              key={i}
+              className="bg-success/15 text-success rounded-sm px-0.5"
+            >
               {chunk.text}
             </span>
           );

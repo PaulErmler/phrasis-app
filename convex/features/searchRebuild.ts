@@ -64,7 +64,10 @@ export async function rebuildSearchableTextForTextHandler(
 
   // First batch: release the debounce marker so content landing from here
   // on schedules a fresh rebuild (this run reads content as of now).
-  if (args.cursor === undefined && text.searchableRebuildScheduledAt !== undefined) {
+  if (
+    args.cursor === undefined &&
+    text.searchableRebuildScheduledAt !== undefined
+  ) {
     await ctx.db.patch(args.textId, {
       searchableRebuildScheduledAt: undefined,
     });
@@ -90,7 +93,12 @@ export async function rebuildSearchableTextForTextHandler(
   };
 
   for (const card of page.page) {
-    const built = await buildSearchableTextPatchForCard(ctx, card, text, caches);
+    const built = await buildSearchableTextPatchForCard(
+      ctx,
+      card,
+      text,
+      caches,
+    );
     if (built) {
       // Raw `db.patch`, NOT `patchCard`. None of the four card aggregates
       // key on `searchableText` / `searchableTextLanguages` (they key on

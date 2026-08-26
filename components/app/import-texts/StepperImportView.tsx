@@ -148,16 +148,16 @@ function ReviewRow({
                       ) {
                         e.preventDefault();
                         commitEdit();
-                      } else if (
-                        e.key === 'Escape' &&
-                        !isComposingEvent(e)
-                      ) {
+                      } else if (e.key === 'Escape' && !isComposingEvent(e)) {
                         e.preventDefault();
                         cancelEdit();
                       }
                     }}
                     {...compositionProps}
-                    rows={Math.min(6, Math.max(2, Math.ceil(draft.length / 50)))}
+                    rows={Math.min(
+                      6,
+                      Math.max(2, Math.ceil(draft.length / 50)),
+                    )}
                     dir={getTextDirection(lang)}
                     className={cn(
                       'flex-1 min-w-0 rounded-md border bg-background px-2 py-1 text-sm text-left resize-y focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none',
@@ -368,7 +368,9 @@ export function StepperImportView({ c }: { c: ImportController }) {
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium">{t('dropzone.orPaste')}</label>
+            <label className="text-sm font-medium">
+              {t('dropzone.orPaste')}
+            </label>
             <textarea
               value={c.input}
               onChange={(e) => c.setInput(e.target.value)}
@@ -413,26 +415,32 @@ export function StepperImportView({ c }: { c: ImportController }) {
           <div className="rounded-md border overflow-x-auto">
             <div
               className="grid text-xs min-w-max"
-              style={{ gridTemplateColumns: `repeat(${c.columnCount}, minmax(140px, 1fr))` }}
+              style={{
+                gridTemplateColumns: `repeat(${c.columnCount}, minmax(140px, 1fr))`,
+              }}
             >
-              {(c.hasHeader ? c.rows.slice(1, 6) : c.rows.slice(0, 5)).map((row, rIdx) => (
-                <div key={rIdx} className="contents">
-                  {Array.from({ length: c.columnCount }).map((_, cIdx) => {
-                    const mapped = Object.entries(c.mapping).find(([, v]) => v === cIdx);
-                    return (
-                      <div
-                        key={cIdx}
-                        className={cn(
-                          'px-2 py-1 border-b border-r last:border-r-0 truncate',
-                          mapped ? 'bg-primary/5' : 'bg-background',
-                        )}
-                      >
-                        {row[cIdx] ?? ''}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+              {(c.hasHeader ? c.rows.slice(1, 6) : c.rows.slice(0, 5)).map(
+                (row, rIdx) => (
+                  <div key={rIdx} className="contents">
+                    {Array.from({ length: c.columnCount }).map((_, cIdx) => {
+                      const mapped = Object.entries(c.mapping).find(
+                        ([, v]) => v === cIdx,
+                      );
+                      return (
+                        <div
+                          key={cIdx}
+                          className={cn(
+                            'px-2 py-1 border-b border-r last:border-r-0 truncate',
+                            mapped ? 'bg-primary/5' : 'bg-background',
+                          )}
+                        >
+                          {row[cIdx] ?? ''}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ),
+              )}
             </div>
           </div>
         </div>
@@ -519,12 +527,12 @@ export function StepperImportView({ c }: { c: ImportController }) {
         description={
           c.validation.warningCount > 0
             ? t('confirmDialog.descriptionWithWarnings', {
-              count: c.validation.importableCount,
-              warnings: c.validation.warningCount,
-            })
+                count: c.validation.importableCount,
+                warnings: c.validation.warningCount,
+              })
             : t('confirmDialog.description', {
-              count: c.validation.importableCount,
-            })
+                count: c.validation.importableCount,
+              })
         }
         cancelLabel={t('confirmDialog.cancel')}
         confirmLabel={

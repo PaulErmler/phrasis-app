@@ -119,9 +119,16 @@ describe('WritingFeedbackCard', () => {
     const onMakeDefault = vi.fn();
     const wrong: RowFeedback = {
       status: 'done',
-      result: { verdict: 'wrong', corrected: 'X.', notes: [], savedAlternative: false },
+      result: {
+        verdict: 'wrong',
+        corrected: 'X.',
+        notes: [],
+        savedAlternative: false,
+      },
     };
-    render(<WritingFeedbackCard feedback={wrong} onMakeDefault={onMakeDefault} />);
+    render(
+      <WritingFeedbackCard feedback={wrong} onMakeDefault={onMakeDefault} />,
+    );
     expect(
       screen.queryByTestId('writing-feedback-make-default-confirm'),
     ).not.toBeInTheDocument();
@@ -143,13 +150,18 @@ describe('WritingFeedbackCard', () => {
     render(<WritingFeedbackCard feedback={feedback} />);
     expect(screen.getByText('verdict.wrong')).toBeInTheDocument();
     expect(screen.getAllByText(/noteType\./)).toHaveLength(2);
-    expect(screen.queryByTestId('writing-feedback-alternative-saved')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('writing-feedback-alternative-saved'),
+    ).not.toBeInTheDocument();
   });
 
   it('renders the limit line with upgrade and turn-off actions', async () => {
     const onTurnOff = vi.fn();
     render(
-      <WritingFeedbackCard feedback={{ status: 'limit' }} onTurnOff={onTurnOff} />,
+      <WritingFeedbackCard
+        feedback={{ status: 'limit' }}
+        onTurnOff={onTurnOff}
+      />,
     );
     expect(screen.getByText('limitReached')).toBeInTheDocument();
     expect(screen.getByTestId('writing-feedback-upgrade')).toBeInTheDocument();

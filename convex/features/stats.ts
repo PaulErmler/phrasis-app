@@ -1,5 +1,8 @@
 import { v } from 'convex/values';
-import { paginationOptsValidator, paginationResultValidator } from 'convex/server';
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from 'convex/server';
 import { query, QueryCtx } from '../_generated/server';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -150,8 +153,11 @@ export const getStatsPageData = query({
       const dailyRows = await ctx.db
         .query('dailyStats')
         .withIndex('by_userId_and_courseId_and_date', (q) =>
-          q.eq('userId', userId).eq('courseId', courseId)
-            .gte('date', args.startDate).lte('date', args.endDate),
+          q
+            .eq('userId', userId)
+            .eq('courseId', courseId)
+            .gte('date', args.startDate)
+            .lte('date', args.endDate),
         )
         .take(400);
 
@@ -171,12 +177,18 @@ export const getStatsPageData = query({
       totalNewCards: number;
       totalTimeMs: number;
     }> = [];
-    if (isValidMonthString(args.startMonth) && isValidMonthString(args.endMonth)) {
+    if (
+      isValidMonthString(args.startMonth) &&
+      isValidMonthString(args.endMonth)
+    ) {
       const rows = await ctx.db
         .query('monthlyStats')
         .withIndex('by_userId_and_courseId_and_month', (q) =>
-          q.eq('userId', userId).eq('courseId', courseId)
-            .gte('month', args.startMonth).lte('month', args.endMonth),
+          q
+            .eq('userId', userId)
+            .eq('courseId', courseId)
+            .gte('month', args.startMonth)
+            .lte('month', args.endMonth),
         )
         .take(24);
 
@@ -195,12 +207,20 @@ export const getStatsPageData = query({
       totalNewCards: number;
       totalTimeMs: number;
     }> = [];
-    if (args.startWeek && args.endWeek && isValidWeekString(args.startWeek) && isValidWeekString(args.endWeek)) {
+    if (
+      args.startWeek &&
+      args.endWeek &&
+      isValidWeekString(args.startWeek) &&
+      isValidWeekString(args.endWeek)
+    ) {
       const weekRows = await ctx.db
         .query('weeklyStats')
         .withIndex('by_userId_and_courseId_and_week', (q) =>
-          q.eq('userId', userId).eq('courseId', courseId)
-            .gte('week', args.startWeek!).lte('week', args.endWeek!),
+          q
+            .eq('userId', userId)
+            .eq('courseId', courseId)
+            .gte('week', args.startWeek!)
+            .lte('week', args.endWeek!),
         )
         .take(60);
 
@@ -218,39 +238,44 @@ export const getStatsPageData = query({
       courseId,
       targetLanguages,
     });
-    const totalWordCount = languageWordCounts.reduce((sum, lw) => sum + lw.words, 0);
+    const totalWordCount = languageWordCounts.reduce(
+      (sum, lw) => sum + lw.words,
+      0,
+    );
 
     // Re-derive the live streak at read time (see getCourseStats) so a lapsed
     // streak shows 0 and the state matches the home card.
     const streak = stats
       ? deriveStreakDisplay(
-        stats.lastActivityDate,
-        todayStr,
-        stats.currentStreak,
-        stats.streakFreezeUsedDate,
-      )
+          stats.lastActivityDate,
+          todayStr,
+          stats.currentStreak,
+          stats.streakFreezeUsedDate,
+        )
       : null;
 
     return {
-      courseStats: stats ? {
-        totalRepetitions: stats.totalRepetitions,
-        totalTimeMs: stats.totalTimeMs,
-        totalCards: stats.totalCards,
-        currentStreak: streak!.displayStreak,
-        streakState: streak!.state,
-        totalWordCount,
-        totalChatMessages: stats.totalChatMessages ?? 0,
-        totalChatCardsApproved: stats.totalChatCardsApproved ?? 0,
-        totalCardsAddedManually: stats.totalCardsAddedManually ?? 0,
-        totalAccuracySum: stats.totalAccuracySum ?? 0,
-        totalAccuracyCount: stats.totalAccuracyCount ?? 0,
-        // Both punctuation variants, plus the setting that says which one to
-        // show. The tile picks client-side; the legacy pair above is the
-        // fallback for users whose history predates the split.
-        totalAccuracyStrictSum: stats.totalAccuracyStrictSum ?? 0,
-        totalAccuracyLenientSum: stats.totalAccuracyLenientSum ?? 0,
-        totalAccuracyDualCount: stats.totalAccuracyDualCount ?? 0,
-      } : null,
+      courseStats: stats
+        ? {
+            totalRepetitions: stats.totalRepetitions,
+            totalTimeMs: stats.totalTimeMs,
+            totalCards: stats.totalCards,
+            currentStreak: streak!.displayStreak,
+            streakState: streak!.state,
+            totalWordCount,
+            totalChatMessages: stats.totalChatMessages ?? 0,
+            totalChatCardsApproved: stats.totalChatCardsApproved ?? 0,
+            totalCardsAddedManually: stats.totalCardsAddedManually ?? 0,
+            totalAccuracySum: stats.totalAccuracySum ?? 0,
+            totalAccuracyCount: stats.totalAccuracyCount ?? 0,
+            // Both punctuation variants, plus the setting that says which one to
+            // show. The tile picks client-side; the legacy pair above is the
+            // fallback for users whose history predates the split.
+            totalAccuracyStrictSum: stats.totalAccuracyStrictSum ?? 0,
+            totalAccuracyLenientSum: stats.totalAccuracyLenientSum ?? 0,
+            totalAccuracyDualCount: stats.totalAccuracyDualCount ?? 0,
+          }
+        : null,
       ignorePunctuation: courseSettings?.ignorePunctuation ?? false,
       todayReps: todayDaily?.reps ?? 0,
       todayNewCards: todayDaily?.newCards ?? 0,
@@ -292,7 +317,10 @@ export const getStatsPageDailyData = query({
     ),
   }),
   handler: async (ctx, args) => {
-    if (!isValidDateString(args.startDate) || !isValidDateString(args.endDate)) {
+    if (
+      !isValidDateString(args.startDate) ||
+      !isValidDateString(args.endDate)
+    ) {
       return { heatmapData: [], languageDailyData: [] };
     }
     const userId = await getAuthUserId(ctx);
@@ -306,8 +334,11 @@ export const getStatsPageDailyData = query({
     const dailyRows = await ctx.db
       .query('dailyStats')
       .withIndex('by_userId_and_courseId_and_date', (q) =>
-        q.eq('userId', userId).eq('courseId', courseId)
-          .gte('date', args.startDate).lte('date', args.endDate),
+        q
+          .eq('userId', userId)
+          .eq('courseId', courseId)
+          .gte('date', args.startDate)
+          .lte('date', args.endDate),
       )
       .take(400);
 
@@ -322,8 +353,11 @@ export const getStatsPageDailyData = query({
     const langRows = await ctx.db
       .query('dailyLanguageStats')
       .withIndex('by_userId_and_courseId_and_date', (q) =>
-        q.eq('userId', userId).eq('courseId', courseId)
-          .gte('date', args.startDate).lte('date', args.endDate),
+        q
+          .eq('userId', userId)
+          .eq('courseId', courseId)
+          .gte('date', args.startDate)
+          .lte('date', args.endDate),
       )
       .take(2000);
 
@@ -406,7 +440,10 @@ export const getRecentWords = query({
         const rows = await ctx.db
           .query('userWords')
           .withIndex('by_userId_and_courseId_and_language', (q) =>
-            q.eq('userId', userId).eq('courseId', courseId).eq('language', variant),
+            q
+              .eq('userId', userId)
+              .eq('courseId', courseId)
+              .eq('language', variant),
           )
           .order('desc')
           .take(500);
@@ -453,7 +490,10 @@ export const getRecentWordsForLanguage = query({
       const rows = await ctx.db
         .query('userWords')
         .withIndex('by_userId_and_courseId_and_language', (q) =>
-          q.eq('userId', userId).eq('courseId', courseId).eq('language', variant),
+          q
+            .eq('userId', userId)
+            .eq('courseId', courseId)
+            .eq('language', variant),
         )
         .order('desc')
         .take(cap);
@@ -620,9 +660,11 @@ export const getSentencesForWord = query({
     // stores the raw code from the course (e.g. "es_latam"). Resolve it from
     // the course's targetLanguages, no extra DB query needed.
     const allLangs = [...baseLanguages, ...targetLanguages];
-    const lang = allLangs.find(
-      (l) => l === args.language || normalizeLanguageCode(l) === args.language,
-    ) ?? args.language;
+    const lang =
+      allLangs.find(
+        (l) =>
+          l === args.language || normalizeLanguageCode(l) === args.language,
+      ) ?? args.language;
 
     const result = await ctx.db
       .query('userWordTexts')
@@ -784,12 +826,13 @@ async function countDueCardsByState(
     return counts.reduce((a, b) => a + b, 0);
   };
 
-  const [newCount, learningCount, reviewCount, relearningCount] = await Promise.all([
-    countState('new'),
-    countState('learning'),
-    countState('review'),
-    countState('relearning'),
-  ]);
+  const [newCount, learningCount, reviewCount, relearningCount] =
+    await Promise.all([
+      countState('new'),
+      countState('learning'),
+      countState('review'),
+      countState('relearning'),
+    ]);
 
   return {
     new: newCount,
@@ -997,10 +1040,7 @@ export const getWorkloadForecast = query({
     for (let k = 0; k <= WORKLOAD_DAYS; k++) {
       boundaries.push(startOfDayMs(addDays(today, k), timezone));
     }
-    const now = Math.min(
-      Math.max(args.now, boundaries[0]),
-      boundaries[1] - 1,
-    );
+    const now = Math.min(Math.max(args.now, boundaries[0]), boundaries[1] - 1);
 
     const { state: stateAggregate, originState: originStateAggregate } =
       TRACK_AGGREGATES[track];
@@ -1208,7 +1248,11 @@ export const getNewWordsForCelebration = query({
 
     const dtf = getDateFormatter(args.timezone);
 
-    type Entry = { language: string; display: string; bucket: 'session' | 'today' };
+    type Entry = {
+      language: string;
+      display: string;
+      bucket: 'session' | 'today';
+    };
     const seen = new Map<string, Entry>();
     for (const row of rows) {
       if (!targetLanguages.has(row.language)) continue;

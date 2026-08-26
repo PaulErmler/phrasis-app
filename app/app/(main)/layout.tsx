@@ -41,7 +41,8 @@ function viewFromPathname(pathname: string): {
   chatThreadId?: string;
   isLearnOpen?: boolean;
 } {
-  if (pathname.startsWith('/app/learn')) return { view: 'home', isLearnOpen: true };
+  if (pathname.startsWith('/app/learn'))
+    return { view: 'home', isLearnOpen: true };
   if (pathname.startsWith('/app/content')) return { view: 'home' };
   if (pathname.startsWith('/app/library')) return { view: 'library' };
   if (pathname.startsWith('/app/stats')) return { view: 'stats' };
@@ -75,10 +76,7 @@ export default function MainLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const {
-    preloadedSettings,
-    activeCourse,
-  } = useAppData();
+  const { preloadedSettings, activeCourse } = useAppData();
 
   const [justReturnedFromLearn, setJustReturnedFromLearn] = useState(false);
   const restartTutorialRef = useRef<(() => void) | null>(null);
@@ -106,11 +104,19 @@ export default function MainLayout({
     initialView.chatThreadId ?? null,
   );
   const viewBeforeChatRef = useRef<Exclude<View, 'chat'>>('home');
-  const [hasVisitedStats, setHasVisitedStats] = useState(initialView.view === 'stats');
-  const [hasVisitedLibrary, setHasVisitedLibrary] = useState(initialView.view === 'library');
-  const [isLearnOpen, setIsLearnOpen] = useState(initialView.isLearnOpen ?? false);
+  const [hasVisitedStats, setHasVisitedStats] = useState(
+    initialView.view === 'stats',
+  );
+  const [hasVisitedLibrary, setHasVisitedLibrary] = useState(
+    initialView.view === 'library',
+  );
+  const [isLearnOpen, setIsLearnOpen] = useState(
+    initialView.isLearnOpen ?? false,
+  );
   const isLearnOpenRef = useRef(false);
-  useEffect(() => { isLearnOpenRef.current = isLearnOpen; }, [isLearnOpen]);
+  useEffect(() => {
+    isLearnOpenRef.current = isLearnOpen;
+  }, [isLearnOpen]);
   const isAddCardsRoute = pathname === '/app/content/add-cards';
 
   useEffect(() => {
@@ -289,7 +295,6 @@ export default function MainLayout({
     return () => window.removeEventListener('popstate', onPopState);
   }, [refreshPrefetchedThread]);
 
-
   const hasActiveCourse = !!activeCourse;
 
   const handleOpenCourseMenu = useCallback(() => {
@@ -298,10 +303,10 @@ export default function MainLayout({
 
   const courseButtonLabel = activeCourse
     ? t('currentCourseWithLanguages', {
-      targetLanguages: activeCourse.targetLanguages
-        .map((code) => getLocalizedLanguageNameByCode(code, locale))
-        .join(', '),
-    })
+        targetLanguages: activeCourse.targetLanguages
+          .map((code) => getLocalizedLanguageNameByCode(code, locale))
+          .join(', '),
+      })
     : t('changeCourse');
 
   return (
@@ -404,10 +409,12 @@ export default function MainLayout({
         {isAddCardsRoute && (
           <KeepMountedView visible={!isLearnOpen}>
             <ViewErrorBoundary>
-              <AddCardsView onBack={() => {
-                setActiveView('home');
-                router.push('/app');
-              }} />
+              <AddCardsView
+                onBack={() => {
+                  setActiveView('home');
+                  router.push('/app');
+                }}
+              />
             </ViewErrorBoundary>
           </KeepMountedView>
         )}
@@ -444,7 +451,9 @@ export default function MainLayout({
       {!isAddCardsRoute && (
         <>
           <div className="shrink-0 h-[calc(4rem+var(--safe-bottom))]" />
-          <div className={`fixed bottom-0 left-0 right-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
+          <div
+            className={`fixed bottom-0 left-0 right-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}
+          >
             <BottomNav
               currentView={activeView}
               onViewChange={handleViewChange}

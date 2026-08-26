@@ -1,4 +1,4 @@
-"use node";
+'use node';
 
 import { v } from 'convex/values';
 import { internalAction, type ActionCtx } from '../_generated/server';
@@ -114,7 +114,6 @@ function humanizePlanId(planId: string): string {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
-
 
 export type DerivedBilling = {
   /** Undefined only when Autumn reported no usable (non-expired) plan. */
@@ -323,7 +322,9 @@ async function getOrCreateCustomer(
 
   if (!res.ok) {
     const body = await res.text();
-    console.error(`Autumn getOrCreate customer failed (${res.status}): ${body}`);
+    console.error(
+      `Autumn getOrCreate customer failed (${res.status}): ${body}`,
+    );
     return null;
   }
 

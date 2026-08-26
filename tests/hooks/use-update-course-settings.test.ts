@@ -88,7 +88,10 @@ describe('useUpdateCourseSettings', () => {
       renderHook(() => useUpdateCourseSettings());
       const store = fakeLocalStore(current);
 
-      capturedUpdater?.(store, { courseId: 'course-1', dailyTimeGoalMinutes: 25 });
+      capturedUpdater?.(store, {
+        courseId: 'course-1',
+        dailyTimeGoalMinutes: 25,
+      });
 
       expect(store.setQuery).not.toHaveBeenCalled();
     },

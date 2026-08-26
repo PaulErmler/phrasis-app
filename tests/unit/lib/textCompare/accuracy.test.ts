@@ -24,7 +24,11 @@ describe('computeAccuracyPair', () => {
   });
 
   it('scores a punctuation-only miss as perfect only in the lenient variant', () => {
-    const pair = computeAccuracyPair('It is hot today.', 'It is hot today', 'en');
+    const pair = computeAccuracyPair(
+      'It is hot today.',
+      'It is hot today',
+      'en',
+    );
     expect(pair.withoutPunctuation).toBe(100);
     expect(pair.withPunctuation).toBeLessThan(100);
   });
@@ -41,7 +45,11 @@ describe('computeAccuracyPair', () => {
   });
 
   it('is symmetric with a perfect answer', () => {
-    const pair = computeAccuracyPair('It is hot today.', 'It is hot today.', 'en');
+    const pair = computeAccuracyPair(
+      'It is hot today.',
+      'It is hot today.',
+      'en',
+    );
     expect(pair).toEqual({ withPunctuation: 100, withoutPunctuation: 100 });
   });
 });

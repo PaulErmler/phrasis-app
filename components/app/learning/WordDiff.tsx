@@ -38,7 +38,9 @@ export function computeWordAccuracy(
   language: string,
   ignorePunctuation = false,
 ): number {
-  const diffOpts = toDiffOptions(getCompareConfig(language, { ignorePunctuation }));
+  const diffOpts = toDiffOptions(
+    getCompareConfig(language, { ignorePunctuation }),
+  );
   const result = alignWords(expected, actual, diffOpts);
   return scoreWordAlignment(result, { ignorePunctuation });
 }
@@ -233,7 +235,11 @@ function WordChip({
             )}
             <span
               className={
-                s.ignored ? 'text-muted-foreground' : s.equal ? '' : underlineClass
+                s.ignored
+                  ? 'text-muted-foreground'
+                  : s.equal
+                    ? ''
+                    : underlineClass
               }
             >
               {s.correct}

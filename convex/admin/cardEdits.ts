@@ -139,7 +139,9 @@ export async function listCardEditsHandler(
   const query =
     kind === undefined
       ? ctx.db.query('cardEdits')
-      : ctx.db.query('cardEdits').withIndex('by_kind', (q) => q.eq('kind', kind));
+      : ctx.db
+          .query('cardEdits')
+          .withIndex('by_kind', (q) => q.eq('kind', kind));
   const result = await query.order('desc').paginate(args.paginationOpts);
   return {
     ...result,
@@ -174,8 +176,8 @@ export async function listRetranslationsHandler(
     status === undefined
       ? ctx.db.query('cardEditRetranslations')
       : ctx.db
-        .query('cardEditRetranslations')
-        .withIndex('by_status', (q) => q.eq('status', status));
+          .query('cardEditRetranslations')
+          .withIndex('by_status', (q) => q.eq('status', status));
   const result = await query.order('desc').paginate(args.paginationOpts);
   return {
     ...result,

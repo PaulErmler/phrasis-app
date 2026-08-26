@@ -69,7 +69,10 @@ export const cutoverUser = internalMutation({
     datasetId: v.id('datasets'),
   },
   returns: v.union(
-    v.object({ skipped: v.literal(true), reason: v.literal('already-reconciled') }),
+    v.object({
+      skipped: v.literal(true),
+      reason: v.literal('already-reconciled'),
+    }),
     v.object({ skipped: v.literal(false), rolled: v.number() }),
   ),
   handler: async (ctx, args) => {
@@ -86,7 +89,9 @@ export const cutoverUser = internalMutation({
     // The new collections are uniquely identified by (datasetId, code).
     const newCollections = await ctx.db
       .query('collections')
-      .withIndex('by_datasetId_and_order', (q) => q.eq('datasetId', args.datasetId))
+      .withIndex('by_datasetId_and_order', (q) =>
+        q.eq('datasetId', args.datasetId),
+      )
       .collect();
     const newCodeToId = new Map<string, Id<'collections'>>();
     for (const c of newCollections) {
@@ -133,7 +138,10 @@ export const cutoverUser = internalMutation({
         const masteredCards = await ctx.db
           .query('cards')
           .withIndex('by_deckId_and_isHidden_and_isMastered', (q) =>
-            q.eq('deckId', deck._id).eq('isHidden', false).eq('isMastered', true),
+            q
+              .eq('deckId', deck._id)
+              .eq('isHidden', false)
+              .eq('isMastered', true),
           )
           .collect();
         for (const card of masteredCards) {
@@ -202,7 +210,8 @@ export const cutoverUser = internalMutation({
         await ctx.db.patch(destProgress._id, {
           cardsAdded: destProgress.cardsAdded + legacyAdded,
           cardsLearned:
-            (destProgress.cardsLearned ?? 0) + (legacyProgress.cardsLearned ?? 0),
+            (destProgress.cardsLearned ?? 0) +
+            (legacyProgress.cardsLearned ?? 0),
           cardsMastered: (destProgress.cardsMastered ?? 0) + legacyMastered,
           legacyCarryAdded: (destProgress.legacyCarryAdded ?? 0) + legacyAdded,
         });

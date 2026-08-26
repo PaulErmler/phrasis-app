@@ -54,17 +54,18 @@ describe('charDiff', () => {
     const OPTS = { ignorePunctuation: true, locale: 'ja' };
 
     it('scores a missing Japanese full stop as perfect', () => {
-      expect(charDiff('今日は暑いですね。', '今日は暑いですね', OPTS).accuracy)
-        .toBe(1);
+      expect(
+        charDiff('今日は暑いですね。', '今日は暑いですね', OPTS).accuracy,
+      ).toBe(1);
       expect(
         charDiff('今日は暑いですね。', '今日は暑いですね').accuracy,
       ).toBeLessThan(1);
     });
 
     it('scores a missing Japanese comma as perfect', () => {
-      expect(
-        charDiff('はい、そうです。', 'はいそうです', OPTS).accuracy,
-      ).toBe(1);
+      expect(charDiff('はい、そうです。', 'はいそうです', OPTS).accuracy).toBe(
+        1,
+      );
     });
 
     it('still penalizes a wrong character', () => {

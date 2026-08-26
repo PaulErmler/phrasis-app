@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  getTodayInTimezone,
-  resolveClientToday,
-} from '@/convex/lib/dateUtils';
+import { getTodayInTimezone, resolveClientToday } from '@/convex/lib/dateUtils';
 import { addDays } from '@/lib/dateStrings';
 
 /**
@@ -27,7 +24,9 @@ describe('resolveClientToday', () => {
   });
 
   it('rejects dates outside the ±1-day window', () => {
-    expect(resolveClientToday('UTC', addDays(serverToday, -2))).toBe(serverToday);
+    expect(resolveClientToday('UTC', addDays(serverToday, -2))).toBe(
+      serverToday,
+    );
     expect(resolveClientToday('UTC', '2020-01-01')).toBe(serverToday);
   });
 
@@ -44,7 +43,9 @@ describe('resolveClientToday', () => {
   it('rejects regex-valid dates that are outside the Date range', () => {
     for (const bad of ['9999-99-99', '0000-00-00', '9999-12-99']) {
       const resolved = resolveClientToday('UTC', bad);
-      expect(resolved, `${bad} must clamp to the server date`).toBe(serverToday);
+      expect(resolved, `${bad} must clamp to the server date`).toBe(
+        serverToday,
+      );
       // The result must always be a usable day key.
       expect(resolved).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(() => addDays(resolved, -89)).not.toThrow();
@@ -55,7 +56,9 @@ describe('resolveClientToday', () => {
     // "…-00" would otherwise leak through as a raw map key that matches no
     // stored row. Only meaningful when the canonical form is in-window.
     const monthStart = serverToday.slice(0, 8) + '01';
-    if (Math.abs(Date.parse(serverToday) - Date.parse(monthStart)) <= 86_400_000) {
+    if (
+      Math.abs(Date.parse(serverToday) - Date.parse(monthStart)) <= 86_400_000
+    ) {
       const zeroDay = serverToday.slice(0, 8) + '00';
       const resolved = resolveClientToday('UTC', zeroDay);
       // Canonicalized (last day of previous month) or clamped to server,

@@ -106,7 +106,8 @@ const vProcessTranslationForCardArgs = v.object({
    */
   retranslationAuditId: v.optional(v.id('cardEditRetranslations')),
 });
-export const processTranslationForCardArgs = vProcessTranslationForCardArgs.fields;
+export const processTranslationForCardArgs =
+  vProcessTranslationForCardArgs.fields;
 export type ProcessTranslationForCardArgs = Infer<
   typeof vProcessTranslationForCardArgs
 >;
@@ -273,7 +274,10 @@ export async function processTranslationForCardHandler(
       ? getMixedVariantByRegion(args.targetLanguage, existingRow.regionVariant)
       : null) ??
     (args.preferredRegionVariant
-      ? getMixedVariantByRegion(args.targetLanguage, args.preferredRegionVariant)
+      ? getMixedVariantByRegion(
+          args.targetLanguage,
+          args.preferredRegionVariant,
+        )
       : null) ??
     resolveMixedVariant(args.targetLanguage, args.textId as string);
   const translateTarget = mixed ? mixed.subCode : args.targetLanguage;
@@ -346,10 +350,10 @@ export async function processTranslationForCardHandler(
 
   const voiceName = regionVariant
     ? getVoiceForLanguageVariant(
-      args.targetLanguage,
-      regionVariant,
-      args.audioSpeakerGender,
-    )
+        args.targetLanguage,
+        regionVariant,
+        args.audioSpeakerGender,
+      )
     : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
 
   // Source travels with the romanization value (real or sentinel) so a
@@ -457,7 +461,10 @@ type TranslationWriteResult = {
 async function guardTranslationWrite(
   ctx: MutationCtx,
   args: StoreTranslationAndScheduleTtsArgs,
-): Promise<{ text: Doc<'texts'>; existing: Doc<'translations'> | null } | null> {
+): Promise<{
+  text: Doc<'texts'>;
+  existing: Doc<'translations'> | null;
+} | null> {
   const text = await ctx.db.get(args.textId);
   if (text === null) {
     await resolveRetranslation(
@@ -516,11 +523,11 @@ async function insertTranslationRow(
     // dropped by the truthy spread and look like "never attempted".
     ...(romanizedText !== undefined
       ? {
-        romanizedText,
-        ...(args.romanizationSource
-          ? { romanizationSource: args.romanizationSource }
-          : {}),
-      }
+          romanizedText,
+          ...(args.romanizationSource
+            ? { romanizationSource: args.romanizationSource }
+            : {}),
+        }
       : {}),
     ...(args.translationSource
       ? { translationSource: args.translationSource }
@@ -666,10 +673,7 @@ async function fillTranslationMetadata(
   // Same `!== undefined` reasoning as the insert branch: persist the sentinel
   // on first write but never overwrite a previously-stored real value. Source
   // travels with the value. They're written/cleared as a unit.
-  if (
-    romanizedText !== undefined &&
-    existing.romanizedText === undefined
-  ) {
+  if (romanizedText !== undefined && existing.romanizedText === undefined) {
     patch.romanizedText = romanizedText;
     if (args.romanizationSource) {
       patch.romanizationSource = args.romanizationSource;
@@ -858,11 +862,11 @@ async function scheduleTtsForLandedTranslation(
     const asset =
       voiceGender !== undefined
         ? await findReusableAudioAsset(ctx, {
-          language: args.targetLanguage,
-          voiceGender,
-          regionVariant: args.regionVariant,
-          spokenText: translatedText,
-        })
+            language: args.targetLanguage,
+            voiceGender,
+            regionVariant: args.regionVariant,
+            spokenText: translatedText,
+          })
         : null;
     if (asset) {
       await upsertAudioPointer(
@@ -872,7 +876,12 @@ async function scheduleTtsForLandedTranslation(
         asset._id,
       );
     } else {
-      const claimed = await claimTtsIfAvailable(ctx, args.textId, args.targetLanguage, ttsPriority);
+      const claimed = await claimTtsIfAvailable(
+        ctx,
+        args.textId,
+        args.targetLanguage,
+        ttsPriority,
+      );
       if (claimed) {
         await enqueueTtsForVoice(ctx, {
           textId: args.textId,
@@ -916,7 +925,13 @@ export async function storeTranslationAndScheduleTTSHandler(
   const write = !existing
     ? await insertTranslationRow(ctx, args, translatedText, romanizedText)
     : args.replaceExisting
-      ? await replaceTranslationRow(ctx, args, existing, translatedText, romanizedText)
+      ? await replaceTranslationRow(
+          ctx,
+          args,
+          existing,
+          translatedText,
+          romanizedText,
+        )
       : await fillTranslationMetadata(ctx, args, existing, romanizedText);
 
   await resolveAuditForWriteOutcome(ctx, args, write, translatedText);

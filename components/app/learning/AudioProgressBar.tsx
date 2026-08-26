@@ -95,8 +95,8 @@ export const AudioProgressBar = memo(function AudioProgressBar({
   const cueMarks =
     !noAudio && languageCues
       ? audibleCues(languageCues)
-        .filter((c) => c.startSec > 0 && c.startSec < durationSec)
-        .map((c) => (c.startSec / durationSec) * 100)
+          .filter((c) => c.startSec > 0 && c.startSec < durationSec)
+          .map((c) => (c.startSec / durationSec) * 100)
       : [];
 
   return (

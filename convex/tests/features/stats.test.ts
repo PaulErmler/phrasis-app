@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
-import { convexTest, type TestConvex } from "convex-test";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { convexTest, type TestConvex } from 'convex-test';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // File-level aggregate mock (takes precedence over the zero-count stub in
 // tests/convexTestSetup.ts. See the precedent in
@@ -14,13 +14,13 @@ const countsByStateSuffix: Record<string, number> = {};
 const countCalls: Array<{
   namespace: string;
   /** Which scheduling track's aggregate instance served this count. */
-  track: "shared" | "writing";
+  track: 'shared' | 'writing';
   bounds?: { upper?: { key: number; inclusive: boolean } };
 }> = [];
 
-vi.mock("@convex-dev/aggregate", () => {
+vi.mock('@convex-dev/aggregate', () => {
   class TableAggregate {
-    private readonly track: "shared" | "writing";
+    private readonly track: 'shared' | 'writing';
 
     constructor(
       _component: unknown,
@@ -33,13 +33,13 @@ vi.mock("@convex-dev/aggregate", () => {
       let probed: unknown;
       try {
         probed = opts?.sortKey?.({
-          dueDate: "shared",
-          writingDueDate: "writing",
+          dueDate: 'shared',
+          writingDueDate: 'writing',
         });
       } catch {
         probed = undefined;
       }
-      this.track = probed === "writing" ? "writing" : "shared";
+      this.track = probed === 'writing' ? 'writing' : 'shared';
     }
 
     async insertIfDoesNotExist(): Promise<void> {}
@@ -57,19 +57,19 @@ vi.mock("@convex-dev/aggregate", () => {
         track: this.track,
         bounds: opts.bounds,
       });
-      const parts = opts.namespace.split(":");
-      const tail2 = parts.slice(-2).join(":");
-      const tail1 = parts[parts.length - 1] ?? "";
+      const parts = opts.namespace.split(':');
+      const tail2 = parts.slice(-2).join(':');
+      const tail1 = parts[parts.length - 1] ?? '';
       return countsByStateSuffix[tail2] ?? countsByStateSuffix[tail1] ?? 0;
     }
   }
   return { TableAggregate };
 });
 
-import schema from "../../schema";
-import { api } from "../../_generated/api";
+import schema from '../../schema';
+import { api } from '../../_generated/api';
 
-const modules = import.meta.glob("/convex/**/*.ts");
+const modules = import.meta.glob('/convex/**/*.ts');
 
 beforeEach(() => {
   countCalls.length = 0;
@@ -80,92 +80,92 @@ beforeEach(() => {
 
 async function seedActiveCourse(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) => {
-    const courseId = await ctx.db.insert("courses", {
-      userId: "user_A",
-      baseLanguages: ["en"],
-      targetLanguages: ["es"],
+    const courseId = await ctx.db.insert('courses', {
+      userId: 'user_A',
+      baseLanguages: ['en'],
+      targetLanguages: ['es'],
     });
-    await ctx.db.insert("userSettings", {
-      userId: "user_A",
+    await ctx.db.insert('userSettings', {
+      userId: 'user_A',
       hasCompletedOnboarding: true,
       activeCourseId: courseId,
     });
-    const deckId = await ctx.db.insert("decks", {
+    const deckId = await ctx.db.insert('decks', {
       courseId,
-      name: "d",
+      name: 'd',
       cardCount: 0,
     });
     return { courseId, deckId };
   });
 }
 
-describe("features/stats", () => {
-  describe("getRecentWords", () => {
-    it("returns [] unauthenticated", async () => {
+describe('features/stats', () => {
+  describe('getRecentWords', () => {
+    it('returns [] unauthenticated', async () => {
       const t = convexTest(schema, modules);
       const res = await t.query(api.features.stats.getRecentWords, {});
       expect(res).toEqual([]);
     });
 
-    it("returns recent words for target language", async () => {
+    it('returns recent words for target language', async () => {
       const t = convexTest(schema, modules);
       const { courseId } = await seedActiveCourse(t);
       await t.run(async (ctx) => {
-        await ctx.db.insert("userWords", {
-          userId: "user_A",
+        await ctx.db.insert('userWords', {
+          userId: 'user_A',
           courseId,
-          language: "es",
-          word: "hola",
-          displayWord: "Hola",
+          language: 'es',
+          word: 'hola',
+          displayWord: 'Hola',
         });
-        await ctx.db.insert("userWords", {
-          userId: "user_A",
+        await ctx.db.insert('userWords', {
+          userId: 'user_A',
           courseId,
-          language: "es",
-          word: "mundo",
-          displayWord: "mundo",
+          language: 'es',
+          word: 'mundo',
+          displayWord: 'mundo',
         });
       });
 
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(api.features.stats.getRecentWords, {});
       expect(res).toHaveLength(1);
-      expect(res[0].language).toBe("es");
-      expect(res[0].words.sort()).toEqual(["Hola", "mundo"]);
+      expect(res[0].language).toBe('es');
+      expect(res[0].words.sort()).toEqual(['Hola', 'mundo']);
     });
   });
 
-  describe("getRecentWordsForLanguage", () => {
-    it("rejects a non-target language", async () => {
+  describe('getRecentWordsForLanguage', () => {
+    it('rejects a non-target language', async () => {
       const t = convexTest(schema, modules);
       await seedActiveCourse(t);
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(
         api.features.stats.getRecentWordsForLanguage,
-        { language: "fr" },
+        { language: 'fr' },
       );
       expect(res).toEqual([]);
     });
   });
 
-  describe("searchWords", () => {
-    it("returns [] on empty query", async () => {
+  describe('searchWords', () => {
+    it('returns [] on empty query', async () => {
       const t = convexTest(schema, modules);
       await seedActiveCourse(t);
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(api.features.stats.searchWords, {
-        searchQuery: "   ",
+        searchQuery: '   ',
       });
       expect(res).toEqual([]);
     });
   });
 
-  describe("getSentencesForWord", () => {
-    it("returns empty page for unauthenticated", async () => {
+  describe('getSentencesForWord', () => {
+    it('returns empty page for unauthenticated', async () => {
       const t = convexTest(schema, modules);
       const res = await t.query(api.features.stats.getSentencesForWord, {
-        word: "hola",
-        language: "es",
+        word: 'hola',
+        language: 'es',
         paginationOpts: { numItems: 10, cursor: null },
       });
       expect(res.page).toEqual([]);
@@ -173,24 +173,24 @@ describe("features/stats", () => {
     });
   });
 
-  describe("getCardCounts", () => {
-    it("returns null when unauthenticated", async () => {
+  describe('getCardCounts', () => {
+    it('returns null when unauthenticated', async () => {
       const t = convexTest(schema, modules);
       const res = await t.query(api.features.stats.getCardCounts, {});
       expect(res).toBeNull();
     });
 
-    it("returns null when there is no active course", async () => {
+    it('returns null when there is no active course', async () => {
       const t = convexTest(schema, modules);
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(api.features.stats.getCardCounts, {});
       expect(res).toBeNull();
     });
 
-    it("returns the four-state shape (new, learning, relearning, review)", async () => {
+    it('returns the four-state shape (new, learning, relearning, review)', async () => {
       const t = convexTest(schema, modules);
       await seedActiveCourse(t);
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(api.features.stats.getCardCounts, {});
       // Aggregate is mocked → all zero, but the shape must include relearning
       // separately so the progress display can color it independently.
@@ -198,8 +198,8 @@ describe("features/stats", () => {
     });
   });
 
-  describe("getCardCounts: aggregate namespace mapping", () => {
-    it("maps each `${deckId}:state` namespace count to its matching return field", async () => {
+  describe('getCardCounts: aggregate namespace mapping', () => {
+    it('maps each `${deckId}:state` namespace count to its matching return field', async () => {
       const t = convexTest(schema, modules);
       const { deckId } = await seedActiveCourse(t);
       Object.assign(countsByStateSuffix, {
@@ -209,7 +209,7 @@ describe("features/stats", () => {
         relearning: 4,
       });
 
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(api.features.stats.getCardCounts, {});
 
       // Distinct per-namespace counts: transposing any two namespaces (or the
@@ -225,10 +225,10 @@ describe("features/stats", () => {
       );
     });
 
-    it("passes the now-inclusive due-date upper bound to every state count", async () => {
+    it('passes the now-inclusive due-date upper bound to every state count', async () => {
       const t = convexTest(schema, modules);
       await seedActiveCourse(t);
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
 
       const before = Date.now();
       await asUser.query(api.features.stats.getCardCounts, {});
@@ -245,10 +245,10 @@ describe("features/stats", () => {
       }
     });
 
-    it("uses a client-supplied `now` verbatim as the due-date bound", async () => {
+    it('uses a client-supplied `now` verbatim as the due-date bound', async () => {
       const t = convexTest(schema, modules);
       await seedActiveCourse(t);
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
 
       const NOW = 1_754_000_000_000;
       await asUser.query(api.features.stats.getCardCounts, { now: NOW });
@@ -260,10 +260,10 @@ describe("features/stats", () => {
     });
   });
 
-  describe("getFilteredCardCounts", () => {
+  describe('getFilteredCardCounts', () => {
     const NOW = 1_754_000_000_000;
 
-    it("returns null when unauthenticated", async () => {
+    it('returns null when unauthenticated', async () => {
       const t = convexTest(schema, modules);
       const res = await t.query(api.features.stats.getFilteredCardCounts, {
         now: NOW,
@@ -281,9 +281,9 @@ describe("features/stats", () => {
         relearning: 4,
       });
 
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(api.features.stats.getFilteredCardCounts, {
-        filter: "both",
+        filter: 'both',
         now: NOW,
       });
       expect(res).toEqual({ new: 1, learning: 2, review: 3, relearning: 4 });
@@ -314,15 +314,15 @@ describe("features/stats", () => {
         learning: 100,
         review: 100,
         relearning: 100,
-        "premade:new": 5,
-        "premade:learning": 6,
-        "premade:review": 7,
-        "premade:relearning": 8,
+        'premade:new': 5,
+        'premade:learning': 6,
+        'premade:review': 7,
+        'premade:relearning': 8,
       });
 
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(api.features.stats.getFilteredCardCounts, {
-        filter: "course",
+        filter: 'course',
         now: NOW,
       });
       expect(res).toEqual({ new: 5, learning: 6, review: 7, relearning: 8 });
@@ -340,19 +340,19 @@ describe("features/stats", () => {
       const t = convexTest(schema, modules);
       const { deckId } = await seedActiveCourse(t);
       Object.assign(countsByStateSuffix, {
-        "custom:new": 1,
-        "chat:new": 2,
-        "custom:learning": 3,
-        "chat:learning": 4,
-        "custom:review": 5,
-        "chat:review": 6,
-        "custom:relearning": 7,
-        "chat:relearning": 8,
+        'custom:new': 1,
+        'chat:new': 2,
+        'custom:learning': 3,
+        'chat:learning': 4,
+        'custom:review': 5,
+        'chat:review': 6,
+        'custom:relearning': 7,
+        'chat:relearning': 8,
       });
 
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(api.features.stats.getFilteredCardCounts, {
-        filter: "custom",
+        filter: 'custom',
         now: NOW,
       });
       expect(res).toEqual({ new: 3, learning: 7, review: 11, relearning: 15 });
@@ -361,16 +361,16 @@ describe("features/stats", () => {
       expect(namespaces).toContain(`${deckId}:custom:new`);
       expect(namespaces).toContain(`${deckId}:chat:new`);
       // Legacy cards without a resolved origin are 'both'-only by design.
-      expect(namespaces.some((n) => n.includes(":none:"))).toBe(false);
-      expect(namespaces.some((n) => n.includes(":premade:"))).toBe(false);
+      expect(namespaces.some((n) => n.includes(':none:'))).toBe(false);
+      expect(namespaces.some((n) => n.includes(':premade:'))).toBe(false);
     });
 
-    it("uses the client-supplied `now` (not the wall clock) as the inclusive due bound", async () => {
+    it('uses the client-supplied `now` (not the wall clock) as the inclusive due bound', async () => {
       const t = convexTest(schema, modules);
       await seedActiveCourse(t);
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       await asUser.query(api.features.stats.getFilteredCardCounts, {
-        filter: "custom",
+        filter: 'custom',
         now: NOW,
       });
       expect(countCalls.length).toBeGreaterThan(0);
@@ -381,7 +381,7 @@ describe("features/stats", () => {
     });
   });
 
-  describe("due counts: separate mode tracking (writing track)", () => {
+  describe('due counts: separate mode tracking (writing track)', () => {
     const NOW = 1_754_000_000_000;
 
     async function seedWithSettings(
@@ -390,7 +390,7 @@ describe("features/stats", () => {
     ) {
       const ids = await seedActiveCourse(t);
       await t.run(async (ctx) => {
-        await ctx.db.insert("courseSettings", {
+        await ctx.db.insert('courseSettings', {
           courseId: ids.courseId,
           initialReviewCount: 5,
           ...settings,
@@ -399,55 +399,55 @@ describe("features/stats", () => {
       return ids;
     }
 
-    it("Writing mode on a split course counts the WRITING aggregates", async () => {
+    it('Writing mode on a split course counts the WRITING aggregates', async () => {
       const t = convexTest(schema, modules);
       await seedWithSettings(t, {
         separateModeTracking: true,
-        reviewMode: "full",
+        reviewMode: 'full',
         writingSeedDone: true,
       });
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(api.features.stats.getFilteredCardCounts, {
-        filter: "both",
+        filter: 'both',
         now: NOW,
       });
       // Seed finished → settled counts, no provisional flag.
       expect(res).toEqual({ new: 0, learning: 0, relearning: 0, review: 0 });
       expect(countCalls).toHaveLength(4);
       for (const call of countCalls) {
-        expect(call.track).toBe("writing");
+        expect(call.track).toBe('writing');
       }
     });
 
-    it("audio mode on a split course (and Writing with the split off) stays on the SHARED aggregates", async () => {
+    it('audio mode on a split course (and Writing with the split off) stays on the SHARED aggregates', async () => {
       const t = convexTest(schema, modules);
       await seedWithSettings(t, {
         separateModeTracking: true,
-        reviewMode: "audio",
+        reviewMode: 'audio',
         writingSeedDone: true,
       });
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       await asUser.query(api.features.stats.getFilteredCardCounts, {
-        filter: "both",
+        filter: 'both',
         now: NOW,
       });
       expect(countCalls).toHaveLength(4);
       for (const call of countCalls) {
-        expect(call.track).toBe("shared");
+        expect(call.track).toBe('shared');
       }
 
       // Split off: Writing mode still counts the shared track.
       const t2 = convexTest(schema, modules);
       countCalls.length = 0;
-      await seedWithSettings(t2, { reviewMode: "full" });
-      const asUser2 = t2.withIdentity({ subject: "user_A" });
+      await seedWithSettings(t2, { reviewMode: 'full' });
+      const asUser2 = t2.withIdentity({ subject: 'user_A' });
       await asUser2.query(api.features.stats.getFilteredCardCounts, {
-        filter: "both",
+        filter: 'both',
         now: NOW,
       });
       expect(countCalls).toHaveLength(4);
       for (const call of countCalls) {
-        expect(call.track).toBe("shared");
+        expect(call.track).toBe('shared');
       }
     });
 
@@ -455,61 +455,59 @@ describe("features/stats", () => {
       const t = convexTest(schema, modules);
       await seedWithSettings(t, {
         separateModeTracking: true,
-        reviewMode: "audio",
+        reviewMode: 'audio',
         writingSeedDone: true,
       });
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
 
       await asUser.query(api.features.stats.getFilteredCardCounts, {
-        filter: "both",
+        filter: 'both',
         now: NOW,
-        reviewMode: "full",
+        reviewMode: 'full',
       });
-      expect(countCalls.map((c) => c.track)).toEqual(
-        Array(4).fill("writing"),
-      );
+      expect(countCalls.map((c) => c.track)).toEqual(Array(4).fill('writing'));
 
       countCalls.length = 0;
       await asUser.query(api.features.stats.getFilteredCardCounts, {
-        filter: "both",
+        filter: 'both',
         now: NOW,
-        reviewMode: "audio",
+        reviewMode: 'audio',
       });
-      expect(countCalls.map((c) => c.track)).toEqual(Array(4).fill("shared"));
+      expect(countCalls.map((c) => c.track)).toEqual(Array(4).fill('shared'));
     });
 
-    it("the origin-filtered path also selects the writing aggregates", async () => {
+    it('the origin-filtered path also selects the writing aggregates', async () => {
       const t = convexTest(schema, modules);
       const { deckId } = await seedWithSettings(t, {
         separateModeTracking: true,
-        reviewMode: "full",
+        reviewMode: 'full',
         writingSeedDone: true,
       });
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       await asUser.query(api.features.stats.getFilteredCardCounts, {
-        filter: "custom",
+        filter: 'custom',
         now: NOW,
       });
       expect(countCalls).toHaveLength(8);
       for (const call of countCalls) {
-        expect(call.track).toBe("writing");
+        expect(call.track).toBe('writing');
       }
       expect(countCalls.map((c) => c.namespace)).toContain(
         `${deckId}:custom:new`,
       );
     });
 
-    it("flags preparingWriting while the seed is unfinished, writing track only", async () => {
+    it('flags preparingWriting while the seed is unfinished, writing track only', async () => {
       const t = convexTest(schema, modules);
       await seedWithSettings(t, {
         separateModeTracking: true,
-        reviewMode: "full",
+        reviewMode: 'full',
         // writingSeedDone deliberately absent: the enable-time sweep hasn't
         // finished, so the writing aggregates hold only a partial prefix.
       });
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(api.features.stats.getFilteredCardCounts, {
-        filter: "both",
+        filter: 'both',
         now: NOW,
       });
       expect(res).toEqual({
@@ -524,36 +522,36 @@ describe("features/stats", () => {
       // seed unfinished on the same course.
       const shared = await asUser.query(
         api.features.stats.getFilteredCardCounts,
-        { filter: "both", now: NOW, reviewMode: "audio" },
+        { filter: 'both', now: NOW, reviewMode: 'audio' },
       );
       expect(shared).toEqual({ new: 0, learning: 0, relearning: 0, review: 0 });
     });
 
-    it("free play (radio + Writing) never flags preparingWriting, it serves the rotation, not the writing queue", async () => {
+    it('free play (radio + Writing) never flags preparingWriting, it serves the rotation, not the writing queue', async () => {
       const t = convexTest(schema, modules);
       await seedWithSettings(t, {
         separateModeTracking: true,
-        reviewMode: "full",
-        schedulingMode: "radio",
+        reviewMode: 'full',
+        schedulingMode: 'radio',
         // writingSeedDone deliberately absent. The seed is still running,
         // but free play never reads the writing queue, so its counts must
         // not be greyed out as provisional.
       });
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(api.features.stats.getFilteredCardCounts, {
-        filter: "both",
+        filter: 'both',
         now: NOW,
       });
       expect(res).toEqual({ new: 0, learning: 0, relearning: 0, review: 0 });
     });
 
-    it("getCardCounts derives the track from settings and flags the unfinished seed too", async () => {
+    it('getCardCounts derives the track from settings and flags the unfinished seed too', async () => {
       const t = convexTest(schema, modules);
       await seedWithSettings(t, {
         separateModeTracking: true,
-        reviewMode: "full",
+        reviewMode: 'full',
       });
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(api.features.stats.getCardCounts, {
         now: NOW,
       });
@@ -566,90 +564,90 @@ describe("features/stats", () => {
       });
       expect(countCalls).toHaveLength(4);
       for (const call of countCalls) {
-        expect(call.track).toBe("writing");
+        expect(call.track).toBe('writing');
       }
     });
   });
 
-  describe("getNewWordsForCelebration", () => {
-    it("buckets rows by sessionId match: matching → session, different or missing → today", async () => {
+  describe('getNewWordsForCelebration', () => {
+    it('buckets rows by sessionId match: matching → session, different or missing → today', async () => {
       const t = convexTest(schema, modules);
       const { courseId } = await seedActiveCourse(t);
       await t.run(async (ctx) => {
         // Matching sessionId → session bucket
-        await ctx.db.insert("userWords", {
-          userId: "user_A",
+        await ctx.db.insert('userWords', {
+          userId: 'user_A',
           courseId,
-          language: "es",
-          word: "hola",
-          displayWord: "hola",
-          sessionId: "session-current",
+          language: 'es',
+          word: 'hola',
+          displayWord: 'hola',
+          sessionId: 'session-current',
         });
         // Different sessionId → today bucket (earlier session today)
-        await ctx.db.insert("userWords", {
-          userId: "user_A",
+        await ctx.db.insert('userWords', {
+          userId: 'user_A',
           courseId,
-          language: "es",
-          word: "adios",
-          displayWord: "adios",
-          sessionId: "session-earlier",
+          language: 'es',
+          word: 'adios',
+          displayWord: 'adios',
+          sessionId: 'session-earlier',
         });
         // No sessionId field → today bucket. Strict semantics: an orphaned
         // row stays orphaned so a regression that re-introduces missing
         // sessionIds is visible on the celebration screen, not masked.
-        await ctx.db.insert("userWords", {
-          userId: "user_A",
+        await ctx.db.insert('userWords', {
+          userId: 'user_A',
           courseId,
-          language: "es",
-          word: "gracias",
-          displayWord: "gracias",
+          language: 'es',
+          word: 'gracias',
+          displayWord: 'gracias',
         });
       });
 
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(
         api.features.stats.getNewWordsForCelebration,
-        { sessionId: "session-current", timezone: "UTC" },
+        { sessionId: 'session-current', timezone: 'UTC' },
       );
 
-      expect(res.session.map((w) => w.display)).toEqual(["hola"]);
+      expect(res.session.map((w) => w.display)).toEqual(['hola']);
       expect(res.today.map((w) => w.display).sort()).toEqual([
-        "adios",
-        "gracias",
+        'adios',
+        'gracias',
       ]);
     });
 
-    it("dedupes by (language, word) and promotes today → session when a session row exists for the same word", async () => {
+    it('dedupes by (language, word) and promotes today → session when a session row exists for the same word', async () => {
       const t = convexTest(schema, modules);
       const { courseId } = await seedActiveCourse(t);
       await t.run(async (ctx) => {
         // Two rows for the same (language, word), different sessionIds.
         // The session row must win regardless of insertion order.
-        await ctx.db.insert("userWords", {
-          userId: "user_A",
+        await ctx.db.insert('userWords', {
+          userId: 'user_A',
           courseId,
-          language: "es",
-          word: "hola",
-          displayWord: "hola",
-          sessionId: "session-earlier",
+          language: 'es',
+          word: 'hola',
+          displayWord: 'hola',
+          sessionId: 'session-earlier',
         });
-        await ctx.db.insert("userWords", {
-          userId: "user_A",
+        await ctx.db.insert('userWords', {
+          userId: 'user_A',
           courseId,
-          language: "es",
-          word: "hola",
-          displayWord: "hola",
-          sessionId: "session-current",
+          language: 'es',
+          word: 'hola',
+          displayWord: 'hola',
+          sessionId: 'session-current',
         });
       });
 
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(
         api.features.stats.getNewWordsForCelebration,
-        { sessionId: "session-current", timezone: "UTC" },
+        { sessionId: 'session-current', timezone: 'UTC' },
       );
 
-      expect(res.session.map((w) => w.display)).toEqual(["hola"]);
+      expect(res.session.map((w) => w.display)).toEqual(['hola']);
       expect(res.today).toEqual([]);
     });
 
@@ -657,16 +655,16 @@ describe("features/stats", () => {
       const t = convexTest(schema, modules);
       const { courseId } = await seedActiveCourse(t);
       await t.run(async (ctx) => {
-        await ctx.db.insert("userWords", {
-          userId: "user_A",
+        await ctx.db.insert('userWords', {
+          userId: 'user_A',
           courseId,
-          language: "es",
-          word: "hola",
-          displayWord: "hola",
-          sessionId: "session-current",
+          language: 'es',
+          word: 'hola',
+          displayWord: 'hola',
+          sessionId: 'session-current',
         });
       });
-      const asUser = t.withIdentity({ subject: "user_A" });
+      const asUser = t.withIdentity({ subject: 'user_A' });
 
       // +1 day is inside resolveClientToday's ±1-day acceptance window, so
       // the client-supplied date is used as-is and the just-created row
@@ -676,7 +674,7 @@ describe("features/stats", () => {
         .slice(0, 10);
       const res = await asUser.query(
         api.features.stats.getNewWordsForCelebration,
-        { sessionId: "session-current", timezone: "UTC", today: tomorrow },
+        { sessionId: 'session-current', timezone: 'UTC', today: tomorrow },
       );
       expect(res.session).toEqual([]);
       expect(res.today).toEqual([]);

@@ -56,7 +56,6 @@ function mintSessionId(): string {
     : `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-
 function effectivePhase(
   reviewMode: string,
   rawPhase: SchedulingPhase,
@@ -348,7 +347,10 @@ export function useLearningMode(
   // "no course yet".
   const { activeCourse, courseSettings, preloadedSettings } = useAppData();
 
-  const cardForReview = useStickyQueryValue(cardForReviewQuery, isAuthenticated);
+  const cardForReview = useStickyQueryValue(
+    cardForReviewQuery,
+    isAuthenticated,
+  );
 
   // Card-specific stickiness on top of the sticky values above: also filters
   // out `null` (deck empty) so the auto-add gap can keep showing the
@@ -462,7 +464,10 @@ export function useLearningMode(
   );
   const translationFlagsQuota = useFeatureQuota(FEATURE_IDS.TRANSLATION_FLAGS);
 
-  const collectionProgress = useQuery(api.features.decks.getCollectionProgress, {});
+  const collectionProgress = useQuery(
+    api.features.decks.getCollectionProgress,
+    {},
+  );
 
   const [isReviewing, setIsReviewing] = useState(false);
   const [isAddingCards, setIsAddingCards] = useState(false);
@@ -487,21 +492,18 @@ export function useLearningMode(
   // language and re-enqueues TTS, so completion = every initially-present
   // audio has been seen deleted then re-emitted. Languages that already had
   // no audio at regen-time only need their URL to come back.
-  const [regenerateAudioStatus, setRegenerateAudioStatus] = useState<
-    | {
-        state: 'pending' | 'resolved';
-        // Card this regenerate was triggered on. Same rationale as the
-        // flag map: drop the status the moment we leave that card so
-        // detection can't fire stale across cards.
-        cardId: Id<'cards'>;
-        startedAt: number;
-        perLang: Map<
-          string,
-          { urlAtStart: string | null; deletedSeen: boolean; resolved: boolean }
-        >;
-      }
-    | null
-  >(null);
+  const [regenerateAudioStatus, setRegenerateAudioStatus] = useState<{
+    state: 'pending' | 'resolved';
+    // Card this regenerate was triggered on. Same rationale as the
+    // flag map: drop the status the moment we leave that card so
+    // detection can't fire stale across cards.
+    cardId: Id<'cards'>;
+    startedAt: number;
+    perLang: Map<
+      string,
+      { urlAtStart: string | null; deletedSeen: boolean; resolved: boolean }
+    >;
+  } | null>(null);
 
   // ----- Progress display (every PROGRESS_DISPLAY_INTERVAL reviews per day) -----
   // ─── Session counters + session-id lifecycle ──────────────────────────
@@ -522,10 +524,14 @@ export function useLearningMode(
       {},
     );
     if (current == null || current.courseId !== args.courseId) return;
-    localStore.setQuery(api.features.courses.getActiveCourseSettings, {}, {
-      ...current,
-      currentSessionId: args.sessionId,
-    });
+    localStore.setQuery(
+      api.features.courses.getActiveCourseSettings,
+      {},
+      {
+        ...current,
+        currentSessionId: args.sessionId,
+      },
+    );
   });
 
   // Locally-minted id, stable from the very first render so any review that
@@ -571,11 +577,7 @@ export function useLearningMode(
     if (seededCourseIdRef.current === courseId) return;
     seededCourseIdRef.current = courseId;
     setCurrentSessionIdMutation({ courseId, sessionId: localSessionId });
-  }, [
-    courseSettings,
-    localSessionId,
-    setCurrentSessionIdMutation,
-  ]);
+  }, [courseSettings, localSessionId, setCurrentSessionIdMutation]);
 
   // Rotation handler passed to `useCelebration`. Fires when the user dismisses
   // a celebration. Mints + persists a fresh id; the optimistic update means
@@ -688,7 +690,10 @@ export function useLearningMode(
       ensureInFlightRef.current = true;
       ensureUpcomingContentMutation()
         .catch((err) => {
-          reportError(err, { op: 'ensureUpcomingCardsContent', trigger: 'reviewTick' });
+          reportError(err, {
+            op: 'ensureUpcomingCardsContent',
+            trigger: 'reviewTick',
+          });
         })
         .finally(() => {
           ensureInFlightRef.current = false;
@@ -703,7 +708,11 @@ export function useLearningMode(
       cancelled = true;
       if (retryTimer !== null) clearTimeout(retryTimer);
     };
-  }, [cardForReview?._id, cardForReview?.hasMissingContent, ensureUpcomingContentMutation]);
+  }, [
+    cardForReview?._id,
+    cardForReview?.hasMissingContent,
+    ensureUpcomingContentMutation,
+  ]);
 
   // When the deck has no due cards, the per-card effect above never fires,
   // so the next "Add cards" click would pull texts whose content prep has not
@@ -727,7 +736,11 @@ export function useLearningMode(
       ensureInFlightRef.current = true;
       ensureUpcomingContentMutation()
         .catch((err) => {
-          reportError(err, { op: 'ensureUpcomingCardsContent', trigger: 'emptyDeck', attempts });
+          reportError(err, {
+            op: 'ensureUpcomingCardsContent',
+            trigger: 'emptyDeck',
+            attempts,
+          });
           if (cancelled || attempts >= ENSURE_CONTENT_MAX_RETRIES) return;
           attempts++;
           hasEnsuredForEmptyDeckRef.current = false;
@@ -742,7 +755,11 @@ export function useLearningMode(
       cancelled = true;
       if (retryTimer !== null) clearTimeout(retryTimer);
     };
-  }, [cardForReview, courseSettings?.activeCollectionId, ensureUpcomingContentMutation]);
+  }, [
+    cardForReview,
+    courseSettings?.activeCollectionId,
+    ensureUpcomingContentMutation,
+  ]);
 
   // --------------------------------------------------------------------------
   // Add cards
@@ -1079,7 +1096,10 @@ export function useLearningMode(
     try {
       await toggleFavoriteCardMutation({ cardId: cardForReview._id });
     } catch (error) {
-      reportError(error, { op: 'toggleFavoriteCard', cardId: cardForReview._id });
+      reportError(error, {
+        op: 'toggleFavoriteCard',
+        cardId: cardForReview._id,
+      });
     }
   }, [cardForReview, toggleFavoriteCardMutation]);
 
@@ -1141,9 +1161,7 @@ export function useLearningMode(
     const nextPerLang = new Map(regenerateAudioStatus.perLang);
     for (const [lang, entry] of regenerateAudioStatus.perLang) {
       if (entry.resolved) continue;
-      const ar = cardForReview.audioRecordings.find(
-        (a) => a.language === lang,
-      );
+      const ar = cardForReview.audioRecordings.find((a) => a.language === lang);
       const currentUrl = ar?.url ?? null;
       let updated = entry;
       if (!updated.deletedSeen && currentUrl == null) {
@@ -1170,7 +1188,11 @@ export function useLearningMode(
     // Only patch when we're still on the same card + still pending.
     setRegenerateAudioStatus((prev) =>
       prev && prev.cardId === cardForReview._id && prev.state === 'pending'
-        ? { ...prev, perLang: nextPerLang, state: allResolved ? 'resolved' : 'pending' }
+        ? {
+            ...prev,
+            perLang: nextPerLang,
+            state: allResolved ? 'resolved' : 'pending',
+          }
         : prev,
     );
   }, [cardForReview, regenerateAudioStatus]);
@@ -1211,10 +1233,7 @@ export function useLearningMode(
   const deleteCard = cardActions.deleteCard;
   const handleDelete = useCallback(async () => {
     if (!cardForReview || isReviewing) return;
-    await runExitingMutation(
-      () => deleteCard(cardForReview._id),
-      'deleteCard',
-    );
+    await runExitingMutation(() => deleteCard(cardForReview._id), 'deleteCard');
   }, [cardForReview, isReviewing, deleteCard, runExitingMutation]);
   // Mirrored for the confirm-dialog path above (same pattern as
   // `sessionContextRef`: assigned every render, read at event time).
@@ -1248,73 +1267,79 @@ export function useLearningMode(
   // `isHandsFree` in useLearningAudio), the server resolves the face itself.
   const isFreePlay = schedulingMode === 'radio';
 
-  const handleNext = useCallback(async (
-    ratingOverride?: ReviewRating,
-    accuracy?: ReviewAccuracyPayload,
-  ) => {
-    if (!cardForReview || isReviewing) return;
-    if (isPendingMaster) {
-      await runExitingMutation(
-        () => masterCardMutation({ cardId: cardForReview._id }),
-        'masterCard',
+  const handleNext = useCallback(
+    async (ratingOverride?: ReviewRating, accuracy?: ReviewAccuracyPayload) => {
+      if (!cardForReview || isReviewing) return;
+      if (isPendingMaster) {
+        await runExitingMutation(
+          () => masterCardMutation({ cardId: cardForReview._id }),
+          'masterCard',
+        );
+        return;
+      }
+      if (isPendingHide) {
+        await runExitingMutation(
+          () => hideCardMutation({ cardId: cardForReview._id }),
+          'hideCard',
+        );
+        return;
+      }
+      if (isFreePlay) {
+        // Free play bypasses FSRS entirely: no rating, no scheduling write, no
+        // celebration. Just bump the active face's play counter so the
+        // next-lowest counter rises to the front of the queue. The mutation
+        // reads the face off course settings, so it can never advance a
+        // different rotation than the one being served.
+        // `alwaysClearExiting`: the shared reset effect only fires when
+        // `cardForReview._id` changes, so on a same-id re-render (single-card
+        // decks) it would otherwise leave the card pane blank.
+        await runExitingMutation(
+          () =>
+            advanceFreePlayCardMutation({
+              cardId: cardForReview._id,
+              timezone: getUserTimezone(),
+              timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
+            }),
+          'advanceFreePlayCard',
+          { alwaysClearExiting: true },
+        );
+        return;
+      }
+      const phase = effectivePhase(
+        reviewMode,
+        cardForReview.schedulingPhase as SchedulingPhase,
       );
-      return;
-    }
-    if (isPendingHide) {
-      await runExitingMutation(
-        () => hideCardMutation({ cardId: cardForReview._id }),
-        'hideCard',
-      );
-      return;
-    }
-    if (isFreePlay) {
-      // Free play bypasses FSRS entirely: no rating, no scheduling write, no
-      // celebration. Just bump the active face's play counter so the
-      // next-lowest counter rises to the front of the queue. The mutation
-      // reads the face off course settings, so it can never advance a
-      // different rotation than the one being served.
-      // `alwaysClearExiting`: the shared reset effect only fires when
-      // `cardForReview._id` changes, so on a same-id re-render (single-card
-      // decks) it would otherwise leave the card pane blank.
-      await runExitingMutation(
-        () =>
-          advanceFreePlayCardMutation({
-            cardId: cardForReview._id,
-            timezone: getUserTimezone(),
-            timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
-          }),
-        'advanceFreePlayCard',
-        { alwaysClearExiting: true },
-      );
-      return;
-    }
-    const phase = effectivePhase(reviewMode, cardForReview.schedulingPhase as SchedulingPhase);
-    const defaultRatingForPhase = getDefaultRating(phase);
-    const rating =
-      ratingOverride ?? selectedRating ?? autoRatingState ?? defaultRatingForPhase;
-    // `wasDefaultRating` deliberately still means "the review landed on the
-    // phase default", NOT "the user accepted what was offered". Redefining it
-    // would change its meaning for audio and pre-review mode too, and it has
-    // no reader today (dailyStats.defaultRatingUsed / defaultRatingChanged are
-    // written and reversed but never queried). If auto-rate acceptance ever
-    // needs measuring, add an explicit `ratingSource` arg rather than
-    // reinterpreting these counters.
-    handleReview(rating, rating === defaultRatingForPhase, accuracy);
-  }, [
-    cardForReview,
-    isReviewing,
-    isPendingMaster,
-    isPendingHide,
-    isFreePlay,
-    selectedRating,
-    autoRatingState,
-    reviewMode,
-    handleReview,
-    runExitingMutation,
-    masterCardMutation,
-    hideCardMutation,
-    advanceFreePlayCardMutation,
-  ]);
+      const defaultRatingForPhase = getDefaultRating(phase);
+      const rating =
+        ratingOverride ??
+        selectedRating ??
+        autoRatingState ??
+        defaultRatingForPhase;
+      // `wasDefaultRating` deliberately still means "the review landed on the
+      // phase default", NOT "the user accepted what was offered". Redefining it
+      // would change its meaning for audio and pre-review mode too, and it has
+      // no reader today (dailyStats.defaultRatingUsed / defaultRatingChanged are
+      // written and reversed but never queried). If auto-rate acceptance ever
+      // needs measuring, add an explicit `ratingSource` arg rather than
+      // reinterpreting these counters.
+      handleReview(rating, rating === defaultRatingForPhase, accuracy);
+    },
+    [
+      cardForReview,
+      isReviewing,
+      isPendingMaster,
+      isPendingHide,
+      isFreePlay,
+      selectedRating,
+      autoRatingState,
+      reviewMode,
+      handleReview,
+      runExitingMutation,
+      masterCardMutation,
+      hideCardMutation,
+      advanceFreePlayCardMutation,
+    ],
+  );
 
   // ============================================================================
   // Return discriminated states
@@ -1413,9 +1438,10 @@ export function useLearningMode(
         targetLanguages,
         handleAddCards,
         isAddingCards,
-        batchSize:
-          courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
-        sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
+        batchSize: courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
+        sentencesRemaining: sentencesQuota.unlimited
+          ? null
+          : sentencesQuota.balance,
         remainingInCollection,
         handleSchedulingModeChange,
       };
@@ -1429,7 +1455,10 @@ export function useLearningMode(
   // Reviewing, in full review mode, always use FSRS ratings (skip pre-review).
   // In free play (radio / free study), skip rating UI entirely (no FSRS, no
   // rating buttons, LearningControls falls back to a plain Next button).
-  const phase = effectivePhase(reviewMode, displayCard.schedulingPhase as SchedulingPhase);
+  const phase = effectivePhase(
+    reviewMode,
+    displayCard.schedulingPhase as SchedulingPhase,
+  );
   const validRatings = isFreePlay ? [] : getValidRatings(phase);
   const defaultRating = getDefaultRating(phase);
   // Manual choice first, then the accuracy suggestion, then the phase default.
@@ -1500,9 +1529,9 @@ export function useLearningMode(
     audioRecordings: displayCard.audioRecordings,
     nextCard: displayCard.nextCard
       ? {
-        cardId: displayCard.nextCard._id,
-        audioRecordings: displayCard.nextCard.audioRecordings,
-      }
+          cardId: displayCard.nextCard._id,
+          audioRecordings: displayCard.nextCard.audioRecordings,
+        }
       : null,
     audioSpeedOverrides: displayCard.audioSpeedOverrides,
     isFavorite: displayCard.isFavorite ?? false,

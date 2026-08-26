@@ -153,9 +153,18 @@ export function CardShell({
       : null;
 
   const cardSurface = (
-    <div className="card-surface overflow-hidden" data-tutorial={TUTORIAL_ANCHORS.cardFlashcard}>
+    <div
+      className="card-surface overflow-hidden"
+      data-tutorial={TUTORIAL_ANCHORS.cardFlashcard}
+    >
       {/* Card top bar: metadata left, actions right */}
-      <div className={compact ? 'flex items-center justify-between px-3 pt-3 pb-1.5' : 'flex items-center justify-between px-4 pt-4 pb-2'}>
+      <div
+        className={
+          compact
+            ? 'flex items-center justify-between px-3 pt-3 pb-1.5'
+            : 'flex items-center justify-between px-4 pt-4 pb-2'
+        }
+      >
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-xs">
             {t('reviewCount', { count: reviewCount })}
@@ -212,7 +221,10 @@ export function CardShell({
       {/* Card text content */}
       <div className={compact ? 'px-4 pb-4 space-y-3' : 'px-6 pb-6 space-y-4'}>
         {/* Base language texts */}
-        <div className="space-y-2" data-tutorial={TUTORIAL_ANCHORS.baseLanguages}>
+        <div
+          className="space-y-2"
+          data-tutorial={TUTORIAL_ANCHORS.baseLanguages}
+        >
           {baseTranslations.map((translation, index) => {
             const audio = audioRecordings.find(
               (a) => a.language === translation.language,
@@ -238,7 +250,9 @@ export function CardShell({
               !isAudioRevealed &&
               !(manuallyRevealedLanguages?.has(translation.language) ?? false);
             // Base text matches the target rows' weight/size, no bolding.
-            const baseTextClass = compact ? 'text-base leading-relaxed' : 'body-large';
+            const baseTextClass = compact
+              ? 'text-base leading-relaxed'
+              : 'body-large';
             return (
               <div
                 key={translation.language}
@@ -274,7 +288,11 @@ export function CardShell({
                     ipa={translation.ipa}
                     showRomanization={showRomanization}
                     showIpa={showIpa}
-                    className={isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}
+                    className={
+                      isBlurred
+                        ? 'blur-sm select-none cursor-pointer'
+                        : 'transition-[filter] duration-300'
+                    }
                   />
                 </div>
                 <div className="flex items-center">
@@ -304,7 +322,16 @@ export function CardShell({
             // dir="auto": no language code in scope for the raw source text;
             // first-strong-character detection handles RTL sources.
             // text-left keeps RTL sources flush with the LTR layout.
-            <p dir="auto" className={compact ? 'text-base leading-relaxed text-left' : 'body-large text-left'}>{sourceText}</p>
+            <p
+              dir="auto"
+              className={
+                compact
+                  ? 'text-base leading-relaxed text-left'
+                  : 'body-large text-left'
+              }
+            >
+              {sourceText}
+            </p>
           )}
         </div>
 

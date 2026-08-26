@@ -159,11 +159,16 @@ export function CardEditsBrowser() {
                       <span className="font-medium">
                         {languageName(r.language)}
                       </span>{' '}
-                      <span className={cn('font-medium', STATUS_TONE[r.status])}>
+                      <span
+                        className={cn('font-medium', STATUS_TONE[r.status])}
+                      >
                         {statusLabel(r.status)}
                       </span>
                       {r.rule && (
-                        <span className="text-muted-foreground"> · {r.rule}</span>
+                        <span className="text-muted-foreground">
+                          {' '}
+                          · {r.rule}
+                        </span>
                       )}
                       <div
                         className="mt-0.5 space-y-0.5"

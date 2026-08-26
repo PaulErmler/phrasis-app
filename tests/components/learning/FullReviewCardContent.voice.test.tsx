@@ -28,7 +28,12 @@ const CARD_ID = 'card_1' as Id<'cards'>;
 
 function renderWithTarget(language: string, text: string) {
   const translations: CardTranslation[] = [
-    { language: 'en', text: 'Good morning.', isBaseLanguage: true, isTargetLanguage: false },
+    {
+      language: 'en',
+      text: 'Good morning.',
+      isBaseLanguage: true,
+      isTargetLanguage: false,
+    },
     { language, text, isBaseLanguage: false, isTargetLanguage: true },
   ];
   render(
@@ -48,7 +53,9 @@ describe('FullReviewCardContent: writing voice button gating', () => {
   it('hides the mic for a supportsStt:false target language (el)', () => {
     renderWithTarget('el', 'Καλημέρα.');
     expect(screen.getByTestId('learn-translation-input')).toBeInTheDocument();
-    expect(screen.queryByTestId('writing-voice-button')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('writing-voice-button'),
+    ).not.toBeInTheDocument();
   });
 
   it('shows the mic for an STT-supported target language (es)', () => {

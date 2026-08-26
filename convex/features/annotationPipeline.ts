@@ -113,10 +113,7 @@ export async function processRomanizationForTranslationHandler(
     // `romanizeText` already retried up to 3 times before throwing.
     // Persist an empty-string sentinel so `scheduleMissingContent` doesn't
     // reschedule another 3-retry burst on every ensureContent call.
-    console.error(
-      'Translation romanization error (persisting sentinel):',
-      err,
-    );
+    console.error('Translation romanization error (persisting sentinel):', err);
     romanized = '';
   }
   // Source recorded even on failure: lets a strategy swap target failed

@@ -75,7 +75,10 @@ export function TestimonialsSection() {
   );
 
   return (
-    <section id="testimonials" className="relative py-20 md:py-32 px-4 sm:px-6 bg-muted/10">
+    <section
+      id="testimonials"
+      className="relative py-20 md:py-32 px-4 sm:px-6 bg-muted/10"
+    >
       <div className="max-w-7xl mx-auto">
         <motion.div {...fadeInUp} className="text-center mb-12 md:mb-16">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground">
@@ -84,7 +87,10 @@ export function TestimonialsSection() {
           </h2>
         </motion.div>
 
-        <motion.div {...fadeInUp} transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' as const }}>
+        <motion.div
+          {...fadeInUp}
+          transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' as const }}
+        >
           <Carousel
             setApi={setApi}
             opts={{ align: 'start', loop: true }}
@@ -92,12 +98,12 @@ export function TestimonialsSection() {
           >
             <CarouselContent>
               {TESTIMONIALS.map(({ quote, name }, index) => (
-                <CarouselItem
-                  key={index}
-                  className="sm:basis-1/2 lg:basis-1/3"
-                >
+                <CarouselItem key={index} className="sm:basis-1/2 lg:basis-1/3">
                   <figure className="flex flex-col h-full rounded-2xl border border-border/40 bg-card p-6 md:p-7">
-                    <Quote className="h-5 w-5 text-primary/60 mb-4 shrink-0" aria-hidden="true" />
+                    <Quote
+                      className="h-5 w-5 text-primary/60 mb-4 shrink-0"
+                      aria-hidden="true"
+                    />
                     <blockquote className="text-sm md:text-base text-foreground/90 leading-relaxed flex-1">
                       {quote}
                     </blockquote>

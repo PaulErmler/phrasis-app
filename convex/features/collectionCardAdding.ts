@@ -27,7 +27,10 @@ import {
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import { consumeQuota, checkQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
-import { MAX_CARDS_PER_BATCH, ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
+import {
+  MAX_CARDS_PER_BATCH,
+  ENSURE_CONTENT_LOOKAHEAD,
+} from '../../lib/constants/learning';
 import { randomOrderKey } from '../lib/freePlay';
 import { requireAccessibleText } from '../lib/collectionAccess';
 import {
@@ -56,7 +59,11 @@ export async function setActiveCollectionHandler(
   const courseId = course._id;
 
   const collection = await ctx.db.get(args.collectionId);
-  if (!collection) throw new ConvexError({ code: 'NOT_FOUND', message: 'Collection not found' });
+  if (!collection)
+    throw new ConvexError({
+      code: 'NOT_FOUND',
+      message: 'Collection not found',
+    });
 
   const courseSettings = await getCourseSettings(ctx, courseId);
 
@@ -68,7 +75,10 @@ export async function setActiveCollectionHandler(
       courseSettings?.activeCustomCollectionIds ?? []
     ).includes(args.collectionId);
     if (!isChatCollection && !isCustomCollection) {
-      throw new ConvexError({ code: 'FORBIDDEN', message: 'Collection not accessible' });
+      throw new ConvexError({
+        code: 'FORBIDDEN',
+        message: 'Collection not accessible',
+      });
     }
   }
 
@@ -114,17 +124,29 @@ export async function setActiveCollectionByLevelHandler(
   const courseId = course._id;
 
   const code = ogteLevelToCollectionCode(args.ogteLevel);
-  if (!code) throw new ConvexError({ code: 'INVALID_ARGUMENT', message: 'Invalid level' });
+  if (!code)
+    throw new ConvexError({
+      code: 'INVALID_ARGUMENT',
+      message: 'Invalid level',
+    });
 
   const activeDataset = await getActiveDataset(ctx);
-  if (!activeDataset) throw new ConvexError({ code: 'INVALID_STATE', message: 'No active dataset' });
+  if (!activeDataset)
+    throw new ConvexError({
+      code: 'INVALID_STATE',
+      message: 'No active dataset',
+    });
   const collection = await ctx.db
     .query('collections')
     .withIndex('by_datasetId_and_code', (q) =>
       q.eq('datasetId', activeDataset._id).eq('code', code),
     )
     .first();
-  if (!collection) throw new ConvexError({ code: 'NOT_FOUND', message: 'Collection not found' });
+  if (!collection)
+    throw new ConvexError({
+      code: 'NOT_FOUND',
+      message: 'Collection not found',
+    });
 
   const courseSettings = await getCourseSettings(ctx, courseId);
   if (courseSettings?.activeCollectionId === collection._id) return null;
@@ -159,7 +181,11 @@ export async function toggleCustomCollectionHandler(
   const courseId = course._id;
 
   const collection = await ctx.db.get(args.collectionId);
-  if (!collection) throw new ConvexError({ code: 'NOT_FOUND', message: 'Collection not found' });
+  if (!collection)
+    throw new ConvexError({
+      code: 'NOT_FOUND',
+      message: 'Collection not found',
+    });
 
   const isLevelCollection = isPremadeLevelCollection(collection);
   if (isLevelCollection) {
@@ -172,14 +198,19 @@ export async function toggleCustomCollectionHandler(
   const courseSettings = await getCourseSettings(ctx, courseId);
 
   const isChatCollection =
-    courseSettings?.chatCollectionId?.toString() === args.collectionId.toString();
+    courseSettings?.chatCollectionId?.toString() ===
+    args.collectionId.toString();
   const isCustomCollection =
-    courseSettings?.customCollectionId?.toString() === args.collectionId.toString();
-  const isAlreadyCustom = (courseSettings?.activeCustomCollectionIds ?? []).some(
-    (id) => id.toString() === args.collectionId.toString(),
-  );
+    courseSettings?.customCollectionId?.toString() ===
+    args.collectionId.toString();
+  const isAlreadyCustom = (
+    courseSettings?.activeCustomCollectionIds ?? []
+  ).some((id) => id.toString() === args.collectionId.toString());
   if (!isChatCollection && !isCustomCollection && !isAlreadyCustom) {
-    throw new ConvexError({ code: 'FORBIDDEN', message: 'Collection not accessible' });
+    throw new ConvexError({
+      code: 'FORBIDDEN',
+      message: 'Collection not accessible',
+    });
   }
 
   const currentIds = courseSettings?.activeCustomCollectionIds ?? [];
@@ -229,8 +260,10 @@ export async function createCardsFromTexts(
   // match the 'course' filter even though the UI treats them as course content.
   const collection = await ctx.db.get(collectionId);
   const maybeOrigin: 'premade' | 'custom' | 'chat' | undefined =
-    collection?.origin
-    ?? (collection && isPremadeLevelCollection(collection) ? 'premade' : undefined);
+    collection?.origin ??
+    (collection && isPremadeLevelCollection(collection)
+      ? 'premade'
+      : undefined);
   // `cards.collectionOrigin` is a required field: every collection carries
   // `origin` since the one-time backfill (and all insert paths stamp it), so
   // this only fires for a dangling collectionId or an unbackfilled legacy
@@ -259,9 +292,17 @@ export async function createCardsFromTexts(
     const existingCard = await getCardByDeckAndText(ctx, deck._id, text._id);
 
     if (!existingCard) {
-      const courseLanguages = [...course.baseLanguages, ...course.targetLanguages];
+      const courseLanguages = [
+        ...course.baseLanguages,
+        ...course.targetLanguages,
+      ];
       const { searchableText, searchableTextLanguages } =
-        await buildCardSearchableText(ctx, text._id, text.text, courseLanguages);
+        await buildCardSearchableText(
+          ctx,
+          text._id,
+          text.text,
+          courseLanguages,
+        );
 
       await insertCard(ctx, {
         deckId: deck._id,
@@ -330,11 +371,11 @@ export async function updateCollectionProgress(
       cardsAdded: progress.cardsAdded + update.addedDelta,
       ...(update.frontierRank !== undefined
         ? {
-          lastRankProcessed: Math.max(
-            progress.lastRankProcessed ?? 0,
-            update.frontierRank,
-          ),
-        }
+            lastRankProcessed: Math.max(
+              progress.lastRankProcessed ?? 0,
+              update.frontierRank,
+            ),
+          }
         : {}),
     });
   } else {
@@ -411,7 +452,12 @@ export async function getNextAddableTextsFromRank(
 }> {
   const { collectionId, afterRank, limit, deckId, userId, courseId } = params;
   if (limit <= 0) {
-    return { picked: [], newFrontier: afterRank, exhausted: false, capped: false };
+    return {
+      picked: [],
+      newFrontier: afterRank,
+      exhausted: false,
+      capped: false,
+    };
   }
 
   const picked: Doc<'texts'>[] = [];
@@ -446,7 +492,9 @@ export async function getNextAddableTextsFromRank(
         limit: batch.length,
       }),
     ]);
-    const ignoredTextIds = new Set(ignoredMarks.map((m) => m.textId.toString()));
+    const ignoredTextIds = new Set(
+      ignoredMarks.map((m) => m.textId.toString()),
+    );
     for (let i = 0; i < batch.length; i++) {
       if (picked.length >= limit) break; // don't pass unprocessed texts
       const text = batch[i];
@@ -535,10 +583,21 @@ async function drainQueuedMarkTexts(
   limit: number,
 ): Promise<Doc<'texts'>[]> {
   const prioritized = await drainMarkedTexts(
-    ctx, userId, courseId, collectionId, deckId, 'prioritized', limit,
+    ctx,
+    userId,
+    courseId,
+    collectionId,
+    deckId,
+    'prioritized',
+    limit,
   );
   const readd = await drainMarkedTexts(
-    ctx, userId, courseId, collectionId, deckId, 'readd',
+    ctx,
+    userId,
+    courseId,
+    collectionId,
+    deckId,
+    'readd',
     limit - prioritized.length,
   );
   return [...prioritized, ...readd];
@@ -621,7 +680,11 @@ async function maybeAutoAdvanceActiveCollection(
 /** Handler body of `addCardsFromCollection`. */
 export async function addCardsFromCollectionHandler(
   ctx: MutationCtx,
-  args: { collectionId: Id<'collections'>; batchSize: number; exclusive?: boolean },
+  args: {
+    collectionId: Id<'collections'>;
+    batchSize: number;
+    exclusive?: boolean;
+  },
 ): Promise<{
   cardsAdded: number;
   totalCardsInDeck: number;
@@ -631,7 +694,10 @@ export async function addCardsFromCollectionHandler(
   const { userId, course } = await requireActiveCourse(ctx);
   const courseId = course._id;
 
-  const clampedBatchSize = Math.max(1, Math.min(MAX_CARDS_PER_BATCH, Math.floor(args.batchSize)));
+  const clampedBatchSize = Math.max(
+    1,
+    Math.min(MAX_CARDS_PER_BATCH, Math.floor(args.batchSize)),
+  );
 
   const deck = await getOrCreateDeck(ctx, course);
 
@@ -660,18 +726,20 @@ export async function addCardsFromCollectionHandler(
   const customCollectionIdsToProcess: Id<'collections'>[] = skipCustomSources
     ? []
     : args.exclusive
-      ? (isLevelCollection
+      ? isLevelCollection
         ? []
-        : [args.collectionId])
+        : [args.collectionId]
       : isLevelCollection
         ? (courseSettings?.activeCustomCollectionIds ?? [])
-        : [args.collectionId].filter((id) =>
-          courseSettings?.chatCollectionId?.toString() === id.toString() ||
-          courseSettings?.customCollectionId?.toString() === id.toString() ||
-          (courseSettings?.activeCustomCollectionIds ?? []).some(
-            (cid) => cid.toString() === id.toString(),
-          ),
-        );
+        : [args.collectionId].filter(
+            (id) =>
+              courseSettings?.chatCollectionId?.toString() === id.toString() ||
+              courseSettings?.customCollectionId?.toString() ===
+                id.toString() ||
+              (courseSettings?.activeCustomCollectionIds ?? []).some(
+                (cid) => cid.toString() === id.toString(),
+              ),
+          );
 
   if (customCollectionIdsToProcess.length > 0 && remainingBatch > 0) {
     const collectionsWithPending: {
@@ -684,7 +752,12 @@ export async function addCardsFromCollectionHandler(
     for (const collId of customCollectionIdsToProcess) {
       const coll = await ctx.db.get(collId);
       if (!coll) continue;
-      const prog = await getCollectionProgressHelper(ctx, userId, courseId, collId);
+      const prog = await getCollectionProgressHelper(
+        ctx,
+        userId,
+        courseId,
+        collId,
+      );
       const lastRank = prog?.lastRankProcessed ?? 0;
       // Ignored texts are deliberately excluded from auto-add, so they
       // don't count as pending. (Custom collections never carry cutover
@@ -727,7 +800,12 @@ export async function addCardsFromCollectionHandler(
         // untouched); the sequential scan fills the rest, skipping ignored
         // and already-carded texts.
         const queuedTexts = await drainQueuedMarkTexts(
-          ctx, userId, courseId, entry.id, deck._id, count,
+          ctx,
+          userId,
+          courseId,
+          entry.id,
+          deck._id,
+          count,
         );
         const scan = await getNextAddableTextsFromRank(ctx, {
           collectionId: entry.id,
@@ -743,7 +821,12 @@ export async function addCardsFromCollectionHandler(
 
         const texts = [...queuedTexts, ...scan.picked];
         const cardsInserted = await addTextsAsCards(
-          ctx, texts, deck, entry.id, course, userId,
+          ctx,
+          texts,
+          deck,
+          entry.id,
+          course,
+          userId,
         );
 
         totalCardsInserted += cardsInserted;
@@ -762,7 +845,12 @@ export async function addCardsFromCollectionHandler(
   // --- Phase 2: Fill remaining batch from the difficulty collection (only for level collections) ---
   if (isLevelCollection && remainingBatch > 0 && !skipPremadeSource) {
     // Deduct sentences quota for difficulty-collection cards
-    const quota = await checkQuota(ctx, userId, FEATURE_IDS.SENTENCES, remainingBatch);
+    const quota = await checkQuota(
+      ctx,
+      userId,
+      FEATURE_IDS.SENTENCES,
+      remainingBatch,
+    );
     if (quota.synced && !quota.allowed) {
       // Clamp to whatever balance is left
       if (quota.balance > 0) {
@@ -792,7 +880,12 @@ export async function addCardsFromCollectionHandler(
     // untouched); the sequential scan fills the rest, skipping ignored
     // texts and cards direct-added ahead of the frontier.
     const queuedTexts = await drainQueuedMarkTexts(
-      ctx, userId, courseId, args.collectionId, deck._id, remainingBatch,
+      ctx,
+      userId,
+      courseId,
+      args.collectionId,
+      deck._id,
+      remainingBatch,
     );
     const scan = await getNextAddableTextsFromRank(ctx, {
       collectionId: args.collectionId,
@@ -812,7 +905,12 @@ export async function addCardsFromCollectionHandler(
       await consumeQuota(ctx, userId, FEATURE_IDS.SENTENCES, textsToAdd.length);
 
       const cardsInserted = await addTextsAsCards(
-        ctx, textsToAdd, deck, args.collectionId, course, userId,
+        ctx,
+        textsToAdd,
+        deck,
+        args.collectionId,
+        course,
+        userId,
       );
       totalCardsInserted += cardsInserted;
 
@@ -842,7 +940,12 @@ export async function addCardsFromCollectionHandler(
       // Auto-advance: if the collection is now complete (every text added
       // or deliberately ignored) and is the active one, move to the next
       // incomplete collection (or clear if last).
-      await maybeAutoAdvanceActiveCollection(ctx, userId, courseId, args.collectionId);
+      await maybeAutoAdvanceActiveCollection(
+        ctx,
+        userId,
+        courseId,
+        args.collectionId,
+      );
     } else if (scan.newFrontier > lastRankProcessed) {
       // Nothing addable in the scanned window (an ignored/direct-added
       // streak), persist the frontier advance so the next call continues
@@ -851,7 +954,12 @@ export async function addCardsFromCollectionHandler(
         addedDelta: 0,
         frontierRank: scan.newFrontier,
       });
-      await maybeAutoAdvanceActiveCollection(ctx, userId, courseId, args.collectionId);
+      await maybeAutoAdvanceActiveCollection(
+        ctx,
+        userId,
+        courseId,
+        args.collectionId,
+      );
     }
   }
 
@@ -909,13 +1017,23 @@ export async function addSingleTextFromCollectionHandler(
   }
 
   const cardsInserted = await addTextsAsCards(
-    ctx, [text], deck, text.collectionId, course, userId,
+    ctx,
+    [text],
+    deck,
+    text.collectionId,
+    course,
+    userId,
   );
   if (cardsInserted > 0) {
     await updateCollectionProgress(ctx, userId, courseId, text.collectionId, {
       addedDelta: cardsInserted,
     });
-    await maybeAutoAdvanceActiveCollection(ctx, userId, courseId, text.collectionId);
+    await maybeAutoAdvanceActiveCollection(
+      ctx,
+      userId,
+      courseId,
+      text.collectionId,
+    );
   }
 
   return { added: cardsInserted > 0, alreadyAdded: false };

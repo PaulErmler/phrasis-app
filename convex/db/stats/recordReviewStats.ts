@@ -91,18 +91,14 @@ export async function recordReviewStats(
   }
 
   const todayDate = getTodayInTimezone(args.timezone);
-  const {
-    newStreak,
-    newLastActivityDate,
-    newFreezeCount,
-    newFreezeUsedDate,
-  } = computeStreakUpdate(
-    stats.lastActivityDate,
-    todayDate,
-    stats.currentStreak,
-    stats.streakFreezeCount,
-    stats.streakFreezeUsedDate,
-  );
+  const { newStreak, newLastActivityDate, newFreezeCount, newFreezeUsedDate } =
+    computeStreakUpdate(
+      stats.lastActivityDate,
+      todayDate,
+      stats.currentStreak,
+      stats.streakFreezeCount,
+      stats.streakFreezeUsedDate,
+    );
 
   const track: SchedulingTrack = args.track ?? 'shared';
 
@@ -140,8 +136,8 @@ export async function recordReviewStats(
     args.priorFsrsState !== undefined
       ? args.priorFsrsState
       : track === 'writing'
-        ? card.writingFsrsState ?? null
-        : card.fsrsState ?? null;
+        ? (card.writingFsrsState ?? null)
+        : (card.fsrsState ?? null);
   const fsrsCardState = priorFsrsState?.state ?? 0;
 
   // --- Course-level stats ---
@@ -156,23 +152,30 @@ export async function recordReviewStats(
     streakFreezeCount: newFreezeCount,
     streakFreezeUsedDate: newFreezeUsedDate,
     ...(args.reviewMode
-      ? { totalReviewsByMode: { ...prevModeReviews, [args.reviewMode]: prevModeReviews[args.reviewMode] + 1 } }
+      ? {
+          totalReviewsByMode: {
+            ...prevModeReviews,
+            [args.reviewMode]: prevModeReviews[args.reviewMode] + 1,
+          },
+        }
       : {}),
     ...(args.accuracy != null
       ? {
-        totalAccuracySum: (stats.totalAccuracySum ?? 0) + args.accuracy,
-        totalAccuracyCount: (stats.totalAccuracyCount ?? 0) + 1,
-      }
+          totalAccuracySum: (stats.totalAccuracySum ?? 0) + args.accuracy,
+          totalAccuracyCount: (stats.totalAccuracyCount ?? 0) + 1,
+        }
       : {}),
     // Gated on BOTH being present, independently of `accuracy` above: the two
     // sums share one count, so a half-written pair would desynchronise the
     // averages permanently.
     ...(args.accuracyStrict != null && args.accuracyLenient != null
       ? {
-        totalAccuracyStrictSum: (stats.totalAccuracyStrictSum ?? 0) + args.accuracyStrict,
-        totalAccuracyLenientSum: (stats.totalAccuracyLenientSum ?? 0) + args.accuracyLenient,
-        totalAccuracyDualCount: (stats.totalAccuracyDualCount ?? 0) + 1,
-      }
+          totalAccuracyStrictSum:
+            (stats.totalAccuracyStrictSum ?? 0) + args.accuracyStrict,
+          totalAccuracyLenientSum:
+            (stats.totalAccuracyLenientSum ?? 0) + args.accuracyLenient,
+          totalAccuracyDualCount: (stats.totalAccuracyDualCount ?? 0) + 1,
+        }
       : {}),
   });
 
@@ -244,7 +247,9 @@ export async function recordReviewStats(
   });
 
   // --- Per-language stats + word tracking ---
-  const allLanguages = [...new Set([...course.baseLanguages, ...course.targetLanguages])];
+  const allLanguages = [
+    ...new Set([...course.baseLanguages, ...course.targetLanguages]),
+  ];
   const timePerLanguage = Math.round(clampedTime / allLanguages.length);
 
   // Determine which languages still need word tracking for this card.
@@ -355,7 +360,10 @@ export async function recordReviewStats(
     const progress = await ctx.db
       .query('collectionProgress')
       .withIndex('by_userId_and_courseId_and_collectionId', (q) =>
-        q.eq('userId', userId).eq('courseId', deck.courseId).eq('collectionId', card.collectionId!),
+        q
+          .eq('userId', userId)
+          .eq('courseId', deck.courseId)
+          .eq('collectionId', card.collectionId!),
       )
       .first();
     if (progress) {

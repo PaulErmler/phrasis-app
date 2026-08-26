@@ -12,7 +12,11 @@ import type { TtsProvider } from '../types';
 import { getTtsProvider } from '../lib/tts';
 
 export { normalizeForComparison, textsMatch } from '../lib/textComparison';
-export { transcribeAudio, reserveAzureSttSlot, type WordTiming } from '../lib/stt';
+export {
+  transcribeAudio,
+  reserveAzureSttSlot,
+  type WordTiming,
+} from '../lib/stt';
 
 /**
  * Provider-agnostic entry point used by ttsProcessing's validation loop.

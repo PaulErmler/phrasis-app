@@ -1,6 +1,10 @@
 import { MutationCtx } from '../../_generated/server';
 import { Id } from '../../_generated/dataModel';
-import { tokenizeText, isAllLowercase, type Token } from '../../../lib/wordTokenize';
+import {
+  tokenizeText,
+  isAllLowercase,
+  type Token,
+} from '../../../lib/wordTokenize';
 
 export { tokenizeText, isAllLowercase, type Token };
 
@@ -178,7 +182,8 @@ export async function updateWordTextsForEdit(
     if (!changedLangs.has(link.language)) continue;
     if (!currentWords.has(`${link.language}\0${link.word}`)) {
       await ctx.db.delete(link._id);
-      if (!removedWordsPerLang.has(link.language)) removedWordsPerLang.set(link.language, new Set());
+      if (!removedWordsPerLang.has(link.language))
+        removedWordsPerLang.set(link.language, new Set());
       removedWordsPerLang.get(link.language)!.add(link.word);
     }
   }
@@ -213,7 +218,10 @@ export async function updateWordTextsForEdit(
           .first();
         if (userWord) {
           await ctx.db.delete(userWord._id);
-          wordDeltaByLang.set(language, (wordDeltaByLang.get(language) ?? 0) - 1);
+          wordDeltaByLang.set(
+            language,
+            (wordDeltaByLang.get(language) ?? 0) - 1,
+          );
         }
       }
     }
@@ -222,7 +230,10 @@ export async function updateWordTextsForEdit(
   // Build set of existing words that survived deletion
   const survivingWords = new Set<string>();
   for (const link of existingLinks) {
-    if (changedLangs.has(link.language) && !currentWords.has(`${link.language}\0${link.word}`)) {
+    if (
+      changedLangs.has(link.language) &&
+      !currentWords.has(`${link.language}\0${link.word}`)
+    ) {
       continue; // was deleted
     }
     survivingWords.add(`${link.language}\0${link.word}`);
@@ -308,7 +319,10 @@ export async function updateWordTextsForEdit(
     const langStat = await ctx.db
       .query('languageStats')
       .withIndex('by_userId_and_courseId_and_language', (q) =>
-        q.eq('userId', args.userId).eq('courseId', args.courseId).eq('language', language),
+        q
+          .eq('userId', args.userId)
+          .eq('courseId', args.courseId)
+          .eq('language', language),
       )
       .first();
     if (langStat) {

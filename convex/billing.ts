@@ -1,4 +1,4 @@
-"use node";
+'use node';
 
 import { ConvexError, v } from 'convex/values';
 import { action } from './_generated/server';
@@ -257,7 +257,8 @@ export const attachNewPlan = action({
     if (state.onTrial) {
       throw new ConvexError({
         code: 'INVALID_STATE',
-        message: 'Plan switches during a trial must go through switchPlanDuringTrial',
+        message:
+          'Plan switches during a trial must go through switchPlanDuringTrial',
       });
     }
     // A customer who already pays would take Autumn's in-place subscription

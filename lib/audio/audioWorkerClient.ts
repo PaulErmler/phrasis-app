@@ -21,8 +21,16 @@ let workerFailed = false;
 let nextRequestId = 1;
 
 type Pending =
-  | { kind: 'stretch'; resolve: (out: RawAudioData) => void; reject: (err: Error) => void }
-  | { kind: 'encodeWav'; resolve: (wav: ArrayBuffer) => void; reject: (err: Error) => void };
+  | {
+      kind: 'stretch';
+      resolve: (out: RawAudioData) => void;
+      reject: (err: Error) => void;
+    }
+  | {
+      kind: 'encodeWav';
+      resolve: (wav: ArrayBuffer) => void;
+      reject: (err: Error) => void;
+    };
 
 const pending = new Map<number, Pending>();
 
@@ -75,7 +83,10 @@ function getWorker(): Worker | null {
   };
 
   worker.onerror = (event) => {
-    reportError(event.error ?? new Error(event.message || 'Audio worker crashed'), { op: 'audioWorkerCrash' });
+    reportError(
+      event.error ?? new Error(event.message || 'Audio worker crashed'),
+      { op: 'audioWorkerCrash' },
+    );
     workerFailed = true;
     failAllPending('Audio worker crashed');
     worker?.terminate();

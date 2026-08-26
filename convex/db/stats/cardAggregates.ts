@@ -273,7 +273,11 @@ export async function patchCard(
 
   if (touchesShared) {
     await cardsByStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
-    await cardsByOriginStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
+    await cardsByOriginStateAndDueDate.replaceOrInsert(
+      ctx,
+      resolvedOld,
+      newDoc,
+    );
   }
   // Writing-track aggregates: membership is gated on the track existing, so a
   // patch can move a card in (seeding), out (never in practice, nothing
@@ -283,10 +287,21 @@ export async function patchCard(
   if (hasWritingTrack(newDoc)) {
     if (!hasWritingTrack(resolvedOld)) {
       await cardsByWritingStateAndDueDate.insertIfDoesNotExist(ctx, newDoc);
-      await cardsByOriginWritingStateAndDueDate.insertIfDoesNotExist(ctx, newDoc);
+      await cardsByOriginWritingStateAndDueDate.insertIfDoesNotExist(
+        ctx,
+        newDoc,
+      );
     } else if (touchesWriting) {
-      await cardsByWritingStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
-      await cardsByOriginWritingStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
+      await cardsByWritingStateAndDueDate.replaceOrInsert(
+        ctx,
+        resolvedOld,
+        newDoc,
+      );
+      await cardsByOriginWritingStateAndDueDate.replaceOrInsert(
+        ctx,
+        resolvedOld,
+        newDoc,
+      );
     }
   } else if (hasWritingTrack(resolvedOld)) {
     await cardsByWritingStateAndDueDate.deleteIfExists(ctx, resolvedOld);

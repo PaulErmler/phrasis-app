@@ -1,9 +1,6 @@
 import { v } from 'convex/values';
 import { internalMutation, internalQuery } from '../_generated/server';
-import {
-  assertTestHooksEnabled,
-  requireUserIdByEmail,
-} from '../lib/testHooks';
+import { assertTestHooksEnabled, requireUserIdByEmail } from '../lib/testHooks';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
 

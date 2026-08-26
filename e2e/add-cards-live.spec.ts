@@ -1,10 +1,10 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from '@playwright/test';
 import {
   dismissErrorBoundary,
   dismissTour,
   gotoAuthedApp,
   neutralizeTours,
-} from "./helpers";
+} from './helpers';
 
 /**
  * Live end-to-end test for the manual "enter texts" save flow
@@ -35,9 +35,9 @@ import {
  * second sentence.
  */
 
-test.describe.configure({ mode: "serial", retries: 0 });
-test.describe("add cards: manual entry (live)", { tag: "@live" }, () => {
-  test("saves a manually-entered text and surfaces it in the custom collection", async ({
+test.describe.configure({ mode: 'serial', retries: 0 });
+test.describe('add cards: manual entry (live)', { tag: '@live' }, () => {
+  test('saves a manually-entered text and surfaces it in the custom collection', async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -52,18 +52,18 @@ test.describe("add cards: manual entry (live)", { tag: "@live" }, () => {
     await neutralizeTours(page);
 
     // --- 1. Save a manually-entered text -------------------------------
-    const english = page.locator("#enter-en");
-    await gotoAuthedApp(page, "/app/content/add-cards", english);
+    const english = page.locator('#enter-en');
+    await gotoAuthedApp(page, '/app/content/add-cards', english);
     await dismissTour(page);
 
     // One input per course language (en base + es target for the shared
     // e2e user), rendered with stable `enter-<lang>` ids by EnterTextsView.
-    const spanish = page.locator("#enter-es");
+    const spanish = page.locator('#enter-es');
     await expect(english).toBeVisible({ timeout: 20_000 });
     await english.fill(`${marker} the sun rises early.`);
     await spanish.fill(`El sol sale temprano ${marker}.`);
 
-    const save = page.getByRole("button", { name: /^save$/i }).first();
+    const save = page.getByRole('button', { name: /^save$/i }).first();
     await expect(save).toBeEnabled({ timeout: 10_000 });
     await save.click();
 
@@ -72,24 +72,22 @@ test.describe("add cards: manual entry (live)", { tag: "@live" }, () => {
     // error under suite load can replace the view with the error boundary
     // mid-wait; retry remounts it (empty if the save landed).
     await dismissErrorBoundary(page);
-    await expect(english).toHaveValue("", { timeout: 30_000 });
+    await expect(english).toHaveValue('', { timeout: 30_000 });
 
     // --- 2. The text is in the Custom collection ------------------------
-    await page.goto("/app");
-    await page.waitForLoadState("domcontentloaded");
-    await dismissTour(page, "home_tour");
+    await page.goto('/app');
+    await page.waitForLoadState('domcontentloaded');
+    await dismissTour(page, 'home_tour');
 
     // Home content section → "Custom Content" tab. The tab shows one
     // collection tile at a time behind a Chat/"Manually Added" switcher.
     // Select "Manually Added" (the Custom collection, targeted via its
     // locale-proof raw-name testid).
-    await page.getByRole("tab", { name: /custom content/i }).click();
-    await page
-      .getByRole("button", { name: /^manually added$/i })
-      .click();
-    const customTile = page.getByTestId("collection-tile-Custom");
+    await page.getByRole('tab', { name: /custom content/i }).click();
+    await page.getByRole('button', { name: /^manually added$/i }).click();
+    const customTile = page.getByTestId('collection-tile-Custom');
     await expect(customTile).toBeVisible({ timeout: 15_000 });
-    await customTile.getByRole("button", { name: /preview/i }).click();
+    await customTile.getByRole('button', { name: /preview/i }).click();
 
     // The detail dialog lists the collection's *texts* (reactive query), so
     // the just-saved sentence appears regardless of deck/card state.
@@ -102,7 +100,7 @@ test.describe("add cards: manual entry (live)", { tag: "@live" }, () => {
     // --- 3. Add it to the deck; it becomes a library card ---------------
     // Per-text add (custom texts consume no SENTENCES quota). The card row
     // is inserted synchronously by the mutation.
-    await markerRow.getByTestId("collection-text-add").click();
+    await markerRow.getByTestId('collection-text-add').click();
     // Wait for the row's status testid to flip to `added`, then give the
     // mutation ack a beat: the flip is an optimistic update, and the
     // full-page navigation below tears down the Convex client, navigating
@@ -115,15 +113,15 @@ test.describe("add cards: manual entry (live)", { tag: "@live" }, () => {
         .first(),
     ).toBeVisible({ timeout: 10_000 });
     await page.waitForTimeout(1_500);
-    await page.keyboard.press("Escape");
+    await page.keyboard.press('Escape');
 
-    await page.goto("/app/library");
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto('/app/library');
+    await page.waitForLoadState('domcontentloaded');
     await dismissTour(page);
 
-    const search = page.getByTestId("library-search").first();
+    const search = page.getByTestId('library-search').first();
     await expect(search).toBeVisible({ timeout: 20_000 });
-    await page.getByTestId("library-source-custom").click();
+    await page.getByTestId('library-source-custom').click();
     await search.fill(marker);
 
     // Filter by marker text (not a bare count): right after `fill` the
@@ -131,7 +129,7 @@ test.describe("add cards: manual entry (live)", { tag: "@live" }, () => {
     // bare count would pass on those. The card exists already. This poll
     // only rides out the subscription refresh, not content generation.
     const markerCard = page
-      .getByTestId("library-card")
+      .getByTestId('library-card')
       .filter({ hasText: marker });
     await expect
       .poll(async () => markerCard.count(), { timeout: 30_000 })

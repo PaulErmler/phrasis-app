@@ -205,7 +205,11 @@ export function useCardActions(options: UseCardActionsOptions): CardActions {
  * Render once near the view root (LearningMode and LibraryView both do);
  * the copy is the shared `LearningMode.actions.*` set.
  */
-export function CardActionConfirmDialogs({ actions }: { actions: CardActions }) {
+export function CardActionConfirmDialogs({
+  actions,
+}: {
+  actions: CardActions;
+}) {
   const t = useTranslations('LearningMode');
   return (
     <>

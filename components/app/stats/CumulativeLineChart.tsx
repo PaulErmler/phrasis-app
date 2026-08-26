@@ -2,8 +2,21 @@
 
 import { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
-import { Area, AreaChart, Line, LineChart, XAxis, YAxis, CartesianGrid, type TooltipProps } from 'recharts';
-import { ChartContainer, ChartTooltip, type ChartConfig } from '@/components/ui/chart';
+import {
+  Area,
+  AreaChart,
+  Line,
+  LineChart,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  type TooltipProps,
+} from 'recharts';
+import {
+  ChartContainer,
+  ChartTooltip,
+  type ChartConfig,
+} from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
 import { formatTimeMs } from '@/lib/formatTime';
 
@@ -59,19 +72,27 @@ const LANGUAGE_COLORS = [
 
 function getDailyValue(point: DailyPoint, metric: Metric): number {
   switch (metric) {
-  case 'words': return point.newCards;
-  case 'reviews': return point.reps;
-  case 'sentences': return point.newCards;
-  case 'time': return point.timeMs;
+    case 'words':
+      return point.newCards;
+    case 'reviews':
+      return point.reps;
+    case 'sentences':
+      return point.newCards;
+    case 'time':
+      return point.timeMs;
   }
 }
 
 function getWeeklyValue(point: WeeklyPoint, metric: Metric): number {
   switch (metric) {
-  case 'words': return point.totalNewCards;
-  case 'reviews': return point.totalRepetitions;
-  case 'sentences': return point.totalNewCards;
-  case 'time': return point.totalTimeMs;
+    case 'words':
+      return point.totalNewCards;
+    case 'reviews':
+      return point.totalRepetitions;
+    case 'sentences':
+      return point.totalNewCards;
+    case 'time':
+      return point.totalTimeMs;
   }
 }
 
@@ -135,11 +156,17 @@ function formatTooltipDate(label: string): string {
   if (!dd) return label; // fallback
   const monthNum = parseInt(mm, 10);
   const currentMonth = now.getMonth() + 1;
-  const year = monthNum > currentMonth ? now.getFullYear() - 1 : now.getFullYear();
+  const year =
+    monthNum > currentMonth ? now.getFullYear() - 1 : now.getFullYear();
   return `${mm}-${dd}-${String(year).slice(2)}`;
 }
 
-export function CumulativeLineChart({ dailyData, weeklyData, languageDailyData, timezone }: CumulativeLineChartProps) {
+export function CumulativeLineChart({
+  dailyData,
+  weeklyData,
+  languageDailyData,
+  timezone,
+}: CumulativeLineChartProps) {
   const t = useTranslations('StatsPage');
   const [metric, setMetric] = useState<Metric>('words');
   const [range, setRange] = useState<TimeRange>('month');
@@ -158,7 +185,9 @@ export function CumulativeLineChart({ dailyData, weeklyData, languageDailyData, 
     if (isWordsByLanguage) return []; // handled separately
 
     if (range === 'year') {
-      const sorted = [...(weeklyData ?? [])].sort((a, b) => a.week.localeCompare(b.week));
+      const sorted = [...(weeklyData ?? [])].sort((a, b) =>
+        a.week.localeCompare(b.week),
+      );
       let cumulative = 0;
       return sorted.map((p) => {
         cumulative += getWeeklyValue(p, metric);
@@ -192,7 +221,10 @@ export function CumulativeLineChart({ dailyData, weeklyData, languageDailyData, 
         const weekKey = dateToISOWeek(d.date);
         if (!weekMap.has(weekKey)) weekMap.set(weekKey, new Map());
         const langMap = weekMap.get(weekKey)!;
-        langMap.set(d.language, (langMap.get(d.language) ?? 0) + d.newWordsCount);
+        langMap.set(
+          d.language,
+          (langMap.get(d.language) ?? 0) + d.newWordsCount,
+        );
       }
 
       const sortedWeeks = Array.from(weekMap.keys()).sort();
@@ -201,9 +233,14 @@ export function CumulativeLineChart({ dailyData, weeklyData, languageDailyData, 
 
       return sortedWeeks.map((week) => {
         const langMap = weekMap.get(week)!;
-        const point: Record<string, string | number> = { label: weekToDateLabel(week) };
+        const point: Record<string, string | number> = {
+          label: weekToDateLabel(week),
+        };
         for (const lang of languages) {
-          cumulatives.set(lang, (cumulatives.get(lang) ?? 0) + (langMap.get(lang) ?? 0));
+          cumulatives.set(
+            lang,
+            (cumulatives.get(lang) ?? 0) + (langMap.get(lang) ?? 0),
+          );
           point[lang] = cumulatives.get(lang)!;
         }
         return point;
@@ -230,7 +267,10 @@ export function CumulativeLineChart({ dailyData, weeklyData, languageDailyData, 
       const langMap = dateMap.get(date);
       const point: Record<string, string | number> = { label: date.slice(5) };
       for (const lang of languages) {
-        cumulatives.set(lang, cumulatives.get(lang)! + (langMap?.get(lang) ?? 0));
+        cumulatives.set(
+          lang,
+          cumulatives.get(lang)! + (langMap?.get(lang) ?? 0),
+        );
         point[lang] = cumulatives.get(lang)!;
       }
       return point;
@@ -239,23 +279,27 @@ export function CumulativeLineChart({ dailyData, weeklyData, languageDailyData, 
 
   const chartConfig: ChartConfig = isWordsByLanguage
     ? Object.fromEntries(
-      languages.map((lang, i) => [
-        lang,
-        { label: lang.toUpperCase(), color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length] },
-      ]),
-    )
+        languages.map((lang, i) => [
+          lang,
+          {
+            label: lang.toUpperCase(),
+            color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length],
+          },
+        ]),
+      )
     : {
-      value: {
-        label: t(`metric.${metric}`),
-        color: 'var(--primary)',
-      },
-    };
+        value: {
+          label: t(`metric.${metric}`),
+          color: 'var(--primary)',
+        },
+      };
 
   const hasData = isWordsByLanguage
-    ? langChartData.length > 0 && languages.some((lang) => {
-      const last = langChartData[langChartData.length - 1];
-      return last && (last[lang] as number) > 0;
-    })
+    ? langChartData.length > 0 &&
+      languages.some((lang) => {
+        const last = langChartData[langChartData.length - 1];
+        return last && (last[lang] as number) > 0;
+      })
     : chartData.length > 0 && chartData[chartData.length - 1]?.value > 0;
 
   // Custom tooltip
@@ -272,12 +316,17 @@ export function CumulativeLineChart({ dailyData, weeklyData, languageDailyData, 
         {payload.map((entry, i) => (
           <div key={i} className="flex items-center gap-2">
             {isWordsByLanguage && (
-              <div className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: entry.color }} />
+              <div
+                className="h-2 w-2 rounded-[2px]"
+                style={{ backgroundColor: entry.color }}
+              />
             )}
             <span className="tabular-nums font-medium">
               {formatValue(entry.value ?? 0, metric)}{' '}
               <span className="text-muted-foreground font-normal">
-                {isWordsByLanguage ? entry.name?.toUpperCase() : t(`metric.${metric}`).toLowerCase()}
+                {isWordsByLanguage
+                  ? entry.name?.toUpperCase()
+                  : t(`metric.${metric}`).toLowerCase()}
               </span>
             </span>
           </div>
@@ -299,7 +348,9 @@ export function CumulativeLineChart({ dailyData, weeklyData, languageDailyData, 
               onClick={() => setRange(r)}
               className={cn(
                 'transition-colors',
-                range === r ? 'text-primary font-medium' : 'text-muted-foreground',
+                range === r
+                  ? 'text-primary font-medium'
+                  : 'text-muted-foreground',
               )}
             >
               {t(r)}
@@ -315,7 +366,9 @@ export function CumulativeLineChart({ dailyData, weeklyData, languageDailyData, 
             onClick={() => setMetric(m)}
             className={cn(
               'transition-colors',
-              metric === m ? 'text-primary font-medium' : 'text-muted-foreground',
+              metric === m
+                ? 'text-primary font-medium'
+                : 'text-muted-foreground',
             )}
           >
             {t(`metric.${m}`)}
@@ -326,7 +379,10 @@ export function CumulativeLineChart({ dailyData, weeklyData, languageDailyData, 
       {hasData ? (
         <ChartContainer config={chartConfig} className="h-[180px] w-full">
           {isWordsByLanguage ? (
-            <LineChart data={langChartData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+            <LineChart
+              data={langChartData}
+              margin={{ top: 4, right: 4, bottom: 0, left: 4 }}
+            >
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis
                 dataKey="label"
@@ -355,7 +411,10 @@ export function CumulativeLineChart({ dailyData, weeklyData, languageDailyData, 
               ))}
             </LineChart>
           ) : (
-            <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+            <AreaChart
+              data={chartData}
+              margin={{ top: 4, right: 4, bottom: 0, left: 4 }}
+            >
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis
                 dataKey="label"
@@ -369,13 +428,23 @@ export function CumulativeLineChart({ dailyData, weeklyData, languageDailyData, 
                 axisLine={false}
                 tick={{ fontSize: 10 }}
                 width={metric === 'time' ? 52 : 36}
-                tickFormatter={(v: number) => metric === 'time' ? formatTimeMs(v) : v.toLocaleString()}
+                tickFormatter={(v: number) =>
+                  metric === 'time' ? formatTimeMs(v) : v.toLocaleString()
+                }
               />
               <ChartTooltip content={renderTooltip} />
               <defs>
                 <linearGradient id="fillValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.02} />
+                  <stop
+                    offset="5%"
+                    stopColor="var(--primary)"
+                    stopOpacity={0.2}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="var(--primary)"
+                    stopOpacity={0.02}
+                  />
                 </linearGradient>
               </defs>
               <Area

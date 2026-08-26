@@ -118,7 +118,9 @@ describe('parseFurigana', () => {
     // Regression: the scan back from the bracket used to walk over anything
     // non-kana, so the 、 (a plain segment from its own token) ended up under
     // the reading — and no text is lost, so the reconstruction check passed.
-    expect(parseFurigana('今日[きょう]、天気[てんき]がいい', '今日、天気がいい')).toEqual([
+    expect(
+      parseFurigana('今日[きょう]、天気[てんき]がいい', '今日、天気がいい'),
+    ).toEqual([
       { text: '今日', reading: 'きょう' },
       { text: '、' },
       { text: '天気', reading: 'てんき' },

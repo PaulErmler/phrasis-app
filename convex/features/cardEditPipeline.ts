@@ -126,7 +126,8 @@ export async function resolveCardEditPlan(
       if (submitted !== text.text) changedLanguages.add(lang);
     } else {
       const existing = existingTranslationMap.get(lang);
-      if (submitted !== (existing?.translatedText ?? '')) changedLanguages.add(lang);
+      if (submitted !== (existing?.translatedText ?? ''))
+        changedLanguages.add(lang);
     }
   }
 
@@ -224,16 +225,14 @@ export async function recordCardEditAuditStart(
       language: lang,
       role: languageRole(course, lang),
       isSourceLanguage,
-      before: isSourceLanguage
-        ? text.text
-        : (existing?.translatedText ?? ''),
+      before: isSourceLanguage ? text.text : (existing?.translatedText ?? ''),
       after: submittedMap.get(lang)!,
       ...(isSourceLanguage
         ? {}
         : {
-          beforeTranslationSource: existing?.translationSource,
-          beforeFlagCount: existing?.flagCount,
-        }),
+            beforeTranslationSource: existing?.translationSource,
+            beforeFlagCount: existing?.flagCount,
+          }),
       soundsSame: !audioChangedLanguages.has(lang),
     };
   });
@@ -306,9 +305,7 @@ export async function applyInPlaceTextEdit(
         // `scheduleMissingContent` sees agreement (the user-provided
         // branch is already skipped by the sweep, but keeping this in
         // sync avoids relying on that skip).
-        ...(audioGenderStamp
-          ? { speakerGender: audioGenderStamp }
-          : {}),
+        ...(audioGenderStamp ? { speakerGender: audioGenderStamp } : {}),
       });
     } else {
       await ctx.db.insert('translations', {
@@ -316,9 +313,7 @@ export async function applyInPlaceTextEdit(
         targetLanguage: lang,
         translatedText: submittedMap.get(lang)!,
         translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
-        ...(audioGenderStamp
-          ? { speakerGender: audioGenderStamp }
-          : {}),
+        ...(audioGenderStamp ? { speakerGender: audioGenderStamp } : {}),
       });
     }
   }
@@ -495,11 +490,19 @@ export async function repointCardAtEditedText(
   // Build searchable text for the new card
   const resolvedText = await ctx.db.get(resolvedTextId);
   if (!resolvedText)
-    throw new ConvexError({ code: 'NOT_FOUND', message: 'Resolved text not found' });
+    throw new ConvexError({
+      code: 'NOT_FOUND',
+      message: 'Resolved text not found',
+    });
 
   const courseLanguages = [...course.baseLanguages, ...course.targetLanguages];
   const { searchableText, searchableTextLanguages } =
-    await buildCardSearchableText(ctx, resolvedTextId, resolvedText.text, courseLanguages);
+    await buildCardSearchableText(
+      ctx,
+      resolvedTextId,
+      resolvedText.text,
+      courseLanguages,
+    );
 
   await patchCard(
     ctx,

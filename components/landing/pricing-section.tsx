@@ -26,7 +26,13 @@ const plans = [
     highlighted: false,
     hasTrial: false,
     paid: false,
-    features: ['sentences', 'credits', 'creditsHint', 'courses', 'detailedStatistics'],
+    features: [
+      'sentences',
+      'credits',
+      'creditsHint',
+      'courses',
+      'detailedStatistics',
+    ],
   },
   {
     key: 'basic' as const,
@@ -143,7 +149,9 @@ export function PricingSection() {
             // Yearly billing shows the effective per-month price as the
             // headline, with the billed-annually total as a subline.
             const price = plan.paid
-              ? t(`plans.${plan.key}.${isYearly ? 'priceYearlyPerMonth' : 'priceMonthly'}`)
+              ? t(
+                  `plans.${plan.key}.${isYearly ? 'priceYearlyPerMonth' : 'priceMonthly'}`,
+                )
               : t(`plans.${plan.key}.price`);
             const period = t(`plans.${plan.key}.period`);
 
@@ -207,7 +215,9 @@ export function PricingSection() {
                     <p
                       className={cn(
                         'mt-1 text-sm font-medium',
-                        plan.highlighted ? 'text-primary' : 'text-foreground/80',
+                        plan.highlighted
+                          ? 'text-primary'
+                          : 'text-foreground/80',
                       )}
                     >
                       {t(`plans.${plan.key}.trial`)}
@@ -257,9 +267,7 @@ export function PricingSection() {
                     plan.highlighted && 'ent-cta-orange font-semibold',
                   )}
                 >
-                  <Link href="/auth/sign-up">
-                    {t(`plans.${plan.key}.cta`)}
-                  </Link>
+                  <Link href="/auth/sign-up">{t(`plans.${plan.key}.cta`)}</Link>
                 </Button>
               </motion.div>
             );
@@ -309,10 +317,7 @@ export function PricingSection() {
                 </h4>
                 <div className="space-y-3">
                   {traditionalIssues.map((issueKey) => (
-                    <div
-                      key={issueKey}
-                      className="flex items-start gap-3"
-                    >
+                    <div key={issueKey} className="flex items-start gap-3">
                       <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-muted">
                         <X className="h-3 w-3 text-muted-foreground/60" />
                       </div>

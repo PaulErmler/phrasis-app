@@ -60,40 +60,58 @@ export const perModeSettingsBackfill = migrations.define({
 
     // Writing-mode ("full") copies of the audio playback settings, stamped
     // from the doc's current effective audio values.
-    if (doc.highlightWordsFull === undefined && doc.highlightWords !== undefined) {
+    if (
+      doc.highlightWordsFull === undefined &&
+      doc.highlightWords !== undefined
+    ) {
       patch.highlightWordsFull = doc.highlightWords;
     }
     if (doc.autoPlayAudioFull === undefined) {
       patch.autoPlayAudioFull = doc.autoPlayAudio ?? DEFAULT_AUTO_PLAY;
     }
-    if (doc.languageRepetitionsFull === undefined && doc.languageRepetitions !== undefined) {
+    if (
+      doc.languageRepetitionsFull === undefined &&
+      doc.languageRepetitions !== undefined
+    ) {
       patch.languageRepetitionsFull = doc.languageRepetitions;
     }
-    if (doc.languageRepetitionPausesFull === undefined && doc.languageRepetitionPauses !== undefined) {
+    if (
+      doc.languageRepetitionPausesFull === undefined &&
+      doc.languageRepetitionPauses !== undefined
+    ) {
       patch.languageRepetitionPausesFull = doc.languageRepetitionPauses;
     }
-    if (doc.languagePlaybackSpeedsFull === undefined && doc.languagePlaybackSpeeds !== undefined) {
+    if (
+      doc.languagePlaybackSpeedsFull === undefined &&
+      doc.languagePlaybackSpeeds !== undefined
+    ) {
       patch.languagePlaybackSpeedsFull = doc.languagePlaybackSpeeds;
     }
     if (doc.pauseBaseToBaseFull === undefined) {
-      patch.pauseBaseToBaseFull = doc.pauseBaseToBase ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
+      patch.pauseBaseToBaseFull =
+        doc.pauseBaseToBase ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
     }
     if (doc.pauseBaseToTargetFull === undefined) {
-      patch.pauseBaseToTargetFull = doc.pauseBaseToTarget ?? DEFAULT_PAUSE_BASE_TO_TARGET;
+      patch.pauseBaseToTargetFull =
+        doc.pauseBaseToTarget ?? DEFAULT_PAUSE_BASE_TO_TARGET;
     }
     if (doc.pauseTargetToTargetFull === undefined) {
-      patch.pauseTargetToTargetFull = doc.pauseTargetToTarget ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
+      patch.pauseTargetToTargetFull =
+        doc.pauseTargetToTarget ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
     }
     if (doc.pauseBeforeAutoAdvanceFull === undefined) {
-      patch.pauseBeforeAutoAdvanceFull = doc.pauseBeforeAutoAdvance ?? DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE;
+      patch.pauseBeforeAutoAdvanceFull =
+        doc.pauseBeforeAutoAdvance ?? DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE;
     }
 
     // Freeze today's Practice Listening defaults for existing users (new
     // courses get Listening ON / only-new 1 stamped at insert time in
     // convex/db/courseSettings.ts).
-    if (doc.playTargetBeforeBase === undefined) patch.playTargetBeforeBase = false;
+    if (doc.playTargetBeforeBase === undefined)
+      patch.playTargetBeforeBase = false;
     if (doc.playTargetAfterBase === undefined) patch.playTargetAfterBase = true;
-    if (doc.targetBeforeOnlyNewReps === undefined) patch.targetBeforeOnlyNewReps = 0; // 0 = ∞ (always)
+    if (doc.targetBeforeOnlyNewReps === undefined)
+      patch.targetBeforeOnlyNewReps = 0; // 0 = ∞ (always)
 
     return Object.keys(patch).length > 0 ? patch : undefined;
   },
@@ -321,9 +339,7 @@ export function resetStaleCantoneseRomanizationPatch(doc: {
   language: string;
   romanizedText?: string;
   romanizationSource?: string;
-}):
-  | { romanizedText: undefined; romanizationSource: undefined }
-  | undefined {
+}): { romanizedText: undefined; romanizationSource: undefined } | undefined {
   const isRetiredSource = doc.romanizationSource === RETIRED_CANTONESE_SOURCE;
   const isStaleCantonese =
     CANTONESE_CODES.has(doc.language) &&
@@ -366,9 +382,7 @@ function unsetStaleLocalRomanization(
   },
   language: string,
   currentSource: string,
-):
-  | { romanizedText: undefined; romanizationSource: undefined }
-  | undefined {
+): { romanizedText: undefined; romanizationSource: undefined } | undefined {
   if (doc.language !== language) return undefined;
   if (doc.romanizedText === undefined) return undefined;
   if (doc.romanizationSource === currentSource) return undefined;
@@ -414,7 +428,8 @@ const teluguResets = staleRomanizationResets(
 );
 export const resetStaleTeluguRomanizationPatch = teluguResets.patch;
 export const resetStaleTeluguTextRomanization = teluguResets.texts;
-export const resetStaleTeluguTranslationRomanization = teluguResets.translations;
+export const resetStaleTeluguTranslationRomanization =
+  teluguResets.translations;
 
 // Bulgarian: `bg` was catalogued as google-v3 but never on Google's list;
 // the local Streamlined System replaces it.
@@ -687,7 +702,11 @@ export const recountDeckCardCountContinue = internalMutation({
       await ctx.scheduler.runAfter(
         0,
         internal.migrations.recountDeckCardCountContinue,
-        { deckId: args.deckId, countedSoFar: counted, cursor: page.continueCursor },
+        {
+          deckId: args.deckId,
+          countedSoFar: counted,
+          cursor: page.continueCursor,
+        },
       );
       return null;
     }

@@ -30,7 +30,13 @@
  * not remove either from this array without first migrating any stored rows
  * that use it.
  */
-export const TTS_PROVIDERS = ['google', 'elevenlabs', 'azure', 'gemini', 'minimax'] as const;
+export const TTS_PROVIDERS = [
+  'google',
+  'elevenlabs',
+  'azure',
+  'gemini',
+  'minimax',
+] as const;
 export type TtsProvider = (typeof TTS_PROVIDERS)[number];
 
 /** Identifier for which translation backend a target language currently uses. */
@@ -342,7 +348,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
-    translationPromptNotes: 'British spelling and vocabulary (colour, lift, queue).',
+    translationPromptNotes:
+      'British spelling and vocabulary (colour, lift, queue).',
   },
   {
     code: 'en_us',
@@ -364,7 +371,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
-    translationPromptNotes: 'American spelling and vocabulary (color, elevator, line).',
+    translationPromptNotes:
+      'American spelling and vocabulary (color, elevator, line).',
   },
   {
     code: 'en_au',
@@ -391,7 +399,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
-    translationPromptNotes: 'Closer to British spelling; Australian vocabulary where natural.',
+    translationPromptNotes:
+      'Closer to British spelling; Australian vocabulary where natural.',
   },
   {
     code: 'es',
@@ -413,7 +422,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'es',
     supportsKaraoke: true,
     supportsStt: true,
-    translationPromptNotes: 'vosotros for the informal plural, peninsular vocabulary.',
+    translationPromptNotes:
+      'vosotros for the informal plural, peninsular vocabulary.',
     translationVersion: 2,
   },
   {
@@ -440,7 +450,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'es-419',
     supportsKaraoke: true,
     supportsStt: true,
-    translationPromptNotes: 'ustedes for the plural, regionally neutral Latin American vocabulary.',
+    translationPromptNotes:
+      'ustedes for the plural, regionally neutral Latin American vocabulary.',
     translationVersion: 2,
   },
   {
@@ -565,7 +576,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // unchanged, so the provider-mismatch regen path wouldn't fire).
     ttsPromptName: 'European Portuguese',
     ttsVersion: 2,
-    translationPromptNotes: 'European Portuguese vocabulary, spelling, and phonetics.',
+    translationPromptNotes:
+      'European Portuguese vocabulary, spelling, and phonetics.',
     translationVersion: 2,
     needsRomanization: false,
     ipaVoice: 'pt-pt',
@@ -757,7 +769,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Pin Cyrillic in the prompt, since the whole pipeline (STT locale,
     // romanization, catalog standard above) assumes Cyrillic output.
     translationName: 'Serbian (Cyrillic script)',
-    translationPromptNotes: 'Use Cyrillic (ћирилица) exclusively; never the Latin alphabet.',
+    translationPromptNotes:
+      'Use Cyrillic (ћирилица) exclusively; never the Latin alphabet.',
     // v2: prompt pins Cyrillic. Regenerate pre-existing (possibly
     // Latin-script) translations.
     translationVersion: 2,
@@ -952,7 +965,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'fi',
     supportsKaraoke: true,
     supportsStt: true,
-    translationPromptNotes: 'The formal/informal distinction is minimal; focus on naturalness.',
+    translationPromptNotes:
+      'The formal/informal distinction is minimal; focus on naturalness.',
     translationVersion: 2,
   },
   {
@@ -1124,7 +1138,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // when we have a learner-grade segmenter.
     supportsKaraoke: false,
     supportsStt: true,
-    translationPromptNotes: 'Simplified Chinese characters, Mainland Mandarin vocabulary.',
+    translationPromptNotes:
+      'Simplified Chinese characters, Mainland Mandarin vocabulary.',
     translationVersion: 2,
   },
   {
@@ -1193,7 +1208,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Written Chinese) and the script; a bare "Cantonese" often yields
     // written Chinese that is effectively Mandarin.
     translationName: 'Cantonese (written in Simplified Chinese characters)',
-    translationPromptNotes: 'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
+    translationPromptNotes:
+      'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
     // v3: prompt pins the spoken-vernacular register. Regenerate
     // translations made under the bare "Cantonese" label.
     translationVersion: 3,
@@ -1228,7 +1244,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Written Chinese) and the script; a bare "Cantonese" often yields
     // written Chinese that is effectively Mandarin.
     translationName: 'Cantonese (written in Traditional Chinese characters)',
-    translationPromptNotes: 'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
+    translationPromptNotes:
+      'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
     // v3: prompt pins the spoken-vernacular register. Regenerate
     // translations made under the bare "Cantonese" label.
     translationVersion: 3,
@@ -1258,7 +1275,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // is gated off.
     supportsKaraoke: false,
     supportsStt: true,
-    translationPromptNotes: 'Match the source formality: informal → plain form (だ／する), formal → polite form (です／ます).',
+    translationPromptNotes:
+      'Match the source formality: informal → plain form (だ／する), formal → polite form (です／ます).',
     translationVersion: 2,
   },
   {
@@ -1279,7 +1297,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Hangul. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
-    translationPromptNotes: 'Informal → 반말; formal → 해요체 or 합쇼체 as appropriate.',
+    translationPromptNotes:
+      'Informal → 반말; formal → 해요체 or 합쇼체 as appropriate.',
     translationVersion: 2,
   },
   {
@@ -1306,7 +1325,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
     // so the model produces Northern vocabulary/particles, not a regionless mix.
     translationName: 'Northern Vietnamese',
-    translationPromptNotes: 'Northern (Hanoi) Vietnamese vocabulary and particles.',
+    translationPromptNotes:
+      'Northern (Hanoi) Vietnamese vocabulary and particles.',
     translationVersion: 2,
   },
   {
@@ -1364,7 +1384,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     // Disambiguates from regional/colloquial Thai in the translation prompt.
     translationName: 'Standard Thai',
-    translationPromptNotes: 'Polite particles (ครับ/ค่ะ) only when the source register is formal.',
+    translationPromptNotes:
+      'Polite particles (ครับ/ค่ะ) only when the source register is formal.',
     translationVersion: 3,
   },
   {
@@ -1456,7 +1477,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Canonical name in the translation prompt. "Arabic (Modern Standard)"
     // is a UI label, not how the register appears in training data.
     translationName: 'Modern Standard Arabic',
-    translationPromptNotes: 'MSA grammar; when the source does not specify gender, pick a grammatically valid form without letting that choice influence any gender metadata.',
+    translationPromptNotes:
+      'MSA grammar; when the source does not specify gender, pick a grammatically valid form without letting that choice influence any gender metadata.',
     translationVersion: 2,
   },
   {
@@ -1485,7 +1507,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
     // so the model produces actual dialect, not MSA with a region hint.
     translationName: 'Saudi Arabic',
-    translationPromptNotes: 'MSA-leaning but with Hejazi/Najdi colloquial markers where natural.',
+    translationPromptNotes:
+      'MSA-leaning but with Hejazi/Najdi colloquial markers where natural.',
     translationVersion: 2,
   },
   {
@@ -1653,7 +1676,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'sw',
     supportsKaraoke: true,
     supportsStt: true,
-    translationPromptNotes: 'Standard Kiswahili as spoken in Kenya, Sheng-free.',
+    translationPromptNotes:
+      'Standard Kiswahili as spoken in Kenya, Sheng-free.',
     translationVersion: 2,
   },
   {
@@ -1817,7 +1841,10 @@ export function isTranslationVersionStale(
   code: string,
   stampedVersion: number | undefined,
 ): boolean {
-  return isContentVersionStale(stampedVersion, getCurrentTranslationVersion(code));
+  return isContentVersionStale(
+    stampedVersion,
+    getCurrentTranslationVersion(code),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1850,7 +1877,13 @@ export function isTranslationVersionStale(
  * `translateTextWithLLM`.
  */
 export type StageReasoning =
-  | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  | 'none'
+  | 'minimal'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'max';
 
 /**
  * OpenRouter provider-routing constraints for a stage. `max_price.completion`
@@ -2087,7 +2120,8 @@ export const TRANSLATION_RULES = {
    */
   luna_bo3: {
     id: 'luna_bo3',
-    label: 'Luna best-of-3 (no thinking, judge) → Gemini 3.7 Flash Nitro (minimal) → Google',
+    label:
+      'Luna best-of-3 (no thinking, judge) → Gemini 3.7 Flash Nitro (minimal) → Google',
     branches: [
       {
         maxChars: Infinity,
@@ -2103,7 +2137,8 @@ export const TRANSLATION_RULES = {
    */
   gemini_35_flash_nitro_minimal: {
     id: 'gemini_35_flash_nitro_minimal',
-    label: 'Gemini 3.7 Flash Nitro (minimal) → Gemini 3.7 Flash Nitro (minimal, retry) → Google',
+    label:
+      'Gemini 3.7 Flash Nitro (minimal) → Gemini 3.7 Flash Nitro (minimal, retry) → Google',
     branches: [
       {
         maxChars: Infinity,
@@ -2129,9 +2164,7 @@ export const TRANSLATION_RULES = {
   retranslation_high: {
     id: 'retranslation_high',
     label: 'Gemini 3.1 Pro (medium) — flagged curriculum retranslation',
-    branches: [
-      { maxChars: Infinity, primary: GEMINI_PRO_MEDIUM },
-    ],
+    branches: [{ maxChars: Infinity, primary: GEMINI_PRO_MEDIUM }],
   },
   /**
    * Triggered by `flagTranslation` for flagged retranslations of CUSTOM
@@ -2146,9 +2179,7 @@ export const TRANSLATION_RULES = {
   retranslation_custom: {
     id: 'retranslation_custom',
     label: 'Gemini 3.5 Flash Lite (minimal) — flagged custom retranslation',
-    branches: [
-      { maxChars: Infinity, primary: GEMINI_FLASH_LITE_MINIMAL },
-    ],
+    branches: [{ maxChars: Infinity, primary: GEMINI_FLASH_LITE_MINIMAL }],
   },
 } satisfies Record<string, TranslationRule>;
 
@@ -2190,8 +2221,8 @@ export function resolveTranslationStages(
  */
 export type ResolvedTranslationConfig = {
   provider: TranslationProvider;
-  targetRegion: string;                      // for the LLM prompt's <context>
-  targetLangName: string;                    // English language name
+  targetRegion: string; // for the LLM prompt's <context>
+  targetLangName: string; // English language name
   /**
    * Language name in its native script (e.g. 'Deutsch', '中文（简体）'). Always
    * injected alongside the English name in LLM prompts. See translationLLM.ts
@@ -2216,7 +2247,8 @@ export function getTranslationConfigForLanguage(
     };
   }
   // Non-English: default to openrouter unless the language explicitly opts back to google.
-  const provider: TranslationProvider = lang.translationProvider ?? 'openrouter';
+  const provider: TranslationProvider =
+    lang.translationProvider ?? 'openrouter';
   return {
     provider,
     targetRegion: regionLabelFromDisplayCode(lang.displayCode),
@@ -2277,10 +2309,7 @@ const NAME_OVERRIDES: Record<string, Record<string, string>> = (() => {
   return out;
 })();
 
-function localizedOverride(
-  key: string,
-  locale: string,
-): string | undefined {
+function localizedOverride(key: string, locale: string): string | undefined {
   // displayCode lookups arrive with mixed casing (`zh-CN` vs `zh-cn`); we
   // normalize both the override keys and the incoming key for the second
   // pass so casing doesn't matter.

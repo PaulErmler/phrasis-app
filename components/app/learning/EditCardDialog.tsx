@@ -70,7 +70,11 @@ export function EditCardDialog({
       const translationArgs = Object.entries(editedTexts).map(
         ([language, text]) => ({ language, text }),
       );
-      await editCard({ cardId, translations: translationArgs, timezone: getUserTimezone() });
+      await editCard({
+        cardId,
+        translations: translationArgs,
+        timezone: getUserTimezone(),
+      });
       onOpenChange(false);
     } catch (err) {
       if (isPaymentPastDueError(err)) {
@@ -134,7 +138,9 @@ export function EditCardDialog({
                     <Label htmlFor={`edit-${lang}`}>
                       {getLocalizedLanguageNameByCode(lang, locale)}
                     </Label>
-                    <span className={`text-xs tabular-nums ${isOverLimit ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                    <span
+                      className={`text-xs tabular-nums ${isOverLimit ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
+                    >
                       {isOverLimit
                         ? `+${value.length - MAX_CARD_TEXT_LENGTH}`
                         : `${value.length}/${MAX_CARD_TEXT_LENGTH}`}

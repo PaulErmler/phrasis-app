@@ -34,7 +34,6 @@ import {
   retranslationStatusValidator,
 } from './types';
 
-
 // Field validators for the `courseSettings` table. Extracted so that queries
 // returning a full `courseSettings` document can share the shape with the
 // schema and avoid drift.
@@ -79,8 +78,12 @@ export const courseSettingsFields = {
   highlightWordsTranscribe: v.optional(v.boolean()),
   autoPlayAudioTranscribe: v.optional(v.boolean()),
   languageRepetitionsTranscribe: v.optional(v.record(v.string(), v.number())),
-  languageRepetitionPausesTranscribe: v.optional(v.record(v.string(), v.number())),
-  languagePlaybackSpeedsTranscribe: v.optional(v.record(v.string(), v.number())),
+  languageRepetitionPausesTranscribe: v.optional(
+    v.record(v.string(), v.number()),
+  ),
+  languagePlaybackSpeedsTranscribe: v.optional(
+    v.record(v.string(), v.number()),
+  ),
   pauseTargetToTargetTranscribe: v.optional(v.number()),
   // Transcribe writing style: independent settings for the post-submit target
   // replay (the pre-submit prompt uses the `*Transcribe` records above).
@@ -298,9 +301,7 @@ export const onboardingProgressFields = {
       // and discard on read.
       strategyVersion: v.optional(v.number()),
       strategy: v.string(), // 'bayesian' | 'binary' | 'staircase'
-      history: v.array(
-        v.object({ level: v.number(), knew: v.boolean() }),
-      ),
+      history: v.array(v.object({ level: v.number(), knew: v.boolean() })),
       finalLevel: v.optional(v.number()),
     }),
   ),
@@ -452,8 +453,16 @@ export default defineSchema({
     .index('by_datasetSentenceId', ['datasetSentenceId'])
     .index('by_dataset_and_externalId', ['datasetId', 'externalId'])
     .index('by_collection_and_rank', ['collectionId', 'collectionRank'])
-    .index('by_collection_and_userCreated_and_rank', ['collectionId', 'userCreated', 'collectionRank'])
-    .index('by_collection_and_userId_and_rank', ['collectionId', 'userId', 'collectionRank'])
+    .index('by_collection_and_userCreated_and_rank', [
+      'collectionId',
+      'userCreated',
+      'collectionRank',
+    ])
+    .index('by_collection_and_userId_and_rank', [
+      'collectionId',
+      'userId',
+      'collectionRank',
+    ])
     // Admin dashboard: enumerate a user's custom texts (userId is only set
     // on user-created rows, so premade texts never appear under a real key)
     .index('by_userId', ['userId'])
@@ -461,7 +470,11 @@ export default defineSchema({
     // followed by `.lt('collectionRank', X).order('desc').take(5)` for the
     // preceding window and `.gt('collectionRank', X).order('asc').take(3)` for
     // the following window. Constant-cost (≤ 8 reads) regardless of arc size.
-    .index('by_collection_arcId_and_rank', ['collectionId', 'arcId', 'collectionRank']),
+    .index('by_collection_arcId_and_rank', [
+      'collectionId',
+      'arcId',
+      'collectionRank',
+    ]),
 
   // Translations table - stores translations of texts
   translations: defineTable({
@@ -631,13 +644,12 @@ export default defineSchema({
   // therefore uniquely identifies a sentence; the unique-pair guarantee is
   // enforced by the seed mutation (idempotent upsert).
   placementTestSentences: defineTable({
-    level: v.number(),               // 1..20 (OGTE level)
-    position: v.number(),            // 0..4 within the level
-    textId: v.id('texts'),           // English source — translations + audio live here
+    level: v.number(), // 1..20 (OGTE level)
+    position: v.number(), // 0..4 within the level
+    textId: v.id('texts'), // English source — translations + audio live here
     rarestWord: v.optional(v.string()),
-    ogteId: v.optional(v.string()),  // Traceability back to the source OGTE row
-  })
-    .index('by_level_and_position', ['level', 'position']),
+    ogteId: v.optional(v.string()), // Traceability back to the source OGTE row
+  }).index('by_level_and_position', ['level', 'position']),
 
   // User settings table - stores user preferences and onboarding status
   userSettings: defineTable({
@@ -703,7 +715,9 @@ export default defineSchema({
   }).index('by_userId', ['userId']),
 
   // Course settings table. Separated so changes don't trigger course re-fetches
-  courseSettings: defineTable(courseSettingsFields).index('by_courseId', ['courseId']),
+  courseSettings: defineTable(courseSettingsFields).index('by_courseId', [
+    'courseId',
+  ]),
 
   // Decks table - one deck per course, auto-created
   decks: defineTable({
@@ -781,7 +795,11 @@ export default defineSchema({
     .index('by_deckId', ['deckId'])
     .index('by_deckId_and_textId', ['deckId', 'textId'])
     .index('by_textId', ['textId'])
-    .index('by_deckId_and_isHidden_and_isMastered', ['deckId', 'isHidden', 'isMastered'])
+    .index('by_deckId_and_isHidden_and_isMastered', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+    ])
     .index('by_deckId_and_isHidden_and_isMastered_and_dueDate', [
       'deckId',
       'isHidden',
@@ -802,9 +820,23 @@ export default defineSchema({
       'freeStudyRoundCounter',
       'freeStudyOrderKey',
     ])
-    .index('by_deckId_and_isHidden_and_lastReviewedAt', ['deckId', 'isHidden', 'lastReviewedAt'])
-    .index('by_deckId_and_isHidden_and_isMastered_and_lastReviewedAt', ['deckId', 'isHidden', 'isMastered', 'lastReviewedAt'])
-    .index('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', ['deckId', 'isHidden', 'isFavorite', 'lastReviewedAt'])
+    .index('by_deckId_and_isHidden_and_lastReviewedAt', [
+      'deckId',
+      'isHidden',
+      'lastReviewedAt',
+    ])
+    .index('by_deckId_and_isHidden_and_isMastered_and_lastReviewedAt', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'lastReviewedAt',
+    ])
+    .index('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', [
+      'deckId',
+      'isHidden',
+      'isFavorite',
+      'lastReviewedAt',
+    ])
     .index('by_deck_hidden_mastered_graduated_due', [
       'deckId',
       'isHidden',
@@ -912,7 +944,13 @@ export default defineSchema({
     ])
     .searchIndex('search_text', {
       searchField: 'searchableText',
-      filterFields: ['deckId', 'isHidden', 'isMastered', 'isFavorite', 'collectionOrigin'],
+      filterFields: [
+        'deckId',
+        'isHidden',
+        'isMastered',
+        'isFavorite',
+        'collectionOrigin',
+      ],
     }),
 
   // Per-user accepted alternative answers for writing mode, written by the AI
@@ -985,10 +1023,16 @@ export default defineSchema({
     reviewsByMode: v.optional(reviewsByModeValidator),
     timeMsByMode: v.optional(reviewsByModeValidator),
     // Rating distribution
-    ratingCounts: v.optional(v.object({
-      stillLearning: v.number(), understood: v.number(),
-      again: v.number(), hard: v.number(), good: v.number(), easy: v.number(),
-    })),
+    ratingCounts: v.optional(
+      v.object({
+        stillLearning: v.number(),
+        understood: v.number(),
+        again: v.number(),
+        hard: v.number(),
+        good: v.number(),
+        easy: v.number(),
+      }),
+    ),
     defaultRatingUsed: v.optional(v.number()),
     defaultRatingChanged: v.optional(v.number()),
     // Full review accuracy
@@ -1001,9 +1045,14 @@ export default defineSchema({
     // Hour-of-day distribution (24-element array, index = hour 0-23)
     hourBuckets: v.optional(v.array(v.number())),
     // Card state distribution
-    reviewsByCardState: v.optional(v.object({
-      new: v.number(), learning: v.number(), review: v.number(), relearning: v.number(),
-    })),
+    reviewsByCardState: v.optional(
+      v.object({
+        new: v.number(),
+        learning: v.number(),
+        review: v.number(),
+        relearning: v.number(),
+      }),
+    ),
     // Event counters
     chatMessagesSent: v.optional(v.number()),
     chatCardsApproved: v.optional(v.number()),
@@ -1033,7 +1082,11 @@ export default defineSchema({
     // 'review' for the FSRS modes; for free play this carries the FACE
     // ('radio' = listening, 'freeStudy' = typing), which both selects the
     // rotation snapshot below and scopes the undo stack.
-    kind: v.union(v.literal('review'), v.literal('radio'), v.literal('freeStudy')),
+    kind: v.union(
+      v.literal('review'),
+      v.literal('radio'),
+      v.literal('freeStudy'),
+    ),
     date: v.string(), // "YYYY-MM-DD" day key of the stats rows the review incremented; week/month/year keys derived
     // Study context at review time. Undo only applies while the CURRENT
     // course settings match. The undoable stack is the newest-first
@@ -1158,12 +1211,11 @@ export default defineSchema({
     // True when this writing-track review lazily seeded the track (prev* are
     // the copied shared baseline; the card's own writing fields were unset).
     lazySeededWriting: v.optional(v.boolean()),
-  })
-    .index('by_userId_and_courseId_and_reviewedAt', [
-      'userId',
-      'courseId',
-      'reviewedAt',
-    ]),
+  }).index('by_userId_and_courseId_and_reviewedAt', [
+    'userId',
+    'courseId',
+    'reviewedAt',
+  ]),
 
   // Collection progress table - per (user, course, collection) monotonic
   // counters used by the home view. Counters are strictly monotonic: incremented
@@ -1221,7 +1273,11 @@ export default defineSchema({
     ),
     collectionRank: v.number(), // Denormalized from the text (rank-ordered drain)
   })
-    .index('by_userId_and_courseId_and_textId', ['userId', 'courseId', 'textId'])
+    .index('by_userId_and_courseId_and_textId', [
+      'userId',
+      'courseId',
+      'textId',
+    ])
     // Abbreviated (full field spelling exceeds Convex's 64-char index-name cap):
     // fields are [userId, courseId, collectionId, mark, collectionRank].
     .index('by_user_course_collection_mark_rank', [
@@ -1397,8 +1453,7 @@ export default defineSchema({
     expectedText: v.string(),
     transcribedText: v.string(),
     attempt: v.number(), // 1-based attempt number
-  })
-    .index('by_textId', ['textId']),
+  }).index('by_textId', ['textId']),
 
   // TTS generation claims. Prevents duplicate processTTSForCard scheduling.
   // Mutations atomically check-and-insert before scheduling; Convex OCC
@@ -1453,7 +1508,12 @@ export default defineSchema({
     newWordsCount: v.number(),
   })
     .index('by_userId_and_courseId_and_date', ['userId', 'courseId', 'date'])
-    .index('by_userId_and_courseId_and_language_and_date', ['userId', 'courseId', 'language', 'date']),
+    .index('by_userId_and_courseId_and_language_and_date', [
+      'userId',
+      'courseId',
+      'language',
+      'date',
+    ]),
 
   // Unique words per user per course per language.
   // courseId is optional only to accommodate pre-migration rows; new writes
@@ -1474,10 +1534,17 @@ export default defineSchema({
     // id only ever matters alongside the auth context that created it.
     sessionId: v.optional(v.string()),
   })
-    .index('by_userId_and_courseId_and_language_and_word',
-      ['userId', 'courseId', 'language', 'word'])
-    .index('by_userId_and_courseId_and_language',
-      ['userId', 'courseId', 'language'])
+    .index('by_userId_and_courseId_and_language_and_word', [
+      'userId',
+      'courseId',
+      'language',
+      'word',
+    ])
+    .index('by_userId_and_courseId_and_language', [
+      'userId',
+      'courseId',
+      'language',
+    ])
     .searchIndex('search_word', {
       searchField: 'word',
       filterFields: ['userId', 'courseId', 'language'],
@@ -1492,10 +1559,13 @@ export default defineSchema({
     word: v.string(), // normalized (lowercase, NFC) — matches userWords.word
     textId: v.id('texts'),
   })
-    .index('by_userId_courseId_language_word',
-      ['userId', 'courseId', 'language', 'word'])
-    .index('by_userId_courseId_textId',
-      ['userId', 'courseId', 'textId']),
+    .index('by_userId_courseId_language_word', [
+      'userId',
+      'courseId',
+      'language',
+      'word',
+    ])
+    .index('by_userId_courseId_textId', ['userId', 'courseId', 'textId']),
 
   // All-time per-language totals
   languageStats: defineTable({
@@ -1508,7 +1578,11 @@ export default defineSchema({
     totalWords: v.number(),
   })
     .index('by_userId_and_courseId', ['userId', 'courseId'])
-    .index('by_userId_and_courseId_and_language', ['userId', 'courseId', 'language']),
+    .index('by_userId_and_courseId_and_language', [
+      'userId',
+      'courseId',
+      'language',
+    ]),
 
   // Weekly stats (ISO 8601 weeks)
   weeklyStats: defineTable({
@@ -1564,7 +1638,11 @@ export default defineSchema({
     count: v.number(),
   })
     .index('by_userId_and_courseId', ['userId', 'courseId'])
-    .index('by_userId_and_courseId_and_reviewNumber', ['userId', 'courseId', 'reviewNumber']),
+    .index('by_userId_and_courseId_and_reviewNumber', [
+      'userId',
+      'courseId',
+      'reviewNumber',
+    ]),
 
   // Usage quotas. Local cache of Autumn entitlements for synchronous checks.
   // One document per user; features stored as a record keyed by feature ID.
@@ -1613,7 +1691,11 @@ export default defineSchema({
   // sends is `isE2EFixtureAddress` in lib/authEmails.ts, not this table.
   testAuthEmails: defineTable({
     email: v.string(), // recipient, lowercase
-    kind: v.union(v.literal('verify'), v.literal('reset'), v.literal('welcome')),
+    kind: v.union(
+      v.literal('verify'),
+      v.literal('reset'),
+      v.literal('welcome'),
+    ),
     url: v.optional(v.string()), // reset link ('reset' emails)
     otp: v.optional(v.string()), // verification code ('verify' emails)
     subject: v.string(),
@@ -1676,5 +1758,4 @@ export default defineSchema({
     .index('by_email', ['email'])
     .index('by_createdAt', ['createdAt'])
     .searchIndex('search_users', { searchField: 'searchText' }),
-
 });

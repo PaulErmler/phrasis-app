@@ -58,7 +58,9 @@ export function SegmentedHomeSection({
   const settings = usePreloadedQuery(preloadedCourseSettings);
   const updateSettings = useUpdateCourseSettings();
   const t = useTranslations('AppPage.collections.carousel');
-  const [currentTab, setCurrentTab] = React.useState<'premade' | 'custom'>('premade');
+  const [currentTab, setCurrentTab] = React.useState<'premade' | 'custom'>(
+    'premade',
+  );
 
   if (summary === undefined) {
     return <SegmentedSkeleton />;
@@ -95,7 +97,9 @@ export function SegmentedHomeSection({
       <div className="flex items-center justify-between gap-2 px-1">
         {/* min-w-0 + truncate: the title yields to the switcher when both
             don't fit (long locales like German on narrow phones). */}
-        <h2 className="heading-section min-w-0 truncate">{t('sectionTitle')}</h2>
+        <h2 className="heading-section min-w-0 truncate">
+          {t('sectionTitle')}
+        </h2>
         <TabsList className="shrink-0">
           <TabsTrigger value="premade">
             {t('tabPremade')}
@@ -141,25 +145,35 @@ export function SegmentedHomeSection({
 
 function PremadeTab({ summary }: { summary: HomeSummary }) {
   const t = useTranslations('AppPage.collections.carousel');
-  const setActiveCollection = useMutation(api.features.decks.setActiveCollection);
-  const [optimisticActiveId, setOptimisticActiveId] = React.useState<Id<'collections'> | null>(null);
+  const setActiveCollection = useMutation(
+    api.features.decks.setActiveCollection,
+  );
+  const [optimisticActiveId, setOptimisticActiveId] =
+    React.useState<Id<'collections'> | null>(null);
   const [paywallOpen, setPaywallOpen] = React.useState(false);
 
   const activeCollectionId = optimisticActiveId ?? summary.activeCollectionId;
 
   // Focus = active collection if it's in this dataset; else the first level.
   const initialFocusId =
-    summary.levels.find((l) => l.collectionId === activeCollectionId)?.collectionId ??
+    summary.levels.find((l) => l.collectionId === activeCollectionId)
+      ?.collectionId ??
     summary.levels[0]?.collectionId ??
     null;
-  const [focusedId, setFocusedId] = React.useState<Id<'collections'> | null>(initialFocusId);
+  const [focusedId, setFocusedId] = React.useState<Id<'collections'> | null>(
+    initialFocusId,
+  );
 
   React.useEffect(() => {
-    if (focusedId && summary.levels.some((l) => l.collectionId === focusedId)) return;
+    if (focusedId && summary.levels.some((l) => l.collectionId === focusedId))
+      return;
     setFocusedId(initialFocusId);
   }, [initialFocusId, summary.levels, focusedId]);
 
-  const groups = React.useMemo(() => groupLevelsByCefr(summary.levels), [summary.levels]);
+  const groups = React.useMemo(
+    () => groupLevelsByCefr(summary.levels),
+    [summary.levels],
+  );
 
   // Items shape consumed by useCollectionDetail and InlineCollectionDetail.
   const items: CollectionProgressItem[] = React.useMemo(
@@ -213,17 +227,23 @@ function PremadeTab({ summary }: { summary: HomeSummary }) {
 
   if (summary.levels.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground py-4 text-center">{t('noLevels')}</p>
+      <p className="text-sm text-muted-foreground py-4 text-center">
+        {t('noLevels')}
+      </p>
     );
   }
 
-  const focusedLevel = summary.levels.find((l) => l.collectionId === focusedId) ?? null;
+  const focusedLevel =
+    summary.levels.find((l) => l.collectionId === focusedId) ?? null;
   const focusedItem = focusedLevel
-    ? items.find((c) => c.collectionId === focusedLevel.collectionId) ?? null
+    ? (items.find((c) => c.collectionId === focusedLevel.collectionId) ?? null)
     : null;
 
   return (
-    <div className="flex flex-col gap-3" data-tutorial={TUTORIAL_ANCHORS.collectionCarousel}>
+    <div
+      className="flex flex-col gap-3"
+      data-tutorial={TUTORIAL_ANCHORS.collectionCarousel}
+    >
       <GroupedLevelRail
         groups={groups}
         activeCollectionId={activeCollectionId}
@@ -235,7 +255,9 @@ function PremadeTab({ summary }: { summary: HomeSummary }) {
         <InlineCollectionDetail
           collection={focusedItem}
           isActive={focusedItem.collectionId === activeCollectionId}
-          onSelect={() => handleSelect(focusedItem.collectionId as Id<'collections'>)}
+          onSelect={() =>
+            handleSelect(focusedItem.collectionId as Id<'collections'>)
+          }
           onOpenDetail={() => setOpenCollectionId(focusedItem.collectionId)}
           onAddCards={() => handleAddCards(focusedItem.collectionId)}
           isAdding={isAdding}
@@ -260,7 +282,8 @@ function PremadeTab({ summary }: { summary: HomeSummary }) {
         browse={browse}
         isAdding={isAdding}
         onSelect={() => {
-          if (openCollectionId) handleSelect(openCollectionId as Id<'collections'>);
+          if (openCollectionId)
+            handleSelect(openCollectionId as Id<'collections'>);
         }}
         onAddCards={() => handleAddCards()}
         sentencesRemaining={sentencesRemaining}
@@ -268,7 +291,11 @@ function PremadeTab({ summary }: { summary: HomeSummary }) {
       />
 
       {paywallOpen && (
-        <PaywallDialog open={paywallOpen} setOpen={setPaywallOpen} featureId={FEATURE_IDS.SENTENCES} />
+        <PaywallDialog
+          open={paywallOpen}
+          setOpen={setPaywallOpen}
+          featureId={FEATURE_IDS.SENTENCES}
+        />
       )}
     </div>
   );
@@ -439,7 +466,10 @@ function ProgressChip({
             aria-hidden
           />
         ) : isComplete ? (
-          <Check className="size-3 text-[color:var(--success)]" strokeWidth={3} />
+          <Check
+            className="size-3 text-[color:var(--success)]"
+            strokeWidth={3}
+          />
         ) : null}
       </div>
     </button>
@@ -542,7 +572,11 @@ function CustomTab({
     customCollections[0]?.collectionId ?? null,
   );
   React.useEffect(() => {
-    if (focusedId && customCollections.some((c) => c.collectionId === focusedId)) return;
+    if (
+      focusedId &&
+      customCollections.some((c) => c.collectionId === focusedId)
+    )
+      return;
     setFocusedId(customCollections[0]?.collectionId ?? null);
   }, [customCollections, focusedId]);
 
@@ -568,7 +602,9 @@ function CustomTab({
   const handleToggleCollection = React.useCallback(
     async (collectionId: string) => {
       try {
-        await toggleMutation({ collectionId: collectionId as Id<'collections'> });
+        await toggleMutation({
+          collectionId: collectionId as Id<'collections'>,
+        });
       } catch {
         toast.error(t('carousel.failedToSelect'));
       }
@@ -578,7 +614,9 @@ function CustomTab({
 
   // Keyed by the raw `collectionName` (e.g. "Custom"/"Chat") to match the
   // `collectionActions[focusedItem.collectionName]` lookup below.
-  const collectionActions = React.useMemo<Record<string, CollectionAction>>(() => {
+  const collectionActions = React.useMemo<
+    Record<string, CollectionAction>
+  >(() => {
     const actions: Record<string, CollectionAction> = {};
     for (const c of customCollections) {
       if (c.isCustom) {
@@ -611,16 +649,29 @@ function CustomTab({
           <div className="flex-[2] min-w-0 md:pr-6 flex items-center">
             <p className="text-muted-sm text-left">{emptyStateDescription}</p>
           </div>
-          <div className="md:hidden h-px w-full shrink-0 bg-border" aria-hidden />
+          <div
+            className="md:hidden h-px w-full shrink-0 bg-border"
+            aria-hidden
+          />
           <div
             className="hidden md:block w-px shrink-0 bg-border self-stretch min-h-[4.5rem]"
             aria-hidden
           />
           <div className="flex-1 min-w-0 md:pl-6 flex flex-col gap-2 justify-center">
-            <Button type="button" variant="secondary" className="w-full" onClick={onNavigateToContent}>
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              onClick={onNavigateToContent}
+            >
               {t('customCarousel.customContentButton')}
             </Button>
-            <Button type="button" variant="secondary" className="w-full" onClick={onNavigateToChat}>
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              onClick={onNavigateToChat}
+            >
               {tApp('views.chat')}
             </Button>
           </div>
@@ -630,10 +681,10 @@ function CustomTab({
   }
 
   const focusedItem = focusedId
-    ? items.find((c) => c.collectionId === focusedId) ?? null
+    ? (items.find((c) => c.collectionId === focusedId) ?? null)
     : null;
   const focusedCustom = focusedId
-    ? customCollections.find((c) => c.collectionId === focusedId) ?? null
+    ? (customCollections.find((c) => c.collectionId === focusedId) ?? null)
     : null;
   const focusedActionOverride = focusedItem
     ? collectionActions[focusedItem.collectionName]
@@ -692,7 +743,11 @@ function CustomTab({
       />
 
       {paywallOpen && (
-        <PaywallDialog open={paywallOpen} setOpen={setPaywallOpen} featureId={FEATURE_IDS.SENTENCES} />
+        <PaywallDialog
+          open={paywallOpen}
+          setOpen={setPaywallOpen}
+          featureId={FEATURE_IDS.SENTENCES}
+        />
       )}
     </div>
   );
@@ -729,10 +784,7 @@ function CustomChipRail({
         {/* Invisible spacer. Mirrors the band-header row in
             GroupedLevelRail so the Course and Custom Content tabs render at
             the same height and switching between them doesn't shift layout. */}
-        <div
-          className="invisible flex items-center gap-1.5 px-0.5"
-          aria-hidden
-        >
+        <div className="invisible flex items-center gap-1.5 px-0.5" aria-hidden>
           <span className="size-2 rounded-full" />
           <span className="font-mono text-[10px] font-bold tracking-widest">
             A1
@@ -856,11 +908,7 @@ function OffBadge({
           </p>
         </div>
         <div className="flex justify-end gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setOpen(false)}
-          >
+          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
             {t('reenablePopover.cancel')}
           </Button>
           <Button
@@ -893,7 +941,10 @@ function SegmentedSkeleton() {
             <div className="h-3 w-16 animate-pulse rounded bg-muted" />
             <div className="flex gap-1">
               {Array.from({ length: 3 }).map((__, j) => (
-                <div key={j} className="h-14 w-14 animate-pulse rounded-lg bg-muted" />
+                <div
+                  key={j}
+                  className="h-14 w-14 animate-pulse rounded-lg bg-muted"
+                />
               ))}
             </div>
           </div>

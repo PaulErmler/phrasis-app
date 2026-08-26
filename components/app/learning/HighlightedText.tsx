@@ -192,5 +192,9 @@ export function HighlightedText({
   // still renders per-word spans (currentIndex is -1 so no blue is applied),
   // which keeps the DOM structure identical across an isActive flip. That's
   // what prevents the search-word orange from disappearing at play start.
-  return <p dir={dir} className={dirClassName}>{wordSpans}</p>;
+  return (
+    <p dir={dir} className={dirClassName}>
+      {wordSpans}
+    </p>
+  );
 }

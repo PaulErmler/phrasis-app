@@ -2,7 +2,11 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { usePaginatedQuery, useMutation, usePreloadedQuery } from 'convex/react';
+import {
+  usePaginatedQuery,
+  useMutation,
+  usePreloadedQuery,
+} from 'convex/react';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { AnnotationLines } from '@/components/app/learning/AnnotationLines';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
@@ -84,9 +88,9 @@ export function WordSentencesDialog({
   useEnsureContent(
     open
       ? results.map((r) => ({
-        textId: r.textId as string,
-        hasMissingContent: r.hasMissingContent,
-      }))
+          textId: r.textId as string,
+          hasMissingContent: r.hasMissingContent,
+        }))
       : undefined,
   );
 
@@ -94,14 +98,18 @@ export function WordSentencesDialog({
   const unmasterCard = useMutation(api.features.scheduling.unmasterCard);
   const hideCard = useMutation(api.features.scheduling.hideCard);
   const unhideCard = useMutation(api.features.scheduling.unhideCard);
-  const toggleFavorite = useMutation(api.features.scheduling.toggleFavoriteCard);
+  const toggleFavorite = useMutation(
+    api.features.scheduling.toggleFavoriteCard,
+  );
   const deleteCard = useMutation(api.features.scheduling.deleteCardPermanently);
 
   const [editingCard, setEditingCard] = useState<{
     cardId: Id<'cards'>;
     translations: CardTranslation[];
   } | null>(null);
-  const [deletingCardId, setDeletingCardId] = useState<Id<'cards'> | null>(null);
+  const [deletingCardId, setDeletingCardId] = useState<Id<'cards'> | null>(
+    null,
+  );
 
   const [pendingMaster, setPendingMaster] = useState<Set<string>>(new Set());
   const [pendingHide, setPendingHide] = useState<Set<string>>(new Set());
@@ -232,14 +240,21 @@ export function WordSentencesDialog({
               );
 
               const cardId = sentence.cardId as Id<'cards'> | null;
-              const isMastered = sentence.isMastered || (cardId ? pendingMaster.has(cardId) : false);
-              const isHidden = sentence.isHidden || (cardId ? pendingHide.has(cardId) : false);
-              const isFavorite = cardId && favoriteOverride.has(cardId)
-                ? (favoriteOverride.get(cardId) as boolean)
-                : (sentence.isFavorite ?? false);
+              const isMastered =
+                sentence.isMastered ||
+                (cardId ? pendingMaster.has(cardId) : false);
+              const isHidden =
+                sentence.isHidden || (cardId ? pendingHide.has(cardId) : false);
+              const isFavorite =
+                cardId && favoriteOverride.has(cardId)
+                  ? (favoriteOverride.get(cardId) as boolean)
+                  : (sentence.isFavorite ?? false);
 
               return (
-                <div key={sentence.textId} className="content-box p-4 space-y-2">
+                <div
+                  key={sentence.textId}
+                  className="content-box p-4 space-y-2"
+                >
                   {/* Card actions row */}
                   {cardId && (
                     <div className="flex items-center justify-between -mt-1 -mx-1 mb-1">
@@ -284,7 +299,10 @@ export function WordSentencesDialog({
                       // Ephemeral surface: ignore the course-level general speed.
                       const effectiveSpeed = override ?? DEFAULT_PLAYBACK_SPEED;
                       return (
-                        <div key={tr.language} className="flex items-start gap-2">
+                        <div
+                          key={tr.language}
+                          className="flex items-start gap-2"
+                        >
                           <div className="flex-1">
                             <HighlightedText
                               text={tr.text}
@@ -344,7 +362,10 @@ export function WordSentencesDialog({
                         : null;
                       const effectiveSpeed = override ?? DEFAULT_PLAYBACK_SPEED;
                       return (
-                        <div key={tr.language} className="flex items-start gap-2">
+                        <div
+                          key={tr.language}
+                          className="flex items-start gap-2"
+                        >
                           <div className="flex-1">
                             <HighlightedText
                               text={tr.text}

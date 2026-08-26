@@ -83,11 +83,24 @@ async function getUpcomingCardsForMode(
     // queue uses. Calling the unfiltered `fetch` here warmed a different set
     // than free play actually serves for anyone on a 'course'/'custom' filter.
     const [radioHead, freeStudyHead] = await Promise.all([
-      fetchFreePlayRotation(ctx, deckId, 'radio', filter, ENSURE_CONTENT_LOOKAHEAD),
-      fetchFreePlayRotation(ctx, deckId, 'freeStudy', filter, ENSURE_CONTENT_LOOKAHEAD),
+      fetchFreePlayRotation(
+        ctx,
+        deckId,
+        'radio',
+        filter,
+        ENSURE_CONTENT_LOOKAHEAD,
+      ),
+      fetchFreePlayRotation(
+        ctx,
+        deckId,
+        'freeStudy',
+        filter,
+        ENSURE_CONTENT_LOOKAHEAD,
+      ),
     ]);
     const byId = new Map<Id<'cards'>, Doc<'cards'>>();
-    for (const card of [...radioHead, ...freeStudyHead]) byId.set(card._id, card);
+    for (const card of [...radioHead, ...freeStudyHead])
+      byId.set(card._id, card);
     return [...byId.values()];
   }
   // Due queues: warm exactly what the serving path (`fetchTrackDueCards`)
@@ -153,18 +166,25 @@ async function scheduleContentForUpcomingCards(
       } else {
         // A probe is read-only, so an unexpected throw is data-shaped (bad
         // config etc.) — skip this card, keep probing the rest.
-        console.error('[ensureUpcomingCards] probe failed for one card — continuing', {
-          textId: card.textId,
-          error,
-        });
+        console.error(
+          '[ensureUpcomingCards] probe failed for one card — continuing',
+          {
+            textId: card.textId,
+            error,
+          },
+        );
       }
     }
     if (needsWork) {
-      await ctx.scheduler.runAfter(0, internal.features.decks.prepareCardContent, {
-        textId: card.textId,
-        baseLanguages: active.course.baseLanguages,
-        targetLanguages: active.course.targetLanguages,
-      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.decks.prepareCardContent,
+        {
+          textId: card.textId,
+          baseLanguages: active.course.baseLanguages,
+          targetLanguages: active.course.targetLanguages,
+        },
+      );
       processed++;
     }
   }
@@ -240,7 +260,8 @@ export async function ensureUpcomingCardsContentAllModesHandler(
   const cardLists = await Promise.all(
     WARMABLE_SCHEDULING_MODES.flatMap((mode) =>
       (mode === 'radio' ? (['shared'] as SchedulingTrack[]) : tracks).map(
-        (track) => getUpcomingCardsForMode(ctx, deck._id, mode, now, filter, track),
+        (track) =>
+          getUpcomingCardsForMode(ctx, deck._id, mode, now, filter, track),
       ),
     ),
   );
@@ -253,7 +274,11 @@ export async function ensureUpcomingCardsContentAllModesHandler(
     }
   }
 
-  return scheduleContentForUpcomingCards(ctx, active, Array.from(byId.values()));
+  return scheduleContentForUpcomingCards(
+    ctx,
+    active,
+    Array.from(byId.values()),
+  );
 }
 
 /** Handler body of the internal mutation `prepareCardContent`. */
@@ -318,10 +343,13 @@ export async function warmNextCollectionBatchHandler(
         course.targetLanguages,
       );
     } catch (error) {
-      console.error('[warmNextCollectionBatch] scheduleMissingContent failed for one text — continuing', {
-        textId: text._id,
-        error,
-      });
+      console.error(
+        '[warmNextCollectionBatch] scheduleMissingContent failed for one text — continuing',
+        {
+          textId: text._id,
+          error,
+        },
+      );
     }
   }
   return null;

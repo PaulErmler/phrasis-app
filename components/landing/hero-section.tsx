@@ -28,7 +28,9 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
               className="text-[2rem] md:text-[2.5rem] lg:text-[3.25rem] font-semibold tracking-tight leading-[1.15]"
             >
               {t.rich('tagline', {
-                highlight: (chunks) => <span className="text-primary">{chunks}</span>,
+                highlight: (chunks) => (
+                  <span className="text-primary">{chunks}</span>
+                ),
               })}
             </motion.h1>
 

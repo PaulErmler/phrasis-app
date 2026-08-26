@@ -88,7 +88,9 @@ describe('textsMatchForLanguage', () => {
   });
 
   it('still rejects a genuinely different Chinese sentence', () => {
-    expect(textsMatchForLanguage('我有三个苹果', '他喜欢喝茶', 'zh')).toBe(false);
+    expect(textsMatchForLanguage('我有三个苹果', '他喜欢喝茶', 'zh')).toBe(
+      false,
+    );
   });
 
   it('ignores punctuation differences even though romanization now keeps them', () => {
@@ -100,7 +102,9 @@ describe('textsMatchForLanguage', () => {
   it('matches numerals against themselves now that digits survive romanization', () => {
     // Digits are NOT stripped by normalizeForComparison, so they reach the
     // comparison for the first time. Identical text must still match.
-    expect(textsMatchForLanguage('我有2个苹果。', '我有2个苹果', 'zh')).toBe(true);
+    expect(textsMatchForLanguage('我有2个苹果。', '我有2个苹果', 'zh')).toBe(
+      true,
+    );
   });
 
   it('matches equivalent traditional text after the simplified pre-conversion', () => {

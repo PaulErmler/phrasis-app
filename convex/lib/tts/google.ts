@@ -31,7 +31,9 @@ export const googleTts: TTSProvider = {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Google TTS API error: ${response.status} - ${errorText}`);
+      throw new Error(
+        `Google TTS API error: ${response.status} - ${errorText}`,
+      );
     }
 
     const data = (await response.json()) as GoogleTTSResponse;

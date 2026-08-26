@@ -28,8 +28,10 @@ export async function isCollectionAccessible(
   const courseSettings = await getCourseSettings(ctx, courseId);
   if (!courseSettings) return false;
 
-  if (courseSettings.chatCollectionId?.toString() === collectionId.toString()) return true;
-  if (courseSettings.customCollectionId?.toString() === collectionId.toString()) return true;
+  if (courseSettings.chatCollectionId?.toString() === collectionId.toString())
+    return true;
+  if (courseSettings.customCollectionId?.toString() === collectionId.toString())
+    return true;
   if (
     (courseSettings.activeCustomCollectionIds ?? []).some(
       (id) => id.toString() === collectionId.toString(),
@@ -58,14 +60,25 @@ export async function requireAccessibleText(
   isLevelCollection: boolean;
 }> {
   const text = await ctx.db.get(textId);
-  if (!text) throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
+  if (!text)
+    throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
   if (!(await isCollectionAccessible(ctx, text.collectionId, courseId))) {
-    throw new ConvexError({ code: 'FORBIDDEN', message: 'Collection not accessible' });
+    throw new ConvexError({
+      code: 'FORBIDDEN',
+      message: 'Collection not accessible',
+    });
   }
   const collection = await ctx.db.get(text.collectionId);
-  if (!collection) throw new ConvexError({ code: 'NOT_FOUND', message: 'Collection not found' });
+  if (!collection)
+    throw new ConvexError({
+      code: 'NOT_FOUND',
+      message: 'Collection not found',
+    });
   if (!canUserAccessCollectionText(collection, text, userId)) {
-    throw new ConvexError({ code: 'FORBIDDEN', message: 'Text not accessible' });
+    throw new ConvexError({
+      code: 'FORBIDDEN',
+      message: 'Text not accessible',
+    });
   }
   return {
     text,

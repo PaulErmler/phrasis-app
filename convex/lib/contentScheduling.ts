@@ -14,10 +14,7 @@ import {
 } from '../../lib/languages';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
-import {
-  missingAnnotationKinds,
-  TEXT_ANNOTATIONS,
-} from './textAnnotations';
+import { missingAnnotationKinds, TEXT_ANNOTATIONS } from './textAnnotations';
 import { deleteAudioRow } from './audio';
 import {
   findReusableAudioAsset,
@@ -294,7 +291,12 @@ export async function scheduleAudioForLanguage(
     }
   }
 
-  const claimed = await claimTtsIfAvailable(ctx, text._id, language, opts?.priority);
+  const claimed = await claimTtsIfAvailable(
+    ctx,
+    text._id,
+    language,
+    opts?.priority,
+  );
   if (!claimed) return false;
   await enqueueTtsForVoice(ctx, {
     textId: text._id,
@@ -456,8 +458,7 @@ async function sweepInvalidAudio(
     // `db.system.get` (metadata point-read), not `storage.getUrl`: presence
     // is the signal, and the metadata read is far cheaper than minting a
     // signed URL — this loop runs per (card × language) on the ensure path.
-    const blobExists =
-      (await ctx.db.system.get(payload.storageId)) !== null;
+    const blobExists = (await ctx.db.system.get(payload.storageId)) !== null;
     if (!blobExists) {
       if (await hasActiveTtsClaim(ctx, textId, lang)) {
         continue;
@@ -574,8 +575,10 @@ async function sweepStaleTranslations(
     if (!mayRegenerateTranslation(text, translation)) continue;
 
     const isLegacy = translation.speakerGender === undefined;
-    const isDrifted = !isLegacy && translation.speakerGender !== audioSpeakerGender;
-    const isLegacyAlongsideDriftedAudio = isLegacy && langsWithAudioGenderDrift.has(lang);
+    const isDrifted =
+      !isLegacy && translation.speakerGender !== audioSpeakerGender;
+    const isLegacyAlongsideDriftedAudio =
+      isLegacy && langsWithAudioGenderDrift.has(lang);
     // Version-stale translation: the language's `translationVersion` config was
     // bumped above this row's stamp (a new model/prompt). Regenerate.
     // `isTranslationVersionStale` encodes the "undefined === current" rule.
@@ -584,7 +587,8 @@ async function sweepStaleTranslations(
       translation.translationVersion,
     );
 
-    if (!isDrifted && !isLegacyAlongsideDriftedAudio && !isVersionStale) continue;
+    if (!isDrifted && !isLegacyAlongsideDriftedAudio && !isVersionStale)
+      continue;
     if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
     // Defer while an LLM retranslation is in flight. It will overwrite the row
     // anyway, so deleting now just races the pending write.
@@ -748,11 +752,11 @@ async function scheduleLanguageContent(
   // loop above.
   for (const kind of missingAnnotationKinds(lang, translation)) {
     if (opts?.probe) throw new ProbeNeedsWork();
-    await ctx.scheduler.runAfter(
-      0,
-      TEXT_ANNOTATIONS[kind].translationAction,
-      { textId, text: translation.translatedText, language: lang },
-    );
+    await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].translationAction, {
+      textId,
+      text: translation.translatedText,
+      language: lang,
+    });
   }
   if (!hasAudio) {
     // Defer TTS while an LLM retranslation is in flight for this

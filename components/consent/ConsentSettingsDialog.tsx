@@ -45,9 +45,14 @@ export function ConsentSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md" data-testid="consent-settings-dialog">
+      <DialogContent
+        className="sm:max-w-md"
+        data-testid="consent-settings-dialog"
+      >
         <DialogHeader>
-          <DialogTitle className="heading-dialog">{t('settings.title')}</DialogTitle>
+          <DialogTitle className="heading-dialog">
+            {t('settings.title')}
+          </DialogTitle>
           <DialogDescription className="text-muted-sm">
             {t('settings.description')}
           </DialogDescription>
@@ -56,16 +61,22 @@ export function ConsentSettingsDialog({
         <div className="space-y-3">
           <div className="content-box space-y-2">
             <div className="flex items-center justify-between gap-4">
-              <span className="text-sm font-medium">{t('categories.necessary.title')}</span>
+              <span className="text-sm font-medium">
+                {t('categories.necessary.title')}
+              </span>
               {/* Locked on: without these the app cannot keep you signed in. */}
               <Switch checked disabled aria-readonly />
             </div>
-            <p className="text-muted-xs">{t('categories.necessary.description')}</p>
+            <p className="text-muted-xs">
+              {t('categories.necessary.description')}
+            </p>
           </div>
 
           <div className="content-box space-y-2">
             <div className="flex items-center justify-between gap-4">
-              <span className="text-sm font-medium">{t('categories.analytics.title')}</span>
+              <span className="text-sm font-medium">
+                {t('categories.analytics.title')}
+              </span>
               <Switch
                 checked={analytics}
                 onCheckedChange={setAnalytics}
@@ -73,12 +84,18 @@ export function ConsentSettingsDialog({
                 data-testid="consent-toggle-analytics"
               />
             </div>
-            <p className="text-muted-xs">{t('categories.analytics.description')}</p>
+            <p className="text-muted-xs">
+              {t('categories.analytics.description')}
+            </p>
           </div>
         </div>
 
         <DialogFooter>
-          <Button onClick={handleSave} className="w-full" data-testid="consent-settings-save">
+          <Button
+            onClick={handleSave}
+            className="w-full"
+            data-testid="consent-settings-save"
+          >
             {t('settings.save')}
           </Button>
         </DialogFooter>

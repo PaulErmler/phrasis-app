@@ -39,10 +39,7 @@ import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import { CardActionConfirmDialogs } from '@/components/app/learning/useCardActions';
-import {
-  COACHMARK_ANCHORS,
-  TUTORIAL_ANCHORS,
-} from '@/lib/tutorials/anchors';
+import { COACHMARK_ANCHORS, TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
 import {
   resolveModeSetting,
@@ -248,9 +245,10 @@ export function LearningMode({
     (settingsForAutoRate?.reviewMode ?? 'audio') === 'full' &&
     (settingsForAutoRate?.autoRateFromAccuracy ?? true) &&
     !autoRateFirstExposure;
-  const autoRateAccuracy = (settingsForAutoRate?.ignorePunctuation ?? false)
-    ? writingAccuracy?.minWithoutPunctuation
-    : writingAccuracy?.minWithPunctuation;
+  const autoRateAccuracy =
+    (settingsForAutoRate?.ignorePunctuation ?? false)
+      ? writingAccuracy?.minWithoutPunctuation
+      : writingAccuracy?.minWithPunctuation;
   const autoRateThresholds = settingsForAutoRate?.autoRateThresholds;
   const setAutoRating = state.setAutoRating;
   useEffect(() => {
@@ -279,12 +277,13 @@ export function LearningMode({
         summary.avgWithPunctuation != null &&
         summary.avgWithoutPunctuation != null
           ? {
-            primary: (state.courseSettings.ignorePunctuation ?? false)
-              ? summary.avgWithoutPunctuation
-              : summary.avgWithPunctuation,
-            strict: summary.avgWithPunctuation,
-            lenient: summary.avgWithoutPunctuation,
-          }
+              primary:
+                (state.courseSettings.ignorePunctuation ?? false)
+                  ? summary.avgWithoutPunctuation
+                  : summary.avgWithPunctuation,
+              strict: summary.avgWithPunctuation,
+              lenient: summary.avgWithoutPunctuation,
+            }
           : undefined;
       state.handleNext(ratingOverride, accuracy);
     },
@@ -460,9 +459,10 @@ export function LearningMode({
   }
 
   const reviewMode = state.courseSettings.reviewMode ?? 'audio';
-  const instantProceed = reviewMode === 'full'
-    ? (state.courseSettings.instantProceedFull ?? true)
-    : (state.courseSettings.instantProceedAudio ?? false);
+  const instantProceed =
+    reviewMode === 'full'
+      ? (state.courseSettings.instantProceedFull ?? true)
+      : (state.courseSettings.instantProceedAudio ?? false);
   const isTranscribe = isTranscribeMode(state.courseSettings);
   // Settings mode for the writing-only lookups below: this branch of the
   // component only renders writing ("full") review, so the mode is never
@@ -494,9 +494,9 @@ export function LearningMode({
   // surface; the card is not deleted.
   const handleFlagPrimary = hasTargetTranslation
     ? () => {
-      audio.pause();
-      state.cardActions.requestFlag(state.cardId);
-    }
+        audio.pause();
+        state.cardActions.requestFlag(state.cardId);
+      }
     : undefined;
 
   // Card-origin pill: premade cards show the collection shorthand ("A1.2")
@@ -608,7 +608,9 @@ export function LearningMode({
         // Blur the base by default in Transcribe (the prompt is the target
         // audio, so a visible base gives the answer away); Translate needs
         // the base text visible and defaults to off.
-        hideBaseLanguages={state.courseSettings.hideBaseLanguagesFull ?? isTranscribe}
+        hideBaseLanguages={
+          state.courseSettings.hideBaseLanguagesFull ?? isTranscribe
+        }
         autoRevealBaseOnSubmit={
           state.courseSettings.autoRevealBaseOnSubmit ?? true
         }
@@ -639,7 +641,9 @@ export function LearningMode({
         hideTargetLanguages={state.courseSettings.hideTargetLanguages ?? true}
         autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? true}
         hideBaseLanguages={state.courseSettings.hideBaseLanguages === true}
-        autoRevealBaseLanguages={state.courseSettings.autoRevealBaseLanguages ?? true}
+        autoRevealBaseLanguages={
+          state.courseSettings.autoRevealBaseLanguages ?? true
+        }
         revealedLanguages={audio.revealedLanguages}
         revealAllSignal={audioRevealNonce}
         onAllTargetsRevealedChange={setAudioAllTargetsRevealed}
@@ -657,8 +661,7 @@ export function LearningMode({
           milestone celebration will fire, even after a reload or a break
           mid-day. Free play never shows the bar in either face, since plays
           don't count toward the milestone. */}
-      {!isFreePlay &&
-        state.courseSettings.progressDisplayEnabled !== false && (
+      {!isFreePlay && state.courseSettings.progressDisplayEnabled !== false && (
         <SessionProgressBar current={state.dailyReviewsToday} />
       )}
       <div className="flex-1 min-h-0 relative">
@@ -796,15 +799,16 @@ function NoCardsDueWithFilter({
   const updateSettings = useUpdateCourseSettings();
 
   const isDeckEmpty = emptyReason?.reason === 'no_cards';
-  const activeFilter = emptyReason?.reason === 'filtered_out'
-    ? emptyReason.activeFilter
-    : null;
-  const filterUnblockAvailable = emptyReason?.reason === 'filtered_out'
-    ? emptyReason.availableInOtherSource
-    : false;
-  const currentSourceHasAnyCards = emptyReason?.reason === 'filtered_out'
-    ? emptyReason.currentSourceHasAnyCards
-    : true;
+  const activeFilter =
+    emptyReason?.reason === 'filtered_out' ? emptyReason.activeFilter : null;
+  const filterUnblockAvailable =
+    emptyReason?.reason === 'filtered_out'
+      ? emptyReason.availableInOtherSource
+      : false;
+  const currentSourceHasAnyCards =
+    emptyReason?.reason === 'filtered_out'
+      ? emptyReason.currentSourceHasAnyCards
+      : true;
   // Only the filtered_out and all_caught_up variants carry this field; for
   // no_cards / no_session / undefined, default to false (no custom queue).
   const customCardsPendingAdd =

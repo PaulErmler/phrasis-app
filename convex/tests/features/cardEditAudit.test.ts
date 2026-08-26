@@ -256,7 +256,9 @@ describe('features/cardEditAudit', () => {
       const { cardId, textId } = await seedCurriculumCard(t);
       const asUser = t.withIdentity({ subject: 'user_A' });
 
-      await asUser.mutation(api.features.scheduling.flagTranslation, { cardId });
+      await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+      });
 
       const [edit] = await listEdits(t);
       expect(edit.kind).toBe('flag');
@@ -288,7 +290,9 @@ describe('features/cardEditAudit', () => {
       const { cardId } = await seedCurriculumCard(t, { flagCount: 2 });
       const asUser = t.withIdentity({ subject: 'user_A' });
 
-      await asUser.mutation(api.features.scheduling.flagTranslation, { cardId });
+      await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+      });
 
       const rows = await listRetranslations(t);
       expect(rows).toHaveLength(1);
@@ -303,7 +307,9 @@ describe('features/cardEditAudit', () => {
       const { cardId } = await seedCurriculumCard(t, { userCreated: true });
       const asUser = t.withIdentity({ subject: 'user_A' });
 
-      await asUser.mutation(api.features.scheduling.flagTranslation, { cardId });
+      await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+      });
 
       // The gesture is recorded — `textWasUserCreated` is what explains why no
       // retranslation followed — but no attempt row is invented for work the

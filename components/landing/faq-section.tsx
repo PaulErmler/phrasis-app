@@ -4,14 +4,20 @@ import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
 import { ChevronDown, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { landingFaqConfig, TATOEBA_FAQ_INDEX } from '@/components/landing/faq-config';
+import {
+  landingFaqConfig,
+  TATOEBA_FAQ_INDEX,
+} from '@/components/landing/faq-config';
 import { PWAInstallButton } from '@/components/landing/pwa-install-button';
 
 export function FAQSection() {
   const t = useTranslations('LandingPage.faq');
 
   return (
-    <section id="faq" className="relative py-20 md:py-32 px-4 sm:px-6 bg-muted/10">
+    <section
+      id="faq"
+      className="relative py-20 md:py-32 px-4 sm:px-6 bg-muted/10"
+    >
       <div className="max-w-3xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 30 }}

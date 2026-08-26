@@ -32,7 +32,10 @@ export async function upsertDailyLanguageStats(
       timeMs: existing.timeMs + args.timeMs,
       newWordsCount: newWordsCountAfter,
     });
-    return { newWordsCountAfter, previousNewWordsCount: existing.newWordsCount };
+    return {
+      newWordsCountAfter,
+      previousNewWordsCount: existing.newWordsCount,
+    };
   }
 
   await ctx.db.insert('dailyLanguageStats', {

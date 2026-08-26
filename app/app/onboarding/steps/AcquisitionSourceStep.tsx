@@ -48,7 +48,9 @@ export function AcquisitionSourceStep({
       <div className="min-h-full flex flex-col justify-center py-6">
         <div className="text-center mb-6 md:mb-8">
           <h2 className="text-xl md:text-2xl font-bold">{t('title')}</h2>
-          <p className="text-xs md:text-sm text-muted-foreground mt-1">{t('subtitle')}</p>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">
+            {t('subtitle')}
+          </p>
         </div>
         <div className="max-w-2xl mx-auto w-full px-4 grid grid-cols-2 gap-2">
           {options.map((value) => {
@@ -79,15 +81,20 @@ export function AcquisitionSourceStep({
           <div className="max-w-md mx-auto w-full mt-4 px-4 animate-in fade-in slide-in-from-top-2 duration-300">
             {(() => {
               const value = freeText ?? '';
-              const isOverLimit = value.length > MAX_ONBOARDING_FREE_TEXT_LENGTH;
+              const isOverLimit =
+                value.length > MAX_ONBOARDING_FREE_TEXT_LENGTH;
               const remaining = MAX_ONBOARDING_FREE_TEXT_LENGTH - value.length;
               const showCharCount =
-              isOverLimit ||
-              remaining <= ONBOARDING_FREE_TEXT_SHOW_COUNT_REMAINING_THRESHOLD;
+                isOverLimit ||
+                remaining <=
+                  ONBOARDING_FREE_TEXT_SHOW_COUNT_REMAINING_THRESHOLD;
               return (
                 <>
                   <div className="flex items-baseline justify-between gap-2 mb-2">
-                    <label htmlFor="other-source" className="text-sm text-muted-foreground">
+                    <label
+                      htmlFor="other-source"
+                      className="text-sm text-muted-foreground"
+                    >
                       {t('otherLabel')}
                     </label>
                     {showCharCount ? (

@@ -46,9 +46,10 @@ describe('SUPPORTED_LANGUAGES ttsProvider', () => {
   // silently drift from lib/languages.ts when a language flips provider.
   const NON_GOOGLE_PROVIDERS: Record<string, 'azure' | 'gemini'> =
     Object.fromEntries(
-      SUPPORTED_LANGUAGES.filter((l) => l.ttsProvider !== 'google').map(
-        (l) => [l.code, l.ttsProvider as 'azure' | 'gemini'],
-      ),
+      SUPPORTED_LANGUAGES.filter((l) => l.ttsProvider !== 'google').map((l) => [
+        l.code,
+        l.ttsProvider as 'azure' | 'gemini',
+      ]),
     );
 
   it('every non-google language is reachable via getLanguageByCode', () => {
@@ -218,9 +219,15 @@ describe('getLocalizedLanguageNameByCode', () => {
     pt: { en: 'Portuguese (Brazil)', de: 'Portugiesisch (Brasilien)' },
     pt_pt: { en: 'Portuguese (Portugal)', de: 'Portugiesisch (Portugal)' },
     zh: { en: 'Chinese (Simplified)', de: 'Chinesisch (Vereinfacht)' },
-    zh_traditional: { en: 'Chinese (Traditional)', de: 'Chinesisch (Traditionell)' },
+    zh_traditional: {
+      en: 'Chinese (Traditional)',
+      de: 'Chinesisch (Traditionell)',
+    },
     yue: { en: 'Cantonese (Simplified)', de: 'Kantonesisch (Vereinfacht)' },
-    yue_traditional: { en: 'Cantonese (Traditional)', de: 'Kantonesisch (Traditionell)' },
+    yue_traditional: {
+      en: 'Cantonese (Traditional)',
+      de: 'Kantonesisch (Traditionell)',
+    },
     ar: { en: 'Arabic (Modern Standard)', de: 'Arabisch (Hocharabisch)' },
     ar_sa: { en: 'Arabic (Saudi)', de: 'Arabisch (Saudisch)' },
     ar_eg: { en: 'Arabic (Egyptian)', de: 'Arabisch (Ägyptisch)' },

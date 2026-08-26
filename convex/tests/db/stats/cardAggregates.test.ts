@@ -1,39 +1,39 @@
 /// <reference types="vite/client" />
-import { convexTest, type TestConvex } from "convex-test";
-import { describe, it, expect } from "vitest";
+import { convexTest, type TestConvex } from 'convex-test';
+import { describe, it, expect } from 'vitest';
 
 import {
   getCardStateLabel,
   patchCard,
   insertCard,
   deleteCard,
-} from "../../../db/stats/cardAggregates";
-import schema from "../../../schema";
-import type { Doc, Id } from "../../../_generated/dataModel";
+} from '../../../db/stats/cardAggregates';
+import schema from '../../../schema';
+import type { Doc, Id } from '../../../_generated/dataModel';
 
-const modules = import.meta.glob("/convex/**/*.ts");
+const modules = import.meta.glob('/convex/**/*.ts');
 
 // Build the minimum-viable card document the helper actually reads.
 // Cast through `unknown` so TypeScript doesn't require the unused fields.
-function makeCard(overrides: Partial<Doc<"cards">>): Doc<"cards"> {
+function makeCard(overrides: Partial<Doc<'cards'>>): Doc<'cards'> {
   return {
-    _id: "cards:test" as Doc<"cards">["_id"],
+    _id: 'cards:test' as Doc<'cards'>['_id'],
     _creationTime: 0,
-    deckId: "decks:test" as Doc<"cards">["deckId"],
-    textId: "texts:test" as Doc<"cards">["textId"],
-    collectionId: "collections:test" as Doc<"cards">["collectionId"],
+    deckId: 'decks:test' as Doc<'cards'>['deckId'],
+    textId: 'texts:test' as Doc<'cards'>['textId'],
+    collectionId: 'collections:test' as Doc<'cards'>['collectionId'],
     dueDate: 0,
     isMastered: false,
     isHidden: false,
-    schedulingPhase: "preReview",
+    schedulingPhase: 'preReview',
     preReviewCount: 0,
     ...overrides,
-  } as unknown as Doc<"cards">;
+  } as unknown as Doc<'cards'>;
 }
 
-function withFsrsState(state: number): Partial<Doc<"cards">> {
+function withFsrsState(state: number): Partial<Doc<'cards'>> {
   return {
-    schedulingPhase: "review",
+    schedulingPhase: 'review',
     fsrsState: {
       due: 0,
       stability: 1,
@@ -49,50 +49,54 @@ function withFsrsState(state: number): Partial<Doc<"cards">> {
   };
 }
 
-describe("getCardStateLabel", () => {
+describe('getCardStateLabel', () => {
   it("returns 'hidden' when isHidden is true (overrides everything)", () => {
-    const card = makeCard({ isHidden: true, isMastered: true, ...withFsrsState(2) });
-    expect(getCardStateLabel(card)).toBe("hidden");
+    const card = makeCard({
+      isHidden: true,
+      isMastered: true,
+      ...withFsrsState(2),
+    });
+    expect(getCardStateLabel(card)).toBe('hidden');
   });
 
   it("returns 'mastered' when isMastered is true (and not hidden)", () => {
     const card = makeCard({ isMastered: true, ...withFsrsState(2) });
-    expect(getCardStateLabel(card)).toBe("mastered");
+    expect(getCardStateLabel(card)).toBe('mastered');
   });
 
   it("returns 'new' for cards in the preReview phase", () => {
-    const card = makeCard({ schedulingPhase: "preReview", preReviewCount: 0 });
-    expect(getCardStateLabel(card)).toBe("new");
+    const card = makeCard({ schedulingPhase: 'preReview', preReviewCount: 0 });
+    expect(getCardStateLabel(card)).toBe('new');
   });
 
   it("returns 'new' for preReview cards even after some pre-review passes", () => {
-    const card = makeCard({ schedulingPhase: "preReview", preReviewCount: 3 });
-    expect(getCardStateLabel(card)).toBe("new");
+    const card = makeCard({ schedulingPhase: 'preReview', preReviewCount: 3 });
+    expect(getCardStateLabel(card)).toBe('new');
   });
 
   it("returns 'new' when in review phase but fsrsState.state=0", () => {
     const card = makeCard(withFsrsState(0));
-    expect(getCardStateLabel(card)).toBe("new");
+    expect(getCardStateLabel(card)).toBe('new');
   });
 
   it("returns 'learning' when fsrsState.state=1", () => {
     const card = makeCard(withFsrsState(1));
-    expect(getCardStateLabel(card)).toBe("learning");
+    expect(getCardStateLabel(card)).toBe('learning');
   });
 
   it("returns 'review' when fsrsState.state=2", () => {
     const card = makeCard(withFsrsState(2));
-    expect(getCardStateLabel(card)).toBe("review");
+    expect(getCardStateLabel(card)).toBe('review');
   });
 
   it("returns 'relearning' when fsrsState.state=3", () => {
     const card = makeCard(withFsrsState(3));
-    expect(getCardStateLabel(card)).toBe("relearning");
+    expect(getCardStateLabel(card)).toBe('relearning');
   });
 
   it("falls back to 'new' for an out-of-range state index", () => {
     const card = makeCard(withFsrsState(99));
-    expect(getCardStateLabel(card)).toBe("new");
+    expect(getCardStateLabel(card)).toBe('new');
   });
 });
 
@@ -117,71 +121,71 @@ async function seedLegacyMasteryFixture(
   } = opts;
 
   return t.run(async (ctx) => {
-    const legacyA1: Id<"collections"> = await ctx.db.insert("collections", {
-      name: "A1",
+    const legacyA1: Id<'collections'> = await ctx.db.insert('collections', {
+      name: 'A1',
       textCount: 0,
     });
-    const datasetId: Id<"datasets"> = await ctx.db.insert("datasets", {
-      slug: "ogte-curated",
-      version: "1.0.0",
+    const datasetId: Id<'datasets'> = await ctx.db.insert('datasets', {
+      slug: 'ogte-curated',
+      version: '1.0.0',
       publishedAt: Date.now(),
       isActive: true,
     });
-    const newL02: Id<"collections"> = await ctx.db.insert("collections", {
-      name: "L02",
+    const newL02: Id<'collections'> = await ctx.db.insert('collections', {
+      name: 'L02',
       textCount: 0,
       datasetId,
-      code: "L02",
-      cefrTier: "A1",
+      code: 'L02',
+      cefrTier: 'A1',
       order: 2,
-      displayName: "A1.1",
+      displayName: 'A1.1',
     });
-    const courseId: Id<"courses"> = await ctx.db.insert("courses", {
-      userId: "user_A",
-      baseLanguages: ["en"],
-      targetLanguages: ["es"],
+    const courseId: Id<'courses'> = await ctx.db.insert('courses', {
+      userId: 'user_A',
+      baseLanguages: ['en'],
+      targetLanguages: ['es'],
     });
-    const deckId: Id<"decks"> = await ctx.db.insert("decks", {
+    const deckId: Id<'decks'> = await ctx.db.insert('decks', {
       courseId,
-      name: "d",
+      name: 'd',
       cardCount: 1,
     });
-    const textId = await ctx.db.insert("texts", {
-      text: "Hola",
-      language: "es",
+    const textId = await ctx.db.insert('texts', {
+      text: 'Hola',
+      language: 'es',
       userCreated: true,
-      userId: "user_A",
+      userId: 'user_A',
       collectionId: legacyA1,
       collectionRank: 1,
     });
-    const cardId: Id<"cards"> = await ctx.db.insert("cards", {
+    const cardId: Id<'cards'> = await ctx.db.insert('cards', {
       deckId,
       textId,
       collectionId: legacyA1,
-      collectionOrigin: "premade",
+      collectionOrigin: 'premade',
       dueDate: Date.now(),
       isMastered: false,
       isHidden: false,
-      schedulingPhase: "preReview",
+      schedulingPhase: 'preReview',
       preReviewCount: 0,
     });
-    const legacyProgressId = await ctx.db.insert("collectionProgress", {
-      userId: "user_A",
+    const legacyProgressId = await ctx.db.insert('collectionProgress', {
+      userId: 'user_A',
       courseId,
       collectionId: legacyA1,
       cardsAdded: 1,
       cardsLearned: 0,
       cardsMastered: legacyCardsMastered,
     });
-    const destProgressId = await ctx.db.insert("collectionProgress", {
-      userId: "user_A",
+    const destProgressId = await ctx.db.insert('collectionProgress', {
+      userId: 'user_A',
       courseId,
       collectionId: newL02,
       cardsAdded: 0,
       cardsLearned: 0,
       cardsMastered: destCardsMastered,
     });
-    await ctx.db.insert("courseSettings", {
+    await ctx.db.insert('courseSettings', {
       courseId,
       initialReviewCount: 0,
       ...(reconciled ? { reconciledDatasetId: datasetId } : {}),
@@ -190,8 +194,8 @@ async function seedLegacyMasteryFixture(
   });
 }
 
-describe("patchCard → bumpCardsMastered legacy redirect", () => {
-  it("redirects mastery on a legacy card to the new collection when reconciled", async () => {
+describe('patchCard → bumpCardsMastered legacy redirect', () => {
+  it('redirects mastery on a legacy card to the new collection when reconciled', async () => {
     const t = convexTest(schema, modules);
     const { cardId, legacyProgressId, destProgressId } =
       await seedLegacyMasteryFixture(t, { reconciled: true });
@@ -207,7 +211,7 @@ describe("patchCard → bumpCardsMastered legacy redirect", () => {
     expect(dest?.cardsMastered).toBe(1);
   });
 
-  it("bumps the legacy row when the course is NOT reconciled", async () => {
+  it('bumps the legacy row when the course is NOT reconciled', async () => {
     const t = convexTest(schema, modules);
     const { cardId, legacyProgressId, destProgressId } =
       await seedLegacyMasteryFixture(t, { reconciled: false });
@@ -223,7 +227,7 @@ describe("patchCard → bumpCardsMastered legacy redirect", () => {
     expect(dest?.cardsMastered).toBe(0);
   });
 
-  it("does not bump on demaster (true → false transitions)", async () => {
+  it('does not bump on demaster (true → false transitions)', async () => {
     const t = convexTest(schema, modules);
     const { cardId, legacyProgressId, destProgressId } =
       await seedLegacyMasteryFixture(t, { reconciled: true });
@@ -245,65 +249,65 @@ describe("patchCard → bumpCardsMastered legacy redirect", () => {
     expect(dest?.cardsMastered).toBe(0);
   });
 
-  it("bumps a new-dataset collection directly (no redirect)", async () => {
+  it('bumps a new-dataset collection directly (no redirect)', async () => {
     // When the card already points at a new collection, the redirect must be
     // a no-op even if the user is reconciled.
     const t = convexTest(schema, modules);
     const { courseId, deckId, newL02, newProgressId, cardId } = await t.run(
       async (ctx) => {
-        const datasetId: Id<"datasets"> = await ctx.db.insert("datasets", {
-          slug: "ogte-curated",
-          version: "1.0.0",
+        const datasetId: Id<'datasets'> = await ctx.db.insert('datasets', {
+          slug: 'ogte-curated',
+          version: '1.0.0',
           publishedAt: Date.now(),
           isActive: true,
         });
-        const newL02: Id<"collections"> = await ctx.db.insert("collections", {
-          name: "L02",
+        const newL02: Id<'collections'> = await ctx.db.insert('collections', {
+          name: 'L02',
           textCount: 0,
           datasetId,
-          code: "L02",
-          cefrTier: "A1",
+          code: 'L02',
+          cefrTier: 'A1',
           order: 2,
-          displayName: "A1.1",
+          displayName: 'A1.1',
         });
-        const courseId: Id<"courses"> = await ctx.db.insert("courses", {
-          userId: "user_A",
-          baseLanguages: ["en"],
-          targetLanguages: ["es"],
+        const courseId: Id<'courses'> = await ctx.db.insert('courses', {
+          userId: 'user_A',
+          baseLanguages: ['en'],
+          targetLanguages: ['es'],
         });
-        const deckId: Id<"decks"> = await ctx.db.insert("decks", {
+        const deckId: Id<'decks'> = await ctx.db.insert('decks', {
           courseId,
-          name: "d",
+          name: 'd',
           cardCount: 1,
         });
-        const textId = await ctx.db.insert("texts", {
-          text: "Hola",
-          language: "es",
+        const textId = await ctx.db.insert('texts', {
+          text: 'Hola',
+          language: 'es',
           userCreated: true,
-          userId: "user_A",
+          userId: 'user_A',
           collectionId: newL02,
           collectionRank: 1,
         });
-        const cardId = await ctx.db.insert("cards", {
+        const cardId = await ctx.db.insert('cards', {
           deckId,
           textId,
           collectionId: newL02,
-          collectionOrigin: "premade",
+          collectionOrigin: 'premade',
           dueDate: Date.now(),
           isMastered: false,
           isHidden: false,
-          schedulingPhase: "preReview",
+          schedulingPhase: 'preReview',
           preReviewCount: 0,
         });
-        const newProgressId = await ctx.db.insert("collectionProgress", {
-          userId: "user_A",
+        const newProgressId = await ctx.db.insert('collectionProgress', {
+          userId: 'user_A',
           courseId,
           collectionId: newL02,
           cardsAdded: 1,
           cardsLearned: 0,
           cardsMastered: 0,
         });
-        await ctx.db.insert("courseSettings", {
+        await ctx.db.insert('courseSettings', {
           courseId,
           initialReviewCount: 0,
           reconciledDatasetId: datasetId,
@@ -325,80 +329,80 @@ describe("patchCard → bumpCardsMastered legacy redirect", () => {
     void newL02;
   });
 
-  it("does not redirect a custom collection whose name happens to be in the legacy map", async () => {
+  it('does not redirect a custom collection whose name happens to be in the legacy map', async () => {
     // A user with a custom collection literally named "A1" must not have
     // their mastery routed to the OGTE L02. Custom collections have no
     // datasetId; the redirect guard checks for that.
     const t = convexTest(schema, modules);
     const { customProgressId, cardId } = await t.run(async (ctx) => {
       // Set up a reconciled course on an active OGTE dataset.
-      const datasetId: Id<"datasets"> = await ctx.db.insert("datasets", {
-        slug: "ogte-curated",
-        version: "1.0.0",
+      const datasetId: Id<'datasets'> = await ctx.db.insert('datasets', {
+        slug: 'ogte-curated',
+        version: '1.0.0',
         publishedAt: Date.now(),
         isActive: true,
       });
-      const newL02: Id<"collections"> = await ctx.db.insert("collections", {
-        name: "L02",
+      const newL02: Id<'collections'> = await ctx.db.insert('collections', {
+        name: 'L02',
         textCount: 0,
         datasetId,
-        code: "L02",
-        cefrTier: "A1",
+        code: 'L02',
+        cefrTier: 'A1',
         order: 2,
-        displayName: "A1.1",
+        displayName: 'A1.1',
       });
       // Custom collection that *happens* to share the legacy "A1" name.
-      const customA1: Id<"collections"> = await ctx.db.insert("collections", {
-        name: "A1",
+      const customA1: Id<'collections'> = await ctx.db.insert('collections', {
+        name: 'A1',
         textCount: 0,
         // No datasetId. This is a user-owned custom collection.
       });
-      const courseId: Id<"courses"> = await ctx.db.insert("courses", {
-        userId: "user_A",
-        baseLanguages: ["en"],
-        targetLanguages: ["es"],
+      const courseId: Id<'courses'> = await ctx.db.insert('courses', {
+        userId: 'user_A',
+        baseLanguages: ['en'],
+        targetLanguages: ['es'],
       });
-      const deckId: Id<"decks"> = await ctx.db.insert("decks", {
+      const deckId: Id<'decks'> = await ctx.db.insert('decks', {
         courseId,
-        name: "d",
+        name: 'd',
         cardCount: 1,
       });
-      const textId = await ctx.db.insert("texts", {
-        text: "Hola",
-        language: "es",
+      const textId = await ctx.db.insert('texts', {
+        text: 'Hola',
+        language: 'es',
         userCreated: true,
-        userId: "user_A",
+        userId: 'user_A',
         collectionId: customA1,
         collectionRank: 1,
       });
-      const cardId = await ctx.db.insert("cards", {
+      const cardId = await ctx.db.insert('cards', {
         deckId,
         textId,
         collectionId: customA1,
-        collectionOrigin: "custom",
+        collectionOrigin: 'custom',
         dueDate: Date.now(),
         isMastered: false,
         isHidden: false,
-        schedulingPhase: "preReview",
+        schedulingPhase: 'preReview',
         preReviewCount: 0,
       });
-      const customProgressId = await ctx.db.insert("collectionProgress", {
-        userId: "user_A",
+      const customProgressId = await ctx.db.insert('collectionProgress', {
+        userId: 'user_A',
         courseId,
         collectionId: customA1,
         cardsAdded: 1,
         cardsLearned: 0,
         cardsMastered: 0,
       });
-      await ctx.db.insert("collectionProgress", {
-        userId: "user_A",
+      await ctx.db.insert('collectionProgress', {
+        userId: 'user_A',
         courseId,
         collectionId: newL02,
         cardsAdded: 0,
         cardsLearned: 0,
         cardsMastered: 0,
       });
-      await ctx.db.insert("courseSettings", {
+      await ctx.db.insert('courseSettings', {
         courseId,
         initialReviewCount: 0,
         reconciledDatasetId: datasetId,
@@ -428,28 +432,28 @@ describe("patchCard → bumpCardsMastered legacy redirect", () => {
 
 // --- insertCard / deleteCard: decks.cardCount single writer -----------------
 
-describe("insertCard / deleteCard: decks.cardCount maintenance", () => {
+describe('insertCard / deleteCard: decks.cardCount maintenance', () => {
   async function seedDeck(t: TestConvex<typeof schema>, cardCount: number) {
     return t.run(async (ctx) => {
-      const collectionId = await ctx.db.insert("collections", {
-        name: "A1",
+      const collectionId = await ctx.db.insert('collections', {
+        name: 'A1',
         textCount: 0,
       });
-      const courseId = await ctx.db.insert("courses", {
-        userId: "user_A",
-        baseLanguages: ["en"],
-        targetLanguages: ["es"],
+      const courseId = await ctx.db.insert('courses', {
+        userId: 'user_A',
+        baseLanguages: ['en'],
+        targetLanguages: ['es'],
       });
-      const deckId = await ctx.db.insert("decks", {
+      const deckId = await ctx.db.insert('decks', {
         courseId,
-        name: "d",
+        name: 'd',
         cardCount,
       });
-      const textId = await ctx.db.insert("texts", {
-        text: "Hola",
-        language: "es",
+      const textId = await ctx.db.insert('texts', {
+        text: 'Hola',
+        language: 'es',
         userCreated: true,
-        userId: "user_A",
+        userId: 'user_A',
         collectionId,
         collectionRank: 1,
       });
@@ -458,28 +462,31 @@ describe("insertCard / deleteCard: decks.cardCount maintenance", () => {
   }
 
   function cardData(
-    deckId: Id<"decks">,
-    textId: Id<"texts">,
-    collectionId: Id<"collections">,
+    deckId: Id<'decks'>,
+    textId: Id<'texts'>,
+    collectionId: Id<'collections'>,
   ) {
     return {
       deckId,
       textId,
       collectionId,
-      collectionOrigin: "premade" as const,
+      collectionOrigin: 'premade' as const,
       dueDate: 0,
       isMastered: false,
       isHidden: false,
-      schedulingPhase: "preReview" as const,
+      schedulingPhase: 'preReview' as const,
       preReviewCount: 0,
     };
   }
 
-  async function getCardCount(t: TestConvex<typeof schema>, deckId: Id<"decks">) {
+  async function getCardCount(
+    t: TestConvex<typeof schema>,
+    deckId: Id<'decks'>,
+  ) {
     return t.run(async (ctx) => (await ctx.db.get(deckId))?.cardCount);
   }
 
-  it("insert → delete returns the counter to its baseline", async () => {
+  it('insert → delete returns the counter to its baseline', async () => {
     const t = convexTest(schema, modules);
     const { deckId, textId, collectionId } = await seedDeck(t, 0);
 
@@ -499,7 +506,7 @@ describe("insertCard / deleteCard: decks.cardCount maintenance", () => {
     expect(await getCardCount(t, deckId)).toBe(0);
   });
 
-  it("a repeat delete of the same card id is a counter no-op", async () => {
+  it('a repeat delete of the same card id is a counter no-op', async () => {
     const t = convexTest(schema, modules);
     const { deckId, textId, collectionId } = await seedDeck(t, 0);
     const cardId = await t.run(async (ctx) =>
@@ -510,13 +517,13 @@ describe("insertCard / deleteCard: decks.cardCount maintenance", () => {
     expect(await getCardCount(t, deckId)).toBe(0);
   });
 
-  it("deleteCard floors at 0 when the counter had drifted low", async () => {
+  it('deleteCard floors at 0 when the counter had drifted low', async () => {
     const t = convexTest(schema, modules);
     const { deckId, textId, collectionId } = await seedDeck(t, 0);
     // Bypass insertCard (the pre-repair drift shape): a row exists but the
     // counter reads 0. Deleting must clamp, not go to -1.
     const cardId = await t.run(async (ctx) =>
-      ctx.db.insert("cards", cardData(deckId, textId, collectionId)),
+      ctx.db.insert('cards', cardData(deckId, textId, collectionId)),
     );
     await t.run(async (ctx) => deleteCard(ctx, cardId));
     expect(await getCardCount(t, deckId)).toBe(0);

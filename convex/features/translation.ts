@@ -66,9 +66,16 @@ function getServiceAccountCredentials(): ServiceAccountCredentials {
   return JSON.parse(json);
 }
 
-let cachedToken: { token: string; projectId: string; expiresAt: number } | null = null;
+let cachedToken: {
+  token: string;
+  projectId: string;
+  expiresAt: number;
+} | null = null;
 
-async function getGoogleAccessToken(): Promise<{ token: string; projectId: string }> {
+async function getGoogleAccessToken(): Promise<{
+  token: string;
+  projectId: string;
+}> {
   if (cachedToken && Date.now() < cachedToken.expiresAt) {
     return { token: cachedToken.token, projectId: cachedToken.projectId };
   }
@@ -92,7 +99,9 @@ async function getGoogleAccessToken(): Promise<{ token: string; projectId: strin
   });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Service account token exchange failed: ${response.status} - ${text}`);
+    throw new Error(
+      `Service account token exchange failed: ${response.status} - ${text}`,
+    );
   }
   const data = (await response.json()) as { access_token: string };
 
@@ -167,12 +176,24 @@ export async function translateText(
  * GOOGLE_TRANSLATE_CODE_MAP first, then check membership.
  */
 export const GOOGLE_V3_ROMANIZE_SUPPORTED = new Set([
-  'am', 'ar', 'be', 'bn', 'gu', 'hi', 'ja',
-  'kn', 'my', 'ru', 'sr', 'ta', 'uk',
+  'am',
+  'ar',
+  'be',
+  'bn',
+  'gu',
+  'hi',
+  'ja',
+  'kn',
+  'my',
+  'ru',
+  'sr',
+  'ta',
+  'uk',
 ]);
 
 /** 4xx other than 429 will not become the empty-result flake on retry. */
-const ROMANIZE_NON_RETRYABLE_STATUS = /\bGoogle romanize API error: (400|401|403|404)\b/;
+const ROMANIZE_NON_RETRYABLE_STATUS =
+  /\bGoogle romanize API error: (400|401|403|404)\b/;
 
 /** Max attempts when calling Google v3 romanizeText. The endpoint
  * occasionally returns `200 {"romanizations":[{}]}` for short inputs
@@ -314,7 +335,5 @@ export async function romanizeText(
       }
     }
   }
-  throw lastError instanceof Error
-    ? lastError
-    : new Error(String(lastError));
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }

@@ -44,10 +44,7 @@ import {
   COLLECTION_PREVIEW_SIZE,
   collectionRemaining,
 } from '@/convex/lib/collections';
-import type {
-  BrowseTextRow,
-  CollectionBrowse,
-} from './useCollectionDetail';
+import type { BrowseTextRow, CollectionBrowse } from './useCollectionDetail';
 
 interface CollectionDetailDialogProps {
   open: boolean;
@@ -140,7 +137,9 @@ export function CollectionDetailDialog({
     let anchor: { ids: string[]; top: number } | null = null;
     if (container) {
       const containerTop = container.getBoundingClientRect().top;
-      for (const row of container.querySelectorAll<HTMLElement>('[data-row-id]')) {
+      for (const row of container.querySelectorAll<HTMLElement>(
+        '[data-row-id]',
+      )) {
         if (anchor === null) {
           // Skip rows fully above the viewport; the first row whose bottom
           // edge is inside it becomes the anchor, and the only row that
@@ -197,13 +196,17 @@ export function CollectionDetailDialog({
 
   // Paging is deliberately button-only, nothing loads from scrolling alone.
   // "Show earlier" (top) and "Show more" (bottom) are the sole fetch triggers.
-  const canLoadEarlier = browse.showAdded && browse.earlierStatus === 'CanLoadMore';
+  const canLoadEarlier =
+    browse.showAdded && browse.earlierStatus === 'CanLoadMore';
 
   if (!collectionName) return null;
 
   const titleText = displayName ?? collectionName;
   const progress = totalTexts > 0 ? (cardsAdded / totalTexts) * 100 : 0;
-  const remaining = collectionRemaining(totalTexts, { cardsAdded, ignoredCount });
+  const remaining = collectionRemaining(totalTexts, {
+    cardsAdded,
+    ignoredCount,
+  });
   const isCompleteProgress = isComplete && totalTexts > 0;
   // Description is keyed by the raw collection name; the localized display
   // title (e.g. "Manually Added") is for rendering only.
@@ -214,7 +217,8 @@ export function CollectionDetailDialog({
   );
 
   const isInitialLoading = browse.status === 'LoadingFirstPage';
-  const isLoadingMore = browse.status === 'LoadingMore' || browse.isPreparingMore;
+  const isLoadingMore =
+    browse.status === 'LoadingMore' || browse.isPreparingMore;
   const isLoadingEarlier = browse.earlierStatus === 'LoadingMore';
 
   const visibleRows = browse.rows.filter(browse.isRowVisible);
@@ -228,7 +232,10 @@ export function CollectionDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col gap-0 p-0 overflow-hidden" data-tutorial={TUTORIAL_ANCHORS.collectionDetail}>
+      <DialogContent
+        className="sm:max-w-md max-h-[80vh] flex flex-col gap-0 p-0 overflow-hidden"
+        data-tutorial={TUTORIAL_ANCHORS.collectionDetail}
+      >
         {/* Progress accent bar */}
         <div className="h-1.5 bg-muted rounded-t-lg overflow-hidden">
           <div
@@ -258,27 +265,35 @@ export function CollectionDetailDialog({
           <div className="flex flex-wrap gap-3 text-xs">
             <div className="flex items-center gap-1">
               <Layers className="h-3 w-3 text-muted-foreground" />
-              <span>{cardsAdded} {t('added')}</span>
+              <span>
+                {cardsAdded} {t('added')}
+              </span>
             </div>
             <div className="flex items-center gap-1">
               <ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
-              <span>{prioritizedCount} {t('prioritizedCount')}</span>
+              <span>
+                {prioritizedCount} {t('prioritizedCount')}
+              </span>
             </div>
             {ignoredCount > 0 && (
               <div className="flex items-center gap-1">
                 <EyeOff className="h-3 w-3 text-muted-foreground" />
-                <span>{ignoredCount} {t('ignoredCount')}</span>
+                <span>
+                  {ignoredCount} {t('ignoredCount')}
+                </span>
               </div>
             )}
             <div className="flex items-center gap-1">
               <BookOpen className="h-3 w-3 text-muted-foreground" />
-              <span>{remaining} {t('remaining')}</span>
+              <span>
+                {remaining} {t('remaining')}
+              </span>
             </div>
           </div>
 
           {/* Action buttons */}
           <div className="grid grid-cols-2 gap-2">
-            {(!isComplete || showToggleWhenComplete) ? (
+            {!isComplete || showToggleWhenComplete ? (
               <Button
                 variant={isActive ? 'secondary' : 'outline'}
                 className="justify-center"
@@ -293,12 +308,10 @@ export function CollectionDetailDialog({
                 {t('done')}
               </div>
             )}
-            {!isComplete && !hideAddCards && (
-              sentencesRemaining === 0 ? (
-                <Button
-                  onClick={onUpgrade}
-                  className="justify-center gap-1.5"
-                >
+            {!isComplete &&
+              !hideAddCards &&
+              (sentencesRemaining === 0 ? (
+                <Button onClick={onUpgrade} className="justify-center gap-1.5">
                   <Lock className="h-4 w-4" />
                   Upgrade
                 </Button>
@@ -320,14 +333,15 @@ export function CollectionDetailDialog({
                         count: Math.min(
                           COLLECTION_PREVIEW_SIZE,
                           remaining,
-                          ...(sentencesRemaining != null ? [sentencesRemaining] : []),
+                          ...(sentencesRemaining != null
+                            ? [sentencesRemaining]
+                            : []),
                         ),
                       })}
                     </>
                   )}
                 </Button>
-              )
-            )}
+              ))}
           </div>
 
           {/* Browse controls */}
@@ -504,7 +518,10 @@ function PreviewTextRow({
   const isAddPending = browse.pendingAddTextIds.has(row._id);
   const addLocked = sentencesRemaining === 0;
 
-  const renderLine = (translation: BrowseTextRow['translations'][number], isBase: boolean) => {
+  const renderLine = (
+    translation: BrowseTextRow['translations'][number],
+    isBase: boolean,
+  ) => {
     const audio = row.audioRecordings.find(
       (a) => a.language === translation.language,
     );
@@ -524,10 +541,7 @@ function PreviewTextRow({
             isActive={isActiveLine}
             enabled={highlightEnabled}
             furigana={showFurigana ? translation.furigana : undefined}
-            className={cn(
-              'text-sm leading-relaxed',
-              isBase && 'font-medium',
-            )}
+            className={cn('text-sm leading-relaxed', isBase && 'font-medium')}
           />
           <AnnotationLines
             romanization={translation.romanization}
@@ -563,10 +577,17 @@ function PreviewTextRow({
       data-row-status={row.status}
       data-testid={`collection-text-${row.status}`}
     >
-      <div className={cn('flex flex-1 items-center p-3 min-w-0', isIgnored && 'opacity-50')}>
+      <div
+        className={cn(
+          'flex flex-1 items-center p-3 min-w-0',
+          isIgnored && 'opacity-50',
+        )}
+      >
         <div className="w-full">
           <div className="space-y-1">
-            {baseTranslations.map((translation) => renderLine(translation, true))}
+            {baseTranslations.map((translation) =>
+              renderLine(translation, true),
+            )}
             {baseTranslations.length === 0 && (
               <p
                 dir={getTextDirection(row.sourceLanguage)}
@@ -580,7 +601,9 @@ function PreviewTextRow({
           <Separator className="my-2" />
 
           <div className="space-y-1">
-            {targetTranslations.map((translation) => renderLine(translation, false))}
+            {targetTranslations.map((translation) =>
+              renderLine(translation, false),
+            )}
           </div>
         </div>
       </div>

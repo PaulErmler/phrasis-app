@@ -161,8 +161,12 @@ describe('Spanish runs on Gemini TTS', () => {
   it('getVoiceForLanguageVariant picks the matching Gemini accent for es_mixed', () => {
     // Repeat a few times since selection is random within the matched pool.
     for (let i = 0; i < 10; i++) {
-      expect(getVoiceForLanguageVariant('es_mixed', 'es-ES')).toMatch(/@es-ES$/);
-      expect(getVoiceForLanguageVariant('es_mixed', 'es-US')).toMatch(/@es-US$/);
+      expect(getVoiceForLanguageVariant('es_mixed', 'es-ES')).toMatch(
+        /@es-ES$/,
+      );
+      expect(getVoiceForLanguageVariant('es_mixed', 'es-US')).toMatch(
+        /@es-US$/,
+      );
     }
   });
 });
@@ -170,7 +174,11 @@ describe('Spanish runs on Gemini TTS', () => {
 describe('resolveCardSpeakerGenders', () => {
   it('definitive speakerGender is the source of truth and mirrors into audio', () => {
     const r = resolveCardSpeakerGenders(
-      { speakerGender: 'female', audioSpeakerGender: undefined, userCreated: false },
+      {
+        speakerGender: 'female',
+        audioSpeakerGender: undefined,
+        userCreated: false,
+      },
       'seed1',
     );
     expect(r.audioSpeakerGender).toBe('female');
@@ -189,7 +197,11 @@ describe('resolveCardSpeakerGenders', () => {
 
   it('custom + neutral preserves speakerGender and only resolves audio', () => {
     const r = resolveCardSpeakerGenders(
-      { speakerGender: 'neutral', audioSpeakerGender: undefined, userCreated: true },
+      {
+        speakerGender: 'neutral',
+        audioSpeakerGender: undefined,
+        userCreated: true,
+      },
       'seed-custom',
     );
     expect(['male', 'female']).toContain(r.audioSpeakerGender);
@@ -200,7 +212,11 @@ describe('resolveCardSpeakerGenders', () => {
 
   it('premade + undefined coin-flips BOTH fields to the same value', () => {
     const r = resolveCardSpeakerGenders(
-      { speakerGender: undefined, audioSpeakerGender: undefined, userCreated: false },
+      {
+        speakerGender: undefined,
+        audioSpeakerGender: undefined,
+        userCreated: false,
+      },
       'seed-premade',
     );
     expect(r.genderPatch.speakerGender).toBe(r.audioSpeakerGender);
@@ -209,11 +225,19 @@ describe('resolveCardSpeakerGenders', () => {
 
   it('is deterministic per seed (retry-stable, no re-roll)', () => {
     const a = resolveCardSpeakerGenders(
-      { speakerGender: undefined, audioSpeakerGender: undefined, userCreated: false },
+      {
+        speakerGender: undefined,
+        audioSpeakerGender: undefined,
+        userCreated: false,
+      },
       'stable-seed',
     );
     const b = resolveCardSpeakerGenders(
-      { speakerGender: undefined, audioSpeakerGender: undefined, userCreated: false },
+      {
+        speakerGender: undefined,
+        audioSpeakerGender: undefined,
+        userCreated: false,
+      },
       'stable-seed',
     );
     expect(a.audioSpeakerGender).toBe(b.audioSpeakerGender);
@@ -221,7 +245,11 @@ describe('resolveCardSpeakerGenders', () => {
 
   it('preserves a prior audioSpeakerGender instead of re-rolling', () => {
     const r = resolveCardSpeakerGenders(
-      { speakerGender: undefined, audioSpeakerGender: 'female', userCreated: false },
+      {
+        speakerGender: undefined,
+        audioSpeakerGender: 'female',
+        userCreated: false,
+      },
       'seed-x',
     );
     expect(r.audioSpeakerGender).toBe('female');

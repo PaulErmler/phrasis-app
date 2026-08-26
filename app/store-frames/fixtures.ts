@@ -5,7 +5,10 @@
  *
  * Nothing here is used by the app itself. See `app/store-frames/page.tsx`.
  */
-import type { CardTranslation, CardAudioRecording } from '@/components/app/learning/types';
+import type {
+  CardTranslation,
+  CardAudioRecording,
+} from '@/components/app/learning/types';
 
 export const TZ = 'Europe/Berlin';
 
@@ -52,8 +55,20 @@ export const shadowCard: {
     },
   ],
   audioRecordings: [
-    { language: 'en', voiceName: 'en-US-Chirp3-HD-Aoede', url: SILENT_AUDIO, wordTimings: null, ttsQuality: 'validated' },
-    { language: 'es', voiceName: 'es-ES-Chirp3-HD-Charon', url: SILENT_AUDIO, wordTimings: null, ttsQuality: 'validated' },
+    {
+      language: 'en',
+      voiceName: 'en-US-Chirp3-HD-Aoede',
+      url: SILENT_AUDIO,
+      wordTimings: null,
+      ttsQuality: 'validated',
+    },
+    {
+      language: 'es',
+      voiceName: 'es-ES-Chirp3-HD-Charon',
+      url: SILENT_AUDIO,
+      wordTimings: null,
+      ttsQuality: 'validated',
+    },
   ],
 };
 
@@ -79,8 +94,20 @@ export const romanizedCard: {
     },
   ],
   audioRecordings: [
-    { language: 'en', voiceName: 'en-US-Chirp3-HD-Aoede', url: SILENT_AUDIO, wordTimings: null, ttsQuality: 'validated' },
-    { language: 'ja', voiceName: 'ja-JP-Chirp3-HD-Puck', url: SILENT_AUDIO, wordTimings: null, ttsQuality: 'validated' },
+    {
+      language: 'en',
+      voiceName: 'en-US-Chirp3-HD-Aoede',
+      url: SILENT_AUDIO,
+      wordTimings: null,
+      ttsQuality: 'validated',
+    },
+    {
+      language: 'ja',
+      voiceName: 'ja-JP-Chirp3-HD-Puck',
+      url: SILENT_AUDIO,
+      wordTimings: null,
+      ttsQuality: 'validated',
+    },
   ],
 };
 
@@ -91,12 +118,34 @@ export const writeCard: {
 } = {
   sourceText: 'Good morning, how are you?',
   translations: [
-    { language: 'en', text: 'Good morning, how are you?', isBaseLanguage: true, isTargetLanguage: false },
-    { language: 'es', text: 'Buenos días, ¿cómo está?', isBaseLanguage: false, isTargetLanguage: true },
+    {
+      language: 'en',
+      text: 'Good morning, how are you?',
+      isBaseLanguage: true,
+      isTargetLanguage: false,
+    },
+    {
+      language: 'es',
+      text: 'Buenos días, ¿cómo está?',
+      isBaseLanguage: false,
+      isTargetLanguage: true,
+    },
   ],
   audioRecordings: [
-    { language: 'en', voiceName: 'en-US-Chirp3-HD-Aoede', url: SILENT_AUDIO, wordTimings: null, ttsQuality: 'validated' },
-    { language: 'es', voiceName: 'es-ES-Chirp3-HD-Charon', url: SILENT_AUDIO, wordTimings: null, ttsQuality: 'validated' },
+    {
+      language: 'en',
+      voiceName: 'en-US-Chirp3-HD-Aoede',
+      url: SILENT_AUDIO,
+      wordTimings: null,
+      ttsQuality: 'validated',
+    },
+    {
+      language: 'es',
+      voiceName: 'es-ES-Chirp3-HD-Charon',
+      url: SILENT_AUDIO,
+      wordTimings: null,
+      ttsQuality: 'validated',
+    },
   ],
 };
 
@@ -146,10 +195,17 @@ export const languageDailyData = dailyData.map((d) => ({
 }));
 
 export const monthlyData = (() => {
-  const byMonth = new Map<string, { totalRepetitions: number; totalNewCards: number; totalTimeMs: number }>();
+  const byMonth = new Map<
+    string,
+    { totalRepetitions: number; totalNewCards: number; totalTimeMs: number }
+  >();
   for (const d of dailyData) {
     const m = d.date.slice(0, 7);
-    const acc = byMonth.get(m) ?? { totalRepetitions: 0, totalNewCards: 0, totalTimeMs: 0 };
+    const acc = byMonth.get(m) ?? {
+      totalRepetitions: 0,
+      totalNewCards: 0,
+      totalTimeMs: 0,
+    };
     acc.totalRepetitions += d.reps;
     acc.totalNewCards += d.newCards;
     acc.totalTimeMs += d.timeMs;
@@ -159,7 +215,12 @@ export const monthlyData = (() => {
 })();
 
 export const weeklyData = (() => {
-  const out: { week: string; totalRepetitions: number; totalNewCards: number; totalTimeMs: number }[] = [];
+  const out: {
+    week: string;
+    totalRepetitions: number;
+    totalNewCards: number;
+    totalTimeMs: number;
+  }[] = [];
   for (let i = 0; i < dailyData.length; i += 7) {
     const chunk = dailyData.slice(i, i + 7);
     out.push({
@@ -172,10 +233,13 @@ export const weeklyData = (() => {
   return out;
 })();
 
-export const heatmapData = dailyData.map((d) => ({ date: d.date, reps: d.reps }));
+export const heatmapData = dailyData.map((d) => ({
+  date: d.date,
+  reps: d.reps,
+}));
 
 /** Reviews per hour of day. Peaks in the evening, dips after lunch. */
 export const hourly = [
-  2, 1, 0, 0, 0, 3, 21, 68, 96, 74, 41, 33,
-  58, 44, 26, 31, 47, 88, 164, 191, 142, 87, 39, 11,
+  2, 1, 0, 0, 0, 3, 21, 68, 96, 74, 41, 33, 58, 44, 26, 31, 47, 88, 164, 191,
+  142, 87, 39, 11,
 ];

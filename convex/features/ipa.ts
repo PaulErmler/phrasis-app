@@ -100,7 +100,13 @@ export const processIpaForSourceText = internalAction({
   },
   returns: v.null(),
   handler: (ctx, args) =>
-    runSourceAnnotation(ctx, 'ipa', args, ipaForText, getIpaSource(args.language)),
+    runSourceAnnotation(
+      ctx,
+      'ipa',
+      args,
+      ipaForText,
+      getIpaSource(args.language),
+    ),
 });
 
 /** IPA for a translation row. */
@@ -112,16 +118,20 @@ export const processIpaForTranslation = internalAction({
   },
   returns: v.null(),
   handler: (ctx, args) =>
-    runTranslationAnnotation(ctx, 'ipa', args, ipaForText, getIpaSource(args.language)),
+    runTranslationAnnotation(
+      ctx,
+      'ipa',
+      args,
+      ipaForText,
+      getIpaSource(args.language),
+    ),
 });
 
 /** IPA for a chat card proposal's entries (see runApprovalAnnotation). */
 export const processIpaForApproval = internalAction({
   args: {
     approvalId: v.id('cardApprovals'),
-    entries: v.array(
-      v.object({ language: v.string(), text: v.string() }),
-    ),
+    entries: v.array(v.object({ language: v.string(), text: v.string() })),
   },
   returns: v.null(),
   handler: (ctx, args) => runApprovalAnnotation(ctx, 'ipa', args, ipaForText),

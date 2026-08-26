@@ -16,8 +16,24 @@ export const FRAME_H = 2868;
 export const PAD_FRAME_W = 2064;
 export const PAD_FRAME_H = 2752;
 
-const PHONE = { logicalW: 390, logicalH: 845, deviceW: 1120, capFont: 92, capPad: '86px 76px 34px', radius: 76, bottom: 54 };
-const PAD = { logicalW: 820, logicalH: 1093, deviceW: 1620, capFont: 128, capPad: '150px 150px 60px', radius: 84, bottom: 90 };
+const PHONE = {
+  logicalW: 390,
+  logicalH: 845,
+  deviceW: 1120,
+  capFont: 92,
+  capPad: '86px 76px 34px',
+  radius: 76,
+  bottom: 54,
+};
+const PAD = {
+  logicalW: 820,
+  logicalH: 1093,
+  deviceW: 1620,
+  capFont: 128,
+  capPad: '150px 150px 60px',
+  radius: 84,
+  bottom: 90,
+};
 
 const HIDE_APP_CHROME = `
   nextjs-portal, [data-nextjs-toast], [data-testid="consent-banner"],
@@ -149,7 +165,9 @@ export function Screen({
           {title}
         </div>
       )}
-      <div className={`flex min-h-0 flex-1 flex-col gap-4 overflow-hidden ${bodyClass}`}>
+      <div
+        className={`flex min-h-0 flex-1 flex-col gap-4 overflow-hidden ${bodyClass}`}
+      >
         {children}
       </div>
       {footer && <div className="flex-none border-t px-4 py-3">{footer}</div>}

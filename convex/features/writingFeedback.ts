@@ -1,17 +1,9 @@
 import { ConvexError, v, type Infer } from 'convex/values';
-import {
-  action,
-  internalMutation,
-  internalQuery,
-} from '../_generated/server';
+import { action, internalMutation, internalQuery } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { generateText } from 'ai';
 import { requireAuthUserId } from '../db/users';
-import {
-  consumeQuota,
-  quotaErrorCode,
-  releaseQuota,
-} from '../usage/helpers';
+import { consumeQuota, quotaErrorCode, releaseQuota } from '../usage/helpers';
 import {
   AI_FEEDBACK_FREE_GRANT,
   AI_FEEDBACK_PAID_GRANT,
@@ -108,9 +100,7 @@ export const writingFeedbackResultValidator = v.object({
     v.literal('error'),
   ),
   // For 'correct': which stored text the answer matched.
-  matched: v.optional(
-    v.union(v.literal('primary'), v.literal('alternative')),
-  ),
+  matched: v.optional(v.union(v.literal('primary'), v.literal('alternative'))),
   corrected: v.optional(v.string()),
   notes: v.optional(v.array(feedbackNoteValidator)),
   /** alsoCorrect + matching register/gender/addressee: `corrected` was stored
@@ -118,7 +108,9 @@ export const writingFeedbackResultValidator = v.object({
   savedAlternative: v.optional(v.boolean()),
 });
 
-export type WritingFeedbackResult = Infer<typeof writingFeedbackResultValidator>;
+export type WritingFeedbackResult = Infer<
+  typeof writingFeedbackResultValidator
+>;
 
 /**
  * "Same answer" for the local gate: punctuation/case/whitespace-insensitive
@@ -276,7 +268,8 @@ export const mirrorAiFeedbackGrant = internalMutation({
       .query('usageQuotas')
       .withIndex('by_userId', (q) => q.eq('userId', args.userId))
       .unique();
-    if (!doc || doc.features[FEATURE_IDS.AI_FEEDBACK] !== undefined) return null;
+    if (!doc || doc.features[FEATURE_IDS.AI_FEEDBACK] !== undefined)
+      return null;
     await ctx.db.patch(doc._id, {
       features: {
         ...doc.features,
@@ -351,7 +344,10 @@ export function parseFeedbackResponse(raw: string): ParsedFeedback | null {
   const obj = parsed as Record<string, unknown>;
 
   const verdict = obj.verdict;
-  if (typeof verdict !== 'string' || !(VERDICTS as readonly string[]).includes(verdict)) {
+  if (
+    typeof verdict !== 'string' ||
+    !(VERDICTS as readonly string[]).includes(verdict)
+  ) {
     return null;
   }
 
@@ -367,9 +363,7 @@ export function parseFeedbackResponse(raw: string): ParsedFeedback | null {
       if (typeof note !== 'object' || note === null) continue;
       const n = note as Record<string, unknown>;
       if (typeof n.text !== 'string' || !n.text.trim()) continue;
-      const type = (NOTE_TYPES as readonly string[]).includes(
-        n.type as string,
-      )
+      const type = (NOTE_TYPES as readonly string[]).includes(n.type as string)
         ? (n.type as (typeof NOTE_TYPES)[number])
         : 'naturalness';
       notes.push({ type, text: n.text.trim().slice(0, MAX_NOTE_CHARS) });
@@ -419,7 +413,10 @@ export const gradeWritingAnswer = action({
 
     const userAnswer = args.userAnswer.trim();
     if (!userAnswer) {
-      throw new ConvexError({ code: 'EMPTY_ANSWER', message: 'Answer is empty' });
+      throw new ConvexError({
+        code: 'EMPTY_ANSWER',
+        message: 'Answer is empty',
+      });
     }
     // Same cap card text lives under; bounds the prompt against injection
     // payloads smuggled through the answer field.
@@ -479,7 +476,8 @@ export const gradeWritingAnswer = action({
           { userId },
         );
       if (provision.provisioned) throw error;
-      const paid = provision.planId !== undefined && provision.planId !== 'free';
+      const paid =
+        provision.planId !== undefined && provision.planId !== 'free';
       const included = paid ? AI_FEEDBACK_PAID_GRANT : AI_FEEDBACK_FREE_GRANT;
       try {
         const res = await autumnFetchRaw(
@@ -598,7 +596,10 @@ ANSWER>>>`;
 
     const parsed = parseFeedbackResponse(text);
     if (!parsed) {
-      console.error('writingFeedback: unparseable grader reply', text.slice(0, 300));
+      console.error(
+        'writingFeedback: unparseable grader reply',
+        text.slice(0, 300),
+      );
       return { verdict: 'error' as const };
     }
 
@@ -625,4 +626,3 @@ ANSWER>>>`;
     };
   },
 });
-

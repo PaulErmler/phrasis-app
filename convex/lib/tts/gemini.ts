@@ -32,10 +32,8 @@ const MP3_KBPS = 48;
 const HOST_IS_LITTLE_ENDIAN =
   new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
-
 function buildStyledInput(text: string, languageName: string): string {
-  const context =
-    `Speak the following text in a natural way like a native ${languageName} speaker would in a way that fits the sentence.`;
+  const context = `Speak the following text in a natural way like a native ${languageName} speaker would in a way that fits the sentence.`;
   return `## Instruction: ${context}\n\n## Transcript: ${text}`;
 }
 

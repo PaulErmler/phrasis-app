@@ -40,41 +40,41 @@ function chatMessagesReducer(
   action: ChatMessagesAction,
 ): ChatMessagesState {
   switch (action.type) {
-  case 'SET_STATUS':
-    return { ...state, status: action.status };
+    case 'SET_STATUS':
+      return { ...state, status: action.status };
 
-  case 'UPDATE_STREAMING':
-    // Automatically transition status based on streaming state
-    if (action.hasStreamingMessages) {
-      // If messages are streaming and we're not already in streaming state
-      if (state.status !== CHAT_STATUS.STREAMING) {
-        return {
-          ...state,
-          status: CHAT_STATUS.STREAMING,
-          hasStreamingMessages: true,
-        };
-      }
-      return { ...state, hasStreamingMessages: true };
-    } else {
-      // No streaming messages - return to ready if we were streaming/submitted
-      if (
-        state.status === CHAT_STATUS.STREAMING ||
+    case 'UPDATE_STREAMING':
+      // Automatically transition status based on streaming state
+      if (action.hasStreamingMessages) {
+        // If messages are streaming and we're not already in streaming state
+        if (state.status !== CHAT_STATUS.STREAMING) {
+          return {
+            ...state,
+            status: CHAT_STATUS.STREAMING,
+            hasStreamingMessages: true,
+          };
+        }
+        return { ...state, hasStreamingMessages: true };
+      } else {
+        // No streaming messages - return to ready if we were streaming/submitted
+        if (
+          state.status === CHAT_STATUS.STREAMING ||
           state.status === CHAT_STATUS.SUBMITTED
-      ) {
-        return {
-          ...state,
-          status: CHAT_STATUS.READY,
-          hasStreamingMessages: false,
-        };
+        ) {
+          return {
+            ...state,
+            status: CHAT_STATUS.READY,
+            hasStreamingMessages: false,
+          };
+        }
+        return { ...state, hasStreamingMessages: false };
       }
-      return { ...state, hasStreamingMessages: false };
-    }
 
-  case 'RESET_THREAD':
-    return { status: CHAT_STATUS.READY, hasStreamingMessages: false };
+    case 'RESET_THREAD':
+      return { status: CHAT_STATUS.READY, hasStreamingMessages: false };
 
-  default:
-    return state;
+    default:
+      return state;
   }
 }
 
@@ -114,9 +114,14 @@ export function useChatMessages({
   );
 
   const isTransitioning = threadId !== activeThreadId;
-  const isLoading = isTransitioning || !messageResult || messageResult.status === 'LoadingFirstPage';
+  const isLoading =
+    isTransitioning ||
+    !messageResult ||
+    messageResult.status === 'LoadingFirstPage';
 
-  const messages: ExtendedUIMessage[] = isTransitioning ? [] : (messageResult?.results ?? []);
+  const messages: ExtendedUIMessage[] = isTransitioning
+    ? []
+    : (messageResult?.results ?? []);
 
   // Monitor streaming status and update button state
   useEffect(() => {

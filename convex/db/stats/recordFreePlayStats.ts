@@ -48,7 +48,11 @@ export async function recordFreePlayStats(
   const nonNegativeTime = Math.max(args.timeSpentMs ?? 0, 0);
   const clampedTime = Math.min(nonNegativeTime, MAX_TIME_PER_PLAY_MS);
 
-  const stats = await getCourseStatsForMutation(ctx, args.userId, args.courseId);
+  const stats = await getCourseStatsForMutation(
+    ctx,
+    args.userId,
+    args.courseId,
+  );
   if (!stats) {
     throw new ConvexError({
       code: 'NOT_FOUND',
@@ -57,18 +61,14 @@ export async function recordFreePlayStats(
   }
 
   const todayDate = getTodayInTimezone(args.timezone);
-  const {
-    newStreak,
-    newLastActivityDate,
-    newFreezeCount,
-    newFreezeUsedDate,
-  } = computeStreakUpdate(
-    stats.lastActivityDate,
-    todayDate,
-    stats.currentStreak,
-    stats.streakFreezeCount,
-    stats.streakFreezeUsedDate,
-  );
+  const { newStreak, newLastActivityDate, newFreezeCount, newFreezeUsedDate } =
+    computeStreakUpdate(
+      stats.lastActivityDate,
+      todayDate,
+      stats.currentStreak,
+      stats.streakFreezeCount,
+      stats.streakFreezeUsedDate,
+    );
 
   // --- Course-level counters ---
   const prevModeReviews: Record<StatsReviewMode, number> = {

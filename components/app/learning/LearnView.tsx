@@ -64,9 +64,12 @@ function WrappedChatPanel({
 }) {
   const chatContext = useLearningChatToggle();
   if (!chatContext) {
-    throw new Error('WrappedChatPanel must be rendered inside LearningChatLayout');
+    throw new Error(
+      'WrappedChatPanel must be rendered inside LearningChatLayout',
+    );
   }
-  const { closeChat, pendingPrompt, claimPrompt, openChatWithAction } = chatContext;
+  const { closeChat, pendingPrompt, claimPrompt, openChatWithAction } =
+    chatContext;
   const {
     approvalsByToolCallId,
     processingApprovals,
@@ -152,7 +155,14 @@ function WrappedChatPanel({
         isLoaded: approvalsLoaded,
       }),
     }),
-    [approvalsByToolCallId, processingApprovals, handleApprove, handleReject, replaceKeepingThread, approvalsLoaded],
+    [
+      approvalsByToolCallId,
+      processingApprovals,
+      handleApprove,
+      handleReject,
+      replaceKeepingThread,
+      approvalsLoaded,
+    ],
   );
 
   return (
@@ -241,10 +251,14 @@ function LearnViewInner({
   // keeps going when the tab is hidden ("listen all day"), so a hidden-long-
   // enough tab is emphatically not idle here.
   useReloadBlock(true);
-  const reviewMode = state.status !== 'loading' ? (state.courseSettings?.reviewMode ?? 'audio') : 'audio';
-  const schedulingMode = state.status !== 'loading'
-    ? (state.courseSettings?.schedulingMode ?? 'learnAndReview')
-    : 'learnAndReview';
+  const reviewMode =
+    state.status !== 'loading'
+      ? (state.courseSettings?.reviewMode ?? 'audio')
+      : 'audio';
+  const schedulingMode =
+    state.status !== 'loading'
+      ? (state.courseSettings?.schedulingMode ?? 'learnAndReview')
+      : 'learnAndReview';
   // Free play is one mode; `reviewMode` picks the face. Only the listening
   // face (Radio) runs hands-free. The writing face (Free Study) is a
   // user-paced typing session.
@@ -331,7 +345,11 @@ function LearnViewInner({
     onBack();
   }, [audio, onBack]);
 
-  const { threadId, isLoading: isThreadLoading, getOrCreateEmptyThread } = useThread({
+  const {
+    threadId,
+    isLoading: isThreadLoading,
+    getOrCreateEmptyThread,
+  } = useThread({
     threadId: prefetchedThreadId,
     autoCreate: !prefetchedThreadId,
   });

@@ -265,8 +265,7 @@ export function WorkloadStackedCard({
               {days.map((day, i) => {
                 const segs = segmentValues(day, unit);
                 const total = dayTotal(day, unit);
-                const cardsTotal =
-                  day.scheduled.total + day.estimated.total;
+                const cardsTotal = day.scheduled.total + day.estimated.total;
                 // Compared by ARRAY index — peakIndex indexes `totals`,
                 // and leaning on the days[i].offset === i invariant here
                 // would break silently if the model ever changed it.
@@ -358,7 +357,9 @@ export function WorkloadStackedCard({
             {showPace && (
               <div
                 className="pointer-events-none absolute inset-x-0 z-[5] border-t-2 border-dashed border-muted-foreground/50"
-                style={{ bottom: 22 + (Math.min(pace, max) / max) * PLOT_HEIGHT }}
+                style={{
+                  bottom: 22 + (Math.min(pace, max) / max) * PLOT_HEIGHT,
+                }}
               >
                 <span className="absolute right-0 top-[-15px] bg-card px-1 text-[9px] text-muted-foreground">
                   {t('paceLine', {
@@ -436,7 +437,10 @@ export function WorkloadStackedCard({
               </LegendKey>
             )}
             {hasWhatIf && (
-              <LegendKey className="bg-primary/15" style={SEGMENT_STRIPE.whatIf}>
+              <LegendKey
+                className="bg-primary/15"
+                style={SEGMENT_STRIPE.whatIf}
+              >
                 {t('legendWhatIf', { count: addCount })}
               </LegendKey>
             )}

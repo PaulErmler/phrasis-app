@@ -39,8 +39,8 @@ function renderWords(furigana?: string) {
 describe('ClickableWords: furigana', () => {
   it('renders ruby readings over kanji runs', () => {
     const { container } = renderWords(FURIGANA);
-    const readings = [...container.querySelectorAll('ruby rt')].map(
-      (rt) => rt.getAttribute('data-reading'),
+    const readings = [...container.querySelectorAll('ruby rt')].map((rt) =>
+      rt.getAttribute('data-reading'),
     );
     expect(readings).toEqual(['まいあさ', 'しちじ', 'お']);
     // Kana runs stay bare, and the paragraph reserves reading headroom.
@@ -84,7 +84,9 @@ describe('ClickableWords: furigana', () => {
     // what select-and-copy yields — is exactly the sentence.
     expect(container.textContent).toBe('天気予報です。');
     expect(
-      [...container.querySelectorAll('ruby rt')].map((rt) => rt.getAttribute('data-reading')),
+      [...container.querySelectorAll('ruby rt')].map((rt) =>
+        rt.getAttribute('data-reading'),
+      ),
     ).toEqual(['てんきよほう']);
   });
 
@@ -142,7 +144,9 @@ describe('ClickableWords: furigana', () => {
     );
     expect(container.textContent).toBe('「日本」が好き');
     expect(
-      [...container.querySelectorAll('ruby rt')].map((rt) => rt.getAttribute('data-reading')),
+      [...container.querySelectorAll('ruby rt')].map((rt) =>
+        rt.getAttribute('data-reading'),
+      ),
     ).toEqual(['にほん', 'す']);
   });
 });

@@ -10,11 +10,7 @@ import type { ReactNode } from 'react';
 import { getWordSegmenter } from '@/lib/wordTokenize';
 
 /** The one way a matched term renders, wherever it appears. */
-export function HighlightSpan({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export function HighlightSpan({ children }: { children: ReactNode }) {
   return (
     <span className="font-medium" style={{ color: 'var(--accent-orange)' }}>
       {children}

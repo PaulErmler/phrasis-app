@@ -1,6 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import { useTranslations } from 'next-intl';
 import { useQueries, type RequestForQueries } from 'convex/react';
 import { driver, type Driver, type DriveStep, type Side } from 'driver.js';
@@ -63,7 +70,9 @@ const INTRO_DELAY_MS = 600;
 
 const CARD_SELECTOR = tutorialSelector(TUTORIAL_ANCHORS.cardFlashcard);
 const REVEAL_SELECTOR = tutorialSelector(TUTORIAL_ANCHORS.targetTextAudio);
-const AUDIO_CONTROLS_SELECTOR = tutorialSelector(TUTORIAL_ANCHORS.audioControls);
+const AUDIO_CONTROLS_SELECTOR = tutorialSelector(
+  TUTORIAL_ANCHORS.audioControls,
+);
 const RATING_SELECTOR = tutorialSelector(TUTORIAL_ANCHORS.ratingButtons);
 const INPUT_SELECTOR = tutorialSelector(TUTORIAL_ANCHORS.targetInputAndSubmit);
 const SHOWN_TRANSLATION_SELECTOR = '[data-testid="first-exposure-answer"]';
@@ -80,7 +89,11 @@ type ReviewMode = 'audio' | 'full';
 
 interface ConceptDef {
   id: TutorialId;
-  buildStep: (t: TranslateFn, mode: ReviewMode, transcribe: boolean) => DriveStep;
+  buildStep: (
+    t: TranslateFn,
+    mode: ReviewMode,
+    transcribe: boolean,
+  ) => DriveStep;
   /** Concept doesn't exist in the Transcribe writing style (e.g. the shown
    *  translation, showing it there would BE the answer). Skipped, not
    *  persisted, so it still appears if the user later switches styles. */
@@ -124,7 +137,13 @@ const CONCEPT_CARD: ConceptDef = {
 const CONCEPT_REVEAL: ConceptDef = {
   id: TUTORIAL_IDS.TIP_CONCEPT_REVEAL,
   buildStep: (t) =>
-    conceptStep(t, 'concept.reveal', 'concept.reveal.description', REVEAL_SELECTOR, 'bottom'),
+    conceptStep(
+      t,
+      'concept.reveal',
+      'concept.reveal.description',
+      REVEAL_SELECTOR,
+      'bottom',
+    ),
 };
 
 const CONCEPT_AUDIO_CONTROLS: ConceptDef = {
@@ -142,8 +161,8 @@ const CONCEPT_AUDIO_CONTROLS: ConceptDef = {
 function ratingStep(t: TranslateFn, key: string): DriveStep {
   const description = t.markup
     ? t.markup(`${key}.description`, {
-      strong: (chunks: string) => `<strong>${chunks}</strong>`,
-    })
+        strong: (chunks: string) => `<strong>${chunks}</strong>`,
+      })
     : t(`${key}.description`);
   return {
     element: RATING_SELECTOR,
@@ -199,7 +218,8 @@ const CONCEPT_INPUT: ConceptDef = {
 
 const CONCEPT_AUTOADD: ConceptDef = {
   id: TUTORIAL_IDS.TIP_CONCEPT_AUTOADD,
-  buildStep: (t) => conceptStep(t, 'concept.autoAdd', 'concept.autoAdd.description'),
+  buildStep: (t) =>
+    conceptStep(t, 'concept.autoAdd', 'concept.autoAdd.description'),
 };
 
 /** Intro walkthrough order per mode. Shared concepts (card, autoAdd) appear
@@ -462,7 +482,8 @@ export function useMilestoneTips({
     enabledRef.current = enabled;
   });
 
-  const { completed, markCompleted, isLoaded } = useCompletedTutorials(ALL_TIP_IDS);
+  const { completed, markCompleted, isLoaded } =
+    useCompletedTutorials(ALL_TIP_IDS);
 
   const allTipsDone = ALL_TIP_IDS.every((id) => completed.includes(id));
   // `useQueries`, not `useQuery`: a `useQuery` server error is THROWN into
@@ -485,8 +506,7 @@ export function useMilestoneTips({
   }, [enabled, allTipsDone]);
   const repsResult = useQueries(repsQuery).lifetimeReps;
   const repsFailed = repsResult instanceof Error;
-  const lifetimeReps =
-    typeof repsResult === 'number' ? repsResult : null;
+  const lifetimeReps = typeof repsResult === 'number' ? repsResult : null;
 
   // Effect-time check against the LIVE store. The DB backfill effect (in
   // useCompletedTutorials, registered earlier in hook order) may merge new
@@ -605,7 +625,11 @@ export function useMilestoneTips({
       (!isVeteran && introPendingForMode));
 
   const buildIntroSteps = useCallback(
-    (mode: ReviewMode, concepts: ConceptDef[], freshWelcome: boolean): DriveStep[] => {
+    (
+      mode: ReviewMode,
+      concepts: ConceptDef[],
+      freshWelcome: boolean,
+    ): DriveStep[] => {
       const tr = tRef.current;
       const welcomeKey = freshWelcome
         ? mode === 'audio'
@@ -629,8 +653,7 @@ export function useMilestoneTips({
   );
 
   // ---- intro walkthrough for the current mode ----
-  const introReady =
-    enabled && isLoaded && lifetimeReps != null && !isVeteran;
+  const introReady = enabled && isLoaded && lifetimeReps != null && !isVeteran;
   useEffect(() => {
     if (!introReady || busyRef.current) return;
     const mode = reviewMode;

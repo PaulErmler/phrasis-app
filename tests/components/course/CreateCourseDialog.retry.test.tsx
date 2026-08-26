@@ -15,10 +15,12 @@ beforeAll(() => {
   }
   if (
     typeof window !== 'undefined' &&
-    !(Element.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView
+    !(Element.prototype as unknown as { scrollIntoView?: unknown })
+      .scrollIntoView
   ) {
-    (Element.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView =
-      function () {};
+    (
+      Element.prototype as unknown as { scrollIntoView: () => void }
+    ).scrollIntoView = function () {};
   }
 });
 

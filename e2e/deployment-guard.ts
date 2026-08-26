@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 /**
  * Hard gate for the destructive e2e lifecycle scripts: global-setup flips
@@ -16,7 +16,7 @@ import path from "node:path";
 export function assertDevDeployment(context: string): void {
   const deployment =
     process.env.CONVEX_DEPLOYMENT ?? readDeploymentFromEnvLocal();
-  if (!deployment?.startsWith("dev:")) {
+  if (!deployment?.startsWith('dev:')) {
     throw new Error(
       `${context}: refusing to touch CONVEX_DEPLOYMENT=` +
         `${JSON.stringify(deployment ?? null)}. The e2e lifecycle scripts ` +
@@ -31,8 +31,8 @@ export function assertDevDeployment(context: string): void {
 function readDeploymentFromEnvLocal(): string | undefined {
   try {
     const envFile = readFileSync(
-      path.resolve(__dirname, "..", ".env.local"),
-      "utf8",
+      path.resolve(__dirname, '..', '.env.local'),
+      'utf8',
     );
     return /^CONVEX_DEPLOYMENT=(.+)$/m.exec(envFile)?.[1]?.trim();
   } catch {

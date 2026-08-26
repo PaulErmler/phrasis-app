@@ -89,7 +89,8 @@ export function useWorkloadForecast({
   const isProvisional = data?.preparingWriting === true;
   const lastGoodRef = React.useRef<WorkloadForecastData | null>(null);
   if (data != null && !isProvisional) lastGoodRef.current = data;
-  const effective = (isProvisional ? null : (data ?? null)) ?? lastGoodRef.current;
+  const effective =
+    (isProvisional ? null : (data ?? null)) ?? lastGoodRef.current;
 
   // The minimum-activity gate needs the payload, so it cannot skip the
   // query the way the preference does — the subscription stays live and the

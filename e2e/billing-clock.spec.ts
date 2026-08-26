@@ -1,13 +1,13 @@
-import { test, expect, type Page, type BrowserContext } from "@playwright/test";
-import { execFileSync } from "node:child_process";
-import path from "node:path";
+import { test, expect, type Page, type BrowserContext } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import path from 'node:path';
 import {
   completeStripeTestCheckout,
   gotoAuthedApp,
   neutralizeTours,
   signUpFreshUser,
   STRIPE_TEST_CARD_CHARGE_FAILS,
-} from "./helpers";
+} from './helpers';
 import {
   advanceClock,
   attachTestCard,
@@ -21,7 +21,7 @@ import {
   stripeTestKey,
   waitForSubscriptions,
   type ClockedCustomer,
-} from "./stripe-clock";
+} from './stripe-clock';
 
 /**
  * Time-driven billing edge cases, simulated with REAL Stripe test clocks.
@@ -99,27 +99,27 @@ import {
  * Autumn's webhook ingestion adds more. Whole file runs several minutes.
  */
 
-const REPO_ROOT = path.resolve(__dirname, "..");
-const BASIC_ANNUAL = "basic_annual";
-const PRO_ANNUAL = "pro_annual";
-const FREE = "free";
+const REPO_ROOT = path.resolve(__dirname, '..');
+const BASIC_ANNUAL = 'basic_annual';
+const PRO_ANNUAL = 'pro_annual';
+const FREE = 'free';
 
 const STRIPE_KEY = stripeTestKey();
 
 /** Run a usage/testing:* Convex hook on the dev deployment. */
 function convexTestHook(fn: string, args: Record<string, unknown>): unknown {
   const out = execFileSync(
-    "pnpm",
-    ["exec", "convex", "run", `usage/testing:${fn}`, JSON.stringify(args)],
-    { cwd: REPO_ROOT, encoding: "utf8" },
+    'pnpm',
+    ['exec', 'convex', 'run', `usage/testing:${fn}`, JSON.stringify(args)],
+    { cwd: REPO_ROOT, encoding: 'utf8' },
   );
   // `convex run` prints the function's return value (JSON) on stdout,
   // possibly surrounded by CLI noise. Parse the last JSON-looking chunk.
-  const lines = out.trim().split("\n");
+  const lines = out.trim().split('\n');
   for (let i = lines.length - 1; i >= 0; i--) {
     if (!lines[i].trim()) continue;
     try {
-      return JSON.parse(lines.slice(i).join("\n"));
+      return JSON.parse(lines.slice(i).join('\n'));
     } catch {
       /* keep scanning upwards */
     }
@@ -139,7 +139,7 @@ type AutumnPlanRow = { id: string; status: string; pastDue: boolean };
 async function waitForAutumnPlans(
   email: string,
   predicate: (plans: AutumnPlanRow[]) => boolean,
-  { timeoutMs = 360_000, label = "Autumn plan state" } = {},
+  { timeoutMs = 360_000, label = 'Autumn plan state' } = {},
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let plans: AutumnPlanRow[] | undefined;
@@ -147,7 +147,7 @@ async function waitForAutumnPlans(
     // A transient hook failure (Autumn API hiccup, live run 2026-08-10 died
     // on one http2 keep-alive timeout) is just a missed poll, not a verdict.
     try {
-      plans = convexTestHook("getBillingDebugState", {
+      plans = convexTestHook('getBillingDebugState', {
         email,
       }) as AutumnPlanRow[];
       if (Array.isArray(plans) && predicate(plans)) return;
@@ -167,11 +167,11 @@ async function waitForAutumnPlans(
 function managedPaymentsEnabled(): boolean {
   try {
     const out = execFileSync(
-      "pnpm",
-      ["exec", "convex", "env", "get", "AUTUMN_MANAGED_PAYMENTS"],
-      { cwd: REPO_ROOT, encoding: "utf8" },
+      'pnpm',
+      ['exec', 'convex', 'env', 'get', 'AUTUMN_MANAGED_PAYMENTS'],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
     );
-    return out.trim() === "true";
+    return out.trim() === 'true';
   } catch {
     return false; // unset
   }
@@ -182,7 +182,7 @@ function planCta(page: Page, productId: string) {
 }
 
 async function openPricingTable(page: Page) {
-  await gotoAuthedApp(page, "/app/settings", planCta(page, BASIC_ANNUAL));
+  await gotoAuthedApp(page, '/app/settings', planCta(page, BASIC_ANNUAL));
 }
 
 /**
@@ -223,7 +223,7 @@ async function startFirstPurchase(
   // does its own waiting.
   await page.waitForURL(/checkout\.stripe\.com/, {
     timeout: 45_000,
-    waitUntil: "commit",
+    waitUntil: 'commit',
   });
 
   // Resolved after the redirect. For unclocked journeys the Stripe customer
@@ -233,10 +233,10 @@ async function startFirstPurchase(
   const customerId = await getCustomerId();
   const nonCancelled = (
     await listSubscriptions(STRIPE_KEY!, customerId)
-  ).filter((s) => s.status !== "canceled");
+  ).filter((s) => s.status !== 'canceled');
   expect(
     nonCancelled,
-    "the CTA click alone must not create or charge a subscription",
+    'the CTA click alone must not create or charge a subscription',
   ).toHaveLength(activeSubsBefore);
 
   const sessionId = sessionIdFromUrl(page.url());
@@ -245,25 +245,25 @@ async function startFirstPurchase(
   if (managedPaymentsEnabled()) {
     expect(
       session.managed_payments?.enabled,
-      "MoR flag is on but the session is not a Managed Payments session",
+      'MoR flag is on but the session is not a Managed Payments session',
     ).toBe(true);
   }
   return session;
 }
 
-test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
+test.describe('billing on a Stripe test clock (live)', { tag: '@live' }, () => {
   test.skip(
     !STRIPE_KEY,
-    "No Stripe test-mode key found (env STRIPE_TEST_SECRET_KEY or .env.local) — see the spec header",
+    'No Stripe test-mode key found (env STRIPE_TEST_SECRET_KEY or .env.local) — see the spec header',
   );
 
   // Serial is scoped PER JOURNEY: within one journey the tests are stages of
   // one user's life and must skip after a failure, but the journeys use
   // independent users. One failing must not take the others down.
-  test.describe("journey A: trial → paid conversion on the clock", () => {
-    test.describe.configure({ mode: "serial", retries: 0 });
-    const STORAGE = path.resolve(__dirname, ".auth/user-clock-a.json");
-    const CREDS = path.resolve(__dirname, ".auth/credentials-clock-a.json");
+  test.describe('journey A: trial → paid conversion on the clock', () => {
+    test.describe.configure({ mode: 'serial', retries: 0 });
+    const STORAGE = path.resolve(__dirname, '.auth/user-clock-a.json');
+    const CREDS = path.resolve(__dirname, '.auth/credentials-clock-a.json');
 
     let context: BrowserContext;
     let page: Page;
@@ -277,7 +277,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       });
       const signupPage = await signupContext.newPage();
       const creds = await signUpFreshUser(signupPage, {
-        prefix: "clock-a",
+        prefix: 'clock-a',
         storageStatePath: STORAGE,
         credentialsPath: CREDS,
       });
@@ -287,7 +287,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       // The clocked Stripe customer, linked to the Autumn customer BEFORE
       // any purchase. The only moment a test clock can enter the picture.
       clocked = await createClockedCustomer(STRIPE_KEY!, email);
-      convexTestHook("relinkStripeCustomer", {
+      convexTestHook('relinkStripeCustomer', {
         email,
         stripeId: clocked.customerId,
       });
@@ -301,50 +301,60 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await context?.close();
     });
 
-    test("first purchase confirms on Stripe, never on the button click", async () => {
+    test('first purchase confirms on Stripe, never on the button click', async () => {
       test.setTimeout(300_000);
       await openPricingTable(page);
       await expect(planCta(page, BASIC_ANNUAL)).toHaveText(/start free trial/i);
 
-      await startFirstPurchase(page, async () => clocked.customerId, BASIC_ANNUAL);
+      await startFirstPurchase(
+        page,
+        async () => clocked.customerId,
+        BASIC_ANNUAL,
+      );
       await completeStripeTestCheckout(page, { email });
 
       await expectPlanState(page, BASIC_ANNUAL, /current plan/i);
       const subs = await waitForSubscriptions(
         STRIPE_KEY!,
         clocked.customerId,
-        (s) => s.some((x) => x.status === "trialing"),
-        { label: "trialing subscription" },
+        (s) => s.some((x) => x.status === 'trialing'),
+        { label: 'trialing subscription' },
       );
-      expect(subs.filter((s) => s.status !== "canceled")).toHaveLength(1);
+      expect(subs.filter((s) => s.status !== 'canceled')).toHaveLength(1);
     });
 
-    test("advancing past trial end converts the trial into a paid subscription", async () => {
+    test('advancing past trial end converts the trial into a paid subscription', async () => {
       test.setTimeout(420_000);
       const [sub] = (
         await listSubscriptions(STRIPE_KEY!, clocked.customerId)
-      ).filter((s) => s.status === "trialing");
-      expect(sub?.trial_end, "trialing subscription with a trial_end").toBeTruthy();
+      ).filter((s) => s.status === 'trialing');
+      expect(
+        sub?.trial_end,
+        'trialing subscription with a trial_end',
+      ).toBeTruthy();
 
-      await advanceClock(STRIPE_KEY!, clocked.clockId, sub.trial_end! + 26 * 3600);
+      await advanceClock(
+        STRIPE_KEY!,
+        clocked.clockId,
+        sub.trial_end! + 26 * 3600,
+      );
       await waitForSubscriptions(
         STRIPE_KEY!,
         clocked.customerId,
-        (s) => s.some((x) => x.status === "active"),
-        { label: "active (converted) subscription", timeoutMs: 180_000 },
+        (s) => s.some((x) => x.status === 'active'),
+        { label: 'active (converted) subscription', timeoutMs: 180_000 },
       );
 
       // The app keeps working on the paid plan, no dunning, plan current.
       await expectPlanState(page, BASIC_ANNUAL, /current plan/i);
-      await expect(page.getByTestId("payment-overdue-dialog")).toHaveCount(0);
+      await expect(page.getByTestId('payment-overdue-dialog')).toHaveCount(0);
     });
-
   });
 
-  test.describe("journey D: lapsed repurchase (real time, no clock)", () => {
-    test.describe.configure({ mode: "serial", retries: 0 });
-    const STORAGE = path.resolve(__dirname, ".auth/user-clock-d.json");
-    const CREDS = path.resolve(__dirname, ".auth/credentials-clock-d.json");
+  test.describe('journey D: lapsed repurchase (real time, no clock)', () => {
+    test.describe.configure({ mode: 'serial', retries: 0 });
+    const STORAGE = path.resolve(__dirname, '.auth/user-clock-d.json');
+    const CREDS = path.resolve(__dirname, '.auth/credentials-clock-d.json');
 
     let context: BrowserContext;
     let page: Page;
@@ -358,7 +368,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       });
       const signupPage = await signupContext.newPage();
       const creds = await signUpFreshUser(signupPage, {
-        prefix: "clock-d",
+        prefix: 'clock-d',
         storageStatePath: STORAGE,
         credentialsPath: CREDS,
       });
@@ -377,14 +387,17 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await context?.close();
     });
 
-    test("trial starts through Stripe checkout and saves the card", async () => {
+    test('trial starts through Stripe checkout and saves the card', async () => {
       test.setTimeout(300_000);
       await openPricingTable(page);
       await startFirstPurchase(
         page,
         async () => {
           const id = await findCustomerByEmail(STRIPE_KEY!, email);
-          expect(id, "Stripe customer created by the checkout session").toBeTruthy();
+          expect(
+            id,
+            'Stripe customer created by the checkout session',
+          ).toBeTruthy();
           customerId = id!;
           return id!;
         },
@@ -395,12 +408,12 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await waitForSubscriptions(
         STRIPE_KEY!,
         customerId,
-        (s) => s.some((x) => x.status === "trialing"),
-        { label: "trialing subscription" },
+        (s) => s.some((x) => x.status === 'trialing'),
+        { label: 'trialing subscription' },
       );
     });
 
-    test("an immediate cancellation lapses the customer to Free", async () => {
+    test('an immediate cancellation lapses the customer to Free', async () => {
       test.setTimeout(300_000);
       // Cancelled via AUTUMN's /cancel (the cancelPlanNow hook, the same
       // call the app's cancelOverdueSubscription makes), NOT via a
@@ -414,33 +427,33 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       // Payments subscriptions, which is what rules out
       // `cancel_immediately` on PAID MoR subs).
       const [sub] = (await listSubscriptions(STRIPE_KEY!, customerId)).filter(
-        (s) => s.status === "trialing",
+        (s) => s.status === 'trialing',
       );
-      expect(sub, "trialing subscription to cancel").toBeTruthy();
-      convexTestHook("cancelPlanNow", { email });
+      expect(sub, 'trialing subscription to cancel').toBeTruthy();
+      convexTestHook('cancelPlanNow', { email });
 
       await waitForSubscriptions(
         STRIPE_KEY!,
         customerId,
-        (s) => s.every((x) => x.status === "canceled"),
-        { label: "cancelled subscription (lapsed)", timeoutMs: 120_000 },
+        (s) => s.every((x) => x.status === 'canceled'),
+        { label: 'cancelled subscription (lapsed)', timeoutMs: 120_000 },
       );
       await waitForAutumnPlans(
         email,
         (plans) =>
-          plans.some((p) => p.id === FREE && p.status === "active") &&
+          plans.some((p) => p.id === FREE && p.status === 'active') &&
           plans.every(
             (p) =>
               p.id === FREE ||
-              !["active", "trialing", "scheduled"].includes(p.status),
+              !['active', 'trialing', 'scheduled'].includes(p.status),
           ),
-        { label: "Autumn to report the lapse to Free", timeoutMs: 240_000 },
+        { label: 'Autumn to report the lapse to Free', timeoutMs: 240_000 },
       );
       await expectPlanState(page, FREE, /current plan/i);
-      await expect(page.getByTestId("payment-overdue-dialog")).toHaveCount(0);
+      await expect(page.getByTestId('payment-overdue-dialog')).toHaveCount(0);
     });
 
-    test("lapsed repurchase redirects to Stripe and grants no second trial", async () => {
+    test('lapsed repurchase redirects to Stripe and grants no second trial', async () => {
       test.setTimeout(300_000);
       await openPricingTable(page);
 
@@ -449,7 +462,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await expect(planCta(page, BASIC_ANNUAL)).not.toHaveText(
         /start free trial/i,
       );
-      await expect(page.getByTestId("pricing-trial-badge")).toHaveCount(0);
+      await expect(page.getByTestId('pricing-trial-badge')).toHaveCount(0);
 
       // A saved card is exactly what made the old 'if_required' path charge
       // silently on click. This asserts the redirect happens and nothing
@@ -461,22 +474,22 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       const subs = await waitForSubscriptions(
         STRIPE_KEY!,
         customerId,
-        (s) => s.some((x) => x.status === "active"),
-        { label: "repurchased subscription" },
+        (s) => s.some((x) => x.status === 'active'),
+        { label: 'repurchased subscription' },
       );
-      const active = subs.filter((s) => s.status !== "canceled");
+      const active = subs.filter((s) => s.status !== 'canceled');
       expect(active).toHaveLength(1);
       // No second trial: active immediately, no trial_end. Live proof of
       // the v2 `customize.free_trial: null` reading.
-      expect(active[0].status).toBe("active");
+      expect(active[0].status).toBe('active');
       expect(active[0].trial_end).toBeNull();
     });
   });
 
-  test.describe("journey B: failed renewal → real past_due → cancel", () => {
-    test.describe.configure({ mode: "serial", retries: 0 });
-    const STORAGE = path.resolve(__dirname, ".auth/user-clock-b.json");
-    const CREDS = path.resolve(__dirname, ".auth/credentials-clock-b.json");
+  test.describe('journey B: failed renewal → real past_due → cancel', () => {
+    test.describe.configure({ mode: 'serial', retries: 0 });
+    const STORAGE = path.resolve(__dirname, '.auth/user-clock-b.json');
+    const CREDS = path.resolve(__dirname, '.auth/credentials-clock-b.json');
 
     let context: BrowserContext;
     let page: Page;
@@ -490,7 +503,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       });
       const signupPage = await signupContext.newPage();
       const creds = await signUpFreshUser(signupPage, {
-        prefix: "clock-b",
+        prefix: 'clock-b',
         storageStatePath: STORAGE,
         credentialsPath: CREDS,
       });
@@ -498,7 +511,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await signupContext.close();
 
       clocked = await createClockedCustomer(STRIPE_KEY!, email);
-      convexTestHook("relinkStripeCustomer", {
+      convexTestHook('relinkStripeCustomer', {
         email,
         stripeId: clocked.customerId,
       });
@@ -512,10 +525,14 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await context?.close();
     });
 
-    test("trial starts on the charge-failing card", async () => {
+    test('trial starts on the charge-failing card', async () => {
       test.setTimeout(300_000);
       await openPricingTable(page);
-      await startFirstPurchase(page, async () => clocked.customerId, BASIC_ANNUAL);
+      await startFirstPurchase(
+        page,
+        async () => clocked.customerId,
+        BASIC_ANNUAL,
+      );
       // 0341 attaches fine (trials only save the card), fails every charge.
       await completeStripeTestCheckout(page, {
         email,
@@ -524,29 +541,36 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await expectPlanState(page, BASIC_ANNUAL, /current plan/i);
     });
 
-    test("failed conversion charge produces a REAL past_due and the dunning dialog", async () => {
+    test('failed conversion charge produces a REAL past_due and the dunning dialog', async () => {
       test.setTimeout(900_000);
       const [sub] = (
         await listSubscriptions(STRIPE_KEY!, clocked.customerId)
-      ).filter((s) => s.status === "trialing");
-      expect(sub?.trial_end, "trialing subscription with a trial_end").toBeTruthy();
+      ).filter((s) => s.status === 'trialing');
+      expect(
+        sub?.trial_end,
+        'trialing subscription with a trial_end',
+      ).toBeTruthy();
 
-      await advanceClock(STRIPE_KEY!, clocked.clockId, sub.trial_end! + 26 * 3600);
+      await advanceClock(
+        STRIPE_KEY!,
+        clocked.clockId,
+        sub.trial_end! + 26 * 3600,
+      );
       await waitForSubscriptions(
         STRIPE_KEY!,
         clocked.customerId,
-        (s) => s.some((x) => x.status === "past_due"),
-        { label: "past_due subscription", timeoutMs: 240_000 },
+        (s) => s.some((x) => x.status === 'past_due'),
+        { label: 'past_due subscription', timeoutMs: 240_000 },
       );
       await waitForAutumnPlans(email, (plans) => plans.some((p) => p.pastDue), {
-        label: "Autumn to report past_due",
+        label: 'Autumn to report past_due',
       });
 
       // No overrides anywhere: the dialog appears purely because Autumn
       // ingested Stripe's failed-invoice webhooks and the app synced it.
       await expect(async () => {
-        await page.goto("/app");
-        await expect(page.getByTestId("payment-overdue-dialog")).toBeVisible({
+        await page.goto('/app');
+        await expect(page.getByTestId('payment-overdue-dialog')).toBeVisible({
           timeout: 10_000,
         });
       }).toPass({ timeout: 240_000, intervals: [5_000, 10_000] });
@@ -554,12 +578,12 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
 
     test("the dialog's cancel path really cancels and frees the account", async () => {
       test.setTimeout(300_000);
-      await page.goto("/app");
-      const dialog = page.getByTestId("payment-overdue-dialog");
+      await page.goto('/app');
+      const dialog = page.getByTestId('payment-overdue-dialog');
       await expect(dialog).toBeVisible({ timeout: 60_000 });
 
-      await page.getByTestId("payment-overdue-cancel").click();
-      await page.getByTestId("payment-overdue-cancel-confirm").click();
+      await page.getByTestId('payment-overdue-cancel').click();
+      await page.getByTestId('payment-overdue-cancel-confirm').click();
 
       // cancelOverdueSubscription verifies the unpaid invoice server-side,
       // cancels immediately, and syncs. The block must clear without a
@@ -568,18 +592,18 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await waitForSubscriptions(
         STRIPE_KEY!,
         clocked.customerId,
-        (s) => s.every((x) => x.status === "canceled"),
-        { label: "cancelled delinquent subscription" },
+        (s) => s.every((x) => x.status === 'canceled'),
+        { label: 'cancelled delinquent subscription' },
       );
       await expectPlanState(page, FREE, /current plan/i);
-      await expect(page.getByTestId("payment-overdue-dialog")).toHaveCount(0);
+      await expect(page.getByTestId('payment-overdue-dialog')).toHaveCount(0);
     });
   });
 
-  test.describe("journey C: legacy non-MoR customer keeps working", () => {
-    test.describe.configure({ mode: "serial", retries: 0 });
-    const STORAGE = path.resolve(__dirname, ".auth/user-clock-c.json");
-    const CREDS = path.resolve(__dirname, ".auth/credentials-clock-c.json");
+  test.describe('journey C: legacy non-MoR customer keeps working', () => {
+    test.describe.configure({ mode: 'serial', retries: 0 });
+    const STORAGE = path.resolve(__dirname, '.auth/user-clock-c.json');
+    const CREDS = path.resolve(__dirname, '.auth/credentials-clock-c.json');
 
     let context: BrowserContext;
     let page: Page;
@@ -594,7 +618,7 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       });
       const signupPage = await signupContext.newPage();
       const creds = await signUpFreshUser(signupPage, {
-        prefix: "clock-c",
+        prefix: 'clock-c',
         storageStatePath: STORAGE,
         credentialsPath: CREDS,
       });
@@ -605,12 +629,12 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       // v1.2 attach. Direct charge, no Checkout Session, so non-MoR by
       // construction, exactly like every subscription that predates the flag.
       clocked = await createClockedCustomer(STRIPE_KEY!, creds.email);
-      await attachTestCard(STRIPE_KEY!, clocked.customerId, "pm_card_visa");
-      convexTestHook("relinkStripeCustomer", {
+      await attachTestCard(STRIPE_KEY!, clocked.customerId, 'pm_card_visa');
+      convexTestHook('relinkStripeCustomer', {
         email: creds.email,
         stripeId: clocked.customerId,
       });
-      convexTestHook("legacyAttachPlan", {
+      convexTestHook('legacyAttachPlan', {
         email: creds.email,
         productId: BASIC_ANNUAL,
       });
@@ -624,17 +648,17 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await context?.close();
     });
 
-    test("the legacy subscription is live, non-MoR, and shown by the app", async () => {
+    test('the legacy subscription is live, non-MoR, and shown by the app', async () => {
       test.setTimeout(240_000);
       await expectPlanState(page, BASIC_ANNUAL, /current plan/i);
 
       const subs = await waitForSubscriptions(
         STRIPE_KEY!,
         clocked.customerId,
-        (s) => s.some((x) => x.status === "active"),
-        { label: "legacy subscription" },
+        (s) => s.some((x) => x.status === 'active'),
+        { label: 'legacy subscription' },
       );
-      const active = subs.filter((s) => s.status !== "canceled");
+      const active = subs.filter((s) => s.status !== 'canceled');
       expect(active).toHaveLength(1);
       expect(active[0].trial_end).toBeNull();
       legacySubId = active[0].id;
@@ -642,19 +666,19 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       const sub = await getSubscription(STRIPE_KEY!, legacySubId);
       expect(
         sub.managed_payments?.enabled ?? false,
-        "a legacy attach must never produce a Managed Payments subscription",
+        'a legacy attach must never produce a Managed Payments subscription',
       ).toBe(false);
     });
 
-    test("upgrade confirms in-app and updates the SAME subscription in place", async () => {
+    test('upgrade confirms in-app and updates the SAME subscription in place', async () => {
       test.setTimeout(240_000);
       await openPricingTable(page);
       await planCta(page, PRO_ANNUAL).click();
 
       // Card on file → the confirm dialog, not a redirect.
-      const title = page.getByTestId("checkout-dialog-title");
+      const title = page.getByTestId('checkout-dialog-title');
       await expect(title).toBeVisible({ timeout: 30_000 });
-      await page.getByTestId("checkout-dialog-confirm").click();
+      await page.getByTestId('checkout-dialog-confirm').click();
       await expect(title).toBeHidden({ timeout: 60_000 });
 
       // In-place subscription update: the page never left the app…
@@ -666,20 +690,20 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       // estate).
       const active = (
         await listSubscriptions(STRIPE_KEY!, clocked.customerId)
-      ).filter((s) => s.status !== "canceled");
+      ).filter((s) => s.status !== 'canceled');
       expect(active).toHaveLength(1);
       expect(active[0].id).toBe(legacySubId);
       const sub = await getSubscription(STRIPE_KEY!, legacySubId);
       expect(sub.managed_payments?.enabled ?? false).toBe(false);
     });
 
-    test("downgrade schedules at period end; renew un-schedules it", async () => {
+    test('downgrade schedules at period end; renew un-schedules it', async () => {
       test.setTimeout(240_000);
       await openPricingTable(page);
       await planCta(page, BASIC_ANNUAL).click();
-      const title = page.getByTestId("checkout-dialog-title");
+      const title = page.getByTestId('checkout-dialog-title');
       await expect(title).toBeVisible({ timeout: 30_000 });
-      await page.getByTestId("checkout-dialog-confirm").click();
+      await page.getByTestId('checkout-dialog-confirm').click();
       await expect(title).toBeHidden({ timeout: 60_000 });
       await expectPlanState(page, BASIC_ANNUAL, /scheduled/i);
 
@@ -687,16 +711,16 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       // scheduled switch.
       await planCta(page, PRO_ANNUAL).click();
       await expect(title).toBeVisible({ timeout: 30_000 });
-      await page.getByTestId("checkout-dialog-confirm").click();
+      await page.getByTestId('checkout-dialog-confirm').click();
       await expect(title).toBeHidden({ timeout: 60_000 });
       await expectPlanState(page, PRO_ANNUAL, /current plan/i);
       await expect(planCta(page, BASIC_ANNUAL)).not.toHaveText(/scheduled/i);
     });
 
-    test("the annual renewal charges the saved card at period end", async () => {
+    test('the annual renewal charges the saved card at period end', async () => {
       test.setTimeout(900_000);
       const before = await getSubscription(STRIPE_KEY!, legacySubId);
-      expect(before.status).toBe("active");
+      expect(before.status).toBe('active');
 
       await advanceClock(
         STRIPE_KEY!,
@@ -711,25 +735,25 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
           s.some(
             (x) =>
               x.id === legacySubId &&
-              x.status === "active" &&
+              x.status === 'active' &&
               x.current_period_end > before.current_period_end,
           ),
-        { label: "renewed subscription", timeoutMs: 180_000 },
+        { label: 'renewed subscription', timeoutMs: 180_000 },
       );
 
       // Renewal went through on the legacy card: still the current plan,
       // no dunning.
       await expectPlanState(page, PRO_ANNUAL, /current plan/i);
-      await expect(page.getByTestId("payment-overdue-dialog")).toHaveCount(0);
+      await expect(page.getByTestId('payment-overdue-dialog')).toHaveCount(0);
     });
 
-    test("cancelling to Free executes at period end (Stripe side)", async () => {
+    test('cancelling to Free executes at period end (Stripe side)', async () => {
       test.setTimeout(900_000);
       await openPricingTable(page);
       await planCta(page, FREE).click();
-      const title = page.getByTestId("checkout-dialog-title");
+      const title = page.getByTestId('checkout-dialog-title');
       await expect(title).toBeVisible({ timeout: 30_000 });
-      await page.getByTestId("checkout-dialog-confirm").click();
+      await page.getByTestId('checkout-dialog-confirm').click();
       await expect(title).toBeHidden({ timeout: 60_000 });
 
       // The cancel must be SCHEDULED, not executed: still active, with the
@@ -747,9 +771,9 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
           s.some(
             (x) => x.id === legacySubId && isCancelScheduledAtPeriodEnd(x),
           ),
-        { label: "cancellation scheduled at period end" },
+        { label: 'cancellation scheduled at period end' },
       ).then((s) => s.find((x) => x.id === legacySubId)!);
-      expect(sub.status).toBe("active");
+      expect(sub.status).toBe('active');
 
       await advanceClock(
         STRIPE_KEY!,
@@ -766,8 +790,8 @@ test.describe("billing on a Stripe test clock (live)", { tag: "@live" }, () => {
       await waitForSubscriptions(
         STRIPE_KEY!,
         clocked.customerId,
-        (s) => s.every((x) => x.status === "canceled"),
-        { label: "cancelled legacy subscription", timeoutMs: 180_000 },
+        (s) => s.every((x) => x.status === 'canceled'),
+        { label: 'cancelled legacy subscription', timeoutMs: 180_000 },
       );
     });
   });

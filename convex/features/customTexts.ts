@@ -1,5 +1,10 @@
 import { v, ConvexError } from 'convex/values';
-import { action, mutation, internalMutation, internalQuery } from '../_generated/server';
+import {
+  action,
+  mutation,
+  internalMutation,
+  internalQuery,
+} from '../_generated/server';
 import { internal } from '../_generated/api';
 import type { Id } from '../_generated/dataModel';
 import { requireAuthUserId, getAuthUserId } from '../db/users';
@@ -7,7 +12,10 @@ import { getActiveCourseForUser } from '../db/courses';
 import { getOrCreateCustomCollection } from '../db/collections';
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
-import { MAX_CARD_TEXT_LENGTH, MAX_IMPORT_BATCH } from '../../lib/constants/learning';
+import {
+  MAX_CARD_TEXT_LENGTH,
+  MAX_IMPORT_BATCH,
+} from '../../lib/constants/learning';
 import {
   getLanguageByCode,
   getTranslationSource,
@@ -46,7 +54,10 @@ export const consumeAutoFillQuota = internalMutation({
 /** Allowed ISO codes for the user’s active course (base ∪ target). Used to validate auto-fill before quota / LLM. */
 export const getAllowedLanguagesForAutoFill = internalQuery({
   args: { userId: v.string() },
-  returns: v.union(v.null(), v.object({ allowedLanguages: v.array(v.string()) })),
+  returns: v.union(
+    v.null(),
+    v.object({ allowedLanguages: v.array(v.string()) }),
+  ),
   handler: async (ctx, { userId }) => {
     const active = await getActiveCourseForUser(ctx, userId);
     if (!active) return null;
@@ -223,10 +234,9 @@ export const autoFillTranslations = action({
       });
     }
 
-    await ctx.runMutation(
-      internal.features.customTexts.consumeAutoFillQuota,
-      { userId },
-    );
+    await ctx.runMutation(internal.features.customTexts.consumeAutoFillQuota, {
+      userId,
+    });
 
     // Prompt name = `translationName ?? name`. The same resolution as the
     // single-sentence pipeline (see getTranslationConfigForLanguage), so
@@ -306,7 +316,10 @@ export const autoFillTranslations = action({
     const startedAt = Date.now();
     // Reasoning + Luna price cap via the shared mapping in translationLLM so
     // `'none'` is correctly sent as `reasoning: {enabled: false}`.
-    const providerOptions = openrouterCallOptions(AUTOFILL_REASONING, LUNA_BO3.provider);
+    const providerOptions = openrouterCallOptions(
+      AUTOFILL_REASONING,
+      LUNA_BO3.provider,
+    );
     const { text, usage, providerMetadata } = await generateText({
       model: openrouter(OPENROUTER_MODELS.translationAutoFill),
       system: TRANSLATION_SYSTEM_PROMPT,
@@ -335,7 +348,10 @@ export const autoFillTranslations = action({
 
     const cleaned = stripJsonFences(text);
 
-    let parsed: { translations?: Record<string, string>; metadata?: Record<string, unknown> };
+    let parsed: {
+      translations?: Record<string, string>;
+      metadata?: Record<string, unknown>;
+    };
     try {
       parsed = JSON.parse(cleaned);
     } catch {
@@ -427,15 +443,24 @@ function validateTranslationSet(
 ):
   | { code: 'INVALID_LANGUAGES'; message: string }
   | { code: 'EMPTY_TEXT'; message: string; language: string }
-  | { code: 'TEXT_TOO_LONG'; message: string; language: string; maxLength: number }
+  | {
+      code: 'TEXT_TOO_LONG';
+      message: string;
+      language: string;
+      maxLength: number;
+    }
   | null {
   const requiredLanguages = [
     ...new Set([...course.baseLanguages, ...course.targetLanguages]),
   ];
   const providedLanguages = translations.map((t) => t.language);
 
-  const missing = requiredLanguages.filter((lang) => !providedLanguages.includes(lang));
-  const extras = providedLanguages.filter((lang) => !requiredLanguages.includes(lang));
+  const missing = requiredLanguages.filter(
+    (lang) => !providedLanguages.includes(lang),
+  );
+  const extras = providedLanguages.filter(
+    (lang) => !requiredLanguages.includes(lang),
+  );
   if (
     missing.length > 0 ||
     extras.length > 0 ||
@@ -520,17 +545,19 @@ export const createCustomText = mutation({
       collectionRank: nextRank,
       ...(args.metadata
         ? {
-          register: args.metadata.register,
-          addresseeNumber: args.metadata.addresseeNumber,
-          speakerGender: args.metadata.speakerGender,
-          addresseeGender: args.metadata.addresseeGender,
-          addressesSomeone: args.metadata.addressesSomeone,
-          // Coin-flip at insert time so gendered-noun agreement is stable
-          // across all target-language translations of this row. Mirrors the
-          // logic in applyMetadataAndPrepareCard for the non-auto-fill path.
-          referentGender: Math.random() < 0.5 ? 'male' : 'female',
-          audioSpeakerGender: resolveAudioSpeakerGender(args.metadata.speakerGender),
-        }
+            register: args.metadata.register,
+            addresseeNumber: args.metadata.addresseeNumber,
+            speakerGender: args.metadata.speakerGender,
+            addresseeGender: args.metadata.addresseeGender,
+            addressesSomeone: args.metadata.addressesSomeone,
+            // Coin-flip at insert time so gendered-noun agreement is stable
+            // across all target-language translations of this row. Mirrors the
+            // logic in applyMetadataAndPrepareCard for the non-auto-fill path.
+            referentGender: Math.random() < 0.5 ? 'male' : 'female',
+            audioSpeakerGender: resolveAudioSpeakerGender(
+              args.metadata.speakerGender,
+            ),
+          }
         : {}),
     });
 
@@ -584,8 +611,16 @@ export const createCustomText = mutation({
     }
 
     // Track manual card creation event
-    await trackEvent(ctx, { userId, courseId: course._id, timezone: args.timezone, field: 'cardsAddedManually' });
-    await track(ctx, userId, EVENTS.CARDS_ADDED, { count: 1, source: 'manual' });
+    await trackEvent(ctx, {
+      userId,
+      courseId: course._id,
+      timezone: args.timezone,
+      field: 'cardsAddedManually',
+    });
+    await track(ctx, userId, EVENTS.CARDS_ADDED, {
+      count: 1,
+      source: 'manual',
+    });
 
     return { textId };
   },
@@ -656,7 +691,10 @@ export const createCustomTextsBatch = mutation({
     const { course } = active;
 
     const skipped: { index: number; code: string; message: string }[] = [];
-    const accepted: { index: number; translations: { language: string; text: string }[] }[] = [];
+    const accepted: {
+      index: number;
+      translations: { language: string; text: string }[];
+    }[] = [];
 
     for (let i = 0; i < args.items.length; i++) {
       const { translations } = args.items[i];
@@ -677,7 +715,12 @@ export const createCustomTextsBatch = mutation({
     }
 
     // Quota is authoritative here. Client pre-check is advisory.
-    await consumeQuota(ctx, userId, FEATURE_IDS.CUSTOM_SENTENCES, accepted.length);
+    await consumeQuota(
+      ctx,
+      userId,
+      FEATURE_IDS.CUSTOM_SENTENCES,
+      accepted.length,
+    );
 
     const collection = await getOrCreateCustomCollection(ctx, course._id);
     const baseRank = collection.textCount;
@@ -757,4 +800,3 @@ export const createCustomTextsBatch = mutation({
     return { createdTextIds, skipped };
   },
 });
-

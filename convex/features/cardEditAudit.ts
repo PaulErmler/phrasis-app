@@ -210,9 +210,7 @@ export async function resolveRetranslation(
   await ctx.db.patch(retranslationAuditId, {
     status,
     resolvedAt: Date.now(),
-    ...(result?.afterText !== undefined
-      ? { afterText: result.afterText }
-      : {}),
+    ...(result?.afterText !== undefined ? { afterText: result.afterText } : {}),
     ...(result?.afterTranslationSource !== undefined
       ? { afterTranslationSource: result.afterTranslationSource }
       : {}),

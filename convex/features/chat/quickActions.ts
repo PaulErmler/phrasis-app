@@ -22,9 +22,21 @@ export const vQuickAction = v.union(
   v.object({ kind: v.literal('paraphrase') }),
   v.object({ kind: v.literal('formal') }),
   v.object({ kind: v.literal('simpler') }),
-  v.object({ kind: v.literal('explainWord'), word: v.string(), language: v.string() }),
-  v.object({ kind: v.literal('synonyms'), word: v.string(), language: v.string() }),
-  v.object({ kind: v.literal('antonyms'), word: v.string(), language: v.string() }),
+  v.object({
+    kind: v.literal('explainWord'),
+    word: v.string(),
+    language: v.string(),
+  }),
+  v.object({
+    kind: v.literal('synonyms'),
+    word: v.string(),
+    language: v.string(),
+  }),
+  v.object({
+    kind: v.literal('antonyms'),
+    word: v.string(),
+    language: v.string(),
+  }),
   v.object({
     kind: v.literal('discussAnswer'),
     userAnswer: v.string(),
@@ -51,7 +63,8 @@ export const SENTENCE_QUICK_ACTION_KINDS = [
   'formal',
   'simpler',
 ] as const;
-export type SentenceQuickActionKind = (typeof SENTENCE_QUICK_ACTION_KINDS)[number];
+export type SentenceQuickActionKind =
+  (typeof SENTENCE_QUICK_ACTION_KINDS)[number];
 
 export const MAX_QUICK_ACTION_WORD_LENGTH = 100;
 // Generous. Real BCP-47 codes are ≤ ~11 chars; this only stops the field
@@ -145,7 +158,10 @@ function targetSubjectNote(ctx: QuickActionContext): string {
     : ` Everything you analyze and every example you produce is ${names} — the target language. Do not analyze or explain the base-language translation of this card.`;
 }
 
-function sentenceSteering(kind: SentenceQuickActionKind, sentence: string): string {
+function sentenceSteering(
+  kind: SentenceQuickActionKind,
+  sentence: string,
+): string {
   switch (kind) {
     case 'grammar':
       return `The user wants a detailed grammar explanation of the sentence they are reviewing: ${sentence}. Never create a card for the reviewed sentence itself.`;
@@ -200,7 +216,10 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export function expandQuickAction(action: QuickAction, ctx: QuickActionContext): string {
+export function expandQuickAction(
+  action: QuickAction,
+  ctx: QuickActionContext,
+): string {
   const header = `[Quick action pressed by the user: ${action.kind}]`;
   const replyNote = replyLanguageNote(ctx);
   switch (action.kind) {

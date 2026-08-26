@@ -94,7 +94,11 @@ export async function transcribeAudio(
   blob: Blob,
   internalLanguageCode?: string,
   opts: TranscribeOptions = {},
-): Promise<{ text: string; wordTimings: WordTiming[]; audioDurationMs?: number }> {
+): Promise<{
+  text: string;
+  wordTimings: WordTiming[];
+  audioDurationMs?: number;
+}> {
   const apiKey = requireEnv('AZURE_SPEECH_API_KEY');
   const region = requireEnv('AZURE_SPEECH_REGION');
 
@@ -127,9 +131,7 @@ export async function transcribeAudio(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `Azure STT API error: ${response.status} - ${errorText}`,
-    );
+    throw new Error(`Azure STT API error: ${response.status} - ${errorText}`);
   }
 
   const data = (await response.json()) as AzureTranscriptionResponse;

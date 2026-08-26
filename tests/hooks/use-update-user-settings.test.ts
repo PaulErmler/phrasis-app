@@ -65,10 +65,14 @@ describe('useUpdateUserSettings', () => {
     capturedUpdater?.(store, { autoPlayAudio: true });
 
     expect(store.getQuery).toHaveBeenCalledWith('getUserSettings-ref', {});
-    expect(store.setQuery).toHaveBeenCalledWith('getUserSettings-ref', {}, {
-      theme: 'dark',
-      autoPlayAudio: true,
-    });
+    expect(store.setQuery).toHaveBeenCalledWith(
+      'getUserSettings-ref',
+      {},
+      {
+        theme: 'dark',
+        autoPlayAudio: true,
+      },
+    );
   });
 
   it.each([undefined, null])(

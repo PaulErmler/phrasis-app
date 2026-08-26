@@ -20,7 +20,10 @@ export async function upsertWeeklyStats(
   const existing = await ctx.db
     .query('weeklyStats')
     .withIndex('by_userId_and_courseId_and_week', (q) =>
-      q.eq('userId', args.userId).eq('courseId', args.courseId).eq('week', args.week),
+      q
+        .eq('userId', args.userId)
+        .eq('courseId', args.courseId)
+        .eq('week', args.week),
     )
     .first();
 
@@ -37,7 +40,12 @@ export async function upsertWeeklyStats(
       totalTimeMs: existing.totalTimeMs + args.timeMs,
       activeDays: existing.activeDays + (args.isFirstActivityToday ? 1 : 0),
       ...(args.reviewMode
-        ? { reviewsByMode: { ...prevMode, [args.reviewMode]: prevMode[args.reviewMode] + 1 } }
+        ? {
+            reviewsByMode: {
+              ...prevMode,
+              [args.reviewMode]: prevMode[args.reviewMode] + 1,
+            },
+          }
         : {}),
     });
     return { isFirstActivityThisWeek: false };
@@ -53,11 +61,11 @@ export async function upsertWeeklyStats(
     activeDays: 1,
     ...(args.reviewMode
       ? {
-        reviewsByMode: {
-          ...EMPTY_MODE_COUNTS(),
-          [args.reviewMode]: 1,
-        },
-      }
+          reviewsByMode: {
+            ...EMPTY_MODE_COUNTS(),
+            [args.reviewMode]: 1,
+          },
+        }
       : {}),
   });
   return { isFirstActivityThisWeek: true };

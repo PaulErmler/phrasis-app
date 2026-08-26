@@ -113,7 +113,10 @@ export const processBatch = internalMutation({
       await cardsByOriginStateAndDueDate.insertIfDoesNotExist(ctx, doc);
       if (hasWritingTrack(doc)) {
         await cardsByWritingStateAndDueDate.insertIfDoesNotExist(ctx, doc);
-        await cardsByOriginWritingStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+        await cardsByOriginWritingStateAndDueDate.insertIfDoesNotExist(
+          ctx,
+          doc,
+        );
       }
     }
 
@@ -126,11 +129,11 @@ export const processBatch = internalMutation({
         advanceDeck
           ? { deckIds: args.deckIds, deckIdx: nextDeckIdx }
           : {
-            deckIds: args.deckIds,
-            deckIdx: nextDeckIdx,
-            cursor: result.continueCursor,
-            clearPhase: 'done' as const,
-          },
+              deckIds: args.deckIds,
+              deckIdx: nextDeckIdx,
+              cursor: result.continueCursor,
+              clearPhase: 'done' as const,
+            },
       );
     }
 

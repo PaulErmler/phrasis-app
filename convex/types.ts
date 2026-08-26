@@ -8,8 +8,8 @@ export const learningStyleValidator = v.union(
 );
 
 export const schedulingPhaseValidator = v.union(
-  v.literal("preReview"),
-  v.literal("review")
+  v.literal('preReview'),
+  v.literal('review'),
 );
 
 export const currentLevelValidator = v.union(
@@ -547,7 +547,9 @@ export type TtsProvider = Infer<typeof ttsProviderValidator>;
 export type VoiceGender = Infer<typeof voiceGenderValidator>;
 export type CardApprovalStatus = Infer<typeof cardApprovalStatusValidator>;
 export type CardApprovalKind = Infer<typeof cardApprovalKindValidator>;
-export type CardApprovalResolution = Infer<typeof cardApprovalResolutionValidator>;
+export type CardApprovalResolution = Infer<
+  typeof cardApprovalResolutionValidator
+>;
 export type ProposedCardMetadata = Infer<typeof proposedCardMetadataValidator>;
 
 /**

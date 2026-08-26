@@ -31,7 +31,13 @@ function messageText(message: AgentMessageLike): string {
     .join('\n');
 }
 
-function ThreadMessages({ userId, threadId }: { userId: string; threadId: string }) {
+function ThreadMessages({
+  userId,
+  threadId,
+}: {
+  userId: string;
+  threadId: string;
+}) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.admin.userContent.listThreadMessages,
     { userId, threadId },
@@ -39,7 +45,11 @@ function ThreadMessages({ userId, threadId }: { userId: string; threadId: string
   );
 
   if (status === 'LoadingFirstPage') {
-    return <div className="py-6 text-center text-muted-foreground text-sm">Loading…</div>;
+    return (
+      <div className="py-6 text-center text-muted-foreground text-sm">
+        Loading…
+      </div>
+    );
   }
 
   return (
@@ -72,7 +82,9 @@ function ThreadMessages({ userId, threadId }: { userId: string; threadId: string
         </div>
       )}
       {results.length === 0 && (
-        <p className="py-4 text-center text-muted-foreground text-sm">No messages</p>
+        <p className="py-4 text-center text-muted-foreground text-sm">
+          No messages
+        </p>
       )}
     </div>
   );
@@ -106,7 +118,9 @@ export function UserThreadsBrowser({ userId }: { userId: string }) {
             onClick={() => setSelectedThreadId(thread._id)}
             className={cn(
               'w-full text-left rounded-md px-3 py-2 text-sm transition-colors',
-              selectedThreadId === thread._id ? 'bg-muted' : 'hover:bg-muted/50',
+              selectedThreadId === thread._id
+                ? 'bg-muted'
+                : 'hover:bg-muted/50',
             )}
           >
             <span className="block truncate font-medium">

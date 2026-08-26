@@ -62,9 +62,13 @@ export function renderWelcomeEmail(name?: string): {
     '</div>',
   ].join('\n');
 
-  const text = [greeting, '', paragraphs.join('\n\n'), '', signoff.join('\n')].join(
-    '\n',
-  );
+  const text = [
+    greeting,
+    '',
+    paragraphs.join('\n\n'),
+    '',
+    signoff.join('\n'),
+  ].join('\n');
 
   return { subject: WELCOME_EMAIL_SUBJECT, html, text };
 }

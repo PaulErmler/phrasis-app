@@ -63,7 +63,9 @@ export function CourseLanguageSettings({
     api.features.courses.updateCourseLanguages,
   );
 
-  const { isAvailable: hasMultipleLanguages } = useFeatureQuota(FEATURE_IDS.MULTIPLE_LANGUAGES);
+  const { isAvailable: hasMultipleLanguages } = useFeatureQuota(
+    FEATURE_IDS.MULTIPLE_LANGUAGES,
+  );
   const [paywallOpen, setPaywallOpen] = useState(false);
 
   const planMaxTotal = hasMultipleLanguages ? 3 : 2;
@@ -75,7 +77,10 @@ export function CourseLanguageSettings({
   // disables its add button at the cap.
   const existingBaseCount = course?.baseLanguages.length ?? 0;
   const existingTargetCount = course?.targetLanguages.length ?? 0;
-  const maxTotal = Math.max(planMaxTotal, existingBaseCount + existingTargetCount);
+  const maxTotal = Math.max(
+    planMaxTotal,
+    existingBaseCount + existingTargetCount,
+  );
   const maxPerGroup = Math.max(
     planMaxPerGroup,
     existingBaseCount,
@@ -97,10 +102,7 @@ export function CourseLanguageSettings({
     if (course) {
       setDraftBase([...course.baseLanguages]);
       setDraftTarget([...course.targetLanguages]);
-      setSavedCodes([
-        ...course.baseLanguages,
-        ...course.targetLanguages,
-      ]);
+      setSavedCodes([...course.baseLanguages, ...course.targetLanguages]);
       setHasChanges(false);
       setSaving(false);
       setError(null);
@@ -176,7 +178,9 @@ export function CourseLanguageSettings({
       // carries one (plain-string data, or a structured `message` field),
       // else the generic localized copy.
       const data =
-        e instanceof ConvexError ? (e.data as { message?: unknown }) : undefined;
+        e instanceof ConvexError
+          ? (e.data as { message?: unknown })
+          : undefined;
       const structuredMessage =
         typeof data?.message === 'string' ? data.message : undefined;
       setError(convexErrorMessage(e) ?? structuredMessage ?? t('saveFailed'));
@@ -187,9 +191,7 @@ export function CourseLanguageSettings({
   };
 
   const formatName = (codes: string[]) =>
-    codes
-      .map((c) => getLocalizedLanguageNameByCode(c, locale))
-      .join(', ');
+    codes.map((c) => getLocalizedLanguageNameByCode(c, locale)).join(', ');
 
   const editorLabels = {
     baseLanguages: t(draftBase.length === 1 ? 'baseLanguage' : 'baseLanguages'),
@@ -213,9 +215,7 @@ export function CourseLanguageSettings({
         {course && (
           <>
             <div className="sheet-header">
-              <SheetTitle className="heading-section">
-                {t('title')}
-              </SheetTitle>
+              <SheetTitle className="heading-section">{t('title')}</SheetTitle>
               <Button
                 variant="ghost"
                 size="icon"
@@ -342,7 +342,10 @@ export function CourseLanguageSettings({
           />
         )}
 
-        <AlertDialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
+        <AlertDialog
+          open={archiveConfirmOpen}
+          onOpenChange={setArchiveConfirmOpen}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>{t('archiveConfirmTitle')}</AlertDialogTitle>

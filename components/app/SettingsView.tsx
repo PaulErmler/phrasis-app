@@ -37,7 +37,8 @@ export function SettingsView({ activeView }: { activeView: View }) {
   const tAuth = useTranslations('Auth');
   const isNative = useIsNativeApp();
   const authUser = useQuery(api.auth.getAuthUser);
-  const userEmail = (authUser as Record<string, unknown> | null | undefined)?.email as string | undefined;
+  const userEmail = (authUser as Record<string, unknown> | null | undefined)
+    ?.email as string | undefined;
   const { preloadedSettings } = useAppData();
   const userSettings = usePreloadedQuery(preloadedSettings);
   const updateUserSettings = useUpdateUserSettings();
@@ -96,7 +97,10 @@ export function SettingsView({ activeView }: { activeView: View }) {
               </SettingsSectionHeading>
               <div className="settings-row">
                 <div className="space-y-0.5">
-                  <Label htmlFor="hideDueCounts" className="text-sm font-medium">
+                  <Label
+                    htmlFor="hideDueCounts"
+                    className="text-sm font-medium"
+                  >
                     {t('settings.uiSettings.hideDueCounts')}
                   </Label>
                   <p className="text-muted-xs">
@@ -174,33 +178,33 @@ export function SettingsView({ activeView }: { activeView: View }) {
                 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground"
                 aria-label={t('settings.legal.label')}
               >
-                  <Link
-                    href="/legal/impressum"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    {tFooter('legal.impressum')}
-                  </Link>
-                  <span aria-hidden>•</span>
-                  <Link
-                    href="/legal/agb"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    {tFooter('legal.agb')}
-                  </Link>
-                  <span aria-hidden>•</span>
-                  <Link
-                    href="/legal/privacy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    {tFooter('legal.privacy')}
-                  </Link>
-                </nav>
+                <Link
+                  href="/legal/impressum"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  {tFooter('legal.impressum')}
+                </Link>
+                <span aria-hidden>•</span>
+                <Link
+                  href="/legal/agb"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  {tFooter('legal.agb')}
+                </Link>
+                <span aria-hidden>•</span>
+                <Link
+                  href="/legal/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  {tFooter('legal.privacy')}
+                </Link>
+              </nav>
             </CardContent>
           </Card>
 
@@ -231,12 +235,22 @@ export function SettingsView({ activeView }: { activeView: View }) {
           <p className="px-2 pb-2 text-xs text-muted-foreground text-center">
             {t.rich('settings.attribution.text', {
               tatoeba: (chunks) => (
-                <a href="http://tatoeba.org/" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+                <a
+                  href="http://tatoeba.org/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-foreground"
+                >
                   {chunks}
                 </a>
               ),
               ccby: (chunks) => (
-                <a href="http://creativecommons.org/licenses/by/2.0/fr/" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+                <a
+                  href="http://creativecommons.org/licenses/by/2.0/fr/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-foreground"
+                >
                   {chunks}
                 </a>
               ),

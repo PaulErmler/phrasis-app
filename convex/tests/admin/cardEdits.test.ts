@@ -121,7 +121,9 @@ describe('admin/cardEdits', () => {
     it('pages newest first with each edit carrying its retranslations', async () => {
       const t = convexTest(schema, modules);
       const first = await seedEdit(t, { childStatuses: ['applied'] });
-      const second = await seedEdit(t, { childStatuses: ['failed', 'enqueued'] });
+      const second = await seedEdit(t, {
+        childStatuses: ['failed', 'enqueued'],
+      });
 
       const result = await runEdits(t, { paginationOpts: PAGE });
 
@@ -216,7 +218,9 @@ describe('admin/cardEdits', () => {
         new URL('../../admin/cardEdits.ts', import.meta.url),
         'utf8',
       );
-      expect(source).not.toMatch(/=\s*(query|mutation|action|internalQuery|internalMutation|internalAction)\s*\(/);
+      expect(source).not.toMatch(
+        /=\s*(query|mutation|action|internalQuery|internalMutation|internalAction)\s*\(/,
+      );
       const registrations = source.match(/=\s*adminQuery\s*\(/g) ?? [];
       expect(registrations.length).toBeGreaterThanOrEqual(2);
     });

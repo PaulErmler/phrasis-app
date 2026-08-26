@@ -15,10 +15,8 @@ import {
 // The global stub drops params; the labels ARE the params, so re-mock with a
 // deterministic "key values…" rendering.
 vi.mock('next-intl', () => ({
-  useTranslations:
-    () =>
-    (key: string, params?: Record<string, unknown>) =>
-      params ? `${key} ${Object.values(params).join(' ')}` : key,
+  useTranslations: () => (key: string, params?: Record<string, unknown>) =>
+    params ? `${key} ${Object.values(params).join(' ')}` : key,
   useLocale: () => 'en',
 }));
 
@@ -211,7 +209,9 @@ describe('WorkloadStackedCard', () => {
       forecast.days[0].scheduled.total + forecast.days[0].estimated.total;
     // Header (via the mocked t: "cardsToday <count> <time>") and cap show
     // the same estimate-inclusive number.
-    expect(screen.getByText(new RegExp(`cardsToday ${day0Cards} `))).toBeTruthy();
+    expect(
+      screen.getByText(new RegExp(`cardsToday ${day0Cards} `)),
+    ).toBeTruthy();
     expect(screen.getByText(String(day0Cards))).toBeTruthy();
   });
 

@@ -12,7 +12,13 @@
  */
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { StoreFrame, FRAME_W, FRAME_H, PAD_FRAME_W, PAD_FRAME_H } from './StoreFrame';
+import {
+  StoreFrame,
+  FRAME_W,
+  FRAME_H,
+  PAD_FRAME_W,
+  PAD_FRAME_H,
+} from './StoreFrame';
 import { SCREENS } from './screens';
 
 /** Designed frames that fill the whole canvas instead of sitting in a phone. */
@@ -29,7 +35,9 @@ function Frame() {
 
   const render = SCREENS[screen];
   if (!render) {
-    return <pre style={{ padding: 40, fontSize: 28 }}>Unknown screen: {screen}</pre>;
+    return (
+      <pre style={{ padding: 40, fontSize: 28 }}>Unknown screen: {screen}</pre>
+    );
   }
 
   if (bleed || POSTERS.has(screen)) {

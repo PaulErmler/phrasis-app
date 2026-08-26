@@ -13,7 +13,6 @@ import { resend } from '../lib/resendClient';
  * email, and the account is deleted manually within the promised 30 days.
  */
 
-
 export const requestAccountDeletion = mutation({
   args: {},
   returns: v.null(),
@@ -51,9 +50,7 @@ export const requestAccountDeletion = mutation({
     await resend.sendEmail(ctx, {
       from: `Flexling <${SUPPORT_EMAIL}>`,
       to: SUPPORT_EMAIL,
-      subject: withEmailEnvSubject(
-        `Account deletion request: ${user.email}`,
-      ),
+      subject: withEmailEnvSubject(`Account deletion request: ${user.email}`),
       text: [
         'A user requested account deletion from the app.',
         '',

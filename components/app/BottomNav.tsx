@@ -22,10 +22,22 @@ interface BottomNavProps {
   onLearnOpen: () => void;
 }
 
-export function BottomNav({ currentView, onViewChange, onLearnOpen }: BottomNavProps) {
+export function BottomNav({
+  currentView,
+  onViewChange,
+  onLearnOpen,
+}: BottomNavProps) {
   const t = useTranslations('AppPage');
 
-  const renderNavButton = ({ view, icon: Icon, labelKey }: { view: View; icon: typeof Home; labelKey: string }) => (
+  const renderNavButton = ({
+    view,
+    icon: Icon,
+    labelKey,
+  }: {
+    view: View;
+    icon: typeof Home;
+    labelKey: string;
+  }) => (
     <div key={view} className="flex justify-center">
       <button
         type="button"

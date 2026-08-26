@@ -23,7 +23,11 @@ export function SessionProgressBar({
   const value = max > 0 ? (within / max) * 100 : 0;
   return (
     <div className="px-4 py-2">
-      <Progress value={value} className="h-1.5" aria-label={t('progressToNextMilestone')} />
+      <Progress
+        value={value}
+        className="h-1.5"
+        aria-label={t('progressToNextMilestone')}
+      />
     </div>
   );
 }

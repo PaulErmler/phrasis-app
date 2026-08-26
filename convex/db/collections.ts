@@ -36,9 +36,7 @@ export async function getActiveDataset(
  * chat collections; custom collections have no `datasetId` and don't share
  * names with LEGACY_LEVEL_ORDER, so both branches naturally exclude them.
  */
-export async function getPremadeLevelCollections(
-  ctx: QueryCtx,
-): Promise<{
+export async function getPremadeLevelCollections(ctx: QueryCtx): Promise<{
   activeDataset: Doc<'datasets'> | null;
   collections: Doc<'collections'>[];
 }> {
@@ -85,7 +83,8 @@ export async function resolveStartingCollection(
   ogteLevel?: number,
 ): Promise<Doc<'collections'> | null> {
   const activeDataset = await getActiveDataset(ctx);
-  const exactCode = ogteLevel !== undefined ? ogteLevelToCollectionCode(ogteLevel) : null;
+  const exactCode =
+    ogteLevel !== undefined ? ogteLevelToCollectionCode(ogteLevel) : null;
   if (activeDataset && exactCode) {
     const exact = await ctx.db
       .query('collections')
@@ -95,7 +94,9 @@ export async function resolveStartingCollection(
       .first();
     if (exact) return exact;
   }
-  const mapping = LEVEL_TO_COLLECTION[currentLevel ?? 'beginner'] ?? LEVEL_TO_COLLECTION.beginner;
+  const mapping =
+    LEVEL_TO_COLLECTION[currentLevel ?? 'beginner'] ??
+    LEVEL_TO_COLLECTION.beginner;
   if (activeDataset) {
     const byCode = await ctx.db
       .query('collections')
@@ -124,11 +125,15 @@ export async function getNextCollection(
     return ctx.db
       .query('collections')
       .withIndex('by_datasetId_and_order', (q) =>
-        q.eq('datasetId', current.datasetId).eq('order', (current.order ?? 0) + 1),
+        q
+          .eq('datasetId', current.datasetId)
+          .eq('order', (current.order ?? 0) + 1),
       )
       .first();
   }
-  const idx = LEGACY_LEVEL_ORDER.indexOf(current.name as (typeof LEGACY_LEVEL_ORDER)[number]);
+  const idx = LEGACY_LEVEL_ORDER.indexOf(
+    current.name as (typeof LEGACY_LEVEL_ORDER)[number],
+  );
   if (idx === -1 || idx >= LEGACY_LEVEL_ORDER.length - 1) return null;
   return ctx.db
     .query('collections')
@@ -155,7 +160,10 @@ export async function findNextIncompleteCollection(
     const progress = await ctx.db
       .query('collectionProgress')
       .withIndex('by_userId_and_courseId_and_collectionId', (q) =>
-        q.eq('userId', userId).eq('courseId', courseId).eq('collectionId', cursor!._id),
+        q
+          .eq('userId', userId)
+          .eq('courseId', courseId)
+          .eq('collectionId', cursor!._id),
       )
       .first();
     if (!isCollectionComplete(cursor.textCount, progress)) return cursor;
@@ -223,7 +231,10 @@ export async function getNextTextsFromRank(
     return ctx.db
       .query('texts')
       .withIndex('by_collection_and_userCreated_and_rank', (q) =>
-        q.eq('collectionId', collectionId).eq('userCreated', false).gt('collectionRank', afterRank),
+        q
+          .eq('collectionId', collectionId)
+          .eq('userCreated', false)
+          .gt('collectionRank', afterRank),
       )
       .order('asc')
       .take(limit);
@@ -232,7 +243,10 @@ export async function getNextTextsFromRank(
     return ctx.db
       .query('texts')
       .withIndex('by_collection_and_userId_and_rank', (q) =>
-        q.eq('collectionId', collectionId).eq('userId', options.forUserId).gt('collectionRank', afterRank),
+        q
+          .eq('collectionId', collectionId)
+          .eq('userId', options.forUserId)
+          .gt('collectionRank', afterRank),
       )
       .order('asc')
       .take(limit);

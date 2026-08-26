@@ -78,13 +78,19 @@ type OpenRouterProviderMetadata = {
 };
 
 /** Actual USD cost of an OpenRouter call, or undefined if usage accounting was off. */
-export function openrouterCostUsd(providerMetadata: unknown): number | undefined {
-  return (providerMetadata as OpenRouterProviderMetadata | undefined)?.openrouter?.usage?.cost;
+export function openrouterCostUsd(
+  providerMetadata: unknown,
+): number | undefined {
+  return (providerMetadata as OpenRouterProviderMetadata | undefined)
+    ?.openrouter?.usage?.cost;
 }
 
 /** OpenRouter's generation id. The join key back to their dashboard for reconciliation. */
-export function openrouterGenerationId(providerMetadata: unknown): string | undefined {
-  return (providerMetadata as OpenRouterProviderMetadata | undefined)?.openrouter?.id;
+export function openrouterGenerationId(
+  providerMetadata: unknown,
+): string | undefined {
+  return (providerMetadata as OpenRouterProviderMetadata | undefined)
+    ?.openrouter?.id;
 }
 
 /**
@@ -128,7 +134,9 @@ export async function captureGeneration(
       // PostHog measures latency in seconds.
       $ai_latency: latencyMs / 1000,
       ...(inputTokens !== undefined ? { $ai_input_tokens: inputTokens } : {}),
-      ...(outputTokens !== undefined ? { $ai_output_tokens: outputTokens } : {}),
+      ...(outputTokens !== undefined
+        ? { $ai_output_tokens: outputTokens }
+        : {}),
       ...(costUsd !== undefined ? { $ai_total_cost_usd: costUsd } : {}),
       ...(input ? { $ai_input: input } : {}),
       ...(outputChoices ? { $ai_output_choices: outputChoices } : {}),

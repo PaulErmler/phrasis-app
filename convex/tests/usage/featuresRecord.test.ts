@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { hasUnpaidInvoice, toFeaturesRecord } from "../../usage/tracking";
+import { describe, it, expect } from 'vitest';
+import { hasUnpaidInvoice, toFeaturesRecord } from '../../usage/tracking';
 
 /**
  * Direct pins for the two payload readers in usage/tracking.ts that the
@@ -17,14 +17,14 @@ import { hasUnpaidInvoice, toFeaturesRecord } from "../../usage/tracking";
  *   cancel of a subscription the user just paid for.
  */
 
-describe("toFeaturesRecord", () => {
-  it("maps balances remaining/granted/usage onto balance/included/used", () => {
+describe('toFeaturesRecord', () => {
+  it('maps balances remaining/granted/usage onto balance/included/used', () => {
     // Deliberately asymmetric numbers so a swapped mapping cannot cancel
     // out (users would be shown, and gated on, the wrong balance).
     const result = toFeaturesRecord({
       balances: {
         chat_messages: {
-          feature_id: "chat_messages",
+          feature_id: 'chat_messages',
           granted: 100,
           remaining: 60,
           usage: 40,
@@ -42,18 +42,18 @@ describe("toFeaturesRecord", () => {
     });
   });
 
-  it("normalizes unlimited:false to an absent flag, and preserves unlimited:true", () => {
+  it('normalizes unlimited:false to an absent flag, and preserves unlimited:true', () => {
     const result = toFeaturesRecord({
       balances: {
         metered: {
-          feature_id: "metered",
+          feature_id: 'metered',
           granted: 10,
           remaining: 10,
           usage: 0,
           unlimited: false,
         },
         firehose: {
-          feature_id: "firehose",
+          feature_id: 'firehose',
           granted: 0,
           remaining: 0,
           usage: 5,
@@ -68,7 +68,7 @@ describe("toFeaturesRecord", () => {
     expect(result.firehose.unlimited).toBe(true);
   });
 
-  it("turns boolean features (flags) into unlimited entries — access, not a meter", () => {
+  it('turns boolean features (flags) into unlimited entries — access, not a meter', () => {
     const result = toFeaturesRecord({
       flags: { multiple_languages: {}, ai_feedback: { anything: true } },
     });
@@ -81,35 +81,38 @@ describe("toFeaturesRecord", () => {
     });
   });
 
-  it("returns an empty record for a payload with neither balances nor flags", () => {
+  it('returns an empty record for a payload with neither balances nor flags', () => {
     expect(toFeaturesRecord({})).toEqual({});
   });
 });
 
-describe("hasUnpaidInvoice", () => {
-  it("counts open and uncollectible invoices as unpaid, hosted page or not", () => {
+describe('hasUnpaidInvoice', () => {
+  it('counts open and uncollectible invoices as unpaid, hosted page or not', () => {
     // "Nothing payable in the dialog" must not read as "nothing owed".
     expect(
       hasUnpaidInvoice({
-        invoices: [{ status: "open", hosted_invoice_url: null }],
+        invoices: [{ status: 'open', hosted_invoice_url: null }],
       }),
     ).toBe(true);
     expect(
       hasUnpaidInvoice({
-        invoices: [{ status: "uncollectible", hosted_invoice_url: null }],
+        invoices: [{ status: 'uncollectible', hosted_invoice_url: null }],
       }),
     ).toBe(true);
   });
 
-  it("does not count paid, void or draft invoices", () => {
+  it('does not count paid, void or draft invoices', () => {
     // `paid` is the race-free signal that lets cancelOverdueSubscription
     // refuse to cancel a subscription the user settled seconds ago.
     expect(
       hasUnpaidInvoice({
         invoices: [
-          { status: "paid", hosted_invoice_url: "https://invoice.stripe.com/i/a" },
-          { status: "void" },
-          { status: "draft" },
+          {
+            status: 'paid',
+            hosted_invoice_url: 'https://invoice.stripe.com/i/a',
+          },
+          { status: 'void' },
+          { status: 'draft' },
         ],
       }),
     ).toBe(false);

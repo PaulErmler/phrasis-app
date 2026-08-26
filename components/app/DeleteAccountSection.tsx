@@ -25,7 +25,9 @@ import { reportError } from '@/lib/report-error';
  */
 export function DeleteAccountSection() {
   const t = useTranslations('AppPage.settings.deleteAccount');
-  const requestDeletion = useMutation(api.features.accountDeletion.requestAccountDeletion);
+  const requestDeletion = useMutation(
+    api.features.accountDeletion.requestAccountDeletion,
+  );
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 

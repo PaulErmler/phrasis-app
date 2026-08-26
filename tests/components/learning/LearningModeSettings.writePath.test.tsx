@@ -144,7 +144,9 @@ describe('LearningModeSettings: preview resolves through the playback chain', ()
       languageRepetitions: { en: 7 },
       languagePlaybackSpeeds: { en: 1.4 },
     });
-    const base = timelineCards.find((c) => c.type === 'base' && c.code === 'en');
+    const base = timelineCards.find(
+      (c) => c.type === 'base' && c.code === 'en',
+    );
     expect(base?.plays).toBe(7);
     expect(base?.speed).toBe(1.4);
   });
@@ -155,7 +157,9 @@ describe('LearningModeSettings: preview resolves through the playback chain', ()
       languageRepetitions: { en: 7 },
       languageRepetitionsFull: { en: 2 },
     });
-    const base = timelineCards.find((c) => c.type === 'base' && c.code === 'en');
+    const base = timelineCards.find(
+      (c) => c.type === 'base' && c.code === 'en',
+    );
     expect(base?.plays).toBe(2);
   });
 });

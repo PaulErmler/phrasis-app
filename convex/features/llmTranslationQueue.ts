@@ -325,8 +325,12 @@ export const enqueueLlmTranslation = internalMutation({
     // to the worker, and the worker's `claimId` is re-stamped from this
     // transaction's claim lookup (see the field comments on the validator).
     const { llmPriority, ...workerArgs } = args;
-    const { ruleOverride, claimId, userSuggestedTranslation, ...completionContext } =
-      args;
+    const {
+      ruleOverride,
+      claimId,
+      userSuggestedTranslation,
+      ...completionContext
+    } = args;
     const pool = llmPriority === 'background' ? llmWarmPool : llmPool;
     const workId: string = await pool.enqueueAction(
       ctx,
@@ -444,8 +448,7 @@ async function resolvePromptMetadata(
   // addressesSomeone: prefer the explicit boolean; fall back to
   // (addresseeNumber !== 'not_applicable') for legacy rows.
   const addressesSomeone =
-    text.addressesSomeone ??
-    (text.addresseeNumber !== 'not_applicable');
+    text.addressesSomeone ?? text.addresseeNumber !== 'not_applicable';
 
   // referentGender: fall back to a deterministic coin-flip seeded the same
   // way the backfill seeds it (`externalId || _id`, salt `'referent'`), so
@@ -480,9 +483,7 @@ async function resolvePromptMetadata(
   // Fetch the sliding window of arc siblings (≤ 5 preceding + ≤ 3
   // following), but only when this text has an arcId. Custom/chat and
   // legacy rows skip the lookup entirely, so they pay no extra cost.
-  let arcContext:
-    | { preceding: string[]; following: string[] }
-    | undefined;
+  let arcContext: { preceding: string[]; following: string[] } | undefined;
   if (text.arcId && text.arcId.length > 0) {
     arcContext = await ctx.runQuery(
       internal.features.llmTranslationQueue.getArcWindowForText,
@@ -593,37 +594,39 @@ async function runTranslationStageChain(
       const sampleTotal = stage.samples.total;
       // Independent captures. Fire together instead of serializing up to
       // N+1 awaited PostHog writes.
-      await Promise.all(bo.telemetryList.map(async (t) => {
-        const visibleTokenEstimate =
-          t.visibleTextLength !== undefined
-            ? Math.max(16, Math.ceil(t.visibleTextLength / 2))
-            : undefined;
-        await captureGeneration(ctx, {
-          feature: 'translation',
-          model: t.model,
-          provider: 'openrouter',
-          latencyMs: t.latencyMs,
-          inputTokens: t.inputTokens,
-          outputTokens: t.outputTokens,
-          costUsd: t.costUsd,
-          traceId: t.generationId,
-          isError: t.error !== undefined,
-          error: t.error,
-          sharedContent: true,
-          extra: {
-            ...stageExtra,
-            strategy: `bo${sampleTotal}`,
-            role: t.role,
-            candidate_index: t.candidateIndex,
-            judge_attempt: t.judgeAttempt,
-            n_unique: bo.meta.nUnique,
-            judge_fallback: bo.meta.judgeFallback,
-            suspect_hidden_reasoning:
-              visibleTokenEstimate !== undefined &&
-              t.outputTokens > 4 * visibleTokenEstimate,
-          },
-        });
-      }));
+      await Promise.all(
+        bo.telemetryList.map(async (t) => {
+          const visibleTokenEstimate =
+            t.visibleTextLength !== undefined
+              ? Math.max(16, Math.ceil(t.visibleTextLength / 2))
+              : undefined;
+          await captureGeneration(ctx, {
+            feature: 'translation',
+            model: t.model,
+            provider: 'openrouter',
+            latencyMs: t.latencyMs,
+            inputTokens: t.inputTokens,
+            outputTokens: t.outputTokens,
+            costUsd: t.costUsd,
+            traceId: t.generationId,
+            isError: t.error !== undefined,
+            error: t.error,
+            sharedContent: true,
+            extra: {
+              ...stageExtra,
+              strategy: `bo${sampleTotal}`,
+              role: t.role,
+              candidate_index: t.candidateIndex,
+              judge_attempt: t.judgeAttempt,
+              n_unique: bo.meta.nUnique,
+              judge_fallback: bo.meta.judgeFallback,
+              suspect_hidden_reasoning:
+                visibleTokenEstimate !== undefined &&
+                t.outputTokens > 4 * visibleTokenEstimate,
+            },
+          });
+        }),
+      );
       result = bo.result;
     } else {
       result = await translateTextWithLLM({
@@ -661,16 +664,19 @@ async function runTranslationStageChain(
     }
     if (i < stages.length - 1) {
       const next = stages[i + 1];
-      console.warn('[llmTranslationQueue] stage failed — retrying with next stage', {
-        textId: args.textId,
-        targetLanguage: args.targetLanguage,
-        stageIndex: i,
-        stageModel: stage.model,
-        stageReasoning: stage.reasoning,
-        reason: result.reason,
-        nextStageModel: next.model,
-        nextStageReasoning: next.reasoning,
-      });
+      console.warn(
+        '[llmTranslationQueue] stage failed — retrying with next stage',
+        {
+          textId: args.textId,
+          targetLanguage: args.targetLanguage,
+          stageIndex: i,
+          stageModel: stage.model,
+          stageReasoning: stage.reasoning,
+          reason: result.reason,
+          nextStageModel: next.model,
+          nextStageReasoning: next.reasoning,
+        },
+      );
     }
   }
   if (!result) throw new Error('Unreachable: stages.length >= 1');
@@ -719,10 +725,10 @@ async function storeLlmTranslationResult(
   // `regionVariant`. Non-mixed languages fall through to the simple picker.
   const voiceName = pin.regionVariant
     ? getVoiceForLanguageVariant(
-      args.targetLanguage,
-      pin.regionVariant,
-      args.audioSpeakerGender,
-    )
+        args.targetLanguage,
+        pin.regionVariant,
+        args.audioSpeakerGender,
+      )
     : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
 
   // Source resolved from `cfgLanguageCode` (the sub-code for mixed
@@ -834,7 +840,13 @@ export const processLlmTranslationForCard = internalAction({
       promptArgs,
     );
 
-    await storeLlmTranslationResult(ctx, args, pin, translatedText, winningStage);
+    await storeLlmTranslationResult(
+      ctx,
+      args,
+      pin,
+      translatedText,
+      winningStage,
+    );
     return null;
   },
 });
@@ -867,7 +879,11 @@ export const onLlmTranslationComplete = internalMutation({
       result: PoolRunResult;
     },
   ) => {
-    const claim = await getLlmClaim(ctx, context.textId, context.targetLanguage);
+    const claim = await getLlmClaim(
+      ctx,
+      context.textId,
+      context.targetLanguage,
+    );
     const ownsClaim =
       claim !== null && (claim.workId === undefined || claim.workId === workId);
 
@@ -898,11 +914,14 @@ export const onLlmTranslationComplete = internalMutation({
       // one was queued/retrying (or the claim is already gone). The current
       // owner drives its own fallback; spawning one here would race the
       // owner's write and duplicate provider spend.
-      console.warn('[llmTranslationQueue] LLM attempts exhausted on a superseded job — skipping Google fallback', {
-        textId: context.textId,
-        targetLanguage: context.targetLanguage,
-        error: result.error,
-      });
+      console.warn(
+        '[llmTranslationQueue] LLM attempts exhausted on a superseded job — skipping Google fallback',
+        {
+          textId: context.textId,
+          targetLanguage: context.targetLanguage,
+          error: result.error,
+        },
+      );
       // Same verdict the write choke point would have reached had this job got
       // that far: a newer job owns the row, so this attempt is dead.
       await resolveRetranslation(
@@ -913,11 +932,14 @@ export const onLlmTranslationComplete = internalMutation({
       return null;
     }
 
-    console.warn('[llmTranslationQueue] LLM attempts exhausted — falling back to Google', {
-      textId: context.textId,
-      targetLanguage: context.targetLanguage,
-      error: result.error,
-    });
+    console.warn(
+      '[llmTranslationQueue] LLM attempts exhausted — falling back to Google',
+      {
+        textId: context.textId,
+        targetLanguage: context.targetLanguage,
+        error: result.error,
+      },
+    );
     // An intermediate state: if Google succeeds, the write choke point
     // overwrites this with the real outcome; if it fails too,
     // `onGoogleFallbackComplete` lands 'failed'. A row still reading
@@ -1003,15 +1025,22 @@ export const onGoogleFallbackComplete = internalMutation({
     },
   ) => {
     if (result.kind === 'failed') {
-      console.error('[llmTranslationQueue] terminal translation failure (LLM + Google both failed):', {
-        textId: context.textId,
-        targetLanguage: context.targetLanguage,
-        error: result.error,
-      });
+      console.error(
+        '[llmTranslationQueue] terminal translation failure (LLM + Google both failed):',
+        {
+          textId: context.textId,
+          targetLanguage: context.targetLanguage,
+          error: result.error,
+        },
+      );
       await resolveRetranslation(ctx, context.retranslationAuditId, 'failed');
       return null;
     }
-    const claim = await getLlmClaim(ctx, context.textId, context.targetLanguage);
+    const claim = await getLlmClaim(
+      ctx,
+      context.textId,
+      context.targetLanguage,
+    );
     if (claim && (claim.workId === undefined || claim.workId === workId)) {
       await ctx.db.delete(claim._id);
     }

@@ -1,7 +1,11 @@
-import {useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useBrowserLayoutEffect } from '@/hooks/use-isomorphic-layout-effect';
 import { useQuery } from 'convex/react';
-import type { FunctionReference, FunctionArgs, FunctionReturnType } from 'convex/server';
+import type {
+  FunctionReference,
+  FunctionArgs,
+  FunctionReturnType,
+} from 'convex/server';
 
 export function useCachedQuery<F extends FunctionReference<'query'>>(
   query: F,

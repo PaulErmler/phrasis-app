@@ -45,17 +45,24 @@ function SmoothMessageResponse({
   text: string;
   isStreaming: boolean;
 }) {
-  const [smoothText, { isStreaming: isSmoothTextStreaming }] = useSmoothText(text, { startStreaming: isStreaming });
+  const [smoothText, { isStreaming: isSmoothTextStreaming }] = useSmoothText(
+    text,
+    { startStreaming: isStreaming },
+  );
   // Keep streaming mode active until smooth text has fully caught up,
   // preventing Streamdown from switching rendering paths mid-animation.
-  const effectiveMode = isStreaming || isSmoothTextStreaming ? 'streaming' : 'static';
+  const effectiveMode =
+    isStreaming || isSmoothTextStreaming ? 'streaming' : 'static';
   const displayText = smoothText ?? text ?? '';
   // Bidi handling (dominant-script dir + text-left) lives inside
   // MessageResponse; the direction is computed from the FULL received text
   // rather than the animation buffer so a reply opening with an RTL token
   // doesn't flip to RTL until the English catches up.
   return (
-    <MessageResponse mode={effectiveMode} dir={dominantTextDirection(text ?? '')}>
+    <MessageResponse
+      mode={effectiveMode}
+      dir={dominantTextDirection(text ?? '')}
+    >
       {displayText}
     </MessageResponse>
   );
@@ -74,7 +81,11 @@ function DefaultToolDisplay({
   return (
     <div key={`${messageId}-tool-${idx}`} className="mt-2">
       <Tool>
-        <ToolHeader title={toolName} type={toolPart.type} state={toolPart.state} />
+        <ToolHeader
+          title={toolName}
+          type={toolPart.type}
+          state={toolPart.state}
+        />
         <ToolContent>
           <ToolInput input={toolPart.input} />
           <ToolOutput output={toolPart.output} errorText={toolPart.errorText} />
@@ -330,18 +341,20 @@ export function ChatMessages({
         <ConversationContent className={`px-4 ${contentClassName ?? ''}`}>
           {displayMessages.length > 0 ? (
             <>
-              {displayMessages.map((message: ExtendedUIMessage, index: number) => (
-                <ChatMessageRow
-                  key={message.key ?? message.id}
-                  message={message}
-                  isLastMessage={index === displayMessages.length - 1}
-                  toolRenderers={toolRenderers}
-                  messageFooter={messageFooter}
-                  errorFallback={t('messageError.title')}
-                  errorRetryLabel={t('messageError.retry')}
-                  thinkingLabel={t('thinking')}
-                />
-              ))}
+              {displayMessages.map(
+                (message: ExtendedUIMessage, index: number) => (
+                  <ChatMessageRow
+                    key={message.key ?? message.id}
+                    message={message}
+                    isLastMessage={index === displayMessages.length - 1}
+                    toolRenderers={toolRenderers}
+                    messageFooter={messageFooter}
+                    errorFallback={t('messageError.title')}
+                    errorRetryLabel={t('messageError.retry')}
+                    thinkingLabel={t('thinking')}
+                  />
+                ),
+              )}
               {showPendingThinking ? (
                 <Message from="assistant">
                   <MessageContent>

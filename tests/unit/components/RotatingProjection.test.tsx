@@ -30,7 +30,12 @@ const projectionData = () => ({
     { kind: 'sessionYield', words: 12, goalMinutes: 20 },
     { kind: 'oneYearWords', words: 2400, capped: false },
     { kind: 'sentencesPerHour', rate: 30 },
-    { kind: 'studyTimeMilestone', hours: 100, etaDays: 12, etaDate: '2026-08-15' },
+    {
+      kind: 'studyTimeMilestone',
+      hours: 100,
+      etaDays: 12,
+      etaDate: '2026-08-15',
+    },
   ],
 });
 

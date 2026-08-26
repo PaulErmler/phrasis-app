@@ -18,7 +18,10 @@ export default function GlobalError({
     // app than is safe to trust at this point, and guarded, because a throw
     // here would crash the crash page itself.
     try {
-      posthog.captureException(error, { boundary: 'global-error', digest: error.digest });
+      posthog.captureException(error, {
+        boundary: 'global-error',
+        digest: error.digest,
+      });
     } catch {
       // Nothing left to report to.
     }
@@ -41,7 +44,13 @@ export default function GlobalError({
           }}
         >
           <div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+            <h2
+              style={{
+                fontSize: '1.5rem',
+                fontWeight: 'bold',
+                marginBottom: '0.5rem',
+              }}
+            >
               Something went wrong
             </h2>
             <p style={{ color: '#666', maxWidth: '28rem' }}>

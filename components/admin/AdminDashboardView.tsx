@@ -57,7 +57,9 @@ function AdminDashboardContent() {
                   onClick={() => setDays(r)}
                   className={cn(
                     'transition-colors',
-                    days === r ? 'text-primary font-medium' : 'text-muted-foreground',
+                    days === r
+                      ? 'text-primary font-medium'
+                      : 'text-muted-foreground',
                   )}
                 >
                   {r}d
@@ -70,7 +72,9 @@ function AdminDashboardContent() {
                 title="Daily active users"
                 valueLabel="active users"
                 isLoading={dau === undefined}
-                headline={todayDau !== undefined ? `${todayDau} today` : undefined}
+                headline={
+                  todayDau !== undefined ? `${todayDau} today` : undefined
+                }
                 data={(dau ?? []).map((d) => ({
                   date: d.date,
                   value: d.activeUsers,
@@ -101,7 +105,9 @@ function AdminDashboardContent() {
                 title="Users per plan"
                 isLoading={plans === undefined}
                 headline={
-                  plans !== undefined ? `${plans.totalWithQuotas} synced` : undefined
+                  plans !== undefined
+                    ? `${plans.totalWithQuotas} synced`
+                    : undefined
                 }
                 rows={(plans?.plans ?? []).map((p) => ({
                   label: p.planName,

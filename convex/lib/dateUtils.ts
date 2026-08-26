@@ -27,7 +27,10 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * that timezone. Anything else falls back to the server date, so a hostile
  * or skewed client can only shift its own display by a day.
  */
-export function resolveClientToday(timezone: string, clientToday?: string): string {
+export function resolveClientToday(
+  timezone: string,
+  clientToday?: string,
+): string {
   const serverToday = getTodayInTimezone(timezone);
   if (clientToday === undefined) return serverToday;
   if (!DATE_RE.test(clientToday)) return serverToday;

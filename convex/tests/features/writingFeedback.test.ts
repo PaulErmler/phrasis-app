@@ -102,7 +102,10 @@ async function seedCard(
   });
 }
 
-async function aiFeedbackBalance(t: TestConvex<typeof schema>, userId = 'user_A') {
+async function aiFeedbackBalance(
+  t: TestConvex<typeof schema>,
+  userId = 'user_A',
+) {
   return t.run(async (ctx) => {
     const doc = await ctx.db
       .query('usageQuotas')
@@ -120,7 +123,11 @@ describe('features/writingFeedback', () => {
   describe('writingAnswersMatch', () => {
     it('ignores punctuation, case, and whitespace', () => {
       expect(
-        writingAnswersMatch('Quisiera un café, por favor.', 'quisiera un café por favor', 'es'),
+        writingAnswersMatch(
+          'Quisiera un café, por favor.',
+          'quisiera un café por favor',
+          'es',
+        ),
       ).toBe(true);
     });
 
@@ -182,7 +189,9 @@ describe('features/writingFeedback', () => {
         }),
       );
       expect(parsed?.notes[0].type).toBe('naturalness');
-      expect(parseFeedbackResponse(JSON.stringify({ verdict: 'great' }))).toBeNull();
+      expect(
+        parseFeedbackResponse(JSON.stringify({ verdict: 'great' })),
+      ).toBeNull();
       expect(parseFeedbackResponse('not json')).toBeNull();
     });
   });
@@ -254,7 +263,11 @@ describe('features/writingFeedback', () => {
 
       const result = await asUser.action(
         api.features.writingFeedback.gradeWritingAnswer,
-        { cardId, language: 'es', userAnswer: 'Me gustaría un café, por favor' },
+        {
+          cardId,
+          language: 'es',
+          userAnswer: 'Me gustaría un café, por favor',
+        },
       );
       expect(result.verdict).toBe('alsoCorrect');
       expect(result.savedAlternative).toBe(true);
@@ -289,7 +302,9 @@ describe('features/writingFeedback', () => {
         JSON.stringify({
           verdict: 'alsoCorrect',
           corrected: 'Dame un café.',
-          notes: [{ type: 'register', text: 'Much more direct than the card.' }],
+          notes: [
+            { type: 'register', text: 'Much more direct than the card.' },
+          ],
           altOk: false,
         }),
       );
@@ -337,8 +352,9 @@ describe('features/writingFeedback', () => {
 
     it('self-heals an account whose quota doc predates the feature', async () => {
       vi.stubEnv('AUTUMN_SECRET_KEY', 'am_test_key');
-      const fetchMock = vi.fn(async () =>
-        new Response(JSON.stringify({ success: true }), { status: 200 }),
+      const fetchMock = vi.fn(
+        async () =>
+          new Response(JSON.stringify({ success: true }), { status: 200 }),
       );
       vi.stubGlobal('fetch', fetchMock);
       try {
@@ -349,7 +365,12 @@ describe('features/writingFeedback', () => {
         });
         const asUser = t.withIdentity({ subject: 'user_A' });
         mockGraderReply(
-          JSON.stringify({ verdict: 'wrong', corrected: 'Quisiera un café.', notes: [], altOk: false }),
+          JSON.stringify({
+            verdict: 'wrong',
+            corrected: 'Quisiera un café.',
+            notes: [],
+            altOk: false,
+          }),
         );
         const result = await asUser.action(
           api.features.writingFeedback.gradeWritingAnswer,
@@ -415,7 +436,11 @@ describe('features/writingFeedback', () => {
       // copy resolves in the free local gate rather than 404ing.
       const result = await asUser.action(
         api.features.writingFeedback.gradeWritingAnswer,
-        { cardId, language: 'en', userAnswer: 'I would like a coffee, please.' },
+        {
+          cardId,
+          language: 'en',
+          userAnswer: 'I would like a coffee, please.',
+        },
       );
       expect(result).toEqual({ verdict: 'correct', matched: 'primary' });
       expect(mockedGenerateText).not.toHaveBeenCalled();
@@ -490,7 +515,9 @@ describe('features/writingFeedback', () => {
         'QUOTA_NOT_SYNCED',
       );
       expect(
-        quotaErrorCode(new Error('Uncaught ConvexError: {"code":"USAGE_LIMIT"}')),
+        quotaErrorCode(
+          new Error('Uncaught ConvexError: {"code":"USAGE_LIMIT"}'),
+        ),
       ).toBe('USAGE_LIMIT');
       expect(quotaErrorCode(new Error('something else'))).toBeUndefined();
     });

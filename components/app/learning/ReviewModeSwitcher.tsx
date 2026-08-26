@@ -11,7 +11,10 @@ interface ReviewModeSwitcherProps {
   onChange: (mode: ReviewMode) => void;
 }
 
-export function ReviewModeSwitcher({ value, onChange }: ReviewModeSwitcherProps) {
+export function ReviewModeSwitcher({
+  value,
+  onChange,
+}: ReviewModeSwitcherProps) {
   const t = useTranslations('LearningMode.settingsPanel');
 
   return (

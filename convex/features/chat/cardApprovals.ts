@@ -4,9 +4,7 @@ import { internal } from '../../_generated/api';
 import { getAuthUserId } from '../../db/users';
 import { EVENTS, track } from '../../analytics';
 import { getActiveCourseForUser } from '../../db/courses';
-import {
-  getOrCreateChatCollection,
-} from '../../db/collections';
+import { getOrCreateChatCollection } from '../../db/collections';
 import {
   cardApprovalKindValidator,
   cardApprovalResolutionValidator,
@@ -34,7 +32,10 @@ import {
   vAnnotationKind,
 } from '../../lib/textAnnotations';
 import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
-import { OPENROUTER_CHAT_REASONING, OPENROUTER_MODELS } from '../../config/aiModels';
+import {
+  OPENROUTER_CHAT_REASONING,
+  OPENROUTER_MODELS,
+} from '../../config/aiModels';
 
 /**
  * Require an authenticated user ID, throwing if not logged in.
@@ -531,7 +532,8 @@ export const replaceCardFromApproval = mutation({
       // gender applied only there ships wrong-voice audio. Non-definitive
       // values keep the row's gender and stay applyTextMetadata's business.
       proposedAudioSpeakerGender:
-        metadata?.speakerGender === 'male' || metadata?.speakerGender === 'female'
+        metadata?.speakerGender === 'male' ||
+        metadata?.speakerGender === 'female'
           ? metadata.speakerGender
           : undefined,
       // `suggestCurriculumFix` is deliberately omitted. The manual edit dialog
@@ -746,7 +748,11 @@ export const approveCard = mutation({
     // Track card approval event
     const active = await getActiveCourseForUser(ctx, userId);
     if (active) {
-      await trackEvent(ctx, { userId, courseId: active.course._id, field: 'chatCardsApproved' });
+      await trackEvent(ctx, {
+        userId,
+        courseId: active.course._id,
+        field: 'chatCardsApproved',
+      });
     }
     await track(ctx, userId, EVENTS.CHAT_CARD_APPROVAL, {
       outcome: 'approved',

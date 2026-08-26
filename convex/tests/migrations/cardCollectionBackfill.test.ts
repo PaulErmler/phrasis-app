@@ -16,7 +16,9 @@ function legacyCard(
   return fields as Pick<Doc<'cards'>, 'collectionId' | 'collectionOrigin'>;
 }
 
-function makeCollection(overrides: Partial<Doc<'collections'>>): Doc<'collections'> {
+function makeCollection(
+  overrides: Partial<Doc<'collections'>>,
+): Doc<'collections'> {
   return {
     _id: collectionId,
     _creationTime: 0,
@@ -72,7 +74,10 @@ describe('cardCollectionBackfillPatch (safety-net migrateOne logic)', () => {
       cardCollectionBackfillPatch(
         legacyCard({ collectionId }),
         collectionId,
-        makeCollection({ name: 'L05', datasetId: 'dataset1' as Id<'datasets'> }),
+        makeCollection({
+          name: 'L05',
+          datasetId: 'dataset1' as Id<'datasets'>,
+        }),
       ),
     ).toEqual({ collectionOrigin: 'premade' });
   });
@@ -88,6 +93,8 @@ describe('cardCollectionBackfillPatch (safety-net migrateOne logic)', () => {
   });
 
   it('returns undefined when the collection cannot be resolved', () => {
-    expect(cardCollectionBackfillPatch(legacyCard({}), undefined, null)).toBeUndefined();
+    expect(
+      cardCollectionBackfillPatch(legacyCard({}), undefined, null),
+    ).toBeUndefined();
   });
 });

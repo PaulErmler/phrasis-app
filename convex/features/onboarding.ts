@@ -164,7 +164,9 @@ async function processPlacementSentences(
     const text = await ctx.db.get(textId);
     if (!text) continue;
     const targetLanguages = Array.from(
-      new Set([targetLanguage, sourceLanguage].filter((l) => l !== text.language)),
+      new Set(
+        [targetLanguage, sourceLanguage].filter((l) => l !== text.language),
+      ),
     );
     const result = await scheduleMissingContent(
       ctx,
@@ -205,7 +207,10 @@ async function processPlacementSentences(
  */
 async function runPlacementContentSweep(
   ctx: MutationCtx,
-  { targetLanguage, sourceLanguage }: { targetLanguage: string; sourceLanguage: string },
+  {
+    targetLanguage,
+    sourceLanguage,
+  }: { targetLanguage: string; sourceLanguage: string },
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   const sentences = await ctx.db
     .query('placementTestSentences')
@@ -238,7 +243,9 @@ async function runPlacementContentSweep(
       0,
       internal.features.onboarding.processPlacementContentBatch,
       {
-        textIds: sentences.slice(i, i + PLACEMENT_CONTENT_BATCH_SIZE).map((s) => s.textId),
+        textIds: sentences
+          .slice(i, i + PLACEMENT_CONTENT_BATCH_SIZE)
+          .map((s) => s.textId),
         targetLanguage,
         sourceLanguage,
       },
@@ -446,15 +453,13 @@ export const warmupOnboardingTranslations = internalMutation({
       args.languages !== undefined
         ? args.languages
         : SUPPORTED_LANGUAGES.filter((l) => !l.hiddenFromPicker).map(
-          (l) => l.code,
-        );
+            (l) => l.code,
+          );
     const unknown = languages.filter(
       (code) => !SUPPORTED_LANGUAGE_CODES.has(code),
     );
     if (unknown.length > 0) {
-      throw new ConvexError(
-        `Unknown language code(s): ${unknown.join(', ')}`,
-      );
+      throw new ConvexError(`Unknown language code(s): ${unknown.join(', ')}`);
     }
     if (languages.length === 0) {
       return { languages: 0, texts: 0, batches: 0 };
@@ -710,4 +715,3 @@ export const finalizeOnboarding = mutation({
     return { alreadyFinalized };
   },
 });
-

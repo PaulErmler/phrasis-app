@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-import { DiffDisplay, computeAccuracy } from '@/components/app/learning/DiffDisplay';
+import {
+  DiffDisplay,
+  computeAccuracy,
+} from '@/components/app/learning/DiffDisplay';
 
 /**
  * End-to-end coverage of the `ignorePunctuation` setting through the component
@@ -14,8 +17,9 @@ import { DiffDisplay, computeAccuracy } from '@/components/app/learning/DiffDisp
 describe('computeAccuracy: ignorePunctuation', () => {
   describe('word path (de: has word boundaries)', () => {
     it('penalizes a missing period by default', () => {
-      expect(computeAccuracy('Das ist ein Test.', 'Das ist ein Test', 'de'))
-        .toBeLessThan(100);
+      expect(
+        computeAccuracy('Das ist ein Test.', 'Das ist ein Test', 'de'),
+      ).toBeLessThan(100);
     });
 
     it('ignores the missing period when the setting is on', () => {
@@ -33,8 +37,9 @@ describe('computeAccuracy: ignorePunctuation', () => {
 
   describe('char path (ja: no word boundaries)', () => {
     it('penalizes a missing 。 by default', () => {
-      expect(computeAccuracy('今日は暑いですね。', '今日は暑いですね', 'ja'))
-        .toBeLessThan(100);
+      expect(
+        computeAccuracy('今日は暑いですね。', '今日は暑いですね', 'ja'),
+      ).toBeLessThan(100);
     });
 
     it('ignores the missing 。 when the setting is on', () => {

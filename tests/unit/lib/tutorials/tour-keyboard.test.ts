@@ -15,7 +15,11 @@ import {
 function keyEvent(
   init: Partial<KeyboardEventInit> & { keyCode?: number } = {},
 ): KeyboardEvent {
-  const e = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, ...init });
+  const e = new KeyboardEvent('keydown', {
+    key: 'Enter',
+    cancelable: true,
+    ...init,
+  });
   if (init.keyCode !== undefined) {
     Object.defineProperty(e, 'keyCode', { value: init.keyCode });
   }
@@ -39,12 +43,16 @@ describe('shouldAdvanceTourOnEnter', () => {
 
   it('ignores modifier chords', () => {
     for (const mod of ['metaKey', 'ctrlKey', 'altKey', 'shiftKey'] as const) {
-      expect(shouldAdvanceTourOnEnter(keyEvent({ [mod]: true })), mod).toBe(false);
+      expect(shouldAdvanceTourOnEnter(keyEvent({ [mod]: true })), mod).toBe(
+        false,
+      );
     }
   });
 
   it('stands down during IME composition', () => {
-    expect(shouldAdvanceTourOnEnter(keyEvent({ isComposing: true }))).toBe(false);
+    expect(shouldAdvanceTourOnEnter(keyEvent({ isComposing: true }))).toBe(
+      false,
+    );
     expect(shouldAdvanceTourOnEnter(keyEvent({ keyCode: 229 }))).toBe(false);
   });
 });

@@ -41,9 +41,7 @@ export function HelpDialog({
     setOpen(value);
   };
 
-  const title = supportOnly
-    ? t('help.supportOnly.title')
-    : t('help.title');
+  const title = supportOnly ? t('help.supportOnly.title') : t('help.title');
   const description = supportOnly
     ? t('help.supportOnly.description')
     : t('help.description');
@@ -51,7 +49,11 @@ export function HelpDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className={`size-9 ${triggerClassName ?? ''}`}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`size-9 ${triggerClassName ?? ''}`}
+        >
           <CircleHelp className="h-5 w-5" />
           <span className="sr-only">{title}</span>
         </Button>

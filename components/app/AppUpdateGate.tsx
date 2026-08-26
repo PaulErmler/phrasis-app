@@ -237,7 +237,10 @@ export function AppUpdateGate({ children }: { children: React.ReactNode }) {
     if (!updateAvailable || escalatedRef.current) return;
 
     const pendingSince = pendingSinceRef.current ?? Date.now();
-    const remaining = Math.max(0, ESCALATE_AFTER_MS - (Date.now() - pendingSince));
+    const remaining = Math.max(
+      0,
+      ESCALATE_AFTER_MS - (Date.now() - pendingSince),
+    );
 
     const timer = setTimeout(() => {
       // Once only. This effect re-runs on every re-render of a component that

@@ -46,20 +46,16 @@ const CATEGORY_ORDER = [
 ] as const satisfies readonly LanguageCategory[];
 
 /** Pinned at the top; still listed again in their category sections below. */
-const POPULAR_CODES = [
-  'es',
-  'fr',
-  'ar',
-  'zh',
-  'ja',
-  'hi',
-  'de',
-  'en',
-] as const;
+const POPULAR_CODES = ['es', 'fr', 'ar', 'zh', 'ja', 'hi', 'de', 'en'] as const;
 
 const PICKABLE = SUPPORTED_LANGUAGES.filter((l) => !l.hiddenFromPicker);
 
-export function LanguagePairStep({ source, target, onSource, onTarget }: Props) {
+export function LanguagePairStep({
+  source,
+  target,
+  onSource,
+  onTarget,
+}: Props) {
   const t = useTranslations('Onboarding.languagePair');
   const tLang = useTranslations('LanguageSelector');
   const locale = useLocale();
@@ -172,7 +168,10 @@ export function LanguagePairStep({ source, target, onSource, onTarget }: Props) 
             >
               <ChevronLeft className="h-4 w-4" />
               {t('backToLearn', {
-                language: getLocalizedLanguageNameByCode(targetLang.code, locale),
+                language: getLocalizedLanguageNameByCode(
+                  targetLang.code,
+                  locale,
+                ),
               })}
             </button>
           ) : null}

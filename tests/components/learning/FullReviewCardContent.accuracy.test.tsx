@@ -16,7 +16,6 @@ vi.mock('@/components/autumn/usage-limit-dialog', () => ({
   default: () => null,
 }));
 
-
 // Spy on the real implementation (values unchanged) so a test can assert an
 // already-submitted answer is diffed once rather than once per keystroke.
 vi.mock('@/lib/textCompare', async (importOriginal) => {
@@ -43,9 +42,24 @@ const computeAccuracyPairSpy = vi.mocked(computeAccuracyPair);
  */
 
 const TWO_TARGETS: CardTranslation[] = [
-  { language: 'en', text: 'The weather is nice.', isBaseLanguage: true, isTargetLanguage: false },
-  { language: 'es', text: 'El tiempo es bueno.', isBaseLanguage: false, isTargetLanguage: true },
-  { language: 'de', text: 'Das Wetter ist schön.', isBaseLanguage: false, isTargetLanguage: true },
+  {
+    language: 'en',
+    text: 'The weather is nice.',
+    isBaseLanguage: true,
+    isTargetLanguage: false,
+  },
+  {
+    language: 'es',
+    text: 'El tiempo es bueno.',
+    isBaseLanguage: false,
+    isTargetLanguage: true,
+  },
+  {
+    language: 'de',
+    text: 'Das Wetter ist schön.',
+    isBaseLanguage: false,
+    isTargetLanguage: true,
+  },
 ];
 
 function renderCard(translations: CardTranslation[]) {
@@ -164,11 +178,15 @@ describe('FullReviewCardContent: accuracy summary across target languages', () =
   it('does not loop when the parent stores the summary in state', () => {
     const emissions = vi.fn();
     function StatefulParent() {
-      const [summary, setSummary] = useState<WritingAccuracySummary | null>(null);
+      const [summary, setSummary] = useState<WritingAccuracySummary | null>(
+        null,
+      );
       return (
         <>
           {/* Reading the state ties the re-render to the stored object. */}
-          <span data-testid="submitted-count">{summary?.submittedCount ?? -1}</span>
+          <span data-testid="submitted-count">
+            {summary?.submittedCount ?? -1}
+          </span>
           <FullReviewCardContent
             presentation={makePresentation({
               sourceText: 'The weather is nice.',

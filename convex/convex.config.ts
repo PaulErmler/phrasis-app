@@ -3,7 +3,7 @@ import { v } from 'convex/values';
 import posthog from '@posthog/convex/convex.config.js';
 import betterAuth from '@convex-dev/better-auth/convex.config';
 import agent from '@convex-dev/agent/convex.config';
-import autumn from "@useautumn/convex/convex.config";
+import autumn from '@useautumn/convex/convex.config';
 import aggregate from '@convex-dev/aggregate/convex.config';
 import actionRetrier from '@convex-dev/action-retrier/convex.config';
 import rateLimiter from '@convex-dev/rate-limiter/convex.config';

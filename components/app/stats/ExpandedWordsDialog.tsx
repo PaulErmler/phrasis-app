@@ -97,7 +97,8 @@ export function ExpandedWordsDialog({
   // While the debounce is catching up, keep showing the prior results so the
   // UI doesn't flash empty between keystrokes.
   const isSearchLoading =
-    isSearching && (debouncedSearch !== trimmedSearch || searchResults === undefined);
+    isSearching &&
+    (debouncedSearch !== trimmedSearch || searchResults === undefined);
   const filtered = useMemo(
     () => (isSearching ? (searchResults ?? []) : displayed),
     [isSearching, searchResults, displayed],
@@ -116,7 +117,9 @@ export function ExpandedWordsDialog({
       <DialogContent className="h-[85vh] flex flex-col sm:max-w-lg p-0 gap-0 overflow-hidden">
         <DialogHeader className="px-4 pt-4 pb-3 text-left">
           <DialogTitle className="text-base">
-            {language ? t('recentWordsTitle', { language: langName(language) }) : ''}
+            {language
+              ? t('recentWordsTitle', { language: langName(language) })
+              : ''}
           </DialogTitle>
         </DialogHeader>
         <Separator />
@@ -170,8 +173,7 @@ export function ExpandedWordsDialog({
                 {filtered.map((w, i) => {
                   // Keep chip color stable with the recent view when possible.
                   const fromMap = indexInDisplayed?.get(w);
-                  const originalIndex =
-                    fromMap !== undefined ? fromMap : i;
+                  const originalIndex = fromMap !== undefined ? fromMap : i;
                   const isNew = !isSearching && i >= newFromIndex;
                   const key = `${isSearching ? 's' : 'r'}-${originalIndex}-${w}`;
                   return (
@@ -189,8 +191,7 @@ export function ExpandedWordsDialog({
                         }
                       >
                         {w}
-                      </button>
-                      {' '}
+                      </button>{' '}
                     </Fragment>
                   );
                 })}
@@ -200,7 +201,9 @@ export function ExpandedWordsDialog({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setLimit((l) => Math.min(l + PAGE_SIZE, MAX_WORDS))}
+                    onClick={() =>
+                      setLimit((l) => Math.min(l + PAGE_SIZE, MAX_WORDS))
+                    }
                     disabled={isFetchingMore}
                     className="min-w-28"
                   >

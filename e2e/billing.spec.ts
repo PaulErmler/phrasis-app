@@ -1,12 +1,12 @@
-import { test, expect, type Page } from "@playwright/test";
-import fs from "node:fs";
-import path from "node:path";
+import { test, expect, type Page } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   completeStripeTestCheckout,
   gotoAuthedApp,
   neutralizeTours,
   signUpFreshUser,
-} from "./helpers";
+} from './helpers';
 
 /**
  * Billing / trial lifecycle. Drives the REAL upgrade/downgrade-during-trial
@@ -52,14 +52,17 @@ import {
  * e2e account and its Autumn/Stripe test customer are left behind.
  */
 
-const STORAGE_STATE_BILLING = path.resolve(__dirname, ".auth/user-billing.json");
+const STORAGE_STATE_BILLING = path.resolve(
+  __dirname,
+  '.auth/user-billing.json',
+);
 const CREDENTIALS_BILLING = path.resolve(
   __dirname,
-  ".auth/credentials-billing.json",
+  '.auth/credentials-billing.json',
 );
 
-const BASIC_ANNUAL = "basic_annual";
-const PRO_ANNUAL = "pro_annual";
+const BASIC_ANNUAL = 'basic_annual';
+const PRO_ANNUAL = 'pro_annual';
 
 test.use({ storageState: STORAGE_STATE_BILLING });
 
@@ -74,7 +77,7 @@ function planCta(page: Page, productId: string) {
  * the annual plan cards are the ones rendered).
  */
 async function openPricingTable(page: Page) {
-  await gotoAuthedApp(page, "/app/settings", planCta(page, BASIC_ANNUAL));
+  await gotoAuthedApp(page, '/app/settings', planCta(page, BASIC_ANNUAL));
 }
 
 /**
@@ -96,9 +99,9 @@ async function expectPlanState(
   }).toPass({ timeout, intervals: [2_000, 5_000] });
 }
 
-test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
+test.describe('billing trial lifecycle (live)', { tag: '@live' }, () => {
   // Serial: the four tests are consecutive stages of one user journey.
-  test.describe.configure({ mode: "serial", retries: 0 });
+  test.describe.configure({ mode: 'serial', retries: 0 });
 
   // Fresh, never-trialed identity for this invocation (see header note).
   // Signing up + onboarding takes ~20-60s depending on backend load.
@@ -111,7 +114,7 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     });
     const page = await context.newPage();
     await signUpFreshUser(page, {
-      prefix: "billing",
+      prefix: 'billing',
       storageStatePath: STORAGE_STATE_BILLING,
       credentialsPath: CREDENTIALS_BILLING,
     });
@@ -126,19 +129,19 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
   // downgrade dialog (step 4), proves the trial end never moves.
   let trialEndDate: string | undefined;
 
-  test("trial-eligible user sees trial badge and Start Free Trial", async ({
+  test('trial-eligible user sees trial badge and Start Free Trial', async ({
     page,
   }) => {
     await openPricingTable(page);
 
-    await expect(page.getByTestId("pricing-trial-badge").first()).toBeVisible({
+    await expect(page.getByTestId('pricing-trial-badge').first()).toBeVisible({
       timeout: 15_000,
     });
     await expect(planCta(page, BASIC_ANNUAL)).toHaveText(/start free trial/i);
     await expect(planCta(page, PRO_ANNUAL)).toHaveText(/start free trial/i);
   });
 
-  test("starting a plan runs the card-required trial through Stripe checkout", async ({
+  test('starting a plan runs the card-required trial through Stripe checkout', async ({
     page,
   }) => {
     test.setTimeout(240_000);
@@ -147,9 +150,9 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     // Card-required trial for a customer without a payment method → the
     // checkout() call redirects to Stripe's hosted checkout.
     await planCta(page, BASIC_ANNUAL).click();
-    const creds = JSON.parse(
-      fs.readFileSync(CREDENTIALS_BILLING, "utf8"),
-    ) as { email: string };
+    const creds = JSON.parse(fs.readFileSync(CREDENTIALS_BILLING, 'utf8')) as {
+      email: string;
+    };
     await completeStripeTestCheckout(page, { email: creds.email });
 
     // Back in the app: Basic Annual becomes the current (trialing) plan…
@@ -158,11 +161,11 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     // …and the trial promo is gone everywhere: trials are once-ever, so a
     // trialing user must never be offered another one (this was the
     // cross-plan trial-hopping hole).
-    await expect(page.getByTestId("pricing-trial-badge")).toHaveCount(0);
+    await expect(page.getByTestId('pricing-trial-badge')).toHaveCount(0);
     await expect(planCta(page, PRO_ANNUAL)).not.toHaveText(/start free trial/i);
   });
 
-  test("upgrading during the trial keeps the running trial", async ({
+  test('upgrading during the trial keeps the running trial', async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -171,30 +174,33 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     await planCta(page, PRO_ANNUAL).click();
 
     // Card is on file now → no Stripe redirect; the confirm dialog opens.
-    const title = page.getByTestId("checkout-dialog-title");
+    const title = page.getByTestId('checkout-dialog-title');
     await expect(title).toBeVisible({ timeout: 30_000 });
     await expect(title).toHaveText(/change to pro annual/i);
 
-    const message = page.getByTestId("checkout-dialog-message");
+    const message = page.getByTestId('checkout-dialog-message');
     await expect(message).toContainText(/still ends on/i);
     await expect(message).not.toContainText(/start a free trial/i);
 
     // Nothing is charged now. Billing starts at the (kept) trial end.
-    await expect(page.getByTestId("checkout-due-today")).toHaveText("€0.00");
+    await expect(page.getByTestId('checkout-due-today')).toHaveText('€0.00');
 
     const messageText = (await message.innerText()).trim();
     trialEndDate = /still ends on (.+?),/.exec(messageText)?.[1];
-    expect(trialEndDate, `trial end date parsed from: ${messageText}`).toBeTruthy();
+    expect(
+      trialEndDate,
+      `trial end date parsed from: ${messageText}`,
+    ).toBeTruthy();
 
-    await page.getByTestId("checkout-dialog-confirm").click();
+    await page.getByTestId('checkout-dialog-confirm').click();
     await expect(title).toBeHidden({ timeout: 60_000 });
 
     // Immediate switch: Pro Annual is the current (still trialing) plan.
     await expectPlanState(page, PRO_ANNUAL, /current plan/i);
-    await expect(page.getByTestId("pricing-trial-badge")).toHaveCount(0);
+    await expect(page.getByTestId('pricing-trial-badge')).toHaveCount(0);
   });
 
-  test("downgrading during the trial schedules the switch at the unchanged trial end", async ({
+  test('downgrading during the trial schedules the switch at the unchanged trial end', async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -204,12 +210,12 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     // "Start trial for Basic Annual".
     await planCta(page, BASIC_ANNUAL).click();
 
-    const title = page.getByTestId("checkout-dialog-title");
+    const title = page.getByTestId('checkout-dialog-title');
     await expect(title).toBeVisible({ timeout: 30_000 });
     await expect(title).toHaveText(/switch to basic annual/i);
     await expect(title).not.toHaveText(/start trial/i);
 
-    const message = page.getByTestId("checkout-dialog-message");
+    const message = page.getByTestId('checkout-dialog-message');
     await expect(message).toContainText(/continues unchanged until/i);
     await expect(message).not.toContainText(/start a free trial/i);
 
@@ -225,9 +231,9 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     expect(scheduledDate, `date parsed from: ${messageText}`).toBeTruthy();
     expect(scheduledDate).toBe(trialEndDate);
 
-    await expect(page.getByTestId("checkout-due-today")).toHaveText("€0.00");
+    await expect(page.getByTestId('checkout-due-today')).toHaveText('€0.00');
 
-    await page.getByTestId("checkout-dialog-confirm").click();
+    await page.getByTestId('checkout-dialog-confirm').click();
     await expect(title).toBeHidden({ timeout: 60_000 });
 
     // Scheduled switch: the trial keeps running on Pro Annual; Basic Annual
@@ -236,10 +242,10 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     // scenario for it is "renew" (offer to un-cancel), not "active".
     await expectPlanState(page, BASIC_ANNUAL, /plan scheduled/i);
     await expect(planCta(page, PRO_ANNUAL)).toHaveText(/renew/i);
-    await expect(page.getByTestId("pricing-trial-badge")).toHaveCount(0);
+    await expect(page.getByTestId('pricing-trial-badge')).toHaveCount(0);
   });
 
-  test("switching to Free during the trial schedules Free at the unchanged trial end", async ({
+  test('switching to Free during the trial schedules Free at the unchanged trial end', async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -248,8 +254,8 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     // The free product's Autumn id is dashboard config, not in the repo,
     // but the table sorts Free first, so the first CTA belongs to it.
     const freeCta = page.locator('[data-testid^="pricing-card-cta-"]').first();
-    const freeTestId = await freeCta.getAttribute("data-testid");
-    const freeProductId = freeTestId!.replace("pricing-card-cta-", "");
+    const freeTestId = await freeCta.getAttribute('data-testid');
+    const freeProductId = freeTestId!.replace('pricing-card-cta-', '');
     expect(freeProductId).not.toBe(BASIC_ANNUAL);
     expect(freeProductId).not.toBe(PRO_ANNUAL);
 
@@ -258,12 +264,12 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     // dialog then just stayed open with nothing happening.
     await freeCta.click();
 
-    const title = page.getByTestId("checkout-dialog-title");
+    const title = page.getByTestId('checkout-dialog-title');
     await expect(title).toBeVisible({ timeout: 30_000 });
     await expect(title).toHaveText(/switch to/i);
     await expect(title).not.toHaveText(/start trial/i);
 
-    const message = page.getByTestId("checkout-dialog-message");
+    const message = page.getByTestId('checkout-dialog-message');
     await expect(message).toContainText(/continues unchanged until/i);
     await expect(message).not.toContainText(/start a free trial/i);
 
@@ -279,7 +285,7 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     // Core regression assertion: confirm routes through
     // switchPlanDuringTrial and the dialog CLOSES (before the fix the gate
     // threw and it stayed open).
-    await page.getByTestId("checkout-dialog-confirm").click();
+    await page.getByTestId('checkout-dialog-confirm').click();
     await expect(title).toBeHidden({ timeout: 60_000 });
 
     // The table must update IN PLACE, without a reload: the trial-switch
@@ -292,10 +298,10 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     // running on Pro Annual, which still lapses at trial end ("renew").
     await expectPlanState(page, freeProductId, /plan scheduled/i);
     await expect(planCta(page, PRO_ANNUAL)).toHaveText(/renew/i);
-    await expect(page.getByTestId("pricing-trial-badge")).toHaveCount(0);
+    await expect(page.getByTestId('pricing-trial-badge')).toHaveCount(0);
   });
 
-  test("renewing the trialing plan un-schedules the pending Free switch", async ({
+  test('renewing the trialing plan un-schedules the pending Free switch', async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -309,16 +315,16 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     await expect(planCta(page, PRO_ANNUAL)).toHaveText(/renew/i);
     await planCta(page, PRO_ANNUAL).click();
 
-    const title = page.getByTestId("checkout-dialog-title");
+    const title = page.getByTestId('checkout-dialog-title');
     await expect(title).toBeVisible({ timeout: 30_000 });
     await expect(title).toHaveText(/renew/i);
     await expect(title).not.toHaveText(/start trial/i);
 
-    const message = page.getByTestId("checkout-dialog-message");
+    const message = page.getByTestId('checkout-dialog-message');
     await expect(message).not.toContainText(/start a free trial/i);
 
     // Confirm must close the dialog (the gate error used to keep it open)…
-    await page.getByTestId("checkout-dialog-confirm").click();
+    await page.getByTestId('checkout-dialog-confirm').click();
     await expect(title).toBeHidden({ timeout: 60_000 });
 
     // …and the table updates in place: Pro Annual is current again, the
@@ -332,6 +338,6 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     // the once-ever trial promo must stay gone.
     await expectPlanState(page, PRO_ANNUAL, /current plan/i);
     await expect(freeCta).not.toHaveText(/plan scheduled/i);
-    await expect(page.getByTestId("pricing-trial-badge")).toHaveCount(0);
+    await expect(page.getByTestId('pricing-trial-badge')).toHaveCount(0);
   });
 });

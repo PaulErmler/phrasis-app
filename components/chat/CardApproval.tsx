@@ -125,7 +125,11 @@ export function EntryLines({
           {/* Own dir-scoped span: the Latin language label shares this <p>,
               so the sentence needs its own bidi context for RTL languages. */}
           <span dir={getTextDirection(entry.language)}>
-            {furiganaSegments ? <Ruby segments={furiganaSegments} /> : entry.text}
+            {furiganaSegments ? (
+              <Ruby segments={furiganaSegments} />
+            ) : (
+              entry.text
+            )}
           </span>
         </p>
         {ipa && <p className="text-ipa">/{ipa}/</p>}
@@ -186,7 +190,9 @@ export function CardApproval({
   };
   const { state: toolState, output: toolOutput } = tool;
 
-  const approval = toolCallId ? approvalsByToolCallId.get(toolCallId) : undefined;
+  const approval = toolCallId
+    ? approvalsByToolCallId.get(toolCallId)
+    : undefined;
   const entries =
     approval?.translations && approval.translations.length > 0
       ? approval.translations
@@ -220,8 +226,12 @@ export function CardApproval({
     return <ApprovalStreamingSkeleton label={t('creatingApproval')} />;
   }
 
-  const targetEntries = entries.filter((e) => targetLanguages.includes(e.language));
-  const baseEntries = entries.filter((e) => !targetLanguages.includes(e.language));
+  const targetEntries = entries.filter((e) =>
+    targetLanguages.includes(e.language),
+  );
+  const baseEntries = entries.filter(
+    (e) => !targetLanguages.includes(e.language),
+  );
 
   if (isWaiting && entries.length > 0) {
     return (
@@ -283,8 +293,10 @@ export function CardApproval({
       data-testid="card-approval"
       className={cn(
         'my-3 flex flex-col gap-3',
-        isApproved && 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950',
-        approvalState === 'rejected' && 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950',
+        isApproved &&
+          'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950',
+        approvalState === 'rejected' &&
+          'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950',
       )}
     >
       <AlertDescription>
@@ -346,7 +358,9 @@ export function CardApproval({
               'h-8 px-3 text-xs font-medium hover:bg-transparent disabled:opacity-100',
               isApproved ? 'text-success' : 'text-red-700 dark:text-red-300',
             )}
-            {...(isApproved ? { 'data-testid': 'card-approved-indicator' } : {})}
+            {...(isApproved
+              ? { 'data-testid': 'card-approved-indicator' }
+              : {})}
           >
             {isApproved ? t('approved') : t('rejected')}
           </Button>

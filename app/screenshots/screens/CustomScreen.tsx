@@ -15,9 +15,18 @@ const TYPED = [
 ];
 
 const GENERATED = [
-  { base: 'Where is the nearest climbing gym?', target: '¿Dónde está el rocódromo más cercano?' },
-  { base: 'Can I rent climbing shoes here?', target: '¿Puedo alquilar pies de gato aquí?' },
-  { base: 'Is this route suitable for beginners?', target: '¿Esta vía es adecuada para principiantes?' },
+  {
+    base: 'Where is the nearest climbing gym?',
+    target: '¿Dónde está el rocódromo más cercano?',
+  },
+  {
+    base: 'Can I rent climbing shoes here?',
+    target: '¿Puedo alquilar pies de gato aquí?',
+  },
+  {
+    base: 'Is this route suitable for beginners?',
+    target: '¿Esta vía es adecuada para principiantes?',
+  },
 ];
 
 export function CustomScreen() {
@@ -52,7 +61,9 @@ export function CustomScreen() {
           {GENERATED.map((card, i) => (
             <div key={card.base} className="card-surface p-3 space-y-1.5">
               <div className="flex items-center justify-between">
-                <Badge variant="secondary" className="text-xs">New</Badge>
+                <Badge variant="secondary" className="text-xs">
+                  New
+                </Badge>
                 {i === 0 && (
                   <Badge className="border-transparent bg-primary/10 text-primary text-xs">
                     Audio ready
@@ -62,7 +73,11 @@ export function CustomScreen() {
               <p className="text-sm text-muted-foreground">{card.base}</p>
               <div className="flex items-start gap-2">
                 <p className="text-base font-medium flex-1">{card.target}</p>
-                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0"
+                >
                   <Volume2 className="h-4 w-4" />
                 </Button>
               </div>

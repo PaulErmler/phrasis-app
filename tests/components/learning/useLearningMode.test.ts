@@ -207,7 +207,9 @@ function seedReviewing(
 
 function reviewing(result: { current: LearningState }) {
   if (result.current.status !== 'reviewing') {
-    throw new Error(`expected status "reviewing", got "${result.current.status}"`);
+    throw new Error(
+      `expected status "reviewing", got "${result.current.status}"`,
+    );
   }
   return result.current;
 }
@@ -379,10 +381,9 @@ describe('useLearningMode', () => {
       expect(del).toHaveBeenCalledTimes(1);
       expect(reviewing(result).isExiting).toBe(false);
       expect(reviewing(result).isReviewing).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.any(Error),
-        { op: 'deleteCard' },
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.any(Error), {
+        op: 'deleteCard',
+      });
     });
 
     it('fires once when invoked twice in the same tick (the isReviewing state guard has not flushed yet, so a synchronous latch carries it)', async () => {
@@ -444,10 +445,9 @@ describe('useLearningMode', () => {
       expect(master).toHaveBeenCalledTimes(1);
       expect(reviewing(result).isExiting).toBe(false);
       expect(reviewing(result).isReviewing).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.any(Error),
-        { op: 'masterCard' },
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.any(Error), {
+        op: 'masterCard',
+      });
     });
 
     it('pending hide: fires hideCard once and restores isExiting on rejection', async () => {
@@ -476,10 +476,9 @@ describe('useLearningMode', () => {
 
       expect(reviewing(result).isExiting).toBe(false);
       expect(reviewing(result).isReviewing).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.any(Error),
-        { op: 'hideCard' },
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.any(Error), {
+        op: 'hideCard',
+      });
     });
   });
 
@@ -531,10 +530,9 @@ describe('useLearningMode', () => {
       expect(radio).toHaveBeenCalledTimes(1);
       expect(reviewing(result).isExiting).toBe(false);
       expect(reviewing(result).isReviewing).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.any(Error),
-        { op: 'advanceFreePlayCard' },
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.any(Error), {
+        op: 'advanceFreePlayCard',
+      });
     });
 
     // Free play is one mode; the server resolves which rotation to advance

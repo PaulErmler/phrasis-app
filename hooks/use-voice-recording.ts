@@ -56,7 +56,9 @@ export function useVoiceRecording(
   const [isTranscribing, setIsTranscribing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const maxDurationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const maxDurationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const { language, maxDurationMs, quiet } = options ?? {};
 
   const transcribeAudio = useAction(
@@ -74,7 +76,9 @@ export function useVoiceRecording(
         'audio/mp4',
         'audio/aac',
       ];
-      const mimeType = preferredTypes.find((t) => MediaRecorder.isTypeSupported(t));
+      const mimeType = preferredTypes.find((t) =>
+        MediaRecorder.isTypeSupported(t),
+      );
       const options = mimeType ? { mimeType } : undefined;
       const chosenMime = mimeType ?? detectDefaultMime();
 
@@ -145,7 +149,16 @@ export function useVoiceRecording(
       console.error('Error starting recording:', error);
       toast.error(tErrors('microphoneAccess'));
     }
-  }, [transcribeAudio, onTranscript, onUsageLimit, language, maxDurationMs, quiet, tErrors, tVoice]);
+  }, [
+    transcribeAudio,
+    onTranscript,
+    onUsageLimit,
+    language,
+    maxDurationMs,
+    quiet,
+    tErrors,
+    tVoice,
+  ]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {

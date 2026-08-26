@@ -15,7 +15,6 @@ vi.mock('@/components/autumn/usage-limit-dialog', () => ({
   default: () => null,
 }));
 
-
 import { FullReviewCardContent } from '@/components/app/learning/FullReviewCardContent';
 import type { CardTranslation } from '@/components/app/learning/types';
 import { makePresentation } from './cardPresentationStub';
@@ -46,9 +45,7 @@ const TRANSLATIONS: CardTranslation[] = [
 ];
 
 function renderCard(
-  overrides: Partial<
-    React.ComponentProps<typeof FullReviewCardContent>
-  > = {},
+  overrides: Partial<React.ComponentProps<typeof FullReviewCardContent>> = {},
 ) {
   render(
     <FullReviewCardContent

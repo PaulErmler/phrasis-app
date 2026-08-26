@@ -12,10 +12,7 @@ import {
 import { MessageCircle, ChevronRight } from 'lucide-react';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
-import {
-  COACHMARK_ANCHORS,
-  TUTORIAL_ANCHORS,
-} from '@/lib/tutorials/anchors';
+import { COACHMARK_ANCHORS, TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import type { QuickAction } from '@/convex/features/chat/quickActions';
 
 // -- Context to share chat toggle state with the header ----------------------
@@ -43,7 +40,8 @@ interface LearningChatContextValue {
   claimPrompt: (nonce: number) => boolean;
 }
 
-export const LearningChatContext = createContext<LearningChatContextValue | null>(null);
+export const LearningChatContext =
+  createContext<LearningChatContextValue | null>(null);
 
 export function useLearningChatToggle(): LearningChatContextValue | null {
   return useContext(LearningChatContext);
@@ -89,7 +87,9 @@ export function LearningChatLayout({
   hideChatToggle = false,
 }: LearningChatLayoutProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [pendingPrompt, setPendingPrompt] = useState<PendingPrompt | null>(null);
+  const [pendingPrompt, setPendingPrompt] = useState<PendingPrompt | null>(
+    null,
+  );
   const claimedNonceRef = useRef<number | null>(null);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
@@ -101,7 +101,6 @@ export function LearningChatLayout({
   // Defensive. Covers the single frame between `hideChatToggle` flipping
   // true and the effect's `setIsChatOpen(false)` landing.
   const effectiveChatOpen = isChatOpen && !hideChatToggle;
-
 
   const openChat = useCallback(() => {
     setIsChatOpen(true);
@@ -174,9 +173,9 @@ export function LearningChatLayout({
               isDesktop
                 ? 'flex flex-1 justify-center overflow-hidden'
                 : cn(
-                  'absolute inset-0 flex flex-col transition-transform duration-300 ease-out',
-                  effectiveChatOpen ? '-translate-x-full' : 'translate-x-0',
-                ),
+                    'absolute inset-0 flex flex-col transition-transform duration-300 ease-out',
+                    effectiveChatOpen ? '-translate-x-full' : 'translate-x-0',
+                  ),
             )}
           >
             <div
@@ -220,9 +219,9 @@ export function LearningChatLayout({
               'min-w-0 min-h-0 bg-background overflow-hidden',
               isDesktop
                 ? cn(
-                  'flex shrink-0 border-l relative z-10 transition-[width] duration-300 ease-out',
-                  effectiveChatOpen ? 'w-[calc(33vw-1rem)]' : 'w-0',
-                )
+                    'flex shrink-0 border-l relative z-10 transition-[width] duration-300 ease-out',
+                    effectiveChatOpen ? 'w-[calc(33vw-1rem)]' : 'w-0',
+                  )
                 : effectiveChatOpen
                   ? 'absolute inset-0 flex flex-col'
                   : 'hidden',

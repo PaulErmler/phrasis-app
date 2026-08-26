@@ -4,8 +4,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
-  Flame, RotateCcw, Clock,
-  TrendingUp, BookOpen, Zap, MessageSquare,
+  Flame,
+  RotateCcw,
+  Clock,
+  TrendingUp,
+  BookOpen,
+  Zap,
+  MessageSquare,
 } from 'lucide-react';
 import { LandingSquircleIcon } from '@/components/landing/landing-squircle-icon';
 import { LandingWordCloud } from '@/components/landing/LandingWordCloud';
@@ -50,7 +55,10 @@ function getWordData(range: TimeRange): { labels: string[]; values: number[] } {
     let cum = 720;
     return {
       labels: dayNames,
-      values: slice.map((v) => { cum += v; return cum; }),
+      values: slice.map((v) => {
+        cum += v;
+        return cum;
+      }),
     };
   }
   if (range === 'month') {
@@ -58,11 +66,27 @@ function getWordData(range: TimeRange): { labels: string[]; values: number[] } {
     let cum = 580;
     return {
       labels: slice.map((_, i) => (i % 5 === 0 ? String(i + 1) : '')),
-      values: slice.map((v) => { cum += v; return cum; }),
+      values: slice.map((v) => {
+        cum += v;
+        return cum;
+      }),
     };
   }
   // year: aggregate into 12 months
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
   const monthly: number[] = [];
   for (let m = 0; m < 12; m++) {
     const start = Math.floor((m / 12) * 365);
@@ -72,7 +96,10 @@ function getWordData(range: TimeRange): { labels: string[]; values: number[] } {
   let cum = 0;
   return {
     labels: months,
-    values: monthly.map((v) => { cum += v; return cum; }),
+    values: monthly.map((v) => {
+      cum += v;
+      return cum;
+    }),
   };
 }
 
@@ -90,7 +117,12 @@ function buildSmoothPath(points: { x: number; y: number }[]): string {
   return d;
 }
 
-function dataToPoints(values: number[], w: number, h: number, padY = 0.05): { x: number; y: number }[] {
+function dataToPoints(
+  values: number[],
+  w: number,
+  h: number,
+  padY = 0.05,
+): { x: number; y: number }[] {
   const min = Math.min(...values) * (1 - padY);
   const max = Math.max(...values) * (1 + padY);
   const range = max - min || 1;
@@ -139,11 +171,22 @@ function MiniChart({ range }: { range: TimeRange }) {
           <defs>
             <linearGradient id="landing-chart-fill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.25} />
-              <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.02} />
+              <stop
+                offset="100%"
+                stopColor="var(--primary)"
+                stopOpacity={0.02}
+              />
             </linearGradient>
           </defs>
           <path d={area} fill="url(#landing-chart-fill)" />
-          <path d={line} fill="none" stroke="var(--primary)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d={line}
+            fill="none"
+            stroke="var(--primary)"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </motion.svg>
       </AnimatePresence>
     </div>
@@ -211,20 +254,43 @@ function MiniSessionSnapshot() {
     <div className="space-y-3">
       <div className="flex items-end gap-3">
         <div className="flex flex-col items-center gap-0.5">
-          <div className="flex items-center justify-center h-9 w-9 rounded-xl" style={{ backgroundColor: 'color-mix(in srgb, var(--streak-active) 15%, transparent)' }}>
-            <Flame className="h-4 w-4" style={{ color: 'var(--streak-active)' }} />
+          <div
+            className="flex items-center justify-center h-9 w-9 rounded-xl"
+            style={{
+              backgroundColor:
+                'color-mix(in srgb, var(--streak-active) 15%, transparent)',
+            }}
+          >
+            <Flame
+              className="h-4 w-4"
+              style={{ color: 'var(--streak-active)' }}
+            />
           </div>
-          <span className="text-base font-bold tabular-nums" style={{ color: 'var(--streak-active)' }}>24</span>
+          <span
+            className="text-base font-bold tabular-nums"
+            style={{ color: 'var(--streak-active)' }}
+          >
+            24
+          </span>
           <span className="text-[10px] text-muted-foreground">Streak</span>
         </div>
         <div className="w-px self-stretch bg-border/60" />
         <div className="flex-1 grid grid-cols-3 gap-1">
           {stats.map(({ icon: Icon, label, value, today }) => (
-            <div key={label} className="flex flex-col items-center text-center gap-0.5">
+            <div
+              key={label}
+              className="flex flex-col items-center text-center gap-0.5"
+            >
               <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-base font-semibold tabular-nums leading-tight">{value}</span>
-              <span className="text-[10px] text-muted-foreground leading-none">{label}</span>
-              <span className="text-[10px] font-medium text-primary tabular-nums leading-none mt-0.5">{today}</span>
+              <span className="text-base font-semibold tabular-nums leading-tight">
+                {value}
+              </span>
+              <span className="text-[10px] text-muted-foreground leading-none">
+                {label}
+              </span>
+              <span className="text-[10px] font-medium text-primary tabular-nums leading-none mt-0.5">
+                {today}
+              </span>
             </div>
           ))}
         </div>
@@ -236,16 +302,29 @@ function MiniSessionSnapshot() {
 
 /* ── Time range selector ── */
 
-function TimeRangeSelector({ value, onChange }: { value: TimeRange; onChange: (r: TimeRange) => void }) {
+function TimeRangeSelector({
+  value,
+  onChange,
+}: {
+  value: TimeRange;
+  onChange: (r: TimeRange) => void;
+}) {
   const ranges: TimeRange[] = ['week', 'month', 'year'];
-  const labels: Record<TimeRange, string> = { week: 'Week', month: 'Month', year: 'Year' };
+  const labels: Record<TimeRange, string> = {
+    week: 'Week',
+    month: 'Month',
+    year: 'Year',
+  };
   return (
     <div className="flex gap-2 text-xs">
       {ranges.map((r) => (
         <button
           key={r}
           onClick={() => onChange(r)}
-          className={cn('transition-colors', r === value ? 'text-primary font-medium' : 'text-muted-foreground')}
+          className={cn(
+            'transition-colors',
+            r === value ? 'text-primary font-medium' : 'text-muted-foreground',
+          )}
         >
           {labels[r]}
         </button>
@@ -286,21 +365,35 @@ const ALL_CARDS: CardDef[] = [
   },
 ];
 
-function AnalyticsCard({ card, index, t }: { card: CardDef; index: number; t: ReturnType<typeof useTranslations> }) {
+function AnalyticsCard({
+  card,
+  index,
+  t,
+}: {
+  card: CardDef;
+  index: number;
+  t: ReturnType<typeof useTranslations>;
+}) {
   const [range, setRange] = useState<TimeRange>('month');
   const Icon = card.icon;
 
   return (
     <motion.div
       {...fadeInUp}
-      transition={{ duration: 0.6, delay: 0.1 + index * 0.04, ease: 'easeOut' as const }}
+      transition={{
+        duration: 0.6,
+        delay: 0.1 + index * 0.04,
+        ease: 'easeOut' as const,
+      }}
       className="ent-bento-card relative flex flex-col rounded-2xl border border-border/40 bg-card p-7 md:p-8"
     >
       <div className="flex items-start justify-between mb-5">
         <LandingSquircleIcon>
           <Icon className="h-6 w-6 text-white" />
         </LandingSquircleIcon>
-        {card.hasTimeRange && <TimeRangeSelector value={range} onChange={setRange} />}
+        {card.hasTimeRange && (
+          <TimeRangeSelector value={range} onChange={setRange} />
+        )}
       </div>
       <h3 className="text-lg md:text-xl font-semibold mb-2">
         {t(card.titleKey)}
@@ -333,7 +426,12 @@ export function AnalyticsSection() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
           {ALL_CARDS.map((card, index) => (
-            <AnalyticsCard key={card.titleKey} card={card} index={index} t={t} />
+            <AnalyticsCard
+              key={card.titleKey}
+              card={card}
+              index={index}
+              t={t}
+            />
           ))}
         </div>
       </div>

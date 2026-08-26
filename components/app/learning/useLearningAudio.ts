@@ -31,7 +31,11 @@ export function useLearningAudio(
   state: LearningState,
   options: UseLearningAudioOptions = {},
 ) {
-  const { disableAutoAdvance = false, disableAutoPlay = false, onAutoNext } = options;
+  const {
+    disableAutoAdvance = false,
+    disableAutoPlay = false,
+    onAutoNext,
+  } = options;
   const cs =
     state.status === 'reviewing' ||
     state.status === 'noCardsDue' ||
@@ -59,7 +63,8 @@ export function useLearningAudio(
   // writing face, which is a typing session and must not borrow Radio's
   // listening settings.
   const isFullMode = reviewMode !== 'audio';
-  const fullReviewTargetAudioMode = cs?.fullReviewTargetAudioMode ?? 'afterSubmit';
+  const fullReviewTargetAudioMode =
+    cs?.fullReviewTargetAudioMode ?? 'afterSubmit';
   // Transcribe: writing-mode variant where the target audio is the prompt.
   // The merged blob contains only the target group and the base stays silent.
   // It carries its own settings copy, chained `*Transcribe ?? *Full ?? audio`.
@@ -149,7 +154,14 @@ export function useLearningAudio(
       onAutoNext?.();
       state.handleNext();
     }
-  }, [state, reviewMode, audioSettings.autoAdvance, isHandsFree, disableAutoAdvance, onAutoNext]);
+  }, [
+    state,
+    reviewMode,
+    audioSettings.autoAdvance,
+    isHandsFree,
+    disableAutoAdvance,
+    onAutoNext,
+  ]);
 
   const resetReviewFlag = useCallback(() => {
     if (state.status === 'reviewing') state.resetReviewFlag();
@@ -170,12 +182,21 @@ export function useLearningAudio(
     nextCard: isReviewing ? state.nextCard : null,
     settings: audioSettings,
     orderedBase: isReviewing && !isTranscribe ? state.baseLanguages : [],
-    orderedTarget: isReviewing && includeTargetInMerge ? state.targetLanguages : [],
+    orderedTarget:
+      isReviewing && includeTargetInMerge ? state.targetLanguages : [],
     sourceText: isReviewing
-      ? state.translations.filter((tr) => tr.isBaseLanguage).map((tr) => tr.text).filter(Boolean).join(' / ')
+      ? state.translations
+          .filter((tr) => tr.isBaseLanguage)
+          .map((tr) => tr.text)
+          .filter(Boolean)
+          .join(' / ')
       : '',
     languageNames: isReviewing
-      ? state.translations.filter((tr) => tr.isTargetLanguage).map((tr) => tr.text).filter(Boolean).join(' / ')
+      ? state.translations
+          .filter((tr) => tr.isTargetLanguage)
+          .map((tr) => tr.text)
+          .filter(Boolean)
+          .join(' / ')
       : '',
     autoPlay,
     settingsOpen,

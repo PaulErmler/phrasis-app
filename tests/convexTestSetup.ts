@@ -60,7 +60,11 @@ vi.mock('@/convex/lib/workpools', () => ({
   seedPool: {
     enqueueMutation: vi.fn(
       async (
-        ctx: { scheduler: { runAfter: (d: number, fn: unknown, a: unknown) => Promise<unknown> } },
+        ctx: {
+          scheduler: {
+            runAfter: (d: number, fn: unknown, a: unknown) => Promise<unknown>;
+          };
+        },
         fn: unknown,
         args: unknown,
       ) => {
@@ -151,10 +155,7 @@ vi.mock('@echogarden/espeak-ng-emscripten', () => ({
  * node-environment suite (tests/node/lindera-furigana.test.ts).
  */
 vi.mock('lindera-wasm-nodejs-ipadic', () => {
-  const CANNED: Record<
-    string,
-    { surface: string; reading: string }[]
-  > = {
+  const CANNED: Record<string, { surface: string; reading: string }[]> = {
     '毎朝七時に起きます。': [
       { surface: '毎朝', reading: 'マイアサ' },
       { surface: '七', reading: 'ナナ' },

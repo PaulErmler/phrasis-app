@@ -25,7 +25,12 @@ async function seedQuota(t: ReturnType<typeof convexTest>) {
     await ctx.db.insert('usageQuotas', {
       userId: 'user_A',
       features: {
-        transcriptions: { balance: 10, included: 10, used: 0, unlimited: false },
+        transcriptions: {
+          balance: 10,
+          included: 10,
+          used: 0,
+          unlimited: false,
+        },
       },
       lastSyncedAt: Date.now(),
     });
@@ -44,12 +49,15 @@ describe('features/chat/transcribe', () => {
     await seedQuota(t);
     const asUser = t.withIdentity({ subject: 'user_A' });
 
-    const text = await asUser.action(api.features.chat.transcribe.transcribeAudio, {
-      audio: new ArrayBuffer(4),
-      mimeType: 'audio/webm',
-      language: 'es_mixed',
-      regionVariant: 'es-MX',
-    });
+    const text = await asUser.action(
+      api.features.chat.transcribe.transcribeAudio,
+      {
+        audio: new ArrayBuffer(4),
+        mimeType: 'audio/webm',
+        language: 'es_mixed',
+        regionVariant: 'es-MX',
+      },
+    );
 
     expect(text).toBe('hola');
     expect(runSttMock).toHaveBeenCalledTimes(1);

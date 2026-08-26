@@ -62,9 +62,7 @@ const completeMutation = vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
 vi.mock('convex/react', async () => {
   const { getFunctionName } = await import('convex/server');
   const resolve = (ref: unknown) => {
-    const name = getFunctionName(
-      ref as Parameters<typeof getFunctionName>[0],
-    );
+    const name = getFunctionName(ref as Parameters<typeof getFunctionName>[0]);
     if (name.includes('getLifetimeReviewCount')) return queryState.lifetimeReps;
     if (name.includes('getCompletedTutorials')) return queryState.dbCompleted;
     // Auth user. Must resolve (isLoaded gates on it) so completions bind
@@ -80,7 +78,10 @@ vi.mock('convex/react', async () => {
     // and `queryState.lifetimeReps` may itself be an Error.
     useQueries: (queries: Record<string, { query: unknown }>) =>
       Object.fromEntries(
-        Object.entries(queries).map(([key, { query }]) => [key, resolve(query)]),
+        Object.entries(queries).map(([key, { query }]) => [
+          key,
+          resolve(query),
+        ]),
       ),
     useMutation: () => completeMutation,
   };
@@ -124,7 +125,7 @@ const FULL_ONLY_IDS = [
 // Fresh module per test. The completed-tutorials snapshot is module-level
 // and reads localStorage at import time, so tests must seed localStorage
 // (preMark) BEFORE calling loadHook().
-let useMilestoneTips: typeof import('@/lib/tutorials/use-milestone-tips')['useMilestoneTips'];
+let useMilestoneTips: (typeof import('@/lib/tutorials/use-milestone-tips'))['useMilestoneTips'];
 
 async function loadHook() {
   ({ useMilestoneTips } = await import('@/lib/tutorials/use-milestone-tips'));
@@ -136,7 +137,11 @@ function renderTips(props: {
   transcribe?: boolean;
 }) {
   return renderHook(
-    (p: { enabled: boolean; reviewMode: 'audio' | 'full'; transcribe?: boolean }) =>
+    (p: {
+      enabled: boolean;
+      reviewMode: 'audio' | 'full';
+      transcribe?: boolean;
+    }) =>
       useMilestoneTips({
         enabled: p.enabled,
         reviewMode: p.reviewMode,
@@ -430,7 +435,10 @@ describe('useMilestoneTips', () => {
     );
     await firePendingTip();
 
-    expect(lastConfig, 'intro must mount despite the double-mount').not.toBeNull();
+    expect(
+      lastConfig,
+      'intro must mount despite the double-mount',
+    ).not.toBeNull();
     expect(view.result.current.isActive).toBe(true);
 
     await act(async () => {

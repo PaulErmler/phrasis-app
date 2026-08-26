@@ -2,7 +2,14 @@
 
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import { BookOpen, RefreshCw, Headphones, PenLine, Radio, NotebookPen } from 'lucide-react';
+import {
+  BookOpen,
+  RefreshCw,
+  Headphones,
+  PenLine,
+  Radio,
+  NotebookPen,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ReviewMode, SchedulingMode } from '@/convex/types';
@@ -116,10 +123,10 @@ export function StartLearningButton({
         className="flex w-full rounded-lg border bg-muted/50 p-0.5"
         data-tutorial={TUTORIAL_ANCHORS.reviewModeToggle}
       >
-        {([
+        {[
           { mode: 'audio' as const, icon: Headphones, label: t('audioReview') },
           { mode: 'full' as const, icon: PenLine, label: t('fullReview') },
-        ]).map(({ mode, icon: Icon, label }) => (
+        ].map(({ mode, icon: Icon, label }) => (
           <button
             key={mode}
             type="button"

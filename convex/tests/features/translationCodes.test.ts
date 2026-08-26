@@ -1,6 +1,9 @@
 /// <reference types="vite/client" />
 import { describe, it, expect } from 'vitest';
-import { toGoogleTranslateCode, GOOGLE_V3_ROMANIZE_SUPPORTED } from '../../features/translation';
+import {
+  toGoogleTranslateCode,
+  GOOGLE_V3_ROMANIZE_SUPPORTED,
+} from '../../features/translation';
 import { SUPPORTED_LANGUAGES } from '../../../lib/languages';
 
 /**
@@ -87,7 +90,10 @@ describe('toGoogleTranslateCode', () => {
     const missing = SUPPORTED_LANGUAGES.filter(
       (l) => !(l.code in EXPECTED_GOOGLE),
     ).map((l) => l.code);
-    expect(missing, `codes without an expected Google mapping: ${missing.join(', ')}`).toEqual([]);
+    expect(
+      missing,
+      `codes without an expected Google mapping: ${missing.join(', ')}`,
+    ).toEqual([]);
   });
 
   it('passes unknown codes through unchanged', () => {
@@ -101,9 +107,11 @@ describe('google-v3 catalog vs live allowlist', () => {
     // worker then threw "Romanization not configured" and persisted ''.
     const mismatches = SUPPORTED_LANGUAGES.filter(
       (l) => l.romanizationBackend === 'google-v3',
-    ).filter(
-      (l) => !GOOGLE_V3_ROMANIZE_SUPPORTED.has(toGoogleTranslateCode(l.code)),
-    ).map((l) => l.code);
+    )
+      .filter(
+        (l) => !GOOGLE_V3_ROMANIZE_SUPPORTED.has(toGoogleTranslateCode(l.code)),
+      )
+      .map((l) => l.code);
     expect(
       mismatches,
       `google-v3 languages missing from GOOGLE_V3_ROMANIZE_SUPPORTED: ${mismatches.join(', ')}`,

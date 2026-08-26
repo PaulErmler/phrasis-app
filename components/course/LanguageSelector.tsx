@@ -173,7 +173,8 @@ export function LanguageSelector({
                           </span>
                         )}
                       </div>
-                      {language.nativeName.toLowerCase() !== localizedName.toLowerCase() ? (
+                      {language.nativeName.toLowerCase() !==
+                      localizedName.toLowerCase() ? (
                         <p className="text-muted-xs break-words">
                           {language.nativeName}
                         </p>

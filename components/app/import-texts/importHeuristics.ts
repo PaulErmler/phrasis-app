@@ -1,4 +1,7 @@
-import { SUPPORTED_LANGUAGES, getLocalizedLanguageNameByCode } from '@/lib/languages';
+import {
+  SUPPORTED_LANGUAGES,
+  getLocalizedLanguageNameByCode,
+} from '@/lib/languages';
 
 function normalize(s: string): string {
   // NFD strips accents, then we drop combining marks; also lowercases and trims.
@@ -54,7 +57,10 @@ export function cellMatchesLanguage(
  * Positive signals: short cells, no sentence punctuation, at least one cell
  * that matches a known language name, or all cells uniformly header-ish.
  */
-export function detectHasHeader(firstRow: string[] | undefined, locale: string): boolean {
+export function detectHasHeader(
+  firstRow: string[] | undefined,
+  locale: string,
+): boolean {
   if (!firstRow || firstRow.length === 0) return false;
   const cells = firstRow.map((c) => c.trim()).filter((c) => c.length > 0);
   if (cells.length === 0) return false;

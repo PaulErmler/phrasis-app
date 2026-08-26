@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, usePreloadedQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
-import { BookOpen, ChevronRight, Clock, Pause, Play, RotateCcw } from 'lucide-react';
+import {
+  BookOpen,
+  ChevronRight,
+  Clock,
+  Pause,
+  Play,
+  RotateCcw,
+} from 'lucide-react';
 import { api } from '@/convex/_generated/api';
 import { useAnimatedCounter } from '@/hooks/use-animated-counter';
 import { useNowMinute } from '@/hooks/use-now-minute';
@@ -211,7 +218,11 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
     // `today` derived from the same minute-quantized `now` (no-wall-clock
     // query guideline, same derivation as the getCourseStats caller); the
     // re-subscribe gap on a tick is bridged by lastWordsRef below.
-    { sessionId: props.sessionId, timezone, today: dateInTimezone(now, timezone) },
+    {
+      sessionId: props.sessionId,
+      timezone,
+      today: dateInTimezone(now, timezone),
+    },
   );
 
   // Cache the most-recent resolved query results so a Convex re-subscription
@@ -236,13 +247,14 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
   const isProvisional = cardCountsQuery?.preparingWriting === true;
   if (cardCountsQuery !== undefined && !isProvisional)
     lastCardCountsRef.current = cardCountsQuery;
-  if (celebrationWordsQuery !== undefined) lastWordsRef.current = celebrationWordsQuery;
+  if (celebrationWordsQuery !== undefined)
+    lastWordsRef.current = celebrationWordsQuery;
 
   const effectiveCardCounts = hideDueCounts
     ? null
     : cardCountsQuery !== undefined
       ? isProvisional
-        ? lastCardCountsRef.current ?? null
+        ? (lastCardCountsRef.current ?? null)
         : cardCountsQuery
       : lastCardCountsRef.current;
   const effectiveWords =
@@ -325,14 +337,38 @@ function CelebrationContent({
   // never ticks past the cap. `reviewsToday` is uncapped. Review counts
   // can legitimately reach the hundreds.
   const heroAnimTarget =
-    hero.kind === 'reviewsToday' ? hero.value : Math.min(hero.value, NEW_WORDS_CAP);
+    hero.kind === 'reviewsToday'
+      ? hero.value
+      : Math.min(hero.value, NEW_WORDS_CAP);
 
   // Memoised so the counter doesn't restart on every render.
-  const heroEasing = useMemo(() => buildHeroEasing(heroAnimTarget), [heroAnimTarget]);
+  const heroEasing = useMemo(
+    () => buildHeroEasing(heroAnimTarget),
+    [heroAnimTarget],
+  );
 
-  const animHero = useAnimatedCounter(heroAnimTarget, 0, COUNTER_DURATION_MS, COUNTER_DELAY_MS, true, heroEasing);
-  const animReviews = useAnimatedCounter(dailyReviewsToday, 0, SUB_COUNTER_DURATION_MS, COUNTER_DELAY_MS, true);
-  const animTime = useAnimatedCounter(dailyTimeMsToday, 0, SUB_COUNTER_DURATION_MS, COUNTER_DELAY_MS, true);
+  const animHero = useAnimatedCounter(
+    heroAnimTarget,
+    0,
+    COUNTER_DURATION_MS,
+    COUNTER_DELAY_MS,
+    true,
+    heroEasing,
+  );
+  const animReviews = useAnimatedCounter(
+    dailyReviewsToday,
+    0,
+    SUB_COUNTER_DURATION_MS,
+    COUNTER_DELAY_MS,
+    true,
+  );
+  const animTime = useAnimatedCounter(
+    dailyTimeMsToday,
+    0,
+    SUB_COUNTER_DURATION_MS,
+    COUNTER_DELAY_MS,
+    true,
+  );
   const animTodayWords = useAnimatedCounter(
     Math.min(dailyNewWordsToday, NEW_WORDS_CAP),
     0,
@@ -582,7 +618,9 @@ function CelebrationContent({
             entirely when there are no words to celebrate. */}
         {(sessionWordsList.length > 0 || todayWordsList.length > 0) && (
           <motion.div className="w-full max-w-sm" variants={CHILD_VARIANTS}>
-            <p className="text-muted-xs text-center mb-1.5">{t('wordsLearned')}</p>
+            <p className="text-muted-xs text-center mb-1.5">
+              {t('wordsLearned')}
+            </p>
             <WordsMultilineTicker
               sessionWords={sessionWordsList}
               todayWords={todayWordsList}
@@ -712,7 +750,9 @@ function StatCell({
   return (
     <div className="flex flex-col items-center text-center gap-0.5">
       <div className="text-muted-foreground">{icon}</div>
-      <p className="text-lg font-semibold tabular-nums leading-tight">{value}</p>
+      <p className="text-lg font-semibold tabular-nums leading-tight">
+        {value}
+      </p>
       <p className="text-muted-xs leading-none">{label}</p>
     </div>
   );
@@ -736,7 +776,9 @@ function StatePill({
   // not pill centers, and long labels can run together regardless of gap.
   return (
     <div className="flex flex-col items-center gap-0.5 min-w-24">
-      <span className={`text-lg font-semibold tabular-nums ${colorClass}`}>{display}</span>
+      <span className={`text-lg font-semibold tabular-nums ${colorClass}`}>
+        {display}
+      </span>
       <span className="text-muted-xs">{label}</span>
     </div>
   );
@@ -779,7 +821,7 @@ function WordsMultilineTicker({ sessionWords, todayWords }: WordVariantProps) {
     MAX_ROWS,
     Math.max(1, Math.ceil(all.length / PER_ROW_FILL)),
   );
-  const rows: typeof all[] = Array.from({ length: rowCount }, () => []);
+  const rows: (typeof all)[] = Array.from({ length: rowCount }, () => []);
   all.forEach((w, i) => rows[i % rowCount].push(w));
   // After redistribution a row scrolls only if it actually overflows; the
   // fill threshold doubles as the scroll threshold so the two notions stay
@@ -792,7 +834,7 @@ function WordsMultilineTicker({ sessionWords, todayWords }: WordVariantProps) {
         // Alternate scroll direction per row so it doesn't look monolithic.
         const direction = rowIdx % 2 === 0 ? -1 : 1;
 
-        const renderItem = (w: typeof row[number], i: number) => (
+        const renderItem = (w: (typeof row)[number], i: number) => (
           <span
             key={i}
             className={cn(

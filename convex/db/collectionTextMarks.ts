@@ -52,23 +52,20 @@ export async function listMarksForCollection(
 ): Promise<Doc<'collectionTextMarks'>[]> {
   return ctx.db
     .query('collectionTextMarks')
-    .withIndex(
-      'by_user_course_collection_mark_rank',
-      (q) => {
-        const base = q
-          .eq('userId', userId)
-          .eq('courseId', courseId)
-          .eq('collectionId', collectionId)
-          .eq('mark', mark);
-        const lower =
-          options?.minRank !== undefined
-            ? base.gte('collectionRank', options.minRank)
-            : base;
-        return options?.maxRank !== undefined
-          ? lower.lte('collectionRank', options.maxRank)
-          : lower;
-      },
-    )
+    .withIndex('by_user_course_collection_mark_rank', (q) => {
+      const base = q
+        .eq('userId', userId)
+        .eq('courseId', courseId)
+        .eq('collectionId', collectionId)
+        .eq('mark', mark);
+      const lower =
+        options?.minRank !== undefined
+          ? base.gte('collectionRank', options.minRank)
+          : base;
+      return options?.maxRank !== undefined
+        ? lower.lte('collectionRank', options.maxRank)
+        : lower;
+    })
     .order('asc')
     .take(options?.limit ?? MARK_READ_LIMIT);
 }
@@ -91,10 +88,18 @@ export async function applyMarkCounterDelta(
   const ignoredDelta = delta.ignored ?? 0;
   if (prioritizedDelta === 0 && ignoredDelta === 0) return;
 
-  const progress = await getCollectionProgress(ctx, userId, courseId, collectionId);
+  const progress = await getCollectionProgress(
+    ctx,
+    userId,
+    courseId,
+    collectionId,
+  );
   if (progress) {
     await ctx.db.patch(progress._id, {
-      prioritizedCount: Math.max(0, (progress.prioritizedCount ?? 0) + prioritizedDelta),
+      prioritizedCount: Math.max(
+        0,
+        (progress.prioritizedCount ?? 0) + prioritizedDelta,
+      ),
       ignoredCount: Math.max(0, (progress.ignoredCount ?? 0) + ignoredDelta),
     });
   } else {

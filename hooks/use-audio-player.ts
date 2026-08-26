@@ -141,9 +141,15 @@ export function useAudioPlayer(
     setIsMergingState(value);
   }, []);
   const [durationSec, setDurationSec] = useState(0);
-  const [revealedLanguages, setRevealedLanguages] = useState<ReadonlySet<string>>(new Set());
-  const [languageCues, setLanguageCues] = useState<ReadonlyArray<LanguageCue>>([]);
-  const [speedByLanguage, setSpeedByLanguage] = useState<Record<string, number>>({});
+  const [revealedLanguages, setRevealedLanguages] = useState<
+    ReadonlySet<string>
+  >(new Set());
+  const [languageCues, setLanguageCues] = useState<ReadonlyArray<LanguageCue>>(
+    [],
+  );
+  const [speedByLanguage, setSpeedByLanguage] = useState<
+    Record<string, number>
+  >({});
 
   // Stable per-hook-instance clock; attached to the audio element on creation.
   const clockRef = useRef<PlaybackClock | null>(null);
@@ -185,7 +191,6 @@ export function useAudioPlayer(
   const settingsOpenRef = useRef(settingsOpen);
   settingsOpenRef.current = settingsOpen;
 
-
   const getAudio = useCallback((): HTMLAudioElement => {
     if (!audioRef.current) {
       audioRef.current = new Audio();
@@ -218,7 +223,10 @@ export function useAudioPlayer(
     // .pause() + currentTime=0 first forces a clean "paused at 0" state;
     // the subsequent .play() then reliably fires 'play' and the clock snaps
     // back so the highlight starts from the first word.
-    if (audio.ended || (audio.duration && audio.currentTime >= audio.duration - 0.05)) {
+    if (
+      audio.ended ||
+      (audio.duration && audio.currentTime >= audio.duration - 0.05)
+    ) {
       audio.pause();
       audio.currentTime = 0;
       clock.notifyOnce();
@@ -253,16 +261,19 @@ export function useAudioPlayer(
     setMediaSessionPlaybackState('none');
   }, []);
 
-  const seekTo = useCallback((seconds: number) => {
-    const audio = audioRef.current;
-    if (audio && audio.duration) {
-      audio.currentTime = Math.max(0, Math.min(seconds, audio.duration));
-      // Paused seeks won't tick the rAF loop. Push one update so word
-      // highlights track the new position immediately.
-      clock.notifyOnce();
-      updateMediaSessionPosition(audio.duration, audio.currentTime);
-    }
-  }, [clock]);
+  const seekTo = useCallback(
+    (seconds: number) => {
+      const audio = audioRef.current;
+      if (audio && audio.duration) {
+        audio.currentTime = Math.max(0, Math.min(seconds, audio.duration));
+        // Paused seeks won't tick the rAF loop. Push one update so word
+        // highlights track the new position immediately.
+        clock.notifyOnce();
+        updateMediaSessionPosition(audio.duration, audio.currentTime);
+      }
+    },
+    [clock],
+  );
 
   const resetRevealed = useCallback(() => {
     setRevealedLanguages(new Set());
@@ -338,7 +349,10 @@ export function useAudioPlayer(
       if (cues.length === 0) return;
       setRevealedLanguages((prev) => {
         const toReveal = cues.filter(
-          (c) => c.reveals !== false && c.startSec <= timeSec && !prev.has(c.language),
+          (c) =>
+            c.reveals !== false &&
+            c.startSec <= timeSec &&
+            !prev.has(c.language),
         );
         if (toReveal.length === 0) return prev;
         const next = new Set(prev);
@@ -398,7 +412,8 @@ export function useAudioPlayer(
   // --------------------------------------------------------------------------
   // Merge audio when card changes, audio URLs arrive, or settings change
   // --------------------------------------------------------------------------
-  const allAudioReady = audioRecordings.length > 0 && audioRecordings.every((a) => a.url);
+  const allAudioReady =
+    audioRecordings.length > 0 && audioRecordings.every((a) => a.url);
 
   // Identity key for the audio set. See `audioIdentityKeyOf`. Stable across
   // signed-URL refreshes while allAudioReady stays true.
@@ -500,10 +515,7 @@ export function useAudioPlayer(
 
     const audioBefore = audioRef.current;
     const wasPlayingSameCard =
-      !!audioBefore &&
-      !audioBefore.paused &&
-      cardId != null &&
-      !isCardChange;
+      !!audioBefore && !audioBefore.paused && cardId != null && !isCardChange;
 
     // Capture the user's structural position BEFORE the remerge so we can seek
     // the new blob to the equivalent (language, repIndex, localTimeOriginal),
@@ -522,10 +534,10 @@ export function useAudioPlayer(
       audioBefore &&
       languageCuesRef.current.length > 0
         ? resolveActiveCuePosition(
-          languageCuesRef.current,
-          audioBefore.currentTime,
-          speedByLanguageRef.current,
-        )
+            languageCuesRef.current,
+            audioBefore.currentTime,
+            speedByLanguageRef.current,
+          )
         : null;
 
     if (!cardId) {
@@ -554,7 +566,9 @@ export function useAudioPlayer(
     // the fetch/decode/render pipeline. Only valid on a real card change and
     // only when the cached audio set and settings exactly match the current
     // ones (otherwise the merged output would differ).
-    const cached = isCardChange ? prefetchCacheRef.current.get(cardId) : undefined;
+    const cached = isCardChange
+      ? prefetchCacheRef.current.get(cardId)
+      : undefined;
     if (
       cached &&
       cached.audioIdentityKey === audioIdentityKey &&
@@ -718,7 +732,10 @@ export function useAudioPlayer(
 
         whenMetadataReady(audio, doResume);
       } catch (err) {
-        if (!cancelled && !(err instanceof DOMException && err.name === 'AbortError')) {
+        if (
+          !cancelled &&
+          !(err instanceof DOMException && err.name === 'AbortError')
+        ) {
           reportError(err, { op: 'audioMerge' });
         }
         if (!cancelled) setIsMerging(false);
@@ -820,7 +837,10 @@ export function useAudioPlayer(
           prefetchCacheRef.current.delete(oldestKey);
         }
       } catch (err) {
-        if (!cancelled && !(err instanceof DOMException && err.name === 'AbortError')) {
+        if (
+          !cancelled &&
+          !(err instanceof DOMException && err.name === 'AbortError')
+        ) {
           reportError(err, { op: 'audioPrefetch' });
         }
       }

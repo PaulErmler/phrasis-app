@@ -20,7 +20,14 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { X, Headphones, PenLine, Settings2, Languages, Ear } from 'lucide-react';
+import {
+  X,
+  Headphones,
+  PenLine,
+  Settings2,
+  Languages,
+  Ear,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   DEFAULT_BATCH_SIZE,
@@ -170,14 +177,18 @@ function ListeningStrategyRow({
     <label
       className={cn(
         'flex items-center justify-between gap-3 rounded-lg border p-2.5 transition-colors cursor-pointer',
-        active ? 'border-primary/40 bg-primary/5' : 'opacity-60 hover:opacity-90',
+        active
+          ? 'border-primary/40 bg-primary/5'
+          : 'opacity-60 hover:opacity-90',
       )}
       data-testid={`listening-strategy-${value}`}
     >
       <div className="flex items-center gap-2.5 min-w-0">
         <RadioGroupItem value={value} className="shrink-0" />
         <div className="space-y-0.5 min-w-0">
-          <span className="text-sm font-medium leading-none block">{title}</span>
+          <span className="text-sm font-medium leading-none block">
+            {title}
+          </span>
           <p className="text-muted-xs">{description}</p>
         </div>
       </div>
@@ -440,9 +451,7 @@ export function LearningModeSettings({
   const handlePauseBaseToTargetChange = (value: number) => {
     if (value < 0 || value > 30) return;
     void setFields(
-      isFull
-        ? { pauseBaseToTargetFull: value }
-        : { pauseBaseToTarget: value },
+      isFull ? { pauseBaseToTargetFull: value } : { pauseBaseToTarget: value },
     );
   };
 
@@ -482,16 +491,16 @@ export function LearningModeSettings({
       0 &&
     Object.keys(courseSettings.targetBeforePlaybackSpeeds ?? {}).length === 0
       ? {
-        targetBeforeRepetitions: {
-          ...(courseSettings.languageRepetitions ?? {}),
-        },
-        targetBeforeRepetitionPauses: {
-          ...(courseSettings.languageRepetitionPauses ?? {}),
-        },
-        targetBeforePlaybackSpeeds: {
-          ...(courseSettings.languagePlaybackSpeeds ?? {}),
-        },
-      }
+          targetBeforeRepetitions: {
+            ...(courseSettings.languageRepetitions ?? {}),
+          },
+          targetBeforeRepetitionPauses: {
+            ...(courseSettings.languageRepetitionPauses ?? {}),
+          },
+          targetBeforePlaybackSpeeds: {
+            ...(courseSettings.languagePlaybackSpeeds ?? {}),
+          },
+        }
       : {};
 
   const handlePlayTargetBeforeBaseChange = (checked: boolean) =>
@@ -572,7 +581,10 @@ export function LearningModeSettings({
     });
   };
 
-  const handleTranscribeAfterSpeedChange = (language: string, value: number) => {
+  const handleTranscribeAfterSpeedChange = (
+    language: string,
+    value: number,
+  ) => {
     void setField('transcribeAfterPlaybackSpeeds', {
       ...(courseSettings.transcribeAfterPlaybackSpeeds ?? {}),
       [language]: clampPlaybackSpeed(value),
@@ -1165,7 +1177,10 @@ export function LearningModeSettings({
                     checked={fullReviewTargetAudioMode === 'afterSubmit'}
                     onCheckedChange={(checked) => {
                       if (checked)
-                        void setField('fullReviewTargetAudioMode', 'afterSubmit');
+                        void setField(
+                          'fullReviewTargetAudioMode',
+                          'afterSubmit',
+                        );
                     }}
                   />
 
@@ -1259,14 +1274,16 @@ export function LearningModeSettings({
             {showAfterTarget && (
               <>
                 {/* Base → Target Pause connector */}
-                {showBaseTimeline && baseLanguages.length > 0 && targetLanguages.length > 0 && (
-                  <StepperPauseConnector
-                    label={t('pause')}
-                    seconds={pauseB2T}
-                    onChange={handlePauseBaseToTargetChange}
-                    accent
-                  />
-                )}
+                {showBaseTimeline &&
+                  baseLanguages.length > 0 &&
+                  targetLanguages.length > 0 && (
+                    <StepperPauseConnector
+                      label={t('pause')}
+                      seconds={pauseB2T}
+                      onChange={handlePauseBaseToTargetChange}
+                      accent
+                    />
+                  )}
 
                 {/* Target languages */}
                 <TimelineLanguageList
@@ -1337,9 +1354,9 @@ export function LearningModeSettings({
                         onRepPauseChange={(v) =>
                           isTranscribe
                             ? handleTranscribeAfterRepetitionPauseChange(
-                              code,
-                              v,
-                            )
+                                code,
+                                v,
+                              )
                             : handleRepetitionPauseChange(code, v)
                         }
                         onSpeedChange={(v) =>
@@ -1371,13 +1388,13 @@ export function LearningModeSettings({
             {reviewMode === 'audio' &&
               autoAdvance &&
               (baseLanguages.length > 0 || targetLanguages.length > 0) && (
-              <StepperPauseConnector
-                label={t('pauseBeforeAutoAdvance')}
-                seconds={pauseBeforeAdvance}
-                onChange={handlePauseBeforeAutoAdvanceChange}
-                accent
-              />
-            )}
+                <StepperPauseConnector
+                  label={t('pauseBeforeAutoAdvance')}
+                  seconds={pauseBeforeAdvance}
+                  onChange={handlePauseBeforeAutoAdvanceChange}
+                  accent
+                />
+              )}
 
             {/* End-of-sequence indicator */}
             <div className="mt-2 flex items-center gap-2 text-muted-xs">
@@ -1582,7 +1599,6 @@ export function LearningModeSettings({
               )}
             </>
           ) : null}
-
         </div>
 
         {/* Rendered INSIDE SheetContent so its portal events bubble through

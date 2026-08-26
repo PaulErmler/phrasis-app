@@ -248,7 +248,10 @@ describe('cardCollectionBackfill: origin-aggregate consistency', () => {
     // no-op over all of them (and the narrowing deploy itself only validates).
     const t = convexTest(schema, modules);
     await seedCard(t);
-    await seedCard(t, { collectionName: 'My cards', collectionOriginField: 'custom' });
+    await seedCard(t, {
+      collectionName: 'My cards',
+      collectionOriginField: 'custom',
+    });
     await seedCard(t, { withWritingTrack: true });
 
     const patches = await t.run(async (ctx) => {

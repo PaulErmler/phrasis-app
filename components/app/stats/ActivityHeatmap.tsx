@@ -22,7 +22,13 @@ function formatDate(date: Date, timezone: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(date);
 }
 
-function YearView({ lookup, timezone }: { lookup: Map<string, number>; timezone: string }) {
+function YearView({
+  lookup,
+  timezone,
+}: {
+  lookup: Map<string, number>;
+  timezone: string;
+}) {
   const todayDate = new Date();
   const weeks: string[][] = [];
   let week: string[] = [];
@@ -57,11 +63,21 @@ function YearView({ lookup, timezone }: { lookup: Map<string, number>; timezone:
   );
 }
 
-function MonthView({ lookup, timezone }: { lookup: Map<string, number>; timezone: string }) {
+function MonthView({
+  lookup,
+  timezone,
+}: {
+  lookup: Map<string, number>;
+  timezone: string;
+}) {
   const now = new Date();
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit' }).formatToParts(now);
-  const year = parseInt(parts.find(p => p.type === 'year')!.value);
-  const month = parseInt(parts.find(p => p.type === 'month')!.value) - 1;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(now);
+  const year = parseInt(parts.find((p) => p.type === 'year')!.value);
+  const month = parseInt(parts.find((p) => p.type === 'month')!.value) - 1;
 
   // Use UTC-constructed dates so day-of-week and day count don't depend on
   // the browser's local timezone; we're computing pure calendar values.
@@ -94,7 +110,8 @@ function MonthView({ lookup, timezone }: { lookup: Map<string, number>; timezone
       {rows.map((row, ri) => (
         <div key={ri} className="grid grid-cols-7 gap-[3px] mb-[3px]">
           {row.map((day, ci) => {
-            if (day === null) return <div key={ci} className={cn(CELL_FIXED, 'opacity-0')} />;
+            if (day === null)
+              return <div key={ci} className={cn(CELL_FIXED, 'opacity-0')} />;
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const count = lookup.get(dateStr) ?? 0;
             return (
@@ -111,7 +128,13 @@ function MonthView({ lookup, timezone }: { lookup: Map<string, number>; timezone
   );
 }
 
-function WeekView({ lookup, timezone }: { lookup: Map<string, number>; timezone: string }) {
+function WeekView({
+  lookup,
+  timezone,
+}: {
+  lookup: Map<string, number>;
+  timezone: string;
+}) {
   const now = new Date();
   const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -135,12 +158,16 @@ function WeekView({ lookup, timezone }: { lookup: Map<string, number>; timezone:
           const dayNum = day.slice(8); // "DD"
           return (
             <div key={day} className="flex flex-col items-center gap-[3px]">
-              <span className="text-[9px] text-muted-foreground">{dayLabels[i]}</span>
+              <span className="text-[9px] text-muted-foreground">
+                {dayLabels[i]}
+              </span>
               <div
                 className={cn(CELL_FIXED, getColor(count))}
                 title={`${day}: ${count}`}
               />
-              <span className="text-[9px] text-muted-foreground">{parseInt(dayNum, 10)}</span>
+              <span className="text-[9px] text-muted-foreground">
+                {parseInt(dayNum, 10)}
+              </span>
             </div>
           );
         })}
@@ -155,7 +182,10 @@ export function ActivityHeatmap({ data, timezone }: ActivityHeatmapProps) {
   const t = useTranslations('StatsPage');
   const [view, setView] = useState<HeatmapView>('month');
 
-  const lookup = useMemo(() => new Map(data.map((d) => [d.date, d.reps])), [data]);
+  const lookup = useMemo(
+    () => new Map(data.map((d) => [d.date, d.reps])),
+    [data],
+  );
 
   return (
     <div className="card-surface p-3">
@@ -170,7 +200,9 @@ export function ActivityHeatmap({ data, timezone }: ActivityHeatmapProps) {
               onClick={() => setView(v)}
               className={cn(
                 'transition-colors',
-                view === v ? 'text-primary font-medium' : 'text-muted-foreground',
+                view === v
+                  ? 'text-primary font-medium'
+                  : 'text-muted-foreground',
               )}
             >
               {t(v)}

@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Flame, Snowflake, BookOpen, RotateCcw, MessageSquare, Clock, Target } from 'lucide-react';
+import {
+  Flame,
+  Snowflake,
+  BookOpen,
+  RotateCcw,
+  MessageSquare,
+  Clock,
+  Target,
+} from 'lucide-react';
 import { formatTimeMs } from '@/lib/formatTime';
 import { getLanguageByCode } from '@/lib/languages';
 import { useAnimatedCounter } from '@/hooks/use-animated-counter';
@@ -43,7 +51,6 @@ interface NumbersRowProps {
   monthNewWords?: number;
 }
 
-
 function StatCell({
   icon,
   label,
@@ -58,9 +65,14 @@ function StatCell({
   testId?: string;
 }) {
   return (
-    <div className="flex flex-col items-center text-center gap-0.5" data-testid={testId}>
+    <div
+      className="flex flex-col items-center text-center gap-0.5"
+      data-testid={testId}
+    >
       <div className="text-muted-foreground">{icon}</div>
-      <p className="text-lg font-semibold tabular-nums leading-tight">{value}</p>
+      <p className="text-lg font-semibold tabular-nums leading-tight">
+        {value}
+      </p>
       <p className="text-muted-xs leading-none">{label}</p>
       {subDisplay != null && (
         <p className="text-xs font-medium text-primary tabular-nums leading-none mt-0.5 whitespace-nowrap">
@@ -76,7 +88,12 @@ function getLanguageFlag(code: string): string {
   return lang?.flag ?? '🌐';
 }
 
-function WordsCell({ languageWordCounts, totalWords, t, subDisplay }: {
+function WordsCell({
+  languageWordCounts,
+  totalWords,
+  t,
+  subDisplay,
+}: {
   languageWordCounts: LanguageWordCount[];
   totalWords: number;
   t: ReturnType<typeof useTranslations>;
@@ -97,15 +114,20 @@ function WordsCell({ languageWordCounts, totalWords, t, subDisplay }: {
   }
 
   return (
-    <div className="flex flex-col items-center text-center gap-0.5" data-testid="stats-tile-words">
+    <div
+      className="flex flex-col items-center text-center gap-0.5"
+      data-testid="stats-tile-words"
+    >
       <div className="text-muted-foreground">
         <BookOpen className="h-3.5 w-3.5" />
       </div>
       <div className="flex flex-wrap justify-center gap-x-2.5 gap-y-0.5">
         {languageWordCounts.map((lw) => (
-          <span key={lw.language} className="text-sm font-semibold tabular-nums leading-tight">
-            {getLanguageFlag(lw.language)}{' '}
-            {lw.words.toLocaleString()}
+          <span
+            key={lw.language}
+            className="text-sm font-semibold tabular-nums leading-tight"
+          >
+            {getLanguageFlag(lw.language)} {lw.words.toLocaleString()}
           </span>
         ))}
       </div>
@@ -145,24 +167,56 @@ export function NumbersRow({
   const t = useTranslations('StatsPage');
   const [period, setPeriod] = useState<StatsPeriod>('week');
 
-  const accuracy = accuracyCount > 0 ? `${Math.round((accuracySum / accuracyCount) * 100)}%` : null;
+  const accuracy =
+    accuracyCount > 0
+      ? `${Math.round((accuracySum / accuracyCount) * 100)}%`
+      : null;
   const showAccuracy = accuracy !== null;
 
   // Select values based on chosen period
-  const periodReps = period === 'day' ? todayReps : period === 'week' ? weekReps : monthReps;
-  const periodNewCards = period === 'day' ? todayNewCards : period === 'week' ? weekNewCards : monthNewCards;
-  const periodTimeMs = period === 'day' ? todayTimeMs : period === 'week' ? weekTimeMs : monthTimeMs;
-  const periodNewWords = period === 'day' ? todayNewWords : period === 'week' ? weekNewWords : monthNewWords;
+  const periodReps =
+    period === 'day' ? todayReps : period === 'week' ? weekReps : monthReps;
+  const periodNewCards =
+    period === 'day'
+      ? todayNewCards
+      : period === 'week'
+        ? weekNewCards
+        : monthNewCards;
+  const periodTimeMs =
+    period === 'day'
+      ? todayTimeMs
+      : period === 'week'
+        ? weekTimeMs
+        : monthTimeMs;
+  const periodNewWords =
+    period === 'day'
+      ? todayNewWords
+      : period === 'week'
+        ? weekNewWords
+        : monthNewWords;
 
   // --- Snapshot-based delta animation ---
   // Track all period values so each period has its own cached "from" state.
   // dateScoped resets the snapshot at the day boundary so the `day` counters
   // animate from today's baseline rather than yesterday's stale totals.
-  const { prev, changed } = useStatsSnapshot('statsPage_periods', {
-    dayReps: todayReps, dayNewCards: todayNewCards, dayTimeMs: todayTimeMs, dayNewWords: todayNewWords,
-    weekReps, weekNewCards, weekTimeMs, weekNewWords,
-    monthReps, monthNewCards, monthTimeMs, monthNewWords,
-  }, { dateScoped: true });
+  const { prev, changed } = useStatsSnapshot(
+    'statsPage_periods',
+    {
+      dayReps: todayReps,
+      dayNewCards: todayNewCards,
+      dayTimeMs: todayTimeMs,
+      dayNewWords: todayNewWords,
+      weekReps,
+      weekNewCards,
+      weekTimeMs,
+      weekNewWords,
+      monthReps,
+      monthNewCards,
+      monthTimeMs,
+      monthNewWords,
+    },
+    { dateScoped: true },
+  );
 
   // Only animate on initial mount, not on period switches.
   const [hasMountAnimated, setHasMountAnimated] = useState(false);
@@ -179,10 +233,34 @@ export function NumbersRow({
 
   const shouldAnimate = !hasMountAnimated && periodReps > 0;
 
-  const animReps = useAnimatedCounter(periodReps, shouldAnimate ? prevReps : periodReps, 1500, 300, shouldAnimate && periodReps !== prevReps);
-  const animNew = useAnimatedCounter(periodNewCards, shouldAnimate ? prevNewCards : periodNewCards, 1500, 450, shouldAnimate && periodNewCards !== prevNewCards);
-  const animTime = useAnimatedCounter(periodTimeMs, shouldAnimate ? prevTimeMs : periodTimeMs, 1500, 600, shouldAnimate && periodTimeMs !== prevTimeMs);
-  const animWords = useAnimatedCounter(periodNewWords, shouldAnimate ? prevNewWords : periodNewWords, 1500, 250, shouldAnimate && periodNewWords !== prevNewWords);
+  const animReps = useAnimatedCounter(
+    periodReps,
+    shouldAnimate ? prevReps : periodReps,
+    1500,
+    300,
+    shouldAnimate && periodReps !== prevReps,
+  );
+  const animNew = useAnimatedCounter(
+    periodNewCards,
+    shouldAnimate ? prevNewCards : periodNewCards,
+    1500,
+    450,
+    shouldAnimate && periodNewCards !== prevNewCards,
+  );
+  const animTime = useAnimatedCounter(
+    periodTimeMs,
+    shouldAnimate ? prevTimeMs : periodTimeMs,
+    1500,
+    600,
+    shouldAnimate && periodTimeMs !== prevTimeMs,
+  );
+  const animWords = useAnimatedCounter(
+    periodNewWords,
+    shouldAnimate ? prevNewWords : periodNewWords,
+    1500,
+    250,
+    shouldAnimate && periodNewWords !== prevNewWords,
+  );
 
   // Match the home card's live streak states: green = studied today,
   // blue snowflake = a freeze is shielding the streak, orange = alive but not
@@ -213,7 +291,9 @@ export function NumbersRow({
               onClick={() => setPeriod(p)}
               className={cn(
                 'transition-colors',
-                period === p ? 'text-primary font-medium' : 'text-muted-foreground',
+                period === p
+                  ? 'text-primary font-medium'
+                  : 'text-muted-foreground',
               )}
             >
               {t(p)}
@@ -223,14 +303,25 @@ export function NumbersRow({
       </div>
       {/* Top row: always 3 items */}
       <div className="grid grid-cols-3 gap-x-4">
-        <div className="flex flex-col items-center text-center gap-0.5" data-testid="stats-tile-streak">
+        <div
+          className="flex flex-col items-center text-center gap-0.5"
+          data-testid="stats-tile-streak"
+        >
           <StreakIcon className="h-3.5 w-3.5" style={{ color: streakColor }} />
-          <p className="text-lg font-semibold tabular-nums leading-tight" style={{ color: streakColor }}>
+          <p
+            className="text-lg font-semibold tabular-nums leading-tight"
+            style={{ color: streakColor }}
+          >
             {streak}
           </p>
           <p className="text-muted-xs leading-none">{t('streak')}</p>
         </div>
-        <WordsCell languageWordCounts={languageWordCounts} totalWords={words} t={t} subDisplay={wordsDisplay} />
+        <WordsCell
+          languageWordCounts={languageWordCounts}
+          totalWords={words}
+          t={t}
+          subDisplay={wordsDisplay}
+        />
         <StatCell
           icon={<RotateCcw className="h-3.5 w-3.5" />}
           label={t('reviews')}

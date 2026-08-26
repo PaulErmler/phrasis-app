@@ -52,7 +52,9 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
   const { activeCourse } = useAppData();
   const quotaInfo = useQuery(api.features.courses.getCourseQuotaInfo);
   const setActiveCourse = useMutation(api.features.courses.setActiveCourse);
-  const unarchiveCourseMutation = useMutation(api.features.courses.unarchiveCourse);
+  const unarchiveCourseMutation = useMutation(
+    api.features.courses.unarchiveCourse,
+  );
   const setActiveCourseOptimistic = setActiveCourse.withOptimisticUpdate(
     (store, { courseId }) => {
       const allCourses = store.getQuery(
@@ -287,9 +289,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
                         onClick={() => handleSelectCourse(course._id)}
                       >
                         {isActive && <Check className="h-4 w-4" />}
-                        {isActive
-                          ? t('courses.selected')
-                          : t('courses.select')}
+                        {isActive ? t('courses.selected') : t('courses.select')}
                       </Button>
 
                       <Button
@@ -371,7 +371,6 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </>
   );
 }

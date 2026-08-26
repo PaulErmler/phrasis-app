@@ -17,9 +17,13 @@ export function useUpdateUserSettings() {
       {},
     );
     if (current === undefined || current === null) return;
-    localStore.setQuery(api.features.courses.getUserSettings, {}, {
-      ...current,
-      ...args,
-    });
+    localStore.setQuery(
+      api.features.courses.getUserSettings,
+      {},
+      {
+        ...current,
+        ...args,
+      },
+    );
   });
 }

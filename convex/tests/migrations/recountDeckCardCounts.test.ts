@@ -3,10 +3,7 @@ import { convexTest, type TestConvex } from 'convex-test';
 import { describe, it, expect, vi } from 'vitest';
 
 import schema from '../../schema';
-import {
-  recountDeckCardCountOne,
-  DECK_RECOUNT_PAGE,
-} from '../../migrations';
+import { recountDeckCardCountOne, DECK_RECOUNT_PAGE } from '../../migrations';
 import type { Id } from '../../_generated/dataModel';
 
 const modules = import.meta.glob('/convex/**/*.ts');

@@ -78,7 +78,10 @@ async function openEditDialog(page: Page, card: Locator): Promise<void> {
   if ((await pinnedEdit.count()) > 0) {
     await pinnedEdit.first().click();
   } else {
-    await card.getByRole('button', { name: 'More', exact: true }).first().click();
+    await card
+      .getByRole('button', { name: 'More', exact: true })
+      .first()
+      .click();
     await page.getByRole('menuitem', { name: 'Edit', exact: true }).click();
   }
   await expect(
@@ -175,10 +178,10 @@ test.describe('curriculum edit flags the shared translation', () => {
 
     // The shared wording itself is untouched: the user's edit lands on their
     // fork, not on the sentence every other learner studies.
-    const shared = convexRun(
-      'features/curriculumFlagTesting:readTranslation',
-      { textId: p.textId, targetLanguage: p.targetLanguage },
-    ) as { translatedText: string };
+    const shared = convexRun('features/curriculumFlagTesting:readTranslation', {
+      textId: p.textId,
+      targetLanguage: p.targetLanguage,
+    }) as { translatedText: string };
     expect(shared.translatedText).toBe(p.targetText);
 
     // The user's card moved to a private fork.
@@ -189,7 +192,10 @@ test.describe('curriculum edit flags the shared translation', () => {
             email,
             textId: p.textId,
           }),
-        { timeout: 30_000, message: "user's card never forked off the shared text" },
+        {
+          timeout: 30_000,
+          message: "user's card never forked off the shared text",
+        },
       )
       .toBe(0);
 

@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import type { MergeResult, ResolvedAudioSettings } from '@/lib/audio/mergeAudio';
+import type {
+  MergeResult,
+  ResolvedAudioSettings,
+} from '@/lib/audio/mergeAudio';
 import type { CardAudioRecording } from '@/components/app/learning/types';
 
 const mergeCardAudioMock = vi.fn();
@@ -73,7 +76,13 @@ function rec(
   voiceName: string,
   url: string | null = `https://cdn.test/${language}/${voiceName}.mp3`,
 ): CardAudioRecording {
-  return { language, voiceName, url, wordTimings: null, ttsQuality: 'validated' };
+  return {
+    language,
+    voiceName,
+    url,
+    wordTimings: null,
+    ttsQuality: 'validated',
+  };
 }
 
 function makeResult(overrides: Partial<MergeResult> = {}): MergeResult {
@@ -109,10 +118,9 @@ function baseOptions(
 }
 
 function renderPlayer(overrides: Partial<UseAudioPlayerOptions> = {}) {
-  return renderHook(
-    (props: UseAudioPlayerOptions) => useAudioPlayer(props),
-    { initialProps: baseOptions(overrides) },
-  );
+  return renderHook((props: UseAudioPlayerOptions) => useAudioPlayer(props), {
+    initialProps: baseOptions(overrides),
+  });
 }
 
 async function resolveMerge(index: number, result: MergeResult) {
@@ -468,7 +476,13 @@ describe('useAudioPlayer', () => {
           durationSec: 8,
           languageCues: [
             { language: 'en', startSec: 0, speed: 1, reveals: true },
-            { language: 'es', startSec: 6, speed: 1, reveals: true, silent: true },
+            {
+              language: 'es',
+              startSec: 6,
+              speed: 1,
+              reveals: true,
+              silent: true,
+            },
           ],
         }),
       );
@@ -478,7 +492,10 @@ describe('useAudioPlayer', () => {
       expect([...result.current.revealedLanguages]).toEqual(['en']);
 
       tick(audio, 6);
-      expect([...result.current.revealedLanguages].sort()).toEqual(['en', 'es']);
+      expect([...result.current.revealedLanguages].sort()).toEqual([
+        'en',
+        'es',
+      ]);
     });
 
     it('reveals a cue sitting exactly at the end when `ended` fires', async () => {
@@ -491,7 +508,13 @@ describe('useAudioPlayer', () => {
           durationSec: 6,
           languageCues: [
             { language: 'es', startSec: 0, speed: 1, reveals: true },
-            { language: 'en', startSec: 6, speed: 1, reveals: true, silent: true },
+            {
+              language: 'en',
+              startSec: 6,
+              speed: 1,
+              reveals: true,
+              silent: true,
+            },
           ],
         }),
       );
@@ -503,7 +526,10 @@ describe('useAudioPlayer', () => {
       act(() => {
         audio.dispatchEvent(new Event('ended'));
       });
-      expect([...result.current.revealedLanguages].sort()).toEqual(['en', 'es']);
+      expect([...result.current.revealedLanguages].sort()).toEqual([
+        'en',
+        'es',
+      ]);
     });
 
     it('still honours reveals:false on `ended`', async () => {
@@ -527,5 +553,4 @@ describe('useAudioPlayer', () => {
       expect([...result.current.revealedLanguages]).toEqual([]);
     });
   });
-
 });

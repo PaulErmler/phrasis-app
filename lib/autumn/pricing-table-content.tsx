@@ -1,4 +1,4 @@
-import { type Product } from "autumn-js";
+import { type Product } from 'autumn-js';
 
 export type PricingTranslateFn = (key: string) => string;
 
@@ -19,66 +19,66 @@ export const getPricingTableContent = (
   // lib/autumn/trial-eligibility.ts).
   const canStartTrial =
     has_trial &&
-    (scenario === "new" || scenario === "upgrade") &&
+    (scenario === 'new' || scenario === 'upgrade') &&
     trialEligible;
 
   if (canStartTrial) {
     return {
-      buttonText: t("startFreeTrial"),
+      buttonText: t('startFreeTrial'),
     };
   }
 
   switch (scenario) {
-  case "scheduled":
-    return {
-      buttonText: t("planScheduled"),
-    };
-
-  case "active":
-    if (updateable) {
+    case 'scheduled':
       return {
-        buttonText: t("updatePlan"),
+        buttonText: t('planScheduled'),
       };
-    }
 
-    return {
-      buttonText: t("currentPlan"),
-    };
+    case 'active':
+      if (updateable) {
+        return {
+          buttonText: t('updatePlan'),
+        };
+      }
 
-  case "new":
-    if (is_one_off) {
       return {
-        buttonText: t("purchase"),
+        buttonText: t('currentPlan'),
       };
-    }
 
-    return {
-      buttonText: t("getStarted"),
-    };
+    case 'new':
+      if (is_one_off) {
+        return {
+          buttonText: t('purchase'),
+        };
+      }
 
-  case "renew":
-    return {
-      buttonText: t("renew"),
-    };
+      return {
+        buttonText: t('getStarted'),
+      };
 
-  case "upgrade":
-    return {
-      buttonText: t("upgrade"),
-    };
+    case 'renew':
+      return {
+        buttonText: t('renew'),
+      };
 
-  case "downgrade":
-    return {
-      buttonText: t("downgrade"),
-    };
+    case 'upgrade':
+      return {
+        buttonText: t('upgrade'),
+      };
 
-  case "cancel":
-    return {
-      buttonText: t("cancelPlan"),
-    };
+    case 'downgrade':
+      return {
+        buttonText: t('downgrade'),
+      };
 
-  default:
-    return {
-      buttonText: t("getStartedDefault"),
-    };
+    case 'cancel':
+      return {
+        buttonText: t('cancelPlan'),
+      };
+
+    default:
+      return {
+        buttonText: t('getStartedDefault'),
+      };
   }
 };

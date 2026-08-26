@@ -1,17 +1,17 @@
-import { test, expect } from "@playwright/test";
-import { showDueCounts } from "./helpers";
+import { test, expect } from '@playwright/test';
+import { showDueCounts } from './helpers';
 
 /**
  * Content-source filter. Smoke tests for the SegmentedHomeSection tab
  * badges and the home dropdown.
  */
 
-test.describe("content filter: tab badges on home", () => {
+test.describe('content filter: tab badges on home', () => {
   test("neither tab shows an Off badge when filter is 'both' (default)", async ({
     page,
   }) => {
-    await page.goto("/app");
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto('/app');
+    await page.waitForLoadState('domcontentloaded');
 
     // SegmentedHomeSection only renders the "Off" pill for an excluded
     // source. Default filter = 'both' → no Off badges anywhere.
@@ -20,16 +20,16 @@ test.describe("content filter: tab badges on home", () => {
     // compile of /app plus the preloaded-query round trip, and under
     // parallel workers that has overrun 10s.
     await expect(
-      page.getByRole("tab", { name: /Course|Kurs/ }).first(),
+      page.getByRole('tab', { name: /Course|Kurs/ }).first(),
     ).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId("source-badge-off")).toHaveCount(0);
+    await expect(page.getByTestId('source-badge-off')).toHaveCount(0);
   });
 });
 
-test.describe("content filter: subtle dropdown on home", () => {
-  test("dropdown renders with the default value visible", async ({ page }) => {
-    await page.goto("/app");
-    await page.waitForLoadState("domcontentloaded");
+test.describe('content filter: subtle dropdown on home', () => {
+  test('dropdown renders with the default value visible', async ({ page }) => {
+    await page.goto('/app');
+    await page.waitForLoadState('domcontentloaded');
     // `.first()`, not the bare locator: for a few frames after hydration the
     // home view's subtree can be present twice, and a strict locator throws
     // "resolved to 2 elements" rather than retrying past it. The duplicate
@@ -37,30 +37,30 @@ test.describe("content filter: subtle dropdown on home", () => {
     // once it settles. Reproduced at ~4% under 8 parallel workers;
     // learning-journey.spec.ts already guards the same trigger this way.
     await expect(
-      page.getByTestId("content-filter-trigger").first(),
+      page.getByTestId('content-filter-trigger').first(),
     ).toBeVisible({
       timeout: 10_000,
     });
   });
 });
 
-test.describe("due-count pills on home", () => {
-  test("filter-aware pills render next to the content filter", async ({
+test.describe('due-count pills on home', () => {
+  test('filter-aware pills render next to the content filter', async ({
     page,
   }) => {
     // New accounts hide due counts by default; this spec is about the
     // pills themselves, so turn them back on first.
     await showDueCounts(page);
-    await page.goto("/app");
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto('/app');
+    await page.waitForLoadState('domcontentloaded');
     // Pills render once getFilteredCardCounts resolves (even all-zero counts
     // return an object). They share a row with the filter dropdown.
     // `.first()` for the post-hydration double-render, see above.
-    await expect(page.getByTestId("due-counts-pills").first()).toBeVisible({
+    await expect(page.getByTestId('due-counts-pills').first()).toBeVisible({
       timeout: 10_000,
     });
     await expect(
-      page.getByTestId("content-filter-trigger").first(),
+      page.getByTestId('content-filter-trigger').first(),
     ).toBeVisible();
   });
 });

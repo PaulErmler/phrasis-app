@@ -8,10 +8,7 @@ import { api, internal } from '../../_generated/api';
 import type { Doc, Id } from '../../_generated/dataModel';
 import type { FsrsState } from '../../types';
 
-import {
-  drainScheduler,
-  drainSchedulerAfterEach,
-} from '../lib/drainScheduler';
+import { drainScheduler, drainSchedulerAfterEach } from '../lib/drainScheduler';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -257,10 +254,9 @@ describe('separateModeTracking', () => {
       });
 
       // A fresh batch, given only the courseId, finishes the rest.
-      await t.mutation(
-        internal.migrations.seedWritingTrack.processBatch,
-        { courseId },
-      );
+      await t.mutation(internal.migrations.seedWritingTrack.processBatch, {
+        courseId,
+      });
       await drainScheduler();
 
       for (const cardId of cardIds) {
@@ -285,10 +281,9 @@ describe('separateModeTracking', () => {
         cards: [{ isHidden: true }, { isMastered: true }, {}],
       });
 
-      await t.mutation(
-        internal.migrations.seedWritingTrack.processBatch,
-        { courseId },
-      );
+      await t.mutation(internal.migrations.seedWritingTrack.processBatch, {
+        courseId,
+      });
       await drainScheduler();
 
       for (const cardId of cardIds) {
@@ -420,7 +415,9 @@ describe('separateModeTracking', () => {
       const t = convexTest(schema, modules);
       const { cardIds } = await seedCourse(t, {
         settings: { separateModeTracking: true, reviewMode: 'full' },
-        cards: [{ writingDueDate: Date.now() - 1000, writingIsGraduated: false }],
+        cards: [
+          { writingDueDate: Date.now() - 1000, writingIsGraduated: false },
+        ],
       });
       const before = await getCard(t, cardIds[0]);
       const asUser = t.withIdentity({ subject: 'user_A' });
@@ -453,7 +450,9 @@ describe('separateModeTracking', () => {
       const t = convexTest(schema, modules);
       const { cardIds } = await seedCourse(t, {
         settings: { separateModeTracking: true, reviewMode: 'audio' },
-        cards: [{ writingDueDate: Date.now() - 1000, writingIsGraduated: false }],
+        cards: [
+          { writingDueDate: Date.now() - 1000, writingIsGraduated: false },
+        ],
       });
       const before = await getCard(t, cardIds[0]);
       const asUser = t.withIdentity({ subject: 'user_A' });
@@ -741,7 +740,9 @@ describe('separateModeTracking', () => {
       const t = convexTest(schema, modules);
       const { cardIds } = await seedCourse(t, {
         settings: { separateModeTracking: true, reviewMode: 'full' },
-        cards: [{ writingDueDate: Date.now() - 1000, writingIsGraduated: false }],
+        cards: [
+          { writingDueDate: Date.now() - 1000, writingIsGraduated: false },
+        ],
       });
       const asUser = t.withIdentity({ subject: 'user_A' });
       await asUser.mutation(api.features.scheduling.reviewCard, {
@@ -804,7 +805,9 @@ describe('separateModeTracking', () => {
       const t = convexTest(schema, modules);
       const { settingsId, cardIds } = await seedCourse(t, {
         settings: { separateModeTracking: true, reviewMode: 'audio' },
-        cards: [{ writingDueDate: Date.now() - 1000, writingIsGraduated: false }],
+        cards: [
+          { writingDueDate: Date.now() - 1000, writingIsGraduated: false },
+        ],
       });
       const asUser = t.withIdentity({ subject: 'user_A' });
       // Shared-track review while in Shadowing.
@@ -870,7 +873,12 @@ describe('separateModeTracking', () => {
         await ctx.db.insert('usageQuotas', {
           userId: 'user_A',
           features: {
-            sentences: { balance: 100, included: 100, used: 0, unlimited: false },
+            sentences: {
+              balance: 100,
+              included: 100,
+              used: 0,
+              unlimited: false,
+            },
           },
           lastSyncedAt: Date.now(),
         });
@@ -905,10 +913,13 @@ describe('separateModeTracking', () => {
         },
       });
       const asUser = t.withIdentity({ subject: 'user_A' });
-      const res = await asUser.mutation(api.features.decks.addCardsFromCollection, {
-        collectionId,
-        batchSize: 2,
-      });
+      const res = await asUser.mutation(
+        api.features.decks.addCardsFromCollection,
+        {
+          collectionId,
+          batchSize: 2,
+        },
+      );
       expect(res.cardsAdded).toBe(2);
 
       const cards = await deckCards(t, deckId);
@@ -972,12 +983,21 @@ describe('separateModeTracking', () => {
           writingSeedDone: true,
         },
         cards: [
-          { dueDate: now - 1000, writingDueDate: now + 86_400_000, writingIsGraduated: false },
-          { dueDate: now + 86_400_000, writingDueDate: now - 1000, writingIsGraduated: false },
+          {
+            dueDate: now - 1000,
+            writingDueDate: now + 86_400_000,
+            writingIsGraduated: false,
+          },
+          {
+            dueDate: now + 86_400_000,
+            writingDueDate: now - 1000,
+            writingIsGraduated: false,
+          },
         ],
       });
       const asUser = t.withIdentity({ subject: 'user_A' });
-      const textIdOf = async (i: number) => (await getCard(t, cardIds[i])).textId;
+      const textIdOf = async (i: number) =>
+        (await getCard(t, cardIds[i])).textId;
       const claimedTextIds = () =>
         t.run(async (ctx) =>
           (await ctx.db.query('ttsGenerationClaims').collect()).map(
@@ -991,13 +1011,19 @@ describe('separateModeTracking', () => {
       // pattern; fetch is stubbed to fail fast so the en-translation Google
       // action in the fan-out can't reach the network.
       vi.useFakeTimers();
-      vi.stubGlobal('fetch', vi.fn(async () => {
-        throw new Error('network disabled in test');
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          throw new Error('network disabled in test');
+        }),
+      );
       try {
         // Writing mode → only card B (writing-due) is warmed.
         expect(
-          await asUser.mutation(api.features.decks.ensureUpcomingCardsContent, {}),
+          await asUser.mutation(
+            api.features.decks.ensureUpcomingCardsContent,
+            {},
+          ),
         ).toBe(1);
         await t.finishAllScheduledFunctions(vi.runAllTimers);
         expect(await claimedTextIds()).toEqual([await textIdOf(1)]);
@@ -1007,7 +1033,10 @@ describe('separateModeTracking', () => {
           await ctx.db.patch(settingsId, { reviewMode: 'audio' });
         });
         expect(
-          await asUser.mutation(api.features.decks.ensureUpcomingCardsContent, {}),
+          await asUser.mutation(
+            api.features.decks.ensureUpcomingCardsContent,
+            {},
+          ),
         ).toBe(1);
         await t.finishAllScheduledFunctions(vi.runAllTimers);
         expect((await claimedTextIds()).sort()).toEqual(
@@ -1029,8 +1058,16 @@ describe('separateModeTracking', () => {
           writingSeedDone: true,
         },
         cards: [
-          { dueDate: now - 1000, writingDueDate: now + 86_400_000, writingIsGraduated: false },
-          { dueDate: now + 86_400_000, writingDueDate: now - 1000, writingIsGraduated: false },
+          {
+            dueDate: now - 1000,
+            writingDueDate: now + 86_400_000,
+            writingIsGraduated: false,
+          },
+          {
+            dueDate: now + 86_400_000,
+            writingDueDate: now - 1000,
+            writingIsGraduated: false,
+          },
         ],
       });
       const asUser = t.withIdentity({ subject: 'user_A' });

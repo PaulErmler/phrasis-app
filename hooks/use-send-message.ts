@@ -103,8 +103,12 @@ export function useSendMessage({
             }
             case 'USAGE_LIMIT': {
               const featureId =
-                (error.data as { featureId?: string })?.featureId ?? FEATURE_IDS.CHAT_MESSAGES;
-              capture(CLIENT_EVENTS.QUOTA_EXHAUSTED, { feature_id: featureId, surface: 'chat' });
+                (error.data as { featureId?: string })?.featureId ??
+                FEATURE_IDS.CHAT_MESSAGES;
+              capture(CLIENT_EVENTS.QUOTA_EXHAUSTED, {
+                feature_id: featureId,
+                surface: 'chat',
+              });
               if (onUsageLimit) {
                 onUsageLimit(featureId);
               }
@@ -149,7 +153,18 @@ export function useSendMessage({
         throw error;
       }
     },
-    [threadId, sendMessageMutation, setStatus, onSuccess, onError, onUsageLimit, onThreadLimit, onMessageTooLong, cardId, t],
+    [
+      threadId,
+      sendMessageMutation,
+      setStatus,
+      onSuccess,
+      onError,
+      onUsageLimit,
+      onThreadLimit,
+      onMessageTooLong,
+      cardId,
+      t,
+    ],
   );
 
   return { sendMessage };

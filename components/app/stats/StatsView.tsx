@@ -80,8 +80,12 @@ export function StatsView() {
   const targetLanguages = pageData?.targetLanguages;
   const filteredLanguageData = useMemo(() => {
     if (!languageDailyData?.length || !targetLanguages) return [];
-    const targetSet = new Set(targetLanguages.map((l: string) => normalizeLanguageCode(l)));
-    return languageDailyData.filter((d) => targetSet.has(normalizeLanguageCode(d.language)));
+    const targetSet = new Set(
+      targetLanguages.map((l: string) => normalizeLanguageCode(l)),
+    );
+    return languageDailyData.filter((d) =>
+      targetSet.has(normalizeLanguageCode(d.language)),
+    );
   }, [languageDailyData, targetLanguages]);
 
   const todayNewWords = useMemo(() => {
@@ -135,11 +139,11 @@ export function StatsView() {
   const accuracy =
     cs && cs.totalAccuracyDualCount > 0
       ? {
-        sum: pageData?.ignorePunctuation
-          ? cs.totalAccuracyLenientSum
-          : cs.totalAccuracyStrictSum,
-        count: cs.totalAccuracyDualCount,
-      }
+          sum: pageData?.ignorePunctuation
+            ? cs.totalAccuracyLenientSum
+            : cs.totalAccuracyStrictSum,
+          count: cs.totalAccuracyDualCount,
+        }
       : { sum: cs?.totalAccuracySum ?? 0, count: cs?.totalAccuracyCount ?? 0 };
 
   if (isLoading) {
@@ -202,12 +206,13 @@ export function StatsView() {
 
         <WordCloudSection />
 
-        <ActivityHeatmap
-          data={dailyData?.heatmapData ?? []}
-          timezone={tz}
-        />
+        <ActivityHeatmap data={dailyData?.heatmapData ?? []} timezone={tz} />
 
-        <HourlyDistribution data={pageData?.hourlyDistribution ?? Array.from({ length: 24 }, () => 0)} />
+        <HourlyDistribution
+          data={
+            pageData?.hourlyDistribution ?? Array.from({ length: 24 }, () => 0)
+          }
+        />
 
         <AppUsageStats
           manualCards={cs?.totalCardsAddedManually ?? 0}

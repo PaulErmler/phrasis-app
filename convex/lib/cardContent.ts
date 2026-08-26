@@ -153,7 +153,11 @@ export async function buildTextContentBatchForLanguages(
     textId: Id<'texts'>;
     userCreated: boolean;
   }> = [];
-  const audioFetches: Array<{ key: string; lang: string; textId: Id<'texts'> }> = [];
+  const audioFetches: Array<{
+    key: string;
+    lang: string;
+    textId: Id<'texts'>;
+  }> = [];
 
   for (const input of inputs) {
     for (const lang of allLanguages) {
@@ -195,7 +199,9 @@ export async function buildTextContentBatchForLanguages(
     // "Retranslating" pill keys off this so it doesn't fire when the user
     // clicks "regenerate audio" (no LLM phase, no claim).
     Promise.all(
-      translationFetches.map((item) => getLlmClaim(ctx, item.textId, item.lang)),
+      translationFetches.map((item) =>
+        getLlmClaim(ctx, item.textId, item.lang),
+      ),
     ),
   ]);
 
@@ -253,7 +259,9 @@ export async function buildTextContentBatchForLanguages(
       idx,
     }))
     .filter(
-      (item): item is { key: string; payload: ResolvedAudioPayload; idx: number } =>
+      (
+        item,
+      ): item is { key: string; payload: ResolvedAudioPayload; idx: number } =>
         item.payload !== null,
     );
 
@@ -413,7 +421,11 @@ export async function buildCardSearchableText(
           )
           .unique();
         return translation
-          ? { lang, text: translation.translatedText, romanization: translation.romanizedText }
+          ? {
+              lang,
+              text: translation.translatedText,
+              romanization: translation.romanizedText,
+            }
           : null;
       }),
     ),
@@ -449,7 +461,10 @@ export interface SearchableTextRebuildCaches {
    * Optional memo of built results keyed by (textId, languages), valid
    * across cards because the build depends only on those two inputs.
    */
-  built?: Map<string, { searchableText: string; searchableTextLanguages: string[] }>;
+  built?: Map<
+    string,
+    { searchableText: string; searchableTextLanguages: string[] }
+  >;
 }
 
 /**

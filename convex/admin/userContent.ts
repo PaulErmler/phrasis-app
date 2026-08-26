@@ -145,6 +145,10 @@ export const listUserTexts = adminQuery({
       }),
     );
 
-    return { page, isDone: result.isDone, continueCursor: result.continueCursor };
+    return {
+      page,
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
   },
 });

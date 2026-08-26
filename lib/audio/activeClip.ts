@@ -98,7 +98,8 @@ export function mergedTimeForCuePosition(
   for (let i = 0; i < audible.length; i++) {
     if (audible[i].language !== pos.language) continue;
     if (seen === pos.repIndex) {
-      const newSpeed = audible[i].speed ?? newSpeedByLanguage[pos.language] ?? 1;
+      const newSpeed =
+        audible[i].speed ?? newSpeedByLanguage[pos.language] ?? 1;
       return audible[i].startSec + pos.localTimeOriginal / newSpeed;
     }
     seen++;

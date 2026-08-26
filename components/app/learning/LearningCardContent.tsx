@@ -9,10 +9,7 @@ import { AnnotationLines } from './AnnotationLines';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import { useCardPlayback, displayReviewCount } from './useCardPlayback';
 import type { CardPresentation } from './cardPresentation';
-import {
-  COACHMARK_ANCHORS,
-  TUTORIAL_ANCHORS,
-} from '@/lib/tutorials/anchors';
+import { COACHMARK_ANCHORS, TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 
 interface LearningCardContentProps {
   /**
@@ -75,7 +72,9 @@ export function LearningCardContent({
   const { buttonPlayback, activeClip, clockBinding } =
     useCardPlayback(mergedPlayback);
 
-  const [manuallyRevealed, setManuallyRevealed] = useState<Set<string>>(new Set());
+  const [manuallyRevealed, setManuallyRevealed] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Last processed reveal signal. Initialized to the mount value so a stale
   // nonce from before this mount isn't treated as a fresh "reveal all"
@@ -83,7 +82,9 @@ export function LearningCardContent({
   // parent never resets it, so no value can collide with an older one).
   const lastRevealSignalRef = useRef(revealAllSignal);
 
-  const translationKey = translations.map((tr) => tr.language + tr.text).join('|');
+  const translationKey = translations
+    .map((tr) => tr.language + tr.text)
+    .join('|');
   const [prevTranslationKey, setPrevTranslationKey] = useState(translationKey);
   if (translationKey !== prevTranslationKey) {
     setPrevTranslationKey(translationKey);
@@ -99,7 +100,8 @@ export function LearningCardContent({
   };
 
   const targetLanguages = useMemo(
-    () => translations.filter((tr) => tr.isTargetLanguage).map((tr) => tr.language),
+    () =>
+      translations.filter((tr) => tr.isTargetLanguage).map((tr) => tr.language),
     [translations],
   );
 
@@ -139,7 +141,10 @@ export function LearningCardContent({
   // ignored, same stale-nonce contract as revealAllSignal above.
   const lastResetSignalRef = useRef(resetSignal);
   useEffect(() => {
-    if (resetSignal === undefined || resetSignal === lastResetSignalRef.current) {
+    if (
+      resetSignal === undefined ||
+      resetSignal === lastResetSignalRef.current
+    ) {
       return;
     }
     lastResetSignalRef.current = resetSignal;
@@ -147,11 +152,18 @@ export function LearningCardContent({
   }, [resetSignal]);
 
   return (
-    <div data-tutorial={TUTORIAL_ANCHORS.cardContent} className="flex flex-col flex-1 min-h-0">
+    <div
+      data-tutorial={TUTORIAL_ANCHORS.cardContent}
+      className="flex flex-col flex-1 min-h-0"
+    >
       <CardShell
         presentation={presentation}
         compact={compact}
-        reviewCount={displayReviewCount(preReviewCount, schedulingPhase, fsrsState)}
+        reviewCount={displayReviewCount(
+          preReviewCount,
+          schedulingPhase,
+          fsrsState,
+        )}
         bare={bare}
         highlightEnabled={highlightEnabled}
         activeClip={activeClip}
@@ -172,8 +184,13 @@ export function LearningCardContent({
               const audio = audioRecordings.find(
                 (a) => a.language === translation.language,
               );
-              const isAudioRevealed = autoRevealLanguages && (revealedLanguages?.has(translation.language) ?? false);
-              const isBlurred = hideTargetLanguages && !isAudioRevealed && !manuallyRevealed.has(translation.language);
+              const isAudioRevealed =
+                autoRevealLanguages &&
+                (revealedLanguages?.has(translation.language) ?? false);
+              const isBlurred =
+                hideTargetLanguages &&
+                !isAudioRevealed &&
+                !manuallyRevealed.has(translation.language);
               const isActive = activeClip?.language === translation.language;
               const override = audioSpeedOverrides?.[translation.language];
               const isEphemeral = speedBadgeVariant === 'ephemeral';
@@ -192,7 +209,11 @@ export function LearningCardContent({
                 >
                   <div
                     className="flex-1"
-                    onClick={isBlurred ? () => handleReveal(translation.language) : undefined}
+                    onClick={
+                      isBlurred
+                        ? () => handleReveal(translation.language)
+                        : undefined
+                    }
                   >
                     <ClickableWords
                       text={translation.text || '...'}
@@ -216,7 +237,11 @@ export function LearningCardContent({
                       ipa={translation.ipa}
                       showRomanization={showRomanization}
                       showIpa={showIpa}
-                      className={isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}
+                      className={
+                        isBlurred
+                          ? 'blur-sm select-none cursor-pointer'
+                          : 'transition-[filter] duration-300'
+                      }
                     />
                   </div>
                   <div className="flex items-center">

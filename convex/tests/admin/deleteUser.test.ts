@@ -711,18 +711,24 @@ describe('admin/deleteUser purge', () => {
       if (!row) throw new Error('audit row missing');
       await ctx.db.patch(row._id, { phase: 'cards', phaseCursor: undefined });
     });
-    const before = await t.run(async (ctx) =>
-      (await ctx.db
-        .query('accountDeletions')
-        .withIndex('by_userId', (q) => q.eq('userId', VICTIM))
-        .first())?.docsDeleted,
+    const before = await t.run(
+      async (ctx) =>
+        (
+          await ctx.db
+            .query('accountDeletions')
+            .withIndex('by_userId', (q) => q.eq('userId', VICTIM))
+            .first()
+        )?.docsDeleted,
     );
     await runPurgeToAuthPhase(t);
-    const after = await t.run(async (ctx) =>
-      (await ctx.db
-        .query('accountDeletions')
-        .withIndex('by_userId', (q) => q.eq('userId', VICTIM))
-        .first())?.docsDeleted,
+    const after = await t.run(
+      async (ctx) =>
+        (
+          await ctx.db
+            .query('accountDeletions')
+            .withIndex('by_userId', (q) => q.eq('userId', VICTIM))
+            .first()
+        )?.docsDeleted,
     );
     expect(after).toBe(before);
   });

@@ -124,7 +124,10 @@ export function LanguageSwitcher({
       onValueChange={handleLocaleChange}
       disabled={isPending}
     >
-      <SelectTrigger className={cn('w-full', className)} data-testid="language-switcher">
+      <SelectTrigger
+        className={cn('w-full', className)}
+        data-testid="language-switcher"
+      >
         <SelectValue placeholder={t('title')} />
       </SelectTrigger>
       <SelectContent>

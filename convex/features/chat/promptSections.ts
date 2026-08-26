@@ -71,7 +71,9 @@ export function buildCardContextSection(opts: {
     const role = roleLabel(code, opts);
     return role ? `${code} — ${role}` : code;
   };
-  const lines = [`Original (${label(opts.sourceLanguage)}): "${opts.sourceText}"`];
+  const lines = [
+    `Original (${label(opts.sourceLanguage)}): "${opts.sourceText}"`,
+  ];
   for (const t of opts.translations) {
     lines.push(`${label(t.language)}: "${t.text}"`);
   }
@@ -107,7 +109,10 @@ export function buildLanguageSection(courseLanguages: {
     .join(', ');
 
   const schematic = allLangs
-    .map((code) => `{"language":"${code}","text":"<${languageName(code)} sentence>"}`)
+    .map(
+      (code) =>
+        `{"language":"${code}","text":"<${languageName(code)} sentence>"}`,
+    )
     .join(',');
 
   return `Course language configuration:

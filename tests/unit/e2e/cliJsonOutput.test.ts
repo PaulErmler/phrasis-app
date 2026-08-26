@@ -33,9 +33,9 @@ describe('extractJsonResult', () => {
   });
 
   it('tolerates output on both sides of the result', () => {
-    expect(
-      extractJsonResult(`notice before\n${PRETTY}\nnotice after`),
-    ).toEqual(RESULT);
+    expect(extractJsonResult(`notice before\n${PRETTY}\nnotice after`)).toEqual(
+      RESULT,
+    );
   });
 
   it('returns the whole result, not a fragment inside it', () => {

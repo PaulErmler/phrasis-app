@@ -25,8 +25,22 @@ describe('alignWordTimings', () => {
     ];
     const aligned = alignWordTimings('hola mundo', scribe, 'es');
     expect(aligned).toEqual([
-      { display: 'hola', leading: '', trailing: '', start: 0, end: 0.5, matched: true },
-      { display: 'mundo', leading: ' ', trailing: '', start: 0.6, end: 1.2, matched: true },
+      {
+        display: 'hola',
+        leading: '',
+        trailing: '',
+        start: 0,
+        end: 0.5,
+        matched: true,
+      },
+      {
+        display: 'mundo',
+        leading: ' ',
+        trailing: '',
+        start: 0.6,
+        end: 1.2,
+        matched: true,
+      },
     ]);
   });
 
@@ -119,9 +133,7 @@ describe('alignWordTimings', () => {
   });
 
   it('inherits the next match boundary for leading-unmatched runs', () => {
-    const scribe: ScribeWord[] = [
-      { word: 'mundo', start: 1.0, end: 1.5 },
-    ];
+    const scribe: ScribeWord[] = [{ word: 'mundo', start: 1.0, end: 1.5 }];
     const aligned = alignWordTimings('hola querido mundo', scribe, 'es');
     expect(aligned[0].matched).toBe(false);
     // No prevEnd → start defaults to nextStart (1.0); end is also nextStart.

@@ -16,10 +16,26 @@ import { ConvexProvider } from 'convex/react';
 import { getFunctionName } from 'convex/server';
 
 const WORDS = [
-  'quería', 'preguntar', 'tiempo', 'cansado', 'ocasión', 'prefiero',
-  'temo', 'mañana', 'deadline', 'ayudar', 'disculpe', 'siempre',
-  'mientras', 'llamaste', 'comida', 'viaje', 'estado', 'vida',
-  'país', 'próxima',
+  'quería',
+  'preguntar',
+  'tiempo',
+  'cansado',
+  'ocasión',
+  'prefiero',
+  'temo',
+  'mañana',
+  'deadline',
+  'ayudar',
+  'disculpe',
+  'siempre',
+  'mientras',
+  'llamaste',
+  'comida',
+  'viaje',
+  'estado',
+  'vida',
+  'país',
+  'próxima',
 ];
 
 const RESULTS: Record<string, unknown> = {
@@ -38,9 +54,24 @@ const RESULTS: Record<string, unknown> = {
       language: 'es',
       words: [
         ...WORDS,
-        'entender', 'trabajo', 'ciudad', 'pensar', 'ahora', 'todavía',
-        'dinero', 'camino', 'salir', 'querer', 'bastante', 'pequeño',
-        'cerca', 'nunca', 'gente', 'porque', 'casa', 'hablar',
+        'entender',
+        'trabajo',
+        'ciudad',
+        'pensar',
+        'ahora',
+        'todavía',
+        'dinero',
+        'camino',
+        'salir',
+        'querer',
+        'bastante',
+        'pequeño',
+        'cerca',
+        'nunca',
+        'gente',
+        'porque',
+        'casa',
+        'hablar',
       ],
     },
   ],
@@ -78,7 +109,8 @@ const emptyWatch = {
 
 const mockClient = {
   watchQuery(query: unknown, _args?: unknown) {
-    const name = typeof query === 'string' ? query : getFunctionName(query as never);
+    const name =
+      typeof query === 'string' ? query : getFunctionName(query as never);
     if (!(name in RESULTS)) return emptyWatch;
     return {
       onUpdate: () => () => {},
@@ -91,12 +123,20 @@ const mockClient = {
   action: async () => undefined,
   setAuth: () => {},
   clearAuth: () => {},
-  connectionState: () => ({ hasInflightRequests: false, isWebSocketConnected: true }),
+  connectionState: () => ({
+    hasInflightRequests: false,
+    isWebSocketConnected: true,
+  }),
 };
 
 /** 20 levels. Numbering restarts inside each CEFR tier, so the chips read
  *  Pre-A1, A1.1, A1.2, A1.3, A2.1 and so on. */
-const LEVEL_PLAN: { name: string; tier: string; total: number; added: number }[] = [
+const LEVEL_PLAN: {
+  name: string;
+  tier: string;
+  total: number;
+  added: number;
+}[] = [
   { name: 'Pre-A1', tier: 'Pre-A1', total: 1200, added: 1200 },
   { name: 'A1.1', tier: 'A1', total: 1150, added: 1150 },
   { name: 'A1.2', tier: 'A1', total: 1150, added: 1150 },
@@ -165,5 +205,7 @@ export const PRELOADED = {
 } as const;
 
 export function MockConvex({ children }: { children: ReactNode }) {
-  return <ConvexProvider client={mockClient as never}>{children}</ConvexProvider>;
+  return (
+    <ConvexProvider client={mockClient as never}>{children}</ConvexProvider>
+  );
 }

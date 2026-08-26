@@ -37,7 +37,9 @@ export function LanguagesSection() {
         <motion.div {...fadeInUp} className="mb-12 md:mb-16 max-w-2xl">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground mb-5">
             {t('title')}{' '}
-            <span className="text-primary">{t('titleHighlight', { count })}</span>
+            <span className="text-primary">
+              {t('titleHighlight', { count })}
+            </span>
           </h2>
           <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
             {t('lead')}
@@ -53,7 +55,9 @@ export function LanguagesSection() {
             <li
               key={lang.code}
               className="flex items-center gap-2 rounded-full border border-border/40 bg-card px-3.5 py-1.5 text-sm md:text-base"
-              title={lang.experimental ? t('experimentalBadgeTooltip') : undefined}
+              title={
+                lang.experimental ? t('experimentalBadgeTooltip') : undefined
+              }
             >
               <span aria-hidden="true">{lang.flag}</span>
               <span>{lang.name}</span>

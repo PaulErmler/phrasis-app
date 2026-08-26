@@ -148,49 +148,165 @@ const ids = (docs: Array<{ _id: Id<UserTable> }>): Array<Id<UserTable>> =>
 
 const USER_TABLE_DRAINS: Record<UserTable, UserTableDrain> = {
   userSettings: async (ctx, u) =>
-    ids(await ctx.db.query('userSettings').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('userSettings')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   onboardingProgress: async (ctx, u) =>
-    ids(await ctx.db.query('onboardingProgress').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('onboardingProgress')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   courseStats: async (ctx, u) =>
-    ids(await ctx.db.query('courseStats').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('courseStats')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   dailyStats: async (ctx, u) =>
-    ids(await ctx.db.query('dailyStats').withIndex('by_userId_and_courseId_and_date', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('dailyStats')
+        .withIndex('by_userId_and_courseId_and_date', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   reviewLogs: async (ctx, u) =>
-    ids(await ctx.db.query('reviewLogs').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('reviewLogs')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   reviewHistory: async (ctx, u) =>
-    ids(await ctx.db.query('reviewHistory').withIndex('by_userId_and_courseId_and_reviewedAt', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('reviewHistory')
+        .withIndex('by_userId_and_courseId_and_reviewedAt', (q) =>
+          q.eq('userId', u),
+        )
+        .take(ROW_BATCH),
+    ),
   collectionProgress: async (ctx, u) =>
-    ids(await ctx.db.query('collectionProgress').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('collectionProgress')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   collectionTextMarks: async (ctx, u) =>
-    ids(await ctx.db.query('collectionTextMarks').withIndex('by_userId_and_courseId_and_textId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('collectionTextMarks')
+        .withIndex('by_userId_and_courseId_and_textId', (q) =>
+          q.eq('userId', u),
+        )
+        .take(ROW_BATCH),
+    ),
   dailyLanguageStats: async (ctx, u) =>
-    ids(await ctx.db.query('dailyLanguageStats').withIndex('by_userId_and_courseId_and_date', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('dailyLanguageStats')
+        .withIndex('by_userId_and_courseId_and_date', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   userWords: async (ctx, u) =>
-    ids(await ctx.db.query('userWords').withIndex('by_userId_and_courseId_and_language_and_word', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('userWords')
+        .withIndex('by_userId_and_courseId_and_language_and_word', (q) =>
+          q.eq('userId', u),
+        )
+        .take(ROW_BATCH),
+    ),
   userWordTexts: async (ctx, u) =>
-    ids(await ctx.db.query('userWordTexts').withIndex('by_userId_courseId_language_word', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('userWordTexts')
+        .withIndex('by_userId_courseId_language_word', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   languageStats: async (ctx, u) =>
-    ids(await ctx.db.query('languageStats').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('languageStats')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   weeklyStats: async (ctx, u) =>
-    ids(await ctx.db.query('weeklyStats').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('weeklyStats')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   monthlyStats: async (ctx, u) =>
-    ids(await ctx.db.query('monthlyStats').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('monthlyStats')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   yearlyStats: async (ctx, u) =>
-    ids(await ctx.db.query('yearlyStats').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('yearlyStats')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   reviewDepthAccuracy: async (ctx, u) =>
-    ids(await ctx.db.query('reviewDepthAccuracy').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('reviewDepthAccuracy')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   usageQuotas: async (ctx, u) =>
-    ids(await ctx.db.query('usageQuotas').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('usageQuotas')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   billingTestOverrides: async (ctx, u) =>
-    ids(await ctx.db.query('billingTestOverrides').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('billingTestOverrides')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   admins: async (ctx, u) =>
-    ids(await ctx.db.query('admins').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('admins')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   userProfiles: async (ctx, u) =>
-    ids(await ctx.db.query('userProfiles').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('userProfiles')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   cardEdits: async (ctx, u) =>
-    ids(await ctx.db.query('cardEdits').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('cardEdits')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   cardEditRetranslations: async (ctx, u) =>
-    ids(await ctx.db.query('cardEditRetranslations').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('cardEditRetranslations')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
 };
 
 export interface PurgeInventory {
@@ -255,22 +371,22 @@ interface PurgeBatchResult {
 
 export type RunResult =
   | {
-    dryRun: true;
-    wouldRun: boolean;
-    authUserFound: boolean;
-    emailMatches: boolean;
-    authEmail: string | null;
-    deletionRequest: 'requested' | 'running' | 'completed' | null;
-    inventory: PurgeInventory;
-  }
+      dryRun: true;
+      wouldRun: boolean;
+      authUserFound: boolean;
+      emailMatches: boolean;
+      authEmail: string | null;
+      deletionRequest: 'requested' | 'running' | 'completed' | null;
+      inventory: PurgeInventory;
+    }
   | {
-    dryRun: false;
-    deleted: true;
-    docsDeleted: number;
-    batches: number;
-    autumnCustomerExisted: boolean;
-    cancelledProductIds: string[];
-  };
+      dryRun: false;
+      deleted: true;
+      docsDeleted: number;
+      batches: number;
+      autumnCustomerExisted: boolean;
+      cancelledProductIds: string[];
+    };
 
 // ---------------------------------------------------------------------------
 // Preflight

@@ -98,7 +98,9 @@ export function AlsoCorrectApproval({
   };
   const { state: toolState, output: toolOutput } = tool;
 
-  const approval = toolCallId ? approvalsByToolCallId.get(toolCallId) : undefined;
+  const approval = toolCallId
+    ? approvalsByToolCallId.get(toolCallId)
+    : undefined;
   const approvalId = approval?._id ?? null;
   const entries = approval?.translations ?? [];
   const changedLanguages = new Set(approval?.changedLanguages ?? []);
@@ -164,7 +166,9 @@ export function AlsoCorrectApproval({
   const unchangedEntries = entries.filter(
     (e) => !changedLanguages.has(e.language),
   );
-  const changedEntries = entries.filter((e) => changedLanguages.has(e.language));
+  const changedEntries = entries.filter((e) =>
+    changedLanguages.has(e.language),
+  );
 
   const isPending = !isResolved && status === 'pending';
 
