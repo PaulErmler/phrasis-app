@@ -163,7 +163,7 @@ describe('features/cardEditAudit', () => {
       ]);
     });
 
-    it('Path B: logs a fork pointing at the new card and text', async () => {
+    it('Path B: logs a fork pointing at the new text on the same card', async () => {
       const t = convexTest(schema, modules);
       const { cardId, textId } = await seedCurriculumCard(t);
       const asUser = t.withIdentity({ subject: 'user_A' });
@@ -180,17 +180,16 @@ describe('features/cardEditAudit', () => {
       const [edit] = await listEdits(t);
       expect(edit.path).toBe('fork');
       expect(edit.cardIdBefore).toBe(cardId);
-      expect(edit.cardIdAfter).not.toBe(cardId);
+      // The card is patched in place — only its text row is forked.
+      expect(edit.cardIdAfter).toBe(cardId);
       expect(edit.textIdBefore).toBe(textId);
       expect(edit.textIdAfter).not.toBe(textId);
       expect(edit.collectionOrigin).toBe('premade');
       expect(edit.textWasUserCreated).toBe(false);
 
-      // The replacement card really is the one the audit row names.
-      const replacement = await t.run(async (ctx) =>
-        ctx.db.get(edit.cardIdAfter),
-      );
-      expect(replacement?.textId).toBe(edit.textIdAfter);
+      // The card really points at the forked text the audit row names.
+      const edited = await t.run(async (ctx) => ctx.db.get(edit.cardIdAfter));
+      expect(edited?.textId).toBe(edit.textIdAfter);
     });
 
     it('records the triggered retranslation against the SHARED text, not the fork', async () => {

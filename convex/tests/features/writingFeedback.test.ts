@@ -530,7 +530,7 @@ describe('features/writingFeedback', () => {
       expect(rows.some((r) => r.text === 'Me gustaría un café.')).toBe(false);
     });
 
-    it('keeps accepted alternatives through a card-replacing edit (Path B fork)', async () => {
+    it('keeps accepted alternatives through a text-forking edit (Path B)', async () => {
       const t = convexTest(schema, modules);
       const { cardId } = await seedCard(t);
       // The edit path bills card_edits; give the account balance for one.
@@ -554,11 +554,10 @@ describe('features/writingFeedback', () => {
         primary: 'Quisiera un café, por favor.',
       });
 
-      // Editing a curriculum card forks (Path B): the card document is
-      // REPLACED (insert + delete), and deleteCard drains alternatives as
-      // part of real deletion — the migration must move them to the
-      // replacement first or "Make default"/manual edits silently destroy
-      // the user's accepted answers.
+      // Editing a curriculum card forks its TEXT (Path B), but the card is
+      // patched in place — the alternatives stay attached to the stable id
+      // with no migration ("Make default"/manual edits must never destroy
+      // the user's accepted answers).
       const asUser = t.withIdentity({ subject: 'user_A' });
       await asUser.mutation(api.features.scheduling.editCard, {
         cardId,
@@ -571,11 +570,10 @@ describe('features/writingFeedback', () => {
       );
       expect(rows).toHaveLength(1);
       expect(rows[0].text).toBe('Me gustaría un café, por favor.');
-      expect(rows[0].cardId).not.toBe(cardId);
+      expect(rows[0].cardId).toBe(cardId);
       await t.run(async (ctx) => {
-        // Old card replaced; the alternatives ride on the live replacement.
-        expect(await ctx.db.get(cardId)).toBeNull();
-        expect(await ctx.db.get(rows[0].cardId)).not.toBeNull();
+        // The card survived the edit; the alternatives still point at it.
+        expect(await ctx.db.get(cardId)).not.toBeNull();
       });
     });
   });

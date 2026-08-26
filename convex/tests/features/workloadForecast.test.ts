@@ -353,4 +353,61 @@ describe('getWorkloadForecast', () => {
     );
     expect(invalidTz!.dayStartMs).toBe(B[0]);
   });
+
+  it('buckets across a spring-forward DST transition with a 23h day (non-UTC)', async () => {
+    // Europe/Berlin, 2026-03-29: clocks jump 02:00 → 03:00. Every other
+    // case in this file runs in UTC, so the 8-boundary loop had never been
+    // exercised with unequal day lengths.
+    const TZ = 'Europe/Berlin';
+    const DST_TODAY = '2026-03-29';
+    const DB = Array.from({ length: 8 }, (_, k) =>
+      startOfDayMs(addDays(DST_TODAY, k), TZ),
+    );
+    expect(DB[1] - DB[0]).toBe(23 * 3_600_000); // the shortened day
+
+    const t = convexTest(schema, modules);
+    await seedActiveCourse(t);
+    // One review at the last ms of the 23h day, one at the first ms of the
+    // next: a naive 24h boundary would put both in the same bucket.
+    keysByTrackAndTail['shared|review'] = [DB[1] - 1, DB[1]];
+
+    // Pin the server clock inside that day so resolveClientToday's ±1-day
+    // validation accepts the fixed `today` (all other cases use the real
+    // clock with a dynamic TODAY).
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(DB[0] + 60_000);
+    try {
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      const res = await asUser.query(api.features.stats.getWorkloadForecast, {
+        timezone: TZ,
+        today: DST_TODAY,
+        now: DB[0] + 60_000,
+      });
+      expect(res!.today).toBe(DST_TODAY);
+      expect(res!.dayStartMs).toBe(DB[0]);
+      expect(res!.laterToday.review).toBe(1);
+      expect(res!.futureDays[0].review).toBe(1);
+      expect(res!.availableNow.review).toBe(0);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('returns all-zero buckets and startedCards 0 for a course with no cards', async () => {
+    const t = convexTest(schema, modules);
+    await seedActiveCourse(t);
+    // No aggregate keys registered at all — the client's minimum-activity
+    // gate and empty state both key off this payload shape.
+    const asUser = t.withIdentity({ subject: 'user_A' });
+    const res = await asUser.query(
+      api.features.stats.getWorkloadForecast,
+      baseArgs,
+    );
+    expect(res).not.toBeNull();
+    expect(res!.startedCards).toBe(0);
+    const zero = { new: 0, learning: 0, relearning: 0, review: 0 };
+    expect(res!.availableNow).toEqual(zero);
+    expect(res!.laterToday).toEqual(zero);
+    expect(res!.futureDays).toEqual(Array.from({ length: 6 }, () => zero));
+    expect(res!.history.reps).toBe(0);
+  });
 });
