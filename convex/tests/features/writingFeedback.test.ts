@@ -431,5 +431,54 @@ describe('features/writingFeedback', () => {
       // first stored alternative.
       expect(rows.some((r) => r.text === 'Me gustaría un café.')).toBe(false);
     });
+
+    it('keeps accepted alternatives through a card-replacing edit (Path B fork)', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCard(t);
+      // The edit path bills card_edits; give the account balance for one.
+      await t.run(async (ctx) => {
+        const doc = await ctx.db
+          .query('usageQuotas')
+          .withIndex('by_userId', (q) => q.eq('userId', 'user_A'))
+          .unique();
+        await ctx.db.patch(doc!._id, {
+          features: {
+            ...doc!.features,
+            card_edits: { balance: 5, included: 5, used: 0, unlimited: false },
+          },
+        });
+      });
+      await t.mutation(internal.features.writingFeedback.storeAlternative, {
+        userId: 'user_A',
+        cardId,
+        language: 'es',
+        text: 'Me gustaría un café, por favor.',
+        primary: 'Quisiera un café, por favor.',
+      });
+
+      // Editing a curriculum card forks (Path B): the card document is
+      // REPLACED (insert + delete), and deleteCard drains alternatives as
+      // part of real deletion — the migration must move them to the
+      // replacement first or "Make default"/manual edits silently destroy
+      // the user's accepted answers.
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [{ language: 'es', text: 'Quisiera un café.' }],
+        timezone: 'UTC',
+      });
+
+      const rows = await t.run((ctx) =>
+        ctx.db.query('writingAlternatives').collect(),
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].text).toBe('Me gustaría un café, por favor.');
+      expect(rows[0].cardId).not.toBe(cardId);
+      await t.run(async (ctx) => {
+        // Old card replaced; the alternatives ride on the live replacement.
+        expect(await ctx.db.get(cardId)).toBeNull();
+        expect(await ctx.db.get(rows[0].cardId)).not.toBeNull();
+      });
+    });
   });
 });

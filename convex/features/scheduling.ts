@@ -98,6 +98,7 @@ import {
 } from '../migrations/seedWritingTrack';
 import { fetchTrackDueCards } from '../lib/dueQueue';
 import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
+import { migrateWritingAlternatives } from './writingAlternatives';
 import {
   MAX_CARD_TEXT_LENGTH,
   WRITING_ALTERNATIVES_MAX,
@@ -2572,6 +2573,10 @@ export async function applyCardEdit(
         searchableTextLanguages,
       });
 
+      // The replacement is the same logical card, so its accepted
+      // alternatives move with it; `deleteCard` below drains whatever is
+      // still attached to the old id (that drain is for REAL deletions).
+      await migrateWritingAlternatives(ctx, args.cardId, resolvedCardId);
       await deleteCard(ctx, args.cardId);
     }
     // Defensive cleanup: if the edit left the old text orphaned and user-created
