@@ -2623,6 +2623,10 @@ export async function applyCardEdit(
         // also silently disable undo's decrement, which no-ops when the field
         // is undefined.
         reviewCountByMode: card.reviewCountByMode,
+        // Same again for the per-mode time-spent running averages: the
+        // replacement is the same logical card, and undo's time reversal
+        // no-ops when the entry is missing.
+        reviewTimeStats: card.reviewTimeStats,
         wordsTrackedLanguages: card.wordsTrackedLanguages,
         searchableText,
         searchableTextLanguages,

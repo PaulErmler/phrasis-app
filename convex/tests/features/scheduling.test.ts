@@ -995,6 +995,7 @@ describe("features/scheduling", () => {
         await ctx.db.patch(cardId, {
           goodReviewCount: 3,
           audioSpeedOverrides: { sv: 0.8 },
+          reviewTimeStats: { audio: { avgMs: 4200, count: 6 } },
         });
       });
       const asUser = t.withIdentity({ subject: "user_A" });
@@ -1015,6 +1016,11 @@ describe("features/scheduling", () => {
       expect(replacement, "a replacement card should exist").toBeTruthy();
       expect(replacement!.goodReviewCount).toBe(3);
       expect(replacement!.audioSpeedOverrides).toEqual({ sv: 0.8 });
+      // Same no-backfill rationale as the counters above: an edit must not
+      // reset the per-card time-spent running averages.
+      expect(replacement!.reviewTimeStats).toEqual({
+        audio: { avgMs: 4200, count: 6 },
+      });
     });
 
     it("copies audio for a punctuation-only edit (sounds identical) but not for an audible one", async () => {
