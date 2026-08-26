@@ -558,32 +558,10 @@ export const replaceCardFromApproval = mutation({
       cardId: replacementCardId,
     });
 
-    // Path B replaced the card document, so every OTHER pending proposal for
-    // the old card now points at a deleted row and would dead-end on "Card not
-    // found". The button just appearing to do nothing. Retarget them.
-    //
-    // Scoped to this thread because `by_thread_and_user` is the only index on
-    // cardApprovals, and it is the right scope in practice: markAlsoCorrect is
-    // registered only on card-context turns and the learn view rotates threads
-    // when the card changes, so a card's proposals live in one conversation by
-    // construction. A stray cross-thread row is left to the "card has changed"
-    // error rather than paying for a by_cardId index on every insert.
-    if (replacementCardId !== previousCardId) {
-      const siblings = await ctx.db
-        .query('cardApprovals')
-        .withIndex('by_thread_and_user', (q) =>
-          q.eq('threadId', approval.threadId).eq('userId', userId),
-        )
-        // Bounded in practice by the approvals a single thread can hold; the
-        // cap is a pure backstop against an unbounded read.
-        .take(500);
-      for (const sibling of siblings) {
-        if (sibling._id === approval._id) continue;
-        if (sibling.status !== 'pending') continue;
-        if (sibling.cardId !== previousCardId) continue;
-        await ctx.db.patch(sibling._id, { cardId: replacementCardId });
-      }
-    }
+    // applyCardEdit patches the card in place on both paths, so
+    // `replacementCardId === previousCardId` always and sibling pending
+    // proposals keep pointing at a live row — the retargeting sweep that
+    // used to live here (for the old insert+delete Path B) is unnecessary.
 
     await track(ctx, userId, EVENTS.CHAT_CARD_APPROVAL, {
       outcome: 'approved',
@@ -693,22 +671,9 @@ export const storeAlternativeFromApproval = mutation({
       cardId: resolvedCardId,
     });
 
-    // Same retargeting as replaceCardFromApproval: a Path B fork replaced the
-    // card document, so sibling pending proposals must follow it.
-    if (resolvedCardId !== previousCardId) {
-      const siblings = await ctx.db
-        .query('cardApprovals')
-        .withIndex('by_thread_and_user', (q) =>
-          q.eq('threadId', approval.threadId).eq('userId', userId),
-        )
-        .take(500);
-      for (const sibling of siblings) {
-        if (sibling._id === approval._id) continue;
-        if (sibling.status !== 'pending') continue;
-        if (sibling.cardId !== previousCardId) continue;
-        await ctx.db.patch(sibling._id, { cardId: resolvedCardId });
-      }
-    }
+    // applyCardEdit patches the card in place, so sibling pending proposals
+    // still point at a live row — no retargeting needed (see
+    // replaceCardFromApproval).
 
     await track(ctx, userId, EVENTS.CHAT_CARD_APPROVAL, {
       outcome: 'approved',

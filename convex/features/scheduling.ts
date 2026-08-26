@@ -41,7 +41,7 @@ import {
   floorToCelebration,
   displayedActiveReviews,
 } from '../db/stats/dailyStats';
-import { patchCard, insertCard, deleteCard } from '../db/stats/cardAggregates';
+import { patchCard, deleteCard } from '../db/stats/cardAggregates';
 import {
   languageRole,
   recordCardEdit,
@@ -105,7 +105,6 @@ import {
 } from '../migrations/seedWritingTrack';
 import { fetchTrackDueCards } from '../lib/dueQueue';
 import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
-import { migrateWritingAlternatives } from './writingAlternatives';
 import {
   MAX_CARD_TEXT_LENGTH,
   WRITING_ALTERNATIVES_MAX,
@@ -2544,100 +2543,37 @@ export async function applyCardEdit(
     const { searchableText, searchableTextLanguages } =
       await buildCardSearchableText(ctx, resolvedTextId, resolvedText.text, courseLanguages);
 
-    // The card this edit leaves behind: unchanged on Path A (patched in
-    // place), a brand-new document on Path B (insert + delete). Callers need
-    // to know which. The chat replace path retargets its sibling approvals
-    // and the learn view suppresses its thread rotation off this identity.
-    let resolvedCardId: Id<'cards'> = args.cardId;
-
-    if (isUserOwned) {
-      // Path A edits the existing text row, so the card still points at the
-      // right content, only its derived search index needs refreshing. Patch
-      // in place: the card keeps its `_id`, `_creationTime` and `dueDate`, so
-      // it holds its exact position in the queue and costs three aggregate
-      // writes instead of the six a delete + insert would.
-      await patchCard(
-        ctx,
-        args.cardId,
-        {
-          searchableText,
-          searchableTextLanguages,
-          // Same defaults the replacement path applied, so cards predating
-          // these fields still get backfilled on edit.
-          isGraduated: card.isGraduated ?? false,
-          radioRoundCounter: card.radioRoundCounter ?? 0,
-          radioOrderKey: card.radioOrderKey ?? randomOrderKey(),
-          freeStudyRoundCounter: card.freeStudyRoundCounter ?? 0,
-          freeStudyOrderKey: card.freeStudyOrderKey ?? randomOrderKey(),
-        },
-        card,
-      );
-    } else {
-      // Path B pointed the card at a brand-new text row, so the card document
-      // has to be replaced. Subtract 1ms from dueDate so this card sorts before
-      // any other card that happens to share the exact same dueDate (Convex
-      // uses _creationTime as the tiebreaker within equal index values, and the
-      // new doc would otherwise sort last, causing a different card to be
-      // returned by getCardForReview).
-      resolvedCardId = await insertCard(ctx, {
-        deckId: card.deckId,
+    // Both paths leave the SAME card document in place: Path A edited its
+    // existing text row, Path B forked the shared text into a private copy
+    // and re-points the card at it (for Path A `resolvedTextId` is the
+    // card's current `textId`, so that part of the patch is a no-op). An
+    // edit used to REPLACE the card on Path B (insert + delete), which
+    // demanded a hand-carried list of every progress field, −1ms due-date
+    // tiebreak tricks to keep the queue position, an alternatives
+    // migration, and sibling-approval retargeting — and still left
+    // `reviewHistory.cardId` dangling. Patching in place keeps `_id`,
+    // `_creationTime` and `dueDate`, so all of that machinery is
+    // unnecessary: every by-id reference (accepted writing alternatives,
+    // pending approvals, reviewHistory, the audit log, the undo stack)
+    // stays valid by construction.
+    const resolvedCardId: Id<'cards'> = args.cardId;
+    await patchCard(
+      ctx,
+      args.cardId,
+      {
         textId: resolvedTextId,
-        collectionId: card.collectionId,
-        collectionOrigin: card.collectionOrigin,
-        dueDate: card.dueDate - 1,
-        isMastered: card.isMastered,
-        isHidden: card.isHidden,
-        isFavorite: card.isFavorite,
-        isGraduated: card.isGraduated ?? false,
-        schedulingPhase: card.schedulingPhase,
-        preReviewCount: card.preReviewCount,
-        // Preserve the "until rated good" Practice-Listening progress. Losing
-        // this on edit would restart listening for an already-graduated card.
-        goodReviewCount: card.goodReviewCount,
-        audioSpeedOverrides: card.audioSpeedOverrides,
-        radioRoundCounter: card.radioRoundCounter ?? 0,
-        // Preserve the true radio play-count so an in-place edit doesn't reset the
-        // "Only new" graduation (undefined for cards that predate the field).
-        radioPlayCount: card.radioPlayCount,
-        // Preserve the existing tiebreak so the edited card keeps its place in
-        // the radio rotation (or take a fresh random one if the original card
-        // predates this field). Same treatment for the free-study rotation.
-        radioOrderKey: card.radioOrderKey ?? randomOrderKey(),
-        freeStudyRoundCounter: card.freeStudyRoundCounter ?? 0,
-        freeStudyPlayCount: card.freeStudyPlayCount,
-        freeStudyOrderKey: card.freeStudyOrderKey ?? randomOrderKey(),
-        fsrsState: card.fsrsState,
-        lastReviewedAt: card.lastReviewedAt,
-        // Preserve the writing track (separateModeTracking) so an edit doesn't
-        // reset the card's writing schedule; same -1ms queue-position trick as
-        // dueDate above. Undefined (no track) stays undefined.
-        writingDueDate:
-          card.writingDueDate !== undefined ? card.writingDueDate - 1 : undefined,
-        writingFsrsState: card.writingFsrsState,
-        writingIsGraduated: card.writingIsGraduated,
-        writingLastReviewedAt: card.writingLastReviewedAt,
-        writingGoodReviewCount: card.writingGoodReviewCount,
-        // Per-mode review history, same rationale as goodReviewCount and the
-        // play counters above: an edit must not reset it. There is no backfill
-        // for these counters, so a drop here is unrecoverable, and it would
-        // also silently disable undo's decrement, which no-ops when the field
-        // is undefined.
-        reviewCountByMode: card.reviewCountByMode,
-        // Same again for the per-mode time-spent running averages: the
-        // replacement is the same logical card, and undo's time reversal
-        // no-ops when the entry is missing.
-        reviewTimeStats: card.reviewTimeStats,
-        wordsTrackedLanguages: card.wordsTrackedLanguages,
         searchableText,
         searchableTextLanguages,
-      });
-
-      // The replacement is the same logical card, so its accepted
-      // alternatives move with it; `deleteCard` below drains whatever is
-      // still attached to the old id (that drain is for REAL deletions).
-      await migrateWritingAlternatives(ctx, args.cardId, resolvedCardId);
-      await deleteCard(ctx, args.cardId);
-    }
+        // Backfill defaults for cards predating these fields, applied on
+        // edit as before.
+        isGraduated: card.isGraduated ?? false,
+        radioRoundCounter: card.radioRoundCounter ?? 0,
+        radioOrderKey: card.radioOrderKey ?? randomOrderKey(),
+        freeStudyRoundCounter: card.freeStudyRoundCounter ?? 0,
+        freeStudyOrderKey: card.freeStudyOrderKey ?? randomOrderKey(),
+      },
+      card,
+    );
     // Defensive cleanup: if the edit left the old text orphaned and user-created
     // (path A reuses the textId, so the new card normally still references it.
     // This is a no-op then), drop its now-unreferenced translations/audio/blobs.
@@ -2669,12 +2605,10 @@ export async function applyCardEdit(
       course.targetLanguages,
     );
 
-    // Path B pointed the card and text at brand-new rows; the audit row still
-    // holds the before-ids for both. Path A never moved either.
-    if (
-      cardEditId !== undefined &&
-      (resolvedCardId !== args.cardId || resolvedTextId !== card.textId)
-    ) {
+    // Path B forked the text row; the audit row still holds the before-id.
+    // The card id never changes (in-place patch) — recorded anyway so the
+    // log stays explicit about it.
+    if (cardEditId !== undefined && resolvedTextId !== card.textId) {
       await setCardEditResult(ctx, cardEditId, {
         cardIdAfter: resolvedCardId,
         textIdAfter: resolvedTextId,

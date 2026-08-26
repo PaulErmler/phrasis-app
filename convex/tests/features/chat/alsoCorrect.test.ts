@@ -383,9 +383,10 @@ describe("features/chat/alsoCorrect", () => {
     });
 
     // The learn view suppresses its chat-thread rotation for exactly the card
-    // a replace produced, so the mutation has to report that id. Path B swaps
-    // the card document; Path A patches in place and must report the same id.
-    it("reports the replacement card id (new on Path B, unchanged on Path A)", async () => {
+    // a replace produced, so the mutation has to report that id. applyCardEdit
+    // patches the card IN PLACE on both paths — Path B forks only the text
+    // row — so the id is stable everywhere.
+    it("reports a stable card id on both paths (Path B re-points the text)", async () => {
       const t = convexTest(schema, modules);
       const asUser = t.withIdentity({ subject: "user_A" });
 
@@ -397,8 +398,11 @@ describe("features/chat/alsoCorrect", () => {
         api.features.chat.cardApprovals.replaceCardFromApproval,
         { approvalId: pathBApproval, timezone: "UTC" },
       );
-      expect(pathB.cardId).not.toBe(shared.cardId);
-      expect(await t.run(async (ctx) => ctx.db.get(pathB.cardId))).not.toBeNull();
+      expect(pathB.cardId).toBe(shared.cardId);
+      // The card survived and was re-pointed at a user-owned fork.
+      const pathBCard = await t.run(async (ctx) => ctx.db.get(pathB.cardId));
+      expect(pathBCard).not.toBeNull();
+      expect(pathBCard!.textId).not.toBe(shared.textId);
 
       const owned = await seedOwnedCard(t);
       const pathAApproval = await createApproval(
@@ -813,9 +817,9 @@ describe("features/chat/alsoCorrect", () => {
       });
     });
 
-    it("forks a curriculum card to user-owned and attaches the alternative to the fork", async () => {
+    it("forks a curriculum card's text to user-owned and attaches the alternative to the same card", async () => {
       const t = convexTest(schema, modules);
-      const { cardId } = await seedOwnedCard(t, { userCreated: false });
+      const { cardId, textId } = await seedOwnedCard(t, { userCreated: false });
       const approvalId = await createApproval(t, cardId, [
         { language: "es", text: "Quisiera un caf\u00e9." },
       ]);
@@ -825,21 +829,23 @@ describe("features/chat/alsoCorrect", () => {
         { approvalId, timezone: "UTC" },
       );
       expect(res.success).toBe(true);
-      expect(res.cardId).not.toBe(cardId);
+      // The card keeps its id; only its text row was forked to user-owned
+      // (which reads identically \u2014 alternatives never change the sentence).
+      expect(res.cardId).toBe(cardId);
       await t.run(async (ctx) => {
-        // Old card replaced by the fork; the fork's text is user-owned but
-        // reads identically (alternatives never change the sentence).
-        expect(await ctx.db.get(cardId)).toBeNull();
-        const newCard = await ctx.db.get(res.cardId);
-        expect(newCard).not.toBeNull();
-        const newText = await ctx.db.get(newCard!.textId);
+        const editedCard = await ctx.db.get(cardId);
+        expect(editedCard).not.toBeNull();
+        expect(editedCard!.textId).not.toBe(textId);
+        const newText = await ctx.db.get(editedCard!.textId);
         expect(newText?.userCreated).toBe(true);
         expect(newText?.userId).toBe("user_A");
         expect(newText?.text).toBe("Quiero un caf\u00e9.");
+        // The stored alternative needs no migration: it was attached to the
+        // stable card id from the start.
         const alts = await ctx.db
           .query("writingAlternatives")
           .withIndex("by_cardId_and_language", (q) =>
-            q.eq("cardId", res.cardId).eq("language", "es"),
+            q.eq("cardId", cardId).eq("language", "es"),
           )
           .collect();
         expect(alts.map((a) => a.text)).toEqual(["Quisiera un caf\u00e9."]);

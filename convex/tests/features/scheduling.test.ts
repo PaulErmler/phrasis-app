@@ -985,17 +985,37 @@ describe("features/scheduling", () => {
       expect(audio?.wordTimings).toEqual([{ word: "Hej", start: 0, end: 0.5 }]);
     });
 
-    it("preserves goodReviewCount and audioSpeedOverrides on the replacement card", async () => {
+    it("keeps the card id and every progress field across a Path B edit", async () => {
       const t = convexTest(schema, modules);
       const { cardId, textId: oldTextId } = await seedSharedCardWithAudio(t);
-      // "Until rated Good" listening progress + per-card speed overrides,
-      // both were silently dropped by the replace path before, resetting
-      // Practice Listening for an already-graduated card on every edit.
-      await t.run(async (ctx) => {
+      // "Until rated Good" listening progress + per-card speed overrides +
+      // per-mode time averages. The old replace path had to hand-carry each
+      // of these; the in-place patch preserves them (and the id, so rows
+      // that reference the card — like reviewHistory — stay attached) by
+      // construction.
+      const historyId = await t.run(async (ctx) => {
         await ctx.db.patch(cardId, {
           goodReviewCount: 3,
           audioSpeedOverrides: { sv: 0.8 },
           reviewTimeStats: { audio: { avgMs: 4200, count: 6 } },
+        });
+        const card = await ctx.db.get(cardId);
+        return ctx.db.insert("reviewHistory", {
+          userId: "user_A",
+          courseId: (await ctx.db.get(card!.deckId))!.courseId,
+          cardId,
+          reviewedAt: Date.now() - 1000,
+          date: "2026-08-26",
+          timezone: "UTC",
+          track: "shared",
+          phase: "preReview",
+          rating: "understood",
+          prevDueDate: card!.dueDate,
+          newDueDate: card!.dueDate + 1,
+          prevPreReviewCount: 0,
+          wasDefaultRating: false,
+          wasFirstReview: true,
+          phaseTransitioned: false,
         });
       });
       const asUser = t.withIdentity({ subject: "user_A" });
@@ -1012,15 +1032,24 @@ describe("features/scheduling", () => {
       const allCards = await t.run(async (ctx) =>
         ctx.db.query("cards").collect(),
       );
-      const replacement = allCards.find((c) => c.textId !== oldTextId);
-      expect(replacement, "a replacement card should exist").toBeTruthy();
-      expect(replacement!.goodReviewCount).toBe(3);
-      expect(replacement!.audioSpeedOverrides).toEqual({ sv: 0.8 });
+      const edited = allCards.find((c) => c.textId !== oldTextId);
+      expect(edited, "the edited card should point at the forked text").toBeTruthy();
+      // Same document, not a replacement.
+      expect(edited!._id).toBe(cardId);
+      expect(edited!.goodReviewCount).toBe(3);
+      expect(edited!.audioSpeedOverrides).toEqual({ sv: 0.8 });
       // Same no-backfill rationale as the counters above: an edit must not
       // reset the per-card time-spent running averages.
-      expect(replacement!.reviewTimeStats).toEqual({
+      expect(edited!.reviewTimeStats).toEqual({
         audio: { avgMs: 4200, count: 6 },
       });
+      // reviewHistory rows reference the card by id, so with the id stable
+      // the card's permanent history stays attached across the edit.
+      const history = await t.run(async (ctx) => ctx.db.get(historyId));
+      expect(history?.cardId).toBe(cardId);
+      expect(
+        await t.run(async (ctx) => ctx.db.get(history!.cardId)),
+      ).not.toBeNull();
     });
 
     it("copies audio for a punctuation-only edit (sounds identical) but not for an audible one", async () => {
@@ -1186,9 +1215,10 @@ describe("features/scheduling", () => {
       expect(byLang.de).toBe("user-provided");
     });
 
-    it("preserves radioPlayCount (and radioRoundCounter) on the replacement card", async () => {
-      // Path B replaces the card with a fresh row; the radio play-count must
-      // carry over so an in-place edit doesn't reset the "Only new" graduation.
+    it("preserves radioPlayCount (and radioRoundCounter) across a Path B edit", async () => {
+      // The card is patched in place (Path B only re-points its text row),
+      // so the radio play-count survives and the "Only new" graduation
+      // doesn't reset on edit.
       const t = convexTest(schema, modules);
       const { cardId, textId: oldTextId } = await seedSharedCardWithAudio(t);
       await t.run(async (ctx) => {
