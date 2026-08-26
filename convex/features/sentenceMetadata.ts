@@ -21,6 +21,7 @@ import {
 import { getLanguageByCode, resolveAudioSpeakerGender } from '../../lib/languages';
 import { isUserCreatedText } from '../../lib/translationProvenance';
 import { retrier } from '../retrier';
+import { stripJsonFences } from '../lib/llmJson';
 
 const METADATA_SYSTEM_PROMPT = `You analyze a sentence and return strict linguistic metadata as JSON.
 
@@ -154,10 +155,7 @@ function pickField<T extends string>(
  * than triggering retrier backoff on a bad-but-recurring LLM response.
  */
 function safeExtractMetadata(raw: string): Partial<Metadata> {
-  const cleaned = raw
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/, '')
-    .trim();
+  const cleaned = stripJsonFences(raw);
   let parsed: unknown;
   try {
     parsed = JSON.parse(cleaned);

@@ -19,27 +19,27 @@ import { resolveShowFurigana } from '@/lib/furigana';
  */
 
 /**
- * The course's IPA-line setting, for the `showIpa` prop on `EntryLines`.
- * Defaults OFF (matching `courseSettings.showIpa ?? false` everywhere else).
+ * The course's annotation-display settings for the `showIpa`/`showFurigana`
+ * props on `EntryLines`: IPA defaults OFF (matching
+ * `courseSettings.showIpa ?? false` everywhere else), furigana defaults ON
+ * via the shared `resolveShowFurigana` (lib/furigana). One hook — both boxes
+ * need both flags, and two separate hooks subscribed each component to the
+ * same preloaded query twice.
  *
  * Lives on the boxes, not inside `EntryLines`: the boxes only ever render in
  * chat, under AppDataProvider, while `EntryLines` is also mounted bare by the
  * store-screenshot route (app/store-frames), where `useAppData` would throw.
  */
-export function useShowIpa(): boolean {
+export function useApprovalDisplaySettings(): {
+  showIpa: boolean;
+  showFurigana: boolean;
+} {
   const { preloadedCourseSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
-  return courseSettings?.showIpa === true;
-}
-
-/**
- * The course's furigana setting, for the `showFurigana` prop on `EntryLines`.
- * Defaults ON via the shared `resolveShowFurigana` (lib/furigana). Same lives-on-the-boxes reasoning as `useShowIpa` above.
- */
-export function useShowFurigana(): boolean {
-  const { preloadedCourseSettings } = useAppData();
-  const courseSettings = usePreloadedQuery(preloadedCourseSettings);
-  return resolveShowFurigana(courseSettings);
+  return {
+    showIpa: courseSettings?.showIpa === true,
+    showFurigana: resolveShowFurigana(courseSettings),
+  };
 }
 
 /**

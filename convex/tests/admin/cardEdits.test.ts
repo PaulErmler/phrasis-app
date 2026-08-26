@@ -200,4 +200,23 @@ describe('admin/cardEdits', () => {
       expect(result.page[0].kind).toBeUndefined();
     });
   });
+
+  describe('registration gate', () => {
+    it('registers every wire-reachable function through adminQuery', async () => {
+      // The suite above deliberately bypasses the admin gate by calling the
+      // exported plain handlers (convex-test can't register the Better Auth
+      // component), so nothing here would notice if a future refactor
+      // re-wrapped a handler with plain `query` and exposed other users'
+      // card edits to any signed-in caller. This pins the registration
+      // itself: the module may only use adminQuery.
+      const { readFileSync } = await import('node:fs');
+      const source = readFileSync(
+        new URL('../../admin/cardEdits.ts', import.meta.url),
+        'utf8',
+      );
+      expect(source).not.toMatch(/=\s*(query|mutation|action|internalQuery|internalMutation|internalAction)\s*\(/);
+      const registrations = source.match(/=\s*adminQuery\s*\(/g) ?? [];
+      expect(registrations.length).toBeGreaterThanOrEqual(2);
+    });
+  });
 });

@@ -4,6 +4,7 @@ import { internal } from '../_generated/api';
 import {
   buildCardSearchableText,
   buildTextContentBatchForLanguages,
+  type CardAlternativeContent,
 } from '../lib/cardContent';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
@@ -48,6 +49,7 @@ import {
   retranslationAuditFields,
   setCardEditResult,
   type CardEditChange,
+  type RetranslationAuditFields,
 } from './cardEditAudit';
 import {
   scheduleCard,
@@ -103,6 +105,7 @@ import {
 } from '../migrations/seedWritingTrack';
 import { fetchTrackDueCards } from '../lib/dueQueue';
 import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
+import { migrateWritingAlternatives } from './writingAlternatives';
 import {
   MAX_CARD_TEXT_LENGTH,
   WRITING_ALTERNATIVES_MAX,
@@ -335,14 +338,7 @@ export const getCardForReview = query({
     // content above): the writing card diffs against the closest of primary +
     // alternatives and lists the others with their own annotations + audio.
     // Usually-empty indexed reads, at most 2 cards x target languages.
-    type AlternativePayload = {
-      text: string;
-      romanization?: string;
-      ipa?: string;
-      furigana?: string;
-      audioUrl?: string | null;
-    };
-    const alternativesByCardLang = new Map<string, AlternativePayload[]>();
+    const alternativesByCardLang = new Map<string, CardAlternativeContent[]>();
     await Promise.all(
       dueCards.flatMap((card, i) =>
         course.targetLanguages.map(async (lang) => {
@@ -1701,17 +1697,10 @@ async function enqueueFlagRetranslation(
     /** Why this retranslation was asked for. Threaded to the worker, which
      * branches on it for the "the user says this is wrong" prompt block. */
     reason: 'flag' | 'curriculum_fix';
-    /** The audit gesture this belongs to, plus the before-state a reviewer
-     * needs. The child row is written HERE because this is the only place
-     * that can tell an enqueue from a lost claim. */
-    audit: {
-      cardEditId: Id<'cardEdits'>;
-      userId: string;
-      role: CardEditLanguageRole;
-      beforeText: string;
-      beforeTranslationSource?: string;
-      flagCountAfter: number;
-    };
+    /** The prebuilt audit bundle (retranslationAuditFields) for this
+     * (gesture, language). The child row is written HERE because this is
+     * the only place that can tell an enqueue from a lost claim. */
+    audit: RetranslationAuditFields;
     userSuggestedTranslation?: string;
     /** Runs after the claim is acquired and before the job is enqueued.
      * `flagTranslation` bills its one quota unit here so a depleted user
@@ -1721,20 +1710,7 @@ async function enqueueFlagRetranslation(
   },
 ): Promise<boolean> {
   const RULE = 'retranslation_high';
-  const auditFields = {
-    ...retranslationAuditFields({
-      cardEditId: opts.audit.cardEditId,
-      userId: opts.audit.userId,
-      language: targetLanguage,
-      role: opts.audit.role,
-      text,
-      beforeText: opts.audit.beforeText,
-      beforeTranslationSource: opts.audit.beforeTranslationSource,
-      userSuggestion: opts.userSuggestedTranslation,
-      flagCountAfter: opts.audit.flagCountAfter,
-    }),
-    rule: RULE,
-  };
+  const auditFields = { ...opts.audit, rule: RULE };
 
   const claimId = await claimLlmTranslationIfAvailable(
     ctx,
@@ -1781,6 +1757,57 @@ async function enqueueFlagRetranslation(
     },
   );
   return true;
+}
+
+/**
+ * Shared tail of the two flag paths (`flagTranslation`, the curriculum-fix
+ * suggestions): build the audit bundle once, record `skipped_capped` when
+ * the post-increment count is over the auto-retranslation cap (counter rose
+ * but no work was created — logged so the QC view can tell "we declined to
+ * spend on this" from "nothing happened"), otherwise enqueue the
+ * retranslation carrying those same fields. Returns whether a job was
+ * actually enqueued (false for the cap skip and for a lost claim).
+ */
+async function retranslateOrRecordCapSkip(
+  ctx: MutationCtx,
+  text: Doc<'texts'>,
+  language: string,
+  opts: {
+    reason: 'flag' | 'curriculum_fix';
+    cardEditId: Id<'cardEdits'>;
+    userId: string;
+    role: CardEditLanguageRole;
+    beforeText: string;
+    beforeTranslationSource?: string;
+    userSuggestion?: string;
+    flagCountAfter: number;
+    onClaimed?: () => Promise<void>;
+  },
+): Promise<boolean> {
+  const audit = retranslationAuditFields({
+    cardEditId: opts.cardEditId,
+    userId: opts.userId,
+    language,
+    role: opts.role,
+    text,
+    beforeText: opts.beforeText,
+    beforeTranslationSource: opts.beforeTranslationSource,
+    userSuggestion: opts.userSuggestion,
+    flagCountAfter: opts.flagCountAfter,
+  });
+  if (opts.flagCountAfter > FLAG_AUTO_RETRANSLATION_MAX) {
+    await recordRetranslationAttempt(ctx, {
+      ...audit,
+      status: 'skipped_capped',
+    });
+    return false;
+  }
+  return enqueueFlagRetranslation(ctx, text, language, {
+    reason: opts.reason,
+    audit,
+    userSuggestedTranslation: opts.userSuggestion,
+    onClaimed: opts.onClaimed,
+  });
 }
 
 /**
@@ -1836,35 +1863,15 @@ async function suggestCurriculumFixesForEdit(
     await ctx.db.patch(existing._id, { flagCount: nextCount });
     flagged.push(lang);
 
-    const auditCommon = retranslationAuditFields({
+    await retranslateOrRecordCapSkip(ctx, originalText, lang, {
+      reason: 'curriculum_fix',
       cardEditId: audit.cardEditId,
       userId: audit.userId,
-      language: lang,
       role: languageRole(audit.course, lang),
-      text: originalText,
       beforeText: existing.translatedText,
       beforeTranslationSource: existing.translationSource,
       userSuggestion: submittedMap.get(lang),
       flagCountAfter: nextCount,
-    });
-
-    if (nextCount > FLAG_AUTO_RETRANSLATION_MAX) {
-      // Counter rose but no work was created. Logged so the QC view can tell
-      // "we declined to spend on this" from "nothing happened".
-      await recordRetranslationAttempt(ctx, {
-        ...auditCommon,
-        status: 'skipped_capped',
-      });
-      continue;
-    }
-
-    await enqueueFlagRetranslation(ctx, originalText, lang, {
-      reason: 'curriculum_fix',
-      // The superset is fine: the helper reads only the fields its opts type
-      // names and derives the rest itself. One constructed object, no
-      // hand-copied field list to drift.
-      audit: auditCommon,
-      userSuggestedTranslation: submittedMap.get(lang),
     });
   }
 
@@ -1997,62 +2004,28 @@ export const flagTranslation = mutation({
       return { retranslated: false };
     }
 
-    // 2) Filter to rows still under-cap. Over-cap rows already had their
-    // counter bumped above but skip the enqueue + quota path. All rows are
-    // guaranteed in-course because we fetched from the course's language
-    // set above.
-    const enqueueable = withCounts.filter(
-      ({ nextCount }) => nextCount <= FLAG_AUTO_RETRANSLATION_MAX,
-    );
-
-    // Over-cap rows: the counter rose but we declined to spend on another
-    // retranslation. Logged so the QC view distinguishes that from a language
-    // the flag never reached.
-    for (const { tr, nextCount } of withCounts) {
-      if (nextCount <= FLAG_AUTO_RETRANSLATION_MAX) continue;
-      await recordRetranslationAttempt(ctx, {
-        ...retranslationAuditFields({
-          cardEditId,
-          userId,
-          language: tr.targetLanguage,
-          role: languageRole(course, tr.targetLanguage),
-          text,
-          beforeText: tr.translatedText,
-          beforeTranslationSource: tr.translationSource,
-          flagCountAfter: nextCount,
-        }),
-        status: 'skipped_capped',
-      });
-    }
-
-    if (enqueueable.length === 0) {
-      // Everything was over-cap. Counters incremented, no quota charge,
-      // no retranslations.
-      return { retranslated: false };
-    }
-
-    // 3) Per-language: claim slot, enqueue the retranslation, charge quota on
-    // the first success only. Claim-contested rows skip silently (something
-    // else is already retranslating them). The rule is always
-    // `retranslation_high` here; user-created texts short-circuited above.
+    // 2) Per-language: over-cap rows record their skip (counter already rose
+    // above); under-cap rows claim a slot and enqueue, charging quota on the
+    // first success only. Claim-contested rows skip silently (something else
+    // is already retranslating them). The rule is always `retranslation_high`
+    // here; user-created texts short-circuited above. All rows are guaranteed
+    // in-course because we fetched from the course's language set.
     let anyEnqueued = false;
     let quotaCharged = false;
 
-    for (const { tr, nextCount } of enqueueable) {
-      const enqueued = await enqueueFlagRetranslation(
+    for (const { tr, nextCount } of withCounts) {
+      const enqueued = await retranslateOrRecordCapSkip(
         ctx,
         text,
         tr.targetLanguage,
         {
           reason: 'flag',
-          audit: {
-            cardEditId,
-            userId,
-            role: languageRole(course, tr.targetLanguage),
-            beforeText: tr.translatedText,
-            beforeTranslationSource: tr.translationSource,
-            flagCountAfter: nextCount,
-          },
+          cardEditId,
+          userId,
+          role: languageRole(course, tr.targetLanguage),
+          beforeText: tr.translatedText,
+          beforeTranslationSource: tr.translationSource,
+          flagCountAfter: nextCount,
           // Charge once total, on the first successful claim. If the user is
           // depleted this throws USAGE_LIMIT from inside the helper, before
           // that language's job is enqueued, and the whole mutation rolls
@@ -2065,6 +2038,17 @@ export const flagTranslation = mutation({
         },
       );
       if (enqueued) anyEnqueued = true;
+    }
+
+    if (
+      withCounts.every(
+        ({ nextCount }) => nextCount > FLAG_AUTO_RETRANSLATION_MAX,
+      )
+    ) {
+      // Everything was over-cap. Counters incremented and skips recorded,
+      // no quota charge, no retranslations, no analytics event (unchanged
+      // from before the loop merge).
+      return { retranslated: false };
     }
 
     // Flag volume per language is the clearest quality signal the app has for
@@ -2644,6 +2628,10 @@ export async function applyCardEdit(
         searchableTextLanguages,
       });
 
+      // The replacement is the same logical card, so its accepted
+      // alternatives move with it; `deleteCard` below drains whatever is
+      // still attached to the old id (that drain is for REAL deletions).
+      await migrateWritingAlternatives(ctx, args.cardId, resolvedCardId);
       await deleteCard(ctx, args.cardId);
     }
     // Defensive cleanup: if the edit left the old text orphaned and user-created

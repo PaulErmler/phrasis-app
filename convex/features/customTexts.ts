@@ -32,6 +32,7 @@ import {
 } from '../lib/posthogAi';
 import { resolveAudioSpeakerGender } from '../../lib/languages';
 import { validateSentenceMetadata } from './sentenceMetadata';
+import { stripJsonFences } from '../lib/llmJson';
 
 export const consumeAutoFillQuota = internalMutation({
   args: { userId: v.string() },
@@ -322,10 +323,7 @@ export const autoFillTranslations = action({
       },
     });
 
-    const cleaned = text
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/, '')
-      .trim();
+    const cleaned = stripJsonFences(text);
 
     let parsed: { translations?: Record<string, string>; metadata?: Record<string, unknown> };
     try {

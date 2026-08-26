@@ -22,7 +22,12 @@ import type { EspeakNgWorkerInstance } from '@echogarden/espeak-ng-emscripten';
 import { internalAction } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { getIpaVoice, IPA_LANGUAGES } from '../../lib/languages';
-import { getIpaSource } from '../lib/textAnnotations';
+import {
+  getIpaSource,
+  runApprovalAnnotation,
+  runSourceAnnotation,
+  runTranslationAnnotation,
+} from '../lib/textAnnotations';
 import type { BackfillPage } from '../admin/backfillIpa';
 
 /**
@@ -82,10 +87,11 @@ export async function ipaForText(
   return ipa;
 }
 
-/**
- * IPA for a source text (texts table). Mirror of
- * processRomanizationForSourceText in decks.ts.
- */
+// The three process actions share the generic try/generate/sentinel/store
+// bodies in convex/lib/textAnnotations.ts (runSourceAnnotation and friends);
+// this file only declares the Node runtime and supplies the espeak engine.
+
+/** IPA for a source text (texts table). */
 export const processIpaForSourceText = internalAction({
   args: {
     textId: v.id('texts'),
@@ -93,33 +99,11 @@ export const processIpaForSourceText = internalAction({
     language: v.string(),
   },
   returns: v.null(),
-  handler: async (ctx, args) => {
-    let ipa: string;
-    try {
-      ipa = await ipaForText(args.text, args.language);
-    } catch (err) {
-      // Persist the empty-string sentinel so scheduleMissingContent doesn't
-      // re-enqueue the same failing input on every ensureContent call.
-      console.error('Source IPA error (persisting sentinel):', err);
-      ipa = '';
-    }
-    // Source recorded even on failure: lets an engine swap target failed
-    // rows by the source that produced the sentinel.
-    await ctx.runMutation(internal.features.decks.storeSourceAnnotation, {
-      textId: args.textId,
-      kind: 'ipa',
-      value: ipa,
-      source: getIpaSource(args.language),
-      forText: args.text,
-    });
-    return null;
-  },
+  handler: (ctx, args) =>
+    runSourceAnnotation(ctx, 'ipa', args, ipaForText, getIpaSource(args.language)),
 });
 
-/**
- * IPA for a translation row. Mirror of processRomanizationForTranslation
- * in decks.ts.
- */
+/** IPA for a translation row. */
 export const processIpaForTranslation = internalAction({
   args: {
     textId: v.id('texts'),
@@ -127,33 +111,11 @@ export const processIpaForTranslation = internalAction({
     language: v.string(),
   },
   returns: v.null(),
-  handler: async (ctx, args) => {
-    let ipa: string;
-    try {
-      ipa = await ipaForText(args.text, args.language);
-    } catch (err) {
-      console.error('Translation IPA error (persisting sentinel):', err);
-      ipa = '';
-    }
-    await ctx.runMutation(internal.features.decks.storeTranslationAnnotation, {
-      textId: args.textId,
-      language: args.language,
-      kind: 'ipa',
-      value: ipa,
-      source: getIpaSource(args.language),
-      forText: args.text,
-    });
-    return null;
-  },
+  handler: (ctx, args) =>
+    runTranslationAnnotation(ctx, 'ipa', args, ipaForText, getIpaSource(args.language)),
 });
 
-/**
- * IPA for a chat card proposal's entries. Proposals live only on the
- * `cardApprovals` row (no texts/translations rows exist until approval), so
- * they get their own store path. One action per proposal, all entries in one
- * pass. Results carry the text they were computed for; the store mutation
- * drops any whose entry has since been edited (see storeApprovalEntryIpa).
- */
+/** IPA for a chat card proposal's entries (see runApprovalAnnotation). */
 export const processIpaForApproval = internalAction({
   args: {
     approvalId: v.id('cardApprovals'),
@@ -162,30 +124,7 @@ export const processIpaForApproval = internalAction({
     ),
   },
   returns: v.null(),
-  handler: async (ctx, args) => {
-    const results: Array<{ language: string; forText: string; ipa: string }> =
-      [];
-    for (const entry of args.entries) {
-      let ipa: string;
-      try {
-        ipa = await ipaForText(entry.text, entry.language);
-      } catch (err) {
-        console.error(
-          `Approval IPA error for ${entry.language} (persisting sentinel):`,
-          err,
-        );
-        ipa = '';
-      }
-      results.push({ language: entry.language, forText: entry.text, ipa });
-    }
-    if (results.length > 0) {
-      await ctx.runMutation(
-        internal.features.chat.cardApprovals.storeApprovalEntryIpa,
-        { approvalId: args.approvalId, results },
-      );
-    }
-    return null;
-  },
+  handler: (ctx, args) => runApprovalAnnotation(ctx, 'ipa', args, ipaForText),
 });
 
 const BACKFILL_BATCH_SIZE = 100;

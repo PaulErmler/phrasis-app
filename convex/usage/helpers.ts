@@ -589,3 +589,23 @@ export function describePlanChange(
   return 'Plan status changed';
 }
 
+
+/**
+ * ConvexError code from an error thrown across a `ctx.runMutation` boundary —
+ * the read side of this module's `error.data.code` contract (USAGE_LIMIT /
+ * QUOTA_NOT_SYNCED / PAYMENT_PAST_DUE). Depending on runtime (prod vs
+ * convex-test) the error may arrive as a ConvexError, a plain object with
+ * `.data`, or a re-thrown Error whose message embeds the serialized data, so
+ * all three shapes are read. Server-side sibling of the client's
+ * `convexErrorCode` in lib/utils.ts.
+ */
+export function quotaErrorCode(error: unknown): string | undefined {
+  if (typeof error === 'object' && error !== null && 'data' in error) {
+    const data = (error as { data?: unknown }).data;
+    if (typeof data === 'object' && data !== null) {
+      return (data as { code?: string }).code;
+    }
+  }
+  const message = error instanceof Error ? error.message : '';
+  return /"code":\s*"([A-Z_]+)"/.exec(message)?.[1];
+}

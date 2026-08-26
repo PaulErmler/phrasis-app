@@ -1,4 +1,4 @@
-import { getLanguageByCode } from '../../../lib/languages';
+import { languageName } from '../../../lib/languages';
 
 /**
  * Dynamic prompt sections injected (uncached) after the agent's static
@@ -6,9 +6,10 @@ import { getLanguageByCode } from '../../../lib/languages';
  * unit-tested without a Convex runtime.
  */
 
-export function languageName(code: string): string {
-  return getLanguageByCode(code)?.name ?? code;
-}
+// The name lookup itself lives in lib/languages (shared with the admin
+// views and the writing grader); re-exported so existing prompt-side
+// importers keep this import site.
+export { languageName } from '../../../lib/languages';
 
 /** "Romanian", "Romanian and Spanish", "Romanian, Spanish and French". */
 export function joinLanguageNames(codes: string[]): string {

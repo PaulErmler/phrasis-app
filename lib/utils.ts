@@ -48,3 +48,8 @@ export const convexErrorCode = (error: unknown): string | undefined =>
  */
 export const isPaymentPastDueError = (error: unknown): boolean =>
   convexErrorCode(error) === 'PAYMENT_PAST_DUE';
+
+/** Escape a literal string for embedding in a RegExp source. */
+export function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}

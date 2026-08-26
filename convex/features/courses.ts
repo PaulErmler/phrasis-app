@@ -41,7 +41,12 @@ import {
 import { resolveClientToday } from '../lib/dateUtils';
 import { getDailyStats } from '../db/stats/dailyStats';
 import { getTargetLanguageWordCounts } from '../db/stats/languageStats';
-import { consumeQuota, hasFeatureAccess, releaseQuota } from '../usage/helpers';
+import {
+  consumeQuota,
+  hasFeatureAccess,
+  quotaErrorCode,
+  releaseQuota,
+} from '../usage/helpers';
 import { EVENTS, track } from '../analytics';
 import { MAX_COURSES_PER_USER, ARCHIVE_COOLDOWN_MS } from '../../lib/constants/courses';
 import { FEATURE_IDS } from './featureIds';
@@ -591,15 +596,9 @@ export const unarchiveCourse = mutation({
     try {
       await consumeQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
     } catch (error) {
-      if (
-        error instanceof ConvexError &&
-        typeof error.data === 'object' &&
-        error.data !== null
-      ) {
-        const code = (error.data as { code?: string }).code;
-        if (code === 'USAGE_LIMIT' || code === 'QUOTA_NOT_SYNCED') {
-          return { status: 'usage_limit' } as const;
-        }
+      const code = quotaErrorCode(error);
+      if (code === 'USAGE_LIMIT' || code === 'QUOTA_NOT_SYNCED') {
+        return { status: 'usage_limit' } as const;
       }
       throw error;
     }

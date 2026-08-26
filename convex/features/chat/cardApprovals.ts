@@ -31,6 +31,7 @@ import {
 import {
   ANNOTATION_KINDS,
   TEXT_ANNOTATIONS,
+  vAnnotationKind,
 } from '../../lib/textAnnotations';
 import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
 import { OPENROUTER_CHAT_REASONING, OPENROUTER_MODELS } from '../../config/aiModels';
@@ -213,48 +214,30 @@ async function storeApprovalEntryValues(
   return null;
 }
 
-/** Store IPA results on an approval row (see storeApprovalEntryValues). */
-export const storeApprovalEntryIpa = internalMutation({
+/**
+ * Store one kind's annotation results on an approval row (see
+ * storeApprovalEntryValues). Kind-generic: the registry maps the kind to its
+ * `entryIpa`/`entryFurigana` record field, so a new precomputed kind is one
+ * registry entry, not another re-key mutation.
+ */
+export const storeApprovalEntryAnnotations = internalMutation({
   args: {
     approvalId: v.id('cardApprovals'),
+    kind: vAnnotationKind,
     results: v.array(
       v.object({
         language: v.string(),
         forText: v.string(),
-        ipa: v.string(),
+        value: v.string(),
       }),
     ),
   },
   returns: v.null(),
-  handler: async (ctx, args) =>
-    storeApprovalEntryValues(
-      ctx,
-      args.approvalId,
-      'entryIpa',
-      args.results.map((r) => ({ ...r, value: r.ipa })),
-    ),
-});
-
-/** Store furigana results on an approval row (see storeApprovalEntryValues). */
-export const storeApprovalEntryFurigana = internalMutation({
-  args: {
-    approvalId: v.id('cardApprovals'),
-    results: v.array(
-      v.object({
-        language: v.string(),
-        forText: v.string(),
-        furigana: v.string(),
-      }),
-    ),
+  handler: async (ctx, args) => {
+    const field = TEXT_ANNOTATIONS[args.kind].approvalEntryField;
+    if (!field) return null; // kind not precomputed on approvals
+    return storeApprovalEntryValues(ctx, args.approvalId, field, args.results);
   },
-  returns: v.null(),
-  handler: async (ctx, args) =>
-    storeApprovalEntryValues(
-      ctx,
-      args.approvalId,
-      'entryFurigana',
-      args.results.map((r) => ({ ...r, value: r.furigana })),
-    ),
 });
 
 export const createApprovalRequestInternal = internalMutation({

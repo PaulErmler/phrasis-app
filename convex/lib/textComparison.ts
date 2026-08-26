@@ -8,19 +8,11 @@ import {
   shouldRomanizeForTtsMatch,
 } from './localRomanization';
 
-/**
- * Strip punctuation, collapse whitespace, lowercase, so that minor
- * transcription differences (e.g. period vs no period) don't cause
- * a false mismatch.
- */
-export function normalizeForComparison(text: string): string {
-  return text
-    .normalize('NFC')
-    .toLowerCase()
-    .replace(/[\p{P}\p{S}]/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+// Moved to lib/textCompare/normalize.ts so the client's local writing gate
+// (lib/textCompare/bestMatch.ts) shares the exact same normalization;
+// re-exported here so server callers keep their import site.
+import { normalizeForComparison } from '../../lib/textCompare/normalize';
+export { normalizeForComparison };
 
 /**
  * Punctuation that is SILENT when a sentence is spoken aloud: sentence
@@ -121,19 +113,26 @@ export function textsMatch(original: string, transcribed: string): boolean {
  * before comparing. A hanzi homophone swap, e.g. 在 vs 再, 他 vs 她. Maps
  * to the same pinyin and matches at edit distance 0.
  *
- * For all other languages, falls back to character-level `textsMatch`.
+ * For all other languages, falls back to comparing the raw strings.
+ *
+ * `compare` decides what "match" means at the leaves: the default is the
+ * TTS-validation `textsMatch` (≤1 edit tolerant); the writing grader's gate
+ * passes exact-normalized equality instead (writingAnswersMatch). The
+ * romanize-both-sides flow lives ONLY here so the zh/ko homophone rule can't
+ * drift between the two callers.
  */
 export function textsMatchForLanguage(
   original: string,
   transcribed: string,
   language: string,
+  compare: (a: string, b: string) => boolean = textsMatch,
 ): boolean {
   if (shouldRomanizeForTtsMatch(language)) {
     const a = romanizeLocal(original, language);
     const b = romanizeLocal(transcribed, language);
     if (a !== null && b !== null) {
-      return textsMatch(a, b);
+      return compare(a, b);
     }
   }
-  return textsMatch(original, transcribed);
+  return compare(original, transcribed);
 }

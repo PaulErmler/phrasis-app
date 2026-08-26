@@ -105,6 +105,7 @@ import type * as lib_dueQueue from "../lib/dueQueue.js";
 import type * as lib_emailEnv from "../lib/emailEnv.js";
 import type * as lib_freePlay from "../lib/freePlay.js";
 import type * as lib_fsrsStates from "../lib/fsrsStates.js";
+import type * as lib_llmJson from "../lib/llmJson.js";
 import type * as lib_localRomanization from "../lib/localRomanization.js";
 import type * as lib_posthogAi from "../lib/posthogAi.js";
 import type * as lib_rateLimitReserve from "../lib/rateLimitReserve.js";
@@ -250,6 +251,7 @@ declare const fullApi: ApiFromModules<{
   "lib/emailEnv": typeof lib_emailEnv;
   "lib/freePlay": typeof lib_freePlay;
   "lib/fsrsStates": typeof lib_fsrsStates;
+  "lib/llmJson": typeof lib_llmJson;
   "lib/localRomanization": typeof lib_localRomanization;
   "lib/posthogAi": typeof lib_posthogAi;
   "lib/rateLimitReserve": typeof lib_rateLimitReserve;

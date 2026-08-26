@@ -3,6 +3,8 @@ import path from "node:path";
 
 import { extractJsonResult } from "./cli-json-output";
 import { unregisterRun } from "./run-lock";
+import { assertDevDeployment } from "./deployment-guard";
+import type { PurgeResult } from "../convex/features/e2eCleanup";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 
@@ -11,16 +13,10 @@ const PURGE_BATCH = 8;
 /** Backstop so a wedged purge cannot hang the teardown indefinitely. */
 const MAX_PASSES = 40;
 
-type PurgeResult = {
-  purged: string[];
-  failed: { email: string; error: string }[];
-  remaining: number;
-  auditRowsDeleted: number;
-  scanTruncated: boolean;
-};
-
 /** Run a Convex function on the dev deployment and parse its JSON result. */
 function convexRun(fn: string, args: Record<string, unknown>): unknown {
+  // The purge deletes accounts; never issue it toward anything but dev.
+  assertDevDeployment("global-teardown");
   const out = execFileSync(
     "pnpm",
     ["exec", "convex", "run", fn, JSON.stringify(args)],
@@ -106,6 +102,7 @@ function purgeFixtureUsers(): void {
  * Best-effort. A failure here must not turn a green suite red.
  */
 export default function globalTeardown() {
+  assertDevDeployment("global-teardown");
   if (!unregisterRun()) {
     console.log(
       "Leaving E2E_TEST_HOOKS set — another Playwright run is still active.",
@@ -120,7 +117,7 @@ export default function globalTeardown() {
       "pnpm",
       ["exec", "convex", "env", "remove", "E2E_TEST_HOOKS"],
       {
-        cwd: path.resolve(__dirname, ".."),
+        cwd: REPO_ROOT,
         stdio: "inherit",
       },
     );

@@ -24,7 +24,13 @@ import { autumnFetchRaw } from '../usage/autumnClient';
  *
  * The purge itself is the real operator path (`admin/deleteUser:run` with
  * `overrideNoRequest`, recorded on the audit row), not a shortcut: fixture
- * users are exercised by the same code that deletes a real account.
+ * users are exercised by the same code that deletes a real account. That
+ * `ctx.runAction` into a same-runtime action is a deliberate exception to
+ * the guidelines' extract-a-helper rule: calling the registered entry point
+ * is the point (the teardown proves the operator path end to end), and the
+ * per-account try/catch keeps each account its own failure boundary. The
+ * extra invocation per fixture account only ever runs on gated test
+ * deployments.
  *
  * Every function throws unless the deployment has `E2E_TEST_HOOKS=1`. Enable
  * it ONLY on dev/test deployments, never in production — this deletes
@@ -48,7 +54,7 @@ type ListResult = {
   scanTruncated: boolean;
 };
 
-type PurgeResult = {
+export type PurgeResult = {
   purged: string[];
   failed: { email: string; error: string }[];
   remaining: number;

@@ -375,63 +375,56 @@ function unsetStaleLocalRomanization(
 }
 
 /**
- * Clear Telugu romanization sentinels (and any google-v3 output) so the lazy
- * pipeline re-runs with the local ISO 15919 mapper. Google v3 400s on `te`,
- * so failed rows carry `romanizedText: ''` and would otherwise never retry.
+ * The texts + translations reset pair for one language's local-romanization
+ * swap, plus its patch function (exported for the per-language migration
+ * tests). `migrations.define` results still need named top-level exports so
+ * `internal.migrations.*` resolves, but the bodies live once here — the
+ * Telugu and Bulgarian pairs were boilerplate twins.
  */
-export function resetStaleTeluguRomanizationPatch(doc: {
-  language: string;
-  romanizedText?: string;
-  romanizationSource?: string;
-}):
-  | { romanizedText: undefined; romanizationSource: undefined }
-  | undefined {
-  return unsetStaleLocalRomanization(doc, 'te', ROMANIZATION_SOURCES.sanscriptIso15919);
+function staleRomanizationResets(language: string, currentSource: string) {
+  const patch = (doc: {
+    language: string;
+    romanizedText?: string;
+    romanizationSource?: string;
+  }) => unsetStaleLocalRomanization(doc, language, currentSource);
+  return {
+    patch,
+    texts: migrations.define({
+      table: 'texts',
+      migrateOne: (_ctx, doc) => patch(doc),
+    }),
+    translations: migrations.define({
+      table: 'translations',
+      migrateOne: (_ctx, doc) =>
+        patch({
+          language: doc.targetLanguage,
+          romanizedText: doc.romanizedText,
+          romanizationSource: doc.romanizationSource,
+        }),
+    }),
+  };
 }
 
-export const resetStaleTeluguTextRomanization = migrations.define({
-  table: 'texts',
-  migrateOne: (_ctx, doc) => resetStaleTeluguRomanizationPatch(doc),
-});
+// Telugu: Google v3 400s on `te`, so failed rows carry `romanizedText: ''`
+// and would otherwise never retry with the local ISO 15919 mapper.
+const teluguResets = staleRomanizationResets(
+  'te',
+  ROMANIZATION_SOURCES.sanscriptIso15919,
+);
+export const resetStaleTeluguRomanizationPatch = teluguResets.patch;
+export const resetStaleTeluguTextRomanization = teluguResets.texts;
+export const resetStaleTeluguTranslationRomanization = teluguResets.translations;
 
-export const resetStaleTeluguTranslationRomanization = migrations.define({
-  table: 'translations',
-  migrateOne: (_ctx, doc) =>
-    resetStaleTeluguRomanizationPatch({
-      language: doc.targetLanguage,
-      romanizedText: doc.romanizedText,
-      romanizationSource: doc.romanizationSource,
-    }),
-});
-
-export function resetStaleBulgarianRomanizationPatch(doc: {
-  language: string;
-  romanizedText?: string;
-  romanizationSource?: string;
-}):
-  | { romanizedText: undefined; romanizationSource: undefined }
-  | undefined {
-  return unsetStaleLocalRomanization(
-    doc,
-    'bg',
-    ROMANIZATION_SOURCES.bulgarianStreamlined,
-  );
-}
-
-export const resetStaleBulgarianTextRomanization = migrations.define({
-  table: 'texts',
-  migrateOne: (_ctx, doc) => resetStaleBulgarianRomanizationPatch(doc),
-});
-
-export const resetStaleBulgarianTranslationRomanization = migrations.define({
-  table: 'translations',
-  migrateOne: (_ctx, doc) =>
-    resetStaleBulgarianRomanizationPatch({
-      language: doc.targetLanguage,
-      romanizedText: doc.romanizedText,
-      romanizationSource: doc.romanizationSource,
-    }),
-});
+// Bulgarian: `bg` was catalogued as google-v3 but never on Google's list;
+// the local Streamlined System replaces it.
+const bulgarianResets = staleRomanizationResets(
+  'bg',
+  ROMANIZATION_SOURCES.bulgarianStreamlined,
+);
+export const resetStaleBulgarianRomanizationPatch = bulgarianResets.patch;
+export const resetStaleBulgarianTextRomanization = bulgarianResets.texts;
+export const resetStaleBulgarianTranslationRomanization =
+  bulgarianResets.translations;
 
 export const recomputeTextRomanization = migrations.define({
   table: 'texts',

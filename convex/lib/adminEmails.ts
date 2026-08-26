@@ -7,7 +7,7 @@ import {
 import { withEmailEnvSubject } from './emailEnv';
 import { resend } from './resendClient';
 import { rateLimiter } from '../rateLimiter';
-import { getLanguageByCode } from '../../lib/languages';
+import { languageName } from '../../lib/languages';
 import type { Doc } from '../_generated/dataModel';
 
 /**
@@ -94,7 +94,7 @@ export interface SignupNotificationInput {
 }
 
 const languageNames = (codes: string[]): string =>
-  codes.map((c) => getLanguageByCode(c)?.name ?? c).join(' + ');
+  codes.map(languageName).join(' + ');
 
 const formatMinutes = (ms: number): string =>
   ms < 60_000 ? '<1 min' : `${Math.round(ms / 60_000)} min`;

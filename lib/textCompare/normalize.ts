@@ -37,3 +37,24 @@ export function normalize(input: string, opts: NormalizeOptions = {}): string {
   }
   return s;
 }
+
+/**
+ * Strip punctuation AND symbols, collapse whitespace, lowercase — the
+ * server's equality normalizer for "is this the same answer/transcript?"
+ * (TTS validation, the writing grader's free local gate). Stricter than
+ * `normalize` above (which is tuned for accuracy scoring): `\p{S}` is
+ * stripped too, and case always folds.
+ *
+ * Lives here (pure, dependency-free) because both runtimes need the SAME
+ * function: convex/lib/textComparison.ts re-exports it for the server, and
+ * the client's local writing gate (bestMatch.ts) mirrors the server gate
+ * with it. One implementation so the two gates can't drift.
+ */
+export function normalizeForComparison(text: string): string {
+  return text
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/[\p{P}\p{S}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}

@@ -149,7 +149,7 @@ describe('DiffDisplay: afterText', () => {
         expected="やあ、みんな。"
         actual="やあ"
         language="ja"
-        afterText={<p>Yā, min'na.</p>}
+        afterText={<p>{"Yā, min'na."}</p>}
       />,
     );
     const text = container.textContent ?? '';

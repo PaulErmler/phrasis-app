@@ -108,6 +108,30 @@ export async function storeWritingAlternative(
   return alternativeId;
 }
 
+/**
+ * Re-point a card's accepted alternatives at its replacement document.
+ * Path B of `applyCardEdit` replaces the card (insert + delete) rather than
+ * patching it, and `deleteCard` drains alternatives as part of real
+ * deletion — without this step, editing a curriculum card (including the
+ * coach card's "Make default", whose docstring promises the answer "stays a
+ * stored accepted alternative either way") silently destroyed them. Must
+ * run BEFORE `deleteCard(oldCardId)`. Bounded: cap per language × the
+ * card's languages.
+ */
+export async function migrateWritingAlternatives(
+  ctx: MutationCtx,
+  oldCardId: Id<'cards'>,
+  newCardId: Id<'cards'>,
+): Promise<void> {
+  const rows = await ctx.db
+    .query('writingAlternatives')
+    .withIndex('by_cardId_and_language', (q) => q.eq('cardId', oldCardId))
+    .take(100);
+  for (const row of rows) {
+    await ctx.db.patch(row._id, { cardId: newCardId });
+  }
+}
+
 const alternativeContextValidator = v.union(
   v.null(),
   v.object({

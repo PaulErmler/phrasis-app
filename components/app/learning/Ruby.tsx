@@ -4,8 +4,13 @@
  * and validation live in lib/furigana.ts, and callers pass segments that
  * already survived `parseFurigana`'s reconstruct-the-sentence check.
  *
- * `<rt>` carries no font-size here; the shared `.furigana-ruby` class in
- * globals.css sizes and colors readings so every surface matches.
+ * The reading is carried as a `data-reading` attribute and painted by the
+ * shared `.has-furigana rt::before { content: attr(data-reading) }` rule in
+ * globals.css (which also sizes and colors it so every surface matches).
+ * CSS-generated content never enters the document text, so selecting and
+ * copying the sentence yields the base text alone — an `<rt>` text node
+ * would ride along into the clipboard (毎朝まいあさ…) in every browser,
+ * and `user-select: none` is only a hint some engines ignore when copying.
  */
 import { Fragment } from 'react';
 import { type FuriganaSegment } from '@/lib/furigana';
@@ -24,7 +29,7 @@ export function Ruby({ segments }: { segments: FuriganaSegment[] }) {
         ) : (
           <ruby key={i}>
             {seg.text}
-            <rt>{seg.reading}</rt>
+            <rt data-reading={seg.reading} />
           </ruby>
         ),
       )}
@@ -65,13 +70,20 @@ export function HighlightedRuby({
   // Invalid locale: highlight-less ruby beats no ruby.
   if (mask === null) return <Ruby segments={segments} />;
 
-  let offset = 0;
+  // Offsets computed up front (not by mutating a counter inside the render
+  // map — the react-compiler lint rejects reassignment from a render closure).
+  const placed: Array<{ seg: FuriganaSegment; segMask: boolean[] }> = [];
+  for (let offset = 0, i = 0; i < segments.length; i++) {
+    const length = [...segments[i].text].length;
+    placed.push({
+      seg: segments[i],
+      segMask: mask.slice(offset, offset + length),
+    });
+    offset += length;
+  }
   return (
     <>
-      {segments.map((seg, i) => {
-        const length = [...seg.text].length;
-        const segMask = mask.slice(offset, offset + length);
-        offset += length;
+      {placed.map(({ seg, segMask }, i) => {
         if (seg.reading === undefined) {
           return (
             <Fragment key={i}>

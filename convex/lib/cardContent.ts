@@ -19,11 +19,28 @@ import {
 
 type ContentCtx = QueryCtx | MutationCtx;
 
+/** One accepted writing alternative as served on a card payload. */
+export interface CardAlternativeContent {
+  text: string;
+  romanization?: string;
+  ipa?: string;
+  furigana?: string;
+  audioUrl?: string | null;
+}
+
 export interface CardTranslationContent {
   language: string;
   text: string;
   isBaseLanguage: boolean;
   isTargetLanguage: boolean;
+  /**
+   * The user's stored AI-feedback accepted alternatives for this card +
+   * language. Populated only by getCardForReview (alternatives are
+   * card-scoped, so the shared content builders here never fill it); typed
+   * on the shared interface so the payload's spread is checked rather than
+   * silently widened. Mirrors `translationValidator.alternatives`.
+   */
+  alternatives?: CardAlternativeContent[];
   romanization?: string;
   /** IPA transcription (espeak-ng), same display semantics as romanization. */
   ipa?: string;

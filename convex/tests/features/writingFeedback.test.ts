@@ -128,6 +128,16 @@ describe('features/writingFeedback', () => {
         writingAnswersMatch('Quisiera un café.', 'Quisiera un cafe.', 'es'),
       ).toBe(false);
     });
+
+    it('matches zh homophone-character swaps via romanized equality', () => {
+      // 在 and 再 both romanize to zài — the whole reason the function is
+      // more than plain normalized equality.
+      expect(writingAnswersMatch('我在家。', '我再家。', 'zh')).toBe(true);
+    });
+
+    it('still rejects real zh differences after romanization', () => {
+      expect(writingAnswersMatch('我在家。', '我在学校。', 'zh')).toBe(false);
+    });
   });
 
   describe('parseFeedbackResponse', () => {
@@ -304,8 +314,24 @@ describe('features/writingFeedback', () => {
         { cardId, language: 'es', userAnswer: 'Dame un café' },
       );
       expect(result.verdict).toBe('error');
-      // Quota was consumed; the model ran, it just replied garbage.
+      // Deliberate policy (review 2026-08): the unit stays spent here — the
+      // model ran on the answer, it just replied garbage. Only TRANSPORT
+      // failures refund (next test).
       expect(await aiFeedbackBalance(t)).toBe(9);
+    });
+
+    it('refunds the quota unit when the LLM call itself fails', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCard(t);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      mockedGenerateText.mockRejectedValueOnce(new Error('upstream 500'));
+      const result = await asUser.action(
+        api.features.writingFeedback.gradeWritingAnswer,
+        { cardId, language: 'es', userAnswer: 'Dame un café' },
+      );
+      expect(result.verdict).toBe('error');
+      // Consume-then-refund: the user got nothing, the balance is whole again.
+      expect(await aiFeedbackBalance(t)).toBe(10);
     });
 
     it('self-heals an account whose quota doc predates the feature', async () => {
@@ -379,6 +405,94 @@ describe('features/writingFeedback', () => {
       ).rejects.toThrow(/USAGE_LIMIT/);
       expect(mockedGenerateText).not.toHaveBeenCalled();
     });
+
+    it('grades against the base-language row when the graded language IS the base', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCard(t);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      // Expected comes from the texts row, not a translations row: an exact
+      // copy resolves in the free local gate rather than 404ing.
+      const result = await asUser.action(
+        api.features.writingFeedback.gradeWritingAnswer,
+        { cardId, language: 'en', userAnswer: 'I would like a coffee, please.' },
+      );
+      expect(result).toEqual({ verdict: 'correct', matched: 'primary' });
+      expect(mockedGenerateText).not.toHaveBeenCalled();
+    });
+
+    it('reports NOT_FOUND for a language the card has no translation for', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCard(t);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      await expect(
+        asUser.action(api.features.writingFeedback.gradeWritingAnswer, {
+          cardId,
+          language: 'fr',
+          userAnswer: 'Je voudrais un café.',
+        }),
+      ).rejects.toThrow(/not found/i);
+    });
+
+    it('does not self-heal when the account has no quota doc at all', async () => {
+      // No usageQuotas row = QUOTA_NOT_SYNCED territory, not the
+      // missing-feature-entry state the backfill exists for: the original
+      // error surfaces and Autumn is never called.
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      try {
+        const t = convexTest(schema, modules);
+        const { cardId } = await seedCard(t);
+        await t.run(async (ctx) => {
+          const doc = await ctx.db
+            .query('usageQuotas')
+            .withIndex('by_userId', (q) => q.eq('userId', 'user_A'))
+            .unique();
+          await ctx.db.delete(doc!._id);
+        });
+        const asUser = t.withIdentity({ subject: 'user_A' });
+        await expect(
+          asUser.action(api.features.writingFeedback.gradeWritingAnswer, {
+            cardId,
+            language: 'es',
+            userAnswer: 'Dame un café',
+          }),
+        ).rejects.toThrow();
+        expect(fetchMock).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('mirrors the healed grant only once under a concurrent double-heal', async () => {
+      const t = convexTest(schema, modules);
+      await seedCard(t, { withoutAiFeedbackEntry: true });
+      await t.mutation(
+        internal.features.writingFeedback.mirrorAiFeedbackGrant,
+        { userId: 'user_A', included: 200 },
+      );
+      await t.mutation(
+        internal.features.writingFeedback.mirrorAiFeedbackGrant,
+        { userId: 'user_A', included: 200 },
+      );
+      expect(await aiFeedbackBalance(t)).toBe(200);
+    });
+  });
+
+  describe('quotaErrorCode (usage/helpers)', () => {
+    it('reads all three shapes the runMutation boundary produces', async () => {
+      const { quotaErrorCode } = await import('../../usage/helpers');
+      const { ConvexError } = await import('convex/values');
+      expect(quotaErrorCode(new ConvexError({ code: 'USAGE_LIMIT' }))).toBe(
+        'USAGE_LIMIT',
+      );
+      expect(quotaErrorCode({ data: { code: 'QUOTA_NOT_SYNCED' } })).toBe(
+        'QUOTA_NOT_SYNCED',
+      );
+      expect(
+        quotaErrorCode(new Error('Uncaught ConvexError: {"code":"USAGE_LIMIT"}')),
+      ).toBe('USAGE_LIMIT');
+      expect(quotaErrorCode(new Error('something else'))).toBeUndefined();
+    });
   });
 
   describe('storeAlternative', () => {
@@ -414,6 +528,55 @@ describe('features/writingFeedback', () => {
       // Oldest evicted first: the earliest surviving row is no longer the
       // first stored alternative.
       expect(rows.some((r) => r.text === 'Me gustaría un café.')).toBe(false);
+    });
+
+    it('keeps accepted alternatives through a card-replacing edit (Path B fork)', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCard(t);
+      // The edit path bills card_edits; give the account balance for one.
+      await t.run(async (ctx) => {
+        const doc = await ctx.db
+          .query('usageQuotas')
+          .withIndex('by_userId', (q) => q.eq('userId', 'user_A'))
+          .unique();
+        await ctx.db.patch(doc!._id, {
+          features: {
+            ...doc!.features,
+            card_edits: { balance: 5, included: 5, used: 0, unlimited: false },
+          },
+        });
+      });
+      await t.mutation(internal.features.writingFeedback.storeAlternative, {
+        userId: 'user_A',
+        cardId,
+        language: 'es',
+        text: 'Me gustaría un café, por favor.',
+        primary: 'Quisiera un café, por favor.',
+      });
+
+      // Editing a curriculum card forks (Path B): the card document is
+      // REPLACED (insert + delete), and deleteCard drains alternatives as
+      // part of real deletion — the migration must move them to the
+      // replacement first or "Make default"/manual edits silently destroy
+      // the user's accepted answers.
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [{ language: 'es', text: 'Quisiera un café.' }],
+        timezone: 'UTC',
+      });
+
+      const rows = await t.run((ctx) =>
+        ctx.db.query('writingAlternatives').collect(),
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].text).toBe('Me gustaría un café, por favor.');
+      expect(rows[0].cardId).not.toBe(cardId);
+      await t.run(async (ctx) => {
+        // Old card replaced; the alternatives ride on the live replacement.
+        expect(await ctx.db.get(cardId)).toBeNull();
+        expect(await ctx.db.get(rows[0].cardId)).not.toBeNull();
+      });
     });
   });
 });

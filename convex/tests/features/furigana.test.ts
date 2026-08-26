@@ -253,10 +253,11 @@ describe('approval-proposal furigana (entryFurigana)', () => {
     // Result computed for the OLD wording arrives after the edit: rejected,
     // so a slow action can never overwrite a fresher proposal.
     await t.mutation(
-      internal.features.chat.cardApprovals.storeApprovalEntryFurigana,
+      internal.features.chat.cardApprovals.storeApprovalEntryAnnotations,
       {
         approvalId,
-        results: [{ language: 'ja', forText: SENTENCE, furigana: ANNOTATED }],
+        kind: 'furigana',
+        results: [{ language: 'ja', forText: SENTENCE, value: ANNOTATED }],
       },
     );
     const approval = await t.run(

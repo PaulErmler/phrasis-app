@@ -397,6 +397,29 @@ describe("features/scheduling", () => {
       expect(res?.hasMissingContent).toBe(false);
     });
 
+    it("hydrates accepted alternatives with sentinel annotations hidden", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedPayloadCard(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("writingAlternatives", {
+          userId: "user_A",
+          cardId,
+          language: "es",
+          text: "Hola mundo entero",
+          // '' is the attempted-and-failed sentinel: the payload must omit
+          // the key entirely rather than hand the client an empty line.
+          romanizedText: "",
+          ipaText: "ipa-alt",
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(api.features.scheduling.getCardForReview, {});
+      const esEntry = res?.translations.find((tr) => tr.language === "es");
+      expect(esEntry?.alternatives).toEqual([
+        { text: "Hola mundo entero", ipa: "ipa-alt" },
+      ]);
+    });
+
     describe("retranslating pill gate", () => {
       it("shows the pill for a fresh claim over a non-empty translation", async () => {
         const t = convexTest(schema, modules);

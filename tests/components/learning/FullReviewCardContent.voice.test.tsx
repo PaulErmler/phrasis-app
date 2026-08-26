@@ -1,0 +1,63 @@
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+
+/**
+ * Voice-input gating in FullReviewCardContent: the mic button must not render
+ * for target languages Azure STT rejects (supportsStt: false — el, sw_tz).
+ * Transcription quota is consumed before the STT call, so an always-rendered
+ * mic would charge those users for a request that can only fail.
+ */
+
+vi.mock('convex/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('convex/react')>();
+  return { ...actual, useAction: () => vi.fn(), useMutation: () => vi.fn() };
+});
+vi.mock('@/components/feature_tracking/useFeatureQuota', () => ({
+  useFeatureQuota: () => ({ isAvailable: true, isLoading: false }),
+}));
+vi.mock('@/components/autumn/usage-limit-dialog', () => ({
+  default: () => null,
+}));
+
+import { FullReviewCardContent } from '@/components/app/learning/FullReviewCardContent';
+import type { CardTranslation } from '@/components/app/learning/types';
+import type { Id } from '@/convex/_generated/dataModel';
+
+const CARD_ID = 'card_1' as Id<'cards'>;
+
+function renderWithTarget(language: string, text: string) {
+  const translations: CardTranslation[] = [
+    { language: 'en', text: 'Good morning.', isBaseLanguage: true, isTargetLanguage: false },
+    { language, text, isBaseLanguage: false, isTargetLanguage: true },
+  ];
+  render(
+    <FullReviewCardContent
+      preReviewCount={0}
+      sourceText="Good morning."
+      translations={translations}
+      audioRecordings={[]}
+      isFavorite={false}
+      isPendingMaster={false}
+      isPendingHide={false}
+      onMaster={vi.fn()}
+      onHide={vi.fn()}
+      onFavorite={vi.fn()}
+      targetAudioMode="never"
+      cardId={CARD_ID}
+      aiFeedbackEnabled
+    />,
+  );
+}
+
+describe('FullReviewCardContent: writing voice button gating', () => {
+  it('hides the mic for a supportsStt:false target language (el)', () => {
+    renderWithTarget('el', 'Καλημέρα.');
+    expect(screen.getByTestId('learn-translation-input')).toBeInTheDocument();
+    expect(screen.queryByTestId('writing-voice-button')).not.toBeInTheDocument();
+  });
+
+  it('shows the mic for an STT-supported target language (es)', () => {
+    renderWithTarget('es', 'Buenos días.');
+    expect(screen.getByTestId('writing-voice-button')).toBeInTheDocument();
+  });
+});

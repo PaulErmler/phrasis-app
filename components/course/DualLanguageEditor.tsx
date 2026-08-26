@@ -23,11 +23,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
-import {
-  SUPPORTED_LANGUAGES,
-  getLanguageByCode,
-  getLocalizedLanguageNameByCode,
-} from '@/lib/languages';
+import { getLanguageByCode, getLocalizedLanguageNameByCode, languageName, SUPPORTED_LANGUAGES } from '@/lib/languages';
 import { cn } from '@/lib/utils';
 
 type ContainerId = 'base' | 'target';
@@ -55,7 +51,7 @@ interface DualLanguageEditorProps {
 
 function getDisplayName(code: string, locale?: string): string {
   if (locale) return getLocalizedLanguageNameByCode(code, locale);
-  return getLanguageByCode(code)?.name ?? code;
+  return languageName(code);
 }
 
 function SortableItem({

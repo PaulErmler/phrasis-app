@@ -29,8 +29,7 @@ import {
   deriveApprovalToolState,
   useApprovalAudio,
   useOptimisticApprovalAction,
-  useShowFurigana,
-  useShowIpa,
+  useApprovalDisplaySettings,
   type EntryAudio,
 } from './approvalCommon';
 
@@ -169,8 +168,7 @@ export function CardApproval({
 }: CardApprovalProps) {
   const { targetLanguages } = useCourseLanguages();
   const t = useTranslations('Chat.cardApproval');
-  const showIpa = useShowIpa();
-  const showFurigana = useShowFurigana();
+  const { showIpa, showFurigana } = useApprovalDisplaySettings();
   // Optimistic-with-rollback + paywall machine, shared with
   // AlsoCorrectApproval (approvalCommon.tsx). This box bills exactly one
   // quota, so `paywallFeature` reduces to an open flag.

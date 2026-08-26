@@ -280,7 +280,6 @@ function romanizeCantonese(text: string): string {
   return joinRomanizedSegments(segments);
 }
 
-
 /**
  * Telugu → ISO 15919 via `@indic-transliteration/sanscript` (its `iso`
  * scheme). Google v3 romanizeText 400s on `te`, and

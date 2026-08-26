@@ -5,7 +5,7 @@ import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { getLanguageByCode } from '@/lib/languages';
+import { languageName } from '@/lib/languages';
 import { formatTimeMs } from '@/lib/formatTime';
 import { TimeSeriesCard } from './TimeSeriesCard';
 import { DistributionCard } from './DistributionCard';
@@ -14,10 +14,6 @@ import { CardEditsBrowser } from './CardEditsBrowser';
 import { AdminGuard } from './AdminGuard';
 
 const RANGES = [30, 60, 90] as const;
-
-function languageName(code: string): string {
-  return getLanguageByCode(code)?.name ?? code;
-}
 
 export function AdminDashboardView() {
   return (

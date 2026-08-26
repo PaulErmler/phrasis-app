@@ -92,6 +92,8 @@ function toRuns(surface: string): { kana: boolean; text: string }[] {
   return runs;
 }
 
+// Private duplicate of lib/utils' escapeRegExp: this module stays
+// dependency-free so it runs unchanged in Node, V8, and the browser.
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -160,7 +162,7 @@ export function resolveShowFurigana(
  * every run is plain would otherwise reserve reading headroom above a line
  * that shows no ruby, visibly misaligning it with its neighbors.
  */
-export function hasReadings(
+function hasReadings(
   segments: FuriganaSegment[] | null | undefined,
 ): boolean {
   return (

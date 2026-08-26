@@ -28,6 +28,7 @@ import {
   isContentVersionStale,
   isTtsVersionStale,
   isTranslationVersionStale,
+  languageSupportsStt,
 } from '@/lib/languages';
 
 describe('getLanguageByCode', () => {
@@ -390,6 +391,22 @@ describe('Bulgarian (bg) language record', () => {
     expect(bg?.needsRomanization).toBe(true);
     expect(bg?.romanizationBackend).toBe('local');
     expect(languageNeedsRomanization('bg')).toBe(true);
+  });
+});
+
+describe('languageSupportsStt', () => {
+  // Azure Fast Transcription rejects el-GR and sw-TZ; UI surfaces (the
+  // writing-mode mic) gate on this flag so those users never pay a
+  // transcription quota unit for a request that can only 400.
+  it('is false for the Azure-rejected locales', () => {
+    expect(languageSupportsStt('el')).toBe(false);
+    expect(languageSupportsStt('sw_tz')).toBe(false);
+  });
+
+  it('is true for mainstream STT languages and false for unknown codes', () => {
+    expect(languageSupportsStt('es')).toBe(true);
+    expect(languageSupportsStt('ja')).toBe(true);
+    expect(languageSupportsStt('not-a-language')).toBe(false);
   });
 });
 

@@ -4,14 +4,14 @@ import { ConvexError } from "convex/values";
 
 const approveMock = vi.fn();
 const rejectMock = vi.fn();
-const replaceMock = vi.fn();
+const storeAlternativeMock = vi.fn();
 const useQueryMock = vi.fn();
 
 vi.mock("convex/react", () => ({
   useMutation: (ref: any) => {
     const name = String(ref);
     if (name.includes("reject")) return rejectMock;
-    if (name.includes("replace")) return replaceMock;
+    if (name.includes("storeAlternative")) return storeAlternativeMock;
     return approveMock;
   },
   useQuery: (...args: unknown[]) => useQueryMock(...args),
@@ -25,7 +25,7 @@ vi.mock("@/convex/_generated/api", () => ({
         cardApprovals: {
           approveCard: "approveCard-ref",
           rejectCard: "rejectCard-ref",
-          replaceCardFromApproval: "replaceCardFromApproval-ref",
+          storeAlternativeFromApproval: "storeAlternativeFromApproval-ref",
           getApprovalsByThread: "getApprovalsByThread-ref",
         },
       },
@@ -39,7 +39,7 @@ describe("useCardApprovals", () => {
   beforeEach(() => {
     approveMock.mockReset();
     rejectMock.mockReset();
-    replaceMock.mockReset();
+    storeAlternativeMock.mockReset();
     useQueryMock.mockReset();
   });
 
@@ -173,23 +173,23 @@ describe("useCardApprovals", () => {
   describe("handleReplace", () => {
     it("returns the replacement card id on success (Path B re-inserts the card doc)", async () => {
       useQueryMock.mockReturnValue([]);
-      replaceMock.mockResolvedValue({ success: true, cardId: "card_new" });
+      storeAlternativeMock.mockResolvedValue({ success: true, cardId: "card_new" });
       const { result } = renderHook(() => useCardApprovals("t"));
       let outcome: { result: string; cardId?: string } | undefined;
       await act(async () => {
         outcome = await result.current.handleReplace("a1" as any);
       });
       // The timezone is resolved by the hook, not the caller.
-      expect(replaceMock).toHaveBeenCalledWith(
+      expect(storeAlternativeMock).toHaveBeenCalledWith(
         expect.objectContaining({ approvalId: "a1" }),
       );
-      expect(replaceMock.mock.calls[0][0].timezone).toEqual(expect.any(String));
+      expect(storeAlternativeMock.mock.calls[0][0].timezone).toEqual(expect.any(String));
       expect(outcome).toEqual({ result: "success", cardId: "card_new" });
     });
 
     it("reports card_replaced with NO card id when the target card is gone", async () => {
       useQueryMock.mockReturnValue([]);
-      replaceMock.mockRejectedValue(
+      storeAlternativeMock.mockRejectedValue(
         new ConvexError({ code: "CARD_REPLACED" }),
       );
       const { result } = renderHook(() => useCardApprovals("t"));
@@ -204,7 +204,7 @@ describe("useCardApprovals", () => {
 
     it("clears the processing flag after the action settles, success or failure", async () => {
       useQueryMock.mockReturnValue([]);
-      replaceMock.mockRejectedValue(new Error("boom"));
+      storeAlternativeMock.mockRejectedValue(new Error("boom"));
       vi.spyOn(console, "error").mockImplementation(() => {});
       const { result } = renderHook(() => useCardApprovals("t"));
       await act(async () => {

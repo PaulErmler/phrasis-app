@@ -8,7 +8,11 @@ import { internal } from '../_generated/api';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { requireAuthUserId } from '../db/users';
-import { consumeQuota } from '../usage/helpers';
+import {
+  consumeQuota,
+  quotaErrorCode,
+  releaseQuota,
+} from '../usage/helpers';
 import {
   AI_FEEDBACK_FREE_GRANT,
   AI_FEEDBACK_PAID_GRANT,
@@ -23,17 +27,17 @@ import {
   MAX_CARD_TEXT_LENGTH,
   WRITING_ALTERNATIVES_MAX,
 } from '../../lib/constants/learning';
-import { normalizeForComparison } from '../lib/textComparison';
 import {
-  romanizeLocal,
-  shouldRomanizeForTtsMatch,
-} from '../lib/localRomanization';
+  normalizeForComparison,
+  textsMatchForLanguage,
+} from '../lib/textComparison';
 import {
   captureGeneration,
   openrouterCostUsd,
   openrouterGenerationId,
 } from '../lib/posthogAi';
-import { languageName } from './chat/promptSections';
+import { languageName } from '../../lib/languages';
+import { stripJsonFences } from '../lib/llmJson';
 
 /**
  * TEMPORARY grader model override (Paul, 2026-08-26): trialing
@@ -83,7 +87,7 @@ const MAX_NOTES = 2;
 /** Hard cap on a single note's length; the prompt asks for <=15 words. */
 const MAX_NOTE_CHARS = 220;
 
-export const feedbackNoteValidator = v.object({
+const feedbackNoteValidator = v.object({
   type: v.union(
     v.literal('grammar'),
     v.literal('vocab'),
@@ -120,26 +124,22 @@ export type WritingFeedbackResult = Infer<typeof writingFeedbackResultValidator>
 /**
  * "Same answer" for the local gate: punctuation/case/whitespace-insensitive
  * equality, plus romanized equality for zh/ko so homophone-character swaps
- * (在 vs 再) count as matches, mirroring `textsMatchForLanguage`. Deliberately
- * NOT edit-distance tolerant: a one-character typo should reach the LLM and
- * come back as a 'minor' verdict with the typo named, not silently pass.
+ * (在 vs 再) count as matches — `textsMatchForLanguage`'s romanize flow with
+ * an exact-equality leaf. Deliberately NOT edit-distance tolerant: a
+ * one-character typo should reach the LLM and come back as a 'minor'
+ * verdict with the typo named, not silently pass.
  */
 export function writingAnswersMatch(
   expected: string,
   answer: string,
   language: string,
 ): boolean {
-  if (normalizeForComparison(expected) === normalizeForComparison(answer)) {
-    return true;
-  }
-  if (shouldRomanizeForTtsMatch(language)) {
-    const a = romanizeLocal(expected, language);
-    const b = romanizeLocal(answer, language);
-    if (a !== null && b !== null) {
-      return normalizeForComparison(a) === normalizeForComparison(b);
-    }
-  }
-  return false;
+  return textsMatchForLanguage(
+    expected,
+    answer,
+    language,
+    (a, b) => normalizeForComparison(a) === normalizeForComparison(b),
+  );
 }
 
 /**
@@ -186,8 +186,9 @@ export const getGradingContext = internalQuery({
     } else {
       const row = await ctx.db
         .query('translations')
-        .withIndex('by_textId', (q) => q.eq('textId', card.textId))
-        .filter((q) => q.eq(q.field('targetLanguage'), language))
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', card.textId).eq('targetLanguage', language),
+        )
         .first();
       expected = row?.translatedText ?? null;
     }
@@ -221,6 +222,22 @@ export const consumeAiFeedbackQuota = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     await consumeQuota(ctx, args.userId, FEATURE_IDS.AI_FEEDBACK, 1);
+    return null;
+  },
+});
+
+/**
+ * Compensation for the consume-before-call ordering: when the grader call
+ * itself fails (provider outage, timeout), the user got nothing and the unit
+ * comes back. Deliberately NOT called for an unparseable reply — the model
+ * did run on the user's answer, so that unit stays spent (see the grade
+ * action's parse-failure branch).
+ */
+export const refundAiFeedbackQuota = internalMutation({
+  args: { userId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await releaseQuota(ctx, args.userId, FEATURE_IDS.AI_FEEDBACK, 1);
     return null;
   },
 });
@@ -302,23 +319,6 @@ export const storeAlternative = internalMutation({
   },
 });
 
-/**
- * ConvexError code from an error thrown across a `ctx.runMutation` boundary.
- * Depending on runtime (prod vs convex-test) the error may arrive as a
- * ConvexError, a plain object with `.data`, or a re-thrown Error whose
- * message embeds the serialized data, so all three shapes are read.
- */
-export function quotaErrorCode(error: unknown): string | undefined {
-  if (typeof error === 'object' && error !== null && 'data' in error) {
-    const data = (error as { data?: unknown }).data;
-    if (typeof data === 'object' && data !== null) {
-      return (data as { code?: string }).code;
-    }
-  }
-  const message = error instanceof Error ? error.message : '';
-  return /"code":\s*"([A-Z_]+)"/.exec(message)?.[1];
-}
-
 type ParsedFeedback = {
   verdict: LlmVerdict;
   corrected?: string;
@@ -332,10 +332,7 @@ type ParsedFeedback = {
  * caller degrades to `verdict: 'error'` instead of trusting garbage.
  */
 export function parseFeedbackResponse(raw: string): ParsedFeedback | null {
-  const cleaned = raw
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/, '')
-    .trim();
+  const cleaned = stripJsonFences(raw);
   let parsed: unknown;
   try {
     parsed = JSON.parse(cleaned);
@@ -565,6 +562,17 @@ ANSWER>>>`;
       }));
     } catch (error) {
       console.error('writingFeedback: LLM call failed', error);
+      // Transport failure: the user got nothing, so the unit consumed above
+      // comes back. The parse-failure branch below deliberately does NOT
+      // refund — there the model ran on the answer, it just replied garbage.
+      try {
+        await ctx.runMutation(
+          internal.features.writingFeedback.refundAiFeedbackQuota,
+          { userId },
+        );
+      } catch (refundError) {
+        console.error('writingFeedback: quota refund failed', refundError);
+      }
       await captureGeneration(ctx, {
         distinctId: userId,
         feature: 'writing_feedback',

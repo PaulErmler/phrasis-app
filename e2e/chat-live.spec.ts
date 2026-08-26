@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { dismissTour } from "./helpers";
+import { escapeRegExp } from "../lib/utils";
 
 /**
  * Chat LIVE. Hits the real Convex backend and real LLM / TTS APIs.
@@ -417,7 +418,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       // (7) Auto-submit fires from ChatPanel's initialTextNonce effect,
       // no user send-press involved. The user bubble should contain the
       // templated prompt. Escape cleanedWord for safe regex embedding.
-      const escaped = cleanedWord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escaped = escapeRegExp(cleanedWord);
       const userBubble = page
         .getByTestId("chat-user-message")
         .filter({ hasText: new RegExp(`Explain:\\s*${escaped}`) })

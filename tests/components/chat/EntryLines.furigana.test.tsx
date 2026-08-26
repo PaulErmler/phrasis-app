@@ -49,7 +49,7 @@ describe('EntryLines: furigana', () => {
       />,
     );
     expect(
-      [...container.querySelectorAll('ruby rt')].map((rt) => rt.textContent),
+      [...container.querySelectorAll('ruby rt')].map((rt) => rt.getAttribute('data-reading')),
     ).toEqual(['まいあさ', 'しちじ', 'お']);
     expect(container.textContent).toContain('I get up at seven.');
   });
