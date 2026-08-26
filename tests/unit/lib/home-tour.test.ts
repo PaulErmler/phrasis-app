@@ -69,3 +69,25 @@ describe('createHomeTour: due-counts step', () => {
     expect(elements).toContain('[data-tutorial="projections"]');
   });
 });
+
+describe('createHomeTour: workload step', () => {
+  it('follows the projections step (monotonic scroll) and drops when the card is absent', () => {
+    const tour = createHomeTour(t, { reviewMode: 'audio' });
+    const elements = tour.steps.map((s) => s.element);
+    const workloadIdx = elements.indexOf('[data-tutorial="workload-forecast"]');
+    // The card renders below the progress card, whose two steps must both
+    // come first or the tour scrolls down and back up.
+    expect(workloadIdx).toBeGreaterThan(
+      elements.indexOf('[data-tutorial="projections"]'),
+    );
+    // Below the minimum-activity gate the card isn't mounted; the step
+    // opts into being dropped at launch instead of floating unanchored.
+    expect(tour.steps[workloadIdx].skipIfMissing).toBe(true);
+  });
+
+  it('is omitted together with the due-count pills', () => {
+    expect(
+      elementsOf({ reviewMode: 'audio', hideDueCounts: true }),
+    ).not.toContain('[data-tutorial="workload-forecast"]');
+  });
+});

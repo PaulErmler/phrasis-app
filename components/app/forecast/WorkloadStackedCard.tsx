@@ -190,6 +190,9 @@ export function WorkloadStackedCard({
 
   const todayMinutes = fmtMin(days[0].estimatedMinutes);
   const weekMinutes = fmtMin(forecast.weekMinutes);
+  // fmtMin renders 0 as "0s"; a zero-load DAY label should read "0m".
+  const fmtMinLabel = (minutes: number) =>
+    minutes > 0 ? fmtMin(minutes) : t('axisMinutes', { value: 0 });
 
   return (
     <div className={cn(isProvisional && 'opacity-70 transition-opacity')}>
@@ -225,7 +228,7 @@ export function WorkloadStackedCard({
         {backlog > 0 && (
           <span className="shrink-0 rounded-full bg-accent-orange/10 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-accent-orange">
             {isTime
-              ? t('overdueTime', { value: `${backlogMinutes}m` })
+              ? t('overdueTime', { value: fmtMin(backlogMinutes) })
               : t('overdue', { count: backlog })}
           </span>
         )}
@@ -244,8 +247,7 @@ export function WorkloadStackedCard({
                 style={{ bottom: 22 + (value / max) * PLOT_HEIGHT }}
               >
                 <span className="absolute right-0 top-[-13px] text-[9px] tabular-nums text-muted-foreground">
-                  {value}
-                  {isTime ? 'm' : ''}
+                  {isTime ? t('axisMinutes', { value }) : value}
                 </span>
               </div>
             ))}
@@ -279,7 +281,7 @@ export function WorkloadStackedCard({
                     >
                       {showCap
                         ? isTime
-                          ? `${day.estimatedMinutes}m`
+                          ? fmtMinLabel(day.estimatedMinutes)
                           : cardsTotal
                         : ''}
                     </span>
@@ -328,7 +330,9 @@ export function WorkloadStackedCard({
                     <span className="mt-[3px] text-[9px] leading-none tabular-nums text-muted-foreground">
                       {isTime
                         ? t('cardsShort', { count: cardsTotal })
-                        : `≈${day.estimatedMinutes}m`}
+                        : t('approxShort', {
+                            value: fmtMinLabel(day.estimatedMinutes),
+                          })}
                     </span>
                   </div>
                 );
@@ -347,7 +351,9 @@ export function WorkloadStackedCard({
                 <span className="absolute right-0 top-[-15px] bg-card px-1 text-[9px] text-muted-foreground">
                   {t('paceLine', {
                     value: isTime
-                      ? `≈${Math.max(1, Math.round(pace))}m`
+                      ? t('approxShort', {
+                          value: fmtMin(Math.max(1, Math.round(pace))),
+                        })
                       : Math.round(pace),
                   })}
                 </span>

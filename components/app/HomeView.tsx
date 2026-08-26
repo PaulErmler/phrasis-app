@@ -202,8 +202,13 @@ export function HomeView({
         />
 
         {/* 7-day workload forecast. Hidden with the due-count pills
-            (hideDueCounts); pauses its subscription while home is hidden. */}
-        <WorkloadForecastCard skip={isHidden} />
+            (hideDueCounts); pauses its subscription while home is hidden.
+            Keyed like ProgressStatsCard so a course switch remounts it —
+            resetting the what-if stepper instead of carrying it over. */}
+        <WorkloadForecastCard
+          key={courseSettings?.courseId}
+          skip={isHidden}
+        />
 
         {/* Content actions */}
         <div className="card-surface space-y-2 p-3">

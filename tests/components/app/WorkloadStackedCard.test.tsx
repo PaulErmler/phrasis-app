@@ -126,8 +126,11 @@ describe('WorkloadStackedCard', () => {
     const day0Cards =
       forecast.days[0].scheduled.total + forecast.days[0].estimated.total;
     expect(screen.getByText(String(day0Cards))).toBeTruthy();
+    // Sub-labels route through i18n + formatTimeMs now (mocked t renders
+    // "approxShort <value>").
     expect(
-      screen.getAllByText(`≈${forecast.days[0].estimatedMinutes}m`).length,
+      screen.getAllByText(`approxShort ${forecast.days[0].estimatedMinutes}m`)
+        .length,
     ).toBeGreaterThan(0);
   });
 

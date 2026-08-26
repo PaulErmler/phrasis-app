@@ -32,25 +32,30 @@ export function createHomeTour(
     freePlayStep,
     tourStep(t, 'home.reviewModeToggle', '[data-tutorial="review-mode-toggle"]', 'bottom', 'center'),
     tourStep(t, 'home.contentSource', '[data-tutorial="content-source-filter"]', 'bottom', 'center'),
-    // The new/review pills next to the content-source filter and the 7-day
-    // workload forecast card. Both omitted when the user hides due counts
-    // (the default for new accounts), otherwise these steps highlight empty
-    // slots and talk about things that aren't there.
+    // The new/review pills next to the content-source filter. Omitted when
+    // the user hides due counts (the default for new accounts), otherwise
+    // this step highlights an empty slot and talks about pills that aren't
+    // there.
+    ...(ctx?.hideDueCounts === true
+      ? []
+      : [tourStep(t, 'home.dueCounts', '[data-tutorial="due-counts"]', 'bottom', 'center')]),
+    // The rotating forecast in the progress card ("by the end of the year…").
+    tourStep(t, 'home.projections', '[data-tutorial="projections"]', 'bottom', 'center'),
+    // The 7-day workload card sits BELOW the progress card, so this step
+    // comes after both progress-card steps — the tour scrolls monotonically
+    // instead of jumping down and back up. Gated the same way as the pills,
+    // and the card also hides itself below the minimum-activity gate
+    // (MIN_STARTED_CARDS_FOR_FORECAST) — that lives in query data this
+    // factory can't see, so the step additionally drops at launch when the
+    // card isn't mounted.
     ...(ctx?.hideDueCounts === true
       ? []
       : [
-          tourStep(t, 'home.dueCounts', '[data-tutorial="due-counts"]', 'bottom', 'center'),
-          // The card also hides itself below the minimum-activity gate
-          // (MIN_STARTED_CARDS_FOR_FORECAST) — that lives in query data this
-          // factory can't see, so the step drops at launch when the card
-          // isn't mounted.
           {
             ...tourStep(t, 'home.workload', '[data-tutorial="workload-forecast"]', 'top', 'center'),
             skipIfMissing: true,
           } satisfies AppDriveStep,
         ]),
-    // The rotating forecast in the progress card ("by the end of the year…").
-    tourStep(t, 'home.projections', '[data-tutorial="projections"]', 'bottom', 'center'),
     tourStep(t, 'home.difficultySelection', '[data-tutorial="collection-carousel"]', 'top', 'center'),
     // Closing call-to-action. Re-highlights Learn & Review (the primary
     // entry point) so the tour finishes on the button the user is most

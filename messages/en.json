@@ -394,6 +394,8 @@
       "cardsToday": "{count} today ≈ {time}",
       "thisWeek": "{value} this week",
       "cardsShort": "{count} cards",
+      "axisMinutes": "{value}m",
+      "approxShort": "≈{value}",
       "overdue": "{count} overdue",
       "overdueTime": "≈ {value} overdue",
       "paceLine": "usual pace {value}/day",
