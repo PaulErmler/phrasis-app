@@ -3,8 +3,8 @@ import type { DriveStep } from 'driver.js';
 /**
  * DriveStep plus app extensions. `skipIfMissing`: drop the step at launch
  * when its selector has no visible match — for steps anchored to
- * conditionally mounted UI whose gate lives in query data the tour factory
- * can't see (e.g. the workload card below its minimum-activity gate).
+ * conditionally mounted UI whose presence the tour factory can't see
+ * (e.g. a settings-gated card whose preference is stale at launch).
  * Like the ctx-gated steps, dropping one shifts the indices of later steps,
  * so `stepCompleteOnClickIndex` must only target steps before any
  * skippable one.

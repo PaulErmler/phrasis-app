@@ -32,6 +32,7 @@ import schema from "../../schema";
 import { internal } from "../../_generated/api";
 import { EXTENDED_STATE_LABELS } from "../../lib/fsrsStates";
 import { ORIGIN_BUCKETS } from "../../db/stats/cardAggregates";
+import { STABILITY_BUCKETS } from "../../../lib/workloadForecast";
 import type { Id } from "../../_generated/dataModel";
 
 const modules = import.meta.glob("/convex/**/*.ts");
@@ -117,8 +118,12 @@ describe("migrations/recalcUserCardAggregates", () => {
       // Each deck triggers, per state label: 1 cardsByStateAndDueDate.clear +
       // 1 cardsByWritingStateAndDueDate.clear + one clear per origin bucket for
       // each of cardsByOriginStateAndDueDate / cardsByOriginWritingStateAndDueDate.
+      // Per deck: every state × (shared + writing instances, each with an
+      // origin mirror), plus the stability-bucket namespaces cleared with
+      // the shared track.
       const perDeck =
-        EXTENDED_STATE_LABELS.length * (2 + 2 * ORIGIN_BUCKETS.length);
+        EXTENDED_STATE_LABELS.length * (2 + 2 * ORIGIN_BUCKETS.length) +
+        STABILITY_BUCKETS.length;
       expect(calls.clear).toHaveLength(deckIds.length * perDeck);
 
       // No aggregate is namespaced by a bare deckId any more: every namespace

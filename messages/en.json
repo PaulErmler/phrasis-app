@@ -391,6 +391,7 @@
     },
     "workload": {
       "title": "Coming up",
+      "locked": "Keep studying to unlock your study schedule",
       "today": "Today",
       "approxToday": "≈ {value} today",
       "cardsToday": "{count} today ≈ {time}",
@@ -398,23 +399,19 @@
       "cardsShort": "{count} cards",
       "axisMinutes": "{value}m",
       "approxShort": "≈{value}",
-      "overdue": "{count} overdue",
-      "overdueTime": "≈ {value} overdue",
       "paceLine": "usual pace {value}/day",
-      "legendOverdue": "Overdue",
-      "legendYoung": "Young",
-      "legendMature": "Mature",
-      "legendReturns": "Est. returns",
+      "goalLine": "daily goal {value}",
       "legendWhatIf": "+{count} new",
       "legendPace": "Usual pace (14-day avg)",
+      "legendGoal": "Daily goal",
       "stepperLabel": "Preview adding cards",
       "stepperFewer": "Fewer cards",
       "stepperMore": "More cards",
-      "stepperValue": "+{count} cards",
+      "stepperValue": "+{count} new cards",
       "whatIfHint": "Step up to preview added load",
       "whatIfNote": "≈ +{reviews} reviews · +{time} this week",
       "empty": "Nothing scheduled yet — add a few sentences to get started.",
-      "dayAria": "{day}: {scheduled} cards scheduled, about {estimated} more estimated, about {minutes} minutes"
+      "dayAria": "{day}: {cards} cards, about {minutes} minutes"
     },
     "dailyGoal": {
       "label": "Daily goal",
@@ -718,8 +715,10 @@
       },
       "noteType": {
         "grammar": "Grammar",
-        "vocab": "Vocabulary",
+        "wordChoice": "Word choice",
+        "vocab": "Word choice",
         "spelling": "Spelling",
+        "punctuation": "Punctuation",
         "register": "Register",
         "wordOrder": "Word order",
         "naturalness": "Naturalness"
@@ -1378,7 +1377,7 @@
       },
       "workload": {
         "title": "Your week ahead",
-        "description": "This chart shows how much review time each of the next seven days will bring — and what adding more sentences would do to it."
+        "description": "This card sums up how much review time each of the next seven days will bring — tap it to open the full chart and preview what adding more sentences would do."
       },
       "projections": {
         "title": "Your forecast",
@@ -1505,7 +1504,10 @@
     "title": "Edit Sentence",
     "cancel": "Cancel",
     "save": "Save",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "alternativesLabel": "Alternative Answers",
+    "deleteAlternative": "Delete alternative answer",
+    "undoDeleteAlternative": "Keep alternative answer"
   },
   "EditCardApproval": {
     "title": "Edit Sentence",

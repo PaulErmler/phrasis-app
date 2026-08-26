@@ -8,14 +8,16 @@
  * Shared app/Convex module (no imports from convex/), unit-tested in
  * tests/unit/lib/workloadForecast.test.ts.
  *
- * The hard rule the UI relies on: `scheduled` numbers are EXACT (straight
+ * The hard rule the model keeps: `scheduled` numbers are EXACT (straight
  * from the due-date aggregates); everything under `estimated` is a model —
  * same-day repeats, the "second wave" (cards due early in the window that
  * get reviewed and become due again within it), and what-if additions. The
  * two are never blended. Kernels are derived by running the real scheduler
- * (lib/scheduling.ts), so they track FSRS parameter changes automatically,
- * and the per-review history table records the prev→new due transitions
- * that can calibrate them later.
+ * (lib/scheduling.ts), so they track FSRS parameter changes automatically —
+ * but not the deck's POPULATION: the mature kernel needs to know how stable
+ * the due cards actually are, which the per-deck stability-bucket counts
+ * (`matureStabilityCounts`, from the cardsByStabilityBucketAndDueDate
+ * aggregate) supply, with a young-deck prior as the thin-data fallback.
  */
 
 import {
@@ -30,17 +32,20 @@ export const WORKLOAD_DAYS = 7;
 export const WORKLOAD_HISTORY_WINDOW_DAYS = 14;
 export const DEFAULT_WHAT_IF_ADD = 5;
 export const WHAT_IF_ADD_MIN = 0;
-/** = MAX_CARDS_PER_BATCH — the most that can be added in one go anyway. */
-export const WHAT_IF_ADD_MAX = 15;
-
 /**
- * Minimum-activity gate: the forecast card stays hidden until this many
+ * Minimum-activity gate: the forecast card renders LOCKED until this many
  * cards have entered a non-'new' state (payload `startedCards`). Below it
- * the estimates would be pure priors — fabricated-looking numbers for a
- * user who has barely started — and the home screen is better off without
- * the card at all.
+ * every estimate is a pure prior — fabricated-looking numbers for a user
+ * who has barely started — so the card shows a teaser instead of a chart,
+ * the same "keep going and this turns on" contract the projections widget
+ * uses (lib/projections.ts, basis 'empty').
  */
 export const MIN_STARTED_CARDS_FOR_FORECAST = 5;
+
+/** Upper bound of the what-if stepper. Deliberately above
+ * MAX_CARDS_PER_BATCH (15): the preview may explore bigger plans than one
+ * add-batch allows. */
+export const WHAT_IF_ADD_MAX = 50;
 
 const DAY_MS = 86_400_000;
 
@@ -61,33 +66,117 @@ const PRIOR_RATES: RatingRates = {
 
 /**
  * Seconds-per-review priors per mode while the window has no timed reviews:
- * Shadowing is listen-and-rate (~15s), Writing types the answer (~35s).
+ * Shadowing is listen-and-rate (~20s), Writing types the answer (~45s).
  * Clamped to a sane band either way so one weird window can't produce
  * absurd time estimates.
  */
-const SECONDS_PER_REVIEW_PRIOR = { audio: 15, full: 35 } as const;
+const SECONDS_PER_REVIEW_PRIOR = { audio: 20, full: 45 } as const;
 const SECONDS_PER_REVIEW_MIN = 3;
 const SECONDS_PER_REVIEW_MAX = 120;
 
 /**
- * Same-day grading events per card sighting. A mature card costs one event
- * plus its again-loop; a young card (learning/relearning/ungraduated, and
- * every estimated return or fresh add) runs its short learning steps the
- * same day. The young multiplier is a documented constant for now —
- * `reviewHistory` accumulates the data to calibrate it per user later.
- * Exported so the chart's display-only time weights reuse the same number
- * instead of restating it.
+ * Same-day grading events per card sighting, priced by the STATE BUCKET the
+ * card is in when it comes up:
+ *
+ *   - new (never studied): `deriveNewCardEvents` — the initial-reps setting
+ *     early-exited by the user's observed Understood rate; the writing track
+ *     has no pre-review phase, so Writing mode is a flat 2 learning steps.
+ *   - learning / relearning (mid-steps): this constant — the card runs its
+ *     remaining short steps the same day.
+ *   - review (mature, including every estimated return and add echo — they
+ *     re-land graduated): `1 + pAgain`, one review plus the probabilistic
+ *     lapse loop.
  */
-export const YOUNG_EVENTS_PER_SIGHTING = 1.5;
+const YOUNG_EVENTS_PER_SIGHTING = 1.5;
 
-/** Representative current stabilities (days) for mature cards due inside a
- * 7-day window, used to derive the mature return kernel. Cards due soon skew
- * toward short stabilities, hence the front-loaded weights. */
-const MATURE_STABILITY_MIX: Array<{ stabilityDays: number; weight: number }> = [
+/**
+ * Expected same-day grading events for a NEW card first studied in the
+ * given mode. Writing (`full`) has no pre-review phase (reviewCard forces
+ * the review phase for that track), so a new card is just the two FSRS
+ * learning steps. Shadowing runs up to `initialReviewCount − 2` pre-review
+ * steps first, each exited early by "Understood" at the user's observed
+ * rate — approximated linearly by the window's stillLearning share (prior
+ * 0.5 while the sample is thin).
+ */
+export function deriveNewCardEvents(
+  reviewMode: 'audio' | 'full',
+  initialReviewCount: number,
+  ratingCounts: RatingCounts,
+): number {
+  if (reviewMode === 'full') return 2;
+  const seen = ratingCounts.stillLearning + ratingCounts.understood;
+  const pStill =
+    seen >= MIN_RATING_SAMPLE ? ratingCounts.stillLearning / seen : 0.5;
+  return clamp(
+    2 + (initialReviewCount - 2) * pStill,
+    2,
+    Math.max(initialReviewCount, 2),
+  );
+}
+
+/**
+ * Stability buckets for mature (Review-state) cards, shared with the
+ * `cardsByStabilityBucketAndDueDate` aggregate (convex/db/stats/
+ * cardAggregates.ts derives its namespaces from these, so the two can't
+ * drift). The per-deck counts of due-in-window cards per bucket calibrate
+ * the mature return kernel; each bucket is represented by one stability the
+ * kernel simulates.
+ */
+export const STABILITY_BUCKETS = [
+  { key: 's0', maxStabilityDays: 3.5, representativeStabilityDays: 2 },
+  { key: 's1', maxStabilityDays: 8, representativeStabilityDays: 5 },
+  { key: 's2', maxStabilityDays: 21, representativeStabilityDays: 12 },
+  { key: 's3', maxStabilityDays: Infinity, representativeStabilityDays: 45 },
+] as const;
+
+export type StabilityBucketKey = (typeof STABILITY_BUCKETS)[number]['key'];
+
+export type MatureStabilityCounts = Record<StabilityBucketKey, number>;
+
+/** Bucket a Review-state card's FSRS stability (days). Total — any finite
+ * number lands in a bucket. */
+export function stabilityBucketKey(stabilityDays: number): StabilityBucketKey {
+  for (const bucket of STABILITY_BUCKETS) {
+    if (stabilityDays < bucket.maxStabilityDays) return bucket.key;
+  }
+  return STABILITY_BUCKETS[STABILITY_BUCKETS.length - 1].key;
+}
+
+/** Below this many bucketed due cards the observed mix is noise (or the
+ * backfill hasn't covered the deck yet) and the prior applies. */
+export const MIN_STABILITY_SAMPLE = 10;
+
+export type MatureStabilityMix = Array<{
+  stabilityDays: number;
+  weight: number;
+}>;
+
+/** PRIOR stability mix for mature cards due inside the window, used while
+ * no observed bucket counts are available. The short, front-loaded
+ * stabilities match a YOUNG deck — the right prior for the thin-data
+ * cohort; established decks get their own observed mix instead. */
+const MATURE_STABILITY_MIX: MatureStabilityMix = [
   { stabilityDays: 2, weight: 0.4 },
   { stabilityDays: 5, weight: 0.35 },
   { stabilityDays: 10, weight: 0.25 },
 ];
+
+/**
+ * The stability mix the mature return kernel runs over: observed per-bucket
+ * due-card counts normalized into weights over the bucket representatives,
+ * or the young-deck prior while counts are absent or the sample is thin.
+ */
+export function deriveStabilityMix(
+  counts: MatureStabilityCounts | undefined,
+): MatureStabilityMix {
+  if (!counts) return MATURE_STABILITY_MIX;
+  const total = STABILITY_BUCKETS.reduce((sum, b) => sum + counts[b.key], 0);
+  if (total < MIN_STABILITY_SAMPLE) return MATURE_STABILITY_MIX;
+  return STABILITY_BUCKETS.filter((b) => counts[b.key] > 0).map((b) => ({
+    stabilityDays: b.representativeStabilityDays,
+    weight: counts[b.key] / total,
+  }));
+}
 
 export type DayStateCounts = {
   new: number;
@@ -129,6 +218,11 @@ export type WorkloadForecastData = {
   /** Deck-wide cards in any non-'new' active state — see
    * MIN_STARTED_CARDS_FOR_FORECAST. */
   startedCards: number;
+  /** Per-stability-bucket counts of mature cards due inside the window,
+   * from the shared-track cardsByStabilityBucketAndDueDate aggregate.
+   * Omitted while the backfill hasn't covered the deck (the query's
+   * cold-start guard) — the prior mix applies then. */
+  matureStabilityCounts?: MatureStabilityCounts;
   preparingWriting?: boolean;
 };
 
@@ -169,7 +263,8 @@ export type WorkloadDay = {
     mature: number;
     total: number;
   };
-  /** ESTIMATED overlay (model output, rendered striped). */
+  /** ESTIMATED overlay (model output; the UI folds it into the day's
+   * single load bar). */
   estimated: {
     /** Second wave + same-day repeats: cards seen earlier in the window
      * re-landing here, in card sightings. */
@@ -184,17 +279,27 @@ export type WorkloadDay = {
    * event multipliers), rounded. */
   estimatedReviews: number;
   /** estimatedReviews × the user's seconds-per-review, whole minutes
-   * (min 1 when the day has any load). */
+   * (min 1 when the day has any load). Display value — the week totals sum
+   * the unrounded events instead. */
   estimatedMinutes: number;
+  /** The what-if stepper's share of this day, for the bar's hypothetical
+   * cap: cards (rounded, = estimated.whatIfAdds) and the fractional slice
+   * of estimatedMinutes its events account for. Zero at addCount 0. */
+  whatIf: { cards: number; minutes: number };
 };
 
 export type WorkloadForecast = {
   days: WorkloadDay[];
   rates: RatingRates & {
-    /** Observed grading events per unique card in the window (≥1). */
-    repeatFactor: number;
     typicalAddsPerDay: number;
+    /** Graded (audio + full) reviews in the window. Below MIN_PACE_SAMPLE
+     * the pace averages are noise — the chart swaps its reference line to
+     * the daily goal then. */
+    gradedReviews: number;
+    /** Graded (audio + full) reviews per active day in the window — free
+     * play excluded, matching what the bars count. */
     avgDailyReviews: number;
+    /** Graded review minutes per active day — same graded-only rule. */
     avgDailyMinutes: number;
     secondsPerReview: number;
     /** FSRS grades in the window; below MIN_RATING_SAMPLE the priors apply. */
@@ -247,6 +352,8 @@ export function isWorkloadForecastData(
     typeof d.dayStartMs === 'number' &&
     typeof d.initialReviewCount === 'number' &&
     typeof d.startedCards === 'number' &&
+    (d.matureStabilityCounts === undefined ||
+      hasNumbers(d.matureStabilityCounts, ['s0', 's1', 's2', 's3'])) &&
     isDayStateCounts(d.availableNow) &&
     isDayStateCounts(d.laterToday) &&
     Array.isArray(d.futureDays) &&
@@ -290,8 +397,14 @@ export function deriveRatingRates(ratingCounts: RatingCounts): RatingRates {
   };
 }
 
+/** Below this many timed reviews a window mean is noise — a couple of
+ * left-open cards can read as a 100s "pace" — so the prior applies, the
+ * same rule MIN_RATING_SAMPLE plays for the grade distribution. */
+export const MIN_PACE_SAMPLE = 10;
+
 /** Average seconds per grading event in the given mode: per-mode window data
- * first, overall window second, mode prior last — always clamped. */
+ * first, overall window second, mode prior last — each accepted only at
+ * MIN_PACE_SAMPLE or more reviews, and always clamped. */
 export function deriveSecondsPerReview(
   history: WorkloadForecastData['history'],
   reviewMode: 'audio' | 'full',
@@ -299,9 +412,9 @@ export function deriveSecondsPerReview(
   const modeReviews = history.reviewsByMode[reviewMode];
   const modeTimeMs = history.timeMsByMode[reviewMode];
   const raw =
-    modeReviews > 0 && modeTimeMs > 0
+    modeReviews >= MIN_PACE_SAMPLE && modeTimeMs > 0
       ? modeTimeMs / modeReviews / 1000
-      : history.reps > 0 && history.timeMs > 0
+      : history.reps >= MIN_PACE_SAMPLE && history.timeMs > 0
         ? history.timeMs / history.reps / 1000
         : SECONDS_PER_REVIEW_PRIOR[reviewMode];
   return clamp(raw, SECONDS_PER_REVIEW_MIN, SECONDS_PER_REVIEW_MAX);
@@ -357,7 +470,19 @@ function ratingOffset(
   };
 }
 
-export type ReturnKernels = { young: number[]; mature: number[] };
+export type ReturnKernels = {
+  young: number[];
+  mature: number[];
+  /** Kernel for a card that already RETURNED once inside the window: its
+   * stability is short (fresh graduation / post-lapse) no matter how old
+   * the deck is, so later generations echo through this, not through the
+   * deck-average mature kernel. */
+  rebound: number[];
+};
+
+/** Stability (days) of a card re-landed inside the window — post-lapse or
+ * freshly graduated, deck age irrelevant. */
+const REBOUND_STABILITY_DAYS = 2;
 
 /**
  * SINGLE-GENERATION return kernels: where a card REVIEWED on day k next
@@ -365,22 +490,27 @@ export type ReturnKernels = { young: number[]; mature: number[] };
  * Δ (index 0 unused — same-day repeats live in the event multipliers).
  * Higher generations (the re-landed card getting reviewed and landing
  * again) are expanded separately in `expandResponses`, where each further
- * generation follows the MATURE kernel — a returned young card has
- * graduated by then. Keeping generations out of the kernels is what makes
- * the composition convergent instead of geometric.
+ * generation follows the REBOUND kernel — a card that just re-landed is on
+ * a short stability whatever the deck's mix says. Keeping generations out
+ * of the kernels is what makes the composition convergent instead of
+ * geometric.
  *
  * young: learning/relearning/ungraduated cards run their remaining learning
  * steps same-day and land the graduation interval (~next day).
  * mature: Review-state cards return inside the window mainly via 'again'
  * (relearn today, land ~tomorrow) and 'hard' on short-stability cards; the
- * kernel runs the real scheduler over a representative stability mix, so
+ * kernel runs the real scheduler over the deck's stability mix (observed
+ * per-bucket counts via `deriveStabilityMix`, or the young-deck prior), so
  * good/easy on stable cards naturally fall outside the window.
  */
 export function deriveReturnKernels(opts: {
   initialReviewCount: number;
   rates: RatingRates;
+  /** From `deriveStabilityMix`; defaults to the young-deck prior. */
+  stabilityMix?: MatureStabilityMix;
 }): ReturnKernels {
   const { initialReviewCount, rates } = opts;
+  const stabilityMix = opts.stabilityMix ?? MATURE_STABILITY_MIX;
   const t0 = 0; // scheduleCard only cares about relative time
 
   const young = new Array<number>(WORKLOAD_DAYS).fill(0);
@@ -394,32 +524,42 @@ export function deriveReturnKernels(opts: {
     young[fresh.offset] += 1;
   }
 
-  const mature = new Array<number>(WORKLOAD_DAYS).fill(0);
-  for (const { stabilityDays, weight } of MATURE_STABILITY_MIX) {
-    const state: CardSchedulingState = {
-      schedulingPhase: 'review',
-      preReviewCount: initialReviewCount,
-      dueDate: t0,
-      fsrsState: makeMatureFsrsState(stabilityDays, t0),
-    };
-    // 'again': relearning steps run out the same day; the graduating
-    // interval lands the card back ~next day.
-    const againNext = advanceToFirstDayOut(
-      applyRating(state, 'again', initialReviewCount, t0),
-      t0,
-      initialReviewCount,
-    );
-    if (againNext.offset < WORKLOAD_DAYS) {
-      mature[againNext.offset] += rates.pAgain * weight;
+  const reviewKernel = (
+    mix: MatureStabilityMix,
+  ): number[] => {
+    const kernel = new Array<number>(WORKLOAD_DAYS).fill(0);
+    for (const { stabilityDays, weight } of mix) {
+      const state: CardSchedulingState = {
+        schedulingPhase: 'review',
+        preReviewCount: initialReviewCount,
+        dueDate: t0,
+        fsrsState: makeMatureFsrsState(stabilityDays, t0),
+      };
+      // 'again': relearning steps run out the same day; the graduating
+      // interval lands the card back ~next day.
+      const againNext = advanceToFirstDayOut(
+        applyRating(state, 'again', initialReviewCount, t0),
+        t0,
+        initialReviewCount,
+      );
+      if (againNext.offset < WORKLOAD_DAYS) {
+        kernel[againNext.offset] += rates.pAgain * weight;
+      }
+      for (const rating of ['hard', 'good', 'easy'] as const) {
+        const p = rates[rating === 'hard' ? 'pHard' : rating === 'good' ? 'pGood' : 'pEasy'];
+        if (p <= 0) continue;
+        const next = ratingOffset(state, rating, t0, 0, initialReviewCount);
+        if (next) kernel[next.offset] += p * weight;
+      }
     }
-    for (const rating of ['hard', 'good', 'easy'] as const) {
-      const p = rates[rating === 'hard' ? 'pHard' : rating === 'good' ? 'pGood' : 'pEasy'];
-      if (p <= 0) continue;
-      const next = ratingOffset(state, rating, t0, 0, initialReviewCount);
-      if (next) mature[next.offset] += p * weight;
-    }
-  }
-  return { young, mature };
+    return kernel;
+  };
+
+  const mature = reviewKernel(stabilityMix);
+  const rebound = reviewKernel([
+    { stabilityDays: REBOUND_STABILITY_DAYS, weight: 1 },
+  ]);
+  return { young, mature, rebound };
 }
 
 /** c[d] = Σ_{i+j=d, j≥1} a[i]·b[j] — window-bounded convolution where `b`
@@ -444,42 +584,56 @@ const addArrays = (...arrs: number[][]): number[] =>
 export type ReturnResponses = { young: number[]; mature: number[] };
 
 /**
- * Expand the single-generation kernels into full within-window responses:
- * a mature sighting echoes matureK, whose landings echo matureK again
- * (three orders — matureK sums well below 1, so the tail is a few percent);
- * a young sighting lands once via youngK and every later generation is
- * mature. Decaying by construction, so the day composition can be a plain
- * sum with no recursion.
+ * Expand the single-generation kernels into full within-window responses.
+ * A first-generation landing comes from the class kernel (young graduation,
+ * or the deck-mix mature kernel); every LATER generation is a card that
+ * just re-landed — short stability by construction — so it echoes through
+ * the rebound kernel (three self-orders; the kernels sum well below 1, so
+ * the truncated tail is a few percent). Decaying by construction, so the
+ * day composition can be a plain sum with no recursion.
  */
 export function expandResponses(kernels: ReturnKernels): ReturnResponses {
-  const m1 = kernels.mature;
-  const m2 = convolveWindow(m1, m1);
-  const m3 = convolveWindow(m2, m1);
-  const mature = addArrays(m1, m2, m3);
-  const young = addArrays(kernels.young, convolveWindow(kernels.young, mature));
+  const r1 = kernels.rebound;
+  const reboundResponse = addArrays(
+    r1,
+    convolveWindow(r1, r1),
+    convolveWindow(convolveWindow(r1, r1), r1),
+  );
+  const mature = addArrays(
+    kernels.mature,
+    convolveWindow(kernels.mature, reboundResponse),
+  );
+  const young = addArrays(
+    kernels.young,
+    convolveWindow(kernels.young, reboundResponse),
+  );
   return { young, mature };
 }
 
 /**
  * `buildWorkloadForecast` runs on every payload identity change — once a
  * minute via the hook's quantized `now` arg, twice per render with the
- * what-if baseline — but the responses depend only on `initialReviewCount`
- * and the rate distribution, which change rarely. A single cached entry
- * covers the one home screen / one rate set that exists in practice, so
- * the dozens of real `scheduleCard` runs behind the kernels don't repeat
- * every tick.
+ * what-if baseline — but the responses depend only on `initialReviewCount`,
+ * the rate distribution, and the deck's stability mix, which change rarely.
+ * A single cached entry covers the one home screen / one rate set that
+ * exists in practice, so the dozens of real `scheduleCard` runs behind the
+ * kernels don't repeat every tick.
  */
 let responsesCache: { key: string; responses: ReturnResponses } | null = null;
 function memoizedResponses(
   initialReviewCount: number,
   rates: RatingRates,
+  stabilityMix: MatureStabilityMix,
 ): ReturnResponses {
-  const key = `${initialReviewCount}|${rates.pAgain}|${rates.pHard}|${rates.pGood}|${rates.pEasy}`;
+  const mixKey = stabilityMix
+    .map((m) => `${m.stabilityDays}:${m.weight}`)
+    .join(',');
+  const key = `${initialReviewCount}|${rates.pAgain}|${rates.pHard}|${rates.pGood}|${rates.pEasy}|${mixKey}`;
   if (responsesCache?.key !== key) {
     responsesCache = {
       key,
       responses: expandResponses(
-        deriveReturnKernels({ initialReviewCount, rates }),
+        deriveReturnKernels({ initialReviewCount, rates, stabilityMix }),
       ),
     };
   }
@@ -531,17 +685,22 @@ export function buildWorkloadForecast(
   const { history } = data;
   const rates = deriveRatingRates(history.ratingCounts);
   const secondsPerReview = deriveSecondsPerReview(history, params.reviewMode);
-  const responses = memoizedResponses(data.initialReviewCount, rates);
+  const stabilityMix = deriveStabilityMix(data.matureStabilityCounts);
+  const responses = memoizedResponses(
+    data.initialReviewCount,
+    rates,
+    stabilityMix,
+  );
   const addKernel = [...responses.young];
   addKernel[0] = 1; // an added card is studied the day it's added
+  const newCardEvents = deriveNewCardEvents(
+    params.reviewMode,
+    data.initialReviewCount,
+    history.ratingCounts,
+  );
 
   const typicalAddsPerDay =
     history.activeDays > 0 ? history.newCards / history.activeDays : 0;
-  const repeatFactor = clamp(
-    history.cardsReviewed > 0 ? history.reps / history.cardsReviewed : 1,
-    1,
-    3,
-  );
 
   // The composition loops below index days 0..WORKLOAD_DAYS-1, so the input
   // must span exactly that window even if a stale cached payload was built
@@ -563,8 +722,15 @@ export function buildWorkloadForecast(
       backlog: mergedDueCount(data.availableNow),
       young: data.availableNow.new + youngOf(data.laterToday),
       mature: data.laterToday.review,
-      // Young/mature across the WHOLE day drive the return composition.
+      // Young/mature across the WHOLE day drive the return composition;
+      // the new/learning split prices the same-day events per state bucket.
       dayYoung: youngOf(data.availableNow) + youngOf(data.laterToday),
+      dayNew: data.availableNow.new + data.laterToday.new,
+      dayLearning:
+        data.availableNow.learning +
+        data.availableNow.relearning +
+        data.laterToday.learning +
+        data.laterToday.relearning,
       dayMature: data.availableNow.review + data.laterToday.review,
     },
     ...futureDays.map((c) => ({
@@ -572,6 +738,8 @@ export function buildWorkloadForecast(
       young: youngOf(c),
       mature: c.review,
       dayYoung: youngOf(c),
+      dayNew: c.new,
+      dayLearning: c.learning + c.relearning,
       dayMature: c.review,
     })),
   ];
@@ -604,25 +772,35 @@ export function buildWorkloadForecast(
     }
   }
 
+  const dayEvents = new Array<number>(WORKLOAD_DAYS).fill(0);
   const days: WorkloadDay[] = scheduledDays.map((s, d) => {
     const scheduledTotal = s.backlog + s.young + s.mature;
     const returns = returnsF[d];
     const whatIfAdds = whatIfF[d];
     const typicalAdds = typicalF[d];
-    const estTotal = returns + whatIfAdds + typicalAdds;
-    // Same-day grading events: mature sightings loop on 'again'; young ones
-    // (incl. every estimated sighting — returns and adds re-land young) run
-    // their learning steps.
-    const youngSightings = s.dayYoung + estTotal;
-    const matureSightings = s.dayMature;
+    // Same-day grading events, priced by the state bucket each sighting is
+    // in when it comes up (see the constant docs): fresh adds are studied
+    // as NEW cards on their add day; every estimated return and add echo
+    // re-lands GRADUATED, so it costs a mature sighting, not a young one.
+    const addsToday = addsPerDay[d];
+    const addEchoes = Math.max(0, whatIfAdds + typicalAdds - addsToday);
     const events =
-      matureSightings * (1 + rates.pAgain) +
-      youngSightings * YOUNG_EVENTS_PER_SIGHTING;
+      (s.dayMature + returns + addEchoes) * (1 + rates.pAgain) +
+      s.dayLearning * YOUNG_EVENTS_PER_SIGHTING +
+      (s.dayNew + addsToday) * newCardEvents;
+    dayEvents[d] = events;
     const estimatedReviews = Math.round(events);
     const estimatedMinutes =
       events > 0
         ? Math.max(1, Math.round((events * secondsPerReview) / 60))
         : 0;
+    // The stepper's slice of the day, for the bar's hypothetical cap: on
+    // day 0 its cards are studied as new adds, later they echo as mature
+    // sightings.
+    const whatIfEvents =
+      d === 0
+        ? whatIfAdds * newCardEvents
+        : whatIfAdds * (1 + rates.pAgain);
     return {
       offset: d,
       scheduled: {
@@ -642,20 +820,35 @@ export function buildWorkloadForecast(
       },
       estimatedReviews,
       estimatedMinutes,
+      whatIf: {
+        cards: Math.round(whatIfAdds),
+        minutes: events > 0 ? (whatIfEvents / events) * estimatedMinutes : 0,
+      },
     };
   });
+
+  // Week totals from the UNROUNDED per-day events, rounded once — seven
+  // per-day roundings (each floored at a minute) would otherwise guarantee
+  // ≥7 min/week for any non-empty deck.
+  const weekEvents = dayEvents.reduce((sum, e) => sum + e, 0);
+
+  // Graded (audio + full) reviews only — free play says nothing about
+  // review load, and the pace line must compare like with like.
+  const gradedReviews =
+    history.reviewsByMode.audio + history.reviewsByMode.full;
+  const gradedTimeMs = history.timeMsByMode.audio + history.timeMsByMode.full;
 
   return {
     days,
     rates: {
       ...rates,
-      repeatFactor,
       typicalAddsPerDay,
+      gradedReviews,
       avgDailyReviews:
-        history.activeDays > 0 ? history.reps / history.activeDays : 0,
+        history.activeDays > 0 ? gradedReviews / history.activeDays : 0,
       avgDailyMinutes:
         history.activeDays > 0
-          ? history.timeMs / history.activeDays / 60_000
+          ? gradedTimeMs / history.activeDays / 60_000
           : 0,
       secondsPerReview,
       sampleSize:
@@ -665,7 +858,10 @@ export function buildWorkloadForecast(
         history.ratingCounts.easy,
     },
     addKernel,
-    weekReviews: days.reduce((s, d) => s + d.estimatedReviews, 0),
-    weekMinutes: days.reduce((s, d) => s + d.estimatedMinutes, 0),
+    weekReviews: Math.round(weekEvents),
+    weekMinutes:
+      weekEvents > 0
+        ? Math.max(1, Math.round((weekEvents * secondsPerReview) / 60))
+        : 0,
   };
 }

@@ -6,6 +6,7 @@ import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
 import {
   cardsByStateAndDueDate,
+  cardsByStabilityBucketAndDueDate,
   TRACK_AGGREGATES,
 } from '../db/stats/cardAggregates';
 import { originsForFilter } from '../lib/collections';
@@ -24,6 +25,7 @@ import {
 import { isValidTimezone, resolveClientToday } from '../lib/dateUtils';
 import { addDays, startOfDayMs } from '../../lib/dateStrings';
 import {
+  STABILITY_BUCKETS,
   WORKLOAD_DAYS,
   WORKLOAD_HISTORY_WINDOW_DAYS,
 } from '../../lib/workloadForecast';
@@ -1105,8 +1107,9 @@ const WORKLOAD_STATES = [
  * belt and braces).
  *
  * Cost: 4 states × 8 bounds × (1 namespace, or 2 for filter 'custom') =
- * 32–64 O(log n) aggregate counts, +3 unbounded state counts for
- * `startedCards`, + ≤ ~20 dailyStats rows. `now` is
+ * 32–64 O(log n) aggregate counts, +5 for the stability-bucket mix (4
+ * bucket counts + the guard's exact review total), +3 unbounded state
+ * counts for `startedCards`, + ≤ ~20 dailyStats rows. `now` is
  * client-supplied and minute-quantized (the only wall-clock read is
  * resolveClientToday's ±1-day validation of `today`; identical
  * args keep the query cacheable across subscribers). If this query ever
@@ -1157,8 +1160,21 @@ export const getWorkloadForecast = query({
       // Cards in any non-'new' active state across the WHOLE deck (no due
       // bound, no content filter) — the client's minimum-activity gate for
       // the forecast card. Filter-independent so toggling the content
-      // filter can't flip the card in and out of existence.
+      // filter can't lock and unlock the card underneath the user.
       startedCards: v.number(),
+      // Per-stability-bucket counts of mature cards due inside the window
+      // (shared track, unfiltered — the mix is a deck property, and for
+      // separateModeTracking's writing mode it doubles as a proxy). Omitted
+      // while the backfill migration hasn't covered the deck yet; the lib
+      // falls back to its young-deck prior then.
+      matureStabilityCounts: v.optional(
+        v.object({
+          s0: v.number(),
+          s1: v.number(),
+          s2: v.number(),
+          s3: v.number(),
+        }),
+      ),
       // Set while the separateModeTracking writing seed is still filling the
       // writing aggregates. See countDueCardsByState.
       preparingWriting: v.optional(v.boolean()),
@@ -1225,6 +1241,41 @@ export const getWorkloadForecast = query({
         ),
       )
     ).reduce((sum, n) => sum + n, 0);
+
+    // Observed stability mix: mature cards due inside the whole window, per
+    // stability bucket, from the SHARED-track deck-wide aggregate (no
+    // content filter, no track split — the mix is a property of the deck,
+    // and for separateModeTracking's writing mode it stands proxy). The
+    // guard compares against the exact shared review-state total over the
+    // same range: while the backfill migration hasn't covered this deck the
+    // bucket counts read low and the payload omits the field, so the model
+    // keeps its prior — no flag, and mid-backfill partials can't masquerade
+    // as a real mix.
+    const windowUpper = { key: boundaries[WORKLOAD_DAYS], inclusive: false };
+    const [bucketCounts, sharedReviewTotal] = await Promise.all([
+      Promise.all(
+        STABILITY_BUCKETS.map((stabilityBucket) =>
+          cardsByStabilityBucketAndDueDate.count(ctx, {
+            namespace: `${deck._id}:${stabilityBucket.key}`,
+            bounds: { upper: windowUpper },
+          }),
+        ),
+      ),
+      cardsByStateAndDueDate.count(ctx, {
+        namespace: `${deck._id}:review`,
+        bounds: { upper: windowUpper },
+      }),
+    ]);
+    const bucketTotal = bucketCounts.reduce((sum, n) => sum + n, 0);
+    const matureStabilityCounts =
+      bucketTotal >= 0.9 * sharedReviewTotal
+        ? {
+            s0: bucketCounts[0],
+            s1: bucketCounts[1],
+            s2: bucketCounts[2],
+            s3: bucketCounts[3],
+          }
+        : undefined;
 
     const bucket = (pick: (prefix: number[]) => number) => ({
       new: Math.max(0, pick(pNew)),
@@ -1301,6 +1352,7 @@ export const getWorkloadForecast = query({
       initialReviewCount:
         settings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
       startedCards,
+      ...(matureStabilityCounts ? { matureStabilityCounts } : {}),
       // Same provisional gate as countDueCardsByState: a mid-seed writing
       // queue is a partial prefix, not a settled zero.
       ...(face === null &&

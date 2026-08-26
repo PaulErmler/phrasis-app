@@ -47,11 +47,6 @@
       }
     }
   },
-  "howWeAchieve": {
-    "title": "Wie erreichen",
-    "titleHighlight": "wir das?",
-    "lead": "Drei Teile, die zusammenwirken."
-  },
   "reviewModes": {
     "title": "Übung, die",
     "titleHighlight": "zum Moment passt.",
@@ -65,7 +60,7 @@
       "write": {
         "title": "Schreiben üben",
         "mode": "Schreiben",
-        "body": "Tippe den Satz und bekomme sofortiges Feedback, Zeichen für Zeichen. Übersetze aus deiner Sprache oder schreib auf, was du hörst."
+        "body": "Tippe den Satz. Die Rechtschreibung wird Zeichen für Zeichen markiert, und ein KI-Tutor bewertet die Bedeutung, wenn die Formulierung abweicht."
       },
       "radio": {
         "title": "Passiver verständlicher Input",
@@ -77,7 +72,7 @@
     "audioTitle": "Shadowing",
     "audioBody": "Das Herzstück von Flexling. Hör einen Satz, übersetze ihn im Kopf und sprich ihn dann laut nach, um deine Aussprache zu üben — sprich vom ersten Tag an, freihändig oder mit den Händen. Jede Zielzeile startet unscharf und wird nach und nach scharf, genau wie nach dem Abspielen in der App.",
     "fullTitle": "Schreiben",
-    "fullBody": "Tippe jeden Satz in deiner Zielsprache und erhalte sofortiges Feedback zur Rechtschreibung, Zeichen für Zeichen — der schnellste Weg, das Schreiben zu meistern. Was richtig ist, erscheint grün, alles Abweichende wird markiert, damit du aus jedem Fehler lernst.",
+    "fullBody": "Tippe jeden Satz in deiner Zielsprache. Die Rechtschreibung wird Zeichen für Zeichen markiert, dann bewertet ein KI-Tutor die Bedeutung: fast richtig, auch richtig, oder eine andere Bedeutung. Eine gültige andere Formulierung wird als akzeptierte Antwort gespeichert.",
     "translateTitle": "Übersetzen",
     "translateBody": "Höre einen Satz in deiner Sprache und tippe die Übersetzung in der Zielsprache ein — aktives Abrufen von Vokabeln, Grammatik und Rechtschreibung in einer Übung.",
     "transcribeTitle": "Transkribieren",
@@ -97,8 +92,23 @@
       "es": "Buenos días ¿cómo está?",
       "fr": "Bonjour, comment allez-vous ?",
       "typedEs": "Buenos dias como esta?",
-      "typedFr": "Bonjour, comment allez vous?"
+      "typedFr": "Bonjour, comment allez vous?",
+      "feedbackEsSpelling": "días, cómo und está brauchen Akzente.",
+      "feedbackEsPunctuation": "Spanische Fragen beginnen mit ¿.",
+      "feedbackFrPunctuation": "Im Französischen steht ein Bindestrich in allez-vous und ein Leerzeichen vor dem Fragezeichen."
     }
+  },
+  "writingCompare": {
+    "title": "Andere Apps nennen das",
+    "titleHighlight": "falsch.",
+    "subtitle": "Die meisten Apps vergleichen mit einem einzigen erwarteten Satz. Flexling bewertet die Bedeutung und speichert eine gültige andere Formulierung als akzeptierte Antwort.",
+    "prompt": "Ich hätte gerne einen Kaffee, bitte.",
+    "otherApps": "Andere Apps",
+    "flexling": "Flexling",
+    "typed": "Me gustaría un café, por favor.",
+    "expectedLabel": "Erwartete Antwort:",
+    "expected": "Quisiera un café, por favor.",
+    "naturalnessNote": "\"Me gustaría\" ist auch eine gültige Art, \"ich hätte gerne\" auszudrücken."
   },
   "chatDemo": {
     "title": "Karten hinzufügen, die",
@@ -373,7 +383,7 @@
     "streakTitle": "Bleib am Ball",
     "streakBody": "Deine Serie zählt jeden aufeinanderfolgenden Tag, an dem du übst. Ein einfacher, kraftvoller Motivator — und Streak-Freezes sichern dich ab, wenn das Leben dazwischenkommt.",
     "feedbackTitle": "Sofortiges Feedback",
-    "feedbackBody": "Nach dem Tippen deiner Übersetzung bekommst du einen zeichengenauen Vergleich: was richtig war, was du verpasst hast, und deinen Genauigkeitswert — sofort."
+    "feedbackBody": "Nach dem Tippen markiert ein zeichengenauer Vergleich die Rechtschreibung. Ein KI-Tutor bewertet dann die Bedeutung und kann eine gültige andere Formulierung als akzeptierte Antwort speichern."
   },
   "features": {
     "title": "Alles was du brauchst, um",
@@ -552,7 +562,7 @@
         "answer": [
           "Flexling bietet dir drei Wege, dieselben Sätze zu lernen: Shadowing, Schreiben und Radio.",
           "Beim Shadowing hörst du einen Satz in einer Sprache, die du schon verstehst, hast einen Moment, ihn im Kopf zu übersetzen, und hörst und sprichst dann den Zielsatz laut nach — freihändig, wenn du magst.",
-          "Beim Schreiben tippst du und bekommst sofort zeichengenaues Feedback zur Rechtschreibung — entweder übersetzt du einen Satz, den du in deiner Sprache hörst, oder du transkribierst genau, was du in der Zielsprache hörst, um dein Hörverständnis zu trainieren. Radio spielt Sätze und ihre Übersetzungen einfach im Hintergrund zum passiven Hören.",
+          "Beim Schreiben tippst du und bekommst einen zeichengenauen Vergleich zur Rechtschreibung, danach einen KI-Tutor, der die Bedeutung bewertet. Eine gültige andere Formulierung wird als akzeptierte Antwort gespeichert. Übersetze einen Satz, den du in deiner Sprache hörst, oder transkribiere genau, was du in der Zielsprache hörst, um dein Hörverständnis zu trainieren. Radio spielt Sätze und ihre Übersetzungen einfach im Hintergrund zum passiven Hören.",
           "Das Besondere an Flexling: Wenn du einen Satz nicht verstehst oder eine Frage hast, kannst du die KI fragen — etwa „Wie kann ich das höflicher sagen?“ oder „Gib mir drei weitere Beispiele mit diesem Verb in einer anderen Zeitform.“ — und sie erstellt automatisch neue Lernkarten mit Audio für dich.",
           "Hinweis: Wir erzeugen natürlich klingendes Audio mit modernster Text-zu-Sprache-Technologie."
         ]

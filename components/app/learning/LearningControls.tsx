@@ -169,7 +169,14 @@ export function LearningControls({
         // Held keys auto-repeat ~30×/s, without this guard a held Enter
         // races through reveal + next across several cards.
         if (e.repeat) return;
+        // While the writing coach is still thinking, Enter/→ mean next
+        // card. Submit unmounts the input and the browser parks focus on
+        // Undo, a speaker, or a clickable word; those would otherwise
+        // swallow the shortcut until the notes land.
+        const waitingOnWritingFeedback =
+          document.querySelector('[data-writing-feedback-pending]') !== null;
         if (
+          !waitingOnWritingFeedback &&
           target instanceof HTMLElement &&
           target.closest(
             'button, a, select, [role="button"], [role="link"], [role="menuitem"], [role="checkbox"], [role="radio"], [role="tab"]',

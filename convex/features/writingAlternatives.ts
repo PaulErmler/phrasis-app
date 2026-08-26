@@ -1,8 +1,10 @@
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 import {
   internalAction,
   internalMutation,
   internalQuery,
+  mutation,
+  query,
   type MutationCtx,
 } from '../_generated/server';
 import { internal } from '../_generated/api';
@@ -29,6 +31,7 @@ import {
 } from '../../lib/voices';
 import { reserveRateLimitToken } from '../lib/rateLimitReserve';
 import { TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
+import { requireAuthUserId } from '../db/users';
 import { captureGeneration } from '../lib/posthogAi';
 import { costForCharacters } from '../config/aiCosts';
 import { ttsProviderValidator, voiceGenderValidator } from '../types';
@@ -107,6 +110,137 @@ export async function storeWritingAlternative(
   );
   return alternativeId;
 }
+
+/**
+ * The caller's stored accepted alternatives for one card, all languages.
+ * Rows are per-user (a shared curriculum card can hold several users' rows),
+ * so the index read is filtered to the caller — the index doesn't carry
+ * userId. Feeds the edit dialog; the review payload gets its (richer,
+ * annotated) copy from getCardForReview instead.
+ */
+export const listForCard = query({
+  args: { cardId: v.id('cards') },
+  returns: v.array(
+    v.object({
+      _id: v.id('writingAlternatives'),
+      language: v.string(),
+      text: v.string(),
+    }),
+  ),
+  handler: async (ctx, { cardId }) => {
+    const userId = await requireAuthUserId(ctx);
+    const rows = await ctx.db
+      .query('writingAlternatives')
+      .withIndex('by_cardId_and_language', (q) => q.eq('cardId', cardId))
+      .take(100); // bounded: WRITING_ALTERNATIVES_MAX per language
+    return rows
+      .filter((r) => r.userId === userId)
+      .map((r) => ({ _id: r._id, language: r.language, text: r.text }));
+  },
+});
+
+/** The card's primary sentence for a language (source text or translation row). */
+async function primaryTextForLanguage(
+  ctx: MutationCtx,
+  cardId: Id<'cards'>,
+  language: string,
+): Promise<string | null> {
+  const card = await ctx.db.get(cardId);
+  if (!card) return null;
+  const text = await ctx.db.get(card.textId);
+  if (!text) return null;
+  if (text.language === language) return text.text;
+  const row = await ctx.db
+    .query('translations')
+    .withIndex('by_text_and_language', (q) =>
+      q.eq('textId', card.textId).eq('targetLanguage', language),
+    )
+    .first();
+  return row?.translatedText ?? null;
+}
+
+/**
+ * Reword a stored accepted alternative (edit dialog). Applies the same
+ * dedupe rule as `storeWritingAlternative`: a new wording that now equals
+ * the card's primary or another stored row deletes this row instead of
+ * patching it — the reactive list simply loses the entry. A real reword
+ * clears the row's annotations + audio pointer (they describe the old
+ * sentence) and reschedules generation. No quota: per-user rows, no
+ * curriculum fork, no cardEdits audit event.
+ */
+export const updateAlternative = mutation({
+  args: { alternativeId: v.id('writingAlternatives'), text: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireAuthUserId(ctx);
+    const row = await ctx.db.get(args.alternativeId);
+    if (!row) throw new ConvexError('Alternative not found');
+    if (row.userId !== userId) throw new ConvexError('Unauthorized');
+
+    const text = args.text.slice(0, MAX_CARD_TEXT_LENGTH).trim();
+    if (!text) throw new ConvexError('Alternative text cannot be empty');
+    const normalized = normalizeForComparison(text);
+    if (normalized === normalizeForComparison(row.text)) return null;
+
+    const primary = await primaryTextForLanguage(ctx, row.cardId, row.language);
+    if (primary !== null && normalized === normalizeForComparison(primary)) {
+      await ctx.db.delete(row._id);
+      return null;
+    }
+    const siblings = await ctx.db
+      .query('writingAlternatives')
+      .withIndex('by_cardId_and_language', (q) =>
+        q.eq('cardId', row.cardId).eq('language', row.language),
+      )
+      .take(WRITING_ALTERNATIVES_MAX * 2);
+    if (
+      siblings.some(
+        (r) =>
+          r._id !== row._id && normalizeForComparison(r.text) === normalized,
+      )
+    ) {
+      await ctx.db.delete(row._id);
+      return null;
+    }
+
+    await ctx.db.patch(row._id, {
+      text,
+      romanizedText: undefined,
+      ipaText: undefined,
+      furiganaText: undefined,
+      audioAssetId: undefined,
+    });
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.writingAlternativesNode.generateAlternativeAnnotations,
+      { alternativeId: row._id },
+    );
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.writingAlternatives.generateAlternativeAudio,
+      { alternativeId: row._id },
+    );
+    return null;
+  },
+});
+
+/**
+ * Delete a stored accepted alternative (edit dialog). The audio asset is
+ * shared and content-addressed, so it is left alone — exactly as card
+ * deletion treats these rows.
+ */
+export const deleteAlternative = mutation({
+  args: { alternativeId: v.id('writingAlternatives') },
+  returns: v.null(),
+  handler: async (ctx, { alternativeId }) => {
+    const userId = await requireAuthUserId(ctx);
+    const row = await ctx.db.get(alternativeId);
+    if (!row) throw new ConvexError('Alternative not found');
+    if (row.userId !== userId) throw new ConvexError('Unauthorized');
+    await ctx.db.delete(row._id);
+    return null;
+  },
+});
 
 const alternativeContextValidator = v.union(
   v.null(),

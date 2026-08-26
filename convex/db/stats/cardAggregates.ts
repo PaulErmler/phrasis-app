@@ -5,6 +5,10 @@ import { TableAggregate } from '@convex-dev/aggregate';
 import { Doc, Id } from '../../_generated/dataModel';
 import { LEGACY_TO_NEW_CODE } from '../../lib/collections';
 import type { SchedulingTrack } from '../../types';
+import {
+  STABILITY_BUCKETS,
+  stabilityBucketKey,
+} from '../../../lib/workloadForecast';
 
 // ============================================================================
 // State label helpers
@@ -123,6 +127,52 @@ export const cardsByOriginWritingStateAndDueDate = new TableAggregate<{
   sortKey: (doc) => doc.writingDueDate ?? 0,
 });
 
+/**
+ * Whether a card belongs in the stability-bucket aggregate: exactly the
+ * cards `getCardStateLabel` files under 'review' (shared track, Review
+ * FSRS state, not hidden/mastered). Membership is gated in the helpers
+ * below (the aggregate has no conditional-membership primitive), mirroring
+ * how `hasWritingTrack` gates the writing mirrors.
+ */
+export function isStabilityBucketMember(doc: Doc<'cards'>): boolean {
+  return getCardStateLabel(doc) === 'review';
+}
+
+/**
+ * Mature cards grouped by [deckId:stabilityBucket], sorted by dueDate — the
+ * bucket thresholds and their kernel representatives live in
+ * lib/workloadForecast.ts (`STABILITY_BUCKETS`), which is also the consumer:
+ * `getWorkloadForecast` counts due-in-window cards per bucket so the
+ * forecast's mature return kernel runs over the deck's OBSERVED stability
+ * mix instead of a hard-coded prior.
+ *
+ * Members are Review-state cards only (see `isStabilityBucketMember`), so
+ * this aggregate is written by the low-frequency mature reviews, lapses and
+ * graduations — never by same-day learning loops.
+ */
+export const cardsByStabilityBucketAndDueDate = new TableAggregate<{
+  Namespace: string; // `${deckId}:${stabilityBucketKey}`
+  Key: number; // dueDate
+  DataModel: DataModel;
+  TableName: 'cards';
+}>(components.cardsByStabilityBucketAndDueDate, {
+  namespace: (doc) =>
+    `${doc.deckId}:${stabilityBucketKey(doc.fsrsState?.stability ?? 0)}`,
+  sortKey: (doc) => doc.dueDate,
+});
+
+/** Card fields the stability-bucket aggregate derives membership,
+ * namespace, or sortKey from — the same untouched-skip contract as
+ * `TRACK_AGGREGATES[track].fields`. */
+const STABILITY_BUCKET_FIELDS: ReadonlySet<string> = new Set([
+  'deckId',
+  'dueDate',
+  'isHidden',
+  'isMastered',
+  'schedulingPhase',
+  'fsrsState',
+]);
+
 // ============================================================================
 // Card write helpers (wrap ctx.db calls + aggregate sync)
 // ============================================================================
@@ -138,6 +188,9 @@ export async function insertCard(
   const doc = (await ctx.db.get(id))!;
   await cardsByStateAndDueDate.insertIfDoesNotExist(ctx, doc);
   await cardsByOriginStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+  if (isStabilityBucketMember(doc)) {
+    await cardsByStabilityBucketAndDueDate.insertIfDoesNotExist(ctx, doc);
+  }
   if (hasWritingTrack(doc)) {
     await cardsByWritingStateAndDueDate.insertIfDoesNotExist(ctx, doc);
     await cardsByOriginWritingStateAndDueDate.insertIfDoesNotExist(ctx, doc);
@@ -247,6 +300,26 @@ export async function patchCard(
   if (touchesShared) {
     await cardsByStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
     await cardsByOriginStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
+  }
+  // Stability-bucket aggregate: membership is Review-state-only, so a patch
+  // can move a card in (graduation), out (lapse, hide, master), or within
+  // (a mature review re-keying dueDate/stability). Membership and namespace
+  // derive only from STABILITY_BUCKET_FIELDS, so untouched patches skip the
+  // subtransaction entirely.
+  if (patchKeys.some((k) => STABILITY_BUCKET_FIELDS.has(k))) {
+    const wasMember = isStabilityBucketMember(resolvedOld);
+    const isMember = isStabilityBucketMember(newDoc);
+    if (isMember && wasMember) {
+      await cardsByStabilityBucketAndDueDate.replaceOrInsert(
+        ctx,
+        resolvedOld,
+        newDoc,
+      );
+    } else if (isMember) {
+      await cardsByStabilityBucketAndDueDate.insertIfDoesNotExist(ctx, newDoc);
+    } else if (wasMember) {
+      await cardsByStabilityBucketAndDueDate.deleteIfExists(ctx, resolvedOld);
+    }
   }
   // Writing-track aggregates: membership is gated on the track existing, so a
   // patch can move a card in (seeding), out (never in practice, nothing
@@ -393,6 +466,15 @@ export async function clearAggregatesForDeck(
       });
     }
   }
+  // The stability-bucket aggregate is shared-track-only; clear it with that
+  // track so the recalc migration's re-insert pass starts from empty.
+  if (track === 'shared') {
+    for (const bucket of STABILITY_BUCKETS) {
+      await cardsByStabilityBucketAndDueDate.clear(ctx, {
+        namespace: `${deckId}:${bucket.key}`,
+      });
+    }
+  }
 }
 
 /**
@@ -406,6 +488,9 @@ export async function deleteCard(
   if (!oldDoc) return;
   await cardsByStateAndDueDate.deleteIfExists(ctx, oldDoc);
   await cardsByOriginStateAndDueDate.deleteIfExists(ctx, oldDoc);
+  if (isStabilityBucketMember(oldDoc)) {
+    await cardsByStabilityBucketAndDueDate.deleteIfExists(ctx, oldDoc);
+  }
   if (hasWritingTrack(oldDoc)) {
     await cardsByWritingStateAndDueDate.deleteIfExists(ctx, oldDoc);
     await cardsByOriginWritingStateAndDueDate.deleteIfExists(ctx, oldDoc);

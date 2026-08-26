@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useLayoutEffect } from 'react';
+import { useState, useLayoutEffect, useMemo } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { getUserTimezone } from '@/lib/timezone';
@@ -16,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Trash2, Undo2 } from 'lucide-react';
 import {
   getLocalizedLanguageNameByCode,
   getTextDirection,
@@ -45,8 +45,29 @@ export function EditCardDialog({
   const t = useTranslations('EditCard');
   const locale = useLocale();
   const editCard = useMutation(api.features.scheduling.editCard);
+  const updateAlternative = useMutation(
+    api.features.writingAlternatives.updateAlternative,
+  );
+  const deleteAlternative = useMutation(
+    api.features.writingAlternatives.deleteAlternative,
+  );
+  // The user's stored accepted alternatives (writing mode). Fetched here
+  // rather than passed in: only the learning-mode payload carries them, and
+  // the dialog also opens from the library and the word-stats sheet.
+  const alternativeRows = useQuery(
+    api.features.writingAlternatives.listForCard,
+    open ? { cardId } : 'skip',
+  );
 
   const [editedTexts, setEditedTexts] = useState<Record<string, string>>({});
+  // Alternative drafts, keyed by row id. Seeded LAZILY (value ?? row.text)
+  // because the rows arrive async after open; only edited ids are stored.
+  const [editedAlternatives, setEditedAlternatives] = useState<
+    Record<string, string>
+  >({});
+  const [deletedAlternatives, setDeletedAlternatives] = useState<Set<string>>(
+    new Set(),
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
 
@@ -61,16 +82,41 @@ export function EditCardDialog({
         initial[tr.language] = tr.text;
       }
       setEditedTexts(initial);
+      setEditedAlternatives({});
+      setDeletedAlternatives(new Set());
     }
   }, [open, translations]);
+
+  const alternativesByLanguage = useMemo(() => {
+    const map = new Map<string, NonNullable<typeof alternativeRows>>();
+    for (const row of alternativeRows ?? []) {
+      map.set(row.language, [...(map.get(row.language) ?? []), row]);
+    }
+    return map;
+  }, [alternativeRows]);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const translationArgs = Object.entries(editedTexts).map(
-        ([language, text]) => ({ language, text }),
-      );
-      await editCard({ cardId, translations: translationArgs, timezone: getUserTimezone() });
+      // The card edit burns card_edits quota and writes an audit row, so it
+      // only runs when a sentence actually changed; alternative edits are
+      // free per-user rows and go through their own mutations.
+      if (hasChanges) {
+        const translationArgs = Object.entries(editedTexts).map(
+          ([language, text]) => ({ language, text }),
+        );
+        await editCard({ cardId, translations: translationArgs, timezone: getUserTimezone() });
+      }
+      for (const row of alternativeRows ?? []) {
+        if (deletedAlternatives.has(row._id)) {
+          await deleteAlternative({ alternativeId: row._id });
+          continue;
+        }
+        const draft = editedAlternatives[row._id];
+        if (draft !== undefined && draft !== row.text && draft.trim()) {
+          await updateAlternative({ alternativeId: row._id, text: draft });
+        }
+      }
       onOpenChange(false);
     } catch (err) {
       if (isPaymentPastDueError(err)) {
@@ -97,9 +143,29 @@ export function EditCardDialog({
       Object.hasOwn(editedTexts, tr.language) &&
       editedTexts[tr.language] !== tr.text,
   );
+  const hasAlternativeChanges =
+    deletedAlternatives.size > 0 ||
+    (alternativeRows ?? []).some(
+      (row) =>
+        !deletedAlternatives.has(row._id) &&
+        editedAlternatives[row._id] !== undefined &&
+        editedAlternatives[row._id] !== row.text,
+    );
 
-  const hasOverLimit = Object.values(editedTexts).some(
-    (text) => text.length > MAX_CARD_TEXT_LENGTH,
+  const hasOverLimit =
+    Object.values(editedTexts).some(
+      (text) => text.length > MAX_CARD_TEXT_LENGTH,
+    ) ||
+    Object.values(editedAlternatives).some(
+      (text) => text.length > MAX_CARD_TEXT_LENGTH,
+    );
+  // An emptied alternative blocks Save (deleting is the trash icon's job,
+  // never a silent side effect of clearing a field).
+  const hasEmptyAlternative = (alternativeRows ?? []).some(
+    (row) =>
+      !deletedAlternatives.has(row._id) &&
+      editedAlternatives[row._id] !== undefined &&
+      !editedAlternatives[row._id].trim(),
   );
 
   const allLanguages = translations.map((tr) => tr.language);
@@ -156,6 +222,74 @@ export function EditCardDialog({
                         'border-destructive focus-visible:ring-destructive',
                     )}
                   />
+                  {(alternativesByLanguage.get(lang)?.length ?? 0) > 0 && (
+                    <div
+                      className="space-y-1.5 pt-1"
+                      data-testid={`edit-alternatives-${lang}`}
+                    >
+                      <p className="text-xs text-muted-foreground">
+                        {t('alternativesLabel')}
+                      </p>
+                      {alternativesByLanguage.get(lang)!.map((row) => {
+                        const draft = editedAlternatives[row._id] ?? row.text;
+                        const isDeleted = deletedAlternatives.has(row._id);
+                        const altOverLimit =
+                          draft.length > MAX_CARD_TEXT_LENGTH;
+                        return (
+                          <div
+                            key={row._id}
+                            className="flex items-center gap-1.5"
+                          >
+                            <Input
+                              value={draft}
+                              disabled={isDeleted}
+                              aria-invalid={!isDeleted && altOverLimit}
+                              onChange={(e) =>
+                                setEditedAlternatives((prev) => ({
+                                  ...prev,
+                                  [row._id]: e.target.value,
+                                }))
+                              }
+                              dir={getTextDirection(lang)}
+                              className={cn(
+                                'text-left',
+                                isDeleted &&
+                                  'line-through opacity-50',
+                                !isDeleted &&
+                                  altOverLimit &&
+                                  'border-destructive focus-visible:ring-destructive',
+                              )}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 shrink-0 text-muted-foreground"
+                              aria-label={
+                                isDeleted
+                                  ? t('undoDeleteAlternative')
+                                  : t('deleteAlternative')
+                              }
+                              onClick={() =>
+                                setDeletedAlternatives((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(row._id)) next.delete(row._id);
+                                  else next.add(row._id);
+                                  return next;
+                                })
+                              }
+                            >
+                              {isDeleted ? (
+                                <Undo2 className="h-4 w-4" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -174,7 +308,12 @@ export function EditCardDialog({
               type="button"
               className="flex-1"
               onClick={handleSave}
-              disabled={isSaving || !hasChanges || hasOverLimit}
+              disabled={
+                isSaving ||
+                (!hasChanges && !hasAlternativeChanges) ||
+                hasOverLimit ||
+                hasEmptyAlternative
+              }
             >
               {isSaving ? (
                 <>

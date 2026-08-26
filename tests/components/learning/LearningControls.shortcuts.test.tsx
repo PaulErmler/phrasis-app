@@ -101,6 +101,88 @@ describe('LearningControls: window shortcuts', () => {
     expect(handlers.onNext).not.toHaveBeenCalled();
   });
 
+  it('Enter advances once the writing card is revealed, from the card sentinel', () => {
+    const handlers = makeHandlers();
+    render(
+      <>
+        <div data-testid="writing-review-card" tabIndex={-1} />
+        <LearningControls
+          validRatings={RATINGS}
+          activeRating="good"
+          ratingIntervals={{}}
+          isPlaying={false}
+          isMerging={false}
+          durationSec={12}
+          undoDisabled={false}
+          isReviewing={false}
+          isFullReview
+          fullReviewRevealed
+          {...handlers}
+        />
+      </>,
+    );
+    const sentinel = screen.getByTestId('writing-review-card');
+    sentinel.focus();
+    fireEvent.keyDown(sentinel, { key: 'Enter' });
+    expect(handlers.onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('Enter on a focused button advances while the writing coach is thinking', () => {
+    const handlers = makeHandlers();
+    render(
+      <>
+        {/* The pending coach card's behavior hook (WritingFeedbackCard). */}
+        <div data-writing-feedback-pending="" />
+        <button data-testid="parked-focus">Undo</button>
+        <LearningControls
+          validRatings={RATINGS}
+          activeRating="good"
+          ratingIntervals={{}}
+          isPlaying={false}
+          isMerging={false}
+          durationSec={12}
+          undoDisabled={false}
+          isReviewing={false}
+          isFullReview
+          fullReviewRevealed
+          {...handlers}
+        />
+      </>,
+    );
+    const button = screen.getByTestId('parked-focus');
+    button.focus();
+    // Submit unmounts the input and parks focus on a button; while the
+    // grader is pending, Enter must still mean next-card.
+    fireEvent.keyDown(button, { key: 'Enter' });
+    expect(handlers.onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('Enter on a focused button is left alone when no grade is pending', () => {
+    const handlers = makeHandlers();
+    render(
+      <>
+        <button data-testid="parked-focus">Undo</button>
+        <LearningControls
+          validRatings={RATINGS}
+          activeRating="good"
+          ratingIntervals={{}}
+          isPlaying={false}
+          isMerging={false}
+          durationSec={12}
+          undoDisabled={false}
+          isReviewing={false}
+          isFullReview
+          fullReviewRevealed
+          {...handlers}
+        />
+      </>,
+    );
+    const button = screen.getByTestId('parked-focus');
+    button.focus();
+    fireEvent.keyDown(button, { key: 'Enter' });
+    expect(handlers.onNext).not.toHaveBeenCalled();
+  });
+
   it('ArrowLeft steps back', () => {
     const handlers = makeHandlers();
     renderControls(handlers);

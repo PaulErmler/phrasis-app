@@ -9,9 +9,9 @@ import { cn } from '@/lib/utils';
 import { addDays } from '@/lib/dateStrings';
 import { formatTimeMs } from '@/lib/formatTime';
 import {
+  MIN_PACE_SAMPLE,
   WHAT_IF_ADD_MAX,
   WHAT_IF_ADD_MIN,
-  YOUNG_EVENTS_PER_SIGHTING,
   type WorkloadDay,
   type WorkloadForecast,
 } from '@/lib/workloadForecast';
@@ -28,6 +28,9 @@ type Props = {
   today: string;
   unit?: WorkloadUnit;
   isProvisional?: boolean;
+  /** The course's daily study-time goal — the reference line while the
+   * window has too few graded reviews for a trustworthy usual-pace average. */
+  dailyGoalMinutes?: number;
   addCount: number;
   onAddCountChange: (n: number) => void;
   /** Extra load of the current stepper value vs. adding nothing. */
@@ -36,89 +39,26 @@ type Props = {
 
 const PLOT_HEIGHT = 104;
 
-/** Same-day event weight per displayed segment class, used only to
- * proportion a day's stack in time mode (the day TOTAL is the model's
- * estimatedMinutes; these split it). Young-ish classes share the model's
- * YOUNG_EVENTS_PER_SIGHTING multiplier; `mature` approximates the model's
- * live `1 + pAgain` with the prior pAgain (display split only — the exact
- * per-day minutes still come from the model), and `backlog` blends the
- * two. */
-const SEGMENT_TIME_WEIGHT = {
-  backlog: 1.35,
-  young: YOUNG_EVENTS_PER_SIGHTING,
-  mature: 1.1,
-  returns: YOUNG_EVENTS_PER_SIGHTING,
-  whatIf: YOUNG_EVENTS_PER_SIGHTING,
-} as const;
-
-type SegmentKey = keyof typeof SEGMENT_TIME_WEIGHT;
-
-const SEGMENT_ORDER: SegmentKey[] = [
-  'backlog',
-  'young',
-  'mature',
-  'returns',
-  'whatIf',
-];
-
-const SEGMENT_CLASS: Record<SegmentKey, string> = {
-  backlog: 'bg-accent-orange/80',
-  young: 'bg-primary/45',
-  mature: 'bg-primary/80',
-  returns: 'bg-primary/15',
-  whatIf: 'bg-primary/15',
+/** Striped fill marks the what-if cap — the one hypothetical, user-dialed
+ * slice of an otherwise solid load bar. */
+const WHAT_IF_STRIPE: React.CSSProperties = {
+  backgroundImage:
+    'repeating-linear-gradient(45deg, color-mix(in srgb, var(--primary) 55%, transparent) 0 2px, transparent 2px 6px)',
 };
-
-/** Striped fills mark ESTIMATES (returns 135°, what-if 45°) — the visual
- * contract that solid = exact schedule, striped = model. */
-const SEGMENT_STRIPE: Partial<Record<SegmentKey, React.CSSProperties>> = {
-  returns: {
-    backgroundImage:
-      'repeating-linear-gradient(135deg, color-mix(in srgb, var(--primary) 55%, transparent) 0 2px, transparent 2px 6px)',
-  },
-  whatIf: {
-    backgroundImage:
-      'repeating-linear-gradient(45deg, color-mix(in srgb, var(--primary) 55%, transparent) 0 2px, transparent 2px 6px)',
-  },
-};
-
-function segmentCards(day: WorkloadDay): Record<SegmentKey, number> {
-  return {
-    backlog: day.scheduled.backlog,
-    young: day.scheduled.young,
-    mature: day.scheduled.mature,
-    returns: day.estimated.returns,
-    whatIf: day.estimated.whatIfAdds + day.estimated.typicalAdds,
-  };
-}
-
-/** A day's segment values in the leading unit. Cards mode shows raw counts;
- * time mode splits the day's estimatedMinutes by event weight so the stack
- * height always agrees with its minute cap. */
-function segmentValues(
-  day: WorkloadDay,
-  unit: WorkloadUnit,
-): Record<SegmentKey, number> {
-  const cards = segmentCards(day);
-  if (unit === 'cards') return cards;
-  const weighted = SEGMENT_ORDER.map(
-    (key) => cards[key] * SEGMENT_TIME_WEIGHT[key],
-  );
-  const total = weighted.reduce((a, b) => a + b, 0);
-  if (total <= 0) {
-    return { backlog: 0, young: 0, mature: 0, returns: 0, whatIf: 0 };
-  }
-  const out = {} as Record<SegmentKey, number>;
-  SEGMENT_ORDER.forEach((key, i) => {
-    out[key] = (weighted[i] / total) * day.estimatedMinutes;
-  });
-  return out;
-}
 
 const dayTotal = (day: WorkloadDay, unit: WorkloadUnit) =>
   unit === 'time'
     ? day.estimatedMinutes
     : day.scheduled.total + day.estimated.total;
+
+/** The stepper's slice of a day's bar, in the leading unit. The model keeps
+ * it ≤ the day total; re-clamped here so a rounded cards split can never
+ * overshoot the bar. */
+const dayWhatIf = (day: WorkloadDay, unit: WorkloadUnit) =>
+  Math.min(
+    unit === 'time' ? day.whatIf.minutes : day.whatIf.cards,
+    dayTotal(day, unit),
+  );
 
 const fmtMin = (minutes: number) => formatTimeMs(minutes * 60_000);
 
@@ -131,17 +71,20 @@ function gridStep(max: number): number {
 }
 
 /**
- * The shipping workload card (artifact prototype "V2 composed"): stacked
- * exact schedule (backlog / young / mature), striped estimate layers
- * (second-wave returns, what-if adds), a dashed usual-pace line, and the
- * "+X cards" stepper. Purely presentational — all data arrives via props,
- * so tests and previews can feed fixtures without Convex.
+ * The shipping workload chart: one solid load bar per day (the model's
+ * scheduled + estimated totals, folded — the internal exact-vs-estimated
+ * taxonomy stays in lib/workloadForecast.ts), a striped cap for the what-if
+ * stepper's adds, a dashed usual-pace line, and the "+X cards" stepper.
+ * Purely presentational — all data arrives via props, so tests and previews
+ * can feed fixtures without Convex. The title + summary row lives in the
+ * collapsible wrapper (WorkloadForecastCard).
  */
 export function WorkloadStackedCard({
   forecast,
   today,
   unit = 'time',
   isProvisional = false,
+  dailyGoalMinutes,
   addCount,
   onAddCountChange,
   whatIfDelta,
@@ -180,70 +123,29 @@ export function WorkloadStackedCard({
       day.estimated.returns === 0 &&
       day.estimated.typicalAdds === 0,
   );
-  const pace = isTime ? rates.avgDailyMinutes : rates.avgDailyReviews;
-  const showPace = pace > 0.5;
+  // Reference line: the observed usual pace once the window holds enough
+  // graded reviews to mean something; before that, the user's daily goal
+  // (time mode only — the goal is a minutes number).
+  const paceReliable = rates.gradedReviews >= MIN_PACE_SAMPLE;
+  const observedPace = isTime ? rates.avgDailyMinutes : rates.avgDailyReviews;
+  const usingGoal =
+    !paceReliable && isTime && (dailyGoalMinutes ?? 0) > 0;
+  const pace = usingGoal ? dailyGoalMinutes! : observedPace;
+  const showPace = usingGoal || (paceReliable && observedPace > 0.5);
   const max = Math.max(...totals, showPace ? pace : 0, 1) * 1.12;
   const step = gridStep(max);
   const gridValues: number[] = [];
   for (let value = step; value <= max; value += step) gridValues.push(value);
   const peakIndex = totals.indexOf(Math.max(...totals));
 
-  const backlog = days[0].scheduled.backlog;
-  const backlogMinutes = Math.max(
-    1,
-    Math.round(segmentValues(days[0], 'time').backlog),
-  );
-  const hasReturns = days.some((d) => d.estimated.returns > 0);
-  const hasWhatIf = days.some(
-    (d) => d.estimated.whatIfAdds + d.estimated.typicalAdds > 0,
-  );
+  const hasWhatIf = days.some((day) => dayWhatIf(day, unit) > 0);
 
-  const todayMinutes = fmtMin(days[0].estimatedMinutes);
-  const weekMinutes = fmtMin(forecast.weekMinutes);
   // fmtMin renders 0 as "0s"; a zero-load DAY label should read "0m".
   const fmtMinLabel = (minutes: number) =>
     minutes > 0 ? fmtMin(minutes) : t('axisMinutes', { value: 0 });
 
   return (
     <div className={cn(isProvisional && 'opacity-70 transition-opacity')}>
-      <div className="flex items-baseline justify-between gap-2">
-        <div className="min-w-0">
-          <h3 className="text-sm font-semibold leading-tight">{t('title')}</h3>
-          <p className="text-muted-xs mt-0.5">
-            {isTime ? (
-              <>
-                <span className="font-semibold text-foreground/80">
-                  {t('approxToday', { value: todayMinutes })}
-                </span>
-                {' · '}
-                {t('thisWeek', { value: weekMinutes })}
-              </>
-            ) : (
-              <>
-                <span className="font-semibold text-foreground/80">
-                  {t('cardsToday', {
-                    // Estimate-inclusive, so the header agrees with the
-                    // day-0 column cap below it (time mode's headline
-                    // minutes already include estimates).
-                    count: days[0].scheduled.total + days[0].estimated.total,
-                    time: todayMinutes,
-                  })}
-                </span>
-                {' · '}
-                {t('thisWeek', { value: weekMinutes })}
-              </>
-            )}
-          </p>
-        </div>
-        {backlog > 0 && (
-          <span className="shrink-0 rounded-full bg-accent-orange/10 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-accent-orange">
-            {isTime
-              ? t('overdueTime', { value: fmtMin(backlogMinutes) })
-              : t('overdue', { count: backlog })}
-          </span>
-        )}
-      </div>
-
       {isEmpty ? (
         <p className="text-muted-xs py-6 text-center">{t('empty')}</p>
       ) : (
@@ -263,22 +165,19 @@ export function WorkloadStackedCard({
             ))}
             <div className="flex" style={{ height: PLOT_HEIGHT + 22 + 24 }}>
               {days.map((day, i) => {
-                const segs = segmentValues(day, unit);
                 const total = dayTotal(day, unit);
-                const cardsTotal =
-                  day.scheduled.total + day.estimated.total;
-                // Compared by ARRAY index — peakIndex indexes `totals`,
-                // and leaning on the days[i].offset === i invariant here
-                // would break silently if the model ever changed it.
-                const showCap = i === 0 || (i === peakIndex && total > 0);
+                const whatIf = dayWhatIf(day, unit);
+                const base = total - whatIf;
+                const cardsTotal = day.scheduled.total + day.estimated.total;
+                const showCap =
+                  day.offset === 0 || (day.offset === peakIndex && total > 0);
                 return (
                   <div
                     key={day.offset}
                     role="img"
                     aria-label={t('dayAria', {
                       day: dayLabels[i],
-                      scheduled: day.scheduled.total,
-                      estimated: day.estimated.total,
+                      cards: cardsTotal,
                       minutes: day.estimatedMinutes,
                     })}
                     className="flex min-w-0 flex-1 flex-col items-center justify-end"
@@ -298,36 +197,33 @@ export function WorkloadStackedCard({
                         : ''}
                     </span>
                     {/* flex-grow apportions the container height by value
-                        (gaps are taken out first), so the stack can neither
-                        overflow its value-scaled height nor silently shrink
-                        the way fixed pixel heights with a 3px floor did;
+                        (gaps are taken out first), so the bar can neither
+                        overflow its value-scaled height nor silently shrink;
                         min-h-px keeps slivers visible as hairlines. */}
                     <div
                       className="flex w-[22px] flex-col-reverse gap-[2px] overflow-hidden"
                       style={{ height: (total / max) * PLOT_HEIGHT }}
                     >
-                      {SEGMENT_ORDER.map((key, i) => {
-                        const value = segs[key];
-                        if (value <= 0) return null;
-                        const isTop = SEGMENT_ORDER.slice(i + 1).every(
-                          (later) => segs[later] <= 0,
-                        );
-                        return (
-                          <div
-                            key={key}
-                            className={cn(
-                              'min-h-px w-full',
-                              SEGMENT_CLASS[key],
-                              isTop && 'rounded-t-[4px]',
-                            )}
-                            style={{
-                              flexGrow: value,
-                              flexBasis: 0,
-                              ...SEGMENT_STRIPE[key],
-                            }}
-                          />
-                        );
-                      })}
+                      {base > 0 && (
+                        <div
+                          className={cn(
+                            'min-h-px w-full bg-primary/70',
+                            whatIf <= 0 && 'rounded-t-[4px]',
+                          )}
+                          style={{ flexGrow: base, flexBasis: 0 }}
+                        />
+                      )}
+                      {whatIf > 0 && (
+                        <div
+                          data-testid="whatif-cap"
+                          className="min-h-px w-full rounded-t-[4px] bg-primary/15"
+                          style={{
+                            flexGrow: whatIf,
+                            flexBasis: 0,
+                            ...WHAT_IF_STRIPE,
+                          }}
+                        />
+                      )}
                     </div>
                     <span
                       className={cn(
@@ -361,13 +257,15 @@ export function WorkloadStackedCard({
                 style={{ bottom: 22 + (Math.min(pace, max) / max) * PLOT_HEIGHT }}
               >
                 <span className="absolute right-0 top-[-15px] bg-card px-1 text-[9px] text-muted-foreground">
-                  {t('paceLine', {
-                    value: isTime
-                      ? t('approxShort', {
-                          value: fmtMin(Math.max(1, Math.round(pace))),
-                        })
-                      : Math.round(pace),
-                  })}
+                  {usingGoal
+                    ? t('goalLine', { value: fmtMin(pace) })
+                    : t('paceLine', {
+                        value: isTime
+                          ? t('approxShort', {
+                              value: fmtMin(Math.max(1, Math.round(pace))),
+                            })
+                          : Math.round(pace),
+                      })}
                 </span>
               </div>
             )}
@@ -419,56 +317,31 @@ export function WorkloadStackedCard({
             </p>
           </div>
 
-          <div className="text-muted-xs mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
-            {backlog > 0 && (
-              <LegendKey className="bg-accent-orange/80">
-                {t('legendOverdue')}
-              </LegendKey>
-            )}
-            <LegendKey className="bg-primary/45">{t('legendYoung')}</LegendKey>
-            <LegendKey className="bg-primary/80">{t('legendMature')}</LegendKey>
-            {hasReturns && (
-              <LegendKey
-                className="bg-primary/15"
-                style={SEGMENT_STRIPE.returns}
-              >
-                {t('legendReturns')}
-              </LegendKey>
-            )}
-            {hasWhatIf && (
-              <LegendKey className="bg-primary/15" style={SEGMENT_STRIPE.whatIf}>
-                {t('legendWhatIf', { count: addCount })}
-              </LegendKey>
-            )}
-            {showPace && (
-              <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block w-3.5 border-t-2 border-dashed border-muted-foreground/50" />
-                {t('legendPace')}
+          {(hasWhatIf || showPace) && (
+            <div className="text-muted-xs mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px]">
+              {/* What-if stays left; the reference-line key sits right,
+                  under the right-anchored line label it explains. */}
+              <span>
+                {hasWhatIf && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      className="inline-block size-[9px] rounded-[2.5px] bg-primary/15"
+                      style={WHAT_IF_STRIPE}
+                    />
+                    {t('legendWhatIf', { count: addCount })}
+                  </span>
+                )}
               </span>
-            )}
-          </div>
+              {showPace && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block w-3.5 border-t-2 border-dashed border-muted-foreground/50" />
+                  {usingGoal ? t('legendGoal') : t('legendPace')}
+                </span>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
-  );
-}
-
-function LegendKey({
-  className,
-  style,
-  children,
-}: {
-  className?: string;
-  style?: React.CSSProperties;
-  children: React.ReactNode;
-}) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span
-        className={cn('inline-block size-[9px] rounded-[2.5px]', className)}
-        style={style}
-      />
-      {children}
-    </span>
   );
 }

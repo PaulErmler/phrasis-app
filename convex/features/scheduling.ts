@@ -89,7 +89,7 @@ import {
   deleteAudioRow,
   deleteAudioRowsForTextLanguage,
 } from '../lib/audio';
-import { soundsSame } from '../lib/textComparison';
+import { normalizeForComparison, soundsSame } from '../lib/textComparison';
 import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
 import {
   isUserCreatedText,
@@ -2613,6 +2613,25 @@ export async function applyCardEdit(
         cardIdAfter: resolvedCardId,
         textIdAfter: resolvedTextId,
       });
+    }
+
+    // An edit can turn the primary sentence INTO one of the user's stored
+    // accepted alternatives; the store path dedupes against the primary, so
+    // keeping such a row would list the card's own sentence twice under the
+    // writing answer. Drop any alternative the new wording now duplicates.
+    for (const lang of changedLanguages) {
+      const newPrimary = normalizeForComparison(submittedMap.get(lang)!);
+      const duplicateAlternatives = await ctx.db
+        .query('writingAlternatives')
+        .withIndex('by_cardId_and_language', (q) =>
+          q.eq('cardId', args.cardId).eq('language', lang),
+        )
+        .take(WRITING_ALTERNATIVES_MAX * 2);
+      for (const alt of duplicateAlternatives) {
+        if (normalizeForComparison(alt.text) === newPrimary) {
+          await ctx.db.delete(alt._id);
+        }
+      }
     }
 
     await trackCardAction(ctx, userId, 'edit', card, {

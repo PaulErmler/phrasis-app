@@ -166,9 +166,10 @@ describe('getWorkloadForecast', () => {
       res!.laterToday.review +
       res!.futureDays.reduce((s, d) => s + d.review, 0);
     expect(totalReview).toBe(8);
-    // 4 states × 8 bounds for filter 'both', + 3 unbounded startedCards
-    // counts (learning/relearning/review).
-    expect(countCalls).toHaveLength(35);
+    // 4 states × 8 bounds for filter 'both', +4 stability buckets +1 guard
+    // total for the observed-mix payload, +3 unbounded startedCards counts
+    // (learning/relearning/review).
+    expect(countCalls).toHaveLength(40);
     expect(countCalls.filter((c) => c.upper === undefined)).toHaveLength(3);
     expect(res!.preparingWriting).toBeUndefined();
     expect(res!.initialReviewCount).toBe(5);
@@ -191,17 +192,19 @@ describe('getWorkloadForecast', () => {
       filter: 'custom',
     });
     expect(res!.futureDays[0].review).toBe(2);
-    // 4 states × 8 bounds × 2 origins, + 3 unbounded startedCards counts.
-    expect(countCalls).toHaveLength(67);
-    // The bucketing goes through the origin namespaces only…
-    expect(
-      countCalls
-        .filter((c) => c.upper !== undefined)
-        .every((c) => /:custom:|:chat:/.test(c.namespace)),
-    ).toBe(true);
-    // …while startedCards stays filter-independent: unbounded counts over
-    // the plain state namespaces, so toggling the content filter cannot
-    // flip the card's minimum-activity gate.
+    // 4 states × 8 bounds × 2 origins, +5 for the (unfiltered) mix counts,
+    // +3 unbounded startedCards counts.
+    expect(countCalls).toHaveLength(72);
+    // The day bucketing goes through the origin namespaces only; the
+    // stability mix and the gate are deliberately deck-wide (deck
+    // properties, not filter-scoped ones).
+    const originCalls = countCalls.filter((c) =>
+      /:custom:|:chat:/.test(c.namespace),
+    );
+    expect(originCalls).toHaveLength(64);
+    // startedCards stays filter-independent: unbounded counts over the
+    // plain state namespaces, so toggling the content filter cannot lock
+    // and unlock the card underneath the user.
     expect(
       countCalls
         .filter((c) => c.upper === undefined)
@@ -222,7 +225,12 @@ describe('getWorkloadForecast', () => {
       reviewMode: 'full',
     });
     expect(writing!.availableNow.review).toBe(1);
-    expect(countCalls.every((c) => c.track === 'writing')).toBe(true);
+    // Day bucketing reads the writing aggregates; the stability-mix counts
+    // stay on the shared track (the deck's mix stands proxy for writing).
+    expect(
+      countCalls.filter((c) => c.track === 'writing').length,
+    ).toBe(35);
+    expect(countCalls.filter((c) => c.track === 'shared').length).toBe(5);
     expect(writing!.preparingWriting).toBe(true);
 
     const audio = await asUser.query(api.features.stats.getWorkloadForecast, {
@@ -325,6 +333,39 @@ describe('getWorkloadForecast', () => {
     });
   });
 
+  it('returns matureStabilityCounts when the bucket aggregate covers the review total', async () => {
+    const t = convexTest(schema, modules);
+    await seedActiveCourse(t);
+    keysByTrackAndTail['shared|review'] = [NOW, B[1], B[2], B[3]];
+    keysByTrackAndTail['shared|s1'] = [NOW, B[1]];
+    keysByTrackAndTail['shared|s2'] = [B[2]];
+    keysByTrackAndTail['shared|s3'] = [B[3], B[7]]; // B[7] outside the window
+
+    const asUser = t.withIdentity({ subject: 'user_A' });
+    const res = await asUser.query(
+      api.features.stats.getWorkloadForecast,
+      baseArgs,
+    );
+    expect(res!.matureStabilityCounts).toEqual({ s0: 0, s1: 2, s2: 1, s3: 1 });
+  });
+
+  it('omits matureStabilityCounts while the backfill has not covered the deck', async () => {
+    const t = convexTest(schema, modules);
+    await seedActiveCourse(t);
+    // Plenty of review cards due, but the bucket aggregate only knows about
+    // a fraction of them — the mid-backfill shape.
+    keysByTrackAndTail['shared|review'] = [NOW, NOW, NOW, NOW, NOW, NOW];
+    keysByTrackAndTail['shared|s0'] = [NOW];
+
+    const asUser = t.withIdentity({ subject: 'user_A' });
+    const res = await asUser.query(
+      api.features.stats.getWorkloadForecast,
+      baseArgs,
+    );
+    expect(res).not.toBeNull();
+    expect(res!.matureStabilityCounts).toBeUndefined();
+  });
+
   it('clamps a skewed client now into today and a drifted today to the server day', async () => {
     const t = convexTest(schema, modules);
     await seedActiveCourse(t);
@@ -395,19 +436,19 @@ describe('getWorkloadForecast', () => {
   it('returns all-zero buckets and startedCards 0 for a course with no cards', async () => {
     const t = convexTest(schema, modules);
     await seedActiveCourse(t);
-    // No aggregate keys registered at all — the client's minimum-activity
-    // gate and empty state both key off this payload shape.
     const asUser = t.withIdentity({ subject: 'user_A' });
     const res = await asUser.query(
       api.features.stats.getWorkloadForecast,
       baseArgs,
     );
     expect(res).not.toBeNull();
-    expect(res!.startedCards).toBe(0);
     const zero = { new: 0, learning: 0, relearning: 0, review: 0 };
     expect(res!.availableNow).toEqual(zero);
     expect(res!.laterToday).toEqual(zero);
     expect(res!.futureDays).toEqual(Array.from({ length: 6 }, () => zero));
     expect(res!.history.reps).toBe(0);
+    // No aggregate keys registered at all — the client's minimum-activity
+    // gate sees a fresh course and locks the card.
+    expect(res!.startedCards).toBe(0);
   });
 });

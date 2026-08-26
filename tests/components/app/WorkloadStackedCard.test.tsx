@@ -74,10 +74,12 @@ function renderCard(
   {
     addCount = 5,
     unit = 'time',
+    dailyGoalMinutes,
     onAddCountChange = vi.fn(),
   }: {
     addCount?: number;
     unit?: WorkloadUnit;
+    dailyGoalMinutes?: number;
     onAddCountChange?: (n: number) => void;
   } = {},
 ) {
@@ -91,6 +93,7 @@ function renderCard(
       forecast={forecast}
       today={data.today}
       unit={unit}
+      dailyGoalMinutes={dailyGoalMinutes}
       addCount={addCount}
       onAddCountChange={onAddCountChange}
       whatIfDelta={{ reviews: 17, minutes: 6 }}
@@ -134,14 +137,20 @@ describe('WorkloadStackedCard', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('shows the overdue badge only when there is a backlog', () => {
+  it('folds the backlog into the day-0 bar — no overdue vocabulary', () => {
     renderCard();
-    expect(screen.getByText(/overdueTime/)).toBeTruthy();
+    expect(screen.queryByText(/overdue/)).toBeNull();
+    expect(screen.queryByText(/legendYoung|legendMature|legendReturns/)).toBeNull();
   });
 
-  it('hides the overdue badge without a backlog', () => {
-    renderCard(makeData({ availableNow: zero() }));
-    expect(screen.queryByText(/overdue/)).toBeNull();
+  it('renders the striped what-if cap only while the stepper is active', () => {
+    renderCard(makeData(), { addCount: 5 });
+    expect(screen.getAllByTestId('whatif-cap').length).toBeGreaterThan(0);
+  });
+
+  it('drops the what-if cap at addCount 0', () => {
+    renderCard(makeData(), { addCount: 0 });
+    expect(screen.queryByTestId('whatif-cap')).toBeNull();
   });
 
   it('stepper steps and clamps at both ends', () => {
@@ -190,6 +199,36 @@ describe('WorkloadStackedCard', () => {
     expect(screen.queryAllByText(/paceLine/)).toHaveLength(1); // only the first render's
   });
 
+  it('swaps the reference line to the daily goal while the window is thin', () => {
+    const thin = makeData();
+    thin.history = {
+      ...thin.history,
+      reviewsByMode: { audio: 3, full: 0 }, // < MIN_PACE_SAMPLE
+      timeMsByMode: { audio: 60_000, full: 0 },
+    };
+    renderCard(thin, { dailyGoalMinutes: 20 });
+    expect(screen.getByText(/goalLine 20m/)).toBeTruthy();
+    expect(screen.getByText('legendGoal')).toBeTruthy();
+    expect(screen.queryByText(/paceLine/)).toBeNull();
+  });
+
+  it('a thin window without a goal shows no reference line', () => {
+    const thin = makeData();
+    thin.history = {
+      ...thin.history,
+      reviewsByMode: { audio: 3, full: 0 },
+      timeMsByMode: { audio: 60_000, full: 0 },
+    };
+    renderCard(thin);
+    expect(screen.queryByText(/paceLine|goalLine/)).toBeNull();
+  });
+
+  it('a reliable window keeps the usual pace even when a goal exists', () => {
+    renderCard(makeData(), { dailyGoalMinutes: 20 });
+    expect(screen.getByText(/paceLine/)).toBeTruthy();
+    expect(screen.queryByText(/goalLine/)).toBeNull();
+  });
+
   it('renders the empty state when nothing is scheduled — even at the default what-if of +5', () => {
     const emptyCourse = makeData({
       availableNow: zero(),
@@ -205,14 +244,22 @@ describe('WorkloadStackedCard', () => {
     expect(screen.getAllByText('empty')).toHaveLength(2);
   });
 
-  it('cards mode: the header count equals the day-0 column cap', () => {
+  it('cards mode: the day-0 column cap shows the estimate-inclusive count', () => {
+    // The title + summary row lives in the collapsible wrapper now; the
+    // chart itself only shows the per-day caps.
     const { forecast } = renderCard(makeData(), { unit: 'cards' });
     const day0Cards =
       forecast.days[0].scheduled.total + forecast.days[0].estimated.total;
-    // Header (via the mocked t: "cardsToday <count> <time>") and cap show
-    // the same estimate-inclusive number.
-    expect(screen.getByText(new RegExp(`cardsToday ${day0Cards} `))).toBeTruthy();
     expect(screen.getByText(String(day0Cards))).toBeTruthy();
+  });
+
+  it('the what-if minutes share never exceeds the day total', () => {
+    const { forecast } = renderCard(makeData(), { addCount: 5 });
+    for (const day of forecast.days) {
+      expect(day.whatIf.minutes).toBeGreaterThanOrEqual(0);
+      expect(day.whatIf.minutes).toBeLessThanOrEqual(day.estimatedMinutes);
+    }
+    expect(forecast.days[0].whatIf.minutes).toBeGreaterThan(0);
   });
 
   it('bar segments sum exactly to the estimated total (no rounding drift)', () => {

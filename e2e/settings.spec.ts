@@ -59,15 +59,12 @@ test.describe("settings", () => {
       }
     }
 
-    // The forecast card's presence also depends on the minimum-activity
-    // gate (data, not preference), so record it rather than assume it —
-    // the invariant under test is that hideDueCounts does NOT change it.
+    // The forecast card is on home whenever its own preference is off.
     await page.goto("/app");
     await expect(page.getByTestId("due-counts-pills")).toBeVisible({
       timeout: 20_000,
     });
-    const forecastShown =
-      (await page.getByTestId("workload-forecast").count()) > 0;
+    await expect(page.getByTestId("workload-forecast")).toBeVisible();
 
     // Hiding due counts hides the pills but leaves the forecast alone.
     await page.goto("/app/settings");
@@ -76,11 +73,9 @@ test.describe("settings", () => {
     await expect(page.getByTestId("due-counts-pills")).toHaveCount(0, {
       timeout: 15_000,
     });
-    await expect(page.getByTestId("workload-forecast")).toHaveCount(
-      forecastShown ? 1 : 0,
-    );
+    await expect(page.getByTestId("workload-forecast")).toBeVisible();
 
-    // The forecast's own switch removes the card (whatever the gate says).
+    // The forecast's own switch removes the card.
     await page.goto("/app/settings");
     await expect(forecastToggle).toBeVisible({ timeout: 15_000 });
     await forecastToggle.click();

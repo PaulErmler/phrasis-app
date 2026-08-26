@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,10 @@ import { getUserTimezone } from '@/lib/timezone';
 import { convexErrorCode, isPaymentPastDueError } from '@/lib/utils';
 import { WritingFeedbackCard, type RowFeedback } from './WritingFeedbackCard';
 import { WritingVoiceButton } from './WritingVoiceButton';
+import {
+  audioUrlForShownSentence,
+  primeAfterSubmitAudioElement,
+} from './shownSentenceAudio';
 import { useLimitDialog } from '@/components/feature_tracking/useFeatureLock';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import {
@@ -59,6 +63,8 @@ import type { Id } from '@/convex/_generated/dataModel';
 import type { PinnableCardAction } from '@/lib/cardActions';
 
 type TargetAudioMode = 'always' | 'afterSubmit' | 'never';
+
+const NO_ALTERNATIVES: CardTranslationAlternative[] = [];
 
 interface LanguageInputState {
   submitted: boolean;
@@ -358,6 +364,20 @@ export function FullReviewCardContent({
 
   const allSubmitted = targetTranslations.length > 0 &&
     targetTranslations.every((tr) => inputs.get(tr.language)?.submitted);
+
+  // After submit the translation <input> unmounts and the browser parks
+  // focus on the nearest tabbable: a speaker, Undo, a clickable word
+  // (`role="button"`), or a coach-card action. LearningControls then
+  // ignores Enter, so next-card dies. Park focus on this sentinel instead.
+  const cardSentinelRef = useRef<HTMLDivElement>(null);
+  const feedbackFocusKey = [...feedback.entries()]
+    .map(([lang, row]) => `${lang}:${row.status}:${row.result?.verdict ?? ''}`)
+    .sort()
+    .join('|');
+  useLayoutEffect(() => {
+    if (!allSubmitted) return;
+    cardSentinelRef.current?.focus({ preventScroll: true });
+  }, [allSubmitted, feedbackFocusKey]);
 
   const onAllSubmittedChangeRef = useRef(onAllSubmittedChange);
   onAllSubmittedChangeRef.current = onAllSubmittedChange;
@@ -850,7 +870,13 @@ export function FullReviewCardContent({
   );
 
   return (
-    <div data-tutorial="card-content-full" className="flex flex-col flex-1 min-h-0">
+    <div
+      ref={cardSentinelRef}
+      tabIndex={-1}
+      data-tutorial="card-content-full"
+      data-testid="writing-review-card"
+      className="flex flex-col flex-1 min-h-0 outline-none"
+    >
       <CardShell
         reviewCount={displayReviewCount(preReviewCount, schedulingPhase, fsrsState)}
         originPill={originPill}
@@ -939,8 +965,10 @@ export function FullReviewCardContent({
                   wordTimings={audio?.wordTimings ?? null}
                   state={state}
                   feedback={feedback.get(translation.language) ?? null}
+                  feedbackActive={feedbackActive}
                   alternatives={
-                    alternativesByLanguage.get(translation.language) ?? []
+                    alternativesByLanguage.get(translation.language) ??
+                    NO_ALTERNATIVES
                   }
                   onDisableAiFeedback={onDisableAiFeedback}
                   onMakeDefault={handleMakeDefault}
@@ -1002,6 +1030,12 @@ interface TargetLanguageInputProps {
   state: LanguageInputState;
   /** AI feedback for this row; null = none requested (yet). */
   feedback: RowFeedback | null;
+  /**
+   * AI grading is on for this card. After-submit autoplay waits for a local
+   * match or a finished grade so it doesn't play the default clip while the
+   * answer may still be accepted as an alternative.
+   */
+  feedbackActive?: boolean;
   /** Accepted alternatives for this language (empty in transcribe mode). */
   alternatives: CardTranslationAlternative[];
   /** Turns the aiWritingFeedback setting off (quota-reached line). */
@@ -1062,6 +1096,7 @@ function TargetLanguageInput({
   wordTimings,
   state,
   feedback,
+  feedbackActive = false,
   alternatives,
   onDisableAiFeedback,
   onMakeDefault,
@@ -1112,6 +1147,110 @@ function TargetLanguageInput({
   // render, and putting it in the deps would tear down a running clip.
   const afterSubmitPlaybackRef = useRef(afterSubmitPlayback);
   afterSubmitPlaybackRef.current = afterSubmitPlayback;
+  // Same reason: not referentially stable across renders.
+  const onAudioPlayPropRef = useRef(onAudioPlay);
+  onAudioPlayPropRef.current = onAudioPlay;
+  // Which clip after-submit autoplay last started. Distinct from
+  // autoPlayedRef (language-level, shared with the reveal sweep): the shown
+  // sentence can change from the card default to a matching alternative
+  // once the grader returns, and that must start a new clip.
+  const autoPlayedUrlRef = useRef<string | null>(null);
+
+  const hasUserText = !!state.userText.trim();
+  const gradedCorrected =
+    feedback?.status === 'done' ? feedback.result?.corrected : undefined;
+  const diffCandidates = useMemo(
+    () =>
+      answerCandidates(
+        translation.text,
+        alternatives.map((a) => a.text),
+        gradedCorrected,
+      ),
+    [translation.text, alternatives, gradedCorrected],
+  );
+  const closest = useMemo(() => {
+    if (!hasUserText) return null;
+    return bestCandidate(diffCandidates, state.userText, translation.language);
+  }, [diffCandidates, hasUserText, state.userText, translation.language]);
+  const closestExpected = closest?.text ?? translation.text;
+  const acceptedItems = useMemo<CardTranslationAlternative[]>(
+    () => [
+      {
+        text: translation.text,
+        romanization: translation.romanization,
+        ipa: translation.ipa,
+        furigana: translation.furigana,
+        audioUrl,
+      },
+      ...alternatives,
+    ],
+    [
+      translation.text,
+      translation.romanization,
+      translation.ipa,
+      translation.furigana,
+      audioUrl,
+      alternatives,
+    ],
+  );
+  const correctedForDiff =
+    !showClean && closestExpected !== translation.text ? closestExpected : null;
+
+  // The grader may still accept this answer as an alternative. The local
+  // match mirrors the server's free gate; an empty answer never reaches the
+  // grader (the kick-off skips it), so it counts as settled.
+  const answer = state.userText.trim();
+  const matchedLocally =
+    answersMatchExactly(translation.text, answer) ||
+    alternatives.some((a) => answersMatchExactly(a.text, answer));
+  const gradeExpected = feedbackActive && answer !== '';
+  const gradeSettled =
+    feedback?.status === 'done' ||
+    feedback?.status === 'error' ||
+    feedback?.status === 'limit';
+  // alsoCorrect + savedAlternative: the corrected sentence WILL become an
+  // accepted alternative, but its row + TTS land seconds after the grade.
+  // Until then it matches nothing in `acceptedItems`, and the primary
+  // fallback in audioUrlForShownSentence would say the old sentence — then
+  // the alternative clip would start on top when the row lands. Hold both
+  // speakers at null for that window instead.
+  const awaitingSavedAlternative =
+    feedback?.status === 'done' &&
+    feedback.result?.verdict === 'alsoCorrect' &&
+    feedback.result.savedAlternative === true &&
+    !!feedback.result.corrected &&
+    !answersMatchExactly(translation.text, feedback.result.corrected) &&
+    !alternatives.some((a) =>
+      answersMatchExactly(a.text, feedback.result!.corrected!),
+    );
+
+  const shownAudioUrl = awaitingSavedAlternative
+    ? null
+    : audioUrlForShownSentence(
+        correctedForDiff ?? translation.text,
+        translation.text,
+        audioUrl,
+        acceptedItems,
+      );
+  // The clip after-submit autoplay should be running, or null while we are
+  // still waiting (grade in flight, or an accepted alternative's audio not
+  // generated yet). Resolved in render — keyed off `closestExpected`, not
+  // the showClean-dependent `correctedForDiff`, so the ShowCleanToggle can't
+  // start a clip — and compared by value in the effect deps, so a feedback
+  // state change that does NOT change the clip cannot tear down a running
+  // one.
+  const autoPlayUrl =
+    !state.submitted ||
+    targetAudioMode !== 'afterSubmit' ||
+    awaitingSavedAlternative ||
+    (!matchedLocally && gradeExpected && !gradeSettled)
+      ? null
+      : audioUrlForShownSentence(
+          closestExpected,
+          translation.text,
+          audioUrl,
+          acceptedItems,
+        );
 
   useEffect(() => {
     if (!state.submitted) {
@@ -1120,12 +1259,10 @@ function TargetLanguageInput({
   }, [state.submitted]);
 
   useEffect(() => {
-    if (
-      !state.submitted ||
-      targetAudioMode !== 'afterSubmit' ||
-      !audioUrl ||
-      autoPlayedRef.current.has(translation.language)
-    ) {
+    if (!state.submitted) {
+      autoPlayedUrlRef.current = null;
+      autoPlayAudioRef.current?.pause();
+      autoPlayAudioRef.current = null;
       return;
     }
 
@@ -1137,16 +1274,34 @@ function TargetLanguageInput({
       return;
     }
 
+    // Null while the clip is undecided (grade in flight, alternative audio
+    // still generating) or autoplay doesn't apply; see the render-time
+    // derivation.
+    if (!autoPlayUrl) return;
+    if (autoPlayedUrlRef.current === autoPlayUrl) return;
+
+    autoPlayedUrlRef.current = autoPlayUrl;
     autoPlayedRef.current.add(translation.language);
-    onAudioPlay?.();
-    const audio = new Audio(audioUrl);
+    onAudioPlayPropRef.current?.();
+    // Reuse the element primed on Enter/submit. A fresh `new Audio()` here
+    // is outside the user-gesture window (the grader and TTS have already
+    // run) and the browser would swallow play() — alternative clips
+    // never started.
+    const audio = primeAfterSubmitAudioElement(autoPlayAudioRef.current);
+    autoPlayAudioRef.current = audio;
+    audio.loop = false;
+    audio.muted = false;
+    // src FIRST: assigning it runs the media load algorithm, which resets
+    // playbackRate to defaultPlaybackRate — a rate set before this line is
+    // silently lost (the first play of every clip ran at 1×).
+    audio.src = autoPlayUrl;
     audio.preservesPitch = true;
     const audioEl = audio as HTMLAudioElement & {
       webkitPreservesPitch?: boolean;
     };
     audioEl.webkitPreservesPitch = true;
+    audio.defaultPlaybackRate = afterSubmitPlaybackRef.current.speed;
     audio.playbackRate = afterSubmitPlaybackRef.current.speed;
-    autoPlayAudioRef.current = audio;
 
     let raf = 0;
     let playsDone = 0;
@@ -1190,13 +1345,17 @@ function TargetLanguageInput({
       });
 
     return () => {
+      // Only runs for genuine transitions (clip change, revert, the settings
+      // sheet opening): `autoPlayUrl` is value-compared, so a feedback state
+      // change that resolves to the same clip never re-runs this effect —
+      // pausing here is safe and keeps a torn-down clip from lingering.
       if (raf) cancelAnimationFrame(raf);
       if (pauseTimer) clearTimeout(pauseTimer);
       audio.pause();
       audio.currentTime = 0;
       onButtonStop(translation.language);
     };
-  }, [state.submitted, targetAudioMode, audioUrl, translation.language, autoPlayedRef, suppressAutoPlay, onButtonTimeUpdate, onButtonStop]);
+  }, [autoPlayUrl, state.submitted, translation.language, autoPlayedRef, suppressAutoPlay, onButtonTimeUpdate, onButtonStop]);
 
   // Keep an already-running afterSubmit auto-play element in sync when its
   // speed changes mid-playback. Mirrors the pattern in AudioButton; without
@@ -1213,11 +1372,19 @@ function TargetLanguageInput({
     };
   }, []);
 
+  const primeAfterSubmitAudio = () => {
+    if (targetAudioMode !== 'afterSubmit' || suppressAutoPlay) return;
+    autoPlayAudioRef.current = primeAfterSubmitAudioElement(
+      autoPlayAudioRef.current,
+    );
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     // IME users (ja/zh/ko/vi) press Enter to confirm a conversion. That
     // keystroke is typing, not a submit. See `useImeSafeEnter`.
     if (e.key === 'Enter' && !state.submitted && !isComposingEvent(e)) {
       e.preventDefault();
+      primeAfterSubmitAudio();
       onSubmit(translation.language);
     }
   };
@@ -1230,8 +1397,6 @@ function TargetLanguageInput({
   // the right IME / keyboard layout when this field is focused.
   const inputLang = getLanguageByCode(translation.language)?.displayCode;
 
-  const hasUserText = !!state.userText.trim();
-
   const handleDiscuss = useCallback(() => {
     if (!chatContext) return;
     const attempt = state.userText.trim();
@@ -1241,7 +1406,7 @@ function TargetLanguageInput({
       attempt.length > 120 ? `${attempt.slice(0, 120)}…` : attempt;
     // What the grader already told the user, so the chat builds on it
     // instead of repeating or contradicting it. Bounded by construction
-    // (verdict + <=2 capped notes + a card-length corrected sentence).
+    // (verdict + <=3 capped notes + a card-length corrected sentence).
     const graded =
       feedback?.status === 'done' &&
       feedback.result &&
@@ -1282,34 +1447,6 @@ function TargetLanguageInput({
   // `isPerfectAnswer` reads the same pair the accuracy footer shows
   // (including the ignore-punctuation setting), so button and label can't
   // disagree.
-  // Everything the answer may legitimately be diffed against: the card's
-  // sentence, the stored accepted alternatives, and (once graded) the
-  // model's corrected form. The diff runs against whichever is CLOSEST to
-  // what the user typed, so a learner who produced a valid alternative sees
-  // their slips against that alternative — not a wall of red against a
-  // sentence they weren't attempting.
-  const gradedCorrected =
-    feedback?.status === 'done' ? feedback.result?.corrected : undefined;
-  const diffCandidates = useMemo(
-    () =>
-      answerCandidates(
-        translation.text,
-        alternatives.map((a) => a.text),
-        gradedCorrected,
-      ),
-    [translation.text, alternatives, gradedCorrected],
-  );
-  // Shared pick rule with the parent's accuracy summary (bestCandidate):
-  // both rank candidates the same way, so the score in the footer is always
-  // computed against the sentence this diff shows. Picking here by the
-  // ignore-punctuation setting used to let the two choose DIFFERENT
-  // candidates whenever the strict and lenient orders disagreed.
-  const closest = useMemo(() => {
-    if (!hasUserText) return null;
-    return bestCandidate(diffCandidates, state.userText, translation.language);
-  }, [diffCandidates, hasUserText, state.userText, translation.language]);
-  const closestExpected = closest?.text ?? translation.text;
-
   const isPerfectAnswer =
     closest !== null &&
     (ignorePunctuation
@@ -1410,25 +1547,6 @@ function TargetLanguageInput({
     );
   }
 
-  // While corrections are shown, diff against the closest accepted/corrected
-  // form; the ShowCleanToggle still flips to the CARD's clean sentence.
-  const correctedForDiff =
-    !showClean && closestExpected !== translation.text ? closestExpected : null;
-
-  // Every accepted answer with its display content: the card's sentence
-  // (annotations from the translation row) plus the stored alternatives
-  // (annotations generated onto their rows). Drives both the list under the
-  // row and the annotation swap when the diff targets an alternative.
-  const acceptedItems: CardTranslationAlternative[] = [
-    {
-      text: translation.text,
-      romanization: translation.romanization,
-      ipa: translation.ipa,
-      furigana: translation.furigana,
-      audioUrl,
-    },
-    ...alternatives,
-  ];
   const diffTargetItem = correctedForDiff
     ? (acceptedItems.find((item) => item.text === correctedForDiff) ?? null)
     : null;
@@ -1465,7 +1583,7 @@ function TargetLanguageInput({
       >
         <TargetRowHeader
           languageDisplayName={languageDisplayName}
-          audioUrl={audioUrl}
+          audioUrl={shownAudioUrl}
           language={translation.language}
           onAudioPlay={onAudioPlay}
           onButtonTimeUpdate={onButtonTimeUpdate}
@@ -1475,6 +1593,7 @@ function TargetLanguageInput({
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
           onSpeedCycle={onSpeedCycle}
+          audioTestId="shown-sentence-audio"
         />
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
@@ -1565,14 +1684,19 @@ function TargetLanguageInput({
                     showIpa={showIpa}
                   />
                 </div>
-                <AudioButton
-                  url={item.audioUrl ?? null}
-                  language={translation.language}
-                  onPlay={onAudioPlay}
-                  onTimeUpdate={onButtonTimeUpdate}
-                  onStop={onButtonStop}
-                  speed={speed}
-                />
+                <div
+                  data-testid="accepted-audio"
+                  data-audio-url={item.audioUrl ?? ''}
+                >
+                  <AudioButton
+                    url={item.audioUrl ?? null}
+                    language={translation.language}
+                    onPlay={onAudioPlay}
+                    onTimeUpdate={onButtonTimeUpdate}
+                    onStop={onButtonStop}
+                    speed={speed}
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -1704,6 +1828,7 @@ function TargetLanguageInput({
               // feedback kick-off effect reads them. A row the user already
               // submitted by keyboard mid-transcription keeps their answer.
               if (state.submitted) return;
+              primeAfterSubmitAudio();
               onInputChange(translation.language, text);
               onSubmit(translation.language);
             }}
@@ -1712,7 +1837,10 @@ function TargetLanguageInput({
         <Button
           variant="outline"
           size="icon"
-          onClick={() => onSubmit(translation.language)}
+          onClick={() => {
+            primeAfterSubmitAudio();
+            onSubmit(translation.language);
+          }}
           className="h-9 w-9 shrink-0"
           aria-label={submitLabel}
           {...(isFirstTarget ? { 'data-tutorial': 'submit-answer', 'data-testid': 'learn-submit-translation' } : {})}
@@ -1742,6 +1870,8 @@ interface TargetRowHeaderProps {
   generalSpeed: number;
   /** Cycle handler; null clears the override. */
   onSpeedCycle?: (next: number | null) => void;
+  /** Optional test id on the header audio wrapper (submitted shown-sentence clip). */
+  audioTestId?: string;
 }
 
 /** Label + audio-button header row shared by the three TargetLanguageInput branches. */
@@ -1757,9 +1887,15 @@ function TargetRowHeader({
   speedOverride,
   generalSpeed,
   onSpeedCycle,
+  audioTestId,
 }: TargetRowHeaderProps) {
   const audio = (
-    <div className="flex items-center">
+    <div
+      className="flex items-center"
+      {...(audioTestId
+        ? { 'data-testid': audioTestId, 'data-audio-url': audioUrl ?? '' }
+        : {})}
+    >
       <AudioButton
         url={audioUrl}
         language={language}

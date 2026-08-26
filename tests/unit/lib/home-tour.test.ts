@@ -80,8 +80,7 @@ describe('createHomeTour: workload step', () => {
     expect(workloadIdx).toBeGreaterThan(
       elements.indexOf('[data-tutorial="projections"]'),
     );
-    // Below the minimum-activity gate the card isn't mounted; the step
-    // opts into being dropped at launch instead of floating unanchored.
+    // skipIfMissing is a safety net if the card isn't mounted at launch.
     expect(tour.steps[workloadIdx].skipIfMissing).toBe(true);
   });
 

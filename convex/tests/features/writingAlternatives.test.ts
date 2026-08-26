@@ -1,7 +1,7 @@
 import { convexTest, type TestConvex } from 'convex-test';
 import { describe, it, expect } from 'vitest';
 import schema from '../../schema';
-import { internal } from '../../_generated/api';
+import { api, internal } from '../../_generated/api';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -19,6 +19,7 @@ async function seedAlternative(
   t: TestConvex<typeof schema>,
   name: string,
   text = 'Me gustaría un café.',
+  userId = 'user_A',
 ) {
   return t.run(async (ctx) => {
     const collectionId = await ctx.db.insert('collections', {
@@ -26,7 +27,7 @@ async function seedAlternative(
       textCount: 0,
     });
     const courseId = await ctx.db.insert('courses', {
-      userId: 'user_A',
+      userId,
       baseLanguages: ['en'],
       targetLanguages: ['es'],
     });
@@ -52,8 +53,13 @@ async function seedAlternative(
       schedulingPhase: 'preReview',
       preReviewCount: 0,
     });
+    await ctx.db.insert('translations', {
+      textId,
+      targetLanguage: 'es',
+      translatedText: 'Quisiera un café.',
+    });
     const alternativeId = await ctx.db.insert('writingAlternatives', {
-      userId: 'user_A',
+      userId,
       cardId,
       language: 'es',
       text,
@@ -166,5 +172,155 @@ describe('features/writingAlternatives generation pipeline', () => {
     await saveAudio(t, a.alternativeId, 'Frase efímera.');
     const aRow = await t.run((ctx) => ctx.db.get(a.alternativeId));
     expect(aRow).toBeNull();
+  });
+});
+
+describe('features/writingAlternatives edit-dialog CRUD', () => {
+  it('listForCard returns only the caller\'s rows and refuses unauthenticated calls', async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedAlternative(t, 'A');
+    // Another user's row on the SAME card (shared curriculum card).
+    await t.run(async (ctx) => {
+      await ctx.db.insert('writingAlternatives', {
+        userId: 'user_B',
+        cardId: a.cardId,
+        language: 'es',
+        text: 'Querría un café.',
+      });
+    });
+
+    await expect(
+      t.query(api.features.writingAlternatives.listForCard, {
+        cardId: a.cardId,
+      }),
+    ).rejects.toThrow('Unauthenticated');
+
+    const rows = await t
+      .withIdentity({ subject: 'user_A' })
+      .query(api.features.writingAlternatives.listForCard, {
+        cardId: a.cardId,
+      });
+    expect(rows).toEqual([
+      { _id: a.alternativeId, language: 'es', text: 'Me gustaría un café.' },
+    ]);
+  });
+
+  it('updateAlternative rewords the row, clears stale content, and schedules regeneration', async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedAlternative(t, 'A');
+    await t.run(async (ctx) => {
+      await ctx.db.patch(a.alternativeId, {
+        romanizedText: 'stale',
+        ipaText: 'stale',
+        furiganaText: 'stale',
+      });
+    });
+    await saveAudio(t, a.alternativeId, 'Me gustaría un café.');
+
+    await t
+      .withIdentity({ subject: 'user_A' })
+      .mutation(api.features.writingAlternatives.updateAlternative, {
+        alternativeId: a.alternativeId,
+        text: '  Me encantaría un café.  ',
+      });
+
+    const { row, scheduled } = await t.run(async (ctx) => ({
+      row: await ctx.db.get(a.alternativeId),
+      scheduled: await ctx.db.system.query('_scheduled_functions').collect(),
+    }));
+    expect(row).toMatchObject({ text: 'Me encantaría un café.' });
+    // The old annotations and audio pointer describe the old sentence.
+    expect(row!.romanizedText).toBeUndefined();
+    expect(row!.ipaText).toBeUndefined();
+    expect(row!.furiganaText).toBeUndefined();
+    expect(row!.audioAssetId).toBeUndefined();
+    const names = scheduled.map((j) => j.name);
+    expect(
+      names.some((n) => n.includes('generateAlternativeAnnotations')),
+    ).toBe(true);
+    expect(names.some((n) => n.includes('generateAlternativeAudio'))).toBe(
+      true,
+    );
+  });
+
+  it('updateAlternative deletes the row instead of patching when the new text duplicates the primary', async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedAlternative(t, 'A');
+
+    await t
+      .withIdentity({ subject: 'user_A' })
+      .mutation(api.features.writingAlternatives.updateAlternative, {
+        alternativeId: a.alternativeId,
+        // Punctuation/case-insensitive match against the translation row.
+        text: 'quisiera un café',
+      });
+
+    expect(await t.run((ctx) => ctx.db.get(a.alternativeId))).toBeNull();
+  });
+
+  it('updateAlternative deletes the row when the new text duplicates a sibling alternative', async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedAlternative(t, 'A');
+    await t.run(async (ctx) => {
+      await ctx.db.insert('writingAlternatives', {
+        userId: 'user_A',
+        cardId: a.cardId,
+        language: 'es',
+        text: 'Querría un café.',
+      });
+    });
+
+    await t
+      .withIdentity({ subject: 'user_A' })
+      .mutation(api.features.writingAlternatives.updateAlternative, {
+        alternativeId: a.alternativeId,
+        text: 'Querría un café.',
+      });
+
+    expect(await t.run((ctx) => ctx.db.get(a.alternativeId))).toBeNull();
+  });
+
+  it('updateAlternative rejects a foreign row and empty text', async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedAlternative(t, 'A');
+    const asIntruder = t.withIdentity({ subject: 'user_B' });
+    await expect(
+      asIntruder.mutation(api.features.writingAlternatives.updateAlternative, {
+        alternativeId: a.alternativeId,
+        text: 'Hacked.',
+      }),
+    ).rejects.toThrow('Unauthorized');
+    await expect(
+      t
+        .withIdentity({ subject: 'user_A' })
+        .mutation(api.features.writingAlternatives.updateAlternative, {
+          alternativeId: a.alternativeId,
+          text: '   ',
+        }),
+    ).rejects.toThrow('empty');
+    // Untouched either way.
+    expect(
+      (await t.run((ctx) => ctx.db.get(a.alternativeId)))?.text,
+    ).toBe('Me gustaría un café.');
+  });
+
+  it('deleteAlternative removes the caller\'s row and rejects a foreign one', async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedAlternative(t, 'A');
+
+    await expect(
+      t
+        .withIdentity({ subject: 'user_B' })
+        .mutation(api.features.writingAlternatives.deleteAlternative, {
+          alternativeId: a.alternativeId,
+        }),
+    ).rejects.toThrow('Unauthorized');
+
+    await t
+      .withIdentity({ subject: 'user_A' })
+      .mutation(api.features.writingAlternatives.deleteAlternative, {
+        alternativeId: a.alternativeId,
+      });
+    expect(await t.run((ctx) => ctx.db.get(a.alternativeId))).toBeNull();
   });
 });

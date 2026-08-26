@@ -47,11 +47,6 @@
       }
     }
   },
-  "howWeAchieve": {
-    "title": "How do we",
-    "titleHighlight": "achieve this?",
-    "lead": "Three pieces, working together."
-  },
   "reviewModes": {
     "title": "Practice that",
     "titleHighlight": "fits the moment.",
@@ -65,7 +60,7 @@
       "write": {
         "title": "Practice writing",
         "mode": "Writing",
-        "body": "Type the sentence and get instant, character-level feedback. Translate from your language, or transcribe what you hear."
+        "body": "Type the sentence. Spelling is marked character by character, and an AI tutor grades meaning when the wording differs."
       },
       "radio": {
         "title": "Passive comprehensible input",
@@ -77,7 +72,7 @@
     "audioTitle": "Shadowing",
     "audioBody": "The heart of Flexling. Listen to a sentence, translate it in your head, then say it aloud to practice your pronunciation — start speaking from day one, hands-free or hands-on. Each target line starts blurred and eases into focus, just like it does after playback in the app.",
     "fullTitle": "Writing",
-    "fullBody": "Type each sentence in your target language and get instant, character-level spelling feedback — the fastest way to master writing. What you get right shows in green, and anything off is highlighted so you learn from every mistake.",
+    "fullBody": "Type each sentence in your target language. Spelling is marked character by character, then an AI tutor grades meaning: almost right, also correct, or a different meaning. Valid other wording is saved as an accepted answer.",
     "translateTitle": "Translate",
     "translateBody": "Hear a sentence in your language and type its translation in the target language — active recall for vocabulary, grammar, and spelling in one exercise.",
     "transcribeTitle": "Transcribe",
@@ -97,8 +92,23 @@
       "es": "Buenos días ¿cómo está?",
       "fr": "Bonjour, comment allez-vous ?",
       "typedEs": "Buenos dias como esta?",
-      "typedFr": "Bonjour, comment allez vous?"
+      "typedFr": "Bonjour, comment allez vous?",
+      "feedbackEsSpelling": "días, cómo, and está need accents.",
+      "feedbackEsPunctuation": "Spanish questions open with ¿.",
+      "feedbackFrPunctuation": "French puts a hyphen in allez-vous and a space before the question mark."
     }
+  },
+  "writingCompare": {
+    "title": "Other apps call this",
+    "titleHighlight": "wrong.",
+    "subtitle": "Most apps match against one expected sentence. Flexling grades meaning, and saves a valid other wording as an accepted answer.",
+    "prompt": "I would like a coffee, please.",
+    "otherApps": "Other apps",
+    "flexling": "Flexling",
+    "typed": "Me gustaría un café, por favor.",
+    "expectedLabel": "Expected answer:",
+    "expected": "Quisiera un café, por favor.",
+    "naturalnessNote": "\"Me gustaría\" is a valid way to express \"I would\" too."
   },
   "chatDemo": {
     "title": "Add cards that",
@@ -373,7 +383,7 @@
     "streakTitle": "Stay On Track",
     "streakBody": "Your streak counts every consecutive day you practice. It's a simple, powerful motivator — and streak freezes have your back if life gets in the way.",
     "feedbackTitle": "Instant Review Feedback",
-    "feedbackBody": "After typing your translation, get a character-level diff showing what you got right, what you missed, and your accuracy score — right away."
+    "feedbackBody": "After you type, a character-level diff marks spelling. An AI tutor then grades meaning and can save a valid other wording as an accepted answer."
   },
   "features": {
     "title": "Everything You Need to",
@@ -552,7 +562,7 @@
         "answer": [
           "Flexling gives you three ways to learn the same sentences: Shadowing, Writing, and Radio.",
           "With Shadowing, you hear a sentence in a language you already know, get a moment to translate it in your head, then hear and say the target sentence aloud — hands-free if you like.",
-          "With Writing, you type and get instant, character-level feedback on spelling — either translating a sentence you hear in your language, or transcribing exactly what you hear in the target language to train listening comprehension. Radio simply plays sentences and their translations in the background for passive listening.",
+          "With Writing, you type and get a character-level spelling diff, then an AI tutor that grades meaning. Valid other wording is saved as an accepted answer. Translate a sentence you hear in your language, or transcribe exactly what you hear in the target language to train listening comprehension. Radio simply plays sentences and their translations in the background for passive listening.",
           "What makes Flexling special is that if you don't understand a sentence or have any question, you can ask the AI — like \"How can I say this more politely?\" or \"Give me 3 more examples with this verb in a different tense.\" — and it automatically creates new flashcards with audio for you.",
           "Note: We generate natural-sounding audio using state of the art text-to-speech technology."
         ]

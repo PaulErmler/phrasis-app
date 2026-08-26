@@ -24,7 +24,7 @@ import {
  * below still runs — the version protects against forgetting the bump, the
  * guard against truncated/corrupted entries within a version.
  */
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 
 /** Cached payloads may be `null` (the query's no-course result) — valid. */
 const isCachedPayloadValid = (value: unknown) =>
@@ -37,11 +37,13 @@ export type UseWorkloadForecastResult = {
   data: WorkloadForecastData | null;
   /** Extra load the current stepper value adds vs. adding nothing. */
   whatIfDelta: { reviews: number; minutes: number };
-  /** The user opted out via the hideWorkloadForecast preference, or the
-   * course is below the minimum-activity gate
-   * (MIN_STARTED_CARDS_FOR_FORECAST) — either way the card renders
-   * nothing. */
+  /** The user opted out via the hideWorkloadForecast preference. */
   hidden: boolean;
+  /** Below the minimum-activity gate (MIN_STARTED_CARDS_FOR_FORECAST): the
+   * card renders its locked teaser instead of a chart. Null while the first
+   * payload is still loading, so the card can hold the skeleton rather than
+   * flashing the lock at someone who has long since passed the gate. */
+  locked: boolean | null;
   /** Rendering last-known data while the writing seed fills the aggregates. */
   isProvisional: boolean;
   reviewMode: 'audio' | 'full';
@@ -91,12 +93,13 @@ export function useWorkloadForecast({
   if (data != null && !isProvisional) lastGoodRef.current = data;
   const effective = (isProvisional ? null : (data ?? null)) ?? lastGoodRef.current;
 
-  // The minimum-activity gate needs the payload, so it cannot skip the
-  // query the way the preference does — the subscription stays live and the
-  // card appears reactively the moment the Nth card starts learning.
-  const belowMinimum =
-    effective !== null &&
-    effective.startedCards < MIN_STARTED_CARDS_FOR_FORECAST;
+  // The minimum-activity gate needs the payload, so unlike the preference it
+  // cannot skip the query — the subscription stays live and the card unlocks
+  // reactively the moment the Nth card starts learning.
+  const locked =
+    effective === null
+      ? null
+      : effective.startedCards < MIN_STARTED_CARDS_FOR_FORECAST;
 
   const [addCount, setAddCount] = React.useState(DEFAULT_WHAT_IF_ADD);
 
@@ -137,7 +140,8 @@ export function useWorkloadForecast({
     forecast,
     data: effective,
     whatIfDelta,
-    hidden: hidden || belowMinimum,
+    hidden,
+    locked,
     isProvisional,
     reviewMode,
     addCount,

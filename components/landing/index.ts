@@ -2,7 +2,6 @@ export { LandingPageClient } from './landing-page-client';
 export { LandingHeader } from './landing-header';
 export { HeroSection } from './hero-section';
 export { PhilosophySection } from './philosophy-section';
-export { HowWeAchieveSection } from './how-we-achieve-section';
 export { LandingDemoProvider } from './landing-demo-context';
 export { ReviewModesSection } from './review-modes-section';
 export { ChatFlashcardSection } from './chat-flashcard-section';
