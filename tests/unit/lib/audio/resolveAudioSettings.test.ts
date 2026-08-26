@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   resolveAudioSettings,
+  resolveModeSetting,
   applyOnlyNewListening,
 } from '@/lib/audio/mergeAudio';
 import type { CourseSettings } from '@/components/app/learning/types';
@@ -8,10 +9,187 @@ import {
   DEFAULT_PLAY_TARGET_BEFORE_BASE,
   DEFAULT_PLAY_TARGET_AFTER_BASE,
   DEFAULT_PAUSE_TARGET_TO_BASE,
+  DEFAULT_PAUSE_BETWEEN_LANGUAGES,
+  DEFAULT_PAUSE_BASE_TO_TARGET,
+  DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
+  DEFAULT_REPETITIONS_TARGET,
+  DEFAULT_REPETITIONS_TARGET_WRITING,
 } from '@/lib/constants/audioPlayback';
 
 const cs = (partial: Partial<CourseSettings>): CourseSettings =>
   partial as unknown as CourseSettings;
+
+describe('resolveModeSetting: the per-field precedence primitive', () => {
+  const doc = cs({
+    autoPlayAudio: false,
+    autoPlayAudioFull: true,
+    autoPlayAudioTranscribe: false,
+    highlightWords: true,
+    pauseBaseToBase: 4,
+    pauseBaseToBaseFull: 5,
+  });
+
+  it('walks `*Transcribe ?? *Full ?? unsuffixed` per mode', () => {
+    expect(resolveModeSetting(doc, 'autoPlayAudio', 'audio')).toBe(false);
+    expect(resolveModeSetting(doc, 'autoPlayAudio', 'full')).toBe(true);
+    expect(resolveModeSetting(doc, 'autoPlayAudio', 'transcribe')).toBe(false);
+  });
+
+  it('falls through undefined levels to the base value in every mode', () => {
+    // highlightWords has no stored Full/Transcribe copy.
+    expect(resolveModeSetting(doc, 'highlightWords', 'audio')).toBe(true);
+    expect(resolveModeSetting(doc, 'highlightWords', 'full')).toBe(true);
+    expect(resolveModeSetting(doc, 'highlightWords', 'transcribe')).toBe(true);
+  });
+
+  it('treats a stored false as a value, never as a gap', () => {
+    expect(
+      resolveModeSetting(
+        cs({ autoPlayAudio: true, autoPlayAudioTranscribe: false }),
+        'autoPlayAudio',
+        'transcribe',
+      ),
+    ).toBe(false);
+    expect(
+      resolveModeSetting(
+        cs({ autoPlayAudio: true, autoPlayAudioFull: false }),
+        'autoPlayAudio',
+        'full',
+      ),
+    ).toBe(false);
+  });
+
+  it('audio mode never reads the per-mode copies', () => {
+    expect(
+      resolveModeSetting(
+        cs({ autoPlayAudioFull: true, autoPlayAudioTranscribe: true }),
+        'autoPlayAudio',
+        'audio',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('resolves fields with no *Transcribe copy in the schema like full mode', () => {
+    expect(resolveModeSetting(doc, 'pauseBaseToBase', 'transcribe')).toBe(5);
+    expect(resolveModeSetting(doc, 'pauseBaseToBase', 'full')).toBe(5);
+    expect(resolveModeSetting(doc, 'pauseBaseToBase', 'audio')).toBe(4);
+  });
+
+  it('returns undefined for a null doc and for fully-unset fields', () => {
+    expect(resolveModeSetting(null, 'autoPlayAudio', 'audio')).toBeUndefined();
+    expect(
+      resolveModeSetting(cs({}), 'autoPlayAudio', 'transcribe'),
+    ).toBeUndefined();
+  });
+});
+
+describe('resolveAudioSettings: per-mode precedence (`*Transcribe ?? *Full ?? unsuffixed`)', () => {
+  // Every per-mode field set at every level, all distinct, so each mode's
+  // pick is unambiguous. pauseBaseToBase / pauseBaseToTarget /
+  // pauseBeforeAutoAdvance have no Transcribe copy (transcribe never plays
+  // base audio and never auto-advances); transcribe must resolve them like
+  // full mode.
+  const allLevels = cs({
+    languageRepetitions: { es: 1 },
+    languageRepetitionsFull: { es: 2 },
+    languageRepetitionsTranscribe: { es: 3 },
+    languageRepetitionPauses: { es: 1.5 },
+    languageRepetitionPausesFull: { es: 2.5 },
+    languageRepetitionPausesTranscribe: { es: 3.5 },
+    languagePlaybackSpeeds: { es: 0.8 },
+    languagePlaybackSpeedsFull: { es: 1.0 },
+    languagePlaybackSpeedsTranscribe: { es: 1.2 },
+    pauseTargetToTarget: 1,
+    pauseTargetToTargetFull: 2,
+    pauseTargetToTargetTranscribe: 3,
+    pauseBaseToBase: 4,
+    pauseBaseToBaseFull: 5,
+    pauseBaseToTarget: 6,
+    pauseBaseToTargetFull: 7,
+    pauseBeforeAutoAdvance: 8,
+    pauseBeforeAutoAdvanceFull: 9,
+  });
+
+  it('audio mode reads only the unsuffixed fields', () => {
+    const r = resolveAudioSettings(allLevels, undefined, 'audio');
+    expect(r.reps).toEqual({ es: 1 });
+    expect(r.repPauses).toEqual({ es: 1.5 });
+    expect(r.speeds).toEqual({ es: 0.8 });
+    expect(r.pauseT2T).toBe(1);
+    expect(r.pauseB2B).toBe(4);
+    expect(r.pauseB2T).toBe(6);
+    expect(r.pauseBeforeAdvance).toBe(8);
+    expect(r.defaultTargetReps).toBe(DEFAULT_REPETITIONS_TARGET);
+  });
+
+  it('full mode prefers *Full and ignores *Transcribe', () => {
+    const r = resolveAudioSettings(allLevels, undefined, 'full');
+    expect(r.reps).toEqual({ es: 2 });
+    expect(r.repPauses).toEqual({ es: 2.5 });
+    expect(r.speeds).toEqual({ es: 1.0 });
+    expect(r.pauseT2T).toBe(2);
+    expect(r.pauseB2B).toBe(5);
+    expect(r.pauseB2T).toBe(7);
+    expect(r.pauseBeforeAdvance).toBe(9);
+    expect(r.defaultTargetReps).toBe(DEFAULT_REPETITIONS_TARGET_WRITING);
+  });
+
+  it('transcribe mode prefers *Transcribe, resolving Transcribe-less fields like full', () => {
+    const r = resolveAudioSettings(allLevels, undefined, 'transcribe');
+    expect(r.reps).toEqual({ es: 3 });
+    expect(r.repPauses).toEqual({ es: 3.5 });
+    expect(r.speeds).toEqual({ es: 1.2 });
+    expect(r.pauseT2T).toBe(3);
+    // No *Transcribe copy exists for these; the chain falls through to *Full.
+    expect(r.pauseB2B).toBe(5);
+    expect(r.pauseB2T).toBe(7);
+    expect(r.pauseBeforeAdvance).toBe(9);
+    expect(r.defaultTargetReps).toBe(DEFAULT_REPETITIONS_TARGET_WRITING);
+  });
+
+  it('falls through per field: transcribe → full → audio for unmigrated docs', () => {
+    const onlyAudio = cs({
+      languageRepetitions: { es: 1 },
+      pauseTargetToTarget: 1,
+    });
+    for (const mode of ['audio', 'full', 'transcribe'] as const) {
+      const r = resolveAudioSettings(onlyAudio, undefined, mode);
+      expect(r.reps).toEqual({ es: 1 });
+      expect(r.pauseT2T).toBe(1);
+    }
+    const audioAndFull = cs({
+      languageRepetitions: { es: 1 },
+      languageRepetitionsFull: { es: 2 },
+      pauseTargetToTarget: 1,
+      pauseTargetToTargetFull: 2,
+    });
+    const t = resolveAudioSettings(audioAndFull, undefined, 'transcribe');
+    expect(t.reps).toEqual({ es: 2 });
+    expect(t.pauseT2T).toBe(2);
+  });
+
+  it('applies the global defaults when no level stores a value', () => {
+    for (const mode of ['audio', 'full', 'transcribe'] as const) {
+      const r = resolveAudioSettings(null, undefined, mode);
+      expect(r.reps).toEqual({});
+      expect(r.repPauses).toEqual({});
+      expect(r.speeds).toEqual({});
+      expect(r.pauseT2T).toBe(DEFAULT_PAUSE_BETWEEN_LANGUAGES);
+      expect(r.pauseB2B).toBe(DEFAULT_PAUSE_BETWEEN_LANGUAGES);
+      expect(r.pauseB2T).toBe(DEFAULT_PAUSE_BASE_TO_TARGET);
+      expect(r.pauseBeforeAdvance).toBe(DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE);
+    }
+  });
+
+  it('a stored 0 is a value, not a gap: it must not fall through the chain', () => {
+    const r = resolveAudioSettings(
+      cs({ pauseTargetToTarget: 5, pauseTargetToTargetFull: 0 }),
+      undefined,
+      'transcribe',
+    );
+    expect(r.pauseT2T).toBe(0);
+  });
+});
 
 describe('resolveAudioSettings: target before/after base', () => {
   it('defaults to the historical base→target sequence (after on, before off)', () => {

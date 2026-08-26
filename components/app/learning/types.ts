@@ -1,5 +1,4 @@
-import { Id } from '@/convex/_generated/dataModel';
-import type { SchedulingMode } from '@/convex/types';
+import type { Doc } from '@/convex/_generated/dataModel';
 
 // ============================================================================
 // Shared constants
@@ -69,109 +68,20 @@ export interface CardAudioRecording {
   ttsQuality: string | null;
 }
 
-export interface CourseSettings {
-  _id: Id<'courseSettings'>;
-  _creationTime: number;
-  courseId: Id<'courses'>;
-  initialReviewCount: number;
-  activeCollectionId?: Id<'collections'>;
-  cardsToAddBatchSize?: number;
-  autoAddCards?: boolean;
-  dailyTimeGoalMinutes?: number;
-  // Audio playback settings
-  highlightWords?: boolean;
-  autoPlayAudio?: boolean;
-  autoAdvance?: boolean;
-  languageRepetitions?: Record<string, number>;
-  languageRepetitionPauses?: Record<string, number>;
-  languagePlaybackSpeeds?: Record<string, number>;
-  pauseBaseToBase?: number;
-  pauseBaseToTarget?: number;
-  pauseTargetToTarget?: number;
-  pauseBeforeAutoAdvance?: number;
-  // Writing ("full") mode counterparts. Undefined falls back to the
-  // unsuffixed audio-mode field (see courseSettingsFields in convex/schema.ts).
-  highlightWordsFull?: boolean;
-  autoPlayAudioFull?: boolean;
-  languageRepetitionsFull?: Record<string, number>;
-  languageRepetitionPausesFull?: Record<string, number>;
-  languagePlaybackSpeedsFull?: Record<string, number>;
-  pauseBaseToBaseFull?: number;
-  pauseBaseToTargetFull?: number;
-  pauseTargetToTargetFull?: number;
-  pauseBeforeAutoAdvanceFull?: number;
-  // Transcribe style: own playback-settings copy, resolved
-  // `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*`.
-  highlightWordsTranscribe?: boolean;
-  autoPlayAudioTranscribe?: boolean;
-  languageRepetitionsTranscribe?: Record<string, number>;
-  languageRepetitionPausesTranscribe?: Record<string, number>;
-  languagePlaybackSpeedsTranscribe?: Record<string, number>;
-  pauseTargetToTargetTranscribe?: number;
-  // Transcribe style: post-submit target replay settings (missing entry =
-  // 1 repetition at the prompt speed).
-  transcribeAfterRepetitions?: Record<string, number>;
-  transcribeAfterRepetitionPauses?: Record<string, number>;
-  transcribeAfterPlaybackSpeeds?: Record<string, number>;
-  // Target-before-base ("Practice Listening") / target-after-base ("Practice Speaking")
-  playTargetBeforeBase?: boolean;
-  playTargetAfterBase?: boolean;
-  targetBeforeRepetitions?: Record<string, number>;
-  targetBeforeRepetitionPauses?: Record<string, number>;
-  targetBeforePlaybackSpeeds?: Record<string, number>;
-  pauseTargetToBase?: number;
-  // "Only new": Practice Listening only on a card's initial N reviews.
-  // 0 / undefined = always (∞); 1-10 = limit.
-  targetBeforeOnlyNewReps?: number;
-  // Practice Listening duration strategy. 'onlyNew' (the rep window above),
-  // 'untilGood' (off after N FSRS good/easy ratings), or 'continuous' (never
-  // off). Unset = legacy doc; inferred from targetBeforeOnlyNewReps.
-  targetBeforeListeningStrategy?: 'onlyNew' | 'untilGood' | 'continuous';
-  targetBeforeUntilGoodReps?: number; // 1-10, default 1
-  // Writing mode: show the translation to copy-type on a card's first N
-  // reviews. undefined = on; window mirrors targetBeforeOnlyNewReps (0 = ∞),
-  // default 1.
-  showTranslationOnNew?: boolean;
-  showTranslationOnlyNewReps?: number;
-  showProgressBar?: boolean;
-  progressDisplayEnabled?: boolean;
-  hideTargetLanguages?: boolean;
-  autoRevealLanguages?: boolean;
-  hideBaseLanguages?: boolean;
-  autoRevealBaseLanguages?: boolean;
-  hideBaseLanguagesFull?: boolean;
-  autoRevealBaseOnSubmit?: boolean;
-  showRomanization?: boolean;
-  /** IPA transcription line below sentences. Default OFF (`?? false`). */
-  showIpa?: boolean;
-  /** Furigana ruby over kanji (Japanese). Default ON (`?? true`). */
-  showFurigana?: boolean;
-  // Instant proceed on rating
-  instantProceedAudio?: boolean;
-  instantProceedFull?: boolean;
-  // Review mode
-  reviewMode?: 'audio' | 'full';
-  /** Split scheduling: Writing keeps its own per-card spaced-repetition
-   * schedule instead of sharing one with Shadowing. Default false (shared). */
-  separateModeTracking?: boolean;
-  fullReviewTargetAudioMode?: 'always' | 'afterSubmit' | 'never';
-  writingInputMode?: 'translate' | 'transcribe';
-  /** Writing mode: exclude punctuation from the accuracy score. Default false. */
-  ignorePunctuation?: boolean;
-  /** Writing mode: AI-grade non-matching answers and show a coach card. Default true. */
-  aiWritingFeedback?: boolean;
-  /** Writing mode: preselect the rating from the accuracy score. Default true. */
-  autoRateFromAccuracy?: boolean;
-  /** Accuracy breakpoints for the above. Default 50 / 80. */
-  autoRateThresholds?: { hard: number; good: number; easy?: number };
-  /** Show the card's source collection (e.g. "A1.2") in the card header. Default false. */
-  showCardOrigin?: boolean;
-  // Scheduling mode
-  schedulingMode?: SchedulingMode;
-  // Language order overrides
-  baseLanguageOrder?: string[];
-  targetLanguageOrder?: string[];
-}
+/**
+ * The `courseSettings` document, as returned by
+ * `api.features.courses.getActiveCourseSettings`. Derived from the schema
+ * (`courseSettingsFields` in convex/schema.ts) via the generated `Doc` type —
+ * type-only, nothing from the server enters the client bundle — so this can
+ * never drift from the validator again. Field semantics and defaults are
+ * documented on the schema.
+ *
+ * The per-mode playback fields resolve along
+ * `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*`; that chain is
+ * implemented once, in `resolveModeSetting` / `resolveAudioSettings`
+ * (lib/audio/mergeAudio.ts) — resolve through those, never inline.
+ */
+export type CourseSettings = Doc<'courseSettings'>;
 
 /**
  * Writing-mode accuracy for the card currently on screen, aggregated across

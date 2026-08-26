@@ -60,6 +60,65 @@ export interface ResolvedAudioSettings {
 }
 
 /**
+ * The three per-mode copies a playback setting can have: audio/Shadowing mode
+ * owns the unsuffixed field, writing ("full") mode the `*Full` copy, and the
+ * transcribe writing style the `*Transcribe` copy.
+ */
+export type AudioSettingsMode = 'audio' | 'full' | 'transcribe';
+
+/**
+ * Settings that resolve along the per-mode chain
+ * `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*`: every base field name
+ * whose `*Full` copy exists in the schema. `hideBaseLanguages` also has a
+ * `Full` twin, but that pair is deliberately independent (writing mode
+ * defaults per input style, it never falls back to the audio value), so it
+ * is excluded from the chain.
+ */
+export type ModeResolvableSetting = Exclude<
+  {
+    [K in keyof CourseSettings & string]: `${K}Full` extends keyof CourseSettings
+      ? K
+      : never;
+  }[keyof CourseSettings & string],
+  'hideBaseLanguages'
+>;
+
+/**
+ * THE per-mode precedence rule, in one place: resolve `field` for `mode`
+ * along `*Transcribe ?? *Full ?? unsuffixed`. Undefined at a level means
+ * "same as the previous mode in the chain", so unmigrated/untweaked docs
+ * behave identically (see docs/migrations/per-mode-settings-backfill.md);
+ * a field with no `*Transcribe` copy (base-group pauses, auto-advance pause)
+ * resolves like full mode there. Callers apply their own `?? DEFAULT_*`.
+ *
+ * Both the settings sheet's preview and actual playback resolution
+ * (`resolveAudioSettings` below) go through here, so they cannot drift.
+ */
+export function resolveModeSetting<K extends ModeResolvableSetting>(
+  cs: CourseSettings | null | undefined,
+  field: K,
+  mode: AudioSettingsMode,
+): CourseSettings[K] | undefined {
+  if (!cs) return undefined;
+  // The per-mode copies of a setting share the base field's value type by
+  // construction (courseSettingsFields in convex/schema.ts); a copy a field
+  // doesn't have reads as undefined, which is exactly the chain's
+  // fall-through. The compiler can't see that convention through a computed
+  // key, hence the localized cast.
+  const variant = (suffix: 'Full' | 'Transcribe') =>
+    (cs as Record<string, unknown>)[`${field}${suffix}`] as
+      | CourseSettings[K]
+      | undefined;
+  if (mode === 'transcribe') {
+    return variant('Transcribe') ?? variant('Full') ?? cs[field];
+  }
+  if (mode === 'full') {
+    return variant('Full') ?? cs[field];
+  }
+  return cs[field];
+}
+
+/**
  * Merge a general per-language speed map with per-card overrides. Overrides win,
  * then the general value, then the global default. Used via `resolveAudioSettings`
  * for both the after-base and before-base target groups.
@@ -83,43 +142,17 @@ function mergeSpeeds(
 export function resolveAudioSettings(
   cs: CourseSettings | null,
   cardOverrides?: Record<string, number>,
-  mode: 'audio' | 'full' | 'transcribe' = 'audio',
+  mode: AudioSettingsMode = 'audio',
 ): ResolvedAudioSettings {
   // Each mode has its own copy of the playback settings, resolved along the
-  // chain `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*`. Undefined means
-  // "same as the previous mode in the chain", so unmigrated/untweaked docs
-  // behave identically (see docs/migrations/per-mode-settings-backfill.md).
-  // Transcribe only copies the settings it uses; the rest resolves like full.
-  const pick = <T,>(
-    transcribe: T | undefined,
-    full: T | undefined,
-    audio: T | undefined,
-  ): T | undefined =>
-      mode === 'transcribe'
-        ? (transcribe ?? full ?? audio)
-        : mode === 'full'
-          ? (full ?? audio)
-          : audio;
+  // chain `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*` — implemented
+  // once in `resolveModeSetting` above.
   const autoAdvance = cs?.autoAdvance ?? DEFAULT_AUTO_ADVANCE;
   return {
-    reps:
-      pick(
-        cs?.languageRepetitionsTranscribe,
-        cs?.languageRepetitionsFull,
-        cs?.languageRepetitions,
-      ) ?? {},
-    repPauses:
-      pick(
-        cs?.languageRepetitionPausesTranscribe,
-        cs?.languageRepetitionPausesFull,
-        cs?.languageRepetitionPauses,
-      ) ?? {},
+    reps: resolveModeSetting(cs, 'languageRepetitions', mode) ?? {},
+    repPauses: resolveModeSetting(cs, 'languageRepetitionPauses', mode) ?? {},
     speeds: mergeSpeeds(
-      pick(
-        cs?.languagePlaybackSpeedsTranscribe,
-        cs?.languagePlaybackSpeedsFull,
-        cs?.languagePlaybackSpeeds,
-      ) ?? {},
+      resolveModeSetting(cs, 'languagePlaybackSpeeds', mode) ?? {},
       cardOverrides,
     ),
     defaultTargetReps:
@@ -127,24 +160,18 @@ export function resolveAudioSettings(
         ? DEFAULT_REPETITIONS_TARGET
         : DEFAULT_REPETITIONS_TARGET_WRITING,
     pauseB2B:
-      pick(undefined, cs?.pauseBaseToBaseFull, cs?.pauseBaseToBase) ??
+      resolveModeSetting(cs, 'pauseBaseToBase', mode) ??
       DEFAULT_PAUSE_BETWEEN_LANGUAGES,
     pauseB2T:
-      pick(undefined, cs?.pauseBaseToTargetFull, cs?.pauseBaseToTarget) ??
+      resolveModeSetting(cs, 'pauseBaseToTarget', mode) ??
       DEFAULT_PAUSE_BASE_TO_TARGET,
     pauseT2T:
-      pick(
-        cs?.pauseTargetToTargetTranscribe,
-        cs?.pauseTargetToTargetFull,
-        cs?.pauseTargetToTarget,
-      ) ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES,
+      resolveModeSetting(cs, 'pauseTargetToTarget', mode) ??
+      DEFAULT_PAUSE_BETWEEN_LANGUAGES,
     autoAdvance,
     pauseBeforeAdvance:
-      pick(
-        undefined,
-        cs?.pauseBeforeAutoAdvanceFull,
-        cs?.pauseBeforeAutoAdvance,
-      ) ?? DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
+      resolveModeSetting(cs, 'pauseBeforeAutoAdvance', mode) ??
+      DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
     playTargetBefore: cs?.playTargetBeforeBase ?? DEFAULT_PLAY_TARGET_BEFORE_BASE,
     playTargetAfter: cs?.playTargetAfterBase ?? DEFAULT_PLAY_TARGET_AFTER_BASE,
     beforeReps: cs?.targetBeforeRepetitions ?? {},

@@ -2,7 +2,13 @@
 
 import { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
+import {
+  resolveAudioSettings,
+  resolveModeSetting,
+  type AudioSettingsMode,
+} from '@/lib/audio/mergeAudio';
 import {
   Sheet,
   SheetContent,
@@ -31,19 +37,10 @@ import { AutoRateThresholdControl } from '@/components/app/learning/AutoRateBand
 import { CourseLanguageSettings } from '@/components/course/CourseLanguageSettings';
 import {
   DEFAULT_AUTO_PLAY,
-  DEFAULT_AUTO_ADVANCE,
   DEFAULT_REPETITIONS_BASE,
-  DEFAULT_REPETITIONS_TARGET,
   DEFAULT_REPETITIONS_TARGET_BEFORE,
-  DEFAULT_REPETITIONS_TARGET_WRITING,
   DEFAULT_PAUSE_BETWEEN_REPETITIONS,
-  DEFAULT_PAUSE_BETWEEN_LANGUAGES,
-  DEFAULT_PAUSE_BASE_TO_TARGET,
-  DEFAULT_PAUSE_TARGET_TO_BASE,
-  DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
   DEFAULT_PLAYBACK_SPEED,
-  DEFAULT_PLAY_TARGET_BEFORE_BASE,
-  DEFAULT_PLAY_TARGET_AFTER_BASE,
   clampPlaybackSpeed,
 } from '@/lib/constants/audioPlayback';
 import { MAX_CARDS_PER_BATCH } from '@/lib/constants/learning';
@@ -63,6 +60,16 @@ interface LearningModeSettingsProps {
   baseLanguages: string[];
   targetLanguages: string[];
 }
+
+/**
+ * The fields `updateCourseSettings` accepts, minus the routing arg. Derived
+ * from the mutation (and therefore from `coursePatchableSettingsValidator`)
+ * so `setField`/`setFields` reject unknown field names at compile time.
+ */
+type CourseSettingsPatch = Omit<
+  Parameters<ReturnType<typeof useUpdateCourseSettings>>[0],
+  'courseId'
+>;
 
 interface SettingSwitchRowProps {
   id: string;
@@ -280,6 +287,9 @@ export function LearningModeSettings({
   targetLanguages: targetProp,
 }: LearningModeSettingsProps) {
   const t = useTranslations('LearningMode.settingsPanel');
+  // Existing generic settings-save failure string, reused by `setFields`
+  // below rather than adding a near-duplicate key to the catalog.
+  const tSaveError = useTranslations('AppPage.courses.manage');
   const locale = useLocale();
   const [courseSettingsOpen, setCourseSettingsOpen] = useState(false);
   const updateSettings = useUpdateCourseSettings();
@@ -308,219 +318,150 @@ export function LearningModeSettings({
   const toLanguageNames = (codes: string[]) =>
     codes.map((code) => getLocalizedLanguageNameByCode(code, locale));
 
-  // ---- existing setting handlers ----
+  // ---- shared write path ----
 
-  const handleBatchSizeChange = async (value: number) => {
+  // Every control writes through here: one place owns the mutation call, so a
+  // failed update (whose optimistic patch has already rolled back, visibly
+  // snapping the control) surfaces as a toast instead of an unhandled
+  // rejection. Reuses the generic settings-save error string.
+  const setFields = async (fields: CourseSettingsPatch) => {
+    try {
+      await updateSettings({ courseId: courseSettings.courseId, ...fields });
+    } catch (error) {
+      console.error('Failed to update course settings:', error);
+      toast.error(tSaveError('saveFailed'));
+    }
+  };
+  // Single-field convenience over `setFields`. The generic ties the value to
+  // the named field's type; the cast only bridges TS's widening of computed
+  // single-key literals (microsoft/TypeScript#13948).
+  const setField = <K extends keyof CourseSettingsPatch>(
+    field: K,
+    value: CourseSettingsPatch[K],
+  ) => setFields({ [field]: value } as Pick<CourseSettingsPatch, K>);
+
+  // ---- setting handlers with extra logic ----
+  // Plain one-field writes have no named handler; their controls call
+  // `setField` straight from the JSX. Everything below keeps a handler
+  // because it guards/clamps, writes coupled fields, or picks the field
+  // variant for the current review mode.
+
+  const handleBatchSizeChange = (value: number) => {
     if (value < 1 || value > MAX_CARDS_PER_BATCH) return;
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      cardsToAddBatchSize: value,
-    });
+    void setField('cardsToAddBatchSize', value);
   };
 
-  const handleAutoAddChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      autoAddCards: checked,
-    });
-  };
-
-  const handleInitialReviewsChange = async (value: number) => {
+  const handleInitialReviewsChange = (value: number) => {
     if (value < 1 || value > 20) return;
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      initialReviewCount: value,
-    });
+    void setField('initialReviewCount', value);
   };
 
   // ---- audio playback setting handlers ----
-  // In writing ("full") mode these write the `*Full` counterpart fields so the
-  // two modes stay independent. Record handlers spread the *effective* map
-  // (mode-resolved, see the resolved-values section below), so the first
-  // writing-mode edit snapshots the audio values for every language instead of
-  // dropping them.
+  // In writing ("full") mode these write the `*Full` counterpart fields (in
+  // transcribe the `*Transcribe` ones) so the modes stay independent. Record
+  // handlers spread the *effective* map (mode-resolved, see the resolved-values
+  // section below), so the first writing-mode edit snapshots the audio values
+  // for every language instead of dropping them.
 
-  const handleAutoPlayChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      ...(isTranscribe
+  const handleAutoPlayChange = (checked: boolean) =>
+    setFields(
+      isTranscribe
         ? { autoPlayAudioTranscribe: checked }
         : isFull
           ? { autoPlayAudioFull: checked }
-          : { autoPlayAudio: checked }),
-    });
-  };
+          : { autoPlayAudio: checked },
+    );
 
-  const handleHighlightWordsChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      ...(isTranscribe
+  const handleHighlightWordsChange = (checked: boolean) =>
+    setFields(
+      isTranscribe
         ? { highlightWordsTranscribe: checked }
         : isFull
           ? { highlightWordsFull: checked }
-          : { highlightWords: checked }),
-    });
-  };
+          : { highlightWords: checked },
+    );
 
-  const handleAutoAdvanceChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      autoAdvance: checked,
-    });
-  };
-
-  const handleShowProgressBarChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      showProgressBar: checked,
-    });
-  };
-
-  const handleShowCardOriginChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      showCardOrigin: checked,
-    });
-  };
-
-  const handleProgressDisplayEnabledChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      progressDisplayEnabled: checked,
-    });
-  };
-
-  const handleHideTargetLanguagesChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
+  const handleHideTargetLanguagesChange = (checked: boolean) =>
+    setFields({
       hideTargetLanguages: checked,
       ...(!checked && { autoRevealLanguages: false }),
     });
-  };
 
-  const handleAutoRevealLanguagesChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      autoRevealLanguages: checked,
-    });
-  };
-
-  const handleHideBaseLanguagesChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
+  const handleHideBaseLanguagesChange = (checked: boolean) =>
+    setFields({
       hideBaseLanguages: checked,
       ...(!checked && { autoRevealBaseLanguages: false }),
     });
-  };
 
-  const handleAutoRevealBaseLanguagesChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      autoRevealBaseLanguages: checked,
-    });
-  };
-
-  const handleShowRomanizationChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      showRomanization: checked,
-    });
-  };
-
-  const handleShowIpaChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      showIpa: checked,
-    });
-  };
-
-  const handleShowFuriganaChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      showFurigana: checked,
-    });
-  };
-
-  const handleRepetitionChange = async (language: string, value: number) => {
+  const handleRepetitionChange = (language: string, value: number) => {
     if (value < 0 || value > 10) return;
     const next = { ...reps, [language]: value };
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      ...(isTranscribe
+    void setFields(
+      isTranscribe
         ? { languageRepetitionsTranscribe: next }
         : isFull
           ? { languageRepetitionsFull: next }
-          : { languageRepetitions: next }),
-    });
+          : { languageRepetitions: next },
+    );
   };
 
-  const handleRepetitionPauseChange = async (
-    language: string,
-    value: number,
-  ) => {
+  const handleRepetitionPauseChange = (language: string, value: number) => {
     if (value < 0 || value > 30) return;
     const next = { ...repPauses, [language]: value };
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      ...(isTranscribe
+    void setFields(
+      isTranscribe
         ? { languageRepetitionPausesTranscribe: next }
         : isFull
           ? { languageRepetitionPausesFull: next }
-          : { languageRepetitionPauses: next }),
-    });
+          : { languageRepetitionPauses: next },
+    );
   };
 
-  const handleLanguageSpeedChange = async (language: string, value: number) => {
-    const clamped = clampPlaybackSpeed(value);
-    const next = { ...speeds, [language]: clamped };
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      ...(isTranscribe
+  const handleLanguageSpeedChange = (language: string, value: number) => {
+    const next = { ...speeds, [language]: clampPlaybackSpeed(value) };
+    void setFields(
+      isTranscribe
         ? { languagePlaybackSpeedsTranscribe: next }
         : isFull
           ? { languagePlaybackSpeedsFull: next }
-          : { languagePlaybackSpeeds: next }),
-    });
+          : { languagePlaybackSpeeds: next },
+    );
   };
 
-  const handlePauseBaseToBaseChange = async (value: number) => {
+  const handlePauseBaseToBaseChange = (value: number) => {
     if (value < 0 || value > 30) return;
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      ...(isFull ? { pauseBaseToBaseFull: value } : { pauseBaseToBase: value }),
-    });
+    void setFields(
+      isFull ? { pauseBaseToBaseFull: value } : { pauseBaseToBase: value },
+    );
   };
 
-  const handlePauseBaseToTargetChange = async (value: number) => {
+  const handlePauseBaseToTargetChange = (value: number) => {
     if (value < 0 || value > 30) return;
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      ...(isFull
+    void setFields(
+      isFull
         ? { pauseBaseToTargetFull: value }
-        : { pauseBaseToTarget: value }),
-    });
+        : { pauseBaseToTarget: value },
+    );
   };
 
-  const handlePauseTargetToTargetChange = async (value: number) => {
+  const handlePauseTargetToTargetChange = (value: number) => {
     if (value < 0 || value > 30) return;
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      ...(isTranscribe
+    void setFields(
+      isTranscribe
         ? { pauseTargetToTargetTranscribe: value }
         : isFull
           ? { pauseTargetToTargetFull: value }
-          : { pauseTargetToTarget: value }),
-    });
+          : { pauseTargetToTarget: value },
+    );
   };
 
-  const handlePauseBeforeAutoAdvanceChange = async (value: number) => {
+  const handlePauseBeforeAutoAdvanceChange = (value: number) => {
     if (value < 0 || value > 10) return;
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      ...(isFull
+    void setFields(
+      isFull
         ? { pauseBeforeAutoAdvanceFull: value }
-        : { pauseBeforeAutoAdvance: value }),
-    });
+        : { pauseBeforeAutoAdvance: value },
+    );
   };
 
   // ---- target before/after base ("Practice Listening" / "Practice Speaking") ----
@@ -551,9 +492,8 @@ export function LearningModeSettings({
       }
       : {};
 
-  const handlePlayTargetBeforeBaseChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
+  const handlePlayTargetBeforeBaseChange = (checked: boolean) =>
+    setFields({
       playTargetBeforeBase: checked,
       // Cannot disable both: if turning this off while "after" is already off,
       // auto-enable "after".
@@ -561,100 +501,79 @@ export function LearningModeSettings({
       // Mirror current target settings on first enable.
       ...(checked ? beforeSeedIfEmpty() : {}),
     });
-  };
 
-  const handlePlayTargetAfterBaseChange = async (checked: boolean) => {
-    const enablingBefore = !checked && !playTargetBefore;
-    await updateSettings({
-      courseId: courseSettings.courseId,
+  const handlePlayTargetAfterBaseChange = (checked: boolean) =>
+    setFields({
       playTargetAfterBase: checked,
       // Cannot disable both: auto-enable "before" (and seed it) when turning
       // this off while "before" is already off.
-      ...(enablingBefore
+      ...(!checked && !playTargetBefore
         ? { playTargetBeforeBase: true, ...beforeSeedIfEmpty() }
         : {}),
     });
-  };
 
-  const handleTargetBeforeRepetitionChange = async (
+  const handleTargetBeforeRepetitionChange = (
     language: string,
     value: number,
   ) => {
     if (value < 0 || value > 10) return;
-    const current = courseSettings.targetBeforeRepetitions ?? {};
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      targetBeforeRepetitions: { ...current, [language]: value },
+    void setField('targetBeforeRepetitions', {
+      ...(courseSettings.targetBeforeRepetitions ?? {}),
+      [language]: value,
     });
   };
 
-  const handleTargetBeforeRepetitionPauseChange = async (
+  const handleTargetBeforeRepetitionPauseChange = (
     language: string,
     value: number,
   ) => {
     if (value < 0 || value > 30) return;
-    const current = courseSettings.targetBeforeRepetitionPauses ?? {};
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      targetBeforeRepetitionPauses: { ...current, [language]: value },
+    void setField('targetBeforeRepetitionPauses', {
+      ...(courseSettings.targetBeforeRepetitionPauses ?? {}),
+      [language]: value,
     });
   };
 
-  const handleTargetBeforeSpeedChange = async (
-    language: string,
-    value: number,
-  ) => {
-    const clamped = clampPlaybackSpeed(value);
-    const current = courseSettings.targetBeforePlaybackSpeeds ?? {};
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      targetBeforePlaybackSpeeds: { ...current, [language]: clamped },
+  const handleTargetBeforeSpeedChange = (language: string, value: number) => {
+    void setField('targetBeforePlaybackSpeeds', {
+      ...(courseSettings.targetBeforePlaybackSpeeds ?? {}),
+      [language]: clampPlaybackSpeed(value),
     });
   };
 
-  const handlePauseTargetToBaseChange = async (value: number) => {
+  const handlePauseTargetToBaseChange = (value: number) => {
     if (value < 0 || value > 30) return;
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      pauseTargetToBase: value,
-    });
+    void setField('pauseTargetToBase', value);
   };
 
   // ---- transcribe post-submit replay group ("Translation Entered") ----
 
-  const handleTranscribeAfterRepetitionChange = async (
+  const handleTranscribeAfterRepetitionChange = (
     language: string,
     value: number,
   ) => {
     if (value < 0 || value > 10) return;
-    const current = courseSettings.transcribeAfterRepetitions ?? {};
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      transcribeAfterRepetitions: { ...current, [language]: value },
+    void setField('transcribeAfterRepetitions', {
+      ...(courseSettings.transcribeAfterRepetitions ?? {}),
+      [language]: value,
     });
   };
 
-  const handleTranscribeAfterRepetitionPauseChange = async (
+  const handleTranscribeAfterRepetitionPauseChange = (
     language: string,
     value: number,
   ) => {
     if (value < 0 || value > 30) return;
-    const current = courseSettings.transcribeAfterRepetitionPauses ?? {};
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      transcribeAfterRepetitionPauses: { ...current, [language]: value },
+    void setField('transcribeAfterRepetitionPauses', {
+      ...(courseSettings.transcribeAfterRepetitionPauses ?? {}),
+      [language]: value,
     });
   };
 
-  const handleTranscribeAfterSpeedChange = async (
-    language: string,
-    value: number,
-  ) => {
-    const clamped = clampPlaybackSpeed(value);
-    const current = courseSettings.transcribeAfterPlaybackSpeeds ?? {};
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      transcribeAfterPlaybackSpeeds: { ...current, [language]: clamped },
+  const handleTranscribeAfterSpeedChange = (language: string, value: number) => {
+    void setField('transcribeAfterPlaybackSpeeds', {
+      ...(courseSettings.transcribeAfterPlaybackSpeeds ?? {}),
+      [language]: clampPlaybackSpeed(value),
     });
   };
 
@@ -662,10 +581,9 @@ export function LearningModeSettings({
   // Listening to Practice Speaking? Writing the strategy also normalizes a
   // legacy ∞ rep window (stored 0) to 1 when switching onto 'onlyNew', since
   // "continuously" is its own strategy now and 0 would contradict it.
-  const handleListeningStrategyChange = async (value: string) => {
+  const handleListeningStrategyChange = (value: string) => {
     const strategy = value as 'onlyNew' | 'untilGood' | 'continuous';
-    await updateSettings({
-      courseId: courseSettings.courseId,
+    void setFields({
       targetBeforeListeningStrategy: strategy,
       ...(strategy === 'onlyNew' && !(onlyNewStored && onlyNewStored > 0)
         ? { targetBeforeOnlyNewReps: 1 }
@@ -674,139 +592,34 @@ export function LearningModeSettings({
   };
 
   // "Only new" rep window: integer 1-10 (∞ lives on the 'continuous' strategy).
-  const handleTargetBeforeOnlyNewChange = async (value: number) => {
-    const clamped = Math.min(10, Math.max(1, Math.floor(value)));
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      targetBeforeOnlyNewReps: clamped,
-    });
-  };
+  const handleTargetBeforeOnlyNewChange = (value: number) =>
+    setField(
+      'targetBeforeOnlyNewReps',
+      Math.min(10, Math.max(1, Math.floor(value))),
+    );
 
   // "Until rated Good" threshold: integer 1-10.
-  const handleTargetBeforeUntilGoodChange = async (value: number) => {
-    const clamped = Math.min(10, Math.max(1, Math.floor(value)));
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      targetBeforeUntilGoodReps: clamped,
-    });
-  };
+  const handleTargetBeforeUntilGoodChange = (value: number) =>
+    setField(
+      'targetBeforeUntilGoodReps',
+      Math.min(10, Math.max(1, Math.floor(value))),
+    );
 
-  // ---- "Show translation on new sentences" (writing mode) ----
-
-  const handleShowTranslationOnNewChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      showTranslationOnNew: checked,
-    });
-  };
-
-  // Same stored window semantics as targetBeforeOnlyNewReps: 0 = ∞, 1-10.
-  const handleShowTranslationOnlyNewChange = async (value: number) => {
-    const clamped = value <= 0 ? 0 : Math.min(10, Math.max(1, Math.floor(value)));
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      showTranslationOnlyNewReps: clamped,
-    });
-  };
-
-  // ---- review mode handlers ----
-
-  const handleReviewModeChange = async (mode: 'audio' | 'full') => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      reviewMode: mode,
-    });
-  };
-
-  // Split scheduling: each mode keeps its own per-card review schedule.
-  // Enabling triggers a server-side seed of the writing track (copy of the
-  // current schedule); disabling just freezes it, nothing is deleted.
-  const handleSeparateModeTrackingChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      separateModeTracking: checked,
-    });
-  };
-
-  const handleFullReviewTargetAudioModeChange = async (
-    mode: 'always' | 'afterSubmit' | 'never',
-  ) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      fullReviewTargetAudioMode: mode,
-    });
-  };
-
-  const handleWritingInputModeChange = async (
-    mode: 'translate' | 'transcribe',
-  ) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      writingInputMode: mode,
-    });
-  };
+  // "Show translation on new sentences" (writing mode). Same stored window
+  // semantics as targetBeforeOnlyNewReps: 0 = ∞, 1-10.
+  const handleShowTranslationOnlyNewChange = (value: number) =>
+    setField(
+      'showTranslationOnlyNewReps',
+      value <= 0 ? 0 : Math.min(10, Math.max(1, Math.floor(value))),
+    );
 
   // Writing-mode "Hide base languages". Independent of the audio-mode pair;
   // its sub-setting reveals on submit (not on audio playback).
-  const handleHideBaseLanguagesFullChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
+  const handleHideBaseLanguagesFullChange = (checked: boolean) =>
+    setFields({
       hideBaseLanguagesFull: checked,
       ...(!checked && { autoRevealBaseOnSubmit: false }),
     });
-  };
-
-  const handleAutoRevealBaseOnSubmitChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      autoRevealBaseOnSubmit: checked,
-    });
-  };
-
-  const handleIgnorePunctuationChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      ignorePunctuation: checked,
-    });
-  };
-
-  const handleAiWritingFeedbackChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      aiWritingFeedback: checked,
-    });
-  };
-
-  const handleAutoRateFromAccuracyChange = async (checked: boolean) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      autoRateFromAccuracy: checked,
-    });
-  };
-
-  const handleAutoRateThresholdsCommit = async (next: {
-    hard: number;
-    good: number;
-  }) => {
-    await updateSettings({
-      courseId: courseSettings.courseId,
-      autoRateThresholds: next,
-    });
-  };
-
-  const handleInstantProceedChange = async (checked: boolean) => {
-    if (reviewMode === 'full') {
-      await updateSettings({
-        courseId: courseSettings.courseId,
-        instantProceedFull: checked,
-      });
-    } else {
-      await updateSettings({
-        courseId: courseSettings.courseId,
-        instantProceedAudio: checked,
-      });
-    }
-  };
 
   // ---- resolved values (with defaults) ----
 
@@ -816,91 +629,52 @@ export function LearningModeSettings({
     courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit';
   const writingInputMode = courseSettings.writingInputMode ?? 'translate';
   const isTranscribe = isFull && writingInputMode === 'transcribe';
+  const settingsMode: AudioSettingsMode = isTranscribe
+    ? 'transcribe'
+    : isFull
+      ? 'full'
+      : 'audio';
   // Each mode edits its own copy of the playback settings; the effective
   // value resolves `*Transcribe ?? *Full ?? unsuffixed` so an untweaked mode
   // shows (and seeds its first write from) the previous mode in the chain.
-  // Audio mode keeps reading the unsuffixed fields.
-  const pick = <T,>(
-    transcribe: T | undefined,
-    full: T | undefined,
-    audio: T | undefined,
-  ): T | undefined =>
-      isTranscribe ? (transcribe ?? full ?? audio) : isFull ? (full ?? audio) : audio;
-  const reps =
-    pick(
-      courseSettings.languageRepetitionsTranscribe,
-      courseSettings.languageRepetitionsFull,
-      courseSettings.languageRepetitions,
-    ) ?? {};
-  const repPauses =
-    pick(
-      courseSettings.languageRepetitionPausesTranscribe,
-      courseSettings.languageRepetitionPausesFull,
-      courseSettings.languageRepetitionPauses,
-    ) ?? {};
-  const speeds =
-    pick(
-      courseSettings.languagePlaybackSpeedsTranscribe,
-      courseSettings.languagePlaybackSpeedsFull,
-      courseSettings.languagePlaybackSpeeds,
-    ) ?? {};
-  const pauseB2B =
-    pick(
-      undefined,
-      courseSettings.pauseBaseToBaseFull,
-      courseSettings.pauseBaseToBase,
-    ) ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
-  const pauseB2T =
-    pick(
-      undefined,
-      courseSettings.pauseBaseToTargetFull,
-      courseSettings.pauseBaseToTarget,
-    ) ?? DEFAULT_PAUSE_BASE_TO_TARGET;
-  const pauseT2T =
-    pick(
-      courseSettings.pauseTargetToTargetTranscribe,
-      courseSettings.pauseTargetToTargetFull,
-      courseSettings.pauseTargetToTarget,
-    ) ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
+  // Resolved through the SAME code path as actual playback
+  // (useLearningAudio → resolveAudioSettings), so the preview timeline and
+  // the merged audio can never disagree. Includes the playback defaults,
+  // the legacy listening-strategy inference, and defaultTargetReps (2x in
+  // audio mode, 1x in the writing modes).
+  const {
+    reps,
+    repPauses,
+    speeds,
+    pauseB2B,
+    pauseB2T,
+    pauseT2T,
+    defaultTargetReps,
+    playTargetBefore,
+    playTargetAfter,
+    beforeReps,
+    beforeRepPauses,
+    beforeSpeeds,
+    pauseT2B,
+    autoAdvance,
+    pauseBeforeAdvance,
+    listeningStrategy,
+  } = resolveAudioSettings(courseSettings, undefined, settingsMode);
   const autoPlay =
-    pick(
-      courseSettings.autoPlayAudioTranscribe,
-      courseSettings.autoPlayAudioFull,
-      courseSettings.autoPlayAudio,
-    ) ?? DEFAULT_AUTO_PLAY;
+    resolveModeSetting(courseSettings, 'autoPlayAudio', settingsMode) ??
+    DEFAULT_AUTO_PLAY;
   const highlightWords =
-    pick(
-      courseSettings.highlightWordsTranscribe,
-      courseSettings.highlightWordsFull,
-      courseSettings.highlightWords,
-    ) === true;
-  // Target cards with no stored reps default to 2x in audio mode but 1x in
-  // the writing modes (once is enough when the learner is typing), mirrors
-  // resolveAudioSettings.defaultTargetReps.
-  const defaultTargetReps = isFull
-    ? DEFAULT_REPETITIONS_TARGET_WRITING
-    : DEFAULT_REPETITIONS_TARGET;
-  const playTargetBefore =
-    courseSettings.playTargetBeforeBase ?? DEFAULT_PLAY_TARGET_BEFORE_BASE;
-  const playTargetAfter =
-    courseSettings.playTargetAfterBase ?? DEFAULT_PLAY_TARGET_AFTER_BASE;
-  const beforeReps = courseSettings.targetBeforeRepetitions ?? {};
-  const beforeRepPauses = courseSettings.targetBeforeRepetitionPauses ?? {};
-  const beforeSpeeds = courseSettings.targetBeforePlaybackSpeeds ?? {};
+    resolveModeSetting(courseSettings, 'highlightWords', settingsMode) === true;
   // Transcribe post-submit replay group (independent of the pre-submit prompt).
   const transcribeAfterReps = courseSettings.transcribeAfterRepetitions ?? {};
   const transcribeAfterRepPauses =
     courseSettings.transcribeAfterRepetitionPauses ?? {};
   const transcribeAfterSpeeds =
     courseSettings.transcribeAfterPlaybackSpeeds ?? {};
-  const pauseT2B = courseSettings.pauseTargetToBase ?? DEFAULT_PAUSE_TARGET_TO_BASE;
-  // Listening-duration strategy. Docs from before the strategy field encode
-  // "continuously" as onlyNewReps 0/undefined. Mirror resolveAudioSettings'
-  // legacy inference so the radio selection always matches actual playback.
+  // Raw "Only new" window, read by handleListeningStrategyChange's legacy-∞
+  // normalization and the stepper below (the resolved settings map it to
+  // Infinity, which is not what the 1-10 stepper displays).
   const onlyNewStored = courseSettings.targetBeforeOnlyNewReps;
-  const listeningStrategy =
-    courseSettings.targetBeforeListeningStrategy ??
-    (onlyNewStored && onlyNewStored > 0 ? 'onlyNew' : 'continuous');
   // Per-strategy X values. "Only new" no longer owns an ∞ position (that is
   // the 'continuous' strategy now), so its stepper floors at 1.
   const onlyNewUiValue =
@@ -928,7 +702,6 @@ export function LearningModeSettings({
   const showAfterSubmitGroup =
     isFull &&
     (isTranscribe ? autoPlay : fullReviewTargetAudioMode === 'afterSubmit');
-  const autoAdvance = courseSettings.autoAdvance ?? DEFAULT_AUTO_ADVANCE;
   const instantProceed =
     reviewMode === 'full'
       ? (courseSettings.instantProceedFull ?? true)
@@ -943,32 +716,16 @@ export function LearningModeSettings({
   };
 
   const moveBaseUp = (idx: number) => {
-    const next = swap(baseLanguages, idx, idx - 1);
-    void updateSettings({
-      courseId: courseSettings.courseId,
-      baseLanguageOrder: next,
-    });
+    void setField('baseLanguageOrder', swap(baseLanguages, idx, idx - 1));
   };
   const moveBaseDown = (idx: number) => {
-    const next = swap(baseLanguages, idx, idx + 1);
-    void updateSettings({
-      courseId: courseSettings.courseId,
-      baseLanguageOrder: next,
-    });
+    void setField('baseLanguageOrder', swap(baseLanguages, idx, idx + 1));
   };
   const moveTargetUp = (idx: number) => {
-    const next = swap(targetLanguages, idx, idx - 1);
-    void updateSettings({
-      courseId: courseSettings.courseId,
-      targetLanguageOrder: next,
-    });
+    void setField('targetLanguageOrder', swap(targetLanguages, idx, idx - 1));
   };
   const moveTargetDown = (idx: number) => {
-    const next = swap(targetLanguages, idx, idx + 1);
-    void updateSettings({
-      courseId: courseSettings.courseId,
-      targetLanguageOrder: next,
-    });
+    void setField('targetLanguageOrder', swap(targetLanguages, idx, idx + 1));
   };
 
   const courseData = {
@@ -1010,7 +767,7 @@ export function LearningModeSettings({
 
           <ReviewModeSwitcher
             value={reviewMode}
-            onChange={handleReviewModeChange}
+            onChange={(mode) => setField('reviewMode', mode)}
           />
 
           <div className="space-y-2.5 rounded-md border bg-muted/30 p-3">
@@ -1040,7 +797,9 @@ export function LearningModeSettings({
               label={t('separateModeTracking')}
               description={t('separateModeTrackingDescription')}
               checked={courseSettings.separateModeTracking === true}
-              onCheckedChange={handleSeparateModeTrackingChange}
+              onCheckedChange={(checked) =>
+                setField('separateModeTracking', checked)
+              }
             />
           </div>
 
@@ -1055,7 +814,7 @@ export function LearningModeSettings({
               <div className="flex w-full rounded-lg border bg-muted/50 p-1">
                 <button
                   type="button"
-                  onClick={() => handleWritingInputModeChange('translate')}
+                  onClick={() => setField('writingInputMode', 'translate')}
                   data-testid="settings-writing-translate"
                   className={cn(
                     'flex-1 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all whitespace-nowrap',
@@ -1069,7 +828,7 @@ export function LearningModeSettings({
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleWritingInputModeChange('transcribe')}
+                  onClick={() => setField('writingInputMode', 'transcribe')}
                   data-testid="settings-writing-transcribe"
                   className={cn(
                     'flex-1 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all whitespace-nowrap',
@@ -1148,7 +907,7 @@ export function LearningModeSettings({
             label={t('autoAddCards')}
             description={t('autoAddCardsDescription')}
             checked={courseSettings.autoAddCards !== false}
-            onCheckedChange={handleAutoAddChange}
+            onCheckedChange={(checked) => setField('autoAddCards', checked)}
           />
 
           {/* Auto-advance. Audio mode only */}
@@ -1158,7 +917,7 @@ export function LearningModeSettings({
               label={t('autoAdvance')}
               description={t('autoAdvanceDescription')}
               checked={autoAdvance}
-              onCheckedChange={handleAutoAdvanceChange}
+              onCheckedChange={(checked) => setField('autoAdvance', checked)}
             />
           )}
 
@@ -1168,7 +927,12 @@ export function LearningModeSettings({
             label={t('instantProceed')}
             description={t('instantProceedDescription')}
             checked={instantProceed}
-            onCheckedChange={handleInstantProceedChange}
+            onCheckedChange={(checked) =>
+              setField(
+                isFull ? 'instantProceedFull' : 'instantProceedAudio',
+                checked,
+              )
+            }
           />
 
           {/* Show every-N-cards celebration screen */}
@@ -1177,7 +941,9 @@ export function LearningModeSettings({
             label={t('progressDisplayEnabled')}
             description={t('progressDisplayEnabledDescription')}
             checked={courseSettings.progressDisplayEnabled !== false}
-            onCheckedChange={handleProgressDisplayEnabledChange}
+            onCheckedChange={(checked) =>
+              setField('progressDisplayEnabled', checked)
+            }
           />
 
           {/* Writing-mode scoring: how the accuracy percentage is computed, and
@@ -1195,7 +961,9 @@ export function LearningModeSettings({
                   label={t('showTranslationOnNew')}
                   description={t('showTranslationOnNewDescription')}
                   checked={courseSettings.showTranslationOnNew ?? true}
-                  onCheckedChange={handleShowTranslationOnNewChange}
+                  onCheckedChange={(checked) =>
+                    setField('showTranslationOnNew', checked)
+                  }
                 />
 
                 {(courseSettings.showTranslationOnNew ?? true) && (
@@ -1227,7 +995,9 @@ export function LearningModeSettings({
                 label={t('ignorePunctuation')}
                 description={t('ignorePunctuationDescription')}
                 checked={courseSettings.ignorePunctuation ?? false}
-                onCheckedChange={handleIgnorePunctuationChange}
+                onCheckedChange={(checked) =>
+                  setField('ignorePunctuation', checked)
+                }
               />
 
               <SettingSwitchRow
@@ -1235,7 +1005,9 @@ export function LearningModeSettings({
                 label={t('aiWritingFeedback')}
                 description={t('aiWritingFeedbackDescription')}
                 checked={courseSettings.aiWritingFeedback ?? true}
-                onCheckedChange={handleAiWritingFeedbackChange}
+                onCheckedChange={(checked) =>
+                  setField('aiWritingFeedback', checked)
+                }
               />
 
               <div className="space-y-0">
@@ -1244,14 +1016,16 @@ export function LearningModeSettings({
                   label={t('autoRateFromAccuracy')}
                   description={t('autoRateFromAccuracyDescription')}
                   checked={courseSettings.autoRateFromAccuracy ?? true}
-                  onCheckedChange={handleAutoRateFromAccuracyChange}
+                  onCheckedChange={(checked) =>
+                    setField('autoRateFromAccuracy', checked)
+                  }
                 />
 
                 {(courseSettings.autoRateFromAccuracy ?? true) && (
                   <div className="ml-4 mt-3 pl-3 border-l-2 border-border">
                     <AutoRateThresholdControl
                       thresholds={courseSettings.autoRateThresholds}
-                      onCommit={handleAutoRateThresholdsCommit}
+                      onCommit={(next) => setField('autoRateThresholds', next)}
                     />
                   </div>
                 )}
@@ -1373,11 +1147,12 @@ export function LearningModeSettings({
                 label={t('fullReviewTargetAudio')}
                 description={t('fullReviewTargetAudioDescription')}
                 checked={fullReviewTargetAudioMode !== 'never'}
-                onCheckedChange={(checked) => {
-                  handleFullReviewTargetAudioModeChange(
+                onCheckedChange={(checked) =>
+                  setField(
+                    'fullReviewTargetAudioMode',
                     checked ? 'afterSubmit' : 'never',
-                  );
-                }}
+                  )
+                }
               />
 
               {fullReviewTargetAudioMode !== 'never' && (
@@ -1388,7 +1163,7 @@ export function LearningModeSettings({
                     checked={fullReviewTargetAudioMode === 'afterSubmit'}
                     onCheckedChange={(checked) => {
                       if (checked)
-                        handleFullReviewTargetAudioModeChange('afterSubmit');
+                        void setField('fullReviewTargetAudioMode', 'afterSubmit');
                     }}
                   />
 
@@ -1398,7 +1173,7 @@ export function LearningModeSettings({
                     checked={fullReviewTargetAudioMode === 'always'}
                     onCheckedChange={(checked) => {
                       if (checked)
-                        handleFullReviewTargetAudioModeChange('always');
+                        void setField('fullReviewTargetAudioMode', 'always');
                     }}
                   />
                 </div>
@@ -1596,10 +1371,7 @@ export function LearningModeSettings({
               (baseLanguages.length > 0 || targetLanguages.length > 0) && (
               <StepperPauseConnector
                 label={t('pauseBeforeAutoAdvance')}
-                seconds={
-                  courseSettings.pauseBeforeAutoAdvance ??
-                    DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE
-                }
+                seconds={pauseBeforeAdvance}
                 onChange={handlePauseBeforeAutoAdvanceChange}
                 accent
               />
@@ -1662,7 +1434,9 @@ export function LearningModeSettings({
                   label={t('autoRevealLanguages')}
                   description={t('autoRevealLanguagesDescription')}
                   checked={courseSettings.autoRevealLanguages ?? true}
-                  onCheckedChange={handleAutoRevealLanguagesChange}
+                  onCheckedChange={(checked) =>
+                    setField('autoRevealLanguages', checked)
+                  }
                   indented
                 />
               )}
@@ -1687,7 +1461,9 @@ export function LearningModeSettings({
                   label={t('autoRevealBaseLanguages')}
                   description={t('autoRevealBaseLanguagesDescription')}
                   checked={courseSettings.autoRevealBaseLanguages ?? true}
-                  onCheckedChange={handleAutoRevealBaseLanguagesChange}
+                  onCheckedChange={(checked) =>
+                    setField('autoRevealBaseLanguages', checked)
+                  }
                   indented
                 />
               )}
@@ -1713,7 +1489,9 @@ export function LearningModeSettings({
                   label={t('autoRevealBaseOnSubmit')}
                   description={t('autoRevealBaseOnSubmitDescription')}
                   checked={courseSettings.autoRevealBaseOnSubmit ?? true}
-                  onCheckedChange={handleAutoRevealBaseOnSubmitChange}
+                  onCheckedChange={(checked) =>
+                    setField('autoRevealBaseOnSubmit', checked)
+                  }
                   indented
                 />
               )}
@@ -1726,7 +1504,7 @@ export function LearningModeSettings({
             label={t('showProgressBar')}
             description={t('showProgressBarDescription')}
             checked={courseSettings.showProgressBar ?? true}
-            onCheckedChange={handleShowProgressBarChange}
+            onCheckedChange={(checked) => setField('showProgressBar', checked)}
           />
 
           {/* Show card origin (source-collection pill on the card header) */}
@@ -1735,7 +1513,7 @@ export function LearningModeSettings({
             label={t('showCardOrigin')}
             description={t('showCardOriginDescription')}
             checked={courseSettings.showCardOrigin ?? false}
-            onCheckedChange={handleShowCardOriginChange}
+            onCheckedChange={(checked) => setField('showCardOrigin', checked)}
           />
 
           {/* ================================================================
@@ -1773,7 +1551,9 @@ export function LearningModeSettings({
                   description={t('showRomanizationDescription')}
                   languages={toLanguageNames(romanizationLanguages)}
                   checked={courseSettings.showRomanization ?? true}
-                  onCheckedChange={handleShowRomanizationChange}
+                  onCheckedChange={(checked) =>
+                    setField('showRomanization', checked)
+                  }
                 />
               )}
               {ipaLanguages.length > 0 && (
@@ -1783,7 +1563,7 @@ export function LearningModeSettings({
                   description={t('showIpaDescription')}
                   languages={toLanguageNames(ipaLanguages)}
                   checked={courseSettings.showIpa ?? false}
-                  onCheckedChange={handleShowIpaChange}
+                  onCheckedChange={(checked) => setField('showIpa', checked)}
                 />
               )}
               {furiganaLanguages.length > 0 && (
@@ -1793,7 +1573,9 @@ export function LearningModeSettings({
                   description={t('showFuriganaDescription')}
                   languages={toLanguageNames(furiganaLanguages)}
                   checked={resolveShowFurigana(courseSettings)}
-                  onCheckedChange={handleShowFuriganaChange}
+                  onCheckedChange={(checked) =>
+                    setField('showFurigana', checked)
+                  }
                 />
               )}
             </>

@@ -42,6 +42,10 @@ import {
   TUTORIAL_ANCHORS,
 } from '@/lib/tutorials/anchors';
 import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
+import {
+  resolveModeSetting,
+  type AudioSettingsMode,
+} from '@/lib/audio/mergeAudio';
 import { PROGRESS_SOUND_URL } from '@/lib/constants/learning';
 import { resolveShowFurigana } from '@/lib/furigana';
 
@@ -464,17 +468,21 @@ export function LearningMode({
     ? (state.courseSettings.instantProceedFull ?? true)
     : (state.courseSettings.instantProceedAudio ?? false);
   const isTranscribe = isTranscribeMode(state.courseSettings);
+  // Settings mode for the writing-only lookups below: this branch of the
+  // component only renders writing ("full") review, so the mode is never
+  // 'audio' here.
+  const writingSettingsMode: AudioSettingsMode = isTranscribe
+    ? 'transcribe'
+    : 'full';
   // Transcribe: the post-submit replay rides the same per-language afterSubmit
   // machinery as Translate, gated by the transcribe auto-play setting
-  // (chained `*Transcribe ?? *Full ?? audio`).
-  const writingAutoPlay = isTranscribe
-    ? (state.courseSettings.autoPlayAudioTranscribe ??
-      state.courseSettings.autoPlayAudioFull ??
-      state.courseSettings.autoPlayAudio ??
-      DEFAULT_AUTO_PLAY)
-    : (state.courseSettings.autoPlayAudioFull ??
-      state.courseSettings.autoPlayAudio ??
-      DEFAULT_AUTO_PLAY);
+  // (chained `*Transcribe ?? *Full ?? audio` via resolveModeSetting).
+  const writingAutoPlay =
+    resolveModeSetting(
+      state.courseSettings,
+      'autoPlayAudio',
+      writingSettingsMode,
+    ) ?? DEFAULT_AUTO_PLAY;
 
   // Flagging acts at the card level. The mutation retranslates every
   // non-source-language translation on the card. We hide the button when
@@ -598,23 +606,19 @@ export function LearningMode({
         resetSignal={cardResetNonce}
         replayTargetSignal={targetReplayNonce}
         highlightEnabled={
-          (isTranscribe
-            ? (state.courseSettings.highlightWordsTranscribe ??
-              state.courseSettings.highlightWordsFull ??
-              state.courseSettings.highlightWords)
-            : (state.courseSettings.highlightWordsFull ??
-              state.courseSettings.highlightWords)) === true
+          resolveModeSetting(
+            state.courseSettings,
+            'highlightWords',
+            writingSettingsMode,
+          ) === true
         }
         flaggedInSession={state.flaggedInSession}
         mergedPlayback={mergedPlayback}
-        languagePlaybackSpeeds={
-          isTranscribe
-            ? (state.courseSettings.languagePlaybackSpeedsTranscribe ??
-              state.courseSettings.languagePlaybackSpeedsFull ??
-              state.courseSettings.languagePlaybackSpeeds)
-            : (state.courseSettings.languagePlaybackSpeedsFull ??
-              state.courseSettings.languagePlaybackSpeeds)
-        }
+        languagePlaybackSpeeds={resolveModeSetting(
+          state.courseSettings,
+          'languagePlaybackSpeeds',
+          writingSettingsMode,
+        )}
         audioSpeedOverrides={state.audioSpeedOverrides}
         onSpeedCycle={handleSpeedCycle}
         audioRef={audio.audioRef}
