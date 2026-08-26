@@ -4,6 +4,7 @@ import { internal } from '../_generated/api';
 import {
   buildCardSearchableText,
   buildTextContentBatchForLanguages,
+  type CardAlternativeContent,
 } from '../lib/cardContent';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
@@ -332,14 +333,7 @@ export const getCardForReview = query({
     // content above): the writing card diffs against the closest of primary +
     // alternatives and lists the others with their own annotations + audio.
     // Usually-empty indexed reads, at most 2 cards x target languages.
-    type AlternativePayload = {
-      text: string;
-      romanization?: string;
-      ipa?: string;
-      furigana?: string;
-      audioUrl?: string | null;
-    };
-    const alternativesByCardLang = new Map<string, AlternativePayload[]>();
+    const alternativesByCardLang = new Map<string, CardAlternativeContent[]>();
     await Promise.all(
       dueCards.flatMap((card, i) =>
         course.targetLanguages.map(async (lang) => {

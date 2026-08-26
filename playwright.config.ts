@@ -101,6 +101,7 @@ export default defineConfig({
         /add-cards-import-live\.spec\.ts/,
         /content-filter-live\.spec\.ts/,
         /curriculum-edit-flag\.spec\.ts/,
+        /writing-feedback-live\.spec\.ts/,
       ],
       dependencies: ["chromium-parallel"],
       fullyParallel: false,
