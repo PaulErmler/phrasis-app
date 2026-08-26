@@ -169,32 +169,32 @@ export async function listRetranslationsHandler(
   ctx: QueryCtx,
   args: { paginationOpts: PaginationOptions; status?: RetranslationStatus },
 ) {
-    const status = args.status;
-    const query =
-      status === undefined
-        ? ctx.db.query('cardEditRetranslations')
-        : ctx.db
-          .query('cardEditRetranslations')
-          .withIndex('by_status', (q) => q.eq('status', status));
-    const result = await query.order('desc').paginate(args.paginationOpts);
-    return {
-      ...result,
-      page: await Promise.all(
-        result.page.map(async (row) => {
-          const parent = await ctx.db.get(row.cardEditId);
-          return {
-            ...projectRetranslation(row),
-            sourceLanguage: row.sourceLanguage,
-            sourceText: row.sourceText,
-            kind: parent?.kind,
-            // From the child row, not the parent: userId is denormalized onto
-            // it precisely so the row stays attributable while a deletion
-            // drain has already removed the parent batch.
-            userId: row.userId,
-          };
-        }),
-      ),
-    };
+  const status = args.status;
+  const query =
+    status === undefined
+      ? ctx.db.query('cardEditRetranslations')
+      : ctx.db
+        .query('cardEditRetranslations')
+        .withIndex('by_status', (q) => q.eq('status', status));
+  const result = await query.order('desc').paginate(args.paginationOpts);
+  return {
+    ...result,
+    page: await Promise.all(
+      result.page.map(async (row) => {
+        const parent = await ctx.db.get(row.cardEditId);
+        return {
+          ...projectRetranslation(row),
+          sourceLanguage: row.sourceLanguage,
+          sourceText: row.sourceText,
+          kind: parent?.kind,
+          // From the child row, not the parent: userId is denormalized onto
+          // it precisely so the row stays attributable while a deletion
+          // drain has already removed the parent batch.
+          userId: row.userId,
+        };
+      }),
+    ),
+  };
 }
 
 export const listRetranslations = adminQuery({

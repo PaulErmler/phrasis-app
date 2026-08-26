@@ -87,7 +87,7 @@ const MAX_NOTES = 2;
 /** Hard cap on a single note's length; the prompt asks for <=15 words. */
 const MAX_NOTE_CHARS = 220;
 
-export const feedbackNoteValidator = v.object({
+const feedbackNoteValidator = v.object({
   type: v.union(
     v.literal('grammar'),
     v.literal('vocab'),

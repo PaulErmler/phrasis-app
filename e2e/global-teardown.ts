@@ -4,6 +4,7 @@ import path from "node:path";
 import { extractJsonResult } from "./cli-json-output";
 import { unregisterRun } from "./run-lock";
 import { assertDevDeployment } from "./deployment-guard";
+import type { PurgeResult } from "../convex/features/e2eCleanup";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 
@@ -11,14 +12,6 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const PURGE_BATCH = 8;
 /** Backstop so a wedged purge cannot hang the teardown indefinitely. */
 const MAX_PASSES = 40;
-
-type PurgeResult = {
-  purged: string[];
-  failed: { email: string; error: string }[];
-  remaining: number;
-  auditRowsDeleted: number;
-  scanTruncated: boolean;
-};
 
 /** Run a Convex function on the dev deployment and parse its JSON result. */
 function convexRun(fn: string, args: Record<string, unknown>): unknown {
@@ -124,7 +117,7 @@ export default function globalTeardown() {
       "pnpm",
       ["exec", "convex", "env", "remove", "E2E_TEST_HOOKS"],
       {
-        cwd: path.resolve(__dirname, ".."),
+        cwd: REPO_ROOT,
         stdio: "inherit",
       },
     );

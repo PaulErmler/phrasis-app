@@ -54,7 +54,7 @@ type ListResult = {
   scanTruncated: boolean;
 };
 
-type PurgeResult = {
+export type PurgeResult = {
   purged: string[];
   failed: { email: string; error: string }[];
   remaining: number;

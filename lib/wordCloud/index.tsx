@@ -13,6 +13,7 @@ import {
   HighlightSpan,
   renderMaskedText,
 } from './highlight';
+import { escapeRegExp } from '@/lib/utils';
 export { getWordMatchMask, HighlightSpan, renderMaskedText };
 
 export const WORD_CLOUD_COLORS = [
@@ -113,7 +114,7 @@ export function highlightWord(
   const mask = getWordMatchMask(text, word, language);
   if (mask !== null) return renderMaskedText(text, mask);
 
-  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escaped = escapeRegExp(word);
   const regex = new RegExp(
     `(?<![\\p{L}\\p{N}])(${escaped})(?![\\p{L}\\p{N}])`,
     'iu',

@@ -70,13 +70,20 @@ export function HighlightedRuby({
   // Invalid locale: highlight-less ruby beats no ruby.
   if (mask === null) return <Ruby segments={segments} />;
 
-  let offset = 0;
+  // Offsets computed up front (not by mutating a counter inside the render
+  // map — the react-compiler lint rejects reassignment from a render closure).
+  const placed: Array<{ seg: FuriganaSegment; segMask: boolean[] }> = [];
+  for (let offset = 0, i = 0; i < segments.length; i++) {
+    const length = [...segments[i].text].length;
+    placed.push({
+      seg: segments[i],
+      segMask: mask.slice(offset, offset + length),
+    });
+    offset += length;
+  }
   return (
     <>
-      {segments.map((seg, i) => {
-        const length = [...seg.text].length;
-        const segMask = mask.slice(offset, offset + length);
-        offset += length;
+      {placed.map(({ seg, segMask }, i) => {
         if (seg.reading === undefined) {
           return (
             <Fragment key={i}>
