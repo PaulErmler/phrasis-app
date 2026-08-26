@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { extractJsonResult } from "./cli-json-output";
 import { unregisterRun } from "./run-lock";
+import { assertDevDeployment } from "./deployment-guard";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 
@@ -21,6 +22,8 @@ type PurgeResult = {
 
 /** Run a Convex function on the dev deployment and parse its JSON result. */
 function convexRun(fn: string, args: Record<string, unknown>): unknown {
+  // The purge deletes accounts; never issue it toward anything but dev.
+  assertDevDeployment("global-teardown");
   const out = execFileSync(
     "pnpm",
     ["exec", "convex", "run", fn, JSON.stringify(args)],
@@ -106,6 +109,7 @@ function purgeFixtureUsers(): void {
  * Best-effort. A failure here must not turn a green suite red.
  */
 export default function globalTeardown() {
+  assertDevDeployment("global-teardown");
   if (!unregisterRun()) {
     console.log(
       "Leaving E2E_TEST_HOOKS set — another Playwright run is still active.",
