@@ -1,9 +1,9 @@
 import { useState, useCallback, useRef } from 'react';
 import { useAction } from 'convex/react';
+import { useTranslations } from 'next-intl';
 import { convexErrorCode, isPaymentPastDueError } from '@/lib/utils';
 import { api } from '@/convex/_generated/api';
 import { toast } from 'sonner';
-import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants/chat';
 
 function detectDefaultMime(): string {
   if (
@@ -48,6 +48,8 @@ export function useVoiceRecording(
   onUsageLimit?: () => void,
   options?: UseVoiceRecordingOptions,
 ): UseVoiceRecordingReturn {
+  const tErrors = useTranslations('Chat.errors');
+  const tVoice = useTranslations('Chat.voice');
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -107,7 +109,7 @@ export function useVoiceRecording(
             });
 
             onTranscript(transcript);
-            if (!quiet) toast.success(SUCCESS_MESSAGES.VOICE_TRANSCRIBED);
+            if (!quiet) toast.success(tVoice('transcribed'));
           } catch (error) {
             if (isPaymentPastDueError(error)) {
               // Silent: the reactive payment-overdue dialog is the
@@ -116,7 +118,7 @@ export function useVoiceRecording(
               onUsageLimit?.();
             } else {
               console.error('Transcription error:', error);
-              toast.error(ERROR_MESSAGES.FAILED_TO_TRANSCRIBE);
+              toast.error(tErrors('failedToTranscribe'));
             }
           } finally {
             setIsTranscribing(false);
@@ -136,9 +138,9 @@ export function useVoiceRecording(
       }
     } catch (error) {
       console.error('Error starting recording:', error);
-      toast.error(ERROR_MESSAGES.MICROPHONE_ACCESS);
+      toast.error(tErrors('microphoneAccess'));
     }
-  }, [transcribeAudio, onTranscript, onUsageLimit, language, maxDurationMs, quiet]);
+  }, [transcribeAudio, onTranscript, onUsageLimit, language, maxDurationMs, quiet, tErrors, tVoice]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {

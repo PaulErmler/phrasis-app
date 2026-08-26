@@ -16,6 +16,12 @@ import {
   bindTourKeyboard,
   resolveStepAnchors,
 } from './driver-common';
+import {
+  COACHMARK_ANCHORS,
+  TUTORIAL_ANCHORS,
+  coachmarkSelector,
+  tutorialSelector,
+} from './anchors';
 import type { TranslateFn } from './types';
 
 /**
@@ -55,17 +61,18 @@ const INTRO_DELAY_MS = 600;
 
 // ─── Anchors ────────────────────────────────────────────────────────────────
 
-const CARD_SELECTOR = '[data-tutorial="card-flashcard"]';
-const REVEAL_SELECTOR = '[data-tutorial="target-text-audio"]';
-const AUDIO_CONTROLS_SELECTOR = '[data-tutorial="audio-controls"]';
-const RATING_SELECTOR = '[data-tutorial="rating-buttons"]';
-const INPUT_SELECTOR = '[data-tutorial="target-input-and-submit"]';
+const CARD_SELECTOR = tutorialSelector(TUTORIAL_ANCHORS.cardFlashcard);
+const REVEAL_SELECTOR = tutorialSelector(TUTORIAL_ANCHORS.targetTextAudio);
+const AUDIO_CONTROLS_SELECTOR = tutorialSelector(TUTORIAL_ANCHORS.audioControls);
+const RATING_SELECTOR = tutorialSelector(TUTORIAL_ANCHORS.ratingButtons);
+const INPUT_SELECTOR = tutorialSelector(TUTORIAL_ANCHORS.targetInputAndSubmit);
 const SHOWN_TRANSLATION_SELECTOR = '[data-testid="first-exposure-answer"]';
-const CARD_ACTIONS_SELECTOR = '[data-coachmark-anchor="card-actions"]';
-const WORD_TAP_SELECTOR = '[data-coachmark-anchor="word-tap"]';
-const CHAT_SELECTOR =
-  '[data-coachmark-anchor="chat-button-desktop"], [data-tutorial="chat-button"]';
-const SETTINGS_SELECTOR = '[data-tutorial="settings-button"]';
+const CARD_ACTIONS_SELECTOR = coachmarkSelector(COACHMARK_ANCHORS.cardActions);
+const WORD_TAP_SELECTOR = coachmarkSelector(COACHMARK_ANCHORS.wordTap);
+const CHAT_SELECTOR = `${coachmarkSelector(
+  COACHMARK_ANCHORS.chatButtonDesktop,
+)}, ${tutorialSelector(TUTORIAL_ANCHORS.chatButton)}`;
+const SETTINGS_SELECTOR = tutorialSelector(TUTORIAL_ANCHORS.settingsButton);
 
 // ─── Tip definitions ────────────────────────────────────────────────────────
 

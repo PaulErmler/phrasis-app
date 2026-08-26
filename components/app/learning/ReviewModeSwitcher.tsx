@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { Headphones, PenLine } from 'lucide-react';
+import { COACHMARK_ANCHORS } from '@/lib/tutorials/anchors';
 import type { ReviewMode } from '@/convex/types';
 
 interface ReviewModeSwitcherProps {
@@ -16,7 +17,7 @@ export function ReviewModeSwitcher({ value, onChange }: ReviewModeSwitcherProps)
   return (
     <div
       className="flex w-full rounded-lg border bg-muted/50 p-1"
-      data-coachmark-anchor="mode-switcher"
+      data-coachmark-anchor={COACHMARK_ANCHORS.modeSwitcher}
     >
       <button
         type="button"

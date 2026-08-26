@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getTextDirection } from '@/lib/languages';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import { getCollectionDescription } from './CollectionCarouselUI';
 import { AudioButton } from '@/components/app/learning/AudioButton';
 import {
@@ -227,7 +228,7 @@ export function CollectionDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col gap-0 p-0 overflow-hidden" data-tutorial="collection-detail">
+      <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col gap-0 p-0 overflow-hidden" data-tutorial={TUTORIAL_ANCHORS.collectionDetail}>
         {/* Progress accent bar */}
         <div className="h-1.5 bg-muted rounded-t-lg overflow-hidden">
           <div

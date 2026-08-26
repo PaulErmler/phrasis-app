@@ -21,6 +21,10 @@ import {
 import { KeyChips } from '@/components/app/learning/KeyChips';
 import { isEditableTarget } from '@/hooks/use-ime-safe-enter';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import {
+  COACHMARK_ANCHORS,
+  TUTORIAL_ANCHORS,
+} from '@/lib/tutorials/anchors';
 import type { ReviewRating } from '@/lib/scheduling';
 
 interface LearningControlsProps {
@@ -266,8 +270,8 @@ export function LearningControls({
           {validRatings.length > 0 && (
             <div
               className="flex gap-2"
-              data-tutorial="rating-buttons"
-              data-coachmark-anchor="rating-buttons"
+              data-tutorial={TUTORIAL_ANCHORS.ratingButtons}
+              data-coachmark-anchor={COACHMARK_ANCHORS.ratingButtons}
             >
               {validRatings.map((rating, index) => (
                 <div
@@ -311,8 +315,8 @@ export function LearningControls({
           )}
 
           {/* Undo + Restart + Play + Next row */}
-          <div className="flex gap-2" data-tutorial="audio-controls">
-            <div className="flex gap-2" data-tutorial="undo-restart">
+          <div className="flex gap-2" data-tutorial={TUTORIAL_ANCHORS.audioControls}>
+            <div className="flex gap-2" data-tutorial={TUTORIAL_ANCHORS.undoRestart}>
               <KeyHint
                 enabled={showKeyHints}
                 label={t('actions.undo')}
@@ -397,7 +401,7 @@ export function LearningControls({
                     : t(isPlaying ? 'actions.pause' : 'actions.play')
                 }
                 className="h-9 flex-[2] min-w-0"
-                data-tutorial="audio-play"
+                data-tutorial={TUTORIAL_ANCHORS.audioPlay}
               >
                 {isPlaying ? (
                   <Pause className="h-4 w-4" />

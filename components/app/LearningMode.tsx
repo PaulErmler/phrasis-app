@@ -36,17 +36,11 @@ import type { AudioPlayerState } from '@/hooks/use-audio-player';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
+import { ConfirmDialog } from '@/components/app/ConfirmDialog';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { buttonVariants } from '@/components/ui/button';
+  COACHMARK_ANCHORS,
+  TUTORIAL_ANCHORS,
+} from '@/lib/tutorials/anchors';
 import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
 import { PROGRESS_SOUND_URL } from '@/lib/constants/learning';
 import { resolveShowFurigana } from '@/lib/furigana';
@@ -716,9 +710,9 @@ export function LearningMode({
             size="icon"
             onClick={openChat}
             className="h-9 w-9 shrink-0 pointer-events-auto"
-            aria-label="Open chat"
-            data-tutorial="chat-button"
-            data-coachmark-anchor="chat-button"
+            aria-label={t('openChat')}
+            data-tutorial={TUTORIAL_ANCHORS.chatButton}
+            data-coachmark-anchor={COACHMARK_ANCHORS.chatButton}
           >
             <MessageCircle className="h-5 w-5" />
           </Button>
@@ -780,50 +774,26 @@ export function LearningMode({
         translations={state.translations}
       />
 
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('actions.deleteConfirmTitle')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('actions.deleteConfirmDescription')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t('actions.deleteConfirmCancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className={buttonVariants({ variant: 'destructive' })}
-              onClick={handleConfirmDelete}
-            >
-              {t('actions.deleteConfirmConfirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title={t('actions.deleteConfirmTitle')}
+        description={t('actions.deleteConfirmDescription')}
+        cancelLabel={t('actions.deleteConfirmCancel')}
+        confirmLabel={t('actions.deleteConfirmConfirm')}
+        onConfirm={handleConfirmDelete}
+        destructive
+      />
 
-      <AlertDialog open={flagConfirmOpen} onOpenChange={setFlagConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('actions.flagConfirmTitle')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('actions.flagConfirmDescription')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t('actions.flagConfirmCancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmFlag}>
-              {t('actions.flagConfirmConfirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={flagConfirmOpen}
+        onOpenChange={setFlagConfirmOpen}
+        title={t('actions.flagConfirmTitle')}
+        description={t('actions.flagConfirmDescription')}
+        cancelLabel={t('actions.flagConfirmCancel')}
+        confirmLabel={t('actions.flagConfirmConfirm')}
+        onConfirm={handleConfirmFlag}
+      />
     </div>
   );
 }

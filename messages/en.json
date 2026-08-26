@@ -1,9 +1,4 @@
 {
-  "SignInPrompt": {
-    "title": "Sign in to continue",
-    "description": "Sign in to access your courses, progress, and saved phrases.",
-    "signInButton": "Sign In"
-  },
   "HomePage": {
     "title": "Master Languages with Flexling",
     "subtitle": "Learn phrases, practice pronunciation, and build fluency in any language",
@@ -45,6 +40,7 @@
       "stats": "Stats",
       "settings": "Settings"
     },
+    "startLearning": "Start learning",
     "noCourse": {
       "title": "No active course",
       "description": "Create or unarchive a course to get started.",
@@ -81,27 +77,13 @@
     "content": {
       "chat": {
         "title": "Chat",
-        "description": "Let a chatbot create sentences for you",
         "openError": "Could not open chat. Check your connection and try again."
-      },
-      "fileUpload": {
-        "title": "File Upload",
-        "description": "Upload documents to generate sentences from your own content"
-      },
-      "enterTexts": {
-        "title": "Enter Your Own Texts",
-        "description": "Type or paste text to create your own sentences"
-      },
-      "comingSoon": "Coming Soon",
-      "feedback": {
-        "prompt": "Is any of these features especially important for you? Let us know!",
-        "emailButton": "Email us",
-        "emailSubject": "Feature feedback (Content)"
       }
     },
     "library": {
       "title": "Library",
       "searchPlaceholder": "Search sentences...",
+      "clearSearch": "Clear search",
       "filterMastered": "Mastered",
       "filterHidden": "Hidden",
       "filterFavorites": "Favorites",
@@ -166,20 +148,6 @@
         "success": "Deletion requested — your account will be deleted within 30 days.",
         "error": "Could not request the deletion. Please try again or email support@flexling.com."
       }
-    },
-    "deckCards": {
-      "title": "Your Deck",
-      "loading": "Loading cards...",
-      "emptyState": "No cards in your deck yet. Add some cards from a collection above!",
-      "description": "Cards with translations and audio",
-      "cardCount": "{count, plural, one {# card} other {# cards}}",
-      "baseLabel": "Base (You know this)",
-      "targetLabel": "Target (Learning this)",
-      "translating": "Translating...",
-      "statusFavorite": "Favorite",
-      "statusMastered": "Mastered",
-      "statusHidden": "Hidden",
-      "due": "Due"
     },
     "collections": {
       "customCarousel": {
@@ -466,6 +434,8 @@
   "LearningMode": {
     "title": "Learning",
     "chat": "Chat",
+    "openChat": "Open chat",
+    "audioProgress": "Audio progress",
     "back": "Back",
     "settings": "Settings",
     "tutorial": "Replay Tutorial",
@@ -579,6 +549,7 @@
       "reviewsToday": "reviews today",
       "timeToday": "time today",
       "newWordsToday": "new words today",
+      "wordsLearned": "Words you learned",
       "comingUp": "Upcoming cards:",
       "stateNew": "new",
       "stateReview": "review",
@@ -590,6 +561,18 @@
     },
     "settingsPanel": {
       "title": "Learning Settings",
+      "stepper": {
+        "decrease": "Decrease",
+        "increase": "Increase",
+        "decreasePlays": "Decrease play count",
+        "increasePlays": "Increase play count",
+        "decreasePause": "Decrease pause",
+        "increasePause": "Increase pause",
+        "decreaseSpeed": "Decrease speed",
+        "increaseSpeed": "Increase speed",
+        "moveUp": "Move up",
+        "moveDown": "Move down"
+      },
       "iconLegend": "Sentence icons",
       "iconFavorite": "Mark sentence as a favorite",
       "iconMaster": "Mark sentence as mastered (won't appear again after next review)",
@@ -779,6 +762,7 @@
     "emptyCreditsNote": "A message uses 1–2 credits depending on its length. The longer the conversation gets, the more credits a message uses.",
     "input": {
       "placeholder": "What would you like to say?",
+      "send": "Send",
       "prompts": {
         "grammar": "Explain me the grammar of this sentence."
       },
@@ -847,7 +831,8 @@
       "startRecording": "Start recording",
       "stopRecording": "Stop recording",
       "recording": "Recording...",
-      "transcribing": "Transcribing..."
+      "transcribing": "Transcribing...",
+      "transcribed": "Voice input transcribed"
     },
     "attachments": {
       "filesAttached": "Files attached",
@@ -855,7 +840,11 @@
       "sentWithAttachments": "Sent with attachments"
     },
     "errors": {
-      "failedToCreateThread": "Failed to create new conversation"
+      "failedToCreateThread": "Failed to create new conversation",
+      "failedToSend": "Failed to send message",
+      "failedToTranscribe": "Failed to transcribe audio",
+      "microphoneAccess": "Failed to access microphone",
+      "messageTooLong": "Your message is too long. Please shorten it and send again."
     },
     "cardApproval": {
       "approveButton": "Add Sentence",
@@ -917,7 +906,7 @@
     "sidebar": {
       "title": "Conversations",
       "newChat": "New Chat",
-      "creating": "Creating...",
+      "toggleConversations": "Toggle conversations",
       "noConversations": "No conversations yet"
     }
   },
@@ -981,11 +970,9 @@
     }
   },
   "FeatureTracking": {
-    "unlimited": "Unlimited",
     "left": "{balance} left",
     "limitReached": "Limit reached",
-    "upgrade": "Upgrade",
-    "remaining": "{balance} / {included} remaining"
+    "upgrade": "Upgrade"
   },
   "LowQuota": {
     "title": "Running Low on {featureName}",
@@ -1537,6 +1524,7 @@
     "dropzone": {
       "title": "Drop a CSV / TSV / TXT file",
       "subtitle": "…or click to choose one",
+      "clear": "Clear",
       "orPaste": "Or paste rows below",
       "info": {
         "columns": "One column per language ({languages})",

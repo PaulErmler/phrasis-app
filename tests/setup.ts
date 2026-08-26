@@ -27,9 +27,13 @@ vi.mock("next/navigation", () => ({
 vi.mock("next-intl", async () => {
   const actual =
     await vi.importActual<typeof import("next-intl")>("next-intl");
+  // Stable identity, like the real useTranslations (which memoizes the
+  // translator): hooks list `t` in effect/callback dependencies, and a fresh
+  // function per render would re-fire one-shot effects in tests.
+  const stubTranslator = (key: string) => key;
   return {
     ...actual,
-    useTranslations: () => (key: string) => key,
+    useTranslations: () => stubTranslator,
     useLocale: () => "en",
     useFormatter: () => ({
       dateTime: (d: Date) => d.toISOString(),

@@ -55,6 +55,7 @@ export function BottomNav({ currentView, onViewChange, onLearnOpen }: BottomNavP
                 size="icon"
                 className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
                 onClick={onLearnOpen}
+                aria-label={t('startLearning')}
               >
                 <Play className="h-6 w-6 fill-current text-primary-foreground" />
               </Button>

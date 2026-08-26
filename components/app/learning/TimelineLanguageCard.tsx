@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { ChevronDown, ChevronUp, Minus, Plus } from 'lucide-react';
 import { getLanguageByCode } from '@/lib/languages';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,7 @@ export function TimelineLanguageCard({
   onMoveDown,
   showReorderButtons = true,
 }: TimelineLanguageCardProps) {
+  const t = useTranslations('LearningMode.settingsPanel.stepper');
   const lang = getLanguageByCode(code);
   const isDisabled = plays === 0;
 
@@ -64,6 +66,7 @@ export function TimelineLanguageCard({
                   <button
                     type="button"
                     onClick={onMoveUp}
+                    aria-label={t('moveUp')}
                     className="text-muted-foreground hover:text-foreground"
                   >
                     <ChevronUp className="h-3.5 w-3.5" />
@@ -75,6 +78,7 @@ export function TimelineLanguageCard({
                   <button
                     type="button"
                     onClick={onMoveDown}
+                    aria-label={t('moveDown')}
                     className="text-muted-foreground hover:text-foreground"
                   >
                     <ChevronDown className="h-3.5 w-3.5" />
@@ -94,6 +98,7 @@ export function TimelineLanguageCard({
               className="h-6 w-6 rounded-full"
               onClick={() => onPlaysChange(Math.max(0, plays - 1))}
               disabled={plays <= 0}
+              aria-label={t('decreasePlays')}
             >
               <Minus className="h-3 w-3" />
             </Button>
@@ -106,6 +111,7 @@ export function TimelineLanguageCard({
               className="h-6 w-6 rounded-full"
               onClick={() => onPlaysChange(Math.min(10, plays + 1))}
               disabled={plays >= 10}
+              aria-label={t('increasePlays')}
             >
               <Plus className="h-3 w-3" />
             </Button>
@@ -124,6 +130,7 @@ export function TimelineLanguageCard({
                 className="h-6 w-6 rounded-full"
                 onClick={() => onRepPauseChange(Math.max(0, repPause - 1))}
                 disabled={repPause <= 0}
+                aria-label={t('decreasePause')}
               >
                 <Minus className="h-3 w-3" />
               </Button>
@@ -136,6 +143,7 @@ export function TimelineLanguageCard({
                 className="h-6 w-6 rounded-full"
                 onClick={() => onRepPauseChange(Math.min(30, repPause + 1))}
                 disabled={repPause >= 30}
+                aria-label={t('increasePause')}
               >
                 <Plus className="h-3 w-3" />
               </Button>
@@ -160,6 +168,7 @@ export function TimelineLanguageCard({
                   )
                 }
                 disabled={speed <= PLAYBACK_SPEED_MIN}
+                aria-label={t('decreaseSpeed')}
               >
                 <Minus className="h-3 w-3" />
               </Button>
@@ -179,6 +188,7 @@ export function TimelineLanguageCard({
                   )
                 }
                 disabled={speed >= PLAYBACK_SPEED_MAX}
+                aria-label={t('increaseSpeed')}
               >
                 <Plus className="h-3 w-3" />
               </Button>

@@ -14,7 +14,6 @@ import {
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -25,6 +24,7 @@ import {
 import { Archive, Check, Lock, Plus, Settings, X } from 'lucide-react';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/app/ConfirmDialog';
 import { CreateCourseDialog } from '@/components/course/CreateCourseDialog';
 import { CourseLanguageSettings } from '@/components/course/CourseLanguageSettings';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
@@ -327,27 +327,17 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
         />
       )}
 
-      <AlertDialog
+      <ConfirmDialog
         open={pendingUnarchiveCourseId !== null}
         onOpenChange={(open) => {
           if (!open) setPendingUnarchiveCourseId(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('courses.unarchiveConfirmTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('courses.unarchiveConfirmDescription')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('courses.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleUnarchive}>
-              {t('courses.unarchiveConfirmButton')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={t('courses.unarchiveConfirmTitle')}
+        description={t('courses.unarchiveConfirmDescription')}
+        cancelLabel={t('courses.cancel')}
+        confirmLabel={t('courses.unarchiveConfirmButton')}
+        onConfirm={handleUnarchive}
+      />
 
       <AlertDialog
         open={courseAlert !== null}

@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { normalizeLanguageCode } from '@/lib/languages';
 import { Badge } from '@/components/ui/badge';
@@ -25,16 +25,7 @@ import { CardActionsMenu } from '@/components/app/learning/CardActionsMenu';
 import { CardSpeedBadge } from '@/components/app/learning/CardSpeedBadge';
 import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
 import type { CardTranslation } from '@/components/app/learning/types';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '@/components/app/ConfirmDialog';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import { Loader2 } from 'lucide-react';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
@@ -434,34 +425,18 @@ export function WordSentencesDialog({
         />
       )}
 
-      <AlertDialog
+      <ConfirmDialog
         open={deletingCardId !== null}
         onOpenChange={(next) => {
           if (!next) setDeletingCardId(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('actions.deleteConfirmTitle')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('actions.deleteConfirmDescription')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t('actions.deleteConfirmCancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className={buttonVariants({ variant: 'destructive' })}
-              onClick={handleConfirmDelete}
-            >
-              {t('actions.deleteConfirmConfirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={t('actions.deleteConfirmTitle')}
+        description={t('actions.deleteConfirmDescription')}
+        cancelLabel={t('actions.deleteConfirmCancel')}
+        confirmLabel={t('actions.deleteConfirmConfirm')}
+        onConfirm={handleConfirmDelete}
+        destructive
+      />
     </Dialog>
   );
 }

@@ -88,6 +88,7 @@ export default function MainLayout({
   const router = useRouter();
   const pathname = usePathname();
   const t = useTranslations('AppPage');
+  const tChatSidebar = useTranslations('Chat.sidebar');
   const locale = useLocale();
 
   // Result unused, but the hook call keeps the preloaded-settings
@@ -327,7 +328,7 @@ export default function MainLayout({
                   variant="ghost"
                   size="icon"
                   onClick={() => setChatSidebarOpen((prev) => !prev)}
-                  aria-label="Toggle conversations"
+                  aria-label={tChatSidebar('toggleConversations')}
                   data-testid="chat-toggle-conversations"
                 >
                   <PanelLeft className="h-4 w-4" />
@@ -336,7 +337,7 @@ export default function MainLayout({
                   variant="ghost"
                   size="icon"
                   onClick={handleNewChat}
-                  aria-label="New chat"
+                  aria-label={tChatSidebar('newChat')}
                   data-testid="chat-new-thread"
                 >
                   <MessageSquarePlus className="h-4 w-4" />

@@ -99,7 +99,7 @@ export function FileDropzone({
             variant="ghost"
             size="icon"
             className="h-7 w-7 shrink-0"
-            aria-label="Clear"
+            aria-label={t('dropzone.clear')}
             onClick={(e) => {
               e.stopPropagation();
               onClear();

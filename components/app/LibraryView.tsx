@@ -21,17 +21,7 @@ import { FEATURE_IDS } from '@/convex/features/featureIds';
 import { getUserTimezone } from '@/lib/timezone';
 import type { PinnableCardAction } from '@/lib/cardActions';
 import type { CardTranslation } from '@/components/app/learning/types';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { buttonVariants } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/app/ConfirmDialog';
 import { resolveShowFurigana } from '@/lib/furigana';
 
 type ActiveFilter = 'mastered' | 'hidden' | 'favorites' | null;
@@ -425,7 +415,7 @@ export function LibraryView({
                 <button
                   onClick={() => setSearchInput('')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Clear search"
+                  aria-label={t('clearSearch')}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -618,60 +608,30 @@ export function LibraryView({
         />
       )}
 
-      <AlertDialog
+      <ConfirmDialog
         open={deletingCardId !== null}
         onOpenChange={(open) => {
           if (!open) setDeletingCardId(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {tLearn('actions.deleteConfirmTitle')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {tLearn('actions.deleteConfirmDescription')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {tLearn('actions.deleteConfirmCancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className={buttonVariants({ variant: 'destructive' })}
-              onClick={handleConfirmDelete}
-            >
-              {tLearn('actions.deleteConfirmConfirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={tLearn('actions.deleteConfirmTitle')}
+        description={tLearn('actions.deleteConfirmDescription')}
+        cancelLabel={tLearn('actions.deleteConfirmCancel')}
+        confirmLabel={tLearn('actions.deleteConfirmConfirm')}
+        onConfirm={handleConfirmDelete}
+        destructive
+      />
 
-      <AlertDialog
+      <ConfirmDialog
         open={flagConfirmCardId !== null}
         onOpenChange={(open) => {
           if (!open) setFlagConfirmCardId(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {tLearn('actions.flagConfirmTitle')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {tLearn('actions.flagConfirmDescription')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {tLearn('actions.flagConfirmCancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmFlag}>
-              {tLearn('actions.flagConfirmConfirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={tLearn('actions.flagConfirmTitle')}
+        description={tLearn('actions.flagConfirmDescription')}
+        cancelLabel={tLearn('actions.flagConfirmCancel')}
+        confirmLabel={tLearn('actions.flagConfirmConfirm')}
+        onConfirm={handleConfirmFlag}
+      />
     </div>
   );
 }

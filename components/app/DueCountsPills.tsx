@@ -9,6 +9,7 @@ import { useAppData } from '@/components/app/AppDataProvider';
 import { useNowMinute } from '@/hooks/use-now-minute';
 import { cn } from '@/lib/utils';
 import { formatCappedCount, mergedDueCount } from '@/lib/constants/dueCounts';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 
 type Counts = {
   new: number;
@@ -79,7 +80,7 @@ export function DueCountsPills({ skip }: { skip?: boolean }) {
       )}
       aria-hidden={!display}
       data-testid="due-counts-pills"
-      data-tutorial="due-counts"
+      data-tutorial={TUTORIAL_ANCHORS.dueCounts}
     >
       <span
         className={cn(pillClass, 'bg-primary/10 text-primary')}

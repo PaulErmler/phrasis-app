@@ -574,7 +574,7 @@ function CelebrationContent({
             entirely when there are no words to celebrate. */}
         {(sessionWordsList.length > 0 || todayWordsList.length > 0) && (
           <motion.div className="w-full max-w-sm" variants={CHILD_VARIANTS}>
-            <p className="text-muted-xs text-center mb-1.5">Words you learned</p>
+            <p className="text-muted-xs text-center mb-1.5">{t('wordsLearned')}</p>
             <WordsMultilineTicker
               sessionWords={sessionWordsList}
               todayWords={todayWordsList}

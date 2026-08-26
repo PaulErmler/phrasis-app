@@ -12,6 +12,7 @@ import {
 } from '@/lib/landing/audio';
 import { getLanguageShortLabel } from '@/lib/languages';
 import { cn } from '@/lib/utils';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 
 interface LandingLearningCardContentProps {
   preReviewCount: number;
@@ -135,7 +136,7 @@ export function LandingLearningCardContent({
   ]);
 
   return (
-    <div data-tutorial="card-content" className="flex flex-col flex-1 min-h-0">
+    <div data-tutorial={TUTORIAL_ANCHORS.cardContent} className="flex flex-col flex-1 min-h-0">
       <LandingCardShell
         reviewCount={displayReviewCount}
         sourceText={sourceText}
@@ -166,7 +167,9 @@ export function LandingLearningCardContent({
                 <div
                   key={translation.language}
                   className="flex items-start gap-2"
-                  {...(index === 0 ? { 'data-tutorial': 'target-text-audio' } : {})}
+                  {...(index === 0
+                    ? { 'data-tutorial': TUTORIAL_ANCHORS.targetTextAudio }
+                    : {})}
                 >
                   <div
                     className="flex-1"

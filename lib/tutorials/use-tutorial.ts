@@ -17,6 +17,7 @@ import {
   getDriverOverlayOpacity,
   resolveStepAnchors,
 } from './driver-common';
+import { TUTORIAL_ANCHORS, tutorialSelector } from './anchors';
 
 const STORAGE_PREFIX = 'phrasis_completed_tutorials';
 
@@ -489,7 +490,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       overlayOpacity: getDriverOverlayOpacity(),
       popoverClass: 'phrasis-tutorial-chat',
       steps: [{
-        element: '[data-tutorial="chat-button"]',
+        element: tutorialSelector(TUTORIAL_ANCHORS.chatButton),
         popover: {
           title: tr('chat.title'),
           description: tr('chat.description'),

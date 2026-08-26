@@ -16,6 +16,7 @@ import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
 import type { ClockBinding } from '@/hooks/use-karaoke-index';
 import type { LanguageCue } from '@/lib/audio/mergeAudio';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import type { PinnableCardAction } from '@/lib/cardActions';
 
 interface CardShellProps {
@@ -195,7 +196,7 @@ export function CardShell({
       : null;
 
   const cardSurface = (
-    <div className="card-surface overflow-hidden" data-tutorial="card-flashcard">
+    <div className="card-surface overflow-hidden" data-tutorial={TUTORIAL_ANCHORS.cardFlashcard}>
       {/* Card top bar: metadata left, actions right */}
       <div className={compact ? 'flex items-center justify-between px-3 pt-3 pb-1.5' : 'flex items-center justify-between px-4 pt-4 pb-2'}>
         <div className="flex items-center gap-2">
@@ -254,7 +255,7 @@ export function CardShell({
       {/* Card text content */}
       <div className={compact ? 'px-4 pb-4 space-y-3' : 'px-6 pb-6 space-y-4'}>
         {/* Base language texts */}
-        <div className="space-y-2" data-tutorial="base-languages">
+        <div className="space-y-2" data-tutorial={TUTORIAL_ANCHORS.baseLanguages}>
           {baseTranslations.map((translation, index) => {
             const audio = audioRecordings.find(
               (a) => a.language === translation.language,

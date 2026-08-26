@@ -14,7 +14,7 @@ vi.mock("sonner", () => ({
 
 import { toast } from "sonner";
 import { useSendMessage } from "@/hooks/use-send-message";
-import { CHAT_STATUS, ERROR_MESSAGES } from "@/lib/constants/chat";
+import { CHAT_STATUS } from "@/lib/constants/chat";
 
 describe("useSendMessage", () => {
   beforeEach(() => {
@@ -218,7 +218,8 @@ describe("useSendMessage payment-overdue handling", () => {
       ).rejects.toThrow("boom");
     });
 
-    expect(toast.error).toHaveBeenCalledWith(ERROR_MESSAGES.FAILED_TO_SEND);
+    // The global next-intl stub returns the key itself.
+    expect(toast.error).toHaveBeenCalledWith("failedToSend");
     expect(onError).toHaveBeenCalled();
     expect(setStatus).toHaveBeenLastCalledWith(CHAT_STATUS.ERROR);
 

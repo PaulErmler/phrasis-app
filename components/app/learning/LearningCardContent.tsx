@@ -12,6 +12,10 @@ import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import { useCardPlayback, displayReviewCount } from './useCardPlayback';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { PinnableCardAction } from '@/lib/cardActions';
+import {
+  COACHMARK_ANCHORS,
+  TUTORIAL_ANCHORS,
+} from '@/lib/tutorials/anchors';
 
 interface LearningCardContentProps {
   /** Denser paddings + smaller sentence text for list contexts (library). */
@@ -215,7 +219,7 @@ export function LearningCardContent({
   }, [resetSignal]);
 
   return (
-    <div data-tutorial="card-content" className="flex flex-col flex-1 min-h-0">
+    <div data-tutorial={TUTORIAL_ANCHORS.cardContent} className="flex flex-col flex-1 min-h-0">
       <CardShell
         compact={compact}
         reviewCount={displayReviewCount(preReviewCount, schedulingPhase, fsrsState)}
@@ -286,7 +290,9 @@ export function LearningCardContent({
                 <div
                   key={translation.language}
                   className="flex items-start gap-2"
-                  {...(index === 0 ? { 'data-tutorial': 'target-text-audio' } : {})}
+                  {...(index === 0
+                    ? { 'data-tutorial': TUTORIAL_ANCHORS.targetTextAudio }
+                    : {})}
                 >
                   <div
                     className="flex-1"
@@ -305,7 +311,9 @@ export function LearningCardContent({
                       className={`${compact ? 'text-base leading-relaxed' : 'body-large'} ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
                       // Onboarding's word-tap tutorial targets the longest
                       // target-language word via this data attribute.
-                      coachmarkAnchorForLongestWord={index === 0 ? 'word-tap' : undefined}
+                      coachmarkAnchorForLongestWord={
+                        index === 0 ? COACHMARK_ANCHORS.wordTap : undefined
+                      }
                     />
                     <AnnotationLines
                       romanization={translation.romanization}

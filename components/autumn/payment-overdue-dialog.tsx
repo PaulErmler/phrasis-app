@@ -25,7 +25,7 @@ import { useIsNativeApp } from "@/hooks/use-native-app";
  * so it covers every route including the standalone /app/learn page; opens
  * whenever the synced billing state is past due. Full policy (no grace
  * window, the two exits, admin-route exclusion, `assertBillingCurrent`
- * backstop): documentation/autumn-usage-tracking.md, "Past-due (dunning)
+ * backstop): docs/architecture/autumn-usage-tracking.md, "Past-due (dunning)
  * flow".
  *
  * Split into this thin gate and the dialog proper: the inner component only

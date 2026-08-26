@@ -1,11 +1,12 @@
 import { useCallback } from 'react';
 import { useMutation } from 'convex/react';
 import { ConvexError } from 'convex/values';
+import { useTranslations } from 'next-intl';
 import { convexErrorCode } from '@/lib/utils';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { toast } from 'sonner';
-import { ERROR_MESSAGES, CHAT_STATUS } from '@/lib/constants/chat';
+import { CHAT_STATUS } from '@/lib/constants/chat';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import type { ChatStatus } from '@/lib/types/chat';
 import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
@@ -45,6 +46,7 @@ export function useSendMessage({
   onMessageTooLong,
   cardId,
 }: UseSendMessageProps) {
+  const t = useTranslations('Chat.errors');
   const sendMessageMutation = useMutation(
     api.features.chat.messages.sendMessage,
   );
@@ -133,7 +135,7 @@ export function useSendMessage({
         }
 
         reportError(error, { op: 'sendMessage', threadId });
-        toast.error(ERROR_MESSAGES.FAILED_TO_SEND);
+        toast.error(t('failedToSend'));
 
         if (setStatus) {
           setStatus(CHAT_STATUS.ERROR);
@@ -147,7 +149,7 @@ export function useSendMessage({
         throw error;
       }
     },
-    [threadId, sendMessageMutation, setStatus, onSuccess, onError, onUsageLimit, onThreadLimit, onMessageTooLong, cardId],
+    [threadId, sendMessageMutation, setStatus, onSuccess, onError, onUsageLimit, onThreadLimit, onMessageTooLong, cardId, t],
   );
 
   return { sendMessage };

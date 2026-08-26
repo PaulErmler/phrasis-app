@@ -29,6 +29,7 @@ import { getLanguageByCode } from '@/lib/languages';
 import { cn } from '@/lib/utils';
 import type { ReviewMode, SchedulingMode } from '@/convex/types';
 import { dateInTimezone } from '@/lib/dateStrings';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 
 function StatColumn({
   icon,
@@ -264,7 +265,7 @@ export function ProgressStatsCard({
     <div className="space-y-2">
       <div
         className="card-surface overflow-hidden"
-        data-tutorial="progress-stats"
+        data-tutorial={TUTORIAL_ANCHORS.progressStats}
       >
         {/* Top progress bar. Pinned to the card's top edge, tinted with the
          * active CEFR tier color. Renders even when level info hasn't loaded

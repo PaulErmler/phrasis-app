@@ -6,6 +6,7 @@ import { BookOpen, RefreshCw, Headphones, PenLine, Radio, NotebookPen } from 'lu
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ReviewMode, SchedulingMode } from '@/convex/types';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import { ContentFilterDropdown } from '@/components/app/ContentFilterDropdown';
 import { DueCountsPills } from '@/components/app/DueCountsPills';
 import { useAppData } from '@/components/app/AppDataProvider';
@@ -45,13 +46,13 @@ export function StartLearningButton({
           Icon: Radio,
           label: t('radioMode'),
           requiresCardsMessage: t('radioRequiresCards'),
-          tutorial: 'radio-mode',
+          tutorial: TUTORIAL_ANCHORS.radioMode,
         }
       : {
           Icon: NotebookPen,
           label: t('freeStudyMode'),
           requiresCardsMessage: t('freeStudyRequiresCards'),
-          tutorial: 'free-study-mode',
+          tutorial: TUTORIAL_ANCHORS.freeStudyMode,
         };
 
   const handleFreePlayClick = () => {
@@ -72,14 +73,14 @@ export function StartLearningButton({
   const modeIconClass = 'h-4 w-4 shrink-0 min-[400px]:h-5 min-[400px]:w-5';
 
   return (
-    <div className="space-y-2" data-tutorial="start-learning">
+    <div className="space-y-2" data-tutorial={TUTORIAL_ANCHORS.startLearning}>
       <div className="grid grid-cols-3 gap-1.5 min-[400px]:gap-2">
         <Button
           size="lg"
           variant="outline"
           className={modeBtnClass}
           onClick={() => onStartLearn('learn_new')}
-          data-tutorial="learn-new"
+          data-tutorial={TUTORIAL_ANCHORS.learnNew}
         >
           <BookOpen className={modeIconClass} />
           <span className={modeLabelClass}>{t('learnNew')}</span>
@@ -88,7 +89,7 @@ export function StartLearningButton({
           size="lg"
           className={modeBtnClass}
           onClick={() => onStartLearn('learnAndReview')}
-          data-tutorial="learn-and-review"
+          data-tutorial={TUTORIAL_ANCHORS.learnAndReview}
         >
           <RefreshCw className={modeIconClass} />
           <span className={modeLabelClass}>{t('learnAndReview')}</span>
@@ -113,7 +114,7 @@ export function StartLearningButton({
        * stays clean: only Learn & Review carries the strong accent. */}
       <div
         className="flex w-full rounded-lg border bg-muted/50 p-0.5"
-        data-tutorial="review-mode-toggle"
+        data-tutorial={TUTORIAL_ANCHORS.reviewModeToggle}
       >
         {([
           { mode: 'audio' as const, icon: Headphones, label: t('audioReview') },

@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useMutation, useConvexAuth } from 'convex/react';
+import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import { toast } from 'sonner';
-import { ERROR_MESSAGES } from '@/lib/constants/chat';
 import { isAuthError } from '@/lib/utils';
 
 interface UseThreadOptions {
@@ -25,6 +25,7 @@ export function useThread({
   autoCreate = false,
   threadId: explicitThreadId,
 }: UseThreadOptions = {}): UseThreadReturn {
+  const t = useTranslations('Chat.errors');
   const [threadId, setThreadId] = useState<string | null>(
     explicitThreadId ?? null,
   );
@@ -71,7 +72,7 @@ export function useThread({
         if (isAuthError(error)) {
           didAutoCreate.current = false;
         } else {
-          toast.error(ERROR_MESSAGES.FAILED_TO_CREATE_THREAD);
+          toast.error(t('failedToCreateThread'));
         }
       })
       .finally(() => {
@@ -82,6 +83,7 @@ export function useThread({
     explicitThreadId,
     isAuthenticated,
     getOrCreateEmptyThreadMutation,
+    t,
   ]);
 
   const getOrCreateEmptyThread = useCallback(async () => {
@@ -94,13 +96,13 @@ export function useThread({
     } catch (error) {
       console.error('Failed to get or create thread:', error);
       if (!isAuthError(error)) {
-        toast.error(ERROR_MESSAGES.FAILED_TO_CREATE_THREAD);
+        toast.error(t('failedToCreateThread'));
       }
       throw error;
     } finally {
       setIsLoading(false);
     }
-  }, [getOrCreateEmptyThreadMutation]);
+  }, [getOrCreateEmptyThreadMutation, t]);
 
   return {
     threadId,

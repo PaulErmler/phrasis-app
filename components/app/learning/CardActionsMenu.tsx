@@ -39,6 +39,10 @@ import {
   normalizePinnedCardActions,
   type PinnableCardAction,
 } from '@/lib/cardActions';
+import {
+  COACHMARK_ANCHORS,
+  TUTORIAL_ANCHORS,
+} from '@/lib/tutorials/anchors';
 
 export interface ActionQuotaState {
   /** Remaining usage. `unlimited` overrides this. */
@@ -425,8 +429,8 @@ export function CardActionsMenu({
   return (
     <div
       className="flex items-center"
-      data-coachmark-anchor="card-actions"
-      data-tutorial="card-actions"
+      data-coachmark-anchor={COACHMARK_ANCHORS.cardActions}
+      data-tutorial={TUTORIAL_ANCHORS.cardActions}
     >
       {pinnedKeys.map((key) => renderSurfaceButton(actions[key]))}
       <DropdownMenu open={open} onOpenChange={setOpen}>

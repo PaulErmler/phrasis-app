@@ -12,6 +12,10 @@ import {
 import { MessageCircle, ChevronRight } from 'lucide-react';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
+import {
+  COACHMARK_ANCHORS,
+  TUTORIAL_ANCHORS,
+} from '@/lib/tutorials/anchors';
 import type { QuickAction } from '@/convex/features/chat/quickActions';
 
 // -- Context to share chat toggle state with the header ----------------------
@@ -190,8 +194,10 @@ export function LearningChatLayout({
             <div
               className="flex flex-col justify-center items-center w-8 shrink-0 border-l bg-muted/10 hover:bg-muted/30 cursor-pointer transition-colors z-20"
               onClick={toggleChat}
-              data-coachmark-anchor="chat-button-desktop"
-              {...(!effectiveChatOpen ? { 'data-tutorial': 'chat-button' } : {})}
+              data-coachmark-anchor={COACHMARK_ANCHORS.chatButtonDesktop}
+              {...(!effectiveChatOpen
+                ? { 'data-tutorial': TUTORIAL_ANCHORS.chatButton }
+                : {})}
             >
               {effectiveChatOpen ? (
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -221,7 +227,9 @@ export function LearningChatLayout({
                   ? 'absolute inset-0 flex flex-col'
                   : 'hidden',
             )}
-            {...(effectiveChatOpen ? { 'data-tutorial': 'chat-button' } : {})}
+            {...(effectiveChatOpen
+              ? { 'data-tutorial': TUTORIAL_ANCHORS.chatButton }
+              : {})}
           >
             <div
               className={cn(

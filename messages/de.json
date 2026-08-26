@@ -1,9 +1,4 @@
 {
-  "SignInPrompt": {
-    "title": "Anmelden, um fortzufahren",
-    "description": "Melde dich an, um auf deine Kurse, deinen Fortschritt und deine gespeicherten Redewendungen zuzugreifen.",
-    "signInButton": "Anmelden"
-  },
   "HomePage": {
     "title": "Sprachen meistern mit Flexling",
     "subtitle": "Lerne Redewendungen, übe die Aussprache und werde fließend in jeder Sprache",
@@ -45,6 +40,7 @@
       "stats": "Statistik",
       "settings": "Einstellungen"
     },
+    "startLearning": "Lernen starten",
     "noCourse": {
       "title": "Kein aktiver Kurs",
       "description": "Erstelle oder reaktiviere einen Kurs, um loszulegen.",
@@ -81,27 +77,13 @@
     "content": {
       "chat": {
         "title": "Chat",
-        "description": "Lass einen Chatbot Sätze für dich erstellen",
         "openError": "Chat konnte nicht geöffnet werden. Prüfe deine Verbindung und versuche es erneut."
-      },
-      "fileUpload": {
-        "title": "Datei hochladen",
-        "description": "Lade Dokumente hoch, um Sätze aus deinen eigenen Inhalten zu erstellen"
-      },
-      "enterTexts": {
-        "title": "Eigene Texte eingeben",
-        "description": "Tippe oder füge Text ein, um eigene Sätze zu erstellen"
-      },
-      "comingSoon": "Demnächst",
-      "feedback": {
-        "prompt": "Ist eine dieser Funktionen besonders wichtig für dich? Sag uns Bescheid!",
-        "emailButton": "E-Mail schreiben",
-        "emailSubject": "Feature-Feedback (Inhalte)"
       }
     },
     "library": {
       "title": "Bibliothek",
       "searchPlaceholder": "Sätze suchen...",
+      "clearSearch": "Suche leeren",
       "filterMastered": "Gemeistert",
       "filterHidden": "Ausgeblendet",
       "filterFavorites": "Favoriten",
@@ -166,20 +148,6 @@
         "success": "Löschung beantragt — dein Konto wird innerhalb von 30 Tagen gelöscht.",
         "error": "Die Löschung konnte nicht beantragt werden. Versuche es erneut oder schreibe an support@flexling.com."
       }
-    },
-    "deckCards": {
-      "title": "Dein Stapel",
-      "loading": "Karten werden geladen...",
-      "emptyState": "Du hast noch keine Karten im Stapel. Füge welche aus einer Sammlung oben hinzu!",
-      "description": "Karten mit Übersetzungen und Audio",
-      "cardCount": "{count, plural, one {# Karte} other {# Karten}}",
-      "baseLabel": "Basis (Das kennst du)",
-      "targetLabel": "Ziel (Das lernst du)",
-      "translating": "Wird übersetzt...",
-      "statusFavorite": "Favorit",
-      "statusMastered": "Gemeistert",
-      "statusHidden": "Ausgeblendet",
-      "due": "Fällig"
     },
     "collections": {
       "customCarousel": {
@@ -466,6 +434,8 @@
   "LearningMode": {
     "title": "Lernen",
     "chat": "Chat",
+    "openChat": "Chat öffnen",
+    "audioProgress": "Audio-Fortschritt",
     "back": "Zurück",
     "settings": "Einstellungen",
     "tutorial": "Tutorial wiederholen",
@@ -579,6 +549,7 @@
       "reviewsToday": "Wiederholungen heute",
       "timeToday": "Zeit heute",
       "newWordsToday": "neue Wörter heute",
+      "wordsLearned": "Deine gelernten Wörter",
       "comingUp": "Als Nächstes:",
       "stateNew": "neu",
       "stateReview": "Wiederholung",
@@ -590,6 +561,18 @@
     },
     "settingsPanel": {
       "title": "Lerneinstellungen",
+      "stepper": {
+        "decrease": "Verringern",
+        "increase": "Erhöhen",
+        "decreasePlays": "Weniger Wiedergaben",
+        "increasePlays": "Mehr Wiedergaben",
+        "decreasePause": "Pause verkürzen",
+        "increasePause": "Pause verlängern",
+        "decreaseSpeed": "Geschwindigkeit verringern",
+        "increaseSpeed": "Geschwindigkeit erhöhen",
+        "moveUp": "Nach oben verschieben",
+        "moveDown": "Nach unten verschieben"
+      },
       "iconLegend": "Satzsymbole",
       "iconFavorite": "Satz als Favorit markieren",
       "iconMaster": "Satz als gemeistert markieren (erscheint nach der nächsten Wiederholung nicht mehr)",
@@ -779,6 +762,7 @@
     "emptyCreditsNote": "Eine Nachricht kostet je nach Länge 1–2 Credits. Je länger die Unterhaltung wird, desto mehr Credits kostet eine Nachricht.",
     "input": {
       "placeholder": "Was möchtest du sagen?",
+      "send": "Senden",
       "prompts": {
         "grammar": "Erkläre mir die Grammatik dieses Satzes."
       },
@@ -847,7 +831,8 @@
       "startRecording": "Aufnahme starten",
       "stopRecording": "Aufnahme stoppen",
       "recording": "Aufnahme...",
-      "transcribing": "Transkribieren..."
+      "transcribing": "Transkribieren...",
+      "transcribed": "Spracheingabe transkribiert"
     },
     "attachments": {
       "filesAttached": "Dateien angehängt",
@@ -855,7 +840,11 @@
       "sentWithAttachments": "Mit Anhängen gesendet"
     },
     "errors": {
-      "failedToCreateThread": "Die neue Unterhaltung konnte nicht erstellt werden."
+      "failedToCreateThread": "Die neue Unterhaltung konnte nicht erstellt werden.",
+      "failedToSend": "Die Nachricht konnte nicht gesendet werden.",
+      "failedToTranscribe": "Die Aufnahme konnte nicht transkribiert werden.",
+      "microphoneAccess": "Kein Zugriff auf das Mikrofon möglich.",
+      "messageTooLong": "Deine Nachricht ist zu lang. Bitte kürze sie und sende sie erneut."
     },
     "cardApproval": {
       "approveButton": "Satz hinzufügen",
@@ -917,7 +906,7 @@
     "sidebar": {
       "title": "Konversationen",
       "newChat": "Neuer Chat",
-      "creating": "Wird erstellt...",
+      "toggleConversations": "Konversationen ein- oder ausblenden",
       "noConversations": "Noch keine Konversationen"
     }
   },
@@ -981,11 +970,9 @@
     }
   },
   "FeatureTracking": {
-    "unlimited": "Unbegrenzt",
     "left": "{balance} übrig",
     "limitReached": "Limit erreicht",
-    "upgrade": "Upgrade",
-    "remaining": "{balance} / {included} übrig"
+    "upgrade": "Upgrade"
   },
   "LowQuota": {
     "title": "{featureName} fast aufgebraucht",
@@ -1537,6 +1524,7 @@
     "dropzone": {
       "title": "CSV- / TSV- / TXT-Datei hier ablegen",
       "subtitle": "…oder klicke, um eine auszuwählen",
+      "clear": "Entfernen",
       "orPaste": "Oder Zeilen unten einfügen",
       "info": {
         "columns": "Eine Spalte pro Sprache ({languages})",

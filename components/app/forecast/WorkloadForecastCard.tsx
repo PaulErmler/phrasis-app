@@ -3,6 +3,7 @@
 import * as React from 'react';
 
 import { useWorkloadForecast } from '@/hooks/use-workload-forecast';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import {
   WorkloadStackedCard,
   type WorkloadUnit,
@@ -37,7 +38,7 @@ export function WorkloadForecastCard({ skip }: { skip?: boolean }) {
     <div
       className="card-surface p-3"
       data-testid="workload-forecast"
-      data-tutorial="workload-forecast"
+      data-tutorial={TUTORIAL_ANCHORS.workloadForecast}
     >
       {forecast && data ? (
         <WorkloadStackedCard

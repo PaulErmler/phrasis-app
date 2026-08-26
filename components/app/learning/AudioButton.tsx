@@ -66,7 +66,7 @@ export interface AudioButtonProps {
   url: string | null;
   /** Canonical language code (e.g. "en", "es_latam"). Broadcast verbatim through onTimeUpdate/onStop so consumers can match against translation.language. The visible label is derived via getLanguageShortLabel. */
   language: string;
-  /** Show a text label next to the icon (used in DeckCardsView). Default: false */
+  /** Show a text label next to the icon. Default: false */
   showLabel?: boolean;
   /** If true, immediately stop current playback and prevent new playback. */
   stopPlayback?: boolean;

@@ -57,6 +57,7 @@ import type {
 } from './types';
 import type { Id } from '@/convex/_generated/dataModel';
 import type { PinnableCardAction } from '@/lib/cardActions';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 
 type TargetAudioMode = 'always' | 'afterSubmit' | 'never';
 
@@ -850,7 +851,7 @@ export function FullReviewCardContent({
   );
 
   return (
-    <div data-tutorial="card-content-full" className="flex flex-col flex-1 min-h-0">
+    <div data-tutorial={TUTORIAL_ANCHORS.cardContentFull} className="flex flex-col flex-1 min-h-0">
       <CardShell
         reviewCount={displayReviewCount(preReviewCount, schedulingPhase, fsrsState)}
         originPill={originPill}
@@ -1351,7 +1352,9 @@ function TargetLanguageInput({
     return (
       <div
         className="space-y-1"
-        {...(isFirstTarget ? { 'data-tutorial': 'target-input-full' } : {})}
+        {...(isFirstTarget
+          ? { 'data-tutorial': TUTORIAL_ANCHORS.targetInputFull }
+          : {})}
       >
         <TargetRowHeader
           languageDisplayName={languageDisplayName}
@@ -1461,7 +1464,9 @@ function TargetLanguageInput({
     return (
       <div
         className="space-y-1"
-        {...(isFirstTarget ? { 'data-tutorial': 'target-input-full' } : {})}
+        {...(isFirstTarget
+          ? { 'data-tutorial': TUTORIAL_ANCHORS.targetInputFull }
+          : {})}
       >
         <TargetRowHeader
           languageDisplayName={languageDisplayName}
@@ -1602,7 +1607,9 @@ function TargetLanguageInput({
   return (
     <div
       className="space-y-1"
-      {...(isFirstTarget ? { 'data-tutorial': 'target-input-full' } : {})}
+      {...(isFirstTarget
+        ? { 'data-tutorial': TUTORIAL_ANCHORS.targetInputFull }
+        : {})}
     >
       {firstExposure ? (
         // First exposure: the answer to copy shares the row with its audio
@@ -1669,7 +1676,9 @@ function TargetLanguageInput({
       )}
       <div
         className="flex items-center gap-2"
-        {...(isFirstTarget ? { 'data-tutorial': 'target-input-and-submit' } : {})}
+        {...(isFirstTarget
+          ? { 'data-tutorial': TUTORIAL_ANCHORS.targetInputAndSubmit }
+          : {})}
       >
         <Input
           ref={inputRef ?? undefined}
@@ -1715,7 +1724,12 @@ function TargetLanguageInput({
           onClick={() => onSubmit(translation.language)}
           className="h-9 w-9 shrink-0"
           aria-label={submitLabel}
-          {...(isFirstTarget ? { 'data-tutorial': 'submit-answer', 'data-testid': 'learn-submit-translation' } : {})}
+          {...(isFirstTarget
+            ? {
+                'data-tutorial': TUTORIAL_ANCHORS.submitAnswer,
+                'data-testid': 'learn-submit-translation',
+              }
+            : {})}
         >
           <Check className="h-4 w-4" />
         </Button>

@@ -16,6 +16,7 @@ import { getLandingAudioUrl } from '@/lib/landing/audio';
 import { getLanguageShortLabel } from '@/lib/languages';
 import type { CardTranslation, CardAudioRecording } from '@/components/app/learning/types';
 import { AnnotationLines } from '@/components/app/learning/AnnotationLines';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 
 interface LandingCardShellProps {
   reviewCount: number;
@@ -59,7 +60,7 @@ export function LandingCardShell({
   const targetTranslations = translations.filter((tr) => tr.isTargetLanguage);
 
   const cardSurface = (
-    <div className="card-surface" data-tutorial="card-flashcard">
+    <div className="card-surface" data-tutorial={TUTORIAL_ANCHORS.cardFlashcard}>
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-xs">
@@ -110,7 +111,7 @@ export function LandingCardShell({
       </div>
 
       <div className="px-6 pb-6 space-y-4">
-        <div className="space-y-2" data-tutorial="base-languages">
+        <div className="space-y-2" data-tutorial={TUTORIAL_ANCHORS.baseLanguages}>
           {baseTranslations.map((translation) => {
             return (
               <div key={translation.language} className="flex items-start gap-2">

@@ -13,16 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '@/components/app/ConfirmDialog';
 import { cn } from '@/lib/utils';
 import {
   getLocalizedLanguageNameByCode,
@@ -513,42 +504,36 @@ export function StepperImportView({ c }: { c: ImportController }) {
         </Button>
       </div>
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-start gap-2">
-              {c.validation.warningCount > 0 && (
-                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-              )}
-              {t('confirmDialog.title', { count: c.validation.importableCount })}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {c.validation.warningCount > 0
-                ? t('confirmDialog.descriptionWithWarnings', {
-                  count: c.validation.importableCount,
-                  warnings: c.validation.warningCount,
-                })
-                : t('confirmDialog.description', {
-                  count: c.validation.importableCount,
-                })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={c.isSubmitting}>
-              {t('confirmDialog.cancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirm}
-              disabled={c.isSubmitting}
-              data-testid="import-confirm"
-            >
-              {c.isSubmitting
-                ? t('importing')
-                : t('confirmDialog.confirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        titleClassName="flex items-start gap-2"
+        title={
+          <>
+            {c.validation.warningCount > 0 && (
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            )}
+            {t('confirmDialog.title', { count: c.validation.importableCount })}
+          </>
+        }
+        description={
+          c.validation.warningCount > 0
+            ? t('confirmDialog.descriptionWithWarnings', {
+              count: c.validation.importableCount,
+              warnings: c.validation.warningCount,
+            })
+            : t('confirmDialog.description', {
+              count: c.validation.importableCount,
+            })
+        }
+        cancelLabel={t('confirmDialog.cancel')}
+        confirmLabel={
+          c.isSubmitting ? t('importing') : t('confirmDialog.confirm')
+        }
+        onConfirm={handleConfirm}
+        pending={c.isSubmitting}
+        confirmTestId="import-confirm"
+      />
     </div>
   );
 }

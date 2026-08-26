@@ -6,7 +6,7 @@
  * the two disagree about where trial/past-due state lives. Every consumer
  * reads the version-independent `AutumnPlan` instead; this file is the only
  * place either set of raw field names appears. Full field mapping table and
- * why both versions coexist: documentation/autumn-usage-tracking.md,
+ * why both versions coexist: docs/architecture/autumn-usage-tracking.md,
  * "v1.2 vs v2.x customer shapes (why both)".
  */
 

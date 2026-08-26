@@ -28,6 +28,7 @@ import {
 import { useCollectionDetail } from '@/components/app/useCollectionDetail';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import { CEFR_COLORS, CEFR_ORDER, isCefr, type Cefr } from './cefr';
 
 type HomeSummary = NonNullable<
@@ -220,7 +221,7 @@ function PremadeTab({ summary }: { summary: HomeSummary }) {
     : null;
 
   return (
-    <div className="flex flex-col gap-3" data-tutorial="collection-carousel">
+    <div className="flex flex-col gap-3" data-tutorial={TUTORIAL_ANCHORS.collectionCarousel}>
       <GroupedLevelRail
         groups={groups}
         activeCollectionId={activeCollectionId}
