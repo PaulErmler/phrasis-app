@@ -27,6 +27,10 @@ export type {
   CompareOverrides,
   DiffOptions,
 } from './languageConfig';
-export { bestCandidate, answersMatchExactly } from './bestMatch';
+export {
+  answerCandidates,
+  answersMatchExactly,
+  bestCandidate,
+} from './bestMatch';
 export type { BestCandidate } from './bestMatch';
 export { normalizeForComparison } from './normalize';

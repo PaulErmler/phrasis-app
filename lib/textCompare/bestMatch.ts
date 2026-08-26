@@ -44,6 +44,30 @@ export function bestCandidate(
 }
 
 /**
+ * Everything a writing answer may legitimately be scored or diffed
+ * against: the card's primary sentence FIRST (`bestCandidate` keeps the
+ * earlier candidate on full ties), every stored accepted alternative, and
+ * — once the grader has responded — its corrected sentence. ONE builder
+ * for both the closest-answer diff (TargetLanguageInput) and the
+ * auto-rating accuracy summary (FullReviewCardContent), because the two
+ * lists drifted apart when `corrected` was added to only the diff's: the
+ * screen showed a high score against the corrected form while the
+ * preselected rating was computed against the primary. Before grading
+ * returns, `gradedCorrected` is undefined and both sites score against
+ * the stored forms; when it lands, both re-rank over the same widened
+ * list.
+ */
+export function answerCandidates(
+  cardText: string,
+  alternatives: readonly string[],
+  gradedCorrected?: string,
+): string[] {
+  const list = [cardText, ...alternatives];
+  if (gradedCorrected) list.push(gradedCorrected);
+  return [...new Set(list)];
+}
+
+/**
  * Client mirror of the server's free local gate (`writingAnswersMatch` in
  * convex/features/writingFeedback.ts): punctuation/case/whitespace-
  * insensitive EQUALITY, sharing the server's exact normalizer. Deliberately

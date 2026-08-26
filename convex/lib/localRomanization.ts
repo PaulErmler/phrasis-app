@@ -70,7 +70,11 @@ export const ROMANIZATION_SOURCES = {
   sanscriptIso15919: 'sanscript-iso15919-v1',
   // v2: the 2009 Act's exception rules (word-final -ия → -ia, България →
   // Bulgaria) and all-caps digraphs, none of which v1's letter walk applied.
-  bulgarianStreamlined: 'bulgarian-streamlined-v2',
+  // v3: combining marks transparent INSIDE the -ия token too — v2 missed
+  // the common stressed form (Мари́я, stress mark between и and я) and
+  // persisted "-íya"; bumping retries every stored v2 row via the
+  // resetStaleBulgarian*RomanizationV3 migrations.
+  bulgarianStreamlined: 'bulgarian-streamlined-v3',
   googleV3: 'google-v3-v1',
 } as const;
 

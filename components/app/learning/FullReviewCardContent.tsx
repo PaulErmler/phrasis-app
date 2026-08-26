@@ -21,6 +21,7 @@ import {
 } from '@/lib/constants/audioPlayback';
 import { DiffDisplay } from './DiffDisplay';
 import {
+  answerCandidates,
   answersMatchExactly,
   bestCandidate,
   computeAccuracyPair,
@@ -390,15 +391,19 @@ export function FullReviewCardContent({
           return { withPunctuation: 100, withoutPunctuation: 100 };
         }
         const userText = inputs.get(tr.language)?.userText ?? '';
-        // Best pair across the primary and every accepted alternative: a
-        // stored alternative is a correct answer, so it must score like one.
-        // The pick rule is shared with the closest-answer diff in
-        // TargetLanguageInput (lib/textCompare/bestMatch), so this summary is
-        // always computed against the sentence the diff shows.
-        const candidates = [
+        // Best pair across the same candidate list the closest-answer diff
+        // uses (answerCandidates + bestCandidate, shared via
+        // lib/textCompare/bestMatch), so this summary is always computed
+        // against the sentence the diff shows — two phases: before grading
+        // it ranks the primary + stored alternatives; once the grader
+        // responds, its corrected sentence joins the ranking here AND in
+        // the diff (this memo depends on `feedback`, so the rescore and
+        // the re-preselected rating follow automatically).
+        const candidates = answerCandidates(
           tr.text,
-          ...(alternativesByLanguage.get(tr.language) ?? []).map((a) => a.text),
-        ];
+          (alternativesByLanguage.get(tr.language) ?? []).map((a) => a.text),
+          fb?.status === 'done' ? fb.result?.corrected : undefined,
+        );
         return bestCandidate(candidates, userText, tr.language, (candidate) => {
           const cacheKey = `${tr.language}\u0000${candidate}\u0000${userText}`;
           let pair = pairCacheRef.current.get(cacheKey);
@@ -1285,11 +1290,15 @@ function TargetLanguageInput({
   // sentence they weren't attempting.
   const gradedCorrected =
     feedback?.status === 'done' ? feedback.result?.corrected : undefined;
-  const diffCandidates = useMemo(() => {
-    const list = [translation.text, ...alternatives.map((a) => a.text)];
-    if (gradedCorrected) list.push(gradedCorrected);
-    return [...new Set(list)];
-  }, [translation.text, alternatives, gradedCorrected]);
+  const diffCandidates = useMemo(
+    () =>
+      answerCandidates(
+        translation.text,
+        alternatives.map((a) => a.text),
+        gradedCorrected,
+      ),
+    [translation.text, alternatives, gradedCorrected],
+  );
   // Shared pick rule with the parent's accuracy summary (bestCandidate):
   // both rank candidates the same way, so the score in the footer is always
   // computed against the sentence this diff shows. Picking here by the

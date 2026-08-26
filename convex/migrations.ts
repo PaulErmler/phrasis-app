@@ -426,6 +426,21 @@ export const resetStaleBulgarianTextRomanization = bulgarianResets.texts;
 export const resetStaleBulgarianTranslationRomanization =
   bulgarianResets.translations;
 
+// Bulgarian, second pass: the mapper bumped to bulgarian-streamlined-v3
+// (v2 let a combining stress mark between и and я defeat the word-final
+// -ия → -ia rule, so stressed Мари́я/Софи́я persisted as "-íya"). The
+// completed-migration tracking would skip the pair above on re-run, so the
+// v3 sweep needs FRESH migration names; the factory's current-source check
+// then clears every bg row still tagged v2 (or older) for lazy
+// regeneration.
+const bulgarianV3Resets = staleRomanizationResets(
+  'bg',
+  ROMANIZATION_SOURCES.bulgarianStreamlined,
+);
+export const resetStaleBulgarianTextRomanizationV3 = bulgarianV3Resets.texts;
+export const resetStaleBulgarianTranslationRomanizationV3 =
+  bulgarianV3Resets.translations;
+
 export const recomputeTextRomanization = migrations.define({
   table: 'texts',
   migrateOne: (_ctx, doc) =>
@@ -625,6 +640,8 @@ export const runAll = migrations.runner([
   internal.migrations.resetStaleTeluguTranslationRomanization,
   internal.migrations.resetStaleBulgarianTextRomanization,
   internal.migrations.resetStaleBulgarianTranslationRomanization,
+  internal.migrations.resetStaleBulgarianTextRomanizationV3,
+  internal.migrations.resetStaleBulgarianTranslationRomanizationV3,
   internal.migrations.recomputeTextRomanization,
   internal.migrations.recomputeTranslationRomanization,
   internal.migrations.resetStaleTextFurigana,

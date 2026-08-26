@@ -73,6 +73,19 @@ describe.each([
       ).toBeUndefined();
     });
 
+    it('clears rows tagged with a superseded version of the local source', () => {
+      // The exact production scenario of a source-tag bump (e.g.
+      // bulgarian-streamlined-v2 → v3): the old tag no longer matches the
+      // current source, so the row re-romanizes lazily.
+      expect(
+        patch({
+          language,
+          romanizedText: staleOutput,
+          romanizationSource: `${currentSource}-superseded`,
+        }),
+      ).toEqual(CLEARED);
+    });
+
     it('leaves rows already written by the local mapper', () => {
       expect(
         patch({

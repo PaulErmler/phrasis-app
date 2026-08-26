@@ -115,17 +115,28 @@ const WORD_CHAR = /[\p{L}\p{N}]/u;
  */
 const COMBINING_MARK = /\p{M}/u;
 
+/** Index of the nearest character in the given direction that isn't a
+ * combining mark, or -1 when the string ends first. */
+function indexSkippingMarks(
+  chars: string[],
+  idx: number,
+  step: -1 | 1,
+): number {
+  let j = idx + step;
+  while (j >= 0 && j < chars.length && COMBINING_MARK.test(chars[j]!)) {
+    j += step;
+  }
+  return j >= 0 && j < chars.length ? j : -1;
+}
+
 /** Nearest character in the given direction that isn't a combining mark. */
 function neighborSkippingMarks(
   chars: string[],
   idx: number,
   step: -1 | 1,
 ): string | undefined {
-  let j = idx + step;
-  while (j >= 0 && j < chars.length && COMBINING_MARK.test(chars[j]!)) {
-    j += step;
-  }
-  return chars[j];
+  const j = indexSkippingMarks(chars, idx, step);
+  return j === -1 ? undefined : chars[j];
 }
 
 /**
@@ -160,18 +171,22 @@ function transliterateRun(text: string): string {
       continue;
     }
 
-    // Art. 5(2): `ия` only collapses to `ia` at a true word end. A combining
-    // stress mark after the я is not a word character, and one after that
-    // position must be looked past: Мария́ still ends in `ия`, while
-    // Мария́та does not.
-    const next = chars[i + 1];
-    if (next !== undefined) {
-      const token = IA_TOKEN[ch + next];
+    // Art. 5(2): `ия` only collapses to `ia` at a true word end. Combining
+    // marks are transparent on BOTH sides of the я: Bulgarian stresses
+    // these words on the и (Мари́я = и + U+0301 + я), so a stress mark
+    // BETWEEN the letters must not defeat the token match, and one after
+    // the я must be looked past — Мари́я still ends in `ия`, while
+    // Мари́ята does not.
+    const yaIdx = indexSkippingMarks(chars, i, 1);
+    const ya = yaIdx === -1 ? undefined : chars[yaIdx];
+    if (ya !== undefined) {
+      const token = IA_TOKEN[ch + ya];
       if (token !== undefined) {
-        const after = neighborSkippingMarks(chars, i + 1, 1);
+        const after = neighborSkippingMarks(chars, yaIdx, 1);
         if (after === undefined || !WORD_CHAR.test(after)) {
-          out += token;
-          i++;
+          // Marks stay attached to the `i` they modify: и́я → "ía".
+          out += token[0]! + chars.slice(i + 1, yaIdx).join('') + token.slice(1);
+          i = yaIdx;
           continue;
         }
       }

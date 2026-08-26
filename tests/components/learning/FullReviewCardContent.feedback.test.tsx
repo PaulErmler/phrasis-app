@@ -42,6 +42,7 @@ import type {
   CardTranslation,
   WritingAccuracySummary,
 } from '@/components/app/learning/types';
+import { computeAccuracyPair } from '@/lib/textCompare';
 import type { Id } from '@/convex/_generated/dataModel';
 
 const TRANSLATIONS: CardTranslation[] = [
@@ -141,6 +142,35 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     const summary = lastSummary(onAccuracyChange);
     expect(summary.minWithPunctuation).toBe(100);
     expect(summary.minWithoutPunctuation).toBe(100);
+  });
+
+  it('rescored against the corrected sentence once a partial verdict lands, matching the diff', async () => {
+    const corrected = 'Me gustaría tomar un té.';
+    gradeMock.mockResolvedValue({
+      verdict: 'partial',
+      corrected,
+      notes: [{ type: 'vocab', text: 'Different drink and phrasing.' }],
+      savedAlternative: false,
+    });
+    const onAccuracyChange = renderCard();
+    const answer = 'Me gustaria tomar un te.';
+    submitAnswer(answer);
+    await waitFor(() =>
+      expect(screen.getByTestId('writing-feedback-card')).toBeInTheDocument(),
+    );
+    // The summary must re-rank over the SAME candidate list the diff shows
+    // (primary + alternatives + gradedCorrected). Before the shared
+    // answerCandidates builder, only the diff got `corrected`: the screen
+    // showed a near-perfect diff while the preselected rating was scored
+    // against the primary sentence.
+    const summary = lastSummary(onAccuracyChange);
+    const vsCorrected = computeAccuracyPair(corrected, answer, 'es');
+    const vsPrimary = computeAccuracyPair('Quisiera un café.', answer, 'es');
+    expect(vsCorrected.withoutPunctuation).toBeGreaterThan(
+      vsPrimary.withoutPunctuation,
+    );
+    expect(summary.minWithoutPunctuation).toBe(vsCorrected.withoutPunctuation);
+    expect(summary.minWithPunctuation).toBe(vsCorrected.withPunctuation);
   });
 
   it('falls back to the plain diff view on a grader error', async () => {

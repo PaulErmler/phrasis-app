@@ -311,6 +311,14 @@ describe('romanizeLocal: Bulgarian (bg)', () => {
     // again), and a word-final ия still collapses with the stress on it.
     expect(romanizeLocal('Мария́та', 'bg')).toBe('Mariya\u0301ta');
     expect(romanizeLocal('Мария́', 'bg')).toBe('Maria\u0301');
+    // A mark BETWEEN и and я — the common stressed form, since Bulgarian
+    // stresses these words on the и — must not defeat the collapse either;
+    // the mark stays attached to the i it modifies.
+    expect(romanizeLocal('Мари́я', 'bg')).toBe('Mari\u0301a');
+    expect(romanizeLocal('Софи́я', 'bg')).toBe('Sofi\u0301a');
+    expect(romanizeLocal('раки́я', 'bg')).toBe('raki\u0301a');
+    // …while a stressed NON-final ия still keeps its -iya-.
+    expect(romanizeLocal('Мари́ята', 'bg')).toBe('Mari\u0301yata');
     // A mark inside an all-caps run doesn't break the run either.
     expect(romanizeLocal('ЩА́СТИЕ', 'bg')).toBe('SHTA\u0301STIE');
   });
