@@ -1,6 +1,6 @@
 # Pending migration: per-mode playback settings backfill
 
-Status: **NOT yet run** (as of 2026-07-10). Deployment does **not** require it.
+Status: **shipped** — chained in `migrations:runAll` (`convex/migrations.ts`), which runs on every deploy via `pnpm build:deploy`. Deployment does **not** require it (the fallback chain below keeps unmigrated docs correct).
 
 ## Background
 

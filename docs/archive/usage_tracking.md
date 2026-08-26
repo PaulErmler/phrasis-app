@@ -1,4 +1,4 @@
-> **ARCHIVED** — Fully superseded by `documentation/autumn-usage-tracking.md`.
+> **ARCHIVED** — Fully superseded by `docs/architecture/autumn-usage-tracking.md`.
 
 # Usage Tracking
 

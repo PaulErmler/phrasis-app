@@ -1,4 +1,4 @@
-> **ARCHIVED** — Implemented; historical spec. Its surviving rule (only non-archived courses count toward the course limit) now lives in `documentation/autumn-usage-tracking.md`.
+> **ARCHIVED** — Implemented; historical spec. Its surviving rule (only non-archived courses count toward the course limit) now lives in `docs/architecture/autumn-usage-tracking.md`.
 
 # Quota Impact: Course Archiving & Language Changes
 

@@ -397,7 +397,7 @@ After onboarding, the tutorial system takes over on the home screen.
 
 ## 8. Styling Notes
 
-Follow the style guide (`documentation/style_guide.md`):
+Follow the style guide (`docs/architecture/style_guide.md`):
 
 - Use Tailwind CSS v4 + shadcn/ui components
 - Cards: `rounded-xl border bg-card shadow-sm` or `Card` component
