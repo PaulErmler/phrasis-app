@@ -38,6 +38,7 @@ import {
   getLanguageByCode,
   getLocalizedLanguageNameByCode,
   getTextDirection,
+  languageSupportsStt,
 } from '@/lib/languages';
 import { useImeSafeEnter } from '@/hooks/use-ime-safe-enter';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
@@ -1669,18 +1670,23 @@ function TargetLanguageInput({
           spellCheck={false}
           {...(isFirstTarget ? { 'data-testid': 'learn-translation-input' } : {})}
         />
-        <WritingVoiceButton
-          language={translation.language}
-          onTranscript={(text) => {
-            // Stop = submit: the transcript fills the input and submits in
-            // one gesture. Both land as committed state before the AI
-            // feedback kick-off effect reads them. A row the user already
-            // submitted by keyboard mid-transcription keeps their answer.
-            if (state.submitted) return;
-            onInputChange(translation.language, text);
-            onSubmit(translation.language);
-          }}
-        />
+        {/* Azure Fast Transcription rejects some locales outright (el-GR,
+            sw-TZ — the supportsStt:false languages); rendering the mic there
+            would consume a transcription quota unit and then fail every time. */}
+        {languageSupportsStt(translation.language) && (
+          <WritingVoiceButton
+            language={translation.language}
+            onTranscript={(text) => {
+              // Stop = submit: the transcript fills the input and submits in
+              // one gesture. Both land as committed state before the AI
+              // feedback kick-off effect reads them. A row the user already
+              // submitted by keyboard mid-transcription keeps their answer.
+              if (state.submitted) return;
+              onInputChange(translation.language, text);
+              onSubmit(translation.language);
+            }}
+          />
+        )}
         <Button
           variant="outline"
           size="icon"
