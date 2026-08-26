@@ -10,6 +10,42 @@ export default defineConfig({
     },
   },
   test: {
+    coverage: {
+      provider: "v8",
+      reporter: ["text-summary", "lcov"],
+      // Print the summary even when a test fails; without this a single red
+      // test hides the numbers entirely.
+      reportOnFailure: true,
+      // App + Convex source. Uncovered files matching these globs count
+      // against the numbers, so untested modules aren't invisible.
+      include: [
+        "app/**/*.{ts,tsx}",
+        "components/**/*.{ts,tsx}",
+        "hooks/**/*.ts",
+        "lib/**/*.{ts,tsx}",
+        "convex/**/*.ts",
+        "i18n/**/*.{ts,tsx}",
+        "middleware.ts",
+      ],
+      exclude: [
+        "convex/_generated/**",
+        "convex/tests/**",
+        // Vendored shadcn/ai-elements component libraries.
+        "components/ui/**",
+        "components/ai-elements/**",
+        "**/*.d.ts",
+      ],
+      // Backslide alarm, not an aspiration: pinned ~2-3 points below the
+      // numbers measured 2026-08-26 (stmts 57.7, branch 49.5, funcs 51.6,
+      // lines 58.8). Raise them as real coverage grows; never lower them to
+      // make a PR pass.
+      thresholds: {
+        statements: 55,
+        branches: 47,
+        functions: 49,
+        lines: 56,
+      },
+    },
     projects: [
       {
         extends: true,

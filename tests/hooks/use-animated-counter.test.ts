@@ -102,4 +102,18 @@ describe('useAnimatedCounter', () => {
     const same = renderHook(() => useAnimatedCounter(5, 5, 1000, 300, true));
     expect(same.result.current).toBe(5);
   });
+
+  it('sweeps with the defaulted parameters (duration 1500, no delay, easeOut)', () => {
+    // The explicit-args cases above always pin `linear`; this exercises the
+    // default signature, including the ease-out path.
+    const { result } = renderHook(() => useAnimatedCounter(100));
+    expect(result.current).toBe(0);
+    act(() => {
+      vi.advanceTimersByTime(2500);
+    });
+    expect(result.current).toBe(100);
+
+    const same = renderHook(() => useAnimatedCounter(50, 50));
+    expect(same.result.current).toBe(50);
+  });
 });

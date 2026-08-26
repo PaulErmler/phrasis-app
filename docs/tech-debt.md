@@ -80,6 +80,14 @@ correctness/cost/velocity noted per item.
 
 ## Frontend architecture & performance
 
+- [ ] **B23 — Library pagination (>100 cards unreachable).** The server caps the
+  library list at `LIBRARY_LIMIT = 100` (`convex/features/library.ts`) and
+  `LibraryView` subscribes with no cursor and no "load more" — a learner with more
+  than 100 matching cards silently cannot reach the rest. Fix: convert to
+  `usePaginatedQuery` (pattern already in-house in `useCollectionDetail`) with a
+  load-more affordance. Deliberately dropped from the 2026-08 cleanup round.
+  Effort M. Impact: correctness for large accounts.
+
 - [ ] **B9 — The `useLearningMode` one-shot split.** 1,583 lines; the file's own scope
   note names three tangled concerns and says "don't split incrementally" — fund the
   planned split (card lifecycle / per-language answer state / audio orchestration)
