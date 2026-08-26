@@ -333,6 +333,9 @@ export function FullReviewCardContent({
     setSubmissionOrder([]);
     setManuallyRevealedBase(new Set());
     setFeedback(new Map());
+    // Invalidate any in-flight grades: their sequence numbers no longer match,
+    // so a reply from before the reset can't land on a fresh submission.
+    feedbackRequestSeqRef.current = new Map();
     autoPlayedRef.current = new Set();
     pairCacheRef.current.clear();
   }
@@ -643,6 +646,9 @@ export function FullReviewCardContent({
     setSubmissionOrder([]);
     setManuallyRevealedBase(new Set());
     setFeedback(new Map());
+    // Invalidate any in-flight grades: their sequence numbers no longer match,
+    // so a reply from before the reset can't land on a fresh submission.
+    feedbackRequestSeqRef.current = new Map();
     autoPlayedRef.current = new Set();
     const raf = requestAnimationFrame(() => {
       firstInputRef.current?.focus({ preventScroll: true });
@@ -698,6 +704,13 @@ export function FullReviewCardContent({
   );
   const cardIdForFeedbackRef = useRef(cardId);
   cardIdForFeedbackRef.current = cardId;
+  // Per-language grade-request sequence. Each kick-off bumps the row's
+  // counter and a resolution lands only while its number is still current.
+  // Entry existence alone cannot guard this: a revert deletes the entry, but
+  // a resubmit re-creates it, and the older request's verdict (for the old
+  // answer) must not attach to the new one — including through `.catch`,
+  // where a stale USAGE_LIMIT would mark the fresh request 'limit'.
+  const feedbackRequestSeqRef = useRef<Map<string, number>>(new Map());
 
   // Turning the setting off mid-card (e.g. via the quota line's "Turn off"
   // button) clears what's already on screen instead of leaving stale
@@ -770,9 +783,18 @@ export function FullReviewCardContent({
 
       setFeedback((prev) => new Map(prev).set(language, { status: 'pending' }));
       const requestCardId = cardId;
+      const requestSeq =
+        (feedbackRequestSeqRef.current.get(language) ?? 0) + 1;
+      feedbackRequestSeqRef.current.set(language, requestSeq);
+      // Stale = the card changed, or a revert+resubmit issued a newer request
+      // for this row. Checked at resolution time so the slower of two
+      // in-flight requests can never overwrite the newer one's slot.
+      const isStale = () =>
+        cardIdForFeedbackRef.current !== requestCardId ||
+        feedbackRequestSeqRef.current.get(language) !== requestSeq;
       gradeWritingAnswer({ cardId, language, userAnswer: answer })
         .then((result) => {
-          if (cardIdForFeedbackRef.current !== requestCardId) return;
+          if (isStale()) return;
           setFeedback((prev) => {
             // Reverted (entry deleted) while in flight: discard.
             if (!prev.has(language)) return prev;
@@ -783,7 +805,7 @@ export function FullReviewCardContent({
           });
         })
         .catch((error) => {
-          if (cardIdForFeedbackRef.current !== requestCardId) return;
+          if (isStale()) return;
           if (!isPaymentPastDueError(error)) {
             console.error('AI feedback failed:', error);
           }

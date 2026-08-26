@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 
 /**
  * AI writing feedback wiring in FullReviewCardContent: the kick-off effect
@@ -222,5 +222,55 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(gradeMock).not.toHaveBeenCalled();
     expect(screen.queryByTestId('writing-feedback-pending')).not.toBeInTheDocument();
+  });
+
+  it('discards a stale in-flight grade after revert + resubmit (request-sequence guard)', async () => {
+    // Two hand-resolved grades: request 1 (answer A) deliberately resolves
+    // AFTER request 2 (answer B). Answer A's verdict must not attach to B —
+    // entry existence alone would let it, since B's pending entry re-creates
+    // the slot A's discard guard relies on being empty.
+    let resolveFirst!: (v: unknown) => void;
+    let resolveSecond!: (v: unknown) => void;
+    gradeMock
+      .mockImplementationOnce(
+        () => new Promise((resolve) => { resolveFirst = resolve; }),
+      )
+      .mockImplementationOnce(
+        () => new Promise((resolve) => { resolveSecond = resolve; }),
+      );
+    renderCard();
+
+    submitAnswer('respuesta equivocada A');
+    await waitFor(() => expect(gradeMock).toHaveBeenCalledTimes(1));
+
+    // Revert while request 1 is still in flight, then submit a new answer.
+    fireEvent.click(screen.getByLabelText('revertSubmission'));
+    submitAnswer('respuesta equivocada B');
+    await waitFor(() => expect(gradeMock).toHaveBeenCalledTimes(2));
+
+    // Request 2 (the current answer) resolves first: its verdict renders.
+    await act(async () => {
+      resolveSecond({
+        verdict: 'minor',
+        corrected: 'Quisiera un café.',
+        notes: [],
+        savedAlternative: false,
+      });
+    });
+    await waitFor(() =>
+      expect(screen.getByText('verdict.minor')).toBeInTheDocument(),
+    );
+
+    // Request 1 (the reverted answer) arrives late and must be discarded.
+    await act(async () => {
+      resolveFirst({
+        verdict: 'wrong',
+        corrected: 'Quisiera un café.',
+        notes: [],
+        savedAlternative: false,
+      });
+    });
+    expect(screen.getByText('verdict.minor')).toBeInTheDocument();
+    expect(screen.queryByText('verdict.wrong')).not.toBeInTheDocument();
   });
 });
