@@ -243,6 +243,53 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     expect(screen.queryByTestId('writing-feedback-pending')).not.toBeInTheDocument();
   });
 
+  it('sends a long-sentence one-char typo to the grader instead of rounding it to correct', async () => {
+    // The local gate is exact-normalized EQUALITY (mirror of the server's
+    // writingAnswersMatch), not a rounded accuracy >= 100: with enough words,
+    // a single-character slip rounds to 100 and the old gate silently marked
+    // it correct, defeating the server's documented "a one-character typo
+    // should reach the LLM and come back as a 'minor' verdict".
+    const primary = Array.from({ length: 60 }, () => 'bonita').join(' ') + '.';
+    const answer = primary.replace(/bonita\.$/, 'bonitaa.');
+    // Self-check the construction: the rounded lenient score IS 100 here.
+    const { computeAccuracyPair } = await import('@/lib/textCompare');
+    expect(computeAccuracyPair(primary, answer, 'es').withoutPunctuation).toBe(
+      100,
+    );
+    gradeMock.mockResolvedValue({
+      verdict: 'minor',
+      corrected: primary,
+      notes: [{ type: 'spelling', text: 'bonitaa has a doubled letter.' }],
+      savedAlternative: false,
+    });
+    const longTranslations: CardTranslation[] = [
+      TRANSLATIONS[0],
+      { language: 'es', text: primary, isBaseLanguage: false, isTargetLanguage: true },
+    ];
+    render(
+      <FullReviewCardContent
+        preReviewCount={0}
+        sourceText="I would like a coffee."
+        translations={longTranslations}
+        audioRecordings={[]}
+        isFavorite={false}
+        isPendingMaster={false}
+        isPendingHide={false}
+        onMaster={vi.fn()}
+        onHide={vi.fn()}
+        onFavorite={vi.fn()}
+        targetAudioMode="never"
+        cardId={CARD_ID}
+        aiFeedbackEnabled
+      />,
+    );
+    submitAnswer(answer);
+    await waitFor(() => expect(gradeMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByText('verdict.minor')).toBeInTheDocument(),
+    );
+  });
+
   it('routes a card_edits USAGE_LIMIT from make-default to the upgrade dialog, not the retry toast', async () => {
     gradeMock.mockResolvedValue({
       verdict: 'alsoCorrect',

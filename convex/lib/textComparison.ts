@@ -8,19 +8,11 @@ import {
   shouldRomanizeForTtsMatch,
 } from './localRomanization';
 
-/**
- * Strip punctuation, collapse whitespace, lowercase, so that minor
- * transcription differences (e.g. period vs no period) don't cause
- * a false mismatch.
- */
-export function normalizeForComparison(text: string): string {
-  return text
-    .normalize('NFC')
-    .toLowerCase()
-    .replace(/[\p{P}\p{S}]/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+// Moved to lib/textCompare/normalize.ts so the client's local writing gate
+// (lib/textCompare/bestMatch.ts) shares the exact same normalization;
+// re-exported here so server callers keep their import site.
+import { normalizeForComparison } from '../../lib/textCompare/normalize';
+export { normalizeForComparison };
 
 /**
  * Punctuation that is SILENT when a sentence is spoken aloud: sentence

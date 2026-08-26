@@ -21,7 +21,8 @@ import {
 } from '@/lib/constants/audioPlayback';
 import { DiffDisplay } from './DiffDisplay';
 import {
-  computeAccuracy,
+  answersMatchExactly,
+  bestCandidate,
   computeAccuracyPair,
   type AccuracyPair,
 } from '@/lib/textCompare';
@@ -325,6 +326,13 @@ export function FullReviewCardContent({
   // yields the same value), so a StrictMode double render is harmless. Cleared
   // when the card changes, below.
   const pairCacheRef = useRef(new Map<string, AccuracyPair>());
+  // Per-language grade-request sequence. Each kick-off bumps the row's
+  // counter and a resolution lands only while its number is still current.
+  // Entry existence alone cannot guard this: a revert deletes the entry, but
+  // a resubmit re-creates it, and the older request's verdict (for the old
+  // answer) must not attach to the new one — including through `.catch`,
+  // where a stale USAGE_LIMIT would mark the fresh request 'limit'.
+  const feedbackRequestSeqRef = useRef<Map<string, number>>(new Map());
 
   const [prevTranslationKey, setPrevTranslationKey] = useState(translationKey);
   if (translationKey !== prevTranslationKey) {
@@ -369,40 +377,37 @@ export function FullReviewCardContent({
     const pairs = targetTranslations
       .filter((tr) => inputs.get(tr.language)?.submitted)
       .map((tr) => {
-        // AI grader accepted the answer as a valid alternative (either fresh
-        // this submit, or a stored one the server matched): the row counts as
+        // AI grader accepted the answer (a fresh alsoCorrect, or a server
+        // 'correct' — a primary/alternative match, including the zh/ko
+        // romanized equality the client gate can't see): the row counts as
         // fully correct so auto-rating doesn't punish a legitimate answer.
         const fb = feedback.get(tr.language);
         if (
           fb?.status === 'done' &&
           (fb.result?.verdict === 'alsoCorrect' ||
-            (fb.result?.verdict === 'correct' &&
-              fb.result.matched === 'alternative'))
+            fb.result?.verdict === 'correct')
         ) {
           return { withPunctuation: 100, withoutPunctuation: 100 };
         }
         const userText = inputs.get(tr.language)?.userText ?? '';
         // Best pair across the primary and every accepted alternative: a
         // stored alternative is a correct answer, so it must score like one.
-        // The winner is picked by the lenient score (mirroring the
-        // closest-answer diff in TargetLanguageInput); its full pair is used.
+        // The pick rule is shared with the closest-answer diff in
+        // TargetLanguageInput (lib/textCompare/bestMatch), so this summary is
+        // always computed against the sentence the diff shows.
         const candidates = [
           tr.text,
           ...(alternativesByLanguage.get(tr.language) ?? []).map((a) => a.text),
         ];
-        let best: AccuracyPair | null = null;
-        for (const candidate of candidates) {
+        return bestCandidate(candidates, userText, tr.language, (candidate) => {
           const cacheKey = `${tr.language}\u0000${candidate}\u0000${userText}`;
           let pair = pairCacheRef.current.get(cacheKey);
           if (!pair) {
             pair = computeAccuracyPair(candidate, userText, tr.language);
             pairCacheRef.current.set(cacheKey, pair);
           }
-          if (!best || pair.withoutPunctuation > best.withoutPunctuation) {
-            best = pair;
-          }
-        }
-        return best!;
+          return pair;
+        }).pair;
       });
 
     const base = {
@@ -706,13 +711,6 @@ export function FullReviewCardContent({
   );
   const cardIdForFeedbackRef = useRef(cardId);
   cardIdForFeedbackRef.current = cardId;
-  // Per-language grade-request sequence. Each kick-off bumps the row's
-  // counter and a resolution lands only while its number is still current.
-  // Entry existence alone cannot guard this: a revert deletes the entry, but
-  // a resubmit re-creates it, and the older request's verdict (for the old
-  // answer) must not attach to the new one — including through `.catch`,
-  // where a stale USAGE_LIMIT would mark the fresh request 'limit'.
-  const feedbackRequestSeqRef = useRef<Map<string, number>>(new Map());
 
   // Turning the setting off mid-card (e.g. via the quota line's "Turn off"
   // button) clears what's already on screen instead of leaving stale
@@ -767,19 +765,19 @@ export function FullReviewCardContent({
       if (!answer) continue;
 
       const language = tr.language;
-      // Local gate: a lenient (punctuation-ignoring) 100 against the primary
-      // OR any stored accepted alternative needs no grader.
+      // Local gate, mirroring the server's (writingAnswersMatch): exact
+      // punctuation/case-insensitive EQUALITY against the primary or any
+      // stored accepted alternative needs no grader. Deliberately not a
+      // rounded accuracy >= 100: that let a one-character typo in a long
+      // sentence round to 100 and skip the grader, where the server's gate
+      // is documented to hand typos to the LLM for a 'minor' verdict.
       const localMatch = [
         { text: tr.text, matched: 'primary' as const },
         ...(alternativesByLanguage.get(language) ?? []).map((a) => ({
           text: a.text,
           matched: 'alternative' as const,
         })),
-      ].find(
-        (c) =>
-          computeAccuracyPair(c.text, answer, language).withoutPunctuation >=
-          100,
-      );
+      ].find((c) => answersMatchExactly(c.text, answer));
       if (localMatch) {
         setFeedback((prev) =>
           new Map(prev).set(language, {
@@ -1276,7 +1274,7 @@ function TargetLanguageInput({
 
   // "Also correct?" exists to dispute an answer the diff marked wrong, at a
   // displayed 100% there is nothing to dispute, so the button is noise.
-  // `computeAccuracy` is the same rounded score the accuracy footer shows
+  // `isPerfectAnswer` reads the same pair the accuracy footer shows
   // (including the ignore-punctuation setting), so button and label can't
   // disagree.
   // Everything the answer may legitimately be diffed against: the card's
@@ -1292,40 +1290,22 @@ function TargetLanguageInput({
     if (gradedCorrected) list.push(gradedCorrected);
     return [...new Set(list)];
   }, [translation.text, alternatives, gradedCorrected]);
-  const closestExpected = useMemo(() => {
-    if (!hasUserText || diffCandidates.length === 1) return translation.text;
-    let best = diffCandidates[0];
-    let bestScore = -1;
-    for (const candidate of diffCandidates) {
-      const score = computeAccuracy(
-        candidate,
-        state.userText,
-        translation.language,
-        ignorePunctuation,
-      );
-      if (score > bestScore) {
-        bestScore = score;
-        best = candidate;
-      }
-    }
-    return best;
-  }, [
-    diffCandidates,
-    hasUserText,
-    state.userText,
-    translation.text,
-    translation.language,
-    ignorePunctuation,
-  ]);
+  // Shared pick rule with the parent's accuracy summary (bestCandidate):
+  // both rank candidates the same way, so the score in the footer is always
+  // computed against the sentence this diff shows. Picking here by the
+  // ignore-punctuation setting used to let the two choose DIFFERENT
+  // candidates whenever the strict and lenient orders disagreed.
+  const closest = useMemo(() => {
+    if (!hasUserText) return null;
+    return bestCandidate(diffCandidates, state.userText, translation.language);
+  }, [diffCandidates, hasUserText, state.userText, translation.language]);
+  const closestExpected = closest?.text ?? translation.text;
 
   const isPerfectAnswer =
-    hasUserText &&
-    computeAccuracy(
-      closestExpected,
-      state.userText,
-      translation.language,
-      ignorePunctuation,
-    ) >= 100;
+    closest !== null &&
+    (ignorePunctuation
+      ? closest.pair.withoutPunctuation
+      : closest.pair.withPunctuation) >= 100;
 
   // The coach card carries its own "Discuss in detail" button; the standalone
   // link only remains for rows without feedback (off, errored, or over quota).
