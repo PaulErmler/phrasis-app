@@ -1,5 +1,16 @@
 import type { DriveStep } from 'driver.js';
 
+/**
+ * DriveStep plus app extensions. `skipIfMissing`: drop the step at launch
+ * when its selector has no visible match — for steps anchored to
+ * conditionally mounted UI whose gate lives in query data the tour factory
+ * can't see (e.g. the workload card below its minimum-activity gate).
+ * Like the ctx-gated steps, dropping one shifts the indices of later steps,
+ * so `stepCompleteOnClickIndex` must only target steps before any
+ * skippable one.
+ */
+export type AppDriveStep = DriveStep & { skipIfMissing?: boolean };
+
 type MarkupValues = Record<string, (chunks: string) => string>;
 
 export type TranslateFn = ((key: string) => string) & {
@@ -13,7 +24,7 @@ export interface TutorialCallbacks {
 
 export interface TutorialDefinition {
   id: string;
-  steps: DriveStep[];
+  steps: AppDriveStep[];
   prerequisite?: string;
   popoverClass?: string;
 }

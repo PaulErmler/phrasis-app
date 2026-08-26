@@ -160,8 +160,15 @@ export function WorkloadStackedCard({
   };
 
   const totals = days.map((day) => dayTotal(day, unit));
+  // Emptiness is a property of the REAL data: scheduled cards, their
+  // second-wave returns, and the typical-adds continuation. The what-if
+  // stepper is hypothetical — its +5 default must not conjure workload bars
+  // for a course with nothing scheduled at all.
   const isEmpty = days.every(
-    (day) => day.scheduled.total === 0 && day.estimated.total === 0,
+    (day) =>
+      day.scheduled.total === 0 &&
+      day.estimated.returns === 0 &&
+      day.estimated.typicalAdds === 0,
   );
   const pace = isTime ? rates.avgDailyMinutes : rates.avgDailyReviews;
   const showPace = pace > 0.5;
@@ -202,7 +209,10 @@ export function WorkloadStackedCard({
               <>
                 <span className="font-semibold text-foreground/80">
                   {t('cardsToday', {
-                    count: days[0].scheduled.total,
+                    // Estimate-inclusive, so the header agrees with the
+                    // day-0 column cap below it (time mode's headline
+                    // minutes already include estimates).
+                    count: days[0].scheduled.total + days[0].estimated.total,
                     time: todayMinutes,
                   })}
                 </span>
@@ -273,8 +283,13 @@ export function WorkloadStackedCard({
                           : cardsTotal
                         : ''}
                     </span>
+                    {/* flex-grow apportions the container height by value
+                        (gaps are taken out first), so the stack can neither
+                        overflow its value-scaled height nor silently shrink
+                        the way fixed pixel heights with a 3px floor did;
+                        min-h-px keeps slivers visible as hairlines. */}
                     <div
-                      className="flex w-[22px] flex-col-reverse gap-[2px]"
+                      className="flex w-[22px] flex-col-reverse gap-[2px] overflow-hidden"
                       style={{ height: (total / max) * PLOT_HEIGHT }}
                     >
                       {SEGMENT_ORDER.map((key, i) => {
@@ -287,15 +302,13 @@ export function WorkloadStackedCard({
                           <div
                             key={key}
                             className={cn(
-                              'w-full',
+                              'min-h-px w-full',
                               SEGMENT_CLASS[key],
                               isTop && 'rounded-t-[4px]',
                             )}
                             style={{
-                              height: Math.max(
-                                (value / max) * PLOT_HEIGHT,
-                                3,
-                              ),
+                              flexGrow: value,
+                              flexBasis: 0,
                               ...SEGMENT_STRIPE[key],
                             }}
                           />

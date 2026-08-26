@@ -1095,7 +1095,8 @@ const WORKLOAD_STATES = ['new', 'learning', 'relearning', 'review'] as const;
  * belt and braces).
  *
  * Cost: 4 states × 8 bounds × (1 namespace, or 2 for filter 'custom') =
- * 32–64 O(log n) aggregate counts + ≤ ~20 dailyStats rows. `now` is
+ * 32–64 O(log n) aggregate counts, +3 unbounded state counts for
+ * `startedCards`, + ≤ ~20 dailyStats rows. `now` is
  * client-supplied and minute-quantized (no wall clock in queries; identical
  * args keep the query cacheable across subscribers). If this query ever
  * shows up in insights, the trim ladder is: drop the `laterToday` split
@@ -1142,6 +1143,11 @@ export const getWorkloadForecast = query({
         }),
       }),
       initialReviewCount: v.number(),
+      // Cards in any non-'new' active state across the WHOLE deck (no due
+      // bound, no content filter) — the client's minimum-activity gate for
+      // the forecast card. Filter-independent so toggling the content
+      // filter can't flip the card in and out of existence.
+      startedCards: v.number(),
       // Set while the separateModeTracking writing seed is still filling the
       // writing aggregates. See countDueCardsByState.
       preparingWriting: v.optional(v.boolean()),
@@ -1197,6 +1203,17 @@ export const getWorkloadForecast = query({
     const [pNew, pLearning, pRelearning, pReview] = await Promise.all(
       WORKLOAD_STATES.map(prefixFor),
     );
+
+    // Deck-wide unbounded counts (3 more O(log n) reads) rather than the
+    // filtered prefix counts above: the gate asks "has this user studied at
+    // all", which no due window or content filter should change.
+    const startedCards = (
+      await Promise.all(
+        (['learning', 'relearning', 'review'] as const).map((state) =>
+          stateAggregate.count(ctx, { namespace: `${deck._id}:${state}` }),
+        ),
+      )
+    ).reduce((sum, n) => sum + n, 0);
 
     const bucket = (pick: (prefix: number[]) => number) => ({
       new: Math.max(0, pick(pNew)),
@@ -1272,6 +1289,7 @@ export const getWorkloadForecast = query({
       history,
       initialReviewCount:
         settings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
+      startedCards,
       // Same provisional gate as countDueCardsByState: a mid-seed writing
       // queue is a partial prefix, not a settled zero.
       ...(face === null &&

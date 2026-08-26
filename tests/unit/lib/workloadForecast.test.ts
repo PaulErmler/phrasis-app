@@ -50,6 +50,7 @@ function makeData(
     futureDays: Array.from({ length: 6 }, zeroCounts),
     history: emptyHistory(),
     initialReviewCount: 5,
+    startedCards: 50,
     ...overrides,
   };
 }
@@ -143,6 +144,11 @@ describe('isWorkloadForecastData', () => {
     const noHistory = { ...makeData() } as Record<string, unknown>;
     delete noHistory.history;
     expect(isWorkloadForecastData(noHistory)).toBe(false);
+    // A payload cached before startedCards existed must be discarded, not
+    // rendered with an undefined gate value.
+    const preGate = { ...makeData() } as Record<string, unknown>;
+    delete preGate.startedCards;
+    expect(isWorkloadForecastData(preGate)).toBe(false);
     const badCounts = makeData();
     (badCounts.availableNow as Record<string, unknown>).review = 'many';
     expect(isWorkloadForecastData(badCounts)).toBe(false);

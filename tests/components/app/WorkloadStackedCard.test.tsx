@@ -64,6 +64,7 @@ function makeData(
       },
     },
     initialReviewCount: 5,
+    startedCards: 50,
     ...overrides,
   };
 }
@@ -186,15 +187,39 @@ describe('WorkloadStackedCard', () => {
     expect(screen.queryAllByText(/paceLine/)).toHaveLength(1); // only the first render's
   });
 
-  it('renders the empty state when nothing is scheduled or estimated', () => {
-    renderCard(
-      makeData({
-        availableNow: zero(),
-        laterToday: zero(),
-        futureDays: Array.from({ length: 6 }, zero),
-      }),
-      { addCount: 0 },
-    );
+  it('renders the empty state when nothing is scheduled — even at the default what-if of +5', () => {
+    const emptyCourse = makeData({
+      availableNow: zero(),
+      laterToday: zero(),
+      futureDays: Array.from({ length: 6 }, zero),
+    });
+    // The shipped default: the stepper starts at +5, whose hypothetical
+    // bars must not defeat the empty state.
+    renderCard(emptyCourse, { addCount: 5 });
     expect(screen.getByText('empty')).toBeTruthy();
+
+    renderCard(emptyCourse, { addCount: 0 });
+    expect(screen.getAllByText('empty')).toHaveLength(2);
+  });
+
+  it('cards mode: the header count equals the day-0 column cap', () => {
+    const { forecast } = renderCard(makeData(), { unit: 'cards' });
+    const day0Cards =
+      forecast.days[0].scheduled.total + forecast.days[0].estimated.total;
+    // Header (via the mocked t: "cardsToday <count> <time>") and cap show
+    // the same estimate-inclusive number.
+    expect(screen.getByText(new RegExp(`cardsToday ${day0Cards} `))).toBeTruthy();
+    expect(screen.getByText(String(day0Cards))).toBeTruthy();
+  });
+
+  it('bar segments sum exactly to the estimated total (no rounding drift)', () => {
+    const { forecast } = renderCard(makeData(), { addCount: 5 });
+    for (const day of forecast.days) {
+      expect(
+        day.estimated.returns +
+          day.estimated.whatIfAdds +
+          day.estimated.typicalAdds,
+      ).toBe(day.estimated.total);
+    }
   });
 });

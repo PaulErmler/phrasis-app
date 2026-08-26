@@ -1,5 +1,9 @@
-import type { DriveStep } from 'driver.js';
-import type { TutorialDefinition, TutorialContext, TranslateFn } from './types';
+import type {
+  AppDriveStep,
+  TutorialDefinition,
+  TutorialContext,
+  TranslateFn,
+} from './types';
 import { tourStep } from './tour-step';
 
 export function createHomeTour(
@@ -15,7 +19,7 @@ export function createHomeTour(
       ? tourStep(t, 'home.freeStudyMode', '[data-tutorial="free-study-mode"]', 'bottom', 'center')
       : tourStep(t, 'home.radioMode', '[data-tutorial="radio-mode"]', 'bottom', 'center');
 
-  const steps: DriveStep[] = [
+  const steps: AppDriveStep[] = [
     {
       // Welcome. Heading only; no description per design.
       popover: {
@@ -36,7 +40,14 @@ export function createHomeTour(
       ? []
       : [
           tourStep(t, 'home.dueCounts', '[data-tutorial="due-counts"]', 'bottom', 'center'),
-          tourStep(t, 'home.workload', '[data-tutorial="workload-forecast"]', 'top', 'center'),
+          // The card also hides itself below the minimum-activity gate
+          // (MIN_STARTED_CARDS_FOR_FORECAST) — that lives in query data this
+          // factory can't see, so the step drops at launch when the card
+          // isn't mounted.
+          {
+            ...tourStep(t, 'home.workload', '[data-tutorial="workload-forecast"]', 'top', 'center'),
+            skipIfMissing: true,
+          } satisfies AppDriveStep,
         ]),
     // The rotating forecast in the progress card ("by the end of the year…").
     tourStep(t, 'home.projections', '[data-tutorial="projections"]', 'bottom', 'center'),

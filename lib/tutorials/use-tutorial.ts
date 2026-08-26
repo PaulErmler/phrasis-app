@@ -9,10 +9,11 @@ import { reportError } from '@/lib/report-error';
 import { driver, type Driver, type DriveStep } from 'driver.js';
 import type { TutorialId } from '@/convex/features/tutorialIds';
 import { getTutorial } from './registry';
-import type { TutorialContext } from './types';
+import type { AppDriveStep, TutorialContext } from './types';
 import {
   baseDriverConfig,
   bindTourKeyboard,
+  findVisibleAnchor,
   getDriverOverlayOpacity,
   resolveStepAnchors,
 } from './driver-common';
@@ -327,7 +328,18 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   const launchDriver = useCallback(() => {
     if (!tutorial) return;
 
-    const allSteps = [...tutorial.steps, ...(extraStepsRef.current ?? [])];
+    // skipIfMissing steps anchor to conditionally mounted UI: when their
+    // selector has no visible match at launch, drop them entirely instead
+    // of letting driver.js float a popover that describes an absent card.
+    const allSteps = [
+      ...tutorial.steps,
+      ...(extraStepsRef.current ?? []),
+    ].filter(
+      (step: AppDriveStep) =>
+        !step.skipIfMissing ||
+        typeof step.element !== 'string' ||
+        findVisibleAnchor(step.element) !== null,
+    );
 
     const resolvedSteps = resolveStepAnchors(allSteps, {
       onMiss: 'keep-selector',

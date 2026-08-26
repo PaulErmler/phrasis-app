@@ -166,10 +166,15 @@ describe('getWorkloadForecast', () => {
       res!.laterToday.review +
       res!.futureDays.reduce((s, d) => s + d.review, 0);
     expect(totalReview).toBe(8);
-    // 4 states × 8 bounds, one namespace each for filter 'both'.
-    expect(countCalls).toHaveLength(32);
+    // 4 states × 8 bounds for filter 'both', + 3 unbounded startedCards
+    // counts (learning/relearning/review).
+    expect(countCalls).toHaveLength(35);
+    expect(countCalls.filter((c) => c.upper === undefined)).toHaveLength(3);
     expect(res!.preparingWriting).toBeUndefined();
     expect(res!.initialReviewCount).toBe(5);
+    // startedCards: every registered non-'new' key regardless of due date
+    // (all 9 review keys incl. the out-of-window B[7], + 1 learning).
+    expect(res!.startedCards).toBe(10);
   });
 
   it("filter 'custom' fans out over the custom+chat origin namespaces", async () => {
@@ -186,12 +191,23 @@ describe('getWorkloadForecast', () => {
       filter: 'custom',
     });
     expect(res!.futureDays[0].review).toBe(2);
-    expect(countCalls).toHaveLength(64); // 4 states × 8 bounds × 2 origins
+    // 4 states × 8 bounds × 2 origins, + 3 unbounded startedCards counts.
+    expect(countCalls).toHaveLength(67);
+    // The bucketing goes through the origin namespaces only…
     expect(
-      countCalls.every((c) =>
-        /:custom:|:chat:/.test(c.namespace),
-      ),
+      countCalls
+        .filter((c) => c.upper !== undefined)
+        .every((c) => /:custom:|:chat:/.test(c.namespace)),
     ).toBe(true);
+    // …while startedCards stays filter-independent: unbounded counts over
+    // the plain state namespaces, so toggling the content filter cannot
+    // flip the card's minimum-activity gate.
+    expect(
+      countCalls
+        .filter((c) => c.upper === undefined)
+        .every((c) => !/:custom:|:chat:/.test(c.namespace)),
+    ).toBe(true);
+    expect(res!.startedCards).toBe(1); // the state-namespace review key
   });
 
   it('writing mode with separateModeTracking reads the writing aggregates and flags mid-seed counts', async () => {

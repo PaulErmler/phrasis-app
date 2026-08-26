@@ -33,6 +33,15 @@ export const WHAT_IF_ADD_MIN = 0;
 /** = MAX_CARDS_PER_BATCH — the most that can be added in one go anyway. */
 export const WHAT_IF_ADD_MAX = 15;
 
+/**
+ * Minimum-activity gate: the forecast card stays hidden until this many
+ * cards have entered a non-'new' state (payload `startedCards`). Below it
+ * the estimates would be pure priors — fabricated-looking numbers for a
+ * user who has barely started — and the home screen is better off without
+ * the card at all.
+ */
+export const MIN_STARTED_CARDS_FOR_FORECAST = 5;
+
 const DAY_MS = 86_400_000;
 
 /**
@@ -115,6 +124,9 @@ export type WorkloadForecastData = {
     ratingCounts: RatingCounts;
   };
   initialReviewCount: number;
+  /** Deck-wide cards in any non-'new' active state — see
+   * MIN_STARTED_CARDS_FOR_FORECAST. */
+  startedCards: number;
   preparingWriting?: boolean;
 };
 
@@ -232,6 +244,7 @@ export function isWorkloadForecastData(
     typeof d.today === 'string' &&
     typeof d.dayStartMs === 'number' &&
     typeof d.initialReviewCount === 'number' &&
+    typeof d.startedCards === 'number' &&
     isDayStateCounts(d.availableNow) &&
     isDayStateCounts(d.laterToday) &&
     Array.isArray(d.futureDays) &&
@@ -613,7 +626,10 @@ export function buildWorkloadForecast(
         returns: Math.round(returns),
         whatIfAdds: Math.round(whatIfAdds),
         typicalAdds: Math.round(typicalAdds),
-        total: Math.round(estTotal),
+        // Sum of the ROUNDED parts (not the rounded raw sum), so a bar
+        // built from the displayed segments always adds up to this total.
+        total:
+          Math.round(returns) + Math.round(whatIfAdds) + Math.round(typicalAdds),
       },
       estimatedReviews,
       estimatedMinutes,

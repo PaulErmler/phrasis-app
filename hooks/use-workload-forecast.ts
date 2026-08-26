@@ -13,6 +13,7 @@ import {
   buildWorkloadForecast,
   DEFAULT_WHAT_IF_ADD,
   isWorkloadForecastData,
+  MIN_STARTED_CARDS_FOR_FORECAST,
   type WorkloadForecast,
   type WorkloadForecastData,
 } from '@/lib/workloadForecast';
@@ -36,7 +37,9 @@ export type UseWorkloadForecastResult = {
   data: WorkloadForecastData | null;
   /** Extra load the current stepper value adds vs. adding nothing. */
   whatIfDelta: { reviews: number; minutes: number };
-  /** The user opted out via the hideDueCounts preference. */
+  /** The user opted out via the hideDueCounts preference, or the course is
+   * below the minimum-activity gate (MIN_STARTED_CARDS_FOR_FORECAST) —
+   * either way the card renders nothing. */
   hidden: boolean;
   /** Rendering last-known data while the writing seed fills the aggregates. */
   isProvisional: boolean;
@@ -84,6 +87,13 @@ export function useWorkloadForecast({
   if (data != null && !isProvisional) lastGoodRef.current = data;
   const effective = (isProvisional ? null : (data ?? null)) ?? lastGoodRef.current;
 
+  // The minimum-activity gate needs the payload, so it cannot skip the
+  // query the way the preference does — the subscription stays live and the
+  // card appears reactively the moment the Nth card starts learning.
+  const belowMinimum =
+    effective !== null &&
+    effective.startedCards < MIN_STARTED_CARDS_FOR_FORECAST;
+
   const [addCount, setAddCount] = React.useState(DEFAULT_WHAT_IF_ADD);
 
   const forecast = React.useMemo(
@@ -119,7 +129,7 @@ export function useWorkloadForecast({
     forecast,
     data: effective,
     whatIfDelta,
-    hidden,
+    hidden: hidden || belowMinimum,
     isProvisional,
     reviewMode,
     addCount,
