@@ -5,6 +5,7 @@ import {
   deriveRatingRates,
   deriveReturnKernels,
   deriveSecondsPerReview,
+  isWorkloadForecastData,
   MIN_RATING_SAMPLE,
   WHAT_IF_ADD_MAX,
   WORKLOAD_DAYS,
@@ -127,6 +128,24 @@ describe('kernels', () => {
     });
     const sum = (k: number[]) => k.reduce((a, b) => a + b, 0);
     expect(sum(lapsy.mature)).toBeGreaterThan(sum(mature));
+  });
+});
+
+describe('isWorkloadForecastData', () => {
+  it('accepts a full payload and rejects malformed cached shapes', () => {
+    expect(isWorkloadForecastData(makeData())).toBe(true);
+
+    expect(isWorkloadForecastData(null)).toBe(false);
+    expect(isWorkloadForecastData('{}')).toBe(false);
+    expect(
+      isWorkloadForecastData(makeData({ futureDays: [zeroCounts()] })),
+    ).toBe(false);
+    const noHistory = { ...makeData() } as Record<string, unknown>;
+    delete noHistory.history;
+    expect(isWorkloadForecastData(noHistory)).toBe(false);
+    const badCounts = makeData();
+    (badCounts.availableNow as Record<string, unknown>).review = 'many';
+    expect(isWorkloadForecastData(badCounts)).toBe(false);
   });
 });
 
@@ -264,6 +283,24 @@ describe('buildWorkloadForecast', () => {
     expect(full.days[0].estimatedMinutes).toBeGreaterThan(
       audio.days[0].estimatedMinutes,
     );
+  });
+
+  it('tolerates a truncated futureDays array (stale cached payload) by zero-padding', () => {
+    const data = makeData({
+      availableNow: { new: 0, learning: 3, relearning: 0, review: 2 },
+      // Only 2 future days instead of WORKLOAD_DAYS - 1 — the shape an old
+      // cached payload could have after a window-size change.
+      futureDays: [
+        { new: 0, learning: 1, relearning: 0, review: 4 },
+        zeroCounts(),
+      ],
+    });
+    const f = buildWorkloadForecast(data, params);
+    expect(f.days).toHaveLength(WORKLOAD_DAYS);
+    expect(f.days[1].scheduled.total).toBe(5);
+    for (const d of f.days.slice(3)) {
+      expect(d.scheduled.total).toBe(0);
+    }
   });
 
   it('repeatFactor clamps to [1, 3] and pace averages derive from active days', () => {

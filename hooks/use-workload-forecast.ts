@@ -12,9 +12,22 @@ import { dateInTimezone } from '@/lib/dateStrings';
 import {
   buildWorkloadForecast,
   DEFAULT_WHAT_IF_ADD,
+  isWorkloadForecastData,
   type WorkloadForecast,
   type WorkloadForecastData,
 } from '@/lib/workloadForecast';
+
+/**
+ * Bump when `getWorkloadForecast`'s payload shape changes so stale
+ * localStorage entries are keyed away instead of parsed. The shape guard
+ * below still runs — the version protects against forgetting the bump, the
+ * guard against truncated/corrupted entries within a version.
+ */
+const CACHE_VERSION = 'v1';
+
+/** Cached payloads may be `null` (the query's no-course result) — valid. */
+const isCachedPayloadValid = (value: unknown) =>
+  value === null || isWorkloadForecastData(value);
 
 export type UseWorkloadForecastResult = {
   /** Model output for the current what-if value; null while loading. */
@@ -62,7 +75,8 @@ export function useWorkloadForecast({
     skip || hidden || !settings
       ? 'skip'
       : { timezone, today, now, reviewMode, filter },
-    `workload_${settings?.courseId ?? 'none'}_${reviewMode}_${filter}`,
+    `workload_${CACHE_VERSION}_${settings?.courseId ?? 'none'}_${reviewMode}_${filter}`,
+    isCachedPayloadValid,
   );
 
   const isProvisional = data?.preparingWriting === true;

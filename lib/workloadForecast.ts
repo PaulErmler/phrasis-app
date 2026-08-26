@@ -192,6 +192,69 @@ const clamp = (v: number, lo: number, hi: number) =>
 const youngOf = (c: DayStateCounts) => c.new + c.learning + c.relearning;
 const totalOf = (c: DayStateCounts) => youngOf(c) + c.review;
 
+const zeroDayCounts = (): DayStateCounts => ({
+  new: 0,
+  learning: 0,
+  relearning: 0,
+  review: 0,
+});
+
+const isDayStateCounts = (value: unknown): value is DayStateCounts =>
+  typeof value === 'object' &&
+  value !== null &&
+  (['new', 'learning', 'relearning', 'review'] as const).every(
+    (k) => typeof (value as Record<string, unknown>)[k] === 'number',
+  );
+
+const hasNumbers = (value: unknown, keys: readonly string[]): boolean =>
+  typeof value === 'object' &&
+  value !== null &&
+  keys.every((k) => typeof (value as Record<string, unknown>)[k] === 'number');
+
+/**
+ * Runtime shape check covering everything `buildWorkloadForecast`
+ * dereferences. Live payloads are guaranteed by the query's `returns`
+ * validator; this exists for localStorage-cached ones, whose shape can lag
+ * a deploy — a payload failing it must be discarded, not rendered.
+ */
+export function isWorkloadForecastData(
+  value: unknown,
+): value is WorkloadForecastData {
+  if (typeof value !== 'object' || value === null) return false;
+  const d = value as Record<string, unknown>;
+  const history = d.history as Record<string, unknown> | null | undefined;
+  return (
+    typeof d.today === 'string' &&
+    typeof d.dayStartMs === 'number' &&
+    typeof d.initialReviewCount === 'number' &&
+    isDayStateCounts(d.availableNow) &&
+    isDayStateCounts(d.laterToday) &&
+    Array.isArray(d.futureDays) &&
+    d.futureDays.length === WORKLOAD_DAYS - 1 &&
+    d.futureDays.every(isDayStateCounts) &&
+    typeof history === 'object' &&
+    history !== null &&
+    hasNumbers(history, [
+      'windowDays',
+      'activeDays',
+      'reps',
+      'cardsReviewed',
+      'newCards',
+      'timeMs',
+    ]) &&
+    hasNumbers(history.reviewsByMode, ['audio', 'full']) &&
+    hasNumbers(history.timeMsByMode, ['audio', 'full']) &&
+    hasNumbers(history.ratingCounts, [
+      'stillLearning',
+      'understood',
+      'again',
+      'hard',
+      'good',
+      'easy',
+    ])
+  );
+}
+
 /** The user's FSRS grade distribution over the window, or the priors while
  * the sample is thin. preReview grades are excluded — they're binary and say
  * nothing about lapse behaviour. */
@@ -453,6 +516,16 @@ export function buildWorkloadForecast(
     3,
   );
 
+  // The composition loops below index days 0..WORKLOAD_DAYS-1, so the input
+  // must span exactly that window even if a stale cached payload was built
+  // for a different one: clamp and zero-fill rather than crash the render.
+  const futureDays = (
+    Array.isArray(data.futureDays) ? data.futureDays : []
+  ).slice(0, WORKLOAD_DAYS - 1);
+  while (futureDays.length < WORKLOAD_DAYS - 1) {
+    futureDays.push(zeroDayCounts());
+  }
+
   // Exact per-day scheduled splits. Day 0 keeps its backlog/later-today
   // structure; future days are their state split.
   const scheduledDays = [
@@ -464,7 +537,7 @@ export function buildWorkloadForecast(
       dayYoung: youngOf(data.availableNow) + youngOf(data.laterToday),
       dayMature: data.availableNow.review + data.laterToday.review,
     },
-    ...data.futureDays.map((c) => ({
+    ...futureDays.map((c) => ({
       backlog: 0,
       young: youngOf(c),
       mature: c.review,
