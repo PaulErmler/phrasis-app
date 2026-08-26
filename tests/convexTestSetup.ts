@@ -1,5 +1,10 @@
 import { vi } from 'vitest';
 
+// LLM call sites construct their client via lib/openrouter's getOpenRouter(),
+// which throws when OPENROUTER_API_KEY is unset. Suites mock `generateText`,
+// so the key is never sent anywhere; it only has to exist.
+process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
+
 /**
  * Global convex-test setup: mock the workpool clients at the module boundary.
  *

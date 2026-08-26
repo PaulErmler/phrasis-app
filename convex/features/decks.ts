@@ -131,7 +131,7 @@ import { FEATURE_IDS } from './featureIds';
 import { MAX_CARDS_PER_BATCH, ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
 import { fetchFreePlayRotation, randomOrderKey } from '../lib/freePlay';
 import { fetchTrackDueCards } from '../lib/dueQueue';
-import { isCollectionAccessible, requireAccessibleText } from './collections';
+import { requireAccessibleText } from './collections';
 import {
   applyMarkCounterDelta,
   clearMarkForAddedText,
@@ -1024,66 +1024,6 @@ export const getCollectionProgress = query({
     });
 
     return result;
-  },
-});
-
-/**
- * Get the next N texts from a collection that haven't been added to the deck yet.
- * Uses collectionProgress.lastRankProcessed for efficient pagination.
- */
-export const getNextTextsFromCollection = query({
-  args: {
-    collectionId: v.id('collections'),
-    limit: v.optional(v.number()),
-  },
-  returns: v.array(
-    v.object({
-      _id: v.id('texts'),
-      text: v.string(),
-      collectionRank: v.number(),
-    }),
-  ),
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-
-    const settings = await getUserSettings(ctx, userId);
-    if (!settings?.activeCourseId) return [];
-
-    const courseId = settings.activeCourseId;
-
-    if (!(await isCollectionAccessible(ctx, args.collectionId, courseId))) {
-      return [];
-    }
-
-    const maxTexts = Math.min(args.limit ?? 5, 20);
-
-    const progress = await getCollectionProgressHelper(
-      ctx,
-      userId,
-      courseId,
-      args.collectionId,
-    );
-    const lastRankProcessed = progress?.lastRankProcessed ?? 0;
-
-    const collection = await ctx.db.get(args.collectionId);
-    const isLevelCollection = collection
-      ? isPremadeLevelCollection(collection)
-      : false;
-
-    const texts = await getNextTextsFromRank(
-      ctx,
-      args.collectionId,
-      lastRankProcessed,
-      maxTexts,
-      isLevelCollection ? { onlyCurriculum: true } : { forUserId: userId },
-    );
-
-    return texts.map((t) => ({
-      _id: t._id,
-      text: t.text,
-      collectionRank: t.collectionRank,
-    }));
   },
 });
 

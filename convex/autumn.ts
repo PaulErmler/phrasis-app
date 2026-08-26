@@ -316,7 +316,7 @@ async function attachViaV2NoTrial(
 /**
  * Is `productId` the free (default) plan? Asked of Autumn, not the customer
  * payload: a paying customer's `products` does NOT contain the free plan
- * (verified in the sandbox, see documentation/autumn-usage-tracking.md), so
+ * (verified in the sandbox, see docs/architecture/autumn-usage-tracking.md), so
  * "is the target held" can never identify a cancel-to-Free. Fails closed,
  * with an unreachable product record the attach cannot be routed safely.
  */

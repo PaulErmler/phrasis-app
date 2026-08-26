@@ -20,8 +20,8 @@ import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../lib/translationProvenanc
 import { trackEvent } from '../db/stats/dailyStats';
 import { isValidTimezone } from '../lib/dateUtils';
 import { generateText } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { OPENROUTER_MODELS, OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
+import { OPENROUTER_MODELS } from '../config/aiModels';
+import { getOpenRouter } from '../lib/openrouter';
 import { openrouterCallOptions } from './translationLLM';
 import { EVENTS, track } from '../analytics';
 import { sourcedTranslationEntriesValidator } from '../types';
@@ -288,10 +288,7 @@ export const autoFillTranslations = action({
 
     const userPrompt = `Source text(s):\n${sourceDescription}\n\nTranslate into these languages:\n${targetList}`;
 
-    const openrouter = createOpenRouter({
-      apiKey: process.env.OPENROUTER_API_KEY,
-      extraBody: OPENROUTER_USAGE_ACCOUNTING,
-    });
+    const openrouter = getOpenRouter();
 
     const startedAt = Date.now();
     // Reasoning + Luna price cap via the shared mapping in translationLLM so

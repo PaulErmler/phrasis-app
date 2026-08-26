@@ -175,35 +175,6 @@ describe("features/decks", () => {
     });
   });
 
-  describe("getNextTextsFromCollection", () => {
-    it("returns next texts for an accessible level collection", async () => {
-      const t = convexTest(schema, modules);
-      const { collA1 } = await seedCourse(t);
-      const asUser = t.withIdentity({ subject: "user_A" });
-      const texts = await asUser.query(
-        api.features.decks.getNextTextsFromCollection,
-        { collectionId: collA1, limit: 2 },
-      );
-      expect(texts).toHaveLength(2);
-      expect(texts[0].collectionRank).toBe(1);
-      expect(texts[1].collectionRank).toBe(2);
-    });
-
-    it("returns [] for non-accessible collection", async () => {
-      const t = convexTest(schema, modules);
-      await seedCourse(t);
-      const unrelated = await t.run(async (ctx) =>
-        ctx.db.insert("collections", { name: "random-xyz", textCount: 0 }),
-      );
-      const asUser = t.withIdentity({ subject: "user_A" });
-      const texts = await asUser.query(
-        api.features.decks.getNextTextsFromCollection,
-        { collectionId: unrelated },
-      );
-      expect(texts).toEqual([]);
-    });
-  });
-
   describe("setActiveCollection", () => {
     it("rejects when no active course", async () => {
       const t = convexTest(schema, modules);

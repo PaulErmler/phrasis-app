@@ -224,35 +224,3 @@ describe("getPlacementPreviewSentences", () => {
     });
   });
 });
-
-describe("getPlacementReadiness", () => {
-  it("counts total / translated / audio-ready sentences for a target language", async () => {
-    const t = convexTest(schema, modules);
-
-    await seedPlacementSentence(t, {
-      level: 1,
-      position: 0,
-      text: "A",
-      targetLanguage: "es",
-      targetText: "A-es",
-    });
-    await seedPlacementSentence(t, {
-      level: 1,
-      position: 1,
-      text: "B",
-      targetLanguage: "es",
-      targetText: "B-es",
-    });
-    // Third sentence with no translation.
-    await seedPlacementSentence(t, { level: 2, position: 0, text: "C" });
-
-    const asUser = t.withIdentity({ subject: "user_A" });
-    const readiness = await asUser.query(
-      api.features.placementTest.getPlacementReadiness,
-      { targetLanguage: "es" },
-    );
-    expect(readiness.totalSentences).toBe(3);
-    expect(readiness.translatedSentences).toBe(2);
-    expect(readiness.audioReadySentences).toBe(0);
-  });
-});

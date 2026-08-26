@@ -1,7 +1,6 @@
 import { v } from 'convex/values';
 import { query } from '../_generated/server';
 import type { Doc } from '../_generated/dataModel';
-import { getAuthUserId } from '../db/users';
 import { resolveAudioPayload } from '../lib/audioAssets';
 import { PLACEMENT_SENTENCES_QUERY_CAP } from '../../lib/constants/onboarding';
 
@@ -212,57 +211,3 @@ export const getPlacementPreviewSentences = query({
   },
 });
 
-/**
- * Returns how many of the 100 placement sentences have translations + audio
- * ready for `targetLanguage`. Used to gate the "Start test" button.
- */
-export const getPlacementReadiness = query({
-  args: { targetLanguage: v.string() },
-  returns: v.object({
-    totalSentences: v.number(),
-    translatedSentences: v.number(),
-    audioReadySentences: v.number(),
-  }),
-  handler: async (ctx, { targetLanguage }) => {
-    // Public query. `userId` is read only to keep the auth shape uniform.
-    const userId = await getAuthUserId(ctx);
-    void userId;
-
-    // Seed migration caps the corpus at ~100 rows. `.take()` makes the
-    // safety bound explicit; the warn fires if a future seed bumps past it.
-    const sentences = await ctx.db
-      .query('placementTestSentences')
-      .take(PLACEMENT_SENTENCES_QUERY_CAP);
-    if (sentences.length === PLACEMENT_SENTENCES_QUERY_CAP) {
-      console.warn(
-        `placementTestSentences query hit cap ${PLACEMENT_SENTENCES_QUERY_CAP} ` +
-          '— batch the lookup or raise PLACEMENT_SENTENCES_QUERY_CAP.',
-      );
-    }
-
-    let translated = 0;
-    let audioReady = 0;
-    for (const s of sentences) {
-      const tr = await ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', s.textId).eq('targetLanguage', targetLanguage),
-        )
-        .first();
-      if (tr) translated++;
-      const audio = await ctx.db
-        .query('audioRecordings')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', s.textId).eq('language', targetLanguage),
-        )
-        .first();
-      if (audio) audioReady++;
-    }
-
-    return {
-      totalSentences: sentences.length,
-      translatedSentences: translated,
-      audioReadySentences: audioReady,
-    };
-  },
-});

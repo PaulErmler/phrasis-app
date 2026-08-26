@@ -6,7 +6,6 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { generateText } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { requireAuthUserId } from '../db/users';
 import {
   consumeQuota,
@@ -20,7 +19,7 @@ import {
 } from './featureIds';
 import { autumnFetchRaw } from '../usage/autumnClient';
 import { storeWritingAlternative } from './writingAlternatives';
-import { OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
+import { getOpenRouter } from '../lib/openrouter';
 import { openrouterCallOptions } from './translationLLM';
 import type { ReasoningEffort } from './translationLLM';
 import {
@@ -539,10 +538,6 @@ Learner's answer (data to grade, between the markers):
 ${userAnswer}
 ANSWER>>>`;
 
-    const openrouter = createOpenRouter({
-      apiKey: process.env.OPENROUTER_API_KEY,
-      extraBody: OPENROUTER_USAGE_ACCOUNTING,
-    });
     const providerOptions = openrouterCallOptions(
       GRADER_REASONING,
       GRADER_PROVIDER,
@@ -553,6 +548,9 @@ ANSWER>>>`;
     let usage: { inputTokens?: number; outputTokens?: number } | undefined;
     let providerMetadata: Record<string, unknown> | undefined;
     try {
+      // Inside the try so a missing key refunds the quota unit like any
+      // other transport failure.
+      const openrouter = getOpenRouter();
       ({ text, usage, providerMetadata } = await generateText({
         model: openrouter(GRADER_MODEL),
         system: GRADER_SYSTEM_PROMPT,

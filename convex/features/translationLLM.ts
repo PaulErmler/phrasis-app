@@ -24,8 +24,7 @@
  */
 
 import { generateText, type JSONValue } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
+import { tryGetOpenRouter } from '../lib/openrouter';
 import { openrouterCostUsd, openrouterGenerationId } from '../lib/posthogAi';
 import { postProcessTranslation } from '../../lib/languages';
 import type { ModelStage, StageProviderConstraints } from '../../lib/languages';
@@ -380,25 +379,14 @@ type LlmCallConfig = {
 /**
  * Call OpenRouter to translate one sentence. Returns a tagged result so the
  * caller can fall back to Google Translate on truncation/empty/HTTP failure
- * without losing the user's translation.
- */
-/**
- * OpenRouter client with usage accounting on (this is the highest-volume
- * LLM path in the app and was previously the largest unmeasured line on
- * the bill), or null when the key is missing. Every caller must degrade
- * to its structured-failure path instead of letting the SDK throw an
+ * without losing the user's translation — including when the key is missing
+ * (`tryGetOpenRouter` returns null), instead of letting the SDK throw an
  * opaque error mid-call.
  */
-function openrouterClient(): ReturnType<typeof createOpenRouter> | null {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) return null;
-  return createOpenRouter({ apiKey, extraBody: OPENROUTER_USAGE_ACCOUNTING });
-}
-
 export async function translateTextWithLLM(
   args: TranslationPromptArgs & LlmCallConfig,
 ): Promise<LlmTranslationResult> {
-  const openrouter = openrouterClient();
+  const openrouter = tryGetOpenRouter();
   if (!openrouter) {
     return {
       ok: false,
@@ -504,18 +492,6 @@ export async function translateTextWithLLM(
       telemetry,
     };
   }
-
-  console.log('[translationLLM] ok', {
-    sourceLang: args.sourceLang,
-    targetLang: args.targetLang,
-    model: args.model,
-    effort,
-    elapsedMs,
-    inputTokens,
-    outputTokens,
-    srcLen: args.text.length,
-    mtLen: mt.length,
-  });
 
   return { ok: true, text: mt, inputTokens, outputTokens, telemetry };
 }
@@ -702,7 +678,7 @@ export async function translateBestOfN(
 
   // Null is unreachable in practice. A missing key already failed every
   // candidate above, but degrade to the anchor pick instead of an SDK crash.
-  const openrouter = openrouterClient();
+  const openrouter = tryGetOpenRouter();
 
   let pickedText: string | null = null;
   let judgeFallback = openrouter === null;

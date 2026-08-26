@@ -257,25 +257,22 @@ const llmJobArgsValidator = v.object({
   retranslationAuditId: v.optional(v.id('cardEditRetranslations')),
 });
 
-/** onComplete context: everything the Google fallback needs to run. */
-const llmCompletionContextValidator = v.object({
-  textId: v.id('texts'),
-  sourceLanguage: v.string(),
-  targetLanguage: v.string(),
-  text: v.string(),
-  audioSpeakerGender: v.optional(v.string()),
-  replaceExisting: v.optional(v.boolean()),
-  preferredRegionVariant: v.optional(v.string()),
-  skipTts: v.optional(v.boolean()),
-  priority: v.optional(ttsPriorityValidator),
-  llmPriority: v.optional(llmPriorityValidator),
-  // Carried so the completion handler can resolve the audit row itself — a
-  // fallback handoff and a terminal failure both land here, never in the
-  // worker. (`userSuggestedTranslation` is deliberately still absent; see the
-  // note on it above.)
-  translationReason: v.optional(translationReasonValidator),
-  retranslationAuditId: v.optional(v.id('cardEditRetranslations')),
-});
+/**
+ * onComplete context: everything the Google fallback needs to run — the job
+ * args minus the fields that must not survive the handoff. `ruleOverride`
+ * and `claimId` are meaningful only to the LLM worker run they were stamped
+ * for (the completion handler re-resolves the claim itself), and omitting
+ * `userSuggestedTranslation` keeps it structurally impossible for a
+ * suggestion to leak down the Google path (see the notes on each field
+ * above). `translationReason` and `retranslationAuditId` stay: the
+ * completion handler resolves the audit row itself — a fallback handoff and
+ * a terminal failure both land here, never in the worker.
+ */
+const llmCompletionContextValidator = llmJobArgsValidator.omit(
+  'ruleOverride',
+  'claimId',
+  'userSuggestedTranslation',
+);
 
 type LlmJobArgs = Infer<typeof llmJobArgsValidator>;
 
@@ -321,43 +318,24 @@ export const enqueueLlmTranslation = internalMutation({
     // Priority = pool choice: interactive jobs go to llmPool, warm sweeps to
     // the low-parallelism llmWarmPool (see workpools.ts). Both pools share
     // onLlmTranslationComplete, so claim lifetime is identical either way.
-    const pool = args.llmPriority === 'background' ? llmWarmPool : llmPool;
+    //
+    // Both payloads are derived from `args` by omission, so a field added to
+    // `llmJobArgsValidator` flows through the enqueue without a matching
+    // hand-written spread line. `llmPriority` is deliberately not forwarded
+    // to the worker, and the worker's `claimId` is re-stamped from this
+    // transaction's claim lookup (see the field comments on the validator).
+    const { llmPriority, ...workerArgs } = args;
+    const { ruleOverride, claimId, userSuggestedTranslation, ...completionContext } =
+      args;
+    const pool = llmPriority === 'background' ? llmWarmPool : llmPool;
     const workId: string = await pool.enqueueAction(
       ctx,
       internal.features.llmTranslationQueue.processLlmTranslationForCard,
-      {
-        textId: args.textId,
-        sourceLanguage: args.sourceLanguage,
-        targetLanguage: args.targetLanguage,
-        text: args.text,
-        audioSpeakerGender: args.audioSpeakerGender,
-        replaceExisting: args.replaceExisting,
-        ruleOverride: args.ruleOverride,
-        claimId: claim?._id,
-        preferredRegionVariant: args.preferredRegionVariant,
-        skipTts: args.skipTts,
-        priority: args.priority,
-        userSuggestedTranslation: args.userSuggestedTranslation,
-        translationReason: args.translationReason,
-        retranslationAuditId: args.retranslationAuditId,
-      },
+      { ...workerArgs, claimId: claim?._id },
       {
         onComplete:
           internal.features.llmTranslationQueue.onLlmTranslationComplete,
-        context: {
-          textId: args.textId,
-          sourceLanguage: args.sourceLanguage,
-          targetLanguage: args.targetLanguage,
-          text: args.text,
-          audioSpeakerGender: args.audioSpeakerGender,
-          replaceExisting: args.replaceExisting,
-          preferredRegionVariant: args.preferredRegionVariant,
-          skipTts: args.skipTts,
-          priority: args.priority,
-          llmPriority: args.llmPriority,
-          translationReason: args.translationReason,
-          retranslationAuditId: args.retranslationAuditId,
-        },
+        context: completionContext,
       },
     );
 

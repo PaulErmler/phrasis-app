@@ -1,7 +1,9 @@
 import { v } from 'convex/values';
 import { internalMutation, internalQuery } from '../_generated/server';
-import type { MutationCtx, QueryCtx } from '../_generated/server';
-import { assertTestHooksEnabled } from '../lib/testHooks';
+import {
+  assertTestHooksEnabled,
+  requireUserIdByEmail,
+} from '../lib/testHooks';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
 
@@ -25,19 +27,6 @@ import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
  * payload, and every exclusion are covered by convex-test in
  * convex/tests/features/scheduling.test.ts.
  */
-
-async function requireUserIdByEmail(
-  ctx: QueryCtx | MutationCtx,
-  rawEmail: string,
-): Promise<string> {
-  const email = rawEmail.trim().toLowerCase();
-  const profile = await ctx.db
-    .query('userProfiles')
-    .withIndex('by_email', (q) => q.eq('email', email))
-    .first();
-  if (!profile) throw new Error(`No userProfiles row for "${email}"`);
-  return profile.userId;
-}
 
 /**
  * Find a card in the user's active course that is backed by a SHARED

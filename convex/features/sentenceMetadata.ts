@@ -11,8 +11,8 @@ import {
 } from '../types';
 import { trackException } from '../analytics';
 import { generateText } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { OPENROUTER_MODELS, OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
+import { OPENROUTER_MODELS } from '../config/aiModels';
+import { getOpenRouter } from '../lib/openrouter';
 import {
   captureGeneration,
   openrouterCostUsd,
@@ -313,10 +313,7 @@ export const fetchSentenceMetadata = internalAction({
 
       const userPrompt = `Renderings of the same sentence:\n${renderings}\n\nReturn the metadata JSON now.`;
 
-      const openrouter = createOpenRouter({
-        apiKey: process.env.OPENROUTER_API_KEY,
-        extraBody: OPENROUTER_USAGE_ACCOUNTING,
-      });
+      const openrouter = getOpenRouter();
 
       const startedAt = Date.now();
       const { text, usage, providerMetadata } = await generateText({

@@ -1532,28 +1532,6 @@ export const advanceFreePlayCard = mutation({
 });
 
 /**
- * @deprecated Back-compat alias for client bundles built before the
- * radio→free-play rename (open tabs, cached PWA/Capacitor builds). Same
- * behavior as `advanceFreePlayCard`, but keeps the old name and the old
- * `nextRadioRoundCounter` return field. Remove once the deploy has soaked.
- * Tracked in `.devtool/features/remove-advance-radio-card-alias-2026-08-03.md`.
- */
-export const advanceRadioCard = mutation({
-  args: {
-    cardId: v.id('cards'),
-    timezone: v.string(),
-    timeSpentMs: v.optional(v.number()),
-  },
-  returns: v.object({
-    nextRadioRoundCounter: v.number(),
-  }),
-  handler: async (ctx, args) => {
-    const { nextRoundCounter } = await advanceFreePlayCardImpl(ctx, args);
-    return { nextRadioRoundCounter: nextRoundCounter };
-  },
-});
-
-/**
  * Whether the user's active deck has at least one playable card
  * (non-hidden, non-mastered). Used by the home screen to gate the free-play
  * button (Radio / Free Study), free play is meaningless on an empty deck.

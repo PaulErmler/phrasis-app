@@ -15,7 +15,7 @@ import { getCourseSettings } from '../../db/courseSettings';
 import { consumeQuota } from '../../usage/helpers';
 import { CHAT_CREDIT_USD_STEP, CREDIT_COSTS, FEATURE_IDS } from '../featureIds';
 import { agent, AGENT_TOOLS, createMarkAlsoCorrectTool } from './agent';
-import type { Doc, Id } from '../../_generated/dataModel';
+import type { Doc } from '../../_generated/dataModel';
 import { THREAD_MESSAGE_LIMIT, MAX_MESSAGE_LENGTH } from './constants';
 import { trackEvent } from '../../db/stats/dailyStats';
 import { EVENTS, track, trackException } from '../../analytics';
@@ -25,14 +25,13 @@ import {
   openrouterGenerationId,
 } from '../../lib/posthogAi';
 import { generateText, type ModelMessage } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import {
   OPENROUTER_CHAT_MAX_OUTPUT_TOKENS,
   OPENROUTER_CHAT_PROVIDER_OPTIONS,
   OPENROUTER_INPUT_CACHE_CONTROL,
   OPENROUTER_MODELS,
-  OPENROUTER_USAGE_ACCOUNTING,
 } from '../../config/aiModels';
+import { getOpenRouter } from '../../lib/openrouter';
 import {
   buildCardContextSection,
   buildDifficultySection,
@@ -654,13 +653,10 @@ export const generateThreadTitle = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
-      const openrouter = createOpenRouter({
-        apiKey: process.env.OPENROUTER_API_KEY,
-        // Makes OpenRouter report the actual USD cost of this call. Titles are
-        // cheap individually but fire once per thread, so they are worth a line
-        // on the cost dashboard rather than an unexplained gap.
-        extraBody: OPENROUTER_USAGE_ACCOUNTING,
-      });
+      // Usage accounting (the factory default) matters even here: titles are
+      // cheap individually but fire once per thread, so they are worth a line
+      // on the cost dashboard rather than an unexplained gap.
+      const openrouter = getOpenRouter();
       const startedAt = Date.now();
       const { text, usage, providerMetadata } = await generateText({
         model: openrouter(OPENROUTER_MODELS.threadTitle),

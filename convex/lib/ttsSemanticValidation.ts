@@ -9,17 +9,12 @@
  */
 
 import { generateText } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { OPENROUTER_MODELS, OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
+import { OPENROUTER_MODELS } from '../config/aiModels';
+import { getOpenRouter } from './openrouter';
 import { openrouterCostUsd, openrouterGenerationId } from './posthogAi';
 import { stripJsonFences } from './llmJson';
 
 export type SemanticMatchResult = 'match' | 'mismatch' | 'error';
-
-const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  extraBody: OPENROUTER_USAGE_ACCOUNTING,
-});
 
 /**
  * What one validator call cost. Reported through a caller-supplied sink rather
@@ -92,6 +87,9 @@ export async function textsMatchSemantic(
 ): Promise<SemanticMatchResult> {
   const startedAt = Date.now();
   try {
+    // Inside the try so a missing key degrades to 'error' like any other
+    // validator failure.
+    const openrouter = getOpenRouter();
     const { text, usage, providerMetadata } = await generateText({
       model: openrouter(OPENROUTER_MODELS.ttsValidation),
       system: SYSTEM_PROMPT,

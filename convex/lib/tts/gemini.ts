@@ -239,12 +239,7 @@ export const geminiTts: TTSProvider = {
     // separated by a silence gap (~10% of clips). Strip it on the raw PCM using
     // only the energy envelope, no STT/word-timings, before transcoding. No-op
     // for the ~90% of clips without one (returns the same bytes). See tailTrim.ts.
-    const { pcm: cleaned, trimmed } = trimTailHiccup(pcm, PCM_SAMPLE_RATE);
-    if (trimmed) {
-      console.log(
-        `[geminiTts] trimmed tail hiccup for "${input.text.slice(0, 40)}"`,
-      );
-    }
+    const { pcm: cleaned } = trimTailHiccup(pcm, PCM_SAMPLE_RATE);
 
     // Gemini emits headerless PCM; transcode to MP3 so the stored Blob matches
     // the other providers' output (google/azure both label it 'audio/mp3') and

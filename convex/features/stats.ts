@@ -1,13 +1,10 @@
 import { v } from 'convex/values';
 import { paginationOptsValidator } from 'convex/server';
-import { query, internalQuery, QueryCtx } from '../_generated/server';
+import { query, QueryCtx } from '../_generated/server';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
-import {
-  cardsByStateAndDueDate,
-  TRACK_AGGREGATES,
-} from '../db/stats/cardAggregates';
+import { TRACK_AGGREGATES } from '../db/stats/cardAggregates';
 import { originsForFilter } from '../lib/collections';
 import {
   studyContentFilterValidator,
@@ -31,10 +28,7 @@ import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import type { Doc } from '../_generated/dataModel';
 import { getDailyStats } from '../db/stats/dailyStats';
 import { getCourseSettings } from '../db/courseSettings';
-import {
-  EXTENDED_STATE_LABELS as STATE_LABELS,
-  type FsrsStateLabel,
-} from '../lib/fsrsStates';
+import { type FsrsStateLabel } from '../lib/fsrsStates';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
 import { normalizeLanguageCode } from '../../lib/languages';
 import { getTargetLanguageWordCounts } from '../db/stats/languageStats';
@@ -51,10 +45,6 @@ function isValidWeekString(s: string): boolean {
 
 function isValidMonthString(s: string): boolean {
   return /^\d{4}-\d{2}$/.test(s);
-}
-
-function isValidYearString(s: string): boolean {
-  return /^\d{4}$/.test(s);
 }
 
 // ============================================================================
@@ -600,279 +590,6 @@ export const getSentencesForWord = query({
       isDone: result.isDone,
       continueCursor: result.continueCursor,
     };
-  },
-});
-
-// ============================================================================
-// INTERNAL QUERIES, currently unused by the UI but retained for future use
-// (e.g. expanded stats views, admin dashboards, data exports).
-// These are internal so they don't pollute the public API surface.
-// ============================================================================
-
-/** Full dailyStats documents for a date range. */
-export const getStatsForRange = internalQuery({
-  args: {
-    startDate: v.string(),
-    endDate: v.string(),
-  },
-  handler: async (ctx, args) => {
-    if (!isValidDateString(args.startDate) || !isValidDateString(args.endDate)) return [];
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return [];
-
-    return ctx.db
-      .query('dailyStats')
-      .withIndex('by_userId_and_courseId_and_date', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id)
-          .gte('date', args.startDate).lte('date', args.endDate),
-      )
-      .take(400);
-  },
-});
-
-/** Weekly stats for a week range (ISO 8601 "YYYY-Www"). */
-export const getWeeklyStatsRange = internalQuery({
-  args: {
-    startWeek: v.string(),
-    endWeek: v.string(),
-  },
-  handler: async (ctx, args) => {
-    if (!isValidWeekString(args.startWeek) || !isValidWeekString(args.endWeek)) return [];
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return [];
-
-    return ctx.db
-      .query('weeklyStats')
-      .withIndex('by_userId_and_courseId_and_week', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id)
-          .gte('week', args.startWeek).lte('week', args.endWeek),
-      )
-      .take(60);
-  },
-});
-
-/** Yearly stats for a year range ("YYYY"). */
-export const getYearlyStatsRange = internalQuery({
-  args: {
-    startYear: v.string(),
-    endYear: v.string(),
-  },
-  handler: async (ctx, args) => {
-    if (!isValidYearString(args.startYear) || !isValidYearString(args.endYear)) return [];
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return [];
-
-    return ctx.db
-      .query('yearlyStats')
-      .withIndex('by_userId_and_courseId_and_year', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id)
-          .gte('year', args.startYear).lte('year', args.endYear),
-      )
-      .take(10);
-  },
-});
-
-/** All-time per-language totals. */
-export const getLanguageStats = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return [];
-
-    return ctx.db
-      .query('languageStats')
-      .withIndex('by_userId_and_courseId', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id),
-      )
-      .take(20);
-  },
-});
-
-/** Rating distribution (stillLearning, understood, again, hard, good, easy) for a date range. */
-export const getRatingDistribution = internalQuery({
-  args: {
-    startDate: v.string(),
-    endDate: v.string(),
-  },
-  handler: async (ctx, args) => {
-    if (!isValidDateString(args.startDate) || !isValidDateString(args.endDate)) return null;
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return null;
-
-    const rows = await ctx.db
-      .query('dailyStats')
-      .withIndex('by_userId_and_courseId_and_date', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id)
-          .gte('date', args.startDate).lte('date', args.endDate),
-      )
-      .take(400);
-
-    const totals = { stillLearning: 0, understood: 0, again: 0, hard: 0, good: 0, easy: 0 };
-    for (const row of rows) {
-      if (row.ratingCounts) {
-        for (const key of Object.keys(totals) as (keyof typeof totals)[]) {
-          totals[key] += row.ratingCounts[key] ?? 0;
-        }
-      }
-    }
-    return totals;
-  },
-});
-
-/** Accuracy curve by review depth (review number → average accuracy). */
-export const getAccuracyByReviewDepth = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return [];
-
-    const rows = await ctx.db
-      .query('reviewDepthAccuracy')
-      .withIndex('by_userId_and_courseId', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id),
-      )
-      .take(100);
-
-    return rows.map((r) => ({
-      reviewNumber: r.reviewNumber,
-      averageAccuracy: r.count > 0 ? r.accuracySum / r.count : 0,
-      count: r.count,
-    }));
-  },
-});
-
-/** Reviews broken down by card FSRS state for a date range. */
-export const getCardStateDistribution = internalQuery({
-  args: {
-    startDate: v.string(),
-    endDate: v.string(),
-  },
-  handler: async (ctx, args) => {
-    if (!isValidDateString(args.startDate) || !isValidDateString(args.endDate)) return null;
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return null;
-
-    const rows = await ctx.db
-      .query('dailyStats')
-      .withIndex('by_userId_and_courseId_and_date', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id)
-          .gte('date', args.startDate).lte('date', args.endDate),
-      )
-      .take(400);
-
-    const totals = { new: 0, learning: 0, review: 0, relearning: 0 };
-    for (const row of rows) {
-      if (row.reviewsByCardState) {
-        for (const key of Object.keys(totals) as (keyof typeof totals)[]) {
-          totals[key] += row.reviewsByCardState[key] ?? 0;
-        }
-      }
-    }
-    return totals;
-  },
-});
-
-/** Learning progress per collection (cards added/learned vs total). */
-export const getCollectionLearningProgress = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return [];
-
-    const rows = await ctx.db
-      .query('collectionProgress')
-      .withIndex('by_userId_and_courseId', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id),
-      )
-      .take(50);
-
-    return Promise.all(
-      rows.map(async (r) => {
-        const collection = await ctx.db.get(r.collectionId);
-        return {
-          collectionId: r.collectionId,
-          collectionName: collection?.name ?? 'Unknown',
-          cardsAdded: r.cardsAdded,
-          cardsLearned: r.cardsLearned ?? 0,
-          totalTexts: collection?.textCount ?? 0,
-        };
-      }),
-    );
-  },
-});
-
-/**
- * Card distribution across FSRS states (O(log n) via aggregates).
- *
- * Counted as whole `${deckId}:${state}` namespaces of `cardsByStateAndDueDate`,
- * which is exactly what a `deckId`-namespaced state aggregate would have held:
- * the two differ only in whether the due-date bound is applied, and here it
- * isn't. See `getDueCardCount` for the other half of that equivalence.
- */
-export const getCardMaturityDistribution = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return null;
-    const deck = await getDeckByCourseId(ctx, active.course._id);
-    if (!deck) return null;
-
-    const result: Record<string, number> = {};
-    for (const label of STATE_LABELS) {
-      result[label] = await cardsByStateAndDueDate.count(ctx, {
-        namespace: `${deck._id}:${label}`,
-      });
-    }
-    return result;
-  },
-});
-
-/**
- * Number of cards currently due for review (O(log n) via aggregates).
- *
- * Summed over every state namespace of `cardsByStateAndDueDate` rather than
- * read from one deck-wide tree. STATE_LABELS is `EXTENDED_STATE_LABELS`, so
- * `mastered` and `hidden` cards are included exactly as a deck-wide due
- * aggregate would have included them.
- */
-export const getDueCardCount = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return 0;
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return 0;
-    const deck = await getDeckByCourseId(ctx, active.course._id);
-    if (!deck) return 0;
-
-    const dueBounds = { upper: { key: Date.now(), inclusive: true } };
-    const perState = await Promise.all(
-      STATE_LABELS.map((label) =>
-        cardsByStateAndDueDate.count(ctx, {
-          namespace: `${deck._id}:${label}`,
-          bounds: dueBounds,
-        }),
-      ),
-    );
-    return perState.reduce((a, b) => a + b, 0);
   },
 });
 

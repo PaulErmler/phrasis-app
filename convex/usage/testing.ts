@@ -3,11 +3,14 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
-  type QueryCtx,
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { normalizePlans } from '../../lib/autumn/customer-shape';
 import { AUTUMN_API } from './autumnClient';
+import {
+  assertTestHooksEnabled,
+  requireUserIdByEmail,
+} from '../lib/testHooks';
 
 /**
  * E2E test hooks for the payment-overdue (dunning) flow. Every function
@@ -35,27 +38,6 @@ import { AUTUMN_API } from './autumnClient';
  * Used by e2e/billing-clock.spec.ts. The override stays for the cheap
  * dunning-UI spec that doesn't want minutes of clock advancing.
  */
-
-function assertTestHooksEnabled(): void {
-  if (process.env.E2E_TEST_HOOKS !== '1') {
-    throw new Error(
-      'E2E test hooks are disabled (set E2E_TEST_HOOKS=1 on a dev deployment)',
-    );
-  }
-}
-
-async function requireUserIdByEmail(
-  ctx: { db: QueryCtx['db'] },
-  rawEmail: string,
-): Promise<string> {
-  const email = rawEmail.trim().toLowerCase();
-  const profile = await ctx.db
-    .query('userProfiles')
-    .withIndex('by_email', (q) => q.eq('email', email))
-    .first();
-  if (!profile) throw new Error(`No userProfiles row for "${email}"`);
-  return profile.userId;
-}
 
 /** Resolve a user's id from their email via the userProfiles mirror. */
 export const resolveUserId = internalQuery({

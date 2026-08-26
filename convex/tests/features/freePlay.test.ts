@@ -753,54 +753,6 @@ describe("features/scheduling: free play", () => {
       expect(res.status).toBe("nothing_to_undo");
     });
   });
-
-  describe("advanceRadioCard: deprecated back-compat alias", () => {
-    /**
-     * Client bundles built before the radio→free-play rename (open tabs,
-     * cached PWA/Capacitor builds) still call `advanceRadioCard` and read
-     * `nextRadioRoundCounter`. The alias delegates to the shared impl and
-     * keeps the old return field name so those sessions survive the deploy.
-     */
-    it("advances the radio rotation and returns nextRadioRoundCounter", async () => {
-      const t = convexTest(schema, modules);
-      const { cardIds } = await seedFreePlayDeck(
-        t,
-        [{ counter: 0 }, { counter: 0, orderKey: 5 }],
-        "radio",
-      );
-      const asUser = t.withIdentity({ subject: "user_A" });
-      const res = await asUser.mutation(
-        api.features.scheduling.advanceRadioCard,
-        { cardId: cardIds[0], timezone: "UTC" },
-      );
-      expect(res).toEqual({ nextRadioRoundCounter: 1 });
-      const card = await t.run((ctx) => ctx.db.get(cardIds[0]));
-      expect(card!.radioRoundCounter).toBe(1);
-      expect(card!.freeStudyRoundCounter ?? 0).toBe(0);
-    });
-
-    it("matches advanceFreePlayCard behavior (same rotation, old field name)", async () => {
-      const t = convexTest(schema, modules);
-      const { cardIds } = await seedFreePlayDeck(
-        t,
-        [{ counter: 0 }, { counter: 0, orderKey: 5 }],
-        "radio",
-      );
-      const asUser = t.withIdentity({ subject: "user_A" });
-      const viaAlias = await asUser.mutation(
-        api.features.scheduling.advanceRadioCard,
-        { cardId: cardIds[0], timezone: "UTC" },
-      );
-      const viaNew = await asUser.mutation(
-        api.features.scheduling.advanceFreePlayCard,
-        { cardId: cardIds[0], timezone: "UTC" },
-      );
-      // Same monotonic counter sequence across the two entry points.
-      expect(viaNew.nextRoundCounter).toBeGreaterThan(
-        viaAlias.nextRadioRoundCounter,
-      );
-    });
-  });
 });
 
 // ----------------------------------------------------------------------------

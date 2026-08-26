@@ -1,7 +1,6 @@
 import { v, ConvexError } from 'convex/values';
 import {
   mutation,
-  query,
   internalMutation,
   type MutationCtx,
 } from '../_generated/server';
@@ -10,7 +9,6 @@ import { EVENTS, track } from '../analytics';
 import type { Doc, Id } from '../_generated/dataModel';
 import {
   requireAuthUserId,
-  getAuthUserId,
   getOnboardingProgress,
   insertUserSettings,
 } from '../db/users';
@@ -41,10 +39,6 @@ import type { TtsPriority } from '../types';
  *   lesson right after the wizard) can run instantly.
  * - `warmupOnboardingTranslations` is the manually-fired global warm-up
  *   that pre-translates the same content for every language upfront.
- * - `getInitialCardsReadiness` reports how many of the first cards have
- *   content ready: currently unused by the app (the old "customizing"
- *   screen polled it) but kept as a dashboard/debug probe for stuck
- *   onboarding content.
  */
 
 export const prepareLanguagePair = mutation({
@@ -662,94 +656,3 @@ export const finalizeOnboarding = mutation({
   },
 });
 
-/**
- * Polled by the customizing-loading screen. Returns counts of how many of the
- * first N cards in the user's active deck have translations + audio ready,
- * so the UI can show progress and gate the next step.
- */
-export const getInitialCardsReadiness = query({
-  args: { sampleSize: v.optional(v.number()) },
-  returns: v.object({
-    totalCards: v.number(),
-    translatedCards: v.number(),
-    audioReadyCards: v.number(),
-    sampleSize: v.number(),
-  }),
-  handler: async (ctx, { sampleSize = 3 }) => {
-    // Shared by every not-ready-yet early exit below; never mutated, only
-    // serialized on return.
-    const emptyReadiness = {
-      totalCards: 0,
-      translatedCards: 0,
-      audioReadyCards: 0,
-      sampleSize,
-    };
-
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      return emptyReadiness;
-    }
-
-    const settings = await ctx.db
-      .query('userSettings')
-      .withIndex('by_userId', (q) => q.eq('userId', userId))
-      .first();
-    const courseId = settings?.activeCourseId;
-    if (!courseId) {
-      return emptyReadiness;
-    }
-    const course = await ctx.db.get(courseId);
-    if (!course) {
-      return emptyReadiness;
-    }
-
-    const deck = await ctx.db
-      .query('decks')
-      .withIndex('by_courseId', (q) => q.eq('courseId', courseId))
-      .first();
-    if (!deck) {
-      return emptyReadiness;
-    }
-
-    const cards = await ctx.db
-      .query('cards')
-      .withIndex('by_deckId', (q) => q.eq('deckId', deck._id))
-      .take(sampleSize);
-
-    // TODO: nested N+1 over (sampleSize × targetLanguages.length). Fine while
-    // courses are single-target; if multi-target becomes common, batch the
-    // lookups by `textId` IN clauses or denormalise readiness onto cards.
-    let translated = 0;
-    let audio = 0;
-    for (const card of cards) {
-      // Translation present for every target language?
-      let allTranslated = true;
-      let allAudio = true;
-      for (const lang of course.targetLanguages) {
-        const tr = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('targetLanguage', lang),
-          )
-          .first();
-        if (!tr) allTranslated = false;
-        const a = await ctx.db
-          .query('audioRecordings')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('language', lang),
-          )
-          .first();
-        if (!a) allAudio = false;
-      }
-      if (allTranslated) translated++;
-      if (allAudio) audio++;
-    }
-
-    return {
-      totalCards: cards.length,
-      translatedCards: translated,
-      audioReadyCards: audio,
-      sampleSize,
-    };
-  },
-});

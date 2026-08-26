@@ -98,7 +98,7 @@ const paidProduct = {
 /**
  * A real payer's customer payload. NOT `[freeProduct, paidProduct]`: a
  * customer who subscribes to a paid tier no longer holds `free` (verified in
- * the sandbox, documentation/autumn-usage-tracking.md). The earlier fixture
+ * the sandbox, docs/architecture/autumn-usage-tracking.md). The earlier fixture
  * shape masked the cancel-to-Free routing bug: with `free` in `products`,
  * `targetIsHeld` was true and the cancel looked legacy-routed when for real
  * payers it was not.

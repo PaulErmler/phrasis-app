@@ -175,6 +175,9 @@ export const AGENT_TOOLS = {
 
 export const agent: Agent = new Agent(components.agent, {
   name: 'Language Teacher',
+  // Direct SDK construction, not lib/openrouter's getOpenRouter(): this runs
+  // at module scope, where an eager missing-key throw would fail analysis for
+  // every function in the file. The SDK loads the key lazily at request time.
   languageModel: createOpenRouter({
     apiKey: process.env.OPENROUTER_API_KEY,
     extraBody: OPENROUTER_CHAT_EXTRA_BODY,
