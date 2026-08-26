@@ -8,6 +8,7 @@ import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
 import { HomeChatInput } from '@/components/chat/HomeChatInput';
 import { SegmentedHomeSection } from '@/components/app/segmented/SegmentedHomeSection';
 import { ProgressStatsCard } from '@/components/app/ProgressStatsCard';
+import { WorkloadForecastCard } from '@/components/app/forecast/WorkloadForecastCard';
 import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { useTutorial } from '@/lib/tutorials/use-tutorial';
@@ -199,6 +200,10 @@ export function HomeView({
           courseId={courseSettings?.courseId}
           hasPlayableCards={hasPlayableCards ?? true}
         />
+
+        {/* 7-day workload forecast. Hidden with the due-count pills
+            (hideDueCounts); pauses its subscription while home is hidden. */}
+        <WorkloadForecastCard skip={isHidden} />
 
         {/* Content actions */}
         <div className="card-surface space-y-2 p-3">

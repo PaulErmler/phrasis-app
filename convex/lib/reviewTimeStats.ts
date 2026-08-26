@@ -38,7 +38,7 @@ export function reviewTimeApplyPatch(
 ): ReviewTimeStatsPatch {
   if (timeSpentMs === undefined) return {};
   const t = clampReviewTimeMs(timeSpentMs);
-  const stats = card.reviewTimeStats ?? {};
+  const stats: ReviewTimeStats = card.reviewTimeStats ?? {};
   const entry = stats[mode];
   const next = entry
     ? {

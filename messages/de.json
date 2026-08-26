@@ -141,7 +141,7 @@
       "uiSettings": {
         "title": "UI-Einstellungen",
         "hideDueCounts": "Ausstehende Wiederholungen ausblenden",
-        "hideDueCountsDescription": "Die Anzahl neuer und fälliger Sätze nicht anzeigen. Hilfreich, wenn eine große Warteschlange entmutigend wirkt."
+        "hideDueCountsDescription": "Die Anzahl neuer und fälliger Sätze sowie die 7-Tage-Vorschau nicht anzeigen. Hilfreich, wenn eine große Warteschlange entmutigend wirkt."
       },
       "contactPrompt": {
         "title": "Brauchst du noch etwas?",
@@ -386,6 +386,31 @@
     "dueCounts": {
       "new": "{count} neu",
       "review": "{count} wiederholen"
+    },
+    "workload": {
+      "title": "Demnächst fällig",
+      "today": "Heute",
+      "approxToday": "≈ {value} heute",
+      "cardsToday": "{count} heute ≈ {time}",
+      "thisWeek": "{value} diese Woche",
+      "cardsShort": "{count} Karten",
+      "overdue": "{count} überfällig",
+      "overdueTime": "≈ {value} überfällig",
+      "paceLine": "übliches Pensum {value}/Tag",
+      "legendOverdue": "Überfällig",
+      "legendYoung": "Jung",
+      "legendMature": "Gefestigt",
+      "legendReturns": "Gesch. Rückkehrer",
+      "legendWhatIf": "+{count} neu",
+      "legendPace": "Übliches Pensum (14-Tage-Schnitt)",
+      "stepperLabel": "Hinzufügen von Karten simulieren",
+      "stepperFewer": "Weniger Karten",
+      "stepperMore": "Mehr Karten",
+      "stepperValue": "+{count} Karten",
+      "whatIfHint": "Erhöhe den Wert, um zusätzliche Last zu sehen",
+      "whatIfNote": "≈ +{reviews} Wiederholungen · +{time} diese Woche",
+      "empty": "Noch nichts geplant — füge ein paar Sätze hinzu, um zu starten.",
+      "dayAria": "{day}: {scheduled} Karten geplant, etwa {estimated} weitere geschätzt, etwa {minutes} Minuten"
     },
     "dailyGoal": {
       "label": "Tagesziel",
@@ -1346,6 +1371,10 @@
       "dueCounts": {
         "title": "Was auf dich wartet",
         "description": "Diese Pillen zeigen, wie viele Sätze bei deiner aktuellen Inhaltsauswahl neu sind und wie viele zur Wiederholung anstehen."
+      },
+      "workload": {
+        "title": "Deine Woche im Blick",
+        "description": "Dieses Diagramm zeigt, wie viel Wiederholungszeit die nächsten sieben Tage bringen — und was das Hinzufügen weiterer Sätze daran ändern würde."
       },
       "projections": {
         "title": "Deine Prognose",

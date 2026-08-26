@@ -38,6 +38,39 @@ test.describe("settings", () => {
     });
   });
 
+  test("hiding due counts hides the workload forecast with the pills", async ({
+    page,
+  }) => {
+    // The shared fixture user has the preference unset (= shown).
+    await page.goto("/app");
+    await expect(page.getByTestId("workload-forecast")).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await page.goto("/app/settings");
+    const toggle = page.locator("#hideDueCounts");
+    await expect(toggle).toBeVisible({ timeout: 15_000 });
+    await toggle.click();
+
+    await page.goto("/app");
+    await expect(page.getByTestId("workload-forecast")).toHaveCount(0, {
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("due-counts-pills")).toHaveCount(0);
+
+    // Restore the preference so downstream shared-fixture specs see the
+    // default state again (same courtesy as the change-password test).
+    await page.goto("/app/settings");
+    await expect(page.locator("#hideDueCounts")).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.locator("#hideDueCounts").click();
+    await page.goto("/app");
+    await expect(page.getByTestId("workload-forecast")).toBeVisible({
+      timeout: 15_000,
+    });
+  });
+
   test("change password via the settings dialog", async ({ page }) => {
     // Three live better-auth round trips (wrong password, change, change
     // back) plus the consent-banner wait don't reliably fit the 30s default.

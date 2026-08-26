@@ -141,7 +141,7 @@
       "uiSettings": {
         "title": "UI Settings",
         "hideDueCounts": "Hide remaining reviews",
-        "hideDueCountsDescription": "Don't show how many sentences are new or waiting. Useful if a large queue feels discouraging."
+        "hideDueCountsDescription": "Don't show how many sentences are new or waiting, or the 7-day workload forecast. Useful if a large queue feels discouraging."
       },
       "contactPrompt": {
         "title": "Need anything?",
@@ -386,6 +386,31 @@
     "dueCounts": {
       "new": "{count} new",
       "review": "{count} review"
+    },
+    "workload": {
+      "title": "Coming up",
+      "today": "Today",
+      "approxToday": "≈ {value} today",
+      "cardsToday": "{count} today ≈ {time}",
+      "thisWeek": "{value} this week",
+      "cardsShort": "{count} cards",
+      "overdue": "{count} overdue",
+      "overdueTime": "≈ {value} overdue",
+      "paceLine": "usual pace {value}/day",
+      "legendOverdue": "Overdue",
+      "legendYoung": "Young",
+      "legendMature": "Mature",
+      "legendReturns": "Est. returns",
+      "legendWhatIf": "+{count} new",
+      "legendPace": "Usual pace (14-day avg)",
+      "stepperLabel": "Preview adding cards",
+      "stepperFewer": "Fewer cards",
+      "stepperMore": "More cards",
+      "stepperValue": "+{count} cards",
+      "whatIfHint": "Step up to preview added load",
+      "whatIfNote": "≈ +{reviews} reviews · +{time} this week",
+      "empty": "Nothing scheduled yet — add a few sentences to get started.",
+      "dayAria": "{day}: {scheduled} cards scheduled, about {estimated} more estimated, about {minutes} minutes"
     },
     "dailyGoal": {
       "label": "Daily goal",
@@ -1346,6 +1371,10 @@
       "dueCounts": {
         "title": "What’s waiting for you",
         "description": "These pills show how many sentences are new and how many are due for review with your current content selection."
+      },
+      "workload": {
+        "title": "Your week ahead",
+        "description": "This chart shows how much review time each of the next seven days will bring — and what adding more sentences would do to it."
       },
       "projections": {
         "title": "Your forecast",
