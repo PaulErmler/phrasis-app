@@ -38,6 +38,9 @@ export interface TutorialContext {
   reviewMode?: 'audio' | 'full';
   /** When true, skip the due-counts tour step — those pills are not on screen. */
   hideDueCounts?: boolean;
+  /** When true, skip the workload-forecast tour step — the card is not on
+   * screen (its own preference, independent of the pills). */
+  hideWorkloadForecast?: boolean;
 }
 
 export type TutorialFactory = (

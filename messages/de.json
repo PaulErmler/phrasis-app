@@ -141,7 +141,9 @@
       "uiSettings": {
         "title": "UI-Einstellungen",
         "hideDueCounts": "Ausstehende Wiederholungen ausblenden",
-        "hideDueCountsDescription": "Die Anzahl neuer und fälliger Sätze sowie die 7-Tage-Vorschau nicht anzeigen. Hilfreich, wenn eine große Warteschlange entmutigend wirkt."
+        "hideDueCountsDescription": "Die Anzahl neuer und fälliger Sätze nicht anzeigen. Hilfreich, wenn eine große Warteschlange entmutigend wirkt.",
+        "hideWorkloadForecast": "Pensum-Vorschau ausblenden",
+        "hideWorkloadForecastDescription": "Die 7-Tage-Vorschau der anstehenden Wiederholungszeit auf dem Startbildschirm nicht anzeigen."
       },
       "contactPrompt": {
         "title": "Brauchst du noch etwas?",

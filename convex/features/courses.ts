@@ -162,6 +162,7 @@ export const getUserSettings = query({
       pinnedCardActions: v.optional(v.array(v.string())),
       analyticsConsent: v.optional(v.boolean()),
       hideDueCounts: v.optional(v.boolean()),
+      hideWorkloadForecast: v.optional(v.boolean()),
     }),
     v.null(),
   ),
@@ -1351,13 +1352,18 @@ export const updatePinnedCardActions = mutation({
 export const updateUserSettings = mutation({
   args: {
     hideDueCounts: v.optional(v.boolean()),
+    hideWorkloadForecast: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
-    const patch: { hideDueCounts?: boolean } = {};
+    const patch: { hideDueCounts?: boolean; hideWorkloadForecast?: boolean } =
+      {};
     if (args.hideDueCounts !== undefined) {
       patch.hideDueCounts = args.hideDueCounts;
+    }
+    if (args.hideWorkloadForecast !== undefined) {
+      patch.hideWorkloadForecast = args.hideWorkloadForecast;
     }
     if (Object.keys(patch).length === 0) return null;
 

@@ -71,10 +71,12 @@ export function HomeView({
     // Anchors the free-play step to the button that actually renders:
     // Radio (Shadowing) vs Free Study (Writing). Matches the face chosen in
     // StartLearningButton, which sets `data-tutorial` from the same field.
-    // `hideDueCounts` drops the pills step when those pills are not on screen.
+    // `hideDueCounts` drops the pills step when those pills are not on
+    // screen; `hideWorkloadForecast` does the same for the forecast step.
     context: {
       reviewMode: courseSettings?.reviewMode ?? 'audio',
       hideDueCounts: userSettings?.hideDueCounts === true,
+      hideWorkloadForecast: userSettings?.hideWorkloadForecast === true,
     },
   });
 

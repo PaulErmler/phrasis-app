@@ -38,35 +38,66 @@ test.describe("settings", () => {
     });
   });
 
-  test("hiding due counts hides the workload forecast with the pills", async ({
+  test("the workload forecast has its own visibility switch, independent of due counts", async ({
     page,
   }) => {
-    // The shared fixture user has the preference unset (= shown).
+    // Ensure a known starting state: both preferences off. (Fixture users
+    // walk real onboarding, which defaults hideDueCounts to true.)
+    await page.goto("/app/settings");
+    const dueToggle = page.locator("#hideDueCounts");
+    const forecastToggle = page.locator("#hideWorkloadForecast");
+    await expect(dueToggle).toBeVisible({ timeout: 15_000 });
+    await expect(forecastToggle).toBeVisible();
+    for (const toggle of [dueToggle, forecastToggle]) {
+      if ((await toggle.getAttribute("aria-checked")) === "true") {
+        await toggle.click();
+        await expect
+          .poll(async () => toggle.getAttribute("aria-checked"), {
+            timeout: 8_000,
+          })
+          .toBe("false");
+      }
+    }
+
+    // The forecast card's presence also depends on the minimum-activity
+    // gate (data, not preference), so record it rather than assume it —
+    // the invariant under test is that hideDueCounts does NOT change it.
     await page.goto("/app");
-    await expect(page.getByTestId("workload-forecast")).toBeVisible({
+    await expect(page.getByTestId("due-counts-pills")).toBeVisible({
       timeout: 20_000,
     });
+    const forecastShown =
+      (await page.getByTestId("workload-forecast").count()) > 0;
 
+    // Hiding due counts hides the pills but leaves the forecast alone.
     await page.goto("/app/settings");
-    const toggle = page.locator("#hideDueCounts");
-    await expect(toggle).toBeVisible({ timeout: 15_000 });
-    await toggle.click();
+    await dueToggle.click();
+    await page.goto("/app");
+    await expect(page.getByTestId("due-counts-pills")).toHaveCount(0, {
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("workload-forecast")).toHaveCount(
+      forecastShown ? 1 : 0,
+    );
 
+    // The forecast's own switch removes the card (whatever the gate says).
+    await page.goto("/app/settings");
+    await expect(forecastToggle).toBeVisible({ timeout: 15_000 });
+    await forecastToggle.click();
     await page.goto("/app");
     await expect(page.getByTestId("workload-forecast")).toHaveCount(0, {
       timeout: 15_000,
     });
-    await expect(page.getByTestId("due-counts-pills")).toHaveCount(0);
 
-    // Restore the preference so downstream shared-fixture specs see the
-    // default state again (same courtesy as the change-password test).
+    // Restore both preferences so downstream shared-fixture specs see the
+    // state this spec started from (same courtesy as the change-password
+    // test).
     await page.goto("/app/settings");
-    await expect(page.locator("#hideDueCounts")).toBeVisible({
-      timeout: 15_000,
-    });
-    await page.locator("#hideDueCounts").click();
+    await expect(dueToggle).toBeVisible({ timeout: 15_000 });
+    await dueToggle.click();
+    await forecastToggle.click();
     await page.goto("/app");
-    await expect(page.getByTestId("workload-forecast")).toBeVisible({
+    await expect(page.getByTestId("due-counts-pills")).toBeVisible({
       timeout: 15_000,
     });
   });

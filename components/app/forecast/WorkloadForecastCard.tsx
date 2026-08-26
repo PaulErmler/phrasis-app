@@ -14,10 +14,11 @@ import {
 const WORKLOAD_UNIT_DEFAULT: WorkloadUnit = 'time';
 
 /**
- * Home-screen 7-day workload forecast. Hidden together with the due-count
- * pills (`hideDueCounts`), and `skip` pauses the live query while the home
- * view is kept-mounted but off screen — the same discipline as
- * DueCountsPills.
+ * Home-screen 7-day workload forecast. Hidden via its own
+ * `hideWorkloadForecast` preference (independent of the due-count pills,
+ * which new accounts hide by default) or below the minimum-activity gate;
+ * `skip` pauses the live query while the home view is kept-mounted but off
+ * screen — the same discipline as DueCountsPills.
  */
 export function WorkloadForecastCard({ skip }: { skip?: boolean }) {
   const {

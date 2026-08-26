@@ -43,12 +43,13 @@ export function createHomeTour(
     tourStep(t, 'home.projections', '[data-tutorial="projections"]', 'bottom', 'center'),
     // The 7-day workload card sits BELOW the progress card, so this step
     // comes after both progress-card steps — the tour scrolls monotonically
-    // instead of jumping down and back up. Gated the same way as the pills,
-    // and the card also hides itself below the minimum-activity gate
-    // (MIN_STARTED_CARDS_FOR_FORECAST) — that lives in query data this
-    // factory can't see, so the step additionally drops at launch when the
-    // card isn't mounted.
-    ...(ctx?.hideDueCounts === true
+    // instead of jumping down and back up. Gated on the card's OWN
+    // preference (not hideDueCounts — the pills hide by default for new
+    // accounts, the forecast doesn't); the card also hides itself below the
+    // minimum-activity gate (MIN_STARTED_CARDS_FOR_FORECAST), which lives
+    // in query data this factory can't see, so the step additionally drops
+    // at launch when the card isn't mounted.
+    ...(ctx?.hideWorkloadForecast === true
       ? []
       : [
           {

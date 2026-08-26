@@ -695,6 +695,9 @@ describe("features/courses", () => {
       expect(settings?.pinnedCardActions).toEqual(["edit"]);
       expect(settings?.hasCompletedOnboarding).toBe(false);
       expect(settings?.hideDueCounts).toBe(true);
+      // Deliberately NOT defaulted: new accounts hide the pills but still
+      // see the workload forecast.
+      expect(settings?.hideWorkloadForecast).toBeUndefined();
     });
   });
 
@@ -760,6 +763,34 @@ describe("features/courses", () => {
       );
       expect(settings?.hideDueCounts).toBe(false);
       expect(settings?.hasCompletedOnboarding).toBe(false);
+    });
+
+    it("patches hideWorkloadForecast independently of hideDueCounts", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) =>
+        ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          hideDueCounts: true,
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.updateUserSettings, {
+        hideWorkloadForecast: true,
+      });
+      let settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      expect(settings?.hideWorkloadForecast).toBe(true);
+      expect(settings?.hideDueCounts).toBe(true);
+
+      await asUser.mutation(api.features.courses.updateUserSettings, {
+        hideWorkloadForecast: false,
+      });
+      settings = await asUser.query(api.features.courses.getUserSettings, {});
+      expect(settings?.hideWorkloadForecast).toBe(false);
+      expect(settings?.hideDueCounts).toBe(true);
     });
   });
 

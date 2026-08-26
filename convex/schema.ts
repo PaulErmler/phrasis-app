@@ -663,6 +663,10 @@ export default defineSchema({
     // unset on existing rows means show, so current users keep seeing counts
     // until they opt in from Preferences.
     hideDueCounts: v.optional(v.boolean()),
+    // Hide the home-screen 7-day workload forecast card. Deliberately
+    // independent of hideDueCounts (and NOT defaulted for new rows): new
+    // accounts hide the pills but still get the forecast. Unset = show.
+    hideWorkloadForecast: v.optional(v.boolean()),
   }).index('by_userId', ['userId']),
 
   // Onboarding progress table. Stores the user's onboarding answers.

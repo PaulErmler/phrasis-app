@@ -37,9 +37,10 @@ export type UseWorkloadForecastResult = {
   data: WorkloadForecastData | null;
   /** Extra load the current stepper value adds vs. adding nothing. */
   whatIfDelta: { reviews: number; minutes: number };
-  /** The user opted out via the hideDueCounts preference, or the course is
-   * below the minimum-activity gate (MIN_STARTED_CARDS_FOR_FORECAST) —
-   * either way the card renders nothing. */
+  /** The user opted out via the hideWorkloadForecast preference, or the
+   * course is below the minimum-activity gate
+   * (MIN_STARTED_CARDS_FOR_FORECAST) — either way the card renders
+   * nothing. */
   hidden: boolean;
   /** Rendering last-known data while the writing seed fills the aggregates. */
   isProvisional: boolean;
@@ -51,8 +52,9 @@ export type UseWorkloadForecastResult = {
 /**
  * Data + model plumbing for the home-screen workload forecast card.
  *
- * Composes the proven due-pills patterns: the `hideDueCounts` gate doubles
- * as a query skip; `now` is minute-quantized (no wall clock in queries);
+ * Composes the proven due-pills patterns: the `hideWorkloadForecast` gate
+ * doubles as a query skip; `now` is minute-quantized (no wall clock in
+ * queries);
  * `reviewMode`/`filter` are passed explicitly from the optimistically-updated
  * settings cache so the bars flip in the same frame as the home toggles; the
  * localStorage-backed query keeps a warm first paint (a stale payload still
@@ -65,7 +67,9 @@ export function useWorkloadForecast({
 }: { skip?: boolean } = {}): UseWorkloadForecastResult {
   const { courseSettings: settings, preloadedSettings } = useAppData();
   const userSettings = usePreloadedQuery(preloadedSettings);
-  const hidden = userSettings?.hideDueCounts === true;
+  // Own preference, independent of hideDueCounts: new accounts default the
+  // pills to hidden but should still get the forecast.
+  const hidden = userSettings?.hideWorkloadForecast === true;
 
   const filter = settings?.studyContentFilter ?? 'both';
   const reviewMode = settings?.reviewMode ?? 'audio';

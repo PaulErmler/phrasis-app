@@ -141,7 +141,9 @@
       "uiSettings": {
         "title": "UI Settings",
         "hideDueCounts": "Hide remaining reviews",
-        "hideDueCountsDescription": "Don't show how many sentences are new or waiting, or the 7-day workload forecast. Useful if a large queue feels discouraging."
+        "hideDueCountsDescription": "Don't show how many sentences are new or waiting. Useful if a large queue feels discouraging.",
+        "hideWorkloadForecast": "Hide workload forecast",
+        "hideWorkloadForecastDescription": "Don't show the 7-day forecast of upcoming review time on the home screen."
       },
       "contactPrompt": {
         "title": "Need anything?",

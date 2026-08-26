@@ -85,9 +85,14 @@ describe('createHomeTour: workload step', () => {
     expect(tour.steps[workloadIdx].skipIfMissing).toBe(true);
   });
 
-  it('is omitted together with the due-count pills', () => {
+  it('is gated by its own preference, not the pills preference', () => {
     expect(
-      elementsOf({ reviewMode: 'audio', hideDueCounts: true }),
+      elementsOf({ reviewMode: 'audio', hideWorkloadForecast: true }),
     ).not.toContain('[data-tutorial="workload-forecast"]');
+    // hideDueCounts alone leaves the forecast step in: new accounts hide
+    // the pills by default but still get the forecast.
+    const pillsHidden = elementsOf({ reviewMode: 'audio', hideDueCounts: true });
+    expect(pillsHidden).not.toContain('[data-tutorial="due-counts"]');
+    expect(pillsHidden).toContain('[data-tutorial="workload-forecast"]');
   });
 });

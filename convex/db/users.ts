@@ -44,6 +44,8 @@ export async function getUserSettings(
 /**
  * Insert a new `userSettings` row. New accounts hide due-count pills
  * (`hideDueCounts: true`); callers that pass the field explicitly win.
+ * `hideWorkloadForecast` is deliberately NOT defaulted — the workload
+ * forecast shows for new accounts even while the pills are hidden.
  * Existing rows are never backfilled — patch them in place instead.
  */
 export async function insertUserSettings(

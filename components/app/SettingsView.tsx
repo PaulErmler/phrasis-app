@@ -112,6 +112,27 @@ export function SettingsView({ activeView }: { activeView: View }) {
                   className="mt-0.5"
                 />
               </div>
+              <div className="settings-row">
+                <div className="space-y-0.5">
+                  <Label
+                    htmlFor="hideWorkloadForecast"
+                    className="text-sm font-medium"
+                  >
+                    {t('settings.uiSettings.hideWorkloadForecast')}
+                  </Label>
+                  <p className="text-muted-xs">
+                    {t('settings.uiSettings.hideWorkloadForecastDescription')}
+                  </p>
+                </div>
+                <Switch
+                  id="hideWorkloadForecast"
+                  checked={userSettings?.hideWorkloadForecast === true}
+                  onCheckedChange={(checked) => {
+                    void updateUserSettings({ hideWorkloadForecast: checked });
+                  }}
+                  className="mt-0.5"
+                />
+              </div>
             </CardContent>
           </Card>
 
