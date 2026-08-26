@@ -8,7 +8,11 @@ import { internal } from '../_generated/api';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { requireAuthUserId } from '../db/users';
-import { consumeQuota, releaseQuota } from '../usage/helpers';
+import {
+  consumeQuota,
+  quotaErrorCode,
+  releaseQuota,
+} from '../usage/helpers';
 import {
   AI_FEEDBACK_FREE_GRANT,
   AI_FEEDBACK_PAID_GRANT,
@@ -32,7 +36,8 @@ import {
   openrouterCostUsd,
   openrouterGenerationId,
 } from '../lib/posthogAi';
-import { languageName } from './chat/promptSections';
+import { languageName } from '../../lib/languages';
+import { stripJsonFences } from '../lib/llmJson';
 
 /**
  * TEMPORARY grader model override (Paul, 2026-08-26): trialing
@@ -314,23 +319,6 @@ export const storeAlternative = internalMutation({
   },
 });
 
-/**
- * ConvexError code from an error thrown across a `ctx.runMutation` boundary.
- * Depending on runtime (prod vs convex-test) the error may arrive as a
- * ConvexError, a plain object with `.data`, or a re-thrown Error whose
- * message embeds the serialized data, so all three shapes are read.
- */
-export function quotaErrorCode(error: unknown): string | undefined {
-  if (typeof error === 'object' && error !== null && 'data' in error) {
-    const data = (error as { data?: unknown }).data;
-    if (typeof data === 'object' && data !== null) {
-      return (data as { code?: string }).code;
-    }
-  }
-  const message = error instanceof Error ? error.message : '';
-  return /"code":\s*"([A-Z_]+)"/.exec(message)?.[1];
-}
-
 type ParsedFeedback = {
   verdict: LlmVerdict;
   corrected?: string;
@@ -344,10 +332,7 @@ type ParsedFeedback = {
  * caller degrades to `verdict: 'error'` instead of trusting garbage.
  */
 export function parseFeedbackResponse(raw: string): ParsedFeedback | null {
-  const cleaned = raw
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/, '')
-    .trim();
+  const cleaned = stripJsonFences(raw);
   let parsed: unknown;
   try {
     parsed = JSON.parse(cleaned);

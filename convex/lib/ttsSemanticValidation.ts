@@ -12,6 +12,7 @@ import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_MODELS, OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
 import { openrouterCostUsd, openrouterGenerationId } from './posthogAi';
+import { stripJsonFences } from './llmJson';
 
 export type SemanticMatchResult = 'match' | 'mismatch' | 'error';
 
@@ -105,10 +106,7 @@ export async function textsMatchSemantic(
       generationId: openrouterGenerationId(providerMetadata),
     });
 
-    const cleaned = text
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/, '')
-      .trim();
+    const cleaned = stripJsonFences(text);
 
     const parsed: unknown = JSON.parse(cleaned);
     if (

@@ -2,14 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 import { DueCountsPills } from '@/components/app/DueCountsPills';
-import { StatePill } from '@/components/app/learning/ProgressDisplay';
-import { REVIEWS_CAP } from '@/lib/constants/dueCounts';
+import {
+  formatCappedCount,
+  mergedDueCount,
+  REVIEWS_CAP,
+} from '@/lib/constants/dueCounts';
 
 /**
  * The merged due count (learning + relearning + review) and its display
  * ceiling. Two surfaces show the same number — the home pills here and
- * learning mode's StatePill — and both must merge the three states and cap
- * at REVIEWS_CAP, or they disagree exactly when the number is largest.
+ * learning mode's StatePill — and both now render the SAME shared functions
+ * (lib/constants/dueCounts), so the rule itself is tested once as pure
+ * functions below instead of exercising each surface's private copy.
  */
 
 const useQueryMock = vi.fn();
@@ -87,28 +91,17 @@ describe('DueCountsPills', () => {
   });
 });
 
-describe('StatePill (learning-mode surface)', () => {
-  it('caps at the same ceiling with the same rendering', () => {
-    render(
-      <StatePill
-        label="review"
-        value={150}
-        colorClass="text-success"
-        cap={REVIEWS_CAP}
-      />,
-    );
-    expect(screen.getByText(`${REVIEWS_CAP}+`)).toBeTruthy();
+describe('mergedDueCount / formatCappedCount (the shared rule both surfaces render)', () => {
+  it('merges the three review states', () => {
+    expect(mergedDueCount({ learning: 3, relearning: 2, review: 5 })).toBe(10);
+  });
+
+  it('caps past REVIEWS_CAP with a trailing plus', () => {
+    expect(formatCappedCount(150)).toBe(`${REVIEWS_CAP}+`);
   });
 
   it('shows the exact value at or below the cap', () => {
-    render(
-      <StatePill
-        label="review"
-        value={REVIEWS_CAP}
-        colorClass="text-success"
-        cap={REVIEWS_CAP}
-      />,
-    );
-    expect(screen.getByText(String(REVIEWS_CAP))).toBeTruthy();
+    expect(formatCappedCount(REVIEWS_CAP)).toBe(String(REVIEWS_CAP));
+    expect(formatCappedCount(7)).toBe('7');
   });
 });

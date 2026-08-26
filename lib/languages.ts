@@ -1715,6 +1715,11 @@ export function getLanguageByCode(code: string): Language | undefined {
   return LANGUAGE_BY_CODE.get(code);
 }
 
+/** English display name for a code, falling back to the code itself. */
+export function languageName(code: string): string {
+  return getLanguageByCode(code)?.name ?? code;
+}
+
 /**
  * Which TTS provider is active for the given language.
  * Defaults to 'google' when the language is not found so callers get a safe

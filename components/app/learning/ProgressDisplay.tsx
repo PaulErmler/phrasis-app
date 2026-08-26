@@ -22,7 +22,12 @@ import {
   setupMediaSession,
   setMediaSessionPlaybackState,
 } from '@/lib/audio/mediaSession';
-import { REVIEWS_CAP } from '@/lib/constants/dueCounts';
+import {
+  formatCappedCount,
+  mergedDueCount,
+  REVIEWS_CAP,
+} from '@/lib/constants/dueCounts';
+
 type CardCounts = {
   new: number;
   learning: number;
@@ -593,11 +598,7 @@ function CelebrationContent({
               />
               <StatePill
                 label={t('stateReview')}
-                value={
-                  cardCounts.learning +
-                  cardCounts.relearning +
-                  cardCounts.review
-                }
+                value={mergedDueCount(cardCounts)}
                 colorClass="text-success"
                 cap={REVIEWS_CAP}
               />
@@ -709,8 +710,7 @@ function StatCell({
   );
 }
 
-// Exported for the due-counts cap tests; only this file renders it.
-export function StatePill({
+function StatePill({
   label,
   value,
   colorClass,
@@ -721,7 +721,7 @@ export function StatePill({
   colorClass: string;
   cap?: number;
 }) {
-  const display = cap != null && value > cap ? `${cap}+` : String(value);
+  const display = cap != null ? formatCappedCount(value, cap) : String(value);
   // `min-w` enforces label separation. Relying on row-level `gap-x-*` alone
   // is fragile because each pill's intrinsic width tracks its label
   // ("review" ≈ 44 px, "new" ≈ 28 px), so the gap is between label edges

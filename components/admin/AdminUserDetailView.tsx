@@ -5,7 +5,7 @@ import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getLanguageByCode } from '@/lib/languages';
+import { languageName } from '@/lib/languages';
 import { formatTimeMs } from '@/lib/formatTime';
 import { StreakBadge, LastActiveCell } from './UsersTable';
 import { UserThreadsBrowser } from './UserThreadsBrowser';
@@ -13,7 +13,7 @@ import { UserTextsBrowser } from './UserTextsBrowser';
 import { AdminGuard } from './AdminGuard';
 
 function languageNames(codes: string[]): string {
-  return codes.map((c) => getLanguageByCode(c)?.name ?? c).join(', ');
+  return codes.map(languageName).join(', ');
 }
 
 export function AdminUserDetailView({ userId }: { userId: string }) {

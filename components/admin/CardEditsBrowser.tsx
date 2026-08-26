@@ -6,7 +6,8 @@ import { api } from '@/convex/_generated/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { getLanguageByCode, getTextDirection } from '@/lib/languages';
+import { getTextDirection, languageName } from '@/lib/languages';
+import type { CardEditKind, RetranslationStatus } from '@/convex/types';
 
 /**
  * QC feed for the card-edit audit log. Two questions per row: was the user's
@@ -15,16 +16,14 @@ import { getLanguageByCode, getTextDirection } from '@/lib/languages';
  * changed language renders as a pair rather than just the new wording.
  */
 
-type EditKind = 'manual_edit' | 'chat_also_correct' | 'flag';
-
-const KIND_FILTERS: Array<{ value: EditKind | 'all'; label: string }> = [
+const KIND_FILTERS: Array<{ value: CardEditKind | 'all'; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'manual_edit', label: 'Manual edit' },
   { value: 'chat_also_correct', label: 'Chat replace' },
   { value: 'flag', label: 'Flag' },
 ];
 
-const KIND_LABELS: Record<EditKind, string> = {
+const KIND_LABELS: Record<CardEditKind, string> = {
   manual_edit: 'manual edit',
   chat_also_correct: 'chat replace',
   flag: 'flag',
@@ -32,7 +31,7 @@ const KIND_LABELS: Record<EditKind, string> = {
 
 // Green = the retranslation landed. Amber = still in flight or deliberately
 // not attempted. Red = it was meant to land and didn't.
-const STATUS_TONE: Record<string, string> = {
+const STATUS_TONE: Record<RetranslationStatus, string> = {
   applied: 'text-emerald-600 dark:text-emerald-400',
   applied_audio_kept: 'text-emerald-600 dark:text-emerald-400',
   enqueued: 'text-amber-600 dark:text-amber-400',
@@ -45,16 +44,12 @@ const STATUS_TONE: Record<string, string> = {
   failed: 'text-destructive',
 };
 
-function languageName(code: string): string {
-  return getLanguageByCode(code)?.name ?? code;
-}
-
 function statusLabel(status: string): string {
   return status.replace(/_/g, ' ');
 }
 
 export function CardEditsBrowser() {
-  const [kind, setKind] = useState<EditKind | 'all'>('all');
+  const [kind, setKind] = useState<CardEditKind | 'all'>('all');
   const { results, status, loadMore } = usePaginatedQuery(
     api.admin.cardEdits.listCardEdits,
     kind === 'all' ? {} : { kind },
