@@ -393,6 +393,19 @@ describe('features/writingFeedback', () => {
       );
       expect(GRADER_SYSTEM_PROMPT).not.toMatch(/at most 15 words/);
     });
+
+    it('asks notes to talk casually without changing how TARGET is graded', () => {
+      // Formal "Sie"-register notes kept coming back in German NOTES. The
+      // rule has to name the address form abstractly (no T–V examples — those
+      // fail the language-neutral suite) and keep it off the grade: a polite
+      // TARGET sentence must stay polite.
+      expect(GRADER_SYSTEM_PROMPT).toMatch(/spoken not written/);
+      expect(GRADER_SYSTEM_PROMPT).toMatch(/familiar second person of NOTES/);
+      expect(GRADER_SYSTEM_PROMPT).toMatch(/never the polite or distant form/);
+      expect(GRADER_SYSTEM_PROMPT).toMatch(
+        /a formal TARGET sentence stays formal/,
+      );
+    });
   });
 
   describe('GRADER_RESPONSE_FORMAT', () => {
