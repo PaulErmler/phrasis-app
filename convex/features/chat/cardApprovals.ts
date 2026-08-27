@@ -462,9 +462,10 @@ export const replaceCardFromApproval = mutation({
     approvalId: v.id('cardApprovals'),
     timezone: v.string(),
   },
-  // `cardId` is the card the edit LEFT BEHIND (a new document on Path B). The
-  // learn view keys its thread-rotation suppression off this exact identity,
-  // so it must be the replacement's id, not the input's.
+  // `cardId` is the edited card. applyCardEdit patches the card in place on
+  // both paths, so this always equals the approval's card id; it is still
+  // returned because the learn view keys its thread-rotation suppression
+  // off this exact identity and must not have to assume that invariant.
   returns: v.object({
     success: v.boolean(),
     cardId: v.id('cards'),
@@ -604,8 +605,9 @@ export const storeAlternativeFromApproval = mutation({
     approvalId: v.id('cardApprovals'),
     timezone: v.string(),
   },
-  // Same contract as replaceCardFromApproval: `cardId` is the card the fork
-  // LEFT BEHIND, which the learn view needs for thread-rotation suppression.
+  // Same contract as replaceCardFromApproval: `cardId` is the (in-place
+  // patched, so identical) card id the learn view needs for thread-rotation
+  // suppression.
   returns: v.object({
     success: v.boolean(),
     cardId: v.id('cards'),

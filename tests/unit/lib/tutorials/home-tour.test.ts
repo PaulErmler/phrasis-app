@@ -71,7 +71,7 @@ describe('createHomeTour: due-counts step', () => {
 });
 
 describe('createHomeTour: workload step', () => {
-  it('follows the projections step (monotonic scroll) and drops when the card is absent', () => {
+  it('follows the projections step (monotonic scroll)', () => {
     const tour = createHomeTour(t, { reviewMode: 'audio' });
     const elements = tour.steps.map((s) => s.element);
     const workloadIdx = elements.indexOf('[data-tutorial="workload-forecast"]');
@@ -80,8 +80,9 @@ describe('createHomeTour: workload step', () => {
     expect(workloadIdx).toBeGreaterThan(
       elements.indexOf('[data-tutorial="projections"]'),
     );
-    // skipIfMissing is a safety net if the card isn't mounted at launch.
-    expect(tour.steps[workloadIdx].skipIfMissing).toBe(true);
+    // Whether the step is dropped when the card isn't mounted at launch is
+    // behavior of the launcher, asserted in use-tutorial.test.tsx
+    // ('drops the workload step…'), not restated against the config here.
   });
 
   it('is gated by its own preference, not the pills preference', () => {

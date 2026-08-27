@@ -8,6 +8,7 @@ import { requireRunMutationCtx } from '@convex-dev/better-auth/utils';
 import { components, internal } from './_generated/api';
 import { DataModel } from './_generated/dataModel';
 import { query } from './_generated/server';
+import { v } from 'convex/values';
 import { betterAuth } from 'better-auth';
 import { SignJWT, importPKCS8 } from 'jose';
 import authConfig from './auth.config';
@@ -88,6 +89,11 @@ export const { onCreate, onUpdate, onDelete } = authComponent.triggersApi();
 // still handled by AuthBoundary's useEffect via useConvexAuth().
 export const getAuthUser = query({
   args: {},
+  // The payload is the Better Auth component's user document; its shape is
+  // owned (and versioned) by that component, so mirroring it field-by-field
+  // here would drift on upgrades. `v.any()` keeps the declared contract
+  // honest: authenticated → component user doc, unauthenticated → null.
+  returns: v.union(v.null(), v.any()),
   handler: async (ctx) => {
     return (await authComponent.safeGetAuthUser(ctx)) ?? null;
   },

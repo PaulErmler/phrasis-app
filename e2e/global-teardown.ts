@@ -99,7 +99,11 @@ function purgeFixtureUsers(): void {
  * back to sending real auth emails. Order matters — the cleanup hook is
  * itself gated on the flag.
  *
- * Best-effort. A failure here must not turn a green suite red.
+ * Best-effort. A cleanup failure must not turn a green suite red — with one
+ * deliberate exception: the dev-deployment gate below throws, because
+ * purging accounts against anything but a dev deployment is worse than a
+ * red run. global-setup runs the same gate, so tripping it here means the
+ * environment changed mid-run and deserves the noise.
  */
 export default function globalTeardown() {
   assertDevDeployment('global-teardown');

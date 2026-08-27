@@ -329,7 +329,10 @@ export async function createCardsFromTexts(
         schedulingPhase: 'preReview' as const,
         preReviewCount: 0,
         ...(seedWritingTrack
-          ? { writingDueDate: dueBase + cardsInserted, writingIsGraduated: false }
+          ? {
+              writingDueDate: dueBase + cardsInserted,
+              writingIsGraduated: false,
+            }
           : {}),
         radioRoundCounter: 0,
         radioPlayCount: 0,

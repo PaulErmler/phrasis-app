@@ -20,10 +20,29 @@ import path from 'node:path';
  */
 const DEV_PREFIXES = ['dev:', 'local:', 'anonymous:'] as const;
 
+function isDevTarget(value: string | undefined): boolean {
+  return DEV_PREFIXES.some((prefix) => value?.startsWith(prefix));
+}
+
 export function assertDevDeployment(context: string): void {
+  // The Convex CLI resolves its target from CONVEX_DEPLOY_KEY BEFORE
+  // CONVEX_DEPLOYMENT, so a prod deploy key in the shell would silently win
+  // over a dev .env.local if only the deployment name were checked. Deploy
+  // keys carry the same deployment-type prefix, so hold them to the same
+  // rule; anything else (prod:, preview:, project-scoped keys) refuses.
+  const deployKey = process.env.CONVEX_DEPLOY_KEY;
+  if (deployKey !== undefined && !isDevTarget(deployKey)) {
+    throw new Error(
+      `${context}: refusing to run with CONVEX_DEPLOY_KEY set to a ` +
+        `non-development key. The Convex CLI targets the key's deployment ` +
+        `ahead of CONVEX_DEPLOYMENT, so the e2e lifecycle scripts would hit ` +
+        `whatever that key unlocks. Unset CONVEX_DEPLOY_KEY (or use a ` +
+        `${DEV_PREFIXES.join('/')} key) to run the e2e suite.`,
+    );
+  }
   const deployment =
     process.env.CONVEX_DEPLOYMENT ?? readDeploymentFromEnvLocal();
-  if (!DEV_PREFIXES.some((prefix) => deployment?.startsWith(prefix))) {
+  if (!isDevTarget(deployment)) {
     throw new Error(
       `${context}: refusing to touch CONVEX_DEPLOYMENT=` +
         `${JSON.stringify(deployment ?? null)}. The e2e lifecycle scripts ` +
@@ -47,7 +66,10 @@ function readDeploymentFromEnvLocal(): string | undefined {
       'utf8',
     );
     const raw = /^CONVEX_DEPLOYMENT=(.+)$/m.exec(envFile)?.[1]?.trim();
-    return raw?.replace(/\s+#.*$/, '').trim();
+    const uncommented = raw?.replace(/\s+#.*$/, '').trim();
+    // dotenv accepts quoted values; a hand-written `"dev:..."` must not
+    // fail the prefix check just for its quotes.
+    return uncommented?.replace(/^(["'])(.*)\1$/, '$2');
   } catch {
     return undefined;
   }

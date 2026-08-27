@@ -51,6 +51,15 @@ correctness/cost/velocity noted per item.
   down (ADR) and strengthen the test. Effort M (doc S; any migration L). Impact:
   correctness-by-convention made explicit.
 
+- [ ] **A33 — `startOfDayMs` DST convergence only walks forward.** The gap walk in
+  `lib/dateStrings.ts` (`startOfDayMs`) steps forward while the candidate timestamp's
+  local date is still before the target date. A fall-back transition sitting at or near
+  local midnight could make the two-iteration convergence overshoot into the next local
+  day, and the forward-only loop cannot come back — shifting one day's due bucket in
+  the forecast query. Fix: add a backward step, or first pin the behavior with unit
+  tests for the known-tricky zones (e.g. America/Santiago, Lord Howe). Effort S.
+  Impact: at worst one shifted forecast day, twice a year, in midnight-transition zones.
+
 ## Backend architecture & scale
 
 - [ ] **A16 — Admin dashboard off whole-table scans.** `convex/admin/dashboard.ts` is
@@ -85,6 +94,18 @@ correctness/cost/velocity noted per item.
   one-shots all document a TTS priority-queue that no longer exists (replaced by
   pool-choice in `convex/lib/workpools.ts`); `warmupSingleLanguage` subsumes the other
   two. Effort S.
+
+- [ ] **B30 — Per-card deck-count writes widen the OCC surface.** `adjustDeckCardCount`
+  (`convex/db/stats/cardAggregates.ts`) does a read-modify-write on the deck document
+  for every card insert/delete, so bulk paths (`createCardsFromTexts`, `purgeCards`) do
+  N writes to one row per transaction and any two concurrent card mutations on a deck
+  now conflict where previously only the four explicit count sites did. Related trade
+  made at the same time: the untouched-field skip removed the incidental aggregate
+  self-heal, so a drifted `cardsByStateAndDueDate` now stays wrong (presenting as
+  silently low due counts) until `recalcUserCardAggregates` runs. Watch conflict
+  telemetry before engineering around it; if it fires, batch the per-transaction delta
+  into one write and add a scheduled recount. Effort M. Impact: OCC retries on busy
+  decks; silent drift persistence.
 
 ## Frontend architecture & performance
 
@@ -130,6 +151,21 @@ correctness/cost/velocity noted per item.
   `react-hooks/refs` are globally disabled. See **docs/react-hooks-debt.md** (written
   2026-08) for the site inventory, the `useLatest()` plan, and the staged re-enable
   path. Effort M (refs) + L (set-state).
+
+- [ ] **B31 — Extract the writing-feedback controller out of `FullReviewCardContent`.**
+  The component is ~1,950 lines and the 2026-08 branch edited it for six unrelated
+  reasons (mic gating, request sequencing, candidate scoring, paywall routing,
+  presentation object, voice options). The natural cut is a `useWritingFeedback` hook
+  owning the feedback map, request-sequence ref, quota gate, and kick-off effect —
+  which would also give the per-card reset (duplicated verbatim at the card-change and
+  restart sites; extract `resetPerCardState()`) a single home. Anchors:
+  `feedbackRequestSeqRef`, `resetSignal` effect. Effort M. Impact: velocity; the
+  restart-race class of bug becomes testable in isolation.
+- [ ] **B32 — `includeTypicalAdds` is a dead toggle.** `hooks/use-workload-forecast.ts`
+  hardcodes `includeTypicalAdds: false` ("kept as a future toggle rather than wired to
+  UI"), dragging an unused branch through `lib/workloadForecast.ts` and its tests. Wire
+  it to a visible control or delete the branch. Effort S. Impact: model and test
+  surface nothing ships.
 
 ## Dead code & bundle
 

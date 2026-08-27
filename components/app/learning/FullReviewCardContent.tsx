@@ -656,9 +656,14 @@ export function FullReviewCardContent({
     setSubmissionOrder([]);
     setManuallyRevealedBase(new Set());
     setFeedback(new Map());
-    // Invalidate any in-flight grades: their sequence numbers no longer match,
-    // so a reply from before the reset can't land on a fresh submission.
-    feedbackRequestSeqRef.current = new Map();
+    // Invalidate any in-flight grades by bumping, never clearing. This reset
+    // stays on the same card, so the card-id half of the staleness check
+    // can't help: a cleared map would hand the next submission seq 1 — the
+    // same number an in-flight request already holds — and its late reply
+    // would pass the check and land on the fresh submission.
+    for (const [language, seq] of feedbackRequestSeqRef.current) {
+      feedbackRequestSeqRef.current.set(language, seq + 1);
+    }
     const raf = requestAnimationFrame(() => {
       firstInputRef.current?.focus({ preventScroll: true });
     });

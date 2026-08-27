@@ -399,12 +399,19 @@ export async function forkSharedTextForEdit(
     if (lang === sourceLanguage) continue;
     const existing = existingTranslationMap.get(lang);
     const changed = changedLanguages.has(lang);
+    const translatedText = changed
+      ? (submittedMap.get(lang) ?? '')
+      : (existing?.translatedText ?? '');
+    // Never persist a blank row. `scheduleLanguageContent` treats any row as
+    // "translation exists", and the stale-translation sweep never deletes a
+    // row for being blank, so a blank insert would permanently block the
+    // language and enqueue TTS for the empty string. Skipping the insert
+    // lets the normal missing-translation path fill it like a new text.
+    if (translatedText.trim() === '') continue;
     await ctx.db.insert('translations', {
       textId: newTextId,
       targetLanguage: lang,
-      translatedText: changed
-        ? (submittedMap.get(lang) ?? '')
-        : (existing?.translatedText ?? ''),
+      translatedText,
       ...(changed
         ? { translationSource: USER_PROVIDED_TRANSLATION_SOURCE }
         : existing?.translationSource

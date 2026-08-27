@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import * as React from 'react';
 import { useNowMinute } from '@/hooks/use-now-minute';
 
 const MINUTE_MS = 60_000;
@@ -71,5 +72,36 @@ describe('useNowMinute', () => {
       vi.advanceTimersByTime(MINUTE_MS);
     });
     expect(result.current).toBe(FLOOR + 6 * MINUTE_MS);
+  });
+
+  it('never commits a stale value on the unpause render', () => {
+    // The effect-based catch-up alone briefly COMMITS the pause-old value
+    // with paused=false, subscribing time-keyed consumer queries with args
+    // nothing else uses. The render-phase catch-up must discard that render
+    // before it commits.
+    const committed: Array<{ paused: boolean; now: number }> = [];
+    const { rerender } = renderHook(
+      ({ paused }: { paused: boolean }) => {
+        const now = useNowMinute(paused);
+        React.useEffect(() => {
+          committed.push({ paused, now });
+        });
+        return now;
+      },
+      { initialProps: { paused: true } },
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(40 * MINUTE_MS);
+    });
+    const fresh = FLOOR + 40 * MINUTE_MS;
+    committed.length = 0;
+    rerender({ paused: false });
+
+    const unpausedCommits = committed.filter((c) => !c.paused);
+    expect(unpausedCommits.length).toBeGreaterThan(0);
+    for (const commit of unpausedCommits) {
+      expect(commit.now).toBe(fresh);
+    }
   });
 });

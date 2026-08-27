@@ -887,4 +887,112 @@ describe('FullReviewCardContent: AI writing feedback', () => {
     expect(screen.getByText('verdict.minor')).toBeInTheDocument();
     expect(screen.queryByText('verdict.wrong')).not.toBeInTheDocument();
   });
+
+  // Restart-card (Shift+R) reuses the SAME card, so the card-id half of the
+  // staleness check can't discard anything — the reset must advance the
+  // sequence numbers. Clearing them instead hands the next submission the
+  // same sequence an in-flight request already holds, and the stale verdict
+  // lands. Both halves of that failure get a test.
+  function renderRestartableCard() {
+    // `resetSignal` rides on the presentation object; everything else stays
+    // identical across rerenders so only the restart effect fires, not the
+    // card-change reset.
+    const card = (resetSignal: number) => (
+      <FullReviewCardContent
+        presentation={makePresentation({
+          cardId: CARD_ID,
+          sourceText: 'I would like a coffee.',
+          translations: TRANSLATIONS,
+          resetSignal,
+        })}
+        targetAudioMode="never"
+        aiFeedbackEnabled
+        onAccuracyChange={vi.fn()}
+      />
+    );
+    const view = render(card(1));
+    return { restart: (nonce: number) => view.rerender(card(nonce)) };
+  }
+
+  it('discards an in-flight grade that resolves after a card restart', async () => {
+    let resolveFirst!: (v: unknown) => void;
+    gradeMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+    const { restart } = renderRestartableCard();
+
+    submitAnswer('respuesta equivocada A');
+    await waitFor(() => expect(gradeMock).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      restart(2);
+    });
+
+    // The pre-restart request resolves against the freshly dealt card and
+    // must vanish, not render feedback for an answer no longer on screen.
+    await act(async () => {
+      resolveFirst({
+        verdict: 'wrong',
+        corrected: 'Quisiera un café.',
+        notes: [],
+        savedAlternative: false,
+      });
+    });
+    expect(screen.queryByText('verdict.wrong')).not.toBeInTheDocument();
+  });
+
+  it('discards a stale in-flight grade after restart + resubmit', async () => {
+    let resolveFirst!: (v: unknown) => void;
+    let resolveSecond!: (v: unknown) => void;
+    gradeMock
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSecond = resolve;
+          }),
+      );
+    const { restart } = renderRestartableCard();
+
+    submitAnswer('respuesta equivocada A');
+    await waitFor(() => expect(gradeMock).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      restart(2);
+    });
+    submitAnswer('respuesta equivocada B');
+    await waitFor(() => expect(gradeMock).toHaveBeenCalledTimes(2));
+
+    // The pre-restart request arrives late: answer A's verdict must not
+    // attach to answer B.
+    await act(async () => {
+      resolveFirst({
+        verdict: 'wrong',
+        corrected: 'Quisiera un café.',
+        notes: [],
+        savedAlternative: false,
+      });
+    });
+    expect(screen.queryByText('verdict.wrong')).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveSecond({
+        verdict: 'minor',
+        corrected: 'Quisiera un café.',
+        notes: [],
+        savedAlternative: false,
+      });
+    });
+    await waitFor(() =>
+      expect(screen.getByText('verdict.minor')).toBeInTheDocument(),
+    );
+  });
 });

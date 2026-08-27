@@ -55,7 +55,11 @@ export function useCachedQuery<F extends FunctionReference<'query'>>(
     }
   }, [cacheKey]);
 
-  const prevLive = useRef(live);
+  // Seeded with undefined, NOT the first render's `live`: on a warm
+  // re-mount Convex can deliver the payload on render one, and seeding with
+  // it would skip the write below, leaving localStorage stale (or empty)
+  // for the next cold start.
+  const prevLive = useRef<FunctionReturnType<F> | undefined>(undefined);
   // Convex returns a fresh payload identity on every re-subscription (e.g.
   // a minute-quantized `now` arg) even when the content is unchanged, so
   // remember what was last written and skip byte-identical writes — the
@@ -80,5 +84,8 @@ export function useCachedQuery<F extends FunctionReference<'query'>>(
     }
   }, [live, cacheKey]);
 
-  return live ?? cached;
+  // `??` would be wrong here: `null` is a legitimate loaded result (e.g.
+  // "no course"), and falling back to `cached` on it would resurrect the
+  // previous payload for a commit. Only `undefined` means still loading.
+  return live !== undefined ? live : cached;
 }

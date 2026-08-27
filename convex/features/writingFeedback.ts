@@ -367,6 +367,25 @@ export const gradeWritingAnswer = action({
       }
     }
 
+    // Build everything the grader call needs BEFORE consuming the quota
+    // unit. The refund below only covers the LLM try; a throw in prompt or
+    // option construction after the consume would charge the user for a
+    // grade that never ran.
+    const userPrompt = buildGraderUserPrompt({
+      baseLanguage: context.baseLanguage,
+      targetLanguage: args.language,
+      notesLanguage: context.notesLanguage,
+      baseText: context.baseText,
+      expected: context.expected,
+      metadata: context.metadata,
+      userAnswer,
+    });
+
+    const providerOptions = openrouterCallOptions(
+      GRADER_REASONING,
+      GRADER_PROVIDER,
+    );
+
     try {
       await ctx.runMutation(
         internal.features.writingFeedback.consumeAiFeedbackQuota,
@@ -422,21 +441,6 @@ export const gradeWritingAnswer = action({
         { userId },
       );
     }
-
-    const userPrompt = buildGraderUserPrompt({
-      baseLanguage: context.baseLanguage,
-      targetLanguage: args.language,
-      notesLanguage: context.notesLanguage,
-      baseText: context.baseText,
-      expected: context.expected,
-      metadata: context.metadata,
-      userAnswer,
-    });
-
-    const providerOptions = openrouterCallOptions(
-      GRADER_REASONING,
-      GRADER_PROVIDER,
-    );
 
     const startedAt = Date.now();
     let text: string;

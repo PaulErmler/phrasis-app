@@ -21,6 +21,17 @@ const quantize = () => Math.floor(Date.now() / MINUTE_MS) * MINUTE_MS;
 export function useNowMinute(paused = false): number {
   const [now, setNow] = React.useState(quantize);
 
+  // Render-phase catch-up (React's adjust-state-during-render pattern). The
+  // effect below only re-quantizes after paint, so without this the first
+  // commit after unpausing would hand consumers a `now` as stale as the
+  // whole pause — briefly subscribing time-keyed queries with args no other
+  // consumer shares. Renders within the same minute hit `fresh === now` and
+  // skip the update, so this never loops.
+  if (!paused) {
+    const fresh = quantize();
+    if (fresh !== now) setNow(fresh);
+  }
+
   React.useEffect(() => {
     if (paused) return;
     // Catch up immediately on (re)activation, then tick at each boundary.

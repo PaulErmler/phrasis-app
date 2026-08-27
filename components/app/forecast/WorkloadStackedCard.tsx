@@ -169,7 +169,7 @@ export function WorkloadStackedCard({
                 const base = total - whatIf;
                 const cardsTotal = day.scheduled.total + day.estimated.total;
                 const showCap =
-                  day.offset === 0 || (day.offset === peakIndex && total > 0);
+                  day.offset === 0 || (i === peakIndex && total > 0);
                 return (
                   <div
                     key={day.offset}

@@ -66,4 +66,22 @@ describe('useCachedQuery', () => {
     const { result } = renderHook(() => useCachedQuery({} as any, {}, 'empty'));
     expect(result.current).toBeUndefined();
   });
+
+  it('returns a loaded null instead of falling back to the cache', () => {
+    // `null` is a legitimate query result ("no course"); resurrecting the
+    // previous cached payload for it would render stale data.
+    localStorage.setItem('nl', JSON.stringify({ stale: true }));
+    useQueryMock.mockReturnValue(null);
+    const { result } = renderHook(() => useCachedQuery({} as any, {}, 'nl'));
+    expect(result.current).toBeNull();
+  });
+
+  it('writes the cache even when live is already present on first render', async () => {
+    // Warm re-mount: Convex delivers from its client cache on render one.
+    // The write must still happen or the warm-first-paint cache stays empty.
+    useQueryMock.mockReturnValue({ warm: true });
+    renderHook(() => useCachedQuery({} as any, {}, 'warm'));
+    await Promise.resolve();
+    expect(JSON.parse(localStorage.getItem('warm')!)).toEqual({ warm: true });
+  });
 });

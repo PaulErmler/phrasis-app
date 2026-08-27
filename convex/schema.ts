@@ -731,16 +731,18 @@ export default defineSchema({
   cards: defineTable({
     deckId: v.id('decks'), // Reference to the deck
     textId: v.id('texts'), // Reference to the text/sentence
-    // Reference to the source collection. Required since the one-time
-    // backfill (admin/backfillCollectionOrigin, retired) completed; the
-    // runAll-chained `cardCollectionBackfill` safety net keeps the guarantee
-    // durable (expects to patch 0 docs). Deploy note: this narrowing only
-    // deploys once every prod row carries the field.
-    collectionId: v.id('collections'),
+    // Reference to the source collection. Every insert path sets it and the
+    // one-time backfill (admin/backfillCollectionOrigin, retired) filled
+    // legacy rows, but the validator stays optional until the runAll-chained
+    // `cardCollectionBackfill` has confirmed 0 unfilled docs against prod —
+    // narrowing in the same deploy as the backfill would reject the push on
+    // any straggler row before the backfill could ever run. Narrow both
+    // fields in the deploy after that confirmation (widen-migrate-narrow).
+    collectionId: v.optional(v.id('collections')),
     // Denormalized from collections.origin at insert time. Powers the
-    // content-source filter index lookups in getCardForReview. Required —
-    // same backfill + safety net as collectionId above.
-    collectionOrigin: collectionOriginValidator,
+    // content-source filter index lookups in getCardForReview. Same
+    // backfill + narrowing plan as collectionId above.
+    collectionOrigin: v.optional(collectionOriginValidator),
     // Scheduling + free-play rotation state mutated by reviewCard /
     // advanceFreePlayCard (one rotation per face). Shared with the `reviewLogs`
     // undo snapshots. Definitions and field comments live in convex/types.ts.

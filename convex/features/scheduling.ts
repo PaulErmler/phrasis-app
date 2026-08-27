@@ -2063,7 +2063,6 @@ export async function applyCardEdit(
   // Re-point the card at the resolved text (in place — see
   // `repointCardAtEditedText` for why the card id never changes) and
   // refresh its searchable text.
-  const resolvedCardId: Id<'cards'> = args.cardId;
   const resolvedText = await repointCardAtEditedText(ctx, {
     card,
     course,
@@ -2084,12 +2083,13 @@ export async function applyCardEdit(
     resolvedText,
   });
 
-  // Path B forked the text row; the audit row still holds the before-id.
-  // The card id never changes (in-place patch) — recorded anyway so the
-  // log stays explicit about it.
+  // Path B forked the text row; the audit row was inserted before the fork
+  // and still holds the before-ids, so point it at the produced text. On
+  // Path A neither id moved, so the row is already correct as inserted and
+  // there is nothing to update (see setCardEditResult's doc).
   if (cardEditId !== undefined && resolvedTextId !== card.textId) {
     await setCardEditResult(ctx, cardEditId, {
-      cardIdAfter: resolvedCardId,
+      cardIdAfter: args.cardId,
       textIdAfter: resolvedTextId,
     });
   }
@@ -2125,7 +2125,9 @@ export async function applyCardEdit(
 
   return {
     textId: resolvedTextId,
-    cardId: resolvedCardId,
+    // Always the input card: edits patch the card in place on both paths
+    // (see repointCardAtEditedText), so by-id references stay valid.
+    cardId: args.cardId,
     changed: true,
     course,
   };

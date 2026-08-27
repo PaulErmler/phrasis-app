@@ -719,9 +719,11 @@ export function buildWorkloadForecast(
   const typicalAddsPerDay =
     history.activeDays > 0 ? history.newCards / history.activeDays : 0;
 
-  // The composition loops below index days 0..WORKLOAD_DAYS-1, so the input
-  // must span exactly that window even if a stale cached payload was built
-  // for a different one: clamp and zero-fill rather than crash the render.
+  // The composition loops below index a fixed 0..WORKLOAD_DAYS-2 window, so
+  // normalize the input to exactly that span. Cached payloads with a
+  // different window never reach here — isWorkloadForecastData discards
+  // them at the cache read — so this exists only to keep an unvalidated
+  // caller from crashing the render, not to salvage stale caches.
   const futureDays = (
     Array.isArray(data.futureDays) ? data.futureDays : []
   ).slice(0, WORKLOAD_DAYS - 1);

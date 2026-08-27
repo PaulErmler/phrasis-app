@@ -854,5 +854,42 @@ describe('features/chat/alsoCorrect', () => {
         expect(alts.map((a) => a.text)).toEqual(['Quisiera un caf\u00e9.']);
       });
     });
+
+    it('forks without persisting blank rows for a language whose translation is missing', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId, courseId } = await seedOwnedCard(t, {
+        userCreated: false,
+      });
+      // A second course language whose translation hasn't landed yet (still
+      // in the pipeline, or flagged and deleted). The fork used to copy it
+      // as `translatedText: ''` \u2014 and a blank row reads as "translation
+      // exists" to scheduleLanguageContent while the sweep never deletes
+      // one, so the language would be blank on that card forever.
+      await t.run(async (ctx) => {
+        await ctx.db.patch(courseId, { targetLanguages: ['es', 'sv'] });
+      });
+      const approvalId = await createApproval(t, cardId, [
+        { language: 'es', text: 'Quisiera un caf\u00e9.' },
+      ]);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      const res = await asUser.mutation(
+        api.features.chat.cardApprovals.storeAlternativeFromApproval,
+        { approvalId, timezone: 'UTC' },
+      );
+      expect(res.success).toBe(true);
+      await t.run(async (ctx) => {
+        const editedCard = await ctx.db.get(cardId);
+        expect(editedCard!.textId).not.toBe(textId);
+        const rows = await ctx.db
+          .query('translations')
+          .withIndex('by_textId', (q) => q.eq('textId', editedCard!.textId))
+          .collect();
+        // The carried 'en' row survives; 'sv' must be ABSENT (not blank) so
+        // the normal missing-translation path can fill it like a new text.
+        expect(rows.map((r) => [r.targetLanguage, r.translatedText])).toEqual([
+          ['en', 'I want a coffee.'],
+        ]);
+      });
+    });
   });
 });

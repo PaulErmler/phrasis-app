@@ -329,6 +329,14 @@ const ALL_TIP_IDS: TutorialId[] = [
   ...HIDDEN_MILESTONE_IDS,
 ].filter((id, i, arr) => arr.indexOf(id) === i);
 
+/** The ids that can actually show. `allTipsDone` must count these only:
+ *  a hidden id can never be completed by watching it, so including it
+ *  would keep the lifetime-reps subscription open for every session of a
+ *  non-veteran who has seen everything there is to see. */
+const SHOWN_TIP_IDS: TutorialId[] = ALL_TIP_IDS.filter(
+  (id) => !HIDDEN_MILESTONE_IDS.includes(id),
+);
+
 // ─── Element settling (ported from the retired onboarding-lesson tutorial) ──
 
 /**
@@ -485,7 +493,7 @@ export function useMilestoneTips({
   const { completed, markCompleted, isLoaded } =
     useCompletedTutorials(ALL_TIP_IDS);
 
-  const allTipsDone = ALL_TIP_IDS.every((id) => completed.includes(id));
+  const allTipsDone = SHOWN_TIP_IDS.every((id) => completed.includes(id));
   // `useQueries`, not `useQuery`: a `useQuery` server error is THROWN into
   // render, and from this hook it unwound past LearnView's ViewErrorBoundary
   // to app/error.tsx, blanking the whole app shell over the teaching layer.
@@ -524,6 +532,33 @@ export function useMilestoneTips({
   // the mount itself has to be re-checked at fire time.
   const unmountedRef = useRef(false);
 
+  // Every claim pauses card audio (`onWillShow` + `pauseAllAudioNow`), so
+  // every release path MUST resume it (`onClosed`) exactly once — an abort
+  // that skips the resume strands the learner in silence mid-card. The pair
+  // is enforced here: schedulers claim through claimTipSlot, and every
+  // abort path releases through releaseTipSlot, which no-ops unless a claim
+  // is actually held. The one path that bypasses releaseTipSlot is the
+  // user-dismissal branch of onDestroyStarted, which must call onClosed
+  // itself inside the dismissing click's call stack (iOS gesture rule) and
+  // drops the claim first so a later release can't double-fire.
+  const claimHeldRef = useRef(false);
+  const claimTipSlot = useCallback(() => {
+    claimHeldRef.current = true;
+    busyRef.current = true;
+    setIsActive(true);
+    onWillShowRef.current?.();
+    pauseAllAudioNow();
+  }, []);
+  const releaseTipSlot = useCallback(() => {
+    if (!claimHeldRef.current) return;
+    claimHeldRef.current = false;
+    busyRef.current = false;
+    setIsActive(false);
+    // After unmount the host that would resume audio is gone; skip the
+    // callback but still clear the slot state.
+    if (!unmountedRef.current) onClosedRef.current?.();
+  }, []);
+
   const runTip = useCallback(
     (steps: DriveStep[], tipIds: TutorialId[], analyticsId: string) => {
       if (unmountedRef.current || !enabledRef.current) {
@@ -538,8 +573,7 @@ export function useMilestoneTips({
         // offered again later instead of mounting unanchored over whatever
         // is now on screen and being marked done on dismiss.
         for (const id of tipIds) claimedRef.current.delete(id);
-        busyRef.current = false;
-        setIsActive(false);
+        releaseTipSlot();
         return;
       }
       teardownActiveDriver(
@@ -569,6 +603,11 @@ export function useMilestoneTips({
           busyRef.current = false;
           setIsActive(false);
           if (!programmaticTeardownRef.current) {
+            // This branch resumes audio itself (below), so drop the claim
+            // first — a later releaseTipSlot must not resume a second time.
+            // The programmatic branch keeps the claim held: its initiator
+            // (an effect cleanup) owns the release.
+            claimHeldRef.current = false;
             // Finished or user-dismissed, either way, don't re-offer
             // (re-offering a tip someone deliberately closed is worse than
             // dropping it). Every concept in the sequence persists, matching
@@ -589,7 +628,7 @@ export function useMilestoneTips({
       pauseAllAudioNow();
       d.drive();
     },
-    [markCompleted],
+    [markCompleted, releaseTipSlot],
   );
 
   // ---- veteran guard: silently retire everything for experienced users ----
@@ -671,10 +710,7 @@ export function useMilestoneTips({
     // can't know that.)
     const claimed = claimedRef.current;
     for (const c of unseenConcepts) claimed.add(c.id);
-    busyRef.current = true;
-    setIsActive(true);
-    onWillShowRef.current?.();
-    pauseAllAudioNow();
+    claimTipSlot();
 
     const tipIds = unseenConcepts.map((c) => c.id);
     let cancelled = false;
@@ -700,8 +736,7 @@ export function useMilestoneTips({
         unbindKeyboardRef,
       );
       for (const id of tipIds) claimed.delete(id);
-      busyRef.current = false;
-      setIsActive(false);
+      releaseTipSlot();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [introReady, reviewMode]);
@@ -725,10 +760,7 @@ export function useMilestoneTips({
     if (!tip) return;
 
     claimedRef.current.add(tip.id);
-    busyRef.current = true;
-    setIsActive(true);
-    onWillShowRef.current?.();
-    pauseAllAudioNow();
+    claimTipSlot();
     whenElementSettled(tip.selector, (found) => {
       if (!found) {
         // Every milestone tip is ABOUT one specific control, so an
@@ -738,8 +770,7 @@ export function useMilestoneTips({
         // the control is on screen (e.g. the chat button in a layout that
         // hides it, or a card state that hasn't rendered the anchor yet).
         claimedRef.current.delete(tip.id);
-        busyRef.current = false;
-        setIsActive(false);
+        releaseTipSlot();
         return;
       }
       runTip([tip.buildStep(tRef.current, reviewMode)], [tip.id], tip.id);
@@ -782,10 +813,7 @@ export function useMilestoneTips({
    *  already-completed ids. */
   const restartIntro = useCallback(() => {
     const sequence = introSequenceFor(reviewMode, transcribeRef.current);
-    busyRef.current = true;
-    setIsActive(true);
-    onWillShowRef.current?.();
-    pauseAllAudioNow();
+    claimTipSlot();
     whenElementSettled(CARD_SELECTOR, () => {
       runTip(
         buildIntroSteps(reviewMode, sequence, true),
@@ -793,7 +821,7 @@ export function useMilestoneTips({
         `intro_${reviewMode}`,
       );
     });
-  }, [reviewMode, runTip, buildIntroSteps]);
+  }, [reviewMode, runTip, buildIntroSteps, claimTipSlot]);
 
   return {
     /** A tip popover is mounted (or committed to mount) right now. */

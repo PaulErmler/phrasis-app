@@ -379,6 +379,35 @@ describe('useMilestoneTips', () => {
     expect(completedIds()).toContain(TUTORIAL_IDS.TIP_WORD_TAP);
   });
 
+  it('resumes audio when a milestone defers on a missing anchor', async () => {
+    // The claim fires onWillShow + pauseAllAudioNow BEFORE the settle wait.
+    // If the anchor never appears the tip is deferred — and the release
+    // must call onClosed, or shadowing-mode autoplay stays paused mid-card
+    // with no popover on screen and nothing ever resumes it.
+    preMark([
+      ...AUDIO_INTRO_IDS,
+      TUTORIAL_IDS.TIP_CARD_ACTIONS,
+      TUTORIAL_IDS.TIP_CHAT,
+    ]);
+    queryState.lifetimeReps = 8; // word-tap is next, and its anchor is absent
+    await loadHook();
+    const onWillShow = vi.fn();
+    const onClosed = vi.fn();
+    renderHook(() =>
+      useMilestoneTips({
+        enabled: true,
+        reviewMode: 'audio',
+        onWillShow,
+        onClosed,
+      }),
+    );
+    await firePendingTip();
+
+    expect(lastConfig, 'no popover for a missing anchor').toBeNull();
+    expect(onWillShow).toHaveBeenCalledTimes(1);
+    expect(onClosed, 'every pause needs its resume').toHaveBeenCalledTimes(1);
+  });
+
   it('a failed lifetime-count query shows no tip and releases the audio gates', async () => {
     // Regression (2026-08-18): the count was read with `useQuery`, which
     // THROWS a server error into render. `getLifetimeReviewCount` is three

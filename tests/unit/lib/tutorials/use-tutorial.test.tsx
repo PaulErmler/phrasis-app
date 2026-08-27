@@ -270,4 +270,37 @@ describe('useTutorial: completion semantics', () => {
     expect(lastDriver!.moveNext).toHaveBeenCalledOnce();
     expect(completedIds()).not.toContain(TUTORIAL_IDS.HOME_TOUR);
   });
+
+  it('drops the workload step when the forecast card is not on screen, and keeps it when it is', async () => {
+    // The forecast card is gated on minimum activity and its own setting,
+    // so at launch it may simply not be mounted. The tour must proceed
+    // without its step instead of floating a popover over nothing.
+    renderTour({ enabled: true });
+    await startTour();
+    const withoutCard = lastConfig!.steps.map((s) => s.element);
+    expect(withoutCard.length).toBeGreaterThan(0);
+    expect(withoutCard).not.toContain('[data-tutorial="workload-forecast"]');
+
+    // Re-run with the card mounted (jsdom rects are all zero, so visibility
+    // needs a stubbed non-zero rect) — the step must survive the filter.
+    vi.resetModules();
+    localStorage.clear();
+    ({ useTutorial } = await import('@/lib/tutorials/use-tutorial'));
+    lastConfig = null;
+    const el = document.createElement('div');
+    el.setAttribute('data-tutorial', 'workload-forecast');
+    el.getBoundingClientRect = () =>
+      ({ width: 100, height: 40, top: 0, left: 0 }) as DOMRect;
+    document.body.appendChild(el);
+    try {
+      renderTour({ enabled: true });
+      await startTour();
+      // resolveStepAnchors swaps a found selector for its DOM element, so
+      // assert by identity: the mounted card is among the step anchors.
+      expect(lastConfig!.steps.map((s) => s.element)).toContain(el);
+      expect(lastConfig!.steps.length).toBe(withoutCard.length + 1);
+    } finally {
+      el.remove();
+    }
+  });
 });
