@@ -1811,6 +1811,13 @@ function TargetLanguageInput({
               // feedback kick-off effect reads them. A row the user already
               // submitted by keyboard mid-transcription keeps their answer.
               if (state.submitted) return;
+              // An empty transcript (silence, mic picked up nothing) must
+              // not submit an empty answer — the card would grade a blank
+              // as wrong. Tell the user instead and leave the row open.
+              if (!text.trim()) {
+                toast.info(tChat('voice.nothingDetected'));
+                return;
+              }
               primeAfterSubmitAudio();
               onInputChange(translation.language, text);
               onSubmit(translation.language);

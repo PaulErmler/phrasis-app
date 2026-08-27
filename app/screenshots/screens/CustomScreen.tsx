@@ -33,12 +33,13 @@ export function CustomScreen() {
   return (
     <div className="h-dvh max-h-dvh flex flex-col overflow-hidden bg-background text-foreground">
       <header className="sheet-header">
-        <div className="flex items-center gap-1 min-w-0">
-          <Button variant="ghost" size="icon" className="-ml-2 shrink-0">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="heading-section truncate">Add Cards</h1>
-        </div>
+        <Button
+          variant="ghost"
+          className="gap-2 -ml-2 min-w-0 shrink overflow-hidden"
+        >
+          <ChevronLeft className="h-4 w-4 shrink-0" />
+          <span className="truncate">Add Cards</span>
+        </Button>
       </header>
 
       <div className="flex-1 overflow-hidden px-4 py-4 space-y-3">

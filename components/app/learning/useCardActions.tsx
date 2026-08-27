@@ -222,6 +222,7 @@ export function CardActionConfirmDialogs({
         description={t('actions.deleteConfirmDescription')}
         cancelLabel={t('actions.deleteConfirmCancel')}
         confirmLabel={t('actions.deleteConfirmConfirm')}
+        confirmTestId="card-delete-confirm"
         onConfirm={actions.confirmDelete}
         destructive
       />

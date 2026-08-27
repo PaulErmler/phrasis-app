@@ -318,19 +318,15 @@ export function EnterTextsView({
       <div className="flex flex-col h-full">
         {!hideHeader && (
           <header className="sticky-header">
-            <div className="container mx-auto px-4 h-14 flex items-center gap-2">
+            <div className="container mx-auto px-4 h-14 flex items-center">
               <Button
                 variant="ghost"
-                size="icon"
-                className="shrink-0 -ml-2"
-                aria-label={t('back')}
+                className="gap-2 -ml-2 min-w-0 shrink overflow-hidden"
                 onClick={onBack}
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-4 w-4 shrink-0" />
+                <span className="truncate">{t('title')}</span>
               </Button>
-              <h1 className="font-semibold text-base truncate flex-1">
-                {t('title')}
-              </h1>
             </div>
           </header>
         )}

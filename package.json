@@ -33,6 +33,7 @@
     "snapshot:restore": "convex import --replace -y --env-file .env.local .convex-snapshots/$(git rev-parse --abbrev-ref HEAD | tr '/' '_').zip",
     "landing:audio": "tsx --env-file=.env.local scripts/generate-landing-audio.mts",
     "eval:feedback": "tsx --env-file=.env.local scripts/eval-writing-feedback.ts",
+    "eval:autofill": "tsx --env-file=.env.local scripts/eval-translation-autofill.ts",
     "store:assets": "tsx scripts/store-screenshots.ts",
     "cap:local": "node scripts/cap-sync.mjs local",
     "cap:dev": "node scripts/cap-sync.mjs dev",

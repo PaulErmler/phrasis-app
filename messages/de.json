@@ -123,7 +123,7 @@
       "uiSettings": {
         "title": "UI-Einstellungen",
         "showDueCounts": "Anzahl fälliger Karten anzeigen",
-        "showDueCountsDescription": "Zeigt, wie viele Sätze neu sind oder auf Wiederholung warten. Standardmäßig aus, da eine große Warteschlange entmutigend wirken kann.",
+        "showDueCountsDescription": "Zeigt, wie viele Sätze auf dem Dashboard neu oder fällig sind.",
         "showWorkloadForecast": "Zeitplan für fällige und kommende Karten anzeigen",
         "showWorkloadForecastDescription": "Zeigt die 7-Tage-Vorschau der anstehenden Wiederholungszeit auf dem Startbildschirm."
       },
@@ -831,7 +831,8 @@
       "stopRecording": "Aufnahme stoppen",
       "recording": "Aufnahme...",
       "transcribing": "Transkribieren...",
-      "transcribed": "Spracheingabe transkribiert"
+      "transcribed": "Spracheingabe transkribiert",
+      "nothingDetected": "Keine Sprache erkannt – nichts wurde übermittelt"
     },
     "attachments": {
       "filesAttached": "Dateien angehängt",

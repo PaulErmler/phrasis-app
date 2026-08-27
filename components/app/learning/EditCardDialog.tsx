@@ -236,7 +236,7 @@ export function EditCardDialog({
                       <p className="text-xs text-muted-foreground">
                         {t('alternativesLabel')}
                       </p>
-                      {alternativesByLanguage.get(lang)!.map((row) => {
+                      {alternativesByLanguage.get(lang)!.map((row, altIdx) => {
                         const draft = editedAlternatives[row._id] ?? row.text;
                         const isDeleted = deletedAlternatives.has(row._id);
                         const altOverLimit =
@@ -247,6 +247,7 @@ export function EditCardDialog({
                             className="flex items-center gap-1.5"
                           >
                             <Input
+                              data-testid={`edit-alternative-input-${lang}-${altIdx}`}
                               value={draft}
                               disabled={isDeleted}
                               aria-invalid={!isDeleted && altOverLimit}
@@ -269,6 +270,7 @@ export function EditCardDialog({
                               type="button"
                               variant="ghost"
                               size="icon"
+                              data-testid={`edit-alternative-delete-${lang}-${altIdx}`}
                               className="h-9 w-9 shrink-0 text-muted-foreground"
                               aria-label={
                                 isDeleted
@@ -304,6 +306,7 @@ export function EditCardDialog({
               type="button"
               variant="outline"
               className="flex-1"
+              data-testid="edit-card-cancel"
               disabled={isSaving}
               onClick={() => onOpenChange(false)}
             >
@@ -312,6 +315,7 @@ export function EditCardDialog({
             <Button
               type="button"
               className="flex-1"
+              data-testid="edit-card-save"
               onClick={handleSave}
               disabled={
                 isSaving ||

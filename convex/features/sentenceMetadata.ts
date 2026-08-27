@@ -65,75 +65,25 @@ FIELD DEFINITIONS:
 
 Be strict: if no rendering forces a value, return "neutral" / "not_applicable". Do not invent gender information.`;
 
-export const ALLOWED_REGISTER = ['formal', 'informal', 'neutral'] as const;
-export const ALLOWED_ADDRESSEE_NUMBER = [
-  'singular',
-  'plural',
-  'not_applicable',
-] as const;
-export const ALLOWED_SPEAKER_GENDER = ['male', 'female', 'neutral'] as const;
-export const ALLOWED_ADDRESSEE_GENDER = [
-  'male',
-  'female',
-  'neutral',
-  'not_applicable',
-] as const;
-
-export type Metadata = {
-  register: (typeof ALLOWED_REGISTER)[number];
-  addresseeNumber: (typeof ALLOWED_ADDRESSEE_NUMBER)[number];
-  speakerGender: (typeof ALLOWED_SPEAKER_GENDER)[number];
-  addresseeGender: (typeof ALLOWED_ADDRESSEE_GENDER)[number];
-  addressesSomeone: boolean;
-};
-
-function validateField<T extends string>(
-  input: Record<string, unknown>,
-  field: string,
-  allowed: readonly T[],
-): T {
-  const value = input[field];
-  if (typeof value !== 'string') {
-    throw new Error(`Metadata field ${field} is missing or not a string`);
-  }
-  if (!(allowed as readonly string[]).includes(value)) {
-    throw new Error(`Invalid ${field} value: ${JSON.stringify(value)}`);
-  }
-  return value as T;
-}
-
-/**
- * Validate that an arbitrary value is a well-formed sentence-metadata object.
- * Throws plain `Error` (not `ConvexError`) so callers can re-wrap as they see fit.
- * Used both server-side after auto-fill and inside the metadata-fetch action.
- */
-export function validateSentenceMetadata(input: unknown): Metadata {
-  if (input === null || typeof input !== 'object') {
-    throw new Error('Metadata response is not an object');
-  }
-  const obj = input as Record<string, unknown>;
-  const addressesSomeone = obj.addressesSomeone;
-  if (typeof addressesSomeone !== 'boolean') {
-    throw new Error(
-      `Metadata field addressesSomeone is missing or not a boolean: ${JSON.stringify(addressesSomeone)}`,
-    );
-  }
-  return {
-    register: validateField(obj, 'register', ALLOWED_REGISTER),
-    addresseeNumber: validateField(
-      obj,
-      'addresseeNumber',
-      ALLOWED_ADDRESSEE_NUMBER,
-    ),
-    speakerGender: validateField(obj, 'speakerGender', ALLOWED_SPEAKER_GENDER),
-    addresseeGender: validateField(
-      obj,
-      'addresseeGender',
-      ALLOWED_ADDRESSEE_GENDER,
-    ),
-    addressesSomeone,
-  };
-}
+// Value sets, `Metadata`, and the strict validator live in
+// lib/sentenceMetadataShape.ts (Convex-runtime-free, so the autofill prompt
+// module and eval script can share them). Re-exported here so existing
+// importers keep one import site.
+export {
+  ALLOWED_REGISTER,
+  ALLOWED_ADDRESSEE_NUMBER,
+  ALLOWED_SPEAKER_GENDER,
+  ALLOWED_ADDRESSEE_GENDER,
+  validateSentenceMetadata,
+  type Metadata,
+} from '../lib/sentenceMetadataShape';
+import {
+  ALLOWED_REGISTER,
+  ALLOWED_ADDRESSEE_NUMBER,
+  ALLOWED_SPEAKER_GENDER,
+  ALLOWED_ADDRESSEE_GENDER,
+  type Metadata,
+} from '../lib/sentenceMetadataShape';
 
 function pickField<T extends string>(
   out: Record<string, string>,

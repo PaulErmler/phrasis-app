@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { neutralizeTours } from './helpers';
+import { ensureTogglesSaved, neutralizeTours } from './helpers';
 
 /**
  * Settings smoke. Verifies the SettingsView mounts and exposes at least
@@ -41,40 +41,23 @@ test.describe('settings', () => {
   test('the workload forecast has its own visibility switch, independent of due counts', async ({
     page,
   }) => {
+    // Four reload-confirmed toggle cycles plus four home visits do not fit
+    // the 30s default when the local backend is still digesting the @live
+    // serial phase.
+    test.setTimeout(120_000);
+
     // Ensure a known starting state: both Show toggles on. (Both surfaces
     // are hidden by default; showing is an explicit opt-in.)
+    // `ensureTogglesSaved` clicks toward the desired state and re-issues
+    // the click if the confirming reload killed the un-acked mutation —
+    // see the helper's comment for the lost-write race this replaces.
     await page.goto('/app/settings');
     const dueToggle = page.locator('#showDueCounts');
     const forecastToggle = page.locator('#showWorkloadForecast');
     await expect(dueToggle).toBeVisible({ timeout: 15_000 });
     await expect(forecastToggle).toBeVisible();
 
-    // A Radix switch flips aria-checked from the optimistic patch in the
-    // same frame — before the mutation commits — so navigating right after
-    // a click can unload the page before the write flushes, or land on a
-    // page whose server-preloaded settings predate it. After clicking,
-    // reload and re-assert so every toggle state is server-confirmed
-    // before moving on.
-    const confirmSaved = async (
-      expected: Array<{ toggle: typeof dueToggle; on: boolean }>,
-    ) => {
-      await page.reload();
-      for (const { toggle, on } of expected) {
-        await expect(toggle).toBeVisible({ timeout: 15_000 });
-        await expect
-          .poll(async () => toggle.getAttribute('aria-checked'), {
-            timeout: 8_000,
-          })
-          .toBe(on ? 'true' : 'false');
-      }
-    };
-
-    for (const toggle of [dueToggle, forecastToggle]) {
-      if ((await toggle.getAttribute('aria-checked')) !== 'true') {
-        await toggle.click();
-      }
-    }
-    await confirmSaved([
+    await ensureTogglesSaved(page, [
       { toggle: dueToggle, on: true },
       { toggle: forecastToggle, on: true },
     ]);
@@ -89,9 +72,7 @@ test.describe('settings', () => {
     // Turning the due-counts toggle back off hides the pills but leaves
     // the forecast alone.
     await page.goto('/app/settings');
-    await expect(dueToggle).toBeVisible({ timeout: 15_000 });
-    await dueToggle.click();
-    await confirmSaved([{ toggle: dueToggle, on: false }]);
+    await ensureTogglesSaved(page, [{ toggle: dueToggle, on: false }]);
     await page.goto('/app');
     await expect(page.getByTestId('due-counts-pills')).toHaveCount(0, {
       timeout: 15_000,
@@ -100,9 +81,7 @@ test.describe('settings', () => {
 
     // Turning the forecast's own switch off removes the card.
     await page.goto('/app/settings');
-    await expect(forecastToggle).toBeVisible({ timeout: 15_000 });
-    await forecastToggle.click();
-    await confirmSaved([{ toggle: forecastToggle, on: false }]);
+    await ensureTogglesSaved(page, [{ toggle: forecastToggle, on: false }]);
     await page.goto('/app');
     await expect(page.getByTestId('workload-forecast')).toHaveCount(0, {
       timeout: 15_000,
@@ -112,10 +91,7 @@ test.describe('settings', () => {
     // the pills (via the showDueCounts helper) start from a visible state
     // (same courtesy as the change-password test).
     await page.goto('/app/settings');
-    await expect(dueToggle).toBeVisible({ timeout: 15_000 });
-    await dueToggle.click();
-    await forecastToggle.click();
-    await confirmSaved([
+    await ensureTogglesSaved(page, [
       { toggle: dueToggle, on: true },
       { toggle: forecastToggle, on: true },
     ]);
@@ -233,10 +209,14 @@ test.describe('settings', () => {
       .first();
     await targetOption.click();
 
-    // Page should not crash after switching.
-    await expect(page.getByRole('heading').first()).toBeVisible({
-      timeout: 10_000,
-    });
+    // A real translated string must change, not just "the page didn't
+    // crash": the UI-settings section heading is stable copy in both
+    // locales (en "UI Settings" / de "UI-Einstellungen").
+    await expect(
+      page.getByText(switchingToGerman ? 'UI-Einstellungen' : 'UI Settings', {
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 10_000 });
 
     // Revert to the original locale for hygiene.
     await langControl.click();
@@ -246,8 +226,10 @@ test.describe('settings', () => {
       })
       .first();
     await revertOption.click();
-    await expect(page.getByRole('heading').first()).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect(
+      page.getByText(switchingToGerman ? 'UI Settings' : 'UI-Einstellungen', {
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 10_000 });
   });
 });

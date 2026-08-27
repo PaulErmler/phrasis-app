@@ -389,6 +389,53 @@ export async function gotoAuthedApp(
 }
 
 /**
+ * Drive one or more settings Switches to the given on/off states and
+ * confirm the SERVER actually saved them. Callers must already be on a
+ * page where the toggles are mounted (e.g. /app/settings) with the
+ * toggles reflecting server state (fresh goto or reload).
+ *
+ * Why not click → reload → poll aria-checked? That pattern is a lost-write
+ * race: the switch flips from the optimistic patch in the same frame, but
+ * `page.reload()` tears down the Convex websocket, and an un-acked
+ * mutation dies with it. The old poll then waited on a server state that
+ * could never arrive (showDueCounts and settings.spec both failed exactly
+ * there under post-@live backend load, 2026-08-27; settings failed BOTH
+ * attempts). Instead retry the whole cycle: click toward the desired
+ * state, give the mutation a bounded flush window, reload, re-read. A
+ * write the reload killed is simply re-issued on the next pass.
+ */
+export async function ensureTogglesSaved(
+  page: Page,
+  expected: Array<{ toggle: Locator; on: boolean }>,
+  timeoutMs = 45_000,
+): Promise<void> {
+  // Once ANY click happened, only a post-reload read proves persistence —
+  // before that, aria-checked may be the optimistic patch of a write that
+  // is still in flight (or already lost).
+  let everClicked = false;
+  await expect(async () => {
+    let clickedThisPass = false;
+    for (const { toggle, on } of expected) {
+      await expect(toggle).toBeVisible({ timeout: 15_000 });
+      if ((await toggle.getAttribute('aria-checked')) !== String(on)) {
+        await toggle.click();
+        clickedThisPass = true;
+        everClicked = true;
+      }
+    }
+    if (!everClicked) return; // server state already matched; nothing to prove
+    // Bounded flush window so the mutation can reach the server before
+    // the reload below kills the websocket.
+    if (clickedThisPass) await page.waitForTimeout(1_000);
+    await page.reload();
+    for (const { toggle, on } of expected) {
+      await expect(toggle).toBeVisible({ timeout: 15_000 });
+      expect(await toggle.getAttribute('aria-checked')).toBe(String(on));
+    }
+  }).toPass({ timeout: timeoutMs, intervals: [500, 1_000, 2_000] });
+}
+
+/**
  * Turn on "Show how many cards are due" so home due-count pills render.
  * The pills are hidden by default (showing is an explicit opt-in); specs
  * that assert on them must opt in first.
@@ -397,20 +444,7 @@ export async function showDueCounts(page: Page): Promise<void> {
   await page.goto('/app/settings');
   await page.waitForLoadState('domcontentloaded');
   const sw = page.locator('#showDueCounts');
-  await expect(sw).toBeVisible({ timeout: 15_000 });
-  if ((await sw.getAttribute('aria-checked')) !== 'true') {
-    await sw.click();
-    // aria-checked flips from the optimistic patch in the same frame —
-    // before the mutation commits. Navigating on that signal alone can
-    // unload the page before the write flushes (or land on a page whose
-    // server-preloaded settings predate it). Reload and re-assert so the
-    // state is server-confirmed before the caller navigates anywhere.
-    await page.reload();
-    await expect(sw).toBeVisible({ timeout: 15_000 });
-    await expect
-      .poll(async () => sw.getAttribute('aria-checked'), { timeout: 8_000 })
-      .toBe('true');
-  }
+  await ensureTogglesSaved(page, [{ toggle: sw, on: true }]);
 }
 
 /**

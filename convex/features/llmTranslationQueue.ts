@@ -582,51 +582,57 @@ async function runTranslationStageChain(
     };
 
     if (stage.samples) {
-      // Best-of-N stage: several candidate calls + possibly a judge, each
-      // reported as its own generation event. `suspect_hidden_reasoning`
-      // flags calls whose output-token count dwarfs the visible text. The
-      // tell for providers that ignore `reasoning: {enabled: false}` and
-      // silently bill thinking tokens (observed on Luna's Azure endpoints
-      // during the Aug 2026 eval).
+      // Best-of-N stage: several candidate calls + possibly a judge,
+      // aggregated into ONE cost event per stage attempt. Per-call events
+      // multiplied PostHog volume ~4x per sentence and no dashboard ever
+      // sliced below the stage; token and cost sums keep the totals exact.
+      // `suspect_hidden_reasoning` flags stages where any call's
+      // output-token count dwarfs its own visible text. The tell for
+      // providers that ignore `reasoning: {enabled: false}` and silently
+      // bill thinking tokens (observed on Luna's Azure endpoints during
+      // the Aug 2026 eval).
+      const startedAt = Date.now();
       const bo = await translateBestOfN({ ...promptArgs, stage });
-      // Capture outside the closure: the `stage.samples` narrowing from
-      // the enclosing if doesn't survive into the callback.
-      const sampleTotal = stage.samples.total;
-      // Independent captures. Fire together instead of serializing up to
-      // N+1 awaited PostHog writes.
-      await Promise.all(
-        bo.telemetryList.map(async (t) => {
-          const visibleTokenEstimate =
-            t.visibleTextLength !== undefined
-              ? Math.max(16, Math.ceil(t.visibleTextLength / 2))
-              : undefined;
-          await captureGeneration(ctx, {
-            feature: 'translation',
-            model: t.model,
-            provider: 'openrouter',
-            latencyMs: t.latencyMs,
-            inputTokens: t.inputTokens,
-            outputTokens: t.outputTokens,
-            costUsd: t.costUsd,
-            traceId: t.generationId,
-            isError: t.error !== undefined,
-            error: t.error,
-            sharedContent: true,
-            extra: {
-              ...stageExtra,
-              strategy: `bo${sampleTotal}`,
-              role: t.role,
-              candidate_index: t.candidateIndex,
-              judge_attempt: t.judgeAttempt,
-              n_unique: bo.meta.nUnique,
-              judge_fallback: bo.meta.judgeFallback,
-              suspect_hidden_reasoning:
-                visibleTokenEstimate !== undefined &&
-                t.outputTokens > 4 * visibleTokenEstimate,
-            },
-          });
-        }),
+      const calls = bo.telemetryList;
+      const judgeAttempts = calls.filter((t) => t.role === 'judge').length;
+      const pricedCalls = calls.filter((t) => t.costUsd !== undefined);
+      const suspectHiddenReasoning = calls.some(
+        (t) =>
+          t.visibleTextLength !== undefined &&
+          t.outputTokens >
+            4 * Math.max(16, Math.ceil(t.visibleTextLength / 2)),
       );
+      await captureGeneration(ctx, {
+        feature: 'translation',
+        model: stage.model,
+        provider: 'openrouter',
+        // Wall clock for the whole stage: candidates run in parallel, then
+        // the judge, so summing per-call latencies would overstate it.
+        latencyMs: Date.now() - startedAt,
+        inputTokens: calls.reduce((sum, t) => sum + t.inputTokens, 0),
+        outputTokens: calls.reduce((sum, t) => sum + t.outputTokens, 0),
+        costUsd:
+          pricedCalls.length > 0
+            ? pricedCalls.reduce((sum, t) => sum + (t.costUsd ?? 0), 0)
+            : undefined,
+        traceId: bo.result.telemetry?.generationId,
+        isError: !bo.result.ok,
+        error: bo.result.ok ? undefined : bo.result.reason,
+        sharedContent: true,
+        extra: {
+          ...stageExtra,
+          strategy: `bo${stage.samples.total}`,
+          call_count: calls.length,
+          candidate_failures: bo.meta.candidateFailures,
+          judge_attempts: judgeAttempts,
+          n_unique: bo.meta.nUnique,
+          judge_fallback: bo.meta.judgeFallback,
+          // Calls that never landed carry no cost, so the sum above can be
+          // partial. Surfaced so a low total can't silently read as cheap.
+          priced_calls: pricedCalls.length,
+          suspect_hidden_reasoning: suspectHiddenReasoning,
+        },
+      });
       result = bo.result;
     } else {
       result = await translateTextWithLLM({

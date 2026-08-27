@@ -43,8 +43,14 @@ export const EVENTS = {
   // Onboarding
   ONBOARDING_COMPLETED: 'onboarding_completed',
 
-  // AI cost. See convex/lib/posthogAi.ts
+  // AI cost. See convex/lib/posthogAi.ts for how a capture picks between
+  // these two: `$ai_generation` is PostHog's metered AI-observability event
+  // (reserved for the low-volume, per-user conversational features);
+  // `ai_cost` is a plain product-analytics event carrying the same fields
+  // for the high-volume content-pipeline spend, where the LLM-analytics UI
+  // adds nothing but the per-event metering is real money.
   AI_GENERATION: '$ai_generation',
+  AI_COST: 'ai_cost',
 } as const;
 
 /**

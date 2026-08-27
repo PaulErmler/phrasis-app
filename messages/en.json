@@ -123,7 +123,7 @@
       "uiSettings": {
         "title": "UI Settings",
         "showDueCounts": "Show how many cards are due",
-        "showDueCountsDescription": "Show how many sentences are new or waiting. Off by default, since a large queue can feel discouraging.",
+        "showDueCountsDescription": "Show how many sentences are new or due on the dashboard.",
         "showWorkloadForecast": "Show time schedule for due and upcoming cards",
         "showWorkloadForecastDescription": "Show the 7-day forecast of upcoming review time on the home screen."
       },
@@ -831,7 +831,8 @@
       "stopRecording": "Stop recording",
       "recording": "Recording...",
       "transcribing": "Transcribing...",
-      "transcribed": "Voice input transcribed"
+      "transcribed": "Voice input transcribed",
+      "nothingDetected": "No speech detected — nothing was submitted"
     },
     "attachments": {
       "filesAttached": "Files attached",

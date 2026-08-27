@@ -287,29 +287,57 @@ async function synthesizeAndValidate(
       args.provider,
       args.language,
     );
+    const synthLatencyMs = Date.now() - synthStartedAt;
     // Google bills per character of input text, so the cost is exactly
     // derivable. Gemini TTS goes through OpenRouter, whose per-request cost is
     // only retrievable by a follow-up lookup on the generation id. Recorded
-    // here without a cost figure so the call volume is at least visible, and
+    // without a cost figure so the call volume is at least visible, and
     // flagged so a zero can't be mistaken for "free".
-    await captureGeneration(ctx, {
-      feature: 'tts_synthesis',
-      model: args.voiceName,
-      provider: args.provider,
-      latencyMs: Date.now() - synthStartedAt,
-      costUsd:
-        args.provider === 'google'
-          ? costForCharacters('googleTts', args.text.length)
-          : undefined,
-      sharedContent: true,
-      extra: {
-        text_id: args.textId,
-        language: args.language,
-        character_count: args.text.length,
-        attempt,
-        cost_source: args.provider === 'google' ? 'rate_table' : 'unavailable',
-      },
-    });
+    const synthCostUsd =
+      args.provider === 'google'
+        ? costForCharacters('googleTts', args.text.length)
+        : undefined;
+    // ONE event per synthesized clip, covering both the synthesis and its
+    // Azure STT validation round-trip (they fire 1:1, and as separate events
+    // they doubled TTS event volume in PostHog). Every exit path of this
+    // attempt emits exactly once, with `stt_status` recording whether the
+    // validation leg ran; `cost_usd` is the sum of both legs.
+    const emitTtsEvent = (stt: {
+      status: 'ok' | 'error' | 'skipped' | 'backpressure';
+      latencyMs?: number;
+      audioDurationMs?: number;
+      error?: string;
+    }) => {
+      const sttCostUsd =
+        stt.audioDurationMs !== undefined
+          ? costForAudioMs('azureStt', stt.audioDurationMs)
+          : undefined;
+      return captureGeneration(ctx, {
+        feature: 'tts_synthesis',
+        model: args.voiceName,
+        provider: args.provider,
+        latencyMs: synthLatencyMs,
+        costUsd:
+          synthCostUsd !== undefined || sttCostUsd !== undefined
+            ? (synthCostUsd ?? 0) + (sttCostUsd ?? 0)
+            : undefined,
+        sharedContent: true,
+        extra: {
+          text_id: args.textId,
+          language: args.language,
+          character_count: args.text.length,
+          attempt,
+          synth_cost_usd: synthCostUsd,
+          synth_cost_source:
+            args.provider === 'google' ? 'rate_table' : 'unavailable',
+          stt_status: stt.status,
+          stt_cost_usd: sttCostUsd,
+          stt_latency_ms: stt.latencyMs,
+          audio_duration_ms: stt.audioDurationMs,
+          stt_error: stt.error,
+        },
+      });
+    };
     const storageId: Id<'_storage'> = await ctx.storage.store(blob);
     lastStorageId = storageId;
 
@@ -340,6 +368,7 @@ async function synthesizeAndValidate(
     }
 
     if (!canValidate) {
+      await emitTtsEvent({ status: 'skipped' });
       return { validated: false, lastStorageId, wordTimings: null };
     }
 
@@ -347,8 +376,14 @@ async function synthesizeAndValidate(
     // a saturated azureStt bucket throws out of the worker (the pool's
     // backoff retries the whole job once the bucket drains) instead of being
     // swallowed as a transcription error and accepting unvalidated audio
-    // over a transient queue spike.
-    await reserveAzureSttSlot(ctx, { maxWaitMs: STT_TOKEN_MAX_WAIT_MS });
+    // over a transient queue spike. The synthesis money was still spent, so
+    // its event fires before the throw; the retried job emits its own.
+    try {
+      await reserveAzureSttSlot(ctx, { maxWaitMs: STT_TOKEN_MAX_WAIT_MS });
+    } catch (backpressureErr) {
+      await emitTtsEvent({ status: 'backpressure' });
+      throw backpressureErr;
+    }
 
     const sttStartedAt = Date.now();
     try {
@@ -361,24 +396,12 @@ async function synthesizeAndValidate(
       });
 
       // Every synthesized clip is round-tripped through Azure to validate it.
-      // That makes this one of the largest spend lines in the app and, until
-      // now, an entirely invisible one. It is billed to no feature and no user.
-      await captureGeneration(ctx, {
-        feature: 'tts_validation_stt',
-        model: 'azure-fast-transcription',
-        provider: 'azure',
+      // That makes it one of the largest spend lines in the app, folded into
+      // the clip's event here (rate-table cost from the audio duration).
+      await emitTtsEvent({
+        status: 'ok',
         latencyMs: Date.now() - sttStartedAt,
-        costUsd:
-          audioDurationMs !== undefined
-            ? costForAudioMs('azureStt', audioDurationMs)
-            : undefined,
-        sharedContent: true,
-        extra: {
-          text_id: args.textId,
-          language: args.language,
-          audio_duration_ms: audioDurationMs,
-          attempt,
-        },
+        audioDurationMs,
       });
 
       // Cheap strict check first. For Chinese/Korean this compares
@@ -446,6 +469,14 @@ async function synthesizeAndValidate(
         `Transcription failed (attempt ${attempt + 1}/${maxAttempts}):`,
         transcriptionErr,
       );
+      await emitTtsEvent({
+        status: 'error',
+        latencyMs: Date.now() - sttStartedAt,
+        error:
+          transcriptionErr instanceof Error
+            ? transcriptionErr.message
+            : String(transcriptionErr),
+      });
       if (attempt + 1 < maxAttempts) {
         // The retry will supersede this attempt's blob, and. Unlike a
         // mismatch, whose blob the ttsMismatches record keeps for review.

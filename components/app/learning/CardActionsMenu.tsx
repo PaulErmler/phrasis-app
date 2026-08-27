@@ -290,6 +290,7 @@ export function CardActionsMenu({
             onClick={depleted ? (e) => e.preventDefault() : cfg.onClick}
             aria-disabled={depleted}
             aria-label={tooltip}
+            data-testid={`card-action-${cfg.key}`}
             className={`${triggerClassName} ${toneClassesForButton(tone)} ${
               depleted
                 ? 'opacity-40 cursor-not-allowed hover:bg-transparent hover:text-muted-foreground'
@@ -358,6 +359,7 @@ export function CardActionsMenu({
         // prevent default. Just no-op when depleted.
         onSelect={depleted ? () => undefined : cfg.onClick}
         aria-disabled={depleted}
+        data-testid={`card-action-${cfg.key}`}
         className={`pl-1 ${
           depleted
             ? 'opacity-50 cursor-not-allowed data-[highlighted]:bg-transparent data-[highlighted]:text-inherit'
@@ -443,6 +445,7 @@ export function CardActionsMenu({
             variant="ghost"
             size="icon"
             aria-label={t('actions.more')}
+            data-testid="card-actions-more"
             className={`${triggerClassName} text-muted-foreground hover:text-foreground hover:bg-muted`}
             onPointerDown={(e) => e.preventDefault()}
             onClick={() => setOpen((v) => !v)}
@@ -461,7 +464,11 @@ export function CardActionsMenu({
           {onDelete && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+              <DropdownMenuItem
+                variant="destructive"
+                data-testid="card-action-delete"
+                onSelect={onDelete}
+              >
                 <Trash2 />
                 <span>{t('actions.delete')}</span>
               </DropdownMenuItem>
