@@ -567,12 +567,13 @@ export async function propagateEditToDerivedContent(
     }
   }
 
-  // Trigger TTS + romanization for changed languages
+  // Trigger TTS + romanization for changed languages, billed to the editor.
   await scheduleMissingContent(
     ctx,
     resolvedTextId,
     resolvedText,
     course.baseLanguages,
     course.targetLanguages,
+    { requestedByUserId: userId },
   );
 }

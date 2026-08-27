@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  recordReviewForSession,
+  undoReviewForSession,
+} from '@/lib/posthog/review-session-counter';
 import { useTranslations } from 'next-intl';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import {
@@ -1028,6 +1032,7 @@ export function useLearningMode(
             accuracyLenient: accuracy.lenient / 100,
           }),
         });
+        recordReviewForSession();
         setDailyReviewsToday(result.dailyReviewsToday);
         setDailyTimeMsToday(result.dailyTimeMsToday);
         setDailyNewWordsToday(result.dailyNewWordsToday);
@@ -1086,6 +1091,7 @@ export function useLearningMode(
         setDailyTimeMsToday(result.dailyTimeMsToday);
         setDailyNewWordsToday(result.dailyNewWordsToday);
         setSessionCardCount((n) => Math.max(0, n - 1));
+        undoReviewForSession();
         // The card-change effect keyed on `cardForReview?._id` won't fire when
         // the restored card is the same document as the one on screen (e.g.
         // after an "again" rating on a small deck), so reset the per-card

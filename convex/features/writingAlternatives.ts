@@ -266,6 +266,8 @@ const alternativeContextValidator = v.union(
     /** Asset already covering this sentence (either gender), if any. */
     reusableAssetId: v.union(v.id('audioAssets'), v.null()),
     hasAudio: v.boolean(),
+    /** Owner of the alternative; synthesis cost bills to them. */
+    userId: v.string(),
   }),
 );
 
@@ -275,6 +277,7 @@ export type AlternativeContext = {
   genders: ('male' | 'female')[];
   reusableAssetId: Id<'audioAssets'> | null;
   hasAudio: boolean;
+  userId: string;
 } | null;
 
 /**
@@ -318,6 +321,7 @@ export const getAlternativeContext = internalQuery({
       genders,
       reusableAssetId,
       hasAudio: row.audioAssetId !== undefined,
+      userId: row.userId,
     };
   },
 });
@@ -441,6 +445,7 @@ export const generateAlternativeAudio = internalAction({
       context.language,
     );
     await captureGeneration(ctx, {
+      distinctId: context.userId,
       feature: 'tts_synthesis',
       model: voiceName,
       provider,

@@ -38,6 +38,10 @@ const app = defineApp({
     APPLE_APP_BUNDLE_IDENTIFIER: v.optional(v.string()),
     // Billing (convex/autumn.ts, convex/usage/*)
     AUTUMN_SECRET_KEY: v.optional(v.string()),
+    // Read-only restricted key (Invoices, Charges, Balance transactions:
+    // read) for the daily payment reconciliation sweep
+    // (convex/features/paymentSync.ts). Unset = the sweep no-ops.
+    STRIPE_SECRET_KEY: v.optional(v.string()),
     // LLM + TTS via OpenRouter (convex/lib/openrouter.ts, convex/lib/tts/*)
     OPENROUTER_API_KEY: v.optional(v.string()),
     // Google Cloud translation / romanization / TTS

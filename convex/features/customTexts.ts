@@ -466,6 +466,7 @@ export const createCustomText = mutation({
           textId,
           baseLanguages: course.baseLanguages,
           targetLanguages: course.targetLanguages,
+          requestedByUserId: userId,
         },
       );
     } else {

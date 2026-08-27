@@ -195,6 +195,12 @@ const llmJobArgsValidator = v.object({
   sourceLanguage: v.string(),
   targetLanguage: v.string(),
   text: v.string(),
+  // The user whose deliberate action caused this job (custom card, card
+  // edit, translation flag, chat approval, …). Cost events bill to them as
+  // "spend this user caused" (paired with shared_content, see
+  // convex/lib/posthogAi.ts). Absent for background/self-heal work, which
+  // stays in the system:content-pipeline bucket.
+  requestedByUserId: v.optional(v.string()),
   audioSpeakerGender: v.optional(v.string()),
   // Retranslation flag forwarded to `storeTranslationAndScheduleTTS` (and
   // through the fallback to `processTranslationForCard`). Set by
@@ -603,6 +609,7 @@ async function runTranslationStageChain(
             4 * Math.max(16, Math.ceil(t.visibleTextLength / 2)),
       );
       await captureGeneration(ctx, {
+        distinctId: args.requestedByUserId,
         feature: 'translation',
         model: stage.model,
         provider: 'openrouter',
@@ -647,6 +654,7 @@ async function runTranslationStageChain(
       // numbers back and the capture happens here.
       if (result.telemetry) {
         await captureGeneration(ctx, {
+          distinctId: args.requestedByUserId,
           feature: 'translation',
           model: result.telemetry.model,
           provider: 'openrouter',
@@ -754,6 +762,7 @@ async function storeLlmTranslationResult(
     {
       textId: args.textId,
       targetLanguage: args.targetLanguage,
+      requestedByUserId: args.requestedByUserId,
       translatedText,
       voiceName,
       romanizedText,
@@ -968,6 +977,7 @@ export const onLlmTranslationComplete = internalMutation({
         targetLanguage: context.targetLanguage,
         text: context.text,
         audioSpeakerGender: context.audioSpeakerGender,
+        requestedByUserId: context.requestedByUserId,
         replaceExisting: context.replaceExisting,
         preferredRegionVariant: context.preferredRegionVariant,
         skipTts: context.skipTts,

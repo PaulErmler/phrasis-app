@@ -431,7 +431,7 @@ export async function scheduleMissingTranslationsForText(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   languages: string[],
-  opts?: { llmPriority?: LlmPriority },
+  opts?: { llmPriority?: LlmPriority; requestedByUserId?: string },
 ): Promise<number> {
   const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
     text,
@@ -521,6 +521,7 @@ export async function scheduleMissingTranslationsForText(
       await scheduleTranslationForLanguage(ctx, text, lang, {
         audioSpeakerGender,
         preferredRegionVariant,
+        requestedByUserId: opts?.requestedByUserId,
         skipTts: true,
         // Warm work. If the landing translation still triggers TTS (a card
         // references the text, see storeTranslationAndScheduleTTS's skipTts
@@ -584,6 +585,9 @@ export const requestPreviewTranslations = mutation({
         ctx,
         text,
         languages,
+        // Explicit preview request: the viewing user caused this spend. The
+        // prewarm sibling below stays unattributed (speculative work).
+        { requestedByUserId: userId },
       );
     }
 
@@ -736,6 +740,7 @@ export const requestPreviewAudio = mutation({
       args.language,
       audioSpeakerGender,
       translation,
+      { requestedByUserId: userId },
     );
     return { scheduled };
   },

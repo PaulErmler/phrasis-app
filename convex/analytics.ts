@@ -51,6 +51,12 @@ export const EVENTS = {
   // adds nothing but the per-event metering is real money.
   AI_GENERATION: '$ai_generation',
   AI_COST: 'ai_cost',
+
+  // One event per PAID Stripe invoice, with the actual gross / tax /
+  // Stripe-fee / net amounts, emitted by the daily reconciliation sweep in
+  // convex/features/paymentSync.ts. The revenue side of the margin
+  // dashboards; replaces list-price assumptions with what was really paid.
+  PAYMENT_RECORDED: 'payment_recorded',
 } as const;
 
 /**

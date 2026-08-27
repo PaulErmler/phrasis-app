@@ -266,6 +266,7 @@ export const sendMessage = mutation({
         {
           threadId: args.threadId,
           userMessage: args.prompt,
+          userId,
         },
       );
     }
@@ -287,6 +288,7 @@ export const sendMessage = mutation({
         difficultySection,
         prompt: args.prompt,
         includeAiContent,
+        userId,
         // Only forwarded when the card context resolved (ownership verified
         // above), gates the markAlsoCorrect tool for this turn.
         cardId: cardData ? args.cardId : undefined,
@@ -409,6 +411,12 @@ export const generateResponse = internalAction({
     // verified by sendMessage's resolveCardContext). Presence registers the
     // markAlsoCorrect tool for this turn, closed over this id.
     cardId: v.optional(v.id('cards')),
+    // The sending user, for cost attribution: seeds `billedUserId` (so
+    // turns whose usageHandler never supplies a userId still bill to the
+    // sender) and rides into the thread-title event. A stream that throws
+    // still skips billing entirely — control jumps to the catch below
+    // before the charge.
+    userId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -457,7 +465,7 @@ export const generateResponse = internalAction({
       // accumulator is complete after the await. Thread-title generation is
       // deliberately not billed (flash-lite, ~4 words, negligible).
       let totalCostUsd = 0;
-      let billedUserId: string | undefined;
+      let billedUserId: string | undefined = args.userId;
 
       // One `$ai_generation` per LLM step is emitted after the stream finishes
       // rather than from inside `usageHandler`: the handler runs mid-stream, and
@@ -671,6 +679,8 @@ export const generateThreadTitle = internalAction({
   args: {
     threadId: v.string(),
     userMessage: v.string(),
+    // Thread owner; the title's (tiny) cost bills to them.
+    userId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -689,6 +699,7 @@ Maximum 4 words. No quotes. No period.`,
         prompt: args.userMessage,
       });
       await captureGeneration(ctx, {
+        distinctId: args.userId,
         feature: 'chat_title',
         model: OPENROUTER_MODELS.threadTitle,
         provider: 'openrouter',

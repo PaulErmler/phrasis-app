@@ -96,6 +96,12 @@ export async function scheduleTranslationForLanguage(
     llmPriority?: LlmPriority;
     /** Read-only probe: throw ProbeNeedsWork instead of writing. */
     probe?: boolean;
+    /**
+     * User whose deliberate action caused this request; the job's cost
+     * events bill to them (see the llm queue validator). Absent for
+     * background/self-heal sweeps.
+     */
+    requestedByUserId?: string;
   },
 ): Promise<boolean> {
   const tCfg = getTranslationConfigForLanguage(targetLanguage);
@@ -141,6 +147,7 @@ export async function scheduleTranslationForLanguage(
           skipTts: opts.skipTts,
           priority: opts.priority,
           llmPriority: opts.llmPriority,
+          requestedByUserId: opts.requestedByUserId,
         },
       },
     );
@@ -162,6 +169,7 @@ export async function scheduleTranslationForLanguage(
       preferredRegionVariant: opts.preferredRegionVariant,
       skipTts: opts.skipTts,
       priority: opts.priority,
+      requestedByUserId: opts.requestedByUserId,
     },
     {
       onComplete:
@@ -188,6 +196,7 @@ export async function enqueueTtsForVoice(
     regionVariant,
     forceRegen,
     priority,
+    requestedByUserId,
   }: {
     textId: Id<'texts'>;
     text: string;
@@ -196,6 +205,8 @@ export async function enqueueTtsForVoice(
     regionVariant: string | undefined;
     forceRegen?: boolean;
     priority?: TtsPriority;
+    /** Requester attribution for the synthesis cost event. */
+    requestedByUserId?: string;
   },
 ): Promise<void> {
   const voiceGender = getVoiceGenderByApiCode(voiceName);
@@ -216,6 +227,7 @@ export async function enqueueTtsForVoice(
       regionVariant,
       forceRegen,
       priority,
+      requestedByUserId,
     },
   });
 }
@@ -250,6 +262,8 @@ export async function scheduleAudioForLanguage(
     priority?: TtsPriority;
     /** Read-only probe: throw ProbeNeedsWork instead of writing. */
     probe?: boolean;
+    /** Requester attribution for the synthesis cost event. */
+    requestedByUserId?: string;
   },
 ): Promise<boolean> {
   const isSource = language === text.language;
@@ -306,6 +320,7 @@ export async function scheduleAudioForLanguage(
     regionVariant,
     forceRegen: opts?.forceRegen,
     priority: opts?.priority,
+    requestedByUserId: opts?.requestedByUserId,
   });
   return true;
 }
@@ -340,6 +355,13 @@ type ContentSweepOpts = {
    * needy. Completing without the throw means the text needs nothing.
    */
   probe?: boolean;
+  /**
+   * User whose deliberate action caused this sweep (custom card, card edit,
+   * audio regen, chat approval). Every translation/TTS job the sweep
+   * enqueues bills its cost events to them. Absent for background ensure /
+   * self-heal sweeps, whose spend stays in the system bucket.
+   */
+  requestedByUserId?: string;
 };
 
 type ResolvedAudioPayload = NonNullable<
@@ -717,6 +739,7 @@ async function scheduleLanguageContent(
           forceRegen: opts?.forceAudioRegen,
           priority: opts?.priority,
           probe: opts?.probe,
+          requestedByUserId: opts?.requestedByUserId,
         },
       );
     } else {
@@ -742,6 +765,7 @@ async function scheduleLanguageContent(
         priority: opts?.priority,
         llmPriority: opts?.llmPriority,
         probe: opts?.probe,
+        requestedByUserId: opts?.requestedByUserId,
       },
     );
     return scheduled;
@@ -785,6 +809,7 @@ async function scheduleLanguageContent(
           forceRegen: opts?.forceAudioRegen,
           priority: opts?.priority,
           probe: opts?.probe,
+          requestedByUserId: opts?.requestedByUserId,
         },
       );
     }

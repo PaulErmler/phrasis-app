@@ -190,6 +190,7 @@ export const requestApprovalAudio = mutation({
         language: args.language,
         spokenText: entry.text,
         voiceGender,
+        userId,
         voiceName: getVoiceForLanguage(args.language, voiceGender),
         provider: getTtsProviderForLanguage(args.language),
       },
@@ -220,6 +221,9 @@ export const synthesizeApprovalAudio = internalAction({
     voiceGender: voiceGenderValidator,
     voiceName: v.string(),
     provider: ttsProviderValidator,
+    // The user who clicked play on the proposal line; the synthesis bills
+    // to them.
+    userId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -237,6 +241,7 @@ export const synthesizeApprovalAudio = internalAction({
       args.language,
     );
     await captureGeneration(ctx, {
+      distinctId: args.userId,
       feature: 'tts_synthesis',
       model: args.voiceName,
       provider: args.provider,

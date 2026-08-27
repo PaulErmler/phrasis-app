@@ -40,6 +40,22 @@ import {
 // backfills).
 export const migrations = new Migrations<DataModel>(components.migrations);
 
+/**
+ * Full-table sweeps are bottlenecked by per-batch scheduling round-trips
+ * (~300ms each), not per-document work: at the default batchSize of 100, one
+ * pass over the ~300k-row translations table is ~3000 scheduled mutations,
+ * ~15 minutes of wall clock per migration — and `runAll` chains many of them.
+ *
+ * Sweeps whose migrateOne is a pure field check that patches only stale rows
+ * can take 1000 docs/batch and still stay well inside the mutation transaction
+ * budget. Sweeps that do real per-document work inside the batch mutation
+ * (synchronous romanization compute) or fan out scheduler calls (furigana
+ * actions) stay at 500 so a worst-case batch (every row matching) keeps clear
+ * of the mutation execution-time and scheduling limits.
+ */
+const CHECK_SWEEP_BATCH_SIZE = 1000;
+const WORK_SWEEP_BATCH_SIZE = 500;
+
 /** Generic runner: npx convex run migrations:run '{"fn": "migrations:<name>"}' */
 export const run = migrations.runner();
 
@@ -373,11 +389,13 @@ export function resetStaleCantoneseRomanizationPatch(doc: {
 
 export const resetStaleCantoneseTextRomanization = migrations.define({
   table: 'texts',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
   migrateOne: (_ctx, doc) => resetStaleCantoneseRomanizationPatch(doc),
 });
 
 export const resetStaleCantoneseTranslationRomanization = migrations.define({
   table: 'translations',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
   migrateOne: (_ctx, doc) =>
     resetStaleCantoneseRomanizationPatch({
       language: doc.targetLanguage,
@@ -427,10 +445,12 @@ function staleRomanizationResets(language: string, currentSource: string) {
     patch,
     texts: migrations.define({
       table: 'texts',
+      batchSize: CHECK_SWEEP_BATCH_SIZE,
       migrateOne: (_ctx, doc) => patch(doc),
     }),
     translations: migrations.define({
       table: 'translations',
+      batchSize: CHECK_SWEEP_BATCH_SIZE,
       migrateOne: (_ctx, doc) =>
         patch({
           language: doc.targetLanguage,
@@ -480,12 +500,14 @@ export const resetStaleBulgarianTranslationRomanizationV3 =
 
 export const recomputeTextRomanization = migrations.define({
   table: 'texts',
+  batchSize: WORK_SWEEP_BATCH_SIZE,
   migrateOne: (_ctx, doc) =>
     recomputeRomanizationPatch(doc.language, doc.text, doc.romanizedText),
 });
 
 export const recomputeTranslationRomanization = migrations.define({
   table: 'translations',
+  batchSize: WORK_SWEEP_BATCH_SIZE,
   migrateOne: (_ctx, doc) =>
     recomputeRomanizationPatch(
       doc.targetLanguage,
@@ -583,16 +605,19 @@ export function resetStaleFuriganaPatch(doc: {
 
 export const resetStaleTextFurigana = migrations.define({
   table: 'texts',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
   migrateOne: (_ctx, doc) => resetStaleFuriganaPatch(doc),
 });
 
 export const resetStaleTranslationFurigana = migrations.define({
   table: 'translations',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
   migrateOne: (_ctx, doc) => resetStaleFuriganaPatch(doc),
 });
 
 export const backfillTextFurigana = migrations.define({
   table: 'texts',
+  batchSize: WORK_SWEEP_BATCH_SIZE,
   migrateOne: async (ctx, doc) => {
     if (!needsFuriganaBackfill(doc.language, doc.furiganaText, doc.text)) {
       return;
@@ -607,6 +632,7 @@ export const backfillTextFurigana = migrations.define({
 
 export const backfillTranslationFurigana = migrations.define({
   table: 'translations',
+  batchSize: WORK_SWEEP_BATCH_SIZE,
   migrateOne: async (ctx, doc) => {
     if (
       !needsFuriganaBackfill(

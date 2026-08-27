@@ -17,6 +17,10 @@ import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { getUserTimezone } from '@/lib/timezone';
 import { usePrefetchedThread } from '@/hooks/use-prefetched-thread';
 import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
+import {
+  getSessionReviewCount,
+  resetSessionReviewCount,
+} from '@/lib/posthog/review-session-counter';
 import { HomeView } from '@/components/app/HomeView';
 import { FreePlanUpgradeBadge } from '@/components/app/FreePlanUpgradeBadge';
 import { AddCardsView } from '@/components/app/AddCardsView';
@@ -115,6 +119,13 @@ export default function MainLayout({
   );
   const isLearnOpenRef = useRef(false);
   useEffect(() => {
+    if (isLearnOpen && !isLearnOpenRef.current) {
+      // A session just opened — via the learn button, a /app/learn deep-link
+      // mount, or popstate forward. Resetting on the open *transition* (not
+      // in handleLearnOpen) covers all three, so a back-then-forward reopen
+      // can't report the previous session's tally.
+      resetSessionReviewCount();
+    }
     isLearnOpenRef.current = isLearnOpen;
   }, [isLearnOpen]);
   const isAddCardsRoute = pathname === '/app/content/add-cards';
@@ -257,6 +268,7 @@ export default function MainLayout({
     learnStartedAtRef.current = null;
     capture(CLIENT_EVENTS.REVIEW_SESSION_ENDED, {
       duration_ms: startedAt === null ? undefined : Date.now() - startedAt,
+      reviews_count: getSessionReviewCount(),
       course_id: activeCourse?._id,
       target_languages: activeCourse?.targetLanguages,
       current_level: activeCourse?.currentLevel,

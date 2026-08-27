@@ -251,6 +251,8 @@ async function synthesizeAndValidate(
     forceRegen?: boolean;
     /** Scheduling priority; picks the synthesis-token wait cap below. */
     priority?: TtsPriority;
+    /** Requester attribution for the cost events (see ttsJobArgsValidator). */
+    requestedByUserId?: string;
   },
   maxAttempts: number,
 ): Promise<{
@@ -313,6 +315,7 @@ async function synthesizeAndValidate(
           ? costForAudioMs('azureStt', stt.audioDurationMs)
           : undefined;
       return captureGeneration(ctx, {
+        distinctId: args.requestedByUserId,
         feature: 'tts_synthesis',
         model: args.voiceName,
         provider: args.provider,
@@ -327,6 +330,7 @@ async function synthesizeAndValidate(
           language: args.language,
           character_count: args.text.length,
           attempt,
+          regen: args.forceRegen === true,
           synth_cost_usd: synthCostUsd,
           synth_cost_source:
             args.provider === 'google' ? 'rate_table' : 'unavailable',
@@ -429,6 +433,7 @@ async function synthesizeAndValidate(
         );
         for (const telemetry of judgeTelemetry) {
           await captureGeneration(ctx, {
+            distinctId: args.requestedByUserId,
             feature: 'tts_validation_judge',
             model: OPENROUTER_MODELS.ttsValidation,
             provider: 'openrouter',
@@ -520,6 +525,10 @@ const ttsJobArgsValidator = v.object({
   // enqueue time and the rate-limit wait cap in the worker. Absent =
   // 'interactive'.
   priority: v.optional(ttsPriorityValidator),
+  // User whose deliberate action caused this synthesis (audio regen, card
+  // edit, custom card, …). The cost event bills to them as "spend this user
+  // caused" (see convex/lib/posthogAi.ts); absent = system bucket.
+  requestedByUserId: v.optional(v.string()),
 });
 
 type TtsJobArgs = Infer<typeof ttsJobArgsValidator>;

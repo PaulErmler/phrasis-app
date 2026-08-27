@@ -1761,4 +1761,24 @@ export default defineSchema({
     .index('by_email', ['email'])
     .index('by_createdAt', ['createdAt'])
     .searchIndex('search_users', { searchField: 'searchText' }),
+
+  // One row per Stripe invoice the payment reconciliation sweep has already
+  // reported to PostHog (convex/features/paymentSync.ts). Pure dedup ledger:
+  // the sweep's lookback windows overlap on purpose, and this index is what
+  // makes the overlap emit nothing twice. Deliberately carries NO user id or
+  // email: the attribution lives on the PostHog event, so this financial
+  // record needs no handling in the account-deletion purge. Amounts are kept
+  // for debugging; Stripe remains the system of record.
+  paymentEvents: defineTable({
+    stripeInvoiceId: v.string(),
+    /** Major currency units (EUR), not cents. */
+    gross: v.number(),
+    tax: v.number(),
+    stripeFee: v.optional(v.number()),
+    balanceNet: v.optional(v.number()),
+    currency: v.string(),
+    paidAt: v.number(),
+    /** Whole months the invoice pays for (12 for annual plans). */
+    periodMonths: v.optional(v.number()),
+  }).index('by_stripeInvoiceId', ['stripeInvoiceId']),
 });

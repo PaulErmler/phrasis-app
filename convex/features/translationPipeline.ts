@@ -62,6 +62,12 @@ const vProcessTranslationForCardArgs = v.object({
   text: v.string(),
   audioSpeakerGender: v.optional(v.string()),
   /**
+   * User whose deliberate action caused this job; cost events bill to them
+   * (see the llm queue's validator for the full contract). Forwarded to
+   * `storeTranslationAndScheduleTTS` so the TTS leg inherits it.
+   */
+  requestedByUserId: v.optional(v.string()),
+  /**
    * Retranslation flag. Set when this action is dispatched as the
    * Google fallback for a deliberate LLM retranslation (flagTranslation
    * or the model-swap migration). When true, the action skips the
@@ -117,6 +123,8 @@ const vStoreTranslationAndScheduleTtsArgs = v.object({
   targetLanguage: v.string(),
   translatedText: v.string(),
   voiceName: v.string(),
+  /** Requester attribution, forwarded into the TTS enqueue. */
+  requestedByUserId: v.optional(v.string()),
   romanizedText: v.optional(v.string()),
   /**
    * Identifier of the romanizer that produced `romanizedText` (or
@@ -321,6 +329,7 @@ export async function processTranslationForCardHandler(
     // after the LLM stage chain has given up, so its volume doubles as a
     // health signal for the LLM translation pipeline.
     await captureGeneration(ctx, {
+      distinctId: args.requestedByUserId,
       feature: 'machine_translation',
       model: 'google-translate-v2',
       provider: 'google',
@@ -890,6 +899,7 @@ async function scheduleTtsForLandedTranslation(
           voiceName: args.voiceName,
           regionVariant: args.regionVariant,
           priority: ttsPriority,
+          requestedByUserId: args.requestedByUserId,
         });
       }
     }

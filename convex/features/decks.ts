@@ -371,6 +371,7 @@ export const prepareCardContent = internalMutation({
     targetLanguages: v.array(v.string()),
     priority: v.optional(ttsPriorityValidator),
     llmPriority: v.optional(llmPriorityValidator),
+    requestedByUserId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: prepareCardContentHandler,

@@ -1506,6 +1506,8 @@ async function enqueueFlagRetranslation(
         targetLanguage,
         text: text.text,
         audioSpeakerGender: text.audioSpeakerGender,
+        // The flagging/editing user deliberately asked for this retranslation.
+        requestedByUserId: opts.audit.userId,
         ruleOverride: RULE,
         translationReason: opts.reason,
         retranslationAuditId,
@@ -1880,7 +1882,7 @@ export const regenerateCardAudio = mutation({
       text,
       course.baseLanguages,
       course.targetLanguages,
-      { forceAudioRegen: true },
+      { forceAudioRegen: true, requestedByUserId: userId },
     );
 
     await trackCardAction(ctx, userId, 'regenerate_audio', card);

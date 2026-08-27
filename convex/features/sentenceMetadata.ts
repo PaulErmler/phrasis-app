@@ -204,6 +204,7 @@ export const generateSentenceMetadata = internalAction({
           targetLanguages: args.targetLanguages,
           priority: args.priority,
           llmPriority: args.llmPriority,
+          requestedByUserId: args.userId,
         },
       );
 
@@ -279,6 +280,7 @@ export const fetchSentenceMetadata = internalAction({
       // Fires once per newly-created card and was previously both unmetered and
       // unbilled, i.e. pure invisible cost that scales with content growth.
       await captureGeneration(ctx, {
+        distinctId: args.userId,
         feature: 'sentence_metadata',
         model: OPENROUTER_MODELS.sentenceMetadata,
         provider: 'openrouter',
@@ -303,6 +305,7 @@ export const fetchSentenceMetadata = internalAction({
           targetLanguages: args.targetLanguages,
           priority: args.priority,
           llmPriority: args.llmPriority,
+          requestedByUserId: args.userId,
         },
       );
 
@@ -351,6 +354,8 @@ export async function applyTextMetadata(
     targetLanguages: string[];
     priority?: TtsPriority;
     llmPriority?: LlmPriority;
+    /** Requester attribution, forwarded into prepareCardContent. */
+    requestedByUserId?: string;
   },
 ): Promise<null> {
   const text = await ctx.db.get(args.textId);
@@ -484,6 +489,7 @@ export async function applyTextMetadata(
         targetLanguages: args.targetLanguages,
         priority: args.priority,
         llmPriority: args.llmPriority,
+        requestedByUserId: args.requestedByUserId,
       },
     );
   }
@@ -508,6 +514,7 @@ export const applyMetadataAndPrepareCard = internalMutation({
     targetLanguages: v.array(v.string()),
     priority: v.optional(ttsPriorityValidator),
     llmPriority: v.optional(llmPriorityValidator),
+    requestedByUserId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: applyTextMetadata,

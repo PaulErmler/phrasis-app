@@ -290,6 +290,8 @@ export async function prepareCardContentHandler(
     targetLanguages: string[];
     priority?: TtsPriority;
     llmPriority?: LlmPriority;
+    /** Requester attribution for the cost events (see ContentSweepOpts). */
+    requestedByUserId?: string;
   },
 ): Promise<null> {
   const text = await ctx.db.get(args.textId);
@@ -301,7 +303,11 @@ export async function prepareCardContentHandler(
     text,
     args.baseLanguages,
     args.targetLanguages,
-    { priority: args.priority, llmPriority: args.llmPriority },
+    {
+      priority: args.priority,
+      llmPriority: args.llmPriority,
+      requestedByUserId: args.requestedByUserId,
+    },
   );
   return null;
 }
