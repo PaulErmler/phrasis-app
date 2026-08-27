@@ -275,7 +275,6 @@ export function FullReviewCardContent({
     () => new Map(),
   );
 
-  const autoPlayedRef = useRef<Set<string>>(new Set());
   const revealAudioRef = useRef<HTMLAudioElement | null>(null);
   const revealAbortedRef = useRef(false);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
@@ -299,9 +298,17 @@ export function FullReviewCardContent({
   // where a stale USAGE_LIMIT would mark the fresh request 'limit'.
   const feedbackRequestSeqRef = useRef<Map<string, number>>(new Map());
 
+  // Keyed on the translation content AND the card id: two consecutive cards
+  // can carry byte-identical translations (duplicate sentences across
+  // collections), and a reset that only watched the text would keep the old
+  // card's `submitted: true` inputs alive — the grade kick-off effect below
+  // would then re-grade the previous card's answers against the new cardId,
+  // spending quota and attaching verdicts to the wrong card.
   const [prevTranslationKey, setPrevTranslationKey] = useState(translationKey);
-  if (translationKey !== prevTranslationKey) {
+  const [prevCardId, setPrevCardId] = useState(cardId);
+  if (translationKey !== prevTranslationKey || cardId !== prevCardId) {
     setPrevTranslationKey(translationKey);
+    setPrevCardId(cardId);
     setInputs(
       new Map(
         targetTranslations.map((tr) => [
@@ -316,14 +323,8 @@ export function FullReviewCardContent({
     // Invalidate any in-flight grades: their sequence numbers no longer match,
     // so a reply from before the reset can't land on a fresh submission.
     feedbackRequestSeqRef.current = new Map();
-    autoPlayedRef.current = new Set();
     pairCacheRef.current.clear();
   }
-
-  useEffect(() => {
-    setSubmissionOrder([]);
-    setFeedback(new Map());
-  }, [cardId]);
 
   const allSubmitted =
     targetTranslations.length > 0 &&
@@ -489,12 +490,10 @@ export function FullReviewCardContent({
     if (unsubmittedAudio.length === 0) return;
 
     // Settings change mid-card (e.g. switching target audio to 'always'
-    // behind the open sheet): never start the sweep, and mark the entries
-    // played so it doesn't fire when the sheet closes either.
+    // behind the open sheet): never start the sweep. Nothing to queue for
+    // sheet-close either — this effect doesn't re-run on suppressAutoPlay
+    // (deliberately read via ref), so skipping is already final.
     if (suppressAutoPlayRef.current) {
-      for (const entry of unsubmittedAudio) {
-        autoPlayedRef.current.add(entry.language);
-      }
       return;
     }
 
@@ -523,7 +522,6 @@ export function FullReviewCardContent({
         return;
       }
       const entry = unsubmittedAudio[idx];
-      autoPlayedRef.current.add(entry.language);
       const audio = new Audio(entry.url);
       revealAudioRef.current = audio;
       activeLanguage = entry.language;
@@ -593,7 +591,6 @@ export function FullReviewCardContent({
       next.delete(language);
       return next;
     });
-    autoPlayedRef.current.delete(language);
     requestAnimationFrame(() => {
       inputRefsByLanguage.current[language]?.focus({ preventScroll: true });
     });
@@ -662,7 +659,6 @@ export function FullReviewCardContent({
     // Invalidate any in-flight grades: their sequence numbers no longer match,
     // so a reply from before the reset can't land on a fresh submission.
     feedbackRequestSeqRef.current = new Map();
-    autoPlayedRef.current = new Set();
     const raf = requestAnimationFrame(() => {
       firstInputRef.current?.focus({ preventScroll: true });
     });
@@ -930,7 +926,6 @@ export function FullReviewCardContent({
                   onDisableAiFeedback={onDisableAiFeedback}
                   onMakeDefault={handleMakeDefault}
                   targetAudioMode={targetAudioMode}
-                  autoPlayedRef={autoPlayedRef}
                   onInputChange={handleInputChange}
                   onSubmit={handleSubmit}
                   onRevert={() => revertLanguage(translation.language)}
@@ -1000,7 +995,6 @@ interface TargetLanguageInputProps {
   /** Replaces the card's sentence for a language (alsoCorrect make-default). */
   onMakeDefault?: (language: string, text: string) => Promise<void>;
   targetAudioMode: TargetAudioMode;
-  autoPlayedRef: React.RefObject<Set<string>>;
   onInputChange: (language: string, text: string) => void;
   onSubmit: (language: string) => void;
   onRevert: () => void;
@@ -1058,7 +1052,6 @@ function TargetLanguageInput({
   onDisableAiFeedback,
   onMakeDefault,
   targetAudioMode,
-  autoPlayedRef,
   onInputChange,
   onSubmit,
   onRevert,
@@ -1107,11 +1100,16 @@ function TargetLanguageInput({
   // Same reason: not referentially stable across renders.
   const onAudioPlayPropRef = useRef(onAudioPlay);
   onAudioPlayPropRef.current = onAudioPlay;
-  // Which clip after-submit autoplay last started. Distinct from
-  // autoPlayedRef (language-level, shared with the reveal sweep): the shown
-  // sentence can change from the card default to a matching alternative
-  // once the grader returns, and that must start a new clip.
+  // Which clip after-submit autoplay last started. URL-level on purpose:
+  // the shown sentence can change from the card default to a matching
+  // alternative once the grader returns, and that must start a new clip.
   const autoPlayedUrlRef = useRef<string | null>(null);
+  // After-submit autoplay disarmed for the rest of this submission: the row
+  // came to qualify behind the open settings sheet (see the suppress branch
+  // below), so sheet-close must not start the clip — not even one whose URL
+  // settles only after the sheet closed. Re-arms when the row returns to
+  // editing (submit revert, card/text reset).
+  const autoPlayDisarmedRef = useRef(false);
 
   const hasUserText = !!state.userText.trim();
   const gradedCorrected =
@@ -1218,18 +1216,23 @@ function TargetLanguageInput({
   useEffect(() => {
     if (!state.submitted) {
       autoPlayedUrlRef.current = null;
+      autoPlayDisarmedRef.current = false;
       autoPlayAudioRef.current?.pause();
       autoPlayAudioRef.current = null;
       return;
     }
 
     // A settings change (writing style / target-audio mode) can make an
-    // already-submitted input qualify here while the sheet is open, never
+    // already-submitted input qualify here while the sheet is open: never
     // start audio behind the sheet, and don't queue it for sheet-close.
+    // Latched (not just skipped) because this effect re-runs when the sheet
+    // closes — suppressAutoPlay is a dep — and the gate below only knows
+    // URLs it has itself started.
     if (suppressAutoPlay) {
-      autoPlayedRef.current.add(translation.language);
+      autoPlayDisarmedRef.current = true;
       return;
     }
+    if (autoPlayDisarmedRef.current) return;
 
     // Null while the clip is undecided (grade in flight, alternative audio
     // still generating) or autoplay doesn't apply; see the render-time
@@ -1238,7 +1241,6 @@ function TargetLanguageInput({
     if (autoPlayedUrlRef.current === autoPlayUrl) return;
 
     autoPlayedUrlRef.current = autoPlayUrl;
-    autoPlayedRef.current.add(translation.language);
     onAudioPlayPropRef.current?.();
     // Reuse the element primed on Enter/submit. A fresh `new Audio()` here
     // is outside the user-gesture window (the grader and TTS have already
@@ -1318,7 +1320,6 @@ function TargetLanguageInput({
     autoPlayUrl,
     state.submitted,
     translation.language,
-    autoPlayedRef,
     suppressAutoPlay,
     onButtonTimeUpdate,
     onButtonStop,

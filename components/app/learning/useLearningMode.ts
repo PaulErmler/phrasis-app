@@ -35,6 +35,7 @@ import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import {
   ENSURE_CONTENT_MAX_RETRIES,
   ENSURE_CONTENT_RETRY_MS,
+  MAX_UNSERVED_ADD_RUNS,
   ENSURE_CONTENT_REVIEW_INTERVAL,
   PROGRESS_DISPLAY_INTERVAL,
 } from '@/lib/constants/learning';
@@ -359,6 +360,16 @@ export function useLearningMode(
     NonNullable<typeof cardForReviewQuery> | undefined
   >(undefined);
 
+  // Stall guard: consecutive handleAddCards runs that inserted cards while
+  // no card got served in between. Adding cards must make one visible; if it
+  // repeatedly doesn't (clock skew hiding fresh due dates, or any future
+  // added-but-not-servable mismatch), auto-add would loop inserting forever.
+  // Incremented on each inserting run, reset whenever a card is served (and
+  // on collection change); at MAX_UNSERVED_ADD_RUNS the run latches
+  // autoAddExhaustedForRef and reports, stopping the auto-add effect while
+  // leaving the manual Add button as the recovery path.
+  const unservedAddRunsRef = useRef(0);
+
   useEffect(() => {
     if (!isAuthenticated) {
       lastReviewingCardRef.current = undefined;
@@ -366,11 +377,13 @@ export function useLearningMode(
     }
     if (cardForReviewQuery != null) {
       lastReviewingCardRef.current = cardForReviewQuery;
+      unservedAddRunsRef.current = 0;
     }
   }, [isAuthenticated, cardForReviewQuery]);
 
   useEffect(() => {
     lastReviewingCardRef.current = undefined;
+    unservedAddRunsRef.current = 0;
   }, [courseSettings?.activeCollectionId]);
 
   // Undo-button state rides on the getCardForReview payload. One
@@ -803,6 +816,18 @@ export function useLearningMode(
       if (result.cardsAdded > 0) {
         autoAddExhaustedForRef.current = null;
         autoAddQuotaEmptyRef.current = false;
+        unservedAddRunsRef.current++;
+        if (unservedAddRunsRef.current >= MAX_UNSERVED_ADD_RUNS) {
+          // Cards keep getting added but none is ever served: stop auto-add
+          // before it runs the collection dry. Serving a card resets the
+          // counter, so a healthy add-serve-add cadence never trips this.
+          autoAddExhaustedForRef.current = collectionId.toString();
+          reportError(new Error('auto-add stall: cards added, none served'), {
+            op: 'autoAddStall',
+            collectionId,
+            runs: unservedAddRunsRef.current,
+          });
+        }
       } else if (result.quotaLimited) {
         autoAddQuotaEmptyRef.current = true;
       } else if (!result.scanIncomplete) {

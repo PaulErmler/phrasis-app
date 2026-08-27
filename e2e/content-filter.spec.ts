@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { showDueCounts } from './helpers';
 
 /**
  * Content-source filter. Smoke tests for the SegmentedHomeSection tab
@@ -41,26 +40,5 @@ test.describe('content filter: subtle dropdown on home', () => {
     ).toBeVisible({
       timeout: 10_000,
     });
-  });
-});
-
-test.describe('due-count pills on home', () => {
-  test('filter-aware pills render next to the content filter', async ({
-    page,
-  }) => {
-    // New accounts hide due counts by default; this spec is about the
-    // pills themselves, so turn them back on first.
-    await showDueCounts(page);
-    await page.goto('/app');
-    await page.waitForLoadState('domcontentloaded');
-    // Pills render once getFilteredCardCounts resolves (even all-zero counts
-    // return an object). They share a row with the filter dropdown.
-    // `.first()` for the post-hydration double-render, see above.
-    await expect(page.getByTestId('due-counts-pills').first()).toBeVisible({
-      timeout: 10_000,
-    });
-    await expect(
-      page.getByTestId('content-filter-trigger').first(),
-    ).toBeVisible();
   });
 });

@@ -173,17 +173,9 @@ export function CourseLanguageSettings({
       await archiveCourse({ courseId: course._id });
       handleClose();
     } catch (e) {
-      // Structured server errors ({ code, message }) stringify to a JSON
-      // blob via `e.message`. Surface the payload's clean message when it
-      // carries one (plain-string data, or a structured `message` field),
-      // else the generic localized copy.
-      const data =
-        e instanceof ConvexError
-          ? (e.data as { message?: unknown })
-          : undefined;
-      const structuredMessage =
-        typeof data?.message === 'string' ? data.message : undefined;
-      setError(convexErrorMessage(e) ?? structuredMessage ?? t('saveFailed'));
+      // convexErrorMessage reads both payload shapes (plain-string data and
+      // structured { code, message }); fall back to the generic copy.
+      setError(convexErrorMessage(e) ?? t('saveFailed'));
     } finally {
       setArchiving(false);
       setArchiveConfirmOpen(false);

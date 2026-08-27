@@ -50,7 +50,9 @@ const counts = (overrides: Partial<Record<string, number>> = {}) => ({
 
 beforeEach(() => {
   useQueryMock.mockReset();
-  userSettingsValue = {};
+  // Pills show only on an explicit opt-in; most cases below assert on the
+  // rendered pills, so opt in by default and test the hidden states below.
+  userSettingsValue = { hideDueCounts: false };
 });
 
 describe('DueCountsPills', () => {
@@ -79,6 +81,14 @@ describe('DueCountsPills', () => {
 
   it('renders nothing and skips the counts query when hideDueCounts is on', () => {
     userSettingsValue = { hideDueCounts: true };
+    useQueryMock.mockReturnValue(counts());
+    render(<DueCountsPills />);
+    expect(screen.queryByTestId('due-counts-pills')).toBeNull();
+    expect(useQueryMock).toHaveBeenCalledWith(expect.anything(), 'skip');
+  });
+
+  it('hides by default: unset preference renders nothing (show is an opt-in)', () => {
+    userSettingsValue = {};
     useQueryMock.mockReturnValue(counts());
     render(<DueCountsPills />);
     expect(screen.queryByTestId('due-counts-pills')).toBeNull();

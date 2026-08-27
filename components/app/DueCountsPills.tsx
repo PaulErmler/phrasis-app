@@ -33,7 +33,8 @@ type Counts = {
 export function DueCountsPills({ skip }: { skip?: boolean }) {
   const { courseSettings: settings, preloadedSettings } = useAppData();
   const userSettings = usePreloadedQuery(preloadedSettings);
-  const hideDueCounts = userSettings?.hideDueCounts === true;
+  // Show only on an explicit opt-in (`false`); unset = hidden by default.
+  const hideDueCounts = userSettings?.hideDueCounts !== false;
   const t = useTranslations('AppPage.dueCounts');
 
   const filter = settings?.studyContentFilter ?? 'both';

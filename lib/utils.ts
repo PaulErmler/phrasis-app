@@ -21,17 +21,24 @@ export const isAuthError = (error: unknown) => {
 };
 
 /**
- * The human-readable text a `ConvexError` carries in a plain-string `data`
- * payload. Prefer this over `error.message` when toasting a server error:
+ * The human-readable text a `ConvexError` carries — either a plain-string
+ * `data` payload or the `message` field of a structured `{ code, message }`
+ * one. Prefer this over `error.message` when toasting a server error:
  * `message` arrives on the client wrapped as
  * `"[Request ID: …] Server Error\nUncaught ConvexError: …"`. Returns
  * `undefined` for anything else, so call sites can fall back to their own
  * localized copy.
+ *
+ * Both payload shapes are read because the backend throws both: the
+ * structured form is the direction of travel (see `convexErrorCode`), while
+ * plain strings remain on the paths not yet migrated.
  */
-export const convexErrorMessage = (error: unknown): string | undefined =>
-  error instanceof ConvexError && typeof error.data === 'string'
-    ? error.data
-    : undefined;
+export const convexErrorMessage = (error: unknown): string | undefined => {
+  if (!(error instanceof ConvexError)) return undefined;
+  if (typeof error.data === 'string') return error.data;
+  const message = (error.data as { message?: unknown })?.message;
+  return typeof message === 'string' ? message : undefined;
+};
 
 /**
  * Extracts the `code` field from a `ConvexError`'s structured data payload.

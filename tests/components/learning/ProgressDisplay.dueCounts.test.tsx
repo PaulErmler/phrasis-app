@@ -93,9 +93,18 @@ beforeEach(() => {
 });
 
 describe('ProgressDisplay due-count pills', () => {
-  it('shows upcoming cards when hideDueCounts is unset', () => {
+  it('shows upcoming cards when the user opted in (hideDueCounts false)', () => {
+    userSettingsValue = { hideDueCounts: false };
     renderProgress();
     expect(screen.getByText('comingUp')).toBeTruthy();
+  });
+
+  it('omits upcoming cards by default: unset preference skips the counts query', () => {
+    renderProgress();
+    expect(screen.queryByText('comingUp')).toBeNull();
+    expect(useQueryMock.mock.calls.some((call) => call[1] === 'skip')).toBe(
+      true,
+    );
   });
 
   it('omits upcoming cards and skips the counts query when hideDueCounts is on', () => {

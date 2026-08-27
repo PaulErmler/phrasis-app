@@ -42,20 +42,16 @@ export async function getUserSettings(
 }
 
 /**
- * Insert a new `userSettings` row. New accounts hide due-count pills
- * (`hideDueCounts: true`); callers that pass the field explicitly win.
- * `hideWorkloadForecast` is deliberately NOT defaulted — the workload
- * forecast shows for new accounts even while the pills are hidden.
+ * Insert a new `userSettings` row. `hideDueCounts` / `hideWorkloadForecast`
+ * are deliberately NOT seeded: unset means hidden (readers show only on an
+ * explicit `false`), so the off-by-default rule lives in one place.
  * Existing rows are never backfilled — patch them in place instead.
  */
 export async function insertUserSettings(
   ctx: MutationCtx,
   fields: UserSettingsInsert,
 ): Promise<Id<'userSettings'>> {
-  return ctx.db.insert('userSettings', {
-    hideDueCounts: true,
-    ...fields,
-  });
+  return ctx.db.insert('userSettings', fields);
 }
 
 /**

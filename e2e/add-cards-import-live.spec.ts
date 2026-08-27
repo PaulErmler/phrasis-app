@@ -21,16 +21,74 @@ test.describe('add cards: import (live)', { tag: '@live' }, () => {
     // steps and timing out at 0 cards. Budget generously; every wait inside
     // is still individually bounded, so a true hang fails early regardless.
     test.setTimeout(150_000);
-    const marker = `e2eImport${Date.now().toString(36)}`;
+    // The marker words must be REAL words in each cell's language: imported
+    // sentences are synthesized and validated by transcribing them back
+    // (processTTSForCard), so a consonant-soup token like "e2eImportmtb58ep5"
+    // guarantees two failed TTS attempts, a semantic-judge LLM call, and an
+    // [ERROR] per sentence — wasted live TTS calls and red herrings in the
+    // backend logs on every run. A timestamp-picked word pair is unique
+    // enough (fresh fixture user per run, retries 0) and stays an exact
+    // library-search hit.
+    const EN_WORDS = [
+      'amber',
+      'birch',
+      'cedar',
+      'dune',
+      'ember',
+      'fjord',
+      'grove',
+      'heron',
+      'iris',
+      'juniper',
+      'kelp',
+      'lagoon',
+      'meadow',
+      'nutmeg',
+      'olive',
+      'pebble',
+      'quartz',
+      'reef',
+      'sage',
+      'tundra',
+    ];
+    const ES_WORDS = [
+      'ámbar',
+      'bosque',
+      'cedro',
+      'duna',
+      'faro',
+      'golfo',
+      'huerta',
+      'isla',
+      'jardín',
+      'lago',
+      'madera',
+      'nube',
+      'olivo',
+      'perla',
+      'roca',
+      'selva',
+      'trigo',
+      'uva',
+      'valle',
+      'zorro',
+    ];
+    const stamp = Date.now();
+    const pickA = stamp % 20;
+    const pickB = Math.floor(stamp / 20) % 20;
+    // Library search below matches on the English pair (searchableText spans
+    // all of a card's languages).
+    const marker = `${EN_WORDS[pickA]} ${EN_WORDS[pickB]}`;
+    const markerEs = `${ES_WORDS[pickA]} ${ES_WORDS[pickB]}`;
 
     await openCardImport(page);
     await pasteImport(
       page,
       [
         'English,Spanish',
-        `${marker} hello,Hola ${marker}`,
-        `${marker} goodbye,Adiós ${marker}`,
-        `${marker} thanks,Gracias ${marker}`,
+        `${marker} hello,Hola ${markerEs}`,
+        `${marker} goodbye,Adiós ${markerEs}`,
+        `${marker} thanks,Gracias ${markerEs}`,
       ].join('\n'),
     );
 

@@ -669,14 +669,15 @@ export default defineSchema({
     // undefined = never synced, treated as declined. Account-scoped where the
     // browser choice is device-scoped, so the last device to sync wins.
     analyticsConsent: v.optional(v.boolean()),
-    // Hide the "N new / N review" pills on home and the coming-up counts on
-    // in-session progress reports. New rows default true (insertUserSettings);
-    // unset on existing rows means show, so current users keep seeing counts
-    // until they opt in from Preferences.
+    // The "N new / N review" pills on home and the coming-up counts on
+    // in-session progress reports. Presented as a "Show" toggle, off by
+    // default: only an explicit `false` here shows them (unset or true =
+    // hidden). Kept under the legacy "hide" name so no row migration was
+    // needed when the default flipped to hidden (2026-08-27).
     hideDueCounts: v.optional(v.boolean()),
-    // Hide the home-screen 7-day workload forecast card. Deliberately
-    // independent of hideDueCounts (and NOT defaulted for new rows): new
-    // accounts hide the pills but still get the forecast. Unset = show.
+    // The home-screen 7-day workload forecast card. Same flipped semantics
+    // and naming rationale as hideDueCounts: explicit `false` = show, unset
+    // or true = hidden. Independent of hideDueCounts.
     hideWorkloadForecast: v.optional(v.boolean()),
   }).index('by_userId', ['userId']),
 

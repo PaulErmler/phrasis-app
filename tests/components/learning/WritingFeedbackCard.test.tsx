@@ -19,7 +19,7 @@ describe('WritingFeedbackCard', () => {
     const pending = screen.getByTestId('writing-feedback-pending');
     expect(pending).toBeInTheDocument();
     expect(pending).toHaveAttribute('aria-label', 'checking');
-    expect(pending).toHaveClass('rounded-md', 'border');
+    expect(pending).toHaveClass('rounded-xl', 'border');
     expect(
       screen.queryByText('checking', { selector: ':not([aria-label])' }),
     ).not.toBeInTheDocument();

@@ -1943,7 +1943,10 @@ export async function applyCardEdit(
   },
 ): Promise<{
   textId: Id<'texts'>;
-  /** The card after the edit, same id on Path A, a NEW id on Path B. */
+  /** The edited card. ALWAYS the id passed in: Path B forks the text row
+   * and patches `textId` in place, never replacing the card document —
+   * pending approvals and per-card counters keep pointing at a live row
+   * (the reason cardApprovals dropped its sibling-retargeting sweep). */
   cardId: Id<'cards'>;
   changed: boolean;
   /** The card's course, from the one authorizeCardAccess walk this edit

@@ -121,7 +121,7 @@ export function WritingFeedbackCard({
   if (feedback.status === 'pending') {
     return (
       <div
-        className="mt-2 overflow-hidden rounded-md border border-border bg-card"
+        className="mt-2 overflow-hidden rounded-xl border border-border bg-card"
         role="status"
         aria-label={t('checking')}
         data-testid="writing-feedback-pending"
@@ -209,7 +209,7 @@ export function WritingFeedbackCard({
 
   return (
     <div
-      className="mt-2 overflow-hidden rounded-md border border-border bg-card"
+      className="mt-2 overflow-hidden rounded-xl border border-border bg-card"
       data-testid="writing-feedback-card"
     >
       <div className={`h-0.5 ${style.bar}`} />

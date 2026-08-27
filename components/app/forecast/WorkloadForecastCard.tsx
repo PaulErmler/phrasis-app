@@ -94,7 +94,10 @@ export function WorkloadForecastCard({ skip }: { skip?: boolean }) {
             </h3>
             <p className="text-muted-xs mt-0.5">{t('locked')}</p>
           </div>
-          <Lock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <Lock
+            className="h-4 w-4 shrink-0 text-muted-foreground"
+            aria-hidden
+          />
         </div>
       </div>
     );
@@ -139,7 +142,7 @@ export function WorkloadForecastCard({ skip }: { skip?: boolean }) {
           </div>
           <ChevronDown
             className={cn(
-              'size-4 shrink-0 text-muted-foreground transition-transform',
+              'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
               expanded && 'rotate-180',
             )}
             aria-hidden

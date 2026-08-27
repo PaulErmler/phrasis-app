@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { dismissTour } from './helpers';
+import { dismissTour, showDueCounts } from './helpers';
 
 /**
  * Mutating tests for the content-source filter dropdown. Runs in the
@@ -125,3 +125,27 @@ test.describe(
     });
   },
 );
+
+// Lives here (chromium-serial), not in content-filter.spec.ts: showDueCounts
+// WRITES the shared fixture user's preferences, and the parallel project's
+// contract is that none of its specs mutate shared user state.
+test.describe('due-count pills on home', () => {
+  test('filter-aware pills render next to the content filter', async ({
+    page,
+  }) => {
+    // New accounts hide due counts by default; this spec is about the
+    // pills themselves, so turn them back on first.
+    await showDueCounts(page);
+    await page.goto('/app');
+    await page.waitForLoadState('domcontentloaded');
+    // Pills render once getFilteredCardCounts resolves (even all-zero counts
+    // return an object). They share a row with the filter dropdown.
+    // `.first()` for the post-hydration double-render, see above.
+    await expect(page.getByTestId('due-counts-pills').first()).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(
+      page.getByTestId('content-filter-trigger').first(),
+    ).toBeVisible();
+  });
+});

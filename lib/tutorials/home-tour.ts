@@ -70,9 +70,9 @@ export function createHomeTour(
       'center',
     ),
     // The new/review pills next to the content-source filter. Omitted when
-    // the user hides due counts (the default for new accounts), otherwise
-    // this step highlights an empty slot and talks about pills that aren't
-    // there.
+    // due counts are hidden (the default — showing them is an explicit
+    // opt-in), otherwise this step highlights an empty slot and talks about
+    // pills that aren't there.
     ...(ctx?.hideDueCounts === true
       ? []
       : [
@@ -95,9 +95,9 @@ export function createHomeTour(
     // The 7-day workload card sits BELOW the progress card, so this step
     // comes after both progress-card steps — the tour scrolls monotonically
     // instead of jumping down and back up. Gated on the card's OWN
-    // preference (not hideDueCounts — the pills hide by default for new
-    // accounts, the forecast doesn't). skipIfMissing is a safety net if the
-    // card isn't mounted when the tour launches.
+    // preference (not hideDueCounts — the two opt-ins are independent).
+    // skipIfMissing is a safety net if the card isn't mounted when the tour
+    // launches.
     ...(ctx?.hideWorkloadForecast === true
       ? []
       : [

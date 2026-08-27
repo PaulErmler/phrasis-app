@@ -174,11 +174,20 @@ export const updateAlternative = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
     const row = await ctx.db.get(args.alternativeId);
-    if (!row) throw new ConvexError('Alternative not found');
-    if (row.userId !== userId) throw new ConvexError('Unauthorized');
+    if (!row)
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'Alternative not found',
+      });
+    if (row.userId !== userId)
+      throw new ConvexError({ code: 'FORBIDDEN', message: 'Unauthorized' });
 
     const text = args.text.slice(0, MAX_CARD_TEXT_LENGTH).trim();
-    if (!text) throw new ConvexError('Alternative text cannot be empty');
+    if (!text)
+      throw new ConvexError({
+        code: 'EMPTY_TEXT',
+        message: 'Alternative text cannot be empty',
+      });
     const normalized = normalizeForComparison(text);
     if (normalized === normalizeForComparison(row.text)) return null;
 
@@ -235,8 +244,13 @@ export const deleteAlternative = mutation({
   handler: async (ctx, { alternativeId }) => {
     const userId = await requireAuthUserId(ctx);
     const row = await ctx.db.get(alternativeId);
-    if (!row) throw new ConvexError('Alternative not found');
-    if (row.userId !== userId) throw new ConvexError('Unauthorized');
+    if (!row)
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'Alternative not found',
+      });
+    if (row.userId !== userId)
+      throw new ConvexError({ code: 'FORBIDDEN', message: 'Unauthorized' });
     await ctx.db.delete(row._id);
     return null;
   },

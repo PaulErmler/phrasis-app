@@ -88,8 +88,8 @@ describe('createHomeTour: workload step', () => {
     expect(
       elementsOf({ reviewMode: 'audio', hideWorkloadForecast: true }),
     ).not.toContain('[data-tutorial="workload-forecast"]');
-    // hideDueCounts alone leaves the forecast step in: new accounts hide
-    // the pills by default but still get the forecast.
+    // hideDueCounts alone leaves the forecast step in: the two opt-ins
+    // are independent.
     const pillsHidden = elementsOf({
       reviewMode: 'audio',
       hideDueCounts: true,

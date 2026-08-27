@@ -597,3 +597,80 @@ describe('collection browse add flows', () => {
     expect(audio).toEqual([]);
   });
 });
+
+describe('new-card due dates vs minute-quantized client clocks', () => {
+  // Clients query the due queue with a minute-floored `now` (useNowMinute)
+  // that can trail the wall clock. Cards stamped at wall-clock insert time
+  // were invisible until the next minute tick, which turned the learn view's
+  // auto-add effect into a runaway insert loop (130 cards in 18s). The fix
+  // backdates fresh stamps (NEW_CARD_DUE_BACKDATE_MS) so every quantized
+  // reader sees a just-added card immediately.
+  const MID_MINUTE = Date.UTC(2026, 7, 26, 21, 45, 45);
+  const MINUTE_START = MID_MINUTE - 45_000;
+
+  it('serves a just-added card to a client whose now is floored to the minute', async () => {
+    const t = convexTest(schema, modules);
+    const { collId, deckId } = await seedCourseWithTexts(t, 3);
+    const asUser = t.withIdentity({ subject: 'user_A' });
+
+    await withContentChainMocks(async () => {
+      vi.setSystemTime(MID_MINUTE);
+      const res = await asUser.mutation(
+        api.features.decks.addCardsFromCollection,
+        { collectionId: collId, batchSize: 3 },
+      );
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      expect(res.cardsAdded).toBe(3);
+
+      // Every stamp predates the caller's floored minute (backdated).
+      const cards = await getDeckCards(t, deckId);
+      for (const card of cards) {
+        expect(card.dueDate).toBeLessThan(MINUTE_START);
+      }
+
+      const served = await asUser.query(
+        api.features.scheduling.getCardForReview,
+        { now: MINUTE_START },
+      );
+      expect(served).not.toBeNull();
+    });
+  });
+
+  it('writing track: seeded writingDueDate is visible to a floored now too', async () => {
+    const t = convexTest(schema, modules);
+    const { collId, courseId, deckId } = await seedCourseWithTexts(t, 3);
+    // Split tracking on + Writing mode: getCardForReview serves from the
+    // writing due queue, and creation-time seeding stamps writingDueDate.
+    await t.run(async (ctx) => {
+      await ctx.db.insert('courseSettings', {
+        courseId,
+        initialReviewCount: 5,
+        separateModeTracking: true,
+        reviewMode: 'full',
+        writingSeedDone: true,
+      });
+    });
+    const asUser = t.withIdentity({ subject: 'user_A' });
+
+    await withContentChainMocks(async () => {
+      vi.setSystemTime(MID_MINUTE);
+      const res = await asUser.mutation(
+        api.features.decks.addCardsFromCollection,
+        { collectionId: collId, batchSize: 3 },
+      );
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      expect(res.cardsAdded).toBe(3);
+
+      const cards = await getDeckCards(t, deckId);
+      for (const card of cards) {
+        expect(card.writingDueDate).toBeLessThan(MINUTE_START);
+      }
+
+      const served = await asUser.query(
+        api.features.scheduling.getCardForReview,
+        { now: MINUTE_START },
+      );
+      expect(served).not.toBeNull();
+    });
+  });
+});

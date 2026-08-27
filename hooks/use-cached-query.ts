@@ -30,15 +30,28 @@ export function useCachedQuery<F extends FunctionReference<'query'>>(
   // client produce the same initial HTML, avoiding hydration mismatches.
   // useLayoutEffect fires synchronously before paint, so the user never
   // sees the intermediate undefined state.
+  //
+  // Every path settles `cached` for THIS key. Returning early on a miss would
+  // leave the PREVIOUS key's payload mounted, and `live` is `undefined` while
+  // the new args re-subscribe — so the consumer would render another key's
+  // data (the forecast card showing the mode you just toggled away from)
+  // until the round-trip lands. A miss must read as "nothing cached yet".
   useBrowserLayoutEffect(() => {
     try {
       const stored = localStorage.getItem(cacheKey);
-      if (!stored) return;
+      if (!stored) {
+        setCached(undefined);
+        return;
+      }
       const parsed = JSON.parse(stored);
-      if (validateRef.current && !validateRef.current(parsed)) return;
+      if (validateRef.current && !validateRef.current(parsed)) {
+        setCached(undefined);
+        return;
+      }
       setCached(parsed);
     } catch {
-      // ignore parse errors from stale/corrupted cache
+      // Stale/corrupted cache reads the same as an absent one.
+      setCached(undefined);
     }
   }, [cacheKey]);
 

@@ -69,9 +69,9 @@ export function useWorkloadForecast({
 }: { skip?: boolean } = {}): UseWorkloadForecastResult {
   const { courseSettings: settings, preloadedSettings } = useAppData();
   const userSettings = usePreloadedQuery(preloadedSettings);
-  // Own preference, independent of hideDueCounts: new accounts default the
-  // pills to hidden but should still get the forecast.
-  const hidden = userSettings?.hideWorkloadForecast === true;
+  // Own preference, independent of hideDueCounts. Show only on an explicit
+  // opt-in (`false`); unset = hidden by default, like the pills.
+  const hidden = userSettings?.hideWorkloadForecast !== false;
 
   const filter = settings?.studyContentFilter ?? 'both';
   const reviewMode = settings?.reviewMode ?? 'audio';

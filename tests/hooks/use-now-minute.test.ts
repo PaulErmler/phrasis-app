@@ -21,19 +21,33 @@ describe('useNowMinute', () => {
     expect(result.current).toBe(FLOOR);
   });
 
-  it('ticks exactly once per interval, staying quantized', () => {
+  it('ticks exactly at minute boundaries, not mount-relative', () => {
     const { result } = renderHook(() => useNowMinute());
 
+    // 10:00:59.999 — the boundary hasn't passed yet.
     act(() => {
-      vi.advanceTimersByTime(MINUTE_MS - 1);
+      vi.advanceTimersByTime(MINUTE_MS / 2 - 501);
     });
     expect(result.current).toBe(FLOOR);
 
-    // Interval fires at mount+60s → wall clock 10:01:30.499 → 10:01:00.
+    // 10:01:00.000 — first tick lands on the boundary (a mount-anchored
+    // interval would still be showing 10:00:00 here, and until 10:01:30,
+    // letting staleness reach ~120s; cards ticked due up to a minute late).
     act(() => {
       vi.advanceTimersByTime(1);
     });
     expect(result.current).toBe(FLOOR + MINUTE_MS);
+
+    // Subsequent ticks stay boundary-aligned: nothing until 10:01:59.999,
+    // then 10:02:00.000 flips the value.
+    act(() => {
+      vi.advanceTimersByTime(MINUTE_MS - 1);
+    });
+    expect(result.current).toBe(FLOOR + MINUTE_MS);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(result.current).toBe(FLOOR + 2 * MINUTE_MS);
   });
 
   it('freezes while paused and catches up immediately on resume', () => {

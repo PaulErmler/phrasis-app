@@ -178,7 +178,7 @@ function ApprovalBox({
             disabled
             variant="ghost"
             size="sm"
-            className="h-9 px-3 text-base font-semibold text-green-700"
+            className="h-9 px-3 text-base font-semibold text-success"
           >
             Sentence added!
           </Button>

@@ -143,6 +143,7 @@ import {
   useLearningMode,
   type LearningState,
 } from '@/components/app/learning/useLearningMode';
+import { MAX_UNSERVED_ADD_RUNS } from '@/lib/constants/learning';
 
 const { REFS } = harness;
 
@@ -631,6 +632,103 @@ describe('useLearningMode', () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.any(Error),
         expect.objectContaining({ op: 'reviewCard' }),
+      );
+    });
+  });
+
+  describe('auto-add stall guard', () => {
+    // Regression: with a minute-quantized query `now`, freshly added cards
+    // could be invisible to getCardForReview, so the auto-add effect re-fired
+    // on every isAddingCards flip and inserted batches forever (130 cards in
+    // 18s). The guard latches auto-add off after MAX_UNSERVED_ADD_RUNS
+    // consecutive inserting runs with no card served in between.
+    function addResult(overrides: Record<string, unknown> = {}) {
+      return {
+        cardsAdded: 5,
+        totalCardsInDeck: 5,
+        scanIncomplete: false,
+        ...overrides,
+      };
+    }
+
+    function seedEmptyDeckWithAutoAdd() {
+      harness.queryValues.set(REFS.getCardForReview, null);
+      harness.queryValues.set(
+        REFS.getActiveCourseSettings,
+        makeSettings({ autoAddCards: true }),
+      );
+      harness.queryValues.set(REFS.getActiveCourse, makeCourse());
+    }
+
+    it('latches auto-add off after MAX_UNSERVED_ADD_RUNS inserting runs with no card served', async () => {
+      const add = harness.mutationFor(REFS.addCardsFromCollection);
+      add.mockImplementation(() => {
+        // Failsafe: without the guard this cadence self-perpetuates forever;
+        // reject instead of hanging the test so a regression fails fast.
+        if (add.mock.calls.length > 10) {
+          return Promise.reject(new Error('runaway auto-add'));
+        }
+        return Promise.resolve(addResult());
+      });
+      seedEmptyDeckWithAutoAdd();
+
+      const { result } = renderHook(() => useLearningMode());
+      // Drain the add -> resolve -> effect-re-fire cadence to quiescence.
+      await act(async () => {});
+      await act(async () => {});
+
+      expect(add).toHaveBeenCalledTimes(MAX_UNSERVED_ADD_RUNS);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ op: 'autoAddStall' }),
+      );
+      // Latched: the empty deck shows noCardsDue instead of a loading screen
+      // promising an auto-add that will never serve.
+      expect(result.current.status).toBe('noCardsDue');
+    });
+
+    it('a served card resets the counter, so add-serve cadences never latch', async () => {
+      const add = harness.mutationFor(REFS.addCardsFromCollection);
+      seedEmptyDeckWithAutoAdd();
+
+      const gates: Array<ReturnType<typeof deferred<unknown>>> = [];
+      add.mockImplementation(() => {
+        const gate = deferred<unknown>();
+        gates.push(gate);
+        return gate.promise;
+      });
+
+      const { result, rerender } = renderHook(() => useLearningMode());
+
+      // One more inserting run than the latch threshold, each followed by a
+      // served card before the next: the counter must keep resetting.
+      for (let round = 0; round < MAX_UNSERVED_ADD_RUNS + 1; round++) {
+        await act(async () => {});
+        expect(add).toHaveBeenCalledTimes(round + 1);
+
+        // The just-added card arrives (query flips to a served card)...
+        harness.queryValues.set(
+          REFS.getCardForReview,
+          makeCard({ _id: `card-${round}` }),
+        );
+        rerender();
+        await act(async () => {
+          gates[round].resolve(addResult());
+        });
+        expect(result.current.status).toBe('reviewing');
+
+        // ...and later the deck runs empty again (not after the last
+        // round, which would fire one further in-flight add).
+        if (round < MAX_UNSERVED_ADD_RUNS) {
+          harness.queryValues.set(REFS.getCardForReview, null);
+          rerender();
+        }
+      }
+
+      expect(add).toHaveBeenCalledTimes(MAX_UNSERVED_ADD_RUNS + 1);
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ op: 'autoAddStall' }),
       );
     });
   });

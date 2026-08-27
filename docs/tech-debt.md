@@ -14,6 +14,14 @@ correctness/cost/velocity noted per item.
 
 ## Correctness & robustness
 
+- [ ] **A32 — Drop the optional-`now` back-compat on `getCardCounts`.** The query keeps
+  `now` optional (falling back to the server clock via `resolveClientNow`) for
+  already-shipped bundles that call with `{}`; the live client passes a minute-quantized
+  `now` (`components/app/learning/ProgressDisplay.tsx`). Once pre-2026-08 bundles have
+  cycled out, make `now` required and drop the fallback so the no-wall-clock query
+  guideline holds unconditionally. Anchor: `getCardCounts` in `convex/features/stats.ts`.
+  Effort S. Impact: query cacheability guaranteed instead of usual-case.
+
 - [ ] **A30 — Dataset seed `.unique()` crash on second dataset version.**
   `convex/db/seed.ts` looks up collections via `.withIndex('by_name', …).unique()`, but
   `convex/admin/uploadDataset.ts` writes the same `name` for every dataset version. The

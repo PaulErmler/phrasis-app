@@ -289,7 +289,7 @@ export function WorkloadStackedCard({
                   onAddCountChange(Math.max(WHAT_IF_ADD_MIN, addCount - 1))
                 }
               >
-                <Minus className="size-3.5" />
+                <Minus className="h-3.5 w-3.5" />
               </Button>
               <span className="min-w-[64px] text-center text-xs font-semibold tabular-nums">
                 {t('stepperValue', { count: addCount })}
@@ -305,7 +305,7 @@ export function WorkloadStackedCard({
                   onAddCountChange(Math.min(WHAT_IF_ADD_MAX, addCount + 1))
                 }
               >
-                <Plus className="size-3.5" />
+                <Plus className="h-3.5 w-3.5" />
               </Button>
             </div>
             <p className="text-muted-xs text-right">

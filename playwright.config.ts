@@ -37,7 +37,11 @@ export default defineConfig({
   globalSetup: './e2e/global-setup.ts',
   globalTeardown: './e2e/global-teardown.ts',
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  // Local retries deliberately non-zero: the project chain means one flaky
+  // test fails its whole project and every dependent project is skipped —
+  // observed dropping ~60% of the suite while reporting "1 failed". One
+  // local retry absorbs the common single-flake case.
+  retries: process.env.CI ? 2 : 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL,
@@ -47,12 +51,12 @@ export default defineConfig({
   projects: [
     {
       name: 'setup',
-      testMatch: /auth\.setup\.ts/,
+      testMatch: /(^|\/)auth\.setup\.ts$/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'tutorial',
-      testMatch: /tutorial\.spec\.ts/,
+      testMatch: /(^|\/)tutorial\.spec\.ts$/,
       dependencies: ['setup'],
       fullyParallel: false,
       use: {
@@ -65,17 +69,17 @@ export default defineConfig({
       // read-only views. None of these mutate shared user state.
       name: 'chromium-parallel',
       testMatch: [
-        /auth\.spec\.ts/,
-        /home\.spec\.ts/,
-        /onboarding\.spec\.ts/,
-        /navigation\.spec\.ts/,
-        /learn\.spec\.ts/,
-        /chat\.spec\.ts/,
-        /library\.spec\.ts/,
-        /stats\.spec\.ts/,
-        /add-cards\.spec\.ts/,
-        /add-cards-import\.spec\.ts/,
-        /content-filter\.spec\.ts/,
+        /(^|\/)auth\.spec\.ts$/,
+        /(^|\/)home\.spec\.ts$/,
+        /(^|\/)onboarding\.spec\.ts$/,
+        /(^|\/)navigation\.spec\.ts$/,
+        /(^|\/)learn\.spec\.ts$/,
+        /(^|\/)chat\.spec\.ts$/,
+        /(^|\/)library\.spec\.ts$/,
+        /(^|\/)stats\.spec\.ts$/,
+        /(^|\/)add-cards\.spec\.ts$/,
+        /(^|\/)add-cards-import\.spec\.ts$/,
+        /(^|\/)content-filter\.spec\.ts$/,
       ],
       dependencies: ['tutorial'],
       fullyParallel: true,
@@ -90,18 +94,18 @@ export default defineConfig({
       // put change-password here (see settings-serial) or billing (own user).
       name: 'chromium-serial',
       testMatch: [
-        /chat-live\.spec\.ts/,
-        /learning-journey\.spec\.ts/,
-        /learning-settings\.spec\.ts/,
-        /learning-undo\.spec\.ts/,
-        /daily-goal\.spec\.ts/,
-        /free-study\.spec\.ts/,
-        /course-settings-sweep\.spec\.ts/,
-        /add-cards-live\.spec\.ts/,
-        /add-cards-import-live\.spec\.ts/,
-        /content-filter-live\.spec\.ts/,
-        /curriculum-edit-flag\.spec\.ts/,
-        /writing-feedback-live\.spec\.ts/,
+        /(^|\/)chat-live\.spec\.ts$/,
+        /(^|\/)learning-journey\.spec\.ts$/,
+        /(^|\/)learning-settings\.spec\.ts$/,
+        /(^|\/)learning-undo\.spec\.ts$/,
+        /(^|\/)daily-goal\.spec\.ts$/,
+        /(^|\/)free-study\.spec\.ts$/,
+        /(^|\/)course-settings-sweep\.spec\.ts$/,
+        /(^|\/)add-cards-live\.spec\.ts$/,
+        /(^|\/)add-cards-import-live\.spec\.ts$/,
+        /(^|\/)content-filter-live\.spec\.ts$/,
+        /(^|\/)curriculum-edit-flag\.spec\.ts$/,
+        /(^|\/)writing-feedback-live\.spec\.ts$/,
       ],
       dependencies: ['chromium-parallel'],
       fullyParallel: false,
@@ -117,7 +121,7 @@ export default defineConfig({
       // walk overlaps shared-fixture live specs instead of extending the
       // serial queue.
       name: 'billing-live',
-      testMatch: /billing\.spec\.ts/,
+      testMatch: /(^|\/)billing\.spec\.ts$/,
       dependencies: ['chromium-parallel'],
       fullyParallel: false,
       use: {
@@ -129,7 +133,7 @@ export default defineConfig({
       // invalidates every other browser context still holding the old
       // cookie. Isolate to one worker after shared-user mutating specs.
       name: 'settings-serial',
-      testMatch: /settings\.spec\.ts/,
+      testMatch: /(^|\/)settings\.spec\.ts$/,
       dependencies: ['chromium-serial'],
       fullyParallel: false,
       workers: 1,
@@ -140,7 +144,7 @@ export default defineConfig({
     },
     {
       name: 'course-management',
-      testMatch: /course-management\.spec\.ts/,
+      testMatch: /(^|\/)course-management\.spec\.ts$/,
       dependencies: ['settings-serial', 'billing-live'],
       fullyParallel: false,
       use: {
@@ -160,7 +164,7 @@ export default defineConfig({
       // per-address bucket email-auth asserts is untouched by other users,
       // and the global backstop (50 tokens/h) dwarfs a few signups' sends.
       name: 'payment-overdue',
-      testMatch: /payment-overdue\.spec\.ts/,
+      testMatch: /(^|\/)payment-overdue\.spec\.ts$/,
       dependencies: ['billing-live'],
       fullyParallel: false,
       use: {
@@ -175,7 +179,7 @@ export default defineConfig({
       // fixture users' warmup fan-out; it never walks onboarding, so it is
       // cheap. The spec sets its own (empty) storageState via test.use.
       name: 'email-auth',
-      testMatch: /email-auth\.spec\.ts/,
+      testMatch: /(^|\/)email-auth\.spec\.ts$/,
       dependencies: ['course-management'],
       fullyParallel: false,
       use: {
@@ -189,7 +193,7 @@ export default defineConfig({
       // email-auth for the same warmup-fan-out reason, and because both
       // consume the per-address auth-email rate budget of fresh addresses.
       name: 'account-deletion',
-      testMatch: /account-deletion\.spec\.ts/,
+      testMatch: /(^|\/)account-deletion\.spec\.ts$/,
       dependencies: ['email-auth'],
       fullyParallel: false,
       use: {
@@ -204,7 +208,7 @@ export default defineConfig({
       // payment-overdue's comment); runs in parallel with the shared-user
       // chain. Manages its own contexts.
       name: 'billing-clock',
-      testMatch: /billing-clock\.spec\.ts/,
+      testMatch: /(^|\/)billing-clock\.spec\.ts$/,
       dependencies: ['payment-overdue'],
       fullyParallel: false,
       workers: 1,

@@ -122,10 +122,10 @@
       "language": "App Language",
       "uiSettings": {
         "title": "UI Settings",
-        "hideDueCounts": "Hide remaining reviews",
-        "hideDueCountsDescription": "Don't show how many sentences are new or waiting. Useful if a large queue feels discouraging.",
-        "hideWorkloadForecast": "Hide workload forecast",
-        "hideWorkloadForecastDescription": "Don't show the 7-day forecast of upcoming review time on the home screen."
+        "showDueCounts": "Show how many cards are due",
+        "showDueCountsDescription": "Show how many sentences are new or waiting. Off by default, since a large queue can feel discouraging.",
+        "showWorkloadForecast": "Show time schedule for due and upcoming cards",
+        "showWorkloadForecastDescription": "Show the 7-day forecast of upcoming review time on the home screen."
       },
       "contactPrompt": {
         "title": "Need anything?",

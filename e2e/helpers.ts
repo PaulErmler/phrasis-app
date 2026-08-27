@@ -389,20 +389,27 @@ export async function gotoAuthedApp(
 }
 
 /**
- * Turn off "Hide remaining reviews" so home due-count pills render.
- * E2E fixtures walk real onboarding, so new accounts hide the pills by
- * default; specs that assert on them must opt back in first.
+ * Turn on "Show how many cards are due" so home due-count pills render.
+ * The pills are hidden by default (showing is an explicit opt-in); specs
+ * that assert on them must opt in first.
  */
 export async function showDueCounts(page: Page): Promise<void> {
   await page.goto('/app/settings');
   await page.waitForLoadState('domcontentloaded');
-  const sw = page.locator('#hideDueCounts');
+  const sw = page.locator('#showDueCounts');
   await expect(sw).toBeVisible({ timeout: 15_000 });
-  if ((await sw.getAttribute('aria-checked')) === 'true') {
+  if ((await sw.getAttribute('aria-checked')) !== 'true') {
     await sw.click();
+    // aria-checked flips from the optimistic patch in the same frame —
+    // before the mutation commits. Navigating on that signal alone can
+    // unload the page before the write flushes (or land on a page whose
+    // server-preloaded settings predate it). Reload and re-assert so the
+    // state is server-confirmed before the caller navigates anywhere.
+    await page.reload();
+    await expect(sw).toBeVisible({ timeout: 15_000 });
     await expect
       .poll(async () => sw.getAttribute('aria-checked'), { timeout: 8_000 })
-      .toBe('false');
+      .toBe('true');
   }
 }
 

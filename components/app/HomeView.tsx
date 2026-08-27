@@ -75,10 +75,12 @@ export function HomeView({
     // StartLearningButton, which sets `data-tutorial` from the same field.
     // `hideDueCounts` drops the pills step when those pills are not on
     // screen; `hideWorkloadForecast` does the same for the forecast step.
+    // Both surfaces show only on an explicit `false` (off by default), so
+    // the steps are dropped unless the user opted in.
     context: {
       reviewMode: courseSettings?.reviewMode ?? 'audio',
-      hideDueCounts: userSettings?.hideDueCounts === true,
-      hideWorkloadForecast: userSettings?.hideWorkloadForecast === true,
+      hideDueCounts: userSettings?.hideDueCounts !== false,
+      hideWorkloadForecast: userSettings?.hideWorkloadForecast !== false,
     },
   });
 

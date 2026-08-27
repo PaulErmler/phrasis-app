@@ -209,7 +209,8 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
   // getUserSettings subscription instead of re-subscribing ad hoc.
   const { preloadedSettings } = useAppData();
   const userSettings = usePreloadedQuery(preloadedSettings);
-  const hideDueCounts = userSettings?.hideDueCounts === true;
+  // Show only on an explicit opt-in (`false`); unset = hidden by default.
+  const hideDueCounts = userSettings?.hideDueCounts !== false;
   const cardCountsQuery = useQuery(
     api.features.stats.getCardCounts,
     hideDueCounts ? 'skip' : { now },

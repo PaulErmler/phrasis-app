@@ -3,8 +3,11 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { usePreloadedQuery, useQuery } from 'convex/react';
+import type { FunctionArgs } from 'convex/server';
 import { api } from '@/convex/_generated/api';
+import { reportError } from '@/lib/report-error';
 import type { View } from '@/components/app/BottomNav';
 import { Card, CardContent } from '@/components/ui/card';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
@@ -42,6 +45,22 @@ export function SettingsView({ activeView }: { activeView: View }) {
   const { preloadedSettings } = useAppData();
   const userSettings = usePreloadedQuery(preloadedSettings);
   const updateUserSettings = useUpdateUserSettings();
+
+  // Every toggle below writes through here. `useUpdateUserSettings` registers
+  // an optimistic patch, so a failed save has already rolled the switch back —
+  // visibly snapping it — by the time the promise rejects. Without this the
+  // rejection is unhandled and the user is told nothing, which is exactly the
+  // silent-revert this app fixed for the course settings sheet.
+  const setUserSetting = async (
+    patch: FunctionArgs<typeof api.features.courses.updateUserSettings>,
+  ) => {
+    try {
+      await updateUserSettings(patch);
+    } catch (error) {
+      reportError(error, { op: 'updateUserSettings' });
+      toast.error(t('courses.manage.saveFailed'));
+    }
+  };
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevViewRef = useRef<View | null>(null);
@@ -98,20 +117,22 @@ export function SettingsView({ activeView }: { activeView: View }) {
               <div className="settings-row">
                 <div className="space-y-0.5">
                   <Label
-                    htmlFor="hideDueCounts"
+                    htmlFor="showDueCounts"
                     className="text-sm font-medium"
                   >
-                    {t('settings.uiSettings.hideDueCounts')}
+                    {t('settings.uiSettings.showDueCounts')}
                   </Label>
                   <p className="text-muted-xs">
-                    {t('settings.uiSettings.hideDueCountsDescription')}
+                    {t('settings.uiSettings.showDueCountsDescription')}
                   </p>
                 </div>
+                {/* Stored under the legacy "hide" field; only an explicit
+                    `false` shows, so this Show switch writes the negation. */}
                 <Switch
-                  id="hideDueCounts"
-                  checked={userSettings?.hideDueCounts === true}
+                  id="showDueCounts"
+                  checked={userSettings?.hideDueCounts === false}
                   onCheckedChange={(checked) => {
-                    void updateUserSettings({ hideDueCounts: checked });
+                    void setUserSetting({ hideDueCounts: !checked });
                   }}
                   className="mt-0.5"
                 />
@@ -119,20 +140,20 @@ export function SettingsView({ activeView }: { activeView: View }) {
               <div className="settings-row">
                 <div className="space-y-0.5">
                   <Label
-                    htmlFor="hideWorkloadForecast"
+                    htmlFor="showWorkloadForecast"
                     className="text-sm font-medium"
                   >
-                    {t('settings.uiSettings.hideWorkloadForecast')}
+                    {t('settings.uiSettings.showWorkloadForecast')}
                   </Label>
                   <p className="text-muted-xs">
-                    {t('settings.uiSettings.hideWorkloadForecastDescription')}
+                    {t('settings.uiSettings.showWorkloadForecastDescription')}
                   </p>
                 </div>
                 <Switch
-                  id="hideWorkloadForecast"
-                  checked={userSettings?.hideWorkloadForecast === true}
+                  id="showWorkloadForecast"
+                  checked={userSettings?.hideWorkloadForecast === false}
                   onCheckedChange={(checked) => {
-                    void updateUserSettings({ hideWorkloadForecast: checked });
+                    void setUserSetting({ hideWorkloadForecast: !checked });
                   }}
                   className="mt-0.5"
                 />

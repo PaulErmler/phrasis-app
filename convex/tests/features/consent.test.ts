@@ -32,7 +32,8 @@ describe('setAnalyticsConsent', () => {
     expect(settings?.analyticsConsent).toBe(true);
     // Only finalizeOnboarding may flip this true.
     expect(settings?.hasCompletedOnboarding).toBe(false);
-    expect(settings?.hideDueCounts).toBe(true);
+    // Not seeded: unset already means hidden (show is an explicit opt-in).
+    expect(settings?.hideDueCounts).toBeUndefined();
   });
 
   it('updates an existing row in place and supports withdrawal', async () => {

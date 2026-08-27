@@ -236,6 +236,9 @@ export async function toggleCustomCollectionHandler(
   return { selected: !isCurrentlySelected };
 }
 
+/** See the `dueBase` comment in `createCardsFromTexts`. */
+const NEW_CARD_DUE_BACKDATE_MS = 2 * 60_000;
+
 /**
  * Creates cards from a list of texts and returns count of new cards inserted.
  * Shared by both chat-collection and difficulty-collection card creation.
@@ -248,6 +251,15 @@ export async function createCardsFromTexts(
   course: Doc<'courses'>,
 ): Promise<{ cardsInserted: number; newLastRank: number }> {
   const now = Date.now();
+  // New cards are "due immediately", but clients read the due queue with a
+  // minute-floored `now` (useNowMinute) that can trail the wall clock by up
+  // to ~2 minutes, so a card stamped `Date.now()` would be invisible until
+  // the next minute tick — which turned the auto-add effect into a runaway
+  // insert loop. Stamp due dates in the past so every quantized reader sees
+  // them at once (tolerates ~60s of client-clock skew in the worst
+  // quantization phase). The `+ cardsInserted` increment keeps in-batch
+  // order; monotonic wall clock keeps FIFO across batches.
+  const dueBase = now - NEW_CARD_DUE_BACKDATE_MS;
   let cardsInserted = 0;
   let newLastRank = 0;
 
@@ -309,7 +321,7 @@ export async function createCardsFromTexts(
         textId: text._id,
         collectionId,
         collectionOrigin,
-        dueDate: now + cardsInserted,
+        dueDate: dueBase + cardsInserted,
         isMastered: false,
         isHidden: false,
         isFavorite: false,
@@ -317,7 +329,7 @@ export async function createCardsFromTexts(
         schedulingPhase: 'preReview' as const,
         preReviewCount: 0,
         ...(seedWritingTrack
-          ? { writingDueDate: now + cardsInserted, writingIsGraduated: false }
+          ? { writingDueDate: dueBase + cardsInserted, writingIsGraduated: false }
           : {}),
         radioRoundCounter: 0,
         radioPlayCount: 0,

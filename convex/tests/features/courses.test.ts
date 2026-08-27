@@ -196,7 +196,8 @@ describe('features/courses', () => {
         {},
       );
       expect(settings?.hasCompletedOnboarding).toBe(false);
-      expect(settings?.hideDueCounts).toBe(true);
+      // Not seeded: unset already means hidden (show is an explicit opt-in).
+      expect(settings?.hideDueCounts).toBeUndefined();
     });
 
     // completeOnboarding copies this value verbatim onto courseSettings, so
@@ -747,9 +748,9 @@ describe('features/courses', () => {
       );
       expect(settings?.pinnedCardActions).toEqual(['edit']);
       expect(settings?.hasCompletedOnboarding).toBe(false);
-      expect(settings?.hideDueCounts).toBe(true);
-      // Deliberately NOT defaulted: new accounts hide the pills but still
-      // see the workload forecast.
+      // Neither field is seeded: unset already means hidden, showing is an
+      // explicit opt-in (`false`).
+      expect(settings?.hideDueCounts).toBeUndefined();
       expect(settings?.hideWorkloadForecast).toBeUndefined();
     });
   });

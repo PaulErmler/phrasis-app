@@ -26,7 +26,11 @@ import {
   getCourseStats as dbGetCourseStats,
   deriveStreakDisplay,
 } from '../db/courseStats';
-import { isValidTimezone, resolveClientToday } from '../lib/dateUtils';
+import {
+  isValidTimezone,
+  resolveClientNow,
+  resolveClientToday,
+} from '../lib/dateUtils';
 import { addDays, startOfDayMs } from '../../lib/dateStrings';
 import {
   STABILITY_BUCKETS,
@@ -889,7 +893,9 @@ export const getCardCounts = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    return countDueCardsByState(ctx, 'both', args.now ?? Date.now());
+    // resolveClientNow covers both the back-compat omission (older bundles
+    // call with {}) and a non-finite client value; each falls to Date.now().
+    return countDueCardsByState(ctx, 'both', resolveClientNow(args.now));
   },
 });
 
@@ -934,7 +940,9 @@ export const getFilteredCardCounts = query({
     return countDueCardsByState(
       ctx,
       args.filter ?? 'both',
-      args.now,
+      // Convex numbers admit NaN/Infinity; fail closed to the server clock
+      // rather than letting a non-finite bound reach the aggregates.
+      resolveClientNow(args.now),
       args.reviewMode,
     );
   },
@@ -1059,7 +1067,13 @@ export const getWorkloadForecast = query({
     for (let k = 0; k <= WORKLOAD_DAYS; k++) {
       boundaries.push(startOfDayMs(addDays(today, k), timezone));
     }
-    const now = Math.min(Math.max(args.now, boundaries[0]), boundaries[1] - 1);
+    // resolveClientNow first: NaN propagates straight through min/max, and a
+    // NaN upper bound would collapse every availableNow count to the first
+    // boundary key.
+    const now = Math.min(
+      Math.max(resolveClientNow(args.now), boundaries[0]),
+      boundaries[1] - 1,
+    );
 
     const { state: stateAggregate, originState: originStateAggregate } =
       TRACK_AGGREGATES[track];

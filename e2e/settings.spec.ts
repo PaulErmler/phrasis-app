@@ -33,7 +33,7 @@ test.describe('settings', () => {
     const control = page.getByRole('button').first();
     await expect(control).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.locator('#hideDueCounts')).toBeVisible({
+    await expect(page.locator('#showDueCounts')).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -41,56 +41,84 @@ test.describe('settings', () => {
   test('the workload forecast has its own visibility switch, independent of due counts', async ({
     page,
   }) => {
-    // Ensure a known starting state: both preferences off. (Fixture users
-    // walk real onboarding, which defaults hideDueCounts to true.)
+    // Ensure a known starting state: both Show toggles on. (Both surfaces
+    // are hidden by default; showing is an explicit opt-in.)
     await page.goto('/app/settings');
-    const dueToggle = page.locator('#hideDueCounts');
-    const forecastToggle = page.locator('#hideWorkloadForecast');
+    const dueToggle = page.locator('#showDueCounts');
+    const forecastToggle = page.locator('#showWorkloadForecast');
     await expect(dueToggle).toBeVisible({ timeout: 15_000 });
     await expect(forecastToggle).toBeVisible();
-    for (const toggle of [dueToggle, forecastToggle]) {
-      if ((await toggle.getAttribute('aria-checked')) === 'true') {
-        await toggle.click();
+
+    // A Radix switch flips aria-checked from the optimistic patch in the
+    // same frame — before the mutation commits — so navigating right after
+    // a click can unload the page before the write flushes, or land on a
+    // page whose server-preloaded settings predate it. After clicking,
+    // reload and re-assert so every toggle state is server-confirmed
+    // before moving on.
+    const confirmSaved = async (
+      expected: Array<{ toggle: typeof dueToggle; on: boolean }>,
+    ) => {
+      await page.reload();
+      for (const { toggle, on } of expected) {
+        await expect(toggle).toBeVisible({ timeout: 15_000 });
         await expect
           .poll(async () => toggle.getAttribute('aria-checked'), {
             timeout: 8_000,
           })
-          .toBe('false');
+          .toBe(on ? 'true' : 'false');
+      }
+    };
+
+    for (const toggle of [dueToggle, forecastToggle]) {
+      if ((await toggle.getAttribute('aria-checked')) !== 'true') {
+        await toggle.click();
       }
     }
+    await confirmSaved([
+      { toggle: dueToggle, on: true },
+      { toggle: forecastToggle, on: true },
+    ]);
 
-    // The forecast card is on home whenever its own preference is off.
+    // The forecast card is on home whenever its own toggle is on.
     await page.goto('/app');
     await expect(page.getByTestId('due-counts-pills')).toBeVisible({
       timeout: 20_000,
     });
     await expect(page.getByTestId('workload-forecast')).toBeVisible();
 
-    // Hiding due counts hides the pills but leaves the forecast alone.
+    // Turning the due-counts toggle back off hides the pills but leaves
+    // the forecast alone.
     await page.goto('/app/settings');
+    await expect(dueToggle).toBeVisible({ timeout: 15_000 });
     await dueToggle.click();
+    await confirmSaved([{ toggle: dueToggle, on: false }]);
     await page.goto('/app');
     await expect(page.getByTestId('due-counts-pills')).toHaveCount(0, {
       timeout: 15_000,
     });
     await expect(page.getByTestId('workload-forecast')).toBeVisible();
 
-    // The forecast's own switch removes the card.
+    // Turning the forecast's own switch off removes the card.
     await page.goto('/app/settings');
     await expect(forecastToggle).toBeVisible({ timeout: 15_000 });
     await forecastToggle.click();
+    await confirmSaved([{ toggle: forecastToggle, on: false }]);
     await page.goto('/app');
     await expect(page.getByTestId('workload-forecast')).toHaveCount(0, {
       timeout: 15_000,
     });
 
-    // Restore both preferences so downstream shared-fixture specs see the
-    // state this spec started from (same courtesy as the change-password
-    // test).
+    // Turn both back on so downstream shared-fixture specs that assert on
+    // the pills (via the showDueCounts helper) start from a visible state
+    // (same courtesy as the change-password test).
     await page.goto('/app/settings');
     await expect(dueToggle).toBeVisible({ timeout: 15_000 });
     await dueToggle.click();
     await forecastToggle.click();
+    await confirmSaved([
+      { toggle: dueToggle, on: true },
+      { toggle: forecastToggle, on: true },
+    ]);
     await page.goto('/app');
     await expect(page.getByTestId('due-counts-pills')).toBeVisible({
       timeout: 15_000,
