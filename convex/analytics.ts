@@ -57,6 +57,12 @@ export const EVENTS = {
   // convex/features/paymentSync.ts. The revenue side of the margin
   // dashboards; replaces list-price assumptions with what was really paid.
   PAYMENT_RECORDED: 'payment_recorded',
+
+  // Latest Convex invoice total, re-emitted daily by
+  // convex/features/infraCostSync.ts. Dashboards read the LATEST value
+  // (argMax by timestamp), so the daily re-emission is idempotent by
+  // construction and needs no dedup ledger.
+  INFRA_COST_RECORDED: 'infra_cost_recorded',
 } as const;
 
 /**

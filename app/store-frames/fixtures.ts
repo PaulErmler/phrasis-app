@@ -149,6 +149,96 @@ export const writeCard: {
   ],
 };
 
+/**
+ * The AI-feedback frame: the learner translated the card differently from
+ * its stored sentence, and the grader accepted the wording. `typedAnswer`
+ * is what they typed; `sourceText` stays the card's own sentence, shown
+ * below the diff as another accepted answer.
+ */
+export const feedbackCard: {
+  sourceText: string;
+  typedAnswer: string;
+  translations: CardTranslation[];
+  audioRecordings: CardAudioRecording[];
+} = {
+  sourceText: 'Mañana tengo que madrugar.',
+  typedAnswer: 'Mañana tengo que levantarme temprano.',
+  translations: [
+    {
+      language: 'en',
+      text: 'I have to get up early tomorrow.',
+      isBaseLanguage: true,
+      isTargetLanguage: false,
+    },
+    {
+      language: 'es',
+      text: 'Mañana tengo que madrugar.',
+      isBaseLanguage: false,
+      isTargetLanguage: true,
+    },
+  ],
+  audioRecordings: [
+    {
+      language: 'en',
+      voiceName: 'en-US-Chirp3-HD-Aoede',
+      url: SILENT_AUDIO,
+      wordTimings: null,
+      ttsQuality: 'validated',
+    },
+    {
+      language: 'es',
+      voiceName: 'es-ES-Chirp3-HD-Charon',
+      url: SILENT_AUDIO,
+      wordTimings: null,
+      ttsQuality: 'validated',
+    },
+  ],
+};
+
+/**
+ * The partly-right AI-feedback frame: a classic tense + duration slip, so
+ * the diff shows real corrections and the coach notes explain why.
+ */
+export const partialCard: {
+  sourceText: string;
+  typedAnswer: string;
+  translations: CardTranslation[];
+  audioRecordings: CardAudioRecording[];
+} = {
+  sourceText: 'Nos conocemos desde hace diez años.',
+  typedAnswer: 'Nos conocimos por diez años.',
+  translations: [
+    {
+      language: 'en',
+      text: 'We have known each other for ten years.',
+      isBaseLanguage: true,
+      isTargetLanguage: false,
+    },
+    {
+      language: 'es',
+      text: 'Nos conocemos desde hace diez años.',
+      isBaseLanguage: false,
+      isTargetLanguage: true,
+    },
+  ],
+  audioRecordings: [
+    {
+      language: 'en',
+      voiceName: 'en-US-Chirp3-HD-Aoede',
+      url: SILENT_AUDIO,
+      wordTimings: null,
+      ttsQuality: 'validated',
+    },
+    {
+      language: 'es',
+      voiceName: 'es-ES-Chirp3-HD-Charon',
+      url: SILENT_AUDIO,
+      wordTimings: null,
+      ttsQuality: 'validated',
+    },
+  ],
+};
+
 // ---------------------------------------------------------------- stats
 
 export const numbers = {

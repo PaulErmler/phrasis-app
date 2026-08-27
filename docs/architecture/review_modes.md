@@ -54,8 +54,11 @@ Shadowing):
   them), the grader uses a transcription prompt/schema with no `alsoCorrect`
   verdict and no `corrected` sentence, and nothing is ever stored as an
   alternative. The chat "Discuss" action carries a matching `transcribe` flag
-  so it judges the attempt as a transcription and never calls
-  markAlsoCorrect.
+  so it words the request as a transcription; separately, and on *every* card
+  turn in a transcribe course (free-text follow-ups included), `sendMessage`
+  re-reads `writingInputMode` and withholds the `markAlsoCorrect` tool
+  altogether. Prompt wording alone would not hold there, because the agent's
+  standing prompt invites the tool whenever it is available.
 
 ### Per-mode playback settings
 

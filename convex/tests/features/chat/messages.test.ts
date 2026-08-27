@@ -18,6 +18,8 @@ const llm = vi.hoisted(() => {
     failGenerate: false,
     streamCalls: 0,
     generateCalls: 0,
+    /** Tool names handed to the model on the Nth doStream call. */
+    toolNamesPerStep: [] as string[][],
     reset() {
       state.responseText = 'Mock assistant reply.';
       state.titleText = 'Mock Thread Title';
@@ -26,6 +28,7 @@ const llm = vi.hoisted(() => {
       state.failGenerate = false;
       state.streamCalls = 0;
       state.generateCalls = 0;
+      state.toolNamesPerStep = [];
     },
   };
   return state;
@@ -52,9 +55,15 @@ vi.mock('@openrouter/ai-sdk-provider', () => {
         warnings: [],
       };
     },
-    async doStream() {
+    async doStream(options: { tools?: Array<{ name?: string }> }) {
       const step = llm.streamCalls;
       llm.streamCalls += 1;
+      // The tool set the model actually sees, at the provider boundary — the
+      // one place that can prove a tool was withheld rather than merely
+      // discouraged by prompt wording.
+      llm.toolNamesPerStep[step] = (options?.tools ?? [])
+        .map((tool) => tool.name ?? '')
+        .filter(Boolean);
       if (llm.failStream) throw new Error('mock stream failure');
       const providerMetadata = llm.providerMetadataPerStep[step];
       const words = llm.responseText.split(' ');
@@ -97,6 +106,7 @@ import { register as registerAgentComponent } from '@convex-dev/agent/test';
 import schema from '../../../schema';
 import { api, internal } from '../../../_generated/api';
 import { posthog } from '../../../posthog';
+import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../../../lib/scheduling';
 import {
   MAX_MESSAGE_LENGTH,
   THREAD_MESSAGE_LIMIT,
@@ -131,6 +141,61 @@ async function seedUserWithCredits(t: TestConvex<typeof schema>, balance = 50) {
         credits: { balance, included: balance, used: 0, unlimited: false },
       },
       lastSyncedAt: Date.now(),
+    });
+  });
+}
+
+/**
+ * A card in USER's active course, plus that course's writing settings. The
+ * markAlsoCorrect tool is registered per card turn, and withheld when the
+ * course writes by transcription.
+ */
+async function seedCardInActiveCourse(
+  t: TestConvex<typeof schema>,
+  writingInputMode: 'translate' | 'transcribe',
+) {
+  return t.run(async (ctx) => {
+    const settings = await ctx.db
+      .query('userSettings')
+      .withIndex('by_userId', (q) => q.eq('userId', USER))
+      .first();
+    const courseId = settings!.activeCourseId!;
+    await ctx.db.insert('courseSettings', {
+      courseId,
+      initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
+      writingInputMode,
+    });
+    const collectionId = await ctx.db.insert('collections', {
+      name: 'A1',
+      textCount: 0,
+    });
+    const deckId = await ctx.db.insert('decks', {
+      courseId,
+      name: 'deck',
+      cardCount: 1,
+    });
+    const textId = await ctx.db.insert('texts', {
+      text: 'I would like a coffee, please.',
+      language: 'en',
+      userCreated: false,
+      collectionId,
+      collectionRank: 1,
+    });
+    await ctx.db.insert('translations', {
+      textId,
+      targetLanguage: 'es',
+      translatedText: 'Quisiera un café, por favor.',
+    });
+    return ctx.db.insert('cards', {
+      deckId,
+      textId,
+      collectionId,
+      collectionOrigin: 'premade',
+      dueDate: 0,
+      isMastered: false,
+      isHidden: false,
+      schedulingPhase: 'preReview',
+      preReviewCount: 0,
     });
   });
 }
@@ -501,6 +566,51 @@ describe('features/chat/messages', () => {
       expect(byRole('assistant').map(textOf)).toEqual(['¡Hola! Mock reply.']);
       // Zero reported cost stays within the prepaid credit: no extra charge.
       expect(await creditsBalance(t)).toBe(49);
+    });
+
+    it('offers markAlsoCorrect on a translate card turn', async () => {
+      const t = setup();
+      await seedUserWithCredits(t, 50);
+      const cardId = await seedCardInActiveCourse(t, 'translate');
+      const asUser = t.withIdentity({ subject: USER });
+      const threadId = await asUser.mutation(
+        api.features.chat.threads.getOrCreateEmptyThread,
+        {},
+      );
+      vi.useFakeTimers();
+      await asUser.mutation(api.features.chat.messages.sendMessage, {
+        threadId,
+        prompt: 'Is my version also correct?',
+        cardId,
+      });
+      await drainScheduled(t);
+
+      expect(llm.toolNamesPerStep[0]).toContain('markAlsoCorrect');
+    });
+
+    it('withholds markAlsoCorrect on every turn of a transcribe course', async () => {
+      // Not just the discussAnswer quick action: a plain free-text follow-up
+      // must not be able to store an alternative either, because in
+      // transcribe a differently-worded sentence is not what the audio said.
+      const t = setup();
+      await seedUserWithCredits(t, 50);
+      const cardId = await seedCardInActiveCourse(t, 'transcribe');
+      const asUser = t.withIdentity({ subject: USER });
+      const threadId = await asUser.mutation(
+        api.features.chat.threads.getOrCreateEmptyThread,
+        {},
+      );
+      vi.useFakeTimers();
+      await asUser.mutation(api.features.chat.messages.sendMessage, {
+        threadId,
+        prompt: 'Is my version also correct?',
+        cardId,
+      });
+      await drainScheduled(t);
+
+      expect(llm.toolNamesPerStep[0]).not.toContain('markAlsoCorrect');
+      // The rest of the card-turn toolset is untouched.
+      expect(llm.toolNamesPerStep[0]).toContain('createCard');
     });
 
     it('only the first message triggers title generation', async () => {

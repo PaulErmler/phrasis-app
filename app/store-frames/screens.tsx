@@ -6,8 +6,15 @@
  * frames (opener, modes) are marketing art and say so.
  */
 import type { ReactNode } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FileText, Undo2 } from 'lucide-react';
 import { LearningCardContent } from '@/components/app/learning/LearningCardContent';
+import { AudioButton } from '@/components/app/learning/AudioButton';
+import { CardShell } from '@/components/app/learning/CardShell';
+import { DiffDisplay } from '@/components/app/learning/DiffDisplay';
+import {
+  WritingFeedbackCard,
+  type RowFeedback,
+} from '@/components/app/learning/WritingFeedbackCard';
 import { LearningControls } from '@/components/app/learning/LearningControls';
 import { ProgressDisplay } from '@/components/app/learning/ProgressDisplay';
 import { LearningHeader } from '@/components/app/learning/LearningHeader';
@@ -410,6 +417,182 @@ export function WriteScreen() {
   );
 }
 
+/**
+ * AI answer feedback: a submitted writing answer with the coach card under
+ * it. Same submitted-row layout FullReviewCardContent renders (header audio,
+ * diff, revert/clean buttons, any other accepted answer, then the coach
+ * card), rebuilt from the real components because the submitted state lives
+ * in component state and can't be passed in.
+ */
+function FeedbackFrame({
+  card,
+  expected,
+  feedback,
+  showAccepted = false,
+}: {
+  card: typeof fx.feedbackCard;
+  /** What the diff scores the typed answer against. */
+  expected: string;
+  feedback: RowFeedback;
+  /** List the card's own sentence below the diff as another accepted answer. */
+  showAccepted?: boolean;
+}) {
+  return (
+    <WithChatContext>
+      <div className="absolute inset-0 flex flex-col bg-background text-foreground pt-4">
+        <LearningHeader
+          onBack={noop}
+          onSettingsOpen={noop}
+          reviewMode="full"
+          ratingCount={4}
+        />
+        <main className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden px-4">
+          <CardShell
+            presentation={{
+              ...cardStubs,
+              sourceText: card.sourceText,
+              translations: card.translations,
+              audioRecordings: card.audioRecordings,
+            }}
+            reviewCount={9}
+            bare
+          >
+            {() => (
+              <div className="space-y-1">
+                <div className="flex justify-end">
+                  <AudioButton url={fx.SILENT_AUDIO} language="es" />
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <DiffDisplay
+                      expected={expected}
+                      actual={card.typedAnswer}
+                      language="es"
+                    />
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-2 pt-0.5">
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 shrink-0"
+                      >
+                        <Undo2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 shrink-0"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                {showAccepted && (
+                  <div className="flex flex-col gap-1.5 pt-1">
+                    <div className="flex items-start gap-2">
+                      <p className="flex-1 min-w-0 text-sm text-muted-foreground">
+                        {card.sourceText}
+                      </p>
+                      <AudioButton url={fx.SILENT_AUDIO} language="es" />
+                    </div>
+                  </div>
+                )}
+                <WritingFeedbackCard
+                  feedback={feedback}
+                  onDiscuss={noop}
+                  onMakeDefault={async () => {}}
+                />
+              </div>
+            )}
+          </CardShell>
+        </main>
+        <LearningControls
+          validRatings={['again', 'hard', 'good', 'easy']}
+          activeRating={'good' as never}
+          ratingIntervals={{ again: '<1m', hard: '6m', good: '3d', easy: '8d' }}
+          onSelectRating={noop}
+          onPlay={noop}
+          onPause={noop}
+          isPlaying={false}
+          isMerging={false}
+          durationSec={3.1}
+          onSeek={noop}
+          onNext={noop}
+          onUndo={noop}
+          undoDisabled={false}
+          isReviewing={false}
+          isFullReview
+          fullReviewRevealed
+        />
+      </div>
+    </WithChatContext>
+  );
+}
+
+/**
+ * A different-but-correct wording the grader accepted and saved.
+ *
+ * Captured for the set as frame 06 with
+ * ?screen=feedback&caption=AI%20FEEDBACK%20ON%20EVERY%20ANSWER.&bg=%23FFB300&fg=%233B2A00
+ */
+export function FeedbackScreen() {
+  return (
+    <FeedbackFrame
+      card={fx.feedbackCard}
+      expected={fx.feedbackCard.typedAnswer}
+      showAccepted
+      feedback={{
+        status: 'done',
+        result: {
+          verdict: 'alsoCorrect',
+          corrected: fx.feedbackCard.typedAnswer,
+          notes: [
+            {
+              type: 'vocab',
+              text: 'Totally fine — madrugar is just the snappy one-word way to say "get up early".',
+            },
+          ],
+          savedAlternative: true,
+        },
+      }}
+    />
+  );
+}
+
+/**
+ * A partly-right answer: the diff marks the slips, the coach explains them.
+ *
+ * Captured for the set as frame 07 with
+ * ?screen=feedback-partial&caption=MISTAKES%20EXPLAINED%2C%20NOT%20JUST%20MARKED.&bg=%23D45C2B&fg=%23FFFFFF
+ */
+export function FeedbackPartialScreen() {
+  return (
+    <FeedbackFrame
+      card={fx.partialCard}
+      expected={fx.partialCard.sourceText}
+      feedback={{
+        status: 'done',
+        result: {
+          verdict: 'partial',
+          corrected: fx.partialCard.sourceText,
+          notes: [
+            {
+              type: 'grammar',
+              text: 'Conocimos says you met once — still knowing each other now takes the present: nos conocemos.',
+            },
+            {
+              type: 'wordChoice',
+              text: 'For "how long so far", Spanish reaches for desde hace, not por.',
+            },
+          ],
+        },
+      }}
+    />
+  );
+}
+
 /** The milestone screen the learner meets partway through a session. */
 export function ProgressScreen() {
   return (
@@ -693,6 +876,8 @@ export const SCREENS: Record<string, () => ReactNode> = {
   modes: () => <ModesScreen />,
   learn: () => <LearnScreen />,
   write: () => <WriteScreen />,
+  feedback: () => <FeedbackScreen />,
+  'feedback-partial': () => <FeedbackPartialScreen />,
   'chat-answer': () => <ChatAnswerScreen sampleIndex={0} />,
   'chat-answer-2': () => <ChatAnswerScreen sampleIndex={2} />,
   'chat-cards': () => <ChatCardsScreen />,

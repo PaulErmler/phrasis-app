@@ -33,6 +33,8 @@ type Env = {
   readonly AUTUMN_SECRET_KEY: string | undefined;
   readonly AZURE_SPEECH_API_KEY: string | undefined;
   readonly AZURE_SPEECH_REGION: string | undefined;
+  readonly CONVEX_BILLING_TOKEN: string | undefined;
+  readonly CONVEX_TEAM_ID: string | undefined;
   readonly E2E_TEST_HOOKS: string | undefined;
   readonly EMAIL_ENV: string | undefined;
   readonly FF_NEW_COURSE_CUTOVER: string | undefined;

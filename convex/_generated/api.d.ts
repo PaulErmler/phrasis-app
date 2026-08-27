@@ -82,6 +82,7 @@ import type * as features_e2eCleanup from "../features/e2eCleanup.js";
 import type * as features_featureIds from "../features/featureIds.js";
 import type * as features_furigana from "../features/furigana.js";
 import type * as features_home from "../features/home.js";
+import type * as features_infraCostSync from "../features/infraCostSync.js";
 import type * as features_ipa from "../features/ipa.js";
 import type * as features_library from "../features/library.js";
 import type * as features_llmTranslationQueue from "../features/llmTranslationQueue.js";
@@ -251,6 +252,7 @@ declare const fullApi: ApiFromModules<{
   "features/featureIds": typeof features_featureIds;
   "features/furigana": typeof features_furigana;
   "features/home": typeof features_home;
+  "features/infraCostSync": typeof features_infraCostSync;
   "features/ipa": typeof features_ipa;
   "features/library": typeof features_library;
   "features/llmTranslationQueue": typeof features_llmTranslationQueue;

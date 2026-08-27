@@ -220,6 +220,17 @@ export const sendMessage = mutation({
       : null;
     const active = await getActiveCourseForUser(ctx, userId);
 
+    // Transcribe: the card's answer must reproduce the audio, so a
+    // differently-worded variant is never "also correct" and markAlsoCorrect
+    // must not be offered. Read from the course settings rather than the
+    // quick-action payload: the payload only describes the discussAnswer turn,
+    // while the tool is registered on EVERY card turn — including a later
+    // free-text "is X also correct?", which the agent prompt actively invites.
+    const transcribeCard = cardData
+      ? (await getCourseSettings(ctx, cardData.courseId))?.writingInputMode ===
+        'transcribe'
+      : false;
+
     const steering = args.quickAction
       ? buildQuickActionSteering(args.quickAction, cardData, active)
       : undefined;
@@ -292,6 +303,8 @@ export const sendMessage = mutation({
         // Only forwarded when the card context resolved (ownership verified
         // above), gates the markAlsoCorrect tool for this turn.
         cardId: cardData ? args.cardId : undefined,
+        // ...and withholds it entirely when the course writes by transcription.
+        transcribeCard,
       },
     );
 
@@ -411,6 +424,12 @@ export const generateResponse = internalAction({
     // verified by sendMessage's resolveCardContext). Presence registers the
     // markAlsoCorrect tool for this turn, closed over this id.
     cardId: v.optional(v.id('cards')),
+    // The card's course writes by transcription (courseSettings
+    // .writingInputMode). Only the spoken sentence is correct there, so the
+    // markAlsoCorrect tool is withheld: prompt wording alone would not hold on
+    // a free-text turn, where the agent prompt invites the tool whenever it is
+    // available. Resolved in sendMessage, which has db access.
+    transcribeCard: v.optional(v.boolean()),
     // The sending user, for cost attribution: seeds `billedUserId` (so
     // turns whose usageHandler never supplies a userId still bill to the
     // sender) and rides into the thread-title event. A stream that throws
@@ -549,14 +568,21 @@ export const generateResponse = internalAction({
           // discussAnswer): the user can free-text ask "is X also correct?",
           // and persisted steering from an earlier quick action is re-read
           // on later turns.
+          //
+          // Except in transcribe, where an alternative phrasing is by
+          // definition not what the audio said: the tool is left out, so
+          // "never store an alternative" holds structurally on every turn
+          // rather than resting on the quick action's prompt wording.
           ...(args.cardId
             ? {
-                tools: {
-                  ...AGENT_TOOLS,
-                  markAlsoCorrect: createMarkAlsoCorrectTool({
-                    cardId: args.cardId,
-                  }),
-                },
+                tools: args.transcribeCard
+                  ? AGENT_TOOLS
+                  : {
+                      ...AGENT_TOOLS,
+                      markAlsoCorrect: createMarkAlsoCorrectTool({
+                        cardId: args.cardId,
+                      }),
+                    },
               }
             : {}),
         },

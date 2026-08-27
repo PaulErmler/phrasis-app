@@ -576,6 +576,7 @@ describe('features/writingFeedback', () => {
       targetLanguage: 'es',
       notesLanguage: 'de',
       expected: 'Quisiera un café, por favor.',
+      metadata: {},
       userAnswer: 'Quisiera un té.',
     };
 
@@ -592,6 +593,35 @@ describe('features/writingFeedback', () => {
       );
       expect(prompt).not.toContain('BASE');
       expect(prompt).not.toContain('Source sentence');
+    });
+
+    it("carries the card metadata, in the translate prompt's slot", () => {
+      // The transcribe prompt offers a "register" note type, so it needs the
+      // card's own register to compare a misheard form against.
+      const withMeta = buildTranscribeGraderUserPrompt({
+        ...base,
+        metadata: { register: 'formal', speakerGender: 'female' },
+      });
+      expect(withMeta).toContain(
+        'Register: formal\nSpeaker gender: female\n\nWrite each',
+      );
+      // …and the blank line survives when there is no metadata at all.
+      expect(buildTranscribeGraderUserPrompt(base)).toContain(
+        'Expected sentence (TARGET, what the audio said): Quisiera un café, por favor.\n\nWrite each',
+      );
+    });
+
+    it('only mentions the addressee when the sentence addresses someone', () => {
+      const meta = { addresseeGender: 'male', addresseeNumber: 'singular' };
+      expect(
+        buildTranscribeGraderUserPrompt({ ...base, metadata: meta }),
+      ).not.toContain('Addressee');
+      expect(
+        buildTranscribeGraderUserPrompt({
+          ...base,
+          metadata: { ...meta, addressesSomeone: true },
+        }),
+      ).toContain('Addressee gender: male\nAddressee number: singular');
     });
 
     it('fences the answer so injected instructions stay data', () => {

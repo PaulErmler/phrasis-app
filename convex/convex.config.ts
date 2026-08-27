@@ -42,6 +42,15 @@ const app = defineApp({
     // read) for the daily payment reconciliation sweep
     // (convex/features/paymentSync.ts). Unset = the sweep no-ops.
     STRIPE_SECRET_KEY: v.optional(v.string()),
+    // Convex account token for the daily infra-cost sweep
+    // (convex/features/infraCostSync.ts): a team access token if the
+    // dashboard billing endpoints accept it, else the CLI login token.
+    // Unset = the sweep no-ops and the dashboards fall back to the
+    // base-fee estimate.
+    CONVEX_BILLING_TOKEN: v.optional(v.string()),
+    // Numeric Convex team id for the same sweep. Optional: when unset the
+    // sweep tries to resolve it from the token via the Management API.
+    CONVEX_TEAM_ID: v.optional(v.string()),
     // LLM + TTS via OpenRouter (convex/lib/openrouter.ts, convex/lib/tts/*)
     OPENROUTER_API_KEY: v.optional(v.string()),
     // Google Cloud translation / romanization / TTS

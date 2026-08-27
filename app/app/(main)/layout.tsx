@@ -18,7 +18,7 @@ import { getUserTimezone } from '@/lib/timezone';
 import { usePrefetchedThread } from '@/hooks/use-prefetched-thread';
 import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import {
-  getSessionReviewCount,
+  getSessionReviewStats,
   resetSessionReviewCount,
 } from '@/lib/posthog/review-session-counter';
 import { HomeView } from '@/components/app/HomeView';
@@ -268,7 +268,9 @@ export default function MainLayout({
     learnStartedAtRef.current = null;
     capture(CLIENT_EVENTS.REVIEW_SESSION_ENDED, {
       duration_ms: startedAt === null ? undefined : Date.now() - startedAt,
-      reviews_count: getSessionReviewCount(),
+      // reviews_count plus per-(surface, activity) count/time buckets:
+      // review|radio x listening|translating|transcribing.
+      ...getSessionReviewStats(),
       course_id: activeCourse?._id,
       target_languages: activeCourse?.targetLanguages,
       current_level: activeCourse?.currentLevel,

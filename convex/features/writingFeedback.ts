@@ -44,7 +44,7 @@ import {
 /**
  * AI feedback for writing mode. One stateless grader call scores the user's
  * typed (or dictated) answer against the card's expected translation and
- * returns a compact verdict + up to two notes + a minimally-corrected
+ * returns a compact verdict + up to MAX_NOTES notes + a minimally-corrected
  * sentence. Exact matches — against the primary translation or any of the
  * user's stored accepted alternatives — are decided locally and consume no
  * quota and no LLM call.
@@ -400,6 +400,7 @@ export const gradeWritingAnswer = action({
           targetLanguage: args.language,
           notesLanguage: context.notesLanguage,
           expected: context.expected,
+          metadata: context.metadata,
           userAnswer,
         })
       : buildGraderUserPrompt({

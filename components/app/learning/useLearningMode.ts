@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   recordReviewForSession,
+  reviewActivity,
   undoReviewForSession,
 } from '@/lib/posthog/review-session-counter';
 import { useTranslations } from 'next-intl';
@@ -937,6 +938,9 @@ export function useLearningMode(
   // Review / master / hide
   // --------------------------------------------------------------------------
   const reviewMode = courseSettings?.reviewMode ?? 'audio';
+  // Which writing task the full face serves; picks the session-stats bucket
+  // (translating vs transcribing). Matches LearnView's default.
+  const writingInputMode = courseSettings?.writingInputMode ?? 'translate';
 
   // Opt-out: undefined (pre-migration rows or unset) defaults to enabled.
   const progressDisplayEnabled = courseSettings?.progressDisplayEnabled ?? true;
@@ -1017,10 +1021,11 @@ export function useLearningMode(
       }
 
       try {
+        const timeSpentMs = Math.max(0, Date.now() - cardShownAtRef.current);
         const result = await reviewCardMutation({
           cardId: cardForReview._id,
           rating,
-          timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
+          timeSpentMs,
           timezone: getUserTimezone(),
           ...(reviewMode === 'full' && { forceReviewPhase: true }),
           reviewMode,
@@ -1032,7 +1037,11 @@ export function useLearningMode(
             accuracyLenient: accuracy.lenient / 100,
           }),
         });
-        recordReviewForSession();
+        recordReviewForSession(
+          'review',
+          reviewActivity(reviewMode, writingInputMode),
+          timeSpentMs,
+        );
         setDailyReviewsToday(result.dailyReviewsToday);
         setDailyTimeMsToday(result.dailyTimeMsToday);
         setDailyNewWordsToday(result.dailyNewWordsToday);
@@ -1069,6 +1078,7 @@ export function useLearningMode(
       isReviewing,
       reviewCardMutation,
       reviewMode,
+      writingInputMode,
       progressDisplayEnabled,
       dailyReviewsToday,
       sessionId,
@@ -1091,7 +1101,7 @@ export function useLearningMode(
         setDailyTimeMsToday(result.dailyTimeMsToday);
         setDailyNewWordsToday(result.dailyNewWordsToday);
         setSessionCardCount((n) => Math.max(0, n - 1));
-        undoReviewForSession();
+        undoReviewForSession(reviewActivity(reviewMode, writingInputMode));
         // The card-change effect keyed on `cardForReview?._id` won't fire when
         // the restored card is the same document as the one on screen (e.g.
         // after an "again" rating on a small deck), so reset the per-card
@@ -1110,7 +1120,13 @@ export function useLearningMode(
     } finally {
       setIsUndoing(false);
     }
-  }, [isReviewing, isUndoing, undoLastReviewMutation]);
+  }, [
+    isReviewing,
+    isUndoing,
+    undoLastReviewMutation,
+    reviewMode,
+    writingInputMode,
+  ]);
 
   const handleMaster = useCallback(() => {
     setIsPendingMaster((prev) => !prev);
@@ -1324,13 +1340,24 @@ export function useLearningMode(
         // `alwaysClearExiting`: the shared reset effect only fires when
         // `cardForReview._id` changes, so on a same-id re-render (single-card
         // decks) it would otherwise leave the card pane blank.
+        const freePlayTimeMs = Math.max(0, Date.now() - cardShownAtRef.current);
         await runExitingMutation(
-          () =>
-            advanceFreePlayCardMutation({
+          async () => {
+            const result = await advanceFreePlayCardMutation({
               cardId: cardForReview._id,
               timezone: getUserTimezone(),
-              timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
-            }),
+              timeSpentMs: freePlayTimeMs,
+            });
+            // Free play counts as listening/writing time for the session
+            // stats, under the 'radio' surface; it is deliberately NOT a
+            // review (no FSRS write happened).
+            recordReviewForSession(
+              'radio',
+              reviewActivity(reviewMode, writingInputMode),
+              freePlayTimeMs,
+            );
+            return result;
+          },
           'advanceFreePlayCard',
           { alwaysClearExiting: true },
         );
@@ -1364,6 +1391,7 @@ export function useLearningMode(
       selectedRating,
       autoRatingState,
       reviewMode,
+      writingInputMode,
       handleReview,
       runExitingMutation,
       masterCardMutation,

@@ -16,4 +16,15 @@ crons.cron(
   {},
 );
 
+// Latest Convex invoice total -> `infra_cost_recorded` PostHog event, so the
+// margin/P&L tiles read the real infra bill instead of a pasted constant.
+// No-ops while CONVEX_BILLING_TOKEN is unset. See
+// convex/features/infraCostSync.ts.
+crons.cron(
+  'sync convex infra cost',
+  '9 5 * * *',
+  internal.features.infraCostSync.syncConvexCost,
+  {},
+);
+
 export default crons;

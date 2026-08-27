@@ -24,6 +24,7 @@ export async function resolveCardContext(
   translations: { language: string; text: string }[];
   baseLanguages: string[];
   targetLanguages: string[];
+  courseId: Id<'courses'>;
 } | null> {
   const card = await ctx.db.get(cardId);
   if (!card) return null;
@@ -67,5 +68,8 @@ export async function resolveCardContext(
     translations,
     baseLanguages: course.baseLanguages,
     targetLanguages: course.targetLanguages,
+    // The caller reads the course's writing settings from this; returning it
+    // here keeps the card → deck → course walk a single traversal.
+    courseId: course._id,
   };
 }
