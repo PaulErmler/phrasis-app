@@ -53,8 +53,8 @@ const VERDICT_STYLE: Record<
     icon: 'check',
   },
   minor: {
-    bar: 'bg-accent-orange',
-    chip: 'bg-accent-orange/10 text-accent-orange',
+    bar: 'bg-warning',
+    chip: 'bg-warning/10 text-warning',
     icon: 'alert',
   },
   partial: {

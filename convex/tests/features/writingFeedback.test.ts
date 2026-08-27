@@ -614,7 +614,7 @@ describe('features/writingFeedback', () => {
       );
     });
 
-    it('routes the grader through Cerebras FP16 then Groq, and only where the schema is honored', async () => {
+    it('routes the grader through Groq then Cerebras FP16, and only where the schema is honored', async () => {
       const t = convexTest(schema, modules);
       const { cardId } = await seedCard(t);
       const asUser = t.withIdentity({ subject: 'user_A' });
@@ -639,7 +639,7 @@ describe('features/writingFeedback', () => {
           providerOptions: {
             openrouter: expect.objectContaining({
               provider: expect.objectContaining({
-                order: ['cerebras/fp16', 'groq'],
+                order: ['groq', 'cerebras/fp16'],
                 // Without this, an endpoint that ignores response_format
                 // would answer in prose and every reply would parse-fail.
                 require_parameters: true,

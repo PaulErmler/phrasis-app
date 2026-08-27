@@ -175,6 +175,24 @@ describe('WritingFeedbackCard', () => {
     expect(onTurnOff).toHaveBeenCalledTimes(1);
   });
 
+  it('colors Almost right in warning yellow, not orange', () => {
+    render(
+      <WritingFeedbackCard
+        feedback={{
+          status: 'done',
+          result: {
+            verdict: 'minor',
+            corrected: 'Quisiera un café, por favor.',
+            notes: [{ type: 'spelling', text: 'Missing accent on café.' }],
+          },
+        }}
+      />,
+    );
+    const chip = screen.getByText('verdict.minor');
+    expect(chip.className).toMatch(/text-warning/);
+    expect(chip.className).not.toMatch(/accent-orange/);
+  });
+
   it('omits the turn-off button when no handler is provided', () => {
     render(<WritingFeedbackCard feedback={{ status: 'limit' }} />);
     expect(

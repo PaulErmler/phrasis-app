@@ -21,8 +21,8 @@ import type { ReasoningEffort } from '../features/translationLLM';
  * gpt-oss-120b:nitro for feedback. To revert to the Luna config, import
  * LUNA_BO3 from lib/languages and set these back to LUNA_BO3.model /
  * LUNA_BO3.reasoning / LUNA_BO3.provider. Notes: gpt-oss is a reasoning
- * model with no true "off", so 'low' is the floor; Cerebras FP16 is tried
- * first (full-precision endpoint on this model), then Groq. Other OpenRouter
+ * model with no true "off", so 'low' is the floor; Groq is tried first
+ * (fast, cheap on this model), then Cerebras FP16. Other OpenRouter
  * endpoints still serve if both are down. The $2/M output ceiling is kept
  * so Azure-priced variants cannot sneak in.
  *
@@ -34,12 +34,12 @@ export const GRADER_REASONING: ReasoningEffort = 'low';
 export const GRADER_MAX_OUTPUT_TOKENS = 2_000;
 export const GRADER_PROVIDER = {
   max_price: { completion: 2 },
-  order: ['cerebras/fp16', 'groq'],
+  order: ['groq', 'cerebras/fp16'],
   // The grader sends a strict json_schema response_format. Without this, a
   // fallback endpoint that ignores the parameter would answer in free-form
   // prose and the reply would parse-fail instead of routing elsewhere.
   // `allow_fallbacks` stays default-true, so any other endpoint that DOES
-  // support it still serves when Cerebras and Groq are both down.
+  // support it still serves when Groq and Cerebras are both down.
   require_parameters: true,
 };
 
