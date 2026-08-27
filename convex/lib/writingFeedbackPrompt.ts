@@ -71,13 +71,13 @@ export const NOTE_TYPE_ALIASES: Record<string, NoteType> = {
 };
 
 /**
- * Two, not three. The learner already sees a word-level diff of their answer;
- * a third note is almost always narrating that diff rather than teaching. The
- * prompt asks for at most this many and the parser clamps to it — strict
- * json_schema mode does not honor `maxItems`, so the cap cannot live in
- * GRADER_RESPONSE_FORMAT.
+ * Up to three (raised from two, Paul 2026-08-27). "Fewer is better" stays in
+ * the prompts: the learner already sees a word-level diff, so every note must
+ * teach rather than narrate it. Both system prompts interpolate this value,
+ * and the parser clamps to it — strict json_schema mode does not honor
+ * `maxItems`, so the cap cannot live in the response formats.
  */
-export const MAX_NOTES = 2;
+export const MAX_NOTES = 3;
 /** Hard cap on a single note's length; the prompt asks for one short sentence. */
 export const MAX_NOTE_CHARS = 280;
 
@@ -279,7 +279,7 @@ Note types — pick the one that names the actual difference:
 - naturalness: how idiomatic the phrasing is next to the expected translation. Default type for "alsoCorrect".
 
 Writing the notes:
-- At most 2, and fewer is better. Send only what changes what the learner does next.
+- At most ${MAX_NOTES}, and fewer is better. Send only what changes what the learner does next.
 - One note per distinct problem. Never split one problem in two, never merge two into one.
 - Most important first: what makes the answer not the expected sentence, then nuance.
 - One sentence of about 25 words, spoken not written, plain text. No Markdown, bullets, or emoji; the text is not rendered, so asterisks and backticks appear literally. Quotation marks and parentheses are fine.
@@ -335,7 +335,7 @@ Note types — pick the one that names the actual difference:
 - naturalness: only for degenerate input that fits nothing above.
 
 Writing the notes:
-- At most 2, and fewer is better. Send only what changes what the learner does next.
+- At most ${MAX_NOTES}, and fewer is better. Send only what changes what the learner does next.
 - One note per distinct problem. Never split one problem in two, never merge two into one.
 - Most important first: what makes the answer not the spoken sentence, then the finer slips.
 - One sentence of about 25 words, spoken not written, plain text. No Markdown, bullets, or emoji; the text is not rendered, so asterisks and backticks appear literally. Quotation marks and parentheses are fine.

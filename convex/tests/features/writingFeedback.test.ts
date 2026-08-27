@@ -182,13 +182,14 @@ describe('features/writingFeedback', () => {
           '\n```',
       );
       expect(parsed?.verdict).toBe('partial');
-      expect(MAX_NOTES).toBe(2);
+      expect(MAX_NOTES).toBe(3);
       expect(parsed?.notes).toHaveLength(MAX_NOTES);
       // The cap keeps the FIRST notes, which the prompt orders most-important
       // first — dropping the tail, not the head.
       expect(parsed?.notes.map((n) => n.type)).toEqual([
         'grammar',
         'wordChoice',
+        'spelling',
       ]);
     });
 
