@@ -684,11 +684,14 @@ export function needsFuriganaBackfill(
  * the row write, and this pass repairs the historical drift.
  *
  * Batching: decks are cheap but their card fan-out is not, so `batchSize: 5`
- * bounds one component transaction at 5 decks × ≤ DECK_RECOUNT_PAGE card
- * reads. A deck whose first page doesn't finish (over DECK_RECOUNT_PAGE
- * cards) is handed to the self-continuing `recountDeckCardCountContinue`
- * chain, one page per transaction — the recalcUserCardAggregates pattern —
- * and patched when its last page lands. For those oversized decks the count
+ * bounds one component transaction at 5 decks × ≤ DECK_RECOUNT_PAGE+1 card
+ * reads. The probe uses `take`, NOT `paginate`: the migration component's
+ * batch worker already runs the mutation's single allowed paginated query to
+ * walk the decks table, so a paginate here throws "ran multiple paginated
+ * queries". A deck the probe can't finish (over DECK_RECOUNT_PAGE cards) is
+ * handed whole to the self-continuing `recountDeckCardCountContinue` chain,
+ * one page per transaction — the recalcUserCardAggregates pattern — and
+ * patched when its last page lands. For those oversized decks the count
  * spans transactions, so cards inserted/deleted mid-chain can skew the final
  * value by that in-flight delta; single-writer maintenance keeps it stable
  * from then on, and the drift it replaces was unbounded.
@@ -699,25 +702,21 @@ export async function recountDeckCardCountOne(
   ctx: MutationCtx,
   deck: Doc<'decks'>,
 ): Promise<Partial<Doc<'decks'>> | undefined> {
-  const page = await ctx.db
+  const probe = await ctx.db
     .query('cards')
     .withIndex('by_deckId', (q) => q.eq('deckId', deck._id))
-    .paginate({ cursor: null, numItems: DECK_RECOUNT_PAGE });
-  if (!page.isDone) {
+    .take(DECK_RECOUNT_PAGE + 1);
+  if (probe.length > DECK_RECOUNT_PAGE) {
     await ctx.scheduler.runAfter(
       0,
       internal.migrations.recountDeckCardCountContinue,
-      {
-        deckId: deck._id,
-        countedSoFar: page.page.length,
-        cursor: page.continueCursor,
-      },
+      { deckId: deck._id, countedSoFar: 0, cursor: null },
     );
     return undefined;
   }
-  return page.page.length === deck.cardCount
+  return probe.length === deck.cardCount
     ? undefined
-    : { cardCount: page.page.length };
+    : { cardCount: probe.length };
 }
 
 export const recountDeckCardCounts = migrations.define({
@@ -736,7 +735,9 @@ export const recountDeckCardCountContinue = internalMutation({
   args: {
     deckId: v.id('decks'),
     countedSoFar: v.number(),
-    cursor: v.string(),
+    // null = start from the beginning (the migrateOne probe hands the whole
+    // deck over rather than a partial count, since it cannot paginate).
+    cursor: v.union(v.string(), v.null()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
