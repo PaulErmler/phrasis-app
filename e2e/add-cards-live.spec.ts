@@ -5,6 +5,7 @@ import {
   gotoAuthedApp,
   neutralizeTours,
 } from './helpers';
+import { deckCardCount, fixtureEmail } from './convex-hooks';
 
 /**
  * Live end-to-end test for the manual "enter texts" save flow
@@ -99,7 +100,10 @@ test.describe('add cards: manual entry (live)', { tag: '@live' }, () => {
 
     // --- 3. Add it to the deck; it becomes a library card ---------------
     // Per-text add (custom texts consume no SENTENCES quota). The card row
-    // is inserted synchronously by the mutation.
+    // is inserted synchronously by the mutation. The backend count before
+    // the click pins the delta to EXACTLY one — a duplicate insert (double
+    // dispatch, retried mutation) would pass any presence assertion.
+    const cardsBefore = deckCardCount(fixtureEmail());
     await markerRow.getByTestId('collection-text-add').click();
     // Wait for the row's status testid to flip to `added`, then give the
     // mutation ack a beat: the flip is an optimistic update, and the
@@ -134,5 +138,8 @@ test.describe('add cards: manual entry (live)', { tag: '@live' }, () => {
     await expect
       .poll(async () => markerCard.count(), { timeout: 30_000 })
       .toBeGreaterThanOrEqual(1);
+
+    // Exactly one card was added — not two, not a batch.
+    expect(deckCardCount(fixtureEmail())).toBe(cardsBefore + 1);
   });
 });

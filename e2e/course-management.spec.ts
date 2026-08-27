@@ -210,4 +210,87 @@ test.describe('course management', () => {
       expect(onLearn || rowVisible || fallbackVisible).toBe(true);
     }).toPass({ timeout: 30_000 });
   });
+
+  test('archiving the active course mid-session degrades the open learn view gracefully', async ({
+    page,
+  }) => {
+    // A destructive-flow interaction no other spec exercises: the course
+    // created by the previous test is archived WHILE a second tab holds an
+    // open learn session on it. The open tab must fall back to an empty /
+    // no-course state (its review UI unmounts) — never the view error
+    // boundary.
+    test.setTimeout(120_000);
+
+    const learnTab = await page.context().newPage();
+    try {
+      await learnTab.goto('/app/learn');
+      await learnTab.waitForLoadState('domcontentloaded');
+      await dismissTour(learnTab).catch(() => {});
+      await expect(learnTab.getByTestId('learn-settings').first()).toBeVisible({
+        timeout: 30_000,
+      });
+
+      await page.goto('/app');
+      await page.waitForLoadState('domcontentloaded');
+      await dismissTour(page);
+      await openCourseMenu(page);
+      const archived = await archiveTopActiveCourse(page);
+      expect(archived, 'Should have archived the active course').toBe(true);
+
+      // The open learn tab reacts to the reactive course change: the
+      // review surface unmounts (or the route bounces away) and the error
+      // boundary never shows.
+      await expect
+        .poll(
+          async () => {
+            const crashed = await learnTab
+              .getByRole('button', { name: /try again/i })
+              .first()
+              .isVisible()
+              .catch(() => false);
+            if (crashed) return 'crashed';
+            if (!/\/app\/learn/.test(learnTab.url())) return 'left-learn';
+            const reviewing = await learnTab
+              .getByTestId('learn-reveal')
+              .first()
+              .isVisible()
+              .catch(() => false);
+            const inputOpen = await learnTab
+              .getByTestId('learn-translation-input')
+              .first()
+              .isVisible()
+              .catch(() => false);
+            return reviewing || inputOpen ? 'still-reviewing' : 'degraded';
+          },
+          { timeout: 30_000 },
+        )
+        .toMatch(/left-learn|degraded/);
+    } finally {
+      await learnTab.close();
+    }
+
+    // Best-effort restore of an active course for later shared-user
+    // consumers. Unarchiving a just-archived course can hit the cooldown
+    // alert — that must not fail the test, so every step tolerates absence.
+    await closeCourseMenu(page);
+    await openCourseMenu(page);
+    const unarchiveBtn = page
+      .getByRole('button', { name: /unarchive/i })
+      .first();
+    if (await unarchiveBtn.isVisible().catch(() => false)) {
+      await unarchiveBtn.click().catch(() => {});
+      const confirm = page
+        .getByRole('button', { name: /^(unarchive|confirm|yes|ok)$/i })
+        .first();
+      if (await confirm.isVisible().catch(() => false)) {
+        await confirm.click().catch(() => {});
+      }
+      await page
+        .getByTestId('course-settings')
+        .first()
+        .waitFor({ state: 'visible', timeout: 10_000 })
+        .catch(() => {});
+      await page.keyboard.press('Escape').catch(() => {});
+    }
+  });
 });

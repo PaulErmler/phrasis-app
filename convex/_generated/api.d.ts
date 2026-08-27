@@ -75,6 +75,7 @@ import type * as features_curriculumFlagTesting from "../features/curriculumFlag
 import type * as features_customTexts from "../features/customTexts.js";
 import type * as features_deckBrowse from "../features/deckBrowse.js";
 import type * as features_deckContent from "../features/deckContent.js";
+import type * as features_deckTesting from "../features/deckTesting.js";
 import type * as features_decks from "../features/decks.js";
 import type * as features_e2eCleanup from "../features/e2eCleanup.js";
 import type * as features_featureIds from "../features/featureIds.js";
@@ -86,6 +87,7 @@ import type * as features_llmTranslationQueue from "../features/llmTranslationQu
 import type * as features_onboarding from "../features/onboarding.js";
 import type * as features_placementTest from "../features/placementTest.js";
 import type * as features_projections from "../features/projections.js";
+import type * as features_quotaTesting from "../features/quotaTesting.js";
 import type * as features_reviewPipeline from "../features/reviewPipeline.js";
 import type * as features_scheduling from "../features/scheduling.js";
 import type * as features_searchRebuild from "../features/searchRebuild.js";
@@ -240,6 +242,7 @@ declare const fullApi: ApiFromModules<{
   "features/customTexts": typeof features_customTexts;
   "features/deckBrowse": typeof features_deckBrowse;
   "features/deckContent": typeof features_deckContent;
+  "features/deckTesting": typeof features_deckTesting;
   "features/decks": typeof features_decks;
   "features/e2eCleanup": typeof features_e2eCleanup;
   "features/featureIds": typeof features_featureIds;
@@ -251,6 +254,7 @@ declare const fullApi: ApiFromModules<{
   "features/onboarding": typeof features_onboarding;
   "features/placementTest": typeof features_placementTest;
   "features/projections": typeof features_projections;
+  "features/quotaTesting": typeof features_quotaTesting;
   "features/reviewPipeline": typeof features_reviewPipeline;
   "features/scheduling": typeof features_scheduling;
   "features/searchRebuild": typeof features_searchRebuild;

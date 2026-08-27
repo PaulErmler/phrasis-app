@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { dismissTour, openCardImport, pasteImport } from './helpers';
+import { deckCardCount, fixtureEmail } from './convex-hooks';
 
 /**
  * Live end-to-end test for the card batch-import mutation.
@@ -114,6 +115,10 @@ test.describe('add cards: import (live)', { tag: '@live' }, () => {
     // Confirm dialog → Import
     const dialog = page.getByRole('alertdialog');
     await expect(dialog).toBeVisible({ timeout: 5_000 });
+    // Backend count before confirming pins the eventual delta to EXACTLY
+    // the 3 imported rows — the scheduled background chain creating the
+    // cards must neither drop one nor run away and insert extras.
+    const cardsBefore = deckCardCount(fixtureEmail());
     await page.getByTestId('import-confirm').click();
 
     // Wait for the submission to settle. The submit button re-enables or
@@ -145,5 +150,15 @@ test.describe('add cards: import (live)', { tag: '@live' }, () => {
     await expect
       .poll(async () => cards.count(), { timeout: 90_000 })
       .toBeGreaterThanOrEqual(3);
+
+    // The background chain must land at EXACTLY +3 and stop there: poll to
+    // the target, then hold a settle window to catch overshoot (a retried
+    // or looping job inserting a 4th card would pass the >= poll above).
+    const email = fixtureEmail();
+    await expect
+      .poll(() => deckCardCount(email), { timeout: 60_000 })
+      .toBeGreaterThanOrEqual(cardsBefore + 3);
+    await page.waitForTimeout(8_000);
+    expect(deckCardCount(email)).toBe(cardsBefore + 3);
   });
 });
