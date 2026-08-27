@@ -99,7 +99,9 @@ interface FullReviewCardContentProps {
   /**
    * "AI feedback on answers" (courseSettings.aiWritingFeedback): grade
    * non-matching submitted answers with the LLM and show a coach card under
-   * the diff. Requires `cardId`; suppressed internally for transcribe mode.
+   * the diff. Requires `cardId`. Applies in both writing styles; in
+   * transcribe the grader runs in transcription mode (see `mode` on
+   * gradeWritingAnswer).
    */
   aiFeedbackEnabled?: boolean;
   /**
@@ -707,12 +709,14 @@ export function FullReviewCardContent({
   }, []);
 
   // ----- AI writing feedback -------------------------------------------------
-  // Off for transcribe mode only (the answer must match the audio, "also
-  // correct" has no meaning there). First-exposure copy-typing rows stay ON:
-  // a fresh course is ALL first-exposure cards, and an exact copy resolves in
-  // the free local gate anyway, so only mistyped copies reach the LLM — which
-  // is exactly when a note helps.
-  const feedbackActive = aiFeedbackEnabled && !!cardId && !transcribeMode;
+  // On in both writing styles. Transcribe sends mode 'transcribe', where the
+  // server grades against the audio's exact sentence ("also correct" has no
+  // meaning there, alternatives grant no credit, nothing is stored).
+  // First-exposure copy-typing rows stay ON: a fresh course is ALL
+  // first-exposure cards, and an exact copy resolves in the free local gate
+  // anyway, so only mistyped copies reach the LLM — which is exactly when a
+  // note helps.
+  const feedbackActive = aiFeedbackEnabled && !!cardId;
   const gradeWritingAnswer = useAction(
     api.features.writingFeedback.gradeWritingAnswer,
   );
@@ -805,7 +809,12 @@ export function FullReviewCardContent({
       const isStale = () =>
         cardIdForFeedbackRef.current !== requestCardId ||
         feedbackRequestSeqRef.current.get(language) !== requestSeq;
-      gradeWritingAnswer({ cardId, language, userAnswer: answer })
+      gradeWritingAnswer({
+        cardId,
+        language,
+        userAnswer: answer,
+        mode: transcribeMode ? 'transcribe' : 'translate',
+      })
         .then((result) => {
           if (isStale()) return;
           setFeedback((prev) => {
@@ -841,6 +850,7 @@ export function FullReviewCardContent({
     targetTranslations,
     alternativesByLanguage,
     gradeWritingAnswer,
+    transcribeMode,
   ]);
 
   const assignInputRef = useCallback(
@@ -924,6 +934,7 @@ export function FullReviewCardContent({
                   state={state}
                   feedback={feedback.get(translation.language) ?? null}
                   feedbackActive={feedbackActive}
+                  transcribeMode={transcribeMode}
                   alternatives={
                     alternativesByLanguage.get(translation.language) ??
                     NO_ALTERNATIVES
@@ -993,6 +1004,8 @@ interface TargetLanguageInputProps {
    * answer may still be accepted as an alternative.
    */
   feedbackActive?: boolean;
+  /** Transcribe writing style; the Discuss chat action grades as transcription. */
+  transcribeMode?: boolean;
   /** Accepted alternatives for this language (empty in transcribe mode). */
   alternatives: CardTranslationAlternative[];
   /** Turns the aiWritingFeedback setting off (quota-reached line). */
@@ -1053,6 +1066,7 @@ function TargetLanguageInput({
   state,
   feedback,
   feedbackActive = false,
+  transcribeMode = false,
   alternatives,
   onDisableAiFeedback,
   onMakeDefault,
@@ -1402,6 +1416,9 @@ function TargetLanguageInput({
         userAnswer: attempt,
         expected: translation.text,
         language: translation.language,
+        // Transcribe: the chat judges the attempt as a transcription of the
+        // audio, not as a possibly-also-correct translation.
+        ...(transcribeMode ? { transcribe: true } : {}),
         ...(aiFeedback ? { aiFeedback } : {}),
       },
       tChat('discuss.message', { attempt: attemptLabel }),
@@ -1411,6 +1428,7 @@ function TargetLanguageInput({
     state.userText,
     translation.text,
     translation.language,
+    transcribeMode,
     feedback,
     tChat,
   ]);

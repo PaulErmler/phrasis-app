@@ -73,16 +73,23 @@ const TRANSLATIONS: CardTranslation[] = [
 
 const CARD_ID = 'card_1' as Id<'cards'>;
 
-function renderCard(opts: { aiFeedbackEnabled?: boolean } = {}) {
+function renderCard(
+  opts: {
+    aiFeedbackEnabled?: boolean;
+    transcribeMode?: boolean;
+    translations?: CardTranslation[];
+  } = {},
+) {
   const onAccuracyChange = vi.fn();
   render(
     <FullReviewCardContent
       presentation={makePresentation({
         cardId: CARD_ID,
         sourceText: 'I would like a coffee.',
-        translations: TRANSLATIONS,
+        translations: opts.translations ?? TRANSLATIONS,
       })}
       targetAudioMode="never"
+      transcribeMode={opts.transcribeMode ?? false}
       aiFeedbackEnabled={opts.aiFeedbackEnabled ?? true}
       onAccuracyChange={onAccuracyChange}
     />,
@@ -182,8 +189,55 @@ describe('FullReviewCardContent: AI writing feedback', () => {
       cardId: CARD_ID,
       language: 'es',
       userAnswer: 'Quisiera un cafe.',
+      mode: 'translate',
     });
     expect(screen.getByText('verdict.minor')).toBeInTheDocument();
+  });
+
+  it('grades in transcribe mode too, sending mode transcribe', async () => {
+    gradeMock.mockResolvedValue({
+      verdict: 'partial',
+      notes: [{ type: 'wordChoice', text: 'The audio said something else.' }],
+    });
+    renderCard({ transcribeMode: true });
+    submitAnswer('Quisiera un té.');
+    await waitFor(() =>
+      expect(screen.getByTestId('writing-feedback-card')).toBeInTheDocument(),
+    );
+    expect(gradeMock).toHaveBeenCalledWith({
+      cardId: CARD_ID,
+      language: 'es',
+      userAnswer: 'Quisiera un té.',
+      mode: 'transcribe',
+    });
+    expect(screen.getByText('verdict.partial')).toBeInTheDocument();
+  });
+
+  it('transcribe: a stored accepted alternative grants no local credit — the grader decides', async () => {
+    // In translate this exact submit resolves in the free local gate (see the
+    // 'resolves a stored accepted alternative locally' test below). In
+    // transcribe the answer must match the audio, so the same text goes to
+    // the server, which grades it as a transcription.
+    gradeMock.mockResolvedValue({
+      verdict: 'partial',
+      notes: [{ type: 'wordChoice', text: 'Not what the audio said.' }],
+    });
+    const withAlternatives: CardTranslation[] = [
+      TRANSLATIONS[0],
+      {
+        ...TRANSLATIONS[1],
+        alternatives: [{ text: 'Me gustaría un café.' }],
+      },
+    ];
+    renderCard({ transcribeMode: true, translations: withAlternatives });
+    submitAnswer('Me gustaría un café.');
+    await waitFor(() => expect(gradeMock).toHaveBeenCalledTimes(1));
+    expect(gradeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'transcribe' }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText('verdict.partial')).toBeInTheDocument(),
+    );
   });
 
   it('overrides the accuracy pair to 100 when the grader accepts an alternative', async () => {

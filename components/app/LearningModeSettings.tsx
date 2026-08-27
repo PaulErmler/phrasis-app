@@ -1017,7 +1017,11 @@ export function LearningModeSettings({
               <SettingSwitchRow
                 id="aiWritingFeedback"
                 label={t('aiWritingFeedback')}
-                description={t('aiWritingFeedbackDescription')}
+                description={t(
+                  isTranscribe
+                    ? 'aiWritingFeedbackDescriptionTranscribe'
+                    : 'aiWritingFeedbackDescription',
+                )}
                 checked={courseSettings.aiWritingFeedback ?? true}
                 onCheckedChange={(checked) =>
                   setField('aiWritingFeedback', checked)

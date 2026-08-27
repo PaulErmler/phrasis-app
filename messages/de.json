@@ -670,6 +670,7 @@
       "ignorePunctuationDescription": "Kommas, Punkte und andere Satzzeichen nicht in die Genauigkeit einrechnen",
       "aiWritingFeedback": "KI-Feedback zu Antworten",
       "aiWritingFeedbackDescription": "Nach dem Absenden prüft ein KI-Tutor abweichende Antworten, erklärt Fehler und erkennt gültige Alternativen an",
+      "aiWritingFeedbackDescriptionTranscribe": "Nach dem Absenden prüft ein KI-Tutor abweichende Antworten und erklärt, was du wahrscheinlich falsch gehört hast",
       "autoRateFromAccuracy": "Automatisch nach Genauigkeit bewerten",
       "autoRateFromAccuracyDescription": "Wählt anhand deiner Schreibgenauigkeit eine Bewertung vor. Du kannst sie vor dem Weitergehen weiterhin ändern.",
       "autoRateBoundary": "Grenze zwischen {lower} und {upper}",

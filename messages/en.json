@@ -670,6 +670,7 @@
       "ignorePunctuationDescription": "Don't count commas, full stops and other punctuation towards the accuracy score",
       "aiWritingFeedback": "AI feedback on answers",
       "aiWritingFeedbackDescription": "After you submit, an AI tutor checks answers that don't match, explains slips, and accepts valid alternatives",
+      "aiWritingFeedbackDescriptionTranscribe": "After you submit, an AI tutor checks answers that don't match what was said and explains what you likely misheard",
       "autoRateFromAccuracy": "Auto-rate from accuracy",
       "autoRateFromAccuracyDescription": "Preselect a rating based on your writing score. You can still change it before continuing.",
       "autoRateBoundary": "Boundary between {lower} and {upper}",

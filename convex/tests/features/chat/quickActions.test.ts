@@ -325,4 +325,34 @@ describe('features/chat/quickActions', () => {
     expect(out).toContain('The user wrote: "Ich habe ein Hund."');
     expect(out).toContain('ALSO a correct');
   });
+
+  it('grades discussAnswer as transcription when the transcribe flag is set', () => {
+    const base = {
+      kind: 'discussAnswer',
+      userAnswer: 'Ich habe ein Hund.',
+      expected: 'Ich habe einen Hund.',
+      language: 'de',
+    } as const;
+    const out = expandQuickAction({ ...base, transcribe: true }, ctx);
+    expect(out).toContain('listening transcription');
+    expect(out).toContain('heard audio of the German sentence');
+    expect(out).toContain('transcription, not translation');
+    // The alsoCorrect flow must be absent AND explicitly forbidden: a valid
+    // paraphrase is still not what the audio said.
+    expect(out).toContain('do NOT call markAlsoCorrect');
+    expect(out).not.toContain('call the markAlsoCorrect tool exactly once');
+    expect(out).not.toContain('ALSO a correct');
+    // The grader-feedback bridge rides along in both variants.
+    const withFeedback = expandQuickAction(
+      { ...base, transcribe: true, aiFeedback: 'verdict: partial' },
+      ctx,
+    );
+    expect(withFeedback).toContain(
+      '<graderFeedback>verdict: partial</graderFeedback>',
+    );
+    // Absent/false keeps today's translation judging.
+    expect(expandQuickAction(base, ctx)).toContain(
+      'call the markAlsoCorrect tool exactly once',
+    );
+  });
 });

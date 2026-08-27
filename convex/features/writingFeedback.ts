@@ -29,6 +29,7 @@ import {
 } from '../lib/posthogAi';
 import {
   buildGraderUserPrompt,
+  buildTranscribeGraderUserPrompt,
   GRADER_MAX_OUTPUT_TOKENS,
   GRADER_MODEL,
   GRADER_PROVIDER,
@@ -36,6 +37,8 @@ import {
   GRADER_RESPONSE_FORMAT,
   GRADER_SYSTEM_PROMPT,
   parseFeedbackResponse,
+  TRANSCRIBE_GRADER_RESPONSE_FORMAT,
+  TRANSCRIBE_GRADER_SYSTEM_PROMPT,
 } from '../lib/writingFeedbackPrompt';
 
 /**
@@ -45,6 +48,11 @@ import {
  * sentence. Exact matches — against the primary translation or any of the
  * user's stored accepted alternatives — are decided locally and consume no
  * quota and no LLM call.
+ *
+ * Both writing styles grade here: Translate judges the answer as a
+ * translation (alternatives count, 'alsoCorrect' can store one), Transcribe
+ * as a reproduction of the target audio (primary-only gate, transcription
+ * prompt/schema, no alternatives in or out). See `mode` on the action.
  *
  * Latency is the design constraint (JIVX-parity is ~2s): single sample, no
  * judge. Visible notes stay short; the 2k output cap is headroom for
@@ -307,16 +315,25 @@ export const storeAlternative = internalMutation({
  * gate (free), a graded verdict from the LLM, or `verdict: 'error'` when the
  * model call or parse failed (the client then renders today's diff-only
  * view). Throws USAGE_LIMIT / PAYMENT_PAST_DUE from the quota check.
+ *
+ * `mode` picks the grading task: 'translate' (the default, so pre-mode
+ * clients keep working) grades the answer as a translation of the base
+ * sentence; 'transcribe' grades it as a transcription of the target audio —
+ * only the card's exact sentence is correct there, so stored alternatives
+ * grant no credit, the transcription prompt/schema is used (no
+ * 'alsoCorrect'), and nothing is ever stored as an alternative.
  */
 export const gradeWritingAnswer = action({
   args: {
     cardId: v.id('cards'),
     language: v.string(),
     userAnswer: v.string(),
+    mode: v.optional(v.union(v.literal('translate'), v.literal('transcribe'))),
   },
   returns: writingFeedbackResultValidator,
   handler: async (ctx, args): Promise<WritingFeedbackResult> => {
     const userId = await requireAuthUserId(ctx);
+    const transcribe = args.mode === 'transcribe';
 
     const userAnswer = args.userAnswer.trim();
     if (!userAnswer) {
@@ -357,13 +374,20 @@ export const gradeWritingAnswer = action({
       throw new ConvexError({ code: 'NOT_FOUND', message: 'Card not found' });
     }
 
-    // Local gate: no quota, no LLM.
+    // Local gate: no quota, no LLM. In transcribe only the card's sentence
+    // counts — an accepted alternative is a different sentence than the
+    // audio, so it must not grant credit there.
     if (writingAnswersMatch(context.expected, userAnswer, args.language)) {
       return { verdict: 'correct' as const, matched: 'primary' as const };
     }
-    for (const alt of context.alternatives) {
-      if (writingAnswersMatch(alt, userAnswer, args.language)) {
-        return { verdict: 'correct' as const, matched: 'alternative' as const };
+    if (!transcribe) {
+      for (const alt of context.alternatives) {
+        if (writingAnswersMatch(alt, userAnswer, args.language)) {
+          return {
+            verdict: 'correct' as const,
+            matched: 'alternative' as const,
+          };
+        }
       }
     }
 
@@ -371,15 +395,22 @@ export const gradeWritingAnswer = action({
     // unit. The refund below only covers the LLM try; a throw in prompt or
     // option construction after the consume would charge the user for a
     // grade that never ran.
-    const userPrompt = buildGraderUserPrompt({
-      baseLanguage: context.baseLanguage,
-      targetLanguage: args.language,
-      notesLanguage: context.notesLanguage,
-      baseText: context.baseText,
-      expected: context.expected,
-      metadata: context.metadata,
-      userAnswer,
-    });
+    const userPrompt = transcribe
+      ? buildTranscribeGraderUserPrompt({
+          targetLanguage: args.language,
+          notesLanguage: context.notesLanguage,
+          expected: context.expected,
+          userAnswer,
+        })
+      : buildGraderUserPrompt({
+          baseLanguage: context.baseLanguage,
+          targetLanguage: args.language,
+          notesLanguage: context.notesLanguage,
+          baseText: context.baseText,
+          expected: context.expected,
+          metadata: context.metadata,
+          userAnswer,
+        });
 
     const providerOptions = openrouterCallOptions(
       GRADER_REASONING,
@@ -453,11 +484,15 @@ export const gradeWritingAnswer = action({
       // accounting default has to be spread back in or cost telemetry dies.
       const openrouter = getOpenRouter({
         ...OPENROUTER_USAGE_ACCOUNTING,
-        response_format: GRADER_RESPONSE_FORMAT,
+        response_format: transcribe
+          ? TRANSCRIBE_GRADER_RESPONSE_FORMAT
+          : GRADER_RESPONSE_FORMAT,
       });
       ({ text, usage, providerMetadata } = await generateText({
         model: openrouter(GRADER_MODEL),
-        system: GRADER_SYSTEM_PROMPT,
+        system: transcribe
+          ? TRANSCRIBE_GRADER_SYSTEM_PROMPT
+          : GRADER_SYSTEM_PROMPT,
         prompt: userPrompt,
         maxOutputTokens: GRADER_MAX_OUTPUT_TOKENS,
         ...(providerOptions ? { providerOptions } : {}),
@@ -497,7 +532,10 @@ export const gradeWritingAnswer = action({
       outputTokens: usage?.outputTokens,
       costUsd: openrouterCostUsd(providerMetadata),
       traceId: openrouterGenerationId(providerMetadata),
-      extra: { language: args.language },
+      extra: {
+        language: args.language,
+        mode: transcribe ? 'transcribe' : 'translate',
+      },
     });
 
     const parsed = parseFeedbackResponse(text);
@@ -507,6 +545,20 @@ export const gradeWritingAnswer = action({
         text.slice(0, 300),
       );
       return { verdict: 'error' as const };
+    }
+
+    if (transcribe) {
+      // No `corrected` (the diff target stays the card's sentence) and never
+      // an alternative. The strict transcribe schema keeps 'alsoCorrect' out;
+      // if an endpoint that ignored response_format produced it anyway, a
+      // paraphrase is still not what the audio said — downgrade, don't praise.
+      return {
+        verdict:
+          parsed.verdict === 'alsoCorrect'
+            ? ('partial' as const)
+            : parsed.verdict,
+        notes: parsed.notes,
+      };
     }
 
     let savedAlternative: boolean = false;

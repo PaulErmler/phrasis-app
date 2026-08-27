@@ -47,6 +47,16 @@ Shadowing):
   hear (listening-comprehension practice). The diff/accuracy pipeline is the
   same as Translate.
 
+  AI feedback (`courseSettings.aiWritingFeedback`) runs in both styles, but
+  Transcribe grades in transcription mode (`gradeWritingAnswer`'s
+  `mode: 'transcribe'`): only the card's exact sentence is correct, stored
+  accepted alternatives grant no credit (client and server gates both skip
+  them), the grader uses a transcription prompt/schema with no `alsoCorrect`
+  verdict and no `corrected` sentence, and nothing is ever stored as an
+  alternative. The chat "Discuss" action carries a matching `transcribe` flag
+  so it judges the attempt as a transcription and never calls
+  markAlsoCorrect.
+
 ### Per-mode playback settings
 
 Playback settings are split per mode: the unsuffixed `courseSettings` fields
