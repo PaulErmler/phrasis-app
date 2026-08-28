@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
 import {
+  appMain,
   dismissDifficultyCheck,
   dismissErrorBoundary,
   dismissTour,
@@ -917,9 +918,10 @@ test.describe('learning settings', () => {
       await showDueCounts(page);
       await page.goto('/app');
       await page.waitForLoadState('domcontentloaded');
-      // `.first()`: the home subtree can be momentarily duplicated after
-      // hydration, and a strict locator throws instead of retrying.
-      const pills = page.getByTestId('due-counts-pills').first();
+      // Scoped to the live tree: the whole layout is momentarily duplicated
+      // mid-navigation, and an unscoped strict locator throws on the copy
+      // instead of retrying (see `appMain`).
+      const pills = appMain(page).getByTestId('due-counts-pills');
       await expect(pills).toBeVisible({ timeout: 15_000 });
       // Flip the home Shadowing/Writing toggle: the counts re-query against
       // the other track's aggregates and the row must stay rendered (never

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ensureTogglesSaved, neutralizeTours } from './helpers';
+import { appMain, ensureTogglesSaved, neutralizeTours } from './helpers';
 
 /**
  * Settings smoke. Verifies the SettingsView mounts and exposes at least
@@ -33,7 +33,7 @@ test.describe('settings', () => {
     const control = page.getByRole('button').first();
     await expect(control).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.locator('#showDueCounts')).toBeVisible({
+    await expect(appMain(page).locator('#showDueCounts')).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -52,8 +52,10 @@ test.describe('settings', () => {
     // the click if the confirming reload killed the un-acked mutation —
     // see the helper's comment for the lost-write race this replaces.
     await page.goto('/app/settings');
-    const dueToggle = page.locator('#showDueCounts');
-    const forecastToggle = page.locator('#showWorkloadForecast');
+    // Scoped to the live app tree: a navigation briefly leaves a second,
+    // stale copy of the whole layout in the document (see `appMain`).
+    const dueToggle = appMain(page).locator('#showDueCounts');
+    const forecastToggle = appMain(page).locator('#showWorkloadForecast');
     await expect(dueToggle).toBeVisible({ timeout: 15_000 });
     await expect(forecastToggle).toBeVisible();
 
@@ -64,28 +66,31 @@ test.describe('settings', () => {
 
     // The forecast card is on home whenever its own toggle is on.
     await page.goto('/app');
-    await expect(page.getByTestId('due-counts-pills')).toBeVisible({
+    await expect(appMain(page).getByTestId('due-counts-pills')).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByTestId('workload-forecast')).toBeVisible();
+    await expect(appMain(page).getByTestId('workload-forecast')).toBeVisible();
 
     // Turning the due-counts toggle back off hides the pills but leaves
     // the forecast alone.
     await page.goto('/app/settings');
     await ensureTogglesSaved(page, [{ toggle: dueToggle, on: false }]);
     await page.goto('/app');
-    await expect(page.getByTestId('due-counts-pills')).toHaveCount(0, {
+    await expect(appMain(page).getByTestId('due-counts-pills')).toHaveCount(0, {
       timeout: 15_000,
     });
-    await expect(page.getByTestId('workload-forecast')).toBeVisible();
+    await expect(appMain(page).getByTestId('workload-forecast')).toBeVisible();
 
     // Turning the forecast's own switch off removes the card.
     await page.goto('/app/settings');
     await ensureTogglesSaved(page, [{ toggle: forecastToggle, on: false }]);
     await page.goto('/app');
-    await expect(page.getByTestId('workload-forecast')).toHaveCount(0, {
-      timeout: 15_000,
-    });
+    await expect(appMain(page).getByTestId('workload-forecast')).toHaveCount(
+      0,
+      {
+        timeout: 15_000,
+      },
+    );
 
     // Turn both back on so downstream shared-fixture specs that assert on
     // the pills (via the showDueCounts helper) start from a visible state
@@ -96,7 +101,7 @@ test.describe('settings', () => {
       { toggle: forecastToggle, on: true },
     ]);
     await page.goto('/app');
-    await expect(page.getByTestId('due-counts-pills')).toBeVisible({
+    await expect(appMain(page).getByTestId('due-counts-pills')).toBeVisible({
       timeout: 15_000,
     });
   });

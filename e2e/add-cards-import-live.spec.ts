@@ -26,12 +26,9 @@ import { deckCardCount, fixtureEmail } from './convex-hooks';
 test.describe.configure({ mode: 'serial', retries: 0 });
 test.describe('add cards: import (live)', { tag: '@live' }, () => {
   test('imports 3 cards and surfaces them in the library', async ({ page }) => {
-    // The default 30s test budget can't cover this test's own internal waits
-    // (dialog-hidden wait up to 30s + the library poll below), under @live
-    // load the poll was getting only the seconds left over from the wizard
-    // steps and timing out at 0 cards. Budget generously; every wait inside
-    // is still individually bounded, so a true hang fails early regardless.
-    test.setTimeout(300_000);
+    // Wizard + three collection-adds + two backend polls comfortably exceed
+    // the default 30s; every wait inside is still individually bounded.
+    test.setTimeout(180_000);
     // The marker words must be REAL words in each cell's language: imported
     // sentences are synthesized and validated by transcribing them back
     // (processTTSForCard), so a consonant-soup token like "e2eImportmtb58ep5"
@@ -171,9 +168,15 @@ test.describe('add cards: import (live)', { tag: '@live' }, () => {
         .poll(async () => addedRows.count(), { timeout: 15_000 })
         .toBe(i + 1);
     }
-    // Give the last optimistic flip's mutation a beat to ack before
-    // navigating (same guard as add-cards-live).
-    await page.waitForTimeout(1_500);
+    // The row flip is optimistic (`optimisticallySetRowStatus`). A 1.5s
+    // pause before navigating is not enough under suite load: goto() tears
+    // down the Convex client and any still-in-flight add is dropped.
+    // Observed 2026-08-28: library search found 2/3 after 150s — "thanks"
+    // (the last click) was never inserted. Wait on the backend count
+    // before leaving this page.
+    await expect
+      .poll(() => deckCardCount(fixtureEmail()), { timeout: 30_000 })
+      .toBe(cardsBefore + 3);
     await page.keyboard.press('Escape');
 
     // --- Verify: the marker cards are in the library… ---
@@ -189,20 +192,15 @@ test.describe('add cards: import (live)', { tag: '@live' }, () => {
     // subscription can still show pre-filter results, and a bare count
     // passes on pre-existing cards even when the import produced nothing
     // (exactly how this spec was vacuously green until 2026-08-27).
-    // Generous budget: the library search matches via searchableText, whose
-    // rebuild job (`rebuildSearchableTextForText`) queues behind the @live
-    // suite's LLM/TTS load — the card can exist a while before it is
-    // findable (observed: 2/3 matched at 30s under full-suite load).
     const markerCards = page
       .getByTestId('library-card')
       .filter({ hasText: marker });
     await expect
-      .poll(async () => markerCards.count(), { timeout: 150_000 })
+      .poll(async () => markerCards.count(), { timeout: 30_000 })
       .toBe(3);
 
-    // --- …and the deck grew by EXACTLY three. A duplicate insert (double
-    // dispatch, retried mutation, runaway job) would pass any presence
-    // assertion; the pinned delta catches it.
+    // Still exactly +3 after the library round-trip — a delayed duplicate
+    // insert would have passed the pre-navigate poll.
     expect(deckCardCount(fixtureEmail())).toBe(cardsBefore + 3);
   });
 });

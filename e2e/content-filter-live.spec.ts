@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { dismissTour, showDueCounts } from './helpers';
+import { appMain, dismissTour, showDueCounts } from './helpers';
 
 /**
  * Mutating tests for the content-source filter dropdown. Runs in the
@@ -140,8 +140,9 @@ test.describe('due-count pills on home', () => {
     await page.waitForLoadState('domcontentloaded');
     // Pills render once getFilteredCardCounts resolves (even all-zero counts
     // return an object). They share a row with the filter dropdown.
-    // `.first()` for the post-hydration double-render, see above.
-    await expect(page.getByTestId('due-counts-pills').first()).toBeVisible({
+    // Scoped to the live tree — the layout is briefly duplicated
+    // mid-navigation (see `appMain`).
+    await expect(appMain(page).getByTestId('due-counts-pills')).toBeVisible({
       timeout: 10_000,
     });
     await expect(

@@ -389,10 +389,40 @@ export async function gotoAuthedApp(
 }
 
 /**
+ * The one LIVE app tree, as a scope for testid lookups.
+ *
+ * During a navigation React streams the app layout in a hidden
+ * `<div hidden id="S:0">` container and swaps it into place a moment
+ * later, so the document briefly holds TWO copies of the whole layout —
+ * `<main>` and all — one of them showing the other view's (stale) state.
+ * A bare `page.getByTestId(...)` sees both: `toBeVisible` fails the strict
+ * check with "resolved to 2 elements", and `toHaveCount(0)` counts the
+ * stale copy (both observed on settings.spec's forecast test, 2026-08-27).
+ *
+ * The staging container carries the `hidden` attribute, so its subtree is
+ * out of the accessibility tree — which is exactly what a role selector
+ * filters on. `getByRole('main')` therefore resolves to the live tree and
+ * only the live tree, mid-swap included. Scope home/settings assertions
+ * through it rather than waiting the window out: there is no load state
+ * that reliably brackets the swap.
+ *
+ * `.first()` because the open learn overlay renders its own `<main>` as a
+ * SIBLING of the layout's (see `(main)/layout.tsx`), and document order puts
+ * the layout's first. This is therefore the tab views' container — home,
+ * library, stats, settings — not the learn overlay; locate inside that
+ * overlay directly.
+ */
+export function appMain(page: Page): Locator {
+  return page.getByRole('main').first();
+}
+
+/**
  * Drive one or more settings Switches to the given on/off states and
  * confirm the SERVER actually saved them. Callers must already be on a
  * page where the toggles are mounted (e.g. /app/settings) with the
- * toggles reflecting server state (fresh goto or reload).
+ * toggles reflecting server state (fresh goto or reload), and must scope
+ * the toggle locators through `appMain` — an unscoped one can read the
+ * stale mid-swap copy and hand this loop a state the server never had.
  *
  * Why not click → reload → poll aria-checked? That pattern is a lost-write
  * race: the switch flips from the optimistic patch in the same frame, but
@@ -443,7 +473,9 @@ export async function ensureTogglesSaved(
 export async function showDueCounts(page: Page): Promise<void> {
   await page.goto('/app/settings');
   await page.waitForLoadState('domcontentloaded');
-  const sw = page.locator('#showDueCounts');
+  // Scoped to the live tree: mid-navigation the document can hold a second,
+  // stale copy of the switch (see `appMain`).
+  const sw = appMain(page).locator('#showDueCounts');
   await ensureTogglesSaved(page, [{ toggle: sw, on: true }]);
 }
 
