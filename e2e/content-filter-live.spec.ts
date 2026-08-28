@@ -57,8 +57,14 @@ test.describe(
         'content-filter-option-course',
       ]) {
         await trigger.click();
-        await page.getByTestId(optionTestId).click();
-        await page.waitForTimeout(200);
+        const option = page.getByTestId(optionTestId);
+        await expect(option).toBeVisible({ timeout: 10_000 });
+        // force: a filter change remounts home (Off pills, collection
+        // tiles) and the open listbox keeps moving — Playwright then
+        // spends the whole 30s budget on "element is not stable"
+        // (observed 2026-08-28 on the 'course' option, third pass).
+        await option.click({ force: true });
+        await expect(option).toBeHidden({ timeout: 5_000 });
         const box = await trigger.boundingBox();
         expect(box).not.toBeNull();
         widths.push(box!.width);
