@@ -56,13 +56,9 @@ export type TargetCheck = {
  */
 export type MetadataExpectation = {
   register?: Metadata['register'] | Metadata['register'][];
-  addresseeNumber?:
-    | Metadata['addresseeNumber']
-    | Metadata['addresseeNumber'][];
+  addresseeNumber?: Metadata['addresseeNumber'] | Metadata['addresseeNumber'][];
   speakerGender?: Metadata['speakerGender'] | Metadata['speakerGender'][];
-  addresseeGender?:
-    | Metadata['addresseeGender']
-    | Metadata['addresseeGender'][];
+  addresseeGender?: Metadata['addresseeGender'] | Metadata['addresseeGender'][];
   addressesSomeone?: boolean;
 };
 
@@ -284,7 +280,10 @@ export const CASES: EvalCase[] = [
     },
     checks: {
       es: { mustMatch: [/(vosotr|venís|vais)/i], mustNotMatch: [/ustedes/i] },
-      es_latam: { mustMatch: [/(ustedes|vienen|van)/i], mustNotMatch: [/vosotr/i] },
+      es_latam: {
+        mustMatch: [/(ustedes|vienen|van)/i],
+        mustNotMatch: [/vosotr/i],
+      },
       de: { mustMatch: [/\b(ihr|Ihr)\b/] },
     },
     why: '“You all” is plural; es must use vosotros, es_latam ustedes.',
@@ -327,7 +326,9 @@ export const CASES: EvalCase[] = [
   {
     id: 'no-addressee-first-person',
     kind: 'noAddressee',
-    texts: [{ language: 'en', text: 'I work at a small bakery near the harbor.' }],
+    texts: [
+      { language: 'en', text: 'I work at a small bakery near the harbor.' },
+    ],
     targets: ['fr', 'ko', 'ru'],
     expectMetadata: {
       addressesSomeone: false,
@@ -347,7 +348,10 @@ export const CASES: EvalCase[] = [
     kind: 'idiom',
     texts: [{ language: 'en', text: "It's raining cats and dogs out there." }],
     targets: ['de', 'es', 'fr'],
-    expectMetadata: { addressesSomeone: false, register: ['neutral', 'informal'] },
+    expectMetadata: {
+      addressesSomeone: false,
+      register: ['neutral', 'informal'],
+    },
     checks: {
       de: {
         mustNotMatch: [/Katzen/i, /Hunde/i],
@@ -364,9 +368,7 @@ export const CASES: EvalCase[] = [
   {
     id: 'idiom-daumen-druecken',
     kind: 'idiom',
-    texts: [
-      { language: 'de', text: 'Ich drücke dir für morgen die Daumen!' },
-    ],
+    texts: [{ language: 'de', text: 'Ich drücke dir für morgen die Daumen!' }],
     targets: ['en', 'es', 'fr'],
     expectMetadata: {
       addressesSomeone: true,
@@ -428,9 +430,7 @@ export const CASES: EvalCase[] = [
   {
     id: 'polysemy-bat',
     kind: 'polysemy',
-    texts: [
-      { language: 'en', text: 'A bat flew out of the cave at dusk.' },
-    ],
+    texts: [{ language: 'en', text: 'A bat flew out of the cave at dusk.' }],
     targets: ['de', 'es', 'fr'],
     expectMetadata: { addressesSomeone: false, register: 'neutral' },
     checks: {
@@ -465,8 +465,14 @@ export const CASES: EvalCase[] = [
     targets: ['en_gb', 'en_us'],
     expectMetadata: { addressesSomeone: false },
     checks: {
-      en_gb: { mustMatch: [/colour/, /lift/], mustNotMatch: [/color\b/, /elevator/] },
-      en_us: { mustMatch: [/color\b/, /elevator/], mustNotMatch: [/colour/, /\blift\b/] },
+      en_gb: {
+        mustMatch: [/colour/, /lift/],
+        mustNotMatch: [/color\b/, /elevator/],
+      },
+      en_us: {
+        mustMatch: [/color\b/, /elevator/],
+        mustNotMatch: [/colour/, /\blift\b/],
+      },
     },
     why: 'Same request, both English variants: spelling AND vocabulary must split.',
   },
@@ -485,7 +491,9 @@ export const CASES: EvalCase[] = [
   {
     id: 'dialect-vi-north-vs-south',
     kind: 'dialect',
-    texts: [{ language: 'en', text: 'I really like eating fruit after lunch.' }],
+    texts: [
+      { language: 'en', text: 'I really like eating fruit after lunch.' },
+    ],
     targets: ['vi', 'vi_south'],
     expectMetadata: { addressesSomeone: false },
     checks: {
@@ -497,7 +505,9 @@ export const CASES: EvalCase[] = [
   {
     id: 'dialect-es-vs-latam-informal-plural',
     kind: 'dialect',
-    texts: [{ language: 'en', text: 'Where are you all going on holiday this year?' }],
+    texts: [
+      { language: 'en', text: 'Where are you all going on holiday this year?' },
+    ],
     targets: ['es', 'es_latam'],
     expectMetadata: {
       addressesSomeone: true,
@@ -505,7 +515,10 @@ export const CASES: EvalCase[] = [
     },
     checks: {
       es: { mustMatch: [/(vosotr|vais)/i], mustNotMatch: [/ustedes/i] },
-      es_latam: { mustMatch: [/(ustedes|van)/i], mustNotMatch: [/(vosotr|vais)/i] },
+      es_latam: {
+        mustMatch: [/(ustedes|van)/i],
+        mustNotMatch: [/(vosotr|vais)/i],
+      },
     },
     why: 'Plural you: the two Spanish variants must diverge exactly here.',
   },
@@ -537,7 +550,9 @@ export const CASES: EvalCase[] = [
   {
     id: 'script-sr-cyrillic',
     kind: 'script',
-    texts: [{ language: 'en', text: 'The library opens at nine in the morning.' }],
+    texts: [
+      { language: 'en', text: 'The library opens at nine in the morning.' },
+    ],
     targets: ['sr', 'el', 'th'],
     expectMetadata: { addressesSomeone: false, register: 'neutral' },
     checks: {
@@ -604,7 +619,10 @@ export const CASES: EvalCase[] = [
     id: 'proper-noun-date',
     kind: 'properNoun',
     texts: [
-      { language: 'en', text: 'The concert is on March 3rd at half past seven.' },
+      {
+        language: 'en',
+        text: 'The concert is on March 3rd at half past seven.',
+      },
     ],
     targets: ['de', 'es', 'fr'],
     expectMetadata: { addressesSomeone: false, register: 'neutral' },
@@ -706,7 +724,10 @@ export const CASES: EvalCase[] = [
     },
     checks: {
       ja: { mustNotMatch: [/(です|ます|ですか|ますか)/] },
-      de: { mustMatch: [/\b[Dd]u\b|\b[Dd]ich\b|Lust/], mustNotMatch: [/\bSie\b/] },
+      de: {
+        mustMatch: [/\b[Dd]u\b|\b[Dd]ich\b|Lust/],
+        mustNotMatch: [/\bSie\b/],
+      },
       en: { mustMatch: [/movie|film/i] },
     },
     why: 'Korean 반말 questions must stay casual in ja (plain form) and de (du).',
@@ -757,7 +778,10 @@ export const CASES: EvalCase[] = [
       addresseeNumber: 'not_applicable',
     },
     checks: {
-      ru: { mustMatch: [/(пошёл|пошел|сходил|ходил)/iu], mustNotMatch: [/(пошла|ходила)/iu] },
+      ru: {
+        mustMatch: [/(пошёл|пошел|сходил|ходил)/iu],
+        mustNotMatch: [/(пошла|ходила)/iu],
+      },
       es: { mustMatch: [/(fui|partido)/i] },
       en: { mustMatch: [/(match|game)/i, /brother/i] },
     },

@@ -171,7 +171,12 @@ type CaseRun = {
   raw: string;
 };
 
-function gradeCase(c: EvalCase, raw: string, latencyMs: number, costUsd?: number): CaseRun {
+function gradeCase(
+  c: EvalCase,
+  raw: string,
+  latencyMs: number,
+  costUsd?: number,
+): CaseRun {
   const failures: Failure[] = [];
   let checksPassed = 0;
   let checksTotal = 0;
@@ -206,10 +211,7 @@ function gradeCase(c: EvalCase, raw: string, latencyMs: number, costUsd?: number
   });
   const extra = gotKeys.filter((k) => !c.targets.includes(k));
   if (missing.length > 0 || extra.length > 0) {
-    fail(
-      'keys',
-      `missing=[${missing.join(',')}] extra=[${extra.join(',')}]`,
-    );
+    fail('keys', `missing=[${missing.join(',')}] extra=[${extra.join(',')}]`);
   } else {
     checksPassed += 1;
   }
@@ -225,7 +227,10 @@ function gradeCase(c: EvalCase, raw: string, latencyMs: number, costUsd?: number
       if (script.test(text)) {
         checksPassed += 1;
       } else {
-        fail('script', `${target}: no ${target}-script character in ${JSON.stringify(text)}`);
+        fail(
+          'script',
+          `${target}: no ${target}-script character in ${JSON.stringify(text)}`,
+        );
       }
     }
 
@@ -259,7 +264,10 @@ function gradeCase(c: EvalCase, raw: string, latencyMs: number, costUsd?: number
     const ok = allowed.includes(got);
     metadataResults[field] = ok;
     if (!ok) {
-      fail(field, `expected ${JSON.stringify(allowed)}, got ${JSON.stringify(got)}`);
+      fail(
+        field,
+        `expected ${JSON.stringify(allowed)}, got ${JSON.stringify(got)}`,
+      );
     }
   }
 
@@ -283,7 +291,8 @@ function providerOptionsFor(
   reasoning: string,
 ): Record<string, Record<string, JSONValue>> {
   const openrouterBody: Record<string, JSONValue> = {
-    reasoning: reasoning === 'none' ? { enabled: false } : { effort: reasoning },
+    reasoning:
+      reasoning === 'none' ? { enabled: false } : { effort: reasoning },
   };
   // The provider constraints (Luna price cap + Bedrock ordering) only make
   // sense for the production model; a Gemini candidate priced above the $2/M
@@ -387,7 +396,10 @@ function pct(passed: number, total: number): string {
 function report(label: string, runs: CaseRun[], verbose: boolean): void {
   const passed = runs.filter((r) => r.pass).length;
   const checks = runs.reduce(
-    (acc, r) => [acc[0] + r.translationChecks[0], acc[1] + r.translationChecks[1]],
+    (acc, r) => [
+      acc[0] + r.translationChecks[0],
+      acc[1] + r.translationChecks[1],
+    ],
     [0, 0],
   );
   console.log(`\n=== ${label}`);
@@ -421,7 +433,9 @@ function report(label: string, runs: CaseRun[], verbose: boolean): void {
   const latencies = runs.map((r) => r.latencyMs).sort((a, b) => a - b);
   const meanLatency =
     latencies.reduce((a, b) => a + b, 0) / Math.max(1, latencies.length);
-  const costs = runs.map((r) => r.costUsd).filter((c): c is number => c !== undefined);
+  const costs = runs
+    .map((r) => r.costUsd)
+    .filter((c): c is number => c !== undefined);
   const totalCost = costs.reduce((a, b) => a + b, 0);
   console.log(
     `latency mean ${Math.round(meanLatency)}ms  p90 ${latencies[Math.floor(latencies.length * 0.9)] ?? 0}ms  ` +
@@ -475,7 +489,9 @@ async function main(): Promise<void> {
     `${cases.length} case(s) × ${prompts.length} prompt(s) × ` +
       `${args.models.length} model(s) × ${args.repeat} repeat(s), ` +
       `reasoning=${args.reasoning}` +
-      (args.temperature === undefined ? '' : `, temperature=${args.temperature}`),
+      (args.temperature === undefined
+        ? ''
+        : `, temperature=${args.temperature}`),
   );
 
   for (const [promptLabel, systemPrompt] of prompts) {

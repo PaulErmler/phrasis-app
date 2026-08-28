@@ -358,6 +358,30 @@ interface SaveProgressArgs {
 }
 
 /**
+ * The Back stack transition for one `advance` call.
+ *
+ * The stack holds only the steps already left, never the current one, so
+ * "don't come back here" means declining to push rather than popping. Popping
+ * would discard the step BEFORE this one, which is the step Back should
+ * actually reach.
+ *
+ * `omit` is for steps the user must never land back on. `placement-test` is
+ * the only one today: it remounts with a fresh strategy, and it renders no
+ * shared footer (see `stepHasOwnAdvance`), so returning to it leaves neither
+ * Back nor Continue and the whole adaptive test has to be answered again.
+ *
+ * Extracted and exported so the trap is pinned by a test rather than by
+ * whoever next edits the wizard's step order.
+ */
+export function nextHistory(
+  history: StepId[],
+  leaving: StepId,
+  omit: boolean,
+): StepId[] {
+  return omit ? history : [...history, leaving];
+}
+
+/**
  * Single source of truth for the `saveOnboardingProgress` payload shape.
  * Used by all three call sites in the wizard (debounced field-change
  * `persist`, immediate `advance`, immediate `back`) so a new field landing
@@ -480,8 +504,8 @@ function OnboardingWizard({
   );
 
   const advance = useCallback(
-    (to: StepId) => {
-      setHistory((h) => [...h, stepId]);
+    (to: StepId, opts?: { omitFromHistory?: boolean }) => {
+      setHistory((h) => nextHistory(h, stepId, opts?.omitFromHistory ?? false));
       setStepId(to);
       saveStepNow(to, 'advance');
     },
@@ -606,7 +630,9 @@ function OnboardingWizard({
         finalLevel: result.finalOgteLevel,
       },
     });
-    advance('review-mode');
+    // Keep the placement test off the Back stack: returning to it restarts
+    // the whole adaptive test with no way out. Back lands on `proficiency`.
+    advance('review-mode', { omitFromHistory: true });
   };
 
   /**

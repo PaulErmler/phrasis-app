@@ -605,8 +605,7 @@ async function runTranslationStageChain(
       const suspectHiddenReasoning = calls.some(
         (t) =>
           t.visibleTextLength !== undefined &&
-          t.outputTokens >
-            4 * Math.max(16, Math.ceil(t.visibleTextLength / 2)),
+          t.outputTokens > 4 * Math.max(16, Math.ceil(t.visibleTextLength / 2)),
       );
       await captureGeneration(ctx, {
         distinctId: args.requestedByUserId,

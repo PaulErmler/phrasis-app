@@ -165,17 +165,22 @@ export const recordPayment = internalMutation({
     await ctx.db.insert('paymentEvents', ledgerRow);
     // Unmatched payments still count toward totals, mirroring the AI-cost
     // system bucket: the money was still received.
-    await track(ctx, args.userId ?? 'system:unmatched-payment', EVENTS.PAYMENT_RECORDED, {
-      stripe_invoice_id: args.stripeInvoiceId,
-      gross: args.gross,
-      tax: args.tax,
-      stripe_fee: args.stripeFee,
-      balance_net: args.balanceNet,
-      currency: args.currency,
-      paid_at: args.paidAt,
-      period_months: args.periodMonths,
-      attributed: args.userId !== undefined,
-    });
+    await track(
+      ctx,
+      args.userId ?? 'system:unmatched-payment',
+      EVENTS.PAYMENT_RECORDED,
+      {
+        stripe_invoice_id: args.stripeInvoiceId,
+        gross: args.gross,
+        tax: args.tax,
+        stripe_fee: args.stripeFee,
+        balance_net: args.balanceNet,
+        currency: args.currency,
+        paid_at: args.paidAt,
+        period_months: args.periodMonths,
+        attributed: args.userId !== undefined,
+      },
+    );
     return true;
   },
 });
@@ -229,10 +234,9 @@ export const syncStripePayments = internalAction({
 
         const email = inv.customer_email ?? undefined;
         const userId = email
-          ? ((await ctx.runQuery(
-              internal.features.paymentSync.userIdByEmail,
-              { email },
-            )) ?? undefined)
+          ? ((await ctx.runQuery(internal.features.paymentSync.userIdByEmail, {
+              email,
+            })) ?? undefined)
           : undefined;
 
         const inserted: boolean = await ctx.runMutation(

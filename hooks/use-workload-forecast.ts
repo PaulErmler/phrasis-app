@@ -26,6 +26,38 @@ import {
  */
 const CACHE_VERSION = 'v2';
 
+/** Prefix every forecast cache entry shares, used by the daily prune below. */
+const CACHE_PREFIX = 'workload_';
+
+/**
+ * `useCachedQuery` never evicts, and the key now carries a date, so without
+ * this every day would leave one dead entry per (course, mode, filter).
+ * Drops any `workload_` entry whose date suffix isn't today's, keeping the
+ * key that is about to be read. Runs once per key change, and a storage
+ * failure is not worth breaking the card over.
+ */
+function useDailyCachePrune(currentKey: string, today: string): void {
+  React.useEffect(() => {
+    try {
+      const stale: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (
+          key &&
+          key.startsWith(CACHE_PREFIX) &&
+          key !== currentKey &&
+          !key.endsWith(`_${today}`)
+        ) {
+          stale.push(key);
+        }
+      }
+      for (const key of stale) localStorage.removeItem(key);
+    } catch {
+      // Private mode / quota errors: a stale entry is harmless, a crash isn't.
+    }
+  }, [currentKey, today]);
+}
+
 /** Cached payloads may be `null` (the query's no-course result) — valid. */
 const isCachedPayloadValid = (value: unknown) =>
   value === null || isWorkloadForecastData(value);
@@ -79,12 +111,20 @@ export function useWorkloadForecast({
   const now = useNowMinute(skip || hidden);
   const today = dateInTimezone(now, timezone);
 
+  // `today` belongs in the key, not just the args: every date the card
+  // renders is derived from the payload's own `today`, so a payload cached
+  // yesterday paints yesterday's seven days with the day-0 bar labelled
+  // "Today" until the round-trip lands. Keying it away makes a stale entry
+  // unreachable instead of wrong.
+  const cacheKey = `workload_${CACHE_VERSION}_${settings?.courseId ?? 'none'}_${reviewMode}_${filter}_${today}`;
+  useDailyCachePrune(cacheKey, today);
+
   const data = useCachedQuery(
     api.features.stats.getWorkloadForecast,
     skip || hidden || !settings
       ? 'skip'
       : { timezone, today, now, reviewMode, filter },
-    `workload_${CACHE_VERSION}_${settings?.courseId ?? 'none'}_${reviewMode}_${filter}`,
+    cacheKey,
     isCachedPayloadValid,
   );
 

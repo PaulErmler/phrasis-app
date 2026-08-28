@@ -165,7 +165,9 @@ export function buildAutofillUserPrompt(args: {
   const sourceDescription = args.texts
     .map((t) => `[${formatLangLabel(t.language)}]: ${t.text}`)
     .join('\n');
-  const targetList = args.resolvedTargets.map(describeTargetLanguage).join('\n');
+  const targetList = args.resolvedTargets
+    .map(describeTargetLanguage)
+    .join('\n');
   return `Source text(s):\n${sourceDescription}\n\nTranslate into these languages:\n${targetList}`;
 }
 
