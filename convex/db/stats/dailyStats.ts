@@ -3,7 +3,26 @@ import { Id, Doc } from '../../_generated/dataModel';
 import { getCourseStatsForMutation } from '../courseStats';
 import { getTodayInTimezone } from '../../lib/dateUtils';
 import { FSRS_STATE_LABELS as CARD_STATE_KEYS } from '../../lib/fsrsStates';
-import type { StatsReviewMode } from '../../types';
+import { ORIGIN_BUCKET_ZEROS } from '../../types';
+import type { StatsReviewMode, OriginBucket } from '../../types';
+
+/**
+ * Increment one origin bucket of a `dailyStats.newCardsByOrigin` split.
+ *
+ * A row written before the field existed has no split, so this seeds from
+ * zeros rather than from `newCards`: the row then carries a PARTIAL split
+ * whose buckets sum to LESS than `newCards`. That is deliberate. Inventing a
+ * bucket for the cards already counted would be a guess, and readers
+ * (`features/projections.ts`) attribute the difference themselves.
+ */
+function incrementOrigin(
+  existing: Doc<'dailyStats'>['newCardsByOrigin'],
+  origin: OriginBucket,
+) {
+  const next = { ...ORIGIN_BUCKET_ZEROS, ...(existing ?? {}) };
+  next[origin] += 1;
+  return next;
+}
 
 export async function getDailyStats(
   ctx: QueryCtx,
@@ -82,6 +101,8 @@ export async function upsertDailyStats(
     date: string;
     timeMs: number;
     isNewCard: boolean;
+    /** Origin bucket of the card, recorded only when `isNewCard`. */
+    newCardOrigin?: OriginBucket;
     reviewMode?: StatsReviewMode;
     rating?: string;
     accuracy?: number;
@@ -189,6 +210,14 @@ export async function upsertDailyStats(
       reps: repsAfter,
       timeMs: timeMsAfter,
       newCards: existing.newCards + (args.isNewCard ? 1 : 0),
+      ...(args.isNewCard && args.newCardOrigin
+        ? {
+            newCardsByOrigin: incrementOrigin(
+              existing.newCardsByOrigin,
+              args.newCardOrigin,
+            ),
+          }
+        : {}),
       cardsReviewed: existing.cardsReviewed + 1,
       ...(hourBuckets ? { hourBuckets } : {}),
       ...(ratingCounts ? { ratingCounts } : {}),
@@ -251,6 +280,9 @@ export async function upsertDailyStats(
     reps: 1,
     timeMs: args.timeMs,
     newCards: args.isNewCard ? 1 : 0,
+    ...(args.isNewCard && args.newCardOrigin
+      ? { newCardsByOrigin: incrementOrigin(undefined, args.newCardOrigin) }
+      : {}),
     cardsReviewed: 1,
     hourBuckets,
     ratingCounts,

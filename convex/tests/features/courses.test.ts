@@ -563,6 +563,145 @@ describe('features/courses', () => {
     });
   });
 
+  describe('getLifetimeReviewCount', () => {
+    /** A course with `reps` recorded reviews, plus its courseStats row. */
+    async function seedCourseWithReps(
+      t: TestConvex<typeof schema>,
+      reps: number,
+      { active }: { active?: boolean } = {},
+    ) {
+      return t.run(async (ctx) => {
+        const courseId = await ctx.db.insert('courses', {
+          userId: 'user_A',
+          baseLanguages: ['en'],
+          targetLanguages: ['es'],
+        });
+        await ctx.db.insert('courseStats', {
+          userId: 'user_A',
+          courseId,
+          totalRepetitions: reps,
+          totalTimeMs: 0,
+          totalCards: 0,
+          currentStreak: 0,
+        });
+        const settings = await ctx.db
+          .query('userSettings')
+          .withIndex('by_userId', (q) => q.eq('userId', 'user_A'))
+          .first();
+        if (!settings) {
+          await ctx.db.insert('userSettings', {
+            userId: 'user_A',
+            hasCompletedOnboarding: true,
+            ...(active ? { activeCourseId: courseId } : {}),
+          });
+        } else if (active) {
+          await ctx.db.patch(settings._id, { activeCourseId: courseId });
+        }
+        return courseId;
+      });
+    }
+
+    const read = (t: TestConvex<typeof schema>) =>
+      t
+        .withIdentity({ subject: 'user_A' })
+        .query(api.features.courses.getLifetimeReviewCount, {});
+
+    it('returns null when unauthenticated', async () => {
+      const t = convexTest(schema, modules);
+      expect(
+        await t.query(api.features.courses.getLifetimeReviewCount, {}),
+      ).toBeNull();
+    });
+
+    /**
+     * The regression this exists for: the count was scoped to the ACTIVE
+     * course, so a user with hundreds of reviews behind them dropped back to
+     * 0 the moment they opened a second course. The one-time review-mode
+     * tutorials gate on this, and their completion is per-user, so a
+     * per-course clock restarted the teaching layer for every new course.
+     */
+    it('sums reviews across every course, not just the active one', async () => {
+      const t = convexTest(schema, modules);
+      await seedCourseWithReps(t, 800);
+      await seedCourseWithReps(t, 3, { active: true });
+      // Not 3: the 800 reviews in the older course still happened.
+      expect(await read(t)).toBe(803);
+    });
+
+    it('keeps a veteran above the suppression threshold on a brand-new course', async () => {
+      const t = convexTest(schema, modules);
+      await seedCourseWithReps(t, 800);
+      await seedCourseWithReps(t, 0, { active: true });
+      // Must stay clear of VETERAN_SUPPRESS_REPS (50, in
+      // lib/tutorials/use-milestone-tips.ts). Asserted as a literal rather
+      // than by importing that module: it is a 'use client' React hook that
+      // pulls in driver.js, which has no business loading in a backend test.
+      expect(await read(t)).toBe(800);
+    });
+
+    it('ignores other users courses', async () => {
+      const t = convexTest(schema, modules);
+      await seedCourseWithReps(t, 12, { active: true });
+      await t.run(async (ctx) => {
+        const courseId = await ctx.db.insert('courses', {
+          userId: 'user_B',
+          baseLanguages: ['en'],
+          targetLanguages: ['fr'],
+        });
+        await ctx.db.insert('courseStats', {
+          userId: 'user_B',
+          courseId,
+          totalRepetitions: 999,
+          totalTimeMs: 0,
+          totalCards: 0,
+          currentStreak: 0,
+        });
+      });
+      expect(await read(t)).toBe(12);
+    });
+
+    /**
+     * A deliberate contract change, pinned so it can't be undone by accident:
+     * the active-course version returned `null` for a signed-in user with no
+     * course, because it bailed on the missing course. `null` is now reserved
+     * for "no identity / query failed", and the count for a user who has
+     * simply never reviewed is 0, which is both the truth and what the
+     * beginner-threshold consumers want to compare against.
+     */
+    it('is 0, not null, for a signed-in user with no course', async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) =>
+        ctx.db.insert('userSettings', {
+          userId: 'user_A',
+          hasCompletedOnboarding: true,
+        }),
+      );
+      expect(await read(t)).toBe(0);
+    });
+
+    it('is 0 for a user with no rows of any kind', async () => {
+      const t = convexTest(schema, modules);
+      expect(await read(t)).toBe(0);
+    });
+
+    it('is 0 for a course whose stats row does not exist yet', async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        const courseId = await ctx.db.insert('courses', {
+          userId: 'user_A',
+          baseLanguages: ['en'],
+          targetLanguages: ['es'],
+        });
+        await ctx.db.insert('userSettings', {
+          userId: 'user_A',
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+      });
+      expect(await read(t)).toBe(0);
+    });
+  });
+
   describe('setCurrentSessionId', () => {
     async function seedOwnedCourse(t: TestConvex<typeof schema>) {
       return t.run(async (ctx) => {

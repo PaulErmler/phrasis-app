@@ -7,6 +7,7 @@ import {
   computeStreakUpdate,
 } from '../courseStats';
 import { upsertDailyStats } from './dailyStats';
+import { getCardOriginBucket } from './cardAggregates';
 import { upsertWeeklyStats, getISOWeekString } from './weeklyStats';
 import { upsertMonthlyStats, getMonthString } from './monthlyStats';
 import { upsertYearlyStats, getYearString } from './yearlyStats';
@@ -198,6 +199,7 @@ export async function recordReviewStats(
     date: todayDate,
     timeMs: clampedTime,
     isNewCard: isFirstReview,
+    newCardOrigin: getCardOriginBucket(card),
     reviewMode: reviewModeForStats,
     rating: args.rating,
     accuracy: args.accuracy,

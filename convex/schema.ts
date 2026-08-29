@@ -28,6 +28,8 @@ import {
   reviewsByModeValidator,
   translationEntriesValidator,
   collectionOriginValidator,
+  collectionOriginBucketValidator,
+  newCardsByOriginValidator,
   cardEditKindValidator,
   cardEditPathValidator,
   cardEditLanguageRoleValidator,
@@ -1061,6 +1063,17 @@ export default defineSchema({
     chatCardsApproved: v.optional(v.number()),
     cardsEdited: v.optional(v.number()),
     cardsAddedManually: v.optional(v.number()),
+    // Origin split of `newCards` above: the same first-review event, bucketed
+    // by the card's denormalized `collectionOrigin`. Powers the curriculum-only
+    // pace behind the level ETAs, which divide a premade-only remaining count
+    // and so must not be fed a pace inflated by custom/chat cards.
+    //
+    // Optional, and readers must NOT assume the buckets sum to `newCards`:
+    // rows predating this field carry no split at all, and a row first written
+    // before the field existed and patched after carries a partial one. See
+    // `features/projections.ts`, which attributes the difference rather than
+    // trusting the sum.
+    newCardsByOrigin: v.optional(newCardsByOriginValidator),
     // High-water mark: today's review count when a celebration last fired.
     // A milestone only triggers when the count EXCEEDS this, and undoing a
     // review never lowers it, so undo + re-review can't replay a celebration.
@@ -1142,6 +1155,13 @@ export default defineSchema({
         cardState: v.optional(v.number()),
         languages: v.array(v.string()), // course languages whose per-language stats were incremented
         collectionId: v.optional(v.id('collections')),
+        // dailyStats.newCardsByOrigin bucket, stamped from the card's
+        // denormalized collectionOrigin. Snapshotted rather than re-derived
+        // from `collectionId` above: a card can be moved or its collection
+        // deleted between review and undo, and the decrement has to land in
+        // the bucket the increment used. Only meaningful when wasFirstReview.
+        // Optional for logs written before this field existed.
+        newCardOrigin: v.optional(collectionOriginBucketValidator),
       }),
     ),
 

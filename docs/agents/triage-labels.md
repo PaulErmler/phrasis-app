@@ -16,16 +16,15 @@ corresponding label string from this table.
 
 ## How labels are applied
 
-Kanban checkbox cards have no label field, so a label is applied in two places:
+Put the role in the card's `labels` array in `.devtool/features/`:
 
-- On the board, append it as an Obsidian tag to the card line:
-  `- [ ] Fix audio gate — .scratch/audio-gate/ #needs-triage`
-  A card carries at most one triage tag; replace the old one rather than
-  stacking them.
-- In the repo, mirror it on a `Status:` line near the top of the `.scratch/`
-  spec or issue file the card points at.
+```yaml
+labels: ["needs-triage"]
+```
 
-If the board is unavailable (the symlink is absent on this machine), the
-`Status:` line in `.scratch/` is the source of truth.
+A card carries at most one triage label; replace the old one rather than
+stacking them. If a longer spec lives in `.scratch/`, mirror it on a
+`Status:` line near the top of that file.
 
-Edit the right-hand column above to match whatever vocabulary you actually use.
+If `.devtool/features/` is absent, the `Status:` line in `.scratch/` is the
+source of truth.

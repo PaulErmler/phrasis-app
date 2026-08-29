@@ -25,7 +25,9 @@ const DIFFICULTY_CHECK_ENABLED = false;
  * same veteran rule as the milestone tips applies. A user whose lifetime
  * review count is already far past the beginner window has long since
  * settled on a difficulty, so the check is silently retired instead of
- * shown.
+ * shown. That count spans every course the user has
+ * (`getLifetimeReviewCount`), so opening a second course does not hand a
+ * veteran a beginner's dialog.
  *
  * `pending` is the HOLD signal for `useLearningMode({ holdAutoAdd })`; the
  * dialog itself opens only when the hold actually intercepts an add

@@ -1,41 +1,61 @@
-# Issue tracker: Obsidian kanban board
+# Issue tracker: `.devtool/features`
 
-Work for this repo is tracked on `board/Flexling Board.md`, a gitignored
-symlink into Paul's Obsidian vault. It may be absent on other machines; if it
-is, say so and fall back to `.scratch/` rather than inventing a queue.
+Work for this repo is tracked in `.devtool/features/` (gitignored). One
+markdown file per card. If that directory is absent, say so and fall back
+to `.scratch/` rather than inventing a queue.
 
-## Structure
+## Cards
 
-Columns are `##` headings: Not Started, Prioritized, Doing, Done, Archived.
-Each card is a single `- [ ] <one-line summary>` under a column.
+Each card is a file named `<slug>-YYYY-MM-DD.md` (or `<slug>-YYYY-MM-DD-N.md`
+on a collision) with YAML frontmatter and a `# Title` body:
 
-**Never add priorities or reorder the Prioritized column.** Prioritization is
-Paul's job. Moving a card you were explicitly asked to work on into Doing or
-Done is fine.
+```yaml
+id: "the-same-slug-as-the-filename-stem"
+status: "todo"          # todo | backlog | in-progress | review | done
+priority: "medium"      # low | medium | high | critical
+assignee: null
+epic: null
+dueDate: null
+created: "2026-08-29T06:20:00.000Z"
+modified: "2026-08-29T06:20:00.000Z"
+completedAt: null
+labels: []
+order: "a7"             # lex order within the status column; append, don't reshuffle
+```
 
-## Cards are titles, not bodies
+- New work: add a file under `.devtool/features/` with `status: todo` (or
+  `backlog` when that is what was asked). Never invent a second board.
+- Do not change `priority` or `order` on existing cards. Prioritization is
+  Paul's job.
+- When explicitly working a card, you may set `status: in-progress`.
+- When the work is finished, set `status: review` and leave the card where it
+  is. `review` means done but awaiting Paul's sign-off; it is not `done`, and a
+  card in it must not be moved to `.devtool/features/done/`.
+- Only Paul closes a card: `status: done`, `completedAt` filled, file moved to
+  `.devtool/features/done/`. Do that yourself only when explicitly asked to.
 
-A card is one line. A spec, an issue with acceptance criteria, or a wayfinder
-map is longer than that, so it lives in the repo:
+## Cards vs longer specs
+
+A card body is the ticket. A spec, acceptance criteria, or wayfinder map
+that outgrows that can live in the repo:
 
 - One effort per directory: `.scratch/<feature-slug>/`
 - Spec: `.scratch/<feature-slug>/spec.md`
 - Issues: one file per ticket at
   `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`. Never a
   single combined tickets file
-- The board card links to it:
-  `- [ ] Fix audio gate — .scratch/audio-gate/`
+- Point at it from the card body if both exist.
 
 ## When a skill says "publish to the issue tracker"
 
-Write the file under `.scratch/<feature-slug>/` (creating the directory if
-needed), then add a `- [ ]` card under **Not Started** on the board pointing at
-that directory. Never file it under Prioritized.
+Write a new `.devtool/features/<slug>-YYYY-MM-DD.md` card. If the work also
+needs a longer spec, create `.scratch/<feature-slug>/` and link it from the
+card. Never file it as `in-progress` unless you were asked to start it.
 
 ## When a skill says "fetch the relevant ticket"
 
-Read the `.scratch/` file the card points at. Paul will normally pass the path
-or the card text directly.
+Read the `.devtool/features/` card (and any `.scratch/` file it points at).
+Paul will normally pass the path or the card title directly.
 
 ## GitHub Issues
 

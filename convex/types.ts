@@ -341,6 +341,54 @@ export const collectionOriginValidator = v.union(
   v.literal('chat'),
 );
 
+/**
+ * The bucket space shared by the card aggregates
+ * (`db/stats/cardAggregates.ts`) and `dailyStats.newCardsByOrigin`: the three
+ * collection origins plus 'none' for a card that belongs to no collection
+ * (legacy rows whose `collectionOrigin` was never resolved).
+ *
+ * Declared HERE, not next to the aggregates, so that `schema.ts` can reach it
+ * without pulling `@convex-dev/aggregate` and `components` into the schema's
+ * module graph. Everything below derives from this one list; adding a fifth
+ * origin should mean editing this line and nothing else.
+ */
+export const ORIGIN_BUCKETS = ['premade', 'custom', 'chat', 'none'] as const;
+export type OriginBucket = (typeof ORIGIN_BUCKETS)[number];
+
+export const collectionOriginBucketValidator = v.union(
+  collectionOriginValidator,
+  v.literal('none'),
+);
+
+/**
+ * Shape of `dailyStats.newCardsByOrigin`. Spelled out rather than derived from
+ * `ORIGIN_BUCKETS` via `Object.fromEntries`, which would erase the per-key
+ * types Convex needs; this is the single place it is spelled.
+ */
+export const newCardsByOriginValidator = v.object({
+  premade: v.number(),
+  custom: v.number(),
+  chat: v.number(),
+  none: v.number(),
+});
+export type NewCardsByOrigin = Infer<typeof newCardsByOriginValidator>;
+
+/** Empty split to seed a row that carries none yet. */
+export const ORIGIN_BUCKET_ZEROS: NewCardsByOrigin = Object.freeze({
+  premade: 0,
+  custom: 0,
+  chat: 0,
+  none: 0,
+});
+
+/**
+ * Total across every bucket. Note this is NOT guaranteed to equal the row's
+ * `newCards`: see the `newCardsByOrigin` comment in `schema.ts`.
+ */
+export function sumOriginBuckets(split: NewCardsByOrigin): number {
+  return ORIGIN_BUCKETS.reduce((acc, b) => acc + split[b], 0);
+}
+
 // ============================================================================
 // Card-edit audit log (convex/features/cardEditAudit.ts)
 // ============================================================================

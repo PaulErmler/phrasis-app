@@ -11,6 +11,7 @@ import {
   getCollectionProgressForCourse,
 } from '../db/collections';
 import { effectiveTextCount } from '../lib/collections';
+import { sumOriginBuckets } from '../types';
 import { isValidTimezone, resolveClientToday } from '../lib/dateUtils';
 import { normalizeLanguageCode } from '../../lib/languages';
 import { addDays, daysBetween, dateInTimezone } from '../../lib/dateStrings';
@@ -185,6 +186,11 @@ export const getProjections = query({
 
     const currentWords = wordCounts.reduce((acc, w) => acc + w.words, 0);
     const totalTimeMs = courseStats?.totalTimeMs ?? 0;
+    // How many cards the user's deck holds. Both the sentence pace and the
+    // premade share below divide by this, so they read it from one place: two
+    // sources with two different precedences would let the share describe a
+    // different deck from the pace.
+    const totalDeckCards = courseStats?.totalCards ?? deck?.cardCount ?? 0;
 
     // Below the unlock threshold there is nothing worth projecting. Bail out
     // before the level-collection reads and let the client show its teaser.
@@ -217,10 +223,6 @@ export const getProjections = query({
         value,
       }),
     );
-    const dailyNewCards: DailyEntry[] = dailyRows.map((r) => ({
-      date: r.date,
-      value: r.newCards,
-    }));
     const dailyMinutes: DailyEntry[] = dailyRows.map((r) => ({
       date: r.date,
       value: r.timeMs / 60_000,
@@ -251,6 +253,36 @@ export const getProjections = query({
       ? levelCollections.findIndex((c) => c._id === settings.activeCollectionId)
       : -1;
 
+    // Premade share of the deck. `cardsAdded` is monotonic (deleting a card
+    // never gives it back), so on a course with deletions the ratio can exceed
+    // 1 and has to be clamped. A course with no cards has no level ETA anyway,
+    // so the 1 fallback is inert.
+    const premadeAdded = levels.reduce((acc, l) => acc + l.cardsAdded, 0);
+    const curriculumShare =
+      totalDeckCards > 0 ? Math.min(1, premadeAdded / totalDeckCards) : 1;
+
+    const dailyNewCards: DailyEntry[] = dailyRows.map((r) => ({
+      date: r.date,
+      value: r.newCards,
+    }));
+    // Premade-only counterpart, for the level ETAs.
+    //
+    // `newCardsByOrigin` buckets are NOT guaranteed to sum to `newCards`: days
+    // predating the field carry no split, and a day straddling its deploy
+    // carries a partial one. So attribute only the part the split doesn't
+    // account for, using the deck's premade ratio. One expression covers all
+    // three cases, and it self-corrects as real split data fills the window
+    // (90 days, 15-day half-life ⇒ dominated by split rows within ~6 weeks).
+    const dailyCurriculumCards: DailyEntry[] = dailyRows.map((r) => {
+      const split = r.newCardsByOrigin;
+      const attributed = split ? sumOriginBuckets(split) : 0;
+      const unattributed = Math.max(0, r.newCards - attributed);
+      return {
+        date: r.date,
+        value: (split?.premade ?? 0) + unattributed * curriculumShare,
+      };
+    });
+
     const creationDate = dateInTimezone(course._creationTime, timezone);
     const courseAgeDays = Math.max(1, daysBetween(creationDate, today) + 1);
 
@@ -259,12 +291,14 @@ export const getProjections = query({
       courseAgeDays,
       goalMinutes: settings?.dailyTimeGoalMinutes ?? null,
       currentWords,
-      currentSentences: courseStats?.totalCards ?? deck?.cardCount ?? 0,
+      currentSentences: totalDeckCards,
       totalTimeMs,
       todayWords: wordsByDate.get(today) ?? 0,
       dailyWords,
       dailyNewCards,
+      dailyCurriculumCards,
       dailyMinutes,
+      curriculumShare,
       levels: levels.length > 0 ? levels : null,
       activeLevelIndex,
     });

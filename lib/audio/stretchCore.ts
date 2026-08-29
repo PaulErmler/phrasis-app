@@ -69,6 +69,18 @@ export function stretchChannels(
 
   const source = new WebAudioBufferSource(audioBufferShim(padded));
   const st = new SoundTouch();
+  // SoundTouch's `Stretch` constructor hardcodes a 44100 Hz sample rate, and
+  // its auto-tuning picks sequence/seek windows in MILLISECONDS before
+  // converting them to samples with that rate. Our buffers arrive at the
+  // AudioContext rate instead (48 kHz on most Apple hardware), so every window
+  // came out 8.6% shorter than the library intended (at 0.7x: 5115 samples
+  // where it wanted 5568, overlap 352 where it wanted 384). Passing the real
+  // rate is a correctness fix, not a tuning knob; zeros keep the library's own
+  // auto sequence/seek sizing and 8 is its DEFAULT_OVERLAP_MS.
+  //
+  // Note this is a no-op on a 44.1 kHz output device, which is why the
+  // artifacts it addresses are hardware-dependent.
+  st.stretch.setParameters(input.sampleRate, 0, 0, 8);
   st.tempo = rate;
   const filter = new SimpleFilter(source, st);
 

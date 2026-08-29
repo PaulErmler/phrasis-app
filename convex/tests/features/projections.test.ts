@@ -5,6 +5,7 @@ import schema from '../../schema';
 import { api } from '../../_generated/api';
 import type { Id } from '../../_generated/dataModel';
 import { addDays } from '../../../lib/dateStrings';
+import { ORIGIN_BUCKET_ZEROS, type NewCardsByOrigin } from '../../types';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -82,7 +83,163 @@ async function seedHistory(
   });
 }
 
+/**
+ * Two premade levels on an active dataset, with the first one active and
+ * partially added, so the `nextLevel` ETA has something to divide.
+ * `cardsAdded` totals 160 of the deck's 300 cards => curriculumShare 0.5333.
+ */
+async function seedLevels(
+  t: TestConvex<typeof schema>,
+  courseId: Id<'courses'>,
+) {
+  return t.run(async (ctx) => {
+    const datasetId = await ctx.db.insert('datasets', {
+      slug: 'ogte-curated',
+      version: '1.0.0',
+      publishedAt: Date.now(),
+      isActive: true,
+    });
+    const l1 = await ctx.db.insert('collections', {
+      name: 'L01',
+      datasetId,
+      code: 'L01',
+      displayName: 'A1.1',
+      order: 1,
+      textCount: 5000,
+      origin: 'premade',
+    });
+    const l2 = await ctx.db.insert('collections', {
+      name: 'L02',
+      datasetId,
+      code: 'L02',
+      displayName: 'A1.2',
+      order: 2,
+      textCount: 200,
+      origin: 'premade',
+    });
+    // 5000 - 160 - 0 = 4840 premade texts left in the active level. Large on
+    // purpose: it keeps every ETA well clear of the 1-day floor so the ratios
+    // below are not swallowed by `ceilDays` rounding.
+    await ctx.db.insert('collectionProgress', {
+      userId: 'user_A',
+      courseId,
+      collectionId: l1,
+      cardsAdded: 160,
+      cardsLearned: 160,
+      cardsMastered: 0,
+      ignoredCount: 0,
+    });
+    await ctx.db.insert('courseSettings', {
+      courseId,
+      initialReviewCount: 2,
+      activeCollectionId: l1,
+    });
+    return { l1, l2 };
+  });
+}
+
+/** A full origin split from the buckets a case actually cares about. */
+const originSplit = (
+  partial: Partial<NewCardsByOrigin>,
+): NewCardsByOrigin => ({ ...ORIGIN_BUCKET_ZEROS, ...partial });
+
+/** Overwrite the seeded window's per-day origin split. */
+async function setOriginSplit(
+  t: TestConvex<typeof schema>,
+  courseId: Id<'courses'>,
+  split: NewCardsByOrigin | null,
+) {
+  await t.run(async (ctx) => {
+    const rows = await ctx.db
+      .query('dailyStats')
+      .withIndex('by_userId_and_courseId_and_date', (q) =>
+        q.eq('userId', 'user_A').eq('courseId', courseId),
+      )
+      .collect();
+    for (const r of rows) {
+      await ctx.db.patch(r._id, { newCardsByOrigin: split ?? undefined });
+    }
+  });
+}
+
+async function nextLevelEta(
+  t: TestConvex<typeof schema>,
+): Promise<number | undefined> {
+  const res = await t
+    .withIdentity({ subject: 'user_A' })
+    .query(api.features.projections.getProjections, {
+      timezone: TZ,
+      today: todayUtc(),
+    });
+  const nl = res?.indicators.find((i) => i.kind === 'nextLevel');
+  return nl && 'etaDays' in nl ? nl.etaDays : undefined;
+}
+
 describe('features/projections: getProjections', () => {
+  /**
+   * The reported bug: the level ETA divided a premade-only remaining count by
+   * an all-origin pace. These cover the query's half of the fix, the
+   * attribution of `dailyStats.newCardsByOrigin` into a curriculum-only
+   * series; `computeIndicators`' half is covered in
+   * tests/unit/lib/projections.test.ts, which pins the exact day counts.
+   *
+   * Assertions here are RATIOS between configurations, not absolute days: a
+   * convex-test course is created "now", so `courseAgeDays` is 1 and
+   * `decayedDailyPace` divides the 90-day window by a single day, inflating
+   * every pace by the same constant. The ratios are what the attribution
+   * controls, and they are immune to it.
+   */
+  describe('curriculum vs custom attribution', () => {
+    /**
+     * ETA for one origin split, on a deck with 4840 premade texts left.
+     * Unnamed buckets are 0; `null` is a row that carries no split at all.
+     */
+    async function etaFor(split: Partial<NewCardsByOrigin> | null) {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedActiveCourse(t);
+      await seedHistory(t, courseId, 90);
+      await seedLevels(t, courseId);
+      await setOriginSplit(t, courseId, split && originSplit(split));
+      return nextLevelEta(t);
+    }
+
+    it('divides remaining premade texts by the PREMADE pace only', async () => {
+      // Both users learn 5 new cards a day. The first learns 5 curriculum
+      // cards, the second learns 1 curriculum card and 4 of their own. Before
+      // the split they read as the same pace and got the same ETA.
+      const allCurriculum = await etaFor({ premade: 5 });
+      const mostlyCustom = await etaFor({ premade: 1, custom: 3, chat: 1 });
+      expect(allCurriculum).toBeDefined();
+      // A fifth of the curriculum pace ⇒ five times the ETA.
+      expect(mostlyCustom! / allCurriculum!).toBeCloseTo(5, 1);
+    });
+
+    it('suppresses the ETA when no curriculum cards are being learned', async () => {
+      // 5 cards a day, none of them curriculum: nothing honest to promise.
+      expect(await etaFor({ custom: 5 })).toBeUndefined();
+    });
+
+    it('apportions legacy rows that carry no split by the deck ratio', async () => {
+      // curriculumShare = 160 premade cardsAdded / 300 deck cards = 0.5333,
+      // so a row with no split contributes 0.5333 of its newCards.
+      const allCurriculum = await etaFor({ premade: 5 });
+      const legacy = await etaFor(null);
+      expect(legacy).toBeDefined();
+      expect(legacy! / allCurriculum!).toBeCloseTo(1 / 0.5333, 1);
+    });
+
+    it('attributes only the remainder on a row with a PARTIAL split', async () => {
+      // The shape of a day that straddled the deploy: newCards is 5, but only
+      // 2 of them were bucketed. Trusting the buckets to sum would undercount
+      // the day; the other 3 fall back to the deck ratio, for an effective
+      // 2 + 3 * 0.5333 = 3.6 curriculum cards.
+      const allCurriculum = await etaFor({ premade: 5 });
+      const partial = await etaFor({ premade: 2 });
+      expect(partial).toBeDefined();
+      expect(partial! / allCurriculum!).toBeCloseTo(5 / 3.6, 1);
+    });
+  });
+
   it('returns null when unauthenticated', async () => {
     const t = convexTest(schema, modules);
     const res = await t.query(api.features.projections.getProjections, {
