@@ -13,11 +13,7 @@ import {
 import { effectiveTextCount } from '../lib/collections';
 import { isValidTimezone, resolveClientToday } from '../lib/dateUtils';
 import { normalizeLanguageCode } from '../../lib/languages';
-import {
-  addDays,
-  daysBetween,
-  dateInTimezone,
-} from '../../lib/dateStrings';
+import { addDays, daysBetween, dateInTimezone } from '../../lib/dateStrings';
 import {
   computeIndicators,
   PACE_WINDOW_DAYS,
@@ -214,10 +210,13 @@ export const getProjections = query({
         (wordsByDate.get(row.date) ?? 0) + row.newWordsCount,
       );
     }
-    const dailyWords: DailyEntry[] = Array.from(wordsByDate, ([date, value]) => ({
-      date,
-      value,
-    }));
+    const dailyWords: DailyEntry[] = Array.from(
+      wordsByDate,
+      ([date, value]) => ({
+        date,
+        value,
+      }),
+    );
     const dailyNewCards: DailyEntry[] = dailyRows.map((r) => ({
       date: r.date,
       value: r.newCards,

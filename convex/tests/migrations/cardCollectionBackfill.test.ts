@@ -4,7 +4,21 @@ import type { Doc, Id } from '../../_generated/dataModel';
 
 const collectionId = 'collection1' as Id<'collections'>;
 
-function makeCollection(overrides: Partial<Doc<'collections'>>): Doc<'collections'> {
+/**
+ * A pre-backfill card fragment. The narrowed schema types both fields as
+ * required, so legacy rows (which the safety net exists for) can no longer be
+ * expressed as plain literals — this cast reconstructs exactly the shape a
+ * prod row written before the backfill presents to `migrateOne`.
+ */
+function legacyCard(
+  fields: Partial<Pick<Doc<'cards'>, 'collectionId' | 'collectionOrigin'>>,
+): Pick<Doc<'cards'>, 'collectionId' | 'collectionOrigin'> {
+  return fields as Pick<Doc<'cards'>, 'collectionId' | 'collectionOrigin'>;
+}
+
+function makeCollection(
+  overrides: Partial<Doc<'collections'>>,
+): Doc<'collections'> {
   return {
     _id: collectionId,
     _creationTime: 0,
@@ -28,7 +42,7 @@ describe('cardCollectionBackfillPatch (safety-net migrateOne logic)', () => {
   it('fills both fields from the resolved collection', () => {
     expect(
       cardCollectionBackfillPatch(
-        {},
+        legacyCard({}),
         collectionId,
         makeCollection({ origin: 'custom' }),
       ),
@@ -38,7 +52,7 @@ describe('cardCollectionBackfillPatch (safety-net migrateOne logic)', () => {
   it('fills only the missing field', () => {
     expect(
       cardCollectionBackfillPatch(
-        { collectionId },
+        legacyCard({ collectionId }),
         collectionId,
         makeCollection({ origin: 'chat' }),
       ),
@@ -48,7 +62,7 @@ describe('cardCollectionBackfillPatch (safety-net migrateOne logic)', () => {
   it('derives premade origin for legacy CEFR collections without an origin field', () => {
     expect(
       cardCollectionBackfillPatch(
-        { collectionId },
+        legacyCard({ collectionId }),
         collectionId,
         makeCollection({ name: 'A1' }),
       ),
@@ -58,9 +72,12 @@ describe('cardCollectionBackfillPatch (safety-net migrateOne logic)', () => {
   it('derives premade origin for dataset collections without an origin field', () => {
     expect(
       cardCollectionBackfillPatch(
-        { collectionId },
+        legacyCard({ collectionId }),
         collectionId,
-        makeCollection({ name: 'L05', datasetId: 'dataset1' as Id<'datasets'> }),
+        makeCollection({
+          name: 'L05',
+          datasetId: 'dataset1' as Id<'datasets'>,
+        }),
       ),
     ).toEqual({ collectionOrigin: 'premade' });
   });
@@ -68,7 +85,7 @@ describe('cardCollectionBackfillPatch (safety-net migrateOne logic)', () => {
   it('leaves origin unset for a non-premade collection without an origin field', () => {
     expect(
       cardCollectionBackfillPatch(
-        { collectionId },
+        legacyCard({ collectionId }),
         collectionId,
         makeCollection({ name: 'Custom' }),
       ),
@@ -76,6 +93,8 @@ describe('cardCollectionBackfillPatch (safety-net migrateOne logic)', () => {
   });
 
   it('returns undefined when the collection cannot be resolved', () => {
-    expect(cardCollectionBackfillPatch({}, undefined, null)).toBeUndefined();
+    expect(
+      cardCollectionBackfillPatch(legacyCard({}), undefined, null),
+    ).toBeUndefined();
   });
 });

@@ -4,9 +4,7 @@ import { internal } from '../../_generated/api';
 import { getAuthUserId } from '../../db/users';
 import { EVENTS, track } from '../../analytics';
 import { getActiveCourseForUser } from '../../db/courses';
-import {
-  getOrCreateChatCollection,
-} from '../../db/collections';
+import { getOrCreateChatCollection } from '../../db/collections';
 import {
   cardApprovalKindValidator,
   cardApprovalResolutionValidator,
@@ -20,16 +18,24 @@ import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
 import { applyCardEdit } from '../scheduling';
 import { applyTextMetadata } from '../sentenceMetadata';
+import { storeWritingAlternative } from '../writingAlternatives';
 import { resolveCardContext } from './cardContext';
 import { MAX_CARD_TEXT_LENGTH } from '../../../lib/constants/learning';
 import { trackEvent } from '../../db/stats/dailyStats';
 import {
   getTranslationSource,
-  IPA_LANGUAGES,
   postProcessTranslation,
 } from '../../../lib/languages';
+import {
+  ANNOTATION_KINDS,
+  TEXT_ANNOTATIONS,
+  vAnnotationKind,
+} from '../../lib/textAnnotations';
 import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
-import { OPENROUTER_CHAT_REASONING, OPENROUTER_MODELS } from '../../config/aiModels';
+import {
+  OPENROUTER_CHAT_REASONING,
+  OPENROUTER_MODELS,
+} from '../../config/aiModels';
 
 /**
  * Require an authenticated user ID, throwing if not logged in.
@@ -52,10 +58,15 @@ async function getAuthenticatedPendingApproval(
   userId: string,
 ): Promise<Doc<'cardApprovals'>> {
   const approval = await ctx.db.get(approvalId);
-  if (!approval) throw new ConvexError('Approval not found');
-  if (approval.userId !== userId) throw new ConvexError('Not authorized');
+  if (!approval)
+    throw new ConvexError({ code: 'NOT_FOUND', message: 'Approval not found' });
+  if (approval.userId !== userId)
+    throw new ConvexError({ code: 'FORBIDDEN', message: 'Not authorized' });
   if (approval.status !== 'pending')
-    throw new ConvexError('Approval already processed');
+    throw new ConvexError({
+      code: 'INVALID_STATE',
+      message: 'Approval already processed',
+    });
   return approval;
 }
 
@@ -70,7 +81,11 @@ async function processApproval(
   userId: string,
 ): Promise<Id<'texts'>> {
   const active = await getActiveCourseForUser(ctx, userId);
-  if (!active) throw new ConvexError('No active course found');
+  if (!active)
+    throw new ConvexError({
+      code: 'NOT_FOUND',
+      message: 'No active course found',
+    });
   const { course } = active;
 
   const chatCollection = await getOrCreateChatCollection(ctx, course._id);
@@ -153,61 +168,85 @@ async function processApproval(
  * Internal mutation to create approval request from tool handler.
  */
 /**
- * Schedule IPA transcription for a proposal's entries (espeak lives in the
- * Node runtime, so it can't run inline here). Only languages with an espeak
- * voice are sent; rows with none simply never get an `entryIpa` key, and the
- * approval card renders nothing for them.
+ * Schedule the annotation actions for a proposal's entries (espeak and the
+ * furigana analyzer live in the Node runtime, so neither can run inline
+ * here). Each kind only receives the languages it supports; rows outside a
+ * kind's language set simply never get an `entryIpa` / `entryFurigana` key,
+ * and the approval card renders nothing for them.
  */
-async function scheduleApprovalIpa(
+async function scheduleApprovalAnnotations(
   ctx: MutationCtx,
   approvalId: Id<'cardApprovals'>,
   translations: Array<{ language: string; text: string }>,
 ): Promise<void> {
-  const entries = translations.filter(
-    (t) => IPA_LANGUAGES.has(t.language) && t.text.length > 0,
-  );
-  if (entries.length === 0) return;
-  await ctx.scheduler.runAfter(0, internal.features.ipa.processIpaForApproval, {
-    approvalId,
-    entries: entries.map((t) => ({ language: t.language, text: t.text })),
-  });
+  for (const kind of ANNOTATION_KINDS) {
+    const spec = TEXT_ANNOTATIONS[kind];
+    if (!spec.approvalAction) continue;
+    const entries = translations
+      .filter((t) => spec.supports(t.language) && t.text.length > 0)
+      .map((t) => ({ language: t.language, text: t.text }));
+    if (entries.length === 0) continue;
+    await ctx.scheduler.runAfter(0, spec.approvalAction, {
+      approvalId,
+      entries,
+    });
+  }
 }
 
 /**
- * Store IPA results on an approval row. Each result carries the text it was
- * computed FOR; results whose language has since been edited to different
- * wording are dropped (the edit path re-schedules against the new text), so
- * a slow espeak action can never overwrite a fresher proposal.
+ * Shared body of the per-kind approval-annotation store mutations below.
+ * Each result carries the text it was computed FOR; results whose language
+ * has since been edited to different wording are dropped (the edit path
+ * re-schedules against the new text), so a slow annotation action can never
+ * overwrite a fresher proposal.
  */
-export const storeApprovalEntryIpa = internalMutation({
+async function storeApprovalEntryValues(
+  ctx: MutationCtx,
+  approvalId: Id<'cardApprovals'>,
+  field: 'entryIpa' | 'entryFurigana',
+  results: Array<{ language: string; forText: string; value: string }>,
+): Promise<null> {
+  const approval = await ctx.db.get(approvalId);
+  if (!approval) return null; // resolved + cleaned up while in flight
+  const currentByLanguage = new Map(
+    approval.translations.map((t) => [t.language, t.text]),
+  );
+  const values = { ...(approval[field] ?? {}) };
+  let changed = false;
+  for (const result of results) {
+    if (currentByLanguage.get(result.language) !== result.forText) continue;
+    values[result.language] = result.value;
+    changed = true;
+  }
+  if (changed) {
+    await ctx.db.patch(approvalId, { [field]: values });
+  }
+  return null;
+}
+
+/**
+ * Store one kind's annotation results on an approval row (see
+ * storeApprovalEntryValues). Kind-generic: the registry maps the kind to its
+ * `entryIpa`/`entryFurigana` record field, so a new precomputed kind is one
+ * registry entry, not another re-key mutation.
+ */
+export const storeApprovalEntryAnnotations = internalMutation({
   args: {
     approvalId: v.id('cardApprovals'),
+    kind: vAnnotationKind,
     results: v.array(
       v.object({
         language: v.string(),
         forText: v.string(),
-        ipa: v.string(),
+        value: v.string(),
       }),
     ),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const approval = await ctx.db.get(args.approvalId);
-    if (!approval) return null; // resolved + cleaned up while in flight
-    const currentByLanguage = new Map(
-      approval.translations.map((t) => [t.language, t.text]),
-    );
-    const entryIpa = { ...(approval.entryIpa ?? {}) };
-    let changed = false;
-    for (const result of args.results) {
-      if (currentByLanguage.get(result.language) !== result.forText) continue;
-      entryIpa[result.language] = result.ipa;
-      changed = true;
-    }
-    if (changed) {
-      await ctx.db.patch(args.approvalId, { entryIpa });
-    }
-    return null;
+    const field = TEXT_ANNOTATIONS[args.kind].approvalEntryField;
+    if (!field) return null; // kind not precomputed on approvals
+    return storeApprovalEntryValues(ctx, args.approvalId, field, args.results);
   },
 });
 
@@ -263,7 +302,7 @@ export const createApprovalRequestInternal = internalMutation({
       userId: args.userId,
       status: 'pending',
     });
-    await scheduleApprovalIpa(ctx, approvalId, cappedTranslations);
+    await scheduleApprovalAnnotations(ctx, approvalId, cappedTranslations);
 
     return approvalId;
   },
@@ -401,7 +440,7 @@ export const createAlsoCorrectApprovalInternal = internalMutation({
       proposedMetadata: metadata,
       ...(replaceOnly ? { replaceOnly: true } : {}),
     });
-    await scheduleApprovalIpa(ctx, approvalId, merged);
+    await scheduleApprovalAnnotations(ctx, approvalId, merged);
 
     return { status: 'created' as const, approvalId };
   },
@@ -423,9 +462,10 @@ export const replaceCardFromApproval = mutation({
     approvalId: v.id('cardApprovals'),
     timezone: v.string(),
   },
-  // `cardId` is the card the edit LEFT BEHIND (a new document on Path B). The
-  // learn view keys its thread-rotation suppression off this exact identity,
-  // so it must be the replacement's id, not the input's.
+  // `cardId` is the edited card. applyCardEdit patches the card in place on
+  // both paths, so this always equals the approval's card id; it is still
+  // returned because the learn view keys its thread-rotation suppression
+  // off this exact identity and must not have to assume that invariant.
   returns: v.object({
     success: v.boolean(),
     cardId: v.id('cards'),
@@ -439,7 +479,10 @@ export const replaceCardFromApproval = mutation({
       userId,
     );
     if ((approval.kind ?? 'createCard') !== 'alsoCorrect' || !approval.cardId) {
-      throw new ConvexError('Approval does not support replacing a card');
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message: 'Approval does not support replacing a card',
+      });
     }
     const previousCardId = approval.cardId;
 
@@ -481,6 +524,7 @@ export const replaceCardFromApproval = mutation({
       cardId: previousCardId,
       translations: translationsToWrite,
       timezone: args.timezone,
+      auditKind: 'chat_also_correct',
       ensureUserOwnedText: metadata !== undefined,
       skipQuota: true,
       // A definitive proposed gender must reach the text row BEFORE the
@@ -489,7 +533,8 @@ export const replaceCardFromApproval = mutation({
       // gender applied only there ships wrong-voice audio. Non-definitive
       // values keep the row's gender and stay applyTextMetadata's business.
       proposedAudioSpeakerGender:
-        metadata?.speakerGender === 'male' || metadata?.speakerGender === 'female'
+        metadata?.speakerGender === 'male' ||
+        metadata?.speakerGender === 'female'
           ? metadata.speakerGender
           : undefined,
       // `suggestCurriculumFix` is deliberately omitted. The manual edit dialog
@@ -528,32 +573,10 @@ export const replaceCardFromApproval = mutation({
       cardId: replacementCardId,
     });
 
-    // Path B replaced the card document, so every OTHER pending proposal for
-    // the old card now points at a deleted row and would dead-end on "Card not
-    // found". The button just appearing to do nothing. Retarget them.
-    //
-    // Scoped to this thread because `by_thread_and_user` is the only index on
-    // cardApprovals, and it is the right scope in practice: markAlsoCorrect is
-    // registered only on card-context turns and the learn view rotates threads
-    // when the card changes, so a card's proposals live in one conversation by
-    // construction. A stray cross-thread row is left to the "card has changed"
-    // error rather than paying for a by_cardId index on every insert.
-    if (replacementCardId !== previousCardId) {
-      const siblings = await ctx.db
-        .query('cardApprovals')
-        .withIndex('by_thread_and_user', (q) =>
-          q.eq('threadId', approval.threadId).eq('userId', userId),
-        )
-        // Bounded in practice by the approvals a single thread can hold; the
-        // cap is a pure backstop against an unbounded read.
-        .take(500);
-      for (const sibling of siblings) {
-        if (sibling._id === approval._id) continue;
-        if (sibling.status !== 'pending') continue;
-        if (sibling.cardId !== previousCardId) continue;
-        await ctx.db.patch(sibling._id, { cardId: replacementCardId });
-      }
-    }
+    // applyCardEdit patches the card in place on both paths, so
+    // `replacementCardId === previousCardId` always and sibling pending
+    // proposals keep pointing at a live row — the retargeting sweep that
+    // used to live here (for the old insert+delete Path B) is unnecessary.
 
     await track(ctx, userId, EVENTS.CHAT_CARD_APPROVAL, {
       outcome: 'approved',
@@ -565,6 +588,122 @@ export const replaceCardFromApproval = mutation({
     });
 
     return { success: true, cardId: replacementCardId };
+  },
+});
+
+/**
+ * Accept an "also correct" proposal by storing the model's wording as an
+ * accepted ALTERNATIVE (writingAlternatives) instead of replacing the card's
+ * text — the default accept path since alternatives exist. The card still
+ * becomes user-owned first (`ensureUserOwnedText`, Path B fork when it was
+ * curriculum): alternatives are private to this user, so they must not hang
+ * off a card whose text rows other users share. Free: no card text changes
+ * hand-off to QC, and the grader's own alternative store is free too.
+ */
+export const storeAlternativeFromApproval = mutation({
+  args: {
+    approvalId: v.id('cardApprovals'),
+    timezone: v.string(),
+  },
+  // Same contract as replaceCardFromApproval: `cardId` is the (in-place
+  // patched, so identical) card id the learn view needs for thread-rotation
+  // suppression.
+  returns: v.object({
+    success: v.boolean(),
+    cardId: v.id('cards'),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await requireUser(ctx);
+
+    const approval = await getAuthenticatedPendingApproval(
+      ctx,
+      args.approvalId,
+      userId,
+    );
+    if ((approval.kind ?? 'createCard') !== 'alsoCorrect' || !approval.cardId) {
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message: 'Approval does not support storing an alternative',
+      });
+    }
+    const previousCardId = approval.cardId;
+    if ((await ctx.db.get(previousCardId)) === null) {
+      throw new ConvexError({
+        code: 'CARD_REPLACED',
+        message: 'This card has changed since the suggestion was made.',
+      });
+    }
+
+    // Fork to user-owned with the text UNCHANGED (empty diff +
+    // ensureUserOwnedText): annotations, translations, and audio pointers are
+    // carried verbatim, no audit row is written, and a card that is already
+    // user-owned passes through with its id intact.
+    const { textId, cardId: resolvedCardId } = await applyCardEdit(ctx, {
+      cardId: previousCardId,
+      translations: [],
+      timezone: args.timezone,
+      auditKind: 'chat_also_correct',
+      ensureUserOwnedText: true,
+      skipQuota: true,
+    });
+
+    // Current primaries, read from the resolved card so the dedupe compares
+    // against what the card says NOW (it may have been edited since the
+    // proposal). resolveCardContext re-checks ownership as a side effect.
+    const context = await resolveCardContext(ctx, resolvedCardId, userId);
+    if (!context) {
+      throw new ConvexError({ code: 'NOT_FOUND', message: 'Card not found' });
+    }
+    const primaryByLanguage = new Map(
+      context.translations.map((t) => [t.language, t.text]),
+    );
+    // The text row's own language isn't in `translations`; its sentence is
+    // the primary for that language (cards whose source text IS the target).
+    primaryByLanguage.set(context.sourceLanguage, context.sourceText);
+
+    const changed = new Set(approval.changedLanguages ?? []);
+    const entries =
+      approval.changedLanguages === undefined
+        ? approval.translations
+        : approval.translations.filter((t) => changed.has(t.language));
+    let storedCount = 0;
+    for (const entry of entries) {
+      const primary = primaryByLanguage.get(entry.language);
+      // A language the card doesn't carry has no primary to be an
+      // alternative OF; those proposals only make sense via Replace.
+      if (primary === undefined) continue;
+      const stored = await storeWritingAlternative(ctx, {
+        userId,
+        cardId: resolvedCardId,
+        language: entry.language,
+        text: entry.text,
+        primary,
+      });
+      if (stored !== null) storedCount += 1;
+    }
+
+    await ctx.db.patch(approval._id, {
+      status: 'approved',
+      resolution: 'alternative',
+      processedAt: Date.now(),
+      textId,
+      cardId: resolvedCardId,
+    });
+
+    // applyCardEdit patches the card in place, so sibling pending proposals
+    // still point at a live row — no retargeting needed (see
+    // replaceCardFromApproval).
+
+    await track(ctx, userId, EVENTS.CHAT_CARD_APPROVAL, {
+      outcome: 'approved',
+      kind: 'alsoCorrect',
+      resolution: 'alternative',
+      thread_id: approval.threadId,
+      changed_languages: approval.changedLanguages ?? [],
+      stored_count: storedCount,
+    });
+
+    return { success: true, cardId: resolvedCardId };
   },
 });
 
@@ -594,9 +733,11 @@ export const approveCard = mutation({
     // server-side enforcement. Throwing rolls the whole mutation back,
     // including the quota consumed above.
     if (approval.replaceOnly === true) {
-      throw new ConvexError(
-        'This version can only replace the card — it is missing text for some course languages.',
-      );
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message:
+          'This version can only replace the card — it is missing text for some course languages.',
+      });
     }
 
     const textId = await processApproval(ctx, approval, userId);
@@ -609,7 +750,11 @@ export const approveCard = mutation({
     // Track card approval event
     const active = await getActiveCourseForUser(ctx, userId);
     if (active) {
-      await trackEvent(ctx, { userId, courseId: active.course._id, field: 'chatCardsApproved' });
+      await trackEvent(ctx, {
+        userId,
+        courseId: active.course._id,
+        field: 'chatCardsApproved',
+      });
     }
     await track(ctx, userId, EVENTS.CHAT_CARD_APPROVAL, {
       outcome: 'approved',
@@ -649,12 +794,18 @@ export const updateApprovalTranslations = mutation({
       existingLanguages.size !== incomingLanguages.size ||
       [...existingLanguages].some((l) => !incomingLanguages.has(l))
     ) {
-      throw new ConvexError('Translation languages must match the original set');
+      throw new ConvexError({
+        code: 'INVALID_ARGUMENT',
+        message: 'Translation languages must match the original set',
+      });
     }
 
     for (const { text } of args.translations) {
       if (text.trim().length === 0) {
-        throw new ConvexError('Translation text must not be empty');
+        throw new ConvexError({
+          code: 'INVALID_ARGUMENT',
+          message: 'Translation text must not be empty',
+        });
       }
     }
 
@@ -677,23 +828,30 @@ export const updateApprovalTranslations = mutation({
       }
     }
 
-    // Drop IPA for languages whose wording changed (it no longer matches)
-    // and recompute against the new text. Unchanged languages keep theirs.
+    // Drop annotations (IPA, furigana) for languages whose wording changed
+    // (they no longer match) and recompute against the new text. Unchanged
+    // languages keep theirs.
     const changedNow = cappedTranslations.filter(
       (entry) => previousTextByLanguage.get(entry.language) !== entry.text,
     );
-    let entryIpa = approval.entryIpa;
-    if (entryIpa && changedNow.length > 0) {
-      entryIpa = { ...entryIpa };
-      for (const entry of changedNow) delete entryIpa[entry.language];
-    }
+    const dropChanged = (
+      values: Record<string, string> | undefined,
+    ): Record<string, string> | undefined => {
+      if (!values || changedNow.length === 0) return values;
+      const next = { ...values };
+      for (const entry of changedNow) delete next[entry.language];
+      return next;
+    };
+    const entryIpa = dropChanged(approval.entryIpa);
+    const entryFurigana = dropChanged(approval.entryFurigana);
 
     await ctx.db.patch(args.approvalId, {
       translations: cappedTranslations,
       userEditedLanguages: [...userEditedLanguages],
       ...(entryIpa !== approval.entryIpa ? { entryIpa } : {}),
+      ...(entryFurigana !== approval.entryFurigana ? { entryFurigana } : {}),
     });
-    await scheduleApprovalIpa(ctx, args.approvalId, changedNow);
+    await scheduleApprovalAnnotations(ctx, args.approvalId, changedNow);
 
     return { success: true };
   },
@@ -750,6 +908,7 @@ export const getApprovalsByThread = query({
       toolCallId: v.string(),
       translations: translationEntriesValidator,
       entryIpa: v.optional(v.record(v.string(), v.string())),
+      entryFurigana: v.optional(v.record(v.string(), v.string())),
       status: cardApprovalStatusValidator,
       kind: v.optional(cardApprovalKindValidator),
       cardId: v.optional(v.id('cards')),
@@ -775,6 +934,7 @@ export const getApprovalsByThread = query({
       toolCallId: a.toolCallId,
       translations: a.translations,
       entryIpa: a.entryIpa,
+      entryFurigana: a.entryFurigana,
       status: a.status,
       kind: a.kind,
       cardId: a.cardId,

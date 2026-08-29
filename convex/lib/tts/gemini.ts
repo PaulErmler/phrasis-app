@@ -1,4 +1,5 @@
 import type { SpeakInput, SpeakResult, TTSProvider } from './types';
+import { requireEnv } from '../env';
 import { Mp3Encoder } from '@breezystack/lamejs';
 import { toGeminiBcp47 } from './languageCodes';
 import { getLanguageByCode } from '../../../lib/languages';
@@ -31,10 +32,8 @@ const MP3_KBPS = 48;
 const HOST_IS_LITTLE_ENDIAN =
   new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
-
 function buildStyledInput(text: string, languageName: string): string {
-  const context =
-    `Speak the following text in a natural way like a native ${languageName} speaker would in a way that fits the sentence.`;
+  const context = `Speak the following text in a natural way like a native ${languageName} speaker would in a way that fits the sentence.`;
   return `## Instruction: ${context}\n\n## Transcript: ${text}`;
 }
 
@@ -193,8 +192,7 @@ function padRandomSpaces(text: string): string {
 export const geminiTts: TTSProvider = {
   id: 'gemini',
   async speak(input: SpeakInput): Promise<SpeakResult> {
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) throw new Error('OPENROUTER_API_KEY is not configured');
+    const apiKey = requireEnv('OPENROUTER_API_KEY');
 
     const { voiceName, locale } = parseVoiceApiCode(input.voiceApiCode);
     // Accent locale comes from the voice apiCode suffix when present (English
@@ -239,12 +237,7 @@ export const geminiTts: TTSProvider = {
     // separated by a silence gap (~10% of clips). Strip it on the raw PCM using
     // only the energy envelope, no STT/word-timings, before transcoding. No-op
     // for the ~90% of clips without one (returns the same bytes). See tailTrim.ts.
-    const { pcm: cleaned, trimmed } = trimTailHiccup(pcm, PCM_SAMPLE_RATE);
-    if (trimmed) {
-      console.log(
-        `[geminiTts] trimmed tail hiccup for "${input.text.slice(0, 40)}"`,
-      );
-    }
+    const { pcm: cleaned } = trimTailHiccup(pcm, PCM_SAMPLE_RATE);
 
     // Gemini emits headerless PCM; transcode to MP3 so the stored Blob matches
     // the other providers' output (google/azure both label it 'audio/mp3') and

@@ -25,7 +25,9 @@ function recentDays(value: number, days: number, endOffset = 0, base = TODAY) {
 // Steady user: full 90-day window of constant activity on a mature account,
 // so every decayed pace equals the constant exactly and expectations below
 // can be computed by hand.
-function baseInputs(overrides: Partial<ProjectionInputs> = {}): ProjectionInputs {
+function baseInputs(
+  overrides: Partial<ProjectionInputs> = {},
+): ProjectionInputs {
   return {
     today: TODAY,
     courseAgeDays: 400,
@@ -154,8 +156,10 @@ describe('computeIndicators', () => {
     ] as const) {
       const frame = byKind(indicators, kind) as { words: number } | undefined;
       if (!frame) continue;
-      expect(frame.words, `${kind} must not regress below currentWords`)
-        .toBeGreaterThanOrEqual(currentWords);
+      expect(
+        frame.words,
+        `${kind} must not regress below currentWords`,
+      ).toBeGreaterThanOrEqual(currentWords);
     }
   });
 
@@ -218,7 +222,9 @@ describe('computeIndicators', () => {
   it('nextLevel at the top level reports nextCode null', () => {
     const { indicators } = computeIndicators(
       baseInputs({
-        levels: [{ code: 'C2.4', totalTexts: 126, cardsAdded: 78, ignoredCount: 2 }],
+        levels: [
+          { code: 'C2.4', totalTexts: 126, cardsAdded: 78, ignoredCount: 2 },
+        ],
         activeLevelIndex: 0,
       }),
     );
@@ -243,13 +249,17 @@ describe('computeIndicators', () => {
   });
 
   it('no premade level active → no level indicators', () => {
-    const { indicators } = computeIndicators(baseInputs({ activeLevelIndex: -1 }));
+    const { indicators } = computeIndicators(
+      baseInputs({ activeLevelIndex: -1 }),
+    );
     expect(byKind(indicators, 'nextLevel')).toBeUndefined();
     expect(byKind(indicators, 'levelByYearEnd')).toBeUndefined();
   });
 
   it('nextWordMilestone targets the next round thousand', () => {
-    const { indicators } = computeIndicators(baseInputs({ currentWords: 2980 }));
+    const { indicators } = computeIndicators(
+      baseInputs({ currentWords: 2980 }),
+    );
     const m = byKind(indicators, 'nextWordMilestone') as {
       milestone: number;
       etaDays: number;

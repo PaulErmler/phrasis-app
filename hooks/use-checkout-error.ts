@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { toast } from "sonner";
-import { useTranslations } from "next-intl";
-import { reportError } from "@/lib/report-error";
+import { toast } from 'sonner';
+import { useTranslations } from 'next-intl';
+import { reportError } from '@/lib/report-error';
 
 /**
  * Shared error surfacing for the billing entry points (pricing table,
@@ -23,7 +23,7 @@ import { reportError } from "@/lib/report-error";
 export function throwOnCheckoutError(result: unknown): void {
   const error = (result as { error?: { message?: string } | null } | null)
     ?.error;
-  if (error) throw new Error(error.message ?? "Checkout failed");
+  if (error) throw new Error(error.message ?? 'Checkout failed');
 }
 
 /**
@@ -31,9 +31,9 @@ export function throwOnCheckoutError(result: unknown): void {
  * "your plan was not changed" toast (Checkout.confirmError).
  */
 export function useCheckoutErrorToast() {
-  const t = useTranslations("Checkout");
+  const t = useTranslations('Checkout');
   return (e: unknown, op: string) => {
     reportError(e, { op });
-    toast.error(t("confirmError"));
+    toast.error(t('confirmError'));
   };
 }

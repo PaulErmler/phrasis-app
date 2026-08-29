@@ -20,7 +20,9 @@ import { useConsentStatus } from '@/lib/posthog/consent';
  */
 export function ConsentSync() {
   const status = useConsentStatus();
-  const setAnalyticsConsent = useMutation(api.features.consent.setAnalyticsConsent);
+  const setAnalyticsConsent = useMutation(
+    api.features.consent.setAnalyticsConsent,
+  );
   const lastSyncedRef = useRef<'granted' | 'denied' | null>(null);
 
   useEffect(() => {

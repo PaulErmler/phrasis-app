@@ -6,8 +6,14 @@ import { ImportModeSwitcher } from '@/components/app/import-texts/ImportModeSwit
 describe('ImportModeSwitcher', () => {
   it('renders both modes and marks the active one', () => {
     render(<ImportModeSwitcher value="individual" onChange={() => {}} />);
-    expect(screen.getByTestId('add-cards-mode-individual')).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByTestId('add-cards-mode-import')).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByTestId('add-cards-mode-individual')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByTestId('add-cards-mode-import')).toHaveAttribute(
+      'aria-selected',
+      'false',
+    );
   });
 
   it('calls onChange when the other mode is clicked', async () => {

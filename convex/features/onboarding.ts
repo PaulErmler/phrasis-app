@@ -1,7 +1,6 @@
 import { v, ConvexError } from 'convex/values';
 import {
   mutation,
-  query,
   internalMutation,
   type MutationCtx,
 } from '../_generated/server';
@@ -10,8 +9,8 @@ import { EVENTS, track } from '../analytics';
 import type { Doc, Id } from '../_generated/dataModel';
 import {
   requireAuthUserId,
-  getAuthUserId,
   getOnboardingProgress,
+  insertUserSettings,
 } from '../db/users';
 import {
   PLACEMENT_BATCH_MAX_ATTEMPTS,
@@ -30,6 +29,7 @@ import {
 } from '../../lib/constants/dailyGoal';
 import { getCourseSettings } from '../db/courseSettings';
 import { scheduleMissingContent } from './decks';
+import { rateLimiter } from '../rateLimiter';
 import type { TtsPriority } from '../types';
 
 /**
@@ -40,11 +40,58 @@ import type { TtsPriority } from '../types';
  *   lesson right after the wizard) can run instantly.
  * - `warmupOnboardingTranslations` is the manually-fired global warm-up
  *   that pre-translates the same content for every language upfront.
- * - `getInitialCardsReadiness` reports how many of the first cards have
- *   content ready: currently unused by the app (the old "customizing"
- *   screen polled it) but kept as a dashboard/debug probe for stuck
- *   onboarding content.
  */
+
+const SUPPORTED_LANGUAGE_CODES: ReadonlySet<string> = new Set(
+  SUPPORTED_LANGUAGES.map((l) => l.code),
+);
+
+/**
+ * Reject unsupported language codes on the public warmup mutations. Both fan
+ * out translation + TTS scheduling over the whole placement corpus, and an
+ * unknown code would default into the Google pipeline and burn real spend on
+ * content nothing can ever read. `sourceLanguage` is validated too: it becomes
+ * a translation target in `processPlacementSentences` and the base language of
+ * the level-collection warmup. Hidden-from-picker codes stay accepted —
+ * they're still real languages carried by existing courses.
+ */
+function assertSupportedLanguagePair(
+  sourceLanguage: string,
+  targetLanguage: string,
+): void {
+  for (const code of [sourceLanguage, targetLanguage]) {
+    if (!SUPPORTED_LANGUAGE_CODES.has(code)) {
+      throw new ConvexError({
+        code: 'UNSUPPORTED_LANGUAGE',
+        message: `'${code}' is not a supported language code`,
+      });
+    }
+  }
+}
+
+/**
+ * Per-user token gate over the public warmup fan-outs. Sized (see
+ * `onboardingContentWarmup` in convex/rateLimiter.ts) so the real onboarding
+ * flow — a handful of calls while picking/switching languages, plus the
+ * placement test's missing-content safety net — never hits it.
+ */
+async function consumeContentWarmupBudget(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<void> {
+  const { ok, retryAfter } = await rateLimiter.limit(
+    ctx,
+    'onboardingContentWarmup',
+    { key: userId },
+  );
+  if (!ok) {
+    throw new ConvexError({
+      code: 'RATE_LIMITED',
+      message: 'Too many content-preparation requests. Please retry shortly.',
+      retryAfter,
+    });
+  }
+}
 
 export const prepareLanguagePair = mutation({
   args: {
@@ -54,7 +101,8 @@ export const prepareLanguagePair = mutation({
   returns: v.null(),
   handler: async (ctx, { sourceLanguage, targetLanguage }) => {
     const userId = await requireAuthUserId(ctx);
-    void userId;
+    assertSupportedLanguagePair(sourceLanguage, targetLanguage);
+    await consumeContentWarmupBudget(ctx, userId);
 
     // Warm up the first few sentences in every level collection so the
     // placement test (which samples across levels) and any subsequent
@@ -116,7 +164,9 @@ async function processPlacementSentences(
     const text = await ctx.db.get(textId);
     if (!text) continue;
     const targetLanguages = Array.from(
-      new Set([targetLanguage, sourceLanguage].filter((l) => l !== text.language)),
+      new Set(
+        [targetLanguage, sourceLanguage].filter((l) => l !== text.language),
+      ),
     );
     const result = await scheduleMissingContent(
       ctx,
@@ -157,7 +207,10 @@ async function processPlacementSentences(
  */
 async function runPlacementContentSweep(
   ctx: MutationCtx,
-  { targetLanguage, sourceLanguage }: { targetLanguage: string; sourceLanguage: string },
+  {
+    targetLanguage,
+    sourceLanguage,
+  }: { targetLanguage: string; sourceLanguage: string },
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   const sentences = await ctx.db
     .query('placementTestSentences')
@@ -190,7 +243,9 @@ async function runPlacementContentSweep(
       0,
       internal.features.onboarding.processPlacementContentBatch,
       {
-        textIds: sentences.slice(i, i + PLACEMENT_CONTENT_BATCH_SIZE).map((s) => s.textId),
+        textIds: sentences
+          .slice(i, i + PLACEMENT_CONTENT_BATCH_SIZE)
+          .map((s) => s.textId),
         targetLanguage,
         sourceLanguage,
       },
@@ -295,7 +350,8 @@ export const ensurePlacementTranslations = mutation({
   returns: v.object({ enqueued: v.number() }),
   handler: async (ctx, { targetLanguage, sourceLanguage }) => {
     const userId = await requireAuthUserId(ctx);
-    void userId;
+    assertSupportedLanguagePair(sourceLanguage, targetLanguage);
+    await consumeContentWarmupBudget(ctx, userId);
     return sweepAndCountEnqueued(ctx, { targetLanguage, sourceLanguage });
   },
 });
@@ -393,18 +449,17 @@ export const warmupOnboardingTranslations = internalMutation({
     batches: v.number(),
   }),
   handler: async (ctx, args) => {
-    const supportedCodes = new Set(SUPPORTED_LANGUAGES.map((l) => l.code));
     const languages =
       args.languages !== undefined
         ? args.languages
         : SUPPORTED_LANGUAGES.filter((l) => !l.hiddenFromPicker).map(
-          (l) => l.code,
-        );
-    const unknown = languages.filter((code) => !supportedCodes.has(code));
+            (l) => l.code,
+          );
+    const unknown = languages.filter(
+      (code) => !SUPPORTED_LANGUAGE_CODES.has(code),
+    );
     if (unknown.length > 0) {
-      throw new ConvexError(
-        `Unknown language code(s): ${unknown.join(', ')}`,
-      );
+      throw new ConvexError(`Unknown language code(s): ${unknown.join(', ')}`);
     }
     if (languages.length === 0) {
       return { languages: 0, texts: 0, batches: 0 };
@@ -573,7 +628,7 @@ export const finalizeOnboarding = mutation({
         hasCompletedOnboarding: true,
       });
     } else {
-      await ctx.db.insert('userSettings', {
+      await insertUserSettings(ctx, {
         userId,
         hasCompletedOnboarding: true,
       });
@@ -658,97 +713,5 @@ export const finalizeOnboarding = mutation({
     }
 
     return { alreadyFinalized };
-  },
-});
-
-/**
- * Polled by the customizing-loading screen. Returns counts of how many of the
- * first N cards in the user's active deck have translations + audio ready,
- * so the UI can show progress and gate the next step.
- */
-export const getInitialCardsReadiness = query({
-  args: { sampleSize: v.optional(v.number()) },
-  returns: v.object({
-    totalCards: v.number(),
-    translatedCards: v.number(),
-    audioReadyCards: v.number(),
-    sampleSize: v.number(),
-  }),
-  handler: async (ctx, { sampleSize = 3 }) => {
-    // Shared by every not-ready-yet early exit below; never mutated, only
-    // serialized on return.
-    const emptyReadiness = {
-      totalCards: 0,
-      translatedCards: 0,
-      audioReadyCards: 0,
-      sampleSize,
-    };
-
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      return emptyReadiness;
-    }
-
-    const settings = await ctx.db
-      .query('userSettings')
-      .withIndex('by_userId', (q) => q.eq('userId', userId))
-      .first();
-    const courseId = settings?.activeCourseId;
-    if (!courseId) {
-      return emptyReadiness;
-    }
-    const course = await ctx.db.get(courseId);
-    if (!course) {
-      return emptyReadiness;
-    }
-
-    const deck = await ctx.db
-      .query('decks')
-      .withIndex('by_courseId', (q) => q.eq('courseId', courseId))
-      .first();
-    if (!deck) {
-      return emptyReadiness;
-    }
-
-    const cards = await ctx.db
-      .query('cards')
-      .withIndex('by_deckId', (q) => q.eq('deckId', deck._id))
-      .take(sampleSize);
-
-    // TODO: nested N+1 over (sampleSize × targetLanguages.length). Fine while
-    // courses are single-target; if multi-target becomes common, batch the
-    // lookups by `textId` IN clauses or denormalise readiness onto cards.
-    let translated = 0;
-    let audio = 0;
-    for (const card of cards) {
-      // Translation present for every target language?
-      let allTranslated = true;
-      let allAudio = true;
-      for (const lang of course.targetLanguages) {
-        const tr = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('targetLanguage', lang),
-          )
-          .first();
-        if (!tr) allTranslated = false;
-        const a = await ctx.db
-          .query('audioRecordings')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('language', lang),
-          )
-          .first();
-        if (!a) allAudio = false;
-      }
-      if (allTranslated) translated++;
-      if (allAudio) audio++;
-    }
-
-    return {
-      totalCards: cards.length,
-      translatedCards: translated,
-      audioReadyCards: audio,
-      sampleSize,
-    };
   },
 });

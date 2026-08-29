@@ -36,9 +36,7 @@ describe('recomputeRomanizationPatch (migrateOne logic)', () => {
     expect(
       recomputeRomanizationPatch('ko', '한국말', 'hangungmal'),
     ).toBeUndefined();
-    expect(
-      recomputeRomanizationPatch('zh', '你好', 'nǐ hǎo'),
-    ).toBeUndefined();
+    expect(recomputeRomanizationPatch('zh', '你好', 'nǐ hǎo')).toBeUndefined();
   });
 
   it('leaves languages outside the affected set untouched', () => {
@@ -47,7 +45,9 @@ describe('recomputeRomanizationPatch (migrateOne logic)', () => {
     expect(
       recomputeRomanizationPatch('yue_traditional', '我唔知。', 'anything'),
     ).toBeUndefined();
-    expect(recomputeRomanizationPatch('el', 'Καλημέρα', 'stale')).toBeUndefined();
+    expect(
+      recomputeRomanizationPatch('el', 'Καλημέρα', 'stale'),
+    ).toBeUndefined();
     expect(recomputeRomanizationPatch('ar', 'سلام', 'stale')).toBeUndefined();
   });
 

@@ -28,21 +28,31 @@ import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { useCourseLanguages } from '@/hooks/use-course-languages';
 import { cn, isPaymentPastDueError } from '@/lib/utils';
 
+import { reportError } from '@/lib/report-error';
+
 interface EnterTextsViewProps {
   onBack: () => void;
   hideHeader?: boolean;
   headerSlot?: ReactNode;
 }
 
-export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: EnterTextsViewProps) {
+export function EnterTextsView({
+  onBack,
+  hideHeader = false,
+  headerSlot,
+}: EnterTextsViewProps) {
   const t = useTranslations('EnterTexts');
   const locale = useLocale();
   const { baseLanguages, targetLanguages } = useCourseLanguages();
   const saveQuota = useFeatureQuota(FEATURE_IDS.CUSTOM_SENTENCES);
   const autoFillQuota = useFeatureQuota(FEATURE_IDS.TRANSLATION_AUTO_FILL);
 
-  const createCustomText = useMutation(api.features.customTexts.createCustomText);
-  const autoFillTranslations = useAction(api.features.customTexts.autoFillTranslations);
+  const createCustomText = useMutation(
+    api.features.customTexts.createCustomText,
+  );
+  const autoFillTranslations = useAction(
+    api.features.customTexts.autoFillTranslations,
+  );
 
   type SentenceMetadata = {
     register: 'formal' | 'informal' | 'neutral';
@@ -53,8 +63,11 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
   };
 
   const [texts, setTexts] = useState<Record<string, string>>({});
-  const [userEditedLangs, setUserEditedLangs] = useState<Set<string>>(new Set());
-  const [autoFillMetadata, setAutoFillMetadata] = useState<SentenceMetadata | null>(null);
+  const [userEditedLangs, setUserEditedLangs] = useState<Set<string>>(
+    new Set(),
+  );
+  const [autoFillMetadata, setAutoFillMetadata] =
+    useState<SentenceMetadata | null>(null);
   // Region variants returned by the autofill action for mixed-dialect targets
   // (today: `es_mixed` → e.g. `'es-US'`). Kept in lockstep with `texts`: when
   // a user manually edits a row we drop its variant so we don't persist a
@@ -88,9 +101,12 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
   const hasLanguages = orderedLanguages.length > 0;
 
   const sourceLangs = orderedLanguages.filter(
-    (lang) => userEditedLangs.has(lang) && (texts[lang] ?? '').trim().length > 0,
+    (lang) =>
+      userEditedLangs.has(lang) && (texts[lang] ?? '').trim().length > 0,
   );
-  const emptyLanguages = orderedLanguages.filter((lang) => (texts[lang] ?? '').trim().length === 0);
+  const emptyLanguages = orderedLanguages.filter(
+    (lang) => (texts[lang] ?? '').trim().length === 0,
+  );
 
   const hasOverLimit = Object.values(texts).some(
     (text) => text.length > MAX_CARD_TEXT_LENGTH,
@@ -110,7 +126,8 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
   const hasAnythingToReset =
     userEditedLangs.size > 0 ||
     orderedLanguages.some((lang) => (texts[lang] ?? '').trim().length > 0);
-  const canReset = hasLanguages && hasAnythingToReset && !isSaving && !isAutoFilling;
+  const canReset =
+    hasLanguages && hasAnythingToReset && !isSaving && !isAutoFilling;
 
   // An unsaved draft lives in component state only. A reload would silently
   // discard whatever the user has typed.
@@ -211,7 +228,7 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
         setPaywallOpen(true);
         return;
       }
-      console.error('Auto-fill failed:', err);
+      reportError(err, { op: 'autoFillTranslations' });
       toast.error(t('autoFillError'));
     } finally {
       setIsAutoFilling(false);
@@ -280,29 +297,36 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
           return;
         }
       }
-      console.error('Save failed:', err);
+      reportError(err, { op: 'saveCustomTexts' });
       toast.error(t('saveError'));
     } finally {
       setIsSaving(false);
     }
-  }, [saveQuota.isAvailable, orderedLanguages, texts, regionVariants, translationSources, createCustomText, t, autoFillMetadata]);
+  }, [
+    saveQuota.isAvailable,
+    orderedLanguages,
+    texts,
+    regionVariants,
+    translationSources,
+    createCustomText,
+    t,
+    autoFillMetadata,
+  ]);
 
   return (
     <>
       <div className="flex flex-col h-full">
         {!hideHeader && (
           <header className="sticky-header">
-            <div className="container mx-auto px-4 h-14 flex items-center gap-2">
+            <div className="container mx-auto px-4 h-14 flex items-center">
               <Button
                 variant="ghost"
-                size="icon"
-                className="shrink-0 -ml-2"
-                aria-label={t('back')}
+                className="gap-2 -ml-2 min-w-0 shrink overflow-hidden"
                 onClick={onBack}
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-4 w-4 shrink-0" />
+                <span className="truncate">{t('title')}</span>
               </Button>
-              <h1 className="font-semibold text-base truncate flex-1">{t('title')}</h1>
             </div>
           </header>
         )}
@@ -409,8 +433,7 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
                   className="flex-1 gap-2"
                   onAction={handleSave}
                   disabled={
-                    saveQuota.isLoading ||
-                    (saveQuota.isAvailable && !canSave)
+                    saveQuota.isLoading || (saveQuota.isAvailable && !canSave)
                   }
                 >
                   {isSaving ? (

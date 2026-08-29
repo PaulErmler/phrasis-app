@@ -63,70 +63,62 @@ type GoogleVoice = { name: string; languageCodes: string[] };
 describe.skipIf(!apiKey)(
   'Google Chirp3-HD voice names exist in the live catalog',
   () => {
-    it(
-      `all ${voices.length} configured Google voices resolve against /v1/voices`,
-      async () => {
-        const res = await fetch(
-          `https://texttospeech.googleapis.com/v1/voices?key=${apiKey}`,
+    it(`all ${voices.length} configured Google voices resolve against /v1/voices`, async () => {
+      const res = await fetch(
+        `https://texttospeech.googleapis.com/v1/voices?key=${apiKey}`,
+      );
+      if (!res.ok) {
+        throw new Error(
+          `/v1/voices ${res.status}: ${(await res.text()).slice(0, 200)}`,
         );
-        if (!res.ok) {
-          throw new Error(
-            `/v1/voices ${res.status}: ${(await res.text()).slice(0, 200)}`,
-          );
-        }
-        const body = (await res.json()) as { voices?: GoogleVoice[] };
-        const known = new Set((body.voices ?? []).map((v) => v.name));
+      }
+      const body = (await res.json()) as { voices?: GoogleVoice[] };
+      const known = new Set((body.voices ?? []).map((v) => v.name));
 
-        const missing = voices.filter((v) => !known.has(v.apiCode));
-        if (missing.length > 0) {
-          throw new Error(
-            `${missing.length}/${voices.length} Google voices not found in catalog:\n` +
-              missing.map((v) => `  - ${v.name} (${v.apiCode})`).join('\n'),
-          );
-        }
-      },
-      60_000,
-    );
-
-    it(
-      'every Google-routed language has at least one active voice in the catalog',
-      async () => {
-        const res = await fetch(
-          `https://texttospeech.googleapis.com/v1/voices?key=${apiKey}`,
+      const missing = voices.filter((v) => !known.has(v.apiCode));
+      if (missing.length > 0) {
+        throw new Error(
+          `${missing.length}/${voices.length} Google voices not found in catalog:\n` +
+            missing.map((v) => `  - ${v.name} (${v.apiCode})`).join('\n'),
         );
-        if (!res.ok) {
-          throw new Error(
-            `/v1/voices ${res.status}: ${(await res.text()).slice(0, 200)}`,
-          );
-        }
-        const body = (await res.json()) as { voices?: GoogleVoice[] };
-        const known = new Set((body.voices ?? []).map((v) => v.name));
+      }
+    }, 60_000);
 
-        const broken: string[] = [];
-        for (const lang of SUPPORTED_LANGUAGES) {
-          if (lang.ttsProvider !== 'google') continue;
-          const pool = VOICE_POOLS[lang.code] ?? [];
-          const usable = pool.filter(
-            (v) =>
-              v.provider === 'google' &&
-              v.active !== false &&
-              known.has(v.apiCode),
+    it('every Google-routed language has at least one active voice in the catalog', async () => {
+      const res = await fetch(
+        `https://texttospeech.googleapis.com/v1/voices?key=${apiKey}`,
+      );
+      if (!res.ok) {
+        throw new Error(
+          `/v1/voices ${res.status}: ${(await res.text()).slice(0, 200)}`,
+        );
+      }
+      const body = (await res.json()) as { voices?: GoogleVoice[] };
+      const known = new Set((body.voices ?? []).map((v) => v.name));
+
+      const broken: string[] = [];
+      for (const lang of SUPPORTED_LANGUAGES) {
+        if (lang.ttsProvider !== 'google') continue;
+        const pool = VOICE_POOLS[lang.code] ?? [];
+        const usable = pool.filter(
+          (v) =>
+            v.provider === 'google' &&
+            v.active !== false &&
+            known.has(v.apiCode),
+        );
+        if (usable.length === 0) {
+          broken.push(
+            `${lang.code} (no Google voices in catalog match the configured pool)`,
           );
-          if (usable.length === 0) {
-            broken.push(
-              `${lang.code} (no Google voices in catalog match the configured pool)`,
-            );
-          }
         }
-        if (broken.length > 0) {
-          throw new Error(
-            `Languages with broken Google TTS coverage:\n` +
-              broken.map((m) => `  - ${m}`).join('\n'),
-          );
-        }
-      },
-      60_000,
-    );
+      }
+      if (broken.length > 0) {
+        throw new Error(
+          `Languages with broken Google TTS coverage:\n` +
+            broken.map((m) => `  - ${m}`).join('\n'),
+        );
+      }
+    }, 60_000);
   },
 );
 

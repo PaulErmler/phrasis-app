@@ -2,7 +2,11 @@ import { v, ConvexError } from 'convex/values';
 import { MutationCtx, QueryCtx, internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Doc } from '../_generated/dataModel';
-import { CREDIT_COSTS, FEATURE_IDS, type FeatureId } from '../features/featureIds';
+import {
+  CREDIT_COSTS,
+  FEATURE_IDS,
+  type FeatureId,
+} from '../features/featureIds';
 import { getActiveCourses } from '../db/courses';
 import { getUserSettings } from '../db/users';
 import { featureStateValidator, type FeatureState } from '../types';
@@ -184,7 +188,11 @@ async function decrementQuotaForDoc(
   amount: number,
 ): Promise<number> {
   if (!doc) {
-    throw new ConvexError(`No quota doc for user. Sync quotas first.`);
+    throw new ConvexError({
+      code: 'QUOTA_NOT_SYNCED',
+      message: `No quota doc for user. Sync quotas first.`,
+      featureId,
+    });
   }
   const { targetFeatureId, targetAmount } = resolveQuotaTarget(
     doc,
@@ -193,7 +201,11 @@ async function decrementQuotaForDoc(
   );
   const feature = doc.features[targetFeatureId];
   if (!feature) {
-    throw new ConvexError(`No quota entry for feature "${targetFeatureId}". Sync quotas first.`);
+    throw new ConvexError({
+      code: 'QUOTA_NOT_SYNCED',
+      message: `No quota entry for feature "${targetFeatureId}". Sync quotas first.`,
+      featureId: targetFeatureId,
+    });
   }
   const newBalance = feature.balance - targetAmount;
   const newUsed = feature.used + targetAmount;
@@ -217,7 +229,11 @@ async function incrementQuota(
 ): Promise<number> {
   const doc = await getQuotaDoc(ctx, userId);
   if (!doc) {
-    throw new ConvexError(`No quota doc for user. Sync quotas first.`);
+    throw new ConvexError({
+      code: 'QUOTA_NOT_SYNCED',
+      message: `No quota doc for user. Sync quotas first.`,
+      featureId,
+    });
   }
   const { targetFeatureId, targetAmount } = resolveQuotaTarget(
     doc,
@@ -226,7 +242,11 @@ async function incrementQuota(
   );
   const feature = doc.features[targetFeatureId];
   if (!feature) {
-    throw new ConvexError(`No quota entry for feature "${targetFeatureId}". Sync quotas first.`);
+    throw new ConvexError({
+      code: 'QUOTA_NOT_SYNCED',
+      message: `No quota entry for feature "${targetFeatureId}". Sync quotas first.`,
+      featureId: targetFeatureId,
+    });
   }
   const newBalance = feature.balance + targetAmount;
   const newUsed = Math.max(feature.used - targetAmount, 0);
@@ -403,20 +423,20 @@ export const syncAllFeatures = internalMutation({
     const billingFields = args.productsMissing
       ? {}
       : {
-        ...(args.planId !== undefined
-          ? {
-            planId: args.planId,
-            planName: args.planName,
-            planStatus: effectiveStatus,
-          }
-          : {}),
-        pastDueSince: pastDue ? (doc?.pastDueSince ?? now) : undefined,
-        // Keep the last known URL while still past due. A later sync that
-        // didn't expand invoices shouldn't blank the pay button.
-        pastDueInvoiceUrl: pastDue
-          ? (args.pastDueInvoiceUrl ?? doc?.pastDueInvoiceUrl)
-          : undefined,
-      };
+          ...(args.planId !== undefined
+            ? {
+                planId: args.planId,
+                planName: args.planName,
+                planStatus: effectiveStatus,
+              }
+            : {}),
+          pastDueSince: pastDue ? (doc?.pastDueSince ?? now) : undefined,
+          // Keep the last known URL while still past due. A later sync that
+          // didn't expand invoices shouldn't blank the pay button.
+          pastDueInvoiceUrl: pastDue
+            ? (args.pastDueInvoiceUrl ?? doc?.pastDueInvoiceUrl)
+            : undefined,
+        };
 
     if (doc) {
       await ctx.db.patch(doc._id, {
@@ -561,7 +581,6 @@ type PlanIdentity = {
   plan_status?: string;
 };
 
-
 function planLabel(p: PlanIdentity): string {
   if (p.plan_id === undefined) return 'none';
   return `${p.plan_name ?? p.plan_id} (${p.plan_status ?? 'unknown'})`;
@@ -579,7 +598,9 @@ export function describePlanChange(
     previous.plan_id !== undefined && previous.plan_id !== FREE_PLAN_ID;
   const toPaid = next.plan_id !== undefined && next.plan_id !== FREE_PLAN_ID;
   if (!fromPaid && toPaid) {
-    return next.plan_status === 'trialing' ? 'Trial started' : 'New subscription';
+    return next.plan_status === 'trialing'
+      ? 'Trial started'
+      : 'New subscription';
   }
   if (fromPaid && !toPaid) return 'Subscription cancelled';
   if (fromPaid && toPaid && previous.plan_id !== next.plan_id) {
@@ -589,3 +610,22 @@ export function describePlanChange(
   return 'Plan status changed';
 }
 
+/**
+ * ConvexError code from an error thrown across a `ctx.runMutation` boundary —
+ * the read side of this module's `error.data.code` contract (USAGE_LIMIT /
+ * QUOTA_NOT_SYNCED / PAYMENT_PAST_DUE). Depending on runtime (prod vs
+ * convex-test) the error may arrive as a ConvexError, a plain object with
+ * `.data`, or a re-thrown Error whose message embeds the serialized data, so
+ * all three shapes are read. Server-side sibling of the client's
+ * `convexErrorCode` in lib/utils.ts.
+ */
+export function quotaErrorCode(error: unknown): string | undefined {
+  if (typeof error === 'object' && error !== null && 'data' in error) {
+    const data = (error as { data?: unknown }).data;
+    if (typeof data === 'object' && data !== null) {
+      return (data as { code?: string }).code;
+    }
+  }
+  const message = error instanceof Error ? error.message : '';
+  return /"code":\s*"([A-Z_]+)"/.exec(message)?.[1];
+}

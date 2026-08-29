@@ -19,7 +19,5 @@ export function formatTimeMs(ms: number): string {
   const remainder = totalSeconds % 86400;
   const hours = Math.floor(remainder / 3600);
   const minutes = Math.floor((remainder % 3600) / 60);
-  return minutes > 0
-    ? `${days}d ${hours}h ${minutes}m`
-    : `${days}d ${hours}h`;
+  return minutes > 0 ? `${days}d ${hours}h ${minutes}m` : `${days}d ${hours}h`;
 }

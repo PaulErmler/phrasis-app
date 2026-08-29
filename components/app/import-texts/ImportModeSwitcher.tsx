@@ -11,7 +11,10 @@ interface ImportModeSwitcherProps {
   onChange: (mode: AddCardsMode) => void;
 }
 
-export function ImportModeSwitcher({ value, onChange }: ImportModeSwitcherProps) {
+export function ImportModeSwitcher({
+  value,
+  onChange,
+}: ImportModeSwitcherProps) {
   const t = useTranslations('ImportTexts');
 
   return (

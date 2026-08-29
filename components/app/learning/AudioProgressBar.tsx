@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, memo } from 'react';
+import { useTranslations } from 'next-intl';
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import { updateMediaSessionPosition } from '@/lib/audio/mediaSession';
 import { audibleCues, type LanguageCue } from '@/lib/audio/mergeAudio';
@@ -22,6 +23,7 @@ export const AudioProgressBar = memo(function AudioProgressBar({
    *  to draw separator tick marks on hover. The first cue at 0s is skipped. */
   languageCues?: ReadonlyArray<LanguageCue>;
 }) {
+  const t = useTranslations('LearningMode');
   const [currentTime, setCurrentTime] = useState(0);
 
   useEffect(() => {
@@ -93,8 +95,8 @@ export const AudioProgressBar = memo(function AudioProgressBar({
   const cueMarks =
     !noAudio && languageCues
       ? audibleCues(languageCues)
-        .filter((c) => c.startSec > 0 && c.startSec < durationSec)
-        .map((c) => (c.startSec / durationSec) * 100)
+          .filter((c) => c.startSec > 0 && c.startSec < durationSec)
+          .map((c) => (c.startSec / durationSec) * 100)
       : [];
 
   return (
@@ -125,7 +127,7 @@ export const AudioProgressBar = memo(function AudioProgressBar({
       {/* No visible thumb. Would get clipped by the card's overflow-hidden.
           The fill edge already indicates drag position. */}
       <SliderPrimitive.Thumb
-        aria-label="Audio progress"
+        aria-label={t('audioProgress')}
         className="block size-0 outline-none"
       />
     </SliderPrimitive.Root>

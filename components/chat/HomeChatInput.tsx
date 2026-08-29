@@ -25,15 +25,18 @@ import LowQuotaDialog from '@/components/autumn/low-quota-dialog';
 import UsageLimitDialog from '@/components/autumn/usage-limit-dialog';
 import { cn, convexErrorCode, isPaymentPastDueError } from '@/lib/utils';
 
+import { reportError } from '@/lib/report-error';
+
 /**
  * Compact single-row chat-input surface used on the home view. Matches the
  * "prototype J" design: Sparkles prefix → text input → voice button → send
  * button, with a low-quota bar appended underneath when the user is close to
  * or has hit their monthly message limit.
  *
- * Deliberately simpler than {@link NewChatInput} (no suggestions, no
- * multi-line textarea, no character counter) because the home-view input is
- * a quick-start shortcut. Full chat composition happens after navigation.
+ * Deliberately simpler than the full {@link ChatInput} composer (no
+ * suggestions, no multi-line textarea, no character counter) because the
+ * home-view input is a quick-start shortcut. Full chat composition happens
+ * after navigation.
  */
 
 const LOW_BALANCE_THRESHOLD = 5;
@@ -65,7 +68,9 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
 
   const { isRecording, isTranscribing, handleVoiceClick } = useVoiceRecording(
     (transcript) => {
-      setText((prev) => (prev ? `${prev.trimEnd()} ${transcript}` : transcript));
+      setText((prev) =>
+        prev ? `${prev.trimEnd()} ${transcript}` : transcript,
+      );
     },
   );
 
@@ -113,7 +118,7 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
         setIsProcessing(false);
         return;
       }
-      console.error('Failed to start chat:', error);
+      reportError(error, { op: 'startChatFromHome' });
       toast.error(tErrors('failedToCreateThread'));
       setIsProcessing(false);
     }
@@ -172,13 +177,11 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
             type="button"
             onClick={() => void handleSubmit()}
             disabled={!canSubmit}
-            aria-label="Send"
+            aria-label={t('send')}
             data-testid="chat-submit"
             className={cn(
               'rounded-md p-1.5 text-primary-foreground transition-colors',
-              canSubmit
-                ? 'bg-primary hover:bg-primary/90'
-                : 'bg-primary/40',
+              canSubmit ? 'bg-primary hover:bg-primary/90' : 'bg-primary/40',
             )}
           >
             {isProcessing ? (
@@ -247,7 +250,9 @@ function HomeVoiceButton({
   disabled?: boolean;
 }) {
   const t = useTranslations('Chat.voice');
-  const { isAvailable, isLoading } = useFeatureQuota(FEATURE_IDS.TRANSCRIPTIONS);
+  const { isAvailable, isLoading } = useFeatureQuota(
+    FEATURE_IDS.TRANSCRIPTIONS,
+  );
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
 
   const isLocked = !isAvailable && !isLoading;

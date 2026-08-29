@@ -1,6 +1,10 @@
 import { feature, item, plan } from 'atmn';
 
-import { CREDIT_COSTS } from './convex/features/featureIds';
+import {
+  AI_FEEDBACK_FREE_GRANT,
+  AI_FEEDBACK_PAID_GRANT,
+  CREDIT_COSTS,
+} from './convex/features/featureIds';
 
 // Features
 export const multiple_languages = feature({
@@ -58,6 +62,17 @@ export const translation_auto_fill = feature({
   consumable: true,
 });
 
+// Writing-mode AI answer feedback. One unit per LLM grading call; exact and
+// accepted-alternative matches are graded locally and consume nothing. Paid
+// plans get 20k/month, which the UI presents as unlimited (see
+// lib/features/feature-meta.ts), so the cap only exists as an abuse guard.
+export const ai_feedback = feature({
+  id: 'ai_feedback',
+  name: 'AI Feedback',
+  type: 'metered',
+  consumable: true,
+});
+
 // Internal-only meters: hidden from the pricing table (gated client-side
 
 // via `isFeatureHidden` in `lib/features/feature-meta.ts`) but enforced by
@@ -100,6 +115,13 @@ export const free = plan({
   name: 'Free',
   autoEnable: true,
   items: [
+    item({
+      featureId: ai_feedback.id,
+      included: AI_FEEDBACK_FREE_GRANT,
+      reset: {
+        interval: 'one_off',
+      },
+    }),
     item({
       featureId: audio_regenerations.id,
       included: 20,
@@ -172,6 +194,13 @@ export const basic = plan({
   },
   items: [
     item({
+      featureId: ai_feedback.id,
+      included: AI_FEEDBACK_PAID_GRANT,
+      reset: {
+        interval: 'month',
+      },
+    }),
+    item({
       featureId: audio_regenerations.id,
       included: 500,
       reset: {
@@ -242,6 +271,13 @@ export const pro = plan({
     interval: 'month',
   },
   items: [
+    item({
+      featureId: ai_feedback.id,
+      included: AI_FEEDBACK_PAID_GRANT,
+      reset: {
+        interval: 'month',
+      },
+    }),
     item({
       featureId: audio_regenerations.id,
       included: 800,
@@ -315,6 +351,13 @@ export const ultra = plan({
     interval: 'month',
   },
   items: [
+    item({
+      featureId: ai_feedback.id,
+      included: AI_FEEDBACK_PAID_GRANT,
+      reset: {
+        interval: 'month',
+      },
+    }),
     item({
       featureId: audio_regenerations.id,
       included: 800,

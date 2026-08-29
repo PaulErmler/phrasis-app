@@ -12,10 +12,15 @@ import { useAppData } from '@/components/app/AppDataProvider';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, MessageSquarePlus, PanelLeft } from 'lucide-react';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import { useNowMinute } from '@/hooks/use-now-minute';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { getUserTimezone } from '@/lib/timezone';
 import { usePrefetchedThread } from '@/hooks/use-prefetched-thread';
 import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
+import {
+  getSessionReviewStats,
+  resetSessionReviewCount,
+} from '@/lib/posthog/review-session-counter';
 import { HomeView } from '@/components/app/HomeView';
 import { FreePlanUpgradeBadge } from '@/components/app/FreePlanUpgradeBadge';
 import { AddCardsView } from '@/components/app/AddCardsView';
@@ -26,6 +31,7 @@ import { LearnView } from '@/components/app/learning/LearnView';
 import { SimplifiedChatView } from '@/components/app/SimplifiedChatView';
 import { HelpDialog } from '@/components/app/HelpDialog';
 import { ViewErrorBoundary } from '@/components/app/ViewErrorBoundary';
+import { reportError } from '@/lib/report-error';
 
 const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
   home: '/app',
@@ -39,7 +45,8 @@ function viewFromPathname(pathname: string): {
   chatThreadId?: string;
   isLearnOpen?: boolean;
 } {
-  if (pathname.startsWith('/app/learn')) return { view: 'home', isLearnOpen: true };
+  if (pathname.startsWith('/app/learn'))
+    return { view: 'home', isLearnOpen: true };
   if (pathname.startsWith('/app/content')) return { view: 'home' };
   if (pathname.startsWith('/app/library')) return { view: 'library' };
   if (pathname.startsWith('/app/stats')) return { view: 'stats' };
@@ -73,10 +80,7 @@ export default function MainLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const {
-    preloadedSettings,
-    activeCourse,
-  } = useAppData();
+  const { preloadedSettings, activeCourse } = useAppData();
 
   const [justReturnedFromLearn, setJustReturnedFromLearn] = useState(false);
   const restartTutorialRef = useRef<(() => void) | null>(null);
@@ -88,6 +92,7 @@ export default function MainLayout({
   const router = useRouter();
   const pathname = usePathname();
   const t = useTranslations('AppPage');
+  const tChatSidebar = useTranslations('Chat.sidebar');
   const locale = useLocale();
 
   // Result unused, but the hook call keeps the preloaded-settings
@@ -103,11 +108,26 @@ export default function MainLayout({
     initialView.chatThreadId ?? null,
   );
   const viewBeforeChatRef = useRef<Exclude<View, 'chat'>>('home');
-  const [hasVisitedStats, setHasVisitedStats] = useState(initialView.view === 'stats');
-  const [hasVisitedLibrary, setHasVisitedLibrary] = useState(initialView.view === 'library');
-  const [isLearnOpen, setIsLearnOpen] = useState(initialView.isLearnOpen ?? false);
+  const [hasVisitedStats, setHasVisitedStats] = useState(
+    initialView.view === 'stats',
+  );
+  const [hasVisitedLibrary, setHasVisitedLibrary] = useState(
+    initialView.view === 'library',
+  );
+  const [isLearnOpen, setIsLearnOpen] = useState(
+    initialView.isLearnOpen ?? false,
+  );
   const isLearnOpenRef = useRef(false);
-  useEffect(() => { isLearnOpenRef.current = isLearnOpen; }, [isLearnOpen]);
+  useEffect(() => {
+    if (isLearnOpen && !isLearnOpenRef.current) {
+      // A session just opened — via the learn button, a /app/learn deep-link
+      // mount, or popstate forward. Resetting on the open *transition* (not
+      // in handleLearnOpen) covers all three, so a back-then-forward reopen
+      // can't report the previous session's tally.
+      resetSessionReviewCount();
+    }
+    isLearnOpenRef.current = isLearnOpen;
+  }, [isLearnOpen]);
   const isAddCardsRoute = pathname === '/app/content/add-cards';
 
   useEffect(() => {
@@ -133,11 +153,14 @@ export default function MainLayout({
 
   // Warm the getCardForReview Convex subscription before learn opens;
   // skip once learn is open since useLearningMode manages its own subscription.
-  // Match the hook's args (timezone) so we hit the same subscription cache
-  // entry and the warm subscription survives the handoff.
+  // Match the hook's args (timezone + minute-quantized `now`) byte-identically
+  // so we hit the same subscription cache entry and the warm subscription
+  // survives the handoff. Paused while learn is open (query is skipped then;
+  // useNowMinute re-quantizes on unpause).
+  const warmupNow = useNowMinute(isLearnOpen);
   useQuery(
     api.features.scheduling.getCardForReview,
-    !isLearnOpen ? { timezone: getUserTimezone() } : 'skip',
+    !isLearnOpen ? { timezone: getUserTimezone(), now: warmupNow } : 'skip',
   );
 
   const threads = useQuery(
@@ -191,7 +214,7 @@ export default function MainLayout({
       const newThreadId = await getOrCreateEmptyThread({});
       handleOpenChat(newThreadId);
     } catch (err) {
-      console.error('Failed to create new chat:', err);
+      reportError(err, { op: 'newChatThread' });
     }
   }, [getOrCreateEmptyThread, handleOpenChat]);
 
@@ -245,6 +268,9 @@ export default function MainLayout({
     learnStartedAtRef.current = null;
     capture(CLIENT_EVENTS.REVIEW_SESSION_ENDED, {
       duration_ms: startedAt === null ? undefined : Date.now() - startedAt,
+      // reviews_count plus per-(surface, activity) count/time buckets:
+      // review|radio x listening|translating|transcribing.
+      ...getSessionReviewStats(),
       course_id: activeCourse?._id,
       target_languages: activeCourse?.targetLanguages,
       current_level: activeCourse?.currentLevel,
@@ -283,7 +309,6 @@ export default function MainLayout({
     return () => window.removeEventListener('popstate', onPopState);
   }, [refreshPrefetchedThread]);
 
-
   const hasActiveCourse = !!activeCourse;
 
   const handleOpenCourseMenu = useCallback(() => {
@@ -292,10 +317,10 @@ export default function MainLayout({
 
   const courseButtonLabel = activeCourse
     ? t('currentCourseWithLanguages', {
-      targetLanguages: activeCourse.targetLanguages
-        .map((code) => getLocalizedLanguageNameByCode(code, locale))
-        .join(', '),
-    })
+        targetLanguages: activeCourse.targetLanguages
+          .map((code) => getLocalizedLanguageNameByCode(code, locale))
+          .join(', '),
+      })
     : t('changeCourse');
 
   return (
@@ -327,7 +352,7 @@ export default function MainLayout({
                   variant="ghost"
                   size="icon"
                   onClick={() => setChatSidebarOpen((prev) => !prev)}
-                  aria-label="Toggle conversations"
+                  aria-label={tChatSidebar('toggleConversations')}
                   data-testid="chat-toggle-conversations"
                 >
                   <PanelLeft className="h-4 w-4" />
@@ -336,7 +361,7 @@ export default function MainLayout({
                   variant="ghost"
                   size="icon"
                   onClick={handleNewChat}
-                  aria-label="New chat"
+                  aria-label={tChatSidebar('newChat')}
                   data-testid="chat-new-thread"
                 >
                   <MessageSquarePlus className="h-4 w-4" />
@@ -398,10 +423,12 @@ export default function MainLayout({
         {isAddCardsRoute && (
           <KeepMountedView visible={!isLearnOpen}>
             <ViewErrorBoundary>
-              <AddCardsView onBack={() => {
-                setActiveView('home');
-                router.push('/app');
-              }} />
+              <AddCardsView
+                onBack={() => {
+                  setActiveView('home');
+                  router.push('/app');
+                }}
+              />
             </ViewErrorBoundary>
           </KeepMountedView>
         )}
@@ -438,7 +465,9 @@ export default function MainLayout({
       {!isAddCardsRoute && (
         <>
           <div className="shrink-0 h-[calc(4rem+var(--safe-bottom))]" />
-          <div className={`fixed bottom-0 left-0 right-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
+          <div
+            className={`fixed bottom-0 left-0 right-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}
+          >
             <BottomNav
               currentView={activeView}
               onViewChange={handleViewChange}

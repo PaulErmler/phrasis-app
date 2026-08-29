@@ -74,7 +74,10 @@ export type ClientEvent = (typeof CLIENT_EVENTS)[keyof typeof CLIENT_EVENTS];
  * Capture a product event. Never throws. A broken analytics call must not
  * change what the user sees.
  */
-export function capture(event: ClientEvent, properties?: Record<string, unknown>): void {
+export function capture(
+  event: ClientEvent,
+  properties?: Record<string, unknown>,
+): void {
   try {
     posthog.capture(event, properties);
   } catch {

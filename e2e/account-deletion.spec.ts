@@ -155,7 +155,9 @@ test.describe('account deletion', () => {
       await passwordFields.nth(i).fill(`${creds.password}-new`);
     }
     await page
-      .getByRole('button', { name: /create an account|create account|^sign\s*up$/i })
+      .getByRole('button', {
+        name: /create an account|create account|^sign\s*up$/i,
+      })
       .click();
     // A NEW verification code arrives (the purge wiped the old captures);
     // completing it proves the address was genuinely freed for re-use.

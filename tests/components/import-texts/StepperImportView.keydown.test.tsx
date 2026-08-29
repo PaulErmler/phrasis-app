@@ -77,7 +77,9 @@ function renderEditor() {
   return {
     c,
     editor: () =>
-      screen.queryByTestId<HTMLTextAreaElement>('import-review-edit-input-0-ja'),
+      screen.queryByTestId<HTMLTextAreaElement>(
+        'import-review-edit-input-0-ja',
+      ),
   };
 }
 

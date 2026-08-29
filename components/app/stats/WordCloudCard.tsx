@@ -1,6 +1,13 @@
 'use client';
 
-import { Fragment, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -54,7 +61,8 @@ function SingleWordCloud({
     if (!container) return;
     const update = () => {
       const h = container.clientHeight;
-      const buttons = container.querySelectorAll<HTMLElement>('[data-cloud-word]');
+      const buttons =
+        container.querySelectorAll<HTMLElement>('[data-cloud-word]');
       let firstOverflow = buttons.length;
       for (let i = 0; i < buttons.length; i++) {
         const btn = buttons[i];
@@ -75,7 +83,9 @@ function SingleWordCloud({
     <div className="card-surface p-3" data-testid="stats-wordcloud">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">
-          {isFirst ? t('recentlyLearnedWords', { language: langName(language) }) : langName(language)}
+          {isFirst
+            ? t('recentlyLearnedWords', { language: langName(language) })
+            : langName(language)}
         </span>
         <div className="flex items-center gap-0.5">
           <Button
@@ -118,8 +128,7 @@ function SingleWordCloud({
               className="inline-block rounded-md px-0.5 font-bold transition-colors hover:bg-muted active:scale-[0.97]"
             >
               {w}
-            </button>
-            {' '}
+            </button>{' '}
           </Fragment>
         ))}
       </div>
@@ -132,7 +141,7 @@ export function WordCloudSection() {
   const langName = useLangName();
   const data = useQuery(api.features.stats.getRecentWords);
   const [selectedWord, setSelectedWord] = useState<{
-    word: string;       // normalized (lowercase NFC) — used for the query
+    word: string; // normalized (lowercase NFC) — used for the query
     displayWord: string; // original casing from the cloud — shown in dialog title
     language: string;
   } | null>(null);

@@ -20,7 +20,9 @@ export async function getTargetLanguageWordCounts(
     )
     .take(20);
 
-  const targetSet = new Set(args.targetLanguages.map((l) => normalizeLanguageCode(l)));
+  const targetSet = new Set(
+    args.targetLanguages.map((l) => normalizeLanguageCode(l)),
+  );
   const wordsByLang = new Map<string, number>();
   for (const r of langStatsRows) {
     if (r.totalWords <= 0) continue;
@@ -48,7 +50,10 @@ export async function upsertLanguageStats(
   const existing = await ctx.db
     .query('languageStats')
     .withIndex('by_userId_and_courseId_and_language', (q) =>
-      q.eq('userId', args.userId).eq('courseId', args.courseId).eq('language', args.language),
+      q
+        .eq('userId', args.userId)
+        .eq('courseId', args.courseId)
+        .eq('language', args.language),
     )
     .first();
 

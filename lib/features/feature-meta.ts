@@ -17,18 +17,67 @@ import { FEATURE_IDS, type FeatureId } from '@/convex/features/featureIds';
  */
 export const FEATURE_META: Record<
   FeatureId,
-  { i18nKey: string; consumable?: boolean; displayCount?: number; hidden?: boolean; paywallKey?: string; displayAsUnlimited?: boolean }
+  {
+    i18nKey: string;
+    consumable?: boolean;
+    displayCount?: number;
+    hidden?: boolean;
+    paywallKey?: string;
+    displayAsUnlimited?: boolean;
+  }
 > = {
   [FEATURE_IDS.CHAT_MESSAGES]: { i18nKey: 'chatMessages', consumable: true },
-  [FEATURE_IDS.COURSES]: { i18nKey: 'courses', consumable: false, paywallKey: 'courseCapWithArchiveOption' },
-  [FEATURE_IDS.SENTENCES]: { i18nKey: 'sentences', consumable: true, displayAsUnlimited: true },
-  [FEATURE_IDS.CUSTOM_SENTENCES]: { i18nKey: 'customSentences', consumable: true },
-  [FEATURE_IDS.MULTIPLE_LANGUAGES]: { i18nKey: 'multipleLanguages', displayCount: 3 },
-  [FEATURE_IDS.TRANSCRIPTIONS]: { i18nKey: 'transcriptions', consumable: true, hidden: true },
-  [FEATURE_IDS.CARD_EDITS]: { i18nKey: 'cardEdits', consumable: true, hidden: true },
-  [FEATURE_IDS.TRANSLATION_AUTO_FILL]: { i18nKey: 'translationAutoFill', consumable: true, hidden: true },
-  [FEATURE_IDS.AUDIO_REGENERATIONS]: { i18nKey: 'audioRegenerations', consumable: true, hidden: true },
-  [FEATURE_IDS.TRANSLATION_FLAGS]: { i18nKey: 'translationFlags', consumable: true, hidden: true },
+  [FEATURE_IDS.COURSES]: {
+    i18nKey: 'courses',
+    consumable: false,
+    paywallKey: 'courseCapWithArchiveOption',
+  },
+  [FEATURE_IDS.SENTENCES]: {
+    i18nKey: 'sentences',
+    consumable: true,
+    displayAsUnlimited: true,
+  },
+  [FEATURE_IDS.CUSTOM_SENTENCES]: {
+    i18nKey: 'customSentences',
+    consumable: true,
+  },
+  [FEATURE_IDS.MULTIPLE_LANGUAGES]: {
+    i18nKey: 'multipleLanguages',
+    displayCount: 3,
+  },
+  [FEATURE_IDS.TRANSCRIPTIONS]: {
+    i18nKey: 'transcriptions',
+    consumable: true,
+    hidden: true,
+  },
+  [FEATURE_IDS.CARD_EDITS]: {
+    i18nKey: 'cardEdits',
+    consumable: true,
+    hidden: true,
+  },
+  [FEATURE_IDS.TRANSLATION_AUTO_FILL]: {
+    i18nKey: 'translationAutoFill',
+    consumable: true,
+    hidden: true,
+  },
+  [FEATURE_IDS.AUDIO_REGENERATIONS]: {
+    i18nKey: 'audioRegenerations',
+    consumable: true,
+    hidden: true,
+  },
+  [FEATURE_IDS.TRANSLATION_FLAGS]: {
+    i18nKey: 'translationFlags',
+    consumable: true,
+    hidden: true,
+  },
+  // 20k/month on paid plans is an abuse guard, not a real allowance; the
+  // pricing table renders anything >= 19000 with displayAsUnlimited as
+  // "Unlimited". Free's 200 one-off shows as the real number.
+  [FEATURE_IDS.AI_FEEDBACK]: {
+    i18nKey: 'aiFeedback',
+    consumable: true,
+    displayAsUnlimited: true,
+  },
   [FEATURE_IDS.CREDITS]: { i18nKey: 'credits', consumable: true },
 };
 

@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { getCompareConfig, toDiffOptions } from '@/lib/textCompare/languageConfig';
+import {
+  getCompareConfig,
+  toDiffOptions,
+} from '@/lib/textCompare/languageConfig';
 import { SUPPORTED_LANGUAGES } from '@/lib/languages';
 
 /**
@@ -8,7 +11,10 @@ import { SUPPORTED_LANGUAGES } from '@/lib/languages';
  * from the Language record) provably preserves it, and fails if a language is
  * added without a compare-locale decision.
  */
-const EXPECTED_COMPARE: Record<string, { locale: string; hasWordBoundaries: boolean }> = {
+const EXPECTED_COMPARE: Record<
+  string,
+  { locale: string; hasWordBoundaries: boolean }
+> = {
   en: { locale: 'en', hasWordBoundaries: true },
   en_gb: { locale: 'en-GB', hasWordBoundaries: true },
   en_us: { locale: 'en-US', hasWordBoundaries: true },
@@ -102,7 +108,10 @@ describe('getCompareConfig', () => {
     for (const lang of SUPPORTED_LANGUAGES) {
       const cfg = getCompareConfig(lang.code);
       const expected = EXPECTED_COMPARE[lang.code];
-      expect(expected, `no expected compare config for code=${lang.code}`).toBeDefined();
+      expect(
+        expected,
+        `no expected compare config for code=${lang.code}`,
+      ).toBeDefined();
       expect(cfg.locale, `locale for ${lang.code}`).toBe(expected.locale);
       expect(cfg.hasWordBoundaries, `hasWordBoundaries for ${lang.code}`).toBe(
         expected.hasWordBoundaries,

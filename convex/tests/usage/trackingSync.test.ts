@@ -1,10 +1,10 @@
 /// <reference types="vite/client" />
-import { convexTest, type TestConvex } from "convex-test";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import schema from "../../schema";
-import { internal } from "../../_generated/api";
+import { convexTest, type TestConvex } from 'convex-test';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import schema from '../../schema';
+import { internal } from '../../_generated/api';
 
-const modules = import.meta.glob("/convex/**/*.ts");
+const modules = import.meta.glob('/convex/**/*.ts');
 
 /**
  * End-to-end wiring tests for `trackUsage` → `pushCustomerState` →
@@ -26,7 +26,7 @@ const modules = import.meta.glob("/convex/**/*.ts");
 
 // No "track" substring in the id. The fetch stub routes by URL substring
 // and must never confuse the customer path with the /track endpoint.
-const USER = "user_sync_wiring";
+const USER = 'user_sync_wiring';
 
 type Call = { url: string; method: string; body: any; version: string | null };
 
@@ -41,10 +41,10 @@ let calls: Call[] = [];
  */
 function stubAutumn(routes: Record<string, unknown>) {
   const fetchMock = vi.fn(async (url: string, init: any = {}) => {
-    const version = init?.headers?.["x-api-version"] ?? null;
+    const version = init?.headers?.['x-api-version'] ?? null;
     calls.push({
       url,
-      method: init?.method ?? "GET",
+      method: init?.method ?? 'GET',
       body: init?.body ? JSON.parse(init.body) : undefined,
       version,
     });
@@ -57,7 +57,7 @@ function stubAutumn(routes: Record<string, unknown>) {
       json: async () => payload,
     };
   });
-  vi.stubGlobal("fetch", fetchMock);
+  vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
 }
 
@@ -66,8 +66,8 @@ const callsTo = (path: string) => calls.filter((c) => c.url.includes(path));
 
 /** v2 subscription entry. The shape `x-api-version: 2.2` actually returns. */
 const subscription = (over: Record<string, unknown> = {}) => ({
-  plan_id: "pro",
-  status: "active",
+  plan_id: 'pro',
+  status: 'active',
   add_on: false,
   past_due: false,
   ...over,
@@ -78,7 +78,7 @@ const subscription = (over: Record<string, unknown> = {}) => ({
 // cannot cancel out.
 const BALANCES = {
   chat_messages: {
-    feature_id: "chat_messages",
+    feature_id: 'chat_messages',
     granted: 100,
     remaining: 60,
     usage: 40,
@@ -86,7 +86,7 @@ const BALANCES = {
   },
 };
 
-const INVOICE_URL = "https://invoice.stripe.com/pay_1";
+const INVOICE_URL = 'https://invoice.stripe.com/pay_1';
 
 const customerPayload = (over: Record<string, unknown> = {}) => ({
   balances: BALANCES,
@@ -97,22 +97,22 @@ const customerPayload = (over: Record<string, unknown> = {}) => ({
 const runTrack = (t: TestConvex<typeof schema>) =>
   t.action(internal.usage.tracking.trackUsage, {
     userId: USER,
-    featureId: "chat_messages",
+    featureId: 'chat_messages',
     value: 1,
   });
 
 async function getQuotaDoc(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) =>
     ctx.db
-      .query("usageQuotas")
-      .withIndex("by_userId", (q) => q.eq("userId", USER))
+      .query('usageQuotas')
+      .withIndex('by_userId', (q) => q.eq('userId', USER))
       .first(),
   );
 }
 
 beforeEach(() => {
   calls = [];
-  vi.stubEnv("AUTUMN_SECRET_KEY", "am_sk_test_stub");
+  vi.stubEnv('AUTUMN_SECRET_KEY', 'am_sk_test_stub');
 });
 
 afterEach(() => {
@@ -120,18 +120,18 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("usage: trackUsage sync wiring", () => {
-  it("past-due customer: blocks, captures the invoice URL, in exactly one extra request", async () => {
+describe('usage: trackUsage sync wiring', () => {
+  it('past-due customer: blocks, captures the invoice URL, in exactly one extra request', async () => {
     stubAutumn({
-      "/track": {},
+      '/track': {},
       // Registered before "/customers/". See stubAutumn note.
-      "expand=invoices": customerPayload({
+      'expand=invoices': customerPayload({
         subscriptions: [subscription({ past_due: true })],
         invoices: [
-          { status: "open", hosted_invoice_url: INVOICE_URL, created_at: 10 },
+          { status: 'open', hosted_invoice_url: INVOICE_URL, created_at: 10 },
         ],
       }),
-      "/customers/": customerPayload({
+      '/customers/': customerPayload({
         subscriptions: [subscription({ past_due: true })],
       }),
     });
@@ -141,9 +141,9 @@ describe("usage: trackUsage sync wiring", () => {
 
     // The negative-value /track exploit was closed by removing the public
     // proxy; the internal action must still send the true underlying id/value.
-    expect(callsTo("/track")[0].body).toEqual({
+    expect(callsTo('/track')[0].body).toEqual({
       customer_id: USER,
-      feature_id: "chat_messages",
+      feature_id: 'chat_messages',
       value: 1,
     });
 
@@ -151,7 +151,7 @@ describe("usage: trackUsage sync wiring", () => {
     // pastDueSince is what assertBillingCurrent keys on, if the
     // action didn't forward anyPastDue, the delinquent user keeps spending.
     expect(doc?.pastDueSince).toBeGreaterThanOrEqual(before);
-    expect(doc?.planStatus).toBe("past_due");
+    expect(doc?.planStatus).toBe('past_due');
     // Without the URL the overdue dialog has no pay button. The user
     // literally cannot settle the debt.
     expect(doc?.pastDueInvoiceUrl).toBe(INVOICE_URL);
@@ -164,24 +164,24 @@ describe("usage: trackUsage sync wiring", () => {
 
     // One expanded re-fetch, not zero (URL lost) and not two (the payload
     // already carrying invoices must be reused, not re-fetched).
-    expect(callsTo("expand=invoices")).toHaveLength(1);
+    expect(callsTo('expand=invoices')).toHaveLength(1);
     // track + plain GET + expanded GET, every one pinned to the v2 shape.
     expect(calls).toHaveLength(3);
-    for (const c of calls) expect(c.version).toBe("2.2");
+    for (const c of calls) expect(c.version).toBe('2.2');
   });
 
-  it("healthy customer: no invoice fetch, no past-due state", async () => {
+  it('healthy customer: no invoice fetch, no past-due state', async () => {
     stubAutumn({
-      "/track": {},
-      "expand=invoices": customerPayload(),
-      "/customers/": customerPayload(),
+      '/track': {},
+      'expand=invoices': customerPayload(),
+      '/customers/': customerPayload(),
     });
     const t = convexTest(schema, modules);
     await runTrack(t);
 
     const doc = await getQuotaDoc(t);
     expect(doc?.pastDueSince).toBeUndefined();
-    expect(doc?.planStatus).toBe("active");
+    expect(doc?.planStatus).toBe('active');
     expect(doc?.pastDueInvoiceUrl).toBeUndefined();
     expect(doc?.features.chat_messages).toEqual({
       balance: 60,
@@ -191,8 +191,8 @@ describe("usage: trackUsage sync wiring", () => {
 
     // The expanded call costs a second Autumn round-trip per sync. It must
     // stay reserved for the rare delinquent path.
-    expect(callsTo("expand=invoices")).toHaveLength(0);
-    for (const c of calls) expect(c.version).toBe("2.2");
+    expect(callsTo('expand=invoices')).toHaveLength(0);
+    for (const c of calls) expect(c.version).toBe('2.2');
   });
 
   it("captures the URL from an 'uncollectible' invoice too", async () => {
@@ -201,18 +201,18 @@ describe("usage: trackUsage sync wiring", () => {
     // it would strand exactly the longest-overdue customers without a pay
     // button.
     stubAutumn({
-      "/track": {},
-      "expand=invoices": customerPayload({
+      '/track': {},
+      'expand=invoices': customerPayload({
         subscriptions: [subscription({ past_due: true })],
         invoices: [
           {
-            status: "uncollectible",
+            status: 'uncollectible',
             hosted_invoice_url: INVOICE_URL,
             created_at: 10,
           },
         ],
       }),
-      "/customers/": customerPayload({
+      '/customers/': customerPayload({
         subscriptions: [subscription({ past_due: true })],
       }),
     });
@@ -222,7 +222,7 @@ describe("usage: trackUsage sync wiring", () => {
     expect((await getQuotaDoc(t))?.pastDueInvoiceUrl).toBe(INVOICE_URL);
   });
 
-  it("an empty Autumn answer leaves an existing past-due block untouched", async () => {
+  it('an empty Autumn answer leaves an existing past-due block untouched', async () => {
     // A transient empty response (no subscriptions, no products) means "we
     // don't know", not "the customer holds nothing". If the action mapped it
     // to anyPastDue:false without productsMissing, one flaky Autumn reply
@@ -233,21 +233,21 @@ describe("usage: trackUsage sync wiring", () => {
       features: { chat_messages: { balance: 10, included: 10, used: 0 } },
       anyPastDue: true,
       productsMissing: false,
-      planId: "pro",
-      planName: "Pro",
-      planStatus: "past_due",
+      planId: 'pro',
+      planName: 'Pro',
+      planStatus: 'past_due',
     });
     const seededSince = (await getQuotaDoc(t))?.pastDueSince;
     expect(seededSince).toBeDefined();
 
     stubAutumn({
-      "/track": {},
-      "/customers/": { balances: BALANCES },
+      '/track': {},
+      '/customers/': { balances: BALANCES },
     });
     await runTrack(t);
 
     const doc = await getQuotaDoc(t);
-    expect(doc?.planStatus).toBe("past_due");
+    expect(doc?.planStatus).toBe('past_due');
     expect(doc?.pastDueSince).toBe(seededSince);
     // The balances themselves are still authoritative. Quota refresh must
     // not be held hostage by the missing plan list.
@@ -258,6 +258,6 @@ describe("usage: trackUsage sync wiring", () => {
     });
     // productsMissing → anyPastDue false on the derived side, so the
     // invoice re-fetch must not fire either.
-    expect(callsTo("expand=invoices")).toHaveLength(0);
+    expect(callsTo('expand=invoices')).toHaveLength(0);
   });
 });

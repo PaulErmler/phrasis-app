@@ -1,11 +1,17 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  recordReviewForSession,
+  reviewActivity,
+  undoReviewForSession,
+} from '@/lib/posthog/review-session-counter';
 import { useTranslations } from 'next-intl';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import {
   useQuery,
   useMutation,
+  usePreloadedQuery,
   useConvexAuth,
 } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -28,17 +34,22 @@ import {
 } from './types';
 import type { SchedulingMode } from '@/convex/types';
 import { getUserTimezone } from '@/lib/timezone';
+import { useNowMinute } from '@/hooks/use-now-minute';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import {
   ENSURE_CONTENT_MAX_RETRIES,
   ENSURE_CONTENT_RETRY_MS,
+  MAX_UNSERVED_ADD_RUNS,
   ENSURE_CONTENT_REVIEW_INTERVAL,
   PROGRESS_DISPLAY_INTERVAL,
 } from '@/lib/constants/learning';
 import { DEFAULT_AUTO_ADVANCE } from '@/lib/constants/audioPlayback';
 import { collectionRemaining } from '@/convex/lib/collections';
 import { useCelebration } from './useCelebration';
+import { useCardActions, type CardActions } from './useCardActions';
+import { useAppData } from '@/components/app/AppDataProvider';
+import { reportError } from '@/lib/report-error';
 
 /**
  * Pure helper: cryptographically-random session ID with a non-crypto
@@ -50,7 +61,6 @@ function mintSessionId(): string {
     ? crypto.randomUUID()
     : `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
-
 
 function effectivePhase(
   reviewMode: string,
@@ -138,6 +148,12 @@ interface BaseState {
    * Not on session start.
    */
   autoAddHeld: boolean;
+  /**
+   * Shared card-action surface (flag/delete confirm state + the pin,
+   * regenerate and flag mutations), owned by `useCardActions` and reused by
+   * the library. LearningMode drives its confirm dialogs from here.
+   */
+  cardActions: CardActions;
 }
 
 interface LoadingState extends BaseState {
@@ -319,20 +335,28 @@ export function useLearningMode(
   // drives the in-learn progress bar. Reusing this subscription means the bar
   // updates live on remote changes (e.g. reviews done on another device) and
   // we don't need a parallel `getTodayReviewCount` subscription.
+  //
+  // `now` is minute-quantized per the no-wall-clock query guideline (house
+  // pattern: getWorkloadForecast); the re-subscribe gap on a minute tick is
+  // bridged by useStickyQueryValue below. The layout warm-up must pass
+  // byte-identical args so the two share one subscription.
+  const now = useNowMinute(!isAuthenticated);
   const cardForReviewQuery = useQuery(
     api.features.scheduling.getCardForReview,
-    isAuthenticated ? { timezone: getUserTimezone() } : 'skip',
+    isAuthenticated ? { timezone: getUserTimezone(), now } : 'skip',
   );
-  // Direct queries (was previously fed via SSR-preloaded data through
-  // AppDataProvider). The downstream logic already treats both as nullable,
-  // so the loading flash on first render is handled by the hook's existing
-  // `loading` status branch.
-  const courseSettingsQuery = useQuery(api.features.courses.getActiveCourseSettings, {});
-  const activeCourseQuery = useQuery(api.features.courses.getActiveCourse, {});
+  // Course + user data read through AppDataProvider (B25): the provider owns
+  // the always-mounted getActiveCourse / getActiveCourseSettings
+  // subscriptions, so learn shares them instead of re-subscribing ad hoc.
+  // The context values are never `undefined` (SSR-seeded, held warm across
+  // navigations), so they need no sticky wrapper; `null` still means
+  // "no course yet".
+  const { activeCourse, courseSettings, preloadedSettings } = useAppData();
 
-  const cardForReview = useStickyQueryValue(cardForReviewQuery, isAuthenticated);
-  const courseSettings = useStickyQueryValue(courseSettingsQuery, isAuthenticated);
-  const activeCourse = useStickyQueryValue(activeCourseQuery, isAuthenticated);
+  const cardForReview = useStickyQueryValue(
+    cardForReviewQuery,
+    isAuthenticated,
+  );
 
   // Card-specific stickiness on top of the sticky values above: also filters
   // out `null` (deck empty) so the auto-add gap can keep showing the
@@ -341,6 +365,16 @@ export function useLearningMode(
     NonNullable<typeof cardForReviewQuery> | undefined
   >(undefined);
 
+  // Stall guard: consecutive handleAddCards runs that inserted cards while
+  // no card got served in between. Adding cards must make one visible; if it
+  // repeatedly doesn't (clock skew hiding fresh due dates, or any future
+  // added-but-not-servable mismatch), auto-add would loop inserting forever.
+  // Incremented on each inserting run, reset whenever a card is served (and
+  // on collection change); at MAX_UNSERVED_ADD_RUNS the run latches
+  // autoAddExhaustedForRef and reports, stopping the auto-add effect while
+  // leaving the manual Add button as the recovery path.
+  const unservedAddRunsRef = useRef(0);
+
   useEffect(() => {
     if (!isAuthenticated) {
       lastReviewingCardRef.current = undefined;
@@ -348,12 +382,14 @@ export function useLearningMode(
     }
     if (cardForReviewQuery != null) {
       lastReviewingCardRef.current = cardForReviewQuery;
+      unservedAddRunsRef.current = 0;
     }
   }, [isAuthenticated, cardForReviewQuery]);
 
   useEffect(() => {
     lastReviewingCardRef.current = undefined;
-  }, [courseSettingsQuery?.activeCollectionId]);
+    unservedAddRunsRef.current = 0;
+  }, [courseSettings?.activeCollectionId]);
 
   // Undo-button state rides on the getCardForReview payload. One
   // subscription that invalidates once per review, instead of a parallel
@@ -379,49 +415,40 @@ export function useLearningMode(
 
   const masterCardMutation = useMutation(api.features.scheduling.masterCard);
   const hideCardMutation = useMutation(api.features.scheduling.hideCard);
-  const deleteCardMutation = useMutation(
-    api.features.scheduling.deleteCardPermanently,
-  );
+
+  // Shared card-action surface (also used by the library). Owns the flag /
+  // delete confirm state, the session flag record, and the pin / regenerate /
+  // flag / delete mutations. Delete confirmation routes back into
+  // `handleDelete` below so the exit animation and in-flight guards apply;
+  // ref-read because `handleDelete` is declared further down (it needs
+  // `cardActions.deleteCard`) and the option closure must not forward-
+  // reference it directly (the React Compiler bails on that).
+  const handleDeleteRef = useRef<(() => Promise<void>) | null>(null);
+  const cardActions = useCardActions({
+    onConfirmDelete: () => {
+      void handleDeleteRef.current?.();
+    },
+  });
 
   const toggleFavoriteCardMutation = useMutation(
     api.features.scheduling.toggleFavoriteCard,
   ).withOptimisticUpdate((localStore) => {
-    const current = localStore.getQuery(
+    // Flip on every cached getCardForReview instance (args carry
+    // timezone + minute-quantized `now`, so the key varies); matching all
+    // instances keeps the optimistic write applying regardless of args.
+    for (const q of localStore.getAllQueries(
       api.features.scheduling.getCardForReview,
-      {},
-    );
-    if (current != null) {
-      localStore.setQuery(api.features.scheduling.getCardForReview, {}, {
-        ...current,
-        isFavorite: !(current.isFavorite ?? false),
+    )) {
+      if (q.value == null) continue;
+      localStore.setQuery(api.features.scheduling.getCardForReview, q.args, {
+        ...q.value,
+        isFavorite: !(q.value.isFavorite ?? false),
       });
     }
   });
-  const flagTranslationMutation = useMutation(
-    api.features.scheduling.flagTranslation,
-  );
-  const regenerateCardAudioMutation = useMutation(
-    api.features.scheduling.regenerateCardAudio,
-  );
-  const userSettingsQuery = useQuery(
-    api.features.courses.getUserSettings,
-    isAuthenticated ? {} : 'skip',
-  );
-  const updatePinnedCardActionsMutation = useMutation(
-    api.features.courses.updatePinnedCardActions,
-  ).withOptimisticUpdate((localStore, args) => {
-    const current = localStore.getQuery(
-      api.features.courses.getUserSettings,
-      {},
-    );
-    if (current != null) {
-      localStore.setQuery(
-        api.features.courses.getUserSettings,
-        {},
-        { ...current, pinnedCardActions: [...args.actions] },
-      );
-    }
-  });
+  // Through the provider's SSR-seeded handle (B25); resolves to the same
+  // getUserSettings subscription the rest of the app shares.
+  const userSettingsQuery = usePreloadedQuery(preloadedSettings);
   const addCardsMutation = useMutation(
     api.features.decks.addCardsFromCollection,
   );
@@ -455,7 +482,10 @@ export function useLearningMode(
   );
   const translationFlagsQuota = useFeatureQuota(FEATURE_IDS.TRANSLATION_FLAGS);
 
-  const collectionProgress = useQuery(api.features.decks.getCollectionProgress, {});
+  const collectionProgress = useQuery(
+    api.features.decks.getCollectionProgress,
+    {},
+  );
 
   const [isReviewing, setIsReviewing] = useState(false);
   const [isAddingCards, setIsAddingCards] = useState(false);
@@ -475,36 +505,23 @@ export function useLearningMode(
   const [isUndoing, setIsUndoing] = useState(false);
   const [cardAnimationKey, setCardAnimationKey] = useState(0);
 
-  // Client-only session record of cards the viewer has flagged this session.
-  // Drives the "Flagged" pill in the card header. Set on click, cleared on
-  // full reload. Explicitly NOT persisted server-side, so it doesn't leak
-  // the flag to other users viewing the same row. Set is keyed by cardId
-  // so the pill survives next/previous navigation within the session if
-  // the user happens to return to a flagged card.
-  const [flaggedCardIds, setFlaggedCardIds] = useState<Set<Id<'cards'>>>(
-    () => new Set(),
-  );
-
   // Whole-card audio regenerate state. Mirrors the flag flow but tracks all
   // course languages at once. `regenerateCardAudio` deletes audio for every
   // language and re-enqueues TTS, so completion = every initially-present
   // audio has been seen deleted then re-emitted. Languages that already had
   // no audio at regen-time only need their URL to come back.
-  const [regenerateAudioStatus, setRegenerateAudioStatus] = useState<
-    | {
-        state: 'pending' | 'resolved';
-        // Card this regenerate was triggered on. Same rationale as the
-        // flag map: drop the status the moment we leave that card so
-        // detection can't fire stale across cards.
-        cardId: Id<'cards'>;
-        startedAt: number;
-        perLang: Map<
-          string,
-          { urlAtStart: string | null; deletedSeen: boolean; resolved: boolean }
-        >;
-      }
-    | null
-  >(null);
+  const [regenerateAudioStatus, setRegenerateAudioStatus] = useState<{
+    state: 'pending' | 'resolved';
+    // Card this regenerate was triggered on. Same rationale as the
+    // flag map: drop the status the moment we leave that card so
+    // detection can't fire stale across cards.
+    cardId: Id<'cards'>;
+    startedAt: number;
+    perLang: Map<
+      string,
+      { urlAtStart: string | null; deletedSeen: boolean; resolved: boolean }
+    >;
+  } | null>(null);
 
   // ----- Progress display (every PROGRESS_DISPLAY_INTERVAL reviews per day) -----
   // ─── Session counters + session-id lifecycle ──────────────────────────
@@ -525,10 +542,14 @@ export function useLearningMode(
       {},
     );
     if (current == null || current.courseId !== args.courseId) return;
-    localStore.setQuery(api.features.courses.getActiveCourseSettings, {}, {
-      ...current,
-      currentSessionId: args.sessionId,
-    });
+    localStore.setQuery(
+      api.features.courses.getActiveCourseSettings,
+      {},
+      {
+        ...current,
+        currentSessionId: args.sessionId,
+      },
+    );
   });
 
   // Locally-minted id, stable from the very first render so any review that
@@ -541,7 +562,7 @@ export function useLearningMode(
 
   // The server-backed id; falls back to `localSessionId` until the seed
   // mutation's optimistic update lands, so the fallback is never empty.
-  const sessionId = courseSettingsQuery?.currentSessionId ?? localSessionId;
+  const sessionId = courseSettings?.currentSessionId ?? localSessionId;
 
   // Track which course we've already seeded so a course switch (or a brand-new
   // user's first course) gets one, and only one. Mint + persist call.
@@ -555,7 +576,7 @@ export function useLearningMode(
     setSessionId: typeof setCurrentSessionIdMutation;
   }>({ courseId: null, setSessionId: setCurrentSessionIdMutation });
   sessionContextRef.current = {
-    courseId: courseSettingsQuery?.courseId ?? null,
+    courseId: courseSettings?.courseId ?? null,
     setSessionId: setCurrentSessionIdMutation,
   };
 
@@ -564,8 +585,8 @@ export function useLearningMode(
   // already used as its fallback, so client-side and server-side agree on
   // a single value from the very first review onward.
   useEffect(() => {
-    if (!courseSettingsQuery) return;
-    const { courseId, currentSessionId } = courseSettingsQuery;
+    if (!courseSettings) return;
+    const { courseId, currentSessionId } = courseSettings;
     if (currentSessionId) {
       // Already seeded. Record it so we don't re-seed for this course.
       seededCourseIdRef.current = courseId;
@@ -574,11 +595,7 @@ export function useLearningMode(
     if (seededCourseIdRef.current === courseId) return;
     seededCourseIdRef.current = courseId;
     setCurrentSessionIdMutation({ courseId, sessionId: localSessionId });
-  }, [
-    courseSettingsQuery,
-    localSessionId,
-    setCurrentSessionIdMutation,
-  ]);
+  }, [courseSettings, localSessionId, setCurrentSessionIdMutation]);
 
   // Rotation handler passed to `useCelebration`. Fires when the user dismisses
   // a celebration. Mints + persists a fresh id; the optimistic update means
@@ -597,7 +614,7 @@ export function useLearningMode(
   // starts a fresh "session" UI.
   const [sessionCardCount, setSessionCardCount] = useState(0);
   const sessionCardCountCourseRef = useRef<string | null>(null);
-  const activeCourseIdForSession = activeCourseQuery?._id ?? null;
+  const activeCourseIdForSession = activeCourse?._id ?? null;
   if (sessionCardCountCourseRef.current !== activeCourseIdForSession) {
     sessionCardCountCourseRef.current = activeCourseIdForSession;
     setSessionCardCount(0);
@@ -691,7 +708,10 @@ export function useLearningMode(
       ensureInFlightRef.current = true;
       ensureUpcomingContentMutation()
         .catch((err) => {
-          console.error('Failed to ensure upcoming cards content:', err);
+          reportError(err, {
+            op: 'ensureUpcomingCardsContent',
+            trigger: 'reviewTick',
+          });
         })
         .finally(() => {
           ensureInFlightRef.current = false;
@@ -706,7 +726,11 @@ export function useLearningMode(
       cancelled = true;
       if (retryTimer !== null) clearTimeout(retryTimer);
     };
-  }, [cardForReview?._id, cardForReview?.hasMissingContent, ensureUpcomingContentMutation]);
+  }, [
+    cardForReview?._id,
+    cardForReview?.hasMissingContent,
+    ensureUpcomingContentMutation,
+  ]);
 
   // When the deck has no due cards, the per-card effect above never fires,
   // so the next "Add cards" click would pull texts whose content prep has not
@@ -730,7 +754,11 @@ export function useLearningMode(
       ensureInFlightRef.current = true;
       ensureUpcomingContentMutation()
         .catch((err) => {
-          console.error('Failed to ensure upcoming cards content:', err);
+          reportError(err, {
+            op: 'ensureUpcomingCardsContent',
+            trigger: 'emptyDeck',
+            attempts,
+          });
           if (cancelled || attempts >= ENSURE_CONTENT_MAX_RETRIES) return;
           attempts++;
           hasEnsuredForEmptyDeckRef.current = false;
@@ -745,7 +773,11 @@ export function useLearningMode(
       cancelled = true;
       if (retryTimer !== null) clearTimeout(retryTimer);
     };
-  }, [cardForReview, courseSettings?.activeCollectionId, ensureUpcomingContentMutation]);
+  }, [
+    cardForReview,
+    courseSettings?.activeCollectionId,
+    ensureUpcomingContentMutation,
+  ]);
 
   // --------------------------------------------------------------------------
   // Add cards
@@ -789,6 +821,18 @@ export function useLearningMode(
       if (result.cardsAdded > 0) {
         autoAddExhaustedForRef.current = null;
         autoAddQuotaEmptyRef.current = false;
+        unservedAddRunsRef.current++;
+        if (unservedAddRunsRef.current >= MAX_UNSERVED_ADD_RUNS) {
+          // Cards keep getting added but none is ever served: stop auto-add
+          // before it runs the collection dry. Serving a card resets the
+          // counter, so a healthy add-serve-add cadence never trips this.
+          autoAddExhaustedForRef.current = collectionId.toString();
+          reportError(new Error('auto-add stall: cards added, none served'), {
+            op: 'autoAddStall',
+            collectionId,
+            runs: unservedAddRunsRef.current,
+          });
+        }
       } else if (result.quotaLimited) {
         autoAddQuotaEmptyRef.current = true;
       } else if (!result.scanIncomplete) {
@@ -798,7 +842,7 @@ export function useLearningMode(
         autoAddExhaustedForRef.current = collectionId.toString();
       }
     } catch (error) {
-      console.error('Failed to add cards:', error);
+      reportError(error, { op: 'addCardsFromCollection', collectionId });
       // Latch failures too: the effect re-fires when isAddingCards flips
       // back, so a persistent rejection (e.g. QUOTA_NOT_SYNCED before the
       // quota doc exists) would otherwise retry the mutation in a tight
@@ -894,6 +938,9 @@ export function useLearningMode(
   // Review / master / hide
   // --------------------------------------------------------------------------
   const reviewMode = courseSettings?.reviewMode ?? 'audio';
+  // Which writing task the full face serves; picks the session-stats bucket
+  // (translating vs transcribing). Matches LearnView's default.
+  const writingInputMode = courseSettings?.writingInputMode ?? 'translate';
 
   // Opt-out: undefined (pre-migration rows or unset) defaults to enabled.
   const progressDisplayEnabled = courseSettings?.progressDisplayEnabled ?? true;
@@ -914,7 +961,8 @@ export function useLearningMode(
   const runExitingMutation = useCallback(
     async (
       run: () => Promise<unknown>,
-      errorMessage: string,
+      /** Stable event name for `reportError` (e.g. 'deleteCard'). */
+      op: string,
       options?: { alwaysClearExiting?: boolean },
     ) => {
       if (exitMutationInFlightRef.current) return;
@@ -926,7 +974,7 @@ export function useLearningMode(
       try {
         await run();
       } catch (error) {
-        console.error(errorMessage, error);
+        reportError(error, { op });
         if (!options?.alwaysClearExiting) {
           setIsExiting(false);
         }
@@ -973,10 +1021,11 @@ export function useLearningMode(
       }
 
       try {
+        const timeSpentMs = Math.max(0, Date.now() - cardShownAtRef.current);
         const result = await reviewCardMutation({
           cardId: cardForReview._id,
           rating,
-          timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
+          timeSpentMs,
           timezone: getUserTimezone(),
           ...(reviewMode === 'full' && { forceReviewPhase: true }),
           reviewMode,
@@ -988,6 +1037,11 @@ export function useLearningMode(
             accuracyLenient: accuracy.lenient / 100,
           }),
         });
+        recordReviewForSession(
+          'review',
+          reviewActivity(reviewMode, writingInputMode),
+          timeSpentMs,
+        );
         setDailyReviewsToday(result.dailyReviewsToday);
         setDailyTimeMsToday(result.dailyTimeMsToday);
         setDailyNewWordsToday(result.dailyNewWordsToday);
@@ -1008,7 +1062,7 @@ export function useLearningMode(
         setSelectedRating(null);
         setAutoRating(null);
       } catch (error) {
-        console.error('Failed to review card:', error);
+        reportError(error, { op: 'reviewCard', cardId: cardForReview._id });
         if (predictedMilestone) {
           setProgressDisplayActive(false);
           setProgressDisplayReady(false);
@@ -1024,6 +1078,7 @@ export function useLearningMode(
       isReviewing,
       reviewCardMutation,
       reviewMode,
+      writingInputMode,
       progressDisplayEnabled,
       dailyReviewsToday,
       sessionId,
@@ -1046,6 +1101,7 @@ export function useLearningMode(
         setDailyTimeMsToday(result.dailyTimeMsToday);
         setDailyNewWordsToday(result.dailyNewWordsToday);
         setSessionCardCount((n) => Math.max(0, n - 1));
+        undoReviewForSession(reviewActivity(reviewMode, writingInputMode));
         // The card-change effect keyed on `cardForReview?._id` won't fire when
         // the restored card is the same document as the one on screen (e.g.
         // after an "again" rating on a small deck), so reset the per-card
@@ -1059,12 +1115,18 @@ export function useLearningMode(
       }
       return false;
     } catch (error) {
-      console.error('Failed to undo review:', error);
+      reportError(error, { op: 'undoLastReview' });
       return false;
     } finally {
       setIsUndoing(false);
     }
-  }, [isReviewing, isUndoing, undoLastReviewMutation]);
+  }, [
+    isReviewing,
+    isUndoing,
+    undoLastReviewMutation,
+    reviewMode,
+    writingInputMode,
+  ]);
 
   const handleMaster = useCallback(() => {
     setIsPendingMaster((prev) => !prev);
@@ -1081,41 +1143,25 @@ export function useLearningMode(
     try {
       await toggleFavoriteCardMutation({ cardId: cardForReview._id });
     } catch (error) {
-      console.error('Failed to toggle favorite:', error);
+      reportError(error, {
+        op: 'toggleFavoriteCard',
+        cardId: cardForReview._id,
+      });
     }
   }, [cardForReview, toggleFavoriteCardMutation]);
 
-  // Flag-only. Fires the retranslation mutation in the background and
-  // otherwise leaves the card alone, no deletion, no exit animation, no
-  // automatic advance. The user stays on the card and can press next when
-  // they're ready; the new translation may arrive in-place as it lands.
+  // Flag-only. Fires the retranslation mutation in the background (via the
+  // shared card-action surface) and otherwise leaves the card alone, no
+  // deletion, no exit animation, no automatic advance. The user stays on the
+  // card and can press next when they're ready; the new translation may
+  // arrive in-place as it lands.
+  const flagCard = cardActions.flagCard;
   const handleFlag = useCallback(async () => {
     if (!cardForReview || isReviewing) return;
-    const flaggedCardId = cardForReview._id;
-    // Fire-and-forget. Mark the card as session-flagged ONLY when the
-    // mutation reports it didn't trigger ANY retranslation, i.e. all
-    // non-source languages were either over-cap or claim-contested. When
-    // a retranslation IS in flight, the server-driven `retranslating`
-    // pill handles the signal, and once it lands we want NO pill (don't
-    // lingeringly tag a card as "Flagged" after the system fixed it).
-    flagTranslationMutation({
-      cardId: cardForReview._id,
-    })
-      .then((result) => {
-        if (result && result.retranslated === false) {
-          setFlaggedCardIds((prev) => {
-            if (prev.has(flaggedCardId)) return prev;
-            const next = new Set(prev);
-            next.add(flaggedCardId);
-            return next;
-          });
-        }
-      })
-      .catch((error) => {
-        console.error('Failed to flag translation:', error);
-      });
-  }, [cardForReview, isReviewing, flagTranslationMutation]);
+    flagCard(cardForReview._id);
+  }, [cardForReview, isReviewing, flagCard]);
 
+  const regenerateAudio = cardActions.regenerateAudio;
   const handleRegenerateAudio = useCallback(async () => {
     if (!cardForReview) return;
     // Snapshot every language's audio URL so the detection effect can
@@ -1137,17 +1183,12 @@ export function useLearningMode(
       startedAt: Date.now(),
       perLang,
     });
-    try {
-      await regenerateCardAudioMutation({
-        cardId: cardForReview._id,
-        timezone: getUserTimezone(),
-      });
-    } catch (error) {
+    const ok = await regenerateAudio(cardForReview._id);
+    if (!ok) {
       // Roll back so the pending gate releases auto-advance immediately.
       setRegenerateAudioStatus(null);
-      console.error('Failed to regenerate audio:', error);
     }
-  }, [cardForReview, regenerateCardAudioMutation]);
+  }, [cardForReview, regenerateAudio]);
 
   // Resolve regenerate-audio when every snapshotted language has been
   // observed deleted-then-restored (or, for languages that started empty,
@@ -1167,9 +1208,7 @@ export function useLearningMode(
     const nextPerLang = new Map(regenerateAudioStatus.perLang);
     for (const [lang, entry] of regenerateAudioStatus.perLang) {
       if (entry.resolved) continue;
-      const ar = cardForReview.audioRecordings.find(
-        (a) => a.language === lang,
-      );
+      const ar = cardForReview.audioRecordings.find((a) => a.language === lang);
       const currentUrl = ar?.url ?? null;
       let updated = entry;
       if (!updated.deletedSeen && currentUrl == null) {
@@ -1196,7 +1235,11 @@ export function useLearningMode(
     // Only patch when we're still on the same card + still pending.
     setRegenerateAudioStatus((prev) =>
       prev && prev.cardId === cardForReview._id && prev.state === 'pending'
-        ? { ...prev, perLang: nextPerLang, state: allResolved ? 'resolved' : 'pending' }
+        ? {
+            ...prev,
+            perLang: nextPerLang,
+            state: allResolved ? 'resolved' : 'pending',
+          }
         : prev,
     );
   }, [cardForReview, regenerateAudioStatus]);
@@ -1232,24 +1275,16 @@ export function useLearningMode(
     return () => clearTimeout(timer);
   }, [regenerateAudioStatus]);
 
-  const handleUpdatePinnedActions = useCallback(
-    async (actions: readonly string[]) => {
-      try {
-        await updatePinnedCardActionsMutation({ actions: [...actions] });
-      } catch (error) {
-        console.error('Failed to update pinned card actions:', error);
-      }
-    },
-    [updatePinnedCardActionsMutation],
-  );
+  const handleUpdatePinnedActions = cardActions.updatePinnedActions;
 
+  const deleteCard = cardActions.deleteCard;
   const handleDelete = useCallback(async () => {
     if (!cardForReview || isReviewing) return;
-    await runExitingMutation(
-      () => deleteCardMutation({ cardId: cardForReview._id }),
-      'Failed to delete card:',
-    );
-  }, [cardForReview, isReviewing, deleteCardMutation, runExitingMutation]);
+    await runExitingMutation(() => deleteCard(cardForReview._id), 'deleteCard');
+  }, [cardForReview, isReviewing, deleteCard, runExitingMutation]);
+  // Mirrored for the confirm-dialog path above (same pattern as
+  // `sessionContextRef`: assigned every render, read at event time).
+  handleDeleteRef.current = handleDelete;
 
   // --------------------------------------------------------------------------
   // Scheduling mode
@@ -1262,7 +1297,7 @@ export function useLearningMode(
         courseId: settingsCourseId,
         schedulingMode: mode,
       }).catch((error) => {
-        console.error('Failed to update scheduling mode:', error);
+        reportError(error, { op: 'updateSchedulingMode' });
       });
     },
     [settingsCourseId, updateCourseSettingsMutation],
@@ -1279,73 +1314,91 @@ export function useLearningMode(
   // `isHandsFree` in useLearningAudio), the server resolves the face itself.
   const isFreePlay = schedulingMode === 'radio';
 
-  const handleNext = useCallback(async (
-    ratingOverride?: ReviewRating,
-    accuracy?: ReviewAccuracyPayload,
-  ) => {
-    if (!cardForReview || isReviewing) return;
-    if (isPendingMaster) {
-      await runExitingMutation(
-        () => masterCardMutation({ cardId: cardForReview._id }),
-        'Failed to master card:',
+  const handleNext = useCallback(
+    async (ratingOverride?: ReviewRating, accuracy?: ReviewAccuracyPayload) => {
+      if (!cardForReview || isReviewing) return;
+      if (isPendingMaster) {
+        await runExitingMutation(
+          () => masterCardMutation({ cardId: cardForReview._id }),
+          'masterCard',
+        );
+        return;
+      }
+      if (isPendingHide) {
+        await runExitingMutation(
+          () => hideCardMutation({ cardId: cardForReview._id }),
+          'hideCard',
+        );
+        return;
+      }
+      if (isFreePlay) {
+        // Free play bypasses FSRS entirely: no rating, no scheduling write, no
+        // celebration. Just bump the active face's play counter so the
+        // next-lowest counter rises to the front of the queue. The mutation
+        // reads the face off course settings, so it can never advance a
+        // different rotation than the one being served.
+        // `alwaysClearExiting`: the shared reset effect only fires when
+        // `cardForReview._id` changes, so on a same-id re-render (single-card
+        // decks) it would otherwise leave the card pane blank.
+        const freePlayTimeMs = Math.max(0, Date.now() - cardShownAtRef.current);
+        await runExitingMutation(
+          async () => {
+            const result = await advanceFreePlayCardMutation({
+              cardId: cardForReview._id,
+              timezone: getUserTimezone(),
+              timeSpentMs: freePlayTimeMs,
+            });
+            // Free play counts as listening/writing time for the session
+            // stats, under the 'radio' surface; it is deliberately NOT a
+            // review (no FSRS write happened).
+            recordReviewForSession(
+              'radio',
+              reviewActivity(reviewMode, writingInputMode),
+              freePlayTimeMs,
+            );
+            return result;
+          },
+          'advanceFreePlayCard',
+          { alwaysClearExiting: true },
+        );
+        return;
+      }
+      const phase = effectivePhase(
+        reviewMode,
+        cardForReview.schedulingPhase as SchedulingPhase,
       );
-      return;
-    }
-    if (isPendingHide) {
-      await runExitingMutation(
-        () => hideCardMutation({ cardId: cardForReview._id }),
-        'Failed to hide card:',
-      );
-      return;
-    }
-    if (isFreePlay) {
-      // Free play bypasses FSRS entirely: no rating, no scheduling write, no
-      // celebration. Just bump the active face's play counter so the
-      // next-lowest counter rises to the front of the queue. The mutation
-      // reads the face off course settings, so it can never advance a
-      // different rotation than the one being served.
-      // `alwaysClearExiting`: the shared reset effect only fires when
-      // `cardForReview._id` changes, so on a same-id re-render (single-card
-      // decks) it would otherwise leave the card pane blank.
-      await runExitingMutation(
-        () =>
-          advanceFreePlayCardMutation({
-            cardId: cardForReview._id,
-            timezone: getUserTimezone(),
-            timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
-          }),
-        'Failed to advance free-play card:',
-        { alwaysClearExiting: true },
-      );
-      return;
-    }
-    const phase = effectivePhase(reviewMode, cardForReview.schedulingPhase as SchedulingPhase);
-    const defaultRatingForPhase = getDefaultRating(phase);
-    const rating =
-      ratingOverride ?? selectedRating ?? autoRatingState ?? defaultRatingForPhase;
-    // `wasDefaultRating` deliberately still means "the review landed on the
-    // phase default", NOT "the user accepted what was offered". Redefining it
-    // would change its meaning for audio and pre-review mode too, and it has
-    // no reader today (dailyStats.defaultRatingUsed / defaultRatingChanged are
-    // written and reversed but never queried). If auto-rate acceptance ever
-    // needs measuring, add an explicit `ratingSource` arg rather than
-    // reinterpreting these counters.
-    handleReview(rating, rating === defaultRatingForPhase, accuracy);
-  }, [
-    cardForReview,
-    isReviewing,
-    isPendingMaster,
-    isPendingHide,
-    isFreePlay,
-    selectedRating,
-    autoRatingState,
-    reviewMode,
-    handleReview,
-    runExitingMutation,
-    masterCardMutation,
-    hideCardMutation,
-    advanceFreePlayCardMutation,
-  ]);
+      const defaultRatingForPhase = getDefaultRating(phase);
+      const rating =
+        ratingOverride ??
+        selectedRating ??
+        autoRatingState ??
+        defaultRatingForPhase;
+      // `wasDefaultRating` deliberately still means "the review landed on the
+      // phase default", NOT "the user accepted what was offered". Redefining it
+      // would change its meaning for audio and pre-review mode too, and it has
+      // no reader today (dailyStats.defaultRatingUsed / defaultRatingChanged are
+      // written and reversed but never queried). If auto-rate acceptance ever
+      // needs measuring, add an explicit `ratingSource` arg rather than
+      // reinterpreting these counters.
+      handleReview(rating, rating === defaultRatingForPhase, accuracy);
+    },
+    [
+      cardForReview,
+      isReviewing,
+      isPendingMaster,
+      isPendingHide,
+      isFreePlay,
+      selectedRating,
+      autoRatingState,
+      reviewMode,
+      writingInputMode,
+      handleReview,
+      runExitingMutation,
+      masterCardMutation,
+      hideCardMutation,
+      advanceFreePlayCardMutation,
+    ],
+  );
 
   // ============================================================================
   // Return discriminated states
@@ -1353,7 +1406,7 @@ export function useLearningMode(
 
   // Cross-cutting fields shared by every state, including the progress
   // display (so a milestone hit on the last card survives the transition to
-  // `noCardsDue`) and `schedulingMode` (used by the celebration UI).
+  // `noCardsDue`). `schedulingMode` is for the header and free-play face.
   const base = {
     settingsOpen,
     setSettingsOpen,
@@ -1370,14 +1423,12 @@ export function useLearningMode(
     autoAdvance: courseSettings?.autoAdvance ?? DEFAULT_AUTO_ADVANCE,
     setAutoRating,
     autoAddHeld,
+    cardActions,
   };
 
-  // Loading
-  if (
-    cardForReview === undefined ||
-    courseSettings === undefined ||
-    activeCourse === undefined
-  ) {
+  // Loading. Only the card query can be in flight: courseSettings and
+  // activeCourse come from AppDataProvider and are never `undefined`.
+  if (cardForReview === undefined) {
     return { ...base, status: 'loading' };
   }
 
@@ -1446,9 +1497,10 @@ export function useLearningMode(
         targetLanguages,
         handleAddCards,
         isAddingCards,
-        batchSize:
-          courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
-        sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
+        batchSize: courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
+        sentencesRemaining: sentencesQuota.unlimited
+          ? null
+          : sentencesQuota.balance,
         remainingInCollection,
         handleSchedulingModeChange,
       };
@@ -1462,7 +1514,10 @@ export function useLearningMode(
   // Reviewing, in full review mode, always use FSRS ratings (skip pre-review).
   // In free play (radio / free study), skip rating UI entirely (no FSRS, no
   // rating buttons, LearningControls falls back to a plain Next button).
-  const phase = effectivePhase(reviewMode, displayCard.schedulingPhase as SchedulingPhase);
+  const phase = effectivePhase(
+    reviewMode,
+    displayCard.schedulingPhase as SchedulingPhase,
+  );
   const validRatings = isFreePlay ? [] : getValidRatings(phase);
   const defaultRating = getDefaultRating(phase);
   // Manual choice first, then the accuracy suggestion, then the phase default.
@@ -1533,15 +1588,15 @@ export function useLearningMode(
     audioRecordings: displayCard.audioRecordings,
     nextCard: displayCard.nextCard
       ? {
-        cardId: displayCard.nextCard._id,
-        audioRecordings: displayCard.nextCard.audioRecordings,
-      }
+          cardId: displayCard.nextCard._id,
+          audioRecordings: displayCard.nextCard.audioRecordings,
+        }
       : null,
     audioSpeedOverrides: displayCard.audioSpeedOverrides,
     isFavorite: displayCard.isFavorite ?? false,
     isPendingMaster,
     isPendingHide,
-    flaggedInSession: flaggedCardIds.has(displayCard._id),
+    flaggedInSession: cardActions.flaggedCardIds.has(displayCard._id),
     hasInflightCardAction: regenerateAudioStatus?.state === 'pending',
     pinnedCardActions: userSettingsQuery?.pinnedCardActions ?? [],
     cardActionQuotas: {

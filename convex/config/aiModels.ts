@@ -15,9 +15,13 @@ export const OPENROUTER_MODELS = {
   /** Bulk translation JSON for custom card auto-fill. Reuses the
    *  single-sentence pipeline's stage (`LUNA_BO3`) so model + no-thinking
    *  reasoning can't drift apart; autofill is a SINGLE call (no sampling,
-   *  no judge, that part of the stage is ignored here). Reasoning and the
-   *  Luna price cap are set at the call site in customTexts.ts (also from
-   *  the stage). */
+   *  no judge, that part of the stage is ignored here). Reasoning, the Luna
+   *  price cap, and the prompt live in lib/translationAutofillPrompt.ts
+   *  (also from the stage), shared with scripts/eval-translation-autofill.ts.
+   *  Held on Luna by the Aug 2026 autofill eval: 95% case accuracy vs 100%
+   *  for gemini-3.7-flash minimal, but at ~1/18 the cost and half the
+   *  latency; Gemini cannot run thinking-free (its reasoning floor is
+   *  `minimal`, billed). Re-run `pnpm eval:autofill` before switching. */
   translationAutoFill: LUNA_BO3.model,
   /** Linguistic metadata inference (register, gender, addresseeNumber) for
    *  newly-created cards. Runs once per row, including during bulk import,

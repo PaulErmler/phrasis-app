@@ -31,9 +31,9 @@ afterEach(() => {
 
 describe('shouldAdvanceOnEnter', () => {
   it('advances on a plain Enter over inert content', () => {
-    expect(shouldAdvanceOnEnter(keyEvent(mount(document.createElement('div'))))).toBe(
-      true,
-    );
+    expect(
+      shouldAdvanceOnEnter(keyEvent(mount(document.createElement('div')))),
+    ).toBe(true);
   });
 
   it('ignores every key that is not Enter', () => {
@@ -51,7 +51,9 @@ describe('shouldAdvanceOnEnter', () => {
   it('ignores modifier chords', () => {
     const div = mount(document.createElement('div'));
     for (const mod of ['metaKey', 'ctrlKey', 'altKey', 'shiftKey'] as const) {
-      expect(shouldAdvanceOnEnter(keyEvent(div, { [mod]: true })), mod).toBe(false);
+      expect(shouldAdvanceOnEnter(keyEvent(div, { [mod]: true })), mod).toBe(
+        false,
+      );
     }
   });
 
@@ -68,7 +70,9 @@ describe('shouldAdvanceOnEnter', () => {
   // ja/zh/ko/vi type through an IME where Enter CONFIRMS the conversion.
   it('stands down during IME composition', () => {
     const div = mount(document.createElement('div'));
-    expect(shouldAdvanceOnEnter(keyEvent(div, { isComposing: true }))).toBe(false);
+    expect(shouldAdvanceOnEnter(keyEvent(div, { isComposing: true }))).toBe(
+      false,
+    );
     // Legacy signal, the only one older Safari / some Android WebViews set.
     expect(shouldAdvanceOnEnter(keyEvent(div, { keyCode: 229 }))).toBe(false);
   });

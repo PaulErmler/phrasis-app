@@ -22,7 +22,8 @@ export function useScreenWakeLock(enabled: boolean) {
     };
 
     const acquire = async () => {
-      if (!enabled || cancelled || document.visibilityState !== 'visible') return;
+      if (!enabled || cancelled || document.visibilityState !== 'visible')
+        return;
       release();
       try {
         const s = await wakeLockApi.request('screen');

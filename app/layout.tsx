@@ -13,7 +13,6 @@ import { ConsentBanner } from '@/components/consent/ConsentBanner';
 import { getToken } from '@/lib/auth-server';
 import { AutumnWrapper } from './providers';
 
-
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
@@ -89,7 +88,10 @@ export default async function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta
+          name="apple-mobile-web-app-status-bar-style"
+          content="black-translucent"
+        />
         <meta name="apple-mobile-web-app-title" content="Flexling" />
       </head>
       <body
@@ -105,9 +107,7 @@ export default async function RootLayout({
           <PWAInstallGlobal />
           <ConvexClientProvider initialToken={initialToken}>
             <Providers locale={locale} messages={messages} timeZone={timeZone}>
-              <AutumnWrapper>
-                {children}
-              </AutumnWrapper>
+              <AutumnWrapper>{children}</AutumnWrapper>
               <Toaster position="top-center" />
               {/* Inside NextIntlClientProvider. The banner is translated. */}
               <ConsentBanner />

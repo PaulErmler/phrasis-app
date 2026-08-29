@@ -45,9 +45,7 @@ export default async function AppLayout({
               for its children while redirecting, which would unmount the gate
               (and its quota sync) mid-navigation. */}
           <BillingGate />
-          <OnboardingGuard>
-            {children}
-          </OnboardingGuard>
+          <OnboardingGuard>{children}</OnboardingGuard>
         </AppUpdateGate>
       </ClientAuthBoundary>
     </AppDataProvider>

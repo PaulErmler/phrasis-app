@@ -1,9 +1,9 @@
-import { type CheckoutResult } from "autumn-js";
-import { type TrialState } from "@/lib/autumn/trial-eligibility";
+import { type CheckoutResult } from 'autumn-js';
+import { type TrialState } from '@/lib/autumn/trial-eligibility';
 
 export type CheckoutTranslateFn = (
   key: string,
-  params?: Record<string, string | number>
+  params?: Record<string, string | number>,
 ) => string;
 
 export const getCheckoutContent = (
@@ -22,7 +22,7 @@ export const getCheckoutContent = (
     currentPeriodEndsAt?: number;
     /** App locale for date formatting; falls back to the browser default. */
     locale?: string;
-  }
+  },
 ) => {
   const { product, current_product, next_cycle } = checkoutResult;
   const { is_one_off, is_free, has_trial, updateable } = product.properties;
@@ -45,15 +45,15 @@ export const getCheckoutContent = (
 
   if (is_one_off) {
     return {
-      title: t("purchaseTitle", { productName }),
-      message: t("purchaseMessage", { productName }),
+      title: t('purchaseTitle', { productName }),
+      message: t('purchaseMessage', { productName }),
     };
   }
 
-  if (scenario === "active" && updateable) {
+  if (scenario === 'active' && updateable) {
     return {
-      title: t("updatePlanTitle"),
-      message: t("updatePlanMessage"),
+      title: t('updatePlanTitle'),
+      message: t('updatePlanMessage'),
     };
   }
 
@@ -68,17 +68,19 @@ export const getCheckoutContent = (
   if (
     trialState.onTrial &&
     (is_free
-      ? scenario === "downgrade" || scenario === "cancel"
-      : scenario === "upgrade" || scenario === "downgrade" || scenario === "new")
+      ? scenario === 'downgrade' || scenario === 'cancel'
+      : scenario === 'upgrade' ||
+        scenario === 'downgrade' ||
+        scenario === 'new')
   ) {
     const trialEndStr = trialState.trialEndsAt
       ? formatDate(trialState.trialEndsAt)
-      : (nextCycleAtStr ?? "");
+      : (nextCycleAtStr ?? '');
     const key = is_free
-      ? "trialFreeScheduled"
-      : scenario === "downgrade"
-        ? "trialContinueScheduled"
-        : "trialContinueSwitchNow";
+      ? 'trialFreeScheduled'
+      : scenario === 'downgrade'
+        ? 'trialContinueScheduled'
+        : 'trialContinueSwitchNow';
     return {
       title: t(`${key}Title`, { productName }),
       message: t(`${key}Message`, { productName, date: trialEndStr }),
@@ -91,78 +93,78 @@ export const getCheckoutContent = (
   // opened without it (falls through to the scenario copy below).
   if (has_trial && trialState.trialEligible) {
     return {
-      title: t("startTrialTitle", { productName }),
-      message: t("startTrialMessage", {
+      title: t('startTrialTitle', { productName }),
+      message: t('startTrialMessage', {
         productName,
-        date: nextCycleAtStr ?? "",
+        date: nextCycleAtStr ?? '',
       }),
     };
   }
 
   switch (scenario) {
-  case "scheduled":
-    return {
-      title: t("scheduledTitle", { productName }),
-      message: t("scheduledMessage", {
-        productName,
-        currentProduct: current_product.name,
-        date: periodEndAtStr ?? "",
-      }),
-    };
-
-  case "active":
-    return {
-      title: t("alreadyActiveTitle"),
-      message: t("alreadyActiveMessage"),
-    };
-
-  case "new":
-    if (is_free) {
+    case 'scheduled':
       return {
-        title: t("enableTitle", { productName }),
-        message: t("enableMessage", { productName }),
+        title: t('scheduledTitle', { productName }),
+        message: t('scheduledMessage', {
+          productName,
+          currentProduct: current_product.name,
+          date: periodEndAtStr ?? '',
+        }),
       };
-    }
-    return {
-      title: t("subscribeTitle", { productName }),
-      message: t("subscribeMessage", { productName }),
-    };
 
-  case "renew":
-    return {
-      title: t("renewTitle"),
-      message: t("renewMessage", { productName }),
-    };
+    case 'active':
+      return {
+        title: t('alreadyActiveTitle'),
+        message: t('alreadyActiveMessage'),
+      };
 
-  case "upgrade":
-    return {
-      title: t("upgradeTitle", { productName }),
-      message: t("upgradeMessage", { productName }),
-    };
+    case 'new':
+      if (is_free) {
+        return {
+          title: t('enableTitle', { productName }),
+          message: t('enableMessage', { productName }),
+        };
+      }
+      return {
+        title: t('subscribeTitle', { productName }),
+        message: t('subscribeMessage', { productName }),
+      };
 
-  case "downgrade":
-    return {
-      title: t("downgradeTitle", { productName }),
-      message: t("downgradeMessage", {
-        productName,
-        currentProduct: current_product.name,
-        date: periodEndAtStr ?? "",
-      }),
-    };
+    case 'renew':
+      return {
+        title: t('renewTitle'),
+        message: t('renewMessage', { productName }),
+      };
 
-  case "cancel":
-    return {
-      title: t("cancelTitle"),
-      message: t("cancelMessage", {
-        currentProduct: current_product.name,
-        date: periodEndAtStr ?? "",
-      }),
-    };
+    case 'upgrade':
+      return {
+        title: t('upgradeTitle', { productName }),
+        message: t('upgradeMessage', { productName }),
+      };
 
-  default:
-    return {
-      title: t("changeTitle"),
-      message: t("changeMessage"),
-    };
+    case 'downgrade':
+      return {
+        title: t('downgradeTitle', { productName }),
+        message: t('downgradeMessage', {
+          productName,
+          currentProduct: current_product.name,
+          date: periodEndAtStr ?? '',
+        }),
+      };
+
+    case 'cancel':
+      return {
+        title: t('cancelTitle'),
+        message: t('cancelMessage', {
+          currentProduct: current_product.name,
+          date: periodEndAtStr ?? '',
+        }),
+      };
+
+    default:
+      return {
+        title: t('changeTitle'),
+        message: t('changeMessage'),
+      };
   }
 };

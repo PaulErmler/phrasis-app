@@ -19,7 +19,6 @@ export async function getDailyStats(
     .first();
 }
 
-
 /**
  * Floor a displayed review count to the celebration high-water mark (which
  * undo deliberately never lowers): after undoing past a milestone the
@@ -54,12 +53,26 @@ export function displayedActiveReviews(
 
 const EMPTY_HOUR_BUCKETS = () => Array.from({ length: 24 }, () => 0);
 const EMPTY_RATING_COUNTS = () => ({
-  stillLearning: 0, understood: 0,
-  again: 0, hard: 0, good: 0, easy: 0,
+  stillLearning: 0,
+  understood: 0,
+  again: 0,
+  hard: 0,
+  good: 0,
+  easy: 0,
 });
 /** Zeroed per-mode review counts; shared by the weekly/monthly/yearly upserts. */
-export const EMPTY_MODE_COUNTS = () => ({ audio: 0, full: 0, radio: 0, freeStudy: 0 });
-const EMPTY_CARD_STATE = () => ({ new: 0, learning: 0, review: 0, relearning: 0 });
+export const EMPTY_MODE_COUNTS = () => ({
+  audio: 0,
+  full: 0,
+  radio: 0,
+  freeStudy: 0,
+});
+const EMPTY_CARD_STATE = () => ({
+  new: 0,
+  learning: 0,
+  review: 0,
+  relearning: 0,
+});
 
 export async function upsertDailyStats(
   ctx: MutationCtx,
@@ -106,12 +119,21 @@ export async function upsertDailyStats(
     // Hour buckets
     let hourBuckets: number[] | undefined;
     if (args.hourOfDay != null && args.hourOfDay >= 0 && args.hourOfDay < 24) {
-      hourBuckets = existing.hourBuckets ? [...existing.hourBuckets] : EMPTY_HOUR_BUCKETS();
+      hourBuckets = existing.hourBuckets
+        ? [...existing.hourBuckets]
+        : EMPTY_HOUR_BUCKETS();
       hourBuckets[args.hourOfDay] = (hourBuckets[args.hourOfDay] ?? 0) + 1;
     }
 
     // Rating counts
-    type RatingCounts = { stillLearning: number; understood: number; again: number; hard: number; good: number; easy: number };
+    type RatingCounts = {
+      stillLearning: number;
+      understood: number;
+      again: number;
+      hard: number;
+      good: number;
+      easy: number;
+    };
     let ratingCounts: RatingCounts | undefined;
     if (args.rating) {
       const prev = existing.ratingCounts ?? EMPTY_RATING_COUNTS();
@@ -124,7 +146,12 @@ export async function upsertDailyStats(
     // Mode counts. `radio`/`freeStudy` are optional in the stored shape
     // (added later), so we coalesce both the merged previous shape and the
     // per-key read.
-    type ModeCounts = { audio: number; full: number; radio: number; freeStudy: number };
+    type ModeCounts = {
+      audio: number;
+      full: number;
+      radio: number;
+      freeStudy: number;
+    };
     let reviewsByMode: ModeCounts | undefined;
     let timeMsByMode: ModeCounts | undefined;
     if (args.reviewMode) {
@@ -132,16 +159,24 @@ export async function upsertDailyStats(
         ...EMPTY_MODE_COUNTS(),
         ...(existing.reviewsByMode ?? {}),
       };
-      reviewsByMode = { ...prevReviews, [args.reviewMode]: prevReviews[args.reviewMode] + 1 };
+      reviewsByMode = {
+        ...prevReviews,
+        [args.reviewMode]: prevReviews[args.reviewMode] + 1,
+      };
       const prevTime: ModeCounts = {
         ...EMPTY_MODE_COUNTS(),
         ...(existing.timeMsByMode ?? {}),
       };
-      timeMsByMode = { ...prevTime, [args.reviewMode]: prevTime[args.reviewMode] + args.timeMs };
+      timeMsByMode = {
+        ...prevTime,
+        [args.reviewMode]: prevTime[args.reviewMode] + args.timeMs,
+      };
     }
 
     // Card state
-    let reviewsByCardState: { new: number; learning: number; review: number; relearning: number } | undefined;
+    let reviewsByCardState:
+      | { new: number; learning: number; review: number; relearning: number }
+      | undefined;
     if (args.cardState != null) {
       const key = CARD_STATE_KEYS[args.cardState] ?? 'new';
       const prev = existing.reviewsByCardState ?? EMPTY_CARD_STATE();
@@ -162,16 +197,18 @@ export async function upsertDailyStats(
       ...(reviewsByCardState ? { reviewsByCardState } : {}),
       ...(args.accuracy != null
         ? {
-          accuracySum: (existing.accuracySum ?? 0) + args.accuracy,
-          accuracyCount: (existing.accuracyCount ?? 0) + 1,
-        }
+            accuracySum: (existing.accuracySum ?? 0) + args.accuracy,
+            accuracyCount: (existing.accuracyCount ?? 0) + 1,
+          }
         : {}),
       ...(args.accuracyStrict != null && args.accuracyLenient != null
         ? {
-          accuracyStrictSum: (existing.accuracyStrictSum ?? 0) + args.accuracyStrict,
-          accuracyLenientSum: (existing.accuracyLenientSum ?? 0) + args.accuracyLenient,
-          accuracyDualCount: (existing.accuracyDualCount ?? 0) + 1,
-        }
+            accuracyStrictSum:
+              (existing.accuracyStrictSum ?? 0) + args.accuracyStrict,
+            accuracyLenientSum:
+              (existing.accuracyLenientSum ?? 0) + args.accuracyLenient,
+            accuracyDualCount: (existing.accuracyDualCount ?? 0) + 1,
+          }
         : {}),
       ...(args.wasDefaultRating === true
         ? { defaultRatingUsed: (existing.defaultRatingUsed ?? 0) + 1 }
@@ -193,7 +230,8 @@ export async function upsertDailyStats(
 
   // Insert new document
   const hourBuckets = EMPTY_HOUR_BUCKETS();
-  if (args.hourOfDay != null && args.hourOfDay >= 0 && args.hourOfDay < 24) hourBuckets[args.hourOfDay] = 1;
+  if (args.hourOfDay != null && args.hourOfDay >= 0 && args.hourOfDay < 24)
+    hourBuckets[args.hourOfDay] = 1;
 
   const ratingCounts = EMPTY_RATING_COUNTS();
   if (args.rating && args.rating in ratingCounts) {
@@ -219,26 +257,32 @@ export async function upsertDailyStats(
     reviewsByCardState: cardState,
     ...(args.reviewMode
       ? {
-        reviewsByMode: {
-          ...EMPTY_MODE_COUNTS(),
-          [args.reviewMode]: 1,
-        },
-        timeMsByMode: {
-          ...EMPTY_MODE_COUNTS(),
-          [args.reviewMode]: args.timeMs,
-        },
-      }
+          reviewsByMode: {
+            ...EMPTY_MODE_COUNTS(),
+            [args.reviewMode]: 1,
+          },
+          timeMsByMode: {
+            ...EMPTY_MODE_COUNTS(),
+            [args.reviewMode]: args.timeMs,
+          },
+        }
       : {}),
-    ...(args.accuracy != null ? { accuracySum: args.accuracy, accuracyCount: 1 } : {}),
+    ...(args.accuracy != null
+      ? { accuracySum: args.accuracy, accuracyCount: 1 }
+      : {}),
     ...(args.accuracyStrict != null && args.accuracyLenient != null
       ? {
-        accuracyStrictSum: args.accuracyStrict,
-        accuracyLenientSum: args.accuracyLenient,
-        accuracyDualCount: 1,
-      }
+          accuracyStrictSum: args.accuracyStrict,
+          accuracyLenientSum: args.accuracyLenient,
+          accuracyDualCount: 1,
+        }
       : {}),
-    ...(args.wasDefaultRating === true ? { defaultRatingUsed: 1, defaultRatingChanged: 0 } : {}),
-    ...(args.wasDefaultRating === false ? { defaultRatingUsed: 0, defaultRatingChanged: 1 } : {}),
+    ...(args.wasDefaultRating === true
+      ? { defaultRatingUsed: 1, defaultRatingChanged: 0 }
+      : {}),
+    ...(args.wasDefaultRating === false
+      ? { defaultRatingUsed: 0, defaultRatingChanged: 1 }
+      : {}),
   });
   const activeReviewsAfter =
     args.reviewMode === 'audio' || args.reviewMode === 'full' ? 1 : 0;
@@ -262,7 +306,11 @@ export async function incrementDailyEventCounter(
     userId: string;
     courseId: Id<'courses'>;
     date: string;
-    field: 'chatMessagesSent' | 'chatCardsApproved' | 'cardsEdited' | 'cardsAddedManually';
+    field:
+      | 'chatMessagesSent'
+      | 'chatCardsApproved'
+      | 'cardsEdited'
+      | 'cardsAddedManually';
     count?: number;
   },
 ): Promise<void> {
@@ -271,13 +319,17 @@ export async function incrementDailyEventCounter(
   const existing = await ctx.db
     .query('dailyStats')
     .withIndex('by_userId_and_courseId_and_date', (q) =>
-      q.eq('userId', args.userId).eq('courseId', args.courseId).eq('date', args.date),
+      q
+        .eq('userId', args.userId)
+        .eq('courseId', args.courseId)
+        .eq('date', args.date),
     )
     .first();
 
   if (existing) {
     await ctx.db.patch(existing._id, {
-      [args.field]: ((existing[args.field] as number | undefined) ?? 0) + amount,
+      [args.field]:
+        ((existing[args.field] as number | undefined) ?? 0) + amount,
     });
   } else {
     await ctx.db.insert('dailyStats', {
@@ -293,7 +345,11 @@ export async function incrementDailyEventCounter(
   }
 }
 
-type DailyField = 'chatMessagesSent' | 'chatCardsApproved' | 'cardsEdited' | 'cardsAddedManually';
+type DailyField =
+  | 'chatMessagesSent'
+  | 'chatCardsApproved'
+  | 'cardsEdited'
+  | 'cardsAddedManually';
 
 const DAILY_TO_TOTAL_MAP: Record<DailyField, keyof Doc<'courseStats'>> = {
   chatMessagesSent: 'totalChatMessages',
@@ -322,7 +378,11 @@ export async function trackEvent(
 ): Promise<void> {
   const amount = args.count ?? 1;
   if (amount <= 0) return;
-  const stats = await getCourseStatsForMutation(ctx, args.userId, args.courseId);
+  const stats = await getCourseStatsForMutation(
+    ctx,
+    args.userId,
+    args.courseId,
+  );
   const tz = args.timezone || stats?.timezone || 'UTC';
   const date = getTodayInTimezone(tz);
   await incrementDailyEventCounter(ctx, {

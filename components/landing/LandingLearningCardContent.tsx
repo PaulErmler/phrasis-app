@@ -4,7 +4,10 @@ import { useState, useEffect } from 'react';
 import { LandingAudioButton } from '@/components/landing/LandingAudioButton';
 import { LandingCardShell } from '@/components/landing/LandingCardShell';
 import { AnnotationLines } from '@/components/app/learning/AnnotationLines';
-import type { CardTranslation, CardAudioRecording } from '@/components/app/learning/types';
+import type {
+  CardTranslation,
+  CardAudioRecording,
+} from '@/components/app/learning/types';
 import {
   getLandingAudioUrl,
   playLandingAudio,
@@ -12,6 +15,7 @@ import {
 } from '@/lib/landing/audio';
 import { getLanguageShortLabel } from '@/lib/languages';
 import { cn } from '@/lib/utils';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 
 interface LandingLearningCardContentProps {
   preReviewCount: number;
@@ -68,9 +72,13 @@ export function LandingLearningCardContent({
       ? preReviewCount + fsrsState.reps
       : preReviewCount;
 
-  const [manuallyRevealed, setManuallyRevealed] = useState<Set<string>>(new Set());
+  const [manuallyRevealed, setManuallyRevealed] = useState<Set<string>>(
+    new Set(),
+  );
 
-  const translationKey = translations.map((tr) => tr.language + tr.text).join('|');
+  const translationKey = translations
+    .map((tr) => tr.language + tr.text)
+    .join('|');
 
   useEffect(() => {
     setManuallyRevealed(new Set());
@@ -84,7 +92,9 @@ export function LandingLearningCardContent({
     });
   };
 
-  const targetLanguageCodes = translations.filter((tr) => tr.isTargetLanguage).map((tr) => tr.language);
+  const targetLanguageCodes = translations
+    .filter((tr) => tr.isTargetLanguage)
+    .map((tr) => tr.language);
   const targetLanguagesKey = targetLanguageCodes.join(',');
 
   useEffect(() => {
@@ -102,7 +112,9 @@ export function LandingLearningCardContent({
     // autoplay is allowed from this point on. Play base immediately, then
     // each target as it unblurs. A missing manifest entry just no-ops.
     const baseTr = translations.find((tr) => tr.isBaseLanguage);
-    const baseUrl = baseTr ? getLandingAudioUrl(baseTr.text, baseTr.language) : null;
+    const baseUrl = baseTr
+      ? getLandingAudioUrl(baseTr.text, baseTr.language)
+      : null;
     if (baseUrl) playLandingAudio(baseUrl);
 
     let at = delaysMs;
@@ -135,7 +147,10 @@ export function LandingLearningCardContent({
   ]);
 
   return (
-    <div data-tutorial="card-content" className="flex flex-col flex-1 min-h-0">
+    <div
+      data-tutorial={TUTORIAL_ANCHORS.cardContent}
+      className="flex flex-col flex-1 min-h-0"
+    >
       <LandingCardShell
         reviewCount={displayReviewCount}
         sourceText={sourceText}
@@ -161,25 +176,34 @@ export function LandingLearningCardContent({
                 hideTargetLanguages &&
                 !isAudioRevealed &&
                 !manuallyRevealed.has(translation.language);
-              const textClickToReveal = isBlurred && !audioDemoAutoUnlockSequence;
+              const textClickToReveal =
+                isBlurred && !audioDemoAutoUnlockSequence;
               return (
                 <div
                   key={translation.language}
                   className="flex items-start gap-2"
-                  {...(index === 0 ? { 'data-tutorial': 'target-text-audio' } : {})}
+                  {...(index === 0
+                    ? { 'data-tutorial': TUTORIAL_ANCHORS.targetTextAudio }
+                    : {})}
                 >
                   <div
                     className="flex-1"
-                    onClick={textClickToReveal ? () => handleReveal(translation.language) : undefined}
+                    onClick={
+                      textClickToReveal
+                        ? () => handleReveal(translation.language)
+                        : undefined
+                    }
                   >
                     <p
                       className={cn(
                         'body-large',
                         isBlurred
                           ? cn(
-                            'blur-md opacity-90 select-none',
-                            audioDemoAutoUnlockSequence ? 'cursor-default' : 'cursor-pointer',
-                          )
+                              'blur-md opacity-90 select-none',
+                              audioDemoAutoUnlockSequence
+                                ? 'cursor-default'
+                                : 'cursor-pointer',
+                            )
                           : 'blur-0 cursor-auto opacity-100 transition-[filter,opacity] duration-700 ease-out',
                       )}
                     >
@@ -193,15 +217,20 @@ export function LandingLearningCardContent({
                       className={cn(
                         isBlurred
                           ? cn(
-                            'blur-md opacity-90 select-none',
-                            audioDemoAutoUnlockSequence ? 'cursor-default' : 'cursor-pointer',
-                          )
+                              'blur-md opacity-90 select-none',
+                              audioDemoAutoUnlockSequence
+                                ? 'cursor-default'
+                                : 'cursor-pointer',
+                            )
                           : 'blur-0 cursor-auto opacity-100 transition-[filter,opacity] duration-700 ease-out',
                       )}
                     />
                   </div>
                   <LandingAudioButton
-                    url={getLandingAudioUrl(translation.text, translation.language)}
+                    url={getLandingAudioUrl(
+                      translation.text,
+                      translation.language,
+                    )}
                     language={getLanguageShortLabel(translation.language)}
                   />
                 </div>

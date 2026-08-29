@@ -1,5 +1,10 @@
-import type { DriveStep } from 'driver.js';
-import type { TutorialDefinition, TutorialContext, TranslateFn } from './types';
+import type {
+  AppDriveStep,
+  TutorialDefinition,
+  TutorialContext,
+  TranslateFn,
+} from './types';
+import { TUTORIAL_ANCHORS, tutorialSelector } from './anchors';
 import { tourStep } from './tour-step';
 
 export function createHomeTour(
@@ -12,10 +17,22 @@ export function createHomeTour(
   // resolver still degrades it to a centered popover if the button is absent.
   const freePlayStep =
     ctx?.reviewMode === 'full'
-      ? tourStep(t, 'home.freeStudyMode', '[data-tutorial="free-study-mode"]', 'bottom', 'center')
-      : tourStep(t, 'home.radioMode', '[data-tutorial="radio-mode"]', 'bottom', 'center');
+      ? tourStep(
+          t,
+          'home.freeStudyMode',
+          tutorialSelector(TUTORIAL_ANCHORS.freeStudyMode),
+          'bottom',
+          'center',
+        )
+      : tourStep(
+          t,
+          'home.radioMode',
+          tutorialSelector(TUTORIAL_ANCHORS.radioMode),
+          'bottom',
+          'center',
+        );
 
-  const steps: DriveStep[] = [
+  const steps: AppDriveStep[] = [
     {
       // Welcome. Heading only; no description per design.
       popover: {
@@ -23,20 +40,95 @@ export function createHomeTour(
         description: '',
       },
     },
-    tourStep(t, 'home.learnNew', '[data-tutorial="learn-new"]', 'bottom', 'center'),
-    tourStep(t, 'home.learnAndReview', '[data-tutorial="learn-and-review"]', 'bottom', 'center'),
+    tourStep(
+      t,
+      'home.learnNew',
+      tutorialSelector(TUTORIAL_ANCHORS.learnNew),
+      'bottom',
+      'center',
+    ),
+    tourStep(
+      t,
+      'home.learnAndReview',
+      tutorialSelector(TUTORIAL_ANCHORS.learnAndReview),
+      'bottom',
+      'center',
+    ),
     freePlayStep,
-    tourStep(t, 'home.reviewModeToggle', '[data-tutorial="review-mode-toggle"]', 'bottom', 'center'),
-    tourStep(t, 'home.contentSource', '[data-tutorial="content-source-filter"]', 'bottom', 'center'),
-    // The new/learning/review pills next to the content-source filter.
-    tourStep(t, 'home.dueCounts', '[data-tutorial="due-counts"]', 'bottom', 'center'),
+    tourStep(
+      t,
+      'home.reviewModeToggle',
+      tutorialSelector(TUTORIAL_ANCHORS.reviewModeToggle),
+      'bottom',
+      'center',
+    ),
+    tourStep(
+      t,
+      'home.contentSource',
+      tutorialSelector(TUTORIAL_ANCHORS.contentSourceFilter),
+      'bottom',
+      'center',
+    ),
+    // The new/review pills next to the content-source filter. Omitted when
+    // due counts are hidden (the default — showing them is an explicit
+    // opt-in), otherwise this step highlights an empty slot and talks about
+    // pills that aren't there.
+    ...(ctx?.hideDueCounts === true
+      ? []
+      : [
+          tourStep(
+            t,
+            'home.dueCounts',
+            tutorialSelector(TUTORIAL_ANCHORS.dueCounts),
+            'bottom',
+            'center',
+          ),
+        ]),
     // The rotating forecast in the progress card ("by the end of the year…").
-    tourStep(t, 'home.projections', '[data-tutorial="projections"]', 'bottom', 'center'),
-    tourStep(t, 'home.difficultySelection', '[data-tutorial="collection-carousel"]', 'top', 'center'),
+    tourStep(
+      t,
+      'home.projections',
+      tutorialSelector(TUTORIAL_ANCHORS.projections),
+      'bottom',
+      'center',
+    ),
+    // The 7-day workload card sits BELOW the progress card, so this step
+    // comes after both progress-card steps — the tour scrolls monotonically
+    // instead of jumping down and back up. Gated on the card's OWN
+    // preference (not hideDueCounts — the two opt-ins are independent).
+    // skipIfMissing is a safety net if the card isn't mounted when the tour
+    // launches.
+    ...(ctx?.hideWorkloadForecast === true
+      ? []
+      : [
+          {
+            ...tourStep(
+              t,
+              'home.workload',
+              tutorialSelector(TUTORIAL_ANCHORS.workloadForecast),
+              'top',
+              'center',
+            ),
+            skipIfMissing: true,
+          } satisfies AppDriveStep,
+        ]),
+    tourStep(
+      t,
+      'home.difficultySelection',
+      tutorialSelector(TUTORIAL_ANCHORS.collectionCarousel),
+      'top',
+      'center',
+    ),
     // Closing call-to-action. Re-highlights Learn & Review (the primary
     // entry point) so the tour finishes on the button the user is most
     // likely to click next.
-    tourStep(t, 'home.readyToLearn', '[data-tutorial="learn-and-review"]', 'bottom', 'center'),
+    tourStep(
+      t,
+      'home.readyToLearn',
+      tutorialSelector(TUTORIAL_ANCHORS.learnAndReview),
+      'bottom',
+      'center',
+    ),
   ];
 
   return {

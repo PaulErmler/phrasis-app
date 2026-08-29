@@ -252,36 +252,31 @@ export function InlineCollectionDetail({
             )}
           </Button>
         ) : (
-          !isComplete && (
-            sentencesRemaining === 0 ? (
-              <Button
-                size="sm"
-                onClick={onUpgrade}
-                className="text-xs"
-              >
-                <Lock className="h-3.5 w-3.5 mr-1" />
-                {t('detail.upgrade')}
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={isAdding}
-                onClick={onAddCards}
-                className="text-xs"
-                data-testid="collection-add-cards"
-              >
-                {isAdding ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <>
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    {t('detail.addN', { count: addCount })}
-                  </>
-                )}
-              </Button>
-            )
-          )
+          !isComplete &&
+          (sentencesRemaining === 0 ? (
+            <Button size="sm" onClick={onUpgrade} className="text-xs">
+              <Lock className="h-3.5 w-3.5 mr-1" />
+              {t('detail.upgrade')}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isAdding}
+              onClick={onAddCards}
+              className="text-xs"
+              data-testid="collection-add-cards"
+            >
+              {isAdding ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <>
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  {t('detail.addN', { count: addCount })}
+                </>
+              )}
+            </Button>
+          ))
         )}
       </div>
     </div>

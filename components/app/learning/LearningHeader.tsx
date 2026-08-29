@@ -18,6 +18,7 @@ import {
   Star,
 } from 'lucide-react';
 import { useLearningChatToggle } from './LearningChatLayout';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import type { SchedulingMode } from '@/convex/types';
 
 interface LearningHeaderProps {
@@ -201,7 +202,7 @@ export function LearningHeader({
             size="icon"
             onClick={onSettingsOpen}
             className="size-9 -mr-1"
-            data-tutorial="settings-button"
+            data-tutorial={TUTORIAL_ANCHORS.settingsButton}
             data-testid="learn-settings"
           >
             <Settings className="h-5 w-5" />

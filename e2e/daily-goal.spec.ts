@@ -44,7 +44,9 @@ function trackGoalWriteAcks(page: Page): { nextAck: () => Promise<void> } {
     if (!ws.url().includes('/sync')) return;
     // requestIds restart per socket, so the sent-frame map is per-socket too.
     const requestIds = new Set<number>();
-    const parse = (payload: string | Buffer): Record<string, unknown> | null => {
+    const parse = (
+      payload: string | Buffer,
+    ): Record<string, unknown> | null => {
       try {
         return JSON.parse(String(payload));
       } catch {
@@ -74,10 +76,7 @@ function trackGoalWriteAcks(page: Page): { nextAck: () => Promise<void> } {
         acks.shift() ??
         (await new Promise<boolean>((resolve, reject) => {
           const timer = setTimeout(
-            () =>
-              reject(
-                new Error(`no server ack for ${UDF_PATH} within 15s`),
-              ),
+            () => reject(new Error(`no server ack for ${UDF_PATH} within 15s`)),
             15_000,
           );
           waiters.push((ok) => {

@@ -16,7 +16,11 @@ describe('LearningGoalStep: free-text char limit', () => {
     render(
       <LearningGoalStep
         selected={['other']}
-        freeText={'x'.repeat(MAX_ONBOARDING_FREE_TEXT_LENGTH - ONBOARDING_FREE_TEXT_SHOW_COUNT_REMAINING_THRESHOLD - 1)}
+        freeText={'x'.repeat(
+          MAX_ONBOARDING_FREE_TEXT_LENGTH -
+            ONBOARDING_FREE_TEXT_SHOW_COUNT_REMAINING_THRESHOLD -
+            1,
+        )}
         onToggle={() => {}}
         onFreeText={() => {}}
       />,
@@ -36,7 +40,9 @@ describe('LearningGoalStep: free-text char limit', () => {
       />,
     );
     const counter = screen.getByTestId(COUNTER_TESTID);
-    expect(counter.textContent).toBe(`${length}/${MAX_ONBOARDING_FREE_TEXT_LENGTH}`);
+    expect(counter.textContent).toBe(
+      `${length}/${MAX_ONBOARDING_FREE_TEXT_LENGTH}`,
+    );
     expect(counter.className).toContain('text-muted-foreground');
     expect(counter.className).not.toContain('text-destructive');
   });

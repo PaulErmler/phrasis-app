@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import {
   alignWords,
   charDiff,
@@ -26,6 +26,10 @@ interface WordDiffProps {
   hideErrors?: boolean;
   /** User setting. Punctuation is still shown, just neutral and unscored. */
   ignorePunctuation?: boolean;
+  /** Bracketed furigana for `expected`; rendered only by the clean reveal. */
+  furigana?: string;
+  /** Romanization/IPA, rendered under the sentence and above the accuracy line. */
+  afterText?: ReactNode;
 }
 
 export function computeWordAccuracy(
@@ -34,7 +38,9 @@ export function computeWordAccuracy(
   language: string,
   ignorePunctuation = false,
 ): number {
-  const diffOpts = toDiffOptions(getCompareConfig(language, { ignorePunctuation }));
+  const diffOpts = toDiffOptions(
+    getCompareConfig(language, { ignorePunctuation }),
+  );
   const result = alignWords(expected, actual, diffOpts);
   return scoreWordAlignment(result, { ignorePunctuation });
 }
@@ -229,7 +235,11 @@ function WordChip({
             )}
             <span
               className={
-                s.ignored ? 'text-muted-foreground' : s.equal ? '' : underlineClass
+                s.ignored
+                  ? 'text-muted-foreground'
+                  : s.equal
+                    ? ''
+                    : underlineClass
               }
             >
               {s.correct}
@@ -249,6 +259,8 @@ export function WordDiff({
   omitAccuracy = false,
   hideErrors = false,
   ignorePunctuation = false,
+  furigana,
+  afterText,
 }: WordDiffProps) {
   const diffOpts = useMemo(
     () => toDiffOptions(getCompareConfig(language, { ignorePunctuation })),
@@ -274,6 +286,8 @@ export function WordDiff({
         language={language}
         accuracy={accuracy}
         hideAccuracy={hideAccuracy}
+        furigana={furigana}
+        afterText={afterText}
       />
     );
   }
@@ -310,6 +324,7 @@ export function WordDiff({
           </AskAboutWord>
         ))}
       </p>
+      {afterText}
       {!omitAccuracy && (
         <AccuracyFooter accuracy={accuracy} hideAccuracy={hideAccuracy} />
       )}

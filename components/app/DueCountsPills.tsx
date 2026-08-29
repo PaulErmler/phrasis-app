@@ -1,13 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { useQuery } from 'convex/react';
+import { usePreloadedQuery, useQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
 
 import { api } from '@/convex/_generated/api';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { useNowMinute } from '@/hooks/use-now-minute';
 import { cn } from '@/lib/utils';
+import { formatCappedCount, mergedDueCount } from '@/lib/constants/dueCounts';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 
 type Counts = {
   new: number;
@@ -17,20 +19,22 @@ type Counts = {
 };
 
 /**
- * Compact "N new · N learning · N review" pills for the Start Learning
- * area (Anki-style triad). Counts are filter-aware: the content-source
- * filter comes from the same (optimistically-updated) settings cache the
- * adjacent dropdown writes to, so switching the filter flips the numbers
- * in the same frame.
+ * Compact "N new · N review" pills for the Start Learning area. Counts are
+ * filter-aware: the content-source filter comes from the same
+ * (optimistically-updated) settings cache the adjacent dropdown writes to,
+ * so switching the filter flips the numbers in the same frame.
  *
- * "Learning" combines learning + relearning (cards mid-acquisition);
- * "Review" is graduated cards whose due date has lapsed; "New" is cards
- * never studied. While a refetch is in flight (filter switch, minute tick)
- * the last-known counts stay rendered to avoid a flash of empty pills
- * (same pattern as ProgressDisplay's card counts).
+ * "New" is cards never studied. "Review" is everything already started whose
+ * due date has lapsed (learning + relearning + review). While a refetch is
+ * in flight (filter switch, minute tick) the last-known counts stay
+ * rendered to avoid a flash of empty pills (same pattern as
+ * ProgressDisplay's card counts).
  */
 export function DueCountsPills({ skip }: { skip?: boolean }) {
-  const { courseSettings: settings } = useAppData();
+  const { courseSettings: settings, preloadedSettings } = useAppData();
+  const userSettings = usePreloadedQuery(preloadedSettings);
+  // Show only on an explicit opt-in (`false`); unset = hidden by default.
+  const hideDueCounts = userSettings?.hideDueCounts !== false;
   const t = useTranslations('AppPage.dueCounts');
 
   const filter = settings?.studyContentFilter ?? 'both';
@@ -38,10 +42,10 @@ export function DueCountsPills({ skip }: { skip?: boolean }) {
   // the one the adjacent Shadowing/Writing toggle optimistically writes, so
   // with separateModeTracking on the counts flip tracks in the same frame.
   const reviewMode = settings?.reviewMode;
-  const now = useNowMinute(skip);
+  const now = useNowMinute(skip || hideDueCounts);
   const counts = useQuery(
     api.features.stats.getFilteredCardCounts,
-    skip || !settings ? 'skip' : { filter, now, reviewMode },
+    skip || hideDueCounts || !settings ? 'skip' : { filter, now, reviewMode },
   );
 
   // While the separateModeTracking writing seed is still running, the writing
@@ -56,9 +60,14 @@ export function DueCountsPills({ skip }: { skip?: boolean }) {
   if (counts != null && !isProvisional) lastCountsRef.current = counts;
   const display = (isProvisional ? null : counts) ?? lastCountsRef.current;
 
-  const learning = display
-    ? display.learning + display.relearning
-    : 0;
+  if (hideDueCounts) return null;
+
+  // Merge rule and display ceiling shared with the learning-mode progress
+  // pill (lib/constants/dueCounts), so the two surfaces showing this number
+  // can never disagree at the margin.
+  const reviewDisplay = formatCappedCount(
+    display ? mergedDueCount(display) : 0,
+  );
 
   // Reserve pill width while the first fetch is in flight so the
   // Shadowing/Writing toggle beside us doesn't reflow (and animate via
@@ -74,22 +83,13 @@ export function DueCountsPills({ skip }: { skip?: boolean }) {
       )}
       aria-hidden={!display}
       data-testid="due-counts-pills"
-      data-tutorial="due-counts"
+      data-tutorial={TUTORIAL_ANCHORS.dueCounts}
     >
-      <span
-        className={cn(pillClass, 'bg-primary/10 text-primary')}
-      >
+      <span className={cn(pillClass, 'bg-primary/10 text-primary')}>
         {t('new', { count: display?.new ?? 0 })}
       </span>
-      <span
-        className={cn(pillClass, 'bg-accent-orange/10 text-accent-orange')}
-      >
-        {t('learning', { count: learning })}
-      </span>
-      <span
-        className={cn(pillClass, 'bg-success/10 text-success')}
-      >
-        {t('review', { count: display?.review ?? 0 })}
+      <span className={cn(pillClass, 'bg-success/10 text-success')}>
+        {t('review', { count: reviewDisplay })}
       </span>
     </div>
   );

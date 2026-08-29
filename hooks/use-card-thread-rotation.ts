@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { Id } from '@/convex/_generated/dataModel';
 
+import { reportError } from '@/lib/report-error';
+
 export interface UseCardThreadRotationReturn {
   /** Call when the user sends a message, so the next card change rotates. */
   markThreadHasMessages: () => void;
@@ -66,7 +68,7 @@ export function useCardThreadRotation(
     if (threadHasMessagesRef.current) {
       threadHasMessagesRef.current = false;
       rotateThread().catch((err) =>
-        console.error('Failed to create new thread on card change:', err),
+        reportError(err, { op: 'rotateCardThread' }),
       );
     }
   }, [currentCardId, rotateThread]);

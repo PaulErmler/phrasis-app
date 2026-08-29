@@ -1,12 +1,12 @@
-import { test, expect, type Page } from "@playwright/test";
-import { execFileSync } from "node:child_process";
-import path from "node:path";
+import { test, expect, type Page } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import path from 'node:path';
 import {
   completeStripeTestCheckout,
   gotoAuthedApp,
   neutralizeTours,
   signUpFreshUser,
-} from "./helpers";
+} from './helpers';
 
 /**
  * Payment-overdue (dunning) journey. Drives the app's overdue popup and
@@ -49,11 +49,11 @@ import {
  * (no cleanup, the app has no account deletion; leftovers are harmless).
  */
 
-const STORAGE_STATE = path.resolve(__dirname, ".auth/user-overdue.json");
-const CREDENTIALS = path.resolve(__dirname, ".auth/credentials-overdue.json");
-const REPO_ROOT = path.resolve(__dirname, "..");
+const STORAGE_STATE = path.resolve(__dirname, '.auth/user-overdue.json');
+const CREDENTIALS = path.resolve(__dirname, '.auth/credentials-overdue.json');
+const REPO_ROOT = path.resolve(__dirname, '..');
 
-const BASIC_ANNUAL = "basic_annual";
+const BASIC_ANNUAL = 'basic_annual';
 
 test.use({ storageState: STORAGE_STATE });
 
@@ -62,18 +62,18 @@ let email: string;
 /** Run a usage/testing:* Convex hook on the dev deployment. */
 function convexTestHook(fn: string, args: Record<string, unknown>): unknown {
   const out = execFileSync(
-    "pnpm",
-    ["exec", "convex", "run", `usage/testing:${fn}`, JSON.stringify(args)],
-    { cwd: REPO_ROOT, encoding: "utf8" },
+    'pnpm',
+    ['exec', 'convex', 'run', `usage/testing:${fn}`, JSON.stringify(args)],
+    { cwd: REPO_ROOT, encoding: 'utf8' },
   );
   // `convex run` prints the function's return value (JSON) on stdout,
   // possibly surrounded by CLI noise. Parse the last JSON-looking chunk.
-  const lines = out.trim().split("\n");
+  const lines = out.trim().split('\n');
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i].trim();
     if (!line) continue;
     try {
-      return JSON.parse(lines.slice(i).join("\n"));
+      return JSON.parse(lines.slice(i).join('\n'));
     } catch {
       /* keep scanning upwards */
     }
@@ -86,10 +86,10 @@ function planCta(page: Page, productId: string) {
 }
 
 const overdueDialog = (page: Page) =>
-  page.getByTestId("payment-overdue-dialog");
+  page.getByTestId('payment-overdue-dialog');
 
-test.describe("payment overdue dunning (live)", { tag: "@live" }, () => {
-  test.describe.configure({ mode: "serial", retries: 0 });
+test.describe('payment overdue dunning (live)', { tag: '@live' }, () => {
+  test.describe.configure({ mode: 'serial', retries: 0 });
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(240_000);
@@ -98,7 +98,7 @@ test.describe("payment overdue dunning (live)", { tag: "@live" }, () => {
     });
     const page = await context.newPage();
     const creds = await signUpFreshUser(page, {
-      prefix: "overdue",
+      prefix: 'overdue',
       storageStatePath: STORAGE_STATE,
       credentialsPath: CREDENTIALS,
     });
@@ -110,24 +110,24 @@ test.describe("payment overdue dunning (live)", { tag: "@live" }, () => {
     await neutralizeTours(page);
   });
 
-  test("trial checkout gives the account a Stripe customer", async ({
+  test('trial checkout gives the account a Stripe customer', async ({
     page,
   }) => {
     test.setTimeout(240_000);
-    await gotoAuthedApp(page, "/app/settings", planCta(page, BASIC_ANNUAL));
+    await gotoAuthedApp(page, '/app/settings', planCta(page, BASIC_ANNUAL));
 
     await planCta(page, BASIC_ANNUAL).click();
     await completeStripeTestCheckout(page, { email });
 
     await expect(async () => {
-      await page.goto("/app/settings");
+      await page.goto('/app/settings');
       await expect(planCta(page, BASIC_ANNUAL)).toHaveText(/current plan/i, {
         timeout: 5_000,
       });
     }).toPass({ timeout: 120_000, intervals: [2_000, 5_000] });
   });
 
-  test("block is immediate and non-dismissible", async ({ page }) => {
+  test('block is immediate and non-dismissible', async ({ page }) => {
     test.setTimeout(180_000);
     // setBillingOverride refuses while the quota doc still reports the free
     // plan, and that doc is written by BillingGate's mount sync, which can
@@ -135,67 +135,67 @@ test.describe("payment overdue dunning (live)", { tag: "@live" }, () => {
     // transiently and only be console.error'd). Each attempt loads /app
     // first so a fresh mount sync runs before the hook re-checks the doc.
     await expect(async () => {
-      await page.goto("/app");
-      convexTestHook("setBillingOverride", { email, planStatus: "past_due" });
+      await page.goto('/app');
+      convexTestHook('setBillingOverride', { email, planStatus: 'past_due' });
     }).toPass({ timeout: 90_000, intervals: [2_000, 5_000] });
 
     // The override patches the quota doc directly, and every later sync
     // re-applies it. Entry retried in case the first mount races it.
     await expect(async () => {
-      await page.goto("/app");
+      await page.goto('/app');
       await expect(overdueDialog(page)).toBeVisible({ timeout: 10_000 });
     }).toPass({ timeout: 60_000, intervals: [2_000, 5_000] });
 
     const dialog = overdueDialog(page);
-    await expect(page.getByTestId("payment-overdue-notice")).toContainText(
+    await expect(page.getByTestId('payment-overdue-notice')).toContainText(
       /overdue since/i,
     );
 
     // No grace window: no dismiss button, no close X, escape and
     // outside-clicks are swallowed.
-    await expect(page.getByTestId("payment-overdue-dismiss")).toHaveCount(0);
-    await expect(dialog.getByRole("button", { name: /close/i })).toHaveCount(0);
-    await page.keyboard.press("Escape");
+    await expect(page.getByTestId('payment-overdue-dismiss')).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: /close/i })).toHaveCount(0);
+    await page.keyboard.press('Escape');
     await expect(dialog).toBeVisible();
     await page.mouse.click(5, 5);
     await expect(dialog).toBeVisible();
   });
 
-  test("block re-shows on the next app entry despite a fresh sync", async ({
+  test('block re-shows on the next app entry despite a fresh sync', async ({
     page,
   }) => {
     test.setTimeout(60_000);
     // The reload triggers a real Autumn sync (healthy trialing customer).
     // The override must survive it via the syncAllFeatures hook.
-    await page.goto("/app");
+    await page.goto('/app');
     await expect(overdueDialog(page)).toBeVisible({ timeout: 20_000 });
   });
 
-  test("block covers the standalone /app/learn route", async ({ page }) => {
+  test('block covers the standalone /app/learn route', async ({ page }) => {
     test.setTimeout(60_000);
     // /app/learn sits outside the (main) route group, so it used to render
     // neither the dialog nor the quota sync. A way to keep studying while
     // "blocked". Regression guard for the BillingGate mount point.
-    await page.goto("/app/learn");
+    await page.goto('/app/learn');
     await expect(overdueDialog(page)).toBeVisible({ timeout: 20_000 });
   });
 
-  test("pay CTA opens the Stripe billing portal", async ({ page }) => {
+  test('pay CTA opens the Stripe billing portal', async ({ page }) => {
     test.setTimeout(120_000);
-    await page.goto("/app");
+    await page.goto('/app');
     await expect(overdueDialog(page)).toBeVisible({ timeout: 20_000 });
 
     // openBillingPortal redirects the current tab itself, no app-side
     // assertions after the click, just the destination.
-    await page.getByTestId("payment-overdue-pay").click();
+    await page.getByTestId('payment-overdue-pay').click();
     await page.waitForURL(/billing\.stripe\.com/, { timeout: 30_000 });
   });
 
-  test("clearing the override restores the app", async ({ page }) => {
+  test('clearing the override restores the app', async ({ page }) => {
     test.setTimeout(60_000);
-    convexTestHook("clearBillingOverride", { email });
+    convexTestHook('clearBillingOverride', { email });
 
-    await page.goto("/app");
+    await page.goto('/app');
     // Entry triggers a sync; with the override gone the healthy Autumn
     // state wins and the dialog must not appear. Give the sync a moment,
     // then assert it stayed hidden.

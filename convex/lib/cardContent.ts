@@ -1,11 +1,14 @@
 import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import {
-  ROMANIZATION_LANGUAGES,
-  IPA_LANGUAGES,
   isTranslationVersionStale,
   languageSupportsStt,
 } from '../../lib/languages';
+import {
+  ANNOTATION_KINDS,
+  TEXT_ANNOTATIONS,
+  type AnnotationKind,
+} from './textAnnotations';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { getLlmClaim, isClaimFresh } from '../features/llmTranslationQueue';
 import { appendSearchSegments } from '../../lib/wordTokenize';
@@ -16,14 +19,36 @@ import {
 
 type ContentCtx = QueryCtx | MutationCtx;
 
+/** One accepted writing alternative as served on a card payload. */
+export interface CardAlternativeContent {
+  text: string;
+  romanization?: string;
+  ipa?: string;
+  furigana?: string;
+  audioUrl?: string | null;
+}
+
 export interface CardTranslationContent {
   language: string;
   text: string;
   isBaseLanguage: boolean;
   isTargetLanguage: boolean;
+  /**
+   * The user's stored AI-feedback accepted alternatives for this card +
+   * language. Populated only by getCardForReview (alternatives are
+   * card-scoped, so the shared content builders here never fill it); typed
+   * on the shared interface so the payload's spread is checked rather than
+   * silently widened. Mirrors `translationValidator.alternatives`.
+   */
+  alternatives?: CardAlternativeContent[];
   romanization?: string;
   /** IPA transcription (espeak-ng), same display semantics as romanization. */
   ipa?: string;
+  /**
+   * Bracketed furigana (lib/furigana.ts format). Unlike romanization/ipa this
+   * renders AS ruby over the sentence, not as a line under it.
+   */
+  furigana?: string;
   /**
    * True iff an LLM retranslation is currently in flight for this language
    * AND an existing `translatedText` is on file. Keyed off the LLM claim
@@ -81,6 +106,11 @@ interface TextContentInput {
    */
   sourceIpa?: string;
   /**
+   * `texts.furiganaText` for this row. Same tri-state and same `?? undefined`
+   * rule as its siblings above.
+   */
+  sourceFurigana?: string;
+  /**
    * `texts.userCreated` for this row. Required so `versionStale` can apply the
    * whole `mayRegenerateTranslation` rule here instead of leaving half of it
    * to each caller.
@@ -123,7 +153,11 @@ export async function buildTextContentBatchForLanguages(
     textId: Id<'texts'>;
     userCreated: boolean;
   }> = [];
-  const audioFetches: Array<{ key: string; lang: string; textId: Id<'texts'> }> = [];
+  const audioFetches: Array<{
+    key: string;
+    lang: string;
+    textId: Id<'texts'>;
+  }> = [];
 
   for (const input of inputs) {
     for (const lang of allLanguages) {
@@ -165,7 +199,9 @@ export async function buildTextContentBatchForLanguages(
     // "Retranslating" pill keys off this so it doesn't fire when the user
     // clicks "regenerate audio" (no LLM phase, no claim).
     Promise.all(
-      translationFetches.map((item) => getLlmClaim(ctx, item.textId, item.lang)),
+      translationFetches.map((item) =>
+        getLlmClaim(ctx, item.textId, item.lang),
+      ),
     ),
   ]);
 
@@ -175,6 +211,7 @@ export async function buildTextContentBatchForLanguages(
       text: string;
       romanization?: string;
       ipa?: string;
+      furigana?: string;
       llmClaimedAt: number | null;
       versionStale: boolean;
     }
@@ -186,6 +223,7 @@ export async function buildTextContentBatchForLanguages(
       text: row?.translatedText ?? '',
       romanization: row?.romanizedText ?? undefined,
       ipa: row?.ipaText ?? undefined,
+      furigana: row?.furiganaText ?? undefined,
       llmClaimedAt: claim?.claimedAt ?? null,
       versionStale:
         row != null &&
@@ -221,7 +259,9 @@ export async function buildTextContentBatchForLanguages(
       idx,
     }))
     .filter(
-      (item): item is { key: string; payload: ResolvedAudioPayload; idx: number } =>
+      (
+        item,
+      ): item is { key: string; payload: ResolvedAudioPayload; idx: number } =>
         item.payload !== null,
     );
 
@@ -247,19 +287,20 @@ export async function buildTextContentBatchForLanguages(
     });
 
     const translations = allLanguages.map((lang) => {
-      // Gate stored romanization on the language's current
-      // `needsRomanization` flag. Rows written while the flag was on stay
-      // in the DB untouched, but their romanizedText is dropped from the
-      // response so the UI doesn't render stale transliteration after the
-      // language is flipped off. See ROMANIZATION_LANGUAGES in
-      // lib/languages.ts. It's derived from the Language entries so this
-      // check stays in sync automatically.
+      // Gate each stored annotation on its kind's CURRENT language set
+      // (spec.supports, derived from the Language entries so the check stays
+      // in sync automatically). Rows written while a language was in the set
+      // stay in the DB untouched, but their value is dropped from the
+      // response so the UI doesn't render stale annotations after the
+      // language is flipped off.
+      const supports = (kind: AnnotationKind) =>
+        TEXT_ANNOTATIONS[kind].supports(lang);
+      // rawRomanization is the review query's historical escape hatch; it
+      // predates IPA/furigana, which have no raw variant.
       const langNeedsRomanization =
-        opts?.rawRomanization || ROMANIZATION_LANGUAGES.has(lang);
-      // Same flag-gate for IPA (no raw escape hatch: the rawRomanization opt
-      // predates IPA and exists only for the review query's historical
-      // romanization behavior).
-      const langNeedsIpa = IPA_LANGUAGES.has(lang);
+        opts?.rawRomanization || supports('romanization');
+      const langNeedsIpa = supports('ipa');
+      const langNeedsFurigana = supports('furigana');
       if (lang === input.sourceLanguage) {
         return {
           language: lang,
@@ -270,6 +311,7 @@ export async function buildTextContentBatchForLanguages(
             ? input.sourceRomanization
             : undefined,
           ipa: langNeedsIpa ? input.sourceIpa : undefined,
+          furigana: langNeedsFurigana ? input.sourceFurigana : undefined,
           retranslating: false,
         };
       }
@@ -284,6 +326,7 @@ export async function buildTextContentBatchForLanguages(
         isTargetLanguage: targetLanguages.includes(lang),
         romanization: langNeedsRomanization ? entry?.romanization : undefined,
         ipa: langNeedsIpa ? entry?.ipa : undefined,
+        furigana: langNeedsFurigana ? entry?.furigana : undefined,
         // Show the pill only when an LLM retranslation is in flight AND a
         // prior translatedText exists (i.e. this is a *re*translation, not
         // the first-time translation of a new card).
@@ -310,12 +353,16 @@ export async function buildTextContentBatchForLanguages(
     const hasMissingAnnotation = allLanguages.some((lang) => {
       const stored =
         lang === input.sourceLanguage
-          ? { romanization: input.sourceRomanization, ipa: input.sourceIpa }
+          ? {
+              romanization: input.sourceRomanization,
+              ipa: input.sourceIpa,
+              furigana: input.sourceFurigana,
+            }
           : translationMap.get(`${input.key}:${lang}`);
-      return (
-        (ROMANIZATION_LANGUAGES.has(lang) &&
-          stored?.romanization === undefined) ||
-        (IPA_LANGUAGES.has(lang) && stored?.ipa === undefined)
+      return ANNOTATION_KINDS.some(
+        (kind) =>
+          TEXT_ANNOTATIONS[kind].supports(lang) &&
+          stored?.[TEXT_ANNOTATIONS[kind].projectedField] === undefined,
       );
     });
     // Legacy audio (generated before Scribe integration) has a URL but no
@@ -374,7 +421,11 @@ export async function buildCardSearchableText(
           )
           .unique();
         return translation
-          ? { lang, text: translation.translatedText, romanization: translation.romanizedText }
+          ? {
+              lang,
+              text: translation.translatedText,
+              romanization: translation.romanizedText,
+            }
           : null;
       }),
     ),
@@ -410,7 +461,10 @@ export interface SearchableTextRebuildCaches {
    * Optional memo of built results keyed by (textId, languages), valid
    * across cards because the build depends only on those two inputs.
    */
-  built?: Map<string, { searchableText: string; searchableTextLanguages: string[] }>;
+  built?: Map<
+    string,
+    { searchableText: string; searchableTextLanguages: string[] }
+  >;
 }
 
 /**

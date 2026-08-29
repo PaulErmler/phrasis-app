@@ -18,12 +18,11 @@ const LandingDemoContext = createContext<LandingDemoContextValue | null>(null);
 
 export function LandingDemoProvider({ children }: { children: ReactNode }) {
   const [multiCourse, setMultiCourse] = useState(false);
-  const value = useMemo(
-    () => ({ multiCourse, setMultiCourse }),
-    [multiCourse],
-  );
+  const value = useMemo(() => ({ multiCourse, setMultiCourse }), [multiCourse]);
   return (
-    <LandingDemoContext.Provider value={value}>{children}</LandingDemoContext.Provider>
+    <LandingDemoContext.Provider value={value}>
+      {children}
+    </LandingDemoContext.Provider>
   );
 }
 

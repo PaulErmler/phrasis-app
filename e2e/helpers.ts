@@ -389,6 +389,97 @@ export async function gotoAuthedApp(
 }
 
 /**
+ * The one LIVE app tree, as a scope for testid lookups.
+ *
+ * During a navigation React streams the app layout in a hidden
+ * `<div hidden id="S:0">` container and swaps it into place a moment
+ * later, so the document briefly holds TWO copies of the whole layout —
+ * `<main>` and all — one of them showing the other view's (stale) state.
+ * A bare `page.getByTestId(...)` sees both: `toBeVisible` fails the strict
+ * check with "resolved to 2 elements", and `toHaveCount(0)` counts the
+ * stale copy (both observed on settings.spec's forecast test, 2026-08-27).
+ *
+ * The staging container carries the `hidden` attribute, so its subtree is
+ * out of the accessibility tree — which is exactly what a role selector
+ * filters on. `getByRole('main')` therefore resolves to the live tree and
+ * only the live tree, mid-swap included. Scope home/settings assertions
+ * through it rather than waiting the window out: there is no load state
+ * that reliably brackets the swap.
+ *
+ * `.first()` because the open learn overlay renders its own `<main>` as a
+ * SIBLING of the layout's (see `(main)/layout.tsx`), and document order puts
+ * the layout's first. This is therefore the tab views' container — home,
+ * library, stats, settings — not the learn overlay; locate inside that
+ * overlay directly.
+ */
+export function appMain(page: Page): Locator {
+  return page.getByRole('main').first();
+}
+
+/**
+ * Drive one or more settings Switches to the given on/off states and
+ * confirm the SERVER actually saved them. Callers must already be on a
+ * page where the toggles are mounted (e.g. /app/settings) with the
+ * toggles reflecting server state (fresh goto or reload), and must scope
+ * the toggle locators through `appMain` — an unscoped one can read the
+ * stale mid-swap copy and hand this loop a state the server never had.
+ *
+ * Why not click → reload → poll aria-checked? That pattern is a lost-write
+ * race: the switch flips from the optimistic patch in the same frame, but
+ * `page.reload()` tears down the Convex websocket, and an un-acked
+ * mutation dies with it. The old poll then waited on a server state that
+ * could never arrive (showDueCounts and settings.spec both failed exactly
+ * there under post-@live backend load, 2026-08-27; settings failed BOTH
+ * attempts). Instead retry the whole cycle: click toward the desired
+ * state, give the mutation a bounded flush window, reload, re-read. A
+ * write the reload killed is simply re-issued on the next pass.
+ */
+export async function ensureTogglesSaved(
+  page: Page,
+  expected: Array<{ toggle: Locator; on: boolean }>,
+  timeoutMs = 45_000,
+): Promise<void> {
+  // Once ANY click happened, only a post-reload read proves persistence —
+  // before that, aria-checked may be the optimistic patch of a write that
+  // is still in flight (or already lost).
+  let everClicked = false;
+  await expect(async () => {
+    let clickedThisPass = false;
+    for (const { toggle, on } of expected) {
+      await expect(toggle).toBeVisible({ timeout: 15_000 });
+      if ((await toggle.getAttribute('aria-checked')) !== String(on)) {
+        await toggle.click();
+        clickedThisPass = true;
+        everClicked = true;
+      }
+    }
+    if (!everClicked) return; // server state already matched; nothing to prove
+    // Bounded flush window so the mutation can reach the server before
+    // the reload below kills the websocket.
+    if (clickedThisPass) await page.waitForTimeout(1_000);
+    await page.reload();
+    for (const { toggle, on } of expected) {
+      await expect(toggle).toBeVisible({ timeout: 15_000 });
+      expect(await toggle.getAttribute('aria-checked')).toBe(String(on));
+    }
+  }).toPass({ timeout: timeoutMs, intervals: [500, 1_000, 2_000] });
+}
+
+/**
+ * Turn on "Show how many cards are due" so home due-count pills render.
+ * The pills are hidden by default (showing is an explicit opt-in); specs
+ * that assert on them must opt in first.
+ */
+export async function showDueCounts(page: Page): Promise<void> {
+  await page.goto('/app/settings');
+  await page.waitForLoadState('domcontentloaded');
+  // Scoped to the live tree: mid-navigation the document can hold a second,
+  // stale copy of the switch (see `appMain`).
+  const sw = appMain(page).locator('#showDueCounts');
+  await ensureTogglesSaved(page, [{ toggle: sw, on: true }]);
+}
+
+/**
  * Best-effort dismissal of the cookie-consent banner. The banner is fixed,
  * bottom-anchored and z-100, so while visible it intercepts clicks on any
  * bottom-of-viewport control (the import wizard's Next/Submit, the learn
@@ -438,9 +529,7 @@ export async function dismissTour(
   waitMs = 2500,
 ): Promise<void> {
   const selector = id
-    ? TOUR_POPOVER_CLASSES[id]
-      .map((cls) => `.driver-popover.${cls}`)
-      .join(', ')
+    ? TOUR_POPOVER_CLASSES[id].map((cls) => `.driver-popover.${cls}`).join(', ')
     : '.driver-popover';
 
   const nukeOverlays = () =>

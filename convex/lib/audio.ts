@@ -87,7 +87,6 @@ export async function deleteStorageBlobIfUnreferenced(
   // (each reference-checked correctly), and the loser must not crash its
   // mutation over a blob that is already in the desired state.
   if ((await ctx.db.system.get(storageId)) === null) return;
-  console.log('[audio] deleting unreferenced blob', { storageId });
   await ctx.storage.delete(storageId);
 }
 

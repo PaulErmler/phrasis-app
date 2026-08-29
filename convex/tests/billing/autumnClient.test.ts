@@ -43,7 +43,12 @@ afterEach(() => {
 describe('autumnFetchRaw', () => {
   it('sends auth, content-type, and the PER-CALL api version verbatim', async () => {
     stubFetch(200, '{}');
-    await autumnFetchRaw('POST', '/billing.attach', { plan_id: 'pro' }, '2.1.0');
+    await autumnFetchRaw(
+      'POST',
+      '/billing.attach',
+      { plan_id: 'pro' },
+      '2.1.0',
+    );
     expect(seen[0].url).toBe(`${AUTUMN_API}/billing.attach`);
     const headers = seen[0].init.headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer am_sk_test_stub');

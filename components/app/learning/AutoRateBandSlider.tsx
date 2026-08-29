@@ -141,27 +141,27 @@ export function AutoRateBandSlider({
         </SliderPrimitive.Track>
 
         {BOUNDARIES.map(([lower, upper], i) => (
-            <SliderPrimitive.Thumb
-              key={i}
-              aria-label={tPanel('autoRateBoundary', {
-                lower: tRatings(lower),
-                upper: tRatings(upper),
-              })}
-              // The visual is 20x36; the ::after pseudo-element widens the hit
-              // area to roughly 52px square without disturbing layout.
-              className={cn(
-                'relative block h-9 w-5 shrink-0 rounded-md border-2 border-foreground/80 bg-background shadow-md',
-                "after:absolute after:-inset-x-3.5 after:-inset-y-2 after:content-['']",
-                'transition-[box-shadow] hover:ring-4 hover:ring-ring/40',
-                'focus-visible:ring-4 focus-visible:ring-ring/50 focus-visible:outline-hidden',
-                'disabled:pointer-events-none',
-              )}
-            >
-              <span
-                aria-hidden
-                className="absolute inset-y-2 left-1/2 w-px -translate-x-1/2 bg-foreground/40"
-              />
-            </SliderPrimitive.Thumb>
+          <SliderPrimitive.Thumb
+            key={i}
+            aria-label={tPanel('autoRateBoundary', {
+              lower: tRatings(lower),
+              upper: tRatings(upper),
+            })}
+            // The visual is 20x36; the ::after pseudo-element widens the hit
+            // area to roughly 52px square without disturbing layout.
+            className={cn(
+              'relative block h-9 w-5 shrink-0 rounded-md border-2 border-foreground/80 bg-background shadow-md',
+              "after:absolute after:-inset-x-3.5 after:-inset-y-2 after:content-['']",
+              'transition-[box-shadow] hover:ring-4 hover:ring-ring/40',
+              'focus-visible:ring-4 focus-visible:ring-ring/50 focus-visible:outline-hidden',
+              'disabled:pointer-events-none',
+            )}
+          >
+            <span
+              aria-hidden
+              className="absolute inset-y-2 left-1/2 w-px -translate-x-1/2 bg-foreground/40"
+            />
+          </SliderPrimitive.Thumb>
         ))}
       </SliderPrimitive.Root>
     </div>
@@ -189,11 +189,9 @@ export function AutoRateThresholdControl({
   const persisted: [number, number] = [resolved.hard, resolved.good];
 
   const [draft, setDraft] = useState<[number, number]>(persisted);
-  const [prevPersisted, setPrevPersisted] = useState<[number, number]>(persisted);
-  if (
-    prevPersisted[0] !== persisted[0] ||
-    prevPersisted[1] !== persisted[1]
-  ) {
+  const [prevPersisted, setPrevPersisted] =
+    useState<[number, number]>(persisted);
+  if (prevPersisted[0] !== persisted[0] || prevPersisted[1] !== persisted[1]) {
     setPrevPersisted(persisted);
     setDraft(persisted);
   }

@@ -19,7 +19,8 @@ export const onRequestError: Instrumentation.onRequestError = async (
   // The edge runtime has no posthog-node; only the Node.js runtime can report.
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
 
-  const { getPostHogServer, distinctIdFromCookie } = await import('@/lib/posthog/server');
+  const { getPostHogServer, distinctIdFromCookie } =
+    await import('@/lib/posthog/server');
   const posthog = getPostHogServer();
   if (!posthog) return;
 

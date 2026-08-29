@@ -11,7 +11,10 @@ import {
 } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { motion, AnimatePresence } from 'motion/react';
-import { Conversation, ConversationContent } from '@/components/ai-elements/conversation';
+import {
+  Conversation,
+  ConversationContent,
+} from '@/components/ai-elements/conversation';
 import { Message, MessageContent } from '@/components/ai-elements/message';
 import { MessageResponse } from '@/components/ai-elements/message';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -26,7 +29,12 @@ import { MousePointer2, Pencil, RotateCcw } from 'lucide-react';
 
 type Scenario = 'grammar' | 'simpler' | 'restaurant';
 
-type Phase = 'userTyping' | 'streaming' | 'cursorMoving' | 'cursorPressing' | 'done';
+type Phase =
+  | 'userTyping'
+  | 'streaming'
+  | 'cursorMoving'
+  | 'cursorPressing'
+  | 'done';
 
 type ProposalLine = { code: string; text: string };
 
@@ -135,7 +143,9 @@ function CourseProposalCard({
   if (approved) {
     return (
       <Alert className="my-3 flex flex-col gap-3 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
-        <AlertDescription className="p-0 m-0 [&_p]:mb-0">{cardInner}</AlertDescription>
+        <AlertDescription className="p-0 m-0 [&_p]:mb-0">
+          {cardInner}
+        </AlertDescription>
         <div className="flex h-8 w-full items-center gap-2">
           <Button
             disabled
@@ -152,9 +162,17 @@ function CourseProposalCard({
 
   return (
     <Alert className="my-3 flex flex-col gap-3">
-      <AlertDescription className="p-0 m-0 [&_p]:mb-0">{cardInner}</AlertDescription>
+      <AlertDescription className="p-0 m-0 [&_p]:mb-0">
+        {cardInner}
+      </AlertDescription>
       <div className="flex h-8 w-full items-center gap-2">
-        <Button type="button" variant="outline" size="sm" className="h-8 px-3 text-sm" disabled>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 px-3 text-sm"
+          disabled
+        >
           {rejectLabel}
         </Button>
         <Button
@@ -242,7 +260,9 @@ export function ChatFlashcardDemo() {
     from: { x: number; y: number };
     to: { x: number; y: number };
   } | null>(null);
-  const [pressPos, setPressPos] = useState<{ x: number; y: number } | null>(null);
+  const [pressPos, setPressPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const cursorMoveAdvanceRef = useRef(false);
   const cursorPressAdvanceRef = useRef(false);
   // Scenarios whose animation already ran to completion: revisiting their tab
@@ -367,7 +387,16 @@ export function ChatFlashcardDemo() {
       cancelled = true;
       clearTimers();
     };
-  }, [runKey, scenario, reducedMotion, userFull, parts, highlightCardIndex, after, clearTimers]);
+  }, [
+    runKey,
+    scenario,
+    reducedMotion,
+    userFull,
+    parts,
+    highlightCardIndex,
+    after,
+    clearTimers,
+  ]);
 
   useLayoutEffect(() => {
     if (phase !== 'cursorMoving') {
@@ -375,7 +404,9 @@ export function ChatFlashcardDemo() {
       return;
     }
     const wrap = wrapRef.current;
-    const btn = wrap?.querySelector<HTMLElement>('[data-landing-approve-target]');
+    const btn = wrap?.querySelector<HTMLElement>(
+      '[data-landing-approve-target]',
+    );
     if (!wrap || !btn) return;
     const wr = wrap.getBoundingClientRect();
     const br = btn.getBoundingClientRect();
@@ -426,7 +457,10 @@ export function ChatFlashcardDemo() {
     donePartCount * 5000 +
     (done ? 200000 : 0);
 
-  const renderCard = (part: Extract<DemoPart, { type: 'card' }>, index: number) => (
+  const renderCard = (
+    part: Extract<DemoPart, { type: 'card' }>,
+    index: number,
+  ) => (
     <motion.div
       key={`${runKey}-${scenario}-card-${index}`}
       initial={reducedMotion ? false : { opacity: 0, y: 12 }}
@@ -458,13 +492,22 @@ export function ChatFlashcardDemo() {
         className="w-full"
       >
         <TabsList className="grid h-auto w-full grid-cols-3 gap-1 p-1">
-          <TabsTrigger value="grammar" className="px-2 py-2.5 text-xs sm:text-sm">
+          <TabsTrigger
+            value="grammar"
+            className="px-2 py-2.5 text-xs sm:text-sm"
+          >
             {t('scenarioGrammar')}
           </TabsTrigger>
-          <TabsTrigger value="simpler" className="px-2 py-2.5 text-xs sm:text-sm">
+          <TabsTrigger
+            value="simpler"
+            className="px-2 py-2.5 text-xs sm:text-sm"
+          >
             {t('scenarioSimpler')}
           </TabsTrigger>
-          <TabsTrigger value="restaurant" className="px-2 py-2.5 text-xs sm:text-sm">
+          <TabsTrigger
+            value="restaurant"
+            className="px-2 py-2.5 text-xs sm:text-sm"
+          >
             {t('scenarioCards')}
           </TabsTrigger>
         </TabsList>
@@ -501,9 +544,12 @@ export function ChatFlashcardDemo() {
                         renderCard(part, index)
                       ),
                     )}
-                    {streamingPart?.type === 'text' && streamText.length > 0 && (
-                      <MessageResponse mode="streaming">{streamText}</MessageResponse>
-                    )}
+                    {streamingPart?.type === 'text' &&
+                      streamText.length > 0 && (
+                        <MessageResponse mode="streaming">
+                          {streamText}
+                        </MessageResponse>
+                      )}
                   </MessageContent>
                 </Message>
               )}
@@ -550,7 +596,11 @@ export function ChatFlashcardDemo() {
                   opacity: 1,
                   scale: 1,
                 }}
-                exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.08 } }}
+                exit={{
+                  opacity: 0,
+                  scale: 0.95,
+                  transition: { duration: 0.08 },
+                }}
                 transition={{ duration: 0.85, ease: [0.4, 0, 0.2, 1] }}
                 onAnimationComplete={() => {
                   if (cursorMoveAdvanceRef.current || !cursorPath) return;

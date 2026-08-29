@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from '@playwright/test';
 
 /**
  * Onboarding e2e coverage.
@@ -20,12 +20,14 @@ import { test, expect } from "@playwright/test";
  * already completed onboarding, so visiting `/app/onboarding` must redirect
  * away. That's the one assertion that genuinely needs the live router.
  */
-test.describe("onboarding gating", () => {
-  test("already-onboarded user is redirected away from /app/onboarding", async ({
+test.describe('onboarding gating', () => {
+  test('already-onboarded user is redirected away from /app/onboarding', async ({
     page,
   }) => {
-    await page.goto("/app/onboarding");
-    await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => {});
+    await page.goto('/app/onboarding');
+    await page
+      .waitForLoadState('networkidle', { timeout: 20_000 })
+      .catch(() => {});
 
     await expect
       .poll(() => /onboarding/.test(page.url()), { timeout: 10_000 })

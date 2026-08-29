@@ -6,6 +6,9 @@ import { defineConfig } from 'eslint/config';
 import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
 import nextTypescript from 'eslint-config-next/typescript';
 import convexPlugin from '@convex-dev/eslint-plugin';
+// Disables every stylistic rule Prettier owns; formatting is enforced
+// separately via `pnpm format:check` (CI) and lint-staged.
+import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default defineConfig([
   ...nextTypescript,
@@ -97,4 +100,8 @@ export default defineConfig([
       '@next/next/no-img-element': 'off',
     },
   },
+
+  // Last on purpose: turns off every stylistic rule Prettier owns, so lint
+  // and formatter can't disagree.
+  eslintConfigPrettier,
 ]);

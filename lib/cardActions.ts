@@ -26,7 +26,9 @@ export const DEFAULT_PINNED_CARD_ACTIONS: readonly PinnableCardAction[] = [
 
 export const MAX_PINNED_CARD_ACTIONS = 5;
 
-export function isPinnableCardAction(value: string): value is PinnableCardAction {
+export function isPinnableCardAction(
+  value: string,
+): value is PinnableCardAction {
   return (PINNABLE_CARD_ACTIONS as readonly string[]).includes(value);
 }
 

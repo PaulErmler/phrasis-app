@@ -4,7 +4,7 @@ import { usePaginatedQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { getLanguageByCode } from '@/lib/languages';
+import { languageName } from '@/lib/languages';
 
 export function UserTextsBrowser({ userId }: { userId: string }) {
   const { results, status, loadMore } = usePaginatedQuery(
@@ -34,7 +34,7 @@ export function UserTextsBrowser({ userId }: { userId: string }) {
             <p className="text-sm font-medium">{text.text}</p>
             <div className="flex shrink-0 items-center gap-1">
               <Badge variant="secondary" className="text-[10px]">
-                {getLanguageByCode(text.language)?.name ?? text.language}
+                {languageName(text.language)}
               </Badge>
               {text.origin && text.origin !== 'premade' && (
                 <Badge variant="outline" className="text-[10px]">
@@ -48,7 +48,7 @@ export function UserTextsBrowser({ userId }: { userId: string }) {
               {text.translations.map((t, i) => (
                 <p key={i} className="text-xs text-muted-foreground">
                   <span className="font-medium">
-                    {getLanguageByCode(t.language)?.name ?? t.language}:
+                    {languageName(t.language)}:
                   </span>{' '}
                   {t.text}
                 </p>

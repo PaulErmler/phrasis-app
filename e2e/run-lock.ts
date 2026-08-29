@@ -1,5 +1,5 @@
-import fs from "node:fs";
-import path from "node:path";
+import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * Tracks concurrent Playwright invocations by PID so overlapping runs don't
@@ -10,7 +10,7 @@ import path from "node:path";
  * cannot wedge the lock (though, as before, it leaves the flag set, see
  * global-setup.ts for the manual cleanup command).
  */
-const LOCK_FILE = path.resolve(__dirname, ".auth", "e2e-run-pids.json");
+const LOCK_FILE = path.resolve(__dirname, '.auth', 'e2e-run-pids.json');
 
 function isAlive(pid: number): boolean {
   try {
@@ -23,10 +23,10 @@ function isAlive(pid: number): boolean {
 
 function readLivePids(): number[] {
   try {
-    const parsed: unknown = JSON.parse(fs.readFileSync(LOCK_FILE, "utf8"));
+    const parsed: unknown = JSON.parse(fs.readFileSync(LOCK_FILE, 'utf8'));
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
-      (pid): pid is number => typeof pid === "number" && isAlive(pid),
+      (pid): pid is number => typeof pid === 'number' && isAlive(pid),
     );
   } catch {
     return [];

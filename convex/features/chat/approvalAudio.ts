@@ -138,12 +138,19 @@ export const requestApprovalAudio = mutation({
     const userId = await requireAuthUserId(ctx);
     const approval = await ctx.db.get(args.approvalId);
     if (!approval || approval.userId !== userId) {
-      throw new ConvexError('Approval not found');
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'Approval not found',
+      });
     }
     const entry = approval.translations.find(
       (t) => t.language === args.language,
     );
-    if (!entry) throw new ConvexError('Language not on this card proposal');
+    if (!entry)
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'Language not on this card proposal',
+      });
     if (entry.text.length === 0) return { scheduled: false };
 
     const existing = await findAssetForLine(
@@ -183,6 +190,7 @@ export const requestApprovalAudio = mutation({
         language: args.language,
         spokenText: entry.text,
         voiceGender,
+        userId,
         voiceName: getVoiceForLanguage(args.language, voiceGender),
         provider: getTtsProviderForLanguage(args.language),
       },
@@ -213,6 +221,9 @@ export const synthesizeApprovalAudio = internalAction({
     voiceGender: voiceGenderValidator,
     voiceName: v.string(),
     provider: ttsProviderValidator,
+    // The user who clicked play on the proposal line; the synthesis bills
+    // to them.
+    userId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -230,6 +241,7 @@ export const synthesizeApprovalAudio = internalAction({
       args.language,
     );
     await captureGeneration(ctx, {
+      distinctId: args.userId,
       feature: 'tts_synthesis',
       model: args.voiceName,
       provider: args.provider,

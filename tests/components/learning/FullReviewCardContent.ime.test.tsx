@@ -1,8 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 
+// The writing card now wires AI feedback (useAction) and the voice button
+// (useFeatureQuota); neither is under test here, so the Convex-backed hooks
+// are stubbed the way other component tests do it.
+vi.mock('convex/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('convex/react')>();
+  return { ...actual, useAction: () => vi.fn(), useMutation: () => vi.fn() };
+});
+vi.mock('@/components/feature_tracking/useFeatureQuota', () => ({
+  useFeatureQuota: () => ({ isAvailable: true, isLoading: false }),
+}));
+vi.mock('@/components/autumn/usage-limit-dialog', () => ({
+  default: () => null,
+}));
+
 import { FullReviewCardContent } from '@/components/app/learning/FullReviewCardContent';
 import type { CardTranslation } from '@/components/app/learning/types';
+import { makePresentation } from './cardPresentationStub';
 
 /**
  * The bug this guards: pressing Enter to confirm a Japanese IME conversion
@@ -14,24 +29,28 @@ import type { CardTranslation } from '@/components/app/learning/types';
  */
 
 const TRANSLATIONS: CardTranslation[] = [
-  { language: 'en', text: 'It is hot today.', isBaseLanguage: true, isTargetLanguage: false },
-  { language: 'ja', text: '今日は暑いですね。', isBaseLanguage: false, isTargetLanguage: true },
+  {
+    language: 'en',
+    text: 'It is hot today.',
+    isBaseLanguage: true,
+    isTargetLanguage: false,
+  },
+  {
+    language: 'ja',
+    text: '今日は暑いですね。',
+    isBaseLanguage: false,
+    isTargetLanguage: true,
+  },
 ];
 
 function renderCard() {
   const onAccuracyChange = vi.fn();
   render(
     <FullReviewCardContent
-      preReviewCount={0}
-      sourceText="It is hot today."
-      translations={TRANSLATIONS}
-      audioRecordings={[]}
-      isFavorite={false}
-      isPendingMaster={false}
-      isPendingHide={false}
-      onMaster={vi.fn()}
-      onHide={vi.fn()}
-      onFavorite={vi.fn()}
+      presentation={makePresentation({
+        sourceText: 'It is hot today.',
+        translations: TRANSLATIONS,
+      })}
       targetAudioMode="never"
       onAccuracyChange={onAccuracyChange}
     />,
@@ -157,16 +176,10 @@ describe('FullReviewCardContent: ignorePunctuation', () => {
     const onAccuracyChange = vi.fn();
     render(
       <FullReviewCardContent
-        preReviewCount={0}
-        sourceText="It is hot today."
-        translations={TRANSLATIONS}
-        audioRecordings={[]}
-        isFavorite={false}
-        isPendingMaster={false}
-        isPendingHide={false}
-        onMaster={vi.fn()}
-        onHide={vi.fn()}
-        onFavorite={vi.fn()}
+        presentation={makePresentation({
+          sourceText: 'It is hot today.',
+          translations: TRANSLATIONS,
+        })}
         targetAudioMode="never"
         ignorePunctuation={ignorePunctuation}
         onAccuracyChange={onAccuracyChange}

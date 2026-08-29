@@ -30,11 +30,14 @@ jobs:
       - name: Run lint
         run: pnpm run lint
 
+      - name: Check formatting
+        run: pnpm run format:check
+
       - name: Typecheck tests
         run: pnpm run typecheck:tests
 
-      - name: Run tests
-        run: pnpm test
+      - name: Run tests (with coverage thresholds)
+        run: pnpm test:coverage
 
       - name: Build project (includes TypeScript check)
         run: pnpm run build

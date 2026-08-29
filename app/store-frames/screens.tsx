@@ -6,8 +6,15 @@
  * frames (opener, modes) are marketing art and say so.
  */
 import type { ReactNode } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FileText, Undo2 } from 'lucide-react';
 import { LearningCardContent } from '@/components/app/learning/LearningCardContent';
+import { AudioButton } from '@/components/app/learning/AudioButton';
+import { CardShell } from '@/components/app/learning/CardShell';
+import { DiffDisplay } from '@/components/app/learning/DiffDisplay';
+import {
+  WritingFeedbackCard,
+  type RowFeedback,
+} from '@/components/app/learning/WritingFeedbackCard';
 import { LearningControls } from '@/components/app/learning/LearningControls';
 import { ProgressDisplay } from '@/components/app/learning/ProgressDisplay';
 import { LearningHeader } from '@/components/app/learning/LearningHeader';
@@ -35,6 +42,7 @@ import * as fx from './fixtures';
 
 const noop = () => {};
 
+/** Shared CardPresentation stub; spread with per-screen card content. */
 const cardStubs = {
   isFavorite: false,
   isPendingMaster: false,
@@ -45,7 +53,6 @@ const cardStubs = {
   preReviewCount: 3,
   schedulingPhase: 'review' as const,
   fsrsState: { reps: 6 },
-  bare: true as const,
 };
 
 /** Canned app data so home's stats card can mount outside /app. */
@@ -96,10 +103,13 @@ export function LearnScreen() {
         <LearningHeader onBack={noop} onSettingsOpen={noop} ratingCount={4} />
         <main className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden px-4">
           <LearningCardContent
-            {...cardStubs}
-            sourceText={fx.shadowCard.sourceText}
-            translations={fx.shadowCard.translations}
-            audioRecordings={fx.shadowCard.audioRecordings}
+            bare
+            presentation={{
+              ...cardStubs,
+              sourceText: fx.shadowCard.sourceText,
+              translations: fx.shadowCard.translations,
+              audioRecordings: fx.shadowCard.audioRecordings,
+            }}
           />
         </main>
         <LearningControls
@@ -126,7 +136,12 @@ export function LearnScreen() {
 
 // ------------------------------------------------------------------- chat
 
-function msg(id: string, role: 'user' | 'assistant', text: string, order: number): never {
+function msg(
+  id: string,
+  role: 'user' | 'assistant',
+  text: string,
+  order: number,
+): never {
   return {
     id,
     key: id,
@@ -153,7 +168,9 @@ function ApprovalBox({
   return (
     <Alert
       className={`my-3 flex flex-col gap-3 ${
-        approved ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950' : ''
+        approved
+          ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950'
+          : ''
       }`}
     >
       <AlertDescription>
@@ -164,7 +181,12 @@ function ApprovalBox({
       </AlertDescription>
       <div className="flex w-full items-center gap-2">
         {approved ? (
-          <Button disabled variant="ghost" size="sm" className="h-9 px-3 text-base font-semibold text-green-700">
+          <Button
+            disabled
+            variant="ghost"
+            size="sm"
+            className="h-9 px-3 text-base font-semibold text-success"
+          >
             Sentence added!
           </Button>
         ) : (
@@ -225,7 +247,12 @@ function ChatScreen({
       <TutorHeader />
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-3">
         <div className={`${chatHeight} shrink-0 overflow-hidden`}>
-          <ChatMessages messages={thread} isLoading={false} threadId="demo" status="ready" />
+          <ChatMessages
+            messages={thread}
+            isLoading={false}
+            threadId="demo"
+            status="ready"
+          />
         </div>
         <div className="min-h-0 flex-1 overflow-hidden px-1">{children}</div>
       </div>
@@ -237,11 +264,19 @@ function ChatScreen({
 }
 
 /** An answer that ends in a card the learner has already accepted. */
-export function ChatAnswerScreen({ sampleIndex = 0 }: { sampleIndex?: number }) {
+export function ChatAnswerScreen({
+  sampleIndex = 0,
+}: {
+  sampleIndex?: number;
+}) {
   const sample = SAMPLES[sampleIndex];
   return (
     <ChatScreen sampleIndex={sampleIndex}>
-      <ApprovalBox base={sample.card.base} target={sample.card.target} approved />
+      <ApprovalBox
+        base={sample.card.base}
+        target={sample.card.target}
+        approved
+      />
       <ApprovalBox base="I did it because of you." target="Lo hice por ti." />
     </ChatScreen>
   );
@@ -258,7 +293,12 @@ export function ChatCardsScreen() {
       <TutorHeader />
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-3">
         <div className="h-[112px] shrink-0 overflow-hidden">
-          <ChatMessages messages={thread} isLoading={false} threadId="demo" status="ready" />
+          <ChatMessages
+            messages={thread}
+            isLoading={false}
+            threadId="demo"
+            status="ready"
+          />
         </div>
         <div className="min-h-0 flex-1 overflow-hidden px-1">
           <ApprovalBox {...REJECT_SAMPLE.cards[0]} approved />
@@ -279,22 +319,26 @@ export function ChatCardsScreen() {
 export function HomeProjectionScreen() {
   return (
     <MockConvex>
-    <div className="absolute inset-0 flex flex-col bg-background text-foreground">
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-3 pt-6">
-        <NumbersRow {...fx.numbers} />
-        <CumulativeLineChart
-          dailyData={fx.dailyData}
-          monthlyData={fx.monthlyData}
-          weeklyData={fx.weeklyData}
-          languageDailyData={fx.languageDailyData}
-          timezone={fx.TZ}
-        />
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <WordCloudSection />
+      <div className="absolute inset-0 flex flex-col bg-background text-foreground">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-3 pt-6">
+          <NumbersRow {...fx.numbers} />
+          <CumulativeLineChart
+            dailyData={fx.dailyData}
+            monthlyData={fx.monthlyData}
+            weeklyData={fx.weeklyData}
+            languageDailyData={fx.languageDailyData}
+            timezone={fx.TZ}
+          />
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <WordCloudSection />
+          </div>
         </div>
+        <BottomNav
+          currentView={'stats' as never}
+          onViewChange={noop}
+          onLearnOpen={noop}
+        />
       </div>
-      <BottomNav currentView={'stats' as never} onViewChange={noop} onLearnOpen={noop} />
-    </div>
     </MockConvex>
   );
 }
@@ -306,10 +350,21 @@ export function DifficultyScreen() {
       <WithAppData>
         <div className="absolute inset-0 flex flex-col bg-background text-foreground">
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-3 pt-6">
-            <ProgressStatsCard onStartLearn={noop} onReviewModeChange={noop} hasPlayableCards />
-            <SegmentedHomeSection onNavigateToContent={noop} onNavigateToChat={noop} />
+            <ProgressStatsCard
+              onStartLearn={noop}
+              onReviewModeChange={noop}
+              hasPlayableCards
+            />
+            <SegmentedHomeSection
+              onNavigateToContent={noop}
+              onNavigateToChat={noop}
+            />
           </div>
-          <BottomNav currentView={'home' as never} onViewChange={noop} onLearnOpen={noop} />
+          <BottomNav
+            currentView={'home' as never}
+            onViewChange={noop}
+            onLearnOpen={noop}
+          />
         </div>
       </WithAppData>
     </MockConvex>
@@ -321,13 +376,21 @@ export function WriteScreen() {
   return (
     <WithChatContext>
       <div className="absolute inset-0 flex flex-col bg-background text-foreground pt-4">
-        <LearningHeader onBack={noop} onSettingsOpen={noop} reviewMode="full" ratingCount={4} />
+        <LearningHeader
+          onBack={noop}
+          onSettingsOpen={noop}
+          reviewMode="full"
+          ratingCount={4}
+        />
         <main className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden px-4">
           <FullReviewCardContent
-            {...cardStubs}
-            sourceText={fx.writeCard.sourceText}
-            translations={fx.writeCard.translations}
-            audioRecordings={fx.writeCard.audioRecordings}
+            bare
+            presentation={{
+              ...cardStubs,
+              sourceText: fx.writeCard.sourceText,
+              translations: fx.writeCard.translations,
+              audioRecordings: fx.writeCard.audioRecordings,
+            }}
             targetAudioMode="afterSubmit"
           />
         </main>
@@ -354,28 +417,210 @@ export function WriteScreen() {
   );
 }
 
+/**
+ * AI answer feedback: a submitted writing answer with the coach card under
+ * it. Same submitted-row layout FullReviewCardContent renders (header audio,
+ * diff, revert/clean buttons, any other accepted answer, then the coach
+ * card), rebuilt from the real components because the submitted state lives
+ * in component state and can't be passed in.
+ */
+function FeedbackFrame({
+  card,
+  expected,
+  feedback,
+  showAccepted = false,
+}: {
+  card: typeof fx.feedbackCard;
+  /** What the diff scores the typed answer against. */
+  expected: string;
+  feedback: RowFeedback;
+  /** List the card's own sentence below the diff as another accepted answer. */
+  showAccepted?: boolean;
+}) {
+  return (
+    <WithChatContext>
+      <div className="absolute inset-0 flex flex-col bg-background text-foreground pt-4">
+        <LearningHeader
+          onBack={noop}
+          onSettingsOpen={noop}
+          reviewMode="full"
+          ratingCount={4}
+        />
+        <main className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden px-4">
+          <CardShell
+            presentation={{
+              ...cardStubs,
+              sourceText: card.sourceText,
+              translations: card.translations,
+              audioRecordings: card.audioRecordings,
+            }}
+            reviewCount={9}
+            bare
+          >
+            {() => (
+              <div className="space-y-1">
+                <div className="flex justify-end">
+                  <AudioButton url={fx.SILENT_AUDIO} language="es" />
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <DiffDisplay
+                      expected={expected}
+                      actual={card.typedAnswer}
+                      language="es"
+                    />
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-2 pt-0.5">
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 shrink-0"
+                      >
+                        <Undo2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 shrink-0"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                {showAccepted && (
+                  <div className="flex flex-col gap-1.5 pt-1">
+                    <div className="flex items-start gap-2">
+                      <p className="flex-1 min-w-0 text-sm text-muted-foreground">
+                        {card.sourceText}
+                      </p>
+                      <AudioButton url={fx.SILENT_AUDIO} language="es" />
+                    </div>
+                  </div>
+                )}
+                <WritingFeedbackCard
+                  feedback={feedback}
+                  onDiscuss={noop}
+                  onMakeDefault={async () => {}}
+                />
+              </div>
+            )}
+          </CardShell>
+        </main>
+        <LearningControls
+          validRatings={['again', 'hard', 'good', 'easy']}
+          activeRating={'good' as never}
+          ratingIntervals={{ again: '<1m', hard: '6m', good: '3d', easy: '8d' }}
+          onSelectRating={noop}
+          onPlay={noop}
+          onPause={noop}
+          isPlaying={false}
+          isMerging={false}
+          durationSec={3.1}
+          onSeek={noop}
+          onNext={noop}
+          onUndo={noop}
+          undoDisabled={false}
+          isReviewing={false}
+          isFullReview
+          fullReviewRevealed
+        />
+      </div>
+    </WithChatContext>
+  );
+}
+
+/**
+ * A different-but-correct wording the grader accepted and saved.
+ *
+ * Captured for the set as frame 06 with
+ * ?screen=feedback&caption=AI%20FEEDBACK%20ON%20EVERY%20ANSWER.&bg=%23FFB300&fg=%233B2A00
+ */
+export function FeedbackScreen() {
+  return (
+    <FeedbackFrame
+      card={fx.feedbackCard}
+      expected={fx.feedbackCard.typedAnswer}
+      showAccepted
+      feedback={{
+        status: 'done',
+        result: {
+          verdict: 'alsoCorrect',
+          corrected: fx.feedbackCard.typedAnswer,
+          notes: [
+            {
+              type: 'vocab',
+              text: 'Totally fine — madrugar is just the snappy one-word way to say "get up early".',
+            },
+          ],
+          savedAlternative: true,
+        },
+      }}
+    />
+  );
+}
+
+/**
+ * A partly-right answer: the diff marks the slips, the coach explains them.
+ *
+ * Captured for the set as frame 07 with
+ * ?screen=feedback-partial&caption=MISTAKES%20EXPLAINED%2C%20NOT%20JUST%20MARKED.&bg=%23D45C2B&fg=%23FFFFFF
+ */
+export function FeedbackPartialScreen() {
+  return (
+    <FeedbackFrame
+      card={fx.partialCard}
+      expected={fx.partialCard.sourceText}
+      feedback={{
+        status: 'done',
+        result: {
+          verdict: 'partial',
+          corrected: fx.partialCard.sourceText,
+          notes: [
+            {
+              type: 'grammar',
+              text: 'Conocimos says you met once — still knowing each other now takes the present: nos conocemos.',
+            },
+            {
+              type: 'wordChoice',
+              text: 'For "how long so far", Spanish reaches for desde hace, not por.',
+            },
+          ],
+        },
+      }}
+    />
+  );
+}
+
 /** The milestone screen the learner meets partway through a session. */
 export function ProgressScreen() {
   return (
     <MockConvex>
-    <WithChatContext>
-      <div className="absolute inset-0 flex flex-col bg-background text-foreground pt-4">
-        <LearningHeader onBack={noop} onSettingsOpen={noop} ratingCount={4} />
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <ProgressDisplay
-            sessionId="store-session"
-            dailyReviewsToday={74}
-            dailyTimeMsToday={21 * 60 * 1000}
-            dailyNewWordsToday={20}
-            schedulingMode={'learnAndReview' as never}
-            reviewMode="audio"
-            autoAdvance={false}
-            onContinue={noop}
-            ready
-          />
-        </div>
-      </div>
-    </WithChatContext>
+      {/* ProgressDisplay reads getUserSettings via AppDataProvider. */}
+      <WithAppData>
+        <WithChatContext>
+          <div className="absolute inset-0 flex flex-col bg-background text-foreground pt-4">
+            <LearningHeader
+              onBack={noop}
+              onSettingsOpen={noop}
+              ratingCount={4}
+            />
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <ProgressDisplay
+                sessionId="store-session"
+                dailyReviewsToday={74}
+                dailyTimeMsToday={21 * 60 * 1000}
+                dailyNewWordsToday={20}
+                reviewMode="audio"
+                autoAdvance={false}
+                onContinue={noop}
+                ready
+              />
+            </div>
+          </div>
+        </WithChatContext>
+      </WithAppData>
     </MockConvex>
   );
 }
@@ -387,14 +632,23 @@ export function WordCloudScreen() {
       <div className="min-h-0 flex-1 overflow-hidden p-4 pt-8">
         <LandingWordCloud />
       </div>
-      <BottomNav currentView={'stats' as never} onViewChange={noop} onLearnOpen={noop} />
+      <BottomNav
+        currentView={'stats' as never}
+        onViewChange={noop}
+        onLearnOpen={noop}
+      />
     </div>
   );
 }
 
 // ------------------------------------------------------------------ posters
 
-const BRAND = { clay: '#D45C2B', sky: '#2BB5D4', amber: '#FFB300', ink: '#0B2A35' };
+const BRAND = {
+  clay: '#D45C2B',
+  sky: '#2BB5D4',
+  amber: '#FFB300',
+  ink: '#0B2A35',
+};
 
 const PILLARS = [
   {
@@ -417,14 +671,42 @@ const PILLARS = [
   },
 ];
 
-function Wordmark({ color = '#fff', size = 130 }: { color?: string; size?: number }) {
+function Wordmark({
+  color = '#fff',
+  size = 130,
+}: {
+  color?: string;
+  size?: number;
+}) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 38 }}>
-      <div style={{ background: '#fff', borderRadius: 46, padding: 18, flex: '0 0 auto' }}>
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 46,
+          padding: 18,
+          flex: '0 0 auto',
+        }}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icons/icon-512x512.png" alt="" width={size} height={size} style={{ display: 'block' }} />
+        <img
+          src="/icons/icon-512x512.png"
+          alt=""
+          width={size}
+          height={size}
+          style={{ display: 'block' }}
+        />
       </div>
-      <p style={{ margin: 0, fontSize: size * 0.82, fontWeight: 800, letterSpacing: '-0.04em', color, lineHeight: 1 }}>
+      <p
+        style={{
+          margin: 0,
+          fontSize: size * 0.82,
+          fontWeight: 800,
+          letterSpacing: '-0.04em',
+          color,
+          lineHeight: 1,
+        }}
+      >
         Flexling
       </p>
     </div>
@@ -466,8 +748,21 @@ function HeroPoster({
   cards: { label: string; line: string; color: string }[];
 }) {
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: '#EEF4F6' }}>
-      <div style={{ background: heroBg, padding: wordmark ? '104px 84px 84px' : '116px 84px 92px' }}>
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        background: '#EEF4F6',
+      }}
+    >
+      <div
+        style={{
+          background: heroBg,
+          padding: wordmark ? '104px 84px 84px' : '116px 84px 92px',
+        }}
+      >
         {wordmark && <Wordmark size={140} />}
         <p
           style={{
@@ -483,7 +778,15 @@ function HeroPoster({
           {heading}
         </p>
       </div>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 24, padding: '40px 84px 76px' }}>
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 24,
+          padding: '40px 84px 76px',
+        }}
+      >
         {cards.map((c) => (
           <div
             key={c.label}
@@ -509,7 +812,16 @@ function HeroPoster({
             >
               {c.label}
             </span>
-            <p style={{ margin: 0, fontSize: 58, fontWeight: 700, letterSpacing: '-0.026em', lineHeight: 1.14, color: '#0D1416' }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 58,
+                fontWeight: 700,
+                letterSpacing: '-0.026em',
+                lineHeight: 1.14,
+                color: '#0D1416',
+              }}
+            >
               {c.line}
             </p>
           </div>
@@ -521,7 +833,14 @@ function HeroPoster({
 
 /** Opening frame. */
 export function OpenerScreen() {
-  return <HeroPoster heroBg={BRAND.sky} heading={TAGLINE} wordmark cards={PILLARS_COPY} />;
+  return (
+    <HeroPoster
+      heroBg={BRAND.sky}
+      heading={TAGLINE}
+      wordmark
+      cards={PILLARS_COPY}
+    />
+  );
 }
 
 /** The three ways one card can be practised. */
@@ -557,6 +876,8 @@ export const SCREENS: Record<string, () => ReactNode> = {
   modes: () => <ModesScreen />,
   learn: () => <LearnScreen />,
   write: () => <WriteScreen />,
+  feedback: () => <FeedbackScreen />,
+  'feedback-partial': () => <FeedbackPartialScreen />,
   'chat-answer': () => <ChatAnswerScreen sampleIndex={0} />,
   'chat-answer-2': () => <ChatAnswerScreen sampleIndex={2} />,
   'chat-cards': () => <ChatCardsScreen />,
@@ -572,21 +893,33 @@ export const SCREENS: Record<string, () => ReactNode> = {
  * Five ways to show the catalogue. All read from SUPPORTED_LANGUAGES, so the
  * names, flags and counts are whatever the app actually ships.
  */
-function LangHead({
-  color = '#fff',
-  sub,
-}: {
-  color?: string;
-  sub: string;
-}) {
+function LangHead({ color = '#fff', sub }: { color?: string; sub: string }) {
   return (
     <>
-      <p style={{ margin: 0, fontSize: 104, lineHeight: 1.02, fontWeight: 800, letterSpacing: '-0.038em', color }}>
+      <p
+        style={{
+          margin: 0,
+          fontSize: 104,
+          lineHeight: 1.02,
+          fontWeight: 800,
+          letterSpacing: '-0.038em',
+          color,
+        }}
+      >
         One method.
         <br />
         {COUNTS.languages}+ languages.
       </p>
-      <p style={{ margin: '26px 0 0', fontSize: 46, lineHeight: 1.32, color, opacity: 0.82, maxWidth: '26ch' }}>
+      <p
+        style={{
+          margin: '26px 0 0',
+          fontSize: 46,
+          lineHeight: 1.32,
+          color,
+          opacity: 0.82,
+          maxWidth: '26ch',
+        }}
+      >
         {sub}
       </p>
     </>
@@ -658,10 +991,15 @@ export function LangsScreen() {
         }}
       >
         {BASE_LANGS.map((l) => (
-          <Pill key={l.code} l={l} bg="rgba(255,255,255,.18)" fg="#fff" size={54} />
+          <Pill
+            key={l.code}
+            l={l}
+            bg="rgba(255,255,255,.18)"
+            fg="#fff"
+            size={54}
+          />
         ))}
       </div>
     </Poster>
   );
 }
-

@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
-import { convexTest, type TestConvex } from "convex-test";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { convexTest, type TestConvex } from 'convex-test';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Track calls to the aggregate component across all instances so we can
 // assert the migration touched every card for every aggregate, without
@@ -10,10 +10,13 @@ const calls = {
   clear: [] as Array<{ namespace: string }>,
 };
 
-vi.mock("@convex-dev/aggregate", () => {
+vi.mock('@convex-dev/aggregate', () => {
   class TableAggregate {
     constructor(_component: unknown, _opts: unknown) {}
-    async insertIfDoesNotExist(_ctx: unknown, doc: { _id: string }): Promise<void> {
+    async insertIfDoesNotExist(
+      _ctx: unknown,
+      doc: { _id: string },
+    ): Promise<void> {
       calls.insert.push({ docId: doc._id });
     }
     async replaceOrInsert(): Promise<void> {}
@@ -28,13 +31,14 @@ vi.mock("@convex-dev/aggregate", () => {
   return { TableAggregate };
 });
 
-import schema from "../../schema";
-import { internal } from "../../_generated/api";
-import { EXTENDED_STATE_LABELS } from "../../lib/fsrsStates";
-import { ORIGIN_BUCKETS } from "../../db/stats/cardAggregates";
-import type { Id } from "../../_generated/dataModel";
+import schema from '../../schema';
+import { internal } from '../../_generated/api';
+import { EXTENDED_STATE_LABELS } from '../../lib/fsrsStates';
+import { ORIGIN_BUCKETS } from '../../db/stats/cardAggregates';
+import { STABILITY_BUCKETS } from '../../../lib/workloadForecast';
+import type { Id } from '../../_generated/dataModel';
 
-const modules = import.meta.glob("/convex/**/*.ts");
+const modules = import.meta.glob('/convex/**/*.ts');
 
 beforeEach(() => {
   calls.insert = [];
@@ -45,43 +49,44 @@ async function seedUserWithDecksAndCards(
   t: TestConvex<typeof schema>,
   userId: string,
   decks: { cards: number }[],
-): Promise<{ deckIds: Id<"decks">[]; cardIds: Id<"cards">[] }> {
+): Promise<{ deckIds: Id<'decks'>[]; cardIds: Id<'cards'>[] }> {
   return t.run(async (ctx) => {
-    const collectionId = await ctx.db.insert("collections", {
-      name: "c",
+    const collectionId = await ctx.db.insert('collections', {
+      name: 'c',
       textCount: 0,
     });
-    const courseId = await ctx.db.insert("courses", {
+    const courseId = await ctx.db.insert('courses', {
       userId,
-      baseLanguages: ["en"],
-      targetLanguages: ["es"],
+      baseLanguages: ['en'],
+      targetLanguages: ['es'],
     });
-    const deckIds: Id<"decks">[] = [];
-    const cardIds: Id<"cards">[] = [];
+    const deckIds: Id<'decks'>[] = [];
+    const cardIds: Id<'cards'>[] = [];
     for (const d of decks) {
-      const deckId = await ctx.db.insert("decks", {
+      const deckId = await ctx.db.insert('decks', {
         courseId,
-        name: "d",
+        name: 'd',
         cardCount: d.cards,
       });
       deckIds.push(deckId);
       for (let i = 0; i < d.cards; i++) {
-        const textId = await ctx.db.insert("texts", {
-          text: "t",
-          language: "es",
+        const textId = await ctx.db.insert('texts', {
+          text: 't',
+          language: 'es',
           userCreated: true,
           userId,
           collectionId,
           collectionRank: 1,
         });
-        const cardId = await ctx.db.insert("cards", {
+        const cardId = await ctx.db.insert('cards', {
           deckId,
           textId,
           collectionId,
+          collectionOrigin: 'custom',
           dueDate: Date.now(),
           isMastered: false,
           isHidden: false,
-          schedulingPhase: "preReview",
+          schedulingPhase: 'preReview',
           preReviewCount: 0,
         });
         cardIds.push(cardId);
@@ -91,18 +96,18 @@ async function seedUserWithDecksAndCards(
   });
 }
 
-describe("migrations/recalcUserCardAggregates", () => {
-  it("clears all aggregate namespaces for every deck, one deck per scheduled mutation", async () => {
+describe('migrations/recalcUserCardAggregates', () => {
+  it('clears all aggregate namespaces for every deck, one deck per scheduled mutation', async () => {
     vi.useFakeTimers();
     try {
       const t = convexTest(schema, modules);
-      const { deckIds } = await seedUserWithDecksAndCards(t, "user_A", [
+      const { deckIds } = await seedUserWithDecksAndCards(t, 'user_A', [
         { cards: 1 },
         { cards: 1 },
       ]);
 
       await t.mutation(internal.migrations.recalcUserCardAggregates.run, {
-        userId: "user_A",
+        userId: 'user_A',
       });
 
       // `run` only enumerates decks. A single deck's clear is dozens of
@@ -117,8 +122,12 @@ describe("migrations/recalcUserCardAggregates", () => {
       // Each deck triggers, per state label: 1 cardsByStateAndDueDate.clear +
       // 1 cardsByWritingStateAndDueDate.clear + one clear per origin bucket for
       // each of cardsByOriginStateAndDueDate / cardsByOriginWritingStateAndDueDate.
+      // Per deck: every state × (shared + writing instances, each with an
+      // origin mirror), plus the stability-bucket namespaces cleared with
+      // the shared track.
       const perDeck =
-        EXTENDED_STATE_LABELS.length * (2 + 2 * ORIGIN_BUCKETS.length);
+        EXTENDED_STATE_LABELS.length * (2 + 2 * ORIGIN_BUCKETS.length) +
+        STABILITY_BUCKETS.length;
       expect(calls.clear).toHaveLength(deckIds.length * perDeck);
 
       // No aggregate is namespaced by a bare deckId any more: every namespace
@@ -150,17 +159,17 @@ describe("migrations/recalcUserCardAggregates", () => {
     }
   });
 
-  it("re-inserts every card on both shared aggregates after draining the scheduler", async () => {
+  it('re-inserts every card on both shared aggregates after draining the scheduler', async () => {
     vi.useFakeTimers();
     try {
       const t = convexTest(schema, modules);
-      const { cardIds } = await seedUserWithDecksAndCards(t, "user_A", [
+      const { cardIds } = await seedUserWithDecksAndCards(t, 'user_A', [
         { cards: 3 },
         { cards: 2 },
       ]);
 
       await t.mutation(internal.migrations.recalcUserCardAggregates.run, {
-        userId: "user_A",
+        userId: 'user_A',
       });
       await t.finishAllScheduledFunctions(vi.runAllTimers);
 
@@ -177,19 +186,19 @@ describe("migrations/recalcUserCardAggregates", () => {
     }
   });
 
-  it("does not touch cards owned by other users", async () => {
+  it('does not touch cards owned by other users', async () => {
     vi.useFakeTimers();
     try {
       const t = convexTest(schema, modules);
-      const { cardIds: aCards } = await seedUserWithDecksAndCards(t, "user_A", [
+      const { cardIds: aCards } = await seedUserWithDecksAndCards(t, 'user_A', [
         { cards: 2 },
       ]);
-      const { cardIds: bCards } = await seedUserWithDecksAndCards(t, "user_B", [
+      const { cardIds: bCards } = await seedUserWithDecksAndCards(t, 'user_B', [
         { cards: 4 },
       ]);
 
       await t.mutation(internal.migrations.recalcUserCardAggregates.run, {
-        userId: "user_A",
+        userId: 'user_A',
       });
       await t.finishAllScheduledFunctions(vi.runAllTimers);
 
@@ -202,13 +211,13 @@ describe("migrations/recalcUserCardAggregates", () => {
     }
   });
 
-  it("no-ops cleanly for a user with no courses", async () => {
+  it('no-ops cleanly for a user with no courses', async () => {
     const t = convexTest(schema, modules);
     const res = await t.mutation(
       internal.migrations.recalcUserCardAggregates.run,
-      { userId: "user_with_nothing" },
+      { userId: 'user_with_nothing' },
     );
-    expect(res).toEqual({ status: "started", deckCount: 0 });
+    expect(res).toEqual({ status: 'started', deckCount: 0 });
     expect(calls.clear).toHaveLength(0);
     expect(calls.insert).toHaveLength(0);
   });

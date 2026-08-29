@@ -36,7 +36,12 @@ describe('detectHasHeader', () => {
     expect(detectHasHeader(['Name', 'Category'], 'en')).toBe(true);
   });
   it('rejects a sentence row as a header', () => {
-    expect(detectHasHeader(['Guten Morgen, wie geht es dir heute?', 'Buenos días'], 'en')).toBe(false);
+    expect(
+      detectHasHeader(
+        ['Guten Morgen, wie geht es dir heute?', 'Buenos días'],
+        'en',
+      ),
+    ).toBe(false);
   });
   it('returns false for empty row', () => {
     expect(detectHasHeader([], 'en')).toBe(false);

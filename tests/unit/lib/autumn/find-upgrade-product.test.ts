@@ -18,7 +18,9 @@ function makeProduct(partial: Partial<Product> & { id: string }): Product {
 
 describe('findUpgradeProductFromPricingTable', () => {
   it('returns undefined for undefined product list', () => {
-    expect(findUpgradeProductFromPricingTable(undefined, 'x', 0)).toBeUndefined();
+    expect(
+      findUpgradeProductFromPricingTable(undefined, 'x', 0),
+    ).toBeUndefined();
   });
 
   it('returns undefined when no product matches', () => {
@@ -32,7 +34,9 @@ describe('findUpgradeProductFromPricingTable', () => {
         items: [],
       }),
     ];
-    expect(findUpgradeProductFromPricingTable(products, 'x', 0)).toBeUndefined();
+    expect(
+      findUpgradeProductFromPricingTable(products, 'x', 0),
+    ).toBeUndefined();
   });
 
   it('finds product with higher included_usage for consumable feature', () => {
@@ -43,7 +47,12 @@ describe('findUpgradeProductFromPricingTable', () => {
         items: [{ feature_id: 'chat', included_usage: 100 } as never],
       }),
     ];
-    const found = findUpgradeProductFromPricingTable(products, 'chat', 10, true);
+    const found = findUpgradeProductFromPricingTable(
+      products,
+      'chat',
+      10,
+      true,
+    );
     expect(found?.id).toBe('pro');
   });
 
@@ -103,7 +112,11 @@ describe('findUpgradeProductFromPricingTable', () => {
         ],
       });
     // Deliberately most-expensive-first.
-    const products = [tier('ultra', 32, 3000), tier('pro', 16, 1000), tier('basic', 8, 400)];
+    const products = [
+      tier('ultra', 32, 3000),
+      tier('pro', 16, 1000),
+      tier('basic', 8, 400),
+    ];
 
     expect(
       findUpgradeProductFromPricingTable(products, 'credits', 30, true)?.id,
@@ -137,10 +150,22 @@ describe('findUpgradeProductFromPricingTable', () => {
     // An annual subscriber must not be sent to monthly Ultra just because
     // €32 sorts below €288.
     expect(
-      findUpgradeProductFromPricingTable(products, 'credits', 1000, true, 'year')?.id,
+      findUpgradeProductFromPricingTable(
+        products,
+        'credits',
+        1000,
+        true,
+        'year',
+      )?.id,
     ).toBe('ultra_annual');
     expect(
-      findUpgradeProductFromPricingTable(products, 'credits', 1000, true, 'month')?.id,
+      findUpgradeProductFromPricingTable(
+        products,
+        'credits',
+        1000,
+        true,
+        'month',
+      )?.id,
     ).toBe('ultra');
     // No paid plan yet → no interval to honour, cheapest wins.
     expect(
@@ -159,7 +184,13 @@ describe('findUpgradeProductFromPricingTable', () => {
       ],
     });
     expect(
-      findUpgradeProductFromPricingTable([monthlyOnly], 'credits', 1000, true, 'year')?.id,
+      findUpgradeProductFromPricingTable(
+        [monthlyOnly],
+        'credits',
+        1000,
+        true,
+        'year',
+      )?.id,
     ).toBe('ultra');
   });
 
@@ -191,9 +222,9 @@ describe('findUpgradeProductFromPricingTable', () => {
     expect(
       findUpgradeProductFromPricingTable([free], 'chat', 0, true),
     ).toBeUndefined();
-    expect(findUpgradeProductFromPricingTable([paid], 'chat', 0, true)?.id).toBe(
-      'paid',
-    );
+    expect(
+      findUpgradeProductFromPricingTable([paid], 'chat', 0, true)?.id,
+    ).toBe('paid');
   });
 });
 

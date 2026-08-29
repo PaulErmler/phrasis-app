@@ -24,7 +24,10 @@ export function getDecodeContext(): AudioContext {
   return sharedCtx;
 }
 
-export function computePeakFromBuffer(buffer: AudioBuffer, url?: string): number {
+export function computePeakFromBuffer(
+  buffer: AudioBuffer,
+  url?: string,
+): number {
   if (url) {
     const cached = peakCache.get(url);
     if (cached !== undefined) return cached;
@@ -50,7 +53,10 @@ export async function getPeak(url: string): Promise<number> {
 
   const task = (async () => {
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`Audio fetch failed: ${res.status} ${res.statusText} for ${url}`);
+    if (!res.ok)
+      throw new Error(
+        `Audio fetch failed: ${res.status} ${res.statusText} for ${url}`,
+      );
     const arrayBuf = await res.arrayBuffer();
     const ctx = getDecodeContext();
     const buffer = await ctx.decodeAudioData(arrayBuf);

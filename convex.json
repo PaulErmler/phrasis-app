@@ -1,5 +1,8 @@
 {
   "node": {
-    "externalPackages": ["@echogarden/espeak-ng-emscripten"]
+    "externalPackages": [
+      "@echogarden/espeak-ng-emscripten",
+      "lindera-wasm-nodejs-ipadic"
+    ]
   }
 }

@@ -22,7 +22,10 @@ export async function upsertYearlyStats(
   const existing = await ctx.db
     .query('yearlyStats')
     .withIndex('by_userId_and_courseId_and_year', (q) =>
-      q.eq('userId', args.userId).eq('courseId', args.courseId).eq('year', args.year),
+      q
+        .eq('userId', args.userId)
+        .eq('courseId', args.courseId)
+        .eq('year', args.year),
     )
     .first();
 
@@ -36,10 +39,17 @@ export async function upsertYearlyStats(
       totalNewCards: existing.totalNewCards + (args.isNewCard ? 1 : 0),
       totalTimeMs: existing.totalTimeMs + args.timeMs,
       activeDays: existing.activeDays + (args.isFirstActivityToday ? 1 : 0),
-      activeWeeks: existing.activeWeeks + (args.isFirstActivityThisWeek ? 1 : 0),
-      activeMonths: existing.activeMonths + (args.isFirstActivityThisMonth ? 1 : 0),
+      activeWeeks:
+        existing.activeWeeks + (args.isFirstActivityThisWeek ? 1 : 0),
+      activeMonths:
+        existing.activeMonths + (args.isFirstActivityThisMonth ? 1 : 0),
       ...(args.reviewMode
-        ? { reviewsByMode: { ...prevMode, [args.reviewMode]: prevMode[args.reviewMode] + 1 } }
+        ? {
+            reviewsByMode: {
+              ...prevMode,
+              [args.reviewMode]: prevMode[args.reviewMode] + 1,
+            },
+          }
         : {}),
     });
     return;
@@ -57,11 +67,11 @@ export async function upsertYearlyStats(
     activeMonths: 1,
     ...(args.reviewMode
       ? {
-        reviewsByMode: {
-          ...EMPTY_MODE_COUNTS(),
-          [args.reviewMode]: 1,
-        },
-      }
+          reviewsByMode: {
+            ...EMPTY_MODE_COUNTS(),
+            [args.reviewMode]: 1,
+          },
+        }
       : {}),
   });
 }

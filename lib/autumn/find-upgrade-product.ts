@@ -1,10 +1,14 @@
-import type { Product } from "autumn-js";
-import { CREDIT_COSTS, FEATURE_IDS, type FeatureId } from "@/convex/features/featureIds";
+import type { Product } from 'autumn-js';
+import {
+  CREDIT_COSTS,
+  FEATURE_IDS,
+  type FeatureId,
+} from '@/convex/features/featureIds';
 import {
   findCurrentPaidPlan,
   normalizePlans,
   type AutumnCustomerLike,
-} from "@/lib/autumn/customer-shape";
+} from '@/lib/autumn/customer-shape';
 
 /**
  * Credit-consuming features are granted via the shared `credits` item on
@@ -24,7 +28,7 @@ export function toBillableFeature(
 /** Monthly/annual list price of a plan, used to order upgrade candidates. */
 function productPrice(product: Product): number {
   const price = product.items[0]?.price;
-  return typeof price === "number" ? price : 0;
+  return typeof price === 'number' ? price : 0;
 }
 
 /**
@@ -90,13 +94,15 @@ export function findUpgradeProductFromPricingTable(
   // interval has nothing to offer, leaving them with no upgrade at all.
   const eligible = (products ?? []).filter((p) => {
     if (p.properties?.is_free) return false;
-    if (p.scenario !== "upgrade" && p.scenario !== "new") return false;
-    const featureItem = p.items.find((i) => i.feature_id === billable.featureId);
+    if (p.scenario !== 'upgrade' && p.scenario !== 'new') return false;
+    const featureItem = p.items.find(
+      (i) => i.feature_id === billable.featureId,
+    );
     if (!featureItem) return false;
     if (consumable === undefined) return true;
-    if (featureItem.included_usage === "inf") return true;
+    if (featureItem.included_usage === 'inf') return true;
     return (
-      typeof featureItem.included_usage === "number" &&
+      typeof featureItem.included_usage === 'number' &&
       featureItem.included_usage > billable.included
     );
   });

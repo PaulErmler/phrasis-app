@@ -16,7 +16,11 @@ describe('AcquisitionSourceStep: free-text char limit', () => {
     render(
       <AcquisitionSourceStep
         selected="other"
-        freeText={'x'.repeat(MAX_ONBOARDING_FREE_TEXT_LENGTH - ONBOARDING_FREE_TEXT_SHOW_COUNT_REMAINING_THRESHOLD - 1)}
+        freeText={'x'.repeat(
+          MAX_ONBOARDING_FREE_TEXT_LENGTH -
+            ONBOARDING_FREE_TEXT_SHOW_COUNT_REMAINING_THRESHOLD -
+            1,
+        )}
         onSelect={() => {}}
         onFreeText={() => {}}
       />,
@@ -36,7 +40,9 @@ describe('AcquisitionSourceStep: free-text char limit', () => {
       />,
     );
     const counter = screen.getByTestId(COUNTER_TESTID);
-    expect(counter.textContent).toBe(`${length}/${MAX_ONBOARDING_FREE_TEXT_LENGTH}`);
+    expect(counter.textContent).toBe(
+      `${length}/${MAX_ONBOARDING_FREE_TEXT_LENGTH}`,
+    );
     expect(counter.className).toContain('text-muted-foreground');
     expect(counter.className).not.toContain('text-destructive');
   });
@@ -80,7 +86,10 @@ describe('AcquisitionSourceStep: free-text char limit', () => {
     );
     const buttons = screen.getAllByTestId(/acquisition-option-/);
     expect(buttons).toHaveLength(8);
-    expect(buttons.at(-1)).toHaveAttribute('data-testid', 'acquisition-option-other');
+    expect(buttons.at(-1)).toHaveAttribute(
+      'data-testid',
+      'acquisition-option-other',
+    );
   });
 
   it('does not render the free-text input when "other" is not selected', () => {

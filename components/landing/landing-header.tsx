@@ -100,7 +100,11 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
               </button>
 
               {isAuthenticated ? (
-                <Button asChild size="sm" className="hidden sm:inline-flex rounded-lg">
+                <Button
+                  asChild
+                  size="sm"
+                  className="hidden sm:inline-flex rounded-lg"
+                >
                   <Link href="/app">{t('goToApp')}</Link>
                 </Button>
               ) : (
@@ -171,7 +175,9 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
                 {t('installApp')}
               </button>
               <div className="px-4 py-2">
-                <span className="text-sm text-muted-foreground">{t('theme')}</span>
+                <span className="text-sm text-muted-foreground">
+                  {t('theme')}
+                </span>
                 <div className="flex gap-1 mt-2">
                   {themeOptions.map((option) => {
                     const isActive = mounted && theme === option.value;

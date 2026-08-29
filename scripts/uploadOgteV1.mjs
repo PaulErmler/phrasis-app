@@ -40,26 +40,146 @@ const LEVELS_DIR = path.join(
  * L20 folded into C2).
  */
 const LEVELS = [
-  { order: 1, code: 'L01', cefrTier: 'Pre-A1', displayName: 'Pre-A1', file: 'ogte_01_alphabet.csv' },
-  { order: 2, code: 'L02', cefrTier: 'A1', displayName: 'A1.1', file: 'ogte_02_early_beginner.csv' },
-  { order: 3, code: 'L03', cefrTier: 'A1', displayName: 'A1.2', file: 'ogte_03_mid_beginner.csv' },
-  { order: 4, code: 'L04', cefrTier: 'A1', displayName: 'A1.3', file: 'ogte_04_high_beginner.csv' },
-  { order: 5, code: 'L05', cefrTier: 'A2', displayName: 'A2.1', file: 'ogte_05_early_elementary.csv' },
-  { order: 6, code: 'L06', cefrTier: 'A2', displayName: 'A2.2', file: 'ogte_06_mid_elementary.csv' },
-  { order: 7, code: 'L07', cefrTier: 'A2', displayName: 'A2.3', file: 'ogte_07_high_elementary.csv' },
-  { order: 8, code: 'L08', cefrTier: 'B1', displayName: 'B1.1', file: 'ogte_08_early_intermediate.csv' },
-  { order: 9, code: 'L09', cefrTier: 'B1', displayName: 'B1.2', file: 'ogte_09_mid_intermediate.csv' },
-  { order: 10, code: 'L10', cefrTier: 'B1', displayName: 'B1.3', file: 'ogte_10_high_intermediate.csv' },
-  { order: 11, code: 'L11', cefrTier: 'B2', displayName: 'B2.1', file: 'ogte_11_early_upper_intermediate.csv' },
-  { order: 12, code: 'L12', cefrTier: 'B2', displayName: 'B2.2', file: 'ogte_12_mid_upper_intermediate.csv' },
-  { order: 13, code: 'L13', cefrTier: 'B2', displayName: 'B2.3', file: 'ogte_13_high_upper_intermediate.csv' },
-  { order: 14, code: 'L14', cefrTier: 'C1', displayName: 'C1.1', file: 'ogte_14_early_advanced.csv' },
-  { order: 15, code: 'L15', cefrTier: 'C1', displayName: 'C1.2', file: 'ogte_15_mid_advanced.csv' },
-  { order: 16, code: 'L16', cefrTier: 'C1', displayName: 'C1.3', file: 'ogte_16_high_advanced.csv' },
-  { order: 17, code: 'L17', cefrTier: 'C2', displayName: 'C2.1', file: 'ogte_17_early_near_native.csv' },
-  { order: 18, code: 'L18', cefrTier: 'C2', displayName: 'C2.2', file: 'ogte_18_mid_near_native.csv' },
-  { order: 19, code: 'L19', cefrTier: 'C2', displayName: 'C2.3', file: 'ogte_19_high_near_native.csv' },
-  { order: 20, code: 'L20', cefrTier: 'C2', displayName: 'C2.4', file: 'ogte_20_native.csv' },
+  {
+    order: 1,
+    code: 'L01',
+    cefrTier: 'Pre-A1',
+    displayName: 'Pre-A1',
+    file: 'ogte_01_alphabet.csv',
+  },
+  {
+    order: 2,
+    code: 'L02',
+    cefrTier: 'A1',
+    displayName: 'A1.1',
+    file: 'ogte_02_early_beginner.csv',
+  },
+  {
+    order: 3,
+    code: 'L03',
+    cefrTier: 'A1',
+    displayName: 'A1.2',
+    file: 'ogte_03_mid_beginner.csv',
+  },
+  {
+    order: 4,
+    code: 'L04',
+    cefrTier: 'A1',
+    displayName: 'A1.3',
+    file: 'ogte_04_high_beginner.csv',
+  },
+  {
+    order: 5,
+    code: 'L05',
+    cefrTier: 'A2',
+    displayName: 'A2.1',
+    file: 'ogte_05_early_elementary.csv',
+  },
+  {
+    order: 6,
+    code: 'L06',
+    cefrTier: 'A2',
+    displayName: 'A2.2',
+    file: 'ogte_06_mid_elementary.csv',
+  },
+  {
+    order: 7,
+    code: 'L07',
+    cefrTier: 'A2',
+    displayName: 'A2.3',
+    file: 'ogte_07_high_elementary.csv',
+  },
+  {
+    order: 8,
+    code: 'L08',
+    cefrTier: 'B1',
+    displayName: 'B1.1',
+    file: 'ogte_08_early_intermediate.csv',
+  },
+  {
+    order: 9,
+    code: 'L09',
+    cefrTier: 'B1',
+    displayName: 'B1.2',
+    file: 'ogte_09_mid_intermediate.csv',
+  },
+  {
+    order: 10,
+    code: 'L10',
+    cefrTier: 'B1',
+    displayName: 'B1.3',
+    file: 'ogte_10_high_intermediate.csv',
+  },
+  {
+    order: 11,
+    code: 'L11',
+    cefrTier: 'B2',
+    displayName: 'B2.1',
+    file: 'ogte_11_early_upper_intermediate.csv',
+  },
+  {
+    order: 12,
+    code: 'L12',
+    cefrTier: 'B2',
+    displayName: 'B2.2',
+    file: 'ogte_12_mid_upper_intermediate.csv',
+  },
+  {
+    order: 13,
+    code: 'L13',
+    cefrTier: 'B2',
+    displayName: 'B2.3',
+    file: 'ogte_13_high_upper_intermediate.csv',
+  },
+  {
+    order: 14,
+    code: 'L14',
+    cefrTier: 'C1',
+    displayName: 'C1.1',
+    file: 'ogte_14_early_advanced.csv',
+  },
+  {
+    order: 15,
+    code: 'L15',
+    cefrTier: 'C1',
+    displayName: 'C1.2',
+    file: 'ogte_15_mid_advanced.csv',
+  },
+  {
+    order: 16,
+    code: 'L16',
+    cefrTier: 'C1',
+    displayName: 'C1.3',
+    file: 'ogte_16_high_advanced.csv',
+  },
+  {
+    order: 17,
+    code: 'L17',
+    cefrTier: 'C2',
+    displayName: 'C2.1',
+    file: 'ogte_17_early_near_native.csv',
+  },
+  {
+    order: 18,
+    code: 'L18',
+    cefrTier: 'C2',
+    displayName: 'C2.2',
+    file: 'ogte_18_mid_near_native.csv',
+  },
+  {
+    order: 19,
+    code: 'L19',
+    cefrTier: 'C2',
+    displayName: 'C2.3',
+    file: 'ogte_19_high_near_native.csv',
+  },
+  {
+    order: 20,
+    code: 'L20',
+    cefrTier: 'C2',
+    displayName: 'C2.4',
+    file: 'ogte_20_native.csv',
+  },
 ];
 
 function parseArgs() {
@@ -75,7 +195,9 @@ function parseArgs() {
     }
   }
   if (!out.version) {
-    console.error('ERROR: --version <semver> is required (e.g. --version 1.0.0)');
+    console.error(
+      'ERROR: --version <semver> is required (e.g. --version 1.0.0)',
+    );
     process.exit(1);
   }
   return out;
@@ -95,7 +217,9 @@ function runConvexMutation(functionPath, args) {
     );
     const detail =
       parts.join('\n').trim() ||
-      (result.error ? String(result.error) : '(no stderr/stdout/error message)');
+      (result.error
+        ? String(result.error)
+        : '(no stderr/stdout/error message)');
     throw new Error(`Convex mutation failed: ${detail}`);
   }
   const trimmed = (result.stdout || '').trim();
@@ -118,7 +242,11 @@ function chunkArray(arr, size) {
 function mapRegister(formality) {
   // Dataset's `formality` column is one of: formal, informal, neutral, n/a, ''.
   // texts.register stores formal/informal/neutral; everything else → null.
-  if (formality === 'formal' || formality === 'informal' || formality === 'neutral') {
+  if (
+    formality === 'formal' ||
+    formality === 'informal' ||
+    formality === 'neutral'
+  ) {
     return formality;
   }
   return undefined;
@@ -150,7 +278,9 @@ function mapGenderField(value) {
 
 async function main() {
   const args = parseArgs();
-  console.log(`Uploading OGTE dataset: slug=${args.slug} version=${args.version}`);
+  console.log(
+    `Uploading OGTE dataset: slug=${args.slug} version=${args.version}`,
+  );
 
   if (!fs.existsSync(LEVELS_DIR)) {
     console.error(`ERROR: levels_curated directory not found at ${LEVELS_DIR}`);
@@ -158,11 +288,14 @@ async function main() {
   }
 
   // Step 1 — create-or-get the dataset row.
-  const datasetId = runConvexMutation('admin/uploadDataset:createOrGetDataset', {
-    slug: args.slug,
-    version: args.version,
-    ...(args.description ? { description: args.description } : {}),
-  });
+  const datasetId = runConvexMutation(
+    'admin/uploadDataset:createOrGetDataset',
+    {
+      slug: args.slug,
+      version: args.version,
+      ...(args.description ? { description: args.description } : {}),
+    },
+  );
   console.log(`Dataset id: ${datasetId}`);
 
   let totalInserted = 0;
@@ -175,16 +308,21 @@ async function main() {
       console.warn(`  Missing CSV for ${level.code}: ${csvPath} — skipping`);
       continue;
     }
-    console.log(`\n=== ${level.code} (${level.cefrTier}) — ${level.displayName} ===`);
+    console.log(
+      `\n=== ${level.code} (${level.cefrTier}) — ${level.displayName} ===`,
+    );
 
     // Step 2 — upsert the collection.
-    const collectionId = runConvexMutation('admin/uploadDataset:upsertDatasetCollection', {
-      datasetId,
-      code: level.code,
-      cefrTier: level.cefrTier,
-      order: level.order,
-      displayName: level.displayName,
-    });
+    const collectionId = runConvexMutation(
+      'admin/uploadDataset:upsertDatasetCollection',
+      {
+        datasetId,
+        code: level.code,
+        cefrTier: level.cefrTier,
+        order: level.order,
+        displayName: level.displayName,
+      },
+    );
     console.log(`  collectionId: ${collectionId}`);
 
     // Step 3 — parse CSV.
@@ -234,27 +372,36 @@ async function main() {
     let levelUpdated = 0;
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
-      const result = runConvexMutation('admin/uploadDataset:batchUpsertDatasetTexts', {
-        datasetId,
-        collectionId,
-        texts: batch,
-      });
+      const result = runConvexMutation(
+        'admin/uploadDataset:batchUpsertDatasetTexts',
+        {
+          datasetId,
+          collectionId,
+          texts: batch,
+        },
+      );
       levelInserted += result.inserted;
       levelUpdated += result.updated;
-      console.log(`  batch ${i + 1}/${batches.length}: +${result.inserted} new, ~${result.updated} updated`);
+      console.log(
+        `  batch ${i + 1}/${batches.length}: +${result.inserted} new, ~${result.updated} updated`,
+      );
     }
 
     totalInserted += levelInserted;
     totalUpdated += levelUpdated;
     totalSkipped += skippedCount;
-    console.log(`  ${level.code} done: ${levelInserted} inserted, ${levelUpdated} updated, ${skippedCount} skipped`);
+    console.log(
+      `  ${level.code} done: ${levelInserted} inserted, ${levelUpdated} updated, ${skippedCount} skipped`,
+    );
   }
 
   console.log('\n=== Upload Complete ===');
   console.log(`Total inserted: ${totalInserted}`);
   console.log(`Total updated:  ${totalUpdated}`);
   console.log(`Total skipped:  ${totalSkipped}`);
-  console.log(`Dataset ${datasetId} is INACTIVE — activate it via admin/activateDataset when ready.`);
+  console.log(
+    `Dataset ${datasetId} is INACTIVE — activate it via admin/activateDataset when ready.`,
+  );
 }
 
 main()

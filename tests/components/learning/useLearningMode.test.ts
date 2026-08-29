@@ -68,7 +68,27 @@ vi.mock('convex/react', () => ({
   }),
   useQuery: (ref: string, args?: unknown) =>
     args === 'skip' ? undefined : harness.queryValues.get(ref),
+  // Preloaded handles are string refs here too (see the AppDataProvider mock
+  // below). Never `undefined`: mirrors the real hook, which always has at
+  // least the SSR-preloaded value.
+  usePreloadedQuery: (ref: string) => harness.queryValues.get(ref) ?? null,
   useMutation: (ref: string) => harness.mutationFor(ref),
+}));
+
+// The hook reads activeCourse/courseSettings (live values) and the
+// getUserSettings preloaded handle from AppDataProvider. Source them from
+// the same harness map, with the provider's never-`undefined` contract
+// (missing entry → null, as for a user without a course).
+vi.mock('@/components/app/AppDataProvider', () => ({
+  useAppData: () => ({
+    preloadedSettings: harness.REFS.getUserSettings,
+    preloadedCourseSettings: harness.REFS.getActiveCourseSettings,
+    preloadedActiveCourse: harness.REFS.getActiveCourse,
+    preloadedHomeSummary: 'home.getHomeSummary',
+    activeCourse: harness.queryValues.get(harness.REFS.getActiveCourse) ?? null,
+    courseSettings:
+      harness.queryValues.get(harness.REFS.getActiveCourseSettings) ?? null,
+  }),
 }));
 
 // Force distinct query/mutation refs (the generated api proxy has no stable
@@ -123,6 +143,7 @@ import {
   useLearningMode,
   type LearningState,
 } from '@/components/app/learning/useLearningMode';
+import { MAX_UNSERVED_ADD_RUNS } from '@/lib/constants/learning';
 
 const { REFS } = harness;
 
@@ -187,7 +208,9 @@ function seedReviewing(
 
 function reviewing(result: { current: LearningState }) {
   if (result.current.status !== 'reviewing') {
-    throw new Error(`expected status "reviewing", got "${result.current.status}"`);
+    throw new Error(
+      `expected status "reviewing", got "${result.current.status}"`,
+    );
   }
   return result.current;
 }
@@ -249,19 +272,21 @@ describe('useLearningMode', () => {
       expect(state.sourceText).toBe('Hola');
     });
 
-    it('keeps serving the last course settings while getActiveCourseSettings refetches', () => {
+    // Course settings and the active course now come from AppDataProvider
+    // (never `undefined`; the provider owns the always-warm subscription), so
+    // only the card query can refetch to `undefined`. `null` settings mean
+    // "no course yet" — that must NOT be masked by stickiness.
+    it('a provider-null courseSettings reads as noCollection, not a sticky reviewing state', () => {
       const { result, rerender } = renderHook(() => useLearningMode());
       expect(result.current.status).toBe('reviewing');
 
       harness.queryValues.delete(REFS.getActiveCourseSettings);
       rerender();
 
-      const state = reviewing(result);
-      expect(state.courseSettings.courseId).toBe('course1');
-      expect(state.reviewMode).toBe('audio');
+      expect(result.current.status).toBe('noCollection');
     });
 
-    it('keeps serving the last active course while getActiveCourse refetches', () => {
+    it('keeps reviewing (with empty language orders) when the provider has no active course', () => {
       const { result, rerender } = renderHook(() => useLearningMode());
       expect(result.current.status).toBe('reviewing');
 
@@ -269,20 +294,8 @@ describe('useLearningMode', () => {
       rerender();
 
       const state = reviewing(result);
-      expect(state.baseLanguages).toEqual(['en']);
-      expect(state.targetLanguages).toEqual(['es']);
-    });
-
-    it('stays reviewing when all three queries refetch at once', () => {
-      const { result, rerender } = renderHook(() => useLearningMode());
-      expect(result.current.status).toBe('reviewing');
-
-      harness.queryValues.delete(REFS.getCardForReview);
-      harness.queryValues.delete(REFS.getActiveCourseSettings);
-      harness.queryValues.delete(REFS.getActiveCourse);
-      rerender();
-
-      expect(reviewing(result).cardId).toBe('card1');
+      expect(state.baseLanguages).toEqual([]);
+      expect(state.targetLanguages).toEqual([]);
     });
 
     it('resets sticky values on sign-out and does not revive them on re-auth', () => {
@@ -369,10 +382,9 @@ describe('useLearningMode', () => {
       expect(del).toHaveBeenCalledTimes(1);
       expect(reviewing(result).isExiting).toBe(false);
       expect(reviewing(result).isReviewing).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to delete card:',
-        expect.any(Error),
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.any(Error), {
+        op: 'deleteCard',
+      });
     });
 
     it('fires once when invoked twice in the same tick (the isReviewing state guard has not flushed yet, so a synchronous latch carries it)', async () => {
@@ -434,10 +446,9 @@ describe('useLearningMode', () => {
       expect(master).toHaveBeenCalledTimes(1);
       expect(reviewing(result).isExiting).toBe(false);
       expect(reviewing(result).isReviewing).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to master card:',
-        expect.any(Error),
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.any(Error), {
+        op: 'masterCard',
+      });
     });
 
     it('pending hide: fires hideCard once and restores isExiting on rejection', async () => {
@@ -466,10 +477,9 @@ describe('useLearningMode', () => {
 
       expect(reviewing(result).isExiting).toBe(false);
       expect(reviewing(result).isReviewing).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to hide card:',
-        expect.any(Error),
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.any(Error), {
+        op: 'hideCard',
+      });
     });
   });
 
@@ -521,10 +531,9 @@ describe('useLearningMode', () => {
       expect(radio).toHaveBeenCalledTimes(1);
       expect(reviewing(result).isExiting).toBe(false);
       expect(reviewing(result).isReviewing).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to advance free-play card:',
-        expect.any(Error),
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.any(Error), {
+        op: 'advanceFreePlayCard',
+      });
     });
 
     // Free play is one mode; the server resolves which rotation to advance
@@ -621,8 +630,105 @@ describe('useLearningMode', () => {
       expect(reviewing(result).isReviewing).toBe(false);
       expect(result.current.sessionCardCount).toBe(0);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to review card:',
         expect.any(Error),
+        expect.objectContaining({ op: 'reviewCard' }),
+      );
+    });
+  });
+
+  describe('auto-add stall guard', () => {
+    // Regression: with a minute-quantized query `now`, freshly added cards
+    // could be invisible to getCardForReview, so the auto-add effect re-fired
+    // on every isAddingCards flip and inserted batches forever (130 cards in
+    // 18s). The guard latches auto-add off after MAX_UNSERVED_ADD_RUNS
+    // consecutive inserting runs with no card served in between.
+    function addResult(overrides: Record<string, unknown> = {}) {
+      return {
+        cardsAdded: 5,
+        totalCardsInDeck: 5,
+        scanIncomplete: false,
+        ...overrides,
+      };
+    }
+
+    function seedEmptyDeckWithAutoAdd() {
+      harness.queryValues.set(REFS.getCardForReview, null);
+      harness.queryValues.set(
+        REFS.getActiveCourseSettings,
+        makeSettings({ autoAddCards: true }),
+      );
+      harness.queryValues.set(REFS.getActiveCourse, makeCourse());
+    }
+
+    it('latches auto-add off after MAX_UNSERVED_ADD_RUNS inserting runs with no card served', async () => {
+      const add = harness.mutationFor(REFS.addCardsFromCollection);
+      add.mockImplementation(() => {
+        // Failsafe: without the guard this cadence self-perpetuates forever;
+        // reject instead of hanging the test so a regression fails fast.
+        if (add.mock.calls.length > 10) {
+          return Promise.reject(new Error('runaway auto-add'));
+        }
+        return Promise.resolve(addResult());
+      });
+      seedEmptyDeckWithAutoAdd();
+
+      const { result } = renderHook(() => useLearningMode());
+      // Drain the add -> resolve -> effect-re-fire cadence to quiescence.
+      await act(async () => {});
+      await act(async () => {});
+
+      expect(add).toHaveBeenCalledTimes(MAX_UNSERVED_ADD_RUNS);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ op: 'autoAddStall' }),
+      );
+      // Latched: the empty deck shows noCardsDue instead of a loading screen
+      // promising an auto-add that will never serve.
+      expect(result.current.status).toBe('noCardsDue');
+    });
+
+    it('a served card resets the counter, so add-serve cadences never latch', async () => {
+      const add = harness.mutationFor(REFS.addCardsFromCollection);
+      seedEmptyDeckWithAutoAdd();
+
+      const gates: Array<ReturnType<typeof deferred<unknown>>> = [];
+      add.mockImplementation(() => {
+        const gate = deferred<unknown>();
+        gates.push(gate);
+        return gate.promise;
+      });
+
+      const { result, rerender } = renderHook(() => useLearningMode());
+
+      // One more inserting run than the latch threshold, each followed by a
+      // served card before the next: the counter must keep resetting.
+      for (let round = 0; round < MAX_UNSERVED_ADD_RUNS + 1; round++) {
+        await act(async () => {});
+        expect(add).toHaveBeenCalledTimes(round + 1);
+
+        // The just-added card arrives (query flips to a served card)...
+        harness.queryValues.set(
+          REFS.getCardForReview,
+          makeCard({ _id: `card-${round}` }),
+        );
+        rerender();
+        await act(async () => {
+          gates[round].resolve(addResult());
+        });
+        expect(result.current.status).toBe('reviewing');
+
+        // ...and later the deck runs empty again (not after the last
+        // round, which would fire one further in-flight add).
+        if (round < MAX_UNSERVED_ADD_RUNS) {
+          harness.queryValues.set(REFS.getCardForReview, null);
+          rerender();
+        }
+      }
+
+      expect(add).toHaveBeenCalledTimes(MAX_UNSERVED_ADD_RUNS + 1);
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ op: 'autoAddStall' }),
       );
     });
   });

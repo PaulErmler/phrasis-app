@@ -107,7 +107,10 @@ export function ClientAuthBoundary({ children }: PropsWithChildren) {
         if (hasSession) {
           // The cookie session is fine. The bounce was a transient token
           // failure. Suppress the redirect and remount once auth recovers.
-          capture(CLIENT_EVENTS.AUTH_BOUNCE, { confirmed: false, reason: 'still-signed-in' });
+          capture(CLIENT_EVENTS.AUTH_BOUNCE, {
+            confirmed: false,
+            reason: 'still-signed-in',
+          });
           setRemountWhenAuthed(true);
           return;
         }
@@ -124,7 +127,10 @@ export function ClientAuthBoundary({ children }: PropsWithChildren) {
       // Both confirm attempts failed (offline, server down). Trade-off: a
       // genuinely signed-out user with no connection stays on a dead app
       // screen instead of a login form they couldn't use anyway.
-      capture(CLIENT_EVENTS.AUTH_BOUNCE, { confirmed: false, reason: 'unreachable' });
+      capture(CLIENT_EVENTS.AUTH_BOUNCE, {
+        confirmed: false,
+        reason: 'unreachable',
+      });
       setRemountWhenAuthed(true);
     } finally {
       confirmingRef.current = false;

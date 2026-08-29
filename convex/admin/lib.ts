@@ -39,7 +39,8 @@ export async function getAdminContext(
  */
 export async function requireAdmin(ctx: QueryCtx): Promise<AdminContext> {
   const admin = await getAdminContext(ctx);
-  if (!admin) throw new ConvexError('Not authorized');
+  if (!admin)
+    throw new ConvexError({ code: 'FORBIDDEN', message: 'Not authorized' });
   return admin;
 }
 

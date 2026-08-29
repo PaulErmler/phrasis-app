@@ -7,7 +7,7 @@ import {
 import { withEmailEnvSubject } from './emailEnv';
 import { resend } from './resendClient';
 import { rateLimiter } from '../rateLimiter';
-import { getLanguageByCode } from '../../lib/languages';
+import { languageName } from '../../lib/languages';
 import type { Doc } from '../_generated/dataModel';
 
 /**
@@ -32,7 +32,9 @@ export async function sendAdminNotificationEmail(
   if (captureMode()) return;
   const html = [
     '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#222222;">',
-    ...lines.map((line) => `<p style="margin:0 0 8px;">${escapeHtml(line)}</p>`),
+    ...lines.map(
+      (line) => `<p style="margin:0 0 8px;">${escapeHtml(line)}</p>`,
+    ),
     '</div>',
   ].join('\n');
   const text = lines.join('\n');
@@ -94,7 +96,7 @@ export interface SignupNotificationInput {
 }
 
 const languageNames = (codes: string[]): string =>
-  codes.map((c) => getLanguageByCode(c)?.name ?? c).join(' + ');
+  codes.map(languageName).join(' + ');
 
 const formatMinutes = (ms: number): string =>
   ms < 60_000 ? '<1 min' : `${Math.round(ms / 60_000)} min`;
@@ -107,9 +109,10 @@ const levelLabel = (level: string): string => level.replaceAll('_', ' ');
  * Exported for tests. Lines with no data are omitted rather than rendered
  * as "(none)" noise; only Name/Email/Course/Onboarding always appear.
  */
-export function buildSignupNotification(
-  input: SignupNotificationInput,
-): { subject: string; lines: string[] } {
+export function buildSignupNotification(input: SignupNotificationInput): {
+  subject: string;
+  lines: string[];
+} {
   const { name, email, emailVerified, onboarding, course, stats } = input;
 
   const coursePair = course
@@ -153,7 +156,9 @@ export function buildSignupNotification(
         `First lesson: ${summary.cardsRated} cards · ${summary.dailyNewWordsToday} new words · ${formatMinutes(summary.dailyTimeMsToday)}`,
       );
     } else if ((onboarding.firstLessonCardsRated ?? 0) > 0) {
-      lines.push(`First lesson: ${onboarding.firstLessonCardsRated} cards rated`);
+      lines.push(
+        `First lesson: ${onboarding.firstLessonCardsRated} cards rated`,
+      );
     }
 
     if (onboarding.dailyTimeGoalMinutes != null) {

@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
+import { useNowMinute } from '@/hooks/use-now-minute';
 import { LearningModeSettings } from '@/components/app/LearningModeSettings';
 import {
   LearningCardContent,
@@ -26,6 +27,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import type { LearningState } from '@/components/app/learning/useLearningMode';
+import type { CardPresentation } from '@/components/app/learning/cardPresentation';
 import type { ReviewRating } from '@/lib/scheduling';
 import { autoRating } from '@/lib/autoRating';
 import type {
@@ -36,19 +38,15 @@ import type { AudioPlayerState } from '@/hooks/use-audio-player';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { buttonVariants } from '@/components/ui/button';
+import { CardActionConfirmDialogs } from '@/components/app/learning/useCardActions';
+import { COACHMARK_ANCHORS, TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
+import {
+  resolveModeSetting,
+  type AudioSettingsMode,
+} from '@/lib/audio/mergeAudio';
 import { PROGRESS_SOUND_URL } from '@/lib/constants/learning';
+import { resolveShowFurigana } from '@/lib/furigana';
 
 interface LearningModeProps {
   state: LearningState;
@@ -79,8 +77,6 @@ export function LearningMode({
   const { openChat } = chatContext;
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [flagConfirmOpen, setFlagConfirmOpen] = useState(false);
   const [fullReviewRevealed, setFullReviewRevealed] = useState(false);
 
   // Stable merged-playback surface for the card content. Identity only
@@ -189,23 +185,26 @@ export function LearningMode({
   const setCardAudioSpeedOverrideMutation = useMutation(
     api.features.scheduling.setCardAudioSpeedOverride,
   ).withOptimisticUpdate((localStore, args) => {
-    const current = localStore.getQuery(
+    // Patch every cached getCardForReview instance (args carry timezone +
+    // minute-quantized `now`, so the key varies); matching all instances
+    // keeps the optimistic write applying regardless of args.
+    for (const q of localStore.getAllQueries(
       api.features.scheduling.getCardForReview,
-      {},
-    );
-    if (current == null || current._id !== args.cardId) return;
-    const nextOverrides: Record<string, number> = {
-      ...(current.audioSpeedOverrides ?? {}),
-    };
-    if (args.speed === null) {
-      delete nextOverrides[args.language];
-    } else {
-      nextOverrides[args.language] = args.speed;
+    )) {
+      if (q.value == null || q.value._id !== args.cardId) continue;
+      const nextOverrides: Record<string, number> = {
+        ...(q.value.audioSpeedOverrides ?? {}),
+      };
+      if (args.speed === null) {
+        delete nextOverrides[args.language];
+      } else {
+        nextOverrides[args.language] = args.speed;
+      }
+      localStore.setQuery(api.features.scheduling.getCardForReview, q.args, {
+        ...q.value,
+        audioSpeedOverrides: nextOverrides,
+      });
     }
-    localStore.setQuery(api.features.scheduling.getCardForReview, {}, {
-      ...current,
-      audioSpeedOverrides: nextOverrides,
-    });
   });
 
   const reviewingCardId = state.status === 'reviewing' ? state.cardId : null;
@@ -246,9 +245,10 @@ export function LearningMode({
     (settingsForAutoRate?.reviewMode ?? 'audio') === 'full' &&
     (settingsForAutoRate?.autoRateFromAccuracy ?? true) &&
     !autoRateFirstExposure;
-  const autoRateAccuracy = (settingsForAutoRate?.ignorePunctuation ?? false)
-    ? writingAccuracy?.minWithoutPunctuation
-    : writingAccuracy?.minWithPunctuation;
+  const autoRateAccuracy =
+    (settingsForAutoRate?.ignorePunctuation ?? false)
+      ? writingAccuracy?.minWithoutPunctuation
+      : writingAccuracy?.minWithPunctuation;
   const autoRateThresholds = settingsForAutoRate?.autoRateThresholds;
   const setAutoRating = state.setAutoRating;
   useEffect(() => {
@@ -277,12 +277,13 @@ export function LearningMode({
         summary.avgWithPunctuation != null &&
         summary.avgWithoutPunctuation != null
           ? {
-            primary: (state.courseSettings.ignorePunctuation ?? false)
-              ? summary.avgWithoutPunctuation
-              : summary.avgWithPunctuation,
-            strict: summary.avgWithPunctuation,
-            lenient: summary.avgWithoutPunctuation,
-          }
+              primary:
+                (state.courseSettings.ignorePunctuation ?? false)
+                  ? summary.avgWithoutPunctuation
+                  : summary.avgWithPunctuation,
+              strict: summary.avgWithPunctuation,
+              lenient: summary.avgWithoutPunctuation,
+            }
           : undefined;
       state.handleNext(ratingOverride, accuracy);
     },
@@ -315,6 +316,17 @@ export function LearningMode({
   const handleReplayTarget = useCallback(() => {
     setTargetReplayNonce((n) => n + 1);
   }, []);
+  // "Turn off AI feedback" from the quota-reached line under an answer. Same
+  // write as the settings-sheet toggle, offered where the limit actually
+  // bites so the user isn't forced to either upgrade or dig through settings.
+  const updateSettings = useUpdateCourseSettings();
+  const handleDisableAiFeedback = useCallback(async () => {
+    if (state.status !== 'reviewing') return;
+    await updateSettings({
+      courseId: state.courseSettings.courseId,
+      aiWritingFeedback: false,
+    });
+  }, [state, updateSettings]);
   // Restart the current card from scratch: re-blur everything, drop typed and
   // submitted translations, clear the picked rating, and replay the merged
   // audio from 0 (deliberately unconditional, like the R shortcut, the user
@@ -335,22 +347,15 @@ export function LearningMode({
     audio.pause();
     setEditDialogOpen(true);
   }, [audio]);
+  // Delete + flag confirms live on the shared card-action surface
+  // (state.cardActions, from useCardActions): it holds the dialog state and
+  // fires the confirmed action (delete routes back through the hook's
+  // exit-animation flow, flag fires the card-level retranslation).
   const handleRequestDelete = useCallback(() => {
+    if (state.status !== 'reviewing') return;
     audio.pause();
-    setDeleteConfirmOpen(true);
-  }, [audio]);
-  const handleConfirmDelete = useCallback(async () => {
-    if (state.status !== 'reviewing') return;
-    setDeleteConfirmOpen(false);
-    await state.handleDelete();
-  }, [state]);
-  // Card-level flag. The mutation flags every non-source-language
-  // translation on the card at once, so no per-language pick here.
-  const handleConfirmFlag = useCallback(async () => {
-    if (state.status !== 'reviewing') return;
-    setFlagConfirmOpen(false);
-    await state.handleFlag();
-  }, [state]);
+    state.cardActions.requestDelete(state.cardId);
+  }, [audio, state]);
   // Declared up here (above the early returns) so its `useCallback` keeps a
   // stable position in the hook list across loading → reviewing transitions.
   // Gates on status internally. Non-reviewing states get a no-op.
@@ -372,7 +377,6 @@ export function LearningMode({
           dailyReviewsToday={state.dailyReviewsToday}
           dailyTimeMsToday={state.dailyTimeMsToday}
           dailyNewWordsToday={state.dailyNewWordsToday}
-          schedulingMode={state.schedulingMode}
           reviewMode={state.reviewMode}
           autoAdvance={state.autoAdvance}
           ready={state.progressDisplayReady}
@@ -455,21 +459,26 @@ export function LearningMode({
   }
 
   const reviewMode = state.courseSettings.reviewMode ?? 'audio';
-  const instantProceed = reviewMode === 'full'
-    ? (state.courseSettings.instantProceedFull ?? true)
-    : (state.courseSettings.instantProceedAudio ?? false);
+  const instantProceed =
+    reviewMode === 'full'
+      ? (state.courseSettings.instantProceedFull ?? true)
+      : (state.courseSettings.instantProceedAudio ?? false);
   const isTranscribe = isTranscribeMode(state.courseSettings);
+  // Settings mode for the writing-only lookups below: this branch of the
+  // component only renders writing ("full") review, so the mode is never
+  // 'audio' here.
+  const writingSettingsMode: AudioSettingsMode = isTranscribe
+    ? 'transcribe'
+    : 'full';
   // Transcribe: the post-submit replay rides the same per-language afterSubmit
   // machinery as Translate, gated by the transcribe auto-play setting
-  // (chained `*Transcribe ?? *Full ?? audio`).
-  const writingAutoPlay = isTranscribe
-    ? (state.courseSettings.autoPlayAudioTranscribe ??
-      state.courseSettings.autoPlayAudioFull ??
-      state.courseSettings.autoPlayAudio ??
-      DEFAULT_AUTO_PLAY)
-    : (state.courseSettings.autoPlayAudioFull ??
-      state.courseSettings.autoPlayAudio ??
-      DEFAULT_AUTO_PLAY);
+  // (chained `*Transcribe ?? *Full ?? audio` via resolveModeSetting).
+  const writingAutoPlay =
+    resolveModeSetting(
+      state.courseSettings,
+      'autoPlayAudio',
+      writingSettingsMode,
+    ) ?? DEFAULT_AUTO_PLAY;
 
   // Flagging acts at the card level. The mutation retranslates every
   // non-source-language translation on the card. We hide the button when
@@ -481,13 +490,13 @@ export function LearningMode({
   // Flag opens a confirmation dialog instead of firing immediately: the
   // action triggers a background retranslation that overwrites the
   // currently-displayed text, so we want an explicit confirm step. The
-  // actual flag fires in `handleConfirmFlag` below; the card itself is
-  // not deleted.
+  // confirm state and the flag itself live on the shared card-action
+  // surface; the card is not deleted.
   const handleFlagPrimary = hasTargetTranslation
     ? () => {
-      audio.pause();
-      setFlagConfirmOpen(true);
-    }
+        audio.pause();
+        state.cardActions.requestFlag(state.cardId);
+      }
     : undefined;
 
   // Card-origin pill: premade cards show the collection shorthand ("A1.2")
@@ -513,6 +522,51 @@ export function LearningMode({
     state.freeStudyPlayCount,
   );
 
+  // The shared card-presentation bundle, built once for both modes (the two
+  // card components previously spelled these ~30 props identically twice).
+  // A plain object rebuilt per render on purpose: the card components are
+  // not memo-wrapped, and their internal memoization keys on these leaf
+  // values, whose identities are unchanged. See cardPresentation.ts.
+  const presentation: CardPresentation = {
+    cardId: state.cardId,
+    preReviewCount: state.preReviewCount,
+    schedulingPhase: state.phase,
+    fsrsState: state.fsrsState,
+    originPill,
+    sourceText: state.sourceText,
+    translations: state.translations,
+    audioRecordings: state.audioRecordings,
+    isFavorite: state.isFavorite,
+    isPendingMaster: state.isPendingMaster,
+    isPendingHide: state.isPendingHide,
+    flaggedInSession: state.flaggedInSession,
+    showRomanization: state.courseSettings.showRomanization ?? true,
+    showIpa: state.courseSettings.showIpa ?? false,
+    showFurigana: resolveShowFurigana(state.courseSettings),
+    onMaster: state.handleMaster,
+    onHide: state.handleHide,
+    onFavorite: state.handleFavorite,
+    onEdit: handleEdit,
+    onDelete: handleRequestDelete,
+    onFlag: handleFlagPrimary,
+    onRegenerateAudio: handleRegenerateAudioWithPause,
+    pinnedActions: state.pinnedCardActions,
+    onUpdatePinnedActions: state.handleUpdatePinnedActions,
+    quotaState: state.cardActionQuotas,
+    onAudioPlay: audio.stop,
+    mergedPlayback,
+    audioSpeedOverrides: state.audioSpeedOverrides,
+    onSpeedCycle: handleSpeedCycle,
+    audioRef: audio.audioRef,
+    durationSec: audio.durationSec,
+    isPlaying: audio.isPlaying,
+    isMerging: audio.isMerging,
+    onSeek: audio.seekTo,
+    showProgressBar: state.courseSettings.showProgressBar ?? true,
+    resetSignal: cardResetNonce,
+    replayTargetSignal: targetReplayNonce,
+  };
+
   const cardContent =
     reviewMode === 'full' ? (
       <FullReviewCardContent
@@ -521,28 +575,8 @@ export function LearningMode({
         // state (shadowing ↔ writing already resets via the conditional
         // render swapping the component out).
         key={isTranscribe ? 'transcribe' : 'translate'}
-        preReviewCount={state.preReviewCount}
-        schedulingPhase={state.phase}
-        fsrsState={state.fsrsState}
+        presentation={presentation}
         firstExposure={firstExposure}
-        originPill={originPill}
-        sourceText={state.sourceText}
-        translations={state.translations}
-        audioRecordings={state.audioRecordings}
-        isFavorite={state.isFavorite}
-        isPendingMaster={state.isPendingMaster}
-        isPendingHide={state.isPendingHide}
-        onMaster={state.handleMaster}
-        onHide={state.handleHide}
-        onFavorite={state.handleFavorite}
-        onEdit={handleEdit}
-        onDelete={handleRequestDelete}
-        onFlag={handleFlagPrimary}
-        onRegenerateAudio={handleRegenerateAudioWithPause}
-        pinnedActions={state.pinnedCardActions}
-        onUpdatePinnedActions={state.handleUpdatePinnedActions}
-        quotaState={state.cardActionQuotas}
-        onAudioPlay={audio.stop}
         // Transcribe: the merged blob plays the target as the prompt; the
         // per-language afterSubmit playback doubles as the post-submit
         // replay, gated by the writing-mode auto-play setting.
@@ -574,94 +608,47 @@ export function LearningMode({
         // Blur the base by default in Transcribe (the prompt is the target
         // audio, so a visible base gives the answer away); Translate needs
         // the base text visible and defaults to off.
-        hideBaseLanguages={state.courseSettings.hideBaseLanguagesFull ?? isTranscribe}
+        hideBaseLanguages={
+          state.courseSettings.hideBaseLanguagesFull ?? isTranscribe
+        }
         autoRevealBaseOnSubmit={
           state.courseSettings.autoRevealBaseOnSubmit ?? true
         }
         ignorePunctuation={state.courseSettings.ignorePunctuation ?? false}
+        aiFeedbackEnabled={state.courseSettings.aiWritingFeedback ?? true}
+        onDisableAiFeedback={handleDisableAiFeedback}
         suppressAutoPlay={state.settingsOpen}
         allRevealed={fullReviewRevealed}
         onAllSubmittedChange={setAllSubmitted}
         onAccuracyChange={setWritingAccuracy}
-        showRomanization={state.courseSettings.showRomanization ?? true}
-        showIpa={state.courseSettings.showIpa ?? false}
-        cardId={state.cardId}
         onRegisterRevert={registerRevertHandler}
-        resetSignal={cardResetNonce}
-        replayTargetSignal={targetReplayNonce}
         highlightEnabled={
-          (isTranscribe
-            ? (state.courseSettings.highlightWordsTranscribe ??
-              state.courseSettings.highlightWordsFull ??
-              state.courseSettings.highlightWords)
-            : (state.courseSettings.highlightWordsFull ??
-              state.courseSettings.highlightWords)) === true
+          resolveModeSetting(
+            state.courseSettings,
+            'highlightWords',
+            writingSettingsMode,
+          ) === true
         }
-        flaggedInSession={state.flaggedInSession}
-        mergedPlayback={mergedPlayback}
-        languagePlaybackSpeeds={
-          isTranscribe
-            ? (state.courseSettings.languagePlaybackSpeedsTranscribe ??
-              state.courseSettings.languagePlaybackSpeedsFull ??
-              state.courseSettings.languagePlaybackSpeeds)
-            : (state.courseSettings.languagePlaybackSpeedsFull ??
-              state.courseSettings.languagePlaybackSpeeds)
-        }
-        audioSpeedOverrides={state.audioSpeedOverrides}
-        onSpeedCycle={handleSpeedCycle}
-        audioRef={audio.audioRef}
-        durationSec={audio.durationSec}
-        isPlaying={audio.isPlaying}
-        isMerging={audio.isMerging}
-        onSeek={audio.seekTo}
-        showProgressBar={state.courseSettings.showProgressBar ?? true}
+        languagePlaybackSpeeds={resolveModeSetting(
+          state.courseSettings,
+          'languagePlaybackSpeeds',
+          writingSettingsMode,
+        )}
       />
     ) : (
       <LearningCardContent
-        preReviewCount={state.preReviewCount}
-        schedulingPhase={state.phase}
-        fsrsState={state.fsrsState}
-        originPill={originPill}
-        sourceText={state.sourceText}
-        translations={state.translations}
-        audioRecordings={state.audioRecordings}
-        isFavorite={state.isFavorite}
-        isPendingMaster={state.isPendingMaster}
-        isPendingHide={state.isPendingHide}
-        onMaster={state.handleMaster}
-        onHide={state.handleHide}
-        onFavorite={state.handleFavorite}
-        onEdit={handleEdit}
-        onDelete={handleRequestDelete}
-        onFlag={handleFlagPrimary}
-        onRegenerateAudio={handleRegenerateAudioWithPause}
-        pinnedActions={state.pinnedCardActions}
-        onUpdatePinnedActions={state.handleUpdatePinnedActions}
-        quotaState={state.cardActionQuotas}
-        onAudioPlay={audio.stop}
+        presentation={presentation}
         hideTargetLanguages={state.courseSettings.hideTargetLanguages ?? true}
         autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? true}
         hideBaseLanguages={state.courseSettings.hideBaseLanguages === true}
-        autoRevealBaseLanguages={state.courseSettings.autoRevealBaseLanguages ?? true}
+        autoRevealBaseLanguages={
+          state.courseSettings.autoRevealBaseLanguages ?? true
+        }
         revealedLanguages={audio.revealedLanguages}
-        showRomanization={state.courseSettings.showRomanization ?? true}
-        showIpa={state.courseSettings.showIpa ?? false}
         revealAllSignal={audioRevealNonce}
-        resetSignal={cardResetNonce}
-        replayTargetSignal={targetReplayNonce}
         onAllTargetsRevealedChange={setAudioAllTargetsRevealed}
         highlightEnabled={state.courseSettings.highlightWords === true}
-        flaggedInSession={state.flaggedInSession}
-        mergedPlayback={mergedPlayback}
         languagePlaybackSpeeds={state.courseSettings.languagePlaybackSpeeds}
-        audioSpeedOverrides={state.audioSpeedOverrides}
-        onSpeedCycle={handleSpeedCycle}
-        audioRef={audio.audioRef}
-        durationSec={audio.durationSec}
-        isPlaying={audio.isPlaying}
-        isMerging={audio.isMerging}
-        onSeek={audio.seekTo}
-        showProgressBar={state.courseSettings.showProgressBar ?? true}
       />
     );
 
@@ -674,8 +661,7 @@ export function LearningMode({
           milestone celebration will fire, even after a reload or a break
           mid-day. Free play never shows the bar in either face, since plays
           don't count toward the milestone. */}
-      {!isFreePlay &&
-        state.courseSettings.progressDisplayEnabled !== false && (
+      {!isFreePlay && state.courseSettings.progressDisplayEnabled !== false && (
         <SessionProgressBar current={state.dailyReviewsToday} />
       )}
       <div className="flex-1 min-h-0 relative">
@@ -701,9 +687,9 @@ export function LearningMode({
             size="icon"
             onClick={openChat}
             className="h-9 w-9 shrink-0 pointer-events-auto"
-            aria-label="Open chat"
-            data-tutorial="chat-button"
-            data-coachmark-anchor="chat-button"
+            aria-label={t('openChat')}
+            data-tutorial={TUTORIAL_ANCHORS.chatButton}
+            data-coachmark-anchor={COACHMARK_ANCHORS.chatButton}
           >
             <MessageCircle className="h-5 w-5" />
           </Button>
@@ -741,8 +727,8 @@ export function LearningMode({
           // no focus, so it must be listed here.
           state.settingsOpen ||
           editDialogOpen ||
-          deleteConfirmOpen ||
-          flagConfirmOpen ||
+          state.cardActions.deleteConfirmOpen ||
+          state.cardActions.flagConfirmOpen ||
           chatContext.isChatOpen
         }
         isAudioReview={reviewMode === 'audio'}
@@ -765,50 +751,7 @@ export function LearningMode({
         translations={state.translations}
       />
 
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('actions.deleteConfirmTitle')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('actions.deleteConfirmDescription')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t('actions.deleteConfirmCancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className={buttonVariants({ variant: 'destructive' })}
-              onClick={handleConfirmDelete}
-            >
-              {t('actions.deleteConfirmConfirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={flagConfirmOpen} onOpenChange={setFlagConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('actions.flagConfirmTitle')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('actions.flagConfirmDescription')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t('actions.flagConfirmCancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmFlag}>
-              {t('actions.flagConfirmConfirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <CardActionConfirmDialogs actions={state.cardActions} />
     </div>
   );
 }
@@ -846,22 +789,26 @@ function NoCardsDueWithFilter({
   onNavigateToChat: () => void;
   onNavigateToAddCustomCards: () => void;
 }) {
+  // Minute-quantized `now` bounds the due-card probes (no-wall-clock query
+  // guideline, house pattern: getWorkloadForecast).
+  const emptyReasonNow = useNowMinute();
   const emptyReason = useQuery(
     api.features.scheduling.getCardForReviewEmptyReason,
-    {},
+    { now: emptyReasonNow },
   );
   const updateSettings = useUpdateCourseSettings();
 
   const isDeckEmpty = emptyReason?.reason === 'no_cards';
-  const activeFilter = emptyReason?.reason === 'filtered_out'
-    ? emptyReason.activeFilter
-    : null;
-  const filterUnblockAvailable = emptyReason?.reason === 'filtered_out'
-    ? emptyReason.availableInOtherSource
-    : false;
-  const currentSourceHasAnyCards = emptyReason?.reason === 'filtered_out'
-    ? emptyReason.currentSourceHasAnyCards
-    : true;
+  const activeFilter =
+    emptyReason?.reason === 'filtered_out' ? emptyReason.activeFilter : null;
+  const filterUnblockAvailable =
+    emptyReason?.reason === 'filtered_out'
+      ? emptyReason.availableInOtherSource
+      : false;
+  const currentSourceHasAnyCards =
+    emptyReason?.reason === 'filtered_out'
+      ? emptyReason.currentSourceHasAnyCards
+      : true;
   // Only the filtered_out and all_caught_up variants carry this field; for
   // no_cards / no_session / undefined, default to false (no custom queue).
   const customCardsPendingAdd =

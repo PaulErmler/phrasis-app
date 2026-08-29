@@ -33,7 +33,9 @@ function runConvexMutation(functionPath, args) {
     );
     const detail =
       parts.join('\n').trim() ||
-      (result.error ? String(result.error) : '(no stderr/stdout/error message)');
+      (result.error
+        ? String(result.error)
+        : '(no stderr/stdout/error message)');
     throw new Error(`Convex mutation failed: ${detail}`);
   }
 

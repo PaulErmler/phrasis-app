@@ -10,11 +10,11 @@ import {
   PopoverContent,
 } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import {
-  alignWordTimings,
-  matchRatio,
-} from '@/lib/audio/alignTimings';
+import { alignWordTimings, matchRatio } from '@/lib/audio/alignTimings';
 import { getTextDirection, languageSupportsKaraoke } from '@/lib/languages';
+import { splitFuriganaByRanges, type FuriganaSegment } from '@/lib/furigana';
+import { useFuriganaDisplay } from './useFuriganaDisplay';
+import { Ruby } from './Ruby';
 import { useKaraokeIndex, type ClockBinding } from '@/hooks/use-karaoke-index';
 import { useLearningChatToggle } from './LearningChatLayout';
 import type { WordTiming } from './types';
@@ -34,6 +34,14 @@ interface Props {
   isActive: boolean;
   /** User setting, when false, karaoke is off but words remain clickable. */
   enabled: boolean;
+  /**
+   * Bracketed furigana annotation for `text` (lib/furigana.ts format).
+   * When set AND it still reconstructs `text` exactly, kanji runs render as
+   * <ruby> with their kana reading above; otherwise (stale annotation after
+   * an edit, no annotation) the sentence renders plain. Word popovers,
+   * karaoke, and direction handling are unchanged either way.
+   */
+  furigana?: string;
   className?: string;
   /** When false, renders plain text without popovers (e.g. blurred translations). */
   interactive?: boolean;
@@ -196,6 +204,7 @@ export function ClickableWords({
   clockBinding,
   isActive,
   enabled,
+  furigana,
   className,
   interactive = true,
 }: Props) {
@@ -205,6 +214,56 @@ export function ClickableWords({
     () => alignWordTimings(text, wordTimings, language),
     [text, wordTimings, language],
   );
+
+  const { segments: furiganaSegments, rubyClass } = useFuriganaDisplay(
+    furigana,
+    text,
+  );
+
+  // Furigana chunk per aligned token's `display`, cut from the sentence-wide
+  // segments by code-point ranges ([leading, display] per token + the final
+  // trailing run — together exactly reconstructing `text`). Where the two
+  // tokenizations disagree about a boundary inside a kanji compound, the
+  // whole ruby unit lands in the token containing its start and the next
+  // token's chunk comes back empty; adjacent rendering keeps the sentence
+  // intact (see splitFuriganaByRanges).
+  const furiganaChunks = useMemo(() => {
+    if (furiganaSegments === null || aligned.length === 0) return null;
+    const lengths: number[] = [];
+    for (const w of aligned) {
+      lengths.push([...w.leading].length, [...w.display].length);
+    }
+    lengths.push([...aligned[aligned.length - 1].trailing].length);
+    return splitFuriganaByRanges(furiganaSegments, lengths);
+  }, [furiganaSegments, aligned]);
+
+  // A chunk of the sentence, with ruby when furigana applies to it. Whenever
+  // the chunk mapping exists it is the ONLY source of text — for leading and
+  // trailing runs too, not just displays: a ruby unit spanning a boundary
+  // (Intl cuts 天気|予報 where the analyzer annotated 天気予報 as one unit,
+  // or a unit starts inside a token's leading run) lands whole in the chunk
+  // containing its start and leaves the next chunk short or empty. Falling
+  // back to the raw string for ANY chunk would render the swallowed
+  // characters twice — or, for an empty chunk, drop them entirely.
+  const renderChunk = (chunk: FuriganaSegment[] | undefined) => {
+    if (chunk === undefined || chunk.length === 0) return null;
+    if (!chunk.some((seg) => seg.reading !== undefined)) {
+      return chunk.map((seg) => seg.text).join('');
+    }
+    return <Ruby segments={chunk} />;
+  };
+  // Chunk layout mirrors the lengths above: [leading, display] per token,
+  // then one final trailing chunk for the last token.
+  const renderLeading = (w: { leading: string }, i: number) =>
+    furiganaChunks ? renderChunk(furiganaChunks[i * 2]) : w.leading;
+  const renderDisplay = (w: { display: string }, i: number) =>
+    furiganaChunks ? renderChunk(furiganaChunks[i * 2 + 1]) : w.display;
+  const renderTrailing = (w: { trailing: string }, i: number) => {
+    if (!furiganaChunks) return w.trailing;
+    return i === aligned.length - 1
+      ? renderChunk(furiganaChunks[aligned.length * 2])
+      : null;
+  };
 
   const canKaraoke = useMemo(() => {
     if (!languageSupportsKaraoke(language)) return false;
@@ -232,11 +291,24 @@ export function ClickableWords({
   // right-alignment `dir="rtl"` would otherwise apply, keeping RTL sentences
   // flush with the rest of the LTR layout.
   const dir = getTextDirection(language);
-  const dirClassName = cn(className, dir === 'rtl' && 'text-left');
+  const dirClassName = cn(
+    className,
+    dir === 'rtl' && 'text-left',
+    // Extra leading so the reading line doesn't collide with the row above.
+    rubyClass,
+  );
 
   if (!interactive || aligned.length === 0 || !chatContext) {
     if (!canKaraoke || !isActive) {
-      return <p dir={dir} className={dirClassName}>{text}</p>;
+      return (
+        <p dir={dir} className={dirClassName}>
+          {furiganaSegments !== null ? (
+            <Ruby segments={furiganaSegments} />
+          ) : (
+            text
+          )}
+        </p>
+      );
     }
     return (
       <p dir={dir} className={dirClassName}>
@@ -248,10 +320,10 @@ export function ClickableWords({
                 i === currentIndex && 'text-primary',
               )}
             >
-              {w.leading}
-              {w.display}
+              {renderLeading(w, i)}
+              {renderDisplay(w, i)}
             </span>
-            {w.trailing}
+            {renderTrailing(w, i)}
           </Fragment>
         ))}
       </p>
@@ -264,12 +336,12 @@ export function ClickableWords({
   // typically the source paragraph, which is the wrong thing to highlight.
   const longestWordIndex = coachmarkAnchorForLongestWord
     ? aligned.reduce<{ idx: number; len: number }>(
-      (best, w, i) => {
-        const cleanedLen = cleanWord(w.display).length;
-        return cleanedLen > best.len ? { idx: i, len: cleanedLen } : best;
-      },
-      { idx: -1, len: 0 },
-    ).idx
+        (best, w, i) => {
+          const cleanedLen = cleanWord(w.display).length;
+          return cleanedLen > best.len ? { idx: i, len: cleanedLen } : best;
+        },
+        { idx: -1, len: 0 },
+      ).idx
     : -1;
 
   return (
@@ -281,7 +353,7 @@ export function ClickableWords({
         // and hover/click never fired on the actual word. Inline children of
         // the <p> participate directly in the parent bidi context.
         <Fragment key={i}>
-          {w.leading}
+          {renderLeading(w, i)}
           <AskAboutWord
             word={w.display}
             language={language}
@@ -296,9 +368,9 @@ export function ClickableWords({
               openIndex === i && 'text-warning hover:bg-transparent',
             )}
           >
-            {w.display}
+            {renderDisplay(w, i)}
           </AskAboutWord>
-          {w.trailing}
+          {renderTrailing(w, i)}
         </Fragment>
       ))}
     </p>

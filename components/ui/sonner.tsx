@@ -19,8 +19,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       // Keep toasts below the notch/status bar (and above the home
       // indicator for bottom positions) in the store-app shell and PWA.
-      offset={{ top: 'calc(var(--safe-top, 0px) + 16px)', bottom: 'calc(var(--safe-bottom, 0px) + 16px)' }}
-      mobileOffset={{ top: 'calc(var(--safe-top, 0px) + 16px)', bottom: 'calc(var(--safe-bottom, 0px) + 16px)' }}
+      offset={{
+        top: 'calc(var(--safe-top, 0px) + 16px)',
+        bottom: 'calc(var(--safe-bottom, 0px) + 16px)',
+      }}
+      mobileOffset={{
+        top: 'calc(var(--safe-top, 0px) + 16px)',
+        bottom: 'calc(var(--safe-bottom, 0px) + 16px)',
+      }}
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,

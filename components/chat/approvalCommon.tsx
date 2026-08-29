@@ -8,6 +8,7 @@ import type { ApprovalActionResult } from '@/hooks/use-card-approvals';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Shimmer } from '@/components/ai-elements/shimmer';
+import { resolveShowFurigana } from '@/lib/furigana';
 
 /**
  * Pieces shared by the two inline approval boxes (`CardApproval` for
@@ -18,17 +19,27 @@ import { Shimmer } from '@/components/ai-elements/shimmer';
  */
 
 /**
- * The course's IPA-line setting, for the `showIpa` prop on `EntryLines`.
- * Defaults OFF (matching `courseSettings.showIpa ?? false` everywhere else).
+ * The course's annotation-display settings for the `showIpa`/`showFurigana`
+ * props on `EntryLines`: IPA defaults OFF (matching
+ * `courseSettings.showIpa ?? false` everywhere else), furigana defaults ON
+ * via the shared `resolveShowFurigana` (lib/furigana). One hook — both boxes
+ * need both flags, and two separate hooks subscribed each component to the
+ * same preloaded query twice.
  *
  * Lives on the boxes, not inside `EntryLines`: the boxes only ever render in
  * chat, under AppDataProvider, while `EntryLines` is also mounted bare by the
  * store-screenshot route (app/store-frames), where `useAppData` would throw.
  */
-export function useShowIpa(): boolean {
+export function useApprovalDisplaySettings(): {
+  showIpa: boolean;
+  showFurigana: boolean;
+} {
   const { preloadedCourseSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
-  return courseSettings?.showIpa === true;
+  return {
+    showIpa: courseSettings?.showIpa === true,
+    showFurigana: resolveShowFurigana(courseSettings),
+  };
 }
 
 /**

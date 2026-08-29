@@ -95,7 +95,9 @@ export function EditApprovalDialog({
     approvalLanguages.includes(l),
   );
   const orderedKnown = [...orderedBase, ...orderedTarget];
-  const orderedExtra = approvalLanguages.filter((l) => !orderedKnown.includes(l));
+  const orderedExtra = approvalLanguages.filter(
+    (l) => !orderedKnown.includes(l),
+  );
   const orderedLanguages = [...orderedKnown, ...orderedExtra];
 
   return (

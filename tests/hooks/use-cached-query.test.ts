@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook } from '@testing-library/react';
 
 const useQueryMock = vi.fn();
 
-vi.mock("convex/react", () => ({
+vi.mock('convex/react', () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
 }));
 
@@ -19,57 +19,69 @@ function installLocalStorage() {
     },
     key: (i: number) => Array.from(store.keys())[i] ?? null,
   };
-  Object.defineProperty(window, "localStorage", {
+  Object.defineProperty(window, 'localStorage', {
     configurable: true,
     value: ls,
   });
   return ls;
 }
 
-import { useCachedQuery } from "@/hooks/use-cached-query";
+import { useCachedQuery } from '@/hooks/use-cached-query';
 
-describe("useCachedQuery", () => {
+describe('useCachedQuery', () => {
   beforeEach(() => {
     installLocalStorage();
     useQueryMock.mockReset();
   });
 
-  it("returns live value when present", () => {
-    useQueryMock.mockReturnValue({ hello: "world" });
-    const { result } = renderHook(() =>
-      useCachedQuery({} as any, {}, "ck"),
-    );
-    expect(result.current).toEqual({ hello: "world" });
+  it('returns live value when present', () => {
+    useQueryMock.mockReturnValue({ hello: 'world' });
+    const { result } = renderHook(() => useCachedQuery({} as any, {}, 'ck'));
+    expect(result.current).toEqual({ hello: 'world' });
   });
 
-  it("returns cached value when live is undefined", () => {
-    localStorage.setItem("ck", JSON.stringify({ cached: true }));
+  it('returns cached value when live is undefined', () => {
+    localStorage.setItem('ck', JSON.stringify({ cached: true }));
     useQueryMock.mockReturnValue(undefined);
-    const { result } = renderHook(() =>
-      useCachedQuery({} as any, {}, "ck"),
-    );
+    const { result } = renderHook(() => useCachedQuery({} as any, {}, 'ck'));
     // Reads via useLayoutEffect
     expect(result.current).toEqual({ cached: true });
   });
 
-  it("persists live value to localStorage when it changes", async () => {
+  it('persists live value to localStorage when it changes', async () => {
     useQueryMock.mockReturnValue(undefined);
     const { rerender } = renderHook(() =>
-      useCachedQuery({} as any, {}, "persist"),
+      useCachedQuery({} as any, {}, 'persist'),
     );
     useQueryMock.mockReturnValue({ v: 1 });
     rerender();
     await Promise.resolve();
-    const stored = localStorage.getItem("persist");
+    const stored = localStorage.getItem('persist');
     expect(stored).not.toBeNull();
     expect(JSON.parse(stored!)).toEqual({ v: 1 });
   });
 
-  it("returns undefined when nothing cached and live undefined", () => {
+  it('returns undefined when nothing cached and live undefined', () => {
     useQueryMock.mockReturnValue(undefined);
-    const { result } = renderHook(() =>
-      useCachedQuery({} as any, {}, "empty"),
-    );
+    const { result } = renderHook(() => useCachedQuery({} as any, {}, 'empty'));
     expect(result.current).toBeUndefined();
+  });
+
+  it('returns a loaded null instead of falling back to the cache', () => {
+    // `null` is a legitimate query result ("no course"); resurrecting the
+    // previous cached payload for it would render stale data.
+    localStorage.setItem('nl', JSON.stringify({ stale: true }));
+    useQueryMock.mockReturnValue(null);
+    const { result } = renderHook(() => useCachedQuery({} as any, {}, 'nl'));
+    expect(result.current).toBeNull();
+  });
+
+  it('writes the cache even when live is already present on first render', async () => {
+    // Warm re-mount: Convex delivers from its client cache on render one.
+    // The write must still happen or the warm-first-paint cache stays empty.
+    useQueryMock.mockReturnValue({ warm: true });
+    renderHook(() => useCachedQuery({} as any, {}, 'warm'));
+    await Promise.resolve();
+    expect(JSON.parse(localStorage.getItem('warm')!)).toEqual({ warm: true });
   });
 });

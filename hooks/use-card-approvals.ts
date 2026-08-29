@@ -12,6 +12,8 @@ import type {
 } from '@/convex/types';
 import { getUserTimezone } from '@/lib/timezone';
 
+import { reportError } from '@/lib/report-error';
+
 export type ApprovalData = {
   _id: Id<'cardApprovals'>;
   toolCallId: string;
@@ -19,6 +21,7 @@ export type ApprovalData = {
   /** IPA per language (espeak), shown under the proposed sentences when the
    * course's showIpa setting is on. '' = engine failed for that entry. */
   entryIpa?: Record<string, string>;
+  entryFurigana?: Record<string, string>;
   status: CardApprovalStatus;
   // Absent = 'createCard' (rows predate the field).
   kind?: CardApprovalKind;
@@ -81,14 +84,13 @@ export interface UseCardApprovalsReturn {
 export function useCardApprovals(
   threadId: string | null,
 ): UseCardApprovalsReturn {
-  const approveCard = useMutation(
-    api.features.chat.cardApprovals.approveCard,
-  );
-  const rejectCard = useMutation(
-    api.features.chat.cardApprovals.rejectCard,
-  );
-  const replaceCardFromApproval = useMutation(
-    api.features.chat.cardApprovals.replaceCardFromApproval,
+  const approveCard = useMutation(api.features.chat.cardApprovals.approveCard);
+  const rejectCard = useMutation(api.features.chat.cardApprovals.rejectCard);
+  // "Accept" on an alsoCorrect proposal stores the wording as an accepted
+  // alternative (and forks the card user-owned) rather than replacing the
+  // card's text; replaceCardFromApproval remains server-side for old clients.
+  const storeAlternativeFromApproval = useMutation(
+    api.features.chat.cardApprovals.storeAlternativeFromApproval,
   );
   const [processingApprovals, setProcessingApprovals] = useState<Set<string>>(
     new Set(),
@@ -127,7 +129,7 @@ export function useCardApprovals(
   // drifted (reject silently lacked it). The result value is the caller's
   // contract for rolling back optimistic UI (see ApprovalActionResult).
   const runApprovalAction = useCallback(
-    async <T,>(
+    async <T>(
       approvalId: Id<'cardApprovals'>,
       label: string,
       fn: () => Promise<T>,
@@ -150,7 +152,7 @@ export function useCardApprovals(
         if (convexErrorCode(error) === 'CARD_REPLACED') {
           return { result: 'card_replaced' };
         }
-        console.error(`Failed to ${label}:`, error);
+        reportError(error, { op: 'cardApproval', action: label });
         return { result: 'error' };
       } finally {
         setProcessingApprovals((prev) => {
@@ -189,12 +191,16 @@ export function useCardApprovals(
     async (approvalId: Id<'cardApprovals'>) => {
       const { result, value } = await runApprovalAction(
         approvalId,
-        'replace card',
-        () => replaceCardFromApproval({ approvalId, timezone: getUserTimezone() }),
+        'store alternative',
+        () =>
+          storeAlternativeFromApproval({
+            approvalId,
+            timezone: getUserTimezone(),
+          }),
       );
       return { result, cardId: value?.cardId };
     },
-    [runApprovalAction, replaceCardFromApproval],
+    [runApprovalAction, storeAlternativeFromApproval],
   );
 
   return {

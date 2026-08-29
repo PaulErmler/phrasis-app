@@ -77,7 +77,12 @@ interface Props {
  * sentences at that level (so the user can sanity-check the placement
  * before continuing).
  */
-export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteLevel, onComplete }: Props) {
+export function PlacementTestStep({
+  targetLanguage,
+  sourceLanguage,
+  initialOgteLevel,
+  onComplete,
+}: Props) {
   const t = useTranslations('Onboarding.placementTest');
   const locale = useLocale();
   const strategyName: StrategyName = DEFAULT_STRATEGY;
@@ -121,7 +126,9 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
   // there was one render where revealed was still true AND the next
   // sentence's `targetAudioUrl` was already populated, which caused the
   // auto-play effect to fire on the not-yet-revealed next question.
-  const [revealedTextId, setRevealedTextId] = useState<Id<'texts'> | null>(null);
+  const [revealedTextId, setRevealedTextId] = useState<Id<'texts'> | null>(
+    null,
+  );
   const revealed =
     sentence?.textId != null && sentence.textId === revealedTextId;
   const handleReveal = () => {
@@ -138,12 +145,12 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
     () =>
       nextLevel !== null
         ? peekNextLevelAndPosition(
-          strategyName,
-          initialOgteLevel,
-          history,
-          nextLevel,
-          true,
-        )
+            strategyName,
+            initialOgteLevel,
+            history,
+            nextLevel,
+            true,
+          )
         : null,
     [strategyName, initialOgteLevel, history, nextLevel],
   );
@@ -151,12 +158,12 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
     () =>
       nextLevel !== null
         ? peekNextLevelAndPosition(
-          strategyName,
-          initialOgteLevel,
-          history,
-          nextLevel,
-          false,
-        )
+            strategyName,
+            initialOgteLevel,
+            history,
+            nextLevel,
+            false,
+          )
         : null,
     [strategyName, initialOgteLevel, history, nextLevel],
   );
@@ -164,22 +171,22 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
     api.features.placementTest.getPlacementSentence,
     prefetchKnew !== null
       ? {
-        level: prefetchKnew.level,
-        position: prefetchKnew.position,
-        targetLanguage,
-        sourceLanguage,
-      }
+          level: prefetchKnew.level,
+          position: prefetchKnew.position,
+          targetLanguage,
+          sourceLanguage,
+        }
       : 'skip',
   );
   useQuery(
     api.features.placementTest.getPlacementSentence,
     prefetchNotKnew !== null
       ? {
-        level: prefetchNotKnew.level,
-        position: prefetchNotKnew.position,
-        targetLanguage,
-        sourceLanguage,
-      }
+          level: prefetchNotKnew.level,
+          position: prefetchNotKnew.position,
+          targetLanguage,
+          sourceLanguage,
+        }
       : 'skip',
   );
 
@@ -193,7 +200,9 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
   // inline retry row + toast. Previously a failure was swallowed and never
   // retried for the language, leaving the placement test content-less with
   // zero feedback.
-  const ensureTranslations = useMutation(api.features.onboarding.ensurePlacementTranslations);
+  const ensureTranslations = useMutation(
+    api.features.onboarding.ensurePlacementTranslations,
+  );
   const ensuredForLanguageRef = useRef<string | null>(null);
   const [ensureStatus, setEnsureStatus] = useState<
     'idle' | 'pending' | 'retry-scheduled' | 'error'
@@ -314,8 +323,12 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7"
-                    onClick={() => sourceAudioRef.current?.play().catch(() => {})}
-                    aria-label={t('playSourceAudio', { language: sourceLanguageLabel })}
+                    onClick={() =>
+                      sourceAudioRef.current?.play().catch(() => {})
+                    }
+                    aria-label={t('playSourceAudio', {
+                      language: sourceLanguageLabel,
+                    })}
                   >
                     <Volume2 className="h-4 w-4" />
                   </Button>
@@ -323,13 +336,15 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
               </div>
               <div className="text-2xl font-semibold leading-relaxed text-center min-h-[3.5rem] break-words">
                 {targetLoading ? (
-                  <span className="text-muted-foreground italic text-base">{t('loading')}</span>
+                  <span className="text-muted-foreground italic text-base">
+                    {t('loading')}
+                  </span>
                 ) : (
-                  sourceText ?? (
+                  (sourceText ?? (
                     <span className="text-muted-foreground italic text-base">
                       {t('noSentence')}
                     </span>
-                  )
+                  ))
                 )}
               </div>
             </div>
@@ -348,7 +363,9 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7"
-                    onClick={() => targetAudioRef.current?.play().catch(() => {})}
+                    onClick={() =>
+                      targetAudioRef.current?.play().catch(() => {})
+                    }
                     aria-label={t('playTranslationAudio')}
                   >
                     <Volume2 className="h-4 w-4" />
@@ -454,10 +471,18 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
       {/* Hidden audio elements. Preload metadata only so we don't burn
           bandwidth before reveal. Source audio plays only on button-tap. */}
       {sentence?.sourceAudioUrl ? (
-        <audio ref={sourceAudioRef} src={sentence.sourceAudioUrl} preload="auto" />
+        <audio
+          ref={sourceAudioRef}
+          src={sentence.sourceAudioUrl}
+          preload="auto"
+        />
       ) : null}
       {sentence?.targetAudioUrl ? (
-        <audio ref={targetAudioRef} src={sentence.targetAudioUrl} preload="auto" />
+        <audio
+          ref={targetAudioRef}
+          src={sentence.targetAudioUrl}
+          preload="auto"
+        />
       ) : null}
     </div>
   );
@@ -594,7 +619,5 @@ function ResultSample({
     return <div className="h-7 rounded bg-muted/40 animate-pulse" />;
   }
   const primary = display.targetText ?? display.sourceText;
-  return (
-    <div className="rounded bg-muted/50 px-3 py-2 text-sm">{primary}</div>
-  );
+  return <div className="rounded bg-muted/50 px-3 py-2 text-sm">{primary}</div>;
 }

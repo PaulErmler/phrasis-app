@@ -15,7 +15,7 @@ export function CTAButtons({ isAuthenticated }: CTAButtonsProps) {
   const t = useTranslations('HomePage');
   const pwaInstallRef = useRef<
     (HTMLElement & { showDialog: () => void }) | null
-      >(null);
+  >(null);
 
   useEffect(() => {
     // Get reference to the pwa-install element

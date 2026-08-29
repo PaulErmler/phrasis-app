@@ -113,7 +113,10 @@ describe('geminiTts.speak: empty-response retry', () => {
     expect(body.input).not.toMatch(/native Arabic\b/); // NOT the stripped base name
     expect(body.input).toContain('## Transcript: كيفك؟');
     // Global Arabic Gemini voice, steered by the shared World-Arabic locale.
-    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).voice).toBe('Leda');
+    expect(
+      JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+        .voice,
+    ).toBe('Leda');
     expect(body.provider.options.google.language_code).toBe('ar-001');
   });
 

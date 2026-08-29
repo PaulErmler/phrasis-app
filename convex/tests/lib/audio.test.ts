@@ -1,14 +1,14 @@
 /// <reference types="vite/client" />
-import { convexTest, type TestConvex } from "convex-test";
-import { describe, it, expect } from "vitest";
-import schema from "../../schema";
+import { convexTest, type TestConvex } from 'convex-test';
+import { describe, it, expect } from 'vitest';
+import schema from '../../schema';
 import {
   deleteAudioRow,
   deleteStorageBlobIfUnreferenced,
-} from "../../lib/audio";
-import { insertAudioFixture } from "./audioFixtures";
+} from '../../lib/audio';
+import { insertAudioFixture } from './audioFixtures';
 
-const modules = import.meta.glob("../../**/*.ts");
+const modules = import.meta.glob('../../**/*.ts');
 
 /**
  * `deleteAudioRow` deletes the shared `audioAssets` row (and its blob) ONLY
@@ -17,35 +17,35 @@ const modules = import.meta.glob("../../**/*.ts");
  * the asset while another row still points at it would corrupt that text's
  * audio.
  */
-describe("deleteAudioRow: reference-aware asset cleanup", () => {
+describe('deleteAudioRow: reference-aware asset cleanup', () => {
   async function seedTwoRowsSharingOneAsset(t: TestConvex<typeof schema>) {
     return t.run(async (ctx) => {
-      const collectionId = await ctx.db.insert("collections", {
-        name: "c",
+      const collectionId = await ctx.db.insert('collections', {
+        name: 'c',
         textCount: 0,
       });
       const mkText = (text: string) =>
-        ctx.db.insert("texts", {
+        ctx.db.insert('texts', {
           text,
-          language: "es",
+          language: 'es',
           userCreated: true,
           collectionId,
           collectionRank: 1,
         });
-      const textA = await mkText("uno");
-      const textB = await mkText("dos");
+      const textA = await mkText('uno');
+      const textB = await mkText('dos');
       const storageId = await ctx.storage.store(
         new Blob([new Uint8Array([1, 2, 3])]),
       );
       // One shared asset, pointed at by both texts' rows.
       const { assetId, rowId: rowA } = await insertAudioFixture(ctx, {
         textId: textA,
-        language: "es",
+        language: 'es',
         storageId,
       });
       const { rowId: rowB } = await insertAudioFixture(ctx, {
         textId: textB,
-        language: "es",
+        language: 'es',
         storageId,
         assetId,
       });
@@ -53,7 +53,7 @@ describe("deleteAudioRow: reference-aware asset cleanup", () => {
     });
   }
 
-  it("keeps the shared asset and blob until the LAST pointer row is deleted", async () => {
+  it('keeps the shared asset and blob until the LAST pointer row is deleted', async () => {
     const t = convexTest(schema, modules);
     const { storageId, assetId, rowA, rowB } =
       await seedTwoRowsSharingOneAsset(t);
@@ -80,16 +80,16 @@ describe("deleteAudioRow: reference-aware asset cleanup", () => {
     });
   });
 
-  it("deletes asset and blob immediately when the row is the only pointer", async () => {
+  it('deletes asset and blob immediately when the row is the only pointer', async () => {
     const t = convexTest(schema, modules);
     const { row, assetId, storageId } = await t.run(async (ctx) => {
-      const collectionId = await ctx.db.insert("collections", {
-        name: "c",
+      const collectionId = await ctx.db.insert('collections', {
+        name: 'c',
         textCount: 0,
       });
-      const textId = await ctx.db.insert("texts", {
-        text: "solo",
-        language: "es",
+      const textId = await ctx.db.insert('texts', {
+        text: 'solo',
+        language: 'es',
         userCreated: true,
         collectionId,
         collectionRank: 1,
@@ -99,7 +99,7 @@ describe("deleteAudioRow: reference-aware asset cleanup", () => {
       );
       const { assetId, rowId: row } = await insertAudioFixture(ctx, {
         textId,
-        language: "es",
+        language: 'es',
         storageId,
       });
       return { row, assetId, storageId };
@@ -122,17 +122,17 @@ describe("deleteAudioRow: reference-aware asset cleanup", () => {
  * a NEW blob (and by the delayed swap-delete job), the OLD blob must not be
  * dropped while another asset still owns it.
  */
-describe("deleteStorageBlobIfUnreferenced: reference-aware blob cleanup", () => {
-  it("keeps a blob still referenced by an asset; drops it once unreferenced", async () => {
+describe('deleteStorageBlobIfUnreferenced: reference-aware blob cleanup', () => {
+  it('keeps a blob still referenced by an asset; drops it once unreferenced', async () => {
     const t = convexTest(schema, modules);
     const { assetId, blobX, blobY } = await t.run(async (ctx) => {
-      const collectionId = await ctx.db.insert("collections", {
-        name: "c",
+      const collectionId = await ctx.db.insert('collections', {
+        name: 'c',
         textCount: 0,
       });
-      const textId = await ctx.db.insert("texts", {
-        text: "uno",
-        language: "es",
+      const textId = await ctx.db.insert('texts', {
+        text: 'uno',
+        language: 'es',
         userCreated: true,
         collectionId,
         collectionRank: 1,
@@ -142,7 +142,7 @@ describe("deleteStorageBlobIfUnreferenced: reference-aware blob cleanup", () => 
       );
       const { assetId } = await insertAudioFixture(ctx, {
         textId,
-        language: "es",
+        language: 'es',
         storageId: blobX,
       });
       const blobY = await ctx.storage.store(

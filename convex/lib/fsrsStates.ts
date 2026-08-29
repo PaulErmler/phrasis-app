@@ -1,5 +1,10 @@
 /** The four core FSRS card states, indexed by state number (0-3). */
-export const FSRS_STATE_LABELS = ['new', 'learning', 'review', 'relearning'] as const;
+export const FSRS_STATE_LABELS = [
+  'new',
+  'learning',
+  'review',
+  'relearning',
+] as const;
 
 export type FsrsStateLabel = (typeof FSRS_STATE_LABELS)[number];
 

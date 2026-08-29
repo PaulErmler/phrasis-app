@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { ActionCtx } from "../../_generated/server";
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { ActionCtx } from '../../_generated/server';
 
 /**
  * Unit tests for the server-side trial gate in convex/autumn.ts.
@@ -16,11 +16,11 @@ import type { ActionCtx } from "../../_generated/server";
  * The module throws at import when AUTUMN_SECRET_KEY is unset, so the env
  * is stubbed BEFORE the (deliberately dynamic) import.
  */
-vi.stubEnv("AUTUMN_SECRET_KEY", "am_sk_test_stub");
-const autumnModule = await import("../../autumn");
+vi.stubEnv('AUTUMN_SECRET_KEY', 'am_sk_test_stub');
+const autumnModule = await import('../../autumn');
 const { gateTrialArgs } = autumnModule;
 
-const USER = "user_x";
+const USER = 'user_x';
 
 /**
  * The gate's generic is bounded by the weak type `{ freeTrial?: boolean }`,
@@ -45,8 +45,8 @@ function stubCustomerFetch(res: {
   const fetchMock = vi.fn(async (url: string, init: any = {}) => {
     calls.push({
       url,
-      method: init?.method ?? "GET",
-      version: init?.headers?.["x-api-version"] ?? null,
+      method: init?.method ?? 'GET',
+      version: init?.headers?.['x-api-version'] ?? null,
     });
     return {
       ok: res.ok ?? true,
@@ -55,20 +55,20 @@ function stubCustomerFetch(res: {
       json: async () => res.body ?? {},
     };
   });
-  vi.stubGlobal("fetch", fetchMock);
+  vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
 }
 
 // v1.2 `products[]` shape. What the gate's x-api-version '1.2' GET returns.
 const freeProduct = {
-  id: "free",
-  status: "active",
+  id: 'free',
+  status: 'active',
   is_default: true,
   is_add_on: false,
 };
 const trialingProduct = {
-  id: "basic_annual",
-  status: "trialing",
+  id: 'basic_annual',
+  status: 'trialing',
   is_default: false,
   is_add_on: false,
   trial_ends_at: null,
@@ -77,7 +77,7 @@ const trialingProduct = {
 
 beforeEach(() => {
   calls = [];
-  vi.stubEnv("AUTUMN_SECRET_KEY", "am_sk_test_stub");
+  vi.stubEnv('AUTUMN_SECRET_KEY', 'am_sk_test_stub');
 });
 
 afterEach(() => {
@@ -85,18 +85,22 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("gateTrialArgs", () => {
-  it("passes a trial-eligible customer through untouched, so Autumn starts the configured trial", async () => {
+describe('gateTrialArgs', () => {
+  it('passes a trial-eligible customer through untouched, so Autumn starts the configured trial', async () => {
     stubCustomerFetch({
       body: { products: [freeProduct], trials_used: [] },
     });
-    const args: GateArgs = { productId: "basic" };
-    const result = await gateTrialArgs(ctxAs({ subject: USER }), "checkout", args);
+    const args: GateArgs = { productId: 'basic' };
+    const result = await gateTrialArgs(
+      ctxAs({ subject: USER }),
+      'checkout',
+      args,
+    );
 
     // Same object, no freeTrial injected, injecting `freeTrial: false` here
     // would silently deny every legitimate first trial.
     expect(result.gated).toBe(args);
-    expect("freeTrial" in result.gated).toBe(false);
+    expect('freeTrial' in result.gated).toBe(false);
     expect(result.state?.trialEligible).toBe(true);
 
     // Eligibility must be derived from the durable trials_used record, on
@@ -104,16 +108,24 @@ describe("gateTrialArgs", () => {
     // every customer look trial-eligible.
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toContain(`/customers/${USER}?expand=trials_used`);
-    expect(calls[0].method).toBe("GET");
-    expect(calls[0].version).toBe("1.2");
+    expect(calls[0].method).toBe('GET');
+    expect(calls[0].version).toBe('1.2');
   });
 
-  it("treats an unknown customer (404) as history-free and passes args through", async () => {
-    stubCustomerFetch({ ok: false, status: 404, body: { message: "not found" } });
-    const args: GateArgs = { productId: "basic" };
+  it('treats an unknown customer (404) as history-free and passes args through', async () => {
+    stubCustomerFetch({
+      ok: false,
+      status: 404,
+      body: { message: 'not found' },
+    });
+    const args: GateArgs = { productId: 'basic' };
     // A brand-new user's very first checkout happens before any Autumn
     // customer exists; blocking on 404 would break every first purchase.
-    const result = await gateTrialArgs(ctxAs({ subject: USER }), "checkout", args);
+    const result = await gateTrialArgs(
+      ctxAs({ subject: USER }),
+      'checkout',
+      args,
+    );
     expect(result.gated).toBe(args);
     // History-free ⇒ the state must read as a first purchase, so the
     // managed-payments guard in `attach` still sees it correctly.
@@ -121,96 +133,106 @@ describe("gateTrialArgs", () => {
     expect(result.state?.onTrial).toBe(false);
   });
 
-  it("rejects attach while trialing, plan switches must go through switchPlanDuringTrial", async () => {
+  it('rejects attach while trialing, plan switches must go through switchPlanDuringTrial', async () => {
     stubCustomerFetch({
-      body: { products: [freeProduct, trialingProduct], trials_used: [{ product_id: "basic_annual" }] },
+      body: {
+        products: [freeProduct, trialingProduct],
+        trials_used: [{ product_id: 'basic_annual' }],
+      },
     });
     // A raw attach mid-trial would either grant a fresh trial or bill
     // immediately; only switchPlanDuringTrial carries the running trial over.
     await expect(
-      gateTrialArgs<GateArgs>(ctxAs({ subject: USER }), "attach", {
-        productId: "pro",
+      gateTrialArgs<GateArgs>(ctxAs({ subject: USER }), 'attach', {
+        productId: 'pro',
       }),
     ).rejects.toThrow(/switchPlanDuringTrial/);
   });
 
-  it("lets checkout proceed while trialing, but with freeTrial forced off", async () => {
+  it('lets checkout proceed while trialing, but with freeTrial forced off', async () => {
     stubCustomerFetch({
-      body: { products: [freeProduct, trialingProduct], trials_used: [{ product_id: "basic_annual" }] },
+      body: {
+        products: [freeProduct, trialingProduct],
+        trials_used: [{ product_id: 'basic_annual' }],
+      },
     });
-    const args: GateArgs = { productId: "pro" };
-    const result = await gateTrialArgs(ctxAs({ subject: USER }), "checkout", args);
+    const args: GateArgs = { productId: 'pro' };
+    const result = await gateTrialArgs(
+      ctxAs({ subject: USER }),
+      'checkout',
+      args,
+    );
 
     // The dialog needs the preview, but no checkout session that could
     // complete into a SECOND trial may ever be created. `false` is correct
     // here: v1.2 /checkout still honors it (probed 2026-08-09; `null` is
     // rejected by its schema). Attach-side suppression is handled by the
     // v2 routing in the attach action, not by this flag.
-    expect(result.gated).toEqual({ productId: "pro", freeTrial: false });
+    expect(result.gated).toEqual({ productId: 'pro', freeTrial: false });
     // Caller's args stay unmutated. They may be reused for a later retry.
-    expect("freeTrial" in args).toBe(false);
+    expect('freeTrial' in args).toBe(false);
   });
 
-  it("forces freeTrial:false for a customer who ever trialed, the anti-trial-farming pin", async () => {
+  it('forces freeTrial:false for a customer who ever trialed, the anti-trial-farming pin', async () => {
     stubCustomerFetch({
       // Trial consumed in the past, nothing running now: `products` has
       // forgotten it (cancelled plans vanish), only trials_used remembers.
-      body: { products: [freeProduct], trials_used: [{ product_id: "basic" }] },
+      body: { products: [freeProduct], trials_used: [{ product_id: 'basic' }] },
     });
     // Even an explicit freeTrial:true from a hand-crafted direct action call
     // must be overridden. This is exactly the basic → pro → basic_annual
     // trial-hopping exploit the gate exists to stop.
-    const result = await gateTrialArgs(ctxAs({ subject: USER }), "attach", {
-      productId: "basic_annual",
+    const result = await gateTrialArgs(ctxAs({ subject: USER }), 'attach', {
+      productId: 'basic_annual',
       freeTrial: true,
     });
     expect(result.gated).toEqual({
-      productId: "basic_annual",
+      productId: 'basic_annual',
       freeTrial: false,
     });
   });
 
-  it("fails closed when eligibility cannot be verified (non-404 error)", async () => {
-    stubCustomerFetch({ ok: false, status: 500, body: { message: "boom" } });
+  it('fails closed when eligibility cannot be verified (non-404 error)', async () => {
+    stubCustomerFetch({ ok: false, status: 500, body: { message: 'boom' } });
     const consoleError = vi
-      .spyOn(console, "error")
+      .spyOn(console, 'error')
       .mockImplementation(() => undefined);
     try {
       // Passing args through on an outage would hand out trials to users
       // whose history simply couldn't be read.
       await expect(
-        gateTrialArgs<GateArgs>(ctxAs({ subject: USER }), "attach", {
-        productId: "pro",
-      }),
+        gateTrialArgs<GateArgs>(ctxAs({ subject: USER }), 'attach', {
+          productId: 'pro',
+        }),
       ).rejects.toThrow(/trial eligibility/);
     } finally {
       consoleError.mockRestore();
     }
   });
 
-  it("passes unauthenticated calls through without hitting Autumn, identify() rejects them", async () => {
+  it('passes unauthenticated calls through without hitting Autumn, identify() rejects them', async () => {
     const fetchMock = stubCustomerFetch({ body: {} });
-    const args: GateArgs = { productId: "basic" };
+    const args: GateArgs = { productId: 'basic' };
     // No identity means no customer id to gate on; the component's
     // identify() throws before any Autumn call executes, so a lookup here
     // would only leak requests for a caller that can never attach anything.
-    const result = await gateTrialArgs(ctxAs(null), "checkout", args);
+    const result = await gateTrialArgs(ctxAs(null), 'checkout', args);
     expect(result.gated).toBe(args);
     expect(result.state).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
-describe("public action surface", () => {
-  it("exports only the endpoints the react hooks use, the negative-track exploit stays closed", () => {
+describe('public action surface', () => {
+  it('exports only the endpoints the react hooks use, the negative-track exploit stays closed', () => {
     // Everything the client legitimately calls must exist...
     for (const name of [
-      "check",
-      "attach",
-      "checkout",
-      "createCustomer",
-      "listProducts",
-      "billingPortal",
+      'check',
+      'attach',
+      'checkout',
+      'createCustomer',
+      'listProducts',
+      'billingPortal',
     ]) {
       expect(
         (autumnModule as Record<string, unknown>)[name],
@@ -223,15 +245,15 @@ describe("public action surface", () => {
     // self-scoped write. Re-exporting `autumn.api()` wholesale would bring
     // them all back at once.
     for (const name of [
-      "track",
-      "cancel",
-      "query",
-      "usage",
-      "setupPayment",
-      "createReferralCode",
-      "redeemReferralCode",
-      "createEntity",
-      "getEntity",
+      'track',
+      'cancel',
+      'query',
+      'usage',
+      'setupPayment',
+      'createReferralCode',
+      'redeemReferralCode',
+      'createEntity',
+      'getEntity',
     ]) {
       expect(name in autumnModule, `unexpected export ${name}`).toBe(false);
     }

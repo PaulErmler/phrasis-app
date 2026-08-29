@@ -24,7 +24,10 @@ vi.mock('autumn-js/react', () => ({
 
 const switchPlanMock = vi.fn();
 vi.mock('convex/react', () => ({
-  useAction: () => (...args: unknown[]) => switchPlanMock(...args),
+  useAction:
+    () =>
+    (...args: unknown[]) =>
+      switchPlanMock(...args),
 }));
 
 const toastSuccessMock = vi.fn();
@@ -93,7 +96,9 @@ function checkoutResult(
 
 function renderDialog(result: CheckoutDialogProps['checkoutResult']) {
   const setOpen = vi.fn();
-  render(<CheckoutDialog open={true} setOpen={setOpen} checkoutResult={result} />);
+  render(
+    <CheckoutDialog open={true} setOpen={setOpen} checkoutResult={result} />,
+  );
   return { setOpen };
 }
 
@@ -154,10 +159,7 @@ describe('CheckoutDialog', () => {
     // phantom cross-plan trial (preview AND charge), letting a previously
     // trialed customer plan-hop through endless free weeks.
     const { setOpen } = renderDialog(
-      checkoutResult(
-        {},
-        { options: [{ feature_id: 'seats', quantity: 2 }] },
-      ),
+      checkoutResult({}, { options: [{ feature_id: 'seats', quantity: 2 }] }),
     );
     await confirm();
 
@@ -205,22 +207,48 @@ describe('CheckoutDialog', () => {
     is_one_off?: boolean;
     route: 'action' | 'attach';
   }> = [
-    { name: 'paid upgrade', scenario: 'upgrade', is_free: false, route: 'action' },
-    { name: 'paid downgrade', scenario: 'downgrade', is_free: false, route: 'action' },
+    {
+      name: 'paid upgrade',
+      scenario: 'upgrade',
+      is_free: false,
+      route: 'action',
+    },
+    {
+      name: 'paid downgrade',
+      scenario: 'downgrade',
+      is_free: false,
+      route: 'action',
+    },
     { name: 'paid new', scenario: 'new', is_free: false, route: 'action' },
     // "renew" = re-attaching the trialing plan to un-schedule a pending
     // switch; a raw attach would instead restart billing on the spot.
     { name: 'paid renew', scenario: 'renew', is_free: false, route: 'action' },
     // Free targets are scheduled at trial end like any downgrade (Autumn
     // classifies free/default as "downgrade" or "cancel").
-    { name: 'free downgrade', scenario: 'downgrade', is_free: true, route: 'action' },
+    {
+      name: 'free downgrade',
+      scenario: 'downgrade',
+      is_free: true,
+      route: 'action',
+    },
     { name: 'free cancel', scenario: 'cancel', is_free: true, route: 'action' },
     // One-off purchases are bolt-ons, not subscriptions. They must not be
     // rerouted into the subscription-switch action mid-trial.
-    { name: 'one-off purchase', scenario: 'new', is_free: false, is_one_off: true, route: 'attach' },
+    {
+      name: 'one-off purchase',
+      scenario: 'new',
+      is_free: false,
+      is_one_off: true,
+      route: 'attach',
+    },
     // A free non-downgrade target is outside the action's accepted set
     // (the server throws on it), it stays on the plain attach path.
-    { name: 'free enable (new)', scenario: 'new', is_free: true, route: 'attach' },
+    {
+      name: 'free enable (new)',
+      scenario: 'new',
+      is_free: true,
+      route: 'attach',
+    },
   ];
 
   it.each(routingTable)(
@@ -262,7 +290,9 @@ describe('CheckoutDialog', () => {
     const { setOpen } = renderDialog(checkoutResult());
     await confirm();
 
-    await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('confirmError'));
+    await waitFor(() =>
+      expect(toastErrorMock).toHaveBeenCalledWith('confirmError'),
+    );
     expect(setOpen).not.toHaveBeenCalled();
     expect(screen.getByTestId('checkout-dialog-title')).toBeInTheDocument();
     // The spinner must reset so the user can retry (or pick another plan).
@@ -281,7 +311,9 @@ describe('CheckoutDialog', () => {
     const { setOpen } = renderDialog(checkoutResult());
     await confirm();
 
-    await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('confirmError'));
+    await waitFor(() =>
+      expect(toastErrorMock).toHaveBeenCalledWith('confirmError'),
+    );
     expect(setOpen).not.toHaveBeenCalled();
     expect(screen.getByTestId('checkout-dialog-confirm')).toBeEnabled();
   });
@@ -332,7 +364,9 @@ describe('CheckoutDialog', () => {
     );
     await confirm();
 
-    await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('confirmError'));
+    await waitFor(() =>
+      expect(toastErrorMock).toHaveBeenCalledWith('confirmError'),
+    );
     expect(setOpen).not.toHaveBeenCalled();
     expect(screen.getByTestId('checkout-dialog-title')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-dialog-confirm')).toBeEnabled();
@@ -344,7 +378,9 @@ describe('CheckoutDialog', () => {
     const { setOpen } = renderDialog(checkoutResult({ scenario: 'upgrade' }));
     await confirm();
 
-    await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('confirmError'));
+    await waitFor(() =>
+      expect(toastErrorMock).toHaveBeenCalledWith('confirmError'),
+    );
     expect(setOpen).not.toHaveBeenCalled();
     expect(screen.getByTestId('checkout-dialog-confirm')).toBeEnabled();
   });

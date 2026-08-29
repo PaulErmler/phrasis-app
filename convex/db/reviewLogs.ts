@@ -123,7 +123,12 @@ export async function takeUndoableLogs(
   courseId: Id<'courses'>,
   current: StudyContext,
 ): Promise<Doc<'reviewLogs'>[]> {
-  const newestFirst = await takeLatestReviewLogs(ctx, userId, courseId, UNDO_DEPTH);
+  const newestFirst = await takeLatestReviewLogs(
+    ctx,
+    userId,
+    courseId,
+    UNDO_DEPTH,
+  );
   const prefix: Doc<'reviewLogs'>[] = [];
   for (const entry of newestFirst) {
     if (

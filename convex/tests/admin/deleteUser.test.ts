@@ -69,6 +69,10 @@ describe('USER_TABLES coverage checklist', () => {
     'courses', // courses phase
     'cardApprovals', // approvals phase
     'accountDeletions', // audit row, survives on purpose
+    // Cards phase: every card deletion routes through `deleteCard`
+    // (convex/db/stats/cardAggregates.ts), which drains the card's
+    // writingAlternatives rows in the same transaction.
+    'writingAlternatives',
   ]);
 
   it('every schema table with a userId field is purged (or explicitly audit-exempt)', () => {
@@ -296,6 +300,20 @@ async function seedFixture(t: TestConvex<typeof schema>): Promise<Fixture> {
       schedulingMode: 'learnAndReview',
       studyContentFilter: 'both',
     });
+    await ctx.db.insert('reviewHistory', {
+      userId: VICTIM,
+      courseId,
+      cardId: customCard,
+      reviewedAt: now,
+      date: '2026-08-20',
+      timezone: 'UTC',
+      track: 'shared',
+      phase: 'preReview',
+      rating: 'stillLearning',
+      wasFirstReview: true,
+      prevDueDate: now - 1000,
+      newDueDate: now + 60_000,
+    });
     await ctx.db.insert('collectionProgress', {
       userId: VICTIM,
       courseId,
@@ -395,6 +413,43 @@ async function seedFixture(t: TestConvex<typeof schema>): Promise<Fixture> {
       name: 'Victim',
       createdAt: now,
       searchText: `${VICTIM_EMAIL} victim`,
+    });
+    const victimCardEditId = await ctx.db.insert('cardEdits', {
+      userId: VICTIM,
+      courseId,
+      kind: 'manual_edit',
+      path: 'fork',
+      cardIdBefore: customCard,
+      cardIdAfter: customCard,
+      textIdBefore: premadeText,
+      textIdAfter: premadeText,
+      textWasUserCreated: false,
+      sourceLanguage: 'en',
+      sourceText: 'My cat',
+      baseLanguages: ['en'],
+      targetLanguages: ['es'],
+      changes: [
+        {
+          language: 'es',
+          role: 'target',
+          isSourceLanguage: false,
+          before: 'Mi gato',
+          after: 'Mi gata',
+          soundsSame: false,
+        },
+      ],
+    });
+    await ctx.db.insert('cardEditRetranslations', {
+      cardEditId: victimCardEditId,
+      userId: VICTIM,
+      language: 'es',
+      role: 'target',
+      textId: premadeText,
+      sourceLanguage: 'en',
+      sourceText: 'My cat',
+      beforeText: 'Mi gato',
+      flagCountAfter: 1,
+      status: 'enqueued',
     });
     await ctx.db.insert('cardApprovals', {
       threadId: 'thread_1',
@@ -626,8 +681,8 @@ describe('admin/deleteUser purge', () => {
     });
 
     // Aggregates: both tracks cleared for the victim's deck (30 shared +
-    // 30 writing namespaces).
-    expect(aggregateCalls.clears.length).toBe(60);
+    // 30 writing namespaces + 4 stability buckets).
+    expect(aggregateCalls.clears.length).toBe(64);
     expect(
       aggregateCalls.clears.every((c) => c.namespace.startsWith(fx.deckId)),
     ).toBe(true);
@@ -656,18 +711,24 @@ describe('admin/deleteUser purge', () => {
       if (!row) throw new Error('audit row missing');
       await ctx.db.patch(row._id, { phase: 'cards', phaseCursor: undefined });
     });
-    const before = await t.run(async (ctx) =>
-      (await ctx.db
-        .query('accountDeletions')
-        .withIndex('by_userId', (q) => q.eq('userId', VICTIM))
-        .first())?.docsDeleted,
+    const before = await t.run(
+      async (ctx) =>
+        (
+          await ctx.db
+            .query('accountDeletions')
+            .withIndex('by_userId', (q) => q.eq('userId', VICTIM))
+            .first()
+        )?.docsDeleted,
     );
     await runPurgeToAuthPhase(t);
-    const after = await t.run(async (ctx) =>
-      (await ctx.db
-        .query('accountDeletions')
-        .withIndex('by_userId', (q) => q.eq('userId', VICTIM))
-        .first())?.docsDeleted,
+    const after = await t.run(
+      async (ctx) =>
+        (
+          await ctx.db
+            .query('accountDeletions')
+            .withIndex('by_userId', (q) => q.eq('userId', VICTIM))
+            .first()
+        )?.docsDeleted,
     );
     expect(after).toBe(before);
   });

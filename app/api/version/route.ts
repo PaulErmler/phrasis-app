@@ -28,8 +28,14 @@ export function GET() {
   // Gated on an explicit opt-in rather than NODE_ENV so a staging build can use
   // it. That costs nothing: DEV_BUILD_ID is a server-side variable, so anyone
   // able to set it already controls the deployment and has no need to spoof it.
-  if (process.env.NEXT_PUBLIC_UPDATE_DEBUG === '1' && process.env.DEV_BUILD_ID) {
-    return Response.json({ buildId: process.env.DEV_BUILD_ID, source: 'debug' });
+  if (
+    process.env.NEXT_PUBLIC_UPDATE_DEBUG === '1' &&
+    process.env.DEV_BUILD_ID
+  ) {
+    return Response.json({
+      buildId: process.env.DEV_BUILD_ID,
+      source: 'debug',
+    });
   }
 
   return Response.json({ buildId, source });

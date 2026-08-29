@@ -13,11 +13,29 @@ import {
 } from '@/lib/wordCloud';
 
 const MOCK_WORD_LIST = [
-  'amigo', 'vida', 'país', 'manera', 'tiempo',
-  'parte', 'estado', 'quiere', 'esta', 'muy',
-  'nunca', 'casa', 'fiesta', 'todavía', 'llegó',
-  'cómo', 'poco', 'importante', 'tiene', 'hasta',
-  'era', 'próxima', 'dígame',
+  'amigo',
+  'vida',
+  'país',
+  'manera',
+  'tiempo',
+  'parte',
+  'estado',
+  'quiere',
+  'esta',
+  'muy',
+  'nunca',
+  'casa',
+  'fiesta',
+  'todavía',
+  'llegó',
+  'cómo',
+  'poco',
+  'importante',
+  'tiene',
+  'hasta',
+  'era',
+  'próxima',
+  'dígame',
 ];
 
 export function LandingWordCloud() {
@@ -39,7 +57,10 @@ export function LandingWordCloud() {
     [wordCount],
   );
   const rotateFn = useCallback(() => -360, []);
-  const fillFn = useCallback((_: Word, i: number) => COLORS[i % COLORS.length], []);
+  const fillFn = useCallback(
+    (_: Word, i: number) => COLORS[i % COLORS.length],
+    [],
+  );
   const handleWordClick = useCallback(
     (word: { text: string }) => setSelectedWord(word.text),
     [],

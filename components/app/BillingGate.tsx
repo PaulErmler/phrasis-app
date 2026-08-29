@@ -5,6 +5,8 @@ import { useAction, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import PaymentOverdueDialog from '@/components/autumn/payment-overdue-dialog';
 
+import { reportError } from '@/lib/report-error';
+
 /**
  * Keeps the local quota mirror fresh and renders the payment-overdue block.
  *
@@ -52,7 +54,7 @@ export function BillingGate() {
     try {
       await syncQuotas();
     } catch (err) {
-      console.error('Failed to sync quotas:', err);
+      reportError(err, { op: 'syncQuotas' });
     } finally {
       inFlight.current = false;
     }
@@ -112,7 +114,10 @@ export function BillingGate() {
         return;
       }
       const lastSyncedAt = lastSyncedAtRef.current;
-      if (lastSyncedAt !== undefined && Date.now() - lastSyncedAt < STALE_AFTER_MS) {
+      if (
+        lastSyncedAt !== undefined &&
+        Date.now() - lastSyncedAt < STALE_AFTER_MS
+      ) {
         return;
       }
       void sync();

@@ -34,7 +34,10 @@ import landingDe from '@/messages/landing/de.json';
 type Catalog = string | Catalog[] | { [key: string]: Catalog };
 
 /** Flattens a nested catalog into dot-separated leaf paths (arrays by index). */
-function flattenLeaves(node: Exclude<Catalog, string>, prefix = ''): Map<string, string> {
+function flattenLeaves(
+  node: Exclude<Catalog, string>,
+  prefix = '',
+): Map<string, string> {
   const leaves = new Map<string, string>();
   for (const [key, value] of Object.entries(node)) {
     const path = prefix ? `${prefix}.${key}` : key;
@@ -70,12 +73,16 @@ function parseBranches(body: string): Array<{ key: string; body: string }> {
     }
     const keyMatch = /^(=\d+|[a-zA-Z0-9_]+)/.exec(body.slice(i));
     if (!keyMatch) {
-      throw new Error(`Unsupported plural/select branch syntax: ${body.slice(i)}`);
+      throw new Error(
+        `Unsupported plural/select branch syntax: ${body.slice(i)}`,
+      );
     }
     i += keyMatch[0].length;
     while (i < body.length && /\s/.test(body[i])) i++;
     if (body[i] !== '{') {
-      throw new Error(`Expected '{' after branch key "${keyMatch[0]}" in: ${body}`);
+      throw new Error(
+        `Expected '{' after branch key "${keyMatch[0]}" in: ${body}`,
+      );
     }
     const close = findMatchingBrace(body, i);
     branches.push({ key: keyMatch[0], body: body.slice(i + 1, close) });
@@ -98,11 +105,16 @@ function collectPlaceholders(message: string, out: Set<string>): void {
     }
     const close = findMatchingBrace(message, i);
     const inner = message.slice(i + 1, close);
-    const complex = /^([a-zA-Z0-9_]+)\s*,\s*(plural|select)\s*,([\s\S]*)$/.exec(inner);
+    const complex = /^([a-zA-Z0-9_]+)\s*,\s*(plural|select)\s*,([\s\S]*)$/.exec(
+      inner,
+    );
     if (complex) {
       const [, name, type, body] = complex;
       const branches = parseBranches(body);
-      const branchKeys = branches.map((b) => b.key).sort().join('|');
+      const branchKeys = branches
+        .map((b) => b.key)
+        .sort()
+        .join('|');
       out.add(`${name}:${type}(${branchKeys})`);
       for (const branch of branches) collectPlaceholders(branch.body, out);
     } else if (/^[a-zA-Z0-9_]+$/.test(inner)) {
@@ -110,7 +122,9 @@ function collectPlaceholders(message: string, out: Set<string>): void {
     } else {
       // Anything else means the extractor's supported subset is out of date.
       // Fail loudly instead of silently under-checking.
-      throw new Error(`Unsupported ICU syntax "{${inner}}" in message: ${message}`);
+      throw new Error(
+        `Unsupported ICU syntax "{${inner}}" in message: ${message}`,
+      );
     }
     i = close + 1;
   }
@@ -160,13 +174,17 @@ describe('placeholder extraction (self-check)', () => {
   });
 
   it('normalizes # and treats =N branches as part of the signature', () => {
-    expect(placeholderSignature('{count, plural, =0 {none} one {# word} other {# words}}')).toEqual([
-      'count:plural(=0|one|other)',
-    ]);
+    expect(
+      placeholderSignature(
+        '{count, plural, =0 {none} one {# word} other {# words}}',
+      ),
+    ).toEqual(['count:plural(=0|one|other)']);
   });
 
   it('throws on ICU syntax outside the supported subset', () => {
-    expect(() => placeholderSignature('{count, number}')).toThrow(/Unsupported ICU syntax/);
+    expect(() => placeholderSignature('{count, number}')).toThrow(
+      /Unsupported ICU syntax/,
+    );
   });
 });
 
@@ -175,9 +193,16 @@ describe.each(pairs)('$name', ({ en, de }) => {
   const deLeaves = flattenLeaves(de);
 
   it('has identical nested key sets', () => {
-    const missingInDe = [...enLeaves.keys()].filter((key) => !deLeaves.has(key));
-    const missingInEn = [...deLeaves.keys()].filter((key) => !enLeaves.has(key));
-    expect({ missingInDe, missingInEn }).toEqual({ missingInDe: [], missingInEn: [] });
+    const missingInDe = [...enLeaves.keys()].filter(
+      (key) => !deLeaves.has(key),
+    );
+    const missingInEn = [...deLeaves.keys()].filter(
+      (key) => !enLeaves.has(key),
+    );
+    expect({ missingInDe, missingInEn }).toEqual({
+      missingInDe: [],
+      missingInEn: [],
+    });
   });
 
   it('has identical ICU placeholder sets for every shared leaf', () => {

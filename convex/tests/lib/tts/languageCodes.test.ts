@@ -92,7 +92,10 @@ describe('toGeminiBcp47', () => {
     const missing = SUPPORTED_LANGUAGES.filter(
       (l) => !(l.code in EXPECTED_GEMINI),
     ).map((l) => l.code);
-    expect(missing, `codes without an expected Gemini mapping: ${missing.join(', ')}`).toEqual([]);
+    expect(
+      missing,
+      `codes without an expected Gemini mapping: ${missing.join(', ')}`,
+    ).toEqual([]);
   });
 
   it('passes unknown codes through unchanged', () => {

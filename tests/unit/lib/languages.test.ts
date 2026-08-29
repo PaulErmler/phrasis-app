@@ -28,6 +28,7 @@ import {
   isContentVersionStale,
   isTtsVersionStale,
   isTranslationVersionStale,
+  languageSupportsStt,
 } from '@/lib/languages';
 
 describe('getLanguageByCode', () => {
@@ -45,9 +46,10 @@ describe('SUPPORTED_LANGUAGES ttsProvider', () => {
   // silently drift from lib/languages.ts when a language flips provider.
   const NON_GOOGLE_PROVIDERS: Record<string, 'azure' | 'gemini'> =
     Object.fromEntries(
-      SUPPORTED_LANGUAGES.filter((l) => l.ttsProvider !== 'google').map(
-        (l) => [l.code, l.ttsProvider as 'azure' | 'gemini'],
-      ),
+      SUPPORTED_LANGUAGES.filter((l) => l.ttsProvider !== 'google').map((l) => [
+        l.code,
+        l.ttsProvider as 'azure' | 'gemini',
+      ]),
     );
 
   it('every non-google language is reachable via getLanguageByCode', () => {
@@ -217,9 +219,15 @@ describe('getLocalizedLanguageNameByCode', () => {
     pt: { en: 'Portuguese (Brazil)', de: 'Portugiesisch (Brasilien)' },
     pt_pt: { en: 'Portuguese (Portugal)', de: 'Portugiesisch (Portugal)' },
     zh: { en: 'Chinese (Simplified)', de: 'Chinesisch (Vereinfacht)' },
-    zh_traditional: { en: 'Chinese (Traditional)', de: 'Chinesisch (Traditionell)' },
+    zh_traditional: {
+      en: 'Chinese (Traditional)',
+      de: 'Chinesisch (Traditionell)',
+    },
     yue: { en: 'Cantonese (Simplified)', de: 'Kantonesisch (Vereinfacht)' },
-    yue_traditional: { en: 'Cantonese (Traditional)', de: 'Kantonesisch (Traditionell)' },
+    yue_traditional: {
+      en: 'Cantonese (Traditional)',
+      de: 'Kantonesisch (Traditionell)',
+    },
     ar: { en: 'Arabic (Modern Standard)', de: 'Arabisch (Hocharabisch)' },
     ar_sa: { en: 'Arabic (Saudi)', de: 'Arabisch (Saudisch)' },
     ar_eg: { en: 'Arabic (Egyptian)', de: 'Arabisch (Ägyptisch)' },
@@ -370,6 +378,42 @@ describe('Persian (fa) language record', () => {
     expect(fa?.romanizationBackend).toBe('local');
     expect(languageNeedsRomanization('fa')).toBe(true);
     expect(fa?.supportsKaraoke).toBe(false);
+  });
+});
+
+describe('Telugu (te) language record', () => {
+  const te = getLanguageByCode('te');
+
+  it('romanizes locally because Google v3 400s on te', () => {
+    expect(te?.needsRomanization).toBe(true);
+    expect(te?.romanizationBackend).toBe('local');
+    expect(languageNeedsRomanization('te')).toBe(true);
+  });
+});
+
+describe('Bulgarian (bg) language record', () => {
+  const bg = getLanguageByCode('bg');
+
+  it('romanizes locally because Google v3 has no bg', () => {
+    expect(bg?.needsRomanization).toBe(true);
+    expect(bg?.romanizationBackend).toBe('local');
+    expect(languageNeedsRomanization('bg')).toBe(true);
+  });
+});
+
+describe('languageSupportsStt', () => {
+  // Azure Fast Transcription rejects el-GR and sw-TZ; UI surfaces (the
+  // writing-mode mic) gate on this flag so those users never pay a
+  // transcription quota unit for a request that can only 400.
+  it('is false for the Azure-rejected locales', () => {
+    expect(languageSupportsStt('el')).toBe(false);
+    expect(languageSupportsStt('sw_tz')).toBe(false);
+  });
+
+  it('is true for mainstream STT languages and false for unknown codes', () => {
+    expect(languageSupportsStt('es')).toBe(true);
+    expect(languageSupportsStt('ja')).toBe(true);
+    expect(languageSupportsStt('not-a-language')).toBe(false);
   });
 });
 

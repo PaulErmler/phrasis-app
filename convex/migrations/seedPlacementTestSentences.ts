@@ -162,7 +162,10 @@ export const run = internalAction({
     sentencesAlreadyPresent: v.number(),
     backfillsScheduled: v.number(),
   }),
-  handler: async (ctx, { languages }): Promise<{
+  handler: async (
+    ctx,
+    { languages },
+  ): Promise<{
     collectionCreated: boolean;
     textsInserted: number;
     sentencesInserted: number;

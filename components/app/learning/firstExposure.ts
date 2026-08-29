@@ -42,7 +42,10 @@ export function isTranscribeMode(
  */
 export function shouldShowTranslationAssist(
   settings:
-    | Pick<CourseSettings, 'showTranslationOnNew' | 'showTranslationOnlyNewReps'>
+    | Pick<
+        CourseSettings,
+        'showTranslationOnNew' | 'showTranslationOnlyNewReps'
+      >
     | null
     | undefined,
   preReviewCount: number,

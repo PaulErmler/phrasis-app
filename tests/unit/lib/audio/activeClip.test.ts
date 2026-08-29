@@ -177,9 +177,7 @@ describe('resolveActiveCuePosition', () => {
   it('rescales localTime to the original frame using speedByLanguage', () => {
     // en baked at 0.8× → original offset = mergedOffset * 0.8
     const cues: LanguageCue[] = [{ language: 'en', startSec: 0 }];
-    expect(
-      resolveActiveCuePosition(cues, 1.0, { en: 0.8 }),
-    ).toEqual({
+    expect(resolveActiveCuePosition(cues, 1.0, { en: 0.8 })).toEqual({
       language: 'en',
       repIndex: 0,
       localTimeOriginal: 0.8,
@@ -251,9 +249,10 @@ describe('mergedTimeForCuePosition', () => {
       { language: 'en', startSec: 4 }, // rep 1 @ 0.5×
     ];
     // localTimeOriginal = 0.6 → at 0.5× that's 1.2s merged offset from rep-1 start.
-    expect(
-      mergedTimeForCuePosition(newCues, { en: 0.5 }, pos),
-    ).toBeCloseTo(5.2, 10);
+    expect(mergedTimeForCuePosition(newCues, { en: 0.5 }, pos)).toBeCloseTo(
+      5.2,
+      10,
+    );
   });
 
   it('returns null when the language is absent in the new cue list', () => {
@@ -266,9 +265,7 @@ describe('mergedTimeForCuePosition', () => {
       { language: 'en', startSec: 0 },
       { language: 'es', startSec: 2 },
     ];
-    expect(
-      mergedTimeForCuePosition(newCues, { en: 1, es: 1 }, pos),
-    ).toBeNull();
+    expect(mergedTimeForCuePosition(newCues, { en: 1, es: 1 }, pos)).toBeNull();
   });
 
   it('returns null when the requested repIndex is absent', () => {
@@ -303,7 +300,10 @@ describe('silent cues (zero-repetition placeholders)', () => {
       { language: 'en', startSec: 0 },
       { language: 'es', startSec: 5, silent: true },
     ];
-    expect(resolveActiveClip(cues, 6)).toEqual({ language: 'en', localTime: 6 });
+    expect(resolveActiveClip(cues, 6)).toEqual({
+      language: 'en',
+      localTime: 6,
+    });
   });
 
   it('prefers the real cue when a silent cue shares its startSec', () => {
@@ -311,7 +311,10 @@ describe('silent cues (zero-repetition placeholders)', () => {
       { language: 'es', startSec: 2, silent: true },
       { language: 'en', startSec: 2 },
     ];
-    expect(resolveActiveClip(cues, 2.5)).toEqual({ language: 'en', localTime: 0.5 });
+    expect(resolveActiveClip(cues, 2.5)).toEqual({
+      language: 'en',
+      localTime: 0.5,
+    });
   });
 
   it('returns null when only silent cues precede currentTime', () => {

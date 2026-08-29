@@ -30,7 +30,13 @@
  * not remove either from this array without first migrating any stored rows
  * that use it.
  */
-export const TTS_PROVIDERS = ['google', 'elevenlabs', 'azure', 'gemini', 'minimax'] as const;
+export const TTS_PROVIDERS = [
+  'google',
+  'elevenlabs',
+  'azure',
+  'gemini',
+  'minimax',
+] as const;
 export type TtsProvider = (typeof TTS_PROVIDERS)[number];
 
 /** Identifier for which translation backend a target language currently uses. */
@@ -274,6 +280,17 @@ export interface Language {
    */
   ipaVoice?: string;
   /**
+   * Opt-in flag for furigana: the kana reading rendered above each kanji run
+   * (`convex/features/furigana.ts`). Same role as `ipaVoice` for IPA — a
+   * language without it never gets furigana scheduled, stored rows stop being
+   * served, and the settings toggle hides.
+   *
+   * Japanese only today. The pipeline itself is script-agnostic, so a future
+   * ruby-annotated language (pinyin over hanzi) sets this flag and supplies an
+   * engine branch rather than growing a second annotation kind.
+   */
+  supportsFurigana?: true;
+  /**
    * Locale-keyed display-name overrides (e.g. { de: 'Spanisch (Spanien)' })
    * for codes where Intl.DisplayNames is ambiguous. The `en` value is derived
    * from `name` when the override map is built. Resolution falls back to the
@@ -331,7 +348,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
-    translationPromptNotes: 'British spelling and vocabulary (colour, lift, queue).',
+    translationPromptNotes:
+      'British spelling and vocabulary (colour, lift, queue).',
   },
   {
     code: 'en_us',
@@ -353,7 +371,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
-    translationPromptNotes: 'American spelling and vocabulary (color, elevator, line).',
+    translationPromptNotes:
+      'American spelling and vocabulary (color, elevator, line).',
   },
   {
     code: 'en_au',
@@ -380,7 +399,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
-    translationPromptNotes: 'Closer to British spelling; Australian vocabulary where natural.',
+    translationPromptNotes:
+      'Closer to British spelling; Australian vocabulary where natural.',
   },
   {
     code: 'es',
@@ -402,7 +422,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'es',
     supportsKaraoke: true,
     supportsStt: true,
-    translationPromptNotes: 'vosotros for the informal plural, peninsular vocabulary.',
+    translationPromptNotes:
+      'vosotros for the informal plural, peninsular vocabulary.',
     translationVersion: 2,
   },
   {
@@ -429,7 +450,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'es-419',
     supportsKaraoke: true,
     supportsStt: true,
-    translationPromptNotes: 'ustedes for the plural, regionally neutral Latin American vocabulary.',
+    translationPromptNotes:
+      'ustedes for the plural, regionally neutral Latin American vocabulary.',
     translationVersion: 2,
   },
   {
@@ -554,7 +576,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // unchanged, so the provider-mismatch regen path wouldn't fire).
     ttsPromptName: 'European Portuguese',
     ttsVersion: 2,
-    translationPromptNotes: 'European Portuguese vocabulary, spelling, and phonetics.',
+    translationPromptNotes:
+      'European Portuguese vocabulary, spelling, and phonetics.',
     translationVersion: 2,
     needsRomanization: false,
     ipaVoice: 'pt-pt',
@@ -746,7 +769,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Pin Cyrillic in the prompt, since the whole pipeline (STT locale,
     // romanization, catalog standard above) assumes Cyrillic output.
     translationName: 'Serbian (Cyrillic script)',
-    translationPromptNotes: 'Use Cyrillic (ћирилица) exclusively; never the Latin alphabet.',
+    translationPromptNotes:
+      'Use Cyrillic (ћирилица) exclusively; never the Latin alphabet.',
     // v2: prompt pins Cyrillic. Regenerate pre-existing (possibly
     // Latin-script) translations.
     translationVersion: 2,
@@ -759,7 +783,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // No `azureSttLocale`: the symmetric default resolves to `bg-BG`, which is
     // in Azure Fast Transcription's supported list. Worth a live probe before
     // the language ships. The docs table has been wrong before (see sw_tz).
-    romanizationBackend: 'google-v3',
+    romanizationBackend: 'local',
     name: 'Bulgarian',
     nativeName: 'Български',
     flag: '🇧🇬',
@@ -768,7 +792,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'bg',
-    // Cyrillic. Karaoke off (non-Latin script policy, matches ru/uk/sr).
+    // Cyrillic. Google v3 romanizeText has no `bg` (ru/uk/sr/be only), so
+    // the 2009 Streamlined System is produced locally in
+    // convex/lib/bulgarianTranslit.ts. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
     experimental: true,
@@ -939,7 +965,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'fi',
     supportsKaraoke: true,
     supportsStt: true,
-    translationPromptNotes: 'The formal/informal distinction is minimal; focus on naturalness.',
+    translationPromptNotes:
+      'The formal/informal distinction is minimal; focus on naturalness.',
     translationVersion: 2,
   },
   {
@@ -1037,16 +1064,19 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     regionLabel: 'India',
     geminiBcp47: 'te-IN',
     azureSttLocale: 'te-IN',
-    romanizationBackend: 'google-v3',
+    romanizationBackend: 'local',
     name: 'Telugu',
     nativeName: 'తెలుగు',
     flag: '🇮🇳',
     category: 'south-asian',
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
+    // Telugu script. Google v3 romanizeText 400s on `te` ("Source language
+    // is unsupported") despite still listing it in the docs table; ISO 15919
+    // is produced locally via sanscript in convex/lib/localRomanization.ts.
+    // Karaoke off (non-Latin script policy).
     needsRomanization: true,
     ipaVoice: 'te',
-    // Telugu script. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
   },
@@ -1108,7 +1138,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // when we have a learner-grade segmenter.
     supportsKaraoke: false,
     supportsStt: true,
-    translationPromptNotes: 'Simplified Chinese characters, Mainland Mandarin vocabulary.',
+    translationPromptNotes:
+      'Simplified Chinese characters, Mainland Mandarin vocabulary.',
     translationVersion: 2,
   },
   {
@@ -1177,7 +1208,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Written Chinese) and the script; a bare "Cantonese" often yields
     // written Chinese that is effectively Mandarin.
     translationName: 'Cantonese (written in Simplified Chinese characters)',
-    translationPromptNotes: 'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
+    translationPromptNotes:
+      'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
     // v3: prompt pins the spoken-vernacular register. Regenerate
     // translations made under the bare "Cantonese" label.
     translationVersion: 3,
@@ -1212,7 +1244,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Written Chinese) and the script; a bare "Cantonese" often yields
     // written Chinese that is effectively Mandarin.
     translationName: 'Cantonese (written in Traditional Chinese characters)',
-    translationPromptNotes: 'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
+    translationPromptNotes:
+      'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
     // v3: prompt pins the spoken-vernacular register. Regenerate
     // translations made under the bare "Cantonese" label.
     translationVersion: 3,
@@ -1234,12 +1267,16 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     // No ipaVoice: espeak-ng only reads kana, so kanji sentences would
     // come out with gaps/garbage. Revisit if a kanji-aware G2P shows up.
+    // Furigana covers the same need better here: it puts the reading on the
+    // kanji itself rather than transcribing the sentence to a second line.
+    supportsFurigana: true,
     // Japanese tokenizes per-morpheme; karaoke flickers too fast to read.
     // Click-to-explain popovers still work, only the current-word colour
     // is gated off.
     supportsKaraoke: false,
     supportsStt: true,
-    translationPromptNotes: 'Match the source formality: informal → plain form (だ／する), formal → polite form (です／ます).',
+    translationPromptNotes:
+      'Match the source formality: informal → plain form (だ／する), formal → polite form (です／ます).',
     translationVersion: 2,
   },
   {
@@ -1260,7 +1297,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Hangul. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
-    translationPromptNotes: 'Informal → 반말; formal → 해요체 or 합쇼체 as appropriate.',
+    translationPromptNotes:
+      'Informal → 반말; formal → 해요체 or 합쇼체 as appropriate.',
     translationVersion: 2,
   },
   {
@@ -1287,7 +1325,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
     // so the model produces Northern vocabulary/particles, not a regionless mix.
     translationName: 'Northern Vietnamese',
-    translationPromptNotes: 'Northern (Hanoi) Vietnamese vocabulary and particles.',
+    translationPromptNotes:
+      'Northern (Hanoi) Vietnamese vocabulary and particles.',
     translationVersion: 2,
   },
   {
@@ -1345,7 +1384,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     // Disambiguates from regional/colloquial Thai in the translation prompt.
     translationName: 'Standard Thai',
-    translationPromptNotes: 'Polite particles (ครับ/ค่ะ) only when the source register is formal.',
+    translationPromptNotes:
+      'Polite particles (ครับ/ค่ะ) only when the source register is formal.',
     translationVersion: 3,
   },
   {
@@ -1437,7 +1477,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Canonical name in the translation prompt. "Arabic (Modern Standard)"
     // is a UI label, not how the register appears in training data.
     translationName: 'Modern Standard Arabic',
-    translationPromptNotes: 'MSA grammar; when the source does not specify gender, pick a grammatically valid form without letting that choice influence any gender metadata.',
+    translationPromptNotes:
+      'MSA grammar; when the source does not specify gender, pick a grammatically valid form without letting that choice influence any gender metadata.',
     translationVersion: 2,
   },
   {
@@ -1466,7 +1507,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
     // so the model produces actual dialect, not MSA with a region hint.
     translationName: 'Saudi Arabic',
-    translationPromptNotes: 'MSA-leaning but with Hejazi/Najdi colloquial markers where natural.',
+    translationPromptNotes:
+      'MSA-leaning but with Hejazi/Najdi colloquial markers where natural.',
     translationVersion: 2,
   },
   {
@@ -1634,7 +1676,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'sw',
     supportsKaraoke: true,
     supportsStt: true,
-    translationPromptNotes: 'Standard Kiswahili as spoken in Kenya, Sheng-free.',
+    translationPromptNotes:
+      'Standard Kiswahili as spoken in Kenya, Sheng-free.',
     translationVersion: 2,
   },
   {
@@ -1694,6 +1737,11 @@ const LANGUAGE_BY_CODE = new Map(
 /** Get a language by its internal code (e.g. "es", "es_latam", "zh"). */
 export function getLanguageByCode(code: string): Language | undefined {
   return LANGUAGE_BY_CODE.get(code);
+}
+
+/** English display name for a code, falling back to the code itself. */
+export function languageName(code: string): string {
+  return getLanguageByCode(code)?.name ?? code;
 }
 
 /**
@@ -1793,7 +1841,10 @@ export function isTranslationVersionStale(
   code: string,
   stampedVersion: number | undefined,
 ): boolean {
-  return isContentVersionStale(stampedVersion, getCurrentTranslationVersion(code));
+  return isContentVersionStale(
+    stampedVersion,
+    getCurrentTranslationVersion(code),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1826,7 +1877,13 @@ export function isTranslationVersionStale(
  * `translateTextWithLLM`.
  */
 export type StageReasoning =
-  | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  | 'none'
+  | 'minimal'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'max';
 
 /**
  * OpenRouter provider-routing constraints for a stage. `max_price.completion`
@@ -1843,6 +1900,14 @@ export type StageProviderConstraints = {
    * ones are down or don't support the request.
    */
   order?: string[];
+  /**
+   * OpenRouter `provider.require_parameters`. Only route to endpoints that
+   * support every parameter in the request. Set it when a parameter is
+   * load-bearing rather than advisory — a `response_format` schema silently
+   * dropped by a fallback endpoint yields prose where the caller expects
+   * JSON.
+   */
+  require_parameters?: boolean;
 };
 
 /** One leg of a translation rule. An OpenRouter model + optional reasoning. */
@@ -2063,7 +2128,8 @@ export const TRANSLATION_RULES = {
    */
   luna_bo3: {
     id: 'luna_bo3',
-    label: 'Luna best-of-3 (no thinking, judge) → Gemini 3.7 Flash Nitro (minimal) → Google',
+    label:
+      'Luna best-of-3 (no thinking, judge) → Gemini 3.7 Flash Nitro (minimal) → Google',
     branches: [
       {
         maxChars: Infinity,
@@ -2079,7 +2145,8 @@ export const TRANSLATION_RULES = {
    */
   gemini_35_flash_nitro_minimal: {
     id: 'gemini_35_flash_nitro_minimal',
-    label: 'Gemini 3.7 Flash Nitro (minimal) → Gemini 3.7 Flash Nitro (minimal, retry) → Google',
+    label:
+      'Gemini 3.7 Flash Nitro (minimal) → Gemini 3.7 Flash Nitro (minimal, retry) → Google',
     branches: [
       {
         maxChars: Infinity,
@@ -2105,9 +2172,7 @@ export const TRANSLATION_RULES = {
   retranslation_high: {
     id: 'retranslation_high',
     label: 'Gemini 3.1 Pro (medium) — flagged curriculum retranslation',
-    branches: [
-      { maxChars: Infinity, primary: GEMINI_PRO_MEDIUM },
-    ],
+    branches: [{ maxChars: Infinity, primary: GEMINI_PRO_MEDIUM }],
   },
   /**
    * Triggered by `flagTranslation` for flagged retranslations of CUSTOM
@@ -2122,9 +2187,7 @@ export const TRANSLATION_RULES = {
   retranslation_custom: {
     id: 'retranslation_custom',
     label: 'Gemini 3.5 Flash Lite (minimal) — flagged custom retranslation',
-    branches: [
-      { maxChars: Infinity, primary: GEMINI_FLASH_LITE_MINIMAL },
-    ],
+    branches: [{ maxChars: Infinity, primary: GEMINI_FLASH_LITE_MINIMAL }],
   },
 } satisfies Record<string, TranslationRule>;
 
@@ -2166,8 +2229,8 @@ export function resolveTranslationStages(
  */
 export type ResolvedTranslationConfig = {
   provider: TranslationProvider;
-  targetRegion: string;                      // for the LLM prompt's <context>
-  targetLangName: string;                    // English language name
+  targetRegion: string; // for the LLM prompt's <context>
+  targetLangName: string; // English language name
   /**
    * Language name in its native script (e.g. 'Deutsch', '中文（简体）'). Always
    * injected alongside the English name in LLM prompts. See translationLLM.ts
@@ -2192,7 +2255,8 @@ export function getTranslationConfigForLanguage(
     };
   }
   // Non-English: default to openrouter unless the language explicitly opts back to google.
-  const provider: TranslationProvider = lang.translationProvider ?? 'openrouter';
+  const provider: TranslationProvider =
+    lang.translationProvider ?? 'openrouter';
   return {
     provider,
     targetRegion: regionLabelFromDisplayCode(lang.displayCode),
@@ -2253,10 +2317,7 @@ const NAME_OVERRIDES: Record<string, Record<string, string>> = (() => {
   return out;
 })();
 
-function localizedOverride(
-  key: string,
-  locale: string,
-): string | undefined {
+function localizedOverride(key: string, locale: string): string | undefined {
   // displayCode lookups arrive with mixed casing (`zh-CN` vs `zh-cn`); we
   // normalize both the override keys and the incoming key for the second
   // pass so casing doesn't matter.
@@ -2357,12 +2418,12 @@ export function dominantTextDirection(text: string): 'rtl' | 'ltr' {
  *
  * Coverage matrix:
  *  - Local libraries (sync, no network): zh, zh_traditional, el, ko, he,
- *    yue, yue_traditional.
- *  - Google v3 romanizeText API: ru, hi, ja, ar (and the Arabic dialects via
- *    GOOGLE_TRANSLATE_CODE_MAP collapsing to "ar"). Google's officially
- *    supported source-language set is small: am/ar/be/bn/gu/hi/ja/kn/my/ru/
- *    sr/ta/te/uk: anything outside that list 400s with "Source language is
- *    unsupported."
+ *    yue, yue_traditional, ar (and dialects), fa, te, bg.
+ *  - Google v3 romanizeText API: ru, hi, bn, ja, ta, uk, sr. Google's
+ *    documented source-language set is am/ar/be/bn/gu/hi/ja/kn/my/ru/sr/ta/
+ *    te/uk, but the live endpoint 400s "Source language is unsupported" for
+ *    `te` (and historically `fa`); `bg` was never on the list. Those three
+ *    are local instead.
  *  - NOT currently supported (no local lib AND no Google v3): th. The
  *    `Language.needsRomanization` flag is also `false` on that entry so the
  *    UI doesn't render a romanization slot for it. To enable, wire a
@@ -2398,6 +2459,22 @@ export const IPA_LANGUAGES = new Set<string>(
 
 export function languageNeedsIpa(code: string): boolean {
   return IPA_LANGUAGES.has(code);
+}
+
+/**
+ * Languages that get furigana (kana readings over kanji runs). Derived from
+ * `supportsFurigana` exactly as IPA_LANGUAGES is derived from `ipaVoice`:
+ * dropping the flag stops scheduling (decks.ts / collections.ts), drops stored
+ * `furiganaText` from query responses (cardContent.ts), and hides the toggle.
+ */
+export const FURIGANA_LANGUAGES = new Set<string>(
+  SUPPORTED_LANGUAGES.filter((l) => l.supportsFurigana === true).map(
+    (l) => l.code,
+  ),
+);
+
+export function languageNeedsFurigana(code: string): boolean {
+  return FURIGANA_LANGUAGES.has(code);
 }
 
 /**

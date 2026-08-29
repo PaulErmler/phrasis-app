@@ -39,7 +39,10 @@ export default async function ScreenshotPage({
 }: {
   params: Promise<{ screen: string }>;
 }) {
-  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_STORE_SCREENS !== '1') {
+  if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.ENABLE_STORE_SCREENS !== '1'
+  ) {
     notFound();
   }
   const { screen } = await params;

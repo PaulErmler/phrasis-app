@@ -17,8 +17,8 @@ export function ReviewModesSection() {
 
   return (
     <section
-      id="review-modes"
-      className="relative pt-8 md:pt-10 pb-20 md:pb-32 px-4 sm:px-6"
+      id="how"
+      className="relative pt-16 md:pt-24 pb-20 md:pb-32 px-4 sm:px-6 border-t border-border/40"
     >
       <div className="max-w-7xl mx-auto">
         <motion.div

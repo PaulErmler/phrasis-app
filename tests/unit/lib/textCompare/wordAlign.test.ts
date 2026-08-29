@@ -65,7 +65,9 @@ describe('alignWords', () => {
   it('surfaces punctuation differences as missing entries', () => {
     const r = alignWords('hello, world!', 'hello world');
     // Both words still align as equal.
-    expect(r.words.filter((w) => w.kind === 'word' && w.tag === 'equal')).toHaveLength(2);
+    expect(
+      r.words.filter((w) => w.kind === 'word' && w.tag === 'equal'),
+    ).toHaveLength(2);
     // The comma and the exclamation are both missing from the user's input.
     const missingPunct = r.words.filter(
       (w) => w.kind === 'punct' && w.tag === 'missing',
@@ -135,10 +137,7 @@ describe('alignWords', () => {
     it('penalizes a punctuation mistake less than a word mistake', () => {
       // Same 4 equal words; one variant misses the period, the other has a
       // wrong word. The wrong-word version must score strictly lower.
-      const missingPunct = alignWords(
-        'Das ist ein Test.',
-        'Das ist ein Test',
-      );
+      const missingPunct = alignWords('Das ist ein Test.', 'Das ist ein Test');
       const wrongWord = alignWords('Das ist ein Test', 'Das ist ein Buch');
       expect(scoreWordAlignment(missingPunct)).toBeGreaterThan(
         scoreWordAlignment(wrongWord),

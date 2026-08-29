@@ -61,7 +61,9 @@ export const pageIpaCandidates = internalQuery({
         continueCursor: page.continueCursor,
       };
     }
-    const page = await ctx.db.query('translations').paginate(args.paginationOpts);
+    const page = await ctx.db
+      .query('translations')
+      .paginate(args.paginationOpts);
     return {
       items: page.page
         .filter(

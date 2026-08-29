@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from '@playwright/test';
 import {
   dismissDifficultyCheck,
   dismissErrorBoundary,
@@ -7,7 +7,7 @@ import {
   isSelectedTestId,
   neutralizeTours,
   waitForInViewport,
-} from "./helpers";
+} from './helpers';
 
 // Tours can mount at ANY moment after hydration and their overlay
 // intercepts pointer events (a home_tour overlay swallowed the learn-CTA
@@ -33,18 +33,18 @@ test.beforeEach(async ({ page }) => {
 // Serial so a failed "add cards" step doesn't pointlessly run the
 // downstream "learn / stats / library" tests. No retries: @live tests
 // burn TTS + Convex round-trips that we don't want to re-spend.
-test.describe.configure({ mode: "serial", retries: 0 });
+test.describe.configure({ mode: 'serial', retries: 0 });
 
-test.describe("learning journey (live)", { tag: "@live" }, () => {
-  test("user adds cards from a collection on home", async ({ page }) => {
-    await page.goto("/app");
-    await page.waitForLoadState("domcontentloaded");
-    await dismissTour(page, "home_tour");
+test.describe('learning journey (live)', { tag: '@live' }, () => {
+  test('user adds cards from a collection on home', async ({ page }) => {
+    await page.goto('/app');
+    await page.waitForLoadState('domcontentloaded');
+    await dismissTour(page, 'home_tour');
 
     // Onboarding picks "beginner" → Essential collection is preselected as
     // the active collection on /app. The "Add N" button on that collection's
     // carousel entry is how we add cards for the learn test downstream.
-    const addBtn = page.getByTestId("collection-add-cards").first();
+    const addBtn = page.getByTestId('collection-add-cards').first();
     await expect(
       addBtn,
       "collection-add-cards should render on /app for the onboarded user's active collection",
@@ -64,7 +64,7 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     void labelAfter;
   });
 
-  test("user learns 3 cards in audio review mode", async ({ page }) => {
+  test('user learns 3 cards in audio review mode', async ({ page }) => {
     // Each iteration touches the real FSRS mutation + a TTS roundtrip to prep
     // the next card's audio. The 20s initial rating wait plus three cards each
     // waiting up to 10s for the next card's ratings to mount can exceed 45s
@@ -82,25 +82,25 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     // The home CTA writes `learnAndReview` before opening the session.
     await gotoAuthedApp(
       page,
-      "/app",
+      '/app',
       page.locator('[data-tutorial="learn-and-review"]').first(),
     );
-    await dismissTour(page, "home_tour", 500);
+    await dismissTour(page, 'home_tour', 500);
 
     // A prior @live test (`content-filter-live`) can leave Source: Custom
     // only, with no custom cards, the deck looks empty and ratings never
     // mount. Reset to Both before opening learn.
-    const sourceTrigger = page.getByTestId("content-filter-trigger").first();
+    const sourceTrigger = page.getByTestId('content-filter-trigger').first();
     const sourceTriggerVisible = await sourceTrigger
-      .waitFor({ state: "visible", timeout: 10_000 })
+      .waitFor({ state: 'visible', timeout: 10_000 })
       .then(() => true)
       .catch(() => false);
     if (sourceTriggerVisible) {
-      const label = (await sourceTrigger.innerText().catch(() => "")).trim();
+      const label = (await sourceTrigger.innerText().catch(() => '')).trim();
       if (!/both/i.test(label)) {
         await sourceTrigger.click().catch(() => {});
         await page
-          .getByTestId("content-filter-option-both")
+          .getByTestId('content-filter-option-both')
           .first()
           .click({ timeout: 5_000 })
           .catch(() => {});
@@ -112,12 +112,12 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
       .first();
     await expect(
       learnAndReviewBtn,
-      "Learn & Review button should render on the home view",
+      'Learn & Review button should render on the home view',
     ).toBeVisible({ timeout: 15_000 });
     await learnAndReviewBtn.click();
 
-    await dismissTour(page, "audio_review_intro", 500);
-    await dismissTour(page, "full_review_intro", 500);
+    await dismissTour(page, 'audio_review_intro', 500);
+    await dismissTour(page, 'full_review_intro', 500);
     await dismissErrorBoundary(page);
     await dismissDifficultyCheck(page);
 
@@ -128,14 +128,14 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
       .first();
     await expect(
       ratingBtn,
-      "A rating button should appear on /app/learn after the previous test added cards",
+      'A rating button should appear on /app/learn after the previous test added cards',
     ).toBeVisible({ timeout: 20_000 });
 
     // The review tour launches ~1s after the reviewing state begins
     // (lib/tutorials/use-tutorial.ts), i.e. AFTER the page-load dismiss
     // above could possibly have caught it. Try again now that cards are up.
-    await dismissTour(page, "audio_review_intro", 1_500);
-    await dismissTour(page, "full_review_intro", 500);
+    await dismissTour(page, 'audio_review_intro', 1_500);
+    await dismissTour(page, 'full_review_intro', 500);
 
     // Cards seeded by onboarding start in `preReview` phase
     // (lib/scheduling.ts:getValidRatings), so the first few iterations render
@@ -147,26 +147,30 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     // count as successful clicks: the loop only asserts that the rating UI
     // was actionable, not that the card was "learned correctly".
     const advancingCandidateTestIds = [
-      "learn-rating-understood",     // preReview — graduates the card
-      "learn-rating-good",           // FSRS — happy-path
-      "learn-rating-easy",           // FSRS — also advances
-      "learn-rating-still-learning", // preReview — fallback
-      "learn-rating-hard",           // FSRS — last-resort
-      "learn-rating-again",          // FSRS — last-resort
+      'learn-rating-understood', // preReview — graduates the card
+      'learn-rating-good', // FSRS — happy-path
+      'learn-rating-easy', // FSRS — also advances
+      'learn-rating-still-learning', // preReview — fallback
+      'learn-rating-hard', // FSRS — last-resort
+      'learn-rating-again', // FSRS — last-resort
     ];
     // Combined locator for "any rating button visible", same set the
     // pre-loop assertion used. Reused inside the iteration to wait for
     // the next card's ratings to mount after an auto-advance, instead
     // of relying on a fixed 1.5s sleep.
     const anyRatingLocator = page
-      .locator(advancingCandidateTestIds.map((id) => `[data-testid="${id}"]`).join(", "))
+      .locator(
+        advancingCandidateTestIds
+          .map((id) => `[data-testid="${id}"]`)
+          .join(', '),
+      )
       .first();
 
     let successfulClicks = 0;
     for (let i = 0; i < 3; i++) {
       // Belt-and-braces: a tour can re-mount between cards.
-      await dismissTour(page, "audio_review_intro", 250);
-      await dismissTour(page, "full_review_intro", 250);
+      await dismissTour(page, 'audio_review_intro', 250);
+      await dismissTour(page, 'full_review_intro', 250);
       await dismissTour(page, undefined, 250);
 
       // In Full Review mode ratings are gated behind submitting a
@@ -176,10 +180,14 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
       // and an unbounded `press` there is what previously hung the whole test
       // until the timeout. If it fails we simply fall through to the rating
       // wait below (which decides whether to advance or break).
-      const translationInput = page.getByTestId("learn-translation-input").first();
+      const translationInput = page
+        .getByTestId('learn-translation-input')
+        .first();
       if (await translationInput.isVisible().catch(() => false)) {
-        await translationInput.fill("skip", { timeout: 5_000 }).catch(() => {});
-        await translationInput.press("Enter", { timeout: 5_000 }).catch(() => {});
+        await translationInput.fill('skip', { timeout: 5_000 }).catch(() => {});
+        await translationInput
+          .press('Enter', { timeout: 5_000 })
+          .catch(() => {});
         // Grading + rating-row mount can take >500ms under @live load.
         // Wait on the next assertion instead of a fixed sleep.
       }
@@ -188,7 +196,7 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
       // specific one. Covers the gap when an auto-advance has just fired
       // and the next card's ratings haven't mounted yet.
       const ratingsReady = await anyRatingLocator
-        .waitFor({ state: "visible", timeout: 10_000 })
+        .waitFor({ state: 'visible', timeout: 10_000 })
         .then(() => true)
         .catch(() => false);
       if (!ratingsReady) break;
@@ -211,7 +219,7 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     expect(successfulClicks).toBeGreaterThanOrEqual(1);
   });
 
-  test("user switches to full review and submits a translation", async ({
+  test('user switches to full review and submits a translation', async ({
     page,
   }) => {
     // Headroom for the mode-switch retry loops below: the backoff path plus
@@ -225,9 +233,9 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     // sitting on the home view with no LearningHeader rendered. Drive the
     // overlay open the same way the user does: land on /app and click
     // "Learn & Review".
-    await page.goto("/app");
-    await page.waitForLoadState("domcontentloaded");
-    await dismissTour(page, "home_tour", 500);
+    await page.goto('/app');
+    await page.waitForLoadState('domcontentloaded');
+    await dismissTour(page, 'home_tour', 500);
 
     // A prior @live test (`content-filter-live`) can leave `Source: Custom
     // only` active on the course; with no custom cards seeded that filter
@@ -236,19 +244,17 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     // instant isVisible(), right after domcontentloaded the home view's
     // queries are still loading, and an instant check silently skips the
     // reset under suite load (the full-review card then never mounts).
-    const sourceTrigger = page
-      .getByTestId("content-filter-trigger")
-      .first();
+    const sourceTrigger = page.getByTestId('content-filter-trigger').first();
     const sourceTriggerVisible = await sourceTrigger
-      .waitFor({ state: "visible", timeout: 10_000 })
+      .waitFor({ state: 'visible', timeout: 10_000 })
       .then(() => true)
       .catch(() => false);
     if (sourceTriggerVisible) {
-      const label = (await sourceTrigger.innerText().catch(() => "")).trim();
+      const label = (await sourceTrigger.innerText().catch(() => '')).trim();
       if (!/both/i.test(label)) {
         await sourceTrigger.click().catch(() => {});
         await page
-          .getByTestId("content-filter-option-both")
+          .getByTestId('content-filter-option-both')
           .first()
           .click({ timeout: 5_000 })
           .catch(() => {});
@@ -260,20 +266,20 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
       .first();
     await expect(
       learnAndReviewBtn,
-      "Learn & Review button should render on the home view",
+      'Learn & Review button should render on the home view',
     ).toBeVisible({ timeout: 15_000 });
     await learnAndReviewBtn.click();
 
     // Both these tours anchor a step to the settings button; under @live
     // load they can render >500ms after the learn overlay mounts, so wait the
     // default window rather than racing them.
-    await dismissTour(page, "audio_review_intro");
-    await dismissTour(page, "full_review_intro");
+    await dismissTour(page, 'audio_review_intro');
+    await dismissTour(page, 'full_review_intro');
 
-    const settings = page.getByTestId("learn-settings").first();
+    const settings = page.getByTestId('learn-settings').first();
     await expect(
       settings,
-      "learn-settings trigger should render in the LearningHeader after opening the learn overlay",
+      'learn-settings trigger should render in the LearningHeader after opening the learn overlay',
     ).toBeVisible({ timeout: 10_000 });
     // Belt-and-braces: a tour can still be mid-render here, and its
     // `.driver-overlay` backdrop intercepts the click (body.driver-active).
@@ -282,15 +288,15 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     await dismissTour(page, undefined, 500);
     await settings.click();
 
-    const sheet = page.getByTestId("learning-settings-sheet").first();
+    const sheet = page.getByTestId('learning-settings-sheet').first();
     await expect(
       sheet,
-      "Learning Settings sheet should open after clicking learn-settings",
+      'Learning Settings sheet should open after clicking learn-settings',
     ).toBeVisible({ timeout: 8_000 });
     // Wait out the 500ms slide-in animation before clicking inside.
     await page.waitForTimeout(550);
 
-    const fullBtn = page.getByTestId("settings-mode-full").first();
+    const fullBtn = page.getByTestId('settings-mode-full').first();
     await expect(fullBtn).toBeVisible({ timeout: 10_000 });
     // The fixed-position sheet re-animates after opening; a click
     // mid-transform either throws ("outside of viewport", force doesn't
@@ -315,7 +321,7 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
       await waitForInViewport(page, fullBtn, 10_000);
       await fullBtn.click({ force: true }).catch(() => {});
       const selected = await expect
-        .poll(() => isSelectedTestId(page, "settings-mode-full"), {
+        .poll(() => isSelectedTestId(page, 'settings-mode-full'), {
           timeout: 5_000,
         })
         .toBe(true)
@@ -323,18 +329,18 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
         .catch(() => false);
       if (!selected) continue;
       await page.waitForTimeout(600);
-      switched = await isSelectedTestId(page, "settings-mode-full");
+      switched = await isSelectedTestId(page, 'settings-mode-full');
     }
     expect(
       switched,
-      "settings-mode-full should read as selected (and stay selected across the server round-trip) after clicking it",
+      'settings-mode-full should read as selected (and stay selected across the server round-trip) after clicking it',
     ).toBe(true);
 
-    await page.keyboard.press("Escape").catch(() => {});
-    await sheet.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
+    await page.keyboard.press('Escape').catch(() => {});
+    await sheet.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
 
     // Switching to Full review can trigger the full-review intro tour.
-    await dismissTour(page, "full_review_intro", 1_500);
+    await dismissTour(page, 'full_review_intro', 1_500);
 
     // The settle check above still reads the OPTIMISTIC overlay, under load
     // the mutation can stay pending well past the settle window and only then
@@ -344,13 +350,13 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     // it as such and retry the whole switch cycle when it rolls back. Also
     // recover from a filter-blocked empty deck (a prior spec's `Custom only`
     // source filter) via its "Include course content" CTA.
-    const input = page.getByTestId("learn-translation-input").first();
+    const input = page.getByTestId('learn-translation-input').first();
     const includeOther = page
-      .getByTestId("filter-blocked-include-other")
+      .getByTestId('filter-blocked-include-other')
       .first();
     const waitForInput = () =>
       input
-        .waitFor({ state: "visible", timeout: 15_000 })
+        .waitFor({ state: 'visible', timeout: 15_000 })
         .then(() => true)
         .catch(() => false);
     let inputVisible = await waitForInput();
@@ -365,23 +371,23 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
       // Mode rolled back. Reopen the sheet, re-switch, and give the
       // mutation time to actually resolve before closing the sheet.
       await settings.click().catch(() => {});
-      await sheet.waitFor({ state: "visible", timeout: 8_000 }).catch(() => {});
+      await sheet.waitFor({ state: 'visible', timeout: 8_000 }).catch(() => {});
       await page.waitForTimeout(550);
       await waitForInViewport(page, fullBtn, 10_000).catch(() => {});
       await fullBtn.click({ force: true }).catch(() => {});
       await page.waitForTimeout(1_500);
-      await page.keyboard.press("Escape").catch(() => {});
-      await sheet.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
-      await dismissTour(page, "full_review_intro", 1_000);
+      await page.keyboard.press('Escape').catch(() => {});
+      await sheet.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
+      await dismissTour(page, 'full_review_intro', 1_000);
       inputVisible = await waitForInput();
     }
     expect(
       inputVisible,
-      "Full-review translation textbox should appear after switching to full review",
+      'Full-review translation textbox should appear after switching to full review',
     ).toBe(true);
 
-    await input.fill("asdf placeholder answer");
-    await input.press("Enter");
+    await input.fill('asdf placeholder answer');
+    await input.press('Enter');
 
     // Feedback can be textual or just a rating button revealing itself.
     const feedback = page
@@ -405,9 +411,9 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     }
   });
 
-  test("stats page shows word activity after learning", async ({ page }) => {
-    await page.goto("/app/stats");
-    await page.waitForLoadState("domcontentloaded");
+  test('stats page shows word activity after learning', async ({ page }) => {
+    await page.goto('/app/stats');
+    await page.waitForLoadState('domcontentloaded');
     // No tour registered on /app/stats, just strip any lingering overlay.
     await dismissTour(page, undefined, 250);
 
@@ -418,8 +424,8 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     await page.waitForTimeout(1_000);
 
     // Either the wordcloud OR any stat tile proves the page rendered its data.
-    const wordcloudContainer = page.getByTestId("stats-wordcloud").first();
-    const streakTile = page.getByTestId("stats-tile-streak").first();
+    const wordcloudContainer = page.getByTestId('stats-wordcloud').first();
+    const streakTile = page.getByTestId('stats-tile-streak').first();
 
     await expect(async () => {
       const wcVisible = await wordcloudContainer.isVisible().catch(() => false);
@@ -429,34 +435,34 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
 
     // Best-effort: click the largest visible word.
     const wordTarget = page
-      .locator("[data-word], svg text, button")
+      .locator('[data-word], svg text, button')
       .filter({ hasText: /.{2,}/ })
       .first();
     if (await wordTarget.isVisible().catch(() => false)) {
       await wordTarget.click({ timeout: 2_000 }).catch(() => {});
-      const dialog = page.getByRole("dialog").first();
+      const dialog = page.getByRole('dialog').first();
       if (await dialog.isVisible().catch(() => false)) {
-        await page.keyboard.press("Escape").catch(() => {});
+        await page.keyboard.press('Escape').catch(() => {});
       }
     }
   });
 
-  test("library search filters the list", async ({ page }) => {
-    await page.goto("/app/library");
-    await page.waitForLoadState("domcontentloaded");
+  test('library search filters the list', async ({ page }) => {
+    await page.goto('/app/library');
+    await page.waitForLoadState('domcontentloaded');
     // No tour registered on /app/library, just strip any lingering overlay.
     await dismissTour(page, undefined, 250);
 
-    const searchInput = page.getByTestId("library-search").first();
+    const searchInput = page.getByTestId('library-search').first();
     await expect(
       searchInput,
-      "library-search input should render on /app/library",
+      'library-search input should render on /app/library',
     ).toBeVisible({ timeout: 20_000 });
 
     // Let the initial, unfiltered list settle before counting. Search uses a
     // 300ms debounce so the test needs room for at least one full debounce +
     // query round-trip.
-    const cards = page.getByTestId("library-card");
+    const cards = page.getByTestId('library-card');
     await expect
       .poll(async () => cards.count(), { timeout: 10_000 })
       .toBeGreaterThan(0);
@@ -464,7 +470,7 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
 
     // Use a rare-ish string that's unlikely to match every card; this makes
     // a distinct count change expected regardless of which seed data ran.
-    await searchInput.fill("zzzzq");
+    await searchInput.fill('zzzzq');
 
     const emptyState = page.getByText(/no results|nothing found/i).first();
     // Wait for either the empty state to appear, or the card count to change.
@@ -472,9 +478,7 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     await expect
       .poll(
         async () => {
-          const isEmpty = await emptyState
-            .isVisible()
-            .catch(() => false);
+          const isEmpty = await emptyState.isVisible().catch(() => false);
           const current = await cards.count();
           return isEmpty || current !== initialCount;
         },

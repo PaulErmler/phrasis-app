@@ -46,28 +46,28 @@ vi.mock('convex/react', () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
   useMutation: (ref: { __mockKey?: string }) => {
     switch (ref.__mockKey) {
-    case 'masterCard':
-      return masterCardFn;
-    case 'unmasterCard':
-      return unmasterCardFn;
-    case 'hideCard':
-      return hideCardFn;
-    case 'unhideCard':
-      return unhideCardFn;
-    case 'toggleFavoriteCard':
-      return toggleFavoriteFn;
-    case 'deleteCardPermanently':
-      return deleteCardFn;
-    case 'editCard':
-      return editCardFn;
-    case 'regenerateCardAudio':
-      return regenerateCardAudioFn;
-    case 'flagTranslation':
-      return flagTranslationFn;
-    case 'updatePinnedCardActions':
-      return updatePinnedActionsFn;
-    default:
-      return vi.fn();
+      case 'masterCard':
+        return masterCardFn;
+      case 'unmasterCard':
+        return unmasterCardFn;
+      case 'hideCard':
+        return hideCardFn;
+      case 'unhideCard':
+        return unhideCardFn;
+      case 'toggleFavoriteCard':
+        return toggleFavoriteFn;
+      case 'deleteCardPermanently':
+        return deleteCardFn;
+      case 'editCard':
+        return editCardFn;
+      case 'regenerateCardAudio':
+        return regenerateCardAudioFn;
+      case 'flagTranslation':
+        return flagTranslationFn;
+      case 'updatePinnedCardActions':
+        return updatePinnedActionsFn;
+      default:
+        return vi.fn();
     }
   },
   usePreloadedQuery: (handle: { __preloadKey?: string }) => {
@@ -139,75 +139,80 @@ vi.mock('@/components/app/NoCourseEmptyState', () => ({
 // button regardless of pin state; the stub also surfaces `pinnedActions` via a
 // `data-pinned` attribute so tests can assert what was pinned.
 vi.mock('@/components/app/learning/LearningCardContent', () => ({
-  LearningCardContent: (props: {
-    sourceText: string;
-    isMastered?: boolean;
-    isHidden?: boolean;
-    onMaster: () => void;
-    onHide: () => void;
-    onEdit?: () => void;
-    onDelete?: () => void;
-    onFlag?: () => void;
-    onRegenerateAudio?: () => void;
-    onUpdatePinnedActions?: (actions: string[]) => void;
-    pinnedActions?: readonly string[];
+  LearningCardContent: ({
+    presentation,
+  }: {
+    /** Structural subset of CardPresentation; only what the stub renders. */
+    presentation: {
+      sourceText: string;
+      isMastered?: boolean;
+      isHidden?: boolean;
+      onMaster: () => void;
+      onHide: () => void;
+      onEdit?: () => void;
+      onDelete?: () => void;
+      onFlag?: () => void;
+      onRegenerateAudio?: () => void;
+      onUpdatePinnedActions?: (actions: string[]) => void;
+      pinnedActions?: readonly string[];
+    };
   }) => (
     <div
-      data-testid={`card-${props.sourceText}`}
-      data-mastered={String(props.isMastered ?? false)}
-      data-hidden={String(props.isHidden ?? false)}
-      data-pinned={(props.pinnedActions ?? []).join(',')}
+      data-testid={`card-${presentation.sourceText}`}
+      data-mastered={String(presentation.isMastered ?? false)}
+      data-hidden={String(presentation.isHidden ?? false)}
+      data-pinned={(presentation.pinnedActions ?? []).join(',')}
     >
       <button
-        data-testid={`master-${props.sourceText}`}
-        onClick={props.onMaster}
+        data-testid={`master-${presentation.sourceText}`}
+        onClick={presentation.onMaster}
       >
         master
       </button>
       <button
-        data-testid={`hide-${props.sourceText}`}
-        onClick={props.onHide}
+        data-testid={`hide-${presentation.sourceText}`}
+        onClick={presentation.onHide}
       >
         hide
       </button>
-      {props.onEdit && (
+      {presentation.onEdit && (
         <button
-          data-testid={`edit-${props.sourceText}`}
-          onClick={props.onEdit}
+          data-testid={`edit-${presentation.sourceText}`}
+          onClick={presentation.onEdit}
         >
           edit
         </button>
       )}
-      {props.onDelete && (
+      {presentation.onDelete && (
         <button
-          data-testid={`delete-${props.sourceText}`}
-          onClick={props.onDelete}
+          data-testid={`delete-${presentation.sourceText}`}
+          onClick={presentation.onDelete}
         >
           delete
         </button>
       )}
-      {props.onFlag && (
+      {presentation.onFlag && (
         <button
-          data-testid={`flag-${props.sourceText}`}
-          onClick={props.onFlag}
+          data-testid={`flag-${presentation.sourceText}`}
+          onClick={presentation.onFlag}
         >
           flag
         </button>
       )}
-      {props.onRegenerateAudio && (
+      {presentation.onRegenerateAudio && (
         <button
-          data-testid={`regen-${props.sourceText}`}
-          onClick={props.onRegenerateAudio}
+          data-testid={`regen-${presentation.sourceText}`}
+          onClick={presentation.onRegenerateAudio}
         >
           regen
         </button>
       )}
-      {props.onUpdatePinnedActions && (
+      {presentation.onUpdatePinnedActions && (
         <button
-          data-testid={`pin-flag-${props.sourceText}`}
+          data-testid={`pin-flag-${presentation.sourceText}`}
           onClick={() =>
-            props.onUpdatePinnedActions?.([
-              ...(props.pinnedActions ?? []),
+            presentation.onUpdatePinnedActions?.([
+              ...(presentation.pinnedActions ?? []),
               'flag',
             ])
           }
@@ -267,7 +272,9 @@ type Card = {
   hasMissingContent: boolean;
 };
 
-function makeCard(overrides: Partial<Card> & { _id: string; sourceText: string }): Card {
+function makeCard(
+  overrides: Partial<Card> & { _id: string; sourceText: string },
+): Card {
   return {
     _creationTime: 0,
     textId: `t-${overrides._id}`,
@@ -293,9 +300,7 @@ function makeFlaggableCard(
   overrides: Partial<Card> & { _id: string; sourceText: string },
 ): Card {
   return makeCard({
-    translations: [
-      { language: 'en', text: 'hello', isTargetLanguage: true },
-    ],
+    translations: [{ language: 'en', text: 'hello', isTargetLanguage: true }],
     ...overrides,
   });
 }
@@ -492,9 +497,7 @@ describe('LibraryView sticky-card behavior', () => {
 describe('LibraryView edit flow', () => {
   it('opens the edit dialog when clicking edit on a card', async () => {
     const user = userEvent.setup();
-    useQueryMock.mockReturnValue([
-      makeCard({ _id: 'c1', sourceText: 'hola' }),
-    ]);
+    useQueryMock.mockReturnValue([makeCard({ _id: 'c1', sourceText: 'hola' })]);
 
     render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
 
@@ -505,9 +508,7 @@ describe('LibraryView edit flow', () => {
 
   it('closes the edit dialog when the dialog requests close', async () => {
     const user = userEvent.setup();
-    useQueryMock.mockReturnValue([
-      makeCard({ _id: 'c1', sourceText: 'hola' }),
-    ]);
+    useQueryMock.mockReturnValue([makeCard({ _id: 'c1', sourceText: 'hola' })]);
 
     render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
 
@@ -521,9 +522,7 @@ describe('LibraryView edit flow', () => {
 describe('LibraryView delete flow', () => {
   it('does not call deleteCard when the confirm dialog is cancelled', async () => {
     const user = userEvent.setup();
-    useQueryMock.mockReturnValue([
-      makeCard({ _id: 'c1', sourceText: 'hola' }),
-    ]);
+    useQueryMock.mockReturnValue([makeCard({ _id: 'c1', sourceText: 'hola' })]);
 
     render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
 

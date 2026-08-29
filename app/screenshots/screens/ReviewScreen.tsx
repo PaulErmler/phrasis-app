@@ -90,10 +90,18 @@ export function ReviewScreen() {
                   </Badge>
                 </div>
                 <div className="flex items-center">
-                  <Button variant="ghost" size="icon" className="text-muted-foreground">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground"
+                  >
                     <Star className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground"
+                  >
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </div>
@@ -117,7 +125,8 @@ export function ReviewScreen() {
                   <div className="flex items-start gap-2">
                     <div className="flex-1">
                       <p className="body-large">
-                        ¿Podríamos <span className="text-primary">ver</span> el menú, por favor?
+                        ¿Podríamos <span className="text-primary">ver</span> el
+                        menú, por favor?
                       </p>
                     </div>
                     <RowAudio playing />
@@ -127,7 +136,10 @@ export function ReviewScreen() {
 
               {/* AudioProgressBar (slim, at the card's bottom edge) */}
               <div className="relative h-1 w-full overflow-hidden bg-primary/20">
-                <div className="absolute h-full bg-primary" style={{ width: '38%' }} />
+                <div
+                  className="absolute h-full bg-primary"
+                  style={{ width: '38%' }}
+                />
               </div>
             </div>
           </div>
@@ -135,7 +147,11 @@ export function ReviewScreen() {
 
         {/* Floating chat button */}
         <div className="absolute inset-x-0 bottom-0 max-w-lg mx-auto flex justify-end px-4 pb-3 pointer-events-none">
-          <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 pointer-events-auto">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 shrink-0 pointer-events-auto"
+          >
             <MessageCircle className="h-5 w-5" />
           </Button>
         </div>
@@ -147,7 +163,10 @@ export function ReviewScreen() {
           <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
             <div className="flex gap-2">
               {ratings.map((rating) => (
-                <div key={rating} className="flex-1 flex flex-col items-center gap-1">
+                <div
+                  key={rating}
+                  className="flex-1 flex flex-col items-center gap-1"
+                >
                   <span className="text-[11px] text-muted-foreground">
                     {card.ratingIntervals[rating]}
                   </span>
@@ -168,14 +187,26 @@ export function ReviewScreen() {
 
             <div className="flex gap-2">
               <div className="flex gap-2">
-                <Button variant="outline" size="icon" className="h-9 w-9 shrink-0">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                >
                   <Undo2 className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="icon" className="h-9 w-9 shrink-0">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                >
                   <SkipBack className="h-4 w-4" />
                 </Button>
               </div>
-              <Button variant="outline" size="icon" className="h-9 flex-[2] min-w-0">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 flex-[2] min-w-0"
+              >
                 <Pause className="h-4 w-4" />
               </Button>
               <Button size="sm" className="flex-[1] gap-2">

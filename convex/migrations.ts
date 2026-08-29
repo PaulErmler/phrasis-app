@@ -1,7 +1,8 @@
 import { Migrations } from '@convex-dev/migrations';
+import { v } from 'convex/values';
 import { components, internal } from './_generated/api';
 import type { DataModel } from './_generated/dataModel';
-import type { MutationCtx } from './_generated/server';
+import { internalMutation, type MutationCtx } from './_generated/server';
 import type { Doc } from './_generated/dataModel';
 import {
   DEFAULT_AUTO_PLAY,
@@ -16,13 +17,17 @@ import {
   ROMANIZATION_SOURCES,
 } from './lib/localRomanization';
 import { isProtectedTranslationSource } from '../lib/translationProvenance';
+import { FURIGANA_LANGUAGES } from '../lib/languages';
+import { getFuriganaSource } from './lib/textAnnotations';
 import { buildSearchableTextPatchForCard } from './lib/cardContent';
 import type { Id } from './_generated/dataModel';
 import { isPremadeLevelCollection } from './lib/collections';
 import {
   cardsByOriginStateAndDueDate,
   cardsByOriginWritingStateAndDueDate,
+  cardsByStabilityBucketAndDueDate,
   hasWritingTrack,
+  isStabilityBucketMember,
 } from './db/stats/cardAggregates';
 
 // App-wide migrations via @convex-dev/migrations: batched, resumable, with
@@ -34,6 +39,22 @@ import {
 // stay as-is (they're parameterized/one-off dashboard tools, not deploy-time
 // backfills).
 export const migrations = new Migrations<DataModel>(components.migrations);
+
+/**
+ * Full-table sweeps are bottlenecked by per-batch scheduling round-trips
+ * (~300ms each), not per-document work: at the default batchSize of 100, one
+ * pass over the ~300k-row translations table is ~3000 scheduled mutations,
+ * ~15 minutes of wall clock per migration — and `runAll` chains many of them.
+ *
+ * Sweeps whose migrateOne is a pure field check that patches only stale rows
+ * can take 1000 docs/batch and still stay well inside the mutation transaction
+ * budget. Sweeps that do real per-document work inside the batch mutation
+ * (synchronous romanization compute) or fan out scheduler calls (furigana
+ * actions) stay at 500 so a worst-case batch (every row matching) keeps clear
+ * of the mutation execution-time and scheduling limits.
+ */
+const CHECK_SWEEP_BATCH_SIZE = 1000;
+const WORK_SWEEP_BATCH_SIZE = 500;
 
 /** Generic runner: npx convex run migrations:run '{"fn": "migrations:<name>"}' */
 export const run = migrations.runner();
@@ -57,40 +78,58 @@ export const perModeSettingsBackfill = migrations.define({
 
     // Writing-mode ("full") copies of the audio playback settings, stamped
     // from the doc's current effective audio values.
-    if (doc.highlightWordsFull === undefined && doc.highlightWords !== undefined) {
+    if (
+      doc.highlightWordsFull === undefined &&
+      doc.highlightWords !== undefined
+    ) {
       patch.highlightWordsFull = doc.highlightWords;
     }
     if (doc.autoPlayAudioFull === undefined) {
       patch.autoPlayAudioFull = doc.autoPlayAudio ?? DEFAULT_AUTO_PLAY;
     }
-    if (doc.languageRepetitionsFull === undefined && doc.languageRepetitions !== undefined) {
+    if (
+      doc.languageRepetitionsFull === undefined &&
+      doc.languageRepetitions !== undefined
+    ) {
       patch.languageRepetitionsFull = doc.languageRepetitions;
     }
-    if (doc.languageRepetitionPausesFull === undefined && doc.languageRepetitionPauses !== undefined) {
+    if (
+      doc.languageRepetitionPausesFull === undefined &&
+      doc.languageRepetitionPauses !== undefined
+    ) {
       patch.languageRepetitionPausesFull = doc.languageRepetitionPauses;
     }
-    if (doc.languagePlaybackSpeedsFull === undefined && doc.languagePlaybackSpeeds !== undefined) {
+    if (
+      doc.languagePlaybackSpeedsFull === undefined &&
+      doc.languagePlaybackSpeeds !== undefined
+    ) {
       patch.languagePlaybackSpeedsFull = doc.languagePlaybackSpeeds;
     }
     if (doc.pauseBaseToBaseFull === undefined) {
-      patch.pauseBaseToBaseFull = doc.pauseBaseToBase ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
+      patch.pauseBaseToBaseFull =
+        doc.pauseBaseToBase ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
     }
     if (doc.pauseBaseToTargetFull === undefined) {
-      patch.pauseBaseToTargetFull = doc.pauseBaseToTarget ?? DEFAULT_PAUSE_BASE_TO_TARGET;
+      patch.pauseBaseToTargetFull =
+        doc.pauseBaseToTarget ?? DEFAULT_PAUSE_BASE_TO_TARGET;
     }
     if (doc.pauseTargetToTargetFull === undefined) {
-      patch.pauseTargetToTargetFull = doc.pauseTargetToTarget ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
+      patch.pauseTargetToTargetFull =
+        doc.pauseTargetToTarget ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
     }
     if (doc.pauseBeforeAutoAdvanceFull === undefined) {
-      patch.pauseBeforeAutoAdvanceFull = doc.pauseBeforeAutoAdvance ?? DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE;
+      patch.pauseBeforeAutoAdvanceFull =
+        doc.pauseBeforeAutoAdvance ?? DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE;
     }
 
     // Freeze today's Practice Listening defaults for existing users (new
     // courses get Listening ON / only-new 1 stamped at insert time in
     // convex/db/courseSettings.ts).
-    if (doc.playTargetBeforeBase === undefined) patch.playTargetBeforeBase = false;
+    if (doc.playTargetBeforeBase === undefined)
+      patch.playTargetBeforeBase = false;
     if (doc.playTargetAfterBase === undefined) patch.playTargetAfterBase = true;
-    if (doc.targetBeforeOnlyNewReps === undefined) patch.targetBeforeOnlyNewReps = 0; // 0 = ∞ (always)
+    if (doc.targetBeforeOnlyNewReps === undefined)
+      patch.targetBeforeOnlyNewReps = 0; // 0 = ∞ (always)
 
     return Object.keys(patch).length > 0 ? patch : undefined;
   },
@@ -289,6 +328,25 @@ export const cardOriginAggregateBackfill = migrations.define({
 });
 
 /**
+ * Backfill for `cardsByStabilityBucketAndDueDate` (the workload forecast's
+ * observed stability mix): insert every existing Review-state card.
+ * Idempotent via insertIfDoesNotExist; new/changed cards are kept in sync by
+ * the live write helpers, so this only has to cover the pre-deploy stock.
+ * Until it completes, `getWorkloadForecast`'s cold-start guard sees the
+ * bucket counts read low against the exact review-due count and keeps the
+ * prior mix — no flag needed.
+ */
+export const stabilityBucketAggregateBackfill = migrations.define({
+  table: 'cards',
+  migrateOne: async (ctx, doc) => {
+    if (isStabilityBucketMember(doc)) {
+      await cardsByStabilityBucketAndDueDate.insertIfDoesNotExist(ctx, doc);
+    }
+    return undefined;
+  },
+});
+
+/**
  * Reset Cantonese romanizations produced by the retired `cantonese-romanisation`
  * library (source tag "cantonese-romanisation-v1"). Its dictionary mapped the
  * core vernacular particles (嘅/哋/咗/嘢…) to empty strings. Leaking raw Han
@@ -318,9 +376,7 @@ export function resetStaleCantoneseRomanizationPatch(doc: {
   language: string;
   romanizedText?: string;
   romanizationSource?: string;
-}):
-  | { romanizedText: undefined; romanizationSource: undefined }
-  | undefined {
+}): { romanizedText: undefined; romanizationSource: undefined } | undefined {
   const isRetiredSource = doc.romanizationSource === RETIRED_CANTONESE_SOURCE;
   const isStaleCantonese =
     CANTONESE_CODES.has(doc.language) &&
@@ -333,11 +389,13 @@ export function resetStaleCantoneseRomanizationPatch(doc: {
 
 export const resetStaleCantoneseTextRomanization = migrations.define({
   table: 'texts',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
   migrateOne: (_ctx, doc) => resetStaleCantoneseRomanizationPatch(doc),
 });
 
 export const resetStaleCantoneseTranslationRomanization = migrations.define({
   table: 'translations',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
   migrateOne: (_ctx, doc) =>
     resetStaleCantoneseRomanizationPatch({
       language: doc.targetLanguage,
@@ -346,14 +404,110 @@ export const resetStaleCantoneseTranslationRomanization = migrations.define({
     }),
 });
 
+/**
+ * Clear a language's attempted romanization back to "never attempted" so the
+ * lazy pipeline re-runs with a new local mapper. Failed Google rows carry
+ * `romanizedText: ''` and would otherwise never retry.
+ *
+ * Language-keyed, current-source-exempt: rows the new local path already
+ * wrote between deploy and this migration stay; never-attempted `undefined`
+ * stays for the scheduler; everything else on `language` is unset.
+ */
+function unsetStaleLocalRomanization(
+  doc: {
+    language: string;
+    romanizedText?: string;
+    romanizationSource?: string;
+  },
+  language: string,
+  currentSource: string,
+): { romanizedText: undefined; romanizationSource: undefined } | undefined {
+  if (doc.language !== language) return undefined;
+  if (doc.romanizedText === undefined) return undefined;
+  if (doc.romanizationSource === currentSource) return undefined;
+  return { romanizedText: undefined, romanizationSource: undefined };
+}
+
+/**
+ * The texts + translations reset pair for one language's local-romanization
+ * swap, plus its patch function (exported for the per-language migration
+ * tests). `migrations.define` results still need named top-level exports so
+ * `internal.migrations.*` resolves, but the bodies live once here — the
+ * Telugu and Bulgarian pairs were boilerplate twins.
+ */
+function staleRomanizationResets(language: string, currentSource: string) {
+  const patch = (doc: {
+    language: string;
+    romanizedText?: string;
+    romanizationSource?: string;
+  }) => unsetStaleLocalRomanization(doc, language, currentSource);
+  return {
+    patch,
+    texts: migrations.define({
+      table: 'texts',
+      batchSize: CHECK_SWEEP_BATCH_SIZE,
+      migrateOne: (_ctx, doc) => patch(doc),
+    }),
+    translations: migrations.define({
+      table: 'translations',
+      batchSize: CHECK_SWEEP_BATCH_SIZE,
+      migrateOne: (_ctx, doc) =>
+        patch({
+          language: doc.targetLanguage,
+          romanizedText: doc.romanizedText,
+          romanizationSource: doc.romanizationSource,
+        }),
+    }),
+  };
+}
+
+// Telugu: Google v3 400s on `te`, so failed rows carry `romanizedText: ''`
+// and would otherwise never retry with the local ISO 15919 mapper.
+const teluguResets = staleRomanizationResets(
+  'te',
+  ROMANIZATION_SOURCES.sanscriptIso15919,
+);
+export const resetStaleTeluguRomanizationPatch = teluguResets.patch;
+export const resetStaleTeluguTextRomanization = teluguResets.texts;
+export const resetStaleTeluguTranslationRomanization =
+  teluguResets.translations;
+
+// Bulgarian: `bg` was catalogued as google-v3 but never on Google's list;
+// the local Streamlined System replaces it.
+const bulgarianResets = staleRomanizationResets(
+  'bg',
+  ROMANIZATION_SOURCES.bulgarianStreamlined,
+);
+export const resetStaleBulgarianRomanizationPatch = bulgarianResets.patch;
+export const resetStaleBulgarianTextRomanization = bulgarianResets.texts;
+export const resetStaleBulgarianTranslationRomanization =
+  bulgarianResets.translations;
+
+// Bulgarian, second pass: the mapper bumped to bulgarian-streamlined-v3
+// (v2 let a combining stress mark between и and я defeat the word-final
+// -ия → -ia rule, so stressed Мари́я/Софи́я persisted as "-íya"). The
+// completed-migration tracking would skip the pair above on re-run, so the
+// v3 sweep needs FRESH migration names; the factory's current-source check
+// then clears every bg row still tagged v2 (or older) for lazy
+// regeneration.
+const bulgarianV3Resets = staleRomanizationResets(
+  'bg',
+  ROMANIZATION_SOURCES.bulgarianStreamlined,
+);
+export const resetStaleBulgarianTextRomanizationV3 = bulgarianV3Resets.texts;
+export const resetStaleBulgarianTranslationRomanizationV3 =
+  bulgarianV3Resets.translations;
+
 export const recomputeTextRomanization = migrations.define({
   table: 'texts',
+  batchSize: WORK_SWEEP_BATCH_SIZE,
   migrateOne: (_ctx, doc) =>
     recomputeRomanizationPatch(doc.language, doc.text, doc.romanizedText),
 });
 
 export const recomputeTranslationRomanization = migrations.define({
   table: 'translations',
+  batchSize: WORK_SWEEP_BATCH_SIZE,
   migrateOne: (_ctx, doc) =>
     recomputeRomanizationPatch(
       doc.targetLanguage,
@@ -419,6 +573,200 @@ export function recomputeRomanizationPatch(
 }
 
 /**
+ * Furigana backfill: schedule the Node-runtime annotation action for every
+ * Japanese row that has never been attempted (`furiganaText === undefined`).
+ *
+ * The engine (lindera WASM, convex/features/furigana.ts) can only run in the
+ * Node runtime, and `migrations.define` handlers are V8 mutations — so unlike
+ * `recompute*Romanization` above this cannot write the value in place. It
+ * schedules the same per-row actions the lazy view-time pipeline uses, which
+ * write through the store mutations' `=== undefined` idempotence guard: a
+ * lazy fill racing the backfill is harmless, and re-running the migration
+ * after the actions land schedules nothing.
+ *
+ * The `''` failure sentinel is honoured (not "missing"), so a re-run never
+ * resurrects rows the engine already gave up on.
+ */
+/**
+ * Clear furigana produced by a stale engine version so the backfills below
+ * re-schedule it. Same invalidate-by-source contract as the romanization
+ * resets above; the current version lives in FURIGANA_SOURCES
+ * (convex/lib/textAnnotations.ts). Sentinel rows (`''`) reset too: a failure
+ * under the old engine deserves one retry under the new one.
+ */
+export function resetStaleFuriganaPatch(doc: {
+  furiganaText?: string;
+  furiganaSource?: string;
+}): { furiganaText: undefined; furiganaSource: undefined } | undefined {
+  if (doc.furiganaText === undefined) return undefined;
+  if (doc.furiganaSource === getFuriganaSource('ja')) return undefined;
+  return { furiganaText: undefined, furiganaSource: undefined };
+}
+
+export const resetStaleTextFurigana = migrations.define({
+  table: 'texts',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => resetStaleFuriganaPatch(doc),
+});
+
+export const resetStaleTranslationFurigana = migrations.define({
+  table: 'translations',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => resetStaleFuriganaPatch(doc),
+});
+
+export const backfillTextFurigana = migrations.define({
+  table: 'texts',
+  batchSize: WORK_SWEEP_BATCH_SIZE,
+  migrateOne: async (ctx, doc) => {
+    if (!needsFuriganaBackfill(doc.language, doc.furiganaText, doc.text)) {
+      return;
+    }
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.furigana.processFuriganaForSourceText,
+      { textId: doc._id, text: doc.text, language: doc.language },
+    );
+  },
+});
+
+export const backfillTranslationFurigana = migrations.define({
+  table: 'translations',
+  batchSize: WORK_SWEEP_BATCH_SIZE,
+  migrateOne: async (ctx, doc) => {
+    if (
+      !needsFuriganaBackfill(
+        doc.targetLanguage,
+        doc.furiganaText,
+        doc.translatedText,
+      )
+    ) {
+      return;
+    }
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.furigana.processFuriganaForTranslation,
+      {
+        textId: doc.textId,
+        text: doc.translatedText,
+        language: doc.targetLanguage,
+      },
+    );
+  },
+});
+
+/**
+ * @param text what the annotation would be derived from — empty for
+ *   translation rows whose translation hasn't landed yet; those rows get
+ *   their furigana from the lazy pipeline once the text exists.
+ */
+export function needsFuriganaBackfill(
+  language: string,
+  furiganaText: string | undefined,
+  text: string,
+): boolean {
+  return (
+    FURIGANA_LANGUAGES.has(language) &&
+    furiganaText === undefined &&
+    text.length > 0
+  );
+}
+
+/**
+ * One-shot repair of `decks.cardCount`: recount every deck from its actual
+ * card rows.
+ *
+ * Until 2026-08-26 the counter was incremented at four call sites but never
+ * decremented — `deleteCard` removed the row + aggregate entries without
+ * touching the deck — so it drifted up by one for every permanent delete.
+ * Counter maintenance now lives in `insertCard`/`deleteCard`
+ * (db/stats/cardAggregates.ts), a single writer in the same transaction as
+ * the row write, and this pass repairs the historical drift.
+ *
+ * Batching: decks are cheap but their card fan-out is not, so `batchSize: 5`
+ * bounds one component transaction at 5 decks × ≤ DECK_RECOUNT_PAGE+1 card
+ * reads. The probe uses `take`, NOT `paginate`: the migration component's
+ * batch worker already runs the mutation's single allowed paginated query to
+ * walk the decks table, so a paginate here throws "ran multiple paginated
+ * queries". A deck the probe can't finish (over DECK_RECOUNT_PAGE cards) is
+ * handed whole to the self-continuing `recountDeckCardCountContinue` chain,
+ * one page per transaction — the recalcUserCardAggregates pattern — and
+ * patched when its last page lands. For those oversized decks the count
+ * spans transactions, so cards inserted/deleted mid-chain can skew the final
+ * value by that in-flight delta; single-writer maintenance keeps it stable
+ * from then on, and the drift it replaces was unbounded.
+ */
+export const DECK_RECOUNT_PAGE = 500;
+
+export async function recountDeckCardCountOne(
+  ctx: MutationCtx,
+  deck: Doc<'decks'>,
+): Promise<Partial<Doc<'decks'>> | undefined> {
+  const probe = await ctx.db
+    .query('cards')
+    .withIndex('by_deckId', (q) => q.eq('deckId', deck._id))
+    .take(DECK_RECOUNT_PAGE + 1);
+  if (probe.length > DECK_RECOUNT_PAGE) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.migrations.recountDeckCardCountContinue,
+      { deckId: deck._id, countedSoFar: 0, cursor: null },
+    );
+    return undefined;
+  }
+  return probe.length === deck.cardCount
+    ? undefined
+    : { cardCount: probe.length };
+}
+
+export const recountDeckCardCounts = migrations.define({
+  table: 'decks',
+  batchSize: 5,
+  migrateOne: (ctx, doc) => recountDeckCardCountOne(ctx, doc),
+});
+
+/**
+ * Self-continuing tail of `recountDeckCardCounts` for decks over
+ * DECK_RECOUNT_PAGE cards: one page per transaction, patch once the index
+ * range is exhausted. A deck deleted mid-chain (account purge) ends the
+ * chain silently.
+ */
+export const recountDeckCardCountContinue = internalMutation({
+  args: {
+    deckId: v.id('decks'),
+    countedSoFar: v.number(),
+    // null = start from the beginning (the migrateOne probe hands the whole
+    // deck over rather than a partial count, since it cannot paginate).
+    cursor: v.union(v.string(), v.null()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query('cards')
+      .withIndex('by_deckId', (q) => q.eq('deckId', args.deckId))
+      .paginate({ cursor: args.cursor, numItems: DECK_RECOUNT_PAGE });
+    const counted = args.countedSoFar + page.page.length;
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.migrations.recountDeckCardCountContinue,
+        {
+          deckId: args.deckId,
+          countedSoFar: counted,
+          cursor: page.continueCursor,
+        },
+      );
+      return null;
+    }
+    const deck = await ctx.db.get(args.deckId);
+    if (deck && deck.cardCount !== counted) {
+      await ctx.db.patch(args.deckId, { cardCount: counted });
+    }
+    return null;
+  },
+});
+
+/**
  * Everything a deploy needs, in order. Completed migrations are skipped.
  *
  * Ordering rationale:
@@ -445,6 +793,18 @@ export const runAll = migrations.runner([
   internal.migrations.rebuildCardSearchableText,
   internal.migrations.resetStaleCantoneseTextRomanization,
   internal.migrations.resetStaleCantoneseTranslationRomanization,
+  internal.migrations.resetStaleTeluguTextRomanization,
+  internal.migrations.resetStaleTeluguTranslationRomanization,
+  internal.migrations.resetStaleBulgarianTextRomanization,
+  internal.migrations.resetStaleBulgarianTranslationRomanization,
+  internal.migrations.resetStaleBulgarianTextRomanizationV3,
+  internal.migrations.resetStaleBulgarianTranslationRomanizationV3,
   internal.migrations.recomputeTextRomanization,
   internal.migrations.recomputeTranslationRomanization,
+  internal.migrations.resetStaleTextFurigana,
+  internal.migrations.resetStaleTranslationFurigana,
+  internal.migrations.backfillTextFurigana,
+  internal.migrations.backfillTranslationFurigana,
+  internal.migrations.recountDeckCardCounts,
+  internal.migrations.stabilityBucketAggregateBackfill,
 ]);

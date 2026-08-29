@@ -9,6 +9,7 @@ import { useNowMinute } from '@/hooks/use-now-minute';
 import { getUserTimezone } from '@/lib/timezone';
 import { dateInTimezone } from '@/lib/dateStrings';
 import { cn } from '@/lib/utils';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 
 const ROTATE_INTERVAL_MS = 8000;
 // Per-course via cacheSuffix (like the query cache), so switching courses
@@ -167,7 +168,7 @@ export function RotatingProjection({
         /* Keep the tour anchor during loading so the projections step
          * doesn't degrade to an unanchored popover when the tour fires
          * before the query resolves (exactly the first-visit case). */
-        data-tutorial="projections"
+        data-tutorial={TUTORIAL_ANCHORS.projections}
       />
     );
   }
@@ -180,7 +181,7 @@ export function RotatingProjection({
           className,
         )}
         data-testid="rotating-projection-empty"
-        data-tutorial="projections"
+        data-tutorial={TUTORIAL_ANCHORS.projections}
       >
         {t('empty')}
       </span>
@@ -199,7 +200,7 @@ export function RotatingProjection({
       // and left the home screen stuck. Tap already advances, and that is the
       // affordance the label advertises.
       data-testid="rotating-projection"
-      data-tutorial="projections"
+      data-tutorial={TUTORIAL_ANCHORS.projections}
       aria-label={`${big} — ${label}. ${t('cycleHint')}`}
       className={cn(
         'group -my-1 ml-auto flex min-w-0 shrink items-center gap-1 rounded-lg px-2 py-1 text-right sm:shrink-0',
@@ -232,7 +233,9 @@ export function RotatingProjection({
             if (Math.abs(off) > 1) return null;
             // The front face was already rendered for the aria/sr-only text.
             const face =
-              i === currentIndex ? current : renderFrame(f, data.basis, t, format);
+              i === currentIndex
+                ? current
+                : renderFrame(f, data.basis, t, format);
             return (
               <div
                 key={`${f.kind}-${i}`}

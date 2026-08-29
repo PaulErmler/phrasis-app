@@ -44,7 +44,12 @@ describe('shouldShowTranslationAssist', () => {
   it('never shows in transcribe mode, the shown target would BE the answer', () => {
     // Even with the widest window (0 = always) and a brand-new card.
     expect(
-      shouldShowTranslationAssist({ showTranslationOnlyNewReps: 0 }, 0, 0, true),
+      shouldShowTranslationAssist(
+        { showTranslationOnlyNewReps: 0 },
+        0,
+        0,
+        true,
+      ),
     ).toBe(false);
     expect(shouldShowTranslationAssist(undefined, 0, 0, true)).toBe(false);
     // Explicit false matches the default-arg behaviour.
@@ -155,7 +160,11 @@ describe('auto-rating suppression on copy-through cards', () => {
 
   it('is not suppressed when the user turned the assist off', () => {
     expect(
-      autoRateEnabled({ reviewMode: 'full', showTranslationOnNew: false }, 0, 0),
+      autoRateEnabled(
+        { reviewMode: 'full', showTranslationOnNew: false },
+        0,
+        0,
+      ),
     ).toBe(true);
   });
 

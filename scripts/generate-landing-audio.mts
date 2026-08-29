@@ -122,11 +122,22 @@ interface LandingBundle {
   };
   chatDemo?: {
     contextCard?: DemoCard;
-    scenarios?: Partial<Record<'grammar' | 'simpler' | 'restaurant', DemoScenario>>;
+    scenarios?: Partial<
+      Record<'grammar' | 'simpler' | 'restaurant', DemoScenario>
+    >;
+  };
+  writingCompare?: {
+    // Spanish demo sentences (deliberately untranslated in every bundle).
+    expected?: string;
+    typed?: string;
   };
 }
 
-function pushPair(out: Pair[], text: string | undefined, lang: keyof typeof LANDING_VOICES) {
+function pushPair(
+  out: Pair[],
+  text: string | undefined,
+  lang: keyof typeof LANDING_VOICES,
+) {
   if (!text || !text.trim()) return;
   out.push({ text, lang });
 }
@@ -148,6 +159,10 @@ function extractFromBundle(json: LandingBundle, baseLang: 'en' | 'de'): Pair[] {
     pushPair(out, mock.es, 'es');
     pushPair(out, mock.fr, 'fr');
   }
+
+  // writingCompare — the "Expected answer" card in the compare section.
+  // `typed` gets no clip: it renders as the learner's answer, not a speaker.
+  pushPair(out, json.writingCompare?.expected, 'es');
 
   const chat = json.chatDemo;
   if (chat) {
@@ -197,7 +212,10 @@ function pcmToMp3(pcm: Uint8Array): Buffer {
 }
 
 /** Split a Gemini voice apiCode into the bare name + optional `@locale`. */
-function parseVoiceApiCode(apiCode: string): { voiceName: string; locale?: string } {
+function parseVoiceApiCode(apiCode: string): {
+  voiceName: string;
+  locale?: string;
+} {
   const at = apiCode.indexOf('@');
   if (at === -1) return { voiceName: apiCode };
   return { voiceName: apiCode.slice(0, at), locale: apiCode.slice(at + 1) };
@@ -384,7 +402,9 @@ function hashFor(text: string, lang: string, voiceApiCode: string): string {
 
 async function main() {
   if (!process.env.OPENROUTER_API_KEY) {
-    console.error('OPENROUTER_API_KEY is required for Gemini TTS (load via --env-file=.env.local)');
+    console.error(
+      'OPENROUTER_API_KEY is required for Gemini TTS (load via --env-file=.env.local)',
+    );
     process.exit(1);
   }
   const azureKey = process.env.AZURE_SPEECH_API_KEY;
@@ -423,7 +443,9 @@ async function main() {
     pairs.push(p);
   }
 
-  console.log(`Found ${all.length} card lines; ${pairs.length} unique after dedupe.\n`);
+  console.log(
+    `Found ${all.length} card lines; ${pairs.length} unique after dedupe.\n`,
+  );
 
   // Manifest builds up as we go: lang -> text -> public URL
   const manifest: Record<string, Record<string, string>> = {};
@@ -431,7 +453,11 @@ async function main() {
 
   let generated = 0;
   let skipped = 0;
-  const validationFailures: Array<{ text: string; lang: string; transcribed: string }> = [];
+  const validationFailures: Array<{
+    text: string;
+    lang: string;
+    transcribed: string;
+  }> = [];
   let i = 0;
 
   for (const { text, lang } of pairs) {
@@ -464,13 +490,19 @@ async function main() {
     if (existsSync(absFile) && revalidate) {
       // Re-transcribe the existing file. If it matches, skip; if not, fall
       // through to the regenerate/retry block below.
-      process.stdout.write(`[check ${i}/${pairs.length}] ${lang}  ${preview} … `);
+      process.stdout.write(
+        `[check ${i}/${pairs.length}] ${lang}  ${preview} … `,
+      );
       try {
         const buf = await readFile(absFile);
         await new Promise((r) => setTimeout(r, 80));
         const heard = await transcribe(buf, lang, stt);
         if (acceptTranscription(heard)) {
-          console.log(allowedAlt && !transcriptionMatches(text, heard) ? 'OK (allowlisted)' : 'OK');
+          console.log(
+            allowedAlt && !transcriptionMatches(text, heard)
+              ? 'OK (allowlisted)'
+              : 'OK',
+          );
           skipped++;
           await new Promise((r) => setTimeout(r, 80));
           continue;
@@ -480,7 +512,11 @@ async function main() {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.log(`READ/STT ERROR — ${msg} — regenerating`);
-        try { await rm(absFile); } catch { /* file went away on its own */ }
+        try {
+          await rm(absFile);
+        } catch {
+          /* file went away on its own */
+        }
       }
     }
 
@@ -489,7 +525,10 @@ async function main() {
     let lastTranscribed = '';
     let validated = false;
     for (let attempt = 1; attempt <= MAX_VALIDATION_ATTEMPTS; attempt++) {
-      const tag = attempt === 1 ? `[gen  ${i}/${pairs.length}]` : `[retry ${attempt}/${MAX_VALIDATION_ATTEMPTS}]`;
+      const tag =
+        attempt === 1
+          ? `[gen  ${i}/${pairs.length}]`
+          : `[retry ${attempt}/${MAX_VALIDATION_ATTEMPTS}]`;
       process.stdout.write(`${tag} ${lang}  ${preview} … `);
       try {
         const buf = await synthesize(text, lang, voiceApiCode);
@@ -532,7 +571,10 @@ async function main() {
     }
   }
   await mkdir(dirname(MANIFEST_PATH), { recursive: true });
-  await writeFile(MANIFEST_PATH, JSON.stringify(sortedManifest, null, 2) + '\n');
+  await writeFile(
+    MANIFEST_PATH,
+    JSON.stringify(sortedManifest, null, 2) + '\n',
+  );
 
   // Orphan scan
   const orphans: string[] = [];
@@ -557,15 +599,21 @@ async function main() {
   console.log(`Generated:    ${generated}`);
   console.log(`Skipped:      ${skipped} (already on disk)`);
   console.log(`Failures:     ${validationFailures.length}`);
-  console.log(`Manifest:     ${relative(REPO_ROOT, MANIFEST_PATH)} (${Object.keys(sortedManifest).length} langs)`);
+  console.log(
+    `Manifest:     ${relative(REPO_ROOT, MANIFEST_PATH)} (${Object.keys(sortedManifest).length} langs)`,
+  );
   console.log(`Orphans:      ${orphans.length}`);
   if (validationFailures.length > 0) {
-    console.log(`\nValidation failed for ${validationFailures.length} clip(s) after ${MAX_VALIDATION_ATTEMPTS} attempts:`);
+    console.log(
+      `\nValidation failed for ${validationFailures.length} clip(s) after ${MAX_VALIDATION_ATTEMPTS} attempts:`,
+    );
     for (const f of validationFailures) {
       console.log(`  - [${f.lang}] expected: "${f.text}"`);
       console.log(`           heard:    "${f.transcribed}"`);
     }
-    console.log('Files were kept on disk; listen to them or re-run the script to retry.');
+    console.log(
+      'Files were kept on disk; listen to them or re-run the script to retry.',
+    );
   }
   if (orphans.length > 0) {
     for (const abs of orphans) console.log(`  - ${relative(REPO_ROOT, abs)}`);

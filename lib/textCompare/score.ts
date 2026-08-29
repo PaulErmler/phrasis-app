@@ -29,26 +29,26 @@ export function scoreWordAlignment(
   for (const w of result.words) {
     const weight = w.kind === 'punct' ? punctWeight : 1;
     switch (w.tag) {
-    case 'equal':
-      expectedWeight += weight;
-      actualWeight += weight;
-      correct += weight * WEIGHT_EQUAL;
-      break;
-    case 'typo':
-      expectedWeight += weight;
-      actualWeight += weight;
-      correct += weight * WEIGHT_TYPO;
-      break;
-    case 'wrong':
-      expectedWeight += weight;
-      actualWeight += weight;
-      break;
-    case 'missing':
-      expectedWeight += weight;
-      break;
-    case 'extra':
-      actualWeight += weight;
-      break;
+      case 'equal':
+        expectedWeight += weight;
+        actualWeight += weight;
+        correct += weight * WEIGHT_EQUAL;
+        break;
+      case 'typo':
+        expectedWeight += weight;
+        actualWeight += weight;
+        correct += weight * WEIGHT_TYPO;
+        break;
+      case 'wrong':
+        expectedWeight += weight;
+        actualWeight += weight;
+        break;
+      case 'missing':
+        expectedWeight += weight;
+        break;
+      case 'extra':
+        actualWeight += weight;
+        break;
     }
   }
   const denom = Math.max(expectedWeight, actualWeight);

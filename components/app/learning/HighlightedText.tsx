@@ -8,6 +8,8 @@ import {
   normalise,
 } from '@/lib/audio/alignTimings';
 import { highlightWord } from '@/lib/wordCloud';
+import { useFuriganaDisplay } from './useFuriganaDisplay';
+import { HighlightedRuby } from './Ruby';
 import { getTextDirection, languageSupportsKaraoke } from '@/lib/languages';
 import { useKaraokeIndex, type ClockBinding } from '@/hooks/use-karaoke-index';
 import type { WordTiming } from './types';
@@ -40,6 +42,14 @@ interface Props {
    * passes it.
    */
   highlightTerm?: string;
+  /**
+   * Bracketed furigana annotation for `text` (lib/furigana.ts format). When
+   * set AND it still reconstructs `text` exactly, kanji runs render as ruby
+   * in the plain branch — the only branch Japanese reaches, since ja has
+   * `supportsKaraoke: false` and so never enters the per-word karaoke path.
+   * Composes with `highlightTerm` (see HighlightedRuby).
+   */
+  furigana?: string;
 }
 
 /**
@@ -68,11 +78,18 @@ export function HighlightedText({
   enabled,
   className,
   highlightTerm,
+  furigana,
 }: Props) {
   const aligned = useMemo(
     () => alignWordTimings(text, wordTimings, language),
     [text, wordTimings, language],
   );
+
+  const { segments: furiganaSegments, rubyClass } = useFuriganaDisplay(
+    furigana,
+    text,
+  );
+
   const canHighlight = useMemo(() => {
     if (!languageSupportsKaraoke(language)) return false;
     return (
@@ -145,12 +162,28 @@ export function HighlightedText({
   // end; `text-left` keeps the sentence flush with the LTR layout (see
   // ClickableWords for the bidi rationale).
   const dir = getTextDirection(language);
-  const dirClassName = cn(className, dir === 'rtl' && 'text-left');
+  const dirClassName = cn(
+    className,
+    dir === 'rtl' && 'text-left',
+    // Extra leading so the reading line doesn't collide with the row above.
+    rubyClass,
+  );
 
   if (!enabled || !canHighlight) {
     return (
       <p dir={dir} className={dirClassName}>
-        {highlightTerm ? highlightWord(text, highlightTerm, language) : text}
+        {furiganaSegments !== null ? (
+          <HighlightedRuby
+            segments={furiganaSegments}
+            text={text}
+            language={language}
+            term={highlightTerm}
+          />
+        ) : highlightTerm ? (
+          highlightWord(text, highlightTerm, language)
+        ) : (
+          text
+        )}
       </p>
     );
   }
@@ -159,5 +192,9 @@ export function HighlightedText({
   // still renders per-word spans (currentIndex is -1 so no blue is applied),
   // which keeps the DOM structure identical across an isActive flip. That's
   // what prevents the search-word orange from disappearing at play start.
-  return <p dir={dir} className={dirClassName}>{wordSpans}</p>;
+  return (
+    <p dir={dir} className={dirClassName}>
+      {wordSpans}
+    </p>
+  );
 }

@@ -9,9 +9,11 @@ import {
   cardApprovalResolutionValidator,
   proposedCardMetadataValidator,
   schedulingModeValidator,
+  schedulingPhaseValidator,
   studyContentFilterValidator,
   autoRateThresholdsValidator,
   reviewRatingValidator,
+  fsrsStateValidator,
   cardSchedulingSnapshotFields,
   cardWritingSchedulingFields,
   cardRadioSnapshotFields,
@@ -25,8 +27,12 @@ import {
   featureStateValidator,
   reviewsByModeValidator,
   translationEntriesValidator,
+  collectionOriginValidator,
+  cardEditKindValidator,
+  cardEditPathValidator,
+  cardEditLanguageRoleValidator,
+  retranslationStatusValidator,
 } from './types';
-
 
 // Field validators for the `courseSettings` table. Extracted so that queries
 // returning a full `courseSettings` document can share the shape with the
@@ -72,8 +78,12 @@ export const courseSettingsFields = {
   highlightWordsTranscribe: v.optional(v.boolean()),
   autoPlayAudioTranscribe: v.optional(v.boolean()),
   languageRepetitionsTranscribe: v.optional(v.record(v.string(), v.number())),
-  languageRepetitionPausesTranscribe: v.optional(v.record(v.string(), v.number())),
-  languagePlaybackSpeedsTranscribe: v.optional(v.record(v.string(), v.number())),
+  languageRepetitionPausesTranscribe: v.optional(
+    v.record(v.string(), v.number()),
+  ),
+  languagePlaybackSpeedsTranscribe: v.optional(
+    v.record(v.string(), v.number()),
+  ),
   pauseTargetToTargetTranscribe: v.optional(v.number()),
   // Transcribe writing style: independent settings for the post-submit target
   // replay (the pre-submit prompt uses the `*Transcribe` records above).
@@ -137,6 +147,7 @@ export const courseSettingsFields = {
   autoRevealBaseOnSubmit: v.optional(v.boolean()), // writing mode: unblur base text once all translations are submitted (default on; sub-setting of hideBaseLanguagesFull)
   showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
   showIpa: v.optional(v.boolean()), // show IPA transcription below sentence text (default OFF, unlike showRomanization)
+  showFurigana: v.optional(v.boolean()), // furigana ruby over kanji for Japanese (default ON; language-specific section in settings)
   // Language order overrides
   baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
   targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages
@@ -203,6 +214,10 @@ export const courseSettingsFields = {
   // Show which collection each card came from (e.g. "A1.2") as a pill in the
   // card header while learning. Unset = false = hidden.
   showCardOrigin: v.optional(v.boolean()),
+  // Writing mode: grade non-matching answers with the LLM and show a coach
+  // card under the diff (verdict, notes, corrected sentence). Unset = true
+  // (on by default); exact/alternative matches never call the LLM either way.
+  aiWritingFeedback: v.optional(v.boolean()),
   chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
   customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
   activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
@@ -286,9 +301,7 @@ export const onboardingProgressFields = {
       // and discard on read.
       strategyVersion: v.optional(v.number()),
       strategy: v.string(), // 'bayesian' | 'binary' | 'staircase'
-      history: v.array(
-        v.object({ level: v.number(), knew: v.boolean() }),
-      ),
+      history: v.array(v.object({ level: v.number(), knew: v.boolean() })),
       finalLevel: v.optional(v.number()),
     }),
   ),
@@ -363,9 +376,7 @@ export default defineSchema({
     // 'premade' = dataset-uploaded; 'custom' = user-typed; 'chat' = chat-approved.
     // Backfilled for all existing rows; optional only in the validator. Treat
     // as required for new writes.
-    origin: v.optional(
-      v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
-    ),
+    origin: v.optional(collectionOriginValidator),
   })
     .index('by_name', ['name'])
     .index('by_datasetId_and_order', ['datasetId', 'order'])
@@ -403,6 +414,15 @@ export default defineSchema({
     // "espeak-ng-emscripten-0.3.5-v1"). Same invalidate-by-source migration
     // pattern as `romanizationSource`.
     ipaSource: v.optional(v.string()),
+    // Furigana: the sentence with kana readings bracketed after each kanji
+    // run ("毎朝[まいあさ]七時[しちじ]に起[お]きます。"). Japanese only. Same
+    // undefined / '' / non-empty tri-state as `romanizedText` above, same
+    // `=== undefined` rule. Format and parser live in lib/furigana.ts.
+    furiganaText: v.optional(v.string()),
+    // Identifier of the analyzer build that produced `furiganaText` (e.g.
+    // "lindera-ipadic-2.0.0-v1"). Same invalidate-by-source migration pattern
+    // as `romanizationSource`.
+    furiganaSource: v.optional(v.string()),
     // Debounce marker for the searchableText rebuild fan-out: timestamp until
     // which a scheduled `rebuildSearchableTextForText` is already pending for
     // this text. Content stores within that window skip re-scheduling. See
@@ -433,8 +453,16 @@ export default defineSchema({
     .index('by_datasetSentenceId', ['datasetSentenceId'])
     .index('by_dataset_and_externalId', ['datasetId', 'externalId'])
     .index('by_collection_and_rank', ['collectionId', 'collectionRank'])
-    .index('by_collection_and_userCreated_and_rank', ['collectionId', 'userCreated', 'collectionRank'])
-    .index('by_collection_and_userId_and_rank', ['collectionId', 'userId', 'collectionRank'])
+    .index('by_collection_and_userCreated_and_rank', [
+      'collectionId',
+      'userCreated',
+      'collectionRank',
+    ])
+    .index('by_collection_and_userId_and_rank', [
+      'collectionId',
+      'userId',
+      'collectionRank',
+    ])
     // Admin dashboard: enumerate a user's custom texts (userId is only set
     // on user-created rows, so premade texts never appear under a real key)
     .index('by_userId', ['userId'])
@@ -442,7 +470,11 @@ export default defineSchema({
     // followed by `.lt('collectionRank', X).order('desc').take(5)` for the
     // preceding window and `.gt('collectionRank', X).order('asc').take(3)` for
     // the following window. Constant-cost (≤ 8 reads) regardless of arc size.
-    .index('by_collection_arcId_and_rank', ['collectionId', 'arcId', 'collectionRank']),
+    .index('by_collection_arcId_and_rank', [
+      'collectionId',
+      'arcId',
+      'collectionRank',
+    ]),
 
   // Translations table - stores translations of texts
   translations: defineTable({
@@ -461,6 +493,10 @@ export default defineSchema({
     ipaText: v.optional(v.string()),
     // Engine identifier for `ipaText`, mirroring `texts.ipaSource`.
     ipaSource: v.optional(v.string()),
+    // Bracketed furigana. Same tri-state as `texts.furiganaText`; see there.
+    furiganaText: v.optional(v.string()),
+    // Analyzer identifier for `furiganaText`, mirroring `texts.furiganaSource`.
+    furiganaSource: v.optional(v.string()),
     // Identifier of the translation method that produced `translatedText`.
     // Format: "<model-slug>-<reasoning|none>" for LLM translations (e.g.
     // "google/gemini-3.1-flash-lite-high"), "google-translate-v2"
@@ -608,14 +644,12 @@ export default defineSchema({
   // therefore uniquely identifies a sentence; the unique-pair guarantee is
   // enforced by the seed mutation (idempotent upsert).
   placementTestSentences: defineTable({
-    level: v.number(),               // 1..20 (OGTE level)
-    position: v.number(),            // 0..4 within the level
-    textId: v.id('texts'),           // English source — translations + audio live here
+    level: v.number(), // 1..20 (OGTE level)
+    position: v.number(), // 0..4 within the level
+    textId: v.id('texts'), // English source — translations + audio live here
     rarestWord: v.optional(v.string()),
-    ogteId: v.optional(v.string()),  // Traceability back to the source OGTE row
-  })
-    .index('by_level_and_position', ['level', 'position'])
-    .index('by_textId', ['textId']),
+    ogteId: v.optional(v.string()), // Traceability back to the source OGTE row
+  }).index('by_level_and_position', ['level', 'position']),
 
   // User settings table - stores user preferences and onboarding status
   userSettings: defineTable({
@@ -635,6 +669,16 @@ export default defineSchema({
     // undefined = never synced, treated as declined. Account-scoped where the
     // browser choice is device-scoped, so the last device to sync wins.
     analyticsConsent: v.optional(v.boolean()),
+    // The "N new / N review" pills on home and the coming-up counts on
+    // in-session progress reports. Presented as a "Show" toggle, off by
+    // default: only an explicit `false` here shows them (unset or true =
+    // hidden). Kept under the legacy "hide" name so no row migration was
+    // needed when the default flipped to hidden (2026-08-27).
+    hideDueCounts: v.optional(v.boolean()),
+    // The home-screen 7-day workload forecast card. Same flipped semantics
+    // and naming rationale as hideDueCounts: explicit `false` = show, unset
+    // or true = hidden. Independent of hideDueCounts.
+    hideWorkloadForecast: v.optional(v.boolean()),
   }).index('by_userId', ['userId']),
 
   // Onboarding progress table. Stores the user's onboarding answers.
@@ -672,7 +716,9 @@ export default defineSchema({
   }).index('by_userId', ['userId']),
 
   // Course settings table. Separated so changes don't trigger course re-fetches
-  courseSettings: defineTable(courseSettingsFields).index('by_courseId', ['courseId']),
+  courseSettings: defineTable(courseSettingsFields).index('by_courseId', [
+    'courseId',
+  ]),
 
   // Decks table - one deck per course, auto-created
   decks: defineTable({
@@ -685,12 +731,18 @@ export default defineSchema({
   cards: defineTable({
     deckId: v.id('decks'), // Reference to the deck
     textId: v.id('texts'), // Reference to the text/sentence
-    collectionId: v.optional(v.id('collections')), // Reference to the source collection. Backfilled for all existing cards; treat as required for new writes.
-    // Denormalized from collections.origin at insert time. Powers the content-source filter
-    // index lookups in getCardForReview. Backfilled for all existing cards; treat as required for new writes.
-    collectionOrigin: v.optional(
-      v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
-    ),
+    // Reference to the source collection. Every insert path sets it and the
+    // one-time backfill (admin/backfillCollectionOrigin, retired) filled
+    // legacy rows, but the validator stays optional until the runAll-chained
+    // `cardCollectionBackfill` has confirmed 0 unfilled docs against prod —
+    // narrowing in the same deploy as the backfill would reject the push on
+    // any straggler row before the backfill could ever run. Narrow both
+    // fields in the deploy after that confirmation (widen-migrate-narrow).
+    collectionId: v.optional(v.id('collections')),
+    // Denormalized from collections.origin at insert time. Powers the
+    // content-source filter index lookups in getCardForReview. Same
+    // backfill + narrowing plan as collectionId above.
+    collectionOrigin: v.optional(collectionOriginValidator),
     // Scheduling + free-play rotation state mutated by reviewCard /
     // advanceFreePlayCard (one rotation per face). Shared with the `reviewLogs`
     // undo snapshots. Definitions and field comments live in convex/types.ts.
@@ -709,6 +761,20 @@ export default defineSchema({
     reviewCountByMode: v.optional(
       v.object({ audio: v.number(), full: v.number() }),
     ),
+    // Running per-mode averages of time spent on this card's graded reviews
+    // (samples clamped to [0, REVIEW_TIME_CLAMP_MAX_MS] before folding, the
+    // same cap as the daily-stats time accounting, so an idle open screen
+    // can't skew the mean). `count` makes the undo reversal exact arithmetic
+    // and keeps a later switch to EMA possible.
+    // Absent until the first timed review in that mode; no backfill exists
+    // (per-review timings weren't retained before reviewHistory). Like
+    // reviewCountByMode this is keyed by the review's MODE, not its track.
+    reviewTimeStats: v.optional(
+      v.object({
+        audio: v.optional(v.object({ avgMs: v.number(), count: v.number() })),
+        full: v.optional(v.object({ avgMs: v.number(), count: v.number() })),
+      }),
+    ),
     ...cardRadioSnapshotFields,
     ...cardFreeStudySnapshotFields,
     isMastered: v.boolean(), // Whether the card has been mastered
@@ -719,10 +785,24 @@ export default defineSchema({
     wordsTrackedLanguages: v.optional(v.array(v.string())), // Languages for which words have been counted in stats
     audioSpeedOverrides: v.optional(v.record(v.string(), v.number())), // Per-card per-language playback speed override (range CARD_OVERRIDE_SPEED_MIN-CARD_OVERRIDE_SPEED_MAX, see lib/constants/audioPlayback). Missing entry = use general courseSettings.languagePlaybackSpeeds.
   })
+    // INDEX BUDGET — read before adding an index here. This table carries 23
+    // database indexes (limit 32) and EVERY card write pays for updating all
+    // of them, so each addition taxes reviewCard and every other card
+    // mutation. Audited 2026-08-26: all 23 have live query references (see
+    // lib/dueQueue.ts, lib/freePlay.ts, features/library.ts,
+    // features/scheduling.ts). When adding one, declare it staged —
+    // `.index('by_field', { fields: ['field'], staged: true })` — so the
+    // backfill runs async instead of blocking the deploy on this large
+    // table, then remove the `staged` flag in a later deploy before
+    // querying it.
     .index('by_deckId', ['deckId'])
     .index('by_deckId_and_textId', ['deckId', 'textId'])
     .index('by_textId', ['textId'])
-    .index('by_deckId_and_isHidden_and_isMastered', ['deckId', 'isHidden', 'isMastered'])
+    .index('by_deckId_and_isHidden_and_isMastered', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+    ])
     .index('by_deckId_and_isHidden_and_isMastered_and_dueDate', [
       'deckId',
       'isHidden',
@@ -743,9 +823,23 @@ export default defineSchema({
       'freeStudyRoundCounter',
       'freeStudyOrderKey',
     ])
-    .index('by_deckId_and_isHidden_and_lastReviewedAt', ['deckId', 'isHidden', 'lastReviewedAt'])
-    .index('by_deckId_and_isHidden_and_isMastered_and_lastReviewedAt', ['deckId', 'isHidden', 'isMastered', 'lastReviewedAt'])
-    .index('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', ['deckId', 'isHidden', 'isFavorite', 'lastReviewedAt'])
+    .index('by_deckId_and_isHidden_and_lastReviewedAt', [
+      'deckId',
+      'isHidden',
+      'lastReviewedAt',
+    ])
+    .index('by_deckId_and_isHidden_and_isMastered_and_lastReviewedAt', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'lastReviewedAt',
+    ])
+    .index('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', [
+      'deckId',
+      'isHidden',
+      'isFavorite',
+      'lastReviewedAt',
+    ])
     .index('by_deck_hidden_mastered_graduated_due', [
       'deckId',
       'isHidden',
@@ -853,8 +947,41 @@ export default defineSchema({
     ])
     .searchIndex('search_text', {
       searchField: 'searchableText',
-      filterFields: ['deckId', 'isHidden', 'isMastered', 'isFavorite', 'collectionOrigin'],
+      filterFields: [
+        'deckId',
+        'isHidden',
+        'isMastered',
+        'isFavorite',
+        'collectionOrigin',
+      ],
     }),
+
+  // Per-user accepted alternative answers for writing mode, written by the AI
+  // feedback grader when it judges a non-matching answer a valid alternative
+  // with the same register/gender/addressee as the card (verdict 'alsoCorrect'
+  // + altOk). Capped at WRITING_ALTERNATIVES_MAX per (cardId, language) in
+  // features/writingFeedback.ts; matching against these skips the LLM (and
+  // the ai_feedback quota) on later reviews. Deliberately per-card rather
+  // than on the shared translation row: curriculum translations are shared
+  // across users, and one user's accepted phrasing must not grade another
+  // user's answer. Never affects what the card displays.
+  writingAlternatives: defineTable({
+    userId: v.string(), // Links to auth user (owner of the card's deck)
+    cardId: v.id('cards'),
+    language: v.string(),
+    text: v.string(),
+    // Annotations, generated async on store (features/writingAlternatives.ts)
+    // with the same tri-state contract as translations rows: undefined =
+    // never attempted, '' = attempted and failed/inapplicable, non-empty =
+    // value. Rendered in the accepted-answers list and under the diff when
+    // the diff targets this alternative.
+    romanizedText: v.optional(v.string()),
+    ipaText: v.optional(v.string()),
+    furiganaText: v.optional(v.string()),
+    // Shared content-addressed audio (audioAssets), synthesized on store
+    // unless an asset for (language, gender, text) already exists.
+    audioAssetId: v.optional(v.id('audioAssets')),
+  }).index('by_cardId_and_language', ['cardId', 'language']),
 
   // Course stats table - tracks learning statistics per course
   courseStats: defineTable({
@@ -899,10 +1026,16 @@ export default defineSchema({
     reviewsByMode: v.optional(reviewsByModeValidator),
     timeMsByMode: v.optional(reviewsByModeValidator),
     // Rating distribution
-    ratingCounts: v.optional(v.object({
-      stillLearning: v.number(), understood: v.number(),
-      again: v.number(), hard: v.number(), good: v.number(), easy: v.number(),
-    })),
+    ratingCounts: v.optional(
+      v.object({
+        stillLearning: v.number(),
+        understood: v.number(),
+        again: v.number(),
+        hard: v.number(),
+        good: v.number(),
+        easy: v.number(),
+      }),
+    ),
     defaultRatingUsed: v.optional(v.number()),
     defaultRatingChanged: v.optional(v.number()),
     // Full review accuracy
@@ -915,9 +1048,14 @@ export default defineSchema({
     // Hour-of-day distribution (24-element array, index = hour 0-23)
     hourBuckets: v.optional(v.array(v.number())),
     // Card state distribution
-    reviewsByCardState: v.optional(v.object({
-      new: v.number(), learning: v.number(), review: v.number(), relearning: v.number(),
-    })),
+    reviewsByCardState: v.optional(
+      v.object({
+        new: v.number(),
+        learning: v.number(),
+        review: v.number(),
+        relearning: v.number(),
+      }),
+    ),
     // Event counters
     chatMessagesSent: v.optional(v.number()),
     chatCardsApproved: v.optional(v.number()),
@@ -947,7 +1085,11 @@ export default defineSchema({
     // 'review' for the FSRS modes; for free play this carries the FACE
     // ('radio' = listening, 'freeStudy' = typing), which both selects the
     // rotation snapshot below and scopes the undo stack.
-    kind: v.union(v.literal('review'), v.literal('radio'), v.literal('freeStudy')),
+    kind: v.union(
+      v.literal('review'),
+      v.literal('radio'),
+      v.literal('freeStudy'),
+    ),
     date: v.string(), // "YYYY-MM-DD" day key of the stats rows the review incremented; week/month/year keys derived
     // Study context at review time. Undo only applies while the CURRENT
     // course settings match. The undoable stack is the newest-first
@@ -962,6 +1104,11 @@ export default defineSchema({
     // toggle/mode flip fences off older entries, and selector for which
     // snapshot below to restore.
     track: v.optional(schedulingTrackValidator),
+    // kind === 'review': the permanent reviewHistory row this undo entry would
+    // revoke. undoLastReview deletes that row (and reverses the card's
+    // reviewTimeStats from its timeSpentMs) when the review is undone.
+    // Optional: absent on pre-feature logs and on free-play entries.
+    historyId: v.optional(v.id('reviewHistory')),
 
     // kind === 'review', track 'shared': pre-review card scheduling state
     // (shared field set with the cards table, see convex/types.ts).
@@ -1016,6 +1163,62 @@ export default defineSchema({
       }),
     ),
   }).index('by_userId_and_courseId', ['userId', 'courseId']),
+
+  // Append-only per-review event log, one row per GRADED review (both phases,
+  // both tracks; free-play radio/freeStudy plays are excluded — they never
+  // grade or reschedule). Unlike reviewLogs (a depth-UNDO_DEPTH undo stack),
+  // rows here are permanent: the raw material for retrospective analyses,
+  // forecast-model calibration, and per-user FSRS parameter optimization. No
+  // backfill exists or is possible — history starts the day this table ships.
+  //
+  // Retention is a DECISION, not an omission: keep forever, no TTL, no
+  // pruning cron. At ~300-500 B/row a heavy user (200 reviews/day) writes
+  // roughly 75k rows ≈ 25-35 MB/year — acceptable storage for the
+  // calibration payoff. Nothing reads the table in production yet; the only
+  // drains are undo and account deletion. Revisit (archival, sampling) only
+  // if per-user row counts start pressuring deleteUser's batch budget.
+  //
+  // prev* fields snapshot the state the review was SCHEDULED FROM. On the
+  // writing track's lazy-seed path that is the copied shared baseline
+  // (flagged via lazySeededWriting), which is what schedule reconstruction
+  // needs; the card's raw pre-review fields live in reviewLogs.prevCard /
+  // prevWriting for undo. An undone review deletes its row (undoLastReview);
+  // a deleted CARD does not cascade here (cardId may dangle — the learning
+  // still happened, matching how stats survive card deletion). User deletion
+  // drains this table via USER_TABLES in convex/admin/deleteUser.ts.
+  reviewHistory: defineTable({
+    userId: v.string(), // Links to auth user
+    courseId: v.id('courses'),
+    cardId: v.id('cards'), // May dangle after card deletion (see above)
+    reviewedAt: v.number(),
+    date: v.string(), // "YYYY-MM-DD" in `timezone`, same day key as dailyStats
+    timezone: v.string(),
+    track: schedulingTrackValidator, // which per-card schedule the review wrote
+    reviewMode: v.optional(reviewModeValidator), // raw args.reviewMode (undefined = legacy client)
+    phase: schedulingPhaseValidator, // phase the grade was given in (writing / forceReviewPhase resolve to 'review')
+    rating: reviewRatingValidator,
+    timeSpentMs: v.optional(v.number()), // raw, unclamped (stats + reviewTimeStats clamp separately)
+    wasDefaultRating: v.optional(v.boolean()),
+    wasFirstReview: v.boolean(),
+    accuracy: v.optional(v.number()),
+    accuracyStrict: v.optional(v.number()), // pair-gated like recordReviewStats
+    accuracyLenient: v.optional(v.number()),
+    sessionId: v.optional(v.string()),
+    // Scheduling transition on the reviewed track:
+    prevDueDate: v.number(), // scheduled-from due (lazy seed: the copied baseline)
+    newDueDate: v.number(), // as persisted, jitter included
+    prevPreReviewCount: v.optional(v.number()), // shared track only
+    prevFsrsState: v.optional(fsrsStateValidator), // scheduled-from; absent while in preReview
+    newFsrsState: v.optional(fsrsStateValidator), // absent while still preReview
+    phaseTransitioned: v.optional(v.boolean()),
+    // True when this writing-track review lazily seeded the track (prev* are
+    // the copied shared baseline; the card's own writing fields were unset).
+    lazySeededWriting: v.optional(v.boolean()),
+  }).index('by_userId_and_courseId_and_reviewedAt', [
+    'userId',
+    'courseId',
+    'reviewedAt',
+  ]),
 
   // Collection progress table - per (user, course, collection) monotonic
   // counters used by the home view. Counters are strictly monotonic: incremented
@@ -1073,7 +1276,11 @@ export default defineSchema({
     ),
     collectionRank: v.number(), // Denormalized from the text (rank-ordered drain)
   })
-    .index('by_userId_and_courseId_and_textId', ['userId', 'courseId', 'textId'])
+    .index('by_userId_and_courseId_and_textId', [
+      'userId',
+      'courseId',
+      'textId',
+    ])
     // Abbreviated (full field spelling exceeds Convex's 64-char index-name cap):
     // fields are [userId, courseId, collectionId, mark, collectionRank].
     .index('by_user_course_collection_mark_rank', [
@@ -1098,6 +1305,12 @@ export default defineSchema({
     // Entries are dropped when the user edits the proposed text and
     // recomputed against the new wording.
     entryIpa: v.optional(v.record(v.string(), v.string())),
+    // Bracketed furigana for the Japanese entries of `translations`, keyed by
+    // language (in practice only 'ja'). Same lifecycle as `entryIpa` above:
+    // computed by a scheduled Node action right after the proposal lands,
+    // absent = not (yet) computed, '' = nothing to annotate / engine failed,
+    // dropped + recomputed when the user edits the proposed text.
+    entryFurigana: v.optional(v.record(v.string(), v.string())),
     userId: v.string(),
     status: cardApprovalStatusValidator,
     // Absent = 'createCard' (rows predate the field). 'alsoCorrect' rows are
@@ -1145,6 +1358,95 @@ export default defineSchema({
     // threads (the agent component owns those and is purged separately).
     .index('by_userId', ['userId']),
 
+  // ==========================================================================
+  // Card-edit audit log. One row per gesture that changes (or disputes) card
+  // wording, plus a child row per retranslation the gesture triggered. Exists
+  // so the quality of user edits — and of the retranslations they spend LLM
+  // budget on — can be reviewed after the fact; nothing else in the app
+  // retains the before/after text. Written by convex/features/cardEditAudit.ts.
+  // ==========================================================================
+  cardEdits: defineTable({
+    userId: v.string(),
+    courseId: v.id('courses'),
+    kind: cardEditKindValidator,
+    path: cardEditPathValidator,
+    // Card identity before/after. The fork path replaces the card document, so
+    // these differ; on the in-place and flag paths they are equal.
+    cardIdBefore: v.id('cards'),
+    cardIdAfter: v.id('cards'),
+    textIdBefore: v.id('texts'),
+    textIdAfter: v.id('texts'),
+    // Provenance of what was edited. Separates "a user corrected our
+    // curriculum" from "a user fixed their own sentence" — different QC
+    // questions, and only the first can trigger a curriculum retranslation.
+    collectionOrigin: v.optional(collectionOriginValidator),
+    textWasUserCreated: v.boolean(),
+    sourceLanguage: v.string(), // texts.language
+    sourceText: v.string(), // the sentence itself, for QC context
+    // Course language config snapshotted at edit time. See
+    // `cardEditLanguageRoleValidator` for why this is not a join.
+    baseLanguages: v.array(v.string()),
+    targetLanguages: v.array(v.string()),
+    // One entry per language this gesture touched. Bounded by the course's
+    // language count (single digits), so an inline array is safe: it cannot
+    // grow after the row is written.
+    changes: v.array(
+      v.object({
+        language: v.string(),
+        role: cardEditLanguageRoleValidator,
+        isSourceLanguage: v.boolean(),
+        before: v.string(),
+        // Absent for `kind: 'flag'` — the user asserted "this is wrong"
+        // without proposing any wording.
+        after: v.optional(v.string()),
+        beforeTranslationSource: v.optional(v.string()),
+        beforeFlagCount: v.optional(v.number()),
+        // Punctuation/'_'-only change (`soundsSame`): the audio was kept.
+        // Absent for flags, which change no text and so have nothing to
+        // compare — not the same statement as `false`.
+        soundsSame: v.optional(v.boolean()),
+      }),
+    ),
+  })
+    .index('by_userId', ['userId'])
+    // Convex appends _creationTime, so this also orders within a kind.
+    .index('by_kind', ['kind']),
+
+  // One row per retranslation a `cardEdits` gesture triggered, from enqueue to
+  // resolution. A child table rather than an array on the parent: the outcome
+  // lands asynchronously, minutes later, from a mutation
+  // (`storeTranslationAndScheduleTTS`) that knows nothing about the edit, and a
+  // targeted patch there beats a read-modify-write of the whole parent.
+  cardEditRetranslations: defineTable({
+    cardEditId: v.id('cardEdits'),
+    // Denormalized from the parent purely so the account-deletion drain is one
+    // indexed read instead of a join through every one of the user's edits.
+    userId: v.string(),
+    language: v.string(),
+    role: cardEditLanguageRoleValidator,
+    // The row being retranslated. On the fork path this is the SHARED
+    // curriculum text, NOT the private copy the user's card now points at —
+    // the distinction QC cares about most, since this write lands for every
+    // other learner studying the sentence.
+    textId: v.id('texts'),
+    sourceLanguage: v.string(),
+    sourceText: v.string(),
+    beforeText: v.string(),
+    beforeTranslationSource: v.optional(v.string()),
+    userSuggestion: v.optional(v.string()), // wording handed to the prompt
+    flagCountAfter: v.number(),
+    // Model policy requested (e.g. 'retranslation_high'). The *reason* is not
+    // duplicated here — the parent row's `kind` determines it.
+    rule: v.optional(v.string()),
+    status: retranslationStatusValidator,
+    afterText: v.optional(v.string()),
+    afterTranslationSource: v.optional(v.string()),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index('by_cardEditId', ['cardEditId'])
+    .index('by_userId', ['userId'])
+    .index('by_status', ['status']),
+
   // TTS mismatches. Stores audio that failed validation for later analysis
   ttsMismatches: defineTable({
     textId: v.id('texts'),
@@ -1154,8 +1456,7 @@ export default defineSchema({
     expectedText: v.string(),
     transcribedText: v.string(),
     attempt: v.number(), // 1-based attempt number
-  })
-    .index('by_textId', ['textId']),
+  }).index('by_textId', ['textId']),
 
   // TTS generation claims. Prevents duplicate processTTSForCard scheduling.
   // Mutations atomically check-and-insert before scheduling; Convex OCC
@@ -1210,7 +1511,12 @@ export default defineSchema({
     newWordsCount: v.number(),
   })
     .index('by_userId_and_courseId_and_date', ['userId', 'courseId', 'date'])
-    .index('by_userId_and_courseId_and_language_and_date', ['userId', 'courseId', 'language', 'date']),
+    .index('by_userId_and_courseId_and_language_and_date', [
+      'userId',
+      'courseId',
+      'language',
+      'date',
+    ]),
 
   // Unique words per user per course per language.
   // courseId is optional only to accommodate pre-migration rows; new writes
@@ -1231,10 +1537,17 @@ export default defineSchema({
     // id only ever matters alongside the auth context that created it.
     sessionId: v.optional(v.string()),
   })
-    .index('by_userId_and_courseId_and_language_and_word',
-      ['userId', 'courseId', 'language', 'word'])
-    .index('by_userId_and_courseId_and_language',
-      ['userId', 'courseId', 'language'])
+    .index('by_userId_and_courseId_and_language_and_word', [
+      'userId',
+      'courseId',
+      'language',
+      'word',
+    ])
+    .index('by_userId_and_courseId_and_language', [
+      'userId',
+      'courseId',
+      'language',
+    ])
     .searchIndex('search_word', {
       searchField: 'word',
       filterFields: ['userId', 'courseId', 'language'],
@@ -1249,10 +1562,13 @@ export default defineSchema({
     word: v.string(), // normalized (lowercase, NFC) — matches userWords.word
     textId: v.id('texts'),
   })
-    .index('by_userId_courseId_language_word',
-      ['userId', 'courseId', 'language', 'word'])
-    .index('by_userId_courseId_textId',
-      ['userId', 'courseId', 'textId']),
+    .index('by_userId_courseId_language_word', [
+      'userId',
+      'courseId',
+      'language',
+      'word',
+    ])
+    .index('by_userId_courseId_textId', ['userId', 'courseId', 'textId']),
 
   // All-time per-language totals
   languageStats: defineTable({
@@ -1265,7 +1581,11 @@ export default defineSchema({
     totalWords: v.number(),
   })
     .index('by_userId_and_courseId', ['userId', 'courseId'])
-    .index('by_userId_and_courseId_and_language', ['userId', 'courseId', 'language']),
+    .index('by_userId_and_courseId_and_language', [
+      'userId',
+      'courseId',
+      'language',
+    ]),
 
   // Weekly stats (ISO 8601 weeks)
   weeklyStats: defineTable({
@@ -1321,7 +1641,11 @@ export default defineSchema({
     count: v.number(),
   })
     .index('by_userId_and_courseId', ['userId', 'courseId'])
-    .index('by_userId_and_courseId_and_reviewNumber', ['userId', 'courseId', 'reviewNumber']),
+    .index('by_userId_and_courseId_and_reviewNumber', [
+      'userId',
+      'courseId',
+      'reviewNumber',
+    ]),
 
   // Usage quotas. Local cache of Autumn entitlements for synchronous checks.
   // One document per user; features stored as a record keyed by feature ID.
@@ -1370,7 +1694,11 @@ export default defineSchema({
   // sends is `isE2EFixtureAddress` in lib/authEmails.ts, not this table.
   testAuthEmails: defineTable({
     email: v.string(), // recipient, lowercase
-    kind: v.union(v.literal('verify'), v.literal('reset'), v.literal('welcome')),
+    kind: v.union(
+      v.literal('verify'),
+      v.literal('reset'),
+      v.literal('welcome'),
+    ),
     url: v.optional(v.string()), // reset link ('reset' emails)
     otp: v.optional(v.string()), // verification code ('verify' emails)
     subject: v.string(),
@@ -1434,4 +1762,23 @@ export default defineSchema({
     .index('by_createdAt', ['createdAt'])
     .searchIndex('search_users', { searchField: 'searchText' }),
 
+  // One row per Stripe invoice the payment reconciliation sweep has already
+  // reported to PostHog (convex/features/paymentSync.ts). Pure dedup ledger:
+  // the sweep's lookback windows overlap on purpose, and this index is what
+  // makes the overlap emit nothing twice. Deliberately carries NO user id or
+  // email: the attribution lives on the PostHog event, so this financial
+  // record needs no handling in the account-deletion purge. Amounts are kept
+  // for debugging; Stripe remains the system of record.
+  paymentEvents: defineTable({
+    stripeInvoiceId: v.string(),
+    /** Major currency units (EUR), not cents. */
+    gross: v.number(),
+    tax: v.number(),
+    stripeFee: v.optional(v.number()),
+    balanceNet: v.optional(v.number()),
+    currency: v.string(),
+    paidAt: v.number(),
+    /** Whole months the invoice pays for (12 for annual plans). */
+    periodMonths: v.optional(v.number()),
+  }).index('by_stripeInvoiceId', ['stripeInvoiceId']),
 });

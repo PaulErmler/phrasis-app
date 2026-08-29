@@ -23,9 +23,16 @@ export function HourlyDistribution({ data }: HourlyDistributionProps) {
       </p>
       <div className="flex">
         {/* Y axis */}
-        <div className="flex flex-col justify-between pr-1.5 shrink-0" style={{ height: 96 }}>
+        <div
+          className="flex flex-col justify-between pr-1.5 shrink-0"
+          style={{ height: 96 }}
+        >
           {[maxPct, maxPct / 2, 0].map((tick, i) => (
-            <span key={i} className="text-[9px] text-muted-foreground tabular-nums leading-none text-right" style={{ minWidth: 24 }}>
+            <span
+              key={i}
+              className="text-[9px] text-muted-foreground tabular-nums leading-none text-right"
+              style={{ minWidth: 24 }}
+            >
               {Math.round(tick)}%
             </span>
           ))}
@@ -35,7 +42,10 @@ export function HourlyDistribution({ data }: HourlyDistributionProps) {
           {percentages.map((pct, hour) => {
             const barHeight = pct > 0 ? Math.max((pct / maxPct) * 100, 4) : 0;
             return (
-              <div key={hour} className="flex-1 h-full flex flex-col justify-end items-center">
+              <div
+                key={hour}
+                className="flex-1 h-full flex flex-col justify-end items-center"
+              >
                 <div
                   className="w-full bg-primary/70 rounded-t-sm"
                   style={{ height: `${barHeight}%` }}

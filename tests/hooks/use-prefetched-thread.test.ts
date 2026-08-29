@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act, waitFor } from "@testing-library/react";
-import { ConvexError } from "convex/values";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, act, waitFor } from '@testing-library/react';
+import { ConvexError } from 'convex/values';
 
 const harness = vi.hoisted(() => ({
   mutationMock: vi.fn(),
@@ -8,47 +8,47 @@ const harness = vi.hoisted(() => ({
 }));
 const { mutationMock } = harness;
 
-vi.mock("convex/react", () => ({
+vi.mock('convex/react', () => ({
   useMutation: () => harness.mutationMock,
   useConvexAuth: () => harness.auth,
 }));
 
-vi.mock("@/lib/report-error", () => ({
+vi.mock('@/lib/report-error', () => ({
   reportError: vi.fn(),
 }));
 
-import { usePrefetchedThread } from "@/hooks/use-prefetched-thread";
-import { reportError } from "@/lib/report-error";
+import { usePrefetchedThread } from '@/hooks/use-prefetched-thread';
+import { reportError } from '@/lib/report-error';
 
-describe("usePrefetchedThread", () => {
+describe('usePrefetchedThread', () => {
   beforeEach(() => {
     mutationMock.mockReset();
     vi.mocked(reportError).mockReset();
     harness.auth = { isAuthenticated: true };
   });
 
-  it("prefetches a thread once authenticated", async () => {
-    mutationMock.mockResolvedValue("thread-1");
+  it('prefetches a thread once authenticated', async () => {
+    mutationMock.mockResolvedValue('thread-1');
     const { result } = renderHook(() => usePrefetchedThread());
 
     await waitFor(() =>
-      expect(result.current.prefetchedThreadId).toBe("thread-1"),
+      expect(result.current.prefetchedThreadId).toBe('thread-1'),
     );
     expect(mutationMock).toHaveBeenCalledTimes(1);
   });
 
-  it("refreshPrefetchedThread replaces the cached thread", async () => {
-    mutationMock.mockResolvedValueOnce("thread-1");
+  it('refreshPrefetchedThread replaces the cached thread', async () => {
+    mutationMock.mockResolvedValueOnce('thread-1');
     const { result } = renderHook(() => usePrefetchedThread());
     await waitFor(() =>
-      expect(result.current.prefetchedThreadId).toBe("thread-1"),
+      expect(result.current.prefetchedThreadId).toBe('thread-1'),
     );
 
-    mutationMock.mockResolvedValueOnce("thread-2");
+    mutationMock.mockResolvedValueOnce('thread-2');
     act(() => result.current.refreshPrefetchedThread());
 
     await waitFor(() =>
-      expect(result.current.prefetchedThreadId).toBe("thread-2"),
+      expect(result.current.prefetchedThreadId).toBe('thread-2'),
     );
     expect(mutationMock).toHaveBeenCalledTimes(2);
   });
@@ -60,10 +60,10 @@ describe("usePrefetchedThread", () => {
    * rejected with "Unauthenticated" and left prefetchedThreadId null for the
    * whole session. Reported as an exception the user could do nothing about.
    */
-  describe("auth gating (regression)", () => {
-    it("does not prefetch while unauthenticated", async () => {
+  describe('auth gating (regression)', () => {
+    it('does not prefetch while unauthenticated', async () => {
       harness.auth = { isAuthenticated: false };
-      mutationMock.mockResolvedValue("thread-1");
+      mutationMock.mockResolvedValue('thread-1');
 
       const { result } = renderHook(() => usePrefetchedThread());
 
@@ -74,9 +74,9 @@ describe("usePrefetchedThread", () => {
       expect(result.current.prefetchedThreadId).toBeNull();
     });
 
-    it("prefetches once auth lands, rather than staying stranded", async () => {
+    it('prefetches once auth lands, rather than staying stranded', async () => {
       harness.auth = { isAuthenticated: false };
-      mutationMock.mockResolvedValue("thread-late");
+      mutationMock.mockResolvedValue('thread-late');
 
       const { result, rerender } = renderHook(() => usePrefetchedThread());
       expect(mutationMock).not.toHaveBeenCalled();
@@ -85,14 +85,14 @@ describe("usePrefetchedThread", () => {
       rerender();
 
       await waitFor(() =>
-        expect(result.current.prefetchedThreadId).toBe("thread-late"),
+        expect(result.current.prefetchedThreadId).toBe('thread-late'),
       );
       expect(mutationMock).toHaveBeenCalledTimes(1);
     });
 
-    it("re-arms after an auth-error failure and retries on the next auth recovery", async () => {
-      mutationMock.mockRejectedValueOnce(new ConvexError("Unauthenticated"));
-      mutationMock.mockResolvedValueOnce("thread-after-recovery");
+    it('re-arms after an auth-error failure and retries on the next auth recovery', async () => {
+      mutationMock.mockRejectedValueOnce(new ConvexError('Unauthenticated'));
+      mutationMock.mockResolvedValueOnce('thread-after-recovery');
 
       const { result, rerender } = renderHook(() => usePrefetchedThread());
       await waitFor(() => expect(mutationMock).toHaveBeenCalledTimes(1));
@@ -109,16 +109,16 @@ describe("usePrefetchedThread", () => {
       rerender();
 
       await waitFor(() =>
-        expect(result.current.prefetchedThreadId).toBe("thread-after-recovery"),
+        expect(result.current.prefetchedThreadId).toBe('thread-after-recovery'),
       );
       expect(mutationMock).toHaveBeenCalledTimes(2);
     });
 
-    it("prefetches only once while authenticated", async () => {
-      mutationMock.mockResolvedValue("thread-1");
+    it('prefetches only once while authenticated', async () => {
+      mutationMock.mockResolvedValue('thread-1');
       const { result, rerender } = renderHook(() => usePrefetchedThread());
       await waitFor(() =>
-        expect(result.current.prefetchedThreadId).toBe("thread-1"),
+        expect(result.current.prefetchedThreadId).toBe('thread-1'),
       );
 
       rerender();
@@ -128,9 +128,9 @@ describe("usePrefetchedThread", () => {
     });
   });
 
-  describe("error reporting", () => {
-    it("does not report auth errors to the exception feed", async () => {
-      mutationMock.mockRejectedValue(new ConvexError("Unauthenticated"));
+  describe('error reporting', () => {
+    it('does not report auth errors to the exception feed', async () => {
+      mutationMock.mockRejectedValue(new ConvexError('Unauthenticated'));
       renderHook(() => usePrefetchedThread());
 
       await waitFor(() => expect(mutationMock).toHaveBeenCalled());
@@ -141,13 +141,13 @@ describe("usePrefetchedThread", () => {
       expect(reportError).not.toHaveBeenCalled();
     });
 
-    it("reports genuine failures", async () => {
-      mutationMock.mockRejectedValue(new Error("boom"));
+    it('reports genuine failures', async () => {
+      mutationMock.mockRejectedValue(new Error('boom'));
       renderHook(() => usePrefetchedThread());
 
       await waitFor(() =>
         expect(reportError).toHaveBeenCalledWith(expect.any(Error), {
-          op: "prefetchEmptyThread",
+          op: 'prefetchEmptyThread',
         }),
       );
     });

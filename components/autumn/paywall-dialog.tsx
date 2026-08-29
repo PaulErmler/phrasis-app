@@ -1,33 +1,41 @@
-"use client";
+'use client';
 
-import { useState, useMemo } from "react";
+import { useState, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { ArrowRight, Loader2, Mail } from "lucide-react";
-import { useTranslations } from "next-intl";
-import { usePaywall, useCustomer, usePricingTable } from "autumn-js/react";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { ArrowRight, Loader2, Mail } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { usePaywall, useCustomer, usePricingTable } from 'autumn-js/react';
 import {
   findCurrentIntervalGroup,
   findUpgradeProductFromPricingTable,
   preferIntervalGroup,
-} from "@/lib/autumn/find-upgrade-product";
-import { getTrialState } from "@/lib/autumn/trial-eligibility";
-import { getPaywallTitle, getPaywallMessage, filterProductsByFeatureIncrease } from "@/lib/autumn/paywall-content";
-import { getFeatureI18nKey, isFeatureConsumable, getFeaturePaywallKey } from "@/lib/features/feature-meta";
-import { isCreditBackedFeature } from "@/convex/features/featureIds";
-import { useFeatureQuota } from "@/components/feature_tracking/useFeatureQuota";
-import { usePaywallImpression } from "@/lib/posthog/use-impression";
-import { cn } from "@/lib/utils";
-import CheckoutDialog from "@/components/autumn/checkout-dialog";
-import UsageLimitDialog from "@/components/autumn/usage-limit-dialog";
-import { useIsNativeApp } from "@/hooks/use-native-app";
-import { useNewPlanCheckout } from "@/hooks/use-new-plan-checkout";
-import { useCheckoutErrorToast } from "@/hooks/use-checkout-error";
+} from '@/lib/autumn/find-upgrade-product';
+import { getTrialState } from '@/lib/autumn/trial-eligibility';
+import {
+  getPaywallTitle,
+  getPaywallMessage,
+  filterProductsByFeatureIncrease,
+} from '@/lib/autumn/paywall-content';
+import {
+  getFeatureI18nKey,
+  isFeatureConsumable,
+  getFeaturePaywallKey,
+} from '@/lib/features/feature-meta';
+import { isCreditBackedFeature } from '@/convex/features/featureIds';
+import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
+import { usePaywallImpression } from '@/lib/posthog/use-impression';
+import { cn } from '@/lib/utils';
+import CheckoutDialog from '@/components/autumn/checkout-dialog';
+import UsageLimitDialog from '@/components/autumn/usage-limit-dialog';
+import { useIsNativeApp } from '@/hooks/use-native-app';
+import { useNewPlanCheckout } from '@/hooks/use-new-plan-checkout';
+import { useCheckoutErrorToast } from '@/hooks/use-checkout-error';
 
 export interface PaywallDialogProps {
   open: boolean;
@@ -56,19 +64,19 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
 }
 
 function PaywallDialogInner(params?: PaywallDialogProps) {
-  const t = useTranslations("Paywall");
-  const tFeatures = useTranslations("Features");
+  const t = useTranslations('Paywall');
+  const tFeatures = useTranslations('Features');
   const { data: preview, isLoading } = usePaywall({
     featureId: params?.featureId,
     entityId: params?.entityId,
   });
   const { products: pricingTableProducts } = usePricingTable();
-  const { checkout, customer } = useCustomer({ expand: ["trials_used"] });
+  const { checkout, customer } = useCustomer({ expand: ['trials_used'] });
   const trialState = getTrialState(customer);
   const { purchasePlan } = useNewPlanCheckout();
   const showCheckoutError = useCheckoutErrorToast();
   const [upgrading, setUpgrading] = useState(false);
-  const filterFeatureId = params?.featureId ?? "";
+  const filterFeatureId = params?.featureId ?? '';
   const consumable = isFeatureConsumable(filterFeatureId);
   const { balance, included, used } = useFeatureQuota(filterFeatureId);
 
@@ -86,7 +94,8 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
       included,
       consumable,
     );
-    if (filtered.length > 0) return preferIntervalGroup(filtered, intervalGroup);
+    if (filtered.length > 0)
+      return preferIntervalGroup(filtered, intervalGroup);
     const fallback = findUpgradeProductFromPricingTable(
       pricingTableProducts ?? undefined,
       filterFeatureId,
@@ -120,7 +129,7 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
   const { open, setOpen, featureId } = params;
 
   const featureI18nKey = isCreditBackedFeature(featureId)
-    ? "credits"
+    ? 'credits'
     : getFeatureI18nKey(featureId);
   const featureName = tFeatures(`${featureI18nKey}.name`);
 
@@ -128,7 +137,7 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
     return (
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="p-0 pt-4 gap-0 text-foreground overflow-hidden text-sm">
-          <DialogTitle className="sr-only">{t("loading")}</DialogTitle>
+          <DialogTitle className="sr-only">{t('loading')}</DialogTitle>
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
@@ -145,19 +154,20 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
     : undefined;
 
   const title = (() => {
-    if (isOnHighestPlan) return t("featureUnavailable");
+    if (isOnHighestPlan) return t('featureUnavailable');
     if (previewWithProducts)
       return getPaywallTitle(previewWithProducts, t, trialState.trialEligible);
-    if (nextProduct) return t("upgradeTo", { productName: nextProduct.name });
-    return t("featureUnavailable");
+    if (nextProduct) return t('upgradeTo', { productName: nextProduct.name });
+    return t('featureUnavailable');
   })();
 
   const message = (() => {
-    if (isOnHighestPlan) return t("noUpgradeAvailable", { featureName });
+    if (isOnHighestPlan) return t('noUpgradeAvailable', { featureName });
 
     // Feature-specific custom template (e.g. courses with archive option)
     if (customPaywallKey && nextProduct) {
-      const activeCourseCount = used > 0 ? used : Math.max(0, included - balance);
+      const activeCourseCount =
+        used > 0 ? used : Math.max(0, included - balance);
       return t(customPaywallKey, {
         activeCount: activeCourseCount,
         maxCourses: included,
@@ -173,15 +183,17 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
     // No preview, but have a product to recommend
     if (nextProduct) {
       const detail = t(
-        consumable === false ? "upgradeDetailCap" : "upgradeDetailUsageLimit",
+        consumable === false ? 'upgradeDetailCap' : 'upgradeDetailUsageLimit',
         { productName: nextProduct.name, featureName },
       );
       return consumable === false
-        ? t("capReachedWithDetail", { featureName, detail })
-        : t("usageLimitWithDetail", { featureName, detail });
+        ? t('capReachedWithDetail', { featureName, detail })
+        : t('usageLimitWithDetail', { featureName, detail });
     }
 
-    return t(consumable === false ? "capReached" : "usageLimitReached", { featureName });
+    return t(consumable === false ? 'capReached' : 'usageLimitReached', {
+      featureName,
+    });
   })();
 
   const handleUpgrade = async () => {
@@ -196,7 +208,7 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
       });
       setOpen(false);
     } catch (e) {
-      showCheckoutError(e, "paywall.upgrade");
+      showCheckoutError(e, 'paywall.upgrade');
     } finally {
       setUpgrading(false);
     }
@@ -205,12 +217,10 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="p-0 pt-4 gap-0 text-foreground overflow-hidden text-sm">
-        <DialogTitle className={cn("font-bold text-xl px-6")}>
+        <DialogTitle className={cn('font-bold text-xl px-6')}>
           {title}
         </DialogTitle>
-        <div className="px-6 my-2 text-muted-foreground">
-          {message}
-        </div>
+        <div className="px-6 my-2 text-muted-foreground">{message}</div>
         <DialogFooter className="dialog-footer-bar">
           <Button
             size="sm"
@@ -218,7 +228,7 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
             className="font-medium min-w-20"
             onClick={() => setOpen(false)}
           >
-            {t("dismiss")}
+            {t('dismiss')}
           </Button>
           {isOnHighestPlan ? (
             <Button
@@ -228,7 +238,7 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
             >
               <a href="mailto:support@flexling.com">
                 <Mail className="h-3.5 w-3.5" />
-                {t("contactUs")}
+                {t('contactUs')}
               </a>
             </Button>
           ) : nextProduct ? (
@@ -242,7 +252,7 @@ function PaywallDialogInner(params?: PaywallDialogProps) {
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <>
-                  {t("upgradeTo", { productName: nextProduct.name })}
+                  {t('upgradeTo', { productName: nextProduct.name })}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </>
               )}

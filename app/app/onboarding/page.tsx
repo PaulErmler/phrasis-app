@@ -13,6 +13,7 @@ import {
   Authenticated,
   AuthLoading,
   useMutation,
+  usePreloadedQuery,
   useQuery,
   useAction,
   useConvexAuth,
@@ -26,6 +27,7 @@ import { toast } from 'sonner';
 import { ConvexError } from 'convex/values';
 import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import { reportError } from '@/lib/report-error';
+import { useAppData } from '@/components/app/AppDataProvider';
 import { convexErrorCode } from '@/lib/utils';
 import { shouldAdvanceOnEnter } from './lib/enterToAdvance';
 
@@ -157,10 +159,18 @@ export default function OnboardingPage() {
 
 function OnboardingContent() {
   const router = useRouter();
-  const userSettings = useQuery(api.features.courses.getUserSettings);
-  const onboardingProgress = useQuery(api.features.courses.getOnboardingProgress);
+  // Through AppDataProvider's SSR-seeded handle (B25; the onboarding page
+  // renders inside app/app/layout.tsx's provider). Same getUserSettings
+  // query key, so the finalize optimistic update below still reaches it.
+  const { preloadedSettings } = useAppData();
+  const userSettings = usePreloadedQuery(preloadedSettings);
+  const onboardingProgress = useQuery(
+    api.features.courses.getOnboardingProgress,
+  );
   const saveProgress = useMutation(api.features.courses.saveOnboardingProgress);
-  const completeOnboarding = useMutation(api.features.courses.completeOnboarding);
+  const completeOnboarding = useMutation(
+    api.features.courses.completeOnboarding,
+  );
   // `withOptimisticUpdate` flips `hasCompletedOnboarding` to `true` in the
   // local Convex cache the moment the wizard finishes, before the server
   // roundtrip and before `router.push('/app/learn')`. Without it, the
@@ -186,7 +196,9 @@ function OnboardingContent() {
       );
     }
   });
-  const prepareLanguagePair = useMutation(api.features.onboarding.prepareLanguagePair);
+  const prepareLanguagePair = useMutation(
+    api.features.onboarding.prepareLanguagePair,
+  );
   const syncQuotas = useAction(api.usage.actions.syncQuotas);
   const { isAuthenticated } = useConvexAuth();
   const syncedRef = useRef(false);
@@ -253,10 +265,7 @@ function OnboardingContent() {
     });
   }, [isLegacyGraduate, finalizeOnboarding]);
 
-  if (
-    userSettings === undefined ||
-    onboardingProgress === undefined
-  ) {
+  if (userSettings === undefined || onboardingProgress === undefined) {
     return <div className="h-dvh" />;
   }
 
@@ -272,36 +281,45 @@ function OnboardingContent() {
 
   // Rehydrate wizard state + resume step from `onboardingProgress`. Mid-flow
   // refreshes return to the same step the user left off on.
-  const initialStepId: StepId =
-    onboardingProgress?.step
-      ? resumeStepId(onboardingProgress.step)
-      : 'language-pair';
+  const initialStepId: StepId = onboardingProgress?.step
+    ? resumeStepId(onboardingProgress.step)
+    : 'language-pair';
   const initialFlowData: OnboardingData = {
     ...EMPTY_ONBOARDING_DATA,
     ...(onboardingProgress
       ? {
-        reviewMode: (onboardingProgress.reviewMode as ReviewMode) ?? null,
-        writingInputMode:
+          reviewMode: (onboardingProgress.reviewMode as ReviewMode) ?? null,
+          writingInputMode:
             (onboardingProgress.writingInputMode as WritingInputMode) ?? null,
-        targetLanguages: onboardingProgress.targetLanguages ?? [],
-        baseLanguages: onboardingProgress.baseLanguages ?? [],
-        currentLevel: (onboardingProgress.currentLevel as CurrentLevel) ?? null,
-        acquisitionSource: (onboardingProgress.acquisitionSource as AcquisitionSource) ?? null,
-        acquisitionSourceFreeText: onboardingProgress.acquisitionSourceFreeText ?? null,
-        learningGoals: (onboardingProgress.learningGoals as LearningReason[] | undefined) ?? [],
-        learningGoalFreeText: onboardingProgress.learningGoalFreeText ?? null,
-        dailyTimeGoalMinutes:
-            (onboardingProgress.dailyTimeGoalMinutes as DailyTimeGoalMinutes) ?? null,
-        placementTest: onboardingProgress.placementTest &&
-            onboardingProgress.placementTest.strategyVersion === CURRENT_PLACEMENT_STRATEGY_VERSION
-          ? {
-            strategyVersion: onboardingProgress.placementTest.strategyVersion,
-            strategy: onboardingProgress.placementTest.strategy,
-            history: onboardingProgress.placementTest.history,
-            finalLevel: onboardingProgress.placementTest.finalLevel,
-          }
-          : null,
-      }
+          targetLanguages: onboardingProgress.targetLanguages ?? [],
+          baseLanguages: onboardingProgress.baseLanguages ?? [],
+          currentLevel:
+            (onboardingProgress.currentLevel as CurrentLevel) ?? null,
+          acquisitionSource:
+            (onboardingProgress.acquisitionSource as AcquisitionSource) ?? null,
+          acquisitionSourceFreeText:
+            onboardingProgress.acquisitionSourceFreeText ?? null,
+          learningGoals:
+            (onboardingProgress.learningGoals as
+              | LearningReason[]
+              | undefined) ?? [],
+          learningGoalFreeText: onboardingProgress.learningGoalFreeText ?? null,
+          dailyTimeGoalMinutes:
+            (onboardingProgress.dailyTimeGoalMinutes as DailyTimeGoalMinutes) ??
+            null,
+          placementTest:
+            onboardingProgress.placementTest &&
+            onboardingProgress.placementTest.strategyVersion ===
+              CURRENT_PLACEMENT_STRATEGY_VERSION
+              ? {
+                  strategyVersion:
+                    onboardingProgress.placementTest.strategyVersion,
+                  strategy: onboardingProgress.placementTest.strategy,
+                  history: onboardingProgress.placementTest.history,
+                  finalLevel: onboardingProgress.placementTest.finalLevel,
+                }
+              : null,
+        }
       : {}),
   };
 
@@ -340,6 +358,30 @@ interface SaveProgressArgs {
 }
 
 /**
+ * The Back stack transition for one `advance` call.
+ *
+ * The stack holds only the steps already left, never the current one, so
+ * "don't come back here" means declining to push rather than popping. Popping
+ * would discard the step BEFORE this one, which is the step Back should
+ * actually reach.
+ *
+ * `omit` is for steps the user must never land back on. `placement-test` is
+ * the only one today: it remounts with a fresh strategy, and it renders no
+ * shared footer (see `stepHasOwnAdvance`), so returning to it leaves neither
+ * Back nor Continue and the whole adaptive test has to be answered again.
+ *
+ * Extracted and exported so the trap is pinned by a test rather than by
+ * whoever next edits the wizard's step order.
+ */
+export function nextHistory(
+  history: StepId[],
+  leaving: StepId,
+  omit: boolean,
+): StepId[] {
+  return omit ? history : [...history, leaving];
+}
+
+/**
  * Single source of truth for the `saveOnboardingProgress` payload shape.
  * Used by all three call sites in the wizard (debounced field-change
  * `persist`, immediate `advance`, immediate `back`) so a new field landing
@@ -354,7 +396,8 @@ export function buildProgressPayload(
     reviewMode: fd.reviewMode ?? undefined,
     // Passed through as-is, including `null`. See SaveProgressArgs.
     writingInputMode: fd.writingInputMode,
-    targetLanguages: fd.targetLanguages.length > 0 ? fd.targetLanguages : undefined,
+    targetLanguages:
+      fd.targetLanguages.length > 0 ? fd.targetLanguages : undefined,
     baseLanguages: fd.baseLanguages.length > 0 ? fd.baseLanguages : undefined,
     currentLevel: fd.currentLevel ?? undefined,
     acquisitionSource: fd.acquisitionSource ?? undefined,
@@ -430,8 +473,9 @@ function OnboardingWizard({
       persistDebounceRef.current = setTimeout(() => {
         const fd = dataRef.current;
         const stepNum = PROGRESS_STEP_ORDER.indexOf(stepIdRef.current) + 1;
-        saveProgress(buildProgressPayload(fd, Math.max(1, stepNum)))
-          .catch((err) => console.error('Failed to save progress:', err));
+        saveProgress(buildProgressPayload(fd, Math.max(1, stepNum))).catch(
+          (err) => reportError(err, { op: 'saveOnboardingProgress' }),
+        );
       }, 250);
     },
     [saveProgress],
@@ -442,23 +486,31 @@ function OnboardingWizard({
   // so the saved step stays behind and a reload resumes at the wrong place.
   // Cancel any pending field-change debounce so its (now stale) save can't
   // arrive after this immediate one and roll the step back.
-  const saveStepNow = useCallback((step: StepId, label: string) => {
-    if (persistDebounceRef.current) {
-      clearTimeout(persistDebounceRef.current);
-      persistDebounceRef.current = null;
-    }
-    const stepNum = PROGRESS_STEP_ORDER.indexOf(step) + 1;
-    if (stepNum > 0) {
-      saveProgress(buildProgressPayload(dataRef.current, stepNum))
-        .catch((err) => console.error(`Failed to save ${label} step:`, err));
-    }
-  }, [saveProgress]);
+  const saveStepNow = useCallback(
+    (step: StepId, label: string) => {
+      if (persistDebounceRef.current) {
+        clearTimeout(persistDebounceRef.current);
+        persistDebounceRef.current = null;
+      }
+      const stepNum = PROGRESS_STEP_ORDER.indexOf(step) + 1;
+      if (stepNum > 0) {
+        saveProgress(buildProgressPayload(dataRef.current, stepNum)).catch(
+          (err) =>
+            reportError(err, { op: 'saveOnboardingProgress', step: label }),
+        );
+      }
+    },
+    [saveProgress],
+  );
 
-  const advance = useCallback((to: StepId) => {
-    setHistory((h) => [...h, stepId]);
-    setStepId(to);
-    saveStepNow(to, 'advance');
-  }, [stepId, saveStepNow]);
+  const advance = useCallback(
+    (to: StepId, opts?: { omitFromHistory?: boolean }) => {
+      setHistory((h) => nextHistory(h, stepId, opts?.omitFromHistory ?? false));
+      setStepId(to);
+      saveStepNow(to, 'advance');
+    },
+    [stepId, saveStepNow],
+  );
 
   /**
    * Funnel instrumentation. One event per step entry, carrying how long the
@@ -509,7 +561,8 @@ function OnboardingWizard({
   // ─── Per-step rendering & controls ─────────────────────────────────────
 
   const isLanguagePairValid =
-    data.baseLanguages[0] && data.targetLanguages[0] &&
+    data.baseLanguages[0] &&
+    data.targetLanguages[0] &&
     data.baseLanguages[0] !== data.targetLanguages[0];
 
   const onLanguagePairContinue = async () => {
@@ -517,7 +570,10 @@ function OnboardingWizard({
     const target = data.targetLanguages[0];
     if (!source || !target) return;
     try {
-      await prepareLanguagePair({ sourceLanguage: source, targetLanguage: target });
+      await prepareLanguagePair({
+        sourceLanguage: source,
+        targetLanguage: target,
+      });
     } catch (err) {
       // Non-fatal. Content warmup is best-effort, and we advance regardless.
       // But "advanced anyway" is exactly the state that later shows up as a
@@ -574,7 +630,9 @@ function OnboardingWizard({
         finalLevel: result.finalOgteLevel,
       },
     });
-    advance('review-mode');
+    // Keep the placement test off the Back stack: returning to it restarts
+    // the whole adaptive test with no way out. Back lands on `proficiency`.
+    advance('review-mode', { omitFromHistory: true });
   };
 
   /**
@@ -625,55 +683,62 @@ function OnboardingWizard({
       });
     }
     router.push('/app/learn');
-  }, [saveProgress, completeOnboarding, finalizeOnboarding, finishingRef, router, t]);
+  }, [
+    saveProgress,
+    completeOnboarding,
+    finalizeOnboarding,
+    finishingRef,
+    router,
+    t,
+  ]);
 
   // Continue-button enable state per step.
   const continueDisabled = (): boolean => {
     switch (stepId) {
-    case 'language-pair':
-      return !isLanguagePairValid;
-    case 'acquisition':
-      return data.acquisitionSource === null;
-    case 'goal':
-      return data.learningGoals.length === 0;
-    case 'daily-time':
-      return data.dailyTimeGoalMinutes === null;
-    case 'proficiency':
-      return data.proficiencyBranch === null;
-    case 'cefr-pick':
-      return false; // slider has a value at all times; button is always enabled
-    case 'review-mode':
-      return data.reviewMode === null;
-    default:
-      return false;
+      case 'language-pair':
+        return !isLanguagePairValid;
+      case 'acquisition':
+        return data.acquisitionSource === null;
+      case 'goal':
+        return data.learningGoals.length === 0;
+      case 'daily-time':
+        return data.dailyTimeGoalMinutes === null;
+      case 'proficiency':
+        return data.proficiencyBranch === null;
+      case 'cefr-pick':
+        return false; // slider has a value at all times; button is always enabled
+      case 'review-mode':
+        return data.reviewMode === null;
+      default:
+        return false;
     }
   };
 
   const onContinue = async () => {
     switch (stepId) {
-    case 'language-pair':
-      await onLanguagePairContinue();
-      return;
-    case 'acquisition':
-      advance('goal');
-      return;
-    case 'goal':
-      advance('daily-time');
-      return;
-    case 'daily-time':
-      advance('proficiency');
-      return;
-    case 'proficiency':
-      onProficiencyContinue();
-      return;
-    case 'cefr-pick':
-      onCefrPickContinue();
-      return;
-    case 'review-mode':
-      await onFinishOnboarding();
-      return;
-    default:
-      return;
+      case 'language-pair':
+        await onLanguagePairContinue();
+        return;
+      case 'acquisition':
+        advance('goal');
+        return;
+      case 'goal':
+        advance('daily-time');
+        return;
+      case 'daily-time':
+        advance('proficiency');
+        return;
+      case 'proficiency':
+        onProficiencyContinue();
+        return;
+      case 'cefr-pick':
+        onCefrPickContinue();
+        return;
+      case 'review-mode':
+        await onFinishOnboarding();
+        return;
+      default:
+        return;
     }
   };
 
@@ -745,7 +810,8 @@ function OnboardingWizard({
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> {t('loading')}
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />{' '}
+                    {t('loading')}
                   </>
                 ) : stepId === 'cefr-pick' ? (
                   t('pickThisLevel')
@@ -790,81 +856,81 @@ function renderStep({
   setCefrSlidLevel: (n: number) => void;
 }) {
   switch (stepId) {
-  case 'language-pair':
-    return (
-      <LanguagePairStep
-        source={data.baseLanguages[0] ?? null}
-        target={data.targetLanguages[0] ?? null}
-        onSource={(code) => persist({ baseLanguages: code ? [code] : [] })}
-        onTarget={(code) => persist({ targetLanguages: code ? [code] : [] })}
-      />
-    );
-  case 'acquisition':
-    return (
-      <AcquisitionSourceStep
-        selected={data.acquisitionSource}
-        freeText={data.acquisitionSourceFreeText}
-        onSelect={(s) => persist({ acquisitionSource: s })}
-        onFreeText={(t) => persist({ acquisitionSourceFreeText: t })}
-      />
-    );
-  case 'goal':
-    return (
-      <LearningGoalStep
-        selected={data.learningGoals}
-        freeText={data.learningGoalFreeText}
-        onToggle={(g) => {
-          const next = data.learningGoals.includes(g)
-            ? data.learningGoals.filter((x) => x !== g)
-            : [...data.learningGoals, g];
-          persist({ learningGoals: next });
-        }}
-        onFreeText={(t) => persist({ learningGoalFreeText: t })}
-      />
-    );
-  case 'daily-time':
-    return (
-      <DailyTimeGoalStep
-        selected={data.dailyTimeGoalMinutes}
-        onSelect={(m) => persist({ dailyTimeGoalMinutes: m })}
-      />
-    );
-  case 'proficiency':
-    return (
-      <ProficiencyBranchStep
-        selected={data.proficiencyBranch}
-        onSelect={(b) => persist({ proficiencyBranch: b })}
-      />
-    );
-  case 'cefr-pick':
-    return (
-      <CefrSelfPickStep
-        sourceLanguage={data.baseLanguages[0] ?? 'en'}
-        targetLanguage={data.targetLanguages[0] ?? 'es'}
-        initialOgteLevel={data.placementTest?.finalLevel ?? 8}
-        onLevelChange={setCefrSlidLevel}
-      />
-    );
-  case 'placement-test':
-    return (
-      <PlacementTestStep
-        targetLanguage={data.targetLanguages[0] ?? 'es'}
-        sourceLanguage={data.baseLanguages[0] ?? 'en'}
-        initialOgteLevel={data.placementTest?.finalLevel}
-        onComplete={onPlacementComplete}
-      />
-    );
-  case 'review-mode':
-    return (
-      <ReviewModeStep
-        selected={reviewModeChoice(data)}
-        onSelect={(choice) =>
-          persist({
-            reviewMode: choice === 'audio' ? 'audio' : 'full',
-            writingInputMode: choice === 'audio' ? null : choice,
-          })
-        }
-      />
-    );
+    case 'language-pair':
+      return (
+        <LanguagePairStep
+          source={data.baseLanguages[0] ?? null}
+          target={data.targetLanguages[0] ?? null}
+          onSource={(code) => persist({ baseLanguages: code ? [code] : [] })}
+          onTarget={(code) => persist({ targetLanguages: code ? [code] : [] })}
+        />
+      );
+    case 'acquisition':
+      return (
+        <AcquisitionSourceStep
+          selected={data.acquisitionSource}
+          freeText={data.acquisitionSourceFreeText}
+          onSelect={(s) => persist({ acquisitionSource: s })}
+          onFreeText={(t) => persist({ acquisitionSourceFreeText: t })}
+        />
+      );
+    case 'goal':
+      return (
+        <LearningGoalStep
+          selected={data.learningGoals}
+          freeText={data.learningGoalFreeText}
+          onToggle={(g) => {
+            const next = data.learningGoals.includes(g)
+              ? data.learningGoals.filter((x) => x !== g)
+              : [...data.learningGoals, g];
+            persist({ learningGoals: next });
+          }}
+          onFreeText={(t) => persist({ learningGoalFreeText: t })}
+        />
+      );
+    case 'daily-time':
+      return (
+        <DailyTimeGoalStep
+          selected={data.dailyTimeGoalMinutes}
+          onSelect={(m) => persist({ dailyTimeGoalMinutes: m })}
+        />
+      );
+    case 'proficiency':
+      return (
+        <ProficiencyBranchStep
+          selected={data.proficiencyBranch}
+          onSelect={(b) => persist({ proficiencyBranch: b })}
+        />
+      );
+    case 'cefr-pick':
+      return (
+        <CefrSelfPickStep
+          sourceLanguage={data.baseLanguages[0] ?? 'en'}
+          targetLanguage={data.targetLanguages[0] ?? 'es'}
+          initialOgteLevel={data.placementTest?.finalLevel ?? 8}
+          onLevelChange={setCefrSlidLevel}
+        />
+      );
+    case 'placement-test':
+      return (
+        <PlacementTestStep
+          targetLanguage={data.targetLanguages[0] ?? 'es'}
+          sourceLanguage={data.baseLanguages[0] ?? 'en'}
+          initialOgteLevel={data.placementTest?.finalLevel}
+          onComplete={onPlacementComplete}
+        />
+      );
+    case 'review-mode':
+      return (
+        <ReviewModeStep
+          selected={reviewModeChoice(data)}
+          onSelect={(choice) =>
+            persist({
+              reviewMode: choice === 'audio' ? 'audio' : 'full',
+              writingInputMode: choice === 'audio' ? null : choice,
+            })
+          }
+        />
+      );
   }
 }

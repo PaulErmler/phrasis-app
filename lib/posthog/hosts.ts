@@ -37,7 +37,8 @@ export const POSTHOG_INGEST_HOST =
  */
 export const POSTHOG_ASSETS_HOST = POSTHOG_INGEST_HOST.replace(
   /^(https?:\/\/)([a-z0-9-]+)\.i\.posthog\.com$/i,
-  (_match, scheme: string, region: string) => `${scheme}${region}-assets.i.posthog.com`,
+  (_match, scheme: string, region: string) =>
+    `${scheme}${region}-assets.i.posthog.com`,
 );
 
 /** What the browser passes as `api_host`. First-party, so ad blockers don't match it. */
@@ -60,4 +61,7 @@ export const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
  * Where "open in PostHog" links point. The ingest host (`eu.i.`) does not serve
  * the app UI, so this has to be the bare regional domain.
  */
-export const POSTHOG_UI_HOST = POSTHOG_INGEST_HOST.replace('.i.posthog.com', '.posthog.com');
+export const POSTHOG_UI_HOST = POSTHOG_INGEST_HOST.replace(
+  '.i.posthog.com',
+  '.posthog.com',
+);

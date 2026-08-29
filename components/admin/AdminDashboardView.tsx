@@ -3,20 +3,18 @@
 import { useState } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { useNowMinute } from '@/hooks/use-now-minute';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { getLanguageByCode } from '@/lib/languages';
+import { languageName } from '@/lib/languages';
 import { formatTimeMs } from '@/lib/formatTime';
 import { TimeSeriesCard } from './TimeSeriesCard';
 import { DistributionCard } from './DistributionCard';
 import { UsersTable } from './UsersTable';
+import { CardEditsBrowser } from './CardEditsBrowser';
 import { AdminGuard } from './AdminGuard';
 
 const RANGES = [30, 60, 90] as const;
-
-function languageName(code: string): string {
-  return getLanguageByCode(code)?.name ?? code;
-}
 
 export function AdminDashboardView() {
   return (
@@ -29,8 +27,11 @@ export function AdminDashboardView() {
 function AdminDashboardContent() {
   const [days, setDays] = useState<number>(30);
 
-  const dau = useQuery(api.admin.dashboard.getDauSeries, { days });
-  const signups = useQuery(api.admin.dashboard.getSignupSeries, { days });
+  // Minute-quantized `now` per the no-wall-clock query guideline so the
+  // series' "today" bucket stays live without churning the subscription.
+  const now = useNowMinute();
+  const dau = useQuery(api.admin.dashboard.getDauSeries, { days, now });
+  const signups = useQuery(api.admin.dashboard.getSignupSeries, { days, now });
   const plans = useQuery(api.admin.dashboard.getPlanDistribution, {});
   const languages = useQuery(api.admin.dashboard.getLanguageStats, {});
   const funnel = useQuery(api.admin.dashboard.getOnboardingFunnel, {});
@@ -45,6 +46,7 @@ function AdminDashboardContent() {
           <TabsList className="mb-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="card-edits">Card edits</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-3">
@@ -55,7 +57,9 @@ function AdminDashboardContent() {
                   onClick={() => setDays(r)}
                   className={cn(
                     'transition-colors',
-                    days === r ? 'text-primary font-medium' : 'text-muted-foreground',
+                    days === r
+                      ? 'text-primary font-medium'
+                      : 'text-muted-foreground',
                   )}
                 >
                   {r}d
@@ -68,7 +72,9 @@ function AdminDashboardContent() {
                 title="Daily active users"
                 valueLabel="active users"
                 isLoading={dau === undefined}
-                headline={todayDau !== undefined ? `${todayDau} today` : undefined}
+                headline={
+                  todayDau !== undefined ? `${todayDau} today` : undefined
+                }
                 data={(dau ?? []).map((d) => ({
                   date: d.date,
                   value: d.activeUsers,
@@ -99,7 +105,9 @@ function AdminDashboardContent() {
                 title="Users per plan"
                 isLoading={plans === undefined}
                 headline={
-                  plans !== undefined ? `${plans.totalWithQuotas} synced` : undefined
+                  plans !== undefined
+                    ? `${plans.totalWithQuotas} synced`
+                    : undefined
                 }
                 rows={(plans?.plans ?? []).map((p) => ({
                   label: p.planName,
@@ -159,6 +167,10 @@ function AdminDashboardContent() {
 
           <TabsContent value="users">
             <UsersTable />
+          </TabsContent>
+
+          <TabsContent value="card-edits">
+            <CardEditsBrowser />
           </TabsContent>
         </Tabs>
       </div>

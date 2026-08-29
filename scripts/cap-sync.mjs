@@ -17,7 +17,9 @@ const MODES = {
 
 const mode = process.argv[2];
 if (!(mode in MODES)) {
-  console.error(`Usage: node scripts/cap-sync.mjs <${Object.keys(MODES).join('|')}>`);
+  console.error(
+    `Usage: node scripts/cap-sync.mjs <${Object.keys(MODES).join('|')}>`,
+  );
   process.exit(1);
 }
 

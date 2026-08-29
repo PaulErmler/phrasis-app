@@ -16,7 +16,10 @@ import {
 } from '@/components/ui/select';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import type { ImportDelimiter, RowStatus } from './types';
-import { MAX_CARD_TEXT_LENGTH, MAX_IMPORT_BATCH } from '@/lib/constants/learning';
+import {
+  MAX_CARD_TEXT_LENGTH,
+  MAX_IMPORT_BATCH,
+} from '@/lib/constants/learning';
 
 interface FileDropzoneProps {
   fileName: string | null;
@@ -53,7 +56,8 @@ export function FileDropzone({
     ?.map((l) => getLocalizedLanguageNameByCode(l, locale))
     .join(', ');
 
-  const showInfo = !fileName && !compact && courseLanguages && courseLanguages.length > 0;
+  const showInfo =
+    !fileName && !compact && courseLanguages && courseLanguages.length > 0;
 
   return (
     <div
@@ -75,7 +79,9 @@ export function FileDropzone({
       data-testid="import-dropzone"
       className={cn(
         'rounded-lg border-2 border-dashed bg-muted/30 transition-colors cursor-pointer',
-        isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50',
+        isDragging
+          ? 'border-primary bg-primary/5'
+          : 'border-border hover:border-primary/50',
         compact ? 'p-3' : 'p-6',
       )}
     >
@@ -99,7 +105,7 @@ export function FileDropzone({
             variant="ghost"
             size="icon"
             className="h-7 w-7 shrink-0"
-            aria-label="Clear"
+            aria-label={t('dropzone.clear')}
             onClick={(e) => {
               e.stopPropagation();
               onClear();
@@ -110,10 +116,17 @@ export function FileDropzone({
         </div>
       ) : (
         <div className="flex flex-col items-center gap-1.5 text-center">
-          <Upload className={cn('text-muted-foreground', compact ? 'h-5 w-5' : 'h-6 w-6')} />
+          <Upload
+            className={cn(
+              'text-muted-foreground',
+              compact ? 'h-5 w-5' : 'h-6 w-6',
+            )}
+          />
           <p className="text-sm font-medium">{t('dropzone.title')}</p>
           {!compact && (
-            <p className="text-xs text-muted-foreground">{t('dropzone.subtitle')}</p>
+            <p className="text-xs text-muted-foreground">
+              {t('dropzone.subtitle')}
+            </p>
           )}
           {showInfo && (
             <ul
@@ -124,7 +137,9 @@ export function FileDropzone({
               <li className="flex items-start gap-2">
                 <Check className="h-3.5 w-3.5 shrink-0 mt-0.5 text-emerald-600" />
                 <span>
-                  {t('dropzone.info.columns', { languages: languageList ?? '' })}
+                  {t('dropzone.info.columns', {
+                    languages: languageList ?? '',
+                  })}
                 </span>
               </li>
               <li className="flex items-start gap-2">
@@ -161,13 +176,24 @@ interface DelimiterSelectProps {
   detected?: string;
 }
 
-export function DelimiterSelect({ value, onChange, detected }: DelimiterSelectProps) {
+export function DelimiterSelect({
+  value,
+  onChange,
+  detected,
+}: DelimiterSelectProps) {
   const t = useTranslations('ImportTexts');
   return (
     <div className="flex flex-col gap-1">
       <Label htmlFor="import-delimiter">{t('delimiter.label')}</Label>
-      <Select value={value} onValueChange={(v) => onChange(v as ImportDelimiter)}>
-        <SelectTrigger id="import-delimiter" data-testid="import-delimiter" className="w-40">
+      <Select
+        value={value}
+        onValueChange={(v) => onChange(v as ImportDelimiter)}
+      >
+        <SelectTrigger
+          id="import-delimiter"
+          data-testid="import-delimiter"
+          className="w-40"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -213,7 +239,8 @@ export function ColumnMappingSelect({
   const t = useTranslations('ImportTexts');
   const locale = useLocale();
   const langName = getLocalizedLanguageNameByCode(language, locale);
-  const currentValue = typeof selectedColumn === 'number' ? String(selectedColumn) : 'none';
+  const currentValue =
+    typeof selectedColumn === 'number' ? String(selectedColumn) : 'none';
   const columnLabel = (i: number) =>
     hasHeader && headerRow?.[i]?.trim().length
       ? headerRow[i]
@@ -229,7 +256,10 @@ export function ColumnMappingSelect({
         value={currentValue}
         onValueChange={(v) => onChange(v === 'none' ? null : parseInt(v, 10))}
       >
-        <SelectTrigger data-testid={`import-mapping-${language}`} className="w-full">
+        <SelectTrigger
+          data-testid={`import-mapping-${language}`}
+          className="w-full"
+        >
           {triggerLabel !== null ? (
             <span className="truncate">{triggerLabel}</span>
           ) : (
@@ -312,7 +342,9 @@ export function SummaryBar({
     <div className="flex flex-wrap items-center gap-2 text-sm w-full">
       <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
         <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-muted-foreground">
-          <span className="font-medium tabular-nums text-foreground">{importableCount}</span>
+          <span className="font-medium tabular-nums text-foreground">
+            {importableCount}
+          </span>
           <span>{t('summary.valid')}</span>
         </span>
         {warningCount > 0 && (
@@ -336,7 +368,9 @@ export function SummaryBar({
             '…'
           ) : (
             <>
-              <span className="font-medium tabular-nums text-foreground">{quotaBalance}</span>
+              <span className="font-medium tabular-nums text-foreground">
+                {quotaBalance}
+              </span>
               <span>{t('summary.quotaRemaining')}</span>
             </>
           )}
@@ -368,7 +402,9 @@ export function RowErrorBadges({ status }: { status: RowStatus }) {
   if (status.kind === 'valid') return null;
   if (status.kind === 'error' && status.reasons.length === 0) {
     return (
-      <span className="text-xs text-destructive">{t('errors.mappingIncomplete')}</span>
+      <span className="text-xs text-destructive">
+        {t('errors.mappingIncomplete')}
+      </span>
     );
   }
   // Dedup reasons that would render to the same badge.

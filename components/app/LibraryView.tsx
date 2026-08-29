@@ -10,7 +10,16 @@ import { useEnsureContent } from '@/hooks/use-ensure-content';
 import { useDebounce } from '@/hooks/use-debounce';
 import { Input } from '@/components/ui/input';
 import { Toggle } from '@/components/ui/toggle';
-import { Search, Star, EyeOff, CircleCheck, X, Loader2, PenLine, BookOpen } from 'lucide-react';
+import {
+  Search,
+  Star,
+  EyeOff,
+  CircleCheck,
+  X,
+  Loader2,
+  PenLine,
+  BookOpen,
+} from 'lucide-react';
 import { LearningCardContent } from '@/components/app/learning/LearningCardContent';
 import { buildCardOriginPill } from '@/components/app/learning/cardOriginPill';
 import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
@@ -18,25 +27,21 @@ import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
-import { getUserTimezone } from '@/lib/timezone';
 import type { PinnableCardAction } from '@/lib/cardActions';
 import type { CardTranslation } from '@/components/app/learning/types';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { buttonVariants } from '@/components/ui/button';
+  useCardActions,
+  CardActionConfirmDialogs,
+} from '@/components/app/learning/useCardActions';
+import { reportError } from '@/lib/report-error';
+import { resolveShowFurigana } from '@/lib/furigana';
 
 type ActiveFilter = 'mastered' | 'hidden' | 'favorites' | null;
 type SourceFilter = 'custom' | 'premade' | null;
 
-type LibraryCard = FunctionReturnType<typeof api.features.library.getLibraryCards>[number];
+type LibraryCard = FunctionReturnType<
+  typeof api.features.library.getLibraryCards
+>[number];
 
 type StickyEntry = {
   card: LibraryCard;
@@ -127,32 +132,10 @@ export function LibraryView({
       );
     }
   });
-  const deleteCard = useMutation(api.features.scheduling.deleteCardPermanently);
-  const regenerateCardAudio = useMutation(
-    api.features.scheduling.regenerateCardAudio,
-  );
-  const flagTranslation = useMutation(api.features.scheduling.flagTranslation);
-  const updatePinnedCardActionsMutation = useMutation(
-    api.features.courses.updatePinnedCardActions,
-  ).withOptimisticUpdate((localStore, args) => {
-    const current = localStore.getQuery(
-      api.features.courses.getUserSettings,
-      {},
-    );
-    if (current != null) {
-      localStore.setQuery(
-        api.features.courses.getUserSettings,
-        {},
-        { ...current, pinnedCardActions: [...args.actions] },
-      );
-    }
-  });
-
   const [editingCard, setEditingCard] = useState<{
     cardId: Id<'cards'>;
     translations: CardTranslation[];
   } | null>(null);
-  const [deletingCardId, setDeletingCardId] = useState<Id<'cards'> | null>(null);
 
   // Ephemeral per-card per-language speed overrides. Live only for as long
   // as this view is mounted. The library is a preview surface: the user
@@ -194,6 +177,25 @@ export function LibraryView({
     setStickyCards(new Map());
     setOrderIds([]);
   }, [activeFilter, sourceFilter, debouncedSearch]);
+
+  // Shared card-action surface (also used by LearningMode): pin updates,
+  // audio regeneration, flag-with-confirm, delete-with-confirm. On a
+  // confirmed delete, drop the card from the sticky/order state first so it
+  // disappears immediately, then fire the shared mutation.
+  const cardActions = useCardActions({
+    onConfirmDelete: (cardId, { deleteCard }) => {
+      setStickyCards((prev) => {
+        if (!prev.has(cardId)) return prev;
+        const next = new Map(prev);
+        next.delete(cardId);
+        return next;
+      });
+      setOrderIds((prev) => prev.filter((id) => id !== cardId));
+      deleteCard(cardId).catch((error) => {
+        reportError(error, { op: 'deleteCard', cardId });
+      });
+    },
+  });
 
   const handleMaster = useCallback(
     async (card: LibraryCard, currentlyMastered: boolean) => {
@@ -245,82 +247,6 @@ export function LibraryView({
     },
     [toggleFavorite],
   );
-
-  const handleUpdatePinnedActions = useCallback(
-    async (actions: readonly string[]) => {
-      try {
-        await updatePinnedCardActionsMutation({ actions: [...actions] });
-      } catch (error) {
-        console.error('Failed to update pinned card actions:', error);
-      }
-    },
-    [updatePinnedCardActionsMutation],
-  );
-
-  const handleRegenerateAudio = useCallback(
-    async (cardId: Id<'cards'>) => {
-      try {
-        await regenerateCardAudio({ cardId, timezone: getUserTimezone() });
-      } catch (error) {
-        console.error('Failed to regenerate audio:', error);
-      }
-    },
-    [regenerateCardAudio],
-  );
-
-  // Flag opens a confirm dialog identical to LearningMode's: on confirm we
-  // fire the retranslation in the background for every non-source-language
-  // translation on the card at once. The card stays in the library. The
-  // new translations land in-place when the worker finishes.
-  const [flagConfirmCardId, setFlagConfirmCardId] = useState<Id<'cards'> | null>(null);
-  // Client-only session record of cards the viewer has flagged. Drives the
-  // "Flagged" pill on each card row. Purely local, never persisted, so it
-  // doesn't leak to other users that someone flagged a row.
-  const [flaggedCardIds, setFlaggedCardIds] = useState<Set<Id<'cards'>>>(
-    () => new Set(),
-  );
-  const handleConfirmFlag = useCallback(async () => {
-    const cardId = flagConfirmCardId;
-    if (!cardId) return;
-    setFlagConfirmCardId(null);
-    // Only mark the card as session-flagged when the mutation reports no
-    // retranslation was triggered (all non-source languages over-cap or
-    // claim-contested). With a retranslation in flight, the server-driven
-    // "Retranslating" pill is the right signal, and once it lands, no
-    // pill (the flag has been acted on, nothing lingering).
-    flagTranslation({ cardId })
-      .then((result) => {
-        if (result && result.retranslated === false) {
-          setFlaggedCardIds((prev) => {
-            if (prev.has(cardId)) return prev;
-            const next = new Set(prev);
-            next.add(cardId);
-            return next;
-          });
-        }
-      })
-      .catch((error) =>
-        console.error('Failed to flag translation:', error),
-      );
-  }, [flagConfirmCardId, flagTranslation]);
-
-  const handleConfirmDelete = useCallback(async () => {
-    const cardId = deletingCardId;
-    if (!cardId) return;
-    setDeletingCardId(null);
-    setStickyCards((prev) => {
-      if (!prev.has(cardId)) return prev;
-      const next = new Map(prev);
-      next.delete(cardId);
-      return next;
-    });
-    setOrderIds((prev) => prev.filter((id) => id !== cardId));
-    try {
-      await deleteCard({ cardId });
-    } catch (error) {
-      console.error('Failed to delete card:', error);
-    }
-  }, [deletingCardId, deleteCard]);
 
   const toggleFilter = (f: Exclude<ActiveFilter, null>) => {
     setActiveFilter((prev) => (prev === f ? null : f));
@@ -384,7 +310,9 @@ export function LibraryView({
 
   const hasResults = displayCards.length > 0;
   const hasActiveFilters =
-    debouncedSearch.length > 0 || activeFilter !== null || sourceFilter !== null;
+    debouncedSearch.length > 0 ||
+    activeFilter !== null ||
+    sourceFilter !== null;
 
   if (!hasActiveCourse) {
     return (
@@ -398,7 +326,10 @@ export function LibraryView({
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-20" style={{ scrollbarGutter: 'stable' }}>
+    <div
+      className="flex-1 min-h-0 overflow-y-auto px-4 pb-20"
+      style={{ scrollbarGutter: 'stable' }}
+    >
       {/* Sticky search + filters card. -mx-4/px-4 makes the opaque background
           span the scroll container's horizontal padding too, otherwise card
           edges slide past in the gutters beside the sticky block. */}
@@ -424,7 +355,7 @@ export function LibraryView({
                 <button
                   onClick={() => setSearchInput('')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Clear search"
+                  aria-label={t('clearSearch')}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -508,9 +439,7 @@ export function LibraryView({
           <div className="card-surface p-4 flex items-center justify-center h-[180px]">
             <div className="flex flex-col items-center gap-2 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-xs font-medium">
-                {t('loadingCards')}
-              </span>
+              <span className="text-xs font-medium">{t('loadingCards')}</span>
             </div>
           </div>
         )}
@@ -520,12 +449,16 @@ export function LibraryView({
             {hasActiveFilters ? (
               <>
                 <p className="font-medium">{t('emptySearchTitle')}</p>
-                <p className="text-sm text-muted-foreground">{t('emptySearchDescription')}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t('emptySearchDescription')}
+                </p>
               </>
             ) : (
               <>
                 <p className="font-medium">{t('emptyTitle')}</p>
-                <p className="text-sm text-muted-foreground">{t('emptyDescription')}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t('emptyDescription')}
+                </p>
               </>
             )}
           </div>
@@ -534,63 +467,70 @@ export function LibraryView({
         {!isLoading && hasResults && (
           <>
             {displayCards.map(({ card, isMastered, isHidden }) => (
-              <div key={card._id} data-testid="library-card">
+              <div
+                key={card._id}
+                data-testid="library-card"
+                // Lets a spec address one specific card instead of
+                // `.first()` racing the debounced search filter.
+                data-card-id={card._id}
+              >
                 <LearningCardContent
                   bare
                   compact
-                  showIpa={courseSettings?.showIpa === true}
-                  preReviewCount={card.preReviewCount}
-                  schedulingPhase={card.schedulingPhase}
-                  fsrsState={card.fsrsState}
-                  originPill={buildCardOriginPill(
-                    courseSettings?.showCardOrigin ?? false,
-                    card,
-                    tLearn,
-                  )}
-                  sourceText={card.sourceText}
-                  translations={card.translations}
-                  audioRecordings={card.audioRecordings}
-                  isFavorite={card.isFavorite ?? false}
-                  isMastered={isMastered}
-                  isHidden={isHidden}
-                  isPendingMaster={false}
-                  isPendingHide={false}
-                  onMaster={() => handleMaster(card, isMastered)}
-                  onHide={() => handleHide(card, isHidden)}
-                  onFavorite={() => handleFavorite(card._id)}
-                  onEdit={() =>
-                    setEditingCard({
-                      cardId: card._id,
-                      translations: card.translations,
-                    })
-                  }
-                  onDelete={() => setDeletingCardId(card._id)}
-                  onRegenerateAudio={() => handleRegenerateAudio(card._id)}
-                  onFlag={(() => {
-                    // Hide the flag affordance only when the card has no
-                    // target translation to display; the mutation itself
-                    // flags every non-source-language translation, so we
-                    // don't pick a specific language here.
-                    const hasTarget = card.translations.some(
-                      (tr) => tr.isTargetLanguage,
-                    );
-                    if (!hasTarget) return undefined;
-                    return () => setFlagConfirmCardId(card._id);
-                  })()}
-                  pinnedActions={pinnedCardActions}
-                  onUpdatePinnedActions={
-                    handleUpdatePinnedActions as (
+                  presentation={{
+                    cardId: card._id,
+                    preReviewCount: card.preReviewCount,
+                    schedulingPhase: card.schedulingPhase,
+                    fsrsState: card.fsrsState,
+                    originPill: buildCardOriginPill(
+                      courseSettings?.showCardOrigin ?? false,
+                      card,
+                      tLearn,
+                    ),
+                    sourceText: card.sourceText,
+                    translations: card.translations,
+                    audioRecordings: card.audioRecordings,
+                    isFavorite: card.isFavorite ?? false,
+                    isMastered,
+                    isHidden,
+                    isPendingMaster: false,
+                    isPendingHide: false,
+                    flaggedInSession: cardActions.flaggedCardIds.has(card._id),
+                    showIpa: courseSettings?.showIpa === true,
+                    showFurigana: resolveShowFurigana(courseSettings),
+                    onMaster: () => handleMaster(card, isMastered),
+                    onHide: () => handleHide(card, isHidden),
+                    onFavorite: () => handleFavorite(card._id),
+                    onEdit: () =>
+                      setEditingCard({
+                        cardId: card._id,
+                        translations: card.translations,
+                      }),
+                    onDelete: () => cardActions.requestDelete(card._id),
+                    onRegenerateAudio: () =>
+                      cardActions.regenerateAudio(card._id),
+                    onFlag: (() => {
+                      // Hide the flag affordance only when the card has no
+                      // target translation to display; the mutation itself
+                      // flags every non-source-language translation, so we
+                      // don't pick a specific language here.
+                      const hasTarget = card.translations.some(
+                        (tr) => tr.isTargetLanguage,
+                      );
+                      if (!hasTarget) return undefined;
+                      return () => cardActions.requestFlag(card._id);
+                    })(),
+                    pinnedActions: pinnedCardActions,
+                    onUpdatePinnedActions: cardActions.updatePinnedActions as (
                       actions: PinnableCardAction[],
-                    ) => void
-                  }
-                  quotaState={cardActionQuotas}
+                    ) => void,
+                    quotaState: cardActionQuotas,
+                    audioSpeedOverrides: ephemeralOverrides[card._id],
+                    onSpeedCycle: (language, next) =>
+                      handleSpeedCycle(card._id, language, next),
+                  }}
                   hideTargetLanguages={false}
                   highlightEnabled={highlightEnabled}
-                  flaggedInSession={flaggedCardIds.has(card._id)}
-                  audioSpeedOverrides={ephemeralOverrides[card._id]}
-                  onSpeedCycle={(language, next) =>
-                    handleSpeedCycle(card._id, language, next)
-                  }
                   speedBadgeVariant="ephemeral"
                 />
               </div>
@@ -610,60 +550,7 @@ export function LibraryView({
         />
       )}
 
-      <AlertDialog
-        open={deletingCardId !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeletingCardId(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {tLearn('actions.deleteConfirmTitle')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {tLearn('actions.deleteConfirmDescription')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {tLearn('actions.deleteConfirmCancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className={buttonVariants({ variant: 'destructive' })}
-              onClick={handleConfirmDelete}
-            >
-              {tLearn('actions.deleteConfirmConfirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={flagConfirmCardId !== null}
-        onOpenChange={(open) => {
-          if (!open) setFlagConfirmCardId(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {tLearn('actions.flagConfirmTitle')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {tLearn('actions.flagConfirmDescription')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {tLearn('actions.flagConfirmCancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmFlag}>
-              {tLearn('actions.flagConfirmConfirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <CardActionConfirmDialogs actions={cardActions} />
     </div>
   );
 }

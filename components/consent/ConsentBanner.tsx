@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
-import { denyConsent, grantConsent, useConsentStatus } from '@/lib/posthog/consent';
+import {
+  denyConsent,
+  grantConsent,
+  useConsentStatus,
+} from '@/lib/posthog/consent';
 import { ConsentSettingsDialog } from './ConsentSettingsDialog';
 
 /**
@@ -80,7 +84,10 @@ export function ConsentBanner() {
         </div>
       </div>
 
-      <ConsentSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <ConsentSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+      />
     </>
   );
 }

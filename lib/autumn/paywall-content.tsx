@@ -1,5 +1,5 @@
-import { type CheckFeaturePreview, type Product } from "autumn-js";
-import { toBillableFeature } from "@/lib/autumn/find-upgrade-product";
+import { type CheckFeaturePreview, type Product } from 'autumn-js';
+import { toBillableFeature } from '@/lib/autumn/find-upgrade-product';
 
 /**
  * Filters Autumn upgrade products to only those that actually increase the
@@ -25,9 +25,9 @@ export function filterProductsByFeatureIncrease(
     );
     if (!featureItem) return false;
     if (consumable === undefined) return true;
-    if (featureItem.included_usage === "inf") return true;
+    if (featureItem.included_usage === 'inf') return true;
     return (
-      typeof featureItem.included_usage === "number" &&
+      typeof featureItem.included_usage === 'number' &&
       featureItem.included_usage > billable.included
     );
   });
@@ -35,7 +35,7 @@ export function filterProductsByFeatureIncrease(
 
 export type PaywallTranslateFn = (
   key: string,
-  params?: Record<string, string | number>
+  params?: Record<string, string | number>,
 ) => string;
 
 /** Pick the right title based on Autumn preview scenario + product type. */
@@ -45,17 +45,17 @@ export function getPaywallTitle(
   trialEligible: boolean,
 ): string {
   const { products } = preview;
-  if (products.length === 0) return t("featureUnavailable");
+  if (products.length === 0) return t('featureUnavailable');
 
   // "Start trial" only for viewers who can actually get one. The
   // product offering a trial is not enough (Autumn only dedupes trials
   // per-plan; see lib/autumn/trial-eligibility.ts).
   const nextProduct = products[0];
   return nextProduct.free_trial && trialEligible
-    ? t("startTrial", { productName: nextProduct.name })
+    ? t('startTrial', { productName: nextProduct.name })
     : nextProduct.is_add_on
-      ? t("purchaseAddOn", { productName: nextProduct.name })
-      : t("upgradeTo", { productName: nextProduct.name });
+      ? t('purchaseAddOn', { productName: nextProduct.name })
+      : t('upgradeTo', { productName: nextProduct.name });
 }
 
 /** Pick the right message body based on Autumn preview scenario. */
@@ -68,13 +68,13 @@ export function getPaywallMessage(
   const { scenario, products } = preview;
 
   if (products.length === 0) {
-    if (scenario === "usage_limit") {
+    if (scenario === 'usage_limit') {
       return t(
-        consumable === false ? "capReachedNoProducts" : "usageLimitNoProducts",
+        consumable === false ? 'capReachedNoProducts' : 'usageLimitNoProducts',
         { featureName },
       );
     }
-    return t("notAvailableContactUs");
+    return t('notAvailableContactUs');
   }
 
   const nextProduct = products[0];
@@ -82,27 +82,29 @@ export function getPaywallMessage(
 
   const upgradeDetailKey = (() => {
     switch (scenario) {
-    case "usage_limit":
-      return consumable === false ? "upgradeDetailCap" : "upgradeDetailUsageLimit";
-    case "feature_flag":
-    default:
-      return "upgradeDetail";
+      case 'usage_limit':
+        return consumable === false
+          ? 'upgradeDetailCap'
+          : 'upgradeDetailUsageLimit';
+      case 'feature_flag':
+      default:
+        return 'upgradeDetail';
     }
   })();
 
   const detail = isAddOn
-    ? t("addOnDetail", { productName: nextProduct.name, featureName })
+    ? t('addOnDetail', { productName: nextProduct.name, featureName })
     : t(upgradeDetailKey, { productName: nextProduct.name, featureName });
 
   switch (scenario) {
-  case "usage_limit":
-    return t(
-      consumable === false ? "capReachedWithDetail" : "usageLimitWithDetail",
-      { featureName, detail },
-    );
-  case "feature_flag":
-    return t("featureFlagWithDetail", { featureName, detail });
-  default:
-    return t("notAvailableForAccount");
+    case 'usage_limit':
+      return t(
+        consumable === false ? 'capReachedWithDetail' : 'usageLimitWithDetail',
+        { featureName, detail },
+      );
+    case 'feature_flag':
+      return t('featureFlagWithDetail', { featureName, detail });
+    default:
+      return t('notAvailableForAccount');
   }
 }
