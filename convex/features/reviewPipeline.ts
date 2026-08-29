@@ -21,7 +21,7 @@ import {
   writingSeedPatch,
 } from '../migrations/seedWritingTrack';
 import { buildCardSearchableText } from '../lib/cardContent';
-import { patchCard } from '../db/stats/cardAggregates';
+import { patchCard, getCardOriginBucket } from '../db/stats/cardAggregates';
 import { insertReviewHistory } from '../db/reviewHistory';
 import { logReview } from '../db/reviewLogs';
 import { reviewTimeApplyPatch } from '../lib/reviewTimeStats';
@@ -529,6 +529,9 @@ export async function logReviewForUndo(
       reviewModeForStats: args.reviewMode ?? 'audio',
       reviewModeRaw: args.reviewMode,
       wasFirstReview: stats.wasFirstReview,
+      // Bucket the dailyStats.newCardsByOrigin increment landed in. Stamped
+      // (not re-derived on undo) for the same reason as `cardState` below.
+      newCardOrigin: getCardOriginBucket(card),
       wasDefaultRating: args.wasDefaultRating,
       accuracy: args.accuracy,
       // Mirrors the both-present gate in recordReviewStats so undo reverses

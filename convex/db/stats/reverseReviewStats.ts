@@ -163,6 +163,7 @@ export async function reverseReviewStats(
     accuracyLenient,
     reviewDepth,
     collectionId,
+    newCardOrigin,
   } = reversal;
 
   // --- Course-level stats ---
@@ -246,6 +247,18 @@ export async function reverseReviewStats(
       reps: dec(daily.reps),
       cardsReviewed: dec(daily.cardsReviewed),
       ...(wasFirstReview ? { newCards: dec(daily.newCards) } : {}),
+      // Only when the row actually carries a split. A first review logged
+      // before `newCardsByOrigin` existed has no bucket to give back, and
+      // seeding one here would fabricate a negative-space split on a row whose
+      // buckets are already known not to sum to `newCards`.
+      ...(wasFirstReview && newCardOrigin && daily.newCardsByOrigin
+        ? {
+            newCardsByOrigin: {
+              ...daily.newCardsByOrigin,
+              [newCardOrigin]: dec(daily.newCardsByOrigin[newCardOrigin]),
+            },
+          }
+        : {}),
       ...(hourBuckets ? { hourBuckets } : {}),
       ...(ratingCounts ? { ratingCounts } : {}),
       ...(reviewsByCardState ? { reviewsByCardState } : {}),

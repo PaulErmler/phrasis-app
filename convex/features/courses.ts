@@ -1343,11 +1343,26 @@ export const getCompletedTutorials = query({
 });
 
 /**
- * Lifetime review count for the active course. The gate for the one-time
- * learning-mode tips (`useMilestoneTips`): thresholds compare against this,
- * and counts far past a tip's threshold suppress it silently (veteran
- * guard). Deliberately tiny (two indexed reads) so the learn view can stay
- * subscribed to it while tips are still pending.
+ * The user's lifetime review count across EVERY course. The gate for the
+ * one-time learning-mode tips (`useMilestoneTips`) and the difficulty check
+ * (`useDifficultyCheck`): thresholds compare against this, and counts far
+ * past a tip's threshold suppress it silently (veteran guard).
+ *
+ * Summed over all courses, not just the active one. Completion is already
+ * per-user (`userSettings.completedTutorials`), so scoping the GATE to one
+ * course made the teaching layer restart per course: someone with hundreds
+ * of reviews in their first course dropped back to 0 the moment they opened
+ * a second one, lost veteran status, and got walked through an app they
+ * already knew. Both consumers show each tip at most once per user, so the
+ * clock driving them has to be per-user too.
+ *
+ * Still cheap: one index scan returning a single row per course, bounded by
+ * the same `MAX_COURSES_PER_USER` that `createCourse` enforces, so it can
+ * never become an unbounded read. It is no longer the narrowest possible
+ * subscription though: the learn view now reinvalidates on a `courseStats`
+ * write in ANY of the user's courses, not just the active one. Acceptable
+ * because only one course can be reviewed at a time, so the extra
+ * invalidations are the user's own writes arriving by a different path.
  */
 export const getLifetimeReviewCount = query({
   args: {},
@@ -1356,10 +1371,15 @@ export const getLifetimeReviewCount = query({
     try {
       const userId = await getAuthUserId(ctx);
       if (!userId) return null;
-      const active = await getActiveCourseForUser(ctx, userId);
-      if (!active) return null;
-      const stats = await dbGetCourseStats(ctx, userId, active.course._id);
-      return stats?.totalRepetitions ?? 0;
+      // No active-course lookup: the question is about the user, not about
+      // where they happen to be standing. A user with no courses sums to 0,
+      // which is the truth and is what a first-timer should see anyway (both
+      // callers additionally need an active course before they act).
+      const rows = await ctx.db
+        .query('courseStats')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', userId))
+        .take(MAX_COURSES_PER_USER);
+      return rows.reduce((acc, r) => acc + r.totalRepetitions, 0);
     } catch {
       return null;
     }

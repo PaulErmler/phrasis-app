@@ -46,9 +46,9 @@ import type { TranslateFn } from './types';
  *    rating scale for Shadowing) appear, prefaced by a "Switched to …"
  *    welcome.
  *
- * 2. **Milestone tips**. Single popovers gated on LIFETIME reviews of the
- *    active course (`getLifetimeReviewCount`, reactive): card actions @2,
- *    chat @5, word tap @8, try-the-other-mode @11. At most
+ * 2. **Milestone tips**. Single popovers gated on the user's LIFETIME
+ *    reviews across every course (`getLifetimeReviewCount`, reactive): card
+ *    actions @2, chat @5, word tap @8, try-the-other-mode @11. At most
  *    one fires per card transition; when several become eligible at once
  *    the lowest threshold wins and the rest wait for later reviews.
  *
@@ -57,6 +57,11 @@ import type { TranslateFn } from './types';
  * unseen tips are silently marked completed instead of shown, existing
  * users never get walked through an app they already know, and no data
  * migration is needed.
+ *
+ * Both the completion set and the review count that clocks it are per USER,
+ * never per course. Each has to be: a per-course clock against a per-user
+ * completion set restarted the whole teaching layer every time someone
+ * opened a second course.
  */
 
 /** Shared with the one-time difficulty check (useDifficultyCheck), which

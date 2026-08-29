@@ -23,25 +23,34 @@ The entries are rolled up monthly into a user-facing summary via the
 
 ## Kanban board
 
-The project kanban board lives at `board/Flexling Board.md` (a gitignored
-symlink into Paul's Obsidian vault; may be absent on other machines). Columns:
-Not Started, Prioritized, Doing, Done, Archived. Cards are `- [ ] item`
-lines under the `##` column headings. When explicitly working on a board
-item you may move it to Doing/Done, but never add priorities or reorder the
-Prioritized column. Prioritization is Paul's job.
+The project kanban board lives at `.devtool/features/` (gitignored). One
+markdown file per card, with YAML frontmatter (`status`, `priority`, `order`).
+Statuses: `todo`, `backlog`, `in-progress`, `review`, `done`. Finished work
+goes to `review` and stays put; only Paul moves a card to `done` and into
+`.devtool/features/done/`. Never invent a second queue; never reorder or
+reprioritize existing cards — prioritization is Paul's job.
 
 ## Agent skills
 
+### Always use these two
+
+- **Writing a plan** — run `/unslop` over it before showing it. Every plan, not
+  just long ones.
+- **Reviewing code** — use `/mattpocock-skills:code-review`, never an ad-hoc
+  read-through. It reviews on two axes (repo standards, and fidelity to the
+  originating card or spec) and reports them separately.
+
 ### Issue tracker
 
-Issues are tracked as cards on the Obsidian kanban board (`board/Flexling
-Board.md`, see above), with spec and issue bodies in `.scratch/<feature-slug>/`.
-See `docs/agents/issue-tracker.md`.
+Issues are tracked as cards in `.devtool/features/` (see above). Longer specs
+or wayfinder maps can live in `.scratch/<feature-slug>/`. See
+`docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-The five canonical roles, unchanged, applied as Obsidian tags on the card and
-mirrored on a `Status:` line in `.scratch/`. See `docs/agents/triage-labels.md`.
+The five canonical roles, unchanged, applied in the card's `labels` array
+and mirrored on a `Status:` line in `.scratch/` when a spec exists. See
+`docs/agents/triage-labels.md`.
 
 ### Domain docs
 
