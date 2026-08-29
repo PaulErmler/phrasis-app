@@ -231,7 +231,9 @@ describe('AppUpdateGate', () => {
   it('fails open on a non-ok response', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) } as Response),
+      vi
+        .fn()
+        .mockResolvedValue({ ok: false, json: async () => ({}) } as Response),
     );
 
     await renderGate();

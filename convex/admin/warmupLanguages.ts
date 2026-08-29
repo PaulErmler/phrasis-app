@@ -62,7 +62,9 @@ export const warmupChartLanguages = internalMutation({
     /** Override the default chart-language set (internal codes). */
     languages: v.optional(v.array(v.string())),
     /** 'collections' (default) → 'placement' → done. */
-    phase: v.optional(v.union(v.literal('collections'), v.literal('placement'))),
+    phase: v.optional(
+      v.union(v.literal('collections'), v.literal('placement')),
+    ),
     /** Pagination cursor within the current phase; passed by self-scheduling. */
     cursor: v.optional(v.union(v.string(), v.null())),
     /** Running totals threaded through the self-scheduled pages. */
@@ -101,9 +103,10 @@ export const warmupChartLanguages = internalMutation({
     let nextCursor: string | null;
 
     if (phase === 'collections') {
-      const page = await ctx.db
-        .query('collections')
-        .paginate({ cursor: args.cursor ?? null, numItems: COLLECTIONS_PER_PAGE });
+      const page = await ctx.db.query('collections').paginate({
+        cursor: args.cursor ?? null,
+        numItems: COLLECTIONS_PER_PAGE,
+      });
 
       for (const collection of page.page) {
         const leading = await ctx.db
@@ -120,9 +123,10 @@ export const warmupChartLanguages = internalMutation({
       nextPhase = page.isDone ? 'placement' : 'collections';
       nextCursor = page.isDone ? null : page.continueCursor;
     } else {
-      const page = await ctx.db
-        .query('placementTestSentences')
-        .paginate({ cursor: args.cursor ?? null, numItems: PLACEMENT_PER_PAGE });
+      const page = await ctx.db.query('placementTestSentences').paginate({
+        cursor: args.cursor ?? null,
+        numItems: PLACEMENT_PER_PAGE,
+      });
 
       for (const sentence of page.page) {
         await warmText(sentence.textId);
@@ -132,10 +136,12 @@ export const warmupChartLanguages = internalMutation({
       nextCursor = page.isDone ? null : page.continueCursor;
     }
 
-    const textsProcessedSoFar = (args.textsProcessedSoFar ?? 0) + textsProcessed;
+    const textsProcessedSoFar =
+      (args.textsProcessedSoFar ?? 0) + textsProcessed;
     const translationsScheduledSoFar =
       (args.translationsScheduledSoFar ?? 0) + translationsScheduled;
-    const audioScheduledSoFar = (args.audioScheduledSoFar ?? 0) + audioScheduled;
+    const audioScheduledSoFar =
+      (args.audioScheduledSoFar ?? 0) + audioScheduled;
 
     if (nextPhase === 'done') {
       console.log('[warmupChartLanguages] warmup complete', {

@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 
 import { useAppData } from '@/components/app/AppDataProvider';
 import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import {
   Select,
   SelectContent,
@@ -54,7 +55,7 @@ export function ContentFilterDropdown() {
     <div
       className="flex items-center justify-end gap-2"
       data-testid="content-filter-dropdown"
-      data-tutorial="content-source-filter"
+      data-tutorial={TUTORIAL_ANCHORS.contentSourceFilter}
     >
       <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
       <span className="text-xs text-muted-foreground">{t('label')}</span>

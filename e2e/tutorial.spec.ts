@@ -50,11 +50,12 @@ test.describe('tutorial (home tour)', () => {
     // projections steps. A shrunken total means a step silently fell out
     // of the registry (welcome, Learn New, Learn+Review, Radio/Free Study,
     // mode toggle, content source, due counts, projections, difficulty,
-    // closing CTA ⇒ 10 in audio mode).
+    // closing CTA ⇒ 10 in audio mode when due counts are visible; new
+    // accounts hide due counts so that step is omitted, 9 remaining).
     const totalSteps = Number(progressText!.match(/of\s*(\d+)/i)?.[1] ?? 0);
     expect(
       totalSteps,
-      'home tour should include the due-counts and projections steps',
+      'home tour should include the projections step (and due-counts when visible)',
     ).toBeGreaterThanOrEqual(9);
 
     // Advance one step to prove Next works.

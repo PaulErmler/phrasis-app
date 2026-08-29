@@ -7,9 +7,7 @@ import { api } from '@/convex/_generated/api';
 
 export interface AppData {
   preloadedSettings: Preloaded<typeof api.features.courses.getUserSettings>;
-  preloadedActiveCourse: Preloaded<
-    typeof api.features.courses.getActiveCourse
-  >;
+  preloadedActiveCourse: Preloaded<typeof api.features.courses.getActiveCourse>;
   preloadedCourseSettings: Preloaded<
     typeof api.features.courses.getActiveCourseSettings
   >;

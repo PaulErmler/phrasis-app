@@ -1,29 +1,47 @@
 import { v } from 'convex/values';
-import { paginationOptsValidator } from 'convex/server';
-import { query, internalQuery, QueryCtx } from '../_generated/server';
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from 'convex/server';
+import { query, QueryCtx } from '../_generated/server';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
 import {
   cardsByStateAndDueDate,
+  cardsByStabilityBucketAndDueDate,
   TRACK_AGGREGATES,
 } from '../db/stats/cardAggregates';
 import { originsForFilter } from '../lib/collections';
 import {
   studyContentFilterValidator,
   reviewModeValidator,
+  translationValidator,
+  audioRecordingValidator,
   type ReviewMode,
   type StudyContentFilter,
 } from '../types';
-import { studyContextFromSettings } from '../db/reviewLogs';
+import { studyContextFromSettings, type StudyContext } from '../db/reviewLogs';
 import {
   getCourseStats as dbGetCourseStats,
-  getTodayInTimezone,
   deriveStreakDisplay,
 } from '../db/courseStats';
+import {
+  isValidTimezone,
+  resolveClientNow,
+  resolveClientToday,
+} from '../lib/dateUtils';
+import { addDays, startOfDayMs } from '../../lib/dateStrings';
+import {
+  STABILITY_BUCKETS,
+  WORKLOAD_DAYS,
+  WORKLOAD_HISTORY_WINDOW_DAYS,
+} from '../../lib/workloadForecast';
+import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
+import type { Doc } from '../_generated/dataModel';
 import { getDailyStats } from '../db/stats/dailyStats';
 import { getCourseSettings } from '../db/courseSettings';
-import { EXTENDED_STATE_LABELS as STATE_LABELS } from '../lib/fsrsStates';
+import { type FsrsStateLabel } from '../lib/fsrsStates';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
 import { normalizeLanguageCode } from '../../lib/languages';
 import { getTargetLanguageWordCounts } from '../db/stats/languageStats';
@@ -42,10 +60,6 @@ function isValidMonthString(s: string): boolean {
   return /^\d{4}-\d{2}$/.test(s);
 }
 
-function isValidYearString(s: string): boolean {
-  return /^\d{4}$/.test(s);
-}
-
 // ============================================================================
 // STATS PAGE QUERIES
 // ============================================================================
@@ -57,6 +71,11 @@ function isValidYearString(s: string): boolean {
 export const getStatsPageData = query({
   args: {
     timezone: v.string(),
+    // Client-supplied "today" per the no-wall-clock query guideline (same
+    // contract as getCourseStats: validated and clamped to ±1 day of the
+    // server's view in resolveClientToday). Optional for back-compat:
+    // already-shipped bundles omit it and keep the server-clock behavior.
+    today: v.optional(v.string()),
     startDate: v.string(),
     endDate: v.string(),
     startMonth: v.string(),
@@ -64,6 +83,62 @@ export const getStatsPageData = query({
     startWeek: v.optional(v.string()),
     endWeek: v.optional(v.string()),
   },
+  returns: v.union(
+    v.null(),
+    v.object({
+      courseStats: v.union(
+        v.object({
+          totalRepetitions: v.number(),
+          totalTimeMs: v.number(),
+          totalCards: v.number(),
+          currentStreak: v.number(),
+          streakState: v.union(
+            v.literal('active'),
+            v.literal('pending'),
+            v.literal('frozen'),
+            v.literal('broken'),
+            v.literal('none'),
+          ),
+          totalWordCount: v.number(),
+          totalChatMessages: v.number(),
+          totalChatCardsApproved: v.number(),
+          totalCardsAddedManually: v.number(),
+          totalAccuracySum: v.number(),
+          totalAccuracyCount: v.number(),
+          totalAccuracyStrictSum: v.number(),
+          totalAccuracyLenientSum: v.number(),
+          totalAccuracyDualCount: v.number(),
+        }),
+        v.null(),
+      ),
+      ignorePunctuation: v.boolean(),
+      todayReps: v.number(),
+      todayNewCards: v.number(),
+      todayTimeMs: v.number(),
+      hourlyDistribution: v.array(v.number()),
+      monthlyStats: v.array(
+        v.object({
+          month: v.string(),
+          totalRepetitions: v.number(),
+          totalNewCards: v.number(),
+          totalTimeMs: v.number(),
+        }),
+      ),
+      weeklyStats: v.array(
+        v.object({
+          week: v.string(),
+          totalRepetitions: v.number(),
+          totalNewCards: v.number(),
+          totalTimeMs: v.number(),
+        }),
+      ),
+      baseLanguages: v.array(v.string()),
+      targetLanguages: v.array(v.string()),
+      languageWordCounts: v.array(
+        v.object({ language: v.string(), words: v.number() }),
+      ),
+    }),
+  ),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
@@ -78,7 +153,7 @@ export const getStatsPageData = query({
     const courseSettings = await getCourseSettings(ctx, courseId);
 
     // todayStats
-    const todayStr = getTodayInTimezone(args.timezone);
+    const todayStr = resolveClientToday(args.timezone, args.today);
     const todayDaily = await getDailyStats(ctx, userId, courseId, todayStr);
 
     // hourly distribution (aggregate from dailyStats)
@@ -87,8 +162,11 @@ export const getStatsPageData = query({
       const dailyRows = await ctx.db
         .query('dailyStats')
         .withIndex('by_userId_and_courseId_and_date', (q) =>
-          q.eq('userId', userId).eq('courseId', courseId)
-            .gte('date', args.startDate).lte('date', args.endDate),
+          q
+            .eq('userId', userId)
+            .eq('courseId', courseId)
+            .gte('date', args.startDate)
+            .lte('date', args.endDate),
         )
         .take(400);
 
@@ -108,12 +186,18 @@ export const getStatsPageData = query({
       totalNewCards: number;
       totalTimeMs: number;
     }> = [];
-    if (isValidMonthString(args.startMonth) && isValidMonthString(args.endMonth)) {
+    if (
+      isValidMonthString(args.startMonth) &&
+      isValidMonthString(args.endMonth)
+    ) {
       const rows = await ctx.db
         .query('monthlyStats')
         .withIndex('by_userId_and_courseId_and_month', (q) =>
-          q.eq('userId', userId).eq('courseId', courseId)
-            .gte('month', args.startMonth).lte('month', args.endMonth),
+          q
+            .eq('userId', userId)
+            .eq('courseId', courseId)
+            .gte('month', args.startMonth)
+            .lte('month', args.endMonth),
         )
         .take(24);
 
@@ -132,12 +216,20 @@ export const getStatsPageData = query({
       totalNewCards: number;
       totalTimeMs: number;
     }> = [];
-    if (args.startWeek && args.endWeek && isValidWeekString(args.startWeek) && isValidWeekString(args.endWeek)) {
+    if (
+      args.startWeek &&
+      args.endWeek &&
+      isValidWeekString(args.startWeek) &&
+      isValidWeekString(args.endWeek)
+    ) {
       const weekRows = await ctx.db
         .query('weeklyStats')
         .withIndex('by_userId_and_courseId_and_week', (q) =>
-          q.eq('userId', userId).eq('courseId', courseId)
-            .gte('week', args.startWeek!).lte('week', args.endWeek!),
+          q
+            .eq('userId', userId)
+            .eq('courseId', courseId)
+            .gte('week', args.startWeek!)
+            .lte('week', args.endWeek!),
         )
         .take(60);
 
@@ -155,39 +247,44 @@ export const getStatsPageData = query({
       courseId,
       targetLanguages,
     });
-    const totalWordCount = languageWordCounts.reduce((sum, lw) => sum + lw.words, 0);
+    const totalWordCount = languageWordCounts.reduce(
+      (sum, lw) => sum + lw.words,
+      0,
+    );
 
     // Re-derive the live streak at read time (see getCourseStats) so a lapsed
     // streak shows 0 and the state matches the home card.
     const streak = stats
       ? deriveStreakDisplay(
-        stats.lastActivityDate,
-        todayStr,
-        stats.currentStreak,
-        stats.streakFreezeUsedDate,
-      )
+          stats.lastActivityDate,
+          todayStr,
+          stats.currentStreak,
+          stats.streakFreezeUsedDate,
+        )
       : null;
 
     return {
-      courseStats: stats ? {
-        totalRepetitions: stats.totalRepetitions,
-        totalTimeMs: stats.totalTimeMs,
-        totalCards: stats.totalCards,
-        currentStreak: streak!.displayStreak,
-        streakState: streak!.state,
-        totalWordCount,
-        totalChatMessages: stats.totalChatMessages ?? 0,
-        totalChatCardsApproved: stats.totalChatCardsApproved ?? 0,
-        totalCardsAddedManually: stats.totalCardsAddedManually ?? 0,
-        totalAccuracySum: stats.totalAccuracySum ?? 0,
-        totalAccuracyCount: stats.totalAccuracyCount ?? 0,
-        // Both punctuation variants, plus the setting that says which one to
-        // show. The tile picks client-side; the legacy pair above is the
-        // fallback for users whose history predates the split.
-        totalAccuracyStrictSum: stats.totalAccuracyStrictSum ?? 0,
-        totalAccuracyLenientSum: stats.totalAccuracyLenientSum ?? 0,
-        totalAccuracyDualCount: stats.totalAccuracyDualCount ?? 0,
-      } : null,
+      courseStats: stats
+        ? {
+            totalRepetitions: stats.totalRepetitions,
+            totalTimeMs: stats.totalTimeMs,
+            totalCards: stats.totalCards,
+            currentStreak: streak!.displayStreak,
+            streakState: streak!.state,
+            totalWordCount,
+            totalChatMessages: stats.totalChatMessages ?? 0,
+            totalChatCardsApproved: stats.totalChatCardsApproved ?? 0,
+            totalCardsAddedManually: stats.totalCardsAddedManually ?? 0,
+            totalAccuracySum: stats.totalAccuracySum ?? 0,
+            totalAccuracyCount: stats.totalAccuracyCount ?? 0,
+            // Both punctuation variants, plus the setting that says which one to
+            // show. The tile picks client-side; the legacy pair above is the
+            // fallback for users whose history predates the split.
+            totalAccuracyStrictSum: stats.totalAccuracyStrictSum ?? 0,
+            totalAccuracyLenientSum: stats.totalAccuracyLenientSum ?? 0,
+            totalAccuracyDualCount: stats.totalAccuracyDualCount ?? 0,
+          }
+        : null,
       ignorePunctuation: courseSettings?.ignorePunctuation ?? false,
       todayReps: todayDaily?.reps ?? 0,
       todayNewCards: todayDaily?.newCards ?? 0,
@@ -211,8 +308,28 @@ export const getStatsPageDailyData = query({
     startDate: v.string(),
     endDate: v.string(),
   },
+  returns: v.object({
+    heatmapData: v.array(
+      v.object({
+        date: v.string(),
+        reps: v.number(),
+        timeMs: v.number(),
+        newCards: v.number(),
+      }),
+    ),
+    languageDailyData: v.array(
+      v.object({
+        date: v.string(),
+        language: v.string(),
+        newWordsCount: v.number(),
+      }),
+    ),
+  }),
   handler: async (ctx, args) => {
-    if (!isValidDateString(args.startDate) || !isValidDateString(args.endDate)) {
+    if (
+      !isValidDateString(args.startDate) ||
+      !isValidDateString(args.endDate)
+    ) {
       return { heatmapData: [], languageDailyData: [] };
     }
     const userId = await getAuthUserId(ctx);
@@ -226,8 +343,11 @@ export const getStatsPageDailyData = query({
     const dailyRows = await ctx.db
       .query('dailyStats')
       .withIndex('by_userId_and_courseId_and_date', (q) =>
-        q.eq('userId', userId).eq('courseId', courseId)
-          .gte('date', args.startDate).lte('date', args.endDate),
+        q
+          .eq('userId', userId)
+          .eq('courseId', courseId)
+          .gte('date', args.startDate)
+          .lte('date', args.endDate),
       )
       .take(400);
 
@@ -242,8 +362,11 @@ export const getStatsPageDailyData = query({
     const langRows = await ctx.db
       .query('dailyLanguageStats')
       .withIndex('by_userId_and_courseId_and_date', (q) =>
-        q.eq('userId', userId).eq('courseId', courseId)
-          .gte('date', args.startDate).lte('date', args.endDate),
+        q
+          .eq('userId', userId)
+          .eq('courseId', courseId)
+          .gte('date', args.startDate)
+          .lte('date', args.endDate),
       )
       .take(2000);
 
@@ -293,6 +416,9 @@ function normalizeSearchTerm(raw: string): string {
  */
 export const getRecentWords = query({
   args: {},
+  returns: v.array(
+    v.object({ language: v.string(), words: v.array(v.string()) }),
+  ),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
@@ -323,7 +449,10 @@ export const getRecentWords = query({
         const rows = await ctx.db
           .query('userWords')
           .withIndex('by_userId_and_courseId_and_language', (q) =>
-            q.eq('userId', userId).eq('courseId', courseId).eq('language', variant),
+            q
+              .eq('userId', userId)
+              .eq('courseId', courseId)
+              .eq('language', variant),
           )
           .order('desc')
           .take(500);
@@ -347,6 +476,7 @@ export const getRecentWordsForLanguage = query({
     language: v.string(),
     limit: v.optional(v.number()),
   },
+  returns: v.array(v.string()),
   handler: async (ctx, { language, limit }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
@@ -369,7 +499,10 @@ export const getRecentWordsForLanguage = query({
       const rows = await ctx.db
         .query('userWords')
         .withIndex('by_userId_and_courseId_and_language', (q) =>
-          q.eq('userId', userId).eq('courseId', courseId).eq('language', variant),
+          q
+            .eq('userId', userId)
+            .eq('courseId', courseId)
+            .eq('language', variant),
         )
         .order('desc')
         .take(cap);
@@ -394,6 +527,7 @@ export const searchWordsForLanguage = query({
     language: v.string(),
     searchQuery: v.string(),
   },
+  returns: v.array(v.string()),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
@@ -446,6 +580,13 @@ export const searchWords = query({
   args: {
     searchQuery: v.string(),
   },
+  returns: v.array(
+    v.object({
+      word: v.string(),
+      displayWord: v.string(),
+      language: v.string(),
+    }),
+  ),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
@@ -497,6 +638,19 @@ export const getSentencesForWord = query({
     language: v.string(),
     paginationOpts: paginationOptsValidator,
   },
+  returns: paginationResultValidator(
+    v.object({
+      textId: v.id('texts'),
+      translations: v.array(translationValidator),
+      audioRecordings: v.array(audioRecordingValidator),
+      hasMissingContent: v.boolean(),
+      cardId: v.union(v.id('cards'), v.null()),
+      isMastered: v.boolean(),
+      isHidden: v.boolean(),
+      isFavorite: v.boolean(),
+      reviewCount: v.number(),
+    }),
+  ),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return { page: [], isDone: true, continueCursor: '' };
@@ -515,9 +669,11 @@ export const getSentencesForWord = query({
     // stores the raw code from the course (e.g. "es_latam"). Resolve it from
     // the course's targetLanguages, no extra DB query needed.
     const allLangs = [...baseLanguages, ...targetLanguages];
-    const lang = allLangs.find(
-      (l) => l === args.language || normalizeLanguageCode(l) === args.language,
-    ) ?? args.language;
+    const lang =
+      allLangs.find(
+        (l) =>
+          l === args.language || normalizeLanguageCode(l) === args.language,
+      ) ?? args.language;
 
     const result = await ctx.db
       .query('userWordTexts')
@@ -553,6 +709,7 @@ export const getSentencesForWord = query({
           sourceLanguage: text.language,
           sourceRomanization: text.romanizedText ?? undefined,
           sourceIpa: text.ipaText ?? undefined,
+          sourceFurigana: text.furiganaText ?? undefined,
           userCreated: text.userCreated,
           card: cardDocs[i] ?? null,
         };
@@ -591,279 +748,6 @@ export const getSentencesForWord = query({
   },
 });
 
-// ============================================================================
-// INTERNAL QUERIES, currently unused by the UI but retained for future use
-// (e.g. expanded stats views, admin dashboards, data exports).
-// These are internal so they don't pollute the public API surface.
-// ============================================================================
-
-/** Full dailyStats documents for a date range. */
-export const getStatsForRange = internalQuery({
-  args: {
-    startDate: v.string(),
-    endDate: v.string(),
-  },
-  handler: async (ctx, args) => {
-    if (!isValidDateString(args.startDate) || !isValidDateString(args.endDate)) return [];
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return [];
-
-    return ctx.db
-      .query('dailyStats')
-      .withIndex('by_userId_and_courseId_and_date', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id)
-          .gte('date', args.startDate).lte('date', args.endDate),
-      )
-      .take(400);
-  },
-});
-
-/** Weekly stats for a week range (ISO 8601 "YYYY-Www"). */
-export const getWeeklyStatsRange = internalQuery({
-  args: {
-    startWeek: v.string(),
-    endWeek: v.string(),
-  },
-  handler: async (ctx, args) => {
-    if (!isValidWeekString(args.startWeek) || !isValidWeekString(args.endWeek)) return [];
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return [];
-
-    return ctx.db
-      .query('weeklyStats')
-      .withIndex('by_userId_and_courseId_and_week', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id)
-          .gte('week', args.startWeek).lte('week', args.endWeek),
-      )
-      .take(60);
-  },
-});
-
-/** Yearly stats for a year range ("YYYY"). */
-export const getYearlyStatsRange = internalQuery({
-  args: {
-    startYear: v.string(),
-    endYear: v.string(),
-  },
-  handler: async (ctx, args) => {
-    if (!isValidYearString(args.startYear) || !isValidYearString(args.endYear)) return [];
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return [];
-
-    return ctx.db
-      .query('yearlyStats')
-      .withIndex('by_userId_and_courseId_and_year', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id)
-          .gte('year', args.startYear).lte('year', args.endYear),
-      )
-      .take(10);
-  },
-});
-
-/** All-time per-language totals. */
-export const getLanguageStats = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return [];
-
-    return ctx.db
-      .query('languageStats')
-      .withIndex('by_userId_and_courseId', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id),
-      )
-      .take(20);
-  },
-});
-
-/** Rating distribution (stillLearning, understood, again, hard, good, easy) for a date range. */
-export const getRatingDistribution = internalQuery({
-  args: {
-    startDate: v.string(),
-    endDate: v.string(),
-  },
-  handler: async (ctx, args) => {
-    if (!isValidDateString(args.startDate) || !isValidDateString(args.endDate)) return null;
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return null;
-
-    const rows = await ctx.db
-      .query('dailyStats')
-      .withIndex('by_userId_and_courseId_and_date', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id)
-          .gte('date', args.startDate).lte('date', args.endDate),
-      )
-      .take(400);
-
-    const totals = { stillLearning: 0, understood: 0, again: 0, hard: 0, good: 0, easy: 0 };
-    for (const row of rows) {
-      if (row.ratingCounts) {
-        for (const key of Object.keys(totals) as (keyof typeof totals)[]) {
-          totals[key] += row.ratingCounts[key] ?? 0;
-        }
-      }
-    }
-    return totals;
-  },
-});
-
-/** Accuracy curve by review depth (review number → average accuracy). */
-export const getAccuracyByReviewDepth = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return [];
-
-    const rows = await ctx.db
-      .query('reviewDepthAccuracy')
-      .withIndex('by_userId_and_courseId', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id),
-      )
-      .take(100);
-
-    return rows.map((r) => ({
-      reviewNumber: r.reviewNumber,
-      averageAccuracy: r.count > 0 ? r.accuracySum / r.count : 0,
-      count: r.count,
-    }));
-  },
-});
-
-/** Reviews broken down by card FSRS state for a date range. */
-export const getCardStateDistribution = internalQuery({
-  args: {
-    startDate: v.string(),
-    endDate: v.string(),
-  },
-  handler: async (ctx, args) => {
-    if (!isValidDateString(args.startDate) || !isValidDateString(args.endDate)) return null;
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return null;
-
-    const rows = await ctx.db
-      .query('dailyStats')
-      .withIndex('by_userId_and_courseId_and_date', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id)
-          .gte('date', args.startDate).lte('date', args.endDate),
-      )
-      .take(400);
-
-    const totals = { new: 0, learning: 0, review: 0, relearning: 0 };
-    for (const row of rows) {
-      if (row.reviewsByCardState) {
-        for (const key of Object.keys(totals) as (keyof typeof totals)[]) {
-          totals[key] += row.reviewsByCardState[key] ?? 0;
-        }
-      }
-    }
-    return totals;
-  },
-});
-
-/** Learning progress per collection (cards added/learned vs total). */
-export const getCollectionLearningProgress = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return [];
-
-    const rows = await ctx.db
-      .query('collectionProgress')
-      .withIndex('by_userId_and_courseId', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id),
-      )
-      .take(50);
-
-    return Promise.all(
-      rows.map(async (r) => {
-        const collection = await ctx.db.get(r.collectionId);
-        return {
-          collectionId: r.collectionId,
-          collectionName: collection?.name ?? 'Unknown',
-          cardsAdded: r.cardsAdded,
-          cardsLearned: r.cardsLearned ?? 0,
-          totalTexts: collection?.textCount ?? 0,
-        };
-      }),
-    );
-  },
-});
-
-/**
- * Card distribution across FSRS states (O(log n) via aggregates).
- *
- * Counted as whole `${deckId}:${state}` namespaces of `cardsByStateAndDueDate`,
- * which is exactly what a `deckId`-namespaced state aggregate would have held:
- * the two differ only in whether the due-date bound is applied, and here it
- * isn't. See `getDueCardCount` for the other half of that equivalence.
- */
-export const getCardMaturityDistribution = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return null;
-    const deck = await getDeckByCourseId(ctx, active.course._id);
-    if (!deck) return null;
-
-    const result: Record<string, number> = {};
-    for (const label of STATE_LABELS) {
-      result[label] = await cardsByStateAndDueDate.count(ctx, {
-        namespace: `${deck._id}:${label}`,
-      });
-    }
-    return result;
-  },
-});
-
-/**
- * Number of cards currently due for review (O(log n) via aggregates).
- *
- * Summed over every state namespace of `cardsByStateAndDueDate` rather than
- * read from one deck-wide tree. STATE_LABELS is `EXTENDED_STATE_LABELS`, so
- * `mastered` and `hidden` cards are included exactly as a deck-wide due
- * aggregate would have included them.
- */
-export const getDueCardCount = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return 0;
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return 0;
-    const deck = await getDeckByCourseId(ctx, active.course._id);
-    if (!deck) return 0;
-
-    const dueBounds = { upper: { key: Date.now(), inclusive: true } };
-    const perState = await Promise.all(
-      STATE_LABELS.map((label) =>
-        cardsByStateAndDueDate.count(ctx, {
-          namespace: `${deck._id}:${label}`,
-          bounds: dueBounds,
-        }),
-      ),
-    );
-    return perState.reduce((a, b) => a + b, 0);
-  },
-});
-
 /**
  * Shared implementation for the due-count queries below: resolve the caller's
  * active deck, then count due cards per FSRS state via aggregates. `filter`
@@ -871,6 +755,47 @@ export const getDueCardCount = internalQuery({
  * cards without a resolved origin); 'course'/'custom' sum the per-origin
  * aggregate buckets.
  */
+/**
+ * Shared preamble of the due-count and workload-forecast queries: resolve
+ * the caller's active course, its deck, settings, and which scheduling
+ * track's aggregates serve the current queue.
+ *
+ * With separateModeTracking on and the course in Writing mode, the due
+ * queue is the writing track. Counting from the matching aggregates keeps
+ * the home pills, forecast, and celebration counts describing the queue the
+ * user will actually be served. The caller may pass its
+ * optimistically-updated reviewMode (same rationale as the explicit `filter`
+ * args below: the counts then flip in the same frame as the
+ * Shadowing↔Writing toggle instead of lagging the settings round-trip);
+ * separateModeTracking itself is server-owned and always read from
+ * settings. `face` comes from the same resolution so the preparingWriting
+ * gates can tell Free Study apart from the due queue.
+ */
+async function resolveDueCountContext(
+  ctx: QueryCtx,
+  reviewModeOverride?: ReviewMode,
+): Promise<{
+  userId: string;
+  course: Doc<'courses'>;
+  deck: Doc<'decks'>;
+  settings: Doc<'courseSettings'> | null;
+  face: StudyContext['face'];
+  track: StudyContext['track'];
+} | null> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) return null;
+  const active = await getActiveCourseForUser(ctx, userId);
+  if (!active) return null;
+  const deck = await getDeckByCourseId(ctx, active.course._id);
+  if (!deck) return null;
+  const settings = await getCourseSettings(ctx, active.course._id);
+  const { face, track } = studyContextFromSettings(
+    settings,
+    reviewModeOverride,
+  );
+  return { userId, course: active.course, deck, settings, face, track };
+}
+
 async function countDueCardsByState(
   ctx: QueryCtx,
   filter: StudyContentFilter,
@@ -883,28 +808,9 @@ async function countDueCardsByState(
   review: number;
   preparingWriting?: boolean;
 } | null> {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) return null;
-  const active = await getActiveCourseForUser(ctx, userId);
-  if (!active) return null;
-  const deck = await getDeckByCourseId(ctx, active.course._id);
-  if (!deck) return null;
-
-  // With separateModeTracking on and the course in Writing mode, the due
-  // queue is the writing track. Count from the matching aggregates so the
-  // home pills and the celebration counts describe the queue the user will
-  // actually be served. The caller may pass its optimistically-updated
-  // reviewMode (same rationale as the explicit `filter` arg: the counts then
-  // flip in the same frame as the Shadowing↔Writing toggle instead of
-  // lagging the settings round-trip); separateModeTracking itself is
-  // server-owned and always read from settings. `face` comes from the same
-  // resolution so the preparingWriting gate below can tell Free Study apart
-  // from the due queue.
-  const settings = await getCourseSettings(ctx, active.course._id);
-  const { face, track } = studyContextFromSettings(
-    settings,
-    reviewModeOverride,
-  );
+  const context = await resolveDueCountContext(ctx, reviewModeOverride);
+  if (!context) return null;
+  const { deck, settings, face, track } = context;
   const { state: stateAggregate, originState: originStateAggregate } =
     TRACK_AGGREGATES[track];
 
@@ -929,12 +835,13 @@ async function countDueCardsByState(
     return counts.reduce((a, b) => a + b, 0);
   };
 
-  const [newCount, learningCount, reviewCount, relearningCount] = await Promise.all([
-    countState('new'),
-    countState('learning'),
-    countState('review'),
-    countState('relearning'),
-  ]);
+  const [newCount, learningCount, reviewCount, relearningCount] =
+    await Promise.all([
+      countState('new'),
+      countState('learning'),
+      countState('review'),
+      countState('relearning'),
+    ]);
 
   return {
     new: newCount,
@@ -986,7 +893,9 @@ export const getCardCounts = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    return countDueCardsByState(ctx, 'both', args.now ?? Date.now());
+    // resolveClientNow covers both the back-compat omission (older bundles
+    // call with {}) and a non-finite client value; each falls to Date.now().
+    return countDueCardsByState(ctx, 'both', resolveClientNow(args.now));
   },
 });
 
@@ -1031,9 +940,305 @@ export const getFilteredCardCounts = query({
     return countDueCardsByState(
       ctx,
       args.filter ?? 'both',
-      args.now,
+      // Convex numbers admit NaN/Infinity; fail closed to the server clock
+      // rather than letting a non-finite bound reach the aggregates.
+      resolveClientNow(args.now),
       args.reviewMode,
     );
+  },
+});
+
+const workloadDayStateCountsValidator = v.object({
+  new: v.number(),
+  learning: v.number(),
+  relearning: v.number(),
+  review: v.number(),
+});
+
+/** The four states the workload forecast buckets (mastered/hidden excluded,
+ * matching the serving queue — same set countDueCardsByState counts).
+ * FSRS_STATE_LABELS' vocabulary, reordered to match the destructure at the
+ * `prefixFor` call site; `satisfies` pins every entry to the shared type. */
+const WORKLOAD_STATES = [
+  'new',
+  'learning',
+  'relearning',
+  'review',
+] as const satisfies readonly FsrsStateLabel[];
+
+/**
+ * Exact per-day scheduled due counts for the next WORKLOAD_DAYS days, plus a
+ * trailing window of the user's own behaviour — everything the pure
+ * forecast model (lib/workloadForecast.ts) needs to render the home-screen
+ * workload card.
+ *
+ * Day buckets are prefix-count differences over the due-date-sorted
+ * aggregates: per state (and per origin bucket when filtered), one count at
+ * each of the 8 upper bounds [now, start(today+1) … start(today+7)]. Today
+ * splits into `availableNow` (due ≤ now — overdue backlog included) and
+ * `laterToday`; each `futureDays[k]` is one whole user-local day, boundaries
+ * from the DST-safe `startOfDayMs`. All counts run in one Promise.all and
+ * one transaction snapshot, so the diffs can't go negative (the max(0,…) is
+ * belt and braces).
+ *
+ * Cost: 4 states × 8 bounds × (1 namespace, or 2 for filter 'custom') =
+ * 32–64 O(log n) aggregate counts, +5 for the stability-bucket mix (4
+ * bucket counts + the guard's exact review total), +3 unbounded state
+ * counts for `startedCards`, + ≤ ~20 dailyStats rows. `now` is
+ * client-supplied and minute-quantized (the only wall-clock read is
+ * resolveClientToday's ±1-day validation of `today`; identical
+ * args keep the query cacheable across subscribers). If this query ever
+ * shows up in insights, the trim ladder is: drop the `laterToday` split
+ * (−4/−8 counts), then restrict `filter` support to 'both'.
+ *
+ * `timezone`/`today` follow the projections.ts contract: invalid zone falls
+ * back to UTC, the client's `today` is accepted only within ±1 day of the
+ * server's view, and `now` is clamped into today's window so a skewed
+ * client clock only shifts its own display.
+ */
+export const getWorkloadForecast = query({
+  args: {
+    timezone: v.string(),
+    today: v.string(),
+    now: v.number(),
+    // Optimistic client values, same contract as getFilteredCardCounts.
+    reviewMode: v.optional(reviewModeValidator),
+    filter: v.optional(studyContentFilterValidator),
+  },
+  returns: v.union(
+    v.null(),
+    v.object({
+      today: v.string(),
+      dayStartMs: v.number(),
+      availableNow: workloadDayStateCountsValidator,
+      laterToday: workloadDayStateCountsValidator,
+      futureDays: v.array(workloadDayStateCountsValidator),
+      history: v.object({
+        windowDays: v.number(),
+        activeDays: v.number(),
+        reps: v.number(),
+        cardsReviewed: v.number(),
+        newCards: v.number(),
+        timeMs: v.number(),
+        reviewsByMode: v.object({ audio: v.number(), full: v.number() }),
+        timeMsByMode: v.object({ audio: v.number(), full: v.number() }),
+        ratingCounts: v.object({
+          stillLearning: v.number(),
+          understood: v.number(),
+          again: v.number(),
+          hard: v.number(),
+          good: v.number(),
+          easy: v.number(),
+        }),
+      }),
+      initialReviewCount: v.number(),
+      // Cards in any non-'new' active state across the WHOLE deck (no due
+      // bound, no content filter) — the client's minimum-activity gate for
+      // the forecast card. Filter-independent so toggling the content
+      // filter can't lock and unlock the card underneath the user.
+      startedCards: v.number(),
+      // Per-stability-bucket counts of mature cards due inside the window
+      // (shared track, unfiltered — the mix is a deck property, and for
+      // separateModeTracking's writing mode it doubles as a proxy). Omitted
+      // while the backfill migration hasn't covered the deck yet; the lib
+      // falls back to its young-deck prior then.
+      matureStabilityCounts: v.optional(
+        v.object({
+          s0: v.number(),
+          s1: v.number(),
+          s2: v.number(),
+          s3: v.number(),
+        }),
+      ),
+      // Set while the separateModeTracking writing seed is still filling the
+      // writing aggregates. See countDueCardsByState.
+      preparingWriting: v.optional(v.boolean()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const context = await resolveDueCountContext(ctx, args.reviewMode);
+    if (!context) return null;
+    const { userId, course, deck, settings, face, track } = context;
+    const filter = args.filter ?? 'both';
+
+    const timezone = isValidTimezone(args.timezone) ? args.timezone : 'UTC';
+    const today = resolveClientToday(timezone, args.today);
+    const boundaries: number[] = [];
+    for (let k = 0; k <= WORKLOAD_DAYS; k++) {
+      boundaries.push(startOfDayMs(addDays(today, k), timezone));
+    }
+    // resolveClientNow first: NaN propagates straight through min/max, and a
+    // NaN upper bound would collapse every availableNow count to the first
+    // boundary key.
+    const now = Math.min(
+      Math.max(resolveClientNow(args.now), boundaries[0]),
+      boundaries[1] - 1,
+    );
+
+    const { state: stateAggregate, originState: originStateAggregate } =
+      TRACK_AGGREGATES[track];
+    const uppers = [
+      { key: now, inclusive: true },
+      ...boundaries.slice(1).map((b) => ({ key: b, inclusive: false })),
+    ];
+
+    // Cumulative counts per state at each upper bound, summed over the
+    // filter's namespaces.
+    const prefixFor = async (state: string): Promise<number[]> => {
+      const pairs =
+        filter === 'both'
+          ? [{ aggregate: stateAggregate, namespace: `${deck._id}:${state}` }]
+          : originsForFilter(filter).map((origin) => ({
+              aggregate: originStateAggregate,
+              namespace: `${deck._id}:${origin}:${state}`,
+            }));
+      const perPair = await Promise.all(
+        pairs.map(({ aggregate, namespace }) =>
+          Promise.all(
+            uppers.map((upper) =>
+              aggregate.count(ctx, { namespace, bounds: { upper } }),
+            ),
+          ),
+        ),
+      );
+      return uppers.map((_, i) =>
+        perPair.reduce((sum, counts) => sum + counts[i], 0),
+      );
+    };
+    const [pNew, pLearning, pRelearning, pReview] = await Promise.all(
+      WORKLOAD_STATES.map(prefixFor),
+    );
+
+    // Deck-wide unbounded counts (3 more O(log n) reads) rather than the
+    // filtered prefix counts above: the gate asks "has this user studied at
+    // all", which no due window or content filter should change.
+    const startedCards = (
+      await Promise.all(
+        (['learning', 'relearning', 'review'] as const).map((state) =>
+          stateAggregate.count(ctx, { namespace: `${deck._id}:${state}` }),
+        ),
+      )
+    ).reduce((sum, n) => sum + n, 0);
+
+    // Observed stability mix: mature cards due inside the whole window, per
+    // stability bucket, from the SHARED-track deck-wide aggregate (no
+    // content filter, no track split — the mix is a property of the deck,
+    // and for separateModeTracking's writing mode it stands proxy). The
+    // guard compares against the exact shared review-state total over the
+    // same range: while the backfill migration hasn't covered this deck the
+    // bucket counts read low and the payload omits the field, so the model
+    // keeps its prior — no flag, and mid-backfill partials can't masquerade
+    // as a real mix.
+    const windowUpper = { key: boundaries[WORKLOAD_DAYS], inclusive: false };
+    const [bucketCounts, sharedReviewTotal] = await Promise.all([
+      Promise.all(
+        STABILITY_BUCKETS.map((stabilityBucket) =>
+          cardsByStabilityBucketAndDueDate.count(ctx, {
+            namespace: `${deck._id}:${stabilityBucket.key}`,
+            bounds: { upper: windowUpper },
+          }),
+        ),
+      ),
+      cardsByStateAndDueDate.count(ctx, {
+        namespace: `${deck._id}:review`,
+        bounds: { upper: windowUpper },
+      }),
+    ]);
+    const bucketTotal = bucketCounts.reduce((sum, n) => sum + n, 0);
+    const matureStabilityCounts =
+      bucketTotal >= 0.9 * sharedReviewTotal
+        ? {
+            s0: bucketCounts[0],
+            s1: bucketCounts[1],
+            s2: bucketCounts[2],
+            s3: bucketCounts[3],
+          }
+        : undefined;
+
+    const bucket = (pick: (prefix: number[]) => number) => ({
+      new: Math.max(0, pick(pNew)),
+      learning: Math.max(0, pick(pLearning)),
+      relearning: Math.max(0, pick(pRelearning)),
+      review: Math.max(0, pick(pReview)),
+    });
+    const availableNow = bucket((p) => p[0]);
+    const laterToday = bucket((p) => p[1] - p[0]);
+    const futureDays = Array.from({ length: WORKLOAD_DAYS - 1 }, (_, i) =>
+      bucket((p) => p[i + 2] - p[i + 1]),
+    );
+
+    // Trailing window of COMPLETE days (today excluded — a partial day would
+    // bias the adds/pace averages). Bounded scan, precedent projections.ts.
+    const windowRows = await ctx.db
+      .query('dailyStats')
+      .withIndex('by_userId_and_courseId_and_date', (q) =>
+        q
+          .eq('userId', userId)
+          .eq('courseId', course._id)
+          .gte('date', addDays(today, -WORKLOAD_HISTORY_WINDOW_DAYS))
+          .lte('date', addDays(today, -1)),
+      )
+      .take(WORKLOAD_HISTORY_WINDOW_DAYS + 5);
+
+    const history = {
+      windowDays: WORKLOAD_HISTORY_WINDOW_DAYS,
+      activeDays: 0,
+      reps: 0,
+      cardsReviewed: 0,
+      newCards: 0,
+      timeMs: 0,
+      reviewsByMode: { audio: 0, full: 0 },
+      timeMsByMode: { audio: 0, full: 0 },
+      ratingCounts: {
+        stillLearning: 0,
+        understood: 0,
+        again: 0,
+        hard: 0,
+        good: 0,
+        easy: 0,
+      },
+    };
+    for (const row of windowRows) {
+      if (row.reps > 0) history.activeDays += 1;
+      history.reps += row.reps;
+      history.cardsReviewed += row.cardsReviewed;
+      history.newCards += row.newCards;
+      history.timeMs += row.timeMs;
+      // Graded modes only — free play's radio/freeStudy members say nothing
+      // about per-review pace.
+      history.reviewsByMode.audio += row.reviewsByMode?.audio ?? 0;
+      history.reviewsByMode.full += row.reviewsByMode?.full ?? 0;
+      history.timeMsByMode.audio += row.timeMsByMode?.audio ?? 0;
+      history.timeMsByMode.full += row.timeMsByMode?.full ?? 0;
+      if (row.ratingCounts) {
+        history.ratingCounts.stillLearning += row.ratingCounts.stillLearning;
+        history.ratingCounts.understood += row.ratingCounts.understood;
+        history.ratingCounts.again += row.ratingCounts.again;
+        history.ratingCounts.hard += row.ratingCounts.hard;
+        history.ratingCounts.good += row.ratingCounts.good;
+        history.ratingCounts.easy += row.ratingCounts.easy;
+      }
+    }
+
+    return {
+      today,
+      dayStartMs: boundaries[0],
+      availableNow,
+      laterToday,
+      futureDays,
+      history,
+      initialReviewCount:
+        settings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
+      startedCards,
+      ...(matureStabilityCounts ? { matureStabilityCounts } : {}),
+      // Same provisional gate as countDueCardsByState: a mid-seed writing
+      // queue is a partial prefix, not a settled zero.
+      ...(face === null &&
+      track === 'writing' &&
+      settings?.writingSeedDone !== true
+        ? { preparingWriting: true }
+        : {}),
+    };
   },
 });
 
@@ -1068,7 +1273,15 @@ function getDateFormatter(timeZone: string): Intl.DateTimeFormat {
  * since they can't belong to today regardless of timezone.
  */
 export const getNewWordsForCelebration = query({
-  args: { sessionId: v.string(), timezone: v.string() },
+  // `today` is client-supplied per the no-wall-clock query guideline (same
+  // contract as getStatsPageData above: validated and clamped to ±1 day of
+  // the server's view in resolveClientToday). Optional for back-compat:
+  // already-shipped bundles omit it and keep the server-clock behavior.
+  args: {
+    sessionId: v.string(),
+    timezone: v.string(),
+    today: v.optional(v.string()),
+  },
   returns: v.object({
     session: v.array(v.object({ language: v.string(), display: v.string() })),
     today: v.array(v.object({ language: v.string(), display: v.string() })),
@@ -1079,7 +1292,7 @@ export const getNewWordsForCelebration = query({
     const active = await getActiveCourseForUser(ctx, userId);
     if (!active) return { session: [], today: [] };
     const targetLanguages = new Set(active.course.targetLanguages);
-    const todayStr = getTodayInTimezone(args.timezone);
+    const todayStr = resolveClientToday(args.timezone, args.today);
 
     // userWords' only userId+courseId-scoped indexes also key on language, so
     // iterate the target languages explicitly. Each per-language scan is
@@ -1104,7 +1317,11 @@ export const getNewWordsForCelebration = query({
 
     const dtf = getDateFormatter(args.timezone);
 
-    type Entry = { language: string; display: string; bucket: 'session' | 'today' };
+    type Entry = {
+      language: string;
+      display: string;
+      bucket: 'session' | 'today';
+    };
     const seen = new Map<string, Entry>();
     for (const row of rows) {
       if (!targetLanguages.has(row.language)) continue;

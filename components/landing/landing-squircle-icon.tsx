@@ -11,9 +11,18 @@ export function LandingSquircleIcon({
   className,
 }: LandingSquircleIconProps) {
   return (
-    <div className={cn('relative flex items-center justify-center h-16 w-16 shrink-0', className)}>
+    <div
+      className={cn(
+        'relative flex items-center justify-center h-16 w-16 shrink-0',
+        className,
+      )}
+    >
       {/* Clip container: overflow visible on top/left/right, clipped at blue square's bottom */}
-      <div className="absolute inset-0" style={{ clipPath: 'inset(-20px -20px 4px -20px)' }} aria-hidden>
+      <div
+        className="absolute inset-0"
+        style={{ clipPath: 'inset(-20px -20px 4px -20px)' }}
+        aria-hidden
+      >
         {/* Back layer: orange (furthest back, most rotated) */}
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="h-14 w-14 rounded-[7px] -rotate-[30deg] bg-[#F97316]" />

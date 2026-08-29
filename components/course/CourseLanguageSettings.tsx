@@ -34,6 +34,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
+import { convexErrorMessage } from '@/lib/utils';
 import { DualLanguageEditor } from '@/components/course/DualLanguageEditor';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
@@ -62,7 +63,9 @@ export function CourseLanguageSettings({
     api.features.courses.updateCourseLanguages,
   );
 
-  const { isAvailable: hasMultipleLanguages } = useFeatureQuota(FEATURE_IDS.MULTIPLE_LANGUAGES);
+  const { isAvailable: hasMultipleLanguages } = useFeatureQuota(
+    FEATURE_IDS.MULTIPLE_LANGUAGES,
+  );
   const [paywallOpen, setPaywallOpen] = useState(false);
 
   const planMaxTotal = hasMultipleLanguages ? 3 : 2;
@@ -74,7 +77,10 @@ export function CourseLanguageSettings({
   // disables its add button at the cap.
   const existingBaseCount = course?.baseLanguages.length ?? 0;
   const existingTargetCount = course?.targetLanguages.length ?? 0;
-  const maxTotal = Math.max(planMaxTotal, existingBaseCount + existingTargetCount);
+  const maxTotal = Math.max(
+    planMaxTotal,
+    existingBaseCount + existingTargetCount,
+  );
   const maxPerGroup = Math.max(
     planMaxPerGroup,
     existingBaseCount,
@@ -96,10 +102,7 @@ export function CourseLanguageSettings({
     if (course) {
       setDraftBase([...course.baseLanguages]);
       setDraftTarget([...course.targetLanguages]);
-      setSavedCodes([
-        ...course.baseLanguages,
-        ...course.targetLanguages,
-      ]);
+      setSavedCodes([...course.baseLanguages, ...course.targetLanguages]);
       setHasChanges(false);
       setSaving(false);
       setError(null);
@@ -170,7 +173,9 @@ export function CourseLanguageSettings({
       await archiveCourse({ courseId: course._id });
       handleClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to archive course');
+      // convexErrorMessage reads both payload shapes (plain-string data and
+      // structured { code, message }); fall back to the generic copy.
+      setError(convexErrorMessage(e) ?? t('saveFailed'));
     } finally {
       setArchiving(false);
       setArchiveConfirmOpen(false);
@@ -178,9 +183,7 @@ export function CourseLanguageSettings({
   };
 
   const formatName = (codes: string[]) =>
-    codes
-      .map((c) => getLocalizedLanguageNameByCode(c, locale))
-      .join(', ');
+    codes.map((c) => getLocalizedLanguageNameByCode(c, locale)).join(', ');
 
   const editorLabels = {
     baseLanguages: t(draftBase.length === 1 ? 'baseLanguage' : 'baseLanguages'),
@@ -204,9 +207,7 @@ export function CourseLanguageSettings({
         {course && (
           <>
             <div className="sheet-header">
-              <SheetTitle className="heading-section">
-                {t('title')}
-              </SheetTitle>
+              <SheetTitle className="heading-section">{t('title')}</SheetTitle>
               <Button
                 variant="ghost"
                 size="icon"
@@ -333,7 +334,10 @@ export function CourseLanguageSettings({
           />
         )}
 
-        <AlertDialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
+        <AlertDialog
+          open={archiveConfirmOpen}
+          onOpenChange={setArchiveConfirmOpen}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>{t('archiveConfirmTitle')}</AlertDialogTitle>

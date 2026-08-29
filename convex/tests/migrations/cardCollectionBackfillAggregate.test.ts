@@ -49,11 +49,19 @@ beforeEach(() => {
 });
 
 type SeedOpts = {
-  collectionOrigin?: Doc<'cards'>['collectionOrigin'];
-  withCollectionId?: boolean;
   collectionName?: string;
   collectionOriginField?: Doc<'collections'>['origin'];
   withWritingTrack?: boolean;
+};
+
+/** The pre-backfill doc value `runOne` reconstructs for the migration. */
+type LegacyView = {
+  /** collectionOrigin the migration sees. Default: stripped (undefined). */
+  collectionOrigin?: Doc<'cards'>['collectionOrigin'];
+  /** false = strip collectionId off the doc value too. */
+  withCollectionId?: boolean;
+  /** Pass the stored doc through unchanged (post-backfill re-run). */
+  asStored?: boolean;
 };
 
 async function seedCard(t: TestConvex<typeof schema>, opts: SeedOpts = {}) {
@@ -82,18 +90,20 @@ async function seedCard(t: TestConvex<typeof schema>, opts: SeedOpts = {}) {
       collectionId,
       collectionRank: 1,
     });
+    // The narrowed schema can no longer PERSIST a pre-backfill card, so the
+    // stored row is fully valid; `runOne` strips the fields back off the doc
+    // in memory (per SeedOpts) before handing it to the migration, exactly
+    // the value shape a prod row written before the backfill presents.
     const cardId = await ctx.db.insert('cards', {
       deckId,
       textId,
+      collectionId,
+      collectionOrigin: 'premade',
       dueDate: 0,
       isMastered: false,
       isHidden: false,
       schedulingPhase: 'preReview',
       preReviewCount: 0,
-      ...(opts.withCollectionId === false ? {} : { collectionId }),
-      ...(opts.collectionOrigin
-        ? { collectionOrigin: opts.collectionOrigin }
-        : {}),
       // Seeded writing track (separateModeTracking), membership marker for
       // the writing origin aggregate is `writingDueDate !== undefined`.
       ...(opts.withWritingTrack
@@ -104,10 +114,23 @@ async function seedCard(t: TestConvex<typeof schema>, opts: SeedOpts = {}) {
   });
 }
 
-async function runOne(t: TestConvex<typeof schema>, cardId: Id<'cards'>) {
+async function runOne(
+  t: TestConvex<typeof schema>,
+  cardId: Id<'cards'>,
+  view: LegacyView = {},
+) {
   return t.run(async (ctx) => {
     const doc = (await ctx.db.get(cardId))!;
-    const patch = await cardCollectionBackfillOne(ctx, doc);
+    // Reconstruct the legacy (pre-backfill) doc value the migration sees.
+    const legacyDoc = view.asStored
+      ? doc
+      : ({
+          ...doc,
+          collectionId:
+            view.withCollectionId === false ? undefined : doc.collectionId,
+          collectionOrigin: view.collectionOrigin,
+        } as unknown as Doc<'cards'>);
+    const patch = await cardCollectionBackfillOne(ctx, legacyDoc);
     if (patch) await ctx.db.patch(cardId, patch);
     // `t.run` serializes the result, turning `undefined` into `null`.
     return patch ?? null;
@@ -181,9 +204,9 @@ describe('cardCollectionBackfill: origin-aggregate consistency', () => {
 
   it('touches no aggregate when the card already has both fields', async () => {
     const t = convexTest(schema, modules);
-    const { cardId } = await seedCard(t, { collectionOrigin: 'premade' });
+    const { cardId } = await seedCard(t);
 
-    const patch = await runOne(t, cardId);
+    const patch = await runOne(t, cardId, { collectionOrigin: 'premade' });
 
     expect(patch).toBeNull();
     expect(replaceCalls).toEqual([]);
@@ -193,27 +216,58 @@ describe('cardCollectionBackfill: origin-aggregate consistency', () => {
     const t = convexTest(schema, modules);
     // Origin already set, id missing. The patch must not carry an origin, so
     // the aggregate namespace is unchanged and nothing needs moving.
-    const { cardId, collectionId } = await seedCard(t, {
+    const { cardId, collectionId } = await seedCard(t);
+
+    const patch = await runOne(t, cardId, {
       withCollectionId: false,
       collectionOrigin: 'chat',
     });
-
-    const patch = await runOne(t, cardId);
 
     expect(patch).toEqual({ collectionId });
     expect(replaceCalls).toEqual([]);
   });
 
-  it('is idempotent, a second pass is a no-op', async () => {
+  it('is idempotent, a second pass over the patched row is a no-op', async () => {
     const t = convexTest(schema, modules);
     const { cardId } = await seedCard(t);
 
     await runOne(t, cardId);
     replaceCalls.length = 0;
-    const second = await runOne(t, cardId);
+    // The first pass patched the row, so a re-run sees the stored doc with
+    // both fields present and must do nothing.
+    const second = await runOne(t, cardId, { asStored: true });
 
     expect(second).toBeNull();
     expect(replaceCalls).toEqual([]);
+  });
+
+  it('patches zero docs on a dataset written under the narrowed schema', async () => {
+    // Deploy-safety pin for the `v.optional()` removal on cards.collectionId /
+    // cards.collectionOrigin: every row the current schema can persist already
+    // carries both fields, so the runAll-chained safety net must be a pure
+    // no-op over all of them (and the narrowing deploy itself only validates).
+    const t = convexTest(schema, modules);
+    await seedCard(t);
+    await seedCard(t, {
+      collectionName: 'My cards',
+      collectionOriginField: 'custom',
+    });
+    await seedCard(t, { withWritingTrack: true });
+
+    const patches = await t.run(async (ctx) => {
+      const all = await ctx.db.query('cards').collect();
+      const results = [];
+      for (const doc of all) {
+        // `t.run` serializes the return value; map `undefined` to `null`.
+        results.push((await cardCollectionBackfillOne(ctx, doc)) ?? null);
+      }
+      return results;
+    });
+
+    expect(patches).toHaveLength(3);
+    expect(patches.every((p) => p === null)).toBe(true);
+    expect(replaceCalls).toEqual([]);
+    expect(insertCalls).toEqual([]);
   });
 });
 

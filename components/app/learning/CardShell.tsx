@@ -6,51 +6,29 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AudioButton } from './AudioButton';
 import { AudioProgressBar } from './AudioProgressBar';
-import { CardActionsMenu, type CardActionsMenuProps } from './CardActionsMenu';
+import { CardActionsMenu } from './CardActionsMenu';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
 import { AnnotationLines } from './AnnotationLines';
-import type { CardOriginPill } from './cardOriginPill';
-import type { CardTranslation, CardAudioRecording } from './types';
+import type { CardTranslation } from './types';
+import type { CardPresentation } from './cardPresentation';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
 import type { ClockBinding } from '@/hooks/use-karaoke-index';
-import type { LanguageCue } from '@/lib/audio/mergeAudio';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
-import type { PinnableCardAction } from '@/lib/cardActions';
+import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 
 interface CardShellProps {
+  /**
+   * Shared card presentation: identity/content, flags, annotation toggles,
+   * action callbacks + quota state, and the merged-audio bundle. See
+   * `cardPresentation.ts`.
+   */
+  presentation: CardPresentation;
   /** Denser paddings + smaller sentence text for list contexts (library),
    *  where the review-screen sizing looks oversized. */
   compact?: boolean;
   reviewCount: number;
-  /** Source-collection pill ("A1.2", "Custom") shown next to the
-   *  review-count badge, tinted with the collection's CEFR color. Absent/null
-   *  = pill hidden (setting off, or the collection couldn't be resolved). */
-  originPill?: CardOriginPill | null;
-  sourceText: string;
-  translations: CardTranslation[];
-  audioRecordings: CardAudioRecording[];
-  isFavorite: boolean;
-  isMastered?: boolean;
-  isHidden?: boolean;
-  isPendingMaster: boolean;
-  isPendingHide: boolean;
-  onMaster: () => void;
-  onHide: () => void;
-  onFavorite: () => void;
-  onEdit?: () => void;
-  onDelete?: () => void;
-  onFlag?: () => void;
-  onRegenerateAudio?: () => void;
-  pinnedActions?: readonly string[];
-  onUpdatePinnedActions?: (actions: PinnableCardAction[]) => void;
-  /** Per-action quota state for the action menu (Edit / Regenerate / Flag). */
-  quotaState?: CardActionsMenuProps['quotaState'];
-  onAudioPlay?: () => void;
   bare?: boolean;
-  showRomanization?: boolean;
-  /** IPA line toggle (from courseSettings.showIpa; default OFF). */
-  showIpa?: boolean;
   /** Karaoke word highlighting toggle (from courseSettings). */
   highlightEnabled?: boolean;
   /** Active per-language playback from an AudioButton; null when none. */
@@ -67,30 +45,8 @@ interface CardShellProps {
   onButtonStop?: (language: string) => void;
   /** Course-level per-language general speed (e.g. { "en": 1.0, "es": 0.8 }). */
   languagePlaybackSpeeds?: Record<string, number>;
-  /** Per-card per-language override stored on the card. Absent = no override. */
-  audioSpeedOverrides?: Record<string, number>;
-  /** Cycle handler for a language's speed badge; null clears the override. */
-  onSpeedCycle?: (language: string, next: number | null) => void;
   /** Badge behavior. `ephemeral` hides the null/default slot and greys 1.0. */
   speedBadgeVariant?: 'persistent' | 'ephemeral';
-  /**
-   * Client-only session state: did the viewer click the flag action on this
-   * card during the current view? Set on click, cleared when navigating
-   * away. Drives the warning-color "Flagged" pill. A per-session signal
-   * scoped to the flagger, NOT a global server-derived state (which would
-   * leak the flag to other users). Wins visually over the server-driven
-   * "Retranslating" pill when both apply.
-   */
-  flaggedInSession?: boolean;
-  /** Merged-audio playback for the slim progress bar at the card's bottom edge. */
-  audioRef?: React.RefObject<HTMLAudioElement | null>;
-  durationSec?: number;
-  isPlaying?: boolean;
-  isMerging?: boolean;
-  onSeek?: (seconds: number) => void;
-  showProgressBar?: boolean;
-  /** Cue boundaries (per-language start times) for the progress bar's hover ticks. */
-  languageCues?: ReadonlyArray<LanguageCue>;
   /** Blur base-language text by default ("Hide base languages"). */
   hideBaseLanguages?: boolean;
   /** Un-blur a base language when its audio starts playing. */
@@ -115,48 +71,17 @@ interface CardShellProps {
 }
 
 export function CardShell({
+  presentation,
   compact = false,
   reviewCount,
-  originPill,
-  sourceText,
-  translations,
-  audioRecordings,
-  isFavorite,
-  isMastered = false,
-  isHidden = false,
-  isPendingMaster,
-  isPendingHide,
-  onMaster,
-  onHide,
-  onFavorite,
-  onEdit,
-  onDelete,
-  onFlag,
-  onRegenerateAudio,
-  pinnedActions,
-  onUpdatePinnedActions,
-  quotaState,
-  onAudioPlay,
   bare = false,
-  showRomanization = true,
-  showIpa = false,
   highlightEnabled = false,
   activeClip = null,
   clockBinding,
   onButtonTimeUpdate,
   onButtonStop,
   languagePlaybackSpeeds,
-  audioSpeedOverrides,
-  onSpeedCycle,
   speedBadgeVariant,
-  flaggedInSession = false,
-  audioRef,
-  durationSec,
-  isPlaying,
-  isMerging,
-  onSeek,
-  showProgressBar = false,
-  languageCues,
   hideBaseLanguages = false,
   autoRevealBaseLanguages = false,
   revealedLanguages,
@@ -165,6 +90,42 @@ export function CardShell({
   baseCoachmarkAnchorForLongestWord,
   children,
 }: CardShellProps) {
+  const {
+    originPill,
+    sourceText,
+    translations,
+    audioRecordings,
+    isFavorite,
+    isMastered = false,
+    isHidden = false,
+    isPendingMaster,
+    isPendingHide,
+    onMaster,
+    onHide,
+    onFavorite,
+    onEdit,
+    onDelete,
+    onFlag,
+    onRegenerateAudio,
+    pinnedActions,
+    onUpdatePinnedActions,
+    quotaState,
+    onAudioPlay,
+    showRomanization = true,
+    showIpa = false,
+    showFurigana = true,
+    audioSpeedOverrides,
+    onSpeedCycle,
+    flaggedInSession = false,
+    audioRef,
+    durationSec,
+    isPlaying,
+    isMerging,
+    onSeek,
+    showProgressBar = false,
+  } = presentation;
+  // Cue boundaries (per-language start times) for the progress bar's ticks.
+  const languageCues = presentation.mergedPlayback?.languageCues;
   const t = useTranslations('LearningMode');
   const baseTranslations = translations.filter((tr) => tr.isBaseLanguage);
   const targetTranslations = translations.filter((tr) => tr.isTargetLanguage);
@@ -192,9 +153,18 @@ export function CardShell({
       : null;
 
   const cardSurface = (
-    <div className="card-surface overflow-hidden" data-tutorial="card-flashcard">
+    <div
+      className="card-surface overflow-hidden"
+      data-tutorial={TUTORIAL_ANCHORS.cardFlashcard}
+    >
       {/* Card top bar: metadata left, actions right */}
-      <div className={compact ? 'flex items-center justify-between px-3 pt-3 pb-1.5' : 'flex items-center justify-between px-4 pt-4 pb-2'}>
+      <div
+        className={
+          compact
+            ? 'flex items-center justify-between px-3 pt-3 pb-1.5'
+            : 'flex items-center justify-between px-4 pt-4 pb-2'
+        }
+      >
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-xs">
             {t('reviewCount', { count: reviewCount })}
@@ -251,7 +221,10 @@ export function CardShell({
       {/* Card text content */}
       <div className={compact ? 'px-4 pb-4 space-y-3' : 'px-6 pb-6 space-y-4'}>
         {/* Base language texts */}
-        <div className="space-y-2" data-tutorial="base-languages">
+        <div
+          className="space-y-2"
+          data-tutorial={TUTORIAL_ANCHORS.baseLanguages}
+        >
           {baseTranslations.map((translation, index) => {
             const audio = audioRecordings.find(
               (a) => a.language === translation.language,
@@ -277,7 +250,9 @@ export function CardShell({
               !isAudioRevealed &&
               !(manuallyRevealedLanguages?.has(translation.language) ?? false);
             // Base text matches the target rows' weight/size, no bolding.
-            const baseTextClass = compact ? 'text-base leading-relaxed' : 'body-large';
+            const baseTextClass = compact
+              ? 'text-base leading-relaxed'
+              : 'body-large';
             return (
               <div
                 key={translation.language}
@@ -299,6 +274,7 @@ export function CardShell({
                     clockBinding={isActive ? clockBinding : undefined}
                     isActive={!!isActive}
                     enabled={highlightEnabled}
+                    furigana={showFurigana ? translation.furigana : undefined}
                     interactive={!isBlurred}
                     className={`${baseTextClass} ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
                     coachmarkAnchorForLongestWord={
@@ -312,7 +288,11 @@ export function CardShell({
                     ipa={translation.ipa}
                     showRomanization={showRomanization}
                     showIpa={showIpa}
-                    className={isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}
+                    className={
+                      isBlurred
+                        ? 'blur-sm select-none cursor-pointer'
+                        : 'transition-[filter] duration-300'
+                    }
                   />
                 </div>
                 <div className="flex items-center">
@@ -342,7 +322,16 @@ export function CardShell({
             // dir="auto": no language code in scope for the raw source text;
             // first-strong-character detection handles RTL sources.
             // text-left keeps RTL sources flush with the LTR layout.
-            <p dir="auto" className={compact ? 'text-base leading-relaxed text-left' : 'body-large text-left'}>{sourceText}</p>
+            <p
+              dir="auto"
+              className={
+                compact
+                  ? 'text-base leading-relaxed text-left'
+                  : 'body-large text-left'
+              }
+            >
+              {sourceText}
+            </p>
           )}
         </div>
 

@@ -182,7 +182,10 @@ const withSourceMapUpload = withPostHogConfig(withNextIntl(nextConfig), {
  */
 type NextConfigInput =
   | NextConfig
-  | ((phase: string, ctx: { defaultConfig: NextConfig }) => NextConfig | Promise<NextConfig>);
+  | ((
+      phase: string,
+      ctx: { defaultConfig: NextConfig },
+    ) => NextConfig | Promise<NextConfig>);
 
 /**
  * Make source-map upload non-fatal.
@@ -197,7 +200,8 @@ type NextConfigInput =
  */
 function makeSourceMapUploadNonFatal(input: NextConfigInput): NextConfigInput {
   return async (phase, ctx) => {
-    const resolved = typeof input === 'function' ? await input(phase, ctx) : input;
+    const resolved =
+      typeof input === 'function' ? await input(phase, ctx) : input;
     const upload = resolved.compiler?.runAfterProductionCompile;
     if (!upload) return resolved;
 

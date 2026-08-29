@@ -1,5 +1,5 @@
-import fs from "node:fs";
-import path from "node:path";
+import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * Minimal Stripe REST helpers for the test-clock billing spec
@@ -19,7 +19,7 @@ import path from "node:path";
  * charges, and values are never logged.
  */
 
-const STRIPE_API = "https://api.stripe.com/v1";
+const STRIPE_API = 'https://api.stripe.com/v1';
 
 const isTestKey = (value: string) => /^(sk|rk)_test_/.test(value);
 
@@ -28,16 +28,16 @@ function parseEnvFile(file: string): Record<string, string> {
   const out: Record<string, string> = {};
   let text: string;
   try {
-    text = fs.readFileSync(file, "utf8");
+    text = fs.readFileSync(file, 'utf8');
   } catch {
     return out;
   }
-  for (const line of text.split("\n")) {
+  for (const line of text.split('\n')) {
     const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(
       line,
     );
     if (!m) continue;
-    out[m[1]] = m[2].replace(/^(["'])(.*)\1$/, "$2");
+    out[m[1]] = m[2].replace(/^(["'])(.*)\1$/, '$2');
   }
   return out;
 }
@@ -47,13 +47,13 @@ export function stripeTestKey(): string | undefined {
   if (explicit) {
     if (!isTestKey(explicit)) {
       throw new Error(
-        "STRIPE_TEST_SECRET_KEY must be a TEST-mode key (sk_test_/rk_test_)",
+        'STRIPE_TEST_SECRET_KEY must be a TEST-mode key (sk_test_/rk_test_)',
       );
     }
     return explicit;
   }
 
-  const env = parseEnvFile(path.resolve(__dirname, "..", ".env.local"));
+  const env = parseEnvFile(path.resolve(__dirname, '..', '.env.local'));
   const preferred = env.STRIPE_TEST_SECRET_KEY;
   if (preferred && isTestKey(preferred)) return preferred;
   for (const [name, value] of Object.entries(env)) {
@@ -66,7 +66,7 @@ export function stripeTestKey(): string | undefined {
 
 async function stripeFetch<T>(
   key: string,
-  method: "GET" | "POST" | "DELETE",
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   params?: Record<string, string>,
   apiVersion?: string,
@@ -76,17 +76,17 @@ async function stripeFetch<T>(
     method,
     headers: {
       Authorization: `Bearer ${key}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-      ...(apiVersion ? { "Stripe-Version": apiVersion } : {}),
+      'Content-Type': 'application/x-www-form-urlencoded',
+      ...(apiVersion ? { 'Stripe-Version': apiVersion } : {}),
     },
-    ...(method !== "GET" && body !== undefined ? { body } : {}),
+    ...(method !== 'GET' && body !== undefined ? { body } : {}),
   });
   const json = (await res.json()) as T & { error?: { message?: string } };
   if (!res.ok) {
     // Never echo the request (it could embed the key via a bug), Stripe's
     // error message is enough.
     throw new Error(
-      `Stripe ${method} ${path} failed (${res.status}): ${json?.error?.message ?? "unknown"}`,
+      `Stripe ${method} ${path} failed (${res.status}): ${json?.error?.message ?? 'unknown'}`,
     );
   }
   return json;
@@ -108,15 +108,20 @@ export async function createClockedCustomer(
 ): Promise<ClockedCustomer> {
   const clock = await stripeFetch<{ id: string }>(
     key,
-    "POST",
-    "/test_helpers/test_clocks",
+    'POST',
+    '/test_helpers/test_clocks',
     { frozen_time: String(Math.floor(Date.now() / 1000)) },
   );
-  const customer = await stripeFetch<{ id: string }>(key, "POST", "/customers", {
-    email,
-    name: "E2E Clock User",
-    test_clock: clock.id,
-  });
+  const customer = await stripeFetch<{ id: string }>(
+    key,
+    'POST',
+    '/customers',
+    {
+      email,
+      name: 'E2E Clock User',
+      test_clock: clock.id,
+    },
+  );
   return { clockId: clock.id, customerId: customer.id };
 }
 
@@ -128,16 +133,16 @@ export async function createClockedCustomer(
 export async function attachTestCard(
   key: string,
   customerId: string,
-  pm: "pm_card_visa" | "pm_card_chargeCustomerFail" = "pm_card_visa",
+  pm: 'pm_card_visa' | 'pm_card_chargeCustomerFail' = 'pm_card_visa',
 ): Promise<string> {
   const attached = await stripeFetch<{ id: string }>(
     key,
-    "POST",
+    'POST',
     `/payment_methods/${pm}/attach`,
     { customer: customerId },
   );
-  await stripeFetch(key, "POST", `/customers/${customerId}`, {
-    "invoice_settings[default_payment_method]": attached.id,
+  await stripeFetch(key, 'POST', `/customers/${customerId}`, {
+    'invoice_settings[default_payment_method]': attached.id,
   });
   return attached.id;
 }
@@ -158,22 +163,27 @@ export async function advanceClock(
       `advanceClock got a non-finite target (${toUnixSeconds}) — a period/trial timestamp was missing on the subscription`,
     );
   }
-  await stripeFetch(key, "POST", `/test_helpers/test_clocks/${clockId}/advance`, {
-    frozen_time: String(Math.floor(toUnixSeconds)),
-  });
+  await stripeFetch(
+    key,
+    'POST',
+    `/test_helpers/test_clocks/${clockId}/advance`,
+    {
+      frozen_time: String(Math.floor(toUnixSeconds)),
+    },
+  );
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const clock = await stripeFetch<{ status: string }>(
       key,
-      "GET",
+      'GET',
       `/test_helpers/test_clocks/${clockId}`,
     );
-    if (clock.status === "ready") return;
-    if (clock.status !== "advancing") {
+    if (clock.status === 'ready') return;
+    if (clock.status !== 'advancing') {
       throw new Error(`Test clock entered unexpected status: ${clock.status}`);
     }
     if (Date.now() > deadline) {
-      throw new Error("Timed out waiting for the test clock to advance");
+      throw new Error('Timed out waiting for the test clock to advance');
     }
     await new Promise((r) => setTimeout(r, 3_000));
   }
@@ -209,7 +219,7 @@ type RawSubscription = {
 function normalizeSubscription(raw: RawSubscription): SubscriptionLite {
   const itemEnds = (raw.items?.data ?? [])
     .map((i) => i.current_period_end)
-    .filter((n): n is number => typeof n === "number");
+    .filter((n): n is number => typeof n === 'number');
   const periodEnd =
     raw.current_period_end ??
     (itemEnds.length ? Math.max(...itemEnds) : Number.NaN);
@@ -244,7 +254,7 @@ export async function listSubscriptions(
 ): Promise<SubscriptionLite[]> {
   const res = await stripeFetch<{ data: RawSubscription[] }>(
     key,
-    "GET",
+    'GET',
     `/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=100`,
   );
   return res.data.map(normalizeSubscription);
@@ -267,10 +277,10 @@ export async function getCheckoutSession(
 }> {
   return stripeFetch(
     key,
-    "GET",
+    'GET',
     `/checkout/sessions/${sessionId}`,
     undefined,
-    "2026-04-22.dahlia",
+    '2026-04-22.dahlia',
   );
 }
 
@@ -285,7 +295,7 @@ export async function findCustomerByEmail(
   // 2026-08-10). The list endpoint is read-your-writes consistent.
   const res = await stripeFetch<{ data: Array<{ id: string }> }>(
     key,
-    "GET",
+    'GET',
     `/customers?email=${encodeURIComponent(email)}&limit=1`,
   );
   return res.data?.[0]?.id;
@@ -303,7 +313,7 @@ export async function cancelSubscriptionNow(
   key: string,
   subscriptionId: string,
 ): Promise<void> {
-  await stripeFetch(key, "DELETE", `/subscriptions/${subscriptionId}`);
+  await stripeFetch(key, 'DELETE', `/subscriptions/${subscriptionId}`);
 }
 
 /**
@@ -320,7 +330,13 @@ export async function getSubscription(
 > {
   const raw = await stripeFetch<
     RawSubscription & { managed_payments?: { enabled?: boolean } | null }
-  >(key, "GET", `/subscriptions/${subscriptionId}`, undefined, "2026-04-22.dahlia");
+  >(
+    key,
+    'GET',
+    `/subscriptions/${subscriptionId}`,
+    undefined,
+    '2026-04-22.dahlia',
+  );
   return {
     ...normalizeSubscription(raw),
     managed_payments: raw.managed_payments,
@@ -337,7 +353,7 @@ export async function waitForSubscriptions(
   key: string,
   customerId: string,
   predicate: (subs: SubscriptionLite[]) => boolean,
-  { timeoutMs = 120_000, label = "subscription state" } = {},
+  { timeoutMs = 120_000, label = 'subscription state' } = {},
 ): Promise<SubscriptionLite[]> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -345,7 +361,7 @@ export async function waitForSubscriptions(
     if (predicate(subs)) return subs;
     if (Date.now() > deadline) {
       throw new Error(
-        `Timed out waiting for ${label}; statuses: ${subs.map((s) => s.status).join(", ") || "none"}`,
+        `Timed out waiting for ${label}; statuses: ${subs.map((s) => s.status).join(', ') || 'none'}`,
       );
     }
     await new Promise((r) => setTimeout(r, 5_000));

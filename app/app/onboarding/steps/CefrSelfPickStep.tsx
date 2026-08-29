@@ -58,7 +58,9 @@ export function CefrSelfPickStep({
     >
       <div className="shrink-0 text-center py-3 md:py-4">
         <h2 className="text-xl md:text-2xl font-bold">{t('title')}</h2>
-        <p className="text-xs md:text-sm text-muted-foreground mt-1">{t('subtitle')}</p>
+        <p className="text-xs md:text-sm text-muted-foreground mt-1">
+          {t('subtitle')}
+        </p>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-1 pb-6">

@@ -66,7 +66,8 @@ export async function LandingJsonLd({ siteUrl }: LandingJsonLdProps) {
           price: '72',
           priceCurrency: 'EUR',
           name: 'Basic Annual',
-          description: 'Everything you need to learn one language, billed annually.',
+          description:
+            'Everything you need to learn one language, billed annually.',
         },
         {
           '@type': 'Offer',
@@ -80,7 +81,8 @@ export async function LandingJsonLd({ siteUrl }: LandingJsonLdProps) {
           price: '144',
           priceCurrency: 'EUR',
           name: 'Pro Annual',
-          description: 'Everything you need to learn multiple languages, billed annually.',
+          description:
+            'Everything you need to learn multiple languages, billed annually.',
         },
         {
           '@type': 'Offer',
@@ -94,7 +96,8 @@ export async function LandingJsonLd({ siteUrl }: LandingJsonLdProps) {
           price: '288',
           priceCurrency: 'EUR',
           name: 'Ultra Annual',
-          description: 'Maximum customization and AI features, billed annually.',
+          description:
+            'Maximum customization and AI features, billed annually.',
         },
       ],
     },

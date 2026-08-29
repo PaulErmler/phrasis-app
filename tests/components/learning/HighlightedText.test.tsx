@@ -138,7 +138,7 @@ describe('HighlightedText', () => {
     expect(container.innerHTML).toBe(beforePlay);
   });
 
-  it('clears the highlight once localTime passes the last word\'s end', () => {
+  it("clears the highlight once localTime passes the last word's end", () => {
     // For the LAST word, the active window stops at its own end (not the next
     // word's start), so once playback runs past that the highlight clears.
     const { container } = render(
@@ -355,9 +355,7 @@ describe('HighlightedText', () => {
         <HighlightedText {...props} localTime={0} isActive={false} />,
       );
       const before = Array.from(container.querySelectorAll('span'));
-      rerender(
-        <HighlightedText {...props} localTime={0.1} isActive={true} />,
-      );
+      rerender(<HighlightedText {...props} localTime={0.1} isActive={true} />);
       const after = Array.from(container.querySelectorAll('span'));
       expect(after).toHaveLength(before.length);
       after.forEach((span, i) => {

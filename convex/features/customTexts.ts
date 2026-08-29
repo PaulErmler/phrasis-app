@@ -1,5 +1,10 @@
 import { v, ConvexError } from 'convex/values';
-import { action, mutation, internalMutation, internalQuery } from '../_generated/server';
+import {
+  action,
+  mutation,
+  internalMutation,
+  internalQuery,
+} from '../_generated/server';
 import { internal } from '../_generated/api';
 import type { Id } from '../_generated/dataModel';
 import { requireAuthUserId, getAuthUserId } from '../db/users';
@@ -7,12 +12,13 @@ import { getActiveCourseForUser } from '../db/courses';
 import { getOrCreateCustomCollection } from '../db/collections';
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
-import { MAX_CARD_TEXT_LENGTH, MAX_IMPORT_BATCH } from '../../lib/constants/learning';
 import {
-  getLanguageByCode,
+  MAX_CARD_TEXT_LENGTH,
+  MAX_IMPORT_BATCH,
+} from '../../lib/constants/learning';
+import {
   getTranslationSource,
   isMixedLanguage,
-  LUNA_BO3,
   postProcessTranslation,
   resolveMixedVariant,
 } from '../../lib/languages';
@@ -20,9 +26,16 @@ import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../lib/translationProvenanc
 import { trackEvent } from '../db/stats/dailyStats';
 import { isValidTimezone } from '../lib/dateUtils';
 import { generateText } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { OPENROUTER_MODELS, OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
-import { openrouterCallOptions } from './translationLLM';
+import { OPENROUTER_MODELS } from '../config/aiModels';
+import { getOpenRouter } from '../lib/openrouter';
+import {
+  AUTOFILL_REASONING,
+  AUTOFILL_SYSTEM_PROMPT,
+  autofillMaxOutputTokens,
+  autofillProviderOptions,
+  buildAutofillUserPrompt,
+  parseAutofillResponse,
+} from '../lib/translationAutofillPrompt';
 import { EVENTS, track } from '../analytics';
 import { sourcedTranslationEntriesValidator } from '../types';
 import {
@@ -31,7 +44,6 @@ import {
   openrouterGenerationId,
 } from '../lib/posthogAi';
 import { resolveAudioSpeakerGender } from '../../lib/languages';
-import { validateSentenceMetadata } from './sentenceMetadata';
 
 export const consumeAutoFillQuota = internalMutation({
   args: { userId: v.string() },
@@ -45,7 +57,10 @@ export const consumeAutoFillQuota = internalMutation({
 /** Allowed ISO codes for the user’s active course (base ∪ target). Used to validate auto-fill before quota / LLM. */
 export const getAllowedLanguagesForAutoFill = internalQuery({
   args: { userId: v.string() },
-  returns: v.union(v.null(), v.object({ allowedLanguages: v.array(v.string()) })),
+  returns: v.union(
+    v.null(),
+    v.object({ allowedLanguages: v.array(v.string()) }),
+  ),
   handler: async (ctx, { userId }) => {
     const active = await getActiveCourseForUser(ctx, userId);
     if (!active) return null;
@@ -57,71 +72,12 @@ export const getAllowedLanguagesForAutoFill = internalQuery({
   },
 });
 
-/**
- * Reasoning setting for the autofill call. Taken from the single-sentence
- * pipeline's LUNA_BO3 stage so the two pipelines can't drift apart
- * (`'none'` → `reasoning: {enabled: false}` on the wire; Luna otherwise
- * reasons adaptively and bills the hidden tokens). Also baked into each
- * row's `translationSource` tag.
- */
-const AUTOFILL_REASONING = LUNA_BO3.reasoning;
+// Reasoning, output cap, system prompt, user-prompt builder, and response
+// parsing all live in convex/lib/translationAutofillPrompt.ts so
+// scripts/eval-translation-autofill.ts exercises the exact production
+// request. This action owns auth, quota, language validation, mixed-dialect
+// resolution, and persistence plumbing.
 
-/**
- * Output cap for the bulk-JSON autofill response. Previously uncapped. A
- * latent unbounded-cost/truncation blind spot. ~200 tokens per requested
- * target language covers translations + metadata comfortably; the floor
- * keeps single-language requests from being starved by the JSON envelope.
- */
-function autofillMaxOutputTokens(targetLanguageCount: number): number {
-  return Math.max(2_000, 200 * targetLanguageCount);
-}
-
-const TRANSLATION_SYSTEM_PROMPT = `You are an expert multilingual translator for a language-learning app. You will receive one or more sentences that the user has already written in specific languages, plus a list of target language codes that still need translations.
-
-Translate the given sentence(s) into every requested target language AND return linguistic metadata describing the sentence.
-
-TRANSLATION RULES:
-
-1. NATURALNESS — Translate meaning, not words. Every translation must sound like it was written by a native speaker. Match the length, register, and complexity of the original.
-
-2. REGISTER & FORMALITY — Infer the register (formal / informal / neutral) from the source text and apply it consistently to all translations.
-
-3. GENDER — If the source text implies a speaker or addressee gender, maintain gender agreement in languages that mark it grammatically.
-
-4. CONSISTENCY — All translations must express the exact same meaning, register, and tone. No translation may add or remove nuance.
-
-5. PER-LANGUAGE REQUIREMENTS — the user message lists every target language as "code: name, region — requirements". The name, region, and requirements pin the exact dialect, script, register conventions, and vocabulary for that code. Follow them exactly.
-
-METADATA RULES:
-
-After producing the translations, infer linguistic metadata from the source AND your translations together. Use cross-lingual signals — if any translation requires gendered morphology referring to the speaker or addressee, that fixes the gender field.
-
-- register: "formal" | "informal" | "neutral" — the politeness/formality of the sentence as a whole.
-- addresseeNumber: "singular" | "plural" | "not_applicable" — how many people the sentence speaks to. "not_applicable" if the sentence has no addressee (e.g. "It is raining.").
-- speakerGender: "male" | "female" | "neutral" — return "male" or "female" ONLY when at least one rendering grammatically marks the speaker's gender (Spanish/Italian/French/Portuguese past participles or adjectives, Russian/Polish/Czech past tense, Arabic/Hebrew/Hindi verb agreement, etc.). Otherwise return "neutral". Never guess from topic or stereotype.
-- addresseeGender: "male" | "female" | "neutral" | "not_applicable" — same rule, for the addressee. "not_applicable" if there is no addressee.
-- addressesSomeone: true | false — true if the sentence speaks to a 2nd-person addressee (imperatives, direct questions, vocatives, sentences containing "you"/"your", commands, requests, greetings). false otherwise (descriptive/narrative sentences like "It is raining.", first-person statements with no second-person reference). When addressesSomeone is false, addresseeNumber should be "not_applicable" and addresseeGender should be "not_applicable".
-
-OUTPUT FORMAT:
-
-Return ONLY a valid JSON object with EXACTLY this shape, no markdown, no explanation:
-
-{
-  "translations": { "<lang_code>": "<translated string>", ... },
-  "metadata": {
-    "register": "...",
-    "addresseeNumber": "...",
-    "speakerGender": "...",
-    "addresseeGender": "...",
-    "addressesSomeone": true
-  }
-}
-
-The "translations" object must contain exactly one key per requested target language. No extra keys, no missing keys.`;
-
-/**
- * Auto-fill missing translations using Gemini via OpenRouter.
- */
 const sentenceMetadataValidator = v.object({
   register: v.union(
     v.literal('formal'),
@@ -163,7 +119,10 @@ export const autoFillTranslations = action({
     const userId = await requireAuthUserId(ctx);
 
     if (args.texts.length === 0) {
-      throw new ConvexError('At least one source text is required');
+      throw new ConvexError({
+        code: 'INVALID_ARGUMENT',
+        message: 'At least one source text is required',
+      });
     }
 
     const courseCtx = await ctx.runQuery(
@@ -171,7 +130,10 @@ export const autoFillTranslations = action({
       { userId },
     );
     if (!courseCtx) {
-      throw new ConvexError('No active course found');
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'No active course found',
+      });
     }
     const allowed = new Set(courseCtx.allowedLanguages);
 
@@ -184,7 +146,11 @@ export const autoFillTranslations = action({
         });
       }
       if (entry.text.trim().length === 0) {
-        throw new ConvexError('Source texts must be non-empty');
+        throw new ConvexError({
+          code: 'EMPTY_TEXT',
+          message: 'Source texts must be non-empty',
+          language: entry.language,
+        });
       }
       sourceLangs.add(entry.language);
     }
@@ -206,46 +172,15 @@ export const autoFillTranslations = action({
     }
 
     if (targetLanguages.length === 0) {
-      throw new ConvexError('At least one target language is required for auto-fill');
+      throw new ConvexError({
+        code: 'INVALID_ARGUMENT',
+        message: 'At least one target language is required for auto-fill',
+      });
     }
 
-    await ctx.runMutation(
-      internal.features.customTexts.consumeAutoFillQuota,
-      { userId },
-    );
-
-    // Prompt name = `translationName ?? name`. The same resolution as the
-    // single-sentence pipeline (see getTranslationConfigForLanguage), so
-    // dialect/script/register qualifiers like 'Taiwanese Mandarin
-    // (Traditional characters)' reach this prompt too. The native-script
-    // name is appended in parens so the model sees the language in the
-    // script it must produce; skipped when it matches the English `name`
-    // (English variants) to avoid `English (English)` noise.
-    const formatLangLabel = (code: string): string => {
-      const lang = getLanguageByCode(code);
-      if (!lang) return code;
-      const promptName = lang.translationName ?? lang.name;
-      if (lang.nativeName && lang.nativeName !== lang.name) {
-        return `${promptName} (${lang.nativeName})`;
-      }
-      return promptName;
-    };
-
-    // One line per target: "code: name, for region — requirements". Region
-    // and requirements come from the language entry (`regionLabel`,
-    // `translationPromptNotes`), so the prompt carries exactly the guidance
-    // relevant to the requested languages and nothing else. The system
-    // prompt's PER-LANGUAGE REQUIREMENTS rule tells the model to obey it.
-    const describeTargetLanguage = (code: string): string => {
-      const lang = getLanguageByCode(code);
-      if (!lang) return code;
-      const label = lang.regionLabel
-        ? `${formatLangLabel(code)}, for ${lang.regionLabel}`
-        : formatLangLabel(code);
-      return lang.translationPromptNotes
-        ? `${code}: ${label} — ${lang.translationPromptNotes}`
-        : `${code}: ${label}`;
-    };
+    await ctx.runMutation(internal.features.customTexts.consumeAutoFillQuota, {
+      userId,
+    });
 
     // Resolve mixed-dialect targets (today: `es_mixed`) to a concrete
     // sub-code BEFORE building the prompt. The LLM never sees the mixed
@@ -274,34 +209,24 @@ export const autoFillTranslations = action({
       resolutionByRequested.set(code, { resolved: code });
     }
 
-    const sourceDescription = args.texts
-      .map((t) => `[${formatLangLabel(t.language)}]: ${t.text}`)
-      .join('\n');
-
-    const targetList = targetLanguages
-      .map((code) => {
-        const { resolved } = resolutionByRequested.get(code)!;
-        return describeTargetLanguage(resolved);
-      })
-      .join('\n');
-
-    const userPrompt = `Source text(s):\n${sourceDescription}\n\nTranslate into these languages:\n${targetList}`;
-
-    const openrouter = createOpenRouter({
-      apiKey: process.env.OPENROUTER_API_KEY,
-      extraBody: OPENROUTER_USAGE_ACCOUNTING,
+    const userPrompt = buildAutofillUserPrompt({
+      texts: args.texts,
+      resolvedTargets: targetLanguages.map(
+        (code) => resolutionByRequested.get(code)!.resolved,
+      ),
     });
 
+    const openrouter = getOpenRouter();
+
     const startedAt = Date.now();
-    // Reasoning + Luna price cap via the shared mapping in translationLLM so
-    // `'none'` is correctly sent as `reasoning: {enabled: false}`.
-    const providerOptions = openrouterCallOptions(AUTOFILL_REASONING, LUNA_BO3.provider);
     const { text, usage, providerMetadata } = await generateText({
       model: openrouter(OPENROUTER_MODELS.translationAutoFill),
-      system: TRANSLATION_SYSTEM_PROMPT,
+      system: AUTOFILL_SYSTEM_PROMPT,
       prompt: userPrompt,
       maxOutputTokens: autofillMaxOutputTokens(targetLanguages.length),
-      ...(providerOptions ? { providerOptions } : {}),
+      // Reasoning + Luna price cap via the shared prompt module so `'none'`
+      // is correctly sent as `reasoning: {enabled: false}`.
+      providerOptions: autofillProviderOptions(),
     });
 
     // Billed as a flat 1 unit of `translation_auto_fill` regardless of how many
@@ -322,23 +247,17 @@ export const autoFillTranslations = action({
       },
     });
 
-    const cleaned = text
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/, '')
-      .trim();
-
-    let parsed: { translations?: Record<string, string>; metadata?: Record<string, unknown> };
+    let parsed: ReturnType<typeof parseAutofillResponse>;
     try {
-      parsed = JSON.parse(cleaned);
-    } catch {
-      throw new ConvexError('Failed to parse translation response');
-    }
-
-    if (!parsed.translations || typeof parsed.translations !== 'object') {
-      throw new ConvexError('Translation response missing "translations" object');
-    }
-    if (!parsed.metadata || typeof parsed.metadata !== 'object') {
-      throw new ConvexError('Translation response missing "metadata" object');
+      parsed = parseAutofillResponse(text);
+    } catch (err) {
+      throw new ConvexError({
+        code: 'UPSTREAM_ERROR',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Failed to parse translation response',
+      });
     }
 
     // Source identifier for every translation in this batch. Single LLM
@@ -362,7 +281,10 @@ export const autoFillTranslations = action({
       const translation =
         parsed.translations[resolved] ?? parsed.translations[lang];
       if (typeof translation !== 'string' || translation.trim().length === 0) {
-        throw new ConvexError(`Missing translation for language: ${lang}`);
+        throw new ConvexError({
+          code: 'UPSTREAM_ERROR',
+          message: `Missing translation for language: ${lang}`,
+        });
       }
       results.push({
         language: lang,
@@ -374,18 +296,8 @@ export const autoFillTranslations = action({
       });
     }
 
-    let metadata;
-    try {
-      metadata = validateSentenceMetadata(parsed.metadata);
-    } catch (err) {
-      throw new ConvexError(
-        err instanceof Error
-          ? err.message
-          : 'Invalid translation response metadata',
-      );
-    }
-
-    return { translations: results, metadata };
+    // Metadata was validated inside parseAutofillResponse.
+    return { translations: results, metadata: parsed.metadata };
   },
 });
 
@@ -405,15 +317,24 @@ function validateTranslationSet(
 ):
   | { code: 'INVALID_LANGUAGES'; message: string }
   | { code: 'EMPTY_TEXT'; message: string; language: string }
-  | { code: 'TEXT_TOO_LONG'; message: string; language: string; maxLength: number }
+  | {
+      code: 'TEXT_TOO_LONG';
+      message: string;
+      language: string;
+      maxLength: number;
+    }
   | null {
   const requiredLanguages = [
     ...new Set([...course.baseLanguages, ...course.targetLanguages]),
   ];
   const providedLanguages = translations.map((t) => t.language);
 
-  const missing = requiredLanguages.filter((lang) => !providedLanguages.includes(lang));
-  const extras = providedLanguages.filter((lang) => !requiredLanguages.includes(lang));
+  const missing = requiredLanguages.filter(
+    (lang) => !providedLanguages.includes(lang),
+  );
+  const extras = providedLanguages.filter(
+    (lang) => !requiredLanguages.includes(lang),
+  );
   if (
     missing.length > 0 ||
     extras.length > 0 ||
@@ -470,7 +391,11 @@ export const createCustomText = mutation({
     }
 
     const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) throw new ConvexError('No active course found');
+    if (!active)
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'No active course found',
+      });
     const { course } = active;
 
     const validationError = validateTranslationSet(course, args.translations);
@@ -494,17 +419,19 @@ export const createCustomText = mutation({
       collectionRank: nextRank,
       ...(args.metadata
         ? {
-          register: args.metadata.register,
-          addresseeNumber: args.metadata.addresseeNumber,
-          speakerGender: args.metadata.speakerGender,
-          addresseeGender: args.metadata.addresseeGender,
-          addressesSomeone: args.metadata.addressesSomeone,
-          // Coin-flip at insert time so gendered-noun agreement is stable
-          // across all target-language translations of this row. Mirrors the
-          // logic in applyMetadataAndPrepareCard for the non-auto-fill path.
-          referentGender: Math.random() < 0.5 ? 'male' : 'female',
-          audioSpeakerGender: resolveAudioSpeakerGender(args.metadata.speakerGender),
-        }
+            register: args.metadata.register,
+            addresseeNumber: args.metadata.addresseeNumber,
+            speakerGender: args.metadata.speakerGender,
+            addresseeGender: args.metadata.addresseeGender,
+            addressesSomeone: args.metadata.addressesSomeone,
+            // Coin-flip at insert time so gendered-noun agreement is stable
+            // across all target-language translations of this row. Mirrors the
+            // logic in applyMetadataAndPrepareCard for the non-auto-fill path.
+            referentGender: Math.random() < 0.5 ? 'male' : 'female',
+            audioSpeakerGender: resolveAudioSpeakerGender(
+              args.metadata.speakerGender,
+            ),
+          }
         : {}),
     });
 
@@ -539,6 +466,7 @@ export const createCustomText = mutation({
           textId,
           baseLanguages: course.baseLanguages,
           targetLanguages: course.targetLanguages,
+          requestedByUserId: userId,
         },
       );
     } else {
@@ -558,8 +486,16 @@ export const createCustomText = mutation({
     }
 
     // Track manual card creation event
-    await trackEvent(ctx, { userId, courseId: course._id, timezone: args.timezone, field: 'cardsAddedManually' });
-    await track(ctx, userId, EVENTS.CARDS_ADDED, { count: 1, source: 'manual' });
+    await trackEvent(ctx, {
+      userId,
+      courseId: course._id,
+      timezone: args.timezone,
+      field: 'cardsAddedManually',
+    });
+    await track(ctx, userId, EVENTS.CARDS_ADDED, {
+      count: 1,
+      source: 'manual',
+    });
 
     return { textId };
   },
@@ -622,11 +558,18 @@ export const createCustomTextsBatch = mutation({
     }
 
     const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) throw new ConvexError('No active course found');
+    if (!active)
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'No active course found',
+      });
     const { course } = active;
 
     const skipped: { index: number; code: string; message: string }[] = [];
-    const accepted: { index: number; translations: { language: string; text: string }[] }[] = [];
+    const accepted: {
+      index: number;
+      translations: { language: string; text: string }[];
+    }[] = [];
 
     for (let i = 0; i < args.items.length; i++) {
       const { translations } = args.items[i];
@@ -647,7 +590,12 @@ export const createCustomTextsBatch = mutation({
     }
 
     // Quota is authoritative here. Client pre-check is advisory.
-    await consumeQuota(ctx, userId, FEATURE_IDS.CUSTOM_SENTENCES, accepted.length);
+    await consumeQuota(
+      ctx,
+      userId,
+      FEATURE_IDS.CUSTOM_SENTENCES,
+      accepted.length,
+    );
 
     const collection = await getOrCreateCustomCollection(ctx, course._id);
     const baseRank = collection.textCount;
@@ -727,4 +675,3 @@ export const createCustomTextsBatch = mutation({
     return { createdTextIds, skipped };
   },
 });
-

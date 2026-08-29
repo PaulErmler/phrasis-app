@@ -6,7 +6,9 @@ import type {
   WordTag,
 } from '@/lib/textCompare/wordAlign';
 
-function makeResult(counts: Partial<WordAlignResult['counts']>): WordAlignResult {
+function makeResult(
+  counts: Partial<WordAlignResult['counts']>,
+): WordAlignResult {
   const full = {
     equal: 0,
     typo: 0,

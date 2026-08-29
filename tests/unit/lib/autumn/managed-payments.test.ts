@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { MANAGED_PAYMENTS_SESSION_PARAMS } from "@/lib/autumn/managed-payments";
+import { describe, it, expect } from 'vitest';
+import { MANAGED_PAYMENTS_SESSION_PARAMS } from '@/lib/autumn/managed-payments';
 
 /**
  * Managed Payments rides entirely on one opaque passthrough field that ends
@@ -11,8 +11,8 @@ import { MANAGED_PAYMENTS_SESSION_PARAMS } from "@/lib/autumn/managed-payments";
  * convex/tests/billing/managedPayments.test.ts; this pins the payload
  * constant itself.
  */
-describe("MANAGED_PAYMENTS_SESSION_PARAMS", () => {
-  it("exports the exact Stripe payload shape", () => {
+describe('MANAGED_PAYMENTS_SESSION_PARAMS', () => {
+  it('exports the exact Stripe payload shape', () => {
     expect(MANAGED_PAYMENTS_SESSION_PARAMS).toEqual({
       managed_payments: { enabled: true },
     });
@@ -20,10 +20,10 @@ describe("MANAGED_PAYMENTS_SESSION_PARAMS", () => {
 
   it("keeps Stripe's snake_case, camelCase would be rejected downstream", () => {
     expect(Object.keys(MANAGED_PAYMENTS_SESSION_PARAMS)).toEqual([
-      "managed_payments",
+      'managed_payments',
     ]);
     expect(MANAGED_PAYMENTS_SESSION_PARAMS).not.toHaveProperty(
-      "managedPayments",
+      'managedPayments',
     );
   });
 });

@@ -93,7 +93,11 @@ export const OGTE_MAX_LEVEL = 20;
  * level must round-trip to a dataset collection code.
  */
 export function ogteLevelToCollectionCode(level: number): string | null {
-  if (!Number.isInteger(level) || level < OGTE_MIN_LEVEL || level > OGTE_MAX_LEVEL) {
+  if (
+    !Number.isInteger(level) ||
+    level < OGTE_MIN_LEVEL ||
+    level > OGTE_MAX_LEVEL
+  ) {
     return null;
   }
   return `L${String(level).padStart(2, '0')}`;

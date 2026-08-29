@@ -13,6 +13,7 @@ export const FEATURE_IDS = {
   TRANSLATION_AUTO_FILL: 'translation_auto_fill',
   AUDIO_REGENERATIONS: 'audio_regenerations',
   TRANSLATION_FLAGS: 'translation_flags',
+  AI_FEEDBACK: 'ai_feedback',
   CREDITS: 'credits',
 } as const;
 
@@ -39,6 +40,17 @@ export const CREDIT_COSTS: Partial<Record<FeatureId, number>> = {
 export function isCreditBackedFeature(featureId: string): boolean {
   return CREDIT_COSTS[featureId as FeatureId] !== undefined;
 }
+
+/**
+ * AI-feedback grants, shared by autumn.config.ts (plan items) and the
+ * self-heal in features/writingFeedback.ts. The self-heal exists because
+ * pushing a NEW feature onto published plans does not materialize a balance
+ * for already-attached customers; the first grade attempt provisions it via
+ * Autumn's balances.create with exactly these numbers, so the lazy backfill
+ * can never drift from the plan config.
+ */
+export const AI_FEEDBACK_FREE_GRANT = 200; // one-off, does not reset
+export const AI_FEEDBACK_PAID_GRANT = 20_000; // per month, shown as Unlimited
 
 /**
  * Chat billing step: 1 credit per started USD 0.005 of LLM cost. One

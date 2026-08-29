@@ -1,43 +1,91 @@
-import {useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useBrowserLayoutEffect } from '@/hooks/use-isomorphic-layout-effect';
 import { useQuery } from 'convex/react';
-import type { FunctionReference, FunctionArgs, FunctionReturnType } from 'convex/server';
+import type {
+  FunctionReference,
+  FunctionArgs,
+  FunctionReturnType,
+} from 'convex/server';
 
 export function useCachedQuery<F extends FunctionReference<'query'>>(
   query: F,
   args: FunctionArgs<F> | 'skip',
   cacheKey: string,
+  // Applied to localStorage payloads only — live results are shape-guaranteed
+  // by the query's `returns` validator, but a cached payload can predate a
+  // deploy that changed the shape. Rejected payloads are treated as absent.
+  validate?: (value: unknown) => boolean,
 ): FunctionReturnType<F> | undefined {
   const live = useQuery(query, args);
   const [cached, setCached] = useState<FunctionReturnType<F> | undefined>(
     undefined,
   );
 
+  // Ref so the mount-time effect below always sees the current validator
+  // without needing it (a possibly per-render function) in its deps.
+  const validateRef = useRef(validate);
+  validateRef.current = validate;
+
   // Deferred to a layout effect (not useState initializer) so server and
   // client produce the same initial HTML, avoiding hydration mismatches.
   // useLayoutEffect fires synchronously before paint, so the user never
   // sees the intermediate undefined state.
+  //
+  // Every path settles `cached` for THIS key. Returning early on a miss would
+  // leave the PREVIOUS key's payload mounted, and `live` is `undefined` while
+  // the new args re-subscribe — so the consumer would render another key's
+  // data (the forecast card showing the mode you just toggled away from)
+  // until the round-trip lands. A miss must read as "nothing cached yet".
   useBrowserLayoutEffect(() => {
     try {
       const stored = localStorage.getItem(cacheKey);
-      if (stored) setCached(JSON.parse(stored));
+      if (!stored) {
+        setCached(undefined);
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      if (validateRef.current && !validateRef.current(parsed)) {
+        setCached(undefined);
+        return;
+      }
+      setCached(parsed);
     } catch {
-      // ignore parse errors from stale/corrupted cache
+      // Stale/corrupted cache reads the same as an absent one.
+      setCached(undefined);
     }
   }, [cacheKey]);
 
-  const prevLive = useRef(live);
+  // Seeded with undefined, NOT the first render's `live`: on a warm
+  // re-mount Convex can deliver the payload on render one, and seeding with
+  // it would skip the write below, leaving localStorage stale (or empty)
+  // for the next cold start.
+  const prevLive = useRef<FunctionReturnType<F> | undefined>(undefined);
+  // Convex returns a fresh payload identity on every re-subscription (e.g.
+  // a minute-quantized `now` arg) even when the content is unchanged, so
+  // remember what was last written and skip byte-identical writes — the
+  // forecast payload is the largest thing going through this hook.
+  const lastWritten = useRef<{ key: string; json: string } | null>(null);
   useEffect(() => {
     if (live !== undefined && live !== prevLive.current) {
       prevLive.current = live;
       setCached(live);
       try {
-        localStorage.setItem(cacheKey, JSON.stringify(live));
+        const json = JSON.stringify(live);
+        if (
+          lastWritten.current?.key !== cacheKey ||
+          lastWritten.current.json !== json
+        ) {
+          lastWritten.current = { key: cacheKey, json };
+          localStorage.setItem(cacheKey, json);
+        }
       } catch {
         // ignore storage errors
       }
     }
   }, [live, cacheKey]);
 
-  return live ?? cached;
+  // `??` would be wrong here: `null` is a legitimate loaded result (e.g.
+  // "no course"), and falling back to `cached` on it would resurrect the
+  // previous payload for a commit. Only `undefined` means still loading.
+  return live !== undefined ? live : cached;
 }

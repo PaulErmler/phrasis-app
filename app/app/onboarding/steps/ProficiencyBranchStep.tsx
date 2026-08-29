@@ -96,7 +96,12 @@ function BranchCard({
           {recommendedLabel}
         </span>
       ) : null}
-      <Icon className={cn('h-7 w-7', selected ? 'text-primary' : 'text-muted-foreground')} />
+      <Icon
+        className={cn(
+          'h-7 w-7',
+          selected ? 'text-primary' : 'text-muted-foreground',
+        )}
+      />
       <div>
         <div className="font-semibold">{title}</div>
         <div className="text-sm text-muted-foreground mt-1">{description}</div>
@@ -107,7 +112,13 @@ function BranchCard({
 
 function QuickTestIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      className={className}
+    >
       <path d="M12 2v6m0 8v6m-10-10h6m8 0h6" />
       <circle cx="12" cy="12" r="3" />
     </svg>

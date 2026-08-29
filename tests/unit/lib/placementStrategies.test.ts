@@ -347,10 +347,14 @@ describe('createStrategy factory', () => {
     expect(createStrategy('binary').name).toBe('binary');
     expect(createStrategy('staircase').name).toBe('staircase');
     expect(createStrategy('bayesian').name).toBe('bayesian');
-    expect(createStrategy('transformed-staircase').name).toBe('transformed-staircase');
+    expect(createStrategy('transformed-staircase').name).toBe(
+      'transformed-staircase',
+    );
     expect(createStrategy('anchor-verify').name).toBe('anchor-verify');
     expect(createStrategy('ramp-bisect').name).toBe('ramp-bisect');
-    expect(createStrategy('staircase-from-bottom').name).toBe('staircase-from-bottom');
+    expect(createStrategy('staircase-from-bottom').name).toBe(
+      'staircase-from-bottom',
+    );
   });
 });
 
@@ -374,12 +378,18 @@ describe('ogteToCurrentLevel', () => {
 describe('currentLevelToOgte', () => {
   it('is a left-inverse of ogteToCurrentLevel for representative levels', () => {
     expect(ogteToCurrentLevel(currentLevelToOgte('beginner'))).toBe('beginner');
-    expect(ogteToCurrentLevel(currentLevelToOgte('elementary'))).toBe('elementary');
-    expect(ogteToCurrentLevel(currentLevelToOgte('intermediate'))).toBe('intermediate');
+    expect(ogteToCurrentLevel(currentLevelToOgte('elementary'))).toBe(
+      'elementary',
+    );
+    expect(ogteToCurrentLevel(currentLevelToOgte('intermediate'))).toBe(
+      'intermediate',
+    );
     expect(ogteToCurrentLevel(currentLevelToOgte('upper_intermediate'))).toBe(
       'upper_intermediate',
     );
     expect(ogteToCurrentLevel(currentLevelToOgte('advanced'))).toBe('advanced');
-    expect(ogteToCurrentLevel(currentLevelToOgte('proficient'))).toBe('proficient');
+    expect(ogteToCurrentLevel(currentLevelToOgte('proficient'))).toBe(
+      'proficient',
+    );
   });
 });

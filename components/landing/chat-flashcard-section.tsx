@@ -70,7 +70,11 @@ export function ChatFlashcardSection() {
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' as const }}
+            transition={{
+              duration: 0.6,
+              delay: 0.15,
+              ease: 'easeOut' as const,
+            }}
             className="min-w-0"
           >
             <ChatFlashcardDemo />

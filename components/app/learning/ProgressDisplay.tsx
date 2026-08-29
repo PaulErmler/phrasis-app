@@ -1,18 +1,28 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from 'convex/react';
+import { useQuery, usePreloadedQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
-import { BookOpen, ChevronRight, Clock, Pause, Play, RotateCcw } from 'lucide-react';
+import {
+  BookOpen,
+  ChevronRight,
+  Clock,
+  Pause,
+  Play,
+  RotateCcw,
+} from 'lucide-react';
 import { api } from '@/convex/_generated/api';
 import { useAnimatedCounter } from '@/hooks/use-animated-counter';
 import { useNowMinute } from '@/hooks/use-now-minute';
 import { formatTimeMs } from '@/lib/formatTime';
+import { dateInTimezone } from '@/lib/dateStrings';
 import { getLanguageByCode } from '@/lib/languages';
 import { getUserTimezone } from '@/lib/timezone';
 import { Button } from '@/components/ui/button';
+import { useAppData } from '@/components/app/AppDataProvider';
 import { cn } from '@/lib/utils';
+import { isComposingKeyEvent } from '@/hooks/use-ime-safe-enter';
 import { ConfettiBurst } from '@/components/effects/ConfettiBurst';
 import {
   PROGRESS_DISPLAY_DURATION_MS,
@@ -22,7 +32,11 @@ import {
   setupMediaSession,
   setMediaSessionPlaybackState,
 } from '@/lib/audio/mediaSession';
-import type { SchedulingMode } from '@/convex/types';
+import {
+  formatCappedCount,
+  mergedDueCount,
+  REVIEWS_CAP,
+} from '@/lib/constants/dueCounts';
 
 type CardCounts = {
   new: number;
@@ -41,7 +55,6 @@ interface ProgressDisplayProps {
   dailyReviewsToday: number;
   dailyTimeMsToday: number;
   dailyNewWordsToday: number;
-  schedulingMode: SchedulingMode;
   /** Auto-advance + auto-advance bar are audio-mode only. */
   reviewMode: 'audio' | 'full';
   /** Mirrors `courseSettings.autoAdvance`. Even in audio mode, the
@@ -56,7 +69,6 @@ interface ProgressDisplayProps {
   ready?: boolean;
 }
 
-const REVIEWS_CAP = 100;
 const NEW_WORDS_CAP = 200;
 
 /**
@@ -193,10 +205,26 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
   // Minute-stable `now` per the no-wall-clock query guideline; the re-subscribe
   // gap on a minute tick is bridged by the lastCardCountsRef cache below.
   const now = useNowMinute();
-  const cardCountsQuery = useQuery(api.features.stats.getCardCounts, { now });
+  // Through AppDataProvider's SSR-seeded handle (B25); shares the app-wide
+  // getUserSettings subscription instead of re-subscribing ad hoc.
+  const { preloadedSettings } = useAppData();
+  const userSettings = usePreloadedQuery(preloadedSettings);
+  // Show only on an explicit opt-in (`false`); unset = hidden by default.
+  const hideDueCounts = userSettings?.hideDueCounts !== false;
+  const cardCountsQuery = useQuery(
+    api.features.stats.getCardCounts,
+    hideDueCounts ? 'skip' : { now },
+  );
   const celebrationWordsQuery = useQuery(
     api.features.stats.getNewWordsForCelebration,
-    { sessionId: props.sessionId, timezone },
+    // `today` derived from the same minute-quantized `now` (no-wall-clock
+    // query guideline, same derivation as the getCourseStats caller); the
+    // re-subscribe gap on a tick is bridged by lastWordsRef below.
+    {
+      sessionId: props.sessionId,
+      timezone,
+      today: dateInTimezone(now, timezone),
+    },
   );
 
   // Cache the most-recent resolved query results so a Convex re-subscription
@@ -221,12 +249,14 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
   const isProvisional = cardCountsQuery?.preparingWriting === true;
   if (cardCountsQuery !== undefined && !isProvisional)
     lastCardCountsRef.current = cardCountsQuery;
-  if (celebrationWordsQuery !== undefined) lastWordsRef.current = celebrationWordsQuery;
+  if (celebrationWordsQuery !== undefined)
+    lastWordsRef.current = celebrationWordsQuery;
 
-  const effectiveCardCounts =
-    cardCountsQuery !== undefined
+  const effectiveCardCounts = hideDueCounts
+    ? null
+    : cardCountsQuery !== undefined
       ? isProvisional
-        ? lastCardCountsRef.current ?? null
+        ? (lastCardCountsRef.current ?? null)
         : cardCountsQuery
       : lastCardCountsRef.current;
   const effectiveWords =
@@ -235,9 +265,12 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
       : lastWordsRef.current;
 
   // `getCardCounts` returns `null` for unauthenticated / no-active-deck users.
-  // That's a resolved value too (we just won't render the pills).
+  // That's a resolved value too (we just won't render the pills). When the
+  // user hides due counts we skip that query entirely and treat counts as
+  // resolved-null so the celebration doesn't wait on a number we won't show.
   const queriesResolved =
-    effectiveCardCounts !== undefined && effectiveWords !== undefined;
+    (hideDueCounts || effectiveCardCounts !== undefined) &&
+    effectiveWords !== undefined;
 
   if (!ready || !queriesResolved) {
     // Empty placeholder of identical size, no sound, no bar movement,
@@ -260,7 +293,6 @@ function CelebrationContent({
   dailyReviewsToday,
   dailyTimeMsToday,
   dailyNewWordsToday,
-  schedulingMode,
   reviewMode,
   autoAdvance,
   onContinue,
@@ -307,14 +339,38 @@ function CelebrationContent({
   // never ticks past the cap. `reviewsToday` is uncapped. Review counts
   // can legitimately reach the hundreds.
   const heroAnimTarget =
-    hero.kind === 'reviewsToday' ? hero.value : Math.min(hero.value, NEW_WORDS_CAP);
+    hero.kind === 'reviewsToday'
+      ? hero.value
+      : Math.min(hero.value, NEW_WORDS_CAP);
 
   // Memoised so the counter doesn't restart on every render.
-  const heroEasing = useMemo(() => buildHeroEasing(heroAnimTarget), [heroAnimTarget]);
+  const heroEasing = useMemo(
+    () => buildHeroEasing(heroAnimTarget),
+    [heroAnimTarget],
+  );
 
-  const animHero = useAnimatedCounter(heroAnimTarget, 0, COUNTER_DURATION_MS, COUNTER_DELAY_MS, true, heroEasing);
-  const animReviews = useAnimatedCounter(dailyReviewsToday, 0, SUB_COUNTER_DURATION_MS, COUNTER_DELAY_MS, true);
-  const animTime = useAnimatedCounter(dailyTimeMsToday, 0, SUB_COUNTER_DURATION_MS, COUNTER_DELAY_MS, true);
+  const animHero = useAnimatedCounter(
+    heroAnimTarget,
+    0,
+    COUNTER_DURATION_MS,
+    COUNTER_DELAY_MS,
+    true,
+    heroEasing,
+  );
+  const animReviews = useAnimatedCounter(
+    dailyReviewsToday,
+    0,
+    SUB_COUNTER_DURATION_MS,
+    COUNTER_DELAY_MS,
+    true,
+  );
+  const animTime = useAnimatedCounter(
+    dailyTimeMsToday,
+    0,
+    SUB_COUNTER_DURATION_MS,
+    COUNTER_DELAY_MS,
+    true,
+  );
   const animTodayWords = useAnimatedCounter(
     Math.min(dailyNewWordsToday, NEW_WORDS_CAP),
     0,
@@ -348,6 +404,27 @@ function CelebrationContent({
   useEffect(() => {
     onContinueRef.current = onContinue;
   }, [onContinue]);
+
+  // LearningMode unmounts LearningControls while this screen is up, so
+  // Enter/→ have nowhere else to go. Same keys as next-card.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' && e.key !== 'ArrowRight') return;
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isComposingKeyEvent(e)) return;
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        target.closest('button, a, input, textarea, select')
+      ) {
+        return;
+      }
+      e.preventDefault();
+      onContinueRef.current();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // The celebration only auto-advances when the underlying review flow
   // does (audio mode + the user's `autoAdvance` setting). In every other
@@ -564,7 +641,9 @@ function CelebrationContent({
             entirely when there are no words to celebrate. */}
         {(sessionWordsList.length > 0 || todayWordsList.length > 0) && (
           <motion.div className="w-full max-w-sm" variants={CHILD_VARIANTS}>
-            <p className="text-muted-xs text-center mb-1.5">Words you learned</p>
+            <p className="text-muted-xs text-center mb-1.5">
+              {t('wordsLearned')}
+            </p>
             <WordsMultilineTicker
               sessionWords={sessionWordsList}
               todayWords={todayWordsList}
@@ -572,7 +651,7 @@ function CelebrationContent({
           </motion.div>
         )}
 
-        {/* Anki-style state pills. Shown when we have card counts. The slot
+        {/* New vs review pills. Shown when we have card counts. The slot
             collapses entirely when counts are unavailable (no active deck). */}
         {cardCounts && (
           <motion.div
@@ -587,18 +666,11 @@ function CelebrationContent({
                 colorClass="text-accent-orange"
               />
               <StatePill
-                label={t('stateLearning')}
-                value={cardCounts.learning + cardCounts.relearning}
-                colorClass="text-primary"
+                label={t('stateReview')}
+                value={mergedDueCount(cardCounts)}
+                colorClass="text-success"
+                cap={REVIEWS_CAP}
               />
-              {schedulingMode !== 'learn_new' && (
-                <StatePill
-                  label={t('stateReview')}
-                  value={cardCounts.review}
-                  colorClass="text-success"
-                  cap={REVIEWS_CAP}
-                />
-              )}
             </div>
           </motion.div>
         )}
@@ -701,7 +773,9 @@ function StatCell({
   return (
     <div className="flex flex-col items-center text-center gap-0.5">
       <div className="text-muted-foreground">{icon}</div>
-      <p className="text-lg font-semibold tabular-nums leading-tight">{value}</p>
+      <p className="text-lg font-semibold tabular-nums leading-tight">
+        {value}
+      </p>
       <p className="text-muted-xs leading-none">{label}</p>
     </div>
   );
@@ -718,14 +792,16 @@ function StatePill({
   colorClass: string;
   cap?: number;
 }) {
-  const display = cap != null && value > cap ? `${cap}+` : String(value);
+  const display = cap != null ? formatCappedCount(value, cap) : String(value);
   // `min-w` enforces label separation. Relying on row-level `gap-x-*` alone
   // is fragile because each pill's intrinsic width tracks its label
-  // ("learning" ≈ 52 px, "new" ≈ 28 px), so the gap is between label edges
+  // ("review" ≈ 44 px, "new" ≈ 28 px), so the gap is between label edges
   // not pill centers, and long labels can run together regardless of gap.
   return (
     <div className="flex flex-col items-center gap-0.5 min-w-24">
-      <span className={`text-lg font-semibold tabular-nums ${colorClass}`}>{display}</span>
+      <span className={`text-lg font-semibold tabular-nums ${colorClass}`}>
+        {display}
+      </span>
       <span className="text-muted-xs">{label}</span>
     </div>
   );
@@ -768,7 +844,7 @@ function WordsMultilineTicker({ sessionWords, todayWords }: WordVariantProps) {
     MAX_ROWS,
     Math.max(1, Math.ceil(all.length / PER_ROW_FILL)),
   );
-  const rows: typeof all[] = Array.from({ length: rowCount }, () => []);
+  const rows: (typeof all)[] = Array.from({ length: rowCount }, () => []);
   all.forEach((w, i) => rows[i % rowCount].push(w));
   // After redistribution a row scrolls only if it actually overflows; the
   // fill threshold doubles as the scroll threshold so the two notions stay
@@ -781,7 +857,7 @@ function WordsMultilineTicker({ sessionWords, todayWords }: WordVariantProps) {
         // Alternate scroll direction per row so it doesn't look monolithic.
         const direction = rowIdx % 2 === 0 ? -1 : 1;
 
-        const renderItem = (w: typeof row[number], i: number) => (
+        const renderItem = (w: (typeof row)[number], i: number) => (
           <span
             key={i}
             className={cn(

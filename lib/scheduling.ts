@@ -181,14 +181,14 @@ function deserializeFsrsCard(s: FsrsCardState): Card {
 
 function ratingToGrade(rating: FSRSRating): Grade {
   switch (rating) {
-  case 'again':
-    return Rating.Again;
-  case 'hard':
-    return Rating.Hard;
-  case 'good':
-    return Rating.Good;
-  case 'easy':
-    return Rating.Easy;
+    case 'again':
+      return Rating.Again;
+    case 'hard':
+      return Rating.Hard;
+    case 'good':
+      return Rating.Good;
+    case 'easy':
+      return Rating.Easy;
   }
 }
 

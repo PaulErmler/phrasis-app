@@ -1,31 +1,33 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { CreditCard, Loader2, Mail } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
-import { CLIENT_EVENTS, capture } from "@/lib/posthog/events";
-import { useImpression } from "@/lib/posthog/use-impression";
-import { usePathname } from "next/navigation";
-import { useAction, useQuery } from "convex/react";
-import type { FunctionReturnType } from "convex/server";
-import { api } from "@/convex/_generated/api";
-import { useCustomer } from "autumn-js/react";
-import { toast } from "sonner";
-import { useIsNativeApp } from "@/hooks/use-native-app";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { CreditCard, Loader2, Mail } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
+import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
+import { useImpression } from '@/lib/posthog/use-impression';
+import { usePathname } from 'next/navigation';
+import { useAction, useQuery } from 'convex/react';
+import type { FunctionReturnType } from 'convex/server';
+import { api } from '@/convex/_generated/api';
+import { useCustomer } from 'autumn-js/react';
+import { toast } from 'sonner';
+import { useIsNativeApp } from '@/hooks/use-native-app';
+
+import { reportError } from '@/lib/report-error';
 
 /**
  * App-wide dunning popup. Mounted once in BillingGate (from the /app layout)
  * so it covers every route including the standalone /app/learn page; opens
  * whenever the synced billing state is past due. Full policy (no grace
  * window, the two exits, admin-route exclusion, `assertBillingCurrent`
- * backstop): documentation/autumn-usage-tracking.md, "Past-due (dunning)
+ * backstop): docs/architecture/autumn-usage-tracking.md, "Past-due (dunning)
  * flow".
  *
  * Split into this thin gate and the dialog proper: the inner component only
@@ -45,7 +47,7 @@ export default function PaymentOverdueDialog() {
   const pastDueSince =
     quotas?.pastDue === true ? quotas.pastDueSince : undefined;
   if (!quotas || pastDueSince === undefined) return null;
-  if (pathname.startsWith("/app/admin")) return null;
+  if (pathname.startsWith('/app/admin')) return null;
 
   return (
     <PaymentOverdueDialogContent quotas={quotas} pastDueSince={pastDueSince} />
@@ -75,7 +77,7 @@ function PaymentOverdueDialogContent({
   quotas: Quotas;
   pastDueSince: number;
 }) {
-  const t = useTranslations("PaymentOverdue");
+  const t = useTranslations('PaymentOverdue');
   const locale = useLocale();
   // Store builds must not link out to Stripe (invoice or billing portal).
   // They get contact-support instead; the cancel path stays available.
@@ -85,11 +87,11 @@ function PaymentOverdueDialogContent({
   // updates what /app/settings displays, without it the settings page
   // keeps showing the cancelled plan as subscribed until a full reload.
   const { openBillingPortal, refetch } = useCustomer({
-    expand: ["trials_used"],
+    expand: ['trials_used'],
   });
   const cancelOverdue = useAction(api.billing.cancelOverdueSubscription);
 
-  const [busy, setBusy] = useState<"pay" | "portal" | "cancel" | null>(null);
+  const [busy, setBusy] = useState<'pay' | 'portal' | 'cancel' | null>(null);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
 
   // handlePay leaves `busy` set on purpose while the tab navigates away,
@@ -103,8 +105,8 @@ function PaymentOverdueDialogContent({
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted) setBusy(null);
     };
-    window.addEventListener("pageshow", onPageShow);
-    return () => window.removeEventListener("pageshow", onPageShow);
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
   }, []);
 
   const invoiceUrl = quotas.pastDueInvoiceUrl;
@@ -122,29 +124,29 @@ function PaymentOverdueDialogContent({
   const handlePay = () => {
     if (!invoiceUrl) return;
     capture(CLIENT_EVENTS.CHECKOUT_REDIRECTED, { flow: 'past_due_invoice' });
-    setBusy("pay");
+    setBusy('pay');
     window.location.href = invoiceUrl;
   };
 
   /** Fallback when Autumn never surfaced a payable invoice URL. */
   const handlePortal = async () => {
-    setBusy("portal");
+    setBusy('portal');
     try {
       const res = await openBillingPortal({ returnUrl: window.location.href });
       if (res.error) {
-        console.error("Billing portal failed:", res.error);
-        toast.error(t("portalError"));
+        reportError(res.error, { op: 'openBillingPortal' });
+        toast.error(t('portalError'));
       }
     } catch (e) {
-      console.error("Billing portal failed:", e);
-      toast.error(t("portalError"));
+      reportError(e, { op: 'openBillingPortal' });
+      toast.error(t('portalError'));
     } finally {
       setBusy(null);
     }
   };
 
   const handleCancel = async () => {
-    setBusy("cancel");
+    setBusy('cancel');
     try {
       const res = await cancelOverdue({});
       // The server already re-synced the Convex quota mirror (which is what
@@ -154,11 +156,11 @@ function PaymentOverdueDialogContent({
       // error the user needs to see.
       await refetch().catch(() => undefined);
       toast.success(
-        res.outcome === "recovered" ? t("paymentReceived") : t("cancelSuccess"),
+        res.outcome === 'recovered' ? t('paymentReceived') : t('cancelSuccess'),
       );
     } catch (e) {
-      console.error("Cancel failed:", e);
-      toast.error(t("cancelError"));
+      reportError(e, { op: 'cancelPastDueSubscription' });
+      toast.error(t('cancelError'));
     } finally {
       setBusy(null);
       setConfirmingCancel(false);
@@ -176,7 +178,7 @@ function PaymentOverdueDialogContent({
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogTitle className="font-bold text-xl px-6">
-          {confirmingCancel ? t("cancelTitle") : t("title")}
+          {confirmingCancel ? t('cancelTitle') : t('title')}
         </DialogTitle>
 
         {confirmingCancel ? (
@@ -185,20 +187,20 @@ function PaymentOverdueDialogContent({
             className="px-6 mt-1 mb-2 text-muted-foreground"
           >
             {coursesArchived > 0
-              ? t("cancelWarning", { count: coursesArchived })
-              : t("cancelWarningNoCourses")}
+              ? t('cancelWarning', { count: coursesArchived })
+              : t('cancelWarningNoCourses')}
           </p>
         ) : (
           <>
             <p className="px-6 mt-1 text-muted-foreground">
-              {isNative ? t("nativeDescription") : t("description")}
+              {isNative ? t('nativeDescription') : t('description')}
             </p>
             {!isNative && (
               <p
                 data-testid="payment-overdue-notice"
                 className="px-6 mt-2 mb-2 text-muted-foreground"
               >
-                {t("blockedDescription", {
+                {t('blockedDescription', {
                   date: new Date(pastDueSince).toLocaleDateString(locale),
                 })}
               </p>
@@ -217,7 +219,7 @@ function PaymentOverdueDialogContent({
                 onClick={() => setConfirmingCancel(false)}
                 disabled={busy !== null}
               >
-                {t("back")}
+                {t('back')}
               </Button>
               <Button
                 size="sm"
@@ -227,10 +229,10 @@ function PaymentOverdueDialogContent({
                 onClick={handleCancel}
                 disabled={busy !== null}
               >
-                {busy === "cancel" ? (
+                {busy === 'cancel' ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  t("cancelConfirm")
+                  t('cancelConfirm')
                 )}
               </Button>
             </>
@@ -244,7 +246,7 @@ function PaymentOverdueDialogContent({
                 onClick={() => setConfirmingCancel(true)}
                 disabled={busy !== null}
               >
-                {t("cancelButton")}
+                {t('cancelButton')}
               </Button>
               {isNative ? (
                 <Button
@@ -255,7 +257,7 @@ function PaymentOverdueDialogContent({
                 >
                   <a href="mailto:support@flexling.com">
                     <Mail className="h-3.5 w-3.5" />
-                    {t("contactUs")}
+                    {t('contactUs')}
                   </a>
                 </Button>
               ) : (
@@ -266,12 +268,12 @@ function PaymentOverdueDialogContent({
                   onClick={invoiceUrl ? handlePay : handlePortal}
                   disabled={busy !== null}
                 >
-                  {busy === "pay" || busy === "portal" ? (
+                  {busy === 'pay' || busy === 'portal' ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <>
                       <CreditCard className="h-3.5 w-3.5" />
-                      {invoiceUrl ? t("payInvoiceButton") : t("payButton")}
+                      {invoiceUrl ? t('payInvoiceButton') : t('payButton')}
                     </>
                   )}
                 </Button>

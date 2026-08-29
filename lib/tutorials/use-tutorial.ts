@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useCallback, useState, useSyncExternalStore } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -9,13 +16,15 @@ import { reportError } from '@/lib/report-error';
 import { driver, type Driver, type DriveStep } from 'driver.js';
 import type { TutorialId } from '@/convex/features/tutorialIds';
 import { getTutorial } from './registry';
-import type { TutorialContext } from './types';
+import type { AppDriveStep, TutorialContext } from './types';
 import {
   baseDriverConfig,
   bindTourKeyboard,
+  findVisibleAnchor,
   getDriverOverlayOpacity,
   resolveStepAnchors,
 } from './driver-common';
+import { TUTORIAL_ANCHORS, tutorialSelector } from './anchors';
 
 const STORAGE_PREFIX = 'phrasis_completed_tutorials';
 
@@ -143,7 +152,11 @@ export function useCompletedTutorials(requiredIds: readonly string[]) {
   }, [userId]);
 
   // ---- localStorage is the primary source of truth for UI decisions ----
-  const completed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const completed = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
 
   const completeMutation = useMutation(api.features.courses.completeTutorial);
 
@@ -201,7 +214,9 @@ export function useCompletedTutorials(requiredIds: readonly string[]) {
       if (!prev.includes(tutorialId)) {
         writeCompleted([...prev, tutorialId]);
         if (opts?.captureEvent !== false) {
-          capture(CLIENT_EVENTS.TUTORIAL_COMPLETED, { tutorial_id: tutorialId });
+          capture(CLIENT_EVENTS.TUTORIAL_COMPLETED, {
+            tutorial_id: tutorialId,
+          });
         }
       }
       completeMutation({ tutorialId }).catch((e) =>
@@ -234,7 +249,10 @@ interface UseTutorialOptions {
   context?: TutorialContext;
 }
 
-export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions = {}) {
+export function useTutorial(
+  tutorialId: TutorialId,
+  options: UseTutorialOptions = {},
+) {
   const {
     enabled = true,
     delayMs = 800,
@@ -327,7 +345,18 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   const launchDriver = useCallback(() => {
     if (!tutorial) return;
 
-    const allSteps = [...tutorial.steps, ...(extraStepsRef.current ?? [])];
+    // skipIfMissing steps anchor to conditionally mounted UI: when their
+    // selector has no visible match at launch, drop them entirely instead
+    // of letting driver.js float a popover that describes an absent card.
+    const allSteps = [
+      ...tutorial.steps,
+      ...(extraStepsRef.current ?? []),
+    ].filter(
+      (step: AppDriveStep) =>
+        !step.skipIfMissing ||
+        typeof step.element !== 'string' ||
+        findVisibleAnchor(step.element) !== null,
+    );
 
     const resolvedSteps = resolveStepAnchors(allSteps, {
       onMiss: 'keep-selector',
@@ -335,7 +364,11 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
 
     const isInteractiveStep = (stepIndex: number) => {
       const step = resolvedSteps[stepIndex];
-      return step?.popover && 'popoverClass' in step.popover && step.popover.popoverClass === 'tutorial-try-card';
+      return (
+        step?.popover &&
+        'popoverClass' in step.popover &&
+        step.popover.popoverClass === 'tutorial-try-card'
+      );
     };
 
     const completeOnClickIndices = new Set<number>();
@@ -444,24 +477,29 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     teardownRef.current('hidden');
   }, []);
 
-  const showCompletionStep = useCallback((title: string, description: string) => {
-    let unbind = () => {};
-    const d = driver({
-      showButtons: ['close'],
-      overlayColor: '#000',
-      overlayOpacity: getDriverOverlayOpacity(),
-      popoverClass: 'phrasis-tutorial-completion',
-      steps: [{
-        popover: { title, description },
-      }],
-      onDestroyStarted: () => {
-        unbind();
-        d.destroy();
-      },
-    });
-    unbind = bindTourKeyboard(d);
-    d.drive();
-  }, []);
+  const showCompletionStep = useCallback(
+    (title: string, description: string) => {
+      let unbind = () => {};
+      const d = driver({
+        showButtons: ['close'],
+        overlayColor: '#000',
+        overlayOpacity: getDriverOverlayOpacity(),
+        popoverClass: 'phrasis-tutorial-completion',
+        steps: [
+          {
+            popover: { title, description },
+          },
+        ],
+        onDestroyStarted: () => {
+          unbind();
+          d.destroy();
+        },
+      });
+      unbind = bindTourKeyboard(d);
+      d.drive();
+    },
+    [],
+  );
 
   const tRef = useRef(t);
   useLayoutEffect(() => {
@@ -476,15 +514,17 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       overlayColor: '#000',
       overlayOpacity: getDriverOverlayOpacity(),
       popoverClass: 'phrasis-tutorial-chat',
-      steps: [{
-        element: '[data-tutorial="chat-button"]',
-        popover: {
-          title: tr('chat.title'),
-          description: tr('chat.description'),
-          side: 'top' as const,
-          align: 'center' as const,
+      steps: [
+        {
+          element: tutorialSelector(TUTORIAL_ANCHORS.chatButton),
+          popover: {
+            title: tr('chat.title'),
+            description: tr('chat.description'),
+            side: 'top' as const,
+            align: 'center' as const,
+          },
         },
-      }],
+      ],
       onDestroyStarted: () => {
         unbind();
         completeTutorial();

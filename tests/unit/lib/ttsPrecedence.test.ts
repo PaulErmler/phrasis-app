@@ -10,7 +10,12 @@ import type { TtsProvider } from '@/lib/languages';
  * a newly-active provider should overwrite. Actively changed (Gemini just
  * landed), so a regression here would silently delete or strand user audio.
  */
-const ALL_PROVIDERS: TtsProvider[] = ['google', 'elevenlabs', 'azure', 'gemini'];
+const ALL_PROVIDERS: TtsProvider[] = [
+  'google',
+  'elevenlabs',
+  'azure',
+  'gemini',
+];
 
 describe('shouldOverwriteProvider', () => {
   it('never overwrites when current === existing', () => {
@@ -55,7 +60,10 @@ describe('shouldOverwriteProvider', () => {
 describe('TTS_PROVIDER_OVERRIDES', () => {
   it('has an entry for every TTS provider', () => {
     for (const p of ALL_PROVIDERS) {
-      expect(TTS_PROVIDER_OVERRIDES[p], `missing override list for ${p}`).toBeDefined();
+      expect(
+        TTS_PROVIDER_OVERRIDES[p],
+        `missing override list for ${p}`,
+      ).toBeDefined();
     }
   });
 

@@ -9,7 +9,7 @@ import type { CompositionEventHandler, KeyboardEvent } from 'react';
  * Japanese, Chinese, Korean and Vietnamese are typed through an IME: you type
  * kana / pinyin / jamo / Telex and press **Enter to confirm the conversion**.
  * That Enter is part of typing, not a submit gesture, treating it as submit
- * grades a half-composed answer. See `documentation/review_modes.md`.
+ * grades a half-composed answer. See `docs/architecture/review_modes.md`.
  *
  * Four checks, because no single one is reliable across browsers:
  *

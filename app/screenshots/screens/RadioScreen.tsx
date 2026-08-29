@@ -20,8 +20,14 @@ import { ThemeSwitcher } from '@/components/ThemeSwitcher';
  * the playing card and transport. Sells all-day comprehensible input.
  */
 const QUEUE = [
-  { base: 'The train leaves in ten minutes.', target: 'El tren sale en diez minutos.' },
-  { base: 'Could you speak more slowly?', target: '¿Podrías hablar más despacio?' },
+  {
+    base: 'The train leaves in ten minutes.',
+    target: 'El tren sale en diez minutos.',
+  },
+  {
+    base: 'Could you speak more slowly?',
+    target: '¿Podrías hablar más despacio?',
+  },
 ];
 
 export function RadioScreen() {
@@ -66,23 +72,37 @@ export function RadioScreen() {
               </div>
               <div className="px-6 pb-6 space-y-4">
                 <div className="flex items-start gap-2">
-                  <p className="body-large flex-1">I would like a table for two.</p>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                  <p className="body-large flex-1">
+                    I would like a table for two.
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                  >
                     <Volume2 className="h-4 w-4" />
                   </Button>
                 </div>
                 <Separator />
                 <div className="flex items-start gap-2">
                   <p className="body-large flex-1">
-                    Quisiera una <span className="text-primary">mesa</span> para dos.
+                    Quisiera una <span className="text-primary">mesa</span> para
+                    dos.
                   </p>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                  >
                     <Volume2 className="h-4 w-4 text-primary" />
                   </Button>
                 </div>
               </div>
               <div className="relative h-1 w-full overflow-hidden bg-primary/20">
-                <div className="absolute h-full bg-primary" style={{ width: '61%' }} />
+                <div
+                  className="absolute h-full bg-primary"
+                  style={{ width: '61%' }}
+                />
               </div>
             </div>
 
@@ -90,7 +110,10 @@ export function RadioScreen() {
             <div className="space-y-2">
               <p className="label-form px-1">Up next</p>
               {QUEUE.map((item) => (
-                <div key={item.base} className="card-surface p-3 space-y-0.5 opacity-80">
+                <div
+                  key={item.base}
+                  className="card-surface p-3 space-y-0.5 opacity-80"
+                >
                   <p className="text-sm text-muted-foreground">{item.base}</p>
                   <p className="text-sm font-medium">{item.target}</p>
                 </div>
@@ -105,13 +128,25 @@ export function RadioScreen() {
         <div className="border-t">
           <div className="max-w-lg mx-auto px-4 py-4">
             <div className="flex gap-2">
-              <Button variant="outline" size="icon" className="h-9 w-9 shrink-0">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+              >
                 <SkipBack className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" className="h-9 flex-[2] min-w-0">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 flex-[2] min-w-0"
+              >
                 <Pause className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" className="h-9 flex-[1] min-w-0">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 flex-[1] min-w-0"
+              >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>

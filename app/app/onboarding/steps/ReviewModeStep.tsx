@@ -106,13 +106,22 @@ function ModeRow({
           selected ? 'bg-primary/15' : 'bg-muted',
         )}
       >
-        <Icon className={cn('h-4 w-4', selected ? 'text-primary' : 'text-muted-foreground')} />
+        <Icon
+          className={cn(
+            'h-4 w-4',
+            selected ? 'text-primary' : 'text-muted-foreground',
+          )}
+        />
       </div>
       <div className="flex-1 min-w-0">
         <div className="font-semibold">{title}</div>
-        <div className="text-sm text-muted-foreground mt-0.5">{description}</div>
+        <div className="text-sm text-muted-foreground mt-0.5">
+          {description}
+        </div>
         {footnote ? (
-          <div className="text-[11px] text-muted-foreground italic mt-1">{footnote}</div>
+          <div className="text-[11px] text-muted-foreground italic mt-1">
+            {footnote}
+          </div>
         ) : null}
       </div>
     </button>

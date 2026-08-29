@@ -23,7 +23,8 @@ export function buildCardOriginPill(
   t: (key: 'cardOriginCustom' | 'cardOriginChat') => string,
 ): CardOriginPill | null {
   if (!show) return null;
-  if (card.collectionOrigin === 'custom') return { label: t('cardOriginCustom') };
+  if (card.collectionOrigin === 'custom')
+    return { label: t('cardOriginCustom') };
   if (card.collectionOrigin === 'chat') return { label: t('cardOriginChat') };
   if (!card.collectionLabel) return null;
   return {

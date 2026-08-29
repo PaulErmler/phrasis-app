@@ -69,7 +69,11 @@ export async function timeStretchBuffer(
   );
 
   const ctx = getDecodeContext();
-  const outBuf = ctx.createBuffer(out.channels.length, out.length, out.sampleRate);
+  const outBuf = ctx.createBuffer(
+    out.channels.length,
+    out.length,
+    out.sampleRate,
+  );
   out.channels.forEach((data, ch) => outBuf.copyToChannel(data, ch));
 
   cacheSet(key, outBuf);

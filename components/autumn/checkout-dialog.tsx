@@ -1,50 +1,52 @@
-"use client";
-import * as AccordionPrimitive from "@radix-ui/react-accordion";
-import type { CheckoutParams, CheckoutResult, ProductItem } from "autumn-js";
-import { ArrowRight, ChevronDown, Loader2 } from "lucide-react";
-import type React from "react";
-import { useEffect, useRef, useState } from "react";
+'use client';
+import * as AccordionPrimitive from '@radix-ui/react-accordion';
+import type { CheckoutParams, CheckoutResult, ProductItem } from 'autumn-js';
+import { ArrowRight, ChevronDown, Loader2 } from 'lucide-react';
+import type React from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
-} from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
+} from '@/components/ui/accordion';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { useCustomer, usePricingTable } from "autumn-js/react";
-import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { useLocale, useTranslations } from "next-intl";
-import { CLIENT_EVENTS, capture } from "@/lib/posthog/events";
-import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
-import { getCheckoutContent } from "@/lib/autumn/checkout-content";
+} from '@/components/ui/popover';
+import { useCustomer, usePricingTable } from 'autumn-js/react';
+import { useAction } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { useLocale, useTranslations } from 'next-intl';
+import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { getCheckoutContent } from '@/lib/autumn/checkout-content';
 import {
   checkoutTrialParams,
   findCurrentPaidProduct,
   getTrialState,
-} from "@/lib/autumn/trial-eligibility";
+} from '@/lib/autumn/trial-eligibility';
 import {
   throwOnCheckoutError,
   useCheckoutErrorToast,
-} from "@/hooks/use-checkout-error";
+} from '@/hooks/use-checkout-error';
+
+import { reportError } from '@/lib/report-error';
 
 export interface CheckoutDialogProps {
-	open: boolean;
-	setOpen: (open: boolean) => void;
-	checkoutResult: CheckoutResult;
-	checkoutParams?: CheckoutParams;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  checkoutResult: CheckoutResult;
+  checkoutParams?: CheckoutParams;
 }
 
 const formatCurrency = ({
@@ -52,22 +54,22 @@ const formatCurrency = ({
   currency,
   locale,
 }: {
-	amount: number;
-	currency: string;
-	locale?: string;
+  amount: number;
+  currency: string;
+  locale?: string;
 }) => {
-  return new Intl.NumberFormat(locale ?? "en-US", {
-    style: "currency",
+  return new Intl.NumberFormat(locale ?? 'en-US', {
+    style: 'currency',
     currency: currency,
   }).format(amount);
 };
 
 export default function CheckoutDialog(params: CheckoutDialogProps) {
-  const t = useTranslations("Checkout");
+  const t = useTranslations('Checkout');
   const locale = useLocale();
   const showCheckoutError = useCheckoutErrorToast();
   const { attach, customer, refetch } = useCustomer({
-    expand: ["trials_used"],
+    expand: ['trials_used'],
   });
   // The pricing table's CTA labels come from usePricingTable's per-customer
   // scenarios, cached in SWR. autumn-js's attach() refetches that cache
@@ -78,8 +80,8 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
   const switchPlanDuringTrial = useAction(api.billing.switchPlanDuringTrial);
   const trialState = getTrialState(customer);
   const [checkoutResult, setCheckoutResult] = useState<
-		CheckoutResult | undefined
-	>(params?.checkoutResult);
+    CheckoutResult | undefined
+  >(params?.checkoutResult);
 
   useEffect(() => {
     if (params.checkoutResult) {
@@ -109,8 +111,9 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
   // Autumn's checkout preview reports next_cycle one year early for annual
   // plans; the customer's own current_period_end is the reliable source
   // for period-end-anchored dates (see getCheckoutContent opts doc).
-  const currentPeriodEndsAt =
-    findCurrentPaidProduct(customer?.products)?.currentPeriodEnd;
+  const currentPeriodEndsAt = findCurrentPaidProduct(
+    customer?.products,
+  )?.currentPeriodEnd;
   const { title, message } = getCheckoutContent(checkoutResult, t, trialState, {
     currentPeriodEndsAt,
     locale,
@@ -133,12 +136,11 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
     trialState.onTrial &&
     !checkoutResult.product.properties?.is_one_off &&
     (isPaid
-      ? scenario === "upgrade" ||
-        scenario === "downgrade" ||
-        scenario === "new" ||
-        scenario === "renew"
-      : isFree === true &&
-        (scenario === "downgrade" || scenario === "cancel"));
+      ? scenario === 'upgrade' ||
+        scenario === 'downgrade' ||
+        scenario === 'new' ||
+        scenario === 'renew'
+      : isFree === true && (scenario === 'downgrade' || scenario === 'cancel'));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -169,7 +171,7 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
             data-testid="checkout-no-commitment"
             className="px-6 mb-4 text-xs text-muted-foreground"
           >
-            {t("noCommitment")}
+            {t('noCommitment')}
           </p>
         )}
 
@@ -242,9 +244,7 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <span className="whitespace-nowrap">
-                {t("confirm")}
-              </span>
+              <span className="whitespace-nowrap">{t('confirm')}</span>
             )}
           </Button>
         </DialogFooter>
@@ -259,10 +259,10 @@ function PriceInformation({
   trialSwitchEndsAt,
   currentPeriodEndsAt,
 }: {
-	checkoutResult: CheckoutResult;
-	setCheckoutResult: (checkoutResult: CheckoutResult) => void;
-	trialSwitchEndsAt?: number;
-	currentPeriodEndsAt?: number;
+  checkoutResult: CheckoutResult;
+  setCheckoutResult: (checkoutResult: CheckoutResult) => void;
+  trialSwitchEndsAt?: number;
+  currentPeriodEndsAt?: number;
 }) {
   return (
     <div className="px-6 mb-4 flex flex-col gap-4">
@@ -275,8 +275,8 @@ function PriceInformation({
         {!trialSwitchEndsAt &&
           checkoutResult?.has_prorations &&
           checkoutResult.lines.length > 0 && (
-          <CheckoutLines checkoutResult={checkoutResult} />
-        )}
+            <CheckoutLines checkoutResult={checkoutResult} />
+          )}
         <DueAmounts
           checkoutResult={checkoutResult}
           trialSwitchEndsAt={trialSwitchEndsAt}
@@ -292,16 +292,16 @@ function DueAmounts({
   trialSwitchEndsAt,
   currentPeriodEndsAt,
 }: {
-	checkoutResult: CheckoutResult;
-	trialSwitchEndsAt?: number;
-	currentPeriodEndsAt?: number;
+  checkoutResult: CheckoutResult;
+  trialSwitchEndsAt?: number;
+  currentPeriodEndsAt?: number;
 }) {
-  const t = useTranslations("Checkout");
+  const t = useTranslations('Checkout');
   const locale = useLocale();
   const { next_cycle, product } = checkoutResult;
 
   const hasUsagePrice = product.items.some(
-    (item) => item.usage_model === "pay_per_use",
+    (item) => item.usage_model === 'pay_per_use',
   );
 
   // Plan switch during a running trial: nothing is charged now. The
@@ -310,13 +310,13 @@ function DueAmounts({
   // trial end, at the target plan's own price.
   if (trialSwitchEndsAt) {
     const planPrice =
-      product.items.find((item) => item.type === "price")?.price ??
+      product.items.find((item) => item.type === 'price')?.price ??
       next_cycle?.total ??
       checkoutResult.total;
     return (
       <div className="flex flex-col gap-1">
         <div className="flex justify-between">
-          <p className="font-medium text-md">{t("totalDueToday")}</p>
+          <p className="font-medium text-md">{t('totalDueToday')}</p>
           <p data-testid="checkout-due-today" className="font-medium text-md">
             {formatCurrency({
               amount: 0,
@@ -326,7 +326,7 @@ function DueAmounts({
         </div>
         <div className="flex justify-between text-muted-foreground">
           <p className="text-md">
-            {t("dueNextCycle", {
+            {t('dueNextCycle', {
               date: new Date(trialSwitchEndsAt).toLocaleDateString(locale),
             })}
           </p>
@@ -335,7 +335,7 @@ function DueAmounts({
               amount: planPrice,
               currency: checkoutResult?.currency,
             })}
-            {hasUsagePrice && <span> {t("plusUsagePrices")}</span>}
+            {hasUsagePrice && <span> {t('plusUsagePrices')}</span>}
           </p>
         </div>
       </div>
@@ -346,9 +346,9 @@ function DueAmounts({
   // the reliable date. Autumn's preview reports next_cycle one year
   // early for annual plans (see getCheckoutContent).
   const periodEndAnchored =
-    product.scenario === "downgrade" ||
-    product.scenario === "cancel" ||
-    product.scenario === "scheduled";
+    product.scenario === 'downgrade' ||
+    product.scenario === 'cancel' ||
+    product.scenario === 'scheduled';
   const nextCycleAt =
     periodEndAnchored && currentPeriodEndsAt !== undefined
       ? currentPeriodEndsAt
@@ -364,7 +364,7 @@ function DueAmounts({
     <div className="flex flex-col gap-1">
       <div className="flex justify-between">
         <div>
-          <p className="font-medium text-md">{t("totalDueToday")}</p>
+          <p className="font-medium text-md">{t('totalDueToday')}</p>
         </div>
 
         <p data-testid="checkout-due-today" className="font-medium text-md">
@@ -378,7 +378,7 @@ function DueAmounts({
         <div className="flex justify-between text-muted-foreground">
           <div>
             <p className="text-md">
-              {t("dueNextCycle", { date: nextCycleAtStr ?? "" })}
+              {t('dueNextCycle', { date: nextCycleAtStr ?? '' })}
             </p>
           </div>
           <p className="text-md">
@@ -386,7 +386,7 @@ function DueAmounts({
               amount: next_cycle.total,
               currency: checkoutResult?.currency,
             })}
-            {hasUsagePrice && <span> {t("plusUsagePrices")}</span>}
+            {hasUsagePrice && <span> {t('plusUsagePrices')}</span>}
           </p>
         </div>
       )}
@@ -396,11 +396,11 @@ function DueAmounts({
 
 function formatPeriodLabel(
   secondaryText: string | undefined,
-  tPricing: (key: "perMonth" | "perYear") => string
+  tPricing: (key: 'perMonth' | 'perYear') => string,
 ): string {
-  if (!secondaryText) return "";
-  if (secondaryText === "per month") return tPricing("perMonth");
-  if (secondaryText === "per year") return tPricing("perYear");
+  if (!secondaryText) return '';
+  if (secondaryText === 'per month') return tPricing('perMonth');
+  if (secondaryText === 'per year') return tPricing('perYear');
   return secondaryText;
 }
 
@@ -408,25 +408,25 @@ function ProductItems({
   checkoutResult,
   setCheckoutResult,
 }: {
-	checkoutResult: CheckoutResult;
-	setCheckoutResult: (checkoutResult: CheckoutResult) => void;
+  checkoutResult: CheckoutResult;
+  setCheckoutResult: (checkoutResult: CheckoutResult) => void;
 }) {
-  const t = useTranslations("Checkout");
-  const tPricing = useTranslations("Pricing");
+  const t = useTranslations('Checkout');
+  const tPricing = useTranslations('Pricing');
 
   const isUpdateQuantity =
-		checkoutResult?.product.scenario === "active" &&
-		checkoutResult.product.properties.updateable;
+    checkoutResult?.product.scenario === 'active' &&
+    checkoutResult.product.properties.updateable;
 
   const isOneOff = checkoutResult?.product.properties.is_one_off;
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium">{t("price")}</p>
+      <p className="text-sm font-medium">{t('price')}</p>
       {checkoutResult?.product.items
-        .filter((item) => item.type !== "feature")
+        .filter((item) => item.type !== 'feature')
         .map((item, index) => {
-          if (item.usage_model === "prepaid") {
+          if (item.usage_model === 'prepaid') {
             return (
               <PrepaidItem
                 key={index}
@@ -447,11 +447,11 @@ function ProductItems({
                 {item.feature
                   ? item.feature.name
                   : isOneOff
-                    ? t("price")
-                    : t("subscription")}
+                    ? t('price')
+                    : t('subscription')}
               </p>
               <p>
-                {item.display?.primary_text}{" "}
+                {item.display?.primary_text}{' '}
                 {formatPeriodLabel(item.display?.secondary_text, tPricing)}
               </p>
             </div>
@@ -462,14 +462,14 @@ function ProductItems({
 }
 
 function CheckoutLines({ checkoutResult }: { checkoutResult: CheckoutResult }) {
-  const t = useTranslations("Checkout");
+  const t = useTranslations('Checkout');
   return (
     <Accordion type="single" collapsible>
       <AccordionItem value="total" className="border-b-0">
         <CustomAccordionTrigger className="justify-between w-full my-0 py-0 border-none">
           <div className="cursor-pointer flex items-center gap-1 w-full justify-end">
             <p className="font-light text-muted-foreground">
-              {t("viewDetails")}
+              {t('viewDetails')}
             </p>
             <ChevronDown
               className="text-muted-foreground mt-0.5 rotate-90 transition-transform duration-200 ease-in-out"
@@ -485,8 +485,8 @@ function CheckoutLines({ checkoutResult }: { checkoutResult: CheckoutResult }) {
                 <div key={index} className="flex justify-between">
                   <p className="text-muted-foreground">{line.description}</p>
                   <p className="text-muted-foreground">
-                    {new Intl.NumberFormat("en-US", {
-                      style: "currency",
+                    {new Intl.NumberFormat('en-US', {
+                      style: 'currency',
                       currency: checkoutResult?.currency,
                     }).format(line.amount)}
                   </p>
@@ -509,7 +509,7 @@ function CustomAccordionTrigger({
       <AccordionPrimitive.Trigger
         data-slot="accordion-trigger"
         className={cn(
-          "focus-visible:border-ring focus-visible:ring-ring/50 flex flex-1 items-start justify-between gap-4 rounded-md py-4 text-left text-sm font-medium transition-all outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 [&[data-state=open]_svg]:rotate-0",
+          'focus-visible:border-ring focus-visible:ring-ring/50 flex flex-1 items-start justify-between gap-4 rounded-md py-4 text-left text-sm font-medium transition-all outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 [&[data-state=open]_svg]:rotate-0',
           className,
         )}
         {...props}
@@ -525,17 +525,17 @@ const PrepaidItem = ({
   checkoutResult,
   setCheckoutResult,
 }: {
-	item: ProductItem;
-	checkoutResult: CheckoutResult;
-	setCheckoutResult: (checkoutResult: CheckoutResult) => void;
+  item: ProductItem;
+  checkoutResult: CheckoutResult;
+  setCheckoutResult: (checkoutResult: CheckoutResult) => void;
 }) => {
-  const t = useTranslations("Checkout");
-  const tPricing = useTranslations("Pricing");
+  const t = useTranslations('Checkout');
+  const tPricing = useTranslations('Pricing');
   const { quantity = 0, billing_units: billingUnits = 1 } = item;
   const [quantityInput, setQuantityInput] = useState<string>(
     (quantity / billingUnits).toString(),
   );
-  const { checkout, customer } = useCustomer({ expand: ["trials_used"] });
+  const { checkout, customer } = useCustomer({ expand: ['trials_used'] });
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const scenario = checkoutResult.product.scenario;
@@ -566,19 +566,19 @@ const PrepaidItem = ({
       });
 
       if (error) {
-        console.error(error);
+        reportError(error, { op: 'checkoutOptionsUpdate' });
         return;
       }
       setCheckoutResult(data!);
     } catch (error) {
-      console.error(error);
+      reportError(error, { op: 'checkoutOptionsUpdate' });
     } finally {
       setLoading(false);
       setOpen(false);
     }
   };
 
-  const disableSelection = scenario === "renew";
+  const disableSelection = scenario === 'renew';
 
   return (
     <div className="flex justify-between gap-2">
@@ -589,15 +589,15 @@ const PrepaidItem = ({
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger
             className={cn(
-              "text-muted-foreground text-xs px-1 py-0.5 rounded-md flex items-center gap-1 bg-accent/80 shrink-0",
+              'text-muted-foreground text-xs px-1 py-0.5 rounded-md flex items-center gap-1 bg-accent/80 shrink-0',
               disableSelection !== true &&
-								"hover:bg-accent hover:text-foreground",
+                'hover:bg-accent hover:text-foreground',
               disableSelection &&
-								"pointer-events-none opacity-80 cursor-not-allowed",
+                'pointer-events-none opacity-80 cursor-not-allowed',
             )}
             disabled={disableSelection}
           >
-            {t("qty", { quantity })}
+            {t('qty', { quantity })}
             {!disableSelection && <ChevronDown size={12} />}
           </PopoverTrigger>
           <PopoverContent
@@ -607,7 +607,7 @@ const PrepaidItem = ({
             <div className="flex flex-col gap-1">
               <p className="text-sm font-medium">{item.feature?.name}</p>
               <p className="text-muted-foreground">
-                {item.display?.primary_text}{" "}
+                {item.display?.primary_text}{' '}
                 {formatPeriodLabel(item.display?.secondary_text, tPricing)}
               </p>
             </div>
@@ -633,7 +633,7 @@ const PrepaidItem = ({
                 {loading ? (
                   <Loader2 className="text-muted-foreground animate-spin !w-4 !h-4" />
                 ) : (
-                  t("save")
+                  t('save')
                 )}
               </Button>
             </div>
@@ -641,7 +641,7 @@ const PrepaidItem = ({
         </Popover>
       </div>
       <p className="text-end">
-        {item.display?.primary_text}{" "}
+        {item.display?.primary_text}{' '}
         {formatPeriodLabel(item.display?.secondary_text, tPricing)}
       </p>
     </div>
@@ -653,13 +653,13 @@ export const PriceItem = ({
   className,
   ...props
 }: {
-	children: React.ReactNode;
-	className?: string;
+  children: React.ReactNode;
+  className?: string;
 } & React.HTMLAttributes<HTMLDivElement>) => {
   return (
     <div
       className={cn(
-        "flex flex-col pb-4 sm:pb-0 gap-1 sm:flex-row justify-between sm:h-7 sm:gap-2 sm:items-center",
+        'flex flex-col pb-4 sm:pb-0 gap-1 sm:flex-row justify-between sm:h-7 sm:gap-2 sm:items-center',
         className,
       )}
       {...props}
@@ -676,18 +676,18 @@ export const PricingDialogButton = ({
   disabled,
   className,
 }: {
-	children: React.ReactNode;
-	size?: "sm" | "lg" | "default" | "icon";
-	onClick: () => void;
-	disabled?: boolean;
-	className?: string;
+  children: React.ReactNode;
+  size?: 'sm' | 'lg' | 'default' | 'icon';
+  onClick: () => void;
+  disabled?: boolean;
+  className?: string;
 }) => {
   return (
     <Button
       onClick={onClick}
       disabled={disabled}
       size={size}
-      className={cn(className, "shadow-sm shadow-stone-400")}
+      className={cn(className, 'shadow-sm shadow-stone-400')}
     >
       {children}
       <ArrowRight className="!h-3" />

@@ -46,35 +46,31 @@ type LanguagesResponse = { data: { languages: Array<{ language: string }> } };
 describe.skipIf(!apiKey)(
   'Google Translate v2 fallback supports every configured language',
   () => {
-    it(
-      'every SUPPORTED_LANGUAGES entry maps to a code in /v2/languages',
-      async () => {
-        const res = await fetch(
-          `https://translation.googleapis.com/language/translate/v2/languages?key=${apiKey}`,
+    it('every SUPPORTED_LANGUAGES entry maps to a code in /v2/languages', async () => {
+      const res = await fetch(
+        `https://translation.googleapis.com/language/translate/v2/languages?key=${apiKey}`,
+      );
+      if (!res.ok) {
+        throw new Error(
+          `/v2/languages ${res.status}: ${(await res.text()).slice(0, 200)}`,
         );
-        if (!res.ok) {
-          throw new Error(
-            `/v2/languages ${res.status}: ${(await res.text()).slice(0, 200)}`,
-          );
-        }
-        const body = (await res.json()) as LanguagesResponse;
-        const supported = new Set(body.data.languages.map((l) => l.language));
+      }
+      const body = (await res.json()) as LanguagesResponse;
+      const supported = new Set(body.data.languages.map((l) => l.language));
 
-        const broken: string[] = [];
-        for (const lang of SUPPORTED_LANGUAGES) {
-          const mapped = toGoogleTranslateCode(lang.code);
-          if (!supported.has(mapped)) {
-            broken.push(`${lang.code} → "${mapped}" (not in v2 catalog)`);
-          }
+      const broken: string[] = [];
+      for (const lang of SUPPORTED_LANGUAGES) {
+        const mapped = toGoogleTranslateCode(lang.code);
+        if (!supported.has(mapped)) {
+          broken.push(`${lang.code} → "${mapped}" (not in v2 catalog)`);
         }
-        if (broken.length > 0) {
-          throw new Error(
-            `${broken.length}/${SUPPORTED_LANGUAGES.length} languages have no Google Translate v2 fallback:\n` +
-              broken.map((m) => `  - ${m}`).join('\n'),
-          );
-        }
-      },
-      60_000,
-    );
+      }
+      if (broken.length > 0) {
+        throw new Error(
+          `${broken.length}/${SUPPORTED_LANGUAGES.length} languages have no Google Translate v2 fallback:\n` +
+            broken.map((m) => `  - ${m}`).join('\n'),
+        );
+      }
+    }, 60_000);
   },
 );

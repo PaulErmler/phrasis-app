@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { getUserTimezone } from '@/lib/timezone';
+import { useNowMinute } from '@/hooks/use-now-minute';
+import { dateInTimezone } from '@/lib/dateStrings';
 import { normalizeLanguageCode } from '@/lib/languages';
 import { NumbersRow } from './NumbersRow';
 import { CumulativeLineChart } from './CumulativeLineChart';
@@ -11,10 +13,6 @@ import { ActivityHeatmap } from './ActivityHeatmap';
 import { HourlyDistribution } from './HourlyDistribution';
 import { AppUsageStats } from './AppUsageStats';
 import { WordCloudSection } from './WordCloudCard';
-
-function today(tz: string) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
-}
 
 function yearStart() {
   return `${new Date().getFullYear()}-01-01`;
@@ -52,12 +50,17 @@ function weeksAgoStr(n: number): string {
 
 export function StatsView() {
   const tz = getUserTimezone();
-  const todayStr = today(tz);
+  // Minute-quantized clock (no-wall-clock query guideline, same derivation
+  // as the getCourseStats caller in ProgressStatsCard) so `today` and the
+  // ranges keyed on it roll over at local midnight while the view is open.
+  const nowMinute = useNowMinute();
+  const todayStr = dateInTimezone(nowMinute, tz);
   const yearStartStr = yearStart();
 
   // Query 1: Small summary data (courseStats, todayReps, hourly, monthly, weekly)
   const pageData = useQuery(api.features.stats.getStatsPageData, {
     timezone: tz,
+    today: todayStr,
     startDate: yearStartStr,
     endDate: todayStr,
     startMonth: monthsAgoStr(12),
@@ -77,8 +80,12 @@ export function StatsView() {
   const targetLanguages = pageData?.targetLanguages;
   const filteredLanguageData = useMemo(() => {
     if (!languageDailyData?.length || !targetLanguages) return [];
-    const targetSet = new Set(targetLanguages.map((l: string) => normalizeLanguageCode(l)));
-    return languageDailyData.filter((d) => targetSet.has(normalizeLanguageCode(d.language)));
+    const targetSet = new Set(
+      targetLanguages.map((l: string) => normalizeLanguageCode(l)),
+    );
+    return languageDailyData.filter((d) =>
+      targetSet.has(normalizeLanguageCode(d.language)),
+    );
   }, [languageDailyData, targetLanguages]);
 
   const todayNewWords = useMemo(() => {
@@ -132,11 +139,11 @@ export function StatsView() {
   const accuracy =
     cs && cs.totalAccuracyDualCount > 0
       ? {
-        sum: pageData?.ignorePunctuation
-          ? cs.totalAccuracyLenientSum
-          : cs.totalAccuracyStrictSum,
-        count: cs.totalAccuracyDualCount,
-      }
+          sum: pageData?.ignorePunctuation
+            ? cs.totalAccuracyLenientSum
+            : cs.totalAccuracyStrictSum,
+          count: cs.totalAccuracyDualCount,
+        }
       : { sum: cs?.totalAccuracySum ?? 0, count: cs?.totalAccuracyCount ?? 0 };
 
   if (isLoading) {
@@ -199,12 +206,13 @@ export function StatsView() {
 
         <WordCloudSection />
 
-        <ActivityHeatmap
-          data={dailyData?.heatmapData ?? []}
-          timezone={tz}
-        />
+        <ActivityHeatmap data={dailyData?.heatmapData ?? []} timezone={tz} />
 
-        <HourlyDistribution data={pageData?.hourlyDistribution ?? Array.from({ length: 24 }, () => 0)} />
+        <HourlyDistribution
+          data={
+            pageData?.hourlyDistribution ?? Array.from({ length: 24 }, () => 0)
+          }
+        />
 
         <AppUsageStats
           manualCards={cs?.totalCardsAddedManually ?? 0}

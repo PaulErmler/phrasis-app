@@ -26,6 +26,8 @@ import {
   DAILY_TIME_CUSTOM_MAX,
 } from '@/lib/constants/dailyGoal';
 
+import { reportError } from '@/lib/report-error';
+
 interface CreateCourseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -96,16 +98,16 @@ export function CreateCourseDialog({
 
   const canContinue = () => {
     switch (step) {
-    case 1:
-      return targetLanguage !== '';
-    case 2:
-      return baseLanguage !== '';
-    case 3:
-      return difficulty !== null;
-    case 4:
-      return effectiveGoal !== null;
-    default:
-      return false;
+      case 1:
+        return targetLanguage !== '';
+      case 2:
+        return baseLanguage !== '';
+      case 3:
+        return difficulty !== null;
+      case 4:
+        return effectiveGoal !== null;
+      default:
+        return false;
     }
   };
 
@@ -124,7 +126,12 @@ export function CreateCourseDialog({
   };
 
   const handleCreate = async () => {
-    if (!targetLanguage || !baseLanguage || !difficulty || effectiveGoal == null) {
+    if (
+      !targetLanguage ||
+      !baseLanguage ||
+      !difficulty ||
+      effectiveGoal == null
+    ) {
       return;
     }
 
@@ -153,7 +160,7 @@ export function CreateCourseDialog({
           try {
             await archiveCourse({ courseId: remembered.courseId });
           } catch (archiveError) {
-            console.error('Error archiving orphaned course:', archiveError);
+            reportError(archiveError, { op: 'archiveOrphanedCourse' });
           }
           createdCourseRef.current = null;
         }
@@ -182,7 +189,7 @@ export function CreateCourseDialog({
       handleClose(false);
       resetForm();
     } catch (error) {
-      console.error('Error creating course:', error);
+      reportError(error, { op: 'createCourse' });
       toast.error(t('error'));
       setIsSubmitting(false);
     }
@@ -325,7 +332,9 @@ export function CreateCourseDialog({
                     <span className="text-lg font-semibold tabular-nums">
                       {minutes}
                     </span>
-                    <span className="text-muted-xs">{t('step4.minutesUnit')}</span>
+                    <span className="text-muted-xs">
+                      {t('step4.minutesUnit')}
+                    </span>
                   </button>
                 ))}
                 <div
@@ -346,7 +355,9 @@ export function CreateCourseDialog({
                     className="h-7 border-0 bg-transparent p-0 text-center text-lg font-semibold tabular-nums shadow-none focus-visible:ring-0"
                     data-testid="course-dialog-goal-custom"
                   />
-                  <span className="text-muted-xs">{t('step4.minutesUnit')}</span>
+                  <span className="text-muted-xs">
+                    {t('step4.minutesUnit')}
+                  </span>
                 </div>
               </div>
             </div>
@@ -374,7 +385,11 @@ export function CreateCourseDialog({
               onClick={handleNext}
               disabled={!canContinue() || isSubmitting}
               className="min-w-[120px]"
-              data-testid={step === totalSteps ? 'course-dialog-create' : 'course-dialog-next'}
+              data-testid={
+                step === totalSteps
+                  ? 'course-dialog-create'
+                  : 'course-dialog-next'
+              }
             >
               {step === totalSteps ? t('create') : t('next')}
             </Button>

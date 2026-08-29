@@ -188,7 +188,9 @@ describe('LearningModeSettings: client clamp handlers', () => {
     // cardsPerBatch is min 1/uncapped-ish, initial reviews min 1/max 20. The
     // two strategy steppers ("Only new" reps, "Until rated Good" count) are
     // the only 1..10 ranges, rendered in that order.
-    const strategySteppers = steppers.filter((s) => s.min === 1 && s.max === 10);
+    const strategySteppers = steppers.filter(
+      (s) => s.min === 1 && s.max === 10,
+    );
     expect(strategySteppers).toHaveLength(2);
     const [onlyNew, untilGood] = strategySteppers;
 

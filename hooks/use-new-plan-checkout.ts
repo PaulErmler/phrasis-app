@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import type { ElementType } from "react";
-import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { CLIENT_EVENTS, capture } from "@/lib/posthog/events";
+import type { ElementType } from 'react';
+import { useAction } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import {
   checkoutTrialParams,
   type TrialState,
-} from "@/lib/autumn/trial-eligibility";
-import { throwOnCheckoutError } from "@/hooks/use-checkout-error";
+} from '@/lib/autumn/trial-eligibility';
+import { throwOnCheckoutError } from '@/hooks/use-checkout-error';
 
 /**
  * Routes a first paid purchase through Autumn's v2 endpoint
@@ -62,7 +62,7 @@ export function useNewPlanCheckout() {
       // resumes as a fresh page load when the customer returns from Stripe.
       capture(CLIENT_EVENTS.CHECKOUT_REDIRECTED, {
         product_id: productId,
-        flow: trialState.trialEligible ? "trial_start" : "purchase",
+        flow: trialState.trialEligible ? 'trial_start' : 'purchase',
       });
       window.location.href = paymentUrl;
       return { redirected: true as const };

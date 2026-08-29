@@ -8,6 +8,7 @@ import { requireRunMutationCtx } from '@convex-dev/better-auth/utils';
 import { components, internal } from './_generated/api';
 import { DataModel } from './_generated/dataModel';
 import { query } from './_generated/server';
+import { v } from 'convex/values';
 import { betterAuth } from 'better-auth';
 import { SignJWT, importPKCS8 } from 'jose';
 import authConfig from './auth.config';
@@ -25,9 +26,11 @@ import {
   WELCOME_EMAIL_JITTER_MS,
 } from './lib/welcomeEmail';
 import { rateLimiter } from './rateLimiter';
+import { optionalEnv, requireEnv } from './lib/env';
 
-const siteUrl = process.env.SITE_URL;
-if (!siteUrl) throw new Error('Missing required Convex environment variable: SITE_URL');
+// Module-scope on purpose: without SITE_URL no auth flow can work, so a
+// misconfigured deployment should fail loudly at import/analysis time.
+const siteUrl = requireEnv('SITE_URL');
 
 // The component client has methods needed for integrating Convex with Better Auth,
 // as well as helper methods for general use.
@@ -86,6 +89,11 @@ export const { onCreate, onUpdate, onDelete } = authComponent.triggersApi();
 // still handled by AuthBoundary's useEffect via useConvexAuth().
 export const getAuthUser = query({
   args: {},
+  // The payload is the Better Auth component's user document; its shape is
+  // owned (and versioned) by that component, so mirroring it field-by-field
+  // here would drift on upgrades. `v.any()` keeps the declared contract
+  // honest: authenticated → component user doc, unauthenticated → null.
+  returns: v.union(v.null(), v.any()),
   handler: async (ctx) => {
     return (await authComponent.safeGetAuthUser(ctx)) ?? null;
   },
@@ -109,13 +117,16 @@ async function appleClientSecret(): Promise<string> {
     return cachedAppleSecret.jwt;
   }
   // Support keys pasted with literal "\n" escapes as well as real newlines.
-  const privateKey = (process.env.APPLE_PRIVATE_KEY as string).replace(/\\n/g, '\n');
+  // requireEnv throws a named error on a missing var; the apple() provider
+  // callback below catches it and disables Apple sign-in, same as any other
+  // client-secret failure.
+  const privateKey = requireEnv('APPLE_PRIVATE_KEY').replace(/\\n/g, '\n');
   const key = await importPKCS8(privateKey, 'ES256');
   const expiresAt = now + 180 * 24 * 60 * 60;
   const jwt = await new SignJWT({})
-    .setProtectedHeader({ alg: 'ES256', kid: process.env.APPLE_KEY_ID as string })
-    .setIssuer(process.env.APPLE_TEAM_ID as string)
-    .setSubject(process.env.APPLE_CLIENT_ID as string)
+    .setProtectedHeader({ alg: 'ES256', kid: requireEnv('APPLE_KEY_ID') })
+    .setIssuer(requireEnv('APPLE_TEAM_ID'))
+    .setSubject(requireEnv('APPLE_CLIENT_ID'))
     .setAudience('https://appleid.apple.com')
     .setIssuedAt(now)
     .setExpirationTime(expiresAt)
@@ -199,44 +210,49 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
     // operator with the full purge in admin/deleteUser.ts.
     socialProviders: {
       google: {
-        clientId: process.env.GOOGLE_CLIENT_ID as string,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+        // Deliberately not required: a deployment without Google credentials
+        // keeps email/password auth working, Better Auth just warns and the
+        // Google button fails at use. '' and undefined behave identically
+        // there (falsy check), so no cast is needed.
+        clientId: optionalEnv('GOOGLE_CLIENT_ID') ?? '',
+        clientSecret: optionalEnv('GOOGLE_CLIENT_SECRET') ?? '',
       },
       // Sign in with Apple. Required by App Store Guideline 4.8 because
       // Google sign-in is offered. Env-gated so deployments without the
       // Apple credentials keep working unchanged. The async form lets the
       // client secret be minted on demand (see appleClientSecret) instead of
       // storing a static JWT that expires every 6 months.
-      ...(process.env.APPLE_CLIENT_ID &&
-      process.env.APPLE_TEAM_ID &&
-      process.env.APPLE_KEY_ID &&
-      process.env.APPLE_PRIVATE_KEY
+      ...(optionalEnv('APPLE_CLIENT_ID') &&
+      optionalEnv('APPLE_TEAM_ID') &&
+      optionalEnv('APPLE_KEY_ID') &&
+      optionalEnv('APPLE_PRIVATE_KEY')
         ? {
-          apple: async () => {
-            // Better Auth resolves ALL providers together, if this throws,
-            // Google/email sign-in break too. A bad Apple key must only
-            // disable Apple (returning null skips the provider).
-            try {
-              return {
-                clientId: process.env.APPLE_CLIENT_ID as string,
-                clientSecret: await appleClientSecret(),
-                // Audience of identity tokens minted by the native iOS app
-                // (the Capacitor shell signs in with an idToken, not a
-                // browser redirect).
-                appBundleIdentifier:
-                    process.env.APPLE_APP_BUNDLE_IDENTIFIER ?? 'com.flexling.app',
-              };
-            } catch (err) {
-              console.error(
-                'Sign in with Apple disabled: client secret generation failed ' +
-                  '(check APPLE_PRIVATE_KEY formatting):',
-                err,
-              );
-              // `enabled: false` makes Better Auth skip the provider.
-              return { enabled: false, clientId: '', clientSecret: '' };
-            }
-          },
-        }
+            apple: async () => {
+              // Better Auth resolves ALL providers together, if this throws,
+              // Google/email sign-in break too. A bad Apple key must only
+              // disable Apple (returning null skips the provider).
+              try {
+                return {
+                  clientId: requireEnv('APPLE_CLIENT_ID'),
+                  clientSecret: await appleClientSecret(),
+                  // Audience of identity tokens minted by the native iOS app
+                  // (the Capacitor shell signs in with an idToken, not a
+                  // browser redirect).
+                  appBundleIdentifier:
+                    optionalEnv('APPLE_APP_BUNDLE_IDENTIFIER') ??
+                    'com.flexling.app',
+                };
+              } catch (err) {
+                console.error(
+                  'Sign in with Apple disabled: client secret generation failed ' +
+                    '(check APPLE_PRIVATE_KEY formatting):',
+                  err,
+                );
+                // `enabled: false` makes Better Auth skip the provider.
+                return { enabled: false, clientId: '', clientSecret: '' };
+              }
+            },
+          }
         : {}),
     },
     plugins: [

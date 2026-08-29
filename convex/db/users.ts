@@ -1,6 +1,8 @@
 import { ConvexError } from 'convex/values';
 import { QueryCtx, MutationCtx, ActionCtx } from '../_generated/server';
-import { Doc } from '../_generated/dataModel';
+import { Doc, Id } from '../_generated/dataModel';
+
+type UserSettingsInsert = Omit<Doc<'userSettings'>, '_id' | '_creationTime'>;
 
 /**
  * Get the authenticated user ID from the JWT (no session validation).
@@ -37,6 +39,19 @@ export async function getUserSettings(
     .query('userSettings')
     .withIndex('by_userId', (q) => q.eq('userId', userId))
     .first();
+}
+
+/**
+ * Insert a new `userSettings` row. `hideDueCounts` / `hideWorkloadForecast`
+ * are deliberately NOT seeded: unset means hidden (readers show only on an
+ * explicit `false`), so the off-by-default rule lives in one place.
+ * Existing rows are never backfilled — patch them in place instead.
+ */
+export async function insertUserSettings(
+  ctx: MutationCtx,
+  fields: UserSettingsInsert,
+): Promise<Id<'userSettings'>> {
+  return ctx.db.insert('userSettings', fields);
 }
 
 /**

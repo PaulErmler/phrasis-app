@@ -142,7 +142,12 @@ export class BinaryStrategy extends BaseStrategy {
   }
 
   state(): unknown {
-    return { lo: this.lo, hi: this.hi, lastYesLevel: this.lastYesLevel, answers: this.answers };
+    return {
+      lo: this.lo,
+      hi: this.hi,
+      lastYesLevel: this.lastYesLevel,
+      answers: this.answers,
+    };
   }
 }
 
@@ -201,7 +206,11 @@ export class StaircaseStrategy extends BaseStrategy {
   }
 
   finalLevel(): number {
-    return reversalMeanFinalLevel(this.reversalLevels, this.answers, STAIRCASE_REVERSALS);
+    return reversalMeanFinalLevel(
+      this.reversalLevels,
+      this.answers,
+      STAIRCASE_REVERSALS,
+    );
   }
 
   state(): unknown {
@@ -370,7 +379,11 @@ export class TransformedStaircaseStrategy extends BaseStrategy {
   }
 
   finalLevel(): number {
-    return reversalMeanFinalLevel(this.reversalLevels, this.answers, TRANSFORMED_REVERSALS);
+    return reversalMeanFinalLevel(
+      this.reversalLevels,
+      this.answers,
+      TRANSFORMED_REVERSALS,
+    );
   }
 
   state(): unknown {
@@ -402,8 +415,8 @@ const ANCHOR_BATCH = 3;
 const ANCHOR_MAX_JUMPS = 2;
 const ANCHOR_DEFAULT = 8;
 const ANCHOR_JUMP = 3;
-const ANCHOR_FINE_BUDGET = 3;            // max extra questions in the fine phase
-const ANCHOR_HARD_QUESTION_CAP = 12;     // safety ceiling across both phases
+const ANCHOR_FINE_BUDGET = 3; // max extra questions in the fine phase
+const ANCHOR_HARD_QUESTION_CAP = 12; // safety ceiling across both phases
 
 type AnchorPhase = 'coarse' | 'fine' | 'done';
 
@@ -474,13 +487,21 @@ export class AnchorVerifyStrategy extends BaseStrategy {
         const allYes = ratio >= 1 - 1e-9;
         const allNo = ratio <= 1e-9;
 
-        if (allYes && this.jumps < ANCHOR_MAX_JUMPS && this.current < MAX_LEVEL) {
+        if (
+          allYes &&
+          this.jumps < ANCHOR_MAX_JUMPS &&
+          this.current < MAX_LEVEL
+        ) {
           // Coarse jump up, still room.
           this.current = clampLevel(this.current + ANCHOR_JUMP);
           this.jumps++;
           this.batchYes = 0;
           this.batchCount = 0;
-        } else if (allNo && this.jumps < ANCHOR_MAX_JUMPS && this.current > MIN_LEVEL) {
+        } else if (
+          allNo &&
+          this.jumps < ANCHOR_MAX_JUMPS &&
+          this.current > MIN_LEVEL
+        ) {
           // Coarse jump down, still room.
           this.current = clampLevel(this.current - ANCHOR_JUMP);
           this.jumps++;
@@ -516,7 +537,11 @@ export class AnchorVerifyStrategy extends BaseStrategy {
       } else if (this.fineDirection === 'up' && !knew) {
         // Stop. We just found a level the user doesn't know.
         this.phase = 'done';
-      } else if (this.fineDirection === 'down' && !knew && this.current > MIN_LEVEL) {
+      } else if (
+        this.fineDirection === 'down' &&
+        !knew &&
+        this.current > MIN_LEVEL
+      ) {
         this.current = clampLevel(this.current - 1);
       } else if (this.fineDirection === 'down' && knew) {
         // Stop. Found a level they DO know while probing downward.
@@ -658,8 +683,8 @@ export class RampBisectStrategy extends BaseStrategy {
   readonly name = 'ramp-bisect' as const;
   private phase: 'ramp' | 'bisect' | 'done' = 'ramp';
   private rampIdx = 0;
-  private lo = MIN_LEVEL;        // last "knew" + 1 (or MIN_LEVEL if no yes yet)
-  private hi = MAX_LEVEL;        // last "didn't know" - 1 (or MAX_LEVEL if no no yet)
+  private lo = MIN_LEVEL; // last "knew" + 1 (or MIN_LEVEL if no yes yet)
+  private hi = MAX_LEVEL; // last "didn't know" - 1 (or MAX_LEVEL if no no yet)
   private lastYesLevel: number | null = null;
 
   init(): void {
@@ -742,20 +767,20 @@ export class RampBisectStrategy extends BaseStrategy {
 
 export function createStrategy(name: StrategyName): PlacementStrategy {
   switch (name) {
-  case 'binary':
-    return new BinaryStrategy();
-  case 'staircase':
-    return new StaircaseStrategy();
-  case 'bayesian':
-    return new BayesianStrategy();
-  case 'transformed-staircase':
-    return new TransformedStaircaseStrategy();
-  case 'anchor-verify':
-    return new AnchorVerifyStrategy();
-  case 'ramp-bisect':
-    return new RampBisectStrategy();
-  case 'staircase-from-bottom':
-    return new StaircaseFromBottomStrategy();
+    case 'binary':
+      return new BinaryStrategy();
+    case 'staircase':
+      return new StaircaseStrategy();
+    case 'bayesian':
+      return new BayesianStrategy();
+    case 'transformed-staircase':
+      return new TransformedStaircaseStrategy();
+    case 'anchor-verify':
+      return new AnchorVerifyStrategy();
+    case 'ramp-bisect':
+      return new RampBisectStrategy();
+    case 'staircase-from-bottom':
+      return new StaircaseFromBottomStrategy();
   }
 }
 
@@ -783,17 +808,17 @@ export function ogteToCurrentLevel(level: number): CurrentLevel {
 // sample sentences at the right level.
 export function currentLevelToOgte(level: CurrentLevel): number {
   switch (level) {
-  case 'beginner':
-    return 1;
-  case 'elementary':
-    return 5;
-  case 'intermediate':
-    return 8;
-  case 'upper_intermediate':
-    return 11;
-  case 'advanced':
-    return 14;
-  case 'proficient':
-    return 17;
+    case 'beginner':
+      return 1;
+    case 'elementary':
+      return 5;
+    case 'intermediate':
+      return 8;
+    case 'upper_intermediate':
+      return 11;
+    case 'advanced':
+      return 14;
+    case 'proficient':
+      return 17;
   }
 }

@@ -10,6 +10,8 @@ import { authClient } from '@/lib/auth-client';
 import { useIsNativeApp } from '@/hooks/use-native-app';
 import { nativePlatform } from '@/lib/native';
 
+import { reportError } from '@/lib/report-error';
+
 /**
  * Social sign-in for the Capacitor store-app shell.
  *
@@ -51,7 +53,8 @@ async function nativeSocialLogin(provider: NativeProvider): Promise<{
     idToken?: string | null;
     accessToken?: { token?: string } | null;
   };
-  if (!result?.idToken) throw new Error(`${provider} login returned no idToken`);
+  if (!result?.idToken)
+    throw new Error(`${provider} login returned no idToken`);
   return {
     idToken: result.idToken,
     accessToken: result.accessToken?.token ?? undefined,
@@ -61,10 +64,22 @@ async function nativeSocialLogin(provider: NativeProvider): Promise<{
 function GoogleMark() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-      <path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.45a5.52 5.52 0 0 1-2.39 3.62v3h3.87c2.26-2.09 3.57-5.17 3.57-8.81Z" />
-      <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.93-2.91l-3.87-3c-1.07.72-2.44 1.14-4.06 1.14-3.12 0-5.77-2.11-6.71-4.95H1.29v3.09A12 12 0 0 0 12 24Z" />
-      <path fill="#FBBC05" d="M5.29 14.28a7.2 7.2 0 0 1 0-4.56V6.63H1.29a12 12 0 0 0 0 10.74l4-3.09Z" />
-      <path fill="#EA4335" d="M12 4.77c1.76 0 3.34.61 4.59 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.29 6.63l4 3.09C6.23 6.88 8.88 4.77 12 4.77Z" />
+      <path
+        fill="#4285F4"
+        d="M23.5 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.45a5.52 5.52 0 0 1-2.39 3.62v3h3.87c2.26-2.09 3.57-5.17 3.57-8.81Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.96-1.07 7.93-2.91l-3.87-3c-1.07.72-2.44 1.14-4.06 1.14-3.12 0-5.77-2.11-6.71-4.95H1.29v3.09A12 12 0 0 0 12 24Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.29 14.28a7.2 7.2 0 0 1 0-4.56V6.63H1.29a12 12 0 0 0 0 10.74l4-3.09Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.77c1.76 0 3.34.61 4.59 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.29 6.63l4 3.09C6.23 6.88 8.88 4.77 12 4.77Z"
+      />
     </svg>
   );
 }
@@ -97,7 +112,7 @@ export function NativeSocialButtons() {
       router.push('/app/onboarding');
       router.refresh();
     } catch (err) {
-      console.error(`Native ${provider} sign-in failed:`, err);
+      reportError(err, { op: 'nativeSocialSignIn', provider });
       toast.error(t('SOCIAL_SIGN_IN_FAILED'));
       setBusy(null);
     }
@@ -112,7 +127,11 @@ export function NativeSocialButtons() {
         disabled={busy !== null}
         onClick={() => signIn('google')}
       >
-        {busy === 'google' ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleMark />}
+        {busy === 'google' ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <GoogleMark />
+        )}
         {t('SIGN_IN_WITH_GOOGLE')}
       </Button>
       {/* Apple's native sheet only exists on iOS; Android keeps Google + email. */}
@@ -124,7 +143,11 @@ export function NativeSocialButtons() {
           disabled={busy !== null}
           onClick={() => signIn('apple')}
         >
-          {busy === 'apple' ? <Loader2 className="h-4 w-4 animate-spin" /> : <AppleMark />}
+          {busy === 'apple' ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <AppleMark />
+          )}
           {t('SIGN_IN_WITH_APPLE')}
         </Button>
       )}

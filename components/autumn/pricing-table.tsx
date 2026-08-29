@@ -1,39 +1,48 @@
-import React from "react";
+import React from 'react';
 
-import { useCustomer, usePricingTable, ProductDetails } from "autumn-js/react";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { useLocale, useTranslations } from "next-intl";
-import { CLIENT_EVENTS, capture } from "@/lib/posthog/events";
-import { cn } from "@/lib/utils";
-import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import CheckoutDialog from "@/components/autumn/checkout-dialog";
-import { getPricingTableContent } from "@/lib/autumn/pricing-table-content";
-import { getTrialState } from "@/lib/autumn/trial-eligibility";
+import { useCustomer, usePricingTable, ProductDetails } from 'autumn-js/react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
+import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import CheckoutDialog from '@/components/autumn/checkout-dialog';
+import { getPricingTableContent } from '@/lib/autumn/pricing-table-content';
+import { getTrialState } from '@/lib/autumn/trial-eligibility';
 import {
   findCurrentPaidPlan,
   normalizePlans,
   type AutumnPlan,
-} from "@/lib/autumn/customer-shape";
-import { FEATURE_META, getFeatureI18nKey, getFeatureDisplayCount, isFeatureHidden, isFeatureDisplayedAsUnlimited, isFeatureConsumable } from "@/lib/features/feature-meta";
-import type { Product, ProductItem } from "autumn-js";
-import { Loader2 } from "lucide-react";
+} from '@/lib/autumn/customer-shape';
+import {
+  FEATURE_META,
+  getFeatureI18nKey,
+  getFeatureDisplayCount,
+  isFeatureHidden,
+  isFeatureDisplayedAsUnlimited,
+  isFeatureConsumable,
+} from '@/lib/features/feature-meta';
+import type { Product, ProductItem } from 'autumn-js';
+import { Loader2 } from 'lucide-react';
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   type CarouselApi,
-} from "@/components/ui/carousel";
-import { CarouselDots } from "@/components/ui/carousel-dots";
-import { useIsNativeApp } from "@/hooks/use-native-app";
-import { useNewPlanCheckout } from "@/hooks/use-new-plan-checkout";
-import { useCheckoutErrorToast } from "@/hooks/use-checkout-error";
+} from '@/components/ui/carousel';
+import { CarouselDots } from '@/components/ui/carousel-dots';
+import { useIsNativeApp } from '@/hooks/use-native-app';
+import { useNewPlanCheckout } from '@/hooks/use-new-plan-checkout';
+import { useCheckoutErrorToast } from '@/hooks/use-checkout-error';
+
+import { reportError } from '@/lib/report-error';
 
 /** Sort key for plan cards: Free first, then paid plans by ascending price. */
 function productSortPrice(product: Product): number {
   if (product.properties?.is_free) return -1;
   const price = product.items[0]?.price;
-  return typeof price === "number" ? price : 0;
+  return typeof price === 'number' ? price : 0;
 }
 
 /**
@@ -43,7 +52,7 @@ function productSortPrice(product: Product): number {
  * plan's copy. Values are keys in the `Pricing` i18n namespace.
  */
 const EXTRA_PLAN_FEATURES: Record<string, string[]> = {
-  ultra: ["priorityFeatureAccess", "prioritySupport"],
+  ultra: ['priorityFeatureAccess', 'prioritySupport'],
 };
 
 /** Paid plans billed on the same interval as `product`, cheapest first. */
@@ -114,15 +123,15 @@ export function itemsAddedOver(
       (p) => p.feature_id === item.feature_id && p.interval === item.interval,
     );
     if (!prior) return [item];
-    if (item.included_usage === "inf") {
-      return prior.included_usage === "inf" ? [] : [item];
+    if (item.included_usage === 'inf') {
+      return prior.included_usage === 'inf' ? [] : [item];
     }
-    if (prior.included_usage === "inf") return [];
+    if (prior.included_usage === 'inf') return [];
     const total = Number(item.included_usage ?? 0);
     const alreadyIncluded = Number(prior.included_usage ?? 0);
     if (total <= alreadyIncluded) return [];
     return [
-      isFeatureConsumable(item.feature_id ?? "") === true
+      isFeatureConsumable(item.feature_id ?? '') === true
         ? { ...item, included_usage: total - alreadyIncluded }
         : item,
     ];
@@ -151,10 +160,14 @@ function PricingTableInner({
    *  dialog narrows the cards so all three tiers fit on large screens. */
   carouselItemClassName?: string;
 }) {
-  const t = useTranslations("Pricing");
-  const { customer, checkout, isLoading: isCustomerLoading } = useCustomer({
+  const t = useTranslations('Pricing');
+  const {
+    customer,
+    checkout,
+    isLoading: isCustomerLoading,
+  } = useCustomer({
     errorOnNotFound: false,
-    expand: ["trials_used"],
+    expand: ['trials_used'],
   });
   const trialState = getTrialState(customer);
   const { purchasePlan } = useNewPlanCheckout();
@@ -162,7 +175,12 @@ function PricingTableInner({
 
   // NOTE: passing `productDetails` to usePricingTable FILTERS the table to
   // only the listed products. Don't use it for display tweaks.
-  const { products: rawProducts, isLoading: isProductsLoading, error, refetch } = usePricingTable({ productDetails });
+  const {
+    products: rawProducts,
+    isLoading: isProductsLoading,
+    error,
+    refetch,
+  } = usePricingTable({ productDetails });
 
   // Stable display order: Free first, then paid plans by ascending price.
   // Autumn returns products in dashboard order, which is not guaranteed
@@ -183,10 +201,12 @@ function PricingTableInner({
   const currentIntervalGroup = rawProducts?.find(
     (p) => p.id === currentPaidProduct?.planId,
   )?.properties?.interval_group;
-  const [isAnnualOverride, setIsAnnualOverride] = useState<boolean | null>(null);
+  const [isAnnualOverride, setIsAnnualOverride] = useState<boolean | null>(
+    null,
+  );
   const isAnnual =
     isAnnualOverride ??
-    (currentIntervalGroup ? currentIntervalGroup === "year" : true);
+    (currentIntervalGroup ? currentIntervalGroup === 'year' : true);
 
   const hasRefetchedRef = useRef(false);
   const [isRefetching, setIsRefetching] = useState(false);
@@ -230,9 +250,16 @@ function PricingTableInner({
   if (error) {
     return (
       <div className="w-full h-full flex flex-col justify-center items-center gap-3 min-h-[300px]">
-        <span className="text-sm text-muted-foreground">{t("error")}</span>
-        <Button variant="ghost" size="sm" onClick={() => { setRetryCount(0); refetch(); }}>
-          {t("retry")}
+        <span className="text-sm text-muted-foreground">{t('error')}</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setRetryCount(0);
+            refetch();
+          }}
+        >
+          {t('retry')}
         </Button>
       </div>
     );
@@ -240,8 +267,8 @@ function PricingTableInner({
 
   const intervals = Array.from(
     new Set(
-      products?.map((p) => p.properties?.interval_group).filter((i) => !!i)
-    )
+      products?.map((p) => p.properties?.interval_group).filter((i) => !!i),
+    ),
   );
 
   const multiInterval = intervals.length > 1;
@@ -253,9 +280,9 @@ function PricingTableInner({
 
     if (multiInterval) {
       if (isAnnual) {
-        return product.properties?.interval_group === "year";
+        return product.properties?.interval_group === 'year';
       } else {
-        return product.properties?.interval_group === "month";
+        return product.properties?.interval_group === 'month';
       }
     }
 
@@ -271,7 +298,7 @@ function PricingTableInner({
   );
 
   return (
-    <div className={cn("root")}>
+    <div className={cn('root')}>
       {products && (
         <PricingTableContainer
           products={products}
@@ -282,7 +309,7 @@ function PricingTableInner({
           multiInterval={multiInterval}
           startIndex={startIndex}
           itemClassName={carouselItemClassName}
->
+        >
           {visibleProducts.map((product, index) => {
             return (
               <PricingCard
@@ -290,9 +317,9 @@ function PricingTableInner({
                 productId={product.id}
                 buttonProps={{
                   disabled:
-                    (product.scenario === "active" &&
+                    (product.scenario === 'active' &&
                       !product.properties.updateable) ||
-                    product.scenario === "scheduled",
+                    product.scenario === 'scheduled',
 
                   onClick: async () => {
                     // The click, not the outcome. Pairing this with
@@ -314,10 +341,10 @@ function PricingTableInner({
                           freeTarget: product.properties?.is_free === true,
                         });
                       } else if (product.display?.button_url) {
-                        window.open(product.display?.button_url, "_blank");
+                        window.open(product.display?.button_url, '_blank');
                       }
                     } catch (e) {
-                      showCheckoutError(e, "pricingTable.select");
+                      showCheckoutError(e, 'pricingTable.select');
                     }
                   },
                 }}
@@ -332,7 +359,7 @@ function PricingTableInner({
           the free plan, where there is no tax to speak of. */}
       {visibleProducts.some((p) => !p.properties?.is_free) && (
         <p className="mt-4 text-center text-xs text-muted-foreground">
-          {t("taxNote")}
+          {t('taxNote')}
         </p>
       )}
     </div>
@@ -346,14 +373,14 @@ const PricingTableContext = createContext<{
   customerProducts: AutumnPlan[];
   trialEligible: boolean;
   showFeatures: boolean;
-    }>({
-      isAnnualToggle: false,
-      setIsAnnualToggle: () => {},
-      products: [],
-      customerProducts: [],
-      trialEligible: false,
-      showFeatures: true,
-    });
+}>({
+  isAnnualToggle: false,
+  setIsAnnualToggle: () => {},
+  products: [],
+  customerProducts: [],
+  trialEligible: false,
+  showFeatures: true,
+});
 
 export const usePricingTableContext = (componentName: string) => {
   const context = useContext(PricingTableContext);
@@ -395,7 +422,7 @@ export const PricingTableContainer = ({
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
 
   if (!products) {
-    throw new Error("products is required in <PricingTable />");
+    throw new Error('products is required in <PricingTable />');
   }
 
   if (products.length === 0) {
@@ -413,7 +440,7 @@ export const PricingTableContainer = ({
         showFeatures,
       }}
     >
-      <div className={cn("flex items-center flex-col", className)}>
+      <div className={cn('flex items-center flex-col', className)}>
         {multiInterval && (
           <AnnualSwitch
             isAnnualToggle={isAnnualToggle}
@@ -423,15 +450,14 @@ export const PricingTableContainer = ({
         <div className="w-full">
           <Carousel
             setApi={setCarouselApi}
-            opts={{ align: "start", loop: false, startIndex }}
+            opts={{ align: 'start', loop: false, startIndex }}
             className="w-full"
           >
             <CarouselContent>
               {React.Children.map(children, (child) => (
                 <CarouselItem
                   className={
-                    itemClassName ??
-                    "basis-[85%] sm:basis-[70%] md:basis-[50%]"
+                    itemClassName ?? 'basis-[85%] sm:basis-[70%] md:basis-[50%]'
                   }
                 >
                   {child}
@@ -451,7 +477,7 @@ interface PricingCardProps {
   showFeatures?: boolean;
   className?: string;
   onButtonClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  buttonProps?: React.ComponentProps<"button">;
+  buttonProps?: React.ComponentProps<'button'>;
 }
 
 export const PricingCard = ({
@@ -459,11 +485,11 @@ export const PricingCard = ({
   className,
   buttonProps,
 }: PricingCardProps) => {
-  const t = useTranslations("Pricing");
-  const tFeatures = useTranslations("Features");
+  const t = useTranslations('Pricing');
+  const tFeatures = useTranslations('Features');
   const locale = useLocale();
   const { products, showFeatures, customerProducts, trialEligible } =
-    usePricingTableContext("PricingCard");
+    usePricingTableContext('PricingCard');
 
   const product = products.find((p) => p.id === productId);
 
@@ -473,11 +499,7 @@ export const PricingCard = ({
 
   const { name, display: productDisplay } = product;
 
-  const { buttonText } = getPricingTableContent(
-    product,
-    t,
-    trialEligible,
-  );
+  const { buttonText } = getPricingTableContent(product, t, trialEligible);
 
   // Autumn labels plan switches by comparing raw prices, which misfires
   // across billing intervals (monthly Pro → Basic Annual reads as
@@ -492,12 +514,12 @@ export const PricingCard = ({
     currentProduct &&
     currentProduct.id !== product.id &&
     !product.properties?.is_free &&
-    (product.scenario === "upgrade" || product.scenario === "downgrade")
+    (product.scenario === 'upgrade' || product.scenario === 'downgrade')
   ) {
     const cardTier = paidTierRank(product, products);
     const currentTier = paidTierRank(currentProduct, products);
     if (cardTier !== -1 && currentTier !== -1 && cardTier !== currentTier) {
-      finalButtonText = t(cardTier > currentTier ? "upgrade" : "downgrade");
+      finalButtonText = t(cardTier > currentTier ? 'upgrade' : 'downgrade');
     }
   }
 
@@ -508,7 +530,7 @@ export const PricingCard = ({
   // `display.description`, which is a single unlocalized dashboard string and
   // would differ between a plan and its `_annual` variant. Falls back to
   // whatever Autumn returns for any plan we have no copy for.
-  const basePlanId = product.id.replace(/_annual$/, "");
+  const basePlanId = product.id.replace(/_annual$/, '');
   const descriptionKey = `planDescriptions.${basePlanId}`;
   const planDescription = t.has(descriptionKey)
     ? t(descriptionKey)
@@ -517,32 +539,32 @@ export const PricingCard = ({
   // Annual plans are displayed as their effective per-month price, with
   // the billed-annually total as a subline.
   const annualBasePrice =
-    !product.properties?.is_free && intervalGroup === "year"
+    !product.properties?.is_free && intervalGroup === 'year'
       ? product.items[0]?.price
       : undefined;
   const formatEur = (amount: number) =>
     new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency: "EUR",
+      style: 'currency',
+      currency: 'EUR',
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(amount);
   const annualMonthlyPrice =
-    typeof annualBasePrice === "number"
+    typeof annualBasePrice === 'number'
       ? formatEur(annualBasePrice / 12)
       : undefined;
 
   const periodLabel =
     !product.properties?.is_free && intervalGroup
-      ? intervalGroup === "year" && !annualMonthlyPrice
-        ? t("perYear")
-        : t("perMonth")
+      ? intervalGroup === 'year' && !annualMonthlyPrice
+        ? t('perYear')
+        : t('perMonth')
       : undefined;
 
   const mainPriceDisplay = product.properties?.is_free
     ? {
-      primary_text: t("free"),
-    }
+        primary_text: t('free'),
+      }
     : annualMonthlyPrice
       ? { primary_text: annualMonthlyPrice }
       : product.items[0].display;
@@ -569,10 +591,10 @@ export const PricingCard = ({
         // this card. The recommended emphasis must not shift layout
         // (translate/height tricks get clipped inside the Carousel), so it
         // is border/shadow only.
-        "relative w-full h-full py-6 text-foreground border rounded-lg shadow-sm max-w-xl overflow-hidden",
+        'relative w-full h-full py-6 text-foreground border rounded-lg shadow-sm max-w-xl overflow-hidden',
         isRecommended &&
-          "border-primary/50 shadow-lg dark:shadow-zinc-800/80 bg-secondary/40",
-        className
+          'border-primary/50 shadow-lg dark:shadow-zinc-800/80 bg-secondary/40',
+        className,
       )}
     >
       {productDisplay?.recommend_text && (
@@ -594,16 +616,16 @@ export const PricingCard = ({
             <div className="mb-2">
               <h3 className="font-semibold h-16 flex flex-col justify-center px-6 border-y mb-4 bg-secondary/40">
                 <div className="line-clamp-2">
-                  {mainPriceDisplay?.primary_text}{" "}
+                  {mainPriceDisplay?.primary_text}{' '}
                   {(periodLabel ?? mainPriceDisplay?.secondary_text) && (
                     <span className="font-normal text-muted-foreground mt-1">
                       {periodLabel ?? mainPriceDisplay?.secondary_text}
                     </span>
                   )}
                 </div>
-                {typeof annualBasePrice === "number" && (
+                {typeof annualBasePrice === 'number' && (
                   <p className="text-xs font-normal text-muted-foreground">
-                    {t("billedAnnually", { price: formatEur(annualBasePrice) })}
+                    {t('billedAnnually', { price: formatEur(annualBasePrice) })}
                   </p>
                 )}
               </h3>
@@ -622,20 +644,19 @@ export const PricingCard = ({
                    plan, no trial promos while trialing, paying, or
                    after a past trial. */}
             {product.properties?.has_trial &&
-              (product.scenario === "new" ||
-                product.scenario === "upgrade") &&
+              (product.scenario === 'new' || product.scenario === 'upgrade') &&
               trialEligible && (
-              <div className="px-6 mb-4">
-                <div
-                  data-testid="pricing-trial-badge"
-                  className="rounded-md bg-primary/10 text-primary border border-primary/20 px-3 py-2 text-sm font-semibold text-center"
-                >
-                  {t("freeTrialBadge", {
-                    days: product.free_trial?.length ?? 7,
-                  })}
+                <div className="px-6 mb-4">
+                  <div
+                    data-testid="pricing-trial-badge"
+                    className="rounded-md bg-primary/10 text-primary border border-primary/20 px-3 py-2 text-sm font-semibold text-center"
+                  >
+                    {t('freeTrialBadge', {
+                      days: product.free_trial?.length ?? 7,
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
           </div>
           {showFeatures && (featureItems.length > 0 || everythingFrom) && (
             <div className="flex-grow px-6 mb-6">
@@ -693,7 +714,7 @@ export const PricingFeatureList = ({
   className?: string;
   tFeatures?: ReturnType<typeof useTranslations>;
 }) => {
-  const t = useTranslations("Pricing");
+  const t = useTranslations('Pricing');
 
   const getFeatureLabel = (item: ProductItem): string | undefined => {
     if (tFeatures && item.feature_id && item.feature_id in FEATURE_META) {
@@ -703,14 +724,20 @@ export const PricingFeatureList = ({
       const isUnlimited =
         included === Infinity ||
         included === Number.POSITIVE_INFINITY ||
-        (isFeatureDisplayedAsUnlimited(item.feature_id) && Number(item.included_usage ?? 0) >= 19000);
+        (isFeatureDisplayedAsUnlimited(item.feature_id) &&
+          Number(item.included_usage ?? 0) >= 19000);
       if (isUnlimited) {
         return tFeatures(`${i18nKey}.pricingLabelUnlimited`);
       }
       // Consumable items without a reset interval are one-off starter
       // grants (e.g. "300 sentences to start", "200 credits to start").
-      if (isFeatureConsumable(item.feature_id) === true && item.interval == null) {
-        return tFeatures(`${i18nKey}.pricingLabelOneOff`, { count: Number(included) });
+      if (
+        isFeatureConsumable(item.feature_id) === true &&
+        item.interval == null
+      ) {
+        return tFeatures(`${i18nKey}.pricingLabelOneOff`, {
+          count: Number(included),
+        });
       }
       return tFeatures(`${i18nKey}.pricingLabel`, { count: Number(included) });
     }
@@ -718,20 +745,22 @@ export const PricingFeatureList = ({
   };
 
   return (
-    <div className={cn("flex-grow", className)}>
+    <div className={cn('flex-grow', className)}>
       {everythingFrom && (
         <p className="text-sm mb-4">
-          {t("everythingFrom", { planName: everythingFrom })}
+          {t('everythingFrom', { planName: everythingFrom })}
         </p>
       )}
       <div className="space-y-3">
-        {items.filter((item) => !isFeatureHidden(item.feature_id ?? '')).map((item, index) => (
-          <FeatureBullet
-            key={index}
-            label={getFeatureLabel(item)}
-            secondary={item.display?.secondary_text}
-          />
-        ))}
+        {items
+          .filter((item) => !isFeatureHidden(item.feature_id ?? ''))
+          .map((item, index) => (
+            <FeatureBullet
+              key={index}
+              label={getFeatureLabel(item)}
+              secondary={item.display?.secondary_text}
+            />
+          ))}
         {extraFeatureKeys?.map((key) => (
           <FeatureBullet key={key} label={t(key)} />
         ))}
@@ -739,7 +768,11 @@ export const PricingFeatureList = ({
             on the base card. Higher tiers inherit it via "Everything from". */}
         {!everythingFrom && (
           <FeatureBullet
-            label={tFeatures ? tFeatures("detailedStatistics.pricingLabel") : "Detailed statistics"}
+            label={
+              tFeatures
+                ? tFeatures('detailedStatistics.pricingLabel')
+                : 'Detailed statistics'
+            }
           />
         )}
       </div>
@@ -747,7 +780,7 @@ export const PricingFeatureList = ({
   );
 };
 
-export interface PricingCardButtonProps extends React.ComponentProps<"button"> {
+export interface PricingCardButtonProps extends React.ComponentProps<'button'> {
   recommended?: boolean;
   buttonUrl?: string;
 }
@@ -763,7 +796,7 @@ export const PricingCardButton = React.forwardRef<
     try {
       await onClick?.(e);
     } catch (error) {
-      console.error(error);
+      reportError(error, { op: 'pricingTableAction' });
     } finally {
       setLoading(false);
     }
@@ -782,11 +815,11 @@ export const PricingCardButton = React.forwardRef<
   return (
     <Button
       className={cn(
-        "w-full py-3 px-4 group overflow-hidden relative transition-all duration-300 hover:brightness-90 border rounded-lg",
-        className
+        'w-full py-3 px-4 group overflow-hidden relative transition-all duration-300 hover:brightness-90 border rounded-lg',
+        className,
       )}
       {...props}
-      variant={recommended ? "default" : "secondary"}
+      variant={recommended ? 'default' : 'secondary'}
       ref={ref}
       disabled={loading || props.disabled}
       onClick={handleClick}
@@ -806,7 +839,7 @@ export const PricingCardButton = React.forwardRef<
     </Button>
   );
 });
-PricingCardButton.displayName = "PricingCardButton";
+PricingCardButton.displayName = 'PricingCardButton';
 
 export const AnnualSwitch = ({
   isAnnualToggle,
@@ -815,18 +848,18 @@ export const AnnualSwitch = ({
   isAnnualToggle: boolean;
   setIsAnnualToggle: (isAnnual: boolean) => void;
 }) => {
-  const t = useTranslations("Pricing");
+  const t = useTranslations('Pricing');
   return (
     <div className="flex items-center space-x-2 mb-4">
-      <span className="text-sm text-muted-foreground">{t("monthly")}</span>
+      <span className="text-sm text-muted-foreground">{t('monthly')}</span>
       <Switch
         id="annual-billing"
         checked={isAnnualToggle}
         onCheckedChange={setIsAnnualToggle}
       />
-      <span className="text-sm text-muted-foreground">{t("annual")}</span>
+      <span className="text-sm text-muted-foreground">{t('annual')}</span>
       <span className="rounded-full bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 text-xs font-semibold">
-        {t("annualSaveHint")}
+        {t('annualSaveHint')}
       </span>
     </div>
   );

@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import type { ReactNode } from 'react';
 import { ClickableWords } from './ClickableWords';
 
 /**
@@ -31,6 +32,10 @@ interface CleanRevealedSentenceProps {
   /** 0–100. */
   accuracy: number;
   hideAccuracy?: boolean;
+  /** Bracketed furigana for `text` (lib/furigana.ts); ruby over kanji. */
+  furigana?: string;
+  /** Romanization/IPA, rendered under the sentence and above the accuracy line. */
+  afterText?: ReactNode;
 }
 
 /**
@@ -44,6 +49,8 @@ export function CleanRevealedSentence({
   language,
   accuracy,
   hideAccuracy = false,
+  furigana,
+  afterText,
 }: CleanRevealedSentenceProps) {
   return (
     <div>
@@ -54,8 +61,10 @@ export function CleanRevealedSentence({
         localTime={0}
         isActive={false}
         enabled={false}
+        furigana={furigana}
         className="leading-relaxed text-foreground"
       />
+      {afterText}
       <AccuracyFooter accuracy={accuracy} hideAccuracy={hideAccuracy} />
     </div>
   );

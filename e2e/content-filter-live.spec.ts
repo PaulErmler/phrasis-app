@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { dismissTour } from './helpers';
+import { appMain, dismissTour, showDueCounts } from './helpers';
 
 /**
  * Mutating tests for the content-source filter dropdown. Runs in the
@@ -31,7 +31,7 @@ test.describe(
       // route bounce, re-mount, etc.); strip it again before touching the
       // trigger so the SVG backdrop doesn't intercept the click.
       await dismissTour(page).catch(() => {});
-      const trigger = page.getByTestId('content-filter-trigger');
+      const trigger = page.getByTestId('content-filter-trigger').first();
       if (await trigger.isVisible().catch(() => false)) {
         await trigger.click();
         const bothOpt = page.getByTestId('content-filter-option-both');
@@ -47,7 +47,7 @@ test.describe(
     test('trigger keeps a fixed width across all three selections', async ({
       page,
     }) => {
-      const trigger = page.getByTestId('content-filter-trigger');
+      const trigger = page.getByTestId('content-filter-trigger').first();
       await expect(trigger).toBeVisible({ timeout: 10_000 });
 
       const widths: number[] = [];
@@ -57,8 +57,14 @@ test.describe(
         'content-filter-option-course',
       ]) {
         await trigger.click();
-        await page.getByTestId(optionTestId).click();
-        await page.waitForTimeout(200);
+        const option = page.getByTestId(optionTestId);
+        await expect(option).toBeVisible({ timeout: 10_000 });
+        // force: a filter change remounts home (Off pills, collection
+        // tiles) and the open listbox keeps moving — Playwright then
+        // spends the whole 30s budget on "element is not stable"
+        // (observed 2026-08-28 on the 'course' option, third pass).
+        await option.click({ force: true });
+        await expect(option).toBeHidden({ timeout: 5_000 });
         const box = await trigger.boundingBox();
         expect(box).not.toBeNull();
         widths.push(box!.width);
@@ -74,7 +80,7 @@ test.describe(
     test("setting filter to 'course' shows the Off pill on the Custom tab only", async ({
       page,
     }) => {
-      const trigger = page.getByTestId('content-filter-trigger');
+      const trigger = page.getByTestId('content-filter-trigger').first();
       await expect(trigger).toBeVisible({ timeout: 10_000 });
 
       await trigger.click();
@@ -88,7 +94,7 @@ test.describe(
     test("setting filter to 'custom' shows the Off pill on the Course tab only", async ({
       page,
     }) => {
-      const trigger = page.getByTestId('content-filter-trigger');
+      const trigger = page.getByTestId('content-filter-trigger').first();
       await expect(trigger).toBeVisible({ timeout: 10_000 });
 
       await trigger.click();
@@ -102,7 +108,7 @@ test.describe(
       page,
     }) => {
       // Set filter to 'custom' → Course tab gets the Off pill.
-      const trigger = page.getByTestId('content-filter-trigger');
+      const trigger = page.getByTestId('content-filter-trigger').first();
       await trigger.click();
       await page.getByTestId('content-filter-option-custom').click();
       await page.waitForTimeout(300);
@@ -125,3 +131,28 @@ test.describe(
     });
   },
 );
+
+// Lives here (chromium-serial), not in content-filter.spec.ts: showDueCounts
+// WRITES the shared fixture user's preferences, and the parallel project's
+// contract is that none of its specs mutate shared user state.
+test.describe('due-count pills on home', () => {
+  test('filter-aware pills render next to the content filter', async ({
+    page,
+  }) => {
+    // New accounts hide due counts by default; this spec is about the
+    // pills themselves, so turn them back on first.
+    await showDueCounts(page);
+    await page.goto('/app');
+    await page.waitForLoadState('domcontentloaded');
+    // Pills render once getFilteredCardCounts resolves (even all-zero counts
+    // return an object). They share a row with the filter dropdown.
+    // Scoped to the live tree — the layout is briefly duplicated
+    // mid-navigation (see `appMain`).
+    await expect(appMain(page).getByTestId('due-counts-pills')).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(
+      page.getByTestId('content-filter-trigger').first(),
+    ).toBeVisible();
+  });
+});

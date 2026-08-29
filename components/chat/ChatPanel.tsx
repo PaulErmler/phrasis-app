@@ -9,7 +9,10 @@ import { MessageSquarePlus } from 'lucide-react';
 import { useChat } from '@/hooks/use-chat';
 import { useReloadBlock } from '@/components/app/AppUpdateGate';
 import { ChatMessages } from '@/components/chat/ChatMessages';
-import type { ToolRenderer, MessageFooterRenderer } from '@/components/chat/ChatMessages';
+import type {
+  ToolRenderer,
+  MessageFooterRenderer,
+} from '@/components/chat/ChatMessages';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { ChatErrorBoundary } from '@/components/chat/MessageErrorBoundary';
 import { Button } from '@/components/ui/button';
@@ -93,7 +96,8 @@ export function ChatPanel({
   const { isAvailable } = useFeatureQuota(FEATURE_IDS.CHAT_MESSAGES);
   const [paywallOpen, setPaywallOpen] = useState(false);
 
-  const [serverThreadLimitReached, setServerThreadLimitReached] = useState(false);
+  const [serverThreadLimitReached, setServerThreadLimitReached] =
+    useState(false);
   const prevThreadIdRef = useRef(threadId);
   useEffect(() => {
     if (threadId !== prevThreadIdRef.current) {
@@ -110,7 +114,12 @@ export function ChatPanel({
     setServerThreadLimitReached(true);
   }, []);
 
-  const chat = useChat({ threadId, cardId, onUsageLimit: handleUsageLimit, onThreadLimit: handleThreadLimit });
+  const chat = useChat({
+    threadId,
+    cardId,
+    onUsageLimit: handleUsageLimit,
+    onThreadLimit: handleThreadLimit,
+  });
   // Reloading mid-stream drops the response the user is waiting on. Registered
   // here rather than in the two chat surfaces so both get it from one place.
   useReloadBlock(chat.status === 'submitted' || chat.status === 'streaming');
@@ -121,7 +130,8 @@ export function ChatPanel({
     () => chat.messages.filter((m) => m.role === 'user').length,
     [chat.messages],
   );
-  const isThreadLimitReached = serverThreadLimitReached || userMessageCount >= THREAD_MESSAGE_LIMIT;
+  const isThreadLimitReached =
+    serverThreadLimitReached || userMessageCount >= THREAD_MESSAGE_LIMIT;
 
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
@@ -139,7 +149,9 @@ export function ChatPanel({
 
       if (message.files?.length) {
         toast.success(t('filesAttached'), {
-          description: t('filesAttachedDescription', { count: message.files.length }),
+          description: t('filesAttachedDescription', {
+            count: message.files.length,
+          }),
         });
       }
 
@@ -195,7 +207,9 @@ export function ChatPanel({
       <div className="flex flex-col h-full w-full min-w-0">
         {header}
 
-        <div className={cn("flex-1 min-h-0 relative px-4 pt-2 w-full", className)}>
+        <div
+          className={cn('flex-1 min-h-0 relative px-4 pt-2 w-full', className)}
+        >
           <ChatMessages
             key={threadId}
             messages={chat.messages}
@@ -214,8 +228,13 @@ export function ChatPanel({
           )}
         </div>
 
-        <div className={cn("flex-none border-t bg-background", !noBottomPadding && "pb-16")}>
-          <div className={cn("p-4", className)}>
+        <div
+          className={cn(
+            'flex-none border-t bg-background',
+            !noBottomPadding && 'pb-16',
+          )}
+        >
+          <div className={cn('p-4', className)}>
             {isThreadLimitReached ? (
               <div className="flex flex-col items-center gap-3 py-2 text-center">
                 <p className="text-sm text-muted-foreground">

@@ -24,14 +24,20 @@ const MOCK_IPA = 'mˈɒkaɪpiːeɪ';
 // while the test context is alive (see drainScheduler docblock).
 drainSchedulerAfterEach();
 
-async function seedText(t: ReturnType<typeof convexTest>, language = 'es') {
+async function seedText(
+  t: ReturnType<typeof convexTest>,
+  language = 'es',
+  // Must match the `text` the action is later called with: the store
+  // mutations' `forText` guard drops results computed for other wording.
+  text = 'Hola mundo',
+) {
   return t.run(async (ctx) => {
     const collId = await ctx.db.insert('collections', {
       name: 'A1',
       textCount: 1,
     });
     const textId = await ctx.db.insert('texts', {
-      text: 'Hola mundo',
+      text,
       language,
       userCreated: false,
       collectionId: collId,
@@ -129,13 +135,14 @@ describe('processIpaFor* actions (stubbed engine)', () => {
       text: 'Bonjour le monde',
       language: 'fr',
     });
-    const row = await t.run(async (ctx) =>
-      (await ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', textId).eq('targetLanguage', 'fr'),
-        )
-        .unique())!,
+    const row = await t.run(
+      async (ctx) =>
+        (await ctx.db
+          .query('translations')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', textId).eq('targetLanguage', 'fr'),
+          )
+          .unique())!,
     );
     expect(row.ipaText).toBe(MOCK_IPA);
     expect(row.ipaSource).toBe(IPA_SOURCES.espeakNg);
@@ -143,7 +150,7 @@ describe('processIpaFor* actions (stubbed engine)', () => {
 
   it("persists the '' sentinel for a language with no espeak voice", async () => {
     const t = convexTest(schema, modules);
-    const { textId } = await seedText(t, 'fil');
+    const { textId } = await seedText(t, 'fil', 'Kumusta ka?');
 
     // fil has no ipaVoice; ipaForText throws and the action persists ''.
     await t.action(internal.features.ipa.processIpaForSourceText, {

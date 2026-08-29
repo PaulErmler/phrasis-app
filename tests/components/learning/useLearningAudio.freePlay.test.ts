@@ -71,13 +71,17 @@ beforeEach(() => {
 
 describe('useLearningAudio: free-play faces', () => {
   it('forces autoplay in the listening face, despite autoplay being off', () => {
-    const { result } = renderHook(() => useLearningAudio(reviewingState(freePlay('audio'))));
+    const { result } = renderHook(() =>
+      useLearningAudio(reviewingState(freePlay('audio'))),
+    );
     expect(result.current.userAutoPlay).toBe(true);
     expect(player.lastProps?.autoPlay).toBe(true);
   });
 
   it('leaves autoplay to the user in the writing face', () => {
-    const { result } = renderHook(() => useLearningAudio(reviewingState(freePlay('full'))));
+    const { result } = renderHook(() =>
+      useLearningAudio(reviewingState(freePlay('full'))),
+    );
     expect(result.current.userAutoPlay).toBe(false);
     expect(player.lastProps?.autoPlay).toBe(false);
   });
@@ -88,7 +92,9 @@ describe('useLearningAudio: free-play faces', () => {
     act(() => {
       (player.lastProps?.onScheduleComplete as () => void)();
     });
-    expect(state.status === 'reviewing' && state.handleNext).toHaveBeenCalledTimes(1);
+    expect(
+      state.status === 'reviewing' && state.handleNext,
+    ).toHaveBeenCalledTimes(1);
   });
 
   it('never auto-advances in the writing face', () => {
@@ -97,7 +103,9 @@ describe('useLearningAudio: free-play faces', () => {
     act(() => {
       (player.lastProps?.onScheduleComplete as () => void)();
     });
-    expect(state.status === 'reviewing' && state.handleNext).not.toHaveBeenCalled();
+    expect(
+      state.status === 'reviewing' && state.handleNext,
+    ).not.toHaveBeenCalled();
     // Writing also strips the trailing pause-before-advance from the blob.
     expect((player.lastProps?.settings as Settings).autoAdvance).toBe(false);
   });
@@ -115,10 +123,14 @@ describe('useLearningAudio: free-play faces', () => {
       ({ cs }: { cs: Settings }) => useLearningAudio(reviewingState(cs)),
       { initialProps: { cs: { ...base, reviewMode: 'audio' } as Settings } },
     );
-    expect((player.lastProps?.settings as { reps: unknown }).reps).toEqual({ en: 3 });
+    expect((player.lastProps?.settings as { reps: unknown }).reps).toEqual({
+      en: 3,
+    });
 
     rerender({ cs: { ...base, reviewMode: 'full' } as Settings });
-    expect((player.lastProps?.settings as { reps: unknown }).reps).toEqual({ en: 1 });
+    expect((player.lastProps?.settings as { reps: unknown }).reps).toEqual({
+      en: 1,
+    });
   });
 
   it('counts radio plays toward Practice Listening in the listening face', () => {
@@ -134,6 +146,8 @@ describe('useLearningAudio: free-play faces', () => {
     (state as unknown as { radioPlayCount: number }).radioPlayCount = 5;
     renderHook(() => useLearningAudio(state));
     // 5 radio plays > the 1-rep "only new" window → Practice Listening is off.
-    expect((player.lastProps?.settings as Settings).playTargetBefore).toBe(false);
+    expect((player.lastProps?.settings as Settings).playTargetBefore).toBe(
+      false,
+    );
   });
 });

@@ -75,7 +75,9 @@ describe('features/chat/promptSections', () => {
         baseLanguages: ['en', 'de'],
         targetLanguages: ['es'],
       });
-      expect(s).toContain('Write your replies IN the PRIMARY BASE language (English)');
+      expect(s).toContain(
+        'Write your replies IN the PRIMARY BASE language (English)',
+      );
     });
 
     it('dedupes codes shared between base and target', () => {
@@ -98,7 +100,9 @@ describe('features/chat/promptSections', () => {
         targetLanguages: ['de'],
       });
       expect(section).toContain('The user is currently reviewing this card:');
-      expect(section).toContain('Original (de — TARGET): "Hallo, wie geht es dir?"');
+      expect(section).toContain(
+        'Original (de — TARGET): "Hallo, wie geht es dir?"',
+      );
       expect(section).toContain('en — BASE: "Hello, how are you?"');
     });
 
@@ -142,7 +146,9 @@ describe('features/chat/promptSections', () => {
       });
       expect(section).toContain('currently learning at CEFR A1');
       expect(section).not.toContain(' (A1)');
-      expect(section).toContain('write example sentences at roughly this difficulty');
+      expect(section).toContain(
+        'write example sentences at roughly this difficulty',
+      );
       expect(section).toContain('basic everyday phrases');
       expect(section).toContain('not much simpler');
       expect(section).toContain('not much harder');
@@ -161,7 +167,9 @@ describe('features/chat/promptSections', () => {
         label: 'Pre-A1',
         cefrTier: 'Pre-A1',
       });
-      expect(section).toContain('very short, high-frequency survival sentences');
+      expect(section).toContain(
+        'very short, high-frequency survival sentences',
+      );
     });
   });
 });

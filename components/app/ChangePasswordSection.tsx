@@ -26,7 +26,11 @@ import { authClient } from '@/lib/auth-client';
  *   reset link: completing it attaches a credential account so email +
  *   password login works alongside the social login.
  */
-export function ChangePasswordSection({ email }: { email: string | undefined }) {
+export function ChangePasswordSection({
+  email,
+}: {
+  email: string | undefined;
+}) {
   const t = useTranslations('AppPage.settings.password');
   // undefined = still loading; renders nothing until resolved to avoid a
   // change→set button flash.

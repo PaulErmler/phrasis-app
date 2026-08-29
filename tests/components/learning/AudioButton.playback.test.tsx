@@ -145,11 +145,13 @@ describe('AudioButton playback state', () => {
     // button. Reading as "it didn't switch".
     const { getPeak } = await import('@/lib/audio/peakCache');
     let releasePeak!: (v: number) => void;
-    vi.mocked(getPeak).mockReturnValueOnce(Promise.resolve(1)).mockReturnValueOnce(
-      new Promise<number>((resolve) => {
-        releasePeak = resolve;
-      }),
-    );
+    vi.mocked(getPeak)
+      .mockReturnValueOnce(Promise.resolve(1))
+      .mockReturnValueOnce(
+        new Promise<number>((resolve) => {
+          releasePeak = resolve;
+        }),
+      );
 
     const user = userEvent.setup();
     render(
@@ -168,7 +170,9 @@ describe('AudioButton playback state', () => {
     await waitFor(() => expect(FakeAudio.instances[0].paused).toBe(true));
 
     releasePeak(1);
-    await waitFor(() => expect(FakeAudio.instances[1]?.play).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(FakeAudio.instances[1]?.play).toHaveBeenCalled(),
+    );
   });
 
   it('only lets one clip play at a time across separate buttons', async () => {
@@ -231,9 +235,7 @@ describe('AudioButton click-to-generate', () => {
     );
 
     await waitFor(() => expect(FakeAudio.instances).toHaveLength(1));
-    await waitFor(() =>
-      expect(FakeAudio.instances[0].play).toHaveBeenCalled(),
-    );
+    await waitFor(() => expect(FakeAudio.instances[0].play).toHaveBeenCalled());
   });
 
   it('does not auto-play when the click scheduled nothing', async () => {

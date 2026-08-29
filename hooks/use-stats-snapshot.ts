@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useBrowserLayoutEffect } from '@/hooks/use-isomorphic-layout-effect';
 import { dateInTimezone } from '@/lib/dateStrings';
 
@@ -30,9 +30,9 @@ export function useStatsSnapshot(
 
   const today = dateScoped
     ? dateInTimezone(
-      Date.now(),
-      Intl.DateTimeFormat().resolvedOptions().timeZone,
-    )
+        Date.now(),
+        Intl.DateTimeFormat().resolvedOptions().timeZone,
+      )
     : null;
 
   // Starts empty on both server and client so the first client render
@@ -58,7 +58,9 @@ export function useStatsSnapshot(
       const { __date: _, ...rest } = parsed;
       prevRef.current = rest;
       bumpEpoch((e) => e + 1);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [storageKey, dateScoped, today]);
 
   // Detect if any tracked value has changed from the snapshot
@@ -78,12 +80,13 @@ export function useStatsSnapshot(
       try {
         const toStore = dateScoped ? { __date: today, ...vals } : vals;
         localStorage.setItem(storageKey, JSON.stringify(toStore));
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       bumpEpoch((e) => e + 1);
     }, settleDuration);
 
     return () => clearTimeout(timer);
-     
   }, [valuesJson, changed, storageKey, settleDuration, dateScoped, today]);
 
   // Return prev values keyed the same as input (default 0 for missing keys)

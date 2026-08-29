@@ -1,19 +1,19 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from '@playwright/test';
 
 /**
  * Stats smoke. Visits /app/stats and verifies that either a chart or the
  * empty-state mounts. Charts are rendered with Recharts/SVG, so we look
  * for an svg or a "no data" copy.
  */
-test.describe("stats", () => {
-  test("stats view renders charts or empty state", async ({ page }) => {
-    await page.goto("/app/stats");
-    await page.waitForLoadState("domcontentloaded");
+test.describe('stats', () => {
+  test('stats view renders charts or empty state', async ({ page }) => {
+    await page.goto('/app/stats');
+    await page.waitForLoadState('domcontentloaded');
 
-    const heading = page.getByRole("heading").first();
+    const heading = page.getByRole('heading').first();
     await expect(heading).toBeVisible({ timeout: 15_000 });
 
-    const chart = page.locator("svg").first();
+    const chart = page.locator('svg').first();
     const empty = page
       .getByText(/no data|nothing to show|noch keine|keine daten/i)
       .first();

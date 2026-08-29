@@ -136,7 +136,7 @@ describe('features/chat/quickActions', () => {
       expect(out).toContain('DIFFERENT grammatical forms');
     });
 
-    it('keeps synonyms in the clicked word\'s own language', () => {
+    it("keeps synonyms in the clicked word's own language", () => {
       const out = expandQuickAction(
         { kind: 'synonyms', word: 'Hund', language: 'de' },
         ctx,
@@ -147,16 +147,25 @@ describe('features/chat/quickActions', () => {
 
     it('branches synonyms and antonyms the same way', () => {
       for (const kind of ['synonyms', 'antonyms'] as const) {
-        const target = expandQuickAction({ kind, word: 'Hund', language: 'de' }, ctx);
+        const target = expandQuickAction(
+          { kind, word: 'Hund', language: 'de' },
+          ctx,
+        );
         expect(target).toContain('"Hund"');
         expect(target).not.toContain('BASE-language');
 
-        const base = expandQuickAction({ kind, word: 'dog', language: 'en' }, ctx);
+        const base = expandQuickAction(
+          { kind, word: 'dog', language: 'en' },
+          ctx,
+        );
         expect(base).toContain('BASE-language (English)');
         expect(base).toContain('give its equivalent(s) in German');
       }
       expect(
-        expandQuickAction({ kind: 'antonyms', word: 'Hund', language: 'de' }, ctx),
+        expandQuickAction(
+          { kind: 'antonyms', word: 'Hund', language: 'de' },
+          ctx,
+        ),
       ).toContain('antonyms (opposites)');
     });
   });
@@ -188,7 +197,10 @@ describe('features/chat/quickActions', () => {
     });
 
     it('pluralizes the no-card fallback', () => {
-      const out = expandQuickAction({ kind: 'tenses' }, { ...multi, card: null });
+      const out = expandQuickAction(
+        { kind: 'tenses' },
+        { ...multi, card: null },
+      );
       expect(out).toContain(
         'the Romanian and Spanish (Spain) sentences currently being reviewed',
       );
@@ -206,7 +218,7 @@ describe('features/chat/quickActions', () => {
       expect(out).toContain('never only the first');
     });
 
-    it('still scopes a target-word click to that word\'s language', () => {
+    it("still scopes a target-word click to that word's language", () => {
       const out = expandQuickAction(
         { kind: 'synonyms', word: 'ziua', language: 'ro' },
         multi,
@@ -251,7 +263,9 @@ describe('features/chat/quickActions', () => {
           language: 'de',
         }),
       ).not.toThrow();
-      expect(() => assertQuickActionWithinLimits({ kind: 'grammar' })).not.toThrow();
+      expect(() =>
+        assertQuickActionWithinLimits({ kind: 'grammar' }),
+      ).not.toThrow();
     });
 
     it('throws MESSAGE_TOO_LONG for each over-long free-text field', () => {
@@ -310,5 +324,35 @@ describe('features/chat/quickActions', () => {
     expect(out).toContain('"Ich habe einen Hund."');
     expect(out).toContain('The user wrote: "Ich habe ein Hund."');
     expect(out).toContain('ALSO a correct');
+  });
+
+  it('grades discussAnswer as transcription when the transcribe flag is set', () => {
+    const base = {
+      kind: 'discussAnswer',
+      userAnswer: 'Ich habe ein Hund.',
+      expected: 'Ich habe einen Hund.',
+      language: 'de',
+    } as const;
+    const out = expandQuickAction({ ...base, transcribe: true }, ctx);
+    expect(out).toContain('listening transcription');
+    expect(out).toContain('heard audio of the German sentence');
+    expect(out).toContain('transcription, not translation');
+    // The alsoCorrect flow must be absent AND explicitly forbidden: a valid
+    // paraphrase is still not what the audio said.
+    expect(out).toContain('do NOT call markAlsoCorrect');
+    expect(out).not.toContain('call the markAlsoCorrect tool exactly once');
+    expect(out).not.toContain('ALSO a correct');
+    // The grader-feedback bridge rides along in both variants.
+    const withFeedback = expandQuickAction(
+      { ...base, transcribe: true, aiFeedback: 'verdict: partial' },
+      ctx,
+    );
+    expect(withFeedback).toContain(
+      '<graderFeedback>verdict: partial</graderFeedback>',
+    );
+    // Absent/false keeps today's translation judging.
+    expect(expandQuickAction(base, ctx)).toContain(
+      'call the markAlsoCorrect tool exactly once',
+    );
   });
 });

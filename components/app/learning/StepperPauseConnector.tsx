@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -18,6 +19,7 @@ export function StepperPauseConnector({
   accent,
   lineOnly,
 }: StepperPauseConnectorProps) {
+  const t = useTranslations('LearningMode.settingsPanel.stepper');
   const decrement = () => onChange(Math.max(0, seconds - 1));
   const increment = () => onChange(Math.min(30, seconds + 1));
 
@@ -52,6 +54,7 @@ export function StepperPauseConnector({
             className="h-5 w-5 rounded-full"
             onClick={decrement}
             disabled={seconds <= 0}
+            aria-label={t('decreasePause')}
           >
             <Minus className="h-3 w-3" />
           </Button>
@@ -66,6 +69,7 @@ export function StepperPauseConnector({
             className="h-5 w-5 rounded-full"
             onClick={increment}
             disabled={seconds >= 30}
+            aria-label={t('increasePause')}
           >
             <Plus className="h-3 w-3" />
           </Button>

@@ -9,13 +9,17 @@ import {
 import { paginationOptsValidator } from 'convex/server';
 import { internal, components } from '../../_generated/api';
 import { saveMessages, listUIMessages, syncStreams } from '@convex-dev/agent';
-import { requireAuthUserId, getAuthUserId, getUserSettings } from '../../db/users';
+import {
+  requireAuthUserId,
+  getAuthUserId,
+  getUserSettings,
+} from '../../db/users';
 import { getActiveCourseForUser } from '../../db/courses';
 import { getCourseSettings } from '../../db/courseSettings';
 import { consumeQuota } from '../../usage/helpers';
 import { CHAT_CREDIT_USD_STEP, CREDIT_COSTS, FEATURE_IDS } from '../featureIds';
 import { agent, AGENT_TOOLS, createMarkAlsoCorrectTool } from './agent';
-import type { Doc, Id } from '../../_generated/dataModel';
+import type { Doc } from '../../_generated/dataModel';
 import { THREAD_MESSAGE_LIMIT, MAX_MESSAGE_LENGTH } from './constants';
 import { trackEvent } from '../../db/stats/dailyStats';
 import { EVENTS, track, trackException } from '../../analytics';
@@ -25,14 +29,13 @@ import {
   openrouterGenerationId,
 } from '../../lib/posthogAi';
 import { generateText, type ModelMessage } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import {
   OPENROUTER_CHAT_MAX_OUTPUT_TOKENS,
   OPENROUTER_CHAT_PROVIDER_OPTIONS,
   OPENROUTER_INPUT_CACHE_CONTROL,
   OPENROUTER_MODELS,
-  OPENROUTER_USAGE_ACCOUNTING,
 } from '../../config/aiModels';
+import { getOpenRouter } from '../../lib/openrouter';
 import {
   buildCardContextSection,
   buildDifficultySection,
@@ -71,8 +74,7 @@ function difficultyFromCollection(
   collection: Doc<'collections'>,
 ): LearnerDifficulty | null {
   if (!isPremadeLevelCollection(collection)) return null;
-  const cefrTier =
-    collection.cefrTier ?? deriveLegacyCefrTier(collection.name);
+  const cefrTier = collection.cefrTier ?? deriveLegacyCefrTier(collection.name);
   if (!cefrTier) return null;
   return {
     label: collection.displayName ?? collection.name,
@@ -128,7 +130,6 @@ export const getCourseLanguagesForUser = internalQuery({
   },
 });
 
-
 /**
  * Expand a quick action into its steering prompt, resolving the language
  * context from the reviewed card when present, else from the active course.
@@ -140,7 +141,8 @@ function buildQuickActionSteering(
 ): string {
   return expandQuickAction(quickAction, {
     card: cardData,
-    baseLanguages: cardData?.baseLanguages ?? active?.course.baseLanguages ?? [],
+    baseLanguages:
+      cardData?.baseLanguages ?? active?.course.baseLanguages ?? [],
     targetLanguages:
       cardData?.targetLanguages ?? active?.course.targetLanguages ?? [],
   });
@@ -178,7 +180,10 @@ export const sendMessage = mutation({
     });
 
     if (!thread || thread.userId !== userId) {
-      throw new ConvexError('Thread not found or access denied');
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'Thread not found or access denied',
+      });
     }
 
     // Count across ALL pages: a single tool-call-heavy turn stores many
@@ -193,23 +198,38 @@ export const sendMessage = mutation({
         page: { message?: { role?: string } }[];
         isDone: boolean;
         continueCursor: string;
-      } = await ctx.runQuery(
-        agentComponent.messages.listMessagesByThreadId,
-        { threadId: args.threadId, order: 'asc', paginationOpts: { cursor, numItems: 300 } },
-      );
+      } = await ctx.runQuery(agentComponent.messages.listMessagesByThreadId, {
+        threadId: args.threadId,
+        order: 'asc',
+        paginationOpts: { cursor, numItems: 300 },
+      });
       userMessageCount += existingMessages.page.filter(
         (m) => m.message?.role === 'user',
       ).length;
       cursor = existingMessages.isDone ? null : existingMessages.continueCursor;
     } while (cursor !== null && userMessageCount < THREAD_MESSAGE_LIMIT);
     if (userMessageCount >= THREAD_MESSAGE_LIMIT) {
-      throw new ConvexError({ code: 'THREAD_MESSAGE_LIMIT', message: 'Thread message limit reached' });
+      throw new ConvexError({
+        code: 'THREAD_MESSAGE_LIMIT',
+        message: 'Thread message limit reached',
+      });
     }
 
     const cardData = args.cardId
       ? await resolveCardContext(ctx, args.cardId, userId)
       : null;
     const active = await getActiveCourseForUser(ctx, userId);
+
+    // Transcribe: the card's answer must reproduce the audio, so a
+    // differently-worded variant is never "also correct" and markAlsoCorrect
+    // must not be offered. Read from the course settings rather than the
+    // quick-action payload: the payload only describes the discussAnswer turn,
+    // while the tool is registered on EVERY card turn — including a later
+    // free-text "is X also correct?", which the agent prompt actively invites.
+    const transcribeCard = cardData
+      ? (await getCourseSettings(ctx, cardData.courseId))?.writingInputMode ===
+        'transcribe'
+      : false;
 
     const steering = args.quickAction
       ? buildQuickActionSteering(args.quickAction, cardData, active)
@@ -219,21 +239,27 @@ export const sendMessage = mutation({
     // message immediately BEFORE the visible label, so the model reads the
     // detailed request in place on this and every later turn while the UI
     // (which filters system messages) shows only the short label bubble.
-    const { messages: savedMessages } = await saveMessages(ctx, agentComponent, {
-      threadId: args.threadId,
-      messages: [
-        ...(steering !== undefined
-          ? [{ role: 'system' as const, content: steering }]
-          : []),
-        { role: 'user' as const, content: args.prompt },
-      ],
-    });
+    const { messages: savedMessages } = await saveMessages(
+      ctx,
+      agentComponent,
+      {
+        threadId: args.threadId,
+        messages: [
+          ...(steering !== undefined
+            ? [{ role: 'system' as const, content: steering }]
+            : []),
+          { role: 'user' as const, content: args.prompt },
+        ],
+      },
+    );
     const messageId = savedMessages[savedMessages.length - 1]._id;
 
     const cardContextSection = cardData
       ? buildCardContextSection(cardData)
       : undefined;
-    const languageSection = cardData ? buildLanguageSection(cardData) : undefined;
+    const languageSection = cardData
+      ? buildLanguageSection(cardData)
+      : undefined;
     const difficulty = await resolveLearnerDifficulty(ctx, active?.course);
     const difficultySection = difficulty
       ? buildDifficultySection(difficulty)
@@ -251,6 +277,7 @@ export const sendMessage = mutation({
         {
           threadId: args.threadId,
           userMessage: args.prompt,
+          userId,
         },
       );
     }
@@ -272,15 +299,22 @@ export const sendMessage = mutation({
         difficultySection,
         prompt: args.prompt,
         includeAiContent,
+        userId,
         // Only forwarded when the card context resolved (ownership verified
         // above), gates the markAlsoCorrect tool for this turn.
         cardId: cardData ? args.cardId : undefined,
+        // ...and withholds it entirely when the course writes by transcription.
+        transcribeCard,
       },
     );
 
     // Track chat message event
     if (active) {
-      await trackEvent(ctx, { userId, courseId: active.course._id, field: 'chatMessagesSent' });
+      await trackEvent(ctx, {
+        userId,
+        courseId: active.course._id,
+        field: 'chatMessagesSent',
+      });
     }
 
     // Captured server-side rather than from the composer: the browser can be
@@ -390,6 +424,18 @@ export const generateResponse = internalAction({
     // verified by sendMessage's resolveCardContext). Presence registers the
     // markAlsoCorrect tool for this turn, closed over this id.
     cardId: v.optional(v.id('cards')),
+    // The card's course writes by transcription (courseSettings
+    // .writingInputMode). Only the spoken sentence is correct there, so the
+    // markAlsoCorrect tool is withheld: prompt wording alone would not hold on
+    // a free-text turn, where the agent prompt invites the tool whenever it is
+    // available. Resolved in sendMessage, which has db access.
+    transcribeCard: v.optional(v.boolean()),
+    // The sending user, for cost attribution: seeds `billedUserId` (so
+    // turns whose usageHandler never supplies a userId still bill to the
+    // sender) and rides into the thread-title event. A stream that throws
+    // still skips billing entirely — control jumps to the catch below
+    // before the charge.
+    userId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -402,14 +448,16 @@ export const generateResponse = internalAction({
         });
         const courseLanguages = thread?.userId
           ? await ctx.runQuery(
-            internal.features.chat.messages.getCourseLanguagesForUser,
-            { userId: thread.userId },
-          )
+              internal.features.chat.messages.getCourseLanguagesForUser,
+              { userId: thread.userId },
+            )
           : null;
         if (courseLanguages) {
           languageSection ??= buildLanguageSection(courseLanguages);
           if (!difficultySection && courseLanguages.difficulty) {
-            difficultySection = buildDifficultySection(courseLanguages.difficulty);
+            difficultySection = buildDifficultySection(
+              courseLanguages.difficulty,
+            );
           }
         }
       }
@@ -436,7 +484,7 @@ export const generateResponse = internalAction({
       // accumulator is complete after the await. Thread-title generation is
       // deliberately not billed (flash-lite, ~4 words, negligible).
       let totalCostUsd = 0;
-      let billedUserId: string | undefined;
+      let billedUserId: string | undefined = args.userId;
 
       // One `$ai_generation` per LLM step is emitted after the stream finishes
       // rather than from inside `usageHandler`: the handler runs mid-stream, and
@@ -520,19 +568,26 @@ export const generateResponse = internalAction({
           // discussAnswer): the user can free-text ask "is X also correct?",
           // and persisted steering from an earlier quick action is re-read
           // on later turns.
+          //
+          // Except in transcribe, where an alternative phrasing is by
+          // definition not what the audio said: the tool is left out, so
+          // "never store an alternative" holds structurally on every turn
+          // rather than resting on the quick action's prompt wording.
           ...(args.cardId
             ? {
-                tools: {
-                  ...AGENT_TOOLS,
-                  markAlsoCorrect: createMarkAlsoCorrectTool({
-                    cardId: args.cardId,
-                  }),
-                },
+                tools: args.transcribeCard
+                  ? AGENT_TOOLS
+                  : {
+                      ...AGENT_TOOLS,
+                      markAlsoCorrect: createMarkAlsoCorrectTool({
+                        cardId: args.cardId,
+                      }),
+                    },
               }
             : {}),
         },
         {
-          saveStreamDeltas: { chunking: "word", throttleMs: 500 },
+          saveStreamDeltas: { chunking: 'word', throttleMs: 500 },
           usageHandler: async (
             _usageCtx,
             { userId, providerMetadata, usage, model, provider },
@@ -650,17 +705,16 @@ export const generateThreadTitle = internalAction({
   args: {
     threadId: v.string(),
     userMessage: v.string(),
+    // Thread owner; the title's (tiny) cost bills to them.
+    userId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
-      const openrouter = createOpenRouter({
-        apiKey: process.env.OPENROUTER_API_KEY,
-        // Makes OpenRouter report the actual USD cost of this call. Titles are
-        // cheap individually but fire once per thread, so they are worth a line
-        // on the cost dashboard rather than an unexplained gap.
-        extraBody: OPENROUTER_USAGE_ACCOUNTING,
-      });
+      // Usage accounting (the factory default) matters even here: titles are
+      // cheap individually but fire once per thread, so they are worth a line
+      // on the cost dashboard rather than an unexplained gap.
+      const openrouter = getOpenRouter();
       const startedAt = Date.now();
       const { text, usage, providerMetadata } = await generateText({
         model: openrouter(OPENROUTER_MODELS.threadTitle),
@@ -671,6 +725,7 @@ Maximum 4 words. No quotes. No period.`,
         prompt: args.userMessage,
       });
       await captureGeneration(ctx, {
+        distinctId: args.userId,
         feature: 'chat_title',
         model: OPENROUTER_MODELS.threadTitle,
         provider: 'openrouter',

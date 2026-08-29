@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useDebounce } from '@/hooks/use-debounce';
+import { useNowMinute } from '@/hooks/use-now-minute';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -71,7 +72,11 @@ export function StreakBadge({
   );
 }
 
-export function LastActiveCell({ lastActivityDate }: { lastActivityDate?: string }) {
+export function LastActiveCell({
+  lastActivityDate,
+}: {
+  lastActivityDate?: string;
+}) {
   if (!lastActivityDate) {
     return <span className="text-muted-foreground">never</span>;
   }
@@ -107,13 +112,20 @@ export function UsersTable() {
     setLimit(PAGE_SIZE);
   }, [debouncedSearch, selectedPlans, activity, sortBy]);
 
-  const planDistribution = useQuery(api.admin.dashboard.getPlanDistribution, {});
+  const planDistribution = useQuery(
+    api.admin.dashboard.getPlanDistribution,
+    {},
+  );
+  // Minute-quantized `now` per the no-wall-clock query guideline (drives the
+  // activity filters and live streak derivation).
+  const now = useNowMinute();
   const result = useQuery(api.admin.dashboard.listUsers, {
     limit,
     search: debouncedSearch.trim() || undefined,
     planIds: selectedPlans.length > 0 ? selectedPlans : undefined,
     activity: activity === 'all' ? undefined : activity,
     sortBy,
+    now,
   });
 
   const planOptions = planDistribution?.plans ?? [];
@@ -158,7 +170,9 @@ export function UsersTable() {
               </DropdownMenuCheckboxItem>
             ))}
             {planOptions.length === 0 && (
-              <p className="px-2 py-1.5 text-xs text-muted-foreground">No plans</p>
+              <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                No plans
+              </p>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -178,7 +192,10 @@ export function UsersTable() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortBy)}>
+        <Select
+          value={sortBy}
+          onValueChange={(value) => setSortBy(value as SortBy)}
+        >
           <SelectTrigger size="sm" className="w-auto">
             <SelectValue />
           </SelectTrigger>
@@ -219,7 +236,10 @@ export function UsersTable() {
                     className="block hover:underline"
                   >
                     <span className="font-medium">{user.name || '—'}</span>
-                    <span className="block text-xs text-muted-foreground" data-ph-mask>
+                    <span
+                      className="block text-xs text-muted-foreground"
+                      data-ph-mask
+                    >
                       {user.email}
                     </span>
                   </Link>
@@ -229,11 +249,15 @@ export function UsersTable() {
                     <Badge variant="secondary" className="whitespace-nowrap">
                       {user.planName}
                       {user.planStatus && user.planStatus !== 'active' && (
-                        <span className="ml-1 opacity-70">({user.planStatus})</span>
+                        <span className="ml-1 opacity-70">
+                          ({user.planStatus})
+                        </span>
                       )}
                     </Badge>
                   ) : (
-                    <span className="text-muted-foreground text-xs">unknown</span>
+                    <span className="text-muted-foreground text-xs">
+                      unknown
+                    </span>
                   )}
                 </TableCell>
                 <TableCell>
@@ -261,17 +285,21 @@ export function UsersTable() {
                 <TableCell className="text-xs tabular-nums">
                   {user.features ? (
                     <div className="space-y-0.5">
-                      {USAGE_COLUMNS.filter(({ featureId }) => user.features![featureId]).map(
-                        ({ featureId, label }) => {
-                          const f = user.features![featureId];
-                          return (
-                            <div key={featureId} className="whitespace-nowrap">
-                              <span className="text-muted-foreground">{label}:</span>{' '}
-                              {f.unlimited ? `${f.used} / ∞` : `${f.used} / ${f.included}`}
-                            </div>
-                          );
-                        },
-                      )}
+                      {USAGE_COLUMNS.filter(
+                        ({ featureId }) => user.features![featureId],
+                      ).map(({ featureId, label }) => {
+                        const f = user.features![featureId];
+                        return (
+                          <div key={featureId} className="whitespace-nowrap">
+                            <span className="text-muted-foreground">
+                              {label}:
+                            </span>{' '}
+                            {f.unlimited
+                              ? `${f.used} / ∞`
+                              : `${f.used} / ${f.included}`}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <span className="text-muted-foreground">—</span>
@@ -284,7 +312,10 @@ export function UsersTable() {
             ))}
             {result !== undefined && result.rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
+                <TableCell
+                  colSpan={7}
+                  className="text-center text-muted-foreground py-6"
+                >
                   No users found
                 </TableCell>
               </TableRow>
@@ -293,7 +324,9 @@ export function UsersTable() {
         </Table>
       </div>
       {result === undefined && (
-        <div className="py-6 text-center text-muted-foreground text-sm">Loading…</div>
+        <div className="py-6 text-center text-muted-foreground text-sm">
+          Loading…
+        </div>
       )}
       {result?.hasMore && (
         <div className="pt-3 text-center">

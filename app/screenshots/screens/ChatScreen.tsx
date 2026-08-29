@@ -21,11 +21,15 @@ function EntryLines({ base, target }: { base: string; target: string }) {
   return (
     <div className="space-y-1.5 text-sm">
       <p className="text-sm text-muted-foreground">
-        <span className="font-medium text-muted-foreground uppercase text-xs">EN</span>{' '}
+        <span className="font-medium text-muted-foreground uppercase text-xs">
+          EN
+        </span>{' '}
         <span>{base}</span>
       </p>
       <p className="text-base font-semibold">
-        <span className="font-medium text-muted-foreground uppercase text-xs">ES</span>{' '}
+        <span className="font-medium text-muted-foreground uppercase text-xs">
+          ES
+        </span>{' '}
         <span>{target}</span>
       </p>
     </div>
@@ -98,7 +102,11 @@ export function ChatScreen() {
               <ChevronLeft className="h-4 w-4" />
               {tApp('views.chat')}
             </Button>
-            <Button variant="ghost" size="icon" aria-label="Toggle conversations">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Toggle conversations"
+            >
               <PanelLeft className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" aria-label="New chat">
@@ -123,12 +131,18 @@ export function ChatScreen() {
             <Message from="assistant">
               <MessageContent>
                 <p>
-                  For <em>yo</em> (I), estar becomes <strong>estoy</strong> — e.g.{' '}
-                  <em>Estoy bien</em>. For <em>ellos/ellas</em> (they) it&apos;s{' '}
-                  <strong>están</strong>. Here are two cards so it sticks:
+                  For <em>yo</em> (I), estar becomes <strong>estoy</strong> —
+                  e.g. <em>Estoy bien</em>. For <em>ellos/ellas</em> (they)
+                  it&apos;s <strong>están</strong>. Here are two cards so it
+                  sticks:
                 </p>
                 {thread.cards.map((card) => (
-                  <ApprovalCard key={card.target} base={card.base} target={card.target} state={card.state} />
+                  <ApprovalCard
+                    key={card.target}
+                    base={card.base}
+                    target={card.target}
+                    state={card.state}
+                  />
                 ))}
               </MessageContent>
             </Message>
@@ -149,7 +163,11 @@ export function ChatScreen() {
             <div className="flex items-center justify-between gap-1 px-2 pb-2">
               <span />
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground"
+                >
                   <Mic className="h-4 w-4" />
                 </Button>
                 <Button size="icon" className="h-8 w-8">
@@ -162,7 +180,11 @@ export function ChatScreen() {
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-20">
-        <BottomNav currentView="chat" onViewChange={() => {}} onLearnOpen={() => {}} />
+        <BottomNav
+          currentView="chat"
+          onViewChange={() => {}}
+          onLearnOpen={() => {}}
+        />
       </div>
     </div>
   );

@@ -65,10 +65,18 @@ export function WritingScreen() {
                   {t('reviewCount', { count: 5 })}
                 </Badge>
                 <div className="flex items-center">
-                  <Button variant="ghost" size="icon" className="text-muted-foreground">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground"
+                  >
                     <Star className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground"
+                  >
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </div>
@@ -99,7 +107,11 @@ export function WritingScreen() {
                       value="¿Podriamos ver el menu, por favor?"
                       className="flex-1 text-left"
                     />
-                    <Button variant="outline" size="icon" className="h-9 w-9 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 shrink-0"
+                    >
                       <Check className="h-4 w-4" />
                     </Button>
                   </div>
@@ -115,33 +127,55 @@ export function WritingScreen() {
         <div className="border-t">
           <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
             <div className="flex gap-2">
-              {([['again', '<10m'], ['hard', '2d'], ['good', '6d'], ['easy', '14d']] as const).map(
-                ([rating, interval]) => (
-                  <div key={rating} className="flex-1 flex flex-col items-center gap-1">
-                    <span className="text-[11px] text-muted-foreground">{interval}</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={
-                        rating === 'good'
-                          ? 'w-full ring-2 ring-primary border-primary bg-primary/5'
-                          : 'w-full'
-                      }
-                    >
-                      {t(`ratings.${rating}`)}
-                    </Button>
-                  </div>
-                ),
-              )}
+              {(
+                [
+                  ['again', '<10m'],
+                  ['hard', '2d'],
+                  ['good', '6d'],
+                  ['easy', '14d'],
+                ] as const
+              ).map(([rating, interval]) => (
+                <div
+                  key={rating}
+                  className="flex-1 flex flex-col items-center gap-1"
+                >
+                  <span className="text-[11px] text-muted-foreground">
+                    {interval}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={
+                      rating === 'good'
+                        ? 'w-full ring-2 ring-primary border-primary bg-primary/5'
+                        : 'w-full'
+                    }
+                  >
+                    {t(`ratings.${rating}`)}
+                  </Button>
+                </div>
+              ))}
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="icon" className="h-9 w-9 shrink-0">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+              >
                 <Undo2 className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" className="h-9 w-9 shrink-0">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+              >
                 <SkipBack className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" className="h-9 flex-[2] min-w-0">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 flex-[2] min-w-0"
+              >
                 <Volume2 className="h-4 w-4" />
               </Button>
               <Button size="sm" className="flex-[1] gap-2">

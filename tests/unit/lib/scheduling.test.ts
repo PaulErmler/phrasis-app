@@ -15,14 +15,24 @@ import {
 
 describe('validateInitialReviewCount', () => {
   it('accepts values inside range', () => {
-    expect(() => validateInitialReviewCount(MIN_INITIAL_REVIEW_COUNT)).not.toThrow();
-    expect(() => validateInitialReviewCount(DEFAULT_INITIAL_REVIEW_COUNT)).not.toThrow();
-    expect(() => validateInitialReviewCount(MAX_INITIAL_REVIEW_COUNT)).not.toThrow();
+    expect(() =>
+      validateInitialReviewCount(MIN_INITIAL_REVIEW_COUNT),
+    ).not.toThrow();
+    expect(() =>
+      validateInitialReviewCount(DEFAULT_INITIAL_REVIEW_COUNT),
+    ).not.toThrow();
+    expect(() =>
+      validateInitialReviewCount(MAX_INITIAL_REVIEW_COUNT),
+    ).not.toThrow();
   });
 
   it('rejects values outside range and non-integers', () => {
-    expect(() => validateInitialReviewCount(MIN_INITIAL_REVIEW_COUNT - 1)).toThrow();
-    expect(() => validateInitialReviewCount(MAX_INITIAL_REVIEW_COUNT + 1)).toThrow();
+    expect(() =>
+      validateInitialReviewCount(MIN_INITIAL_REVIEW_COUNT - 1),
+    ).toThrow();
+    expect(() =>
+      validateInitialReviewCount(MAX_INITIAL_REVIEW_COUNT + 1),
+    ).toThrow();
     expect(() => validateInitialReviewCount(3.5)).toThrow();
     expect(() => validateInitialReviewCount(Number.NaN)).toThrow();
   });
@@ -61,7 +71,12 @@ describe('getValidRatings / getDefaultRating', () => {
   });
 
   it('returns FSRS ratings for review phase', () => {
-    expect(getValidRatings('review')).toEqual(['again', 'hard', 'good', 'easy']);
+    expect(getValidRatings('review')).toEqual([
+      'again',
+      'hard',
+      'good',
+      'easy',
+    ]);
     expect(getDefaultRating('review')).toBe('good');
   });
 });
@@ -118,7 +133,11 @@ describe('scheduleCard (pre-review phase)', () => {
 
 describe('simulateReviews', () => {
   it('produces one step per rating', () => {
-    const steps = simulateReviews(5, ['stillLearning', 'stillLearning', 'understood'], 0);
+    const steps = simulateReviews(
+      5,
+      ['stillLearning', 'stillLearning', 'understood'],
+      0,
+    );
     expect(steps).toHaveLength(3);
     expect(steps[0].reviewNumber).toBe(1);
     expect(steps[2].reviewNumber).toBe(3);

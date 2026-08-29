@@ -11,15 +11,28 @@ export function generateStaticParams() {
   return Object.values(authViewPaths).map((path) => ({ path }));
 }
 
-function TermsFooter({ authLocalization }: { authLocalization: Record<string, string> }) {
+function TermsFooter({
+  authLocalization,
+}: {
+  authLocalization: Record<string, string>;
+}) {
   return (
     <p className="text-center text-xs text-muted-foreground">
-      {authLocalization.BY_SIGNING_UP_AGREE || 'By signing up, you agree to our'}{' '}
-      <Link href="/legal/agb" className="underline hover:text-foreground" target="_blank">
+      {authLocalization.BY_SIGNING_UP_AGREE ||
+        'By signing up, you agree to our'}{' '}
+      <Link
+        href="/legal/agb"
+        className="underline hover:text-foreground"
+        target="_blank"
+      >
         {authLocalization.TERMS_AND_CONDITIONS || 'Terms & Conditions'}
       </Link>{' '}
       {authLocalization.ACCEPT_TERMS_AND || 'and the'}{' '}
-      <Link href="/legal/privacy" className="underline hover:text-foreground" target="_blank">
+      <Link
+        href="/legal/privacy"
+        className="underline hover:text-foreground"
+        target="_blank"
+      >
         {authLocalization.ACCEPT_TERMS_PRIVACY || 'Privacy Policy'}
       </Link>
     </p>

@@ -88,17 +88,25 @@ export function resolveStepAnchors(
 ): DriveStep[] {
   return steps.map((step) => {
     if (typeof step.element !== 'string') return step;
-    const candidates = document.querySelectorAll<HTMLElement>(step.element);
-    for (const el of candidates) {
-      const rect = el.getBoundingClientRect();
-      if (
-        rect.width > 0 &&
-        rect.height > 0 &&
-        getComputedStyle(el).visibility !== 'hidden'
-      ) {
-        return { ...step, element: el };
-      }
-    }
+    const el = findVisibleAnchor(step.element);
+    if (el) return { ...step, element: el };
     return onMiss === 'unanchor' ? { ...step, element: undefined } : step;
   });
+}
+
+/** First VISIBLE element matching `selector`, by the same criteria
+ * `resolveStepAnchors` uses (a layout box and not `visibility: hidden`). */
+export function findVisibleAnchor(selector: string): HTMLElement | null {
+  const candidates = document.querySelectorAll<HTMLElement>(selector);
+  for (const el of candidates) {
+    const rect = el.getBoundingClientRect();
+    if (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      getComputedStyle(el).visibility !== 'hidden'
+    ) {
+      return el;
+    }
+  }
+  return null;
 }

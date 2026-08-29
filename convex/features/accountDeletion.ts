@@ -1,4 +1,4 @@
-import { ConvexError } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 import { mutation } from '../_generated/server';
 import { authComponent } from '../auth';
 import { rateLimiter } from '../rateLimiter';
@@ -13,9 +13,9 @@ import { resend } from '../lib/resendClient';
  * email, and the account is deleted manually within the promised 30 days.
  */
 
-
 export const requestAccountDeletion = mutation({
   args: {},
+  returns: v.null(),
   handler: async (ctx) => {
     const user = await authComponent.safeGetAuthUser(ctx);
     if (!user) throw new ConvexError('Unauthenticated');
@@ -50,9 +50,7 @@ export const requestAccountDeletion = mutation({
     await resend.sendEmail(ctx, {
       from: `Flexling <${SUPPORT_EMAIL}>`,
       to: SUPPORT_EMAIL,
-      subject: withEmailEnvSubject(
-        `Account deletion request: ${user.email}`,
-      ),
+      subject: withEmailEnvSubject(`Account deletion request: ${user.email}`),
       text: [
         'A user requested account deletion from the app.',
         '',
@@ -64,5 +62,6 @@ export const requestAccountDeletion = mutation({
         'Promised to the user: deletion within 30 days.',
       ].join('\n'),
     });
+    return null;
   },
 });

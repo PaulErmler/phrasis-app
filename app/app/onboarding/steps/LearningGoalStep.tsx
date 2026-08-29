@@ -3,7 +3,15 @@
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { Check, Plane, Heart, Briefcase, Sparkles, GraduationCap, Pencil } from 'lucide-react';
+import {
+  Check,
+  Plane,
+  Heart,
+  Briefcase,
+  Sparkles,
+  GraduationCap,
+  Pencil,
+} from 'lucide-react';
 import type { LearningReason } from '../types';
 import {
   MAX_ONBOARDING_FREE_TEXT_LENGTH,
@@ -29,7 +37,12 @@ const REASONS: {
   { value: 'other', Icon: Pencil },
 ];
 
-export function LearningGoalStep({ selected, freeText, onToggle, onFreeText }: Props) {
+export function LearningGoalStep({
+  selected,
+  freeText,
+  onToggle,
+  onFreeText,
+}: Props) {
   const t = useTranslations('Onboarding.goal');
   const selectedSet = new Set(selected);
   return (
@@ -55,15 +68,23 @@ export function LearningGoalStep({ selected, freeText, onToggle, onFreeText }: P
                 className={cn(
                   'relative rounded-xl border p-6 text-left transition-all flex flex-col gap-3',
                   'hover:bg-accent hover:scale-[1.02]',
-                  isSelected && 'border-primary bg-primary/5 ring-2 ring-primary/20',
+                  isSelected &&
+                    'border-primary bg-primary/5 ring-2 ring-primary/20',
                 )}
               >
                 {isSelected ? (
                   <Check className="absolute top-3 right-3 h-4 w-4 text-primary" />
                 ) : null}
-                <Icon className={cn('h-7 w-7', isSelected ? 'text-primary' : 'text-muted-foreground')} />
+                <Icon
+                  className={cn(
+                    'h-7 w-7',
+                    isSelected ? 'text-primary' : 'text-muted-foreground',
+                  )}
+                />
                 <div>
-                  <div className="font-semibold">{t(`options.${value}.label`)}</div>
+                  <div className="font-semibold">
+                    {t(`options.${value}.label`)}
+                  </div>
                   <div className="text-sm text-muted-foreground mt-1">
                     {t(`options.${value}.description`)}
                   </div>
@@ -76,15 +97,20 @@ export function LearningGoalStep({ selected, freeText, onToggle, onFreeText }: P
           <div className="max-w-md mx-auto w-full mt-4 px-4 animate-in fade-in slide-in-from-top-2 duration-300">
             {(() => {
               const value = freeText ?? '';
-              const isOverLimit = value.length > MAX_ONBOARDING_FREE_TEXT_LENGTH;
+              const isOverLimit =
+                value.length > MAX_ONBOARDING_FREE_TEXT_LENGTH;
               const remaining = MAX_ONBOARDING_FREE_TEXT_LENGTH - value.length;
               const showCharCount =
-              isOverLimit ||
-              remaining <= ONBOARDING_FREE_TEXT_SHOW_COUNT_REMAINING_THRESHOLD;
+                isOverLimit ||
+                remaining <=
+                  ONBOARDING_FREE_TEXT_SHOW_COUNT_REMAINING_THRESHOLD;
               return (
                 <>
                   <div className="flex items-baseline justify-between gap-2 mb-2">
-                    <label htmlFor="other-reason" className="text-sm text-muted-foreground">
+                    <label
+                      htmlFor="other-reason"
+                      className="text-sm text-muted-foreground"
+                    >
                       {t('otherLabel')}
                     </label>
                     {showCharCount ? (

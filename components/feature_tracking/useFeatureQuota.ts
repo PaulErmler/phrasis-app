@@ -2,7 +2,11 @@
 
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
-import { CREDIT_COSTS, FEATURE_IDS, type FeatureId } from '@/convex/features/featureIds';
+import {
+  CREDIT_COSTS,
+  FEATURE_IDS,
+  type FeatureId,
+} from '@/convex/features/featureIds';
 
 export interface FeatureQuotaInfo {
   balance: number;

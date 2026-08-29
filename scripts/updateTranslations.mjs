@@ -58,7 +58,9 @@ function runConvexMutation(functionPath, args) {
     );
     const detail =
       parts.join('\n').trim() ||
-      (result.error ? String(result.error) : '(no stderr/stdout/error message)');
+      (result.error
+        ? String(result.error)
+        : '(no stderr/stdout/error message)');
     throw new Error(`Convex mutation failed: ${detail}`);
   }
 
@@ -172,9 +174,12 @@ async function updateTranslations() {
     const pct = ((batchNum / batches.length) * 100).toFixed(1);
 
     try {
-      const result = runConvexMutation('db/translationSeed:batchUpsertTranslations', {
-        items: batch,
-      });
+      const result = runConvexMutation(
+        'db/translationSeed:batchUpsertTranslations',
+        {
+          items: batch,
+        },
+      );
 
       if (result) {
         for (const key of Object.keys(totals)) {
@@ -213,7 +218,9 @@ async function updateTranslations() {
         }
       }
     } catch (error) {
-      console.error(`  Batch ${batchNum}/${batches.length} FAILED: ${error.message}`);
+      console.error(
+        `  Batch ${batchNum}/${batches.length} FAILED: ${error.message}`,
+      );
     }
   }
 
@@ -224,11 +231,15 @@ async function updateTranslations() {
   console.log(`Texts updated: ${totals.textsUpdated}`);
   console.log(`Texts not found (count): ${totals.textsNotFound}`);
   console.log(`Translations inserted: ${totals.translationsInserted}`);
-  console.log(`Translations updated (text changed): ${totals.translationsUpdated}`);
+  console.log(
+    `Translations updated (text changed): ${totals.translationsUpdated}`,
+  );
   console.log(`Translations unchanged: ${totals.translationsUnchanged}`);
   console.log(`Audio recordings invalidated: ${totals.audioInvalidated}`);
 
-  const sortedUniqueNotFound = [...allNotFoundDatasetSentenceIds].sort((a, b) => a - b);
+  const sortedUniqueNotFound = [...allNotFoundDatasetSentenceIds].sort(
+    (a, b) => a - b,
+  );
   console.log(
     `\nDataset sentence IDs with no matching texts row (unique, sorted): ${sortedUniqueNotFound.length}`,
   );

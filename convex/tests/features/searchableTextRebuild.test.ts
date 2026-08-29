@@ -1,13 +1,13 @@
 /// <reference types="vite/client" />
-import { convexTest, type TestConvex } from "convex-test";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { convexTest, type TestConvex } from 'convex-test';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import schema from "../../schema";
-import { internal } from "../../_generated/api";
-import type { Id } from "../../_generated/dataModel";
-import { buildCardSearchableText } from "../../lib/cardContent";
+import schema from '../../schema';
+import { internal } from '../../_generated/api';
+import type { Id } from '../../_generated/dataModel';
+import { buildCardSearchableText } from '../../lib/cardContent';
 
-const modules = import.meta.glob("/convex/**/*.ts");
+const modules = import.meta.glob('/convex/**/*.ts');
 
 // The rebuild fan-out is DEBOUNCED (10s marker on the text row, see
 // scheduleSearchableTextRebuild in convex/features/decks.ts), so the tests
@@ -45,21 +45,21 @@ async function seedCourseCardText(
   },
 ) {
   return t.run(async (ctx) => {
-    const collectionId = await ctx.db.insert("collections", {
-      name: "A1",
+    const collectionId = await ctx.db.insert('collections', {
+      name: 'A1',
       textCount: 0,
     });
-    const courseId = await ctx.db.insert("courses", {
-      userId: "user_A",
+    const courseId = await ctx.db.insert('courses', {
+      userId: 'user_A',
       baseLanguages: opts.baseLanguages,
       targetLanguages: opts.targetLanguages,
     });
-    const deckId = await ctx.db.insert("decks", {
+    const deckId = await ctx.db.insert('decks', {
       courseId,
-      name: "deck",
+      name: 'deck',
       cardCount: 1,
     });
-    const textId = await ctx.db.insert("texts", {
+    const textId = await ctx.db.insert('texts', {
       text: opts.sourceText,
       language: opts.sourceLanguage,
       userCreated: false,
@@ -70,7 +70,7 @@ async function seedCourseCardText(
         : {}),
     });
     if (opts.translation) {
-      await ctx.db.insert("translations", {
+      await ctx.db.insert('translations', {
         textId,
         targetLanguage: opts.translation.lang,
         translatedText: opts.translation.text,
@@ -85,15 +85,15 @@ async function seedCourseCardText(
       ...opts.baseLanguages,
       ...opts.targetLanguages,
     ]);
-    const cardId = await ctx.db.insert("cards", {
+    const cardId = await ctx.db.insert('cards', {
       deckId,
       textId,
       collectionId,
-      collectionOrigin: "premade",
+      collectionOrigin: 'premade',
       dueDate: 0,
       isMastered: false,
       isHidden: false,
-      schedulingPhase: "preReview",
+      schedulingPhase: 'preReview',
       preReviewCount: 0,
       ...built,
     });
@@ -101,21 +101,21 @@ async function seedCourseCardText(
   });
 }
 
-function getCard(t: TestConvex<typeof schema>, cardId: Id<"cards">) {
+function getCard(t: TestConvex<typeof schema>, cardId: Id<'cards'>) {
   return t.run(async (ctx) => (await ctx.db.get(cardId))!);
 }
 
-describe("rebuildSearchableTextForText via storeTranslationAndScheduleTTS", () => {
-  it("adds a translation that lands after card creation, without a review", async () => {
+describe('rebuildSearchableTextForText via storeTranslationAndScheduleTTS', () => {
+  it('adds a translation that lands after card creation, without a review', async () => {
     const t = convexTest(schema, modules);
     const { textId, cardId } = await seedCourseCardText(t, {
-      sourceText: "你真的体贴",
-      sourceLanguage: "zh",
-      baseLanguages: ["en"],
-      targetLanguages: ["zh"],
+      sourceText: '你真的体贴',
+      sourceLanguage: 'zh',
+      baseLanguages: ['en'],
+      targetLanguages: ['zh'],
     });
     const before = await getCard(t, cardId);
-    expect(before.searchableText).not.toContain("considerate");
+    expect(before.searchableText).not.toContain('considerate');
     expect(before.searchableTextLanguages).toEqual([]);
 
     // A real curated voice: every text here has a card, so `skipTts` no
@@ -124,110 +124,110 @@ describe("rebuildSearchableTextForText via storeTranslationAndScheduleTTS", () =
     // module-mocked; nothing synthesizes.
     await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
       textId,
-      targetLanguage: "en",
-      translatedText: "You are really considerate",
-      voiceName: "en-US-Chirp3-HD-Leda",
+      targetLanguage: 'en',
+      translatedText: 'You are really considerate',
+      voiceName: 'en-US-Chirp3-HD-Leda',
       skipTts: true,
     });
     await drainScheduled(t);
 
     const after = await getCard(t, cardId);
-    expect(after.searchableText).toContain("considerate");
-    expect(after.searchableTextLanguages).toEqual(["en"]);
+    expect(after.searchableText).toContain('considerate');
+    expect(after.searchableTextLanguages).toEqual(['en']);
   });
 
-  it("replaces the search string on a retranslation of existing content", async () => {
+  it('replaces the search string on a retranslation of existing content', async () => {
     const t = convexTest(schema, modules);
     const { textId, cardId } = await seedCourseCardText(t, {
-      sourceText: "你真的体贴",
-      sourceLanguage: "zh",
-      baseLanguages: ["en"],
-      targetLanguages: ["zh"],
-      translation: { lang: "en", text: "You are really considerate" },
+      sourceText: '你真的体贴',
+      sourceLanguage: 'zh',
+      baseLanguages: ['en'],
+      targetLanguages: ['zh'],
+      translation: { lang: 'en', text: 'You are really considerate' },
     });
-    expect((await getCard(t, cardId)).searchableText).toContain("considerate");
+    expect((await getCard(t, cardId)).searchableText).toContain('considerate');
 
     await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
       textId,
-      targetLanguage: "en",
-      translatedText: "You are truly thoughtful",
-      voiceName: "en-US-Chirp3-HD-Leda",
+      targetLanguage: 'en',
+      translatedText: 'You are truly thoughtful',
+      voiceName: 'en-US-Chirp3-HD-Leda',
       replaceExisting: true,
       skipTts: true,
     });
     await drainScheduled(t);
 
     const after = await getCard(t, cardId);
-    expect(after.searchableText).toContain("thoughtful");
-    expect(after.searchableText).not.toContain("considerate");
+    expect(after.searchableText).toContain('thoughtful');
+    expect(after.searchableText).not.toContain('considerate');
   });
 
-  it("adds a romanization filled into an existing translation row", async () => {
+  it('adds a romanization filled into an existing translation row', async () => {
     const t = convexTest(schema, modules);
     const { textId, cardId } = await seedCourseCardText(t, {
-      sourceText: "How are you",
-      sourceLanguage: "en",
-      baseLanguages: ["en"],
-      targetLanguages: ["zh"],
-      translation: { lang: "zh", text: "你好吗" },
+      sourceText: 'How are you',
+      sourceLanguage: 'en',
+      baseLanguages: ['en'],
+      targetLanguages: ['zh'],
+      translation: { lang: 'zh', text: '你好吗' },
     });
-    expect((await getCard(t, cardId)).searchableText).not.toContain("nihaoma");
+    expect((await getCard(t, cardId)).searchableText).not.toContain('nihaoma');
 
     // Same (textId, lang) arriving again with a romanization → fill-if-missing
     // branch patches the row and must trigger the rebuild.
     await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
       textId,
-      targetLanguage: "zh",
-      translatedText: "你好吗",
-      voiceName: "cmn-CN-Chirp3-HD-Leda",
-      romanizedText: "nihaoma",
-      romanizationSource: "pinyin",
+      targetLanguage: 'zh',
+      translatedText: '你好吗',
+      voiceName: 'cmn-CN-Chirp3-HD-Leda',
+      romanizedText: 'nihaoma',
+      romanizationSource: 'pinyin',
       skipTts: true,
     });
     await drainScheduled(t);
 
-    expect((await getCard(t, cardId)).searchableText).toContain("nihaoma");
+    expect((await getCard(t, cardId)).searchableText).toContain('nihaoma');
   });
 });
 
-describe("rebuildSearchableTextForText via the romanization store mutations", () => {
-  it("adds a late source romanization (storeSourceAnnotation)", async () => {
+describe('rebuildSearchableTextForText via the romanization store mutations', () => {
+  it('adds a late source romanization (storeSourceAnnotation)', async () => {
     const t = convexTest(schema, modules);
     const { textId, cardId } = await seedCourseCardText(t, {
-      sourceText: "你真的体贴",
-      sourceLanguage: "zh",
-      baseLanguages: ["en"],
-      targetLanguages: ["zh"],
-      translation: { lang: "en", text: "You are really considerate" },
+      sourceText: '你真的体贴',
+      sourceLanguage: 'zh',
+      baseLanguages: ['en'],
+      targetLanguages: ['zh'],
+      translation: { lang: 'en', text: 'You are really considerate' },
     });
-    expect((await getCard(t, cardId)).searchableText).not.toContain("zhende");
+    expect((await getCard(t, cardId)).searchableText).not.toContain('zhende');
 
     await t.mutation(internal.features.decks.storeSourceAnnotation, {
       textId,
-      kind: "romanization",
-      value: "ni zhende titie",
-      source: "pinyin",
+      kind: 'romanization',
+      value: 'ni zhende titie',
+      source: 'pinyin',
     });
     await drainScheduled(t);
 
-    expect((await getCard(t, cardId)).searchableText).toContain("zhende");
+    expect((await getCard(t, cardId)).searchableText).toContain('zhende');
   });
 
   it("does not rebuild for the empty-string 'tried, failed' sentinel", async () => {
     const t = convexTest(schema, modules);
     const { textId, cardId } = await seedCourseCardText(t, {
-      sourceText: "你真的体贴",
-      sourceLanguage: "zh",
-      baseLanguages: ["en"],
-      targetLanguages: ["zh"],
+      sourceText: '你真的体贴',
+      sourceLanguage: 'zh',
+      baseLanguages: ['en'],
+      targetLanguages: ['zh'],
     });
     const before = await getCard(t, cardId);
 
     await t.mutation(internal.features.decks.storeSourceAnnotation, {
       textId,
-      kind: "romanization",
-      value: "",
-      source: "pinyin",
+      kind: 'romanization',
+      value: '',
+      source: 'pinyin',
     });
     await drainScheduled(t);
 
@@ -236,46 +236,46 @@ describe("rebuildSearchableTextForText via the romanization store mutations", ()
     );
   });
 
-  it("adds a late translation romanization (storeTranslationAnnotation)", async () => {
+  it('adds a late translation romanization (storeTranslationAnnotation)', async () => {
     const t = convexTest(schema, modules);
     const { textId, cardId } = await seedCourseCardText(t, {
-      sourceText: "How are you",
-      sourceLanguage: "en",
-      baseLanguages: ["en"],
-      targetLanguages: ["zh"],
-      translation: { lang: "zh", text: "你好吗" },
+      sourceText: 'How are you',
+      sourceLanguage: 'en',
+      baseLanguages: ['en'],
+      targetLanguages: ['zh'],
+      translation: { lang: 'zh', text: '你好吗' },
     });
-    expect((await getCard(t, cardId)).searchableText).not.toContain("nihaoma");
+    expect((await getCard(t, cardId)).searchableText).not.toContain('nihaoma');
 
     await t.mutation(internal.features.decks.storeTranslationAnnotation, {
       textId,
-      language: "zh",
-      kind: "romanization",
-      value: "nihaoma",
-      source: "pinyin",
+      language: 'zh',
+      kind: 'romanization',
+      value: 'nihaoma',
+      source: 'pinyin',
     });
     await drainScheduled(t);
 
-    expect((await getCard(t, cardId)).searchableText).toContain("nihaoma");
+    expect((await getCard(t, cardId)).searchableText).toContain('nihaoma');
   });
 });
 
-describe("scheduleSearchableTextRebuild: per-text debounce", () => {
-  it("coalesces a burst of stores into one pending rebuild that sees all content", async () => {
+describe('scheduleSearchableTextRebuild: per-text debounce', () => {
+  it('coalesces a burst of stores into one pending rebuild that sees all content', async () => {
     const t = convexTest(schema, modules);
     const { textId, cardId } = await seedCourseCardText(t, {
-      sourceText: "你真的体贴",
-      sourceLanguage: "zh",
-      baseLanguages: ["en"],
-      targetLanguages: ["zh"],
+      sourceText: '你真的体贴',
+      sourceLanguage: 'zh',
+      baseLanguages: ['en'],
+      targetLanguages: ['zh'],
     });
 
     // First store arms the debounce marker on the text row…
     await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
       textId,
-      targetLanguage: "en",
-      translatedText: "You are really considerate",
-      voiceName: "en-US-Chirp3-HD-Leda",
+      targetLanguage: 'en',
+      translatedText: 'You are really considerate',
+      voiceName: 'en-US-Chirp3-HD-Leda',
       skipTts: true,
     });
     const marker1 = (await t.run(async (ctx) => (await ctx.db.get(textId))!))
@@ -286,9 +286,9 @@ describe("scheduleSearchableTextRebuild: per-text debounce", () => {
     // no second schedule) instead of fanning out its own full rebuild.
     await t.mutation(internal.features.decks.storeSourceAnnotation, {
       textId,
-      kind: "romanization",
-      value: "ni zhende titie",
-      source: "pinyin",
+      kind: 'romanization',
+      value: 'ni zhende titie',
+      source: 'pinyin',
     });
     const marker2 = (await t.run(async (ctx) => (await ctx.db.get(textId))!))
       .searchableRebuildScheduledAt;
@@ -298,8 +298,8 @@ describe("scheduleSearchableTextRebuild: per-text debounce", () => {
     // BOTH writes of the burst; it also releases the marker.
     await drainScheduled(t);
     const after = await getCard(t, cardId);
-    expect(after.searchableText).toContain("considerate");
-    expect(after.searchableText).toContain("zhende");
+    expect(after.searchableText).toContain('considerate');
+    expect(after.searchableText).toContain('zhende');
     const text = await t.run(async (ctx) => (await ctx.db.get(textId))!);
     expect(text.searchableRebuildScheduledAt).toBeUndefined();
   });

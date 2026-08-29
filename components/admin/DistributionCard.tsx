@@ -38,9 +38,13 @@ export function DistributionCard({
         )}
       </div>
       {isLoading ? (
-        <div className="py-6 text-center text-muted-foreground text-sm">Loading…</div>
+        <div className="py-6 text-center text-muted-foreground text-sm">
+          Loading…
+        </div>
       ) : shown.length === 0 ? (
-        <div className="py-6 text-center text-muted-foreground text-sm">No data</div>
+        <div className="py-6 text-center text-muted-foreground text-sm">
+          No data
+        </div>
       ) : (
         <div className="space-y-2">
           {shown.map((row) => (
@@ -49,7 +53,10 @@ export function DistributionCard({
                 <span className="font-medium truncate">
                   {row.label}
                   {row.sublabel && (
-                    <span className="text-muted-foreground font-normal"> · {row.sublabel}</span>
+                    <span className="text-muted-foreground font-normal">
+                      {' '}
+                      · {row.sublabel}
+                    </span>
                   )}
                 </span>
                 <span className="tabular-nums text-muted-foreground ml-2 shrink-0">

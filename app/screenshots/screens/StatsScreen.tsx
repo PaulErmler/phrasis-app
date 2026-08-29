@@ -36,7 +36,7 @@ export function StatsScreen() {
             reviews={s.reps}
             sentences={s.sentences}
             timeMs={s.timeMs}
-            accuracySum={s.accuracyPct / 100 * 250}
+            accuracySum={(s.accuracyPct / 100) * 250}
             accuracyCount={250}
             languageWordCounts={[{ language: 'es', words: 2038 }]}
             todayReps={s.todayReps}

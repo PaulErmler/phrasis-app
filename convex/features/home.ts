@@ -87,8 +87,15 @@ export const getHomeSummary = query({
       await getPremadeLevelCollections(ctx);
 
     // --- Progress rows for the active course (one indexed scan) ------------
-    const progressRows = await getCollectionProgressForCourse(ctx, userId, course._id);
-    const progressByCollection = new Map<Id<'collections'>, Doc<'collectionProgress'>>();
+    const progressRows = await getCollectionProgressForCourse(
+      ctx,
+      userId,
+      course._id,
+    );
+    const progressByCollection = new Map<
+      Id<'collections'>,
+      Doc<'collectionProgress'>
+    >();
     for (const row of progressRows) {
       progressByCollection.set(row.collectionId, row);
     }

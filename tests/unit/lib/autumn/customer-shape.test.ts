@@ -138,8 +138,12 @@ describe('normalizePlans: the two wire families agree after normalization', () =
   });
 
   it('the auto-attached free plan is isDefault on both (is_default / auto_enable)', () => {
-    expect(only(normalizePlans({ products: [V1_FREE] }, NOW)).isDefault).toBe(true);
-    expect(only(normalizePlans({ subscriptions: [V2_FREE] }, NOW)).isDefault).toBe(true);
+    expect(only(normalizePlans({ products: [V1_FREE] }, NOW)).isDefault).toBe(
+      true,
+    );
+    expect(
+      only(normalizePlans({ subscriptions: [V2_FREE] }, NOW)).isDefault,
+    ).toBe(true);
   });
 
   it('a GRANDFATHERED free attachment with NO default flag is still isDefault', () => {
@@ -150,7 +154,16 @@ describe('normalizePlans: the two wire families agree after normalization', () =
     expect(
       only(
         normalizePlans(
-          { products: [{ id: 'free', status: 'active', is_default: false, is_add_on: false }] },
+          {
+            products: [
+              {
+                id: 'free',
+                status: 'active',
+                is_default: false,
+                is_add_on: false,
+              },
+            ],
+          },
           NOW,
         ),
       ).isDefault,
@@ -199,7 +212,9 @@ describe('normalizePlans: shape selection', () => {
   });
 
   it('normalizePlanList handles a bare array of either shape', () => {
-    expect(normalizePlanList([V1_TRIALING], NOW)[0].planId).toBe('basic_annual');
+    expect(normalizePlanList([V1_TRIALING], NOW)[0].planId).toBe(
+      'basic_annual',
+    );
     expect(normalizePlanList([V2_PAST_DUE], NOW)[0].isPastDue).toBe(true);
     expect(normalizePlanList(undefined, NOW)).toEqual([]);
   });
@@ -207,19 +222,31 @@ describe('normalizePlans: shape selection', () => {
 
 describe('normalizePlans: flags', () => {
   it('marks add-ons from either field name', () => {
-    expect(only(normalizePlanList([{ id: 'x', is_add_on: true }], NOW)).isAddOn).toBe(true);
-    expect(only(normalizePlanList([{ plan_id: 'x', add_on: true }], NOW)).isAddOn).toBe(true);
+    expect(
+      only(normalizePlanList([{ id: 'x', is_add_on: true }], NOW)).isAddOn,
+    ).toBe(true);
+    expect(
+      only(normalizePlanList([{ plan_id: 'x', add_on: true }], NOW)).isAddOn,
+    ).toBe(true);
   });
 
   it('marks expired and scheduled', () => {
-    expect(only(normalizePlanList([{ id: 'x', status: 'expired' }], NOW)).isExpired).toBe(true);
-    expect(only(normalizePlanList([{ id: 'x', status: 'scheduled' }], NOW)).isScheduled).toBe(true);
+    expect(
+      only(normalizePlanList([{ id: 'x', status: 'expired' }], NOW)).isExpired,
+    ).toBe(true);
+    expect(
+      only(normalizePlanList([{ id: 'x', status: 'scheduled' }], NOW))
+        .isScheduled,
+    ).toBe(true);
   });
 
   it('does not treat a plan whose trial already ended as trialing', () => {
     // Otherwise every plan that ever had a trial would read as trialing.
     const past = only(
-      normalizePlanList([{ plan_id: 'x', status: 'active', trial_ends_at: NOW - 1 }], NOW),
+      normalizePlanList(
+        [{ plan_id: 'x', status: 'active', trial_ends_at: NOW - 1 }],
+        NOW,
+      ),
     );
     expect(past.isTrialing).toBe(false);
   });
@@ -277,7 +304,9 @@ describe('currentPlans / findCurrentPaidPlan', () => {
   });
 
   it('falls back to a scheduled plan when it is the only candidate', () => {
-    expect(findCurrentPaidPlan(plans([{ id: 'next', status: 'scheduled' }]))?.planId).toBe('next');
+    expect(
+      findCurrentPaidPlan(plans([{ id: 'next', status: 'scheduled' }]))?.planId,
+    ).toBe('next');
   });
 
   it('returns undefined when only the free plan is attached', () => {

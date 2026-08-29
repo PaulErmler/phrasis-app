@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button';
 import { api } from '@/convex/_generated/api';
 import { authClient } from '@/lib/auth-client';
 
+import { reportError } from '@/lib/report-error';
+
 /**
  * Account deletion from settings. Required by App Store Guideline 5.1.1(v)
  * now that the app ships in the stores. Files a deletion request (support@
@@ -23,7 +25,9 @@ import { authClient } from '@/lib/auth-client';
  */
 export function DeleteAccountSection() {
   const t = useTranslations('AppPage.settings.deleteAccount');
-  const requestDeletion = useMutation(api.features.accountDeletion.requestAccountDeletion);
+  const requestDeletion = useMutation(
+    api.features.accountDeletion.requestAccountDeletion,
+  );
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -40,7 +44,7 @@ export function DeleteAccountSection() {
         },
       });
     } catch (err) {
-      console.error('Account deletion request failed:', err);
+      reportError(err, { op: 'deleteAccount' });
       toast.error(t('error'));
       setBusy(false);
     }

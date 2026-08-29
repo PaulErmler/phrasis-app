@@ -118,9 +118,11 @@ export function effectiveTextCount(
  */
 export function isCollectionComplete(
   textCount: number,
-  progress?:
-    | { cardsAdded?: number; ignoredCount?: number; legacyCarryAdded?: number }
-    | null,
+  progress?: {
+    cardsAdded?: number;
+    ignoredCount?: number;
+    legacyCarryAdded?: number;
+  } | null,
 ): boolean {
   return settledCount(progress) >= effectiveTextCount(textCount, progress);
 }
@@ -138,7 +140,10 @@ export function isCollectionComplete(
  * | advanced           | C1          | L14      | ~5,000              |
  * | proficient         | C2          | L17      | 8,000+              |
  */
-export const LEVEL_TO_COLLECTION: Record<string, { legacyName: string; code: string }> = {
+export const LEVEL_TO_COLLECTION: Record<
+  string,
+  { legacyName: string; code: string }
+> = {
   beginner: { legacyName: 'Essential', code: 'L01' },
   elementary: { legacyName: 'A2', code: 'L05' },
   intermediate: { legacyName: 'B1', code: 'L08' },
@@ -152,7 +157,9 @@ export const LEVEL_TO_COLLECTION: Record<string, { legacyName: string; code: str
  * row or a legacy CEFR row). Used by auto-add and content-fetch flows to
  * distinguish curriculum collections from user-owned custom/chat collections.
  */
-export function isPremadeLevelCollection(collection: Doc<'collections'>): boolean {
+export function isPremadeLevelCollection(
+  collection: Doc<'collections'>,
+): boolean {
   if (collection.datasetId) return true;
   return (LEGACY_LEVEL_ORDER as readonly string[]).includes(collection.name);
 }
@@ -164,9 +171,7 @@ export function isPremadeLevelCollection(collection: Doc<'collections'>): boolea
  */
 export function deriveLegacyCefrTier(name: string): string | null {
   if (name === 'Essential') return 'Pre-A1';
-  return (LEGACY_LEVEL_ORDER as readonly string[]).includes(name)
-    ? name
-    : null;
+  return (LEGACY_LEVEL_ORDER as readonly string[]).includes(name) ? name : null;
 }
 
 /**
@@ -215,7 +220,6 @@ export function canUserAccessCollectionText(
     ? !text.userCreated
     : text.userId === userId;
 }
-
 
 /**
  * The `collectionOrigin` values a study content filter admits.

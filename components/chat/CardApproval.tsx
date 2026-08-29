@@ -21,13 +21,15 @@ import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { useCourseLanguages } from '@/hooks/use-course-languages';
 import { cn } from '@/lib/utils';
 import { EditApprovalDialog } from './EditApprovalDialog';
+import { Ruby } from '@/components/app/learning/Ruby';
+import { furiganaDisplay } from '@/lib/furigana';
 import {
   ApprovalErrorAlert,
   ApprovalStreamingSkeleton,
   deriveApprovalToolState,
   useApprovalAudio,
   useOptimisticApprovalAction,
-  useShowIpa,
+  useApprovalDisplaySettings,
   type EntryAudio,
 } from './approvalCommon';
 
@@ -44,6 +46,7 @@ export interface CardApprovalProps {
       toolCallId: string;
       translations: { language: string; text: string }[];
       entryIpa?: Record<string, string>;
+      entryFurigana?: Record<string, string>;
       status: CardApprovalStatus;
     }
   >;
@@ -73,6 +76,8 @@ export function EntryLines({
   audio,
   ipaByLanguage,
   showIpa = false,
+  furiganaByLanguage,
+  showFurigana = true,
 }: {
   baseEntries: { language: string; text: string }[];
   targetEntries: { language: string; text: string }[];
@@ -90,6 +95,15 @@ export function EntryLines({
    * AppDataProvider, in the store-screenshot route (app/store-frames).
    */
   showIpa?: boolean;
+  /**
+   * Bracketed furigana per language (cardApprovals.entryFurigana), rendered
+   * as ruby over the sentence when `showFurigana` is on. `''` = nothing to
+   * annotate (hidden); an entry that no longer matches the (edited) text is
+   * rejected by parseFurigana and renders plain.
+   */
+  furiganaByLanguage?: Record<string, string>;
+  /** Furigana toggle (courseSettings.showFurigana; default ON). */
+  showFurigana?: boolean;
 }) {
   const renderLine = (
     entry: { language: string; text: string },
@@ -97,13 +111,26 @@ export function EntryLines({
     textClass: string,
   ) => {
     const ipa = showIpa ? ipaByLanguage?.[entry.language] : undefined;
+    // Ruby readings over the proposed sentence. The '' sentinel and
+    // annotations that no longer reconstruct an edited text both come back
+    // with null segments, so both fall back to the plain sentence.
+    const { segments: furiganaSegments, rubyClass } = furiganaDisplay(
+      showFurigana ? furiganaByLanguage?.[entry.language] : undefined,
+      entry.text,
+    );
     const line = (
       <div key={audio ? undefined : key}>
-        <p className={textClass}>
+        <p className={cn(textClass, rubyClass)}>
           <Lang code={entry.language} />{' '}
           {/* Own dir-scoped span: the Latin language label shares this <p>,
               so the sentence needs its own bidi context for RTL languages. */}
-          <span dir={getTextDirection(entry.language)}>{entry.text}</span>
+          <span dir={getTextDirection(entry.language)}>
+            {furiganaSegments ? (
+              <Ruby segments={furiganaSegments} />
+            ) : (
+              entry.text
+            )}
+          </span>
         </p>
         {ipa && <p className="text-ipa">/{ipa}/</p>}
       </div>
@@ -145,7 +172,7 @@ export function CardApproval({
 }: CardApprovalProps) {
   const { targetLanguages } = useCourseLanguages();
   const t = useTranslations('Chat.cardApproval');
-  const showIpa = useShowIpa();
+  const { showIpa, showFurigana } = useApprovalDisplaySettings();
   // Optimistic-with-rollback + paywall machine, shared with
   // AlsoCorrectApproval (approvalCommon.tsx). This box bills exactly one
   // quota, so `paywallFeature` reduces to an open flag.
@@ -163,7 +190,9 @@ export function CardApproval({
   };
   const { state: toolState, output: toolOutput } = tool;
 
-  const approval = toolCallId ? approvalsByToolCallId.get(toolCallId) : undefined;
+  const approval = toolCallId
+    ? approvalsByToolCallId.get(toolCallId)
+    : undefined;
   const entries =
     approval?.translations && approval.translations.length > 0
       ? approval.translations
@@ -197,8 +226,12 @@ export function CardApproval({
     return <ApprovalStreamingSkeleton label={t('creatingApproval')} />;
   }
 
-  const targetEntries = entries.filter((e) => targetLanguages.includes(e.language));
-  const baseEntries = entries.filter((e) => !targetLanguages.includes(e.language));
+  const targetEntries = entries.filter((e) =>
+    targetLanguages.includes(e.language),
+  );
+  const baseEntries = entries.filter(
+    (e) => !targetLanguages.includes(e.language),
+  );
 
   if (isWaiting && entries.length > 0) {
     return (
@@ -209,6 +242,8 @@ export function CardApproval({
             targetEntries={targetEntries}
             ipaByLanguage={approval?.entryIpa}
             showIpa={showIpa}
+            furiganaByLanguage={approval?.entryFurigana}
+            showFurigana={showFurigana}
           />
         </AlertDescription>
         <div className="flex items-center justify-end gap-2 h-8">
@@ -239,6 +274,8 @@ export function CardApproval({
             audio={entryAudio}
             ipaByLanguage={approval?.entryIpa}
             showIpa={showIpa}
+            furiganaByLanguage={approval?.entryFurigana}
+            showFurigana={showFurigana}
           />
           <div className="mt-3">
             <Shimmer duration={1.5}>{t('creatingApproval')}</Shimmer>
@@ -256,8 +293,10 @@ export function CardApproval({
       data-testid="card-approval"
       className={cn(
         'my-3 flex flex-col gap-3',
-        isApproved && 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950',
-        approvalState === 'rejected' && 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950',
+        isApproved &&
+          'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950',
+        approvalState === 'rejected' &&
+          'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950',
       )}
     >
       <AlertDescription>
@@ -267,6 +306,8 @@ export function CardApproval({
           audio={entryAudio}
           ipaByLanguage={approval?.entryIpa}
           showIpa={showIpa}
+          furiganaByLanguage={approval?.entryFurigana}
+          showFurigana={showFurigana}
         />
       </AlertDescription>
       <div className="flex w-full items-center gap-2 h-8">
@@ -317,7 +358,9 @@ export function CardApproval({
               'h-8 px-3 text-xs font-medium hover:bg-transparent disabled:opacity-100',
               isApproved ? 'text-success' : 'text-red-700 dark:text-red-300',
             )}
-            {...(isApproved ? { 'data-testid': 'card-approved-indicator' } : {})}
+            {...(isApproved
+              ? { 'data-testid': 'card-approved-indicator' }
+              : {})}
           >
             {isApproved ? t('approved') : t('rejected')}
           </Button>

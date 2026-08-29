@@ -37,7 +37,9 @@ function StatColumn({
   return (
     <div className="flex flex-col items-center text-center gap-1">
       <div className="text-muted-foreground">{icon}</div>
-      <p className="text-lg font-semibold tabular-nums leading-tight whitespace-nowrap">{value}</p>
+      <p className="text-lg font-semibold tabular-nums leading-tight whitespace-nowrap">
+        {value}
+      </p>
       <p className="text-muted-xs leading-none">{label}</p>
       {today && (
         <p className="text-xs font-medium text-primary tabular-nums leading-none mt-0.5 whitespace-nowrap">
@@ -57,7 +59,10 @@ function ProgressStatsCardMock() {
     <div className="space-y-2">
       <div className="card-surface overflow-hidden">
         <div className="h-1 bg-muted">
-          <div className="h-full transition-all" style={{ width: '62%', backgroundColor: tierColor }} />
+          <div
+            className="h-full transition-all"
+            style={{ width: '62%', backgroundColor: tierColor }}
+          />
         </div>
 
         <div className="space-y-3 p-4">
@@ -80,7 +85,10 @@ function ProgressStatsCardMock() {
           <div className="flex items-end gap-4">
             <div className="flex flex-col items-center gap-0.5">
               <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-streak-active/15">
-                <Flame className="h-5 w-5" style={{ color: 'var(--streak-active)' }} />
+                <Flame
+                  className="h-5 w-5"
+                  style={{ color: 'var(--streak-active)' }}
+                />
               </div>
               <span
                 className="text-lg font-bold tabular-nums leading-tight"
@@ -88,7 +96,9 @@ function ProgressStatsCardMock() {
               >
                 {s.streak}
               </span>
-              <span className="text-muted-xs leading-none">{t('stats.streak')}</span>
+              <span className="text-muted-xs leading-none">
+                {t('stats.streak')}
+              </span>
             </div>
 
             <div className="w-px self-stretch bg-border" />
@@ -156,8 +166,18 @@ function ProgressStatsCardMock() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <div className="flex w-full rounded-lg border bg-muted/50 p-0.5 sm:flex-1">
               {[
-                { mode: 'audio', icon: Headphones, label: t('audioReview'), active: true },
-                { mode: 'full', icon: PenLine, label: t('fullReview'), active: false },
+                {
+                  mode: 'audio',
+                  icon: Headphones,
+                  label: t('audioReview'),
+                  active: true,
+                },
+                {
+                  mode: 'full',
+                  icon: PenLine,
+                  label: t('fullReview'),
+                  active: false,
+                },
               ].map(({ mode, icon: Icon, label, active }) => (
                 <button
                   key={mode}
@@ -169,7 +189,9 @@ function ProgressStatsCardMock() {
                   }
                 >
                   <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  <span className="min-w-0 text-center leading-snug">{label}</span>
+                  <span className="min-w-0 text-center leading-snug">
+                    {label}
+                  </span>
                 </button>
               ))}
             </div>
@@ -194,10 +216,17 @@ function HomeChatInputMock() {
           dir="auto"
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
-        <button type="button" className="rounded-md p-1.5 text-muted-foreground">
+        <button
+          type="button"
+          className="rounded-md p-1.5 text-muted-foreground"
+        >
           <Mic className="h-4 w-4" />
         </button>
-        <button type="button" aria-label="Send" className="rounded-md p-1.5 text-primary-foreground bg-primary/40">
+        <button
+          type="button"
+          aria-label="Send"
+          className="rounded-md p-1.5 text-primary-foreground bg-primary/40"
+        >
           <ArrowUp className="h-4 w-4" />
         </button>
       </div>
@@ -208,7 +237,11 @@ function HomeChatInputMock() {
 /** Mirror of the SegmentedHomeSection CEFR rail + active collection card. */
 function CollectionsMock() {
   const t = useTranslations('AppPage.collections.carousel');
-  const groups: { cefr: keyof typeof CEFR_COLORS; pct: number; levels: { label: string; pct: number; focused?: boolean }[] }[] = [
+  const groups: {
+    cefr: keyof typeof CEFR_COLORS;
+    pct: number;
+    levels: { label: string; pct: number; focused?: boolean }[];
+  }[] = [
     {
       cefr: 'A1',
       pct: 1,
@@ -240,7 +273,9 @@ function CollectionsMock() {
   return (
     <Tabs value="premade" className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2 px-1">
-        <h2 className="heading-section min-w-0 truncate">{t('sectionTitle')}</h2>
+        <h2 className="heading-section min-w-0 truncate">
+          {t('sectionTitle')}
+        </h2>
         <TabsList className="shrink-0">
           <TabsTrigger value="premade">{t('tabPremade')}</TabsTrigger>
           <TabsTrigger value="custom">{t('tabCustom')}</TabsTrigger>
@@ -251,8 +286,14 @@ function CollectionsMock() {
         {groups.map((g) => (
           <div key={g.cefr} className="flex shrink-0 flex-col gap-1.5">
             <div className="flex items-center gap-1.5 px-0.5">
-              <span className="size-2 rounded-full" style={{ backgroundColor: CEFR_COLORS[g.cefr] }} aria-hidden />
-              <span className="font-mono text-[10px] font-bold tracking-widest text-foreground">{g.cefr}</span>
+              <span
+                className="size-2 rounded-full"
+                style={{ backgroundColor: CEFR_COLORS[g.cefr] }}
+                aria-hidden
+              />
+              <span className="font-mono text-[10px] font-bold tracking-widest text-foreground">
+                {g.cefr}
+              </span>
               <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
                 {Math.round(g.pct * 100)}%
               </span>
@@ -287,7 +328,10 @@ function CollectionsMock() {
       {/* Active collection detail (CollectionCarouselUI.tsx InlineCollectionDetail) */}
       <div className="rounded-xl border-2 bg-card overflow-hidden">
         <div className="h-1.5 bg-muted">
-          <div className="h-full transition-all bg-primary" style={{ width: '62%' }} />
+          <div
+            className="h-full transition-all bg-primary"
+            style={{ width: '62%' }}
+          />
         </div>
         <div className="p-3 space-y-2.5">
           <div className="flex items-center justify-between">
@@ -301,7 +345,9 @@ function CollectionsMock() {
               </span>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">{t('descriptions.A2_1')}</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {t('descriptions.A2_1')}
+          </p>
           <div className="flex gap-3 text-xs">
             <div className="flex items-center gap-1">
               <Layers className="h-3 w-3 text-muted-foreground" />
@@ -321,7 +367,12 @@ function CollectionsMock() {
 export function HomeScreen() {
   const t = useTranslations('AppPage');
   return (
-    <PhoneShell activeView="home" courseLabel={t('currentCourseWithLanguages', { targetLanguages: 'Spanish' })}>
+    <PhoneShell
+      activeView="home"
+      courseLabel={t('currentCourseWithLanguages', {
+        targetLanguages: 'Spanish',
+      })}
+    >
       <div className="scroll-view" style={{ scrollbarGutter: 'stable' }}>
         <div className="app-view">
           <ProgressStatsCardMock />

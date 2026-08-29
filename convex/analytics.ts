@@ -43,8 +43,26 @@ export const EVENTS = {
   // Onboarding
   ONBOARDING_COMPLETED: 'onboarding_completed',
 
-  // AI cost. See convex/lib/posthogAi.ts
+  // AI cost. See convex/lib/posthogAi.ts for how a capture picks between
+  // these two: `$ai_generation` is PostHog's metered AI-observability event
+  // (reserved for the low-volume, per-user conversational features);
+  // `ai_cost` is a plain product-analytics event carrying the same fields
+  // for the high-volume content-pipeline spend, where the LLM-analytics UI
+  // adds nothing but the per-event metering is real money.
   AI_GENERATION: '$ai_generation',
+  AI_COST: 'ai_cost',
+
+  // One event per PAID Stripe invoice, with the actual gross / tax /
+  // Stripe-fee / net amounts, emitted by the daily reconciliation sweep in
+  // convex/features/paymentSync.ts. The revenue side of the margin
+  // dashboards; replaces list-price assumptions with what was really paid.
+  PAYMENT_RECORDED: 'payment_recorded',
+
+  // Latest Convex invoice total, re-emitted daily by
+  // convex/features/infraCostSync.ts. Dashboards read the LATEST value
+  // (argMax by timestamp), so the daily re-emission is idempotent by
+  // construction and needs no dedup ledger.
+  INFRA_COST_RECORDED: 'infra_cost_recorded',
 } as const;
 
 /**
@@ -118,7 +136,11 @@ export async function trackException(
   additionalProperties?: Record<string, unknown>,
 ): Promise<void> {
   try {
-    await posthog.captureException(ctx, { error, distinctId, additionalProperties });
+    await posthog.captureException(ctx, {
+      error,
+      distinctId,
+      additionalProperties,
+    });
   } catch (captureError) {
     console.error('[analytics] failed to capture exception', captureError);
   }

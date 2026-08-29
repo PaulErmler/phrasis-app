@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useMutation, useQuery } from 'convex/react';
+import { usePreloadedQuery, useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
 import { HomeChatInput } from '@/components/chat/HomeChatInput';
 import { SegmentedHomeSection } from '@/components/app/segmented/SegmentedHomeSection';
 import { ProgressStatsCard } from '@/components/app/ProgressStatsCard';
+import { WorkloadForecastCard } from '@/components/app/forecast/WorkloadForecastCard';
 import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { useTutorial } from '@/lib/tutorials/use-tutorial';
@@ -16,6 +17,8 @@ import { MessageSquare, PenLine, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import type { ReviewMode, SchedulingMode } from '@/convex/types';
+
+import { reportError } from '@/lib/report-error';
 
 // Module-level guard so the all-modes content warm fires at most once per
 // course per page session (not on every HomeView re-render or remount). Keyed
@@ -47,7 +50,8 @@ export function HomeView({
 }) {
   const t = useTranslations('AppPage');
 
-  const { courseSettings } = useAppData();
+  const { courseSettings, preloadedSettings } = useAppData();
+  const userSettings = usePreloadedQuery(preloadedSettings);
 
   const { restartTutorial } = useTutorial(TUTORIAL_IDS.HOME_TOUR, {
     delayMs: 1200,
@@ -69,7 +73,15 @@ export function HomeView({
     // Anchors the free-play step to the button that actually renders:
     // Radio (Shadowing) vs Free Study (Writing). Matches the face chosen in
     // StartLearningButton, which sets `data-tutorial` from the same field.
-    context: { reviewMode: courseSettings?.reviewMode ?? 'audio' },
+    // `hideDueCounts` drops the pills step when those pills are not on
+    // screen; `hideWorkloadForecast` does the same for the forecast step.
+    // Both surfaces show only on an explicit `false` (off by default), so
+    // the steps are dropped unless the user opted in.
+    context: {
+      reviewMode: courseSettings?.reviewMode ?? 'audio',
+      hideDueCounts: userSettings?.hideDueCounts !== false,
+      hideWorkloadForecast: userSettings?.hideWorkloadForecast !== false,
+    },
   });
 
   useEffect(() => {
@@ -102,7 +114,7 @@ export function HomeView({
 
     warmedCourseIds.add(courseId);
     ensureAllModesContent().catch((error) => {
-      console.error('Failed to ensure upcoming cards content:', error);
+      reportError(error, { op: 'ensureAllModesContent' });
       warmedCourseIds.delete(courseId);
     });
   }, [isHidden, courseId, ensureAllModesContent]);
@@ -118,7 +130,7 @@ export function HomeView({
       const threadId = await getOrCreateEmptyThread({});
       onChatOpen(threadId);
     } catch (error) {
-      console.error('Failed to open chat:', error);
+      reportError(error, { op: 'openChatFromHome' });
       toast.error(t('content.chat.openError'));
     } finally {
       setIsChatNavigating(false);
@@ -142,7 +154,7 @@ export function HomeView({
             schedulingMode,
           });
         } catch (error) {
-          console.error('Failed to update scheduling mode:', error);
+          reportError(error, { op: 'updateSchedulingMode' });
         }
       }
 
@@ -161,7 +173,7 @@ export function HomeView({
           courseId: courseSettings.courseId,
           reviewMode: mode,
         }).catch((error) => {
-          console.error('Failed to update review mode:', error);
+          reportError(error, { op: 'updateReviewMode' });
         });
       }
     },
@@ -170,29 +182,33 @@ export function HomeView({
 
   if (!hasActiveCourse) {
     return (
-      <div
-        className="scroll-view"
-        style={{ scrollbarGutter: 'stable' }}
-      >
+      <div className="scroll-view" style={{ scrollbarGutter: 'stable' }}>
         <NoCourseEmptyState onOpenCourseMenu={onOpenCourseMenu} />
       </div>
     );
   }
 
   return (
-    <div
-      className="scroll-view"
-      style={{ scrollbarGutter: 'stable' }}
-    >
+    <div className="scroll-view" style={{ scrollbarGutter: 'stable' }}>
       <div className="app-view">
         <ProgressStatsCard
-          key={courseSettings?.courseId}
+          key={`progress-${courseSettings?.courseId}`}
           onStartLearn={handleStartLearn}
           onReviewModeChange={handleReviewModeChange}
           animateEntrance={animateEntrance}
           skipLiveStats={isHidden}
           courseId={courseSettings?.courseId}
           hasPlayableCards={hasPlayableCards ?? true}
+        />
+
+        {/* 7-day workload forecast. Hidden with the due-count pills
+            (hideDueCounts); pauses its subscription while home is hidden.
+            Keyed on courseId (distinct prefix from ProgressStatsCard —
+            siblings must not share a key) so a course switch remounts it
+            and resets the what-if stepper instead of carrying it over. */}
+        <WorkloadForecastCard
+          key={`workload-${courseSettings?.courseId}`}
+          skip={isHidden}
         />
 
         {/* Content actions */}
@@ -234,7 +250,6 @@ export function HomeView({
             onNavigateToChat={onNavigateToChat}
           />
         </div>
-
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { v } from 'convex/values';
 import { internalMutation, internalQuery } from '../_generated/server';
+import { assertTestHooksEnabled } from '../lib/testHooks';
 
 /**
  * E2E test hooks for transactional auth emails (verification + password
@@ -14,14 +15,6 @@ import { internalMutation, internalQuery } from '../_generated/server';
  * (see fetchAuthEmail in e2e/helpers.ts).
  */
 
-function assertTestHooksEnabled(): void {
-  if (process.env.E2E_TEST_HOOKS !== '1') {
-    throw new Error(
-      'E2E test hooks are disabled (set E2E_TEST_HOOKS=1 on a dev deployment)',
-    );
-  }
-}
-
 /**
  * Capture hook for lib/authEmails.ts: the Better Auth send callbacks run
  * in an HTTP action ctx (no direct db access), so the capture write goes
@@ -30,7 +23,11 @@ function assertTestHooksEnabled(): void {
 export const captureAuthEmail = internalMutation({
   args: {
     email: v.string(),
-    kind: v.union(v.literal('verify'), v.literal('reset'), v.literal('welcome')),
+    kind: v.union(
+      v.literal('verify'),
+      v.literal('reset'),
+      v.literal('welcome'),
+    ),
     url: v.optional(v.string()),
     otp: v.optional(v.string()),
     subject: v.string(),
@@ -57,7 +54,11 @@ export const captureAuthEmail = internalMutation({
 export const latestAuthEmail = internalQuery({
   args: {
     email: v.string(),
-    kind: v.union(v.literal('verify'), v.literal('reset'), v.literal('welcome')),
+    kind: v.union(
+      v.literal('verify'),
+      v.literal('reset'),
+      v.literal('welcome'),
+    ),
   },
   returns: v.union(
     v.null(),

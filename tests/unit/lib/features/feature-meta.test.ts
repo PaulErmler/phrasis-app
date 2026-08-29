@@ -8,7 +8,10 @@ import {
   isFeatureHidden,
   getFeaturePaywallKey,
 } from '@/lib/features/feature-meta';
-import { FEATURE_IDS, isCreditBackedFeature } from '@/convex/features/featureIds';
+import {
+  FEATURE_IDS,
+  isCreditBackedFeature,
+} from '@/convex/features/featureIds';
 
 describe('feature-meta helpers', () => {
   it('exposes metadata for every FEATURE_IDS entry', () => {
@@ -35,7 +38,9 @@ describe('feature-meta helpers', () => {
 
   it('isFeatureDisplayedAsUnlimited matches config', () => {
     expect(isFeatureDisplayedAsUnlimited(FEATURE_IDS.SENTENCES)).toBe(true);
-    expect(isFeatureDisplayedAsUnlimited(FEATURE_IDS.CHAT_MESSAGES)).toBe(false);
+    expect(isFeatureDisplayedAsUnlimited(FEATURE_IDS.CHAT_MESSAGES)).toBe(
+      false,
+    );
     expect(isFeatureDisplayedAsUnlimited('bogus')).toBe(false);
   });
 

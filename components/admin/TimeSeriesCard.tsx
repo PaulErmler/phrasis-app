@@ -1,7 +1,11 @@
 'use client';
 
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { ChartContainer, ChartTooltip, type ChartConfig } from '@/components/ui/chart';
+import {
+  ChartContainer,
+  ChartTooltip,
+  type ChartConfig,
+} from '@/components/ui/chart';
 
 export interface TimeSeriesPoint {
   date: string; // "YYYY-MM-DD"
@@ -54,7 +58,9 @@ export function TimeSeriesCard({
         <p className="font-medium text-muted-foreground mb-1">{point.date}</p>
         <p className="tabular-nums font-medium">
           {point.value.toLocaleString()}{' '}
-          <span className="text-muted-foreground font-normal">{valueLabel}</span>
+          <span className="text-muted-foreground font-normal">
+            {valueLabel}
+          </span>
         </p>
         {point.extra &&
           Object.entries(point.extra).map(([key, value]) => (
@@ -80,7 +86,10 @@ export function TimeSeriesCard({
         </div>
       ) : (
         <ChartContainer config={chartConfig} className="h-[180px] w-full">
-          <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+          <AreaChart
+            data={chartData}
+            margin={{ top: 4, right: 4, bottom: 0, left: 4 }}
+          >
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis
               dataKey="label"
@@ -99,8 +108,16 @@ export function TimeSeriesCard({
             <ChartTooltip content={renderTooltip} />
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.02} />
+                <stop
+                  offset="5%"
+                  stopColor="var(--primary)"
+                  stopOpacity={0.2}
+                />
+                <stop
+                  offset="95%"
+                  stopColor="var(--primary)"
+                  stopOpacity={0.02}
+                />
               </linearGradient>
             </defs>
             <Area

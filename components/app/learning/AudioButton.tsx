@@ -6,6 +6,8 @@ import { Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { getLanguageShortLabel } from '@/lib/languages';
 import { computeAttenuation, getPeak } from '@/lib/audio/peakCache';
 
+import { reportError } from '@/lib/report-error';
+
 /**
  * How long a generate click may hold the spinner while waiting for the URL.
  * TTS can fail terminally without any signal reaching this component (the
@@ -66,7 +68,7 @@ export interface AudioButtonProps {
   url: string | null;
   /** Canonical language code (e.g. "en", "es_latam"). Broadcast verbatim through onTimeUpdate/onStop so consumers can match against translation.language. The visible label is derived via getLanguageShortLabel. */
   language: string;
-  /** Show a text label next to the icon (used in DeckCardsView). Default: false */
+  /** Show a text label next to the icon. Default: false */
   showLabel?: boolean;
   /** If true, immediately stop current playback and prevent new playback. */
   stopPlayback?: boolean;
@@ -236,7 +238,7 @@ export function AudioButton({
         resetGenerating(true);
       }
     } catch (error) {
-      console.error('Error requesting audio generation:', error);
+      reportError(error, { op: 'generateCardAudio' });
       resetGenerating(true);
     }
     // On success we stay in the generating state. The reactive query
@@ -305,7 +307,10 @@ export function AudioButton({
           peakTarget.volume = computeAttenuation(peak);
         }
       } catch (peakErr) {
-        console.warn('Peak measurement failed; playing at native volume', peakErr);
+        console.warn(
+          'Peak measurement failed; playing at native volume',
+          peakErr,
+        );
       }
       // Always start from the beginning. Rewinding only when `ended` left the
       // interrupted case broken: an element paused mid-clip (by the toggle, by
@@ -317,6 +322,8 @@ export function AudioButton({
       isPlayingRef.current = true;
       setIsPlaying(true);
     } catch (error) {
+      // Deliberately not reportError: `play()` rejections here are the
+      // autoplay-policy/interruption class (see lib/report-error).
       console.error('Error playing audio:', error);
     } finally {
       playInFlightRef.current = false;
@@ -424,7 +431,9 @@ export function AudioButton({
         className="gap-1 text-muted-foreground"
       >
         <Loader2 className="h-3 w-3 animate-spin" />
-        <span className="text-xs">Generating {getLanguageShortLabel(language)}...</span>
+        <span className="text-xs">
+          Generating {getLanguageShortLabel(language)}...
+        </span>
       </Button>
     );
   }

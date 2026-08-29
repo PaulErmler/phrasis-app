@@ -1,13 +1,14 @@
 import { getRequestConfig } from 'next-intl/server';
-import { getUserLocale } from './locale';
+import { getUserLocale, type Locale } from './locale';
+import en from '../messages/en.json';
+import de from '../messages/de.json';
+
+const catalogs = { en, de } satisfies Record<Locale, typeof en>;
 
 export default getRequestConfig(async () => {
   const locale = await getUserLocale();
 
-  const [mainMessages, authMessages, landingMessages] = await Promise.all([
-    import(`../messages/${locale}.json`)
-      .then((m) => m.default)
-      .catch(() => import('../messages/en.json').then((m) => m.default)),
+  const [authMessages, landingMessages] = await Promise.all([
     import(`../messages/authentication/${locale}.json`)
       .then((m) => m.default)
       .catch(() => ({})),
@@ -19,9 +20,11 @@ export default getRequestConfig(async () => {
   return {
     locale,
     messages: {
-      ...mainMessages,
+      ...catalogs[locale],
       ...(Object.keys(authMessages).length > 0 && { Auth: authMessages.Auth }),
-      ...(Object.keys(landingMessages).length > 0 && { LandingPage: landingMessages }),
+      ...(Object.keys(landingMessages).length > 0 && {
+        LandingPage: landingMessages,
+      }),
     },
     timeZone: 'UTC',
   };

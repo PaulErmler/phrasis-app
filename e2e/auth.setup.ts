@@ -1,12 +1,12 @@
-import { test, type Page } from "@playwright/test";
-import fs from "node:fs";
-import path from "node:path";
-import crypto from "node:crypto";
+import { test, type Page } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
 import {
   completeEmailVerification,
   completeOnboardingFresh,
   type OnboardingWalkOptions,
-} from "./helpers";
+} from './helpers';
 
 /**
  * Setup project. Runs before every chromium spec.
@@ -58,14 +58,14 @@ import {
  * it, which signs the fresh user in.
  */
 
-test.describe.configure({ mode: "serial" });
+test.describe.configure({ mode: 'serial' });
 
-const STORAGE_STATE_A = path.resolve(__dirname, ".auth/user.json");
-const STORAGE_STATE_B = path.resolve(__dirname, ".auth/user-b.json");
-const CREDENTIALS_DIR = path.resolve(__dirname, ".auth");
+const STORAGE_STATE_A = path.resolve(__dirname, '.auth/user.json');
+const STORAGE_STATE_B = path.resolve(__dirname, '.auth/user-b.json');
+const CREDENTIALS_DIR = path.resolve(__dirname, '.auth');
 
 function generateCredentials(prefix: string) {
-  const random = crypto.randomBytes(6).toString("hex");
+  const random = crypto.randomBytes(6).toString('hex');
   return {
     // Shape is load-bearing: `isE2EFixtureAddress` (convex/lib/authEmails.ts)
     // matches it to suppress the deferred welcome / signup-notification mails,
@@ -80,8 +80,8 @@ async function fillSignUp(
   page: Page,
   creds: { email: string; password: string; name: string },
 ) {
-  await page.goto("/auth/sign-up");
-  await page.waitForLoadState("domcontentloaded");
+  await page.goto('/auth/sign-up');
+  await page.waitForLoadState('domcontentloaded');
 
   // The sign-up form predates this testid initiative and still uses
   // ARIA labels; signing in correctly is verified by the resulting redirect
@@ -104,14 +104,16 @@ async function fillSignUp(
   // count() check. The banner mounts only after the PostHog SDK boots, so
   // the instant check raced it and consent stayed 'pending' in the saved
   // storageState, leaving the banner to intercept clicks in dependent specs.
-  const acceptCookies = page.getByTestId("consent-accept").first();
+  const acceptCookies = page.getByTestId('consent-accept').first();
   await acceptCookies
-    .waitFor({ state: "visible", timeout: 5_000 })
+    .waitFor({ state: 'visible', timeout: 5_000 })
     .then(() => acceptCookies.click())
     .catch(() => {}); // no banner: PostHog key absent or already answered
 
   await page
-    .getByRole("button", { name: /create an account|create account|^sign\s*up$/i })
+    .getByRole('button', {
+      name: /create an account|create account|^sign\s*up$/i,
+    })
     .click();
 
   // Verification required: the submit does not create a session. Enter the
@@ -127,7 +129,7 @@ async function signUpAndOnboard(
 ) {
   const creds = generateCredentials(prefix);
   test.info().annotations.push({
-    type: "auth",
+    type: 'auth',
     description: `Creating fresh test user ${creds.email} (walk=${prefix})`,
   });
 
@@ -143,19 +145,21 @@ async function signUpAndOnboard(
   );
 }
 
-test("authenticate user A (default 'completely-new' walk)", async ({ page }) => {
+test("authenticate user A (default 'completely-new' walk)", async ({
+  page,
+}) => {
   // Default walk: proficiency=new, skip lesson. Exercises the most common
   // path through the wizard and produces the primary shared session.
-  await signUpAndOnboard(page, "a", STORAGE_STATE_A, {});
+  await signUpAndOnboard(page, 'a', STORAGE_STATE_A, {});
 });
 
-test("authenticate user B (placement-test branch walk)", async ({ page }) => {
+test('authenticate user B (placement-test branch walk)', async ({ page }) => {
   // Placement-test branch. Answers every question as "I didn't know" so the
   // strategy resolves to ~L01 deterministically. Exercises
   // `enqueueMissingPlacementTranslations`, `getPlacementSentence`, and the
   // staircase loop in one go.
-  await signUpAndOnboard(page, "b", STORAGE_STATE_B, {
-    proficiency: "test",
-    placementAnswer: "didnt",
+  await signUpAndOnboard(page, 'b', STORAGE_STATE_B, {
+    proficiency: 'test',
+    placementAnswer: 'didnt',
   });
 });

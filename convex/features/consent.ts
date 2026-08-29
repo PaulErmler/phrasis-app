@@ -1,7 +1,11 @@
 import { v } from 'convex/values';
 
 import { mutation } from '../_generated/server';
-import { getUserSettings, requireAuthUserId } from '../db/users';
+import {
+  getUserSettings,
+  insertUserSettings,
+  requireAuthUserId,
+} from '../db/users';
 
 /**
  * Mirror the browser's analytics-consent choice onto the account.
@@ -35,7 +39,7 @@ export const setAnalyticsConsent = mutation({
     // No settings row yet (consent can be answered before onboarding creates
     // one). Only `finalizeOnboarding` may flip `hasCompletedOnboarding` true,
     // so a fresh row starts false, same rule as the course-creation upsert.
-    await ctx.db.insert('userSettings', {
+    await insertUserSettings(ctx, {
       userId,
       hasCompletedOnboarding: false,
       analyticsConsent: args.granted,

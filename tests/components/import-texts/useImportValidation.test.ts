@@ -37,9 +37,7 @@ describe('validateRows', () => {
 
   it('flags over-length cells', () => {
     const long = 'x'.repeat(MAX_CARD_TEXT_LENGTH + 1);
-    const r = validateRows(
-      baseOpts({ rows: [[long, 'Hola']] }),
-    );
+    const r = validateRows(baseOpts({ rows: [[long, 'Hola']] }));
     expect(r.errorCount).toBe(1);
     const s = r.statuses[0];
     expect(s.kind).toBe('error');
@@ -50,9 +48,7 @@ describe('validateRows', () => {
 
   it('treats length exactly MAX_CARD_TEXT_LENGTH as valid', () => {
     const atMax = 'y'.repeat(MAX_CARD_TEXT_LENGTH);
-    const r = validateRows(
-      baseOpts({ rows: [[atMax, 'Hola']] }),
-    );
+    const r = validateRows(baseOpts({ rows: [[atMax, 'Hola']] }));
     expect(r.validCount).toBe(1);
     expect(r.errorCount).toBe(0);
   });
@@ -119,7 +115,9 @@ describe('validateRows', () => {
     const s = r.statuses[0];
     expect(s.kind).toBe('error');
     if (s.kind === 'error') {
-      expect(s.reasons.some((x) => x.code === 'EMPTY_CELL' && x.language === 'es')).toBe(true);
+      expect(
+        s.reasons.some((x) => x.code === 'EMPTY_CELL' && x.language === 'es'),
+      ).toBe(true);
     }
   });
 });

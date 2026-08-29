@@ -1,5 +1,5 @@
-import { test, expect } from "@playwright/test";
-import { dismissTour } from "./helpers";
+import { test, expect } from '@playwright/test';
+import { dismissTour } from './helpers';
 
 /**
  * Chat smoke. Opens the chat surface and checks the message input renders.
@@ -15,16 +15,16 @@ import { dismissTour } from "./helpers";
  * we navigate to a placeholder threadId; the layout's parser tolerates
  * arbitrary ids and the SimplifiedChatView will render with no messages.
  */
-test.describe("chat", () => {
-  test("home surfaces the new-chat input control", async ({ page }) => {
+test.describe('chat', () => {
+  test('home surfaces the new-chat input control', async ({ page }) => {
     // The chat entry point on the authed home is a NewChatInput on /app
     // with placeholder "What would you like to know?". /app/chat itself
     // requires a real thread id, so we don't navigate there directly.
-    await page.goto("/app");
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto('/app');
+    await page.waitForLoadState('domcontentloaded');
     await dismissTour(page);
 
-    const input = page.getByTestId("chat-new-input").first();
+    const input = page.getByTestId('chat-new-input').first();
     await expect(input).toBeVisible({ timeout: 20_000 });
   });
 });

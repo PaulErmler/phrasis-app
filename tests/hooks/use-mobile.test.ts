@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 function setup(width: number) {
   let listener: ((e: MediaQueryListEvent) => void) | null = null;
   const mql = {
     matches: width < 768,
-    media: "",
+    media: '',
     onchange: null,
     addEventListener: (_: string, l: (e: MediaQueryListEvent) => void) => {
       listener = l;
@@ -17,7 +17,7 @@ function setup(width: number) {
     dispatchEvent: vi.fn(),
   };
   window.matchMedia = vi.fn().mockReturnValue(mql);
-  Object.defineProperty(window, "innerWidth", {
+  Object.defineProperty(window, 'innerWidth', {
     writable: true,
     configurable: true,
     value: width,
@@ -30,24 +30,24 @@ function setup(width: number) {
   };
 }
 
-describe("useIsMobile", () => {
+describe('useIsMobile', () => {
   beforeEach(() => {
     setup(1024);
   });
 
-  it("returns false on desktop widths", () => {
+  it('returns false on desktop widths', () => {
     setup(1024);
     const { result } = renderHook(() => useIsMobile());
     expect(result.current).toBe(false);
   });
 
-  it("returns true on mobile widths", () => {
+  it('returns true on mobile widths', () => {
     setup(500);
     const { result } = renderHook(() => useIsMobile());
     expect(result.current).toBe(true);
   });
 
-  it("updates when width changes", () => {
+  it('updates when width changes', () => {
     const ctrl = setup(1024);
     const { result } = renderHook(() => useIsMobile());
     expect(result.current).toBe(false);

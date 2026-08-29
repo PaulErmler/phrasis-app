@@ -1,20 +1,21 @@
-import { v } from "convex/values";
-import { components, internal } from "./_generated/api";
-import { action, type ActionCtx } from "./_generated/server";
-import { Autumn } from "@useautumn/convex";
-import { getTrialState, type TrialState } from "../lib/autumn/trial-eligibility";
-import { currentPlans, normalizePlans } from "../lib/autumn/customer-shape";
+import { ConvexError, v } from 'convex/values';
+import { components, internal } from './_generated/api';
+import { action, type ActionCtx } from './_generated/server';
+import { Autumn } from '@useautumn/convex';
+import {
+  getTrialState,
+  type TrialState,
+} from '../lib/autumn/trial-eligibility';
+import { currentPlans, normalizePlans } from '../lib/autumn/customer-shape';
 import {
   managedPaymentsCheckoutParams,
   managedPaymentsEnabled,
-} from "../lib/autumn/managed-payments";
-import { autumnFetchRaw } from "./usage/autumnClient";
+} from '../lib/autumn/managed-payments';
+import { autumnFetchRaw, getSecretKey } from './usage/autumnClient';
 
-const secretKey = (() => {
-  const key = process.env.AUTUMN_SECRET_KEY;
-  if (!key) throw new Error('Missing required Convex environment variable: AUTUMN_SECRET_KEY');
-  return key;
-})();
+// Module-scope on purpose: the Autumn component client below needs the key
+// at construction, so a key-less deployment fails at import/analysis time.
+const secretKey = getSecretKey();
 
 // Managed Payments params ride only on v2 `/billing.attach` calls, namely
 // convex/billing.ts (attachNewPlan, switchPlanDuringTrial) and
@@ -32,7 +33,7 @@ export const autumn = new Autumn(components.autumn, {
     auth: { getUserIdentity: () => Promise<Record<string, unknown> | null> };
   }) => {
     const user = await ctx.auth.getUserIdentity();
-    if (!user) return null
+    if (!user) return null;
 
     return {
       customerId: user.subject as string,
@@ -129,8 +130,13 @@ export async function gateTrialArgs<T extends { freeTrial?: boolean }>(
     return { gated: args, state: getTrialState(null), customer: null };
   }
   if (!res.ok) {
-    console.error(`Autumn trial-gate customer fetch failed (${res.status}): ${res.text}`);
-    throw new Error('Could not verify trial eligibility — please retry');
+    console.error(
+      `Autumn trial-gate customer fetch failed (${res.status}): ${res.text}`,
+    );
+    throw new ConvexError({
+      code: 'UPSTREAM_ERROR',
+      message: 'Could not verify trial eligibility — please retry',
+    });
   }
   const customer = res.json as {
     products?: unknown;
@@ -140,9 +146,11 @@ export async function gateTrialArgs<T extends { freeTrial?: boolean }>(
   const state = getTrialState(customer);
   if (state.trialEligible) return { gated: args, state, customer };
   if (state.onTrial && kind === 'attach') {
-    throw new Error(
-      'Plan switches during a trial must go through switchPlanDuringTrial',
-    );
+    throw new ConvexError({
+      code: 'INVALID_STATE',
+      message:
+        'Plan switches during a trial must go through switchPlanDuringTrial',
+    });
   }
   return { gated: { ...args, freeTrial: false }, state, customer };
 }
@@ -175,6 +183,10 @@ export const check = action({
     customerData: v.optional(customerDataValidator),
     entityData: v.optional(v.any()),
   },
+  // Autumn API passthrough: the component's `{ data, error }` payloads are
+  // version-dependent external shapes (preview lines, scenarios, ...), so
+  // `v.any()` is the tightest honest validator here.
+  returns: v.any(),
   handler: async (ctx, args) => {
     return await autumn.check(ctx, { ...args, sendEvent: false });
   },
@@ -236,7 +248,10 @@ function guardFirstPurchaseOffLegacyPath(state: TrialState | null): void {
     // incident was opaque without it), the error string alone says nothing
     // about WHY the customer was classified this way.
     console.warn('Blocked a first purchase off the legacy path', { state });
-    throw new Error('Checkout has been updated — please refresh the page');
+    throw new ConvexError({
+      code: 'INVALID_STATE',
+      message: 'Checkout has been updated — please refresh the page',
+    });
   }
 }
 
@@ -256,11 +271,22 @@ function guardFirstPurchaseOffLegacyPath(state: TrialState | null): void {
  */
 async function attachViaV2NoTrial(
   ctx: ActionCtx,
-  args: { productId?: string; options?: { featureId: string; quantity: number }[] },
+  args: {
+    productId?: string;
+    options?: { featureId: string; quantity: number }[];
+  },
 ) {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new Error('Not authenticated');
-  if (!args.productId) throw new Error('productId is required');
+  if (!identity)
+    throw new ConvexError({
+      code: 'UNAUTHENTICATED',
+      message: 'Not authenticated',
+    });
+  if (!args.productId)
+    throw new ConvexError({
+      code: 'INVALID_ARGUMENT',
+      message: 'productId is required',
+    });
 
   const res = await autumnFetchRaw(
     'POST',
@@ -286,7 +312,11 @@ async function attachViaV2NoTrial(
   );
   const json =
     typeof res.json === 'object' && res.json !== null
-      ? (res.json as { payment_url?: string | null; message?: string; code?: string })
+      ? (res.json as {
+          payment_url?: string | null;
+          message?: string;
+          code?: string;
+        })
       : { message: res.text.slice(0, 200) };
   if (!res.ok) {
     console.error(`Autumn v2 attach failed (${res.status}): ${res.text}`);
@@ -316,7 +346,7 @@ async function attachViaV2NoTrial(
 /**
  * Is `productId` the free (default) plan? Asked of Autumn, not the customer
  * payload: a paying customer's `products` does NOT contain the free plan
- * (verified in the sandbox, see documentation/autumn-usage-tracking.md), so
+ * (verified in the sandbox, see docs/architecture/autumn-usage-tracking.md), so
  * "is the target held" can never identify a cancel-to-Free. Fails closed,
  * with an unreachable product record the attach cannot be routed safely.
  */
@@ -329,7 +359,10 @@ async function isFreeProduct(productId: string): Promise<boolean> {
   );
   if (!res.ok) {
     console.error(`Autumn product fetch failed (${res.status}): ${res.text}`);
-    throw new Error('Could not verify the selected plan — please retry');
+    throw new ConvexError({
+      code: 'UPSTREAM_ERROR',
+      message: 'Could not verify the selected plan — please retry',
+    });
   }
   const product = res.json as {
     is_default?: boolean;
@@ -359,9 +392,10 @@ function rejectArgsUnsupportedOnV2(args: Record<string, unknown>): void {
     (key) => args[key] !== undefined,
   );
   if (present.length > 0) {
-    throw new Error(
-      `Not supported on this plan switch: ${present.join(', ')}`,
-    );
+    throw new ConvexError({
+      code: 'INVALID_ARGUMENT',
+      message: `Not supported on this plan switch: ${present.join(', ')}`,
+    });
   }
 }
 
@@ -382,22 +416,24 @@ export function rejectLegacySessionUnderManagedPayments(
   const data = (
     result as { data?: { url?: unknown; checkout_url?: unknown } | null } | null
   )?.data;
-  if (
-    typeof data?.url === 'string' ||
-    typeof data?.checkout_url === 'string'
-  ) {
+  if (typeof data?.url === 'string' || typeof data?.checkout_url === 'string') {
     console.warn(
       'Refused a legacy attach that returned a checkout session under Managed Payments',
       { state },
     );
-    throw new Error(
-      'No usable payment method on file — please update your payment details in the billing portal, then try again',
-    );
+    throw new ConvexError({
+      code: 'INVALID_STATE',
+      message:
+        'No usable payment method on file — please update your payment details in the billing portal, then try again',
+    });
   }
 }
 
 export const attach = action({
   args: { ...checkoutSharedArgs, metadata: v.optional(v.object({})) },
+  // Autumn API passthrough (`{ data, error }` container from either the
+  // component client or the v2 reroute); see `check` above.
+  returns: v.any(),
   handler: async (ctx, args) => {
     const { gated, state, customer } = await gateTrialArgs(ctx, 'attach', args);
     guardFirstPurchaseOffLegacyPath(state);
@@ -463,6 +499,8 @@ export function stripLegacySessionUnderManagedPayments(
 
 export const checkout = action({
   args: checkoutSharedArgs,
+  // Autumn API passthrough; see `check` above.
+  returns: v.any(),
   handler: async (ctx, args) => {
     const { gated, state } = await gateTrialArgs(ctx, 'checkout', args);
     guardFirstPurchaseOffLegacyPath(state);

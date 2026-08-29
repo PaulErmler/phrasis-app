@@ -5,7 +5,10 @@ import {
 } from '../../db/stats/cardAggregates';
 import type { Doc } from '../../_generated/dataModel';
 
-const card = (collectionOrigin: Doc<'cards'>['collectionOrigin']) =>
+// `| undefined` deliberately: the schema types collectionOrigin as required
+// now, but getCardOriginBucket keeps its 'none' fallback for legacy in-memory
+// doc values (pre-backfill prod rows), which is what this suite pins down.
+const card = (collectionOrigin: Doc<'cards'>['collectionOrigin'] | undefined) =>
   ({ collectionOrigin }) as Doc<'cards'>;
 
 describe('getCardOriginBucket (cardsByOriginStateAndDueDate namespace part)', () => {

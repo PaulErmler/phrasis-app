@@ -30,28 +30,29 @@ const config: CapacitorConfig = {
   // only treats URLs that start with the FULL server.url string (path
   // included) as internal, so without the host allow-listed, the redirect
   // from /app to /auth/sign-in would be cancelled and opened in Safari.
-  server: process.env.CAP_SERVER === 'local'
-    ? {
-      url: 'http://localhost:3000/app',
-      allowNavigation: ['localhost'],
-    }
-    : process.env.CAP_SERVER === 'dev'
+  server:
+    process.env.CAP_SERVER === 'local'
       ? {
-        // Staging environment — same shape as the store build, offline page
-        // included (its retry URL comes from the generated app-url.js).
-        // *.cloudflareaccess.com keeps the Cloudflare Zero Trust login flow
-        // inside the WebView — otherwise it opens in Safari and the
-        // CF_Authorization cookie never reaches the app ("invalid login
-        // session").
-        url: 'https://dev.flexling.com/app',
-        allowNavigation: ['dev.flexling.com', '*.cloudflareaccess.com'],
-        errorPath: 'error.html',
-      }
-      : {
-        url: 'https://flexling.com/app',
-        allowNavigation: ['flexling.com'],
-        errorPath: 'error.html',
-      },
+          url: 'http://localhost:3000/app',
+          allowNavigation: ['localhost'],
+        }
+      : process.env.CAP_SERVER === 'dev'
+        ? {
+            // Staging environment — same shape as the store build, offline page
+            // included (its retry URL comes from the generated app-url.js).
+            // *.cloudflareaccess.com keeps the Cloudflare Zero Trust login flow
+            // inside the WebView — otherwise it opens in Safari and the
+            // CF_Authorization cookie never reaches the app ("invalid login
+            // session").
+            url: 'https://dev.flexling.com/app',
+            allowNavigation: ['dev.flexling.com', '*.cloudflareaccess.com'],
+            errorPath: 'error.html',
+          }
+        : {
+            url: 'https://flexling.com/app',
+            allowNavigation: ['flexling.com'],
+            errorPath: 'error.html',
+          },
   // No ios.contentInset override: the default ('never') lets the WebView
   // extend under the notch/home bar so the app's own CSS
   // env(safe-area-inset-*) padding works — 'automatic' fights it (native

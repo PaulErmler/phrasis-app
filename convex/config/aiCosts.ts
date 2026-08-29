@@ -42,7 +42,8 @@ export const AI_COST_RATES = {
   azureStt: {
     usdPerUnit: 0.36,
     unit: 'audio_hour',
-    sourceUrl: 'https://azure.microsoft.com/pricing/details/cognitive-services/speech-services/',
+    sourceUrl:
+      'https://azure.microsoft.com/pricing/details/cognitive-services/speech-services/',
     lastVerified: '2026-07-28',
   },
 } as const satisfies Record<string, AiCostRate>;
@@ -59,7 +60,10 @@ export function costForCharacters(
 }
 
 /** Cost of transcribing `durationMs` of audio. */
-export function costForAudioMs(provider: 'azureStt', durationMs: number): number {
+export function costForAudioMs(
+  provider: 'azureStt',
+  durationMs: number,
+): number {
   if (!Number.isFinite(durationMs) || durationMs <= 0) return 0;
   return (durationMs / 3_600_000) * AI_COST_RATES[provider].usdPerUnit;
 }

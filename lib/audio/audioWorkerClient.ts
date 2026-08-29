@@ -8,6 +8,8 @@ import type {
   StretchWorkerResponse,
 } from './stretch.worker';
 
+import { reportError } from '@/lib/report-error';
+
 /**
  * Lazy singleton client for the audio DSP worker, with a synchronous
  * main-thread fallback (same stretchCore code) when workers are unavailable
@@ -19,8 +21,16 @@ let workerFailed = false;
 let nextRequestId = 1;
 
 type Pending =
-  | { kind: 'stretch'; resolve: (out: RawAudioData) => void; reject: (err: Error) => void }
-  | { kind: 'encodeWav'; resolve: (wav: ArrayBuffer) => void; reject: (err: Error) => void };
+  | {
+      kind: 'stretch';
+      resolve: (out: RawAudioData) => void;
+      reject: (err: Error) => void;
+    }
+  | {
+      kind: 'encodeWav';
+      resolve: (wav: ArrayBuffer) => void;
+      reject: (err: Error) => void;
+    };
 
 const pending = new Map<number, Pending>();
 
@@ -41,7 +51,7 @@ function getWorker(): Worker | null {
   try {
     worker = new Worker(new URL('./stretch.worker.ts', import.meta.url));
   } catch (err) {
-    console.error('Audio worker construction failed, using main thread:', err);
+    reportError(err, { op: 'audioWorkerConstruct' });
     workerFailed = true;
     worker = null;
     return null;
@@ -73,7 +83,10 @@ function getWorker(): Worker | null {
   };
 
   worker.onerror = (event) => {
-    console.error('Audio worker crashed, falling back to main thread:', event);
+    reportError(
+      event.error ?? new Error(event.message || 'Audio worker crashed'),
+      { op: 'audioWorkerCrash' },
+    );
     workerFailed = true;
     failAllPending('Audio worker crashed');
     worker?.terminate();
@@ -96,7 +109,7 @@ function post(
     return true;
   } catch (err) {
     pending.delete(request.id);
-    console.error('Audio worker postMessage failed:', err);
+    reportError(err, { op: 'audioWorkerPostMessage' });
     workerFailed = true;
     return false;
   }

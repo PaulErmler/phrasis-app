@@ -125,7 +125,11 @@ async function autumn(method, endpoint, body, apiVersion) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function until(label, check, { timeoutMs = 180_000, everyMs = 5_000 } = {}) {
+async function until(
+  label,
+  check,
+  { timeoutMs = 180_000, everyMs = 5_000 } = {},
+) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const v = await check();
@@ -244,7 +248,9 @@ async function main() {
   });
   const bound = await describe(userId);
   if (bound.stripe_id !== customer.id) {
-    throw new Error(`Autumn did not adopt ${customer.id} (got ${bound.stripe_id ?? 'none'})`);
+    throw new Error(
+      `Autumn did not adopt ${customer.id} (got ${bound.stripe_id ?? 'none'})`,
+    );
   }
   console.log(`  3. bound to autumn .... ok`);
 
@@ -262,11 +268,17 @@ async function main() {
     );
     return s.data?.[0] ?? null;
   });
-  console.log(`  4. subscribed ......... ${sub.id} (${sub.status}, paid with the good card)`);
+  console.log(
+    `  4. subscribed ......... ${sub.id} (${sub.status}, paid with the good card)`,
+  );
 
-  const badCard = await stripe('POST', `/payment_methods/${PM_DECLINES}/attach`, {
-    customer: customer.id,
-  });
+  const badCard = await stripe(
+    'POST',
+    `/payment_methods/${PM_DECLINES}/attach`,
+    {
+      customer: customer.id,
+    },
+  );
   await stripe('POST', `/customers/${customer.id}`, {
     invoice_settings: { default_payment_method: badCard.id },
   });
@@ -299,7 +311,9 @@ async function main() {
     },
     { timeoutMs: 300_000 },
   );
-  console.log(`  6. clock advanced ..... to renewal +1h (retries still pending)`);
+  console.log(
+    `  6. clock advanced ..... to renewal +1h (retries still pending)`,
+  );
 
   const final = await until(
     'the subscription to go past_due',

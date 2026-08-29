@@ -1,4 +1,12 @@
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeAll,
+  beforeEach,
+  afterEach,
+} from 'vitest';
 import type {
   ResolvedAudioSettings,
   LanguageCue,
@@ -32,15 +40,23 @@ const h = vi.hoisted(() => {
 vi.mock('@/lib/audio/peakCache', () => ({
   // Decoded source clips are all 1.0s; gain/peak are inert.
   // `sampleRate` is read only when nothing was decoded (a fully silent merge).
-  getDecodeContext: () => ({ decodeAudioData: async () => h.fakeBuffer(1.0), sampleRate: 48000 }),
+  getDecodeContext: () => ({
+    decodeAudioData: async () => h.fakeBuffer(1.0),
+    sampleRate: 48000,
+  }),
   computePeakFromBuffer: () => 0.7,
   computeGain: () => 1,
 }));
 
 vi.mock('@/lib/audio/timeStretch', () => ({
   // rate === 1 returns the original; otherwise duration becomes 1 / rate.
-  timeStretchBuffer: async (buffer: { duration: number; sampleRate: number }, rate: number) =>
-    rate === 1 ? buffer : h.fakeBuffer(buffer.duration / rate, buffer.sampleRate),
+  timeStretchBuffer: async (
+    buffer: { duration: number; sampleRate: number },
+    rate: number,
+  ) =>
+    rate === 1
+      ? buffer
+      : h.fakeBuffer(buffer.duration / rate, buffer.sampleRate),
 }));
 
 vi.mock('audiobuffer-to-wav', () => ({ default: () => new ArrayBuffer(8) }));
@@ -57,7 +73,10 @@ beforeAll(() => {
 beforeEach(() => {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) })),
+    vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new ArrayBuffer(8),
+    })),
   );
   class MockOfflineAudioContext {
     destination = {};
@@ -91,26 +110,27 @@ const recs = (langs: string[]): CardAudioRecording[] =>
 
 const settings = (
   overrides: Partial<ResolvedAudioSettings> = {},
-): ResolvedAudioSettings => ({
-  reps: {},
-  repPauses: {},
-  speeds: {},
-  pauseB2B: 3,
-  pauseB2T: 5,
-  pauseT2T: 3,
-  autoAdvance: false,
-  pauseBeforeAdvance: 2,
-  playTargetBefore: false,
-  playTargetAfter: true,
-  beforeReps: {},
-  beforeRepPauses: {},
-  beforeSpeeds: {},
-  pauseT2B: 5,
-  beforeOnlyNewReps: Infinity,
-  ...overrides,
-  // `defaultTargetReps` is intentionally absent unless overridden: these
-  // fixtures predate the field and pin the resolved-undefined fallback path.
-}) as ResolvedAudioSettings;
+): ResolvedAudioSettings =>
+  ({
+    reps: {},
+    repPauses: {},
+    speeds: {},
+    pauseB2B: 3,
+    pauseB2T: 5,
+    pauseT2T: 3,
+    autoAdvance: false,
+    pauseBeforeAdvance: 2,
+    playTargetBefore: false,
+    playTargetAfter: true,
+    beforeReps: {},
+    beforeRepPauses: {},
+    beforeSpeeds: {},
+    pauseT2B: 5,
+    beforeOnlyNewReps: Infinity,
+    ...overrides,
+    // `defaultTargetReps` is intentionally absent unless overridden: these
+    // fixtures predate the field and pin the resolved-undefined fallback path.
+  }) as ResolvedAudioSettings;
 
 const cue = (
   language: string,

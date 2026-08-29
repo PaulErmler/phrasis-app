@@ -64,7 +64,12 @@ describe('WordDiff: intra-word ignored punctuation', () => {
 
     it('renders the apostrophe muted, without underline or annotation', () => {
       const { container } = render(
-        <WordDiff expected="don't" actual="dint" language="en" ignorePunctuation />,
+        <WordDiff
+          expected="don't"
+          actual="dint"
+          language="en"
+          ignorePunctuation
+        />,
       );
       const [apostrophe] = leafSpans(container, "'");
       expect(apostrophe).toBeTruthy();
@@ -77,7 +82,12 @@ describe('WordDiff: intra-word ignored punctuation', () => {
 
     it('still marks the real o→i error in the same word', () => {
       const { container } = render(
-        <WordDiff expected="don't" actual="dint" language="en" ignorePunctuation />,
+        <WordDiff
+          expected="don't"
+          actual="dint"
+          language="en"
+          ignorePunctuation
+        />,
       );
       const [o] = leafSpans(container, 'o');
       expect(o).toBeTruthy();
@@ -119,7 +129,12 @@ describe('WordDiff: intra-word ignored punctuation', () => {
 
     it('still renders the pair as an error', () => {
       const { container } = render(
-        <WordDiff expected="don't" actual="donat" language="en" ignorePunctuation />,
+        <WordDiff
+          expected="don't"
+          actual="donat"
+          language="en"
+          ignorePunctuation
+        />,
       );
       // The scored insertion sits where the forgiven mark was. Muting it
       // would hide a mistake that cost the user accuracy.
@@ -149,7 +164,12 @@ describe('WordDiff: intra-word ignored punctuation', () => {
 
     it('renders the extra apostrophe muted, without strike-through', () => {
       const { container } = render(
-        <WordDiff expected="dont" actual="din't" language="en" ignorePunctuation />,
+        <WordDiff
+          expected="dont"
+          actual="din't"
+          language="en"
+          ignorePunctuation
+        />,
       );
       const [apostrophe] = leafSpans(container, "'");
       expect(apostrophe).toBeTruthy();

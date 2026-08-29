@@ -14,12 +14,12 @@
  * both runtimes.
  */
 
+import { requireEnv } from '../lib/env';
+
 export const AUTUMN_API = 'https://api.useautumn.com/v1';
 
 export function getSecretKey(): string {
-  const key = process.env.AUTUMN_SECRET_KEY;
-  if (!key) throw new Error('AUTUMN_SECRET_KEY environment variable is not set');
-  return key;
+  return requireEnv('AUTUMN_SECRET_KEY');
 }
 
 export interface AutumnRawResponse {
@@ -89,7 +89,9 @@ export async function autumnFetch<T>(
   const raw = await autumnFetchRaw(method, path, body, apiVersion);
   if (opts?.nullOn404 && raw.status === 404) return null;
   if (!raw.ok) {
-    console.error(`Autumn ${method} ${path} failed (${raw.status}): ${raw.text}`);
+    console.error(
+      `Autumn ${method} ${path} failed (${raw.status}): ${raw.text}`,
+    );
     const err = raw.json as { message?: string; code?: string } | null;
     throw new Error(
       `Autumn request failed: ${err?.message ?? err?.code ?? raw.status}`,

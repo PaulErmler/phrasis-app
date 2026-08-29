@@ -123,12 +123,24 @@ const GEMINI_EN_MIXED: Voice[] = [
 // except some languages Google only offers the 8-voice core set. We build
 // per-language pools from these shared name lists so the file stays readable.
 const CHIRP3_STANDARD_FEMALES = [
-  'Leda', 'Kore', 'Aoede', 'Zephyr',
-  'Achernar', 'Autonoe', 'Callirrhoe', 'Sulafat',
+  'Leda',
+  'Kore',
+  'Aoede',
+  'Zephyr',
+  'Achernar',
+  'Autonoe',
+  'Callirrhoe',
+  'Sulafat',
 ] as const;
 const CHIRP3_STANDARD_MALES = [
-  'Charon', 'Puck', 'Fenrir', 'Orus',
-  'Achird', 'Algenib', 'Enceladus', 'Umbriel',
+  'Charon',
+  'Puck',
+  'Fenrir',
+  'Orus',
+  'Achird',
+  'Algenib',
+  'Enceladus',
+  'Umbriel',
 ] as const;
 const CHIRP3_CORE_FEMALES = CHIRP3_STANDARD_FEMALES.slice(0, 4);
 const CHIRP3_CORE_MALES = CHIRP3_STANDARD_MALES.slice(0, 4);
@@ -164,7 +176,8 @@ function buildChirp3Pool(
   accentLabel: string,
   variant: 'standard' | 'core' = 'standard',
 ): Voice[] {
-  const females = variant === 'core' ? CHIRP3_CORE_FEMALES : CHIRP3_STANDARD_FEMALES;
+  const females =
+    variant === 'core' ? CHIRP3_CORE_FEMALES : CHIRP3_STANDARD_FEMALES;
   const males = variant === 'core' ? CHIRP3_CORE_MALES : CHIRP3_STANDARD_MALES;
   return [
     ...females.map((n) => createChirp3Voice(n, 'female', locale, accentLabel)),
@@ -241,7 +254,10 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   // Chirp3 yue-HK pool stays listed dormant for a one-line revert. Both
   // script variants share the same audio.
   yue: [...MINIMAX_CANTONESE, ...buildChirp3Pool('yue-HK', 'Hong Kong')],
-  yue_traditional: [...MINIMAX_CANTONESE, ...buildChirp3Pool('yue-HK', 'Hong Kong')],
+  yue_traditional: [
+    ...MINIMAX_CANTONESE,
+    ...buildChirp3Pool('yue-HK', 'Hong Kong'),
+  ],
   ja: [...buildChirp3Pool('ja-JP', 'Japan'), ...GEMINI_CORE],
   ko: [...buildChirp3Pool('ko-KR', 'Korea'), ...GEMINI_CORE],
   vi: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...GEMINI_CORE],
@@ -377,7 +393,8 @@ export function resolveAudioSpeakerGender(
   speakerGender?: string,
   seed?: string,
 ): 'male' | 'female' {
-  if (speakerGender === 'male' || speakerGender === 'female') return speakerGender;
+  if (speakerGender === 'male' || speakerGender === 'female')
+    return speakerGender;
   if (seed && seed.length > 0) {
     // FNV-1a. Fast and well-distributed for short identifiers like a
     // Convex `_id`. Last bit picks the gender deterministically.
@@ -420,7 +437,10 @@ export function resolveCardSpeakerGenders(
   seed: string,
 ): {
   audioSpeakerGender: 'male' | 'female';
-  genderPatch: { speakerGender?: 'male' | 'female'; audioSpeakerGender?: 'male' | 'female' };
+  genderPatch: {
+    speakerGender?: 'male' | 'female';
+    audioSpeakerGender?: 'male' | 'female';
+  };
 } {
   let audioSpeakerGender: 'male' | 'female';
   const genderPatch: {

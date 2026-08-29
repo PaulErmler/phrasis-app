@@ -76,7 +76,10 @@ export function autoRating(opts: {
 }): FSRSRating | null {
   if (!opts.enabled) return null;
   if (opts.accuracy == null || !Number.isFinite(opts.accuracy)) return null;
-  return ratingForAccuracy(opts.accuracy, resolveAutoRateThresholds(opts.thresholds));
+  return ratingForAccuracy(
+    opts.accuracy,
+    resolveAutoRateThresholds(opts.thresholds),
+  );
 }
 
 /**

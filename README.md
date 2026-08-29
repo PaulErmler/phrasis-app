@@ -26,7 +26,19 @@ pnpm install
 
 ### Setup environment variables
 
-#### Local development
+Every environment variable the app reads is catalogued in [`.env.example`](./.env.example), grouped by service, with a comment per variable saying where it is used, whether it is required for `pnpm dev`, and whether it belongs in `.env.local` or on the Convex deployment (`npx convex env set NAME value`). Start from a copy:
+
+```bash
+cp .env.example .env.local   # then fill in what you need
+```
+
+The Convex variables are the only ones `pnpm dev` hard-requires; everything else is feature-specific (billing, TTS/STT providers, analytics, e2e) — see the comments in `.env.example`.
+
+#### Develop against a Convex cloud deployment (default)
+
+`npx convex dev` provisions a dev deployment and writes `CONVEX_DEPLOYMENT` and the deployment URLs into `.env.local` for you; the values are also on the Convex dashboard. `SITE_URL` and `BETTER_AUTH_SECRET` must be set on the deployment itself.
+
+#### Local development (self-hosted Convex)
 
 Make sure Docker is running and run:
 
@@ -34,39 +46,13 @@ Make sure Docker is running and run:
 docker compose up
 ```
 
-Then run the following:
+Then generate the admin key:
 
 ```bash
 docker compose exec backend ./generate_admin_key.sh
 ```
 
-Create a `.env.local` file in the root directory with and set the admin key and other variables:
-
-```
-CONVEX_SELF_HOSTED_URL='http://127.0.0.1:3210'
-CONVEX_SELF_HOSTED_ADMIN_KEY='convex-self-hosted|XXX'
-NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210
-NEXT_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:3211
-# BETTER_AUTH_SECRET=your-secret-here # has to be the same as the one set in the convex dashboard
-SITE_URL=http://localhost:3000
-```
-
-You also have to set SITE_URL and BETTER_AUTH_SECRET in the convex dashboard.
-
-#### Develop against Convex dev/prod environment
-
-For developing against the cloud instance, you can take the URLS and keys from the convex dashboard.
-
-```env
-# Convex
-CONVEX_DEPLOYMENT=dev:your-deployment-name
-NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
-NEXT_PUBLIC_CONVEX_SITE_URL=XXX
-
-# Better Auth (if using social providers)
-# BETTER_AUTH_SECRET=your-secret-here # has to be the same as the one set in the convex dashboard
-SITE_URL=http://localhost:3000
-```
+In `.env.local`, set `CONVEX_SELF_HOSTED_URL` (`http://127.0.0.1:3210`) and `CONVEX_SELF_HOSTED_ADMIN_KEY` (from the step above) instead of `CONVEX_DEPLOYMENT`, and point `NEXT_PUBLIC_CONVEX_URL` / `NEXT_PUBLIC_CONVEX_SITE_URL` at ports 3210 / 3211. `SITE_URL` and `BETTER_AUTH_SECRET` go on the self-hosted backend (dashboard or container env).
 
 ### Development
 
@@ -209,9 +195,19 @@ You can also add the MCP Servers for Convex, BetterAuth and AI Elements by setti
 ├── messages/               # Locale files (en.json, de.json)
 ├── tests/                  # Frontend vitest tests (see TESTING.md)
 ├── e2e/                    # Playwright specs (see TESTING.md)
-├── documentation/          # Architecture & feature docs
+├── docs/                   # All project documentation (see below)
 └── scripts/                # One-off / maintenance scripts
 ```
+
+## Documentation
+
+All project documentation lives under `docs/` — the single docs root:
+
+- `docs/architecture/` — architecture & feature reference (app summary, style guide, review modes, tutorial system, Autumn usage tracking, PostHog, Git LFS deploys)
+- `docs/archive/` — superseded historical docs, kept for reference
+- `docs/agents/` — agent workflow conventions (issue tracker, triage labels, domain docs)
+- `docs/migrations/` — notes on one-off data migrations
+- `docs/store/` — app-store submission guides
 
 ---
 

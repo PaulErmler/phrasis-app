@@ -1,12 +1,12 @@
 /// <reference types="vite/client" />
-import { convexTest, type TestConvex } from "convex-test";
-import { describe, it, expect } from "vitest";
+import { convexTest, type TestConvex } from 'convex-test';
+import { describe, it, expect } from 'vitest';
 
-import schema, { coursePatchableSettingsValidator } from "../../schema";
-import { api } from "../../_generated/api";
-import type { Id } from "../../_generated/dataModel";
+import schema, { coursePatchableSettingsValidator } from '../../schema';
+import { api } from '../../_generated/api';
+import type { Id } from '../../_generated/dataModel';
 
-const modules = import.meta.glob("/convex/**/*.ts");
+const modules = import.meta.glob('/convex/**/*.ts');
 
 /**
  * Exhaustive course-settings sweep: derive a sample value for EVERY patchable
@@ -28,25 +28,25 @@ type AnyValidator = any;
 /** All sample values to try for a validator (unions fan out per literal). */
 function samplesFor(validator: AnyValidator): unknown[] {
   switch (validator.kind) {
-    case "float64":
+    case 'float64':
       // 2 sits inside every numeric clamp in updateCourseSettings
       // (batch size ≥1, reps 0..10, untilGood 1..10, goal 1..120).
       return [2];
-    case "string":
-      return ["sweep-sample"];
-    case "boolean":
+    case 'string':
+      return ['sweep-sample'];
+    case 'boolean':
       return [true, false];
-    case "literal":
+    case 'literal':
       return [validator.value];
-    case "union":
+    case 'union':
       return validator.members.flatMap((m: AnyValidator) => samplesFor(m));
-    case "array":
+    case 'array':
       return [[samplesFor(validator.element)[0]]];
-    case "record":
+    case 'record':
       // Course languages in this test are en/de; playback-speed records are
       // keyed by language code with clamped numeric values.
       return [{ de: 1 }];
-    case "object":
+    case 'object':
       return [
         Object.fromEntries(
           Object.entries(validator.fields).map(([k, f]) => [
@@ -62,17 +62,17 @@ function samplesFor(validator: AnyValidator): unknown[] {
 }
 
 async function makeActiveCourse(t: TestConvex<typeof schema>): Promise<{
-  asUser: ReturnType<TestConvex<typeof schema>["withIdentity"]>;
-  courseId: Id<"courses">;
+  asUser: ReturnType<TestConvex<typeof schema>['withIdentity']>;
+  courseId: Id<'courses'>;
 }> {
   const courseId = await t.run(async (ctx) =>
-    ctx.db.insert("courses", {
-      userId: "user_A",
-      baseLanguages: ["en"],
-      targetLanguages: ["de"],
+    ctx.db.insert('courses', {
+      userId: 'user_A',
+      baseLanguages: ['en'],
+      targetLanguages: ['de'],
     }),
   );
-  const asUser = t.withIdentity({ subject: "user_A" });
+  const asUser = t.withIdentity({ subject: 'user_A' });
   await asUser.mutation(api.features.courses.setActiveCourse, { courseId });
   return { asUser, courseId };
 }
@@ -81,8 +81,8 @@ const PATCHABLE_FIELDS = Object.entries(
   coursePatchableSettingsValidator.fields,
 ) as Array<[string, AnyValidator]>;
 
-describe("updateCourseSettings: exhaustive settings sweep", () => {
-  it("covers every patchable key with at least one sample value", () => {
+describe('updateCourseSettings: exhaustive settings sweep', () => {
+  it('covers every patchable key with at least one sample value', () => {
     expect(PATCHABLE_FIELDS.length).toBeGreaterThan(0);
     for (const [key, validator] of PATCHABLE_FIELDS) {
       expect(
@@ -92,7 +92,7 @@ describe("updateCourseSettings: exhaustive settings sweep", () => {
     }
   });
 
-  it("every key × every sample writes without throwing and reads back validly", async () => {
+  it('every key × every sample writes without throwing and reads back validly', async () => {
     const t = convexTest(schema, modules);
     const { asUser, courseId } = await makeActiveCourse(t);
 
@@ -116,12 +116,15 @@ describe("updateCourseSettings: exhaustive settings sweep", () => {
           api.features.courses.getActiveCourseSettings,
           {},
         );
-        expect(settings, `settings unreadable after writing '${key}'`).not.toBeNull();
+        expect(
+          settings,
+          `settings unreadable after writing '${key}'`,
+        ).not.toBeNull();
       }
     }
   });
 
-  it("all keys written together still produce a readable row (fresh insert branch)", async () => {
+  it('all keys written together still produce a readable row (fresh insert branch)', async () => {
     // A single mutation carrying every key exercises the INSERT branch's
     // field list. A key present in the validator but missing from the
     // insert object silently drops (regression class: showRomanization).

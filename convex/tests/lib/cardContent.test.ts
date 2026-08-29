@@ -1,15 +1,15 @@
 /// <reference types="vite/client" />
-import { convexTest, type TestConvex } from "convex-test";
-import { describe, it, expect } from "vitest";
+import { convexTest, type TestConvex } from 'convex-test';
+import { describe, it, expect } from 'vitest';
 
-import schema from "../../schema";
-import type { Id } from "../../_generated/dataModel";
-import { buildTextContentBatchForLanguages } from "../../lib/cardContent";
-import { insertAudioFixture } from "./audioFixtures";
+import schema from '../../schema';
+import type { Id } from '../../_generated/dataModel';
+import { buildTextContentBatchForLanguages } from '../../lib/cardContent';
+import { insertAudioFixture } from './audioFixtures';
 
-const modules = import.meta.glob("../../**/*.ts");
+const modules = import.meta.glob('../../**/*.ts');
 
-const TIMINGS = [{ word: "x", start: 0, end: 1 }];
+const TIMINGS = [{ word: 'x', start: 0, end: 1 }];
 
 /**
  * Seed a fully-populated card so `hasMissingContent` is driven ONLY by the
@@ -39,16 +39,16 @@ async function seedCard(
   },
 ) {
   return t.run(async (ctx) => {
-    const collectionId = await ctx.db.insert("collections", {
-      name: "A1",
+    const collectionId = await ctx.db.insert('collections', {
+      name: 'A1',
       textCount: 0,
     });
     // IPA defaults to a complete value (a fully-populated card carries one
     // since the annotations refactor); '' seeds the sentinel; null omits.
     const sourceIpa =
-      args.sourceIpaText === undefined ? "ipa-source" : args.sourceIpaText;
-    const textId = await ctx.db.insert("texts", {
-      text: "source text",
+      args.sourceIpaText === undefined ? 'ipa-source' : args.sourceIpaText;
+    const textId = await ctx.db.insert('texts', {
+      text: 'source text',
       language: args.sourceLanguage,
       userCreated: false,
       collectionId,
@@ -57,11 +57,15 @@ async function seedCard(
         ? { romanizedText: args.sourceRomanizedText }
         : {}),
       ...(sourceIpa !== null ? { ipaText: sourceIpa } : {}),
+      // Same reasoning for furigana, but only ja carries the field: a
+      // complete Japanese row has one since the furigana feature landed.
+      ...(args.sourceLanguage === 'ja' ? { furiganaText: 'ふりがな' } : {}),
     });
 
     for (const tr of args.translations) {
-      const trIpa = tr.ipaText === undefined ? `ipa-${tr.language}` : tr.ipaText;
-      await ctx.db.insert("translations", {
+      const trIpa =
+        tr.ipaText === undefined ? `ipa-${tr.language}` : tr.ipaText;
+      await ctx.db.insert('translations', {
         textId,
         targetLanguage: tr.language,
         translatedText: `translated-${tr.language}`,
@@ -85,7 +89,7 @@ async function seedCard(
         textId,
         language,
         storageId,
-        ttsQuality: "validated",
+        ttsQuality: 'validated',
         ...(withoutTimings.has(language) ? {} : { wordTimings: TIMINGS }),
       });
     }
@@ -96,7 +100,7 @@ async function seedCard(
 
 async function hasMissingContent(
   t: TestConvex<typeof schema>,
-  textId: Id<"texts">,
+  textId: Id<'texts'>,
   sourceLanguage: string,
   baseLanguages: string[],
   targetLanguages: string[],
@@ -107,13 +111,14 @@ async function hasMissingContent(
       ctx,
       [
         {
-          key: "k",
+          key: 'k',
           textId,
-          sourceText: "source text",
+          sourceText: 'source text',
           sourceLanguage,
           sourceRomanization:
             (await ctx.db.get(textId))!.romanizedText ?? undefined,
           sourceIpa: (await ctx.db.get(textId))!.ipaText ?? undefined,
+          sourceFurigana: (await ctx.db.get(textId))!.furiganaText ?? undefined,
           userCreated: false,
         },
       ],
@@ -121,142 +126,152 @@ async function hasMissingContent(
       targetLanguages,
       opts,
     );
-    return map.get("k")!.hasMissingContent;
+    return map.get('k')!.hasMissingContent;
   });
 }
 
-describe("buildTextContentBatchForLanguages: romanization sentinel", () => {
+describe('buildTextContentBatchForLanguages: romanization sentinel', () => {
   // `zh` needs romanization; `en` does not. The empty string is the
   // "tried, failed, leave empty" sentinel the romanization workers persist
   // after exhausting their retries. The schedulers in decks.ts never
   // re-enqueue it, so reporting the card as incomplete would ask forever for
   // work nothing is willing to do.
-  it("treats a sentinel romanization on a translation as attempted", async () => {
+  it('treats a sentinel romanization on a translation as attempted', async () => {
     const t = convexTest(schema, modules);
     const textId = await seedCard(t, {
-      sourceLanguage: "en",
-      translations: [{ language: "zh", romanizedText: "" }],
+      sourceLanguage: 'en',
+      translations: [{ language: 'zh', romanizedText: '' }],
     });
-    expect(await hasMissingContent(t, textId, "en", ["en"], ["zh"])).toBe(false);
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['zh'])).toBe(
+      false,
+    );
   });
 
-  it("still reports a never-attempted romanization on a translation", async () => {
+  it('still reports a never-attempted romanization on a translation', async () => {
     const t = convexTest(schema, modules);
     const textId = await seedCard(t, {
-      sourceLanguage: "en",
-      translations: [{ language: "zh" }],
+      sourceLanguage: 'en',
+      translations: [{ language: 'zh' }],
     });
-    expect(await hasMissingContent(t, textId, "en", ["en"], ["zh"])).toBe(true);
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['zh'])).toBe(true);
   });
 
-  it("treats a sentinel romanization on the source text as attempted", async () => {
+  it('treats a sentinel romanization on the source text as attempted', async () => {
     const t = convexTest(schema, modules);
     const textId = await seedCard(t, {
-      sourceLanguage: "zh",
-      sourceRomanizedText: "",
-      translations: [{ language: "en" }],
+      sourceLanguage: 'zh',
+      sourceRomanizedText: '',
+      translations: [{ language: 'en' }],
     });
-    expect(await hasMissingContent(t, textId, "zh", ["en"], ["zh"])).toBe(false);
+    expect(await hasMissingContent(t, textId, 'zh', ['en'], ['zh'])).toBe(
+      false,
+    );
   });
 
-  it("still reports a never-attempted romanization on the source text", async () => {
+  it('still reports a never-attempted romanization on the source text', async () => {
     const t = convexTest(schema, modules);
     const textId = await seedCard(t, {
-      sourceLanguage: "zh",
-      translations: [{ language: "en" }],
+      sourceLanguage: 'zh',
+      translations: [{ language: 'en' }],
     });
-    expect(await hasMissingContent(t, textId, "zh", ["en"], ["zh"])).toBe(true);
+    expect(await hasMissingContent(t, textId, 'zh', ['en'], ['zh'])).toBe(true);
   });
 
   it("ignores romanization entirely for languages that don't need it", async () => {
     const t = convexTest(schema, modules);
     const textId = await seedCard(t, {
-      sourceLanguage: "en",
-      translations: [{ language: "de" }],
+      sourceLanguage: 'en',
+      translations: [{ language: 'de' }],
     });
-    expect(await hasMissingContent(t, textId, "en", ["en"], ["de"])).toBe(false);
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['de'])).toBe(
+      false,
+    );
   });
 });
 
-describe("buildTextContentBatchForLanguages: IPA sentinel", () => {
+describe('buildTextContentBatchForLanguages: IPA sentinel', () => {
   // Same tri-state as romanization, IPA edition: '' = tried-and-failed
   // sentinel (espeak produced nothing), undefined/absent = never attempted.
-  it("treats a sentinel IPA on a translation as attempted", async () => {
+  it('treats a sentinel IPA on a translation as attempted', async () => {
     const t = convexTest(schema, modules);
     const textId = await seedCard(t, {
-      sourceLanguage: "en",
-      translations: [{ language: "es", ipaText: "" }],
+      sourceLanguage: 'en',
+      translations: [{ language: 'es', ipaText: '' }],
     });
-    expect(await hasMissingContent(t, textId, "en", ["en"], ["es"])).toBe(false);
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['es'])).toBe(
+      false,
+    );
   });
 
-  it("still reports a never-attempted IPA on a translation", async () => {
+  it('still reports a never-attempted IPA on a translation', async () => {
     const t = convexTest(schema, modules);
     const textId = await seedCard(t, {
-      sourceLanguage: "en",
-      translations: [{ language: "es", ipaText: null }],
+      sourceLanguage: 'en',
+      translations: [{ language: 'es', ipaText: null }],
     });
-    expect(await hasMissingContent(t, textId, "en", ["en"], ["es"])).toBe(true);
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['es'])).toBe(true);
   });
 
-  it("still reports a never-attempted IPA on the source text", async () => {
+  it('still reports a never-attempted IPA on the source text', async () => {
     const t = convexTest(schema, modules);
     const textId = await seedCard(t, {
-      sourceLanguage: "en",
+      sourceLanguage: 'en',
       sourceIpaText: null,
-      translations: [{ language: "es" }],
+      translations: [{ language: 'es' }],
     });
-    expect(await hasMissingContent(t, textId, "en", ["en"], ["es"])).toBe(true);
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['es'])).toBe(true);
   });
 
   it("ignores IPA for languages espeak can't serve (ja)", async () => {
     const t = convexTest(schema, modules);
     // ja is excluded from IPA_LANGUAGES; romanization present, so complete.
     const textId = await seedCard(t, {
-      sourceLanguage: "ja",
-      sourceRomanizedText: "konnichiwa",
+      sourceLanguage: 'ja',
+      sourceRomanizedText: 'konnichiwa',
       sourceIpaText: null,
-      translations: [{ language: "en", romanizedText: "hello" }],
+      translations: [{ language: 'en', romanizedText: 'hello' }],
     });
-    expect(await hasMissingContent(t, textId, "ja", ["en"], ["ja"])).toBe(false);
+    expect(await hasMissingContent(t, textId, 'ja', ['en'], ['ja'])).toBe(
+      false,
+    );
   });
 });
 
-describe("buildTextContentBatchForLanguages: word timings", () => {
+describe('buildTextContentBatchForLanguages: word timings', () => {
   // `scheduleTimingsBackfillIfNeeded` refuses to schedule a backfill for
   // languages our STT backend can't transcribe, so flagging those cards as
   // incomplete asks for work that is deliberately never done.
-  it("does not report missing timings for a language without STT support", async () => {
+  it('does not report missing timings for a language without STT support', async () => {
     const t = convexTest(schema, modules);
     const textId = await seedCard(t, {
-      sourceLanguage: "en",
-      translations: [{ language: "sw_tz" }],
-      languagesWithoutTimings: ["sw_tz"],
+      sourceLanguage: 'en',
+      translations: [{ language: 'sw_tz' }],
+      languagesWithoutTimings: ['sw_tz'],
     });
-    expect(await hasMissingContent(t, textId, "en", ["en"], ["sw_tz"])).toBe(
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['sw_tz'])).toBe(
       false,
     );
   });
 
-  it("still reports missing timings for a language with STT support", async () => {
+  it('still reports missing timings for a language with STT support', async () => {
     const t = convexTest(schema, modules);
     const textId = await seedCard(t, {
-      sourceLanguage: "en",
-      translations: [{ language: "de" }],
-      languagesWithoutTimings: ["de"],
+      sourceLanguage: 'en',
+      translations: [{ language: 'de' }],
+      languagesWithoutTimings: ['de'],
     });
-    expect(await hasMissingContent(t, textId, "en", ["en"], ["de"])).toBe(true);
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['de'])).toBe(true);
   });
 
-  it("honours ignoreMissingWordTimings", async () => {
+  it('honours ignoreMissingWordTimings', async () => {
     const t = convexTest(schema, modules);
     const textId = await seedCard(t, {
-      sourceLanguage: "en",
-      translations: [{ language: "de" }],
-      languagesWithoutTimings: ["de"],
+      sourceLanguage: 'en',
+      translations: [{ language: 'de' }],
+      languagesWithoutTimings: ['de'],
     });
     expect(
-      await hasMissingContent(t, textId, "en", ["en"], ["de"], {
+      await hasMissingContent(t, textId, 'en', ['en'], ['de'], {
         ignoreMissingWordTimings: true,
       }),
     ).toBe(false);

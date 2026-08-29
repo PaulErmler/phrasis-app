@@ -19,6 +19,7 @@ import {
   requireAuthUserId,
   getUserSettings as dbGetUserSettings,
   getOnboardingProgress as dbGetOnboardingProgress,
+  insertUserSettings,
 } from '../db/users';
 import {
   getCoursesForUser,
@@ -40,9 +41,17 @@ import {
 import { resolveClientToday } from '../lib/dateUtils';
 import { getDailyStats } from '../db/stats/dailyStats';
 import { getTargetLanguageWordCounts } from '../db/stats/languageStats';
-import { consumeQuota, hasFeatureAccess, releaseQuota } from '../usage/helpers';
+import {
+  consumeQuota,
+  hasFeatureAccess,
+  quotaErrorCode,
+  releaseQuota,
+} from '../usage/helpers';
 import { EVENTS, track } from '../analytics';
-import { MAX_COURSES_PER_USER, ARCHIVE_COOLDOWN_MS } from '../../lib/constants/courses';
+import {
+  MAX_COURSES_PER_USER,
+  ARCHIVE_COOLDOWN_MS,
+} from '../../lib/constants/courses';
 import { FEATURE_IDS } from './featureIds';
 import {
   DEFAULT_INITIAL_REVIEW_COUNT,
@@ -82,9 +91,15 @@ async function validateLanguageLimits(
   existing?: { baseLanguages: string[]; targetLanguages: string[] },
 ) {
   if (baseLanguages.length === 0)
-    throw new ConvexError('At least one base language is required');
+    throw new ConvexError({
+      code: 'INVALID_ARGUMENT',
+      message: 'At least one base language is required',
+    });
   if (targetLanguages.length === 0)
-    throw new ConvexError('At least one target language is required');
+    throw new ConvexError({
+      code: 'INVALID_ARGUMENT',
+      message: 'At least one target language is required',
+    });
 
   const { available: hasMultiLang, synced: multiLangSynced } =
     await hasFeatureAccess(ctx, userId, FEATURE_IDS.MULTIPLE_LANGUAGES);
@@ -155,6 +170,8 @@ export const getUserSettings = query({
       completedTutorials: v.optional(v.array(v.string())),
       pinnedCardActions: v.optional(v.array(v.string())),
       analyticsConsent: v.optional(v.boolean()),
+      hideDueCounts: v.optional(v.boolean()),
+      hideWorkloadForecast: v.optional(v.boolean()),
     }),
     v.null(),
   ),
@@ -390,7 +407,10 @@ export const getCourseStats = query({
         courseId: active.course._id,
         targetLanguages: active.course.targetLanguages,
       });
-      const totalWordCount = languageWordCounts.reduce((sum, lw) => sum + lw.words, 0);
+      const totalWordCount = languageWordCounts.reduce(
+        (sum, lw) => sum + lw.words,
+        0,
+      );
 
       return {
         totalRepetitions: stats.totalRepetitions,
@@ -478,11 +498,18 @@ export const setActiveCourse = mutation({
     const userId = await requireAuthUserId(ctx);
 
     const course = await ctx.db.get(args.courseId);
-    if (!course) throw new ConvexError('Course not found');
+    if (!course)
+      throw new ConvexError({ code: 'NOT_FOUND', message: 'Course not found' });
     if (course.userId !== userId)
-      throw new ConvexError('Course does not belong to user');
+      throw new ConvexError({
+        code: 'FORBIDDEN',
+        message: 'Course does not belong to user',
+      });
     if (course.isArchived === true)
-      throw new ConvexError('Cannot select an archived course');
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message: 'Cannot select an archived course',
+      });
 
     const existingSettings = await dbGetUserSettings(ctx, userId);
     if (existingSettings) {
@@ -490,7 +517,7 @@ export const setActiveCourse = mutation({
         activeCourseId: args.courseId,
       });
     } else {
-      await ctx.db.insert('userSettings', {
+      await insertUserSettings(ctx, {
         userId,
         hasCompletedOnboarding: true,
         activeCourseId: args.courseId,
@@ -511,11 +538,18 @@ export const archiveCourse = mutation({
     const userId = await requireAuthUserId(ctx);
 
     const course = await ctx.db.get(args.courseId);
-    if (!course) throw new ConvexError('Course not found');
+    if (!course)
+      throw new ConvexError({ code: 'NOT_FOUND', message: 'Course not found' });
     if (course.userId !== userId)
-      throw new ConvexError('Course does not belong to user');
+      throw new ConvexError({
+        code: 'FORBIDDEN',
+        message: 'Course does not belong to user',
+      });
     if (course.isArchived === true)
-      throw new ConvexError('Course is already archived');
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message: 'Course is already archived',
+      });
 
     await ctx.db.patch(args.courseId, {
       isArchived: true,
@@ -563,11 +597,18 @@ export const unarchiveCourse = mutation({
     const userId = await requireAuthUserId(ctx);
 
     const course = await ctx.db.get(args.courseId);
-    if (!course) throw new ConvexError('Course not found');
+    if (!course)
+      throw new ConvexError({ code: 'NOT_FOUND', message: 'Course not found' });
     if (course.userId !== userId)
-      throw new ConvexError('Course does not belong to user');
+      throw new ConvexError({
+        code: 'FORBIDDEN',
+        message: 'Course does not belong to user',
+      });
     if (course.isArchived !== true)
-      throw new ConvexError('Course is not archived');
+      throw new ConvexError({
+        code: 'INVALID_STATE',
+        message: 'Course is not archived',
+      });
 
     // Cooldown is anti-churn protection only for single-course plans
     // (free/basic). Multi-course plans gate on quota alone, so they can
@@ -589,15 +630,9 @@ export const unarchiveCourse = mutation({
     try {
       await consumeQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
     } catch (error) {
-      if (
-        error instanceof ConvexError &&
-        typeof error.data === 'object' &&
-        error.data !== null
-      ) {
-        const code = (error.data as { code?: string }).code;
-        if (code === 'USAGE_LIMIT' || code === 'QUOTA_NOT_SYNCED') {
-          return { status: 'usage_limit' } as const;
-        }
+      const code = quotaErrorCode(error);
+      if (code === 'USAGE_LIMIT' || code === 'QUOTA_NOT_SYNCED') {
+        return { status: 'usage_limit' } as const;
       }
       throw error;
     }
@@ -664,17 +699,19 @@ export const saveOnboardingProgress = mutation({
       args.acquisitionSourceFreeText &&
       args.acquisitionSourceFreeText.length > MAX_ONBOARDING_FREE_TEXT_LENGTH
     ) {
-      throw new ConvexError(
-        `acquisitionSourceFreeText exceeds ${MAX_ONBOARDING_FREE_TEXT_LENGTH} characters`,
-      );
+      throw new ConvexError({
+        code: 'INVALID_ARGUMENT',
+        message: `acquisitionSourceFreeText exceeds ${MAX_ONBOARDING_FREE_TEXT_LENGTH} characters`,
+      });
     }
     if (
       args.learningGoalFreeText &&
       args.learningGoalFreeText.length > MAX_ONBOARDING_FREE_TEXT_LENGTH
     ) {
-      throw new ConvexError(
-        `learningGoalFreeText exceeds ${MAX_ONBOARDING_FREE_TEXT_LENGTH} characters`,
-      );
+      throw new ConvexError({
+        code: 'INVALID_ARGUMENT',
+        message: `learningGoalFreeText exceeds ${MAX_ONBOARDING_FREE_TEXT_LENGTH} characters`,
+      });
     }
 
     // Same clamp window as updateCourseSettings, completeOnboarding copies
@@ -712,15 +749,15 @@ export const saveOnboardingProgress = mutation({
 
     const existingSettings = await dbGetUserSettings(ctx, userId);
     if (!existingSettings) {
-      await ctx.db.insert('userSettings', {
+      await insertUserSettings(ctx, {
         userId,
         hasCompletedOnboarding: false,
       });
     }
 
     const progress = await ctx.db.get(progressId);
-    if (!progress)
-      throw new ConvexError('Failed to retrieve onboarding progress');
+    // Invariant: the row was just inserted/patched above. Logs audience.
+    if (!progress) throw new Error('Failed to retrieve onboarding progress');
     return progress;
   },
 });
@@ -741,7 +778,12 @@ export const createCourse = mutation({
   }),
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
-    await validateLanguageLimits(ctx, userId, args.baseLanguages, args.targetLanguages);
+    await validateLanguageLimits(
+      ctx,
+      userId,
+      args.baseLanguages,
+      args.targetLanguages,
+    );
 
     const initialReviewCount =
       args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
@@ -760,7 +802,10 @@ export const createCourse = mutation({
 
     let activeCollectionId: Id<'collections'> | undefined;
     if (args.currentLevel) {
-      const collection = await resolveStartingCollection(ctx, args.currentLevel);
+      const collection = await resolveStartingCollection(
+        ctx,
+        args.currentLevel,
+      );
       activeCollectionId = collection?._id;
     }
 
@@ -837,7 +882,10 @@ export const completeOnboarding = mutation({
     }
 
     if (!progress) {
-      throw new ConvexError('Onboarding progress not found');
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'Onboarding progress not found',
+      });
     }
 
     const targetLanguages = progress.targetLanguages || [];
@@ -901,33 +949,51 @@ export const completeOnboarding = mutation({
     // `cardsToAddBatchSize` set above) firing mid-lesson when the deck
     // empties.
     if (collection) {
-      const textsToAdd = await getNextTextsFromRank(ctx, collection._id, 0, ONBOARDING_INITIAL_SEED_CARDS, { onlyCurriculum: true });
+      const textsToAdd = await getNextTextsFromRank(
+        ctx,
+        collection._id,
+        0,
+        ONBOARDING_INITIAL_SEED_CARDS,
+        { onlyCurriculum: true },
+      );
 
       if (textsToAdd.length > 0) {
         const deck = await ctx.db.get(deckId);
         const course = await ctx.db.get(courseId);
-        if (!deck || !course) throw new ConvexError('Failed to load deck or course');
+        // Invariant: both were created earlier in this mutation. Logs audience.
+        if (!deck || !course) throw new Error('Failed to load deck or course');
 
+        // deck.cardCount is maintained by `insertCard` inside
+        // `createCardsFromTexts`, in the same transaction as each row insert.
         const { cardsInserted, newLastRank } = await createCardsFromTexts(
-          ctx, textsToAdd, deck, collection._id, course,
+          ctx,
+          textsToAdd,
+          deck,
+          collection._id,
+          course,
         );
 
-        if (cardsInserted > 0) {
-          await ctx.db.patch(deckId, { cardCount: deck.cardCount + cardsInserted });
-        }
-
-        await consumeQuota(ctx, userId, FEATURE_IDS.SENTENCES, textsToAdd.length);
-        await updateCollectionProgress(
-          ctx, userId, courseId, collection._id,
-          { addedDelta: cardsInserted, frontierRank: newLastRank },
+        await consumeQuota(
+          ctx,
+          userId,
+          FEATURE_IDS.SENTENCES,
+          textsToAdd.length,
         );
+        await updateCollectionProgress(ctx, userId, courseId, collection._id, {
+          addedDelta: cardsInserted,
+          frontierRank: newLastRank,
+        });
 
         for (const text of textsToAdd) {
-          await ctx.scheduler.runAfter(0, internal.features.decks.prepareCardContent, {
-            textId: text._id,
-            baseLanguages,
-            targetLanguages,
-          });
+          await ctx.scheduler.runAfter(
+            0,
+            internal.features.decks.prepareCardContent,
+            {
+              textId: text._id,
+              baseLanguages,
+              targetLanguages,
+            },
+          );
         }
       }
     }
@@ -948,7 +1014,7 @@ export const completeOnboarding = mutation({
 
     let settingsId;
     if (!existingSettings) {
-      settingsId = await ctx.db.insert('userSettings', {
+      settingsId = await insertUserSettings(ctx, {
         userId,
         ...settingsPatch,
       });
@@ -982,9 +1048,13 @@ export const updateCourseLanguages = mutation({
     const userId = await requireAuthUserId(ctx);
 
     const course = await ctx.db.get(args.courseId);
-    if (!course) throw new ConvexError('Course not found');
+    if (!course)
+      throw new ConvexError({ code: 'NOT_FOUND', message: 'Course not found' });
     if (course.userId !== userId)
-      throw new ConvexError('Course does not belong to user');
+      throw new ConvexError({
+        code: 'FORBIDDEN',
+        message: 'Course does not belong to user',
+      });
 
     await validateLanguageLimits(
       ctx,
@@ -1001,13 +1071,13 @@ export const updateCourseLanguages = mutation({
       ...course.baseLanguages,
       ...course.targetLanguages,
     ]);
-    const newCodes = new Set([
-      ...args.baseLanguages,
-      ...args.targetLanguages,
-    ]);
+    const newCodes = new Set([...args.baseLanguages, ...args.targetLanguages]);
     for (const code of existingCodes) {
       if (!newCodes.has(code)) {
-        throw new ConvexError(`Cannot remove existing language: ${code}`);
+        throw new ConvexError({
+          code: 'INVALID_ARGUMENT',
+          message: `Cannot remove existing language: ${code}`,
+        });
       }
     }
 
@@ -1063,9 +1133,13 @@ export const setCurrentSessionId = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
     const course = await ctx.db.get(args.courseId);
-    if (!course) throw new ConvexError('Course not found');
+    if (!course)
+      throw new ConvexError({ code: 'NOT_FOUND', message: 'Course not found' });
     if (course.userId !== userId) {
-      throw new ConvexError('Course does not belong to user');
+      throw new ConvexError({
+        code: 'FORBIDDEN',
+        message: 'Course does not belong to user',
+      });
     }
 
     const existing = await dbGetCourseSettings(ctx, args.courseId);
@@ -1111,9 +1185,13 @@ export const updateCourseSettings = mutation({
     }
 
     const course = await ctx.db.get(args.courseId);
-    if (!course) throw new ConvexError('Course not found');
+    if (!course)
+      throw new ConvexError({ code: 'NOT_FOUND', message: 'Course not found' });
     if (course.userId !== userId)
-      throw new ConvexError('Course does not belong to user');
+      throw new ConvexError({
+        code: 'FORBIDDEN',
+        message: 'Course does not belong to user',
+      });
 
     // Build patch object with only provided fields
     const existing = await dbGetCourseSettings(ctx, args.courseId);
@@ -1161,7 +1239,9 @@ export const updateCourseSettings = mutation({
         typeof value === 'object'
       ) {
         const clamped: Record<string, number> = {};
-        for (const [lang, speed] of Object.entries(value as Record<string, number>)) {
+        for (const [lang, speed] of Object.entries(
+          value as Record<string, number>,
+        )) {
           if (typeof speed !== 'number' || !Number.isFinite(speed)) continue;
           clamped[lang] = Math.max(
             PLAYBACK_SPEED_MIN,
@@ -1297,7 +1377,11 @@ export const completeTutorial = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
     const settings = await dbGetUserSettings(ctx, userId);
-    if (!settings) throw new ConvexError('User settings not found');
+    if (!settings)
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'User settings not found',
+      });
 
     const existing = settings.completedTutorials ?? [];
     if (!existing.includes(args.tutorialId)) {
@@ -1332,7 +1416,7 @@ export const updatePinnedCardActions = mutation({
     if (settings) {
       await ctx.db.patch(settings._id, { pinnedCardActions: normalized });
     } else {
-      await ctx.db.insert('userSettings', {
+      await insertUserSettings(ctx, {
         userId,
         hasCompletedOnboarding: false,
         pinnedCardActions: normalized,
@@ -1342,3 +1426,39 @@ export const updatePinnedCardActions = mutation({
   },
 });
 
+/**
+ * Patch account-level preferences (cross-course). Missing fields are left
+ * unchanged. Creates a settings row if the user has none yet, with the
+ * same new-user defaults as other insert paths.
+ */
+export const updateUserSettings = mutation({
+  args: {
+    hideDueCounts: v.optional(v.boolean()),
+    hideWorkloadForecast: v.optional(v.boolean()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireAuthUserId(ctx);
+    const patch: { hideDueCounts?: boolean; hideWorkloadForecast?: boolean } =
+      {};
+    if (args.hideDueCounts !== undefined) {
+      patch.hideDueCounts = args.hideDueCounts;
+    }
+    if (args.hideWorkloadForecast !== undefined) {
+      patch.hideWorkloadForecast = args.hideWorkloadForecast;
+    }
+    if (Object.keys(patch).length === 0) return null;
+
+    const settings = await dbGetUserSettings(ctx, userId);
+    if (settings) {
+      await ctx.db.patch(settings._id, patch);
+    } else {
+      await insertUserSettings(ctx, {
+        userId,
+        hasCompletedOnboarding: false,
+        ...patch,
+      });
+    }
+    return null;
+  },
+});

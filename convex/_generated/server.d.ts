@@ -25,8 +25,29 @@ import type { DataModel } from "./dataModel.js";
  * Typesafe environment variables declared in `convex.config.ts`.
  */
 type Env = {
+  readonly APPLE_APP_BUNDLE_IDENTIFIER: string | undefined;
+  readonly APPLE_CLIENT_ID: string | undefined;
+  readonly APPLE_KEY_ID: string | undefined;
+  readonly APPLE_PRIVATE_KEY: string | undefined;
+  readonly APPLE_TEAM_ID: string | undefined;
+  readonly AUTUMN_SECRET_KEY: string | undefined;
+  readonly AZURE_SPEECH_API_KEY: string | undefined;
+  readonly AZURE_SPEECH_REGION: string | undefined;
+  readonly CONVEX_BILLING_TOKEN: string | undefined;
+  readonly CONVEX_TEAM_ID: string | undefined;
+  readonly E2E_TEST_HOOKS: string | undefined;
+  readonly EMAIL_ENV: string | undefined;
+  readonly FF_NEW_COURSE_CUTOVER: string | undefined;
+  readonly GOOGLE_CLIENT_ID: string | undefined;
+  readonly GOOGLE_CLIENT_SECRET: string | undefined;
+  readonly GOOGLE_SERVICE_ACCOUNT_KEY: string | undefined;
+  readonly GOOGLE_TRANSLATE_API_KEY: string | undefined;
+  readonly GOOGLE_TTS_API_KEY: string | undefined;
+  readonly OPENROUTER_API_KEY: string | undefined;
   readonly POSTHOG_HOST: string | undefined;
   readonly POSTHOG_PROJECT_TOKEN: string;
+  readonly SITE_URL: string | undefined;
+  readonly STRIPE_SECRET_KEY: string | undefined;
 };
 
 /**

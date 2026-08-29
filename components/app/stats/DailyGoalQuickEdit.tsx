@@ -22,6 +22,8 @@ import {
 } from '@/lib/constants/dailyGoal';
 import { GoalPresetTile } from '@/components/app/stats/GoalPresetTile';
 
+import { reportError } from '@/lib/report-error';
+
 /**
  * Popover for editing the daily study-time goal straight from the
  * homescreen: tap the goal indicator (the trigger child), pick one of the
@@ -59,7 +61,7 @@ export function DailyGoalQuickEdit({
       // The popover is already closed and the optimistic update has rolled
       // back, so without this the ring silently snaps to the old goal and the
       // rejection surfaces only as an unhandled promise.
-      console.error('Error updating daily goal:', error);
+      reportError(error, { op: 'updateDailyTimeGoal' });
       toast.error(t('saveError'));
     }
   };

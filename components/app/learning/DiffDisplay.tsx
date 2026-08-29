@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { charDiff, getCompareConfig, toDiffOptions } from '@/lib/textCompare';
 import { WordDiff } from './WordDiff';
 import { AccuracyFooter, CleanRevealedSentence } from './CleanRevealedSentence';
@@ -17,6 +17,14 @@ interface DiffDisplayProps {
   hideErrors?: boolean;
   /** `courseSettings.ignorePunctuation`. Drop punctuation from the score. */
   ignorePunctuation?: boolean;
+  /**
+   * Bracketed furigana for `expected` (lib/furigana.ts). Only the clean
+   * reveal renders it — diff chips stay bare, readings over struck-through
+   * fragments would be noise.
+   */
+  furigana?: string;
+  /** Romanization/IPA, rendered under the sentence and above the accuracy line. */
+  afterText?: ReactNode;
 }
 
 // Lives in lib/textCompare/accuracy.ts so non-React code (and the auto-rating
@@ -31,6 +39,8 @@ export function DiffDisplay({
   omitAccuracy = false,
   hideErrors = false,
   ignorePunctuation = false,
+  furigana,
+  afterText,
 }: DiffDisplayProps) {
   const cfg = getCompareConfig(language);
 
@@ -44,6 +54,8 @@ export function DiffDisplay({
         omitAccuracy={omitAccuracy}
         hideErrors={hideErrors}
         ignorePunctuation={ignorePunctuation}
+        furigana={furigana}
+        afterText={afterText}
       />
     );
   }
@@ -57,6 +69,8 @@ export function DiffDisplay({
       omitAccuracy={omitAccuracy}
       hideErrors={hideErrors}
       ignorePunctuation={ignorePunctuation}
+      furigana={furigana}
+      afterText={afterText}
     />
   );
 }
@@ -69,6 +83,8 @@ interface CharDiffViewProps {
   omitAccuracy: boolean;
   hideErrors: boolean;
   ignorePunctuation: boolean;
+  furigana?: string;
+  afterText?: ReactNode;
 }
 
 function CharDiffView({
@@ -79,6 +95,8 @@ function CharDiffView({
   omitAccuracy,
   hideErrors,
   ignorePunctuation,
+  furigana,
+  afterText,
 }: CharDiffViewProps) {
   const diffOpts = useMemo(
     () => toDiffOptions(getCompareConfig(language, { ignorePunctuation })),
@@ -101,6 +119,8 @@ function CharDiffView({
         language={language}
         accuracy={accuracyPct}
         hideAccuracy={hideAccuracy}
+        furigana={furigana}
+        afterText={afterText}
       />
     );
   }
@@ -142,12 +162,16 @@ function CharDiffView({
             );
           }
           return (
-            <span key={i} className="bg-success/15 text-success rounded-sm px-0.5">
+            <span
+              key={i}
+              className="bg-success/15 text-success rounded-sm px-0.5"
+            >
               {chunk.text}
             </span>
           );
         })}
       </p>
+      {afterText}
       {!omitAccuracy && (
         <AccuracyFooter accuracy={accuracyPct} hideAccuracy={hideAccuracy} />
       )}

@@ -93,7 +93,10 @@ describe('toAzureSttLocale', () => {
     const missing = SUPPORTED_LANGUAGES.filter(
       (l) => !(l.code in EXPECTED_AZURE),
     ).map((l) => l.code);
-    expect(missing, `codes without an expected Azure mapping: ${missing.join(', ')}`).toEqual([]);
+    expect(
+      missing,
+      `codes without an expected Azure mapping: ${missing.join(', ')}`,
+    ).toEqual([]);
   });
 
   it('preserves the legacy `cmn` alias used by Google voice locale prefixes', () => {

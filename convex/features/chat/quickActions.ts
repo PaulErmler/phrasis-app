@@ -22,14 +22,40 @@ export const vQuickAction = v.union(
   v.object({ kind: v.literal('paraphrase') }),
   v.object({ kind: v.literal('formal') }),
   v.object({ kind: v.literal('simpler') }),
-  v.object({ kind: v.literal('explainWord'), word: v.string(), language: v.string() }),
-  v.object({ kind: v.literal('synonyms'), word: v.string(), language: v.string() }),
-  v.object({ kind: v.literal('antonyms'), word: v.string(), language: v.string() }),
+  v.object({
+    kind: v.literal('explainWord'),
+    word: v.string(),
+    language: v.string(),
+  }),
+  v.object({
+    kind: v.literal('synonyms'),
+    word: v.string(),
+    language: v.string(),
+  }),
+  v.object({
+    kind: v.literal('antonyms'),
+    word: v.string(),
+    language: v.string(),
+  }),
   v.object({
     kind: v.literal('discussAnswer'),
     userAnswer: v.string(),
     expected: v.string(),
     language: v.string(),
+    /**
+     * Transcribe writing style: the user typed what they heard, so the chat
+     * must judge the attempt as a transcription of the audio — a
+     * differently-worded equivalent is not "also correct" and
+     * markAlsoCorrect must never fire. Absent/false = Translate.
+     */
+    transcribe: v.optional(v.boolean()),
+    /**
+     * Compact summary of what the writing grader already told the user
+     * (verdict + notes + corrected form), built client-side from the coach
+     * card. Lets the chat build on that feedback instead of repeating or
+     * contradicting it. Absent when feedback was off/errored.
+     */
+    aiFeedback: v.optional(v.string()),
   }),
 );
 
@@ -44,7 +70,8 @@ export const SENTENCE_QUICK_ACTION_KINDS = [
   'formal',
   'simpler',
 ] as const;
-export type SentenceQuickActionKind = (typeof SENTENCE_QUICK_ACTION_KINDS)[number];
+export type SentenceQuickActionKind =
+  (typeof SENTENCE_QUICK_ACTION_KINDS)[number];
 
 export const MAX_QUICK_ACTION_WORD_LENGTH = 100;
 // Generous. Real BCP-47 codes are ≤ ~11 chars; this only stops the field
@@ -63,7 +90,8 @@ export function assertQuickActionWithinLimits(action: QuickAction): void {
       action.language.length > MAX_QUICK_ACTION_LANGUAGE_LENGTH) ||
     ('userAnswer' in action &&
       (action.userAnswer.length > MAX_MESSAGE_LENGTH ||
-        action.expected.length > MAX_MESSAGE_LENGTH));
+        action.expected.length > MAX_MESSAGE_LENGTH ||
+        (action.aiFeedback?.length ?? 0) > MAX_MESSAGE_LENGTH));
   if (tooLong) {
     throw new ConvexError({
       code: 'MESSAGE_TOO_LONG',
@@ -137,7 +165,10 @@ function targetSubjectNote(ctx: QuickActionContext): string {
     : ` Everything you analyze and every example you produce is ${names} — the target language. Do not analyze or explain the base-language translation of this card.`;
 }
 
-function sentenceSteering(kind: SentenceQuickActionKind, sentence: string): string {
+function sentenceSteering(
+  kind: SentenceQuickActionKind,
+  sentence: string,
+): string {
   switch (kind) {
     case 'grammar':
       return `The user wants a detailed grammar explanation of the sentence they are reviewing: ${sentence}. Never create a card for the reviewed sentence itself.`;
@@ -192,7 +223,19 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export function expandQuickAction(action: QuickAction, ctx: QuickActionContext): string {
+/**
+ * The card-creation policy both discussAnswer prompts close with. Only the
+ * name of the pattern differs between them; the "otherwise no cards, and never
+ * the user's own variant" rule must stay identical, so it lives in one place.
+ */
+function discussCardPolicy(trigger: string, trains: string): string {
+  return `If you spot a recurring ${trigger}, create 1-2 flashcards (createCard) with fresh example sentences that train exactly that ${trains} — otherwise create no cards for this reply, and never createCard the user's variant itself.`;
+}
+
+export function expandQuickAction(
+  action: QuickAction,
+  ctx: QuickActionContext,
+): string {
   const header = `[Quick action pressed by the user: ${action.kind}]`;
   const replyNote = replyLanguageNote(ctx);
   switch (action.kind) {
@@ -213,7 +256,14 @@ export function expandQuickAction(action: QuickAction, ctx: QuickActionContext):
         ctx.targetLanguages.includes(action.language),
         ctx.targetLanguages,
       )}${replyNote}`;
-    case 'discussAnswer':
-      return `${header} The user is practicing writing. The expected ${languageName(action.language)} sentence was: "${action.expected}". The user wrote: "${action.userAnswer}". Judge whether the user's version is ALSO a correct, natural way to express the same thing. If fully correct: say so clearly, point out any nuance or register differences from the expected sentence, and call the markAlsoCorrect tool exactly once — pass the full corrected sentence for every language whose text changes (keep the user's wording; fix only punctuation/capitalization/diacritics) plus any card-metadata fields the version changes (speaker gender, register, addressee); the app then offers to save it, so do not ask. If partially correct: identify exactly which parts are right and which are off, and why — do NOT call markAlsoCorrect. If incorrect: explain every error (grammar, vocabulary, word order, spelling/diacritics) concretely, quoting the exact words, and give the corrected form. If you spot a recurring error pattern, create 1-2 flashcards (createCard) with fresh example sentences that train exactly that pattern — otherwise create no cards for this reply, and never createCard the user's variant itself.${replyNote}`;
+    case 'discussAnswer': {
+      const graderNote = action.aiFeedback
+        ? ` The app's quick grader already showed the user this feedback: <graderFeedback>${action.aiFeedback}</graderFeedback> Do not repeat it verbatim — go deeper: expand on the WHY, add examples or related patterns, and if your judgment disagrees with the grader's, say so explicitly and explain.`
+        : '';
+      if (action.transcribe) {
+        return `${header} The user is practicing listening transcription. They heard audio of the ${languageName(action.language)} sentence "${action.expected}" and typed what they heard. The user wrote: "${action.userAnswer}". This is transcription, not translation: only the spoken sentence is correct, so never present a differently-worded equivalent as also correct, and do NOT call markAlsoCorrect. Compare the transcript with the spoken sentence and explain every mishearing concretely: quote the exact words, say what the written word means versus what was said, and when the two sound alike, say so and explain how to tell them apart by ear. For spelling or grammar slips, give the correct form. ${discussCardPolicy('listening confusion', 'distinction')}${graderNote}${replyNote}`;
+      }
+      return `${header} The user is practicing writing. The expected ${languageName(action.language)} sentence was: "${action.expected}". The user wrote: "${action.userAnswer}". Judge whether the user's version is ALSO a correct, natural way to express the same thing. If fully correct: say so clearly, point out any nuance or register differences from the expected sentence, and call the markAlsoCorrect tool exactly once — pass the full corrected sentence for every language whose text changes (keep the user's wording; fix only punctuation/capitalization/diacritics) plus any card-metadata fields the version changes (speaker gender, register, addressee); the app then offers to save it, so do not ask. If partially correct: identify exactly which parts are right and which are off, and why — do NOT call markAlsoCorrect. If incorrect: explain every error (grammar, vocabulary, word order, spelling/diacritics) concretely, quoting the exact words, and give the corrected form. ${discussCardPolicy('error pattern', 'pattern')}${graderNote}${replyNote}`;
+    }
   }
 }

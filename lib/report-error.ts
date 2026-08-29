@@ -15,11 +15,17 @@ import { posthog } from '@/lib/posthog/client';
  * `capture`-style product events (`lib/posthog/events.ts`), not the exception
  * feed, or real crashes drown in noise.
  */
-export function reportError(error: unknown, context?: Record<string, unknown>): void {
+export function reportError(
+  error: unknown,
+  context?: Record<string, unknown>,
+): void {
   console.error(error, context);
 
   try {
-    posthog.captureException(error instanceof Error ? error : new Error(String(error)), context);
+    posthog.captureException(
+      error instanceof Error ? error : new Error(String(error)),
+      context,
+    );
   } catch {
     // A broken reporter must not escalate into a broken app.
   }

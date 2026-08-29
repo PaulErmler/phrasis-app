@@ -4,8 +4,8 @@ import { LandingDemoProvider } from '@/components/landing/landing-demo-context';
 import { LandingHeader } from '@/components/landing/landing-header';
 import { HeroSection } from '@/components/landing/hero-section';
 import { PhilosophySection } from '@/components/landing/philosophy-section';
-import { HowWeAchieveSection } from '@/components/landing/how-we-achieve-section';
 import { ReviewModesSection } from '@/components/landing/review-modes-section';
+import { WritingCompareSection } from '@/components/landing/writing-compare-section';
 import { ChatFlashcardSection } from '@/components/landing/chat-flashcard-section';
 import { FeaturesSection } from '@/components/landing/features-section';
 import { LanguagesSection } from '@/components/landing/languages-section';
@@ -27,9 +27,9 @@ export function LandingPageClient({ isAuthenticated }: LandingPageClientProps) {
       <LandingHeader isAuthenticated={isAuthenticated} />
       <HeroSection isAuthenticated={isAuthenticated} />
       <PhilosophySection />
-      <HowWeAchieveSection />
       <LandingDemoProvider>
         <ReviewModesSection />
+        <WritingCompareSection />
         <ChatFlashcardSection />
       </LandingDemoProvider>
       <AnalyticsSection />

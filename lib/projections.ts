@@ -106,7 +106,12 @@ export interface ProjectionInputs {
 export type ProjectionIndicator =
   | { kind: 'endOfYearWords'; words: number; capped: boolean; year: string }
   | { kind: 'oneYearWords'; words: number; capped: boolean }
-  | { kind: 'endOfMonthWords'; words: number; capped: boolean; monthDate: string }
+  | {
+      kind: 'endOfMonthWords';
+      words: number;
+      capped: boolean;
+      monthDate: string;
+    }
   | {
       kind: 'counterfactualWords';
       boostedWords: number;
@@ -125,8 +130,18 @@ export type ProjectionIndicator =
       etaDate: string;
     }
   | { kind: 'levelByYearEnd'; code: string; year: string }
-  | { kind: 'nextWordMilestone'; milestone: number; etaDays: number; etaDate: string }
-  | { kind: 'studyTimeMilestone'; hours: number; etaDays: number; etaDate: string }
+  | {
+      kind: 'nextWordMilestone';
+      milestone: number;
+      etaDays: number;
+      etaDate: string;
+    }
+  | {
+      kind: 'studyTimeMilestone';
+      hours: number;
+      etaDays: number;
+      etaDate: string;
+    }
   | { kind: 'empty' };
 
 export interface ProjectionResult {
@@ -150,7 +165,8 @@ export function decayedDailyPace(
   courseAgeDays: number,
 ): number {
   const byDate = new Map<string, number>();
-  for (const e of entries) byDate.set(e.date, (byDate.get(e.date) ?? 0) + e.value);
+  for (const e of entries)
+    byDate.set(e.date, (byDate.get(e.date) ?? 0) + e.value);
 
   let numerator = 0;
   for (let d = 0; d < PACE_WINDOW_DAYS; d++) {
@@ -190,7 +206,11 @@ export function projectFirstSession(
   dailyTimeGoalMinutes: number,
   days: number,
 ): number {
-  const rate = firstSessionDailyRate(newWords, sessionMinutes, dailyTimeGoalMinutes);
+  const rate = firstSessionDailyRate(
+    newWords,
+    sessionMinutes,
+    dailyTimeGoalMinutes,
+  );
   return Math.min(PROJECTION_CAP_WORDS, Math.round(rate * days));
 }
 
@@ -269,10 +289,15 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
         ? 0
         : Math.min(
             PROJECTION_CAP_WORDS,
-            firstSessionDailyRate(windowCards, windowMinutes, minutesPerActiveDay),
+            firstSessionDailyRate(
+              windowCards,
+              windowMinutes,
+              minutesPerActiveDay,
+            ),
           );
     minutesPerDay = minutesPerActiveDay;
-    wordsPerMinute = windowWords / Math.max(windowMinutes, 5) / FIRST_SESSION_DAMPENER;
+    wordsPerMinute =
+      windowWords / Math.max(windowMinutes, 5) / FIRST_SESSION_DAMPENER;
   } else if (currentWords > 0 && totalTimeMs > 60_000 && goalMinutes != null) {
     // Long pause: no recent activity, but real all-time history. Frame
     // everything as goal-conditional ("if you hit your goal daily…").
@@ -284,7 +309,8 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
     basis = 'goal';
     const totalMinutes = totalTimeMs / 60_000;
     const trust = Math.min(1, totalMinutes / GOAL_BASIS_FULL_TRUST_MINUTES);
-    const dampener = FIRST_SESSION_DAMPENER - (FIRST_SESSION_DAMPENER - 1) * trust;
+    const dampener =
+      FIRST_SESSION_DAMPENER - (FIRST_SESSION_DAMPENER - 1) * trust;
     const allTimeWpm = currentWords / totalMinutes / dampener;
     wordsPerDay = allTimeWpm * goalMinutes;
     cardsPerDay = (currentSentences / totalMinutes / dampener) * goalMinutes;
@@ -444,13 +470,20 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
         idx++;
       }
       if (idx > activeLevelIndex) {
-        indicators.push({ kind: 'levelByYearEnd', code: levels[idx].code, year });
+        indicators.push({
+          kind: 'levelByYearEnd',
+          code: levels[idx].code,
+          year,
+        });
       }
     }
   }
 
   if (wordsPerDay > 0 && currentWords >= 0) {
-    const milestone = Math.max(1000, Math.ceil((currentWords + 1) / 1000) * 1000);
+    const milestone = Math.max(
+      1000,
+      Math.ceil((currentWords + 1) / 1000) * 1000,
+    );
     const etaDays = ceilDays((milestone - currentWords) / wordsPerDay);
     if (etaDays >= 1 && etaDays <= MAX_ETA_DAYS) {
       indicators.push({

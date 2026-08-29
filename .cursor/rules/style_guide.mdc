@@ -1,8 +1,8 @@
 # App Style Guide Rules
 
-When writing or editing React components in `components/` or `app/`, always follow the project style guide at `documentation/style_guide.md`. It is the single source of truth for the reusable CSS classes (defined in `app/globals.css`), typography, cards/surfaces, page layout, sheet/dialog headers, icon sizing, and semantic colors — read it before styling work rather than relying on a summary here.
+When writing or editing React components in `components/` or `app/`, always follow the project style guide at `docs/architecture/style_guide.md`. It is the single source of truth for the reusable CSS classes (defined in `app/globals.css`), typography, cards/surfaces, page layout, sheet/dialog headers, icon sizing, and semantic colors — read it before styling work rather than relying on a summary here.
 
 Cursor-specific directives:
 
 - Prefer the reusable CSS classes in `app/globals.css` over inline Tailwind when they match the pattern.
-- Do not restate or hand-condense `documentation/style_guide.md` in this rule file; it drifts. Update the style guide itself instead.
+- Do not restate or hand-condense `docs/architecture/style_guide.md` in this rule file; it drifts. Update the style guide itself instead.

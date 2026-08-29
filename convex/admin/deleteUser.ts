@@ -49,8 +49,11 @@ const CARD_BATCH = 40;
 const TEXT_BATCH = 25;
 const ROW_BATCH = 200;
 // Backstop on the action's mutation loop. At the batch sizes above this is
-// ~1M rows, far past any real account; hitting it means something is not
-// draining and the run should stop rather than spin.
+// ~1M rows across all tables; hitting it means something is not draining
+// and the run should stop rather than spin. reviewHistory is the one table
+// that grows without bound (~75k rows/year for a heavy user — see its
+// schema note), so a multi-year power account consumes a real share of
+// this budget; raise it before it becomes the limiting factor.
 const MAX_BATCHES = 5000;
 
 /**
@@ -105,6 +108,7 @@ export const USER_TABLES = [
   'courseStats',
   'dailyStats',
   'reviewLogs',
+  'reviewHistory',
   'collectionProgress',
   'collectionTextMarks',
   'dailyLanguageStats',
@@ -119,6 +123,13 @@ export const USER_TABLES = [
   'billingTestOverrides',
   'admins',
   'userProfiles',
+  // Card-edit audit log. The rows carry the user's own typed sentences, so
+  // they purge with the account rather than surviving as a QC record: the
+  // quality signal is not worth retaining text from a deleted account.
+  // `cardEditRetranslations` denormalizes `userId` from its parent precisely
+  // so it can be drained here by one indexed read.
+  'cardEdits',
+  'cardEditRetranslations',
 ] as const;
 type UserTable = (typeof USER_TABLES)[number];
 
@@ -137,43 +148,165 @@ const ids = (docs: Array<{ _id: Id<UserTable> }>): Array<Id<UserTable>> =>
 
 const USER_TABLE_DRAINS: Record<UserTable, UserTableDrain> = {
   userSettings: async (ctx, u) =>
-    ids(await ctx.db.query('userSettings').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('userSettings')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   onboardingProgress: async (ctx, u) =>
-    ids(await ctx.db.query('onboardingProgress').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('onboardingProgress')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   courseStats: async (ctx, u) =>
-    ids(await ctx.db.query('courseStats').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('courseStats')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   dailyStats: async (ctx, u) =>
-    ids(await ctx.db.query('dailyStats').withIndex('by_userId_and_courseId_and_date', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('dailyStats')
+        .withIndex('by_userId_and_courseId_and_date', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   reviewLogs: async (ctx, u) =>
-    ids(await ctx.db.query('reviewLogs').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('reviewLogs')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
+  reviewHistory: async (ctx, u) =>
+    ids(
+      await ctx.db
+        .query('reviewHistory')
+        .withIndex('by_userId_and_courseId_and_reviewedAt', (q) =>
+          q.eq('userId', u),
+        )
+        .take(ROW_BATCH),
+    ),
   collectionProgress: async (ctx, u) =>
-    ids(await ctx.db.query('collectionProgress').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('collectionProgress')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   collectionTextMarks: async (ctx, u) =>
-    ids(await ctx.db.query('collectionTextMarks').withIndex('by_userId_and_courseId_and_textId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('collectionTextMarks')
+        .withIndex('by_userId_and_courseId_and_textId', (q) =>
+          q.eq('userId', u),
+        )
+        .take(ROW_BATCH),
+    ),
   dailyLanguageStats: async (ctx, u) =>
-    ids(await ctx.db.query('dailyLanguageStats').withIndex('by_userId_and_courseId_and_date', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('dailyLanguageStats')
+        .withIndex('by_userId_and_courseId_and_date', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   userWords: async (ctx, u) =>
-    ids(await ctx.db.query('userWords').withIndex('by_userId_and_courseId_and_language_and_word', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('userWords')
+        .withIndex('by_userId_and_courseId_and_language_and_word', (q) =>
+          q.eq('userId', u),
+        )
+        .take(ROW_BATCH),
+    ),
   userWordTexts: async (ctx, u) =>
-    ids(await ctx.db.query('userWordTexts').withIndex('by_userId_courseId_language_word', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('userWordTexts')
+        .withIndex('by_userId_courseId_language_word', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   languageStats: async (ctx, u) =>
-    ids(await ctx.db.query('languageStats').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('languageStats')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   weeklyStats: async (ctx, u) =>
-    ids(await ctx.db.query('weeklyStats').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('weeklyStats')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   monthlyStats: async (ctx, u) =>
-    ids(await ctx.db.query('monthlyStats').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('monthlyStats')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   yearlyStats: async (ctx, u) =>
-    ids(await ctx.db.query('yearlyStats').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('yearlyStats')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   reviewDepthAccuracy: async (ctx, u) =>
-    ids(await ctx.db.query('reviewDepthAccuracy').withIndex('by_userId_and_courseId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('reviewDepthAccuracy')
+        .withIndex('by_userId_and_courseId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   usageQuotas: async (ctx, u) =>
-    ids(await ctx.db.query('usageQuotas').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('usageQuotas')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   billingTestOverrides: async (ctx, u) =>
-    ids(await ctx.db.query('billingTestOverrides').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('billingTestOverrides')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   admins: async (ctx, u) =>
-    ids(await ctx.db.query('admins').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('admins')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
   userProfiles: async (ctx, u) =>
-    ids(await ctx.db.query('userProfiles').withIndex('by_userId', (q) => q.eq('userId', u)).take(ROW_BATCH)),
+    ids(
+      await ctx.db
+        .query('userProfiles')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
+  cardEdits: async (ctx, u) =>
+    ids(
+      await ctx.db
+        .query('cardEdits')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
+  cardEditRetranslations: async (ctx, u) =>
+    ids(
+      await ctx.db
+        .query('cardEditRetranslations')
+        .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
 };
 
 export interface PurgeInventory {
@@ -186,6 +319,38 @@ export interface PurgeInventory {
   hasQuotaRow: boolean;
   isAdmin: boolean;
 }
+
+const purgeInventoryValidator = v.object({
+  courses: v.number(),
+  decks: v.number(),
+  cards: v.number(),
+  texts: v.number(),
+  chatApprovals: v.number(),
+  customCollections: v.number(),
+  hasQuotaRow: v.boolean(),
+  isAdmin: v.boolean(),
+});
+
+/** `accountDeletions.status` (schema union), or null when no row exists. */
+const deletionRequestStatusValidator = v.union(
+  v.literal('requested'),
+  v.literal('running'),
+  v.literal('completed'),
+  v.null(),
+);
+
+/** The PHASES tuple above, as literals (validators need the spelled-out union). */
+const purgePhaseValidator = v.union(
+  v.literal('cards'),
+  v.literal('aggregates'),
+  v.literal('texts'),
+  v.literal('approvals'),
+  v.literal('collections'),
+  v.literal('userTables'),
+  v.literal('courses'),
+  v.literal('auth'),
+  v.literal('done'),
+);
 
 // Explicit result shapes for the same-file ctx.run* calls in `run`; without
 // them TypeScript trips over the internal.admin.deleteUser type circularity.
@@ -206,22 +371,22 @@ interface PurgeBatchResult {
 
 export type RunResult =
   | {
-    dryRun: true;
-    wouldRun: boolean;
-    authUserFound: boolean;
-    emailMatches: boolean;
-    authEmail: string | null;
-    deletionRequest: 'requested' | 'running' | 'completed' | null;
-    inventory: PurgeInventory;
-  }
+      dryRun: true;
+      wouldRun: boolean;
+      authUserFound: boolean;
+      emailMatches: boolean;
+      authEmail: string | null;
+      deletionRequest: 'requested' | 'running' | 'completed' | null;
+      inventory: PurgeInventory;
+    }
   | {
-    dryRun: false;
-    deleted: true;
-    docsDeleted: number;
-    batches: number;
-    autumnCustomerExisted: boolean;
-    cancelledProductIds: string[];
-  };
+      dryRun: false;
+      deleted: true;
+      docsDeleted: number;
+      batches: number;
+      autumnCustomerExisted: boolean;
+      cancelledProductIds: string[];
+    };
 
 // ---------------------------------------------------------------------------
 // Preflight
@@ -234,6 +399,13 @@ export type RunResult =
  */
 export const preflight = internalQuery({
   args: { userId: v.string(), email: v.string() },
+  returns: v.object({
+    authOk: v.boolean(),
+    emailMatches: v.boolean(),
+    authEmail: v.union(v.string(), v.null()),
+    requestStatus: deletionRequestStatusValidator,
+    inventory: purgeInventoryValidator,
+  }),
   handler: async (ctx, args) => {
     const email = args.email.trim().toLowerCase();
     const authUser = await authComponent.getAnyUserById(ctx, args.userId);
@@ -335,6 +507,7 @@ export const beginPurge = internalMutation({
     email: v.string(),
     overrideNoRequest: v.optional(v.boolean()),
   },
+  returns: v.object({ email: v.string(), authEmail: v.string() }),
   handler: async (ctx, args) => {
     const email = args.email.trim().toLowerCase();
     const authUser = await authComponent.getAnyUserById(ctx, args.userId);
@@ -430,6 +603,12 @@ export const beginPurge = internalMutation({
  */
 export const purgeBatch = internalMutation({
   args: { userId: v.string(), email: v.string() },
+  returns: v.object({
+    phase: purgePhaseValidator,
+    deleted: v.number(),
+    totalDeleted: v.number(),
+    done: v.boolean(),
+  }),
   handler: async (ctx, args) => {
     const row = await ctx.db
       .query('accountDeletions')
@@ -819,6 +998,7 @@ async function purgeAuth(
 
 export const markCompleted = internalMutation({
   args: { userId: v.string() },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db
       .query('accountDeletions')
@@ -840,6 +1020,24 @@ export const markCompleted = internalMutation({
 /** Status of a purge, for the e2e spec and for checking on a resumed run. */
 export const purgeStatus = internalQuery({
   args: { userId: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      status: v.union(
+        v.literal('requested'),
+        v.literal('running'),
+        v.literal('completed'),
+      ),
+      // Schema stores phase as a plain optional string (values are the
+      // PHASES tuple, but historical rows aren't re-validated), so string
+      // here rather than purgePhaseValidator.
+      phase: v.union(v.string(), v.null()),
+      docsDeleted: v.number(),
+      requestedAt: v.union(v.number(), v.null()),
+      completedAt: v.union(v.number(), v.null()),
+      overrideNoRequest: v.boolean(),
+    }),
+  ),
   handler: async (ctx, args) => {
     const row = await ctx.db
       .query('accountDeletions')
@@ -929,6 +1127,25 @@ export const run = internalAction({
     dryRun: v.optional(v.boolean()),
     overrideNoRequest: v.optional(v.boolean()),
   },
+  returns: v.union(
+    v.object({
+      dryRun: v.literal(true),
+      wouldRun: v.boolean(),
+      authUserFound: v.boolean(),
+      emailMatches: v.boolean(),
+      authEmail: v.union(v.string(), v.null()),
+      deletionRequest: deletionRequestStatusValidator,
+      inventory: purgeInventoryValidator,
+    }),
+    v.object({
+      dryRun: v.literal(false),
+      deleted: v.literal(true),
+      docsDeleted: v.number(),
+      batches: v.number(),
+      autumnCustomerExisted: v.boolean(),
+      cancelledProductIds: v.array(v.string()),
+    }),
+  ),
   handler: async (ctx, args): Promise<RunResult> => {
     const email = args.email.trim().toLowerCase();
     const check: PreflightResult = await ctx.runQuery(

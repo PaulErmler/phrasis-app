@@ -6,10 +6,15 @@ const LOCALE_COOKIE = 'NEXT_LOCALE';
 
 export type Locale = 'en' | 'de';
 
+const LOCALES: readonly Locale[] = ['en', 'de'];
+
 export async function getUserLocale(): Promise<Locale> {
   const cookieStore = await cookies();
   const locale = cookieStore.get(LOCALE_COOKIE)?.value;
-  return (locale as Locale) || 'en';
+  // The cookie is client-controlled and may hold anything (stale app
+  // versions, other apps on the domain). An unknown value must fall back to
+  // 'en' — it is used to index the static message catalogs in request.tsx.
+  return LOCALES.includes(locale as Locale) ? (locale as Locale) : 'en';
 }
 
 export async function setUserLocale(locale: Locale): Promise<void> {

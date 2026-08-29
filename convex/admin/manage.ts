@@ -14,6 +14,7 @@ export const setAdmin = internalMutation({
     email: v.string(),
     userId: v.optional(v.string()),
   },
+  returns: v.object({ email: v.string(), userId: v.string() }),
   handler: async (ctx, args) => {
     const email = args.email.trim().toLowerCase();
 
@@ -64,6 +65,7 @@ export const setAdmin = internalMutation({
  */
 export const removeAdmin = internalMutation({
   args: { email: v.string() },
+  returns: v.object({ removed: v.boolean() }),
   handler: async (ctx, args) => {
     const email = args.email.trim().toLowerCase();
     const existing = await ctx.db

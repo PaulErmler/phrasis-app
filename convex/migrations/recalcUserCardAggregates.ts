@@ -5,9 +5,11 @@ import { Id } from '../_generated/dataModel';
 import {
   cardsByStateAndDueDate,
   cardsByOriginStateAndDueDate,
+  cardsByStabilityBucketAndDueDate,
   cardsByWritingStateAndDueDate,
   cardsByOriginWritingStateAndDueDate,
   hasWritingTrack,
+  isStabilityBucketMember,
   clearAggregatesForDeck,
 } from '../db/stats/cardAggregates';
 
@@ -30,6 +32,7 @@ const BATCH_SIZE = 75;
  */
 export const run = internalMutation({
   args: { userId: v.string() },
+  returns: v.object({ status: v.literal('started'), deckCount: v.number() }),
   handler: async (ctx, args) => {
     const courses = await ctx.db
       .query('courses')
@@ -53,7 +56,7 @@ export const run = internalMutation({
       );
     }
 
-    return { status: 'started', deckCount: deckIds.length };
+    return { status: 'started' as const, deckCount: deckIds.length };
   },
 });
 
@@ -79,6 +82,7 @@ export const processBatch = internalMutation({
     cursor: v.optional(v.string()),
     clearPhase: v.optional(v.union(v.literal('writing'), v.literal('done'))),
   },
+  returns: v.object({ processed: v.number(), isDone: v.boolean() }),
   handler: async (ctx, args) => {
     if (args.deckIdx >= args.deckIds.length) {
       return { processed: 0, isDone: true };
@@ -109,9 +113,15 @@ export const processBatch = internalMutation({
     for (const doc of result.page) {
       await cardsByStateAndDueDate.insertIfDoesNotExist(ctx, doc);
       await cardsByOriginStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+      if (isStabilityBucketMember(doc)) {
+        await cardsByStabilityBucketAndDueDate.insertIfDoesNotExist(ctx, doc);
+      }
       if (hasWritingTrack(doc)) {
         await cardsByWritingStateAndDueDate.insertIfDoesNotExist(ctx, doc);
-        await cardsByOriginWritingStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+        await cardsByOriginWritingStateAndDueDate.insertIfDoesNotExist(
+          ctx,
+          doc,
+        );
       }
     }
 
@@ -124,11 +134,11 @@ export const processBatch = internalMutation({
         advanceDeck
           ? { deckIds: args.deckIds, deckIdx: nextDeckIdx }
           : {
-            deckIds: args.deckIds,
-            deckIdx: nextDeckIdx,
-            cursor: result.continueCursor,
-            clearPhase: 'done' as const,
-          },
+              deckIds: args.deckIds,
+              deckIdx: nextDeckIdx,
+              cursor: result.continueCursor,
+              clearPhase: 'done' as const,
+            },
       );
     }
 

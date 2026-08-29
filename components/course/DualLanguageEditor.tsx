@@ -24,9 +24,10 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import {
-  SUPPORTED_LANGUAGES,
   getLanguageByCode,
   getLocalizedLanguageNameByCode,
+  languageName,
+  SUPPORTED_LANGUAGES,
 } from '@/lib/languages';
 import { cn } from '@/lib/utils';
 
@@ -55,7 +56,7 @@ interface DualLanguageEditorProps {
 
 function getDisplayName(code: string, locale?: string): string {
   if (locale) return getLocalizedLanguageNameByCode(code, locale);
-  return getLanguageByCode(code)?.name ?? code;
+  return languageName(code);
 }
 
 function SortableItem({
@@ -325,21 +326,13 @@ export function DualLanguageEditor({
     const activeContainer = findContainer(active.id as string);
     const overContainer = findContainer(over.id as string);
 
-    if (
-      !activeContainer ||
-      !overContainer ||
-      activeContainer === overContainer
-    )
+    if (!activeContainer || !overContainer || activeContainer === overContainer)
       return;
 
     const sourceList =
-      activeContainer === 'base'
-        ? [...baseLanguages]
-        : [...targetLanguages];
+      activeContainer === 'base' ? [...baseLanguages] : [...targetLanguages];
     const destList =
-      overContainer === 'base'
-        ? [...baseLanguages]
-        : [...targetLanguages];
+      overContainer === 'base' ? [...baseLanguages] : [...targetLanguages];
 
     const activeCode = active.id as string;
     const activeIndex = sourceList.indexOf(activeCode);
@@ -372,9 +365,7 @@ export function DualLanguageEditor({
 
     if (activeContainer === overContainer) {
       const list =
-        activeContainer === 'base'
-          ? [...baseLanguages]
-          : [...targetLanguages];
+        activeContainer === 'base' ? [...baseLanguages] : [...targetLanguages];
       const oldIndex = list.indexOf(active.id as string);
       const newIndex = list.indexOf(over.id as string);
 
@@ -415,9 +406,7 @@ export function DualLanguageEditor({
           addLabel={l.addLanguage}
           noMoreLabel={l.noMoreAvailable}
           cancelLabel={l.cancel}
-          onAdd={(code) =>
-            onChange([...baseLanguages, code], targetLanguages)
-          }
+          onAdd={(code) => onChange([...baseLanguages, code], targetLanguages)}
           onRemove={(code) =>
             onChange(
               baseLanguages.filter((c) => c !== code),
@@ -444,9 +433,7 @@ export function DualLanguageEditor({
           addLabel={l.addLanguage}
           noMoreLabel={l.noMoreAvailable}
           cancelLabel={l.cancel}
-          onAdd={(code) =>
-            onChange(baseLanguages, [...targetLanguages, code])
-          }
+          onAdd={(code) => onChange(baseLanguages, [...targetLanguages, code])}
           onRemove={(code) =>
             onChange(
               baseLanguages,

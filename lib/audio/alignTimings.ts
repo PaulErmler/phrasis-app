@@ -160,8 +160,7 @@ export function alignWordTimings(
       }
     }
 
-    const fallback =
-      prevEnd ?? nextStart ?? 0; // if truly nothing matched, anchor at 0
+    const fallback = prevEnd ?? nextStart ?? 0; // if truly nothing matched, anchor at 0
     partials[i].start = partials[i].start ?? prevEnd ?? fallback;
     partials[i].end = partials[i].end ?? nextStart ?? fallback;
   }
@@ -197,8 +196,7 @@ export function findCurrentIndex(words: AlignedWord[], t: number): number {
   if (words.length === 0) return -1;
   if (t < words[0].start) return -1;
   for (let i = 0; i < words.length; i++) {
-    const nextStart =
-      i < words.length - 1 ? words[i + 1].start : words[i].end;
+    const nextStart = i < words.length - 1 ? words[i + 1].start : words[i].end;
     if (t >= words[i].start && t < nextStart) return i;
   }
   return -1;

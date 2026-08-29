@@ -49,5 +49,7 @@ export function nativePlatform(): 'ios' | 'android' | null {
   const platform = window.Capacitor?.getPlatform?.();
   if (platform === 'ios' || platform === 'android') return platform;
   // Override active without a real Capacitor bridge (browser testing).
-  return /iphone|ipad|ipod|macintosh/i.test(navigator.userAgent) ? 'ios' : 'android';
+  return /iphone|ipad|ipod|macintosh/i.test(navigator.userAgent)
+    ? 'ios'
+    : 'android';
 }

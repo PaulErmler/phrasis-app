@@ -22,9 +22,9 @@ describe('normalize', () => {
   });
 
   it('can fold both case and diacritics together', () => {
-    expect(
-      normalize('ÉLÈVE', { foldCase: true, foldDiacritics: true }),
-    ).toBe('eleve');
+    expect(normalize('ÉLÈVE', { foldCase: true, foldDiacritics: true })).toBe(
+      'eleve',
+    );
   });
 
   it('handles empty strings', () => {
@@ -45,9 +45,9 @@ describe('normalize', () => {
 
     it('strips CJK punctuation', () => {
       // 。(U+3002) and 、(U+3001) are Unicode category Po, same as ASCII marks.
-      expect(
-        normalize('今日は暑いですね。', { ignorePunctuation: true }),
-      ).toBe('今日は暑いですね');
+      expect(normalize('今日は暑いですね。', { ignorePunctuation: true })).toBe(
+        '今日は暑いですね',
+      );
       expect(normalize('はい、そうです。', { ignorePunctuation: true })).toBe(
         'はい、そうです。'.replace(/[、。]/g, ''),
       );

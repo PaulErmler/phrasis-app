@@ -50,6 +50,8 @@ describe('posthog hosts', () => {
   it('serves events from a first-party path an ad blocker will not match', async () => {
     const { POSTHOG_API_HOST, POSTHOG_PROXY_PATH } = await loadHosts(undefined);
     expect(POSTHOG_API_HOST).toBe(POSTHOG_PROXY_PATH);
-    expect(POSTHOG_PROXY_PATH).not.toMatch(/analytics|track|telemetry|posthog/i);
+    expect(POSTHOG_PROXY_PATH).not.toMatch(
+      /analytics|track|telemetry|posthog/i,
+    );
   });
 });

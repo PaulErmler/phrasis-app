@@ -8,13 +8,15 @@
  * Leave unset (or set to `production` / `prod`) on production, no prefix.
  */
 
+import { optionalEnv } from './env';
+
 const PRODUCTION_VALUES = new Set(['', 'production', 'prod']);
 
 /**
  * Raw EMAIL_ENV value, trimmed. Empty when unset or production-like.
  */
 export function emailEnvLabel(): string | null {
-  const raw = (process.env.EMAIL_ENV ?? '').trim();
+  const raw = (optionalEnv('EMAIL_ENV') ?? '').trim();
   if (PRODUCTION_VALUES.has(raw.toLowerCase())) return null;
   return raw;
 }

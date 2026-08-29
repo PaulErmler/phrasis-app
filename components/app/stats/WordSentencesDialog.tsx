@@ -2,7 +2,11 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { usePaginatedQuery, useMutation, usePreloadedQuery } from 'convex/react';
+import {
+  usePaginatedQuery,
+  useMutation,
+  usePreloadedQuery,
+} from 'convex/react';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { AnnotationLines } from '@/components/app/learning/AnnotationLines';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
@@ -16,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { normalizeLanguageCode } from '@/lib/languages';
 import { Badge } from '@/components/ui/badge';
@@ -25,19 +29,13 @@ import { CardActionsMenu } from '@/components/app/learning/CardActionsMenu';
 import { CardSpeedBadge } from '@/components/app/learning/CardSpeedBadge';
 import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
 import type { CardTranslation } from '@/components/app/learning/types';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '@/components/app/ConfirmDialog';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import { Loader2 } from 'lucide-react';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
+import { resolveShowFurigana } from '@/lib/furigana';
+
+import { reportError } from '@/lib/report-error';
 
 export function WordSentencesDialog({
   word,
@@ -57,6 +55,7 @@ export function WordSentencesDialog({
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords === true;
   const showIpa = courseSettings?.showIpa === true;
+  const showFurigana = resolveShowFurigana(courseSettings);
   const buttonPlayback = useButtonPlayback();
 
   // Ephemeral per-card per-language speed overrides. This dialog is a
@@ -89,9 +88,9 @@ export function WordSentencesDialog({
   useEnsureContent(
     open
       ? results.map((r) => ({
-        textId: r.textId as string,
-        hasMissingContent: r.hasMissingContent,
-      }))
+          textId: r.textId as string,
+          hasMissingContent: r.hasMissingContent,
+        }))
       : undefined,
   );
 
@@ -99,14 +98,18 @@ export function WordSentencesDialog({
   const unmasterCard = useMutation(api.features.scheduling.unmasterCard);
   const hideCard = useMutation(api.features.scheduling.hideCard);
   const unhideCard = useMutation(api.features.scheduling.unhideCard);
-  const toggleFavorite = useMutation(api.features.scheduling.toggleFavoriteCard);
+  const toggleFavorite = useMutation(
+    api.features.scheduling.toggleFavoriteCard,
+  );
   const deleteCard = useMutation(api.features.scheduling.deleteCardPermanently);
 
   const [editingCard, setEditingCard] = useState<{
     cardId: Id<'cards'>;
     translations: CardTranslation[];
   } | null>(null);
-  const [deletingCardId, setDeletingCardId] = useState<Id<'cards'> | null>(null);
+  const [deletingCardId, setDeletingCardId] = useState<Id<'cards'> | null>(
+    null,
+  );
 
   const [pendingMaster, setPendingMaster] = useState<Set<string>>(new Set());
   const [pendingHide, setPendingHide] = useState<Set<string>>(new Set());
@@ -187,7 +190,7 @@ export function WordSentencesDialog({
       try {
         await toggleFavorite({ cardId });
       } catch (error) {
-        console.error('Failed to toggle favorite:', error);
+        reportError(error, { op: 'toggleFavoriteCard', cardId });
         setFavoriteOverride((prev) => {
           const next = new Map(prev);
           next.set(cardId, currentlyFavorite);
@@ -205,7 +208,7 @@ export function WordSentencesDialog({
     try {
       await deleteCard({ cardId });
     } catch (error) {
-      console.error('Failed to delete card:', error);
+      reportError(error, { op: 'deleteCard', cardId });
     }
   }, [deletingCardId, deleteCard]);
 
@@ -237,14 +240,21 @@ export function WordSentencesDialog({
               );
 
               const cardId = sentence.cardId as Id<'cards'> | null;
-              const isMastered = sentence.isMastered || (cardId ? pendingMaster.has(cardId) : false);
-              const isHidden = sentence.isHidden || (cardId ? pendingHide.has(cardId) : false);
-              const isFavorite = cardId && favoriteOverride.has(cardId)
-                ? (favoriteOverride.get(cardId) as boolean)
-                : (sentence.isFavorite ?? false);
+              const isMastered =
+                sentence.isMastered ||
+                (cardId ? pendingMaster.has(cardId) : false);
+              const isHidden =
+                sentence.isHidden || (cardId ? pendingHide.has(cardId) : false);
+              const isFavorite =
+                cardId && favoriteOverride.has(cardId)
+                  ? (favoriteOverride.get(cardId) as boolean)
+                  : (sentence.isFavorite ?? false);
 
               return (
-                <div key={sentence.textId} className="content-box p-4 space-y-2">
+                <div
+                  key={sentence.textId}
+                  className="content-box p-4 space-y-2"
+                >
                   {/* Card actions row */}
                   {cardId && (
                     <div className="flex items-center justify-between -mt-1 -mx-1 mb-1">
@@ -289,7 +299,10 @@ export function WordSentencesDialog({
                       // Ephemeral surface: ignore the course-level general speed.
                       const effectiveSpeed = override ?? DEFAULT_PLAYBACK_SPEED;
                       return (
-                        <div key={tr.language} className="flex items-start gap-2">
+                        <div
+                          key={tr.language}
+                          className="flex items-start gap-2"
+                        >
                           <div className="flex-1">
                             <HighlightedText
                               text={tr.text}
@@ -298,6 +311,7 @@ export function WordSentencesDialog({
                               localTime={buttonPlayback.active?.localTime ?? 0}
                               isActive={isActive}
                               enabled={highlightEnabled}
+                              furigana={showFurigana ? tr.furigana : undefined}
                               className="text-sm font-medium leading-relaxed"
                               highlightTerm={isWordLanguage ? word : undefined}
                             />
@@ -348,7 +362,10 @@ export function WordSentencesDialog({
                         : null;
                       const effectiveSpeed = override ?? DEFAULT_PLAYBACK_SPEED;
                       return (
-                        <div key={tr.language} className="flex items-start gap-2">
+                        <div
+                          key={tr.language}
+                          className="flex items-start gap-2"
+                        >
                           <div className="flex-1">
                             <HighlightedText
                               text={tr.text}
@@ -357,6 +374,7 @@ export function WordSentencesDialog({
                               localTime={buttonPlayback.active?.localTime ?? 0}
                               isActive={isActive}
                               enabled={highlightEnabled}
+                              furigana={showFurigana ? tr.furigana : undefined}
                               className="text-sm leading-relaxed"
                               highlightTerm={isWordLanguage ? word : undefined}
                             />
@@ -430,34 +448,18 @@ export function WordSentencesDialog({
         />
       )}
 
-      <AlertDialog
+      <ConfirmDialog
         open={deletingCardId !== null}
         onOpenChange={(next) => {
           if (!next) setDeletingCardId(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('actions.deleteConfirmTitle')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('actions.deleteConfirmDescription')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t('actions.deleteConfirmCancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className={buttonVariants({ variant: 'destructive' })}
-              onClick={handleConfirmDelete}
-            >
-              {t('actions.deleteConfirmConfirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={t('actions.deleteConfirmTitle')}
+        description={t('actions.deleteConfirmDescription')}
+        cancelLabel={t('actions.deleteConfirmCancel')}
+        confirmLabel={t('actions.deleteConfirmConfirm')}
+        onConfirm={handleConfirmDelete}
+        destructive
+      />
     </Dialog>
   );
 }

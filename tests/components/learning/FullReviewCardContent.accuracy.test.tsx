@@ -2,6 +2,20 @@ import { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
+// The writing card now wires AI feedback (useAction) and the voice button
+// (useFeatureQuota); neither is under test here, so the Convex-backed hooks
+// are stubbed the way other component tests do it.
+vi.mock('convex/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('convex/react')>();
+  return { ...actual, useAction: () => vi.fn(), useMutation: () => vi.fn() };
+});
+vi.mock('@/components/feature_tracking/useFeatureQuota', () => ({
+  useFeatureQuota: () => ({ isAvailable: true, isLoading: false }),
+}));
+vi.mock('@/components/autumn/usage-limit-dialog', () => ({
+  default: () => null,
+}));
+
 // Spy on the real implementation (values unchanged) so a test can assert an
 // already-submitted answer is diffed once rather than once per keystroke.
 vi.mock('@/lib/textCompare', async (importOriginal) => {
@@ -15,6 +29,7 @@ import type {
   CardTranslation,
   WritingAccuracySummary,
 } from '@/components/app/learning/types';
+import { makePresentation } from './cardPresentationStub';
 
 const computeAccuracyPairSpy = vi.mocked(computeAccuracyPair);
 
@@ -27,25 +42,34 @@ const computeAccuracyPairSpy = vi.mocked(computeAccuracyPair);
  */
 
 const TWO_TARGETS: CardTranslation[] = [
-  { language: 'en', text: 'The weather is nice.', isBaseLanguage: true, isTargetLanguage: false },
-  { language: 'es', text: 'El tiempo es bueno.', isBaseLanguage: false, isTargetLanguage: true },
-  { language: 'de', text: 'Das Wetter ist schön.', isBaseLanguage: false, isTargetLanguage: true },
+  {
+    language: 'en',
+    text: 'The weather is nice.',
+    isBaseLanguage: true,
+    isTargetLanguage: false,
+  },
+  {
+    language: 'es',
+    text: 'El tiempo es bueno.',
+    isBaseLanguage: false,
+    isTargetLanguage: true,
+  },
+  {
+    language: 'de',
+    text: 'Das Wetter ist schön.',
+    isBaseLanguage: false,
+    isTargetLanguage: true,
+  },
 ];
 
 function renderCard(translations: CardTranslation[]) {
   const onAccuracyChange = vi.fn();
   render(
     <FullReviewCardContent
-      preReviewCount={0}
-      sourceText="The weather is nice."
-      translations={translations}
-      audioRecordings={[]}
-      isFavorite={false}
-      isPendingMaster={false}
-      isPendingHide={false}
-      onMaster={vi.fn()}
-      onHide={vi.fn()}
-      onFavorite={vi.fn()}
+      presentation={makePresentation({
+        sourceText: 'The weather is nice.',
+        translations,
+      })}
       targetAudioMode="never"
       onAccuracyChange={onAccuracyChange}
     />,
@@ -154,22 +178,20 @@ describe('FullReviewCardContent: accuracy summary across target languages', () =
   it('does not loop when the parent stores the summary in state', () => {
     const emissions = vi.fn();
     function StatefulParent() {
-      const [summary, setSummary] = useState<WritingAccuracySummary | null>(null);
+      const [summary, setSummary] = useState<WritingAccuracySummary | null>(
+        null,
+      );
       return (
         <>
           {/* Reading the state ties the re-render to the stored object. */}
-          <span data-testid="submitted-count">{summary?.submittedCount ?? -1}</span>
+          <span data-testid="submitted-count">
+            {summary?.submittedCount ?? -1}
+          </span>
           <FullReviewCardContent
-            preReviewCount={0}
-            sourceText="The weather is nice."
-            translations={TWO_TARGETS}
-            audioRecordings={[]}
-            isFavorite={false}
-            isPendingMaster={false}
-            isPendingHide={false}
-            onMaster={vi.fn()}
-            onHide={vi.fn()}
-            onFavorite={vi.fn()}
+            presentation={makePresentation({
+              sourceText: 'The weather is nice.',
+              translations: TWO_TARGETS,
+            })}
             targetAudioMode="never"
             onAccuracyChange={(s) => {
               emissions(s);

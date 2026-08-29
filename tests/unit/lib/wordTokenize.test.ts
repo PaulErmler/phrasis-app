@@ -142,12 +142,12 @@ describe('appendSearchSegments', () => {
     // The changelog's CJK-search fix claims these languages work; without the
     // compareLocale resolution the "segments" were the whole sentence again
     // and an infix query like 體貼 matched nothing.
-    expect(appendSearchSegments('你真的體貼', 'zh_traditional').split(' ')).toContain(
-      '體貼',
-    );
-    expect(appendSearchSegments('你真的體貼', 'yue_traditional').split(' ')).toContain(
-      '體貼',
-    );
+    expect(
+      appendSearchSegments('你真的體貼', 'zh_traditional').split(' '),
+    ).toContain('體貼');
+    expect(
+      appendSearchSegments('你真的體貼', 'yue_traditional').split(' '),
+    ).toContain('體貼');
   });
 
   it('appends segmented words for Japanese', () => {

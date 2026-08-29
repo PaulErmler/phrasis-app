@@ -20,13 +20,17 @@ describe('isUserCreatedText', () => {
 
 describe('isProtectedTranslationSource', () => {
   it('protects the two human-authored provenances', () => {
-    expect(isProtectedTranslationSource(USER_PROVIDED_TRANSLATION_SOURCE)).toBe(true);
+    expect(isProtectedTranslationSource(USER_PROVIDED_TRANSLATION_SOURCE)).toBe(
+      true,
+    );
     expect(isProtectedTranslationSource(CURATED_TRANSLATION_SOURCE)).toBe(true);
   });
 
   it('does not protect machine output or an untagged row', () => {
     expect(isProtectedTranslationSource(GOOGLE_TRANSLATE_SOURCE)).toBe(false);
-    expect(isProtectedTranslationSource('google/gemini-3.1-flash-lite-high')).toBe(false);
+    expect(
+      isProtectedTranslationSource('google/gemini-3.1-flash-lite-high'),
+    ).toBe(false);
     expect(isProtectedTranslationSource(undefined)).toBe(false);
     expect(isProtectedTranslationSource(null)).toBe(false);
   });
@@ -40,7 +44,9 @@ describe('mayRegenerateTranslation', () => {
       }),
     ).toBe(true);
     expect(
-      mayRegenerateTranslation(premade, { translationSource: GOOGLE_TRANSLATE_SOURCE }),
+      mayRegenerateTranslation(premade, {
+        translationSource: GOOGLE_TRANSLATE_SOURCE,
+      }),
     ).toBe(true);
   });
 
@@ -76,7 +82,9 @@ describe('mayRegenerateTranslation', () => {
       USER_PROVIDED_TRANSLATION_SOURCE,
       undefined,
     ]) {
-      expect(mayRegenerateTranslation(userOwned, { translationSource })).toBe(false);
+      expect(mayRegenerateTranslation(userOwned, { translationSource })).toBe(
+        false,
+      );
     }
   });
 });

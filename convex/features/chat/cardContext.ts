@@ -24,6 +24,7 @@ export async function resolveCardContext(
   translations: { language: string; text: string }[];
   baseLanguages: string[];
   targetLanguages: string[];
+  courseId: Id<'courses'>;
 } | null> {
   const card = await ctx.db.get(cardId);
   if (!card) return null;
@@ -39,7 +40,10 @@ export async function resolveCardContext(
   const text = await ctx.db.get(card.textId);
   if (!text) return null;
 
-  const courseLangs = new Set([...course.baseLanguages, ...course.targetLanguages]);
+  const courseLangs = new Set([
+    ...course.baseLanguages,
+    ...course.targetLanguages,
+  ]);
   courseLangs.delete(text.language);
 
   // One indexed read for the whole text instead of one query per course
@@ -64,5 +68,8 @@ export async function resolveCardContext(
     translations,
     baseLanguages: course.baseLanguages,
     targetLanguages: course.targetLanguages,
+    // The caller reads the course's writing settings from this; returning it
+    // here keeps the card → deck → course walk a single traversal.
+    courseId: course._id,
   };
 }

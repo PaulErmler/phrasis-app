@@ -1,5 +1,16 @@
 import type { DriveStep } from 'driver.js';
 
+/**
+ * DriveStep plus app extensions. `skipIfMissing`: drop the step at launch
+ * when its selector has no visible match — for steps anchored to
+ * conditionally mounted UI whose presence the tour factory can't see
+ * (e.g. a settings-gated card whose preference is stale at launch).
+ * Like the ctx-gated steps, dropping one shifts the indices of later steps,
+ * so `stepCompleteOnClickIndex` must only target steps before any
+ * skippable one.
+ */
+export type AppDriveStep = DriveStep & { skipIfMissing?: boolean };
+
 type MarkupValues = Record<string, (chunks: string) => string>;
 
 export type TranslateFn = ((key: string) => string) & {
@@ -13,7 +24,7 @@ export interface TutorialCallbacks {
 
 export interface TutorialDefinition {
   id: string;
-  steps: DriveStep[];
+  steps: AppDriveStep[];
   prerequisite?: string;
   popoverClass?: string;
 }
@@ -25,6 +36,11 @@ export interface TutorialDefinition {
  */
 export interface TutorialContext {
   reviewMode?: 'audio' | 'full';
+  /** When true, skip the due-counts tour step — those pills are not on screen. */
+  hideDueCounts?: boolean;
+  /** When true, skip the workload-forecast tour step — the card is not on
+   * screen (its own preference, independent of the pills). */
+  hideWorkloadForecast?: boolean;
 }
 
 export type TutorialFactory = (

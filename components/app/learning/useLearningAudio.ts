@@ -2,7 +2,12 @@
 
 import { useCallback, useMemo } from 'react';
 import { useAudioPlayer } from '@/hooks/use-audio-player';
-import { resolveAudioSettings, applyOnlyNewListening } from '@/lib/audio/mergeAudio';
+import {
+  resolveAudioSettings,
+  resolveModeSetting,
+  applyOnlyNewListening,
+  type AudioSettingsMode,
+} from '@/lib/audio/mergeAudio';
 import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
 import type { LearningState } from './useLearningMode';
 
@@ -26,7 +31,11 @@ export function useLearningAudio(
   state: LearningState,
   options: UseLearningAudioOptions = {},
 ) {
-  const { disableAutoAdvance = false, disableAutoPlay = false, onAutoNext } = options;
+  const {
+    disableAutoAdvance = false,
+    disableAutoPlay = false,
+    onAutoNext,
+  } = options;
   const cs =
     state.status === 'reviewing' ||
     state.status === 'noCardsDue' ||
@@ -54,25 +63,25 @@ export function useLearningAudio(
   // writing face, which is a typing session and must not borrow Radio's
   // listening settings.
   const isFullMode = reviewMode !== 'audio';
-  const fullReviewTargetAudioMode = cs?.fullReviewTargetAudioMode ?? 'afterSubmit';
+  const fullReviewTargetAudioMode =
+    cs?.fullReviewTargetAudioMode ?? 'afterSubmit';
   // Transcribe: writing-mode variant where the target audio is the prompt.
   // The merged blob contains only the target group and the base stays silent.
   // It carries its own settings copy, chained `*Transcribe ?? *Full ?? audio`.
   const isTranscribe =
     isFullMode && (cs?.writingInputMode ?? 'translate') === 'transcribe';
+  const settingsMode: AudioSettingsMode = isTranscribe
+    ? 'transcribe'
+    : isFullMode
+      ? 'full'
+      : 'audio';
   // The user's mode-resolved auto-play setting, before the disable gates.
   // Also returned to callers that need to re-trigger playback after a gate
   // releases (e.g. a tutorial popover being dismissed).
   const userAutoPlay = isHandsFree
     ? true
-    : isTranscribe
-      ? (cs?.autoPlayAudioTranscribe ??
-        cs?.autoPlayAudioFull ??
-        cs?.autoPlayAudio ??
-        DEFAULT_AUTO_PLAY)
-      : isFullMode
-        ? (cs?.autoPlayAudioFull ?? cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY)
-        : (cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY);
+    : (resolveModeSetting(cs, 'autoPlayAudio', settingsMode) ??
+      DEFAULT_AUTO_PLAY);
   const autoPlay = disableAutoPlay || settingsOpen ? false : userAutoPlay;
 
   const cardSpeedOverrides =
@@ -90,11 +99,7 @@ export function useLearningAudio(
   const cardGoodReviewCount =
     state.status === 'reviewing' ? state.goodReviewCount : 0;
   const audioSettings = useMemo(() => {
-    const resolved = resolveAudioSettings(
-      cs,
-      cardSpeedOverrides,
-      isTranscribe ? 'transcribe' : isFullMode ? 'full' : 'audio',
-    );
+    const resolved = resolveAudioSettings(cs, cardSpeedOverrides, settingsMode);
     // The "Practice Listening / Speaking" (target before/after base) toggles
     // only apply to the merged-audio practice path. Audio review mode and
     // radio. Full (typing) review mode keeps the historical base→target
@@ -121,7 +126,7 @@ export function useLearningAudio(
     cs,
     cardSpeedOverrides,
     isFullMode,
-    isTranscribe,
+    settingsMode,
     isHandsFree,
     cardReviewCount,
     cardRadioReviewCount,
@@ -149,7 +154,14 @@ export function useLearningAudio(
       onAutoNext?.();
       state.handleNext();
     }
-  }, [state, reviewMode, audioSettings.autoAdvance, isHandsFree, disableAutoAdvance, onAutoNext]);
+  }, [
+    state,
+    reviewMode,
+    audioSettings.autoAdvance,
+    isHandsFree,
+    disableAutoAdvance,
+    onAutoNext,
+  ]);
 
   const resetReviewFlag = useCallback(() => {
     if (state.status === 'reviewing') state.resetReviewFlag();
@@ -170,12 +182,21 @@ export function useLearningAudio(
     nextCard: isReviewing ? state.nextCard : null,
     settings: audioSettings,
     orderedBase: isReviewing && !isTranscribe ? state.baseLanguages : [],
-    orderedTarget: isReviewing && includeTargetInMerge ? state.targetLanguages : [],
+    orderedTarget:
+      isReviewing && includeTargetInMerge ? state.targetLanguages : [],
     sourceText: isReviewing
-      ? state.translations.filter((tr) => tr.isBaseLanguage).map((tr) => tr.text).filter(Boolean).join(' / ')
+      ? state.translations
+          .filter((tr) => tr.isBaseLanguage)
+          .map((tr) => tr.text)
+          .filter(Boolean)
+          .join(' / ')
       : '',
     languageNames: isReviewing
-      ? state.translations.filter((tr) => tr.isTargetLanguage).map((tr) => tr.text).filter(Boolean).join(' / ')
+      ? state.translations
+          .filter((tr) => tr.isTargetLanguage)
+          .map((tr) => tr.text)
+          .filter(Boolean)
+          .join(' / ')
       : '',
     autoPlay,
     settingsOpen,

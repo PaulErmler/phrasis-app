@@ -26,8 +26,24 @@ export const ENSURE_CONTENT_RETRY_MS = 15_000;
  * backend for the whole session. */
 export const ENSURE_CONTENT_MAX_RETRIES = 3;
 
+/**
+ * Consecutive card-adding runs that inserted cards while no card got served
+ * in between before auto-add latches off (stall guard in useLearningMode).
+ * Normal operation never exceeds 1-2 (one spurious re-fire can race the
+ * reactive update that delivers the new card); reaching the cap means added
+ * cards are invisible to the serving query (e.g. extreme client-clock skew),
+ * and adding more would loop forever. The manual Add button bypasses the
+ * latch, same as the exhausted latch.
+ */
+export const MAX_UNSERVED_ADD_RUNS = 3;
+
 /** Maximum character length for any single translation text (editing and creating cards). */
 export const MAX_CARD_TEXT_LENGTH = 150;
+
+/** Max stored AI-feedback accepted alternatives per (card, language). Shared
+ * by the store mutation (convex/features/writingFeedback.ts) and the
+ * getCardForReview payload that ships them to the writing card. */
+export const WRITING_ALTERNATIVES_MAX = 5;
 
 /** In custom text entry, show n/max only when this many or fewer characters remain (or over limit). */
 export const CARD_TEXT_SHOW_COUNT_REMAINING_THRESHOLD = 20;

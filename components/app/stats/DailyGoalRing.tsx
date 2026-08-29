@@ -19,7 +19,9 @@ const LAP_COLORS = [
 ] as const;
 
 const lapColor = (lap: number) =>
-  LAP_COLORS[((lap % LAP_COLORS.length) + LAP_COLORS.length) % LAP_COLORS.length];
+  LAP_COLORS[
+    ((lap % LAP_COLORS.length) + LAP_COLORS.length) % LAP_COLORS.length
+  ];
 
 /**
  * rAF-driven ring progress in "laps" (1.0 = one full goal). A plain

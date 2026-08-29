@@ -23,8 +23,8 @@ export function DailyTimeGoalStep({ selected, onSelect }: Props) {
   const [customMode, setCustomMode] = useState(
     () => selected !== null && !isPreset(selected),
   );
-  const [customDraft, setCustomDraft] = useState<string>(
-    () => (selected !== null && !isPreset(selected) ? String(selected) : ''),
+  const [customDraft, setCustomDraft] = useState<string>(() =>
+    selected !== null && !isPreset(selected) ? String(selected) : '',
   );
   const customInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -33,12 +33,17 @@ export function DailyTimeGoalStep({ selected, onSelect }: Props) {
     if (customMode) customInputRef.current?.focus();
   }, [customMode]);
 
-  const customIsActive = customMode || (selected !== null && !isPreset(selected));
+  const customIsActive =
+    customMode || (selected !== null && !isPreset(selected));
 
   const commitCustom = (raw: string) => {
     setCustomDraft(raw);
     const n = Number.parseInt(raw, 10);
-    if (Number.isFinite(n) && n >= DAILY_TIME_CUSTOM_MIN && n <= DAILY_TIME_CUSTOM_MAX) {
+    if (
+      Number.isFinite(n) &&
+      n >= DAILY_TIME_CUSTOM_MIN &&
+      n <= DAILY_TIME_CUSTOM_MAX
+    ) {
       onSelect(n);
     }
   };
@@ -75,11 +80,19 @@ export function DailyTimeGoalStep({ selected, onSelect }: Props) {
                 className={cn(
                   'rounded-xl border p-6 text-center transition-all',
                   'hover:bg-accent hover:scale-[1.02]',
-                  isSelected && 'border-primary bg-primary/5 ring-2 ring-primary/20',
+                  isSelected &&
+                    'border-primary bg-primary/5 ring-2 ring-primary/20',
                 )}
               >
-                <Clock className={cn('h-6 w-6 mx-auto mb-2', isSelected ? 'text-primary' : 'text-muted-foreground')} />
-                <div className="font-semibold">{t(`options.${value}.label`)}</div>
+                <Clock
+                  className={cn(
+                    'h-6 w-6 mx-auto mb-2',
+                    isSelected ? 'text-primary' : 'text-muted-foreground',
+                  )}
+                />
+                <div className="font-semibold">
+                  {t(`options.${value}.label`)}
+                </div>
                 <div className="text-xs text-muted-foreground mt-1">
                   {t(`options.${value}.description`)}
                 </div>
@@ -101,10 +114,16 @@ export function DailyTimeGoalStep({ selected, onSelect }: Props) {
             className={cn(
               'rounded-xl border p-6 text-center transition-all',
               'hover:bg-accent hover:scale-[1.02]',
-              customIsActive && 'border-primary bg-primary/5 ring-2 ring-primary/20',
+              customIsActive &&
+                'border-primary bg-primary/5 ring-2 ring-primary/20',
             )}
           >
-            <Settings2 className={cn('h-6 w-6 mx-auto mb-2', customIsActive ? 'text-primary' : 'text-muted-foreground')} />
+            <Settings2
+              className={cn(
+                'h-6 w-6 mx-auto mb-2',
+                customIsActive ? 'text-primary' : 'text-muted-foreground',
+              )}
+            />
             <div className="font-semibold">{t('options.custom.label')}</div>
             <div className="text-xs text-muted-foreground mt-1">
               {t('options.custom.description')}
@@ -118,7 +137,10 @@ export function DailyTimeGoalStep({ selected, onSelect }: Props) {
               htmlFor="custom-daily-time"
               className="text-sm text-muted-foreground block mb-2 text-center"
             >
-              {t('customLabel', { min: DAILY_TIME_CUSTOM_MIN, max: DAILY_TIME_CUSTOM_MAX })}
+              {t('customLabel', {
+                min: DAILY_TIME_CUSTOM_MIN,
+                max: DAILY_TIME_CUSTOM_MAX,
+              })}
             </label>
             <div className="flex items-center gap-2">
               <Input

@@ -1,5 +1,8 @@
 import { encodeWav } from '@/lib/audio/audioWorkerClient';
-import type { CardAudioRecording, CourseSettings } from '@/components/app/learning/types';
+import type {
+  CardAudioRecording,
+  CourseSettings,
+} from '@/components/app/learning/types';
 import {
   DEFAULT_REPETITIONS_BASE,
   DEFAULT_REPETITIONS_TARGET,
@@ -60,6 +63,64 @@ export interface ResolvedAudioSettings {
 }
 
 /**
+ * The three per-mode copies a playback setting can have: audio/Shadowing mode
+ * owns the unsuffixed field, writing ("full") mode the `*Full` copy, and the
+ * transcribe writing style the `*Transcribe` copy.
+ */
+export type AudioSettingsMode = 'audio' | 'full' | 'transcribe';
+
+/**
+ * Settings that resolve along the per-mode chain
+ * `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*`: every base field name
+ * whose `*Full` copy exists in the schema. `hideBaseLanguages` also has a
+ * `Full` twin, but that pair is deliberately independent (writing mode
+ * defaults per input style, it never falls back to the audio value), so it
+ * is excluded from the chain.
+ */
+export type ModeResolvableSetting = Exclude<
+  {
+    [K in keyof CourseSettings &
+      string]: `${K}Full` extends keyof CourseSettings ? K : never;
+  }[keyof CourseSettings & string],
+  'hideBaseLanguages'
+>;
+
+/**
+ * THE per-mode precedence rule, in one place: resolve `field` for `mode`
+ * along `*Transcribe ?? *Full ?? unsuffixed`. Undefined at a level means
+ * "same as the previous mode in the chain", so unmigrated/untweaked docs
+ * behave identically (see docs/migrations/per-mode-settings-backfill.md);
+ * a field with no `*Transcribe` copy (base-group pauses, auto-advance pause)
+ * resolves like full mode there. Callers apply their own `?? DEFAULT_*`.
+ *
+ * Both the settings sheet's preview and actual playback resolution
+ * (`resolveAudioSettings` below) go through here, so they cannot drift.
+ */
+export function resolveModeSetting<K extends ModeResolvableSetting>(
+  cs: CourseSettings | null | undefined,
+  field: K,
+  mode: AudioSettingsMode,
+): CourseSettings[K] | undefined {
+  if (!cs) return undefined;
+  // The per-mode copies of a setting share the base field's value type by
+  // construction (courseSettingsFields in convex/schema.ts); a copy a field
+  // doesn't have reads as undefined, which is exactly the chain's
+  // fall-through. The compiler can't see that convention through a computed
+  // key, hence the localized cast.
+  const variant = (suffix: 'Full' | 'Transcribe') =>
+    (cs as Record<string, unknown>)[`${field}${suffix}`] as
+      | CourseSettings[K]
+      | undefined;
+  if (mode === 'transcribe') {
+    return variant('Transcribe') ?? variant('Full') ?? cs[field];
+  }
+  if (mode === 'full') {
+    return variant('Full') ?? cs[field];
+  }
+  return cs[field];
+}
+
+/**
  * Merge a general per-language speed map with per-card overrides. Overrides win,
  * then the general value, then the global default. Used via `resolveAudioSettings`
  * for both the after-base and before-base target groups.
@@ -69,10 +130,7 @@ function mergeSpeeds(
   cardOverrides?: Record<string, number>,
 ): Record<string, number> {
   const overrides = cardOverrides ?? {};
-  const langs = new Set([
-    ...Object.keys(general),
-    ...Object.keys(overrides),
-  ]);
+  const langs = new Set([...Object.keys(general), ...Object.keys(overrides)]);
   const out: Record<string, number> = {};
   for (const lang of langs) {
     out[lang] = overrides[lang] ?? general[lang] ?? DEFAULT_PLAYBACK_SPEED;
@@ -83,43 +141,17 @@ function mergeSpeeds(
 export function resolveAudioSettings(
   cs: CourseSettings | null,
   cardOverrides?: Record<string, number>,
-  mode: 'audio' | 'full' | 'transcribe' = 'audio',
+  mode: AudioSettingsMode = 'audio',
 ): ResolvedAudioSettings {
   // Each mode has its own copy of the playback settings, resolved along the
-  // chain `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*`. Undefined means
-  // "same as the previous mode in the chain", so unmigrated/untweaked docs
-  // behave identically (see docs/migrations/per-mode-settings-backfill.md).
-  // Transcribe only copies the settings it uses; the rest resolves like full.
-  const pick = <T,>(
-    transcribe: T | undefined,
-    full: T | undefined,
-    audio: T | undefined,
-  ): T | undefined =>
-      mode === 'transcribe'
-        ? (transcribe ?? full ?? audio)
-        : mode === 'full'
-          ? (full ?? audio)
-          : audio;
+  // chain `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*` — implemented
+  // once in `resolveModeSetting` above.
   const autoAdvance = cs?.autoAdvance ?? DEFAULT_AUTO_ADVANCE;
   return {
-    reps:
-      pick(
-        cs?.languageRepetitionsTranscribe,
-        cs?.languageRepetitionsFull,
-        cs?.languageRepetitions,
-      ) ?? {},
-    repPauses:
-      pick(
-        cs?.languageRepetitionPausesTranscribe,
-        cs?.languageRepetitionPausesFull,
-        cs?.languageRepetitionPauses,
-      ) ?? {},
+    reps: resolveModeSetting(cs, 'languageRepetitions', mode) ?? {},
+    repPauses: resolveModeSetting(cs, 'languageRepetitionPauses', mode) ?? {},
     speeds: mergeSpeeds(
-      pick(
-        cs?.languagePlaybackSpeedsTranscribe,
-        cs?.languagePlaybackSpeedsFull,
-        cs?.languagePlaybackSpeeds,
-      ) ?? {},
+      resolveModeSetting(cs, 'languagePlaybackSpeeds', mode) ?? {},
       cardOverrides,
     ),
     defaultTargetReps:
@@ -127,30 +159,28 @@ export function resolveAudioSettings(
         ? DEFAULT_REPETITIONS_TARGET
         : DEFAULT_REPETITIONS_TARGET_WRITING,
     pauseB2B:
-      pick(undefined, cs?.pauseBaseToBaseFull, cs?.pauseBaseToBase) ??
+      resolveModeSetting(cs, 'pauseBaseToBase', mode) ??
       DEFAULT_PAUSE_BETWEEN_LANGUAGES,
     pauseB2T:
-      pick(undefined, cs?.pauseBaseToTargetFull, cs?.pauseBaseToTarget) ??
+      resolveModeSetting(cs, 'pauseBaseToTarget', mode) ??
       DEFAULT_PAUSE_BASE_TO_TARGET,
     pauseT2T:
-      pick(
-        cs?.pauseTargetToTargetTranscribe,
-        cs?.pauseTargetToTargetFull,
-        cs?.pauseTargetToTarget,
-      ) ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES,
+      resolveModeSetting(cs, 'pauseTargetToTarget', mode) ??
+      DEFAULT_PAUSE_BETWEEN_LANGUAGES,
     autoAdvance,
     pauseBeforeAdvance:
-      pick(
-        undefined,
-        cs?.pauseBeforeAutoAdvanceFull,
-        cs?.pauseBeforeAutoAdvance,
-      ) ?? DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
-    playTargetBefore: cs?.playTargetBeforeBase ?? DEFAULT_PLAY_TARGET_BEFORE_BASE,
+      resolveModeSetting(cs, 'pauseBeforeAutoAdvance', mode) ??
+      DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
+    playTargetBefore:
+      cs?.playTargetBeforeBase ?? DEFAULT_PLAY_TARGET_BEFORE_BASE,
     playTargetAfter: cs?.playTargetAfterBase ?? DEFAULT_PLAY_TARGET_AFTER_BASE,
     beforeReps: cs?.targetBeforeRepetitions ?? {},
     beforeRepPauses: cs?.targetBeforeRepetitionPauses ?? {},
     // Card-level speed overrides apply to the before-base group too (same language).
-    beforeSpeeds: mergeSpeeds(cs?.targetBeforePlaybackSpeeds ?? {}, cardOverrides),
+    beforeSpeeds: mergeSpeeds(
+      cs?.targetBeforePlaybackSpeeds ?? {},
+      cardOverrides,
+    ),
     pauseT2B: cs?.pauseTargetToBase ?? DEFAULT_PAUSE_TARGET_TO_BASE,
     // Stored 0 / undefined means "always" (∞); 1-10 limits to that many initial reviews.
     beforeOnlyNewReps:
@@ -266,9 +296,7 @@ export type AudibleCue = LanguageCue & { silent?: false };
  * a new consumer inherits the rule instead of having to remember it. The reveal
  * path deliberately does not use this. Silent cues exist to un-blur text.
  */
-export function audibleCues(
-  cues: ReadonlyArray<LanguageCue>,
-): AudibleCue[] {
+export function audibleCues(cues: ReadonlyArray<LanguageCue>): AudibleCue[] {
   return cues.filter((c): c is AudibleCue => !c.silent);
 }
 
@@ -303,7 +331,13 @@ export async function mergeCardAudio(
 
   try {
     // --- 1. Collect entries with their resolved repetition counts ---
-    type AudibleEntry = { language: string; url: string; reps: number; speed: number; silent?: false };
+    type AudibleEntry = {
+      language: string;
+      url: string;
+      reps: number;
+      speed: number;
+      silent?: false;
+    };
     /**
      * A language the user muted by setting its repetitions to 0. It keeps its
      * slot in the sequence but schedules no clip: the auto-reveal ("Hide target
@@ -311,7 +345,13 @@ export async function mergeCardAudio(
      * outright would leave its text blurred for the whole card with no way back
      * except tapping it.
      */
-    type SilentEntry = { language: string; url: null; reps: 0; speed: number; silent: true };
+    type SilentEntry = {
+      language: string;
+      url: null;
+      reps: 0;
+      speed: number;
+      silent: true;
+    };
     type Entry = AudibleEntry | SilentEntry;
 
     const baseEntries: Entry[] = [];
@@ -327,7 +367,12 @@ export async function mergeCardAudio(
 
     // Repetitions at 0 keep their slot as a silent entry (see SilentEntry); a
     // language with no playable recording is still dropped entirely, as before.
-    const collect = (out: Entry[], language: string, reps: number, speed: number) => {
+    const collect = (
+      out: Entry[],
+      language: string,
+      reps: number,
+      speed: number,
+    ) => {
       if (reps <= 0) {
         out.push({ language, url: null, reps: 0, speed, silent: true });
         return;
@@ -337,7 +382,12 @@ export async function mergeCardAudio(
     };
 
     for (const lang of orderedBase) {
-      collect(baseEntries, lang, settings.reps[lang] ?? DEFAULT_REPETITIONS_BASE, speedFor(lang));
+      collect(
+        baseEntries,
+        lang,
+        settings.reps[lang] ?? DEFAULT_REPETITIONS_BASE,
+        speedFor(lang),
+      );
     }
     if (settings.playTargetBefore) {
       for (const lang of orderedTarget) {
@@ -367,12 +417,18 @@ export async function mergeCardAudio(
     // listen-then-guess-then-see flow of "Practice Listening".
     const afterLangs = new Set(afterTargetEntries.map((e) => e.language));
 
-    const allEntries = [...beforeTargetEntries, ...baseEntries, ...afterTargetEntries];
+    const allEntries = [
+      ...beforeTargetEntries,
+      ...baseEntries,
+      ...afterTargetEntries,
+    ];
     if (allEntries.length === 0) return null;
 
     // --- 2. Fetch & decode unique URLs in parallel ---
     // Silent entries have no clip to fetch, decode or stretch.
-    const audibleEntries = allEntries.filter((e): e is AudibleEntry => !e.silent);
+    const audibleEntries = allEntries.filter(
+      (e): e is AudibleEntry => !e.silent,
+    );
     const uniqueUrls = [...new Set(audibleEntries.map((e) => e.url))];
     const decoded = new Map<string, AudioBuffer>();
 
@@ -380,7 +436,10 @@ export async function mergeCardAudio(
       uniqueUrls.map(async (url) => {
         const res = await fetch(url);
         if (signal?.aborted) return;
-        if (!res.ok) throw new Error(`Audio fetch failed: ${res.status} ${res.statusText} for ${url}`);
+        if (!res.ok)
+          throw new Error(
+            `Audio fetch failed: ${res.status} ${res.statusText} for ${url}`,
+          );
         const arrayBuf = await res.arrayBuffer();
         if (signal?.aborted) return;
         const audioBuf = await ctx.decodeAudioData(arrayBuf);
@@ -400,7 +459,11 @@ export async function mergeCardAudio(
       `${url}|${speed.toFixed(3)}`;
     const stretched = new Map<StretchKey, AudioBuffer>();
     const uniqueCombos = new Map<StretchKey, { url: string; speed: number }>();
-    for (const e of audibleEntries) uniqueCombos.set(stretchKey(e.url, e.speed), { url: e.url, speed: e.speed });
+    for (const e of audibleEntries)
+      uniqueCombos.set(stretchKey(e.url, e.speed), {
+        url: e.url,
+        speed: e.speed,
+      });
 
     await Promise.all(
       [...uniqueCombos.values()].map(async ({ url, speed }) => {
@@ -419,7 +482,11 @@ export async function mergeCardAudio(
     const beforeRepPause = (lang: string) =>
       settings.beforeRepPauses[lang] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS;
 
-    type ScheduledClip = { buffer: AudioBuffer; startSec: number; gain: number };
+    type ScheduledClip = {
+      buffer: AudioBuffer;
+      startSec: number;
+      gain: number;
+    };
     const clips: ScheduledClip[] = [];
     const languageCues: LanguageCue[] = [];
     const speedByLanguage: Record<string, number> = {};
@@ -442,7 +509,13 @@ export async function mergeCardAudio(
           // deliberately no `speedByLanguage` entry, nothing was stretched for
           // this language, and a phantom one would shadow the real per-cue speed
           // of a language that also plays in the other group.
-          languageCues.push({ language: entry.language, startSec: cursor, speed: entry.speed, reveals, silent: true });
+          languageCues.push({
+            language: entry.language,
+            startSec: cursor,
+            speed: entry.speed,
+            reveals,
+            silent: true,
+          });
         } else {
           const originalBuffer = decoded.get(entry.url);
           const buffer = stretched.get(stretchKey(entry.url, entry.speed));
@@ -454,7 +527,12 @@ export async function mergeCardAudio(
           speedByLanguage[entry.language] = entry.speed;
 
           for (let r = 0; r < entry.reps; r++) {
-            languageCues.push({ language: entry.language, startSec: cursor, speed: entry.speed, reveals });
+            languageCues.push({
+              language: entry.language,
+              startSec: cursor,
+              speed: entry.speed,
+              reveals,
+            });
             clips.push({ buffer, startSec: cursor, gain });
             cursor += buffer.duration;
             if (r < entry.reps - 1) {
@@ -522,7 +600,8 @@ export async function mergeCardAudio(
     // --- 4. Render with OfflineAudioContext ---
     // Match the decoded clips' rate; a fully silent render decodes nothing and
     // has no rate to match, so fall back to the shared decode context's.
-    const sampleRate = decoded.values().next().value?.sampleRate ?? ctx.sampleRate;
+    const sampleRate =
+      decoded.values().next().value?.sampleRate ?? ctx.sampleRate;
     const totalSamples = Math.ceil(totalDuration * sampleRate);
     const offline = new OfflineAudioContext(1, totalSamples, sampleRate);
 
@@ -550,7 +629,12 @@ export async function mergeCardAudio(
     const blob = new Blob([wavData], { type: 'audio/wav' });
     const blobUrl = URL.createObjectURL(blob);
 
-    return { blobUrl, durationSec: totalDuration, languageCues, speedByLanguage };
+    return {
+      blobUrl,
+      durationSec: totalDuration,
+      languageCues,
+      speedByLanguage,
+    };
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') return null;
     throw err;

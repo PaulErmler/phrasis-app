@@ -1,5 +1,9 @@
 import { v, ConvexError } from 'convex/values';
-import { action, internalMutation, internalQuery } from '../../_generated/server';
+import {
+  action,
+  internalMutation,
+  internalQuery,
+} from '../../_generated/server';
 import { internal } from '../../_generated/api';
 import { requireAuthUserId } from '../../db/users';
 import { consumeQuota } from '../../usage/helpers';
@@ -47,6 +51,13 @@ export const transcribeAudio = action({
   args: {
     audio: v.bytes(),
     mimeType: v.optional(v.string()),
+    // Pin transcription to one language (internal code) instead of running
+    // language-ID over the course languages. Used by writing-mode voice
+    // input, where the row's target language is already known — a single
+    // locale gives Azure its best accuracy. `regionVariant` narrows a
+    // mixed-dialect code (e.g. es_mixed) to its concrete Azure locale.
+    language: v.optional(v.string()),
+    regionVariant: v.optional(v.string()),
   },
   returns: v.string(),
   handler: async (ctx, args) => {
@@ -57,18 +68,22 @@ export const transcribeAudio = action({
       { userId },
     );
 
-    const courseLanguages = await ctx.runQuery(
-      internal.features.chat.transcribe.getActiveCourseLanguages,
-      { userId },
-    );
+    const courseLanguages = args.language
+      ? []
+      : await ctx.runQuery(
+          internal.features.chat.transcribe.getActiveCourseLanguages,
+          { userId },
+        );
 
     const startedAt = Date.now();
     try {
       const baseMime = (args.mimeType ?? 'audio/webm').split(';')[0].trim();
       const blob = new Blob([args.audio], { type: baseMime });
       await reserveAzureSttSlot(ctx, { maxWaitMs: 3000 });
-      const { text, audioDurationMs } = await runStt(blob, undefined, {
-        autoDetectCourseLanguages: courseLanguages,
+      const { text, audioDurationMs } = await runStt(blob, args.language, {
+        ...(args.language
+          ? { regionVariant: args.regionVariant }
+          : { autoDetectCourseLanguages: courseLanguages }),
       });
 
       await captureGeneration(ctx, {
@@ -99,9 +114,14 @@ export const transcribeAudio = action({
         message: error instanceof Error ? error.message : String(error),
       });
       console.error('Transcription error:', error);
-      throw new ConvexError(
-        error instanceof Error ? error.message : 'Failed to transcribe audio',
-      );
+      // Structured errors (e.g. RATE_LIMITED from the STT slot reservation)
+      // pass through with their code intact.
+      if (error instanceof ConvexError) throw error;
+      throw new ConvexError({
+        code: 'UPSTREAM_ERROR',
+        message:
+          error instanceof Error ? error.message : 'Failed to transcribe audio',
+      });
     }
   },
 });
