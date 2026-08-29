@@ -4,7 +4,8 @@ import { MutationCtx } from '../../_generated/server';
 import { TableAggregate } from '@convex-dev/aggregate';
 import { Doc, Id } from '../../_generated/dataModel';
 import { LEGACY_TO_NEW_CODE } from '../../lib/collections';
-import type { SchedulingTrack } from '../../types';
+import { ORIGIN_BUCKETS } from '../../types';
+import type { SchedulingTrack, OriginBucket } from '../../types';
 import {
   STABILITY_BUCKETS,
   stabilityBucketKey,
@@ -49,9 +50,12 @@ export function hasWritingTrack(doc: Doc<'cards'>): boolean {
  * Origin bucket for the filter-aware aggregate. 'none' collects legacy cards
  * whose `collectionOrigin` was never resolved. They are only counted under
  * the unfiltered 'both' path, mirroring `fetchDueCardsWithFilter`.
+ *
+ * The list itself lives in `convex/types.ts` so the schema can share it; it is
+ * re-exported here because this is where callers expect to find it.
  */
-export const ORIGIN_BUCKETS = ['premade', 'custom', 'chat', 'none'] as const;
-export type OriginBucket = (typeof ORIGIN_BUCKETS)[number];
+export { ORIGIN_BUCKETS };
+export type { OriginBucket };
 
 export function getCardOriginBucket(doc: Doc<'cards'>): OriginBucket {
   return doc.collectionOrigin ?? 'none';

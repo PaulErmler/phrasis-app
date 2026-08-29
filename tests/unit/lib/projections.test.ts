@@ -28,7 +28,7 @@ function recentDays(value: number, days: number, endOffset = 0, base = TODAY) {
 function baseInputs(
   overrides: Partial<ProjectionInputs> = {},
 ): ProjectionInputs {
-  return {
+  const base = {
     today: TODAY,
     courseAgeDays: 400,
     goalMinutes: 20,
@@ -38,6 +38,7 @@ function baseInputs(
     todayWords: 0,
     dailyWords: recentDays(20, 90),
     dailyNewCards: recentDays(5, 90),
+    curriculumShare: 1,
     dailyMinutes: recentDays(20, 90),
     levels: [
       { code: 'A2.1', totalTexts: 126, cardsAdded: 78, ignoredCount: 2 },
@@ -46,6 +47,15 @@ function baseInputs(
     ],
     activeLevelIndex: 0,
     ...overrides,
+  };
+  return {
+    ...base,
+    // All-curriculum unless a test says otherwise, and derived from whatever
+    // `dailyNewCards` ended up being so that overriding one series can't leave
+    // the other silently stale. Every expectation below that doesn't pass
+    // `dailyCurriculumCards` therefore doubles as an assertion that a user with
+    // no custom content sees exactly the ETAs they saw before the split existed.
+    dailyCurriculumCards: overrides.dailyCurriculumCards ?? base.dailyNewCards,
   };
 }
 
@@ -246,6 +256,118 @@ describe('computeIndicators', () => {
     );
     expect(byKind(indicators, 'nextLevel')).toBeUndefined();
     expect(byKind(indicators, 'levelByYearEnd')).toBeUndefined();
+  });
+
+  /**
+   * The reported bug: the level ETA divided a PREMADE-only remaining count by
+   * an all-origin pace, so anyone adding their own sentences was promised the
+   * next level sooner than the curriculum could actually be finished.
+   */
+  describe('curriculum vs custom pace', () => {
+    it('custom cards no longer shorten the level ETA', () => {
+      // Same 5 cards/day overall. Left: all curriculum. Right: 1 curriculum
+      // and 4 custom. Before the split both read as 5 premade cards/day.
+      const allCurriculum = computeIndicators(
+        baseInputs({ dailyNewCards: recentDays(5, 90) }),
+      );
+      const mostlyCustom = computeIndicators(
+        baseInputs({
+          dailyNewCards: recentDays(5, 90),
+          dailyCurriculumCards: recentDays(1, 90),
+        }),
+      );
+      const a = byKind(allCurriculum.indicators, 'nextLevel') as {
+        etaDays: number;
+      };
+      const b = byKind(mostlyCustom.indicators, 'nextLevel') as {
+        etaDays: number;
+      };
+      // 126 - 78 - 2 = 46 remaining. At 5/day → 10 days; at 1/day → 46.
+      expect(a.etaDays).toBe(10);
+      expect(b.etaDays).toBe(46);
+    });
+
+    it('reports both paces, with custom as the remainder', () => {
+      const r = computeIndicators(
+        baseInputs({
+          dailyNewCards: recentDays(5, 90),
+          dailyCurriculumCards: recentDays(1, 90),
+        }),
+      );
+      expect(r.cardsPerDay).toBeCloseTo(5, 5);
+      expect(r.curriculumCardsPerDay).toBeCloseTo(1, 5);
+      expect(r.customCardsPerDay).toBeCloseTo(4, 5);
+    });
+
+    it('the year-end level walk spends the curriculum pace only', () => {
+      // 46 + 140 + 150 = 336 premade texts left, and ~360 days of budget from
+      // early January. All-origin 5/day clears the ladder to the
+      // MAX_LEVEL_JUMP_YEAR_END cap; a 0.5/day curriculum pace buys 180, which
+      // clears A2.1's 46 but stalls 6 short of A2.2's 140.
+      const early = { today: '2026-01-05', courseAgeDays: 400 };
+      const allCurriculum = computeIndicators(
+        baseInputs({
+          ...early,
+          dailyNewCards: recentDays(5, 90, 0, '2026-01-05'),
+        }),
+      );
+      const mostlyCustom = computeIndicators(
+        baseInputs({
+          ...early,
+          dailyNewCards: recentDays(5, 90, 0, '2026-01-05'),
+          dailyCurriculumCards: recentDays(0.5, 90, 0, '2026-01-05'),
+        }),
+      );
+      const a = byKind(allCurriculum.indicators, 'levelByYearEnd') as {
+        code: string;
+      };
+      const b = byKind(mostlyCustom.indicators, 'levelByYearEnd') as {
+        code: string;
+      };
+      expect(a.code).toBe('A2.3');
+      expect(b.code).toBe('A2.2');
+    });
+
+    it('hides the level ETAs when only the CUSTOM pace is meaningful', () => {
+      // 5 cards/day would clear the level in 10 days, but none of them are
+      // curriculum cards, so there is nothing honest to promise.
+      const { indicators } = computeIndicators(
+        baseInputs({
+          dailyNewCards: recentDays(5, 90),
+          dailyCurriculumCards: recentDays(0, 90),
+        }),
+      );
+      expect(byKind(indicators, 'nextLevel')).toBeUndefined();
+      expect(byKind(indicators, 'levelByYearEnd')).toBeUndefined();
+      // The all-origin sentence indicators are unaffected: those project the
+      // whole deck, which legitimately includes custom sentences.
+      expect(byKind(indicators, 'endOfYearSentences')).toBeDefined();
+      expect(byKind(indicators, 'sentencesPerHour')).toBeDefined();
+    });
+
+    it('goal basis scales the curriculum pace by curriculumShare', () => {
+      // No recent activity, so there is no window to split; the deck's
+      // standing composition stands in for it.
+      const paused = {
+        dailyWords: [],
+        dailyNewCards: [],
+        dailyCurriculumCards: [],
+        dailyMinutes: [],
+      };
+      const full = computeIndicators(
+        baseInputs({ ...paused, curriculumShare: 1 }),
+      );
+      const partial = computeIndicators(
+        baseInputs({ ...paused, curriculumShare: 0.25 }),
+      );
+      expect(full.basis).toBe('goal');
+      expect(partial.basis).toBe('goal');
+      expect(full.cardsPerDay).toBeCloseTo(partial.cardsPerDay, 5);
+      expect(partial.curriculumCardsPerDay).toBeCloseTo(
+        full.curriculumCardsPerDay * 0.25,
+        5,
+      );
+    });
   });
 
   it('no premade level active → no level indicators', () => {

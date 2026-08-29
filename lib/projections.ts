@@ -96,7 +96,24 @@ export interface ProjectionInputs {
   todayWords: number;
   dailyWords: DailyEntry[];
   dailyNewCards: DailyEntry[];
+  /**
+   * Per-day new cards from PREMADE course collections only. The level ETAs
+   * divide a premade-only remaining count, so feeding them `dailyNewCards`
+   * (which also counts custom and chat cards) systematically promised the
+   * next level sooner than the curriculum could actually be finished.
+   *
+   * Deliberately a separate required input rather than an optional one
+   * defaulting to `dailyNewCards`: that default would silently reinstate the
+   * bug at any call site that forgot it.
+   */
+  dailyCurriculumCards: DailyEntry[];
   dailyMinutes: DailyEntry[];
+  /**
+   * Share of the course's cards that came from premade collections, in [0,1].
+   * Used only by the `goal` basis, which by definition has no window data to
+   * derive a curriculum pace from.
+   */
+  curriculumShare: number;
   /** Ordered premade levels (by `order`), or null when unavailable. */
   levels: LevelInfo[] | null;
   /** Index into `levels` of the active level, -1 when custom/chat is active. */
@@ -147,6 +164,12 @@ export type ProjectionIndicator =
 export interface ProjectionResult {
   basis: PaceBasis;
   indicators: ProjectionIndicator[];
+  /** All-origin new cards per day. Drives the sentence indicators. */
+  cardsPerDay: number;
+  /** Premade-only new cards per day. Drives the level ETAs. */
+  curriculumCardsPerDay: number;
+  /** Custom + chat new cards per day. Reported for tests and diagnostics. */
+  customCardsPerDay: number;
 }
 
 // ============================================================================
@@ -241,13 +264,16 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
     todayWords,
     dailyWords,
     dailyNewCards,
+    dailyCurriculumCards,
     dailyMinutes,
+    curriculumShare,
     levels,
     activeLevelIndex,
   } = inputs;
 
   const windowWords = sum(dailyWords);
   const windowCards = sum(dailyNewCards);
+  const windowCurriculumCards = sum(dailyCurriculumCards);
   const windowMinutes = sum(dailyMinutes);
   const activeDays = new Set(
     dailyMinutes.filter((e) => e.value > 0).map((e) => e.date),
@@ -257,6 +283,8 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
   let basis: PaceBasis;
   let wordsPerDay: number;
   let cardsPerDay: number;
+  /** Premade-only counterpart of `cardsPerDay`; see `dailyCurriculumCards`. */
+  let curriculumCardsPerDay: number;
   let minutesPerDay: number;
   /** Words per study-minute, from the user's own history. */
   let wordsPerMinute: number;
@@ -265,6 +293,11 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
     basis = 'observed';
     wordsPerDay = decayedDailyPace(dailyWords, today, courseAgeDays);
     cardsPerDay = decayedDailyPace(dailyNewCards, today, courseAgeDays);
+    curriculumCardsPerDay = decayedDailyPace(
+      dailyCurriculumCards,
+      today,
+      courseAgeDays,
+    );
     minutesPerDay = decayedDailyPace(dailyMinutes, today, courseAgeDays);
     wordsPerMinute = windowWords / Math.max(windowMinutes, 5);
   } else if (activeDays >= 1 && windowMinutes > 0) {
@@ -284,17 +317,19 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
       PROJECTION_CAP_WORDS,
       firstSessionDailyRate(windowWords, windowMinutes, minutesPerActiveDay),
     );
-    cardsPerDay =
-      windowCards <= 0
+    const dampenedCardRate = (windowValue: number) =>
+      windowValue <= 0
         ? 0
         : Math.min(
             PROJECTION_CAP_WORDS,
             firstSessionDailyRate(
-              windowCards,
+              windowValue,
               windowMinutes,
               minutesPerActiveDay,
             ),
           );
+    cardsPerDay = dampenedCardRate(windowCards);
+    curriculumCardsPerDay = dampenedCardRate(windowCurriculumCards);
     minutesPerDay = minutesPerActiveDay;
     wordsPerMinute =
       windowWords / Math.max(windowMinutes, 5) / FIRST_SESSION_DAMPENER;
@@ -314,10 +349,19 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
     const allTimeWpm = currentWords / totalMinutes / dampener;
     wordsPerDay = allTimeWpm * goalMinutes;
     cardsPerDay = (currentSentences / totalMinutes / dampener) * goalMinutes;
+    // No window data by definition, so the split comes from the deck's
+    // standing composition rather than from recent behaviour.
+    curriculumCardsPerDay = cardsPerDay * curriculumShare;
     minutesPerDay = goalMinutes;
     wordsPerMinute = allTimeWpm;
   } else {
-    return { basis: 'empty', indicators: [{ kind: 'empty' }] };
+    return {
+      basis: 'empty',
+      indicators: [{ kind: 'empty' }],
+      cardsPerDay: 0,
+      curriculumCardsPerDay: 0,
+      customCardsPerDay: 0,
+    };
   }
 
   const indicators: ProjectionIndicator[] = [];
@@ -434,15 +478,19 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
   const remainingOf = (l: LevelInfo) =>
     Math.max(0, l.totalTexts - l.cardsAdded - l.ignoredCount);
 
+  // Level ETAs run on the CURRICULUM pace, not the all-origin one: `remaining`
+  // below counts premade texts only, so dividing it by a pace that also counts
+  // custom and chat cards understated every level ETA for anyone adding their
+  // own sentences.
   if (
     levels != null &&
     activeLevelIndex >= 0 &&
-    cardsPerDay >= MIN_CARDS_PER_DAY_FOR_ETA
+    curriculumCardsPerDay >= MIN_CARDS_PER_DAY_FOR_ETA
   ) {
     const active = levels[activeLevelIndex];
     const remaining = remainingOf(active);
     if (remaining > 0) {
-      const etaDays = ceilDays(remaining / cardsPerDay);
+      const etaDays = ceilDays(remaining / curriculumCardsPerDay);
       if (etaDays <= MAX_ETA_DAYS) {
         indicators.push({
           kind: 'nextLevel',
@@ -459,7 +507,7 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
     // PROJECTION_CAP_WORDS to keep a hot week honest; this is the level
     // equivalent, so an inflated pace can't promise the top of the ladder.
     if (daysToYearEnd >= MIN_DAYS_FOR_YEAR_HORIZON) {
-      let budget = cardsPerDay * daysToYearEnd;
+      let budget = curriculumCardsPerDay * daysToYearEnd;
       let idx = activeLevelIndex;
       const maxIdx = Math.min(
         levels.length - 1,
@@ -513,8 +561,13 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
     }
   }
 
+  const paces = {
+    cardsPerDay,
+    curriculumCardsPerDay,
+    customCardsPerDay: Math.max(0, cardsPerDay - curriculumCardsPerDay),
+  };
   if (indicators.length === 0) {
-    return { basis, indicators: [{ kind: 'empty' }] };
+    return { basis, indicators: [{ kind: 'empty' }], ...paces };
   }
-  return { basis, indicators };
+  return { basis, indicators, ...paces };
 }
