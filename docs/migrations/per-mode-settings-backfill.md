@@ -27,6 +27,14 @@ needed between deploys. The first edit of a setting in a mode snapshots the
 effective value into that mode's field (the settings UI spreads the effective
 map), after which the modes diverge for that field.
 
+> **Since superseded for radio.** "(and radio)" above was true when this
+> migration shipped. Radio has since grown its own `*Radio` copy, gated by
+> `separateRadioSettings`, which *branches* off the unsuffixed audio fields
+> (`*Radio ?? unsuffixed ?? DEFAULT_*`) rather than joining the writing chain
+> — it never falls back to `*Full`. That split needs no migration of its own
+> (undefined means "same as Learn & Review"). See "The Radio branch" in
+> `docs/architecture/review_modes.md`.
+
 The `*Transcribe` / `transcribeAfter*` fields are NOT part of this migration:
 Transcribe shipped after the split, so no user has legacy state there. The
 `?? *Full` inheritance is the intended default, not a compatibility shim.

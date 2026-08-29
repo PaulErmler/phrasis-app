@@ -486,6 +486,13 @@ export function useLearningMode(
     api.features.decks.getCollectionProgress,
     {},
   );
+  // Custom/chat texts still waiting to be pulled. They cost no SENTENCES
+  // credits, so this is what tells auto-add to keep going on an empty
+  // balance (`addCardsFromCollection` sends every coin flip to the custom
+  // source then). Defaults to false while the query is in flight, which is
+  // the pre-existing behaviour for an empty balance.
+  const customCardsPending =
+    useQuery(api.features.decks.hasPendingCustomCards, {}) === true;
 
   const [isReviewing, setIsReviewing] = useState(false);
   const [isAddingCards, setIsAddingCards] = useState(false);
@@ -800,14 +807,14 @@ export function useLearningMode(
   const handleAddCards = useCallback(async () => {
     if (!courseSettings?.activeCollectionId || isAddingCards) return;
     const collectionId = courseSettings.activeCollectionId;
-    const configuredBatch =
-      courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE;
-    const effectiveBatch = sentencesQuota.unlimited
-      ? configuredBatch
-      : Math.min(configuredBatch, Math.max(1, sentencesQuota.balance));
+    // The full configured batch, credits or not: the server splits it
+    // between the premade and custom sources by coin flip and caps only the
+    // premade half at the balance. Clamping here would shrink the custom
+    // half too, which on an empty balance meant one card per run.
+    const batchSize = courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE;
     setIsAddingCards(true);
     try {
-      const args = { collectionId, batchSize: effectiveBatch };
+      const args = { collectionId, batchSize };
       let result = await addCardsMutation(args);
       // A 0-card result with scanIncomplete means the scan burned its
       // per-call read budget on an ignored/direct-added streak; the frontier
@@ -852,16 +859,23 @@ export function useLearningMode(
     } finally {
       setIsAddingCards(false);
     }
-  }, [courseSettings, isAddingCards, addCardsMutation, sentencesQuota]);
+  }, [courseSettings, isAddingCards, addCardsMutation]);
 
   // Un-stick the quota latch the moment the reactive balance shows headroom
   // again. Runs before the auto-add effect below (definition order), so the
   // same commit that delivers the refill also resumes auto-add.
   useEffect(() => {
-    if (sentencesQuota.unlimited || sentencesQuota.balance > 0) {
+    // Custom texts appearing un-sticks it too: the latch means "the last run
+    // added nothing and the premade source was out of credits", and a new
+    // chat/custom sentence is something that run couldn't have seen.
+    if (
+      sentencesQuota.unlimited ||
+      sentencesQuota.balance > 0 ||
+      customCardsPending
+    ) {
       autoAddQuotaEmptyRef.current = false;
     }
-  }, [sentencesQuota.unlimited, sentencesQuota.balance]);
+  }, [sentencesQuota.unlimited, sentencesQuota.balance, customCardsPending]);
 
   // Auto-add cards when enabled and no cards due. isAddingCards and
   // activeCollectionId are deliberate deps: a run that adds 0 cards while
@@ -903,6 +917,7 @@ export function useLearningMode(
     holdAutoAdd,
     sentencesQuota.unlimited,
     sentencesQuota.balance,
+    customCardsPending,
   ]);
 
   // Reset selectedRating, pending master/hide state, exit flag, and card timer when card changes.
@@ -1475,7 +1490,11 @@ export function useLearningMode(
       autoAddEnabled &&
       !settingsOpen &&
       courseSettings.studyContentFilter !== 'custom' &&
-      (sentencesQuota.unlimited || sentencesQuota.balance > 0) &&
+      // Credits gate the premade half only; pending custom texts are enough
+      // on their own to make a run produce cards.
+      (sentencesQuota.unlimited ||
+        sentencesQuota.balance > 0 ||
+        customCardsPending) &&
       (remainingInCollection === null || remainingInCollection > 0) &&
       // A completed run proved this collection drained. The effect won't
       // re-fire for it, so don't promise a load that will never happen.

@@ -9,7 +9,7 @@ import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getCourseSettings } from '../db/courseSettings';
-import { getCollectionProgress } from '../db/collections';
+import { hasPendingCustomCardsToAdd } from '../db/collections';
 import { getDeckByCourseId } from '../db/decks';
 import { trackEvent } from '../db/stats/dailyStats';
 import { EVENTS, track } from '../analytics';
@@ -53,11 +53,7 @@ import {
   type FreePlayFace,
   type CardEditLanguageRole,
 } from '../types';
-import {
-  cardOriginPillFields,
-  isCollectionComplete,
-  originsForFilter,
-} from '../lib/collections';
+import { cardOriginPillFields, originsForFilter } from '../lib/collections';
 import {
   FREE_PLAY_MODES,
   fetchFreePlayRotation,
@@ -495,36 +491,6 @@ export const getCardForReview = query({
  *   - 'all_caught_up'  : the deck has cards but none are due right now
  *                        (filter not the cause).
  */
-/**
- * True iff any of the user's active custom collections has at least one text
- * the deck hasn't pulled in yet. The auto-add Phase 1 (custom/chat) consumes
- * no `SENTENCES` quota, so when this returns `true` the user can still get
- * more cards without paying. The UI must NOT show the upgrade button in
- * that case (see decks.ts:`addCardsFromCollection`).
- *
- * `activeCustomCollectionIds` is the canonical source-of-truth: when the
- * user creates a chat or custom collection it's appended here (see
- * collections.ts:`getOrCreateChatCollection` / `getOrCreateCustomCollection`).
- */
-async function hasPendingCustomCardsToAdd(
-  ctx: QueryCtx,
-  userId: string,
-  courseId: Id<'courses'>,
-  activeCustomCollectionIds: Id<'collections'>[] | undefined,
-): Promise<boolean> {
-  if (!activeCustomCollectionIds || activeCustomCollectionIds.length === 0) {
-    return false;
-  }
-  for (const collId of activeCustomCollectionIds) {
-    const coll = await ctx.db.get(collId);
-    if (!coll) continue;
-    const prog = await getCollectionProgress(ctx, userId, courseId, collId);
-    // Ignored texts are excluded from auto-add, so they aren't pending.
-    if (!isCollectionComplete(coll.textCount, prog)) return true;
-  }
-  return false;
-}
-
 export const getCardForReviewEmptyReason = query({
   // `now` bounds the due-card probes; same optional back-compat contract as
   // getCardForReview above (no-wall-clock query guideline).

@@ -107,6 +107,34 @@ async function setWritingStyle(
   await page.waitForTimeout(700);
 }
 
+/** Drive one switch to an explicit state by DOM id, in the same sheet-scoped
+ *  idiom as flipEverySwitchTwice. */
+async function setSwitchById(
+  page: Page,
+  id: string,
+  on: boolean,
+): Promise<void> {
+  const sheet = page.getByTestId('learning-settings-sheet');
+  const sw = sheet.locator(`[id=${JSON.stringify(id)}]`);
+  await expect(sw).toBeVisible({ timeout: 8_000 });
+  if ((await sw.getAttribute('aria-checked')) === String(on)) return;
+  await clickInSheet(page, sw, `setting #${id} to ${on}`);
+  await expect
+    .poll(() => sw.getAttribute('aria-checked'), { timeout: 8_000 })
+    .toBe(String(on));
+}
+
+/** Mirror of setWritingStyle for the Shadowing-side Review/Radio scope pill.
+ *  Only rendered while `separateRadioSettings` is on. */
+async function setAudioScope(
+  page: Page,
+  scope: 'review' | 'radio',
+): Promise<void> {
+  const btn = page.getByTestId(`settings-scope-${scope}`).first();
+  await clickInSheet(page, btn, `switching audio scope to ${scope}`);
+  await page.waitForTimeout(700);
+}
+
 /**
  * Toggle every Radix switch currently in the sheet twice (on/off back to the
  * original value), each click is a real updateCourseSettings write. Switches
@@ -174,6 +202,17 @@ test.describe('course settings: full UI sweep', () => {
     await setMode(page, 'audio');
     await flipEverySwitchTwice(page, 'audio');
     await cycleListeningStrategies(page);
+
+    // --- Shadowing / Radio scope ---
+    // The split writes the `*Radio` copies, a whole second set of fields the
+    // sweep would otherwise never exercise. Flipping the switch on first is
+    // itself a write; the pill only appears afterwards.
+    await setSwitchById(page, 'separateRadioSettings', true);
+    await setAudioScope(page, 'radio');
+    await flipEverySwitchTwice(page, 'audio/radio');
+    await cycleListeningStrategies(page);
+    await setAudioScope(page, 'review');
+    await setSwitchById(page, 'separateRadioSettings', false);
 
     // --- Writing / Translate ---
     await setMode(page, 'full');

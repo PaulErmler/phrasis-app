@@ -43,6 +43,7 @@ import { COACHMARK_ANCHORS, TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
 import {
   resolveModeSetting,
+  resolveSettingsMode,
   type AudioSettingsMode,
 } from '@/lib/audio/mergeAudio';
 import { PROGRESS_SOUND_URL } from '@/lib/constants/learning';
@@ -464,21 +465,20 @@ export function LearningMode({
       ? (state.courseSettings.instantProceedFull ?? true)
       : (state.courseSettings.instantProceedAudio ?? false);
   const isTranscribe = isTranscribeMode(state.courseSettings);
-  // Settings mode for the writing-only lookups below: this branch of the
-  // component only renders writing ("full") review, so the mode is never
-  // 'audio' here.
-  const writingSettingsMode: AudioSettingsMode = isTranscribe
-    ? 'transcribe'
-    : 'full';
+  // Which copy of the playback settings this session reads. The SAME helper
+  // useLearningAudio uses to build the merged blob, so the card's display
+  // (word highlighting, speed badges, manual row taps) can never resolve a
+  // different mode than the audio playing over it — which is exactly what
+  // happened when this branch read the raw fields and Radio grew its own.
+  const settingsMode: AudioSettingsMode = resolveSettingsMode(
+    state.courseSettings,
+  );
   // Transcribe: the post-submit replay rides the same per-language afterSubmit
   // machinery as Translate, gated by the transcribe auto-play setting
   // (chained `*Transcribe ?? *Full ?? audio` via resolveModeSetting).
   const writingAutoPlay =
-    resolveModeSetting(
-      state.courseSettings,
-      'autoPlayAudio',
-      writingSettingsMode,
-    ) ?? DEFAULT_AUTO_PLAY;
+    resolveModeSetting(state.courseSettings, 'autoPlayAudio', settingsMode) ??
+    DEFAULT_AUTO_PLAY;
 
   // Flagging acts at the card level. The mutation retranslates every
   // non-source-language translation on the card. We hide the button when
@@ -626,13 +626,13 @@ export function LearningMode({
           resolveModeSetting(
             state.courseSettings,
             'highlightWords',
-            writingSettingsMode,
+            settingsMode,
           ) === true
         }
         languagePlaybackSpeeds={resolveModeSetting(
           state.courseSettings,
           'languagePlaybackSpeeds',
-          writingSettingsMode,
+          settingsMode,
         )}
       />
     ) : (
@@ -647,8 +647,18 @@ export function LearningMode({
         revealedLanguages={audio.revealedLanguages}
         revealAllSignal={audioRevealNonce}
         onAllTargetsRevealedChange={setAudioAllTargetsRevealed}
-        highlightEnabled={state.courseSettings.highlightWords === true}
-        languagePlaybackSpeeds={state.courseSettings.languagePlaybackSpeeds}
+        highlightEnabled={
+          resolveModeSetting(
+            state.courseSettings,
+            'highlightWords',
+            settingsMode,
+          ) === true
+        }
+        languagePlaybackSpeeds={resolveModeSetting(
+          state.courseSettings,
+          'languagePlaybackSpeeds',
+          settingsMode,
+        )}
       />
     );
 

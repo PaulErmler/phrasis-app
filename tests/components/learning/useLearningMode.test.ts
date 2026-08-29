@@ -38,6 +38,7 @@ const harness = vi.hoisted(() => {
     addCardsFromCollection: 'decks.addCardsFromCollection',
     ensureUpcomingCardsContent: 'decks.ensureUpcomingCardsContent',
     getCollectionProgress: 'decks.getCollectionProgress',
+    hasPendingCustomCards: 'decks.hasPendingCustomCards',
   } as const;
 
   type MutationMock = ReturnType<typeof vi.fn> & {
@@ -47,6 +48,8 @@ const harness = vi.hoisted(() => {
   const queryValues = new Map<string, unknown>();
   const mutations = new Map<string, MutationMock>();
   const auth = { isAuthenticated: true };
+  // Mutable so the credit-exhaustion tests can drop the balance to 0.
+  const quota = { balance: 100, unlimited: false };
 
   function mutationFor(ref: string): MutationMock {
     let fn = mutations.get(ref);
@@ -58,7 +61,7 @@ const harness = vi.hoisted(() => {
     return fn;
   }
 
-  return { REFS, queryValues, mutations, auth, mutationFor };
+  return { REFS, queryValues, mutations, auth, quota, mutationFor };
 });
 
 vi.mock('convex/react', () => ({
@@ -122,6 +125,7 @@ vi.mock('@/convex/_generated/api', () => {
           addCardsFromCollection: REFS.addCardsFromCollection,
           ensureUpcomingCardsContent: REFS.ensureUpcomingCardsContent,
           getCollectionProgress: REFS.getCollectionProgress,
+          hasPendingCustomCards: REFS.hasPendingCustomCards,
         },
       },
     },
@@ -130,11 +134,11 @@ vi.mock('@/convex/_generated/api', () => {
 
 vi.mock('@/components/feature_tracking/useFeatureQuota', () => ({
   useFeatureQuota: () => ({
-    balance: 100,
+    balance: harness.quota.balance,
     included: 100,
-    used: 0,
-    unlimited: false,
-    isAvailable: true,
+    used: 100 - harness.quota.balance,
+    unlimited: harness.quota.unlimited,
+    isAvailable: harness.quota.balance > 0 || harness.quota.unlimited,
     isLoading: false,
   }),
 }));
@@ -232,6 +236,8 @@ describe('useLearningMode', () => {
     harness.queryValues.clear();
     harness.mutations.clear();
     harness.auth.isAuthenticated = true;
+    harness.quota.balance = 100;
+    harness.quota.unlimited = false;
     seedReviewing();
     consoleErrorSpy = vi
       .spyOn(console, 'error')
@@ -659,6 +665,51 @@ describe('useLearningMode', () => {
       );
       harness.queryValues.set(REFS.getActiveCourse, makeCourse());
     }
+
+    it('asks for the full configured batch even with no credits left', async () => {
+      // Premade cards spend credits and custom ones don't, and the server
+      // splits the batch between them. Clamping the request to the balance
+      // here used to shrink the custom half too: an empty balance floored
+      // the whole batch at one card per run.
+      harness.quota.balance = 0;
+      harness.queryValues.set(REFS.hasPendingCustomCards, true);
+      const add = harness.mutationFor(REFS.addCardsFromCollection);
+      add.mockResolvedValue(addResult({ cardsAdded: 0, quotaLimited: true }));
+      seedEmptyDeckWithAutoAdd();
+
+      renderHook(() => useLearningMode());
+      await act(async () => {});
+
+      expect(add).toHaveBeenCalledWith({
+        collectionId: 'col1',
+        batchSize: 10,
+      });
+    });
+
+    it('keeps promising a load while custom texts can still be added for free', async () => {
+      // The requested fallback: out of credits but custom cards left. The
+      // run will produce cards, so the seamless loading state is the honest
+      // status, not the no-cards-due screen.
+      harness.quota.balance = 0;
+      harness.queryValues.set(REFS.hasPendingCustomCards, true);
+      const add = harness.mutationFor(REFS.addCardsFromCollection);
+      add.mockResolvedValue(addResult({ cardsAdded: 0, scanIncomplete: true }));
+      seedEmptyDeckWithAutoAdd();
+
+      const { result } = renderHook(() => useLearningMode());
+      expect(result.current.status).toBe('loading');
+    });
+
+    it('falls back to noCardsDue when neither credits nor custom texts are left', async () => {
+      harness.quota.balance = 0;
+      harness.queryValues.set(REFS.hasPendingCustomCards, false);
+      const add = harness.mutationFor(REFS.addCardsFromCollection);
+      add.mockResolvedValue(addResult({ cardsAdded: 0, quotaLimited: true }));
+      seedEmptyDeckWithAutoAdd();
+
+      const { result } = renderHook(() => useLearningMode());
+      expect(result.current.status).toBe('noCardsDue');
+    });
 
     it('latches auto-add off after MAX_UNSERVED_ADD_RUNS inserting runs with no card served', async () => {
       const add = harness.mutationFor(REFS.addCardsFromCollection);

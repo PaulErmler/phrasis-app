@@ -73,6 +73,7 @@ import type * as features_collections from "../features/collections.js";
 import type * as features_consent from "../features/consent.js";
 import type * as features_courses from "../features/courses.js";
 import type * as features_curriculumFlagTesting from "../features/curriculumFlagTesting.js";
+import type * as features_customSourceTesting from "../features/customSourceTesting.js";
 import type * as features_customTexts from "../features/customTexts.js";
 import type * as features_deckBrowse from "../features/deckBrowse.js";
 import type * as features_deckContent from "../features/deckContent.js";
@@ -243,6 +244,7 @@ declare const fullApi: ApiFromModules<{
   "features/consent": typeof features_consent;
   "features/courses": typeof features_courses;
   "features/curriculumFlagTesting": typeof features_curriculumFlagTesting;
+  "features/customSourceTesting": typeof features_customSourceTesting;
   "features/customTexts": typeof features_customTexts;
   "features/deckBrowse": typeof features_deckBrowse;
   "features/deckContent": typeof features_deckContent;

@@ -7,34 +7,42 @@ import {
   formatInterval,
   scheduleCard,
   simulateReviews,
-  validateInitialReviewCount,
+  clampInitialReviewCount,
   DEFAULT_INITIAL_REVIEW_COUNT,
   MIN_INITIAL_REVIEW_COUNT,
   MAX_INITIAL_REVIEW_COUNT,
 } from '@/lib/scheduling';
 
-describe('validateInitialReviewCount', () => {
-  it('accepts values inside range', () => {
-    expect(() =>
-      validateInitialReviewCount(MIN_INITIAL_REVIEW_COUNT),
-    ).not.toThrow();
-    expect(() =>
-      validateInitialReviewCount(DEFAULT_INITIAL_REVIEW_COUNT),
-    ).not.toThrow();
-    expect(() =>
-      validateInitialReviewCount(MAX_INITIAL_REVIEW_COUNT),
-    ).not.toThrow();
+describe('clampInitialReviewCount', () => {
+  it('passes values inside range through unchanged', () => {
+    expect(clampInitialReviewCount(MIN_INITIAL_REVIEW_COUNT)).toBe(
+      MIN_INITIAL_REVIEW_COUNT,
+    );
+    expect(clampInitialReviewCount(DEFAULT_INITIAL_REVIEW_COUNT)).toBe(
+      DEFAULT_INITIAL_REVIEW_COUNT,
+    );
+    expect(clampInitialReviewCount(MAX_INITIAL_REVIEW_COUNT)).toBe(
+      MAX_INITIAL_REVIEW_COUNT,
+    );
   });
 
-  it('rejects values outside range and non-integers', () => {
-    expect(() =>
-      validateInitialReviewCount(MIN_INITIAL_REVIEW_COUNT - 1),
-    ).toThrow();
-    expect(() =>
-      validateInitialReviewCount(MAX_INITIAL_REVIEW_COUNT + 1),
-    ).toThrow();
-    expect(() => validateInitialReviewCount(3.5)).toThrow();
-    expect(() => validateInitialReviewCount(Number.NaN)).toThrow();
+  it('clamps out-of-range values to the supported bounds', () => {
+    expect(clampInitialReviewCount(MIN_INITIAL_REVIEW_COUNT - 1)).toBe(
+      MIN_INITIAL_REVIEW_COUNT,
+    );
+    expect(clampInitialReviewCount(MAX_INITIAL_REVIEW_COUNT + 10)).toBe(
+      MAX_INITIAL_REVIEW_COUNT,
+    );
+  });
+
+  it('floors non-integers and defaults non-finite input', () => {
+    expect(clampInitialReviewCount(3.5)).toBe(3);
+    expect(clampInitialReviewCount(Number.NaN)).toBe(
+      DEFAULT_INITIAL_REVIEW_COUNT,
+    );
+    expect(clampInitialReviewCount(Number.POSITIVE_INFINITY)).toBe(
+      DEFAULT_INITIAL_REVIEW_COUNT,
+    );
   });
 });
 

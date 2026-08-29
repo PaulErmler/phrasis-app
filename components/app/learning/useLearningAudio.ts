@@ -5,6 +5,7 @@ import { useAudioPlayer } from '@/hooks/use-audio-player';
 import {
   resolveAudioSettings,
   resolveModeSetting,
+  resolveSettingsMode,
   applyOnlyNewListening,
   type AudioSettingsMode,
 } from '@/lib/audio/mergeAudio';
@@ -70,11 +71,12 @@ export function useLearningAudio(
   // It carries its own settings copy, chained `*Transcribe ?? *Full ?? audio`.
   const isTranscribe =
     isFullMode && (cs?.writingInputMode ?? 'translate') === 'transcribe';
-  const settingsMode: AudioSettingsMode = isTranscribe
-    ? 'transcribe'
-    : isFullMode
-      ? 'full'
-      : 'audio';
+  // Which copy of the playback settings this session reads. Radio can carry
+  // its own, gated by the `separateRadioSettings` switch; only the hands-free
+  // face qualifies, so Free Study (free play while typing) keeps the writing
+  // copies, per the note above. Shared with the card view via
+  // `resolveSettingsMode` so the two cannot disagree about the mode.
+  const settingsMode: AudioSettingsMode = resolveSettingsMode(cs);
   // The user's mode-resolved auto-play setting, before the disable gates.
   // Also returned to callers that need to re-trigger playback after a gate
   // releases (e.g. a tutorial popover being dismissed).

@@ -692,6 +692,155 @@ async function maybeAutoAdvanceActiveCollection(
   await setActiveCollectionOnSettings(ctx, courseId, next?._id);
 }
 
+/**
+ * A custom collection that still has texts to pull, carried between the two
+ * custom passes. `pendingCount` is decremented as slots are allocated and
+ * `lastRank` advances with the scan frontier, so the second pass picks up
+ * where the first one stopped instead of re-scanning it.
+ */
+type PendingCustomCollection = {
+  id: Id<'collections'>;
+  lastRank: number;
+  pendingCount: number;
+};
+
+/**
+ * Split a batch between the premade level collection and the user's custom
+ * collections by a fair coin flip per slot: half the cards come from each
+ * source on average.
+ *
+ * Per-slot flips rather than an exact half-split — the ask is a fair coin, so
+ * a batch of 10 lands wherever ten coins land, not always on 5/5.
+ *
+ * A flip that picks a source with no capacity left hands its slot to the other
+ * one, so the batch still fills. That is what makes the out-of-credits case
+ * work: `premadeCap` is 0 once the SENTENCES balance is empty, so every slot
+ * lands on custom (which costs no credits) instead of the batch coming up
+ * short. The mirror case — no custom texts pending — sends every slot to the
+ * premade collection, which is the behaviour this whole path had before.
+ */
+export function flipBatchBetweenSources(
+  batch: number,
+  customCap: number,
+  premadeCap: number,
+): { customBudget: number; premadeBudget: number } {
+  let customBudget = 0;
+  let premadeBudget = 0;
+  for (let i = 0; i < batch; i++) {
+    const canCustom = customBudget < customCap;
+    const canPremade = premadeBudget < premadeCap;
+    if (!canCustom && !canPremade) break;
+    // The coin picks a source; a source with nothing left hands the slot over.
+    const toCustom = Math.random() < 0.5 ? canCustom : !canPremade;
+    if (toCustom) customBudget++;
+    else premadeBudget++;
+  }
+  return { customBudget, premadeBudget };
+}
+
+/**
+ * Pull up to `limit` cards from the given custom collections, spreading the
+ * budget over them one slot at a time from a uniformly random pick so no
+ * single collection monopolises the batch.
+ *
+ * Returns `picked` alongside `inserted`: a pass that couldn't find as many
+ * texts as it was given (a capped scan, a dedup streak) leaves slots the
+ * caller hands to the other source rather than shrinking the batch.
+ */
+async function drainCustomCollections(
+  ctx: MutationCtx,
+  params: {
+    pending: PendingCustomCollection[];
+    limit: number;
+    deck: Doc<'decks'>;
+    course: Doc<'courses'>;
+    userId: string;
+  },
+): Promise<{ inserted: number; picked: number; scanIncomplete: boolean }> {
+  const { pending, limit, deck, course, userId } = params;
+  const courseId = course._id;
+  if (limit <= 0) return { inserted: 0, picked: 0, scanIncomplete: false };
+
+  const allocations = new Map<string, number>();
+  const pool = pending.filter((entry) => entry.pendingCount > 0);
+  let remaining = limit;
+  while (remaining > 0 && pool.length > 0) {
+    const idx = Math.floor(Math.random() * pool.length);
+    const entry = pool[idx];
+    const key = entry.id.toString();
+    allocations.set(key, (allocations.get(key) ?? 0) + 1);
+    entry.pendingCount--;
+    if (entry.pendingCount <= 0) pool.splice(idx, 1);
+    remaining--;
+  }
+
+  let inserted = 0;
+  let picked = 0;
+  let scanIncomplete = false;
+
+  for (const entry of pending) {
+    const count = allocations.get(entry.id.toString()) ?? 0;
+    if (count === 0) continue;
+
+    // Prioritized/readd marks jump the queue (rank-ordered, frontier
+    // untouched); the sequential scan fills the rest, skipping ignored
+    // and already-carded texts.
+    const queuedTexts = await drainQueuedMarkTexts(
+      ctx,
+      userId,
+      courseId,
+      entry.id,
+      deck._id,
+      count,
+    );
+    const scan = await getNextAddableTextsFromRank(ctx, {
+      collectionId: entry.id,
+      afterRank: entry.lastRank,
+      limit: count - queuedTexts.length,
+      deckId: deck._id,
+      userId,
+      courseId,
+      options: { forUserId: userId },
+      excludeTextIds: new Set(queuedTexts.map((t) => t._id.toString())),
+    });
+    if (scan.capped) scanIncomplete = true;
+
+    const texts = [...queuedTexts, ...scan.picked];
+    const cardsInserted = await addTextsAsCards(
+      ctx,
+      texts,
+      deck,
+      entry.id,
+      course,
+      userId,
+    );
+
+    inserted += cardsInserted;
+    picked += texts.length;
+
+    // The allocation loop above already spent these slots out of
+    // `pendingCount`. A capped scan stopped at ADD_SCAN_CAP, not at the end of
+    // the collection, so the texts behind the slots it couldn't fill are still
+    // there — hand them back, or the Phase 3 top-up reads this collection as
+    // drained and the batch comes up short. An `exhausted` scan really did
+    // reach the end: those slots stay spent, because re-offering them would
+    // only buy a second empty scan.
+    if (scan.capped) entry.pendingCount += count - texts.length;
+
+    if (cardsInserted > 0 || scan.newFrontier > entry.lastRank) {
+      await updateCollectionProgress(ctx, userId, courseId, entry.id, {
+        addedDelta: cardsInserted,
+        frontierRank: scan.newFrontier,
+      });
+      // Carried so a second pass in the same call continues past the texts
+      // this one already walked.
+      entry.lastRank = Math.max(entry.lastRank, scan.newFrontier);
+    }
+  }
+
+  return { inserted, picked, scanIncomplete };
+}
+
 /** Handler body of `addCardsFromCollection`. */
 export async function addCardsFromCollectionHandler(
   ctx: MutationCtx,
@@ -717,14 +866,12 @@ export async function addCardsFromCollectionHandler(
   const deck = await getOrCreateDeck(ctx, course);
 
   let totalCardsInserted = 0;
-  let remainingBatch = clampedBatchSize;
   let scanIncomplete = false;
 
-  // --- Phase 1: Add from custom collection(s) ---
   // When the requested collection is a level collection (learning mode auto-add),
-  // drain pending texts from ALL selected custom collections randomly.
-  // When the requested collection is a custom collection (collection detail "add" button),
-  // only add from that specific collection.
+  // draw from ALL selected custom collections. When the requested collection is
+  // a custom collection (collection detail "add" button), only add from that
+  // specific collection.
   const courseSettings = await getCourseSettings(ctx, courseId);
   const requestedCollection = await ctx.db.get(args.collectionId);
   const isLevelCollection = requestedCollection
@@ -756,110 +903,92 @@ export async function addCardsFromCollectionHandler(
               ),
           );
 
-  if (customCollectionIdsToProcess.length > 0 && remainingBatch > 0) {
-    const collectionsWithPending: {
-      id: Id<'collections'>;
-      collection: Doc<'collections'>;
-      lastRank: number;
-      pendingCount: number;
-    }[] = [];
-
-    for (const collId of customCollectionIdsToProcess) {
-      const coll = await ctx.db.get(collId);
-      if (!coll) continue;
-      const prog = await getCollectionProgressHelper(
-        ctx,
-        userId,
-        courseId,
-        collId,
-      );
-      const lastRank = prog?.lastRankProcessed ?? 0;
-      // Ignored texts are deliberately excluded from auto-add, so they
-      // don't count as pending. (Custom collections never carry cutover
-      // credit, so widening here is a no-op. It just keeps every
-      // `collectionRemaining` call on the effective total.)
-      const pending = collectionRemaining(
-        effectiveTextCount(coll.textCount, prog),
-        prog,
-      );
-      if (pending > 0) {
-        collectionsWithPending.push({
-          id: collId,
-          collection: coll,
-          lastRank,
-          pendingCount: pending,
-        });
-      }
+  // --- What each source could supply -------------------------------------
+  // Both capacities are known before anything is added, which is what lets
+  // the coin flips below respect them instead of discovering a dry source
+  // halfway through the batch.
+  const pendingCustom: PendingCustomCollection[] = [];
+  for (const collId of customCollectionIdsToProcess) {
+    const coll = await ctx.db.get(collId);
+    if (!coll) continue;
+    const prog = await getCollectionProgressHelper(
+      ctx,
+      userId,
+      courseId,
+      collId,
+    );
+    // Ignored texts are deliberately excluded from auto-add, so they
+    // don't count as pending. (Custom collections never carry cutover
+    // credit, so widening here is a no-op. It just keeps every
+    // `collectionRemaining` call on the effective total.)
+    const pendingCount = collectionRemaining(
+      effectiveTextCount(coll.textCount, prog),
+      prog,
+    );
+    if (pendingCount > 0) {
+      pendingCustom.push({
+        id: collId,
+        lastRank: prog?.lastRankProcessed ?? 0,
+        pendingCount,
+      });
     }
+  }
+  const customCap = Math.min(
+    clampedBatchSize,
+    pendingCustom.reduce((sum, entry) => sum + entry.pendingCount, 0),
+  );
 
-    if (collectionsWithPending.length > 0) {
-      const allocations = new Map<string, number>();
-      const pool = [...collectionsWithPending];
-      let remaining = remainingBatch;
-
-      while (remaining > 0 && pool.length > 0) {
-        const idx = Math.floor(Math.random() * pool.length);
-        const entry = pool[idx];
-        const key = entry.id.toString();
-        allocations.set(key, (allocations.get(key) ?? 0) + 1);
-        entry.pendingCount--;
-        if (entry.pendingCount <= 0) pool.splice(idx, 1);
-        remaining--;
-      }
-
-      for (const entry of collectionsWithPending) {
-        const count = allocations.get(entry.id.toString()) ?? 0;
-        if (count === 0) continue;
-
-        // Prioritized/readd marks jump the queue (rank-ordered, frontier
-        // untouched); the sequential scan fills the rest, skipping ignored
-        // and already-carded texts.
-        const queuedTexts = await drainQueuedMarkTexts(
-          ctx,
-          userId,
-          courseId,
-          entry.id,
-          deck._id,
-          count,
-        );
-        const scan = await getNextAddableTextsFromRank(ctx, {
-          collectionId: entry.id,
-          afterRank: entry.lastRank,
-          limit: count - queuedTexts.length,
-          deckId: deck._id,
-          userId,
-          courseId,
-          options: { forUserId: userId },
-          excludeTextIds: new Set(queuedTexts.map((t) => t._id.toString())),
-        });
-        if (scan.capped) scanIncomplete = true;
-
-        const texts = [...queuedTexts, ...scan.picked];
-        const cardsInserted = await addTextsAsCards(
-          ctx,
-          texts,
-          deck,
-          entry.id,
-          course,
-          userId,
-        );
-
-        totalCardsInserted += cardsInserted;
-        remainingBatch -= texts.length;
-
-        if (cardsInserted > 0 || scan.newFrontier > entry.lastRank) {
-          await updateCollectionProgress(ctx, userId, courseId, entry.id, {
-            addedDelta: cardsInserted,
-            frontierRank: scan.newFrontier,
-          });
-        }
-      }
+  // Premade cards are the ones that cost SENTENCES credits, so the balance is
+  // the cap. Mirrors the Phase 2 gate below: an unsynced quota doc (no doc
+  // yet) is treated as allowed, and `allowed` already covers unlimited plans.
+  const premadeEligible = isLevelCollection && !skipPremadeSource;
+  let premadeQuotaBlocked = false;
+  let premadeCap = 0;
+  if (premadeEligible) {
+    const quota = await checkQuota(
+      ctx,
+      userId,
+      FEATURE_IDS.SENTENCES,
+      clampedBatchSize,
+    );
+    if (!quota.synced || quota.allowed) {
+      premadeCap = clampedBatchSize;
+    } else {
+      premadeCap = Math.max(0, quota.balance);
+      premadeQuotaBlocked = premadeCap === 0;
     }
   }
 
-  // --- Phase 2: Fill remaining batch from the difficulty collection (only for level collections) ---
-  if (isLevelCollection && remainingBatch > 0 && !skipPremadeSource) {
-    // Deduct sentences quota for difficulty-collection cards
+  const { customBudget, premadeBudget } = flipBatchBetweenSources(
+    clampedBatchSize,
+    customCap,
+    premadeCap,
+  );
+
+  // --- Phase 1: the custom half ------------------------------------------
+  const customPass = await drainCustomCollections(ctx, {
+    pending: pendingCustom,
+    limit: customBudget,
+    deck,
+    course,
+    userId,
+  });
+  totalCardsInserted += customPass.inserted;
+  if (customPass.scanIncomplete) scanIncomplete = true;
+
+  // --- Phase 2: the premade half, plus whatever custom couldn't fill ------
+  // Still capped by the credits: the spillover buys the premade source more
+  // slots, never more balance.
+  let remainingBatch = Math.min(
+    premadeBudget + (customBudget - customPass.picked),
+    premadeCap,
+  );
+  const premadeWanted = remainingBatch;
+  let premadePicked = 0;
+
+  if (premadeEligible && remainingBatch > 0) {
+    // Re-checked against the amount actually being asked for; the cap above
+    // was computed for the whole batch.
     const quota = await checkQuota(
       ctx,
       userId,
@@ -867,22 +996,16 @@ export async function addCardsFromCollectionHandler(
       remainingBatch,
     );
     if (quota.synced && !quota.allowed) {
-      // Clamp to whatever balance is left
       if (quota.balance > 0) {
         remainingBatch = quota.balance;
       } else {
-        // No sentences left. Skip Phase 2 entirely, return Phase 1 results.
-        // `insertCard` maintained deck.cardCount per insert; `deck` is the
-        // pre-insert snapshot, so add this call's inserts for the report.
-        return {
-          cardsAdded: totalCardsInserted,
-          totalCardsInDeck: deck.cardCount + totalCardsInserted,
-          scanIncomplete,
-          quotaLimited: true,
-        };
+        remainingBatch = 0;
+        premadeQuotaBlocked = true;
       }
     }
+  }
 
+  if (premadeEligible && remainingBatch > 0) {
     const progress = await getCollectionProgressHelper(
       ctx,
       userId,
@@ -915,6 +1038,7 @@ export async function addCardsFromCollectionHandler(
     if (scan.capped) scanIncomplete = true;
 
     const textsToAdd = [...queuedTexts, ...scan.picked];
+    premadePicked = textsToAdd.length;
 
     if (textsToAdd.length > 0) {
       await consumeQuota(ctx, userId, FEATURE_IDS.SENTENCES, textsToAdd.length);
@@ -978,6 +1102,20 @@ export async function addCardsFromCollectionHandler(
     }
   }
 
+  // --- Phase 3: the premade half came up short, top up from custom --------
+  // A drained level collection, a capped scan, or a balance smaller than the
+  // flips asked for. Custom costs no credits, so the batch is filled from
+  // there rather than handed back short.
+  const topUp = await drainCustomCollections(ctx, {
+    pending: pendingCustom,
+    limit: premadeWanted - premadePicked,
+    deck,
+    course,
+    userId,
+  });
+  totalCardsInserted += topUp.inserted;
+  if (topUp.scanIncomplete) scanIncomplete = true;
+
   // deck.cardCount is maintained by `insertCard` (db/stats/cardAggregates),
   // one increment per inserted row, in the same transaction as the insert.
   // `deck` below is the pre-insert snapshot, so snapshot + inserts equals
@@ -999,7 +1137,10 @@ export async function addCardsFromCollectionHandler(
     cardsAdded: totalCardsInserted,
     totalCardsInDeck: deck.cardCount + totalCardsInserted,
     scanIncomplete,
-    quotaLimited: false,
+    // Reported whenever the premade source was shut out by an empty balance,
+    // added cards or not: the client uses it to tell "out of credits" (retry
+    // when the balance refills) apart from "collection drained" (don't).
+    quotaLimited: premadeQuotaBlocked,
   };
 }
 

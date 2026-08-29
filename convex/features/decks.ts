@@ -16,6 +16,7 @@ import { vAnnotationKind } from '../lib/textAnnotations';
 import {
   getDeckCardsHandler,
   getCollectionProgressQueryHandler,
+  hasPendingCustomCardsHandler,
   getActiveDifficultyLevelHandler,
   getUpcomingSentencesForLevelHandler,
 } from './deckBrowse';
@@ -139,6 +140,19 @@ export const getCollectionProgress = query({
   handler: getCollectionProgressQueryHandler,
 });
 
+/**
+ * Whether any selected custom collection still has a text to pull. Custom
+ * cards cost no SENTENCES credits, so the learn view uses this to keep
+ * auto-adding once the credit balance is empty (see
+ * `addCardsFromCollection`, which sends every coin flip to the custom source
+ * in that case).
+ */
+export const hasPendingCustomCards = query({
+  args: {},
+  returns: v.boolean(),
+  handler: hasPendingCustomCardsHandler,
+});
+
 // ============================================================================
 // MUTATIONS
 // ============================================================================
@@ -253,11 +267,18 @@ export const addCardsFromCollection = mutation({
      */
     scanIncomplete: v.boolean(),
     /**
-     * True when Phase 2 was skipped because the SENTENCES quota is exhausted.
-     * Distinguishes "0 cards because out of quota" from "collection drained"
-     * Without it the two are byte-identical and clients would latch a
-     * quota-limited collection as permanently exhausted. Optional so replies
-     * from a not-yet-redeployed backend still validate.
+     * True when the premade source was shut out by an empty SENTENCES
+     * balance. Distinguishes "0 cards because out of quota" from "collection
+     * drained" — without it the two are byte-identical and clients would
+     * latch a quota-limited collection as permanently exhausted.
+     *
+     * NOT a claim that the batch came up short. Since the source split, an
+     * empty balance sends every coin flip to the custom source, so this can
+     * be true on a fully filled batch of custom cards. Read it only when
+     * `cardsAdded === 0`, which is what both callers do
+     * (`useLearningMode.handleAddCards`, `useCollectionDetail`).
+     *
+     * Optional so replies from a not-yet-redeployed backend still validate.
      */
     quotaLimited: v.optional(v.boolean()),
   }),

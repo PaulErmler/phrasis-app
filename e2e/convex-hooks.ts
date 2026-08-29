@@ -41,3 +41,40 @@ export function deckDuplicateTextCount(email: string): number {
     email,
   }) as number;
 }
+
+/** Cards in the active-course decks split by the source they came from. */
+export function deckCardCountsBySource(email: string): {
+  premade: number;
+  custom: number;
+  total: number;
+} {
+  return convexRun('features/deckTesting:cardCountsBySource', { email }) as {
+    premade: number;
+    custom: number;
+    total: number;
+  };
+}
+
+/** Put `count` pending texts in the user's Custom collection. */
+export function seedCustomTexts(
+  email: string,
+  count: number,
+  marker: string,
+): { collectionId: string; textIds: string[] } {
+  return convexRun('features/customSourceTesting:seedCustomTexts', {
+    email,
+    count,
+    marker,
+  }) as { collectionId: string; textIds: string[] };
+}
+
+/** Undo `seedCustomTexts`: the texts, their cards, and the progress booked. */
+export function cleanupSeededTexts(
+  email: string,
+  textIds: string[],
+): { textsDeleted: number; cardsDeleted: number } {
+  return convexRun('features/customSourceTesting:cleanupSeededTexts', {
+    email,
+    textIds,
+  }) as { textsDeleted: number; cardsDeleted: number };
+}

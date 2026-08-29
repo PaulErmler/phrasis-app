@@ -93,6 +93,49 @@ export const courseSettingsFields = {
   transcribeAfterRepetitions: v.optional(v.record(v.string(), v.number())),
   transcribeAfterRepetitionPauses: v.optional(v.record(v.string(), v.number())),
   transcribeAfterPlaybackSpeeds: v.optional(v.record(v.string(), v.number())),
+  // Radio's copy of the playback settings, gated by `separateRadioSettings`.
+  // Radio is a `schedulingMode`, not a `reviewMode`, so it BRANCHES off the
+  // audio fields rather than chaining through the writing ones: the resolution
+  // rule is `*Radio ?? unsuffixed ?? DEFAULT_*`, never `?? *Full`. Undefined
+  // means "same as Learn & Review", so a doc that never enabled the split
+  // behaves exactly as before and no migration is needed. Turning the split
+  // back off leaves these values in place (freeze-and-keep, matching
+  // `separateModeTracking`), so re-enabling resumes where the user left off.
+  // Only applies to the hands-free Radio face (`schedulingMode 'radio'` AND
+  // `reviewMode 'audio'`); Free Study keeps the writing copies.
+  separateRadioSettings: v.optional(v.boolean()),
+  highlightWordsRadio: v.optional(v.boolean()),
+  languageRepetitionsRadio: v.optional(v.record(v.string(), v.number())),
+  languageRepetitionPausesRadio: v.optional(v.record(v.string(), v.number())),
+  languagePlaybackSpeedsRadio: v.optional(v.record(v.string(), v.number())),
+  pauseBaseToBaseRadio: v.optional(v.number()),
+  pauseBaseToTargetRadio: v.optional(v.number()),
+  pauseTargetToTargetRadio: v.optional(v.number()),
+  pauseBeforeAutoAdvanceRadio: v.optional(v.number()),
+  // Radio copies of the Practice Listening group. Unlike the fields above these
+  // have no `*Full` twin (writing mode has never forked them), which is why
+  // `ModeResolvableSetting` in lib/audio/mergeAudio.ts accepts EITHER twin.
+  // The 'untilGood' strategy forks too: radio PLAYS can't advance a card's
+  // good-rating count (radio never rates), but the count a card already
+  // carries still graduates it out of Practice Listening in radio, so the
+  // window has to be visible and separately settable there.
+  playTargetBeforeBaseRadio: v.optional(v.boolean()),
+  playTargetAfterBaseRadio: v.optional(v.boolean()),
+  targetBeforeRepetitionsRadio: v.optional(v.record(v.string(), v.number())),
+  targetBeforeRepetitionPausesRadio: v.optional(
+    v.record(v.string(), v.number()),
+  ),
+  targetBeforePlaybackSpeedsRadio: v.optional(v.record(v.string(), v.number())),
+  pauseTargetToBaseRadio: v.optional(v.number()),
+  targetBeforeOnlyNewRepsRadio: v.optional(v.number()),
+  targetBeforeUntilGoodRepsRadio: v.optional(v.number()),
+  targetBeforeListeningStrategyRadio: v.optional(
+    v.union(
+      v.literal('onlyNew'),
+      v.literal('untilGood'),
+      v.literal('continuous'),
+    ),
+  ),
   // Target-before-base ("Practice Listening") vs target-after-base ("Practice Speaking").
   // At least one must be enabled; the client enforces this. Defaults reproduce the
   // historical base→target sequence (after on, before off).
