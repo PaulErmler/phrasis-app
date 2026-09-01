@@ -45,6 +45,7 @@ import type { StatsReviewMode } from '../../types';
 export const UNREVERSED_STAT_FIELDS: Record<string, readonly string[]> = {
   courseStats: [
     'totalTimeMs',
+    'totalTimeMsByMode',
     'currentStreak',
     'lastActivityDate',
     'timezone',

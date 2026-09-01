@@ -419,9 +419,17 @@
     "stats": {
       "streak": "Serie",
       "reps": "Wiederholungen",
+      "repsLearn": "Lern-Wdh.",
+      "repsRadio": "Radio-Wdh.",
+      "repsFreeStudy": "Freies-Üben-Wdh.",
+      "repsCycleHint": "Tippen, um zwischen allen, Lern-, Radio- und Freies-Üben-Wiederholungen zu wechseln",
       "sentences": "Sätze",
       "words": "Wörter",
       "time": "Zeit",
+      "timeLearn": "Lernzeit",
+      "timeRadio": "Radiozeit",
+      "timeFreeStudy": "Freies-Üben-Zeit",
+      "timeCycleHint": "Tippen, um zwischen gesamter, Lern-, Radio- und Freies-Üben-Zeit zu wechseln",
       "today": "heute",
       "new": "neu"
     },

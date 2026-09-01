@@ -554,6 +554,18 @@ export const reviewsByModeValidator = v.object({
 // parameters so a new mode can't be added to the validator but missed there.
 export type StatsReviewMode = keyof Infer<typeof reviewsByModeValidator>;
 
+// Which slice of a per-mode counter (reps or time) a home-card tile shows.
+// Tapping a tile cycles all -> learn -> radio -> freeStudy; each tile stores
+// its own choice on userSettings (`repsStatFilter`, `timeStatFilter`).
+// 'learn' is the graded FSRS reviews, 'radio' and 'freeStudy' are the two
+// free-play buckets above, shown separately. Unset ≡ 'all'.
+export const statFilterValidator = v.union(
+  v.literal('all'),
+  v.literal('learn'),
+  v.literal('radio'),
+  v.literal('freeStudy'),
+);
+
 // `{language, text}` translation-entry list used by the cardApprovals
 // table/mutations. Also the stored document shape. Do not widen; producers
 // that carry provenance use `sourcedTranslationEntriesValidator` below.

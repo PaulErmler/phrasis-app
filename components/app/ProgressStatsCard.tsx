@@ -19,6 +19,16 @@ import {
   BookOpen,
   Check,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { reportError } from '@/lib/report-error';
+import { useUpdateUserSettings } from '@/hooks/use-update-user-settings';
+import {
+  REPS_FILTER_LABEL_KEYS,
+  TIME_FILTER_LABEL_KEYS,
+  nextStatFilter,
+  statForFilter,
+  type StatFilter,
+} from '@/lib/statFilter';
 import { formatTimeMs } from '@/lib/formatTime';
 import { StartLearningButton } from '@/components/app/StartLearningButton';
 import { DailyGoalRing } from '@/components/app/stats/DailyGoalRing';
@@ -41,6 +51,9 @@ function StatColumn({
   todayFormatter,
   animateToday = true,
   className,
+  onClick,
+  ariaLabel,
+  testId,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -53,6 +66,11 @@ function StatColumn({
   /** Extra classes for the column wrapper. Used by the home view to hide
    * the words stat on narrow screens (`hidden sm:flex`). */
   className?: string;
+  /** When set the column becomes a button. The other columns stay inert
+   * `div`s, so only the interactive one advertises itself as tappable. */
+  onClick?: () => void;
+  ariaLabel?: string;
+  testId?: string;
 }) {
   const displayValue =
     todayValue != null && todayValue > 0
@@ -64,10 +82,8 @@ function StatColumn({
   const todayClassName =
     'text-xs font-medium text-primary tabular-nums leading-none mt-0.5 whitespace-nowrap';
 
-  return (
-    <div
-      className={cn('flex flex-col items-center text-center gap-1', className)}
-    >
+  const body = (
+    <>
       <div className="text-muted-foreground">{icon}</div>
       <p className="text-lg font-semibold tabular-nums leading-tight whitespace-nowrap">
         {value}
@@ -97,6 +113,34 @@ function StatColumn({
           </p>
         )
       )}
+    </>
+  );
+
+  const wrapperClassName = cn(
+    'flex flex-col items-center text-center gap-1',
+    className,
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={ariaLabel}
+        data-testid={testId}
+        className={cn(
+          wrapperClassName,
+          'rounded-lg transition-[background-color,transform] hover:bg-muted/60 active:scale-[0.97]',
+        )}
+      >
+        {body}
+      </button>
+    );
+  }
+
+  return (
+    <div className={wrapperClassName} data-testid={testId}>
+      {body}
     </div>
   );
 }
@@ -143,26 +187,107 @@ export function ProgressStatsCard({
     ? `todayStats_snapshot_${courseId}`
     : 'todayStats_snapshot';
 
+  // Which slice of the per-mode counters each tile shows. Account-level, so
+  // the faces follow the user across devices; one setting per tile, so reps
+  // and time can be inspected independently. `useUpdateUserSettings` patches
+  // the cached `getUserSettings` optimistically, so a tap flips the tile in
+  // the same frame instead of waiting for the round-trip; no local mirror
+  // state.
+  const { preloadedSettings, preloadedHomeSummary, preloadedCourseSettings } =
+    useAppData();
+  const userSettings = usePreloadedQuery(preloadedSettings);
+  const repsFilter: StatFilter = userSettings?.repsStatFilter ?? 'all';
+  const timeFilter: StatFilter = userSettings?.timeStatFilter ?? 'all';
+  const updateUserSettings = useUpdateUserSettings();
+
+  const cycleStatFilter = (
+    key: 'repsStatFilter' | 'timeStatFilter',
+    current: StatFilter,
+  ) => {
+    updateUserSettings({ [key]: nextStatFilter(current) }).catch(
+      (error: unknown) => {
+        // The optimistic patch has already rolled the tile back to the
+        // previous face by the time this rejects, which on its own just looks
+        // like the tap didn't register.
+        reportError(error, { op: `updateUserSettings.${key}` });
+        toast.error(t('courses.manage.saveFailed'));
+      },
+    );
+  };
+
+  const todayReps = todayStats?.reps ?? 0;
+  const todayRepsByFilter = {
+    all: todayReps,
+    learn: statForFilter(todayReps, todayStats?.reviewsByMode, 'learn'),
+    radio: statForFilter(todayReps, todayStats?.reviewsByMode, 'radio'),
+    freeStudy: statForFilter(todayReps, todayStats?.reviewsByMode, 'freeStudy'),
+  } satisfies Record<StatFilter, number>;
+  const todayTimeMs = todayStats?.timeMs ?? 0;
+  const todayTimeByFilter = {
+    all: todayTimeMs,
+    learn: statForFilter(todayTimeMs, todayStats?.timeMsByMode, 'learn'),
+    radio: statForFilter(todayTimeMs, todayStats?.timeMsByMode, 'radio'),
+    freeStudy: statForFilter(
+      todayTimeMs,
+      todayStats?.timeMsByMode,
+      'freeStudy',
+    ),
+  } satisfies Record<StatFilter, number>;
+
+  // Every face is snapshotted, not just the visible one: the delta
+  // animation compares against "what the user last saw", and switching face
+  // would otherwise count up from the previous bucket's number. `reps` and
+  // `timeMs` keep their old key/meaning so snapshots already in localStorage
+  // stay valid.
   const { prev, changed: statsActuallyChanged } = useStatsSnapshot(
     snapshotKey,
     {
-      reps: todayStats?.reps ?? 0,
+      reps: todayRepsByFilter.all,
+      repsLearn: todayRepsByFilter.learn,
+      repsRadio: todayRepsByFilter.radio,
+      repsFreeStudy: todayRepsByFilter.freeStudy,
       newCards: todayStats?.newCards ?? 0,
-      timeMs: todayStats?.timeMs ?? 0,
+      timeMs: todayTimeByFilter.all,
+      timeMsLearn: todayTimeByFilter.learn,
+      timeMsRadio: todayTimeByFilter.radio,
+      timeMsFreeStudy: todayTimeByFilter.freeStudy,
     },
     { dateScoped: true },
   );
+  const prevRepsByFilter = {
+    all: prev.reps,
+    learn: prev.repsLearn,
+    radio: prev.repsRadio,
+    freeStudy: prev.repsFreeStudy,
+  } satisfies Record<StatFilter, number>;
+  const prevTimeByFilter = {
+    all: prev.timeMs,
+    learn: prev.timeMsLearn,
+    radio: prev.timeMsRadio,
+    freeStudy: prev.timeMsFreeStudy,
+  } satisfies Record<StatFilter, number>;
 
   const streak = stats?.currentStreak ?? 0;
-  const reps = stats?.totalRepetitions ?? 0;
+  const reps = statForFilter(
+    stats?.totalRepetitions ?? 0,
+    stats?.totalReviewsByMode,
+    repsFilter,
+  );
+  const repsLabel = t(REPS_FILTER_LABEL_KEYS[repsFilter]);
   const cards = stats?.totalCards ?? 0;
   const words = stats?.totalWordCount ?? 0;
-  const time = formatTimeMs(stats?.totalTimeMs ?? 0);
+  const time = formatTimeMs(
+    statForFilter(
+      stats?.totalTimeMs ?? 0,
+      stats?.totalTimeMsByMode,
+      timeFilter,
+    ),
+  );
+  const timeLabel = t(TIME_FILTER_LABEL_KEYS[timeFilter]);
 
   // Home summary powers the "current level" header strip. Preloaded
   // server-side in app/app/layout.tsx so the level header is available on
   // the first paint and the card height doesn't grow when the data arrives.
-  const { preloadedHomeSummary, preloadedCourseSettings } = useAppData();
   const homeSummary = usePreloadedQuery(preloadedHomeSummary);
 
   // Only render the level header when a *premade* CEFR level is active.
@@ -211,8 +336,8 @@ export function ProgressStatsCard({
   const isInactive = streakState === 'broken' || streakState === 'none';
 
   const animatedReps = useAnimatedCounter(
-    hasLearned ? todayStats.reps : 0,
-    prev.reps,
+    hasLearned ? todayRepsByFilter[repsFilter] : 0,
+    prevRepsByFilter[repsFilter],
     1500,
     300,
     statsActuallyChanged,
@@ -232,6 +357,15 @@ export function ProgressStatsCard({
   const animatedTimeMs = useAnimatedCounter(
     todayStats?.timeMs ?? 0,
     prev.timeMs,
+    1500,
+    600,
+    statsActuallyChanged,
+  );
+  // The Time tile's own counter follows its face; the ring above keeps the
+  // raw total because the daily goal is about all time spent.
+  const animatedTileTimeMs = useAnimatedCounter(
+    todayTimeByFilter[timeFilter],
+    prevTimeByFilter[timeFilter],
     1500,
     600,
     statsActuallyChanged,
@@ -427,11 +561,14 @@ export function ProgressStatsCard({
             <div className="flex-1 grid grid-cols-3 gap-2 sm:grid-cols-4">
               <StatColumn
                 icon={<RotateCcw className="h-4 w-4" />}
-                label={t('stats.reps')}
+                label={repsLabel}
                 value={String(reps)}
                 todayValue={hasLearned ? animatedReps : undefined}
                 todayLabel={t('stats.today')}
                 animateToday={statsActuallyChanged}
+                onClick={() => cycleStatFilter('repsStatFilter', repsFilter)}
+                ariaLabel={`${reps} ${repsLabel}. ${t('stats.repsCycleHint')}`}
+                testId="reps-stat-column"
               />
               <StatColumn
                 icon={<MessageSquare className="h-4 w-4" />}
@@ -454,16 +591,19 @@ export function ProgressStatsCard({
               />
               <StatColumn
                 icon={<Clock className="h-4 w-4" />}
-                label={t('stats.time')}
+                label={timeLabel}
                 value={time}
                 todayValue={
-                  hasLearned && todayStats.timeMs > 0
-                    ? animatedTimeMs
+                  hasLearned && todayTimeByFilter[timeFilter] > 0
+                    ? animatedTileTimeMs
                     : undefined
                 }
                 todayFormatter={formatTimeMs}
                 todayLabel={t('stats.today')}
                 animateToday={statsActuallyChanged}
+                onClick={() => cycleStatFilter('timeStatFilter', timeFilter)}
+                ariaLabel={`${time} ${timeLabel}. ${t('stats.timeCycleHint')}`}
+                testId="time-stat-column"
               />
             </div>
           </div>

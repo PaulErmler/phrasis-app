@@ -26,6 +26,7 @@ import {
   voiceGenderValidator,
   featureStateValidator,
   reviewsByModeValidator,
+  statFilterValidator,
   translationEntriesValidator,
   collectionOriginValidator,
   collectionOriginBucketValidator,
@@ -724,6 +725,12 @@ export default defineSchema({
     // and naming rationale as hideDueCounts: explicit `false` = show, unset
     // or true = hidden. Independent of hideDueCounts.
     hideWorkloadForecast: v.optional(v.boolean()),
+    // Which slice of the per-mode counters the home card's reps and time
+    // tiles show. Tapping a tile cycles all -> learn -> radio -> freeStudy and
+    // writes through here, so the face follows the account across devices.
+    // One field per tile: the two are independent. Unset ≡ 'all'.
+    repsStatFilter: v.optional(statFilterValidator),
+    timeStatFilter: v.optional(statFilterValidator),
   }).index('by_userId', ['userId']),
 
   // Onboarding progress table. Stores the user's onboarding answers.
@@ -1047,6 +1054,12 @@ export default defineSchema({
     totalCardsEdited: v.optional(v.number()),
     totalCardsAddedManually: v.optional(v.number()),
     totalReviewsByMode: v.optional(reviewsByModeValidator),
+    // Per-mode split of totalTimeMs, same buckets as totalReviewsByMode and
+    // dailyStats.timeMsByMode. Graded reviews without an explicit mode land
+    // in `audio`, mirroring the daily writer. Backfilled from the daily rows
+    // by courseStatsTimeByModeBackfill; days before the daily split existed
+    // carry no breakdown, so the tile's subtraction rule shows them as learn.
+    totalTimeMsByMode: v.optional(reviewsByModeValidator),
     totalAccuracySum: v.optional(v.number()),
     totalAccuracyCount: v.optional(v.number()),
     // Writing accuracy split by punctuation handling, so the headline number

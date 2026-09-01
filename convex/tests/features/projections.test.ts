@@ -139,9 +139,10 @@ async function seedLevels(
 }
 
 /** A full origin split from the buckets a case actually cares about. */
-const originSplit = (
-  partial: Partial<NewCardsByOrigin>,
-): NewCardsByOrigin => ({ ...ORIGIN_BUCKET_ZEROS, ...partial });
+const originSplit = (partial: Partial<NewCardsByOrigin>): NewCardsByOrigin => ({
+  ...ORIGIN_BUCKET_ZEROS,
+  ...partial,
+});
 
 /** Overwrite the seeded window's per-day origin split. */
 async function setOriginSplit(

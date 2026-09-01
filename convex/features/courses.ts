@@ -12,6 +12,7 @@ import {
   learningStyleValidator,
   currentLevelValidator,
   reviewsByModeValidator,
+  statFilterValidator,
 } from '../types';
 import { tutorialIdValidator } from './tutorialIds';
 import {
@@ -191,6 +192,8 @@ export const getUserSettings = query({
       analyticsConsent: v.optional(v.boolean()),
       hideDueCounts: v.optional(v.boolean()),
       hideWorkloadForecast: v.optional(v.boolean()),
+      repsStatFilter: v.optional(statFilterValidator),
+      timeStatFilter: v.optional(statFilterValidator),
     }),
     v.null(),
   ),
@@ -389,6 +392,7 @@ export const getCourseStats = query({
       totalCardsEdited: v.optional(v.number()),
       totalCardsAddedManually: v.optional(v.number()),
       totalReviewsByMode: v.optional(reviewsByModeValidator),
+      totalTimeMsByMode: v.optional(reviewsByModeValidator),
       totalAccuracySum: v.optional(v.number()),
       totalAccuracyCount: v.optional(v.number()),
       // Course language config. Exposed so the home view can label the
@@ -445,6 +449,7 @@ export const getCourseStats = query({
         totalCardsEdited: stats.totalCardsEdited,
         totalCardsAddedManually: stats.totalCardsAddedManually,
         totalReviewsByMode: stats.totalReviewsByMode,
+        totalTimeMsByMode: stats.totalTimeMsByMode,
         totalAccuracySum: stats.totalAccuracySum,
         totalAccuracyCount: stats.totalAccuracyCount,
         targetLanguages: active.course.targetLanguages,
@@ -468,6 +473,7 @@ export const getTodayStats = query({
       newCards: v.number(),
       timeMs: v.number(),
       reviewsByMode: v.optional(reviewsByModeValidator),
+      timeMsByMode: v.optional(reviewsByModeValidator),
       accuracyAvg: v.optional(v.number()),
       chatMessagesSent: v.optional(v.number()),
       chatCardsApproved: v.optional(v.number()),
@@ -489,6 +495,7 @@ export const getTodayStats = query({
       newCards: daily.newCards,
       timeMs: daily.timeMs,
       reviewsByMode: daily.reviewsByMode,
+      timeMsByMode: daily.timeMsByMode,
       accuracyAvg:
         daily.accuracyCount && daily.accuracyCount > 0
           ? (daily.accuracySum ?? 0) / daily.accuracyCount
@@ -1492,17 +1499,29 @@ export const updateUserSettings = mutation({
   args: {
     hideDueCounts: v.optional(v.boolean()),
     hideWorkloadForecast: v.optional(v.boolean()),
+    repsStatFilter: v.optional(statFilterValidator),
+    timeStatFilter: v.optional(statFilterValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
-    const patch: { hideDueCounts?: boolean; hideWorkloadForecast?: boolean } =
-      {};
+    const patch: {
+      hideDueCounts?: boolean;
+      hideWorkloadForecast?: boolean;
+      repsStatFilter?: Infer<typeof statFilterValidator>;
+      timeStatFilter?: Infer<typeof statFilterValidator>;
+    } = {};
     if (args.hideDueCounts !== undefined) {
       patch.hideDueCounts = args.hideDueCounts;
     }
     if (args.hideWorkloadForecast !== undefined) {
       patch.hideWorkloadForecast = args.hideWorkloadForecast;
+    }
+    if (args.repsStatFilter !== undefined) {
+      patch.repsStatFilter = args.repsStatFilter;
+    }
+    if (args.timeStatFilter !== undefined) {
+      patch.timeStatFilter = args.timeStatFilter;
     }
     if (Object.keys(patch).length === 0) return null;
 

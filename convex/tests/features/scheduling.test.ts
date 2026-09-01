@@ -2858,6 +2858,7 @@ describe('features/scheduling', () => {
         expect(stats?.totalRepetitions).toBe(1);
         expect(stats?.totalTimeMs).toBe(4000);
         expect(stats?.totalReviewsByMode?.radio).toBe(1);
+        expect(stats?.totalTimeMsByMode?.radio).toBe(4000);
         // Radio doesn't graduate cards or count "first review". totalCards
         // should stay at the seeded value (0).
         expect(stats?.totalCards).toBe(0);

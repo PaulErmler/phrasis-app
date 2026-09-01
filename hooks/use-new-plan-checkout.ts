@@ -4,6 +4,7 @@ import type { ElementType } from 'react';
 import { useAction } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
+import { markCheckoutStarted } from '@/lib/openai-pixel';
 import {
   checkoutTrialParams,
   type TrialState,
@@ -64,6 +65,9 @@ export function useNewPlanCheckout() {
         product_id: productId,
         flow: trialState.trialEligible ? 'trial_start' : 'purchase',
       });
+      // Lets OpenAIPixelConversions tell this purchase apart from a
+      // pre-existing subscription when the customer comes back from Stripe.
+      markCheckoutStarted(productId);
       window.location.href = paymentUrl;
       return { redirected: true as const };
     }

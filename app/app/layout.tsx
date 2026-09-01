@@ -7,6 +7,7 @@ import { BillingGate } from '@/components/app/BillingGate';
 import { AppUpdateGate } from '@/components/app/AppUpdateGate';
 import { PostHogIdentify } from '@/components/analytics/PostHogIdentify';
 import { ConsentSync } from '@/components/analytics/ConsentSync';
+import { OpenAIPixelConversions } from '@/components/analytics/OpenAIPixelConversions';
 
 export default async function AppLayout({
   children,
@@ -37,6 +38,7 @@ export default async function AppLayout({
             event fires, and the gate can hold rendering back on a stale bundle. */}
         <PostHogIdentify />
         <ConsentSync />
+        <OpenAIPixelConversions />
         {/* Wraps rather than sits beside the guard so useReloadBlock is
             reachable from every view, notably LearnView, whose detached
             audio element cannot be detected from outside the hook tree. */}

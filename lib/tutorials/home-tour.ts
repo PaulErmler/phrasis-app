@@ -92,12 +92,12 @@ export function createHomeTour(
       'bottom',
       'center',
     ),
-    // The 7-day workload card sits BELOW the progress card, so this step
-    // comes after both progress-card steps — the tour scrolls monotonically
-    // instead of jumping down and back up. Gated on the card's OWN
-    // preference (not hideDueCounts — the two opt-ins are independent).
-    // skipIfMissing is a safety net if the card isn't mounted when the tour
-    // launches.
+    // The 7-day workload card sits below the chat input (after the
+    // progress card), so this step comes after both progress-card steps —
+    // the tour scrolls monotonically instead of jumping down and back up.
+    // Gated on the card's OWN preference (not hideDueCounts — the two
+    // opt-ins are independent). skipIfMissing is a safety net if the card
+    // isn't mounted when the tour launches.
     ...(ctx?.hideWorkloadForecast === true
       ? []
       : [

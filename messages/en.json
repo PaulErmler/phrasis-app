@@ -419,9 +419,17 @@
     "stats": {
       "streak": "Streak",
       "reps": "Reps",
+      "repsLearn": "Learn reps",
+      "repsRadio": "Radio reps",
+      "repsFreeStudy": "Free Study reps",
+      "repsCycleHint": "Tap to switch between all, learn, radio and free study reps",
       "sentences": "Sentences",
       "words": "Words",
       "time": "Time",
+      "timeLearn": "Learn time",
+      "timeRadio": "Radio time",
+      "timeFreeStudy": "Free Study time",
+      "timeCycleHint": "Tap to switch between all, learn, radio and free study time",
       "today": "today",
       "new": "new"
     },

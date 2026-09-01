@@ -491,7 +491,8 @@ describe('auto-add: splitting the batch between premade and custom', () => {
     expect(res.cardsAdded).toBe(8);
     // Still short of 10, and the cap is why — the client re-calls on this.
     expect(res.scanIncomplete).toBe(true);
-  });
+    // 1500+ inserts: ~1.3 s alone, 8 s+ under coverage instrumentation.
+  }, 30_000);
 
   it('an exclusive add from one collection is not split', async () => {
     // The collection-detail "add" button targets one collection; the coin

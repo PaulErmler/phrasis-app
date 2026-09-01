@@ -15,7 +15,7 @@ import { upsertDailyLanguageStats } from './dailyLanguageStats';
 import { upsertLanguageStats } from './languageStats';
 import { upsertReviewDepthAccuracy } from './reviewDepthAccuracy';
 import { trackNewWords } from './wordTracking';
-import type { SchedulingTrack } from '../../types';
+import type { StatsReviewMode, SchedulingTrack } from '../../types';
 // Shared with the per-card running averages (cards.reviewTimeStats) so the
 // daily time series and the per-card means clamp samples identically.
 import { REVIEW_TIME_CLAMP_MAX_MS as MAX_TIME_PER_CARD_MS } from '../../lib/reviewTimeStats';
@@ -141,11 +141,29 @@ export async function recordReviewStats(
         : (card.fsrsState ?? null);
   const fsrsCardState = priorFsrsState?.state ?? 0;
 
+  // Default to 'audio' when the caller omits a mode. This path is the
+  // active-review path (free play uses `recordFreePlayStats`), so the review
+  // must count toward the audio/full buckets for the milestone math, and the
+  // course-level time split must agree with the daily one it is backfilled
+  // from.
+  const reviewModeForStats = args.reviewMode ?? 'audio';
+
   // --- Course-level stats ---
   const prevModeReviews = stats.totalReviewsByMode ?? { audio: 0, full: 0 };
+  const prevModeTime: Record<StatsReviewMode, number> = {
+    audio: 0,
+    full: 0,
+    radio: 0,
+    freeStudy: 0,
+    ...(stats.totalTimeMsByMode ?? {}),
+  };
   await ctx.db.patch(stats._id, {
     totalRepetitions: stats.totalRepetitions + 1,
     totalTimeMs: stats.totalTimeMs + clampedTime,
+    totalTimeMsByMode: {
+      ...prevModeTime,
+      [reviewModeForStats]: prevModeTime[reviewModeForStats] + clampedTime,
+    },
     totalCards: stats.totalCards + (isFirstReview ? 1 : 0),
     currentStreak: newStreak,
     lastActivityDate: newLastActivityDate,
@@ -184,10 +202,6 @@ export async function recordReviewStats(
   // `dailyReviewsToday` here is the non-radio review count (audio + full) so
   // that radio plays don't inflate the celebration milestone or the in-learn
   // progress bar. `repsAfter` (total reps incl. radio) is intentionally unused.
-  // Default to 'audio' when the caller omits a mode. This path is the
-  // active-review path (free play uses `recordFreePlayStats`), so the review
-  // must count toward `reviewsByMode.audio`/`full` for the milestone math.
-  const reviewModeForStats = args.reviewMode ?? 'audio';
   const {
     isFirstActivityToday,
     activeReviewsAfter: dailyReviewsToday,

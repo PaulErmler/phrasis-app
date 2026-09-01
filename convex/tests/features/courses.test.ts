@@ -989,6 +989,74 @@ describe('features/courses', () => {
       expect(settings?.hideWorkloadForecast).toBe(false);
       expect(settings?.hideDueCounts).toBe(true);
     });
+
+    it('round-trips repsStatFilter on an existing row', async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) =>
+        ctx.db.insert('userSettings', {
+          userId: 'user_A',
+          hasCompletedOnboarding: true,
+          hideDueCounts: true,
+        }),
+      );
+      const asUser = t.withIdentity({ subject: 'user_A' });
+
+      // Unset means 'all'; the field is only written once the user taps.
+      let settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      expect(settings?.repsStatFilter).toBeUndefined();
+
+      for (const filter of ['learn', 'radio', 'freeStudy', 'all'] as const) {
+        await asUser.mutation(api.features.courses.updateUserSettings, {
+          repsStatFilter: filter,
+        });
+        settings = await asUser.query(api.features.courses.getUserSettings, {});
+        expect(settings?.repsStatFilter).toBe(filter);
+      }
+      // Untouched by the reps taps.
+      expect(settings?.hideDueCounts).toBe(true);
+    });
+
+    it('keeps timeStatFilter independent of repsStatFilter', async () => {
+      const t = convexTest(schema, modules);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      await asUser.mutation(api.features.courses.updateUserSettings, {
+        repsStatFilter: 'radio',
+      });
+      await asUser.mutation(api.features.courses.updateUserSettings, {
+        timeStatFilter: 'freeStudy',
+      });
+      let settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      expect(settings?.repsStatFilter).toBe('radio');
+      expect(settings?.timeStatFilter).toBe('freeStudy');
+
+      await asUser.mutation(api.features.courses.updateUserSettings, {
+        timeStatFilter: 'all',
+      });
+      settings = await asUser.query(api.features.courses.getUserSettings, {});
+      expect(settings?.repsStatFilter).toBe('radio');
+      expect(settings?.timeStatFilter).toBe('all');
+    });
+
+    it('creates a settings row when repsStatFilter is the first write', async () => {
+      const t = convexTest(schema, modules);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      await asUser.mutation(api.features.courses.updateUserSettings, {
+        repsStatFilter: 'radio',
+      });
+      const settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      expect(settings?.repsStatFilter).toBe('radio');
+      expect(settings?.hasCompletedOnboarding).toBe(false);
+      expect(settings?.hideDueCounts).toBeUndefined();
+    });
   });
 
   describe('updateCourseSettings: audio playback', () => {

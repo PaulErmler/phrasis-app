@@ -35,6 +35,7 @@
     "eval:feedback": "tsx --env-file=.env.local scripts/eval-writing-feedback.ts",
     "eval:autofill": "tsx --env-file=.env.local scripts/eval-translation-autofill.ts",
     "store:assets": "tsx scripts/store-screenshots.ts",
+    "store:squares": "tsx scripts/store-squares.ts",
     "cap:local": "node scripts/cap-sync.mjs local",
     "cap:dev": "node scripts/cap-sync.mjs dev",
     "cap:store": "node scripts/cap-sync.mjs store"
@@ -120,7 +121,6 @@
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
     "es-hangul": "^2.4.0",
-    "gray-matter": "^4.0.3",
     "greek-utils": "^1.3.0",
     "hebrew-transliteration": "^2.10.1",
     "input-otp": "^1.4.2",

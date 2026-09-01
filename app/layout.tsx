@@ -10,6 +10,7 @@ import { getMessages, getTimeZone } from 'next-intl/server';
 import { Toaster } from '@/components/ui/sonner';
 import { PostHogProvider } from '@/components/analytics/PostHogProvider';
 import { ConsentBanner } from '@/components/consent/ConsentBanner';
+import { OpenAIPixel } from '@/components/analytics/OpenAIPixel';
 import { getToken } from '@/lib/auth-server';
 import { AutumnWrapper } from './providers';
 
@@ -111,6 +112,9 @@ export default async function RootLayout({
               <Toaster position="top-center" />
               {/* Inside NextIntlClientProvider. The banner is translated. */}
               <ConsentBanner />
+              {/* Root, not /app: the ad click lands on the marketing pages,
+                  and the pixel only reads its click id from that first URL. */}
+              <OpenAIPixel />
             </Providers>
           </ConvexClientProvider>
         </PostHogProvider>
