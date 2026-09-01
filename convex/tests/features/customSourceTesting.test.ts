@@ -79,6 +79,16 @@ describe('customSourceTesting hooks', () => {
         }),
       ).rejects.toThrow(/E2E test hooks are disabled/);
     });
+
+    it('refuses to defer due cards', async () => {
+      const t = convexTest(schema, modules);
+      await seedUser(t);
+      await expect(
+        t.mutation(internal.features.customSourceTesting.deferDueCards, {
+          email: EMAIL,
+        }),
+      ).rejects.toThrow(/E2E test hooks are disabled/);
+    });
   });
 
   describe('with E2E_TEST_HOOKS=1', () => {
@@ -184,6 +194,92 @@ describe('customSourceTesting hooks', () => {
         ctx.db.query('collectionProgress').first(),
       );
       expect(progress?.cardsAdded ?? 0).toBe(0);
+    });
+
+    it('rewinds the add frontier so leftover unadded texts stay reachable', async () => {
+      const t = convexTest(schema, modules);
+      await seedUser(t);
+      const first = await t.mutation(
+        internal.features.customSourceTesting.seedCustomTexts,
+        { email: EMAIL, count: 5, marker: 'frontier' },
+      );
+      const asUser = t.withIdentity({ subject: USER_ID });
+      await asUser.mutation(api.features.decks.addCardsFromCollection, {
+        collectionId: first.collectionId,
+        batchSize: 3,
+        exclusive: true,
+      });
+
+      await t.mutation(
+        internal.features.customSourceTesting.cleanupSeededTexts,
+        { email: EMAIL, textIds: first.textIds },
+      );
+
+      const leftover = await t.mutation(
+        internal.features.customSourceTesting.seedCustomTexts,
+        { email: EMAIL, count: 1, marker: 'afterCleanup' },
+      );
+      const added = await asUser.mutation(
+        api.features.decks.addCardsFromCollection,
+        {
+          collectionId: leftover.collectionId,
+          batchSize: 1,
+          exclusive: true,
+        },
+      );
+      expect(added.cardsAdded).toBe(1);
+    });
+
+    it('pushes due cards out of the queue without deleting them', async () => {
+      const t = convexTest(schema, modules);
+      const { deckId } = await seedUser(t);
+      const seeded = await t.mutation(
+        internal.features.customSourceTesting.seedCustomTexts,
+        { email: EMAIL, count: 3, marker: 'defer' },
+      );
+      const asUser = t.withIdentity({ subject: USER_ID });
+      await asUser.mutation(api.features.decks.addCardsFromCollection, {
+        collectionId: seeded.collectionId,
+        batchSize: 3,
+        exclusive: true,
+      });
+
+      const dueBefore = await t.run(async (ctx) => {
+        const cards = await ctx.db
+          .query('cards')
+          .withIndex('by_deckId', (q) => q.eq('deckId', deckId))
+          .take(10);
+        return cards.map((c) => c.dueDate);
+      });
+      expect(dueBefore).toHaveLength(3);
+      expect(dueBefore.every((d) => d <= Date.now())).toBe(true);
+
+      const result = await t.mutation(
+        internal.features.customSourceTesting.deferDueCards,
+        { email: EMAIL },
+      );
+      expect(result.deferred).toBe(3);
+
+      const after = await t.run(async (ctx) => {
+        const cards = await ctx.db
+          .query('cards')
+          .withIndex('by_deckId', (q) => q.eq('deckId', deckId))
+          .take(10);
+        return cards.map((c) => ({
+          dueDate: c.dueDate,
+          writingDueDate: c.writingDueDate,
+        }));
+      });
+      expect(after).toHaveLength(3);
+      expect(after.every((c) => c.dueDate > Date.now())).toBe(true);
+      // Unseeded writing tracks stay unseeded — a due-date bump is not a seed.
+      expect(after.every((c) => c.writingDueDate === undefined)).toBe(true);
+
+      const second = await t.mutation(
+        internal.features.customSourceTesting.deferDueCards,
+        { email: EMAIL },
+      );
+      expect(second.deferred).toBe(0);
     });
 
     it('cleanup tolerates ids whose texts are already gone', async () => {

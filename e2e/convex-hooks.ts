@@ -55,6 +55,17 @@ export function deckCardCountsBySource(email: string): {
   };
 }
 
+/**
+ * Push currently-due cards out of the learn queue. Auto-add only runs
+ * when nothing is due; the home collection "Add 5" button is exclusive
+ * and never mixes sources.
+ */
+export function deferDueCards(email: string): { deferred: number } {
+  return convexRun('features/customSourceTesting:deferDueCards', {
+    email,
+  }) as { deferred: number };
+}
+
 /** Put `count` pending texts in the user's Custom collection. */
 export function seedCustomTexts(
   email: string,

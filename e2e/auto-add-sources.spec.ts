@@ -1,9 +1,15 @@
 import { test, expect, type Page } from '@playwright/test';
-import { dismissTour, gotoAuthedApp, neutralizeTours } from './helpers';
+import {
+  dismissDifficultyCheck,
+  dismissTour,
+  gotoAuthedApp,
+  neutralizeTours,
+} from './helpers';
 import {
   cleanupSeededTexts,
   convexRun,
   deckCardCountsBySource,
+  deferDueCards,
   fixtureEmail,
   seedCustomTexts,
 } from './convex-hooks';
@@ -122,25 +128,28 @@ test.describe('auto-add card sources (live)', { tag: '@live' }, () => {
     const email = fixtureEmail();
     const before = deckCardCountsBySource(email);
 
+    // Mixing lives on the learn-view auto-add path (no `exclusive` flag).
+    // The home "Add 5" button is exclusive to that collection, so clicking
+    // it can never draw custom texts — it is the wrong surface for this
+    // assertion. Auto-add only runs when the due queue is empty, so each
+    // batch starts by parking currently-due cards; the live LearningMode
+    // subscription then sees `cardForReview === null` and fires the mix.
     await gotoAuthedApp(
       page,
-      '/app',
-      page.getByTestId('collection-add-cards').first(),
+      '/app/learn',
+      page.getByTestId('learn-settings').first(),
     );
-    await dismissTour(page, 'home_tour');
+    await dismissTour(page, 'audio_review_intro', 500);
+    await dismissDifficultyCheck(page);
 
     // TWO batches, not one. A fair coin per slot CAN put a single batch of
-    // ten entirely on one source (~1 in 500); over twenty slots that drops to
-    // ~1 in a million, which is the difference between a spec and a flake.
-    // The old behaviour — every pending custom text first, course sentences
-    // only once those ran out — cannot produce a course card here at all,
-    // because the seed leaves far more custom texts pending than two batches
-    // can consume.
-    const addBtn = page.getByTestId('collection-add-cards').first();
+    // five entirely on one source (~1 in 16); over ten slots that drops to
+    // ~1 in 500, and the seed leaves far more custom texts pending than two
+    // batches can consume, so the old all-custom-first behaviour still
+    // cannot produce a course card here.
     let running = before.total;
     for (let batch = 0; batch < 2; batch++) {
-      await expect(addBtn).toBeEnabled({ timeout: 15_000 });
-      await addBtn.click();
+      deferDueCards(email);
       running = (await waitForDeckGrowth(page, email, running, 60_000)).total;
     }
 
@@ -172,20 +181,25 @@ test.describe('auto-add card sources (live)', { tag: '@live' }, () => {
       page.getByTestId('learn-settings').first(),
     );
     await dismissTour(page, 'audio_review_intro', 500);
+    await dismissDifficultyCheck(page);
 
     // Zero AFTER the mount, like quota-exhaustion.spec: the mount's own
     // Autumn sync has already run, so the patched mirror survives until the
     // next reload and the reactive UI flips live. No reload from here on.
+    // Then empty the due queue so auto-add actually fires — it only runs
+    // when `cardForReview === null`, and earlier serial specs leave due
+    // cards. Order matters: defer-before-zero would auto-add while credits
+    // still remain and mix in premade cards.
     const before = deckCardCountsBySource(email);
     zeroedPrevious = convexRun('features/quotaTesting:zeroFeatureBalances', {
       email,
       featureIds: ['sentences'],
     });
+    deferDueCards(email);
 
-    // The learn view auto-adds on mount for the fixture user (the invariant
-    // deck-integrity.spec is built on). With the balance at zero that run
-    // used to stop dead; pending custom texts cost nothing, so it must keep
-    // going and fill the whole batch from them.
+    // Pending custom texts cost nothing, so the run must keep going and
+    // fill the whole batch from them instead of settling on the locked
+    // upgrade wall.
     const after = await waitForDeckGrowth(page, email, before.total, 90_000);
     const added = delta(before, after);
 
