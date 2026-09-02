@@ -47,6 +47,7 @@ import {
 import { DEFAULT_AUTO_ADVANCE } from '@/lib/constants/audioPlayback';
 import { collectionRemaining } from '@/convex/lib/collections';
 import { useCelebration } from './useCelebration';
+import { advanceToNextCardOptimistic } from './optimisticAdvance';
 import { useCardActions, type CardActions } from './useCardActions';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { reportError } from '@/lib/report-error';
@@ -405,10 +406,22 @@ export function useLearningMode(
         ? lastReviewingCardRef.current.undoableCount + 1
         : 0;
 
-  const reviewCardMutation = useMutation(api.features.scheduling.reviewCard);
+  // Both advance mutations show the prefetched next card immediately (see
+  // `advanceToNextCardOptimistic`); the server payload confirms or corrects.
+  const reviewCardMutation = useMutation(
+    api.features.scheduling.reviewCard,
+  ).withOptimisticUpdate((localStore, args) => {
+    advanceToNextCardOptimistic(localStore, args.cardId, {
+      countsAsReview: true,
+    });
+  });
   const advanceFreePlayCardMutation = useMutation(
     api.features.scheduling.advanceFreePlayCard,
-  );
+  ).withOptimisticUpdate((localStore, args) => {
+    advanceToNextCardOptimistic(localStore, args.cardId, {
+      countsAsReview: false,
+    });
+  });
   const undoLastReviewMutation = useMutation(
     api.features.scheduling.undoLastReview,
   );

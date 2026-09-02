@@ -43,6 +43,9 @@ const harness = vi.hoisted(() => {
 
   type MutationMock = ReturnType<typeof vi.fn> & {
     withOptimisticUpdate: (cb: unknown) => MutationMock;
+    /** The updater the hook registered, kept for the wiring tests. The mock
+     *  never applies it on its own. */
+    optimisticUpdate?: (localStore: unknown, args: unknown) => void;
   };
 
   const queryValues = new Map<string, unknown>();
@@ -55,7 +58,10 @@ const harness = vi.hoisted(() => {
     let fn = mutations.get(ref);
     if (!fn) {
       fn = vi.fn(() => Promise.resolve()) as unknown as MutationMock;
-      fn.withOptimisticUpdate = () => fn!;
+      fn.withOptimisticUpdate = (cb) => {
+        fn!.optimisticUpdate = cb as MutationMock['optimisticUpdate'];
+        return fn!;
+      };
       mutations.set(ref, fn);
     }
     return fn;
@@ -781,6 +787,47 @@ describe('useLearningMode', () => {
         expect.any(Error),
         expect.objectContaining({ op: 'autoAddStall' }),
       );
+    });
+  });
+
+  describe('optimistic advance wiring', () => {
+    // Both advance mutations register `advanceToNextCardOptimistic`; the
+    // updater itself is covered in optimisticAdvance.test.ts. Here: it is
+    // attached, and with the right "counts as a review" flag.
+    function applyUpdater(ref: string) {
+      const shown = makeCard({ nextCard: makeCard({ _id: 'card2' }) });
+      const writes: unknown[] = [];
+      const store = {
+        getAllQueries: () => [{ args: {}, value: shown }],
+        setQuery: (_ref: unknown, _args: unknown, value: unknown) =>
+          writes.push(value),
+        getQuery: () => undefined,
+      };
+      const updater = harness.mutationFor(ref).optimisticUpdate;
+      expect(updater).toBeTypeOf('function');
+      updater!(store, { cardId: 'card1' });
+      return writes[0] as Record<string, unknown>;
+    }
+
+    it('reviewCard swaps to the next card and counts a review', () => {
+      renderHook(() => useLearningMode());
+      expect(applyUpdater(REFS.reviewCard)).toMatchObject({
+        _id: 'card2',
+        nextCard: null,
+        dailyReviewsToday: 4,
+        undoableCount: 3,
+      });
+    });
+
+    it('advanceFreePlayCard swaps to the next card without counting a review', () => {
+      seedReviewing({}, { schedulingMode: 'radio' });
+      renderHook(() => useLearningMode());
+      expect(applyUpdater(REFS.advanceFreePlayCard)).toMatchObject({
+        _id: 'card2',
+        nextCard: null,
+        dailyReviewsToday: 3,
+        undoableCount: 3,
+      });
     });
   });
 });
