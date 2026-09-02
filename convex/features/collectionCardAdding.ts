@@ -249,6 +249,10 @@ export async function createCardsFromTexts(
   deck: Doc<'decks'>,
   collectionId: Id<'collections'>,
   course: Doc<'courses'>,
+  options?: {
+    /** Earliest due stamp for the batch. See `notBeforeFor`. */
+    notBefore?: number;
+  },
 ): Promise<{ cardsInserted: number; newLastRank: number }> {
   const now = Date.now();
   // New cards are "due immediately", but clients read the due queue with a
@@ -259,7 +263,17 @@ export async function createCardsFromTexts(
   // them at once (tolerates ~60s of client-clock skew in the worst
   // quantization phase). The `+ cardsInserted` increment keeps in-batch
   // order; monotonic wall clock keeps FIFO across batches.
-  const dueBase = now - NEW_CARD_DUE_BACKDATE_MS;
+  //
+  // `notBefore` lifts the base when a card is still on screen: the backdate
+  // would sort the batch ahead of any card rescheduled within the last two
+  // minutes, and the reactive due query would then swap that card out from
+  // under the user. Placing the batch just after it keeps it due at once
+  // (the shown card is due against the same quantized `now`) without
+  // overtaking it.
+  const dueBase = Math.max(
+    now - NEW_CARD_DUE_BACKDATE_MS,
+    options?.notBefore ?? 0,
+  );
   let cardsInserted = 0;
   let newLastRank = 0;
 
@@ -630,6 +644,7 @@ async function addTextsAsCards(
   collectionId: Id<'collections'>,
   course: Doc<'courses'>,
   userId: string,
+  notBefore?: number,
 ): Promise<number> {
   if (texts.length === 0) return 0;
   const { cardsInserted } = await createCardsFromTexts(
@@ -638,6 +653,7 @@ async function addTextsAsCards(
     deck,
     collectionId,
     course,
+    { notBefore },
   );
   for (const text of texts) {
     await clearMarkForAddedText(ctx, userId, course._id, text._id);
@@ -755,9 +771,10 @@ async function drainCustomCollections(
     deck: Doc<'decks'>;
     course: Doc<'courses'>;
     userId: string;
+    notBefore?: number;
   },
 ): Promise<{ inserted: number; picked: number; scanIncomplete: boolean }> {
-  const { pending, limit, deck, course, userId } = params;
+  const { pending, limit, deck, course, userId, notBefore } = params;
   const courseId = course._id;
   if (limit <= 0) return { inserted: 0, picked: 0, scanIncomplete: false };
 
@@ -813,6 +830,7 @@ async function drainCustomCollections(
       entry.id,
       course,
       userId,
+      notBefore,
     );
 
     inserted += cardsInserted;
@@ -842,12 +860,29 @@ async function drainCustomCollections(
 }
 
 /** Handler body of `addCardsFromCollection`. */
+/**
+ * Earliest due stamp for a batch added while `afterCardId` is on screen:
+ * one past that card's due (both tracks), so the batch queues behind it. A
+ * card outside the deck (stale client state) gives no floor.
+ */
+async function notBeforeFor(
+  ctx: MutationCtx,
+  deckId: Id<'decks'>,
+  afterCardId: Id<'cards'> | undefined,
+): Promise<number | undefined> {
+  if (!afterCardId) return undefined;
+  const card = await ctx.db.get(afterCardId);
+  if (!card || card.deckId !== deckId) return undefined;
+  return Math.max(card.dueDate, card.writingDueDate ?? 0) + 1;
+}
+
 export async function addCardsFromCollectionHandler(
   ctx: MutationCtx,
   args: {
     collectionId: Id<'collections'>;
     batchSize: number;
     exclusive?: boolean;
+    afterCardId?: Id<'cards'>;
   },
 ): Promise<{
   cardsAdded: number;
@@ -864,6 +899,7 @@ export async function addCardsFromCollectionHandler(
   );
 
   const deck = await getOrCreateDeck(ctx, course);
+  const notBefore = await notBeforeFor(ctx, deck._id, args.afterCardId);
 
   let totalCardsInserted = 0;
   let scanIncomplete = false;
@@ -972,6 +1008,7 @@ export async function addCardsFromCollectionHandler(
     deck,
     course,
     userId,
+    notBefore,
   });
   totalCardsInserted += customPass.inserted;
   if (customPass.scanIncomplete) scanIncomplete = true;
@@ -1050,6 +1087,7 @@ export async function addCardsFromCollectionHandler(
         args.collectionId,
         course,
         userId,
+        notBefore,
       );
       totalCardsInserted += cardsInserted;
 

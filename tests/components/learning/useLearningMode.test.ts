@@ -965,9 +965,11 @@ describe('useLearningMode', () => {
 
       const { result, rerender } = renderHook(() => useLearningMode());
       await act(async () => {});
+      // Queued behind the card on screen, so the batch cannot overtake it.
       expect(add).toHaveBeenCalledExactlyOnceWith({
         collectionId: 'col1',
         batchSize: 10,
+        afterCardId: 'card1',
       });
       // The card stays on screen, the user is still typing: no second run.
       rerender();

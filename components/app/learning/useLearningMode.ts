@@ -817,62 +817,80 @@ export function useLearningMode(
   // isAddingCards flip.
   const autoAddQuotaEmptyRef = useRef(false);
 
-  const handleAddCards = useCallback(async () => {
-    if (!courseSettings?.activeCollectionId || isAddingCards) return;
-    const collectionId = courseSettings.activeCollectionId;
-    // The full configured batch, credits or not: the server splits it
-    // between the premade and custom sources by coin flip and caps only the
-    // premade half at the balance. Clamping here would shrink the custom
-    // half too, which on an empty balance meant one card per run.
-    const batchSize = courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE;
-    setIsAddingCards(true);
-    try {
-      const args = { collectionId, batchSize };
-      let result = await addCardsMutation(args);
-      // A 0-card result with scanIncomplete means the scan burned its
-      // per-call read budget on an ignored/direct-added streak; the frontier
-      // already advanced, so re-calling continues past it. Bounded retries.
-      // Mirrors the collection dialog's handleAddCards.
-      let attempts = 1;
-      while (result.cardsAdded === 0 && result.scanIncomplete && attempts < 5) {
-        result = await addCardsMutation(args);
-        attempts++;
-      }
-      if (result.cardsAdded > 0) {
-        autoAddExhaustedForRef.current = null;
-        autoAddQuotaEmptyRef.current = false;
-        unservedAddRunsRef.current++;
-        if (unservedAddRunsRef.current >= MAX_UNSERVED_ADD_RUNS) {
-          // Cards keep getting added but none is ever served: stop auto-add
-          // before it runs the collection dry. Serving a card resets the
-          // counter, so a healthy add-serve-add cadence never trips this.
-          autoAddExhaustedForRef.current = collectionId.toString();
-          reportError(new Error('auto-add stall: cards added, none served'), {
-            op: 'autoAddStall',
-            collectionId,
-            runs: unservedAddRunsRef.current,
-          });
+  const handleAddCards = useCallback(
+    async (options?: {
+      /** The card on screen: the batch queues behind it (pre-add). */
+      afterCardId?: Id<'cards'>;
+    }) => {
+      if (!courseSettings?.activeCollectionId || isAddingCards) return;
+      const collectionId = courseSettings.activeCollectionId;
+      // The full configured batch, credits or not: the server splits it
+      // between the premade and custom sources by coin flip and caps only the
+      // premade half at the balance. Clamping here would shrink the custom
+      // half too, which on an empty balance meant one card per run.
+      const batchSize =
+        courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE;
+      setIsAddingCards(true);
+      try {
+        // The Add button hands its click event in here; only an explicit id
+        // counts.
+        const afterCardId = options?.afterCardId;
+        const args = {
+          collectionId,
+          batchSize,
+          ...(afterCardId ? { afterCardId } : {}),
+        };
+        let result = await addCardsMutation(args);
+        // A 0-card result with scanIncomplete means the scan burned its
+        // per-call read budget on an ignored/direct-added streak; the frontier
+        // already advanced, so re-calling continues past it. Bounded retries.
+        // Mirrors the collection dialog's handleAddCards.
+        let attempts = 1;
+        while (
+          result.cardsAdded === 0 &&
+          result.scanIncomplete &&
+          attempts < 5
+        ) {
+          result = await addCardsMutation(args);
+          attempts++;
         }
-      } else if (result.quotaLimited) {
-        autoAddQuotaEmptyRef.current = true;
-      } else if (!result.scanIncomplete) {
-        // Proven drained (not just capped, not out of quota). Remembering it
-        // here is what lets the auto-add effect safely depend on
-        // isAddingCards without looping.
+        if (result.cardsAdded > 0) {
+          autoAddExhaustedForRef.current = null;
+          autoAddQuotaEmptyRef.current = false;
+          unservedAddRunsRef.current++;
+          if (unservedAddRunsRef.current >= MAX_UNSERVED_ADD_RUNS) {
+            // Cards keep getting added but none is ever served: stop auto-add
+            // before it runs the collection dry. Serving a card resets the
+            // counter, so a healthy add-serve-add cadence never trips this.
+            autoAddExhaustedForRef.current = collectionId.toString();
+            reportError(new Error('auto-add stall: cards added, none served'), {
+              op: 'autoAddStall',
+              collectionId,
+              runs: unservedAddRunsRef.current,
+            });
+          }
+        } else if (result.quotaLimited) {
+          autoAddQuotaEmptyRef.current = true;
+        } else if (!result.scanIncomplete) {
+          // Proven drained (not just capped, not out of quota). Remembering it
+          // here is what lets the auto-add effect safely depend on
+          // isAddingCards without looping.
+          autoAddExhaustedForRef.current = collectionId.toString();
+        }
+      } catch (error) {
+        reportError(error, { op: 'addCardsFromCollection', collectionId });
+        // Latch failures too: the effect re-fires when isAddingCards flips
+        // back, so a persistent rejection (e.g. QUOTA_NOT_SYNCED before the
+        // quota doc exists) would otherwise retry the mutation in a tight
+        // loop. The noCardsDue screen's manual Add button bypasses the latch
+        // and clears it on the next successful run.
         autoAddExhaustedForRef.current = collectionId.toString();
+      } finally {
+        setIsAddingCards(false);
       }
-    } catch (error) {
-      reportError(error, { op: 'addCardsFromCollection', collectionId });
-      // Latch failures too: the effect re-fires when isAddingCards flips
-      // back, so a persistent rejection (e.g. QUOTA_NOT_SYNCED before the
-      // quota doc exists) would otherwise retry the mutation in a tight
-      // loop. The noCardsDue screen's manual Add button bypasses the latch
-      // and clears it on the next successful run.
-      autoAddExhaustedForRef.current = collectionId.toString();
-    } finally {
-      setIsAddingCards(false);
-    }
-  }, [courseSettings, isAddingCards, addCardsMutation]);
+    },
+    [courseSettings, isAddingCards, addCardsMutation],
+  );
 
   // Un-stick the quota latch the moment the reactive balance shows headroom
   // again. Runs before the auto-add effect below (definition order), so the
@@ -934,8 +952,15 @@ export function useLearningMode(
     // the regular path.
     setAutoAddHeld(deckEmpty && wantsAutoAdd && holdAutoAdd);
     if (wantsAutoAdd && !holdAutoAdd) {
-      if (queueEndsHere) preAddedForCardRef.current = cardForReview._id;
-      handleAddCards();
+      if (queueEndsHere) {
+        preAddedForCardRef.current = cardForReview._id;
+        // Queue the batch behind the card on screen: its backdated due stamp
+        // would otherwise sort ahead of a recently rescheduled card and the
+        // reactive query would swap that card out mid-read.
+        handleAddCards({ afterCardId: cardForReview._id });
+      } else {
+        handleAddCards();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [

@@ -254,6 +254,11 @@ export const addCardsFromCollection = mutation({
     batchSize: v.number(),
     /** When true, only add from this specific collection. Skip custom collection mixing. */
     exclusive: v.optional(v.boolean()),
+    /** The card currently on screen, when the learn view adds the next batch
+     * while the user is still on the last due card. The new cards are placed
+     * strictly after it in the due order; without this their backdated due
+     * stamp can sort them ahead of it and swap the card mid-read. */
+    afterCardId: v.optional(v.id('cards')),
   },
   returns: v.object({
     cardsAdded: v.number(),
