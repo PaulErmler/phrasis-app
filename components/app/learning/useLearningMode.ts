@@ -899,12 +899,27 @@ export function useLearningMode(
   // quota-empty, cleared on refill) are what keep this from looping on a
   // drained collection, a persistently failing mutation, or an empty balance.
   const [autoAddHeld, setAutoAddHeld] = useState(false);
+  // The card a pre-add run was already fired for (see `queueEndsHere`).
+  const preAddedForCardRef = useRef<Id<'cards'> | null>(null);
   useEffect(() => {
     // Auto-add default is `true`, only opt out when explicitly false.
     const autoAddEnabled = courseSettings?.autoAddCards !== false;
     const activeCollectionId = courseSettings?.activeCollectionId;
+    const deckEmpty = cardForReview === null;
+    // Pre-add: the card on screen is the last one due. Only the server says
+    // so (`nextCard === null`); the optimistic advance leaves the preview
+    // `undefined` until the server answers, and that must not count. Adding
+    // the next batch now, while the user is still on this card, is what
+    // makes the hand-over seamless instead of a loading gap after the last
+    // submit. Once per card: a run that adds cards shows up as `nextCard`
+    // on the server's next payload, and a run that adds nothing latches
+    // through the same guards as the empty-deck path.
+    const queueEndsHere =
+      cardForReview != null &&
+      cardForReview.nextCard === null &&
+      preAddedForCardRef.current !== cardForReview._id;
     const wantsAutoAdd =
-      cardForReview === null &&
+      (deckEmpty || queueEndsHere) &&
       autoAddEnabled &&
       !!activeCollectionId &&
       courseSettings?.studyContentFilter !== 'custom' &&
@@ -914,9 +929,12 @@ export function useLearningMode(
       autoAddExhaustedForRef.current !== activeCollectionId.toString();
     // Parked behind the difficulty check: surface the intent (opens the
     // dialog) and try again when the hold releases. This effect re-runs on
-    // `holdAutoAdd` changes.
-    setAutoAddHeld(wantsAutoAdd && holdAutoAdd);
+    // `holdAutoAdd` changes. Empty deck only: the pre-add must not pop the
+    // dialog over a card the user is still working on, it simply waits for
+    // the regular path.
+    setAutoAddHeld(deckEmpty && wantsAutoAdd && holdAutoAdd);
     if (wantsAutoAdd && !holdAutoAdd) {
+      if (queueEndsHere) preAddedForCardRef.current = cardForReview._id;
       handleAddCards();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

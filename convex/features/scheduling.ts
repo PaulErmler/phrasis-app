@@ -1,4 +1,4 @@
-import { v, ConvexError } from 'convex/values';
+import { v, ConvexError, type Infer } from 'convex/values';
 import { mutation, query, MutationCtx, QueryCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import {
@@ -234,6 +234,35 @@ async function fetchDueCardsWithFilter(
   );
 }
 
+/**
+ * `getCardForReview`'s result. Hoisted so the handler can be annotated with
+ * it: a Convex function's client-facing return type is inferred from the
+ * HANDLER, not from `returns`, so an optional field declared only in the
+ * validator (`nextCard`, see below) would still reach the client as
+ * required and reject the optimistic advance's "unknown" preview.
+ */
+const getCardForReviewResult = v.union(
+  v.object({
+    ...cardResultFields,
+    /** The card served after this one. `null` means the server found no
+     * other card due now, i.e. this is the last of the queue (the client
+     * pre-adds the next batch on that signal). Never omitted by the server;
+     * `undefined` is reserved for the client's optimistic advance, which
+     * cannot know the next preview until this query answers again. */
+    nextCard: v.optional(v.union(cardResultValidator, v.null())),
+    /** Today's non-radio review count (audio + full) for the active course,
+     * mirroring what drives `triggerCelebration` in `reviewCard`. 0 when
+     * `timezone` is omitted (caller opted out of the side-channel). */
+    dailyReviewsToday: v.number(),
+    /** How many reviews the undo button can take back (0..UNDO_DEPTH).
+     * Bundled here so the learn view needs a single subscription that
+     * invalidates once per review, not this query plus a separate
+     * `getUndoableReviewCount`. */
+    undoableCount: v.number(),
+  }),
+  v.null(),
+);
+
 export const getCardForReview = query({
   // `timezone` is optional so callers that don't care about the daily-count
   // side-channel (tests, the layout warm-up) can still call `{}`. The learn
@@ -250,23 +279,8 @@ export const getCardForReview = query({
   // side-channel's "today" is derived from the same `now` so the two can
   // never disagree. A skewed `now` only shifts the caller's own queue.
   args: { timezone: v.optional(v.string()), now: v.optional(v.number()) },
-  returns: v.union(
-    v.object({
-      ...cardResultFields,
-      nextCard: v.union(cardResultValidator, v.null()),
-      /** Today's non-radio review count (audio + full) for the active course,
-       * mirroring what drives `triggerCelebration` in `reviewCard`. 0 when
-       * `timezone` is omitted (caller opted out of the side-channel). */
-      dailyReviewsToday: v.number(),
-      /** How many reviews the undo button can take back (0..UNDO_DEPTH).
-       * Bundled here so the learn view needs a single subscription that
-       * invalidates once per review, not this query plus a separate
-       * `getUndoableReviewCount`. */
-      undoableCount: v.number(),
-    }),
-    v.null(),
-  ),
-  handler: async (ctx, args) => {
+  returns: getCardForReviewResult,
+  handler: async (ctx, args): Promise<Infer<typeof getCardForReviewResult>> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 

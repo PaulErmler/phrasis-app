@@ -18,8 +18,11 @@ import { api } from '@/convex/_generated/api';
  * changed) its answer replaces this one on arrival, and Convex rolls the
  * write back when the mutation fails.
  *
- * `nextCard` itself is nulled on the optimistic result: the server payload
- * brings the fresh one, and the audio prefetch waits for it. `undoableCount`
+ * `nextCard` is left out (unknown) of the optimistic result, NOT set to
+ * `null`: the server payload brings the fresh preview and the audio prefetch
+ * waits for it, while `null` is the server's own "nothing else is due"
+ * signal that triggers the pre-add of the next batch (useLearningMode). A
+ * null here would fire that add on every single advance. `undoableCount`
  * rises for both mutations (both log an undoable entry); `dailyReviewsToday`
  * only for a real review, which is what the progress bar counts.
  */
@@ -39,7 +42,6 @@ export function advanceToNextCardOptimistic(
     }
     localStore.setQuery(api.features.scheduling.getCardForReview, q.args, {
       ...current.nextCard,
-      nextCard: null,
       dailyReviewsToday:
         current.dailyReviewsToday + (opts.countsAsReview ? 1 : 0),
       undoableCount: current.undoableCount + 1,

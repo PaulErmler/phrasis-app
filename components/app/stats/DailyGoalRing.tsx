@@ -27,9 +27,17 @@ const lapColor = (lap: number) =>
  * rAF-driven ring progress in "laps" (1.0 = one full goal). A plain
  * motion.circle can't switch stroke color discretely at lap boundaries
  * mid-tween, so the sweep is driven manually and lap/arc are derived per
- * frame. Restarts from `from` whenever `replayKey` changes. Duration scales
- * with the number of laps to sweep, capped so a 5× day doesn't animate
- * forever.
+ * frame. Duration scales with the number of laps to sweep, capped so a 5×
+ * day doesn't animate forever.
+ *
+ * Two kinds of change, handled differently:
+ * - A new `replayKey` (a fresh visit) restarts the entrance sweep from
+ *   `from`, after a short delay.
+ * - A new `to` under the same key continues from wherever the arc is right
+ *   now. On the way back from a session the cached count lands first and
+ *   the live one a moment later, and restarting from `from` for the second
+ *   value played the whole sweep twice. `from` alone never restarts
+ *   anything; it is only read when a sweep starts.
  */
 function useRingProgress(
   from: number,
@@ -37,22 +45,34 @@ function useRingProgress(
   replayKey: number | string,
 ): number {
   const [progress, setProgress] = React.useState(from);
+  const progressRef = React.useRef(from);
+  const fromRef = React.useRef(from);
+  fromRef.current = from;
+  // The key whose entrance sweep already started; `null` until the first.
+  const sweptKeyRef = React.useRef<number | string | null>(null);
 
   React.useEffect(() => {
+    const isReplay = sweptKeyRef.current !== replayKey;
+    sweptKeyRef.current = replayKey;
+    const start = isReplay ? fromRef.current : progressRef.current;
+    if (!isReplay && start === to) return;
+
     let raf: number;
-    const laps = Math.max(1, Math.ceil(Math.abs(to - from)));
+    const laps = Math.max(1, Math.ceil(Math.abs(to - start)));
     const duration = Math.min(1200 + (laps - 1) * 600, 2800);
-    const delay = 300;
-    const start = performance.now() + delay;
+    const delay = isReplay ? 300 : 0;
+    const startTs = performance.now() + delay;
     const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
     const tick = (nowTs: number) => {
-      const t = Math.max(0, Math.min(1, (nowTs - start) / duration));
-      setProgress(from + (to - from) * easeOutCubic(t));
+      const t = Math.max(0, Math.min(1, (nowTs - startTs) / duration));
+      const next = start + (to - start) * easeOutCubic(t);
+      progressRef.current = next;
+      setProgress(next);
       if (t < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [from, to, replayKey]);
+  }, [to, replayKey]);
 
   return progress;
 }

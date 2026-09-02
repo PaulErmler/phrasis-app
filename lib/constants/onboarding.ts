@@ -3,9 +3,9 @@
  * than `ONBOARDING_INITIAL_SEED_CARDS` on purpose. The first 5 are the
  * seeded batch, the next 5 are drawn from whichever cards become due
  * again (audio warm-up + FSRS "Again/Hard") or, if nothing is due, from
- * auto-add (`ONBOARDING_CARDS_BATCH_SIZE`). This gives the user a
- * meaningfully longer first lesson without us having to inflate the
- * upfront seed.
+ * auto-add (`ONBOARDING_CARDS_BATCH_SIZE` at a time, as often as the deck
+ * runs dry). This gives the user a meaningfully longer first lesson
+ * without us having to inflate the upfront seed.
  */
 export const ONBOARDING_FIRST_LESSON_CARDS = 10;
 
@@ -19,8 +19,11 @@ export const ONBOARDING_INITIAL_SEED_CARDS = 5;
 /**
  * Default `cardsToAddBatchSize` written to `courseSettings` for onboarded
  * users. Auto-add fires this many cards at a time when the deck runs dry.
+ * Kept equal to the app-wide `DEFAULT_BATCH_SIZE` (components/app/learning/
+ * types.ts); 3 since 2026-09-02, small batches keep the queue short and the
+ * next batch is now added while the last card is still on screen.
  */
-export const ONBOARDING_CARDS_BATCH_SIZE = 5;
+export const ONBOARDING_CARDS_BATCH_SIZE = 3;
 
 /**
  * Hard cap on user-provided free-text answers in onboarding (acquisition

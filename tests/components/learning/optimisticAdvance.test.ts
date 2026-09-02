@@ -31,7 +31,7 @@ function fakeStore(
 const CARD_1 = 'card-1' as Id<'cards'>;
 
 describe('advanceToNextCardOptimistic', () => {
-  it('swaps every instance showing the card to its nextCard, nulls the preview, and bumps the counters', () => {
+  it('swaps every instance showing the card to its nextCard, leaves the preview unknown, and bumps the counters', () => {
     const shown = card('card-1', {
       nextCard: card('card-2'),
       dailyReviewsToday: 3,
@@ -49,10 +49,12 @@ describe('advanceToNextCardOptimistic', () => {
     expect(writes[0].value).toEqual({
       _id: 'card-2',
       sourceText: 'text card-2',
-      nextCard: null,
       dailyReviewsToday: 4,
       undoableCount: 3,
     });
+    // Unknown, not "none": `null` is the server's last-card signal that
+    // pre-adds the next batch, and must not fire on every advance.
+    expect(writes[0].value).not.toHaveProperty('nextCard');
   });
 
   it('bumps undoableCount but not dailyReviewsToday for a free-play advance', () => {

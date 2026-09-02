@@ -763,10 +763,15 @@ describe('useLearningMode', () => {
         await act(async () => {});
         expect(add).toHaveBeenCalledTimes(round + 1);
 
-        // The just-added card arrives (query flips to a served card)...
+        // The just-added card arrives (query flips to a served card) with
+        // more behind it, so the last-card pre-add stays out of this
+        // cadence...
         harness.queryValues.set(
           REFS.getCardForReview,
-          makeCard({ _id: `card-${round}` }),
+          makeCard({
+            _id: `card-${round}`,
+            nextCard: { _id: `card-${round}-next` },
+          }),
         );
         rerender();
         await act(async () => {
@@ -795,7 +800,11 @@ describe('useLearningMode', () => {
     // updater itself is covered in optimisticAdvance.test.ts. Here: it is
     // attached, and with the right "counts as a review" flag.
     function applyUpdater(ref: string) {
-      const shown = makeCard({ nextCard: makeCard({ _id: 'card2' }) });
+      // The server's preview is a bare card result: it carries no nextCard
+      // of its own (the fake's default `nextCard: null` would leak through
+      // the updater's spread and read as the last-card signal).
+      const { nextCard: _omitted, ...preview } = makeCard({ _id: 'card2' });
+      const shown = makeCard({ nextCard: preview });
       const writes: unknown[] = [];
       const store = {
         getAllQueries: () => [{ args: {}, value: shown }],
@@ -811,23 +820,26 @@ describe('useLearningMode', () => {
 
     it('reviewCard swaps to the next card and counts a review', () => {
       renderHook(() => useLearningMode());
-      expect(applyUpdater(REFS.reviewCard)).toMatchObject({
+      const swapped = applyUpdater(REFS.reviewCard);
+      expect(swapped).toMatchObject({
         _id: 'card2',
-        nextCard: null,
         dailyReviewsToday: 4,
         undoableCount: 3,
       });
+      // Unknown until the server answers, never `null` (the last-card signal).
+      expect(swapped.nextCard).toBeUndefined();
     });
 
     it('advanceFreePlayCard swaps to the next card without counting a review', () => {
       seedReviewing({}, { schedulingMode: 'radio' });
       renderHook(() => useLearningMode());
-      expect(applyUpdater(REFS.advanceFreePlayCard)).toMatchObject({
+      const swapped = applyUpdater(REFS.advanceFreePlayCard);
+      expect(swapped).toMatchObject({
         _id: 'card2',
-        nextCard: null,
         dailyReviewsToday: 3,
         undoableCount: 3,
       });
+      expect(swapped.nextCard).toBeUndefined();
     });
   });
 
@@ -927,6 +939,81 @@ describe('useLearningMode', () => {
         await gate.promise.catch(() => undefined);
       });
       expect(review).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  /**
+   * The next batch is added while the LAST due card is still on screen, so
+   * the hand-over after its submit is seamless instead of a loading gap.
+   * The trigger is the server's `nextCard === null`; the optimistic advance
+   * leaves the preview `undefined`, which must not count.
+   */
+  describe('auto-add: pre-add on the last card of the queue', () => {
+    function addResult(overrides: Record<string, unknown> = {}) {
+      return {
+        cardsAdded: 3,
+        totalCardsInDeck: 8,
+        scanIncomplete: false,
+        ...overrides,
+      };
+    }
+
+    it('adds the next batch once while the last due card is shown', async () => {
+      const add = harness.mutationFor(REFS.addCardsFromCollection);
+      add.mockResolvedValue(addResult());
+      seedReviewing({ nextCard: null }, { autoAddCards: true });
+
+      const { result, rerender } = renderHook(() => useLearningMode());
+      await act(async () => {});
+      expect(add).toHaveBeenCalledExactlyOnceWith({
+        collectionId: 'col1',
+        batchSize: 10,
+      });
+      // The card stays on screen, the user is still typing: no second run.
+      rerender();
+      await act(async () => {});
+      expect(add).toHaveBeenCalledTimes(1);
+      expect(result.current.status).toBe('reviewing');
+
+      // The server's next payload carries the added card as the preview.
+      harness.queryValues.set(
+        REFS.getCardForReview,
+        makeCard({ nextCard: { _id: 'card-added' } }),
+      );
+      rerender();
+      await act(async () => {});
+      expect(add).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fire on the optimistic advance, whose preview is merely unknown', async () => {
+      const add = harness.mutationFor(REFS.addCardsFromCollection);
+      add.mockResolvedValue(addResult());
+      seedReviewing({ nextCard: undefined }, { autoAddCards: true });
+
+      renderHook(() => useLearningMode());
+      await act(async () => {});
+      expect(add).not.toHaveBeenCalled();
+    });
+
+    it('waits for the regular path behind the difficulty check instead of raising the hold over the card', async () => {
+      const add = harness.mutationFor(REFS.addCardsFromCollection);
+      add.mockResolvedValue(addResult());
+      seedReviewing({ nextCard: null }, { autoAddCards: true });
+
+      const { result } = renderHook(() =>
+        useLearningMode({ holdAutoAdd: true }),
+      );
+      await act(async () => {});
+      expect(add).not.toHaveBeenCalled();
+      expect(result.current.autoAddHeld).toBe(false);
+    });
+
+    it('stays off when auto-add is disabled', async () => {
+      const add = harness.mutationFor(REFS.addCardsFromCollection);
+      seedReviewing({ nextCard: null }, { autoAddCards: false });
+      renderHook(() => useLearningMode());
+      await act(async () => {});
+      expect(add).not.toHaveBeenCalled();
     });
   });
 });
