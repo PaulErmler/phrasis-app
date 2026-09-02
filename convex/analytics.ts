@@ -33,6 +33,8 @@ export const EVENTS = {
   // Chat
   CHAT_MESSAGE_SENT: 'chat_message_sent',
   CHAT_CARD_APPROVAL: 'chat_card_approval',
+  /** The user asked for a failed tutor reply to be generated again. */
+  CHAT_RESPONSE_RETRIED: 'chat_response_retried',
   VOICE_TRANSCRIBED: 'voice_transcribed',
   VOICE_TRANSCRIPTION_FAILED: 'voice_transcription_failed',
 

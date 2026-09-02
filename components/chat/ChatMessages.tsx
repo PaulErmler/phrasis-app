@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { useTranslations } from 'next-intl';
-import { BotIcon } from 'lucide-react';
+import { AlertTriangle, BotIcon } from 'lucide-react';
 import { MessageErrorBoundary } from '@/components/chat/MessageErrorBoundary';
 import {
   Conversation,
@@ -166,6 +166,45 @@ function PlainTextContent({ text }: { text: string }) {
   return <MessageResponse>{text}</MessageResponse>;
 }
 
+/**
+ * Shown in place of (or under the partial content of) a reply whose
+ * generation failed server-side, e.g. an upstream rate limit. Without this
+ * the failed row rendered as an empty bubble and the thread just went quiet.
+ */
+function FailedReplyNotice({
+  label,
+  retryLabel,
+  onRetry,
+  disabled,
+}: {
+  label: string;
+  retryLabel: string;
+  onRetry?: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div
+      role="alert"
+      data-testid="chat-reply-failed"
+      className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-xs text-muted-foreground"
+    >
+      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive/70" />
+      <span>{label}</span>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          disabled={disabled}
+          data-testid="chat-reply-retry"
+          className="ml-auto shrink-0 text-xs font-medium text-primary hover:underline disabled:opacity-50 disabled:no-underline"
+        >
+          {retryLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Memoized message row
 // ---------------------------------------------------------------------------
@@ -178,6 +217,11 @@ interface ChatMessageRowProps {
   errorFallback: string;
   errorRetryLabel: string;
   thinkingLabel: string;
+  replyFailedLabel: string;
+  replyRetryLabel: string;
+  onRetry?: (messageId: string) => void;
+  /** A send or retry is already in flight: the retry button waits. */
+  retryDisabled: boolean;
 }
 
 /**
@@ -226,7 +270,11 @@ function areRowPropsEqual(
     prev.messageFooter === next.messageFooter &&
     prev.errorFallback === next.errorFallback &&
     prev.errorRetryLabel === next.errorRetryLabel &&
-    prev.thinkingLabel === next.thinkingLabel
+    prev.thinkingLabel === next.thinkingLabel &&
+    prev.replyFailedLabel === next.replyFailedLabel &&
+    prev.replyRetryLabel === next.replyRetryLabel &&
+    prev.onRetry === next.onRetry &&
+    prev.retryDisabled === next.retryDisabled
   );
 }
 
@@ -238,11 +286,17 @@ const ChatMessageRow = memo(function ChatMessageRow({
   errorFallback,
   errorRetryLabel,
   thinkingLabel,
+  replyFailedLabel,
+  replyRetryLabel,
+  onRetry,
+  retryDisabled,
 }: ChatMessageRowProps) {
   const messageText = message.content ?? message.text ?? '';
   const isAssistantStreaming =
     message.role === 'assistant' &&
     (message.status === 'streaming' || message.status === 'pending');
+  const isFailedReply =
+    message.role === 'assistant' && message.status === 'failed';
 
   const hasParts = message.parts && message.parts.length > 0;
   const hasVisibleParts =
@@ -264,14 +318,22 @@ const ChatMessageRow = memo(function ChatMessageRow({
             <MessageContent>
               {isAssistantStreaming && !messageText && !hasVisibleParts ? (
                 <Shimmer>{thinkingLabel}</Shimmer>
-              ) : hasParts ? (
+              ) : hasVisibleParts ? (
                 <MessageParts
                   message={message}
                   isStreaming={isAssistantStreaming}
                   toolRenderers={toolRenderers}
                 />
-              ) : (
+              ) : isFailedReply ? null : (
                 <PlainTextContent text={messageText} />
+              )}
+              {isFailedReply && (
+                <FailedReplyNotice
+                  label={replyFailedLabel}
+                  retryLabel={replyRetryLabel}
+                  onRetry={onRetry ? () => onRetry(message.id) : undefined}
+                  disabled={retryDisabled}
+                />
               )}
             </MessageContent>
           </Message>
@@ -310,6 +372,8 @@ interface ChatMessagesProps {
   emptyStateExtra?: ReactNode;
   /** Composer status. Shows thinking before the assistant message exists. */
   status?: ChatStatus;
+  /** Generate a failed reply again; the failed row offers a retry button when set. */
+  onRetry?: (messageId: string) => void;
 }
 
 /**
@@ -325,8 +389,11 @@ export function ChatMessages({
   contentClassName,
   emptyStateExtra,
   status,
+  onRetry,
 }: ChatMessagesProps) {
   const t = useTranslations('Chat');
+  const retryDisabled =
+    status === CHAT_STATUS.SUBMITTED || status === CHAT_STATUS.STREAMING;
 
   const visibleMessages = messages?.filter((m) => m.role !== 'system') ?? [];
   const displayMessages = isLoading ? [] : visibleMessages;
@@ -352,6 +419,10 @@ export function ChatMessages({
                     errorFallback={t('messageError.title')}
                     errorRetryLabel={t('messageError.retry')}
                     thinkingLabel={t('thinking')}
+                    replyFailedLabel={t('replyFailed.title')}
+                    replyRetryLabel={t('replyFailed.retry')}
+                    onRetry={onRetry}
+                    retryDisabled={retryDisabled}
                   />
                 ),
               )}

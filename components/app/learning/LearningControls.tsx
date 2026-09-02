@@ -132,10 +132,14 @@ export function LearningControls({
       // arrow-key navigation keeps working; ← must not also undo a review
       // behind the overlay).
       if (document.body.classList.contains('driver-active')) return;
+      // The chat panel is neither a dialog nor a focus trap, so it is
+      // matched by its own marker: keys pressed inside it (on a message,
+      // a card approval, a button) belong to the chat, keys pressed on the
+      // card beside it still drive the session.
       if (
         target instanceof HTMLElement &&
         target.closest(
-          '[role="dialog"], [role="alertdialog"], [role="menu"], [data-radix-popper-content-wrapper]',
+          '[role="dialog"], [role="alertdialog"], [role="menu"], [data-radix-popper-content-wrapper], [data-learning-chat-panel]',
         )
       ) {
         return;
@@ -195,7 +199,11 @@ export function LearningControls({
         ) {
           e.preventDefault();
           onRevealAllAudioTargets();
-        } else if (!isReviewing) {
+        } else {
+          // Not gated on `isReviewing`: since the optimistic advance the
+          // next card is on screen while the previous review is still in
+          // flight, and the hook queues a press made then rather than
+          // dropping it (see handleNext in useLearningMode).
           e.preventDefault();
           onNext();
         }
@@ -457,7 +465,6 @@ export function LearningControls({
                   <Button
                     size="sm"
                     onClick={() => onNext()}
-                    disabled={isReviewing}
                     data-testid="learn-next"
                     className="flex-[1] gap-2"
                   >

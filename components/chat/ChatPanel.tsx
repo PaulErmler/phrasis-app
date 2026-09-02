@@ -220,6 +220,7 @@ export function ChatPanel({
             contentClassName={aboveFooterAction ? 'pb-12 lg:pb-6' : 'pb-6'}
             emptyStateExtra={emptyStateExtra}
             status={chat.status}
+            onRetry={chat.retryResponse}
           />
           {aboveFooterAction && (
             <div className="absolute bottom-3 left-4 lg:hidden z-10">

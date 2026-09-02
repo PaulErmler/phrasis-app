@@ -4,6 +4,7 @@ import {
   internalQuery,
   mutation,
   query,
+  type MutationCtx,
   type QueryCtx,
 } from '../../_generated/server';
 import { paginationOptsValidator } from 'convex/server';
@@ -19,7 +20,7 @@ import { getCourseSettings } from '../../db/courseSettings';
 import { consumeQuota } from '../../usage/helpers';
 import { CHAT_CREDIT_USD_STEP, CREDIT_COSTS, FEATURE_IDS } from '../featureIds';
 import { agent, AGENT_TOOLS, createMarkAlsoCorrectTool } from './agent';
-import type { Doc } from '../../_generated/dataModel';
+import type { Doc, Id } from '../../_generated/dataModel';
 import { THREAD_MESSAGE_LIMIT, MAX_MESSAGE_LENGTH } from './constants';
 import { trackEvent } from '../../db/stats/dailyStats';
 import { EVENTS, track, trackException } from '../../analytics';
@@ -215,21 +216,8 @@ export const sendMessage = mutation({
       });
     }
 
-    const cardData = args.cardId
-      ? await resolveCardContext(ctx, args.cardId, userId)
-      : null;
-    const active = await getActiveCourseForUser(ctx, userId);
-
-    // Transcribe: the card's answer must reproduce the audio, so a
-    // differently-worded variant is never "also correct" and markAlsoCorrect
-    // must not be offered. Read from the course settings rather than the
-    // quick-action payload: the payload only describes the discussAnswer turn,
-    // while the tool is registered on EVERY card turn — including a later
-    // free-text "is X also correct?", which the agent prompt actively invites.
-    const transcribeCard = cardData
-      ? (await getCourseSettings(ctx, cardData.courseId))?.writingInputMode ===
-        'transcribe'
-      : false;
+    const turn = await resolveTurnContext(ctx, userId, args.cardId);
+    const { cardData, active } = turn;
 
     const steering = args.quickAction
       ? buildQuickActionSteering(args.quickAction, cardData, active)
@@ -254,17 +242,6 @@ export const sendMessage = mutation({
     );
     const messageId = savedMessages[savedMessages.length - 1]._id;
 
-    const cardContextSection = cardData
-      ? buildCardContextSection(cardData)
-      : undefined;
-    const languageSection = cardData
-      ? buildLanguageSection(cardData)
-      : undefined;
-    const difficulty = await resolveLearnerDifficulty(ctx, active?.course);
-    const difficultySection = difficulty
-      ? buildDifficultySection(difficulty)
-      : undefined;
-
     if (userMessageCount === 0) {
       await ctx.runMutation(agentComponent.threads.updateThread, {
         threadId: args.threadId,
@@ -282,31 +259,14 @@ export const sendMessage = mutation({
       );
     }
 
-    // The privacy policy promises that declining analytics stops chat content
-    // from reaching PostHog. The consent choice lives in the browser, mirrored
-    // to `userSettings` by ConsentSync; unset means never synced → withhold.
-    const settings = await getUserSettings(ctx, userId);
-    const includeAiContent = settings?.analyticsConsent === true;
-
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.chat.messages.generateResponse,
-      {
-        threadId: args.threadId,
-        promptMessageId: messageId,
-        cardContextSection,
-        languageSection,
-        difficultySection,
-        prompt: args.prompt,
-        includeAiContent,
-        userId,
-        // Only forwarded when the card context resolved (ownership verified
-        // above), gates the markAlsoCorrect tool for this turn.
-        cardId: cardData ? args.cardId : undefined,
-        // ...and withholds it entirely when the course writes by transcription.
-        transcribeCard,
-      },
-    );
+    await scheduleResponse(ctx, {
+      userId,
+      threadId: args.threadId,
+      promptMessageId: messageId,
+      prompt: args.prompt,
+      cardId: args.cardId,
+      turn,
+    });
 
     // Track chat message event
     if (active) {
@@ -331,6 +291,195 @@ export const sendMessage = mutation({
     });
 
     return messageId;
+  },
+});
+
+/** Everything a tutor turn needs beyond the prompt text. Re-derived from the
+ *  card and the user on every generation (a send AND a retry) rather than
+ *  stored on the message, so a retry sees exactly what a fresh send would. */
+type TurnContext = {
+  cardData: Awaited<ReturnType<typeof resolveCardContext>>;
+  active: Awaited<ReturnType<typeof getActiveCourseForUser>>;
+  transcribeCard: boolean;
+};
+
+async function resolveTurnContext(
+  ctx: MutationCtx,
+  userId: string,
+  cardId: Id<'cards'> | undefined,
+): Promise<TurnContext> {
+  const cardData = cardId
+    ? await resolveCardContext(ctx, cardId, userId)
+    : null;
+  const active = await getActiveCourseForUser(ctx, userId);
+
+  // Transcribe: the card's answer must reproduce the audio, so a
+  // differently-worded variant is never "also correct" and markAlsoCorrect
+  // must not be offered. Read from the course settings rather than the
+  // quick-action payload: the payload only describes the discussAnswer turn,
+  // while the tool is registered on EVERY card turn — including a later
+  // free-text "is X also correct?", which the agent prompt actively invites.
+  const transcribeCard = cardData
+    ? (await getCourseSettings(ctx, cardData.courseId))?.writingInputMode ===
+      'transcribe'
+    : false;
+
+  return { cardData, active, transcribeCard };
+}
+
+/** Schedules the tutor's reply to a saved user message. */
+async function scheduleResponse(
+  ctx: MutationCtx,
+  args: {
+    userId: string;
+    threadId: string;
+    promptMessageId: string;
+    prompt: string;
+    cardId: Id<'cards'> | undefined;
+    turn: TurnContext;
+  },
+): Promise<void> {
+  const { cardData, active, transcribeCard } = args.turn;
+  const cardContextSection = cardData
+    ? buildCardContextSection(cardData)
+    : undefined;
+  const languageSection = cardData ? buildLanguageSection(cardData) : undefined;
+  const difficulty = await resolveLearnerDifficulty(ctx, active?.course);
+  const difficultySection = difficulty
+    ? buildDifficultySection(difficulty)
+    : undefined;
+
+  // The privacy policy promises that declining analytics stops chat content
+  // from reaching PostHog. The consent choice lives in the browser, mirrored
+  // to `userSettings` by ConsentSync; unset means never synced → withhold.
+  const settings = await getUserSettings(ctx, args.userId);
+  const includeAiContent = settings?.analyticsConsent === true;
+
+  await ctx.scheduler.runAfter(
+    0,
+    internal.features.chat.messages.generateResponse,
+    {
+      threadId: args.threadId,
+      promptMessageId: args.promptMessageId,
+      cardContextSection,
+      languageSection,
+      difficultySection,
+      prompt: args.prompt,
+      includeAiContent,
+      userId: args.userId,
+      // Only forwarded when the card context resolved (ownership verified
+      // by resolveCardContext), gates the markAlsoCorrect tool for this turn.
+      cardId: cardData ? args.cardId : undefined,
+      // ...and withholds it entirely when the course writes by transcription.
+      transcribeCard,
+    },
+  );
+}
+
+/**
+ * Generate the tutor's reply again for a turn whose generation failed (a
+ * provider outage, an upstream rate limit). The failed placeholder(s) of that
+ * turn are removed and a fresh generation is scheduled against the same
+ * prompt, so the thread reads as if the first attempt never happened.
+ *
+ * No credit is consumed: the send already charged one, and a failed stream
+ * bills nothing (generateResponse skips the charge when it throws), so the
+ * user has paid for a reply they never got. Only a turn that actually holds a
+ * failed reply qualifies, which is what keeps this from being a free way to
+ * regenerate a reply that did arrive.
+ *
+ * `messageId` is any message of the failed turn as the UI sees it: the
+ * client's message groups take their id from the first document of the turn,
+ * which may be an earlier successful step of a tool loop rather than the
+ * failed document itself, so the turn is resolved by `order` here.
+ */
+export const retryResponse = mutation({
+  args: {
+    threadId: v.string(),
+    messageId: v.string(),
+    cardId: v.optional(v.id('cards')),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireAuthUserId(ctx);
+
+    const thread = await ctx.runQuery(agentComponent.threads.getThread, {
+      threadId: args.threadId,
+    });
+    if (!thread || thread.userId !== userId) {
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'Thread not found or access denied',
+      });
+    }
+
+    const [anchor] = await ctx.runQuery(
+      agentComponent.messages.getMessagesByIds,
+      { messageIds: [args.messageId] },
+    );
+    if (!anchor || anchor.threadId !== args.threadId) {
+      throw new ConvexError({
+        code: 'NOT_FOUND',
+        message: 'Message not found in this thread',
+      });
+    }
+
+    // `upToAndIncludingMessageId` returns every message of the anchor's order
+    // (and earlier ones, filtered out below), so one page covers the turn.
+    const pageOf = async (
+      statuses: Array<'success' | 'failed'>,
+      excludeToolMessages: boolean,
+    ) =>
+      (
+        await ctx.runQuery(agentComponent.messages.listMessagesByThreadId, {
+          threadId: args.threadId,
+          order: 'desc',
+          statuses,
+          excludeToolMessages,
+          upToAndIncludingMessageId: args.messageId,
+          paginationOpts: { cursor: null, numItems: 50 },
+        })
+      ).page.filter((m) => m.order === anchor.order);
+
+    const failedDocs = (await pageOf(['failed'], false)).filter(
+      (m) => m.message?.role !== 'user',
+    );
+    if (failedDocs.length === 0) {
+      throw new ConvexError({
+        code: 'NOT_RETRYABLE',
+        message: 'This reply did not fail, nothing to retry',
+      });
+    }
+    const promptDoc = (await pageOf(['success'], true)).find(
+      (m) => m.message?.role === 'user',
+    );
+    if (!promptDoc) {
+      throw new ConvexError({
+        code: 'NOT_RETRYABLE',
+        message: 'The prompt of this reply is gone',
+      });
+    }
+
+    await ctx.runMutation(agentComponent.messages.deleteByIds, {
+      messageIds: failedDocs.map((m) => m._id),
+    });
+
+    const turn = await resolveTurnContext(ctx, userId, args.cardId);
+    await scheduleResponse(ctx, {
+      userId,
+      threadId: args.threadId,
+      promptMessageId: promptDoc._id,
+      prompt: promptDoc.text ?? '',
+      cardId: args.cardId,
+      turn,
+    });
+
+    await track(ctx, userId, EVENTS.CHAT_RESPONSE_RETRIED, {
+      thread_id: args.threadId,
+      has_card_context: turn.cardData !== null,
+    });
+
+    return null;
   },
 });
 

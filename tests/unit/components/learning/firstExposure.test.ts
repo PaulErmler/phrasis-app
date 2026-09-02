@@ -41,19 +41,12 @@ describe('shouldShowTranslationAssist', () => {
     expect(shouldShowTranslationAssist(settings, 1, 1)).toBe(false);
   });
 
-  it('never shows in transcribe mode, the shown target would BE the answer', () => {
-    // Even with the widest window (0 = always) and a brand-new card.
-    expect(
-      shouldShowTranslationAssist(
-        { showTranslationOnlyNewReps: 0 },
-        0,
-        0,
-        true,
-      ),
-    ).toBe(false);
-    expect(shouldShowTranslationAssist(undefined, 0, 0, true)).toBe(false);
-    // Explicit false matches the default-arg behaviour.
-    expect(shouldShowTranslationAssist(undefined, 0, 0, false)).toBe(true);
+  // The predicate has no writing-style input any more: the assist applies
+  // in transcribe exactly as in translate (the shown sentence is what the
+  // audio says; the first passes are copy-work, the test starts afterwards).
+  it('takes no writing-style argument, transcribe cards get the assist too', () => {
+    expect(shouldShowTranslationAssist.length).toBe(3);
+    expect(shouldShowTranslationAssist(undefined, 0, 0)).toBe(true);
   });
 
   // Free play advances neither preReviewCount nor the FSRS reps, so without
@@ -61,18 +54,18 @@ describe('shouldShowTranslationAssist', () => {
   // pass of the Free Study round-robin, forever.
   it('retires in Free Study on freeStudyPlayCount alone', () => {
     // First pass: never played anywhere.
-    expect(shouldShowTranslationAssist(undefined, 0, 0, false, 0)).toBe(true);
+    expect(shouldShowTranslationAssist(undefined, 0, 0, 0)).toBe(true);
     // Second pass: the advance bumped freeStudyPlayCount, FSRS still frozen.
-    expect(shouldShowTranslationAssist(undefined, 0, 0, false, 1)).toBe(false);
+    expect(shouldShowTranslationAssist(undefined, 0, 0, 1)).toBe(false);
   });
 
   it('takes the max of FSRS exposures and free-study plays, not their sum', () => {
     const settings = { showTranslationOnlyNewReps: 3 };
     // 2 FSRS exposures + 2 free-study plays must not read as 4 and retire early
     // Each face retires the assist on its own exposures.
-    expect(shouldShowTranslationAssist(settings, 1, 1, false, 2)).toBe(true);
-    expect(shouldShowTranslationAssist(settings, 1, 2, false, 0)).toBe(false);
-    expect(shouldShowTranslationAssist(settings, 0, 0, false, 3)).toBe(false);
+    expect(shouldShowTranslationAssist(settings, 1, 1, 2)).toBe(true);
+    expect(shouldShowTranslationAssist(settings, 1, 2, 0)).toBe(false);
+    expect(shouldShowTranslationAssist(settings, 0, 0, 3)).toBe(false);
   });
 
   it('defaults freeStudyPlayCount to 0 so FSRS-only callers are unchanged', () => {
@@ -82,9 +75,7 @@ describe('shouldShowTranslationAssist', () => {
 });
 
 /**
- * Shared transcribe predicate. Used by both the auto-rating gate in
- * LearningMode (before its early returns) and the render path (after them),
- * so the two can't disagree about whether a card is copy-through.
+ * Shared transcribe predicate, used by LearningMode's render path.
  */
 describe('isTranscribeMode', () => {
   it('is true only for writing mode with the transcribe input', () => {
@@ -136,7 +127,6 @@ describe('auto-rating suppression on copy-through cards', () => {
       settings,
       preReviewCount,
       fsrsReps,
-      isTranscribeMode(settings),
       freeStudyPlayCount,
     );
 
@@ -148,11 +138,18 @@ describe('auto-rating suppression on copy-through cards', () => {
     expect(autoRateEnabled({ reviewMode: 'full' }, 1, 0)).toBe(true);
   });
 
-  it('is never suppressed in transcribe mode, no assist is shown there', () => {
+  it('is suppressed on a brand-new transcribe card too, the assist shows there as well', () => {
     expect(
       autoRateEnabled(
         { reviewMode: 'full', writingInputMode: 'transcribe' },
         0,
+        0,
+      ),
+    ).toBe(false);
+    expect(
+      autoRateEnabled(
+        { reviewMode: 'full', writingInputMode: 'transcribe' },
+        1,
         0,
       ),
     ).toBe(true);

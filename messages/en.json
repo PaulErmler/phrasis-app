@@ -858,6 +858,7 @@
     "errors": {
       "failedToCreateThread": "Failed to create new conversation",
       "failedToSend": "Failed to send message",
+      "retryFailed": "Couldn't ask for the reply again. Please try once more in a moment.",
       "failedToTranscribe": "Failed to transcribe audio",
       "microphoneAccess": "Failed to access microphone",
       "messageTooLong": "Your message is too long. Please shorten it and send again."
@@ -913,6 +914,10 @@
     },
     "messageError": {
       "title": "This message couldn't be displayed",
+      "retry": "Try again"
+    },
+    "replyFailed": {
+      "title": "The tutor couldn't answer right now. The AI service was busy for a moment.",
       "retry": "Try again"
     },
     "chatError": {

@@ -176,9 +176,9 @@ export const courseSettingsFields = {
     ),
   ),
   targetBeforeUntilGoodReps: v.optional(v.number()), // 1-10, default 1 (no ∞ — that's 'continuous')
-  // Writing mode: show the target translation above the input on a card's
-  // first N reviews so the user copy-types it ("Abschreiben"); the unassisted
-  // test starts afterwards. Unset = true (on). The rep window mirrors
+  // Writing mode (translate and transcribe): show the target sentence above
+  // the input on a card's first N reviews so the user copy-types it
+  // ("Abschreiben"); the unassisted test starts afterwards. Unset = true (on). The rep window mirrors
   // targetBeforeOnlyNewReps: 0 = always show (∞), 1-10 = first N reviews
   // (preReviewCount + FSRS reps), default 1.
   showTranslationOnNew: v.optional(v.boolean()),

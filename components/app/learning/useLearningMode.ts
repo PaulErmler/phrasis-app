@@ -978,6 +978,18 @@ export function useLearningMode(
   // setter hasn't re-rendered yet), so a double-click would fire the mutation
   // twice. A ref flips immediately and closes that window.
   const exitMutationInFlightRef = useRef(false);
+  // The card whose advance is in flight. Since the optimistic swap
+  // (optimisticAdvance.ts) the NEXT card is on screen and interactive while
+  // that mutation is still pending, so a press on it must not be confused
+  // with a repeat press on the card being reviewed.
+  const inFlightCardIdRef = useRef<Id<'cards'> | null>(null);
+  // An advance asked for on that next card before the pending one settled.
+  // Replayed by the effect below `handleNext` once it does.
+  const queuedAdvanceRef = useRef<{
+    cardId: Id<'cards'>;
+    ratingOverride?: ReviewRating;
+    accuracy?: ReviewAccuracyPayload;
+  } | null>(null);
 
   // Shared shape for mutations that animate the card out (master / hide /
   // delete / radio advance): mark this tab as review initiator, bump the
@@ -1008,6 +1020,7 @@ export function useLearningMode(
         }
       } finally {
         exitMutationInFlightRef.current = false;
+        inFlightCardIdRef.current = null;
         setIsReviewing(false);
         if (options?.alwaysClearExiting) {
           setIsExiting(false);
@@ -1028,6 +1041,7 @@ export function useLearningMode(
       // same-tick double submit would record the review twice.
       if (exitMutationInFlightRef.current) return;
       exitMutationInFlightRef.current = true;
+      inFlightCardIdRef.current = cardForReview._id;
       reviewInitiatedByThisTabRef.current = true;
       setCardAnimationKey((k) => k + 1);
       setIsExiting(true);
@@ -1098,6 +1112,7 @@ export function useLearningMode(
         setIsExiting(false);
       } finally {
         exitMutationInFlightRef.current = false;
+        inFlightCardIdRef.current = null;
         setIsReviewing(false);
       }
     },
@@ -1344,7 +1359,23 @@ export function useLearningMode(
 
   const handleNext = useCallback(
     async (ratingOverride?: ReviewRating, accuracy?: ReviewAccuracyPayload) => {
-      if (!cardForReview || isReviewing) return;
+      if (!cardForReview) return;
+      if (isReviewing || exitMutationInFlightRef.current) {
+        // The previous card's advance is still in flight while this one is
+        // already on screen (optimistic swap). Dropping the press here was
+        // what made Enter / Next silently do nothing on a slow connection.
+        // Keep it and replay it once the mutation settles, unless it targets
+        // the very card in flight, where a repeat press stays a no-op.
+        if (inFlightCardIdRef.current !== cardForReview._id) {
+          queuedAdvanceRef.current = {
+            cardId: cardForReview._id,
+            ratingOverride,
+            accuracy,
+          };
+        }
+        return;
+      }
+      inFlightCardIdRef.current = cardForReview._id;
       if (isPendingMaster) {
         await runExitingMutation(
           () => masterCardMutation({ cardId: cardForReview._id }),
@@ -1427,6 +1458,19 @@ export function useLearningMode(
       advanceFreePlayCardMutation,
     ],
   );
+
+  // Replay an advance queued while the previous card's mutation was in
+  // flight. Only if the queued card is still the one on screen: a rejected
+  // mutation rolls the optimistic swap back and brings the previous card
+  // back, whose review must not be re-sent with the next card's rating.
+  useEffect(() => {
+    if (isReviewing) return;
+    const queued = queuedAdvanceRef.current;
+    if (!queued) return;
+    queuedAdvanceRef.current = null;
+    if (cardForReview?._id !== queued.cardId) return;
+    void handleNext(queued.ratingOverride, queued.accuracy);
+  }, [isReviewing, cardForReview?._id, handleNext]);
 
   // ============================================================================
   // Return discriminated states

@@ -830,4 +830,103 @@ describe('useLearningMode', () => {
       });
     });
   });
+
+  /**
+   * Since the optimistic advance the next card is on screen (and typed
+   * into) while the previous card's review is still in flight. A press
+   * made on it in that window used to be dropped silently; now it is
+   * replayed once the mutation settles, and only if that card is still
+   * the one on screen.
+   */
+  describe('handleNext: advance queued behind an in-flight review', () => {
+    const settled = {
+      dailyReviewsToday: 4,
+      dailyTimeMsToday: 100,
+      dailyNewWordsToday: 0,
+      triggerCelebration: false,
+    };
+
+    it('replays an advance pressed on the optimistically shown next card', async () => {
+      const review = harness.mutationFor(REFS.reviewCard);
+      const gate = deferred<Record<string, unknown>>();
+      review
+        .mockReturnValueOnce(gate.promise)
+        .mockResolvedValueOnce({ ...settled, dailyReviewsToday: 5 });
+
+      const { result, rerender } = renderHook(() => useLearningMode());
+      await act(async () => {
+        void reviewing(result).handleNext();
+      });
+      expect(review).toHaveBeenCalledTimes(1);
+
+      // The optimistic swap: card2 is on screen while card1 is in flight.
+      harness.queryValues.set(
+        REFS.getCardForReview,
+        makeCard({ _id: 'card2' }),
+      );
+      rerender();
+      await act(async () => {
+        void reviewing(result).handleNext();
+      });
+      expect(review).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        gate.resolve(settled);
+        await gate.promise;
+      });
+
+      expect(review).toHaveBeenCalledTimes(2);
+      expect(review.mock.calls[1][0]).toMatchObject({ cardId: 'card2' });
+    });
+
+    it('still ignores a repeat press on the very card in flight', async () => {
+      const review = harness.mutationFor(REFS.reviewCard);
+      const gate = deferred<Record<string, unknown>>();
+      review.mockReturnValueOnce(gate.promise);
+
+      const { result } = renderHook(() => useLearningMode());
+      await act(async () => {
+        void reviewing(result).handleNext();
+      });
+      await act(async () => {
+        void reviewing(result).handleNext();
+      });
+      await act(async () => {
+        gate.resolve(settled);
+        await gate.promise;
+      });
+      expect(review).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops the queued advance when the previous card comes back (rejected review)', async () => {
+      const review = harness.mutationFor(REFS.reviewCard);
+      const gate = deferred<Record<string, unknown>>();
+      review.mockReturnValueOnce(gate.promise);
+
+      const { result, rerender } = renderHook(() => useLearningMode());
+      await act(async () => {
+        void reviewing(result).handleNext();
+      });
+      harness.queryValues.set(
+        REFS.getCardForReview,
+        makeCard({ _id: 'card2' }),
+      );
+      rerender();
+      await act(async () => {
+        void reviewing(result).handleNext();
+      });
+
+      // Convex rolls the optimistic swap back on failure: card1 returns.
+      harness.queryValues.set(
+        REFS.getCardForReview,
+        makeCard({ _id: 'card1' }),
+      );
+      rerender();
+      await act(async () => {
+        gate.reject(new Error('boom'));
+        await gate.promise.catch(() => undefined);
+      });
+      expect(review).toHaveBeenCalledTimes(1);
+    });
+  });
 });

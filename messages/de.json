@@ -858,6 +858,7 @@
     "errors": {
       "failedToCreateThread": "Die neue Unterhaltung konnte nicht erstellt werden.",
       "failedToSend": "Die Nachricht konnte nicht gesendet werden.",
+      "retryFailed": "Die Antwort konnte nicht erneut angefordert werden. Bitte versuche es gleich noch einmal.",
       "failedToTranscribe": "Die Aufnahme konnte nicht transkribiert werden.",
       "microphoneAccess": "Kein Zugriff auf das Mikrofon möglich.",
       "messageTooLong": "Deine Nachricht ist zu lang. Bitte kürze sie und sende sie erneut."
@@ -913,6 +914,10 @@
     },
     "messageError": {
       "title": "Diese Nachricht konnte nicht angezeigt werden",
+      "retry": "Erneut versuchen"
+    },
+    "replyFailed": {
+      "title": "Der Tutor konnte gerade nicht antworten. Der KI-Dienst war kurz ausgelastet.",
       "retry": "Erneut versuchen"
     },
     "chatError": {

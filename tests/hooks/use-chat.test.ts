@@ -21,6 +21,7 @@ vi.mock('sonner', () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
+import { toast } from 'sonner';
 import { useChat } from '@/hooks/use-chat';
 
 describe('useChat', () => {
@@ -82,5 +83,38 @@ describe('useChat', () => {
       await result.current.sendQuickAction({ kind: 'grammar' }, '  ');
     });
     expect(sendMutation).not.toHaveBeenCalled();
+  });
+
+  describe('retryResponse', () => {
+    it('asks the server to regenerate the failed turn and locks the composer', async () => {
+      sendMutation.mockResolvedValue(null);
+      const { result } = renderHook(() =>
+        useChat({ threadId: 't1', cardId: 'card_1' as never }),
+      );
+      await act(async () => {
+        await result.current.retryResponse('m_failed');
+      });
+      expect(sendMutation).toHaveBeenCalledWith({
+        threadId: 't1',
+        messageId: 'm_failed',
+        cardId: 'card_1',
+      });
+      // Stays submitted until the regenerated reply starts streaming.
+      expect(result.current.status).toBe('submitted');
+    });
+
+    it('reports a failed retry and unlocks the composer again', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => undefined);
+      sendMutation.mockRejectedValue(new Error('offline'));
+      const { result } = renderHook(() => useChat({ threadId: 't1' }));
+      await act(async () => {
+        await result.current.retryResponse('m_failed');
+      });
+      expect(toast.error).toHaveBeenCalled();
+      expect(result.current.status).toBe('ready');
+      consoleError.mockRestore();
+    });
   });
 });

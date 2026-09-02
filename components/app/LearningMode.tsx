@@ -239,7 +239,6 @@ export function LearningMode({
       state.courseSettings,
       state.preReviewCount,
       state.fsrsState?.reps ?? 0,
-      isTranscribeMode(state.courseSettings),
       state.freeStudyPlayCount,
     );
   const autoRateEnabled =
@@ -508,17 +507,17 @@ export function LearningMode({
     t,
   );
 
-  // "Show translation on new sentences" (writing mode): the answer is shown
-  // above the input to copy-type on the card's first N reviews, never in
-  // transcribe, where the shown target would BE the answer (gate lives in
-  // the helper). freeStudyPlayCount is passed because free play advances
-  // neither preReviewCount nor the FSRS reps, so without it the assist would
-  // never retire in the Free Study face.
+  // "Show translation on new sentences" (both writing styles): the answer
+  // is shown above the input to copy-type on the card's first N reviews. In
+  // transcribe the sentence IS what the audio says, and that is the point:
+  // the first passes are copy-work, the unassisted test starts afterwards.
+  // freeStudyPlayCount is passed because free play advances neither
+  // preReviewCount nor the FSRS reps, so without it the assist would never
+  // retire in the Free Study face.
   const firstExposure = shouldShowTranslationAssist(
     state.courseSettings,
     state.preReviewCount,
     state.fsrsState?.reps ?? 0,
-    isTranscribe,
     state.freeStudyPlayCount,
   );
 
@@ -733,13 +732,17 @@ export function LearningMode({
           // shortcuts, with a confirm dialog open, a stray ← would undo
           // the previous review behind the modal. Dialogs/menus that manage
           // their own open state (help, card menu) are caught structurally in
-          // LearningControls' handler; the chat panel isn't a dialog and traps
-          // no focus, so it must be listed here.
+          // LearningControls' handler. The chat only counts as an overlay in
+          // the narrow layout, where it covers the card; beside the card
+          // (desktop) the shortcuts stay live, and keys pressed inside the
+          // panel are filtered by its marker in the same handler. Silencing
+          // them wholesale there left the writing card without Enter, Space
+          // or R for as long as the chat stayed open.
           state.settingsOpen ||
           editDialogOpen ||
           state.cardActions.deleteConfirmOpen ||
           state.cardActions.flagConfirmOpen ||
-          chatContext.isChatOpen
+          chatContext.chatCoversCard
         }
         isAudioReview={reviewMode === 'audio'}
         audioAllTargetsRevealed={audioAllTargetsRevealed}

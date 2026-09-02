@@ -26,6 +26,13 @@ interface PendingPrompt {
 
 interface LearningChatContextValue {
   isChatOpen: boolean;
+  /**
+   * The open chat covers the card (narrow layout). On desktop the chat sits
+   * beside the card, and the session shortcuts stay live for keys pressed on
+   * the card side; the panel itself is marked `data-learning-chat-panel` so
+   * keys pressed inside it are left to the chat.
+   */
+  chatCoversCard: boolean;
   openChat: () => void;
   closeChat: () => void;
   toggleChat: () => void;
@@ -147,6 +154,7 @@ export function LearningChatLayout({
     <LearningChatContext.Provider
       value={{
         isChatOpen: effectiveChatOpen,
+        chatCoversCard: effectiveChatOpen && !isDesktop,
         openChat,
         closeChat,
         toggleChat,
@@ -215,6 +223,7 @@ export function LearningChatLayout({
               flashing the chat into view). Trade-off: no slide-in/out
               animation on mobile toggle. The chat snaps in/out. */}
           <div
+            data-learning-chat-panel=""
             className={cn(
               'min-w-0 min-h-0 bg-background overflow-hidden',
               isDesktop
