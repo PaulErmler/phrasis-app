@@ -1,0 +1,1880 @@
+[
+ {
+  "id": "de-ea76fad8fb36",
+  "lang": "de",
+  "srcHash": "ea76fad8fb36",
+  "letters": {
+   "A": [
+    "sol-low"
+   ],
+   "B": [
+    "luna-bo3"
+   ],
+   "C": [
+    "sol-medium",
+    "sol-low-bo3"
+   ],
+   "D": [
+    "sol-minimal"
+   ],
+   "E": [
+    "sol-minimal-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 8,
+   "C": 9,
+   "D": 9,
+   "E": 9
+  }
+ },
+ {
+  "id": "de-61b9441af212",
+  "lang": "de",
+  "srcHash": "61b9441af212",
+  "letters": {
+   "A": [
+    "sol-minimal",
+    "sol-medium"
+   ],
+   "B": [
+    "luna-bo3"
+   ],
+   "C": [
+    "sol-low",
+    "sol-minimal-bo3",
+    "sol-low-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 4,
+   "B": 9,
+   "C": 4
+  }
+ },
+ {
+  "id": "de-1481f8b28b28",
+  "lang": "de",
+  "srcHash": "1481f8b28b28",
+  "letters": {
+   "A": [
+    "luna-bo3"
+   ],
+   "B": [
+    "sol-medium"
+   ],
+   "C": [
+    "sol-low"
+   ],
+   "D": [
+    "sol-minimal-bo3"
+   ],
+   "E": [
+    "sol-minimal"
+   ],
+   "F": [
+    "sol-low-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 8,
+   "C": 9,
+   "D": 9,
+   "E": 10,
+   "F": 9
+  }
+ },
+ {
+  "id": "de-9ab63ac15581",
+  "lang": "de",
+  "srcHash": "9ab63ac15581",
+  "letters": {
+   "A": [
+    "sol-minimal-bo3",
+    "sol-low-bo3"
+   ],
+   "B": [
+    "luna-bo3"
+   ],
+   "C": [
+    "sol-minimal",
+    "sol-low",
+    "sol-medium"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 9,
+   "C": 10
+  }
+ },
+ {
+  "id": "de-221d178b0e14",
+  "lang": "de",
+  "srcHash": "221d178b0e14",
+  "letters": {
+   "A": [
+    "sol-medium"
+   ],
+   "B": [
+    "luna-bo3"
+   ],
+   "C": [
+    "sol-low",
+    "sol-minimal-bo3"
+   ],
+   "D": [
+    "sol-minimal"
+   ],
+   "E": [
+    "sol-low-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 7,
+   "C": 10,
+   "D": 10,
+   "E": 10
+  }
+ },
+ {
+  "id": "de-a76524461d0c",
+  "lang": "de",
+  "srcHash": "a76524461d0c",
+  "letters": {
+   "A": [
+    "luna-bo3",
+    "sol-medium"
+   ],
+   "B": [
+    "sol-minimal",
+    "sol-low",
+    "sol-minimal-bo3",
+    "sol-low-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 10
+  }
+ },
+ {
+  "id": "de-3ea5b5e16ce6",
+  "lang": "de",
+  "srcHash": "3ea5b5e16ce6",
+  "letters": {
+   "A": [
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-low"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-minimal-bo3"
+   ],
+   "E": [
+    "sol-minimal",
+    "sol-medium"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 10,
+   "C": 8,
+   "D": 10,
+   "E": 10
+  }
+ },
+ {
+  "id": "de-41021608caa9",
+  "lang": "de",
+  "srcHash": "41021608caa9",
+  "letters": {
+   "A": [
+    "sol-medium"
+   ],
+   "B": [
+    "sol-low"
+   ],
+   "C": [
+    "sol-low-bo3"
+   ],
+   "D": [
+    "sol-minimal"
+   ],
+   "E": [
+    "luna-bo3"
+   ],
+   "F": [
+    "sol-minimal-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 7,
+   "B": 9,
+   "C": 9,
+   "D": 9,
+   "E": 9,
+   "F": 9
+  }
+ },
+ {
+  "id": "de-e51859935f51",
+  "lang": "de",
+  "srcHash": "e51859935f51",
+  "letters": {
+   "A": [
+    "sol-minimal"
+   ],
+   "B": [
+    "sol-medium"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-low"
+   ],
+   "E": [
+    "sol-minimal-bo3"
+   ],
+   "F": [
+    "sol-low-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 10,
+   "C": 10,
+   "D": 10,
+   "E": 10,
+   "F": 9
+  }
+ },
+ {
+  "id": "de-e3a1c24abd66",
+  "lang": "de",
+  "srcHash": "e3a1c24abd66",
+  "letters": {
+   "A": [
+    "sol-minimal-bo3",
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-low"
+   ],
+   "C": [
+    "sol-minimal"
+   ],
+   "D": [
+    "luna-bo3"
+   ],
+   "E": [
+    "sol-medium"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 9,
+   "C": 10,
+   "D": 7,
+   "E": 9
+  }
+ },
+ {
+  "id": "de-4cfd36a82adf",
+  "lang": "de",
+  "srcHash": "4cfd36a82adf",
+  "letters": {
+   "A": [
+    "luna-bo3"
+   ],
+   "B": [
+    "sol-minimal-bo3"
+   ],
+   "C": [
+    "sol-low-bo3"
+   ],
+   "D": [
+    "sol-minimal"
+   ],
+   "E": [
+    "sol-low"
+   ],
+   "F": [
+    "sol-medium"
+   ]
+  },
+  "judgeScores": {
+   "A": 7,
+   "B": 9,
+   "C": 10,
+   "D": 9,
+   "E": 9,
+   "F": 9
+  }
+ },
+ {
+  "id": "de-ba5f15cbf789",
+  "lang": "de",
+  "srcHash": "ba5f15cbf789",
+  "letters": {
+   "A": [
+    "sol-medium"
+   ],
+   "B": [
+    "sol-minimal"
+   ],
+   "C": [
+    "sol-low-bo3"
+   ],
+   "D": [
+    "sol-minimal-bo3"
+   ],
+   "E": [
+    "sol-low"
+   ],
+   "F": [
+    "luna-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 8,
+   "B": 9,
+   "C": 8,
+   "D": 5,
+   "E": 9,
+   "F": 4
+  }
+ },
+ {
+  "id": "de-9485e7d3b7a6",
+  "lang": "de",
+  "srcHash": "9485e7d3b7a6",
+  "letters": {
+   "A": [
+    "sol-minimal"
+   ],
+   "B": [
+    "luna-bo3"
+   ],
+   "C": [
+    "sol-medium"
+   ],
+   "D": [
+    "sol-minimal-bo3"
+   ],
+   "E": [
+    "sol-low-bo3"
+   ],
+   "F": [
+    "sol-low"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 9,
+   "C": 10,
+   "D": 10,
+   "E": 10,
+   "F": 10
+  }
+ },
+ {
+  "id": "de-2493355ce14b",
+  "lang": "de",
+  "srcHash": "2493355ce14b",
+  "letters": {
+   "A": [
+    "sol-low"
+   ],
+   "B": [
+    "sol-medium"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-low-bo3"
+   ],
+   "E": [
+    "sol-minimal-bo3"
+   ],
+   "F": [
+    "sol-minimal"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 10,
+   "C": 7,
+   "D": 8,
+   "E": 9,
+   "F": 8
+  }
+ },
+ {
+  "id": "de-342e4f694b4d",
+  "lang": "de",
+  "srcHash": "342e4f694b4d",
+  "letters": {
+   "A": [
+    "luna-bo3"
+   ],
+   "B": [
+    "sol-minimal-bo3"
+   ],
+   "C": [
+    "sol-minimal"
+   ],
+   "D": [
+    "sol-low-bo3"
+   ],
+   "E": [
+    "sol-low"
+   ],
+   "F": [
+    "sol-medium"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 9,
+   "C": 8,
+   "D": 8,
+   "E": 10,
+   "F": 8
+  }
+ },
+ {
+  "id": "ru-ea76fad8fb36",
+  "lang": "ru",
+  "srcHash": "ea76fad8fb36",
+  "letters": {
+   "A": [
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-minimal-bo3"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-minimal"
+   ],
+   "E": [
+    "sol-medium"
+   ],
+   "F": [
+    "sol-low"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 10,
+   "C": 7,
+   "D": 9,
+   "E": 8,
+   "F": 8
+  }
+ },
+ {
+  "id": "ru-61b9441af212",
+  "lang": "ru",
+  "srcHash": "61b9441af212",
+  "letters": {
+   "A": [
+    "sol-low"
+   ],
+   "B": [
+    "sol-low-bo3"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-medium",
+    "sol-minimal-bo3"
+   ],
+   "E": [
+    "sol-minimal"
+   ]
+  },
+  "judgeScores": {
+   "A": 4,
+   "B": 5,
+   "C": 10,
+   "D": 4,
+   "E": 8
+  }
+ },
+ {
+  "id": "ru-1481f8b28b28",
+  "lang": "ru",
+  "srcHash": "1481f8b28b28",
+  "letters": {
+   "A": [
+    "sol-minimal-bo3"
+   ],
+   "B": [
+    "sol-low"
+   ],
+   "C": [
+    "sol-medium"
+   ],
+   "D": [
+    "luna-bo3"
+   ],
+   "E": [
+    "sol-low-bo3"
+   ],
+   "F": [
+    "sol-minimal"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 10,
+   "C": 10,
+   "D": 8,
+   "E": 10,
+   "F": 10
+  }
+ },
+ {
+  "id": "ru-9ab63ac15581",
+  "lang": "ru",
+  "srcHash": "9ab63ac15581",
+  "letters": {
+   "A": [
+    "sol-minimal-bo3",
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-low",
+    "sol-medium"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-minimal"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 9,
+   "C": 9,
+   "D": 9
+  }
+ },
+ {
+  "id": "ru-221d178b0e14",
+  "lang": "ru",
+  "srcHash": "221d178b0e14",
+  "letters": {
+   "A": [
+    "luna-bo3"
+   ],
+   "B": [
+    "sol-medium"
+   ],
+   "C": [
+    "sol-minimal"
+   ],
+   "D": [
+    "sol-low-bo3"
+   ],
+   "E": [
+    "sol-low"
+   ],
+   "F": [
+    "sol-minimal-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 10,
+   "C": 10,
+   "D": 10,
+   "E": 10,
+   "F": 10
+  }
+ },
+ {
+  "id": "ru-a76524461d0c",
+  "lang": "ru",
+  "srcHash": "a76524461d0c",
+  "letters": {
+   "A": [
+    "luna-bo3"
+   ],
+   "B": [
+    "sol-medium"
+   ],
+   "C": [
+    "sol-minimal",
+    "sol-minimal-bo3",
+    "sol-low-bo3"
+   ],
+   "D": [
+    "sol-low"
+   ]
+  },
+  "judgeScores": {
+   "A": 8,
+   "B": 9,
+   "C": 10,
+   "D": 9
+  }
+ },
+ {
+  "id": "ru-3ea5b5e16ce6",
+  "lang": "ru",
+  "srcHash": "3ea5b5e16ce6",
+  "letters": {
+   "A": [
+    "sol-medium",
+    "sol-low-bo3"
+   ],
+   "B": [
+    "luna-bo3"
+   ],
+   "C": [
+    "sol-minimal"
+   ],
+   "D": [
+    "sol-low",
+    "sol-minimal-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 8,
+   "C": 9,
+   "D": 10
+  }
+ },
+ {
+  "id": "ru-41021608caa9",
+  "lang": "ru",
+  "srcHash": "41021608caa9",
+  "letters": {
+   "A": [
+    "sol-minimal"
+   ],
+   "B": [
+    "luna-bo3"
+   ],
+   "C": [
+    "sol-low"
+   ],
+   "D": [
+    "sol-low-bo3"
+   ],
+   "E": [
+    "sol-medium"
+   ],
+   "F": [
+    "sol-minimal-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 8,
+   "B": 6,
+   "C": 9,
+   "D": 9,
+   "E": 6,
+   "F": 9
+  }
+ },
+ {
+  "id": "ru-e51859935f51",
+  "lang": "ru",
+  "srcHash": "e51859935f51",
+  "letters": {
+   "A": [
+    "sol-minimal",
+    "sol-medium",
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-minimal-bo3"
+   ],
+   "C": [
+    "sol-low"
+   ],
+   "D": [
+    "luna-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 9,
+   "C": 9,
+   "D": 10
+  }
+ },
+ {
+  "id": "ru-e3a1c24abd66",
+  "lang": "ru",
+  "srcHash": "e3a1c24abd66",
+  "letters": {
+   "A": [
+    "sol-medium"
+   ],
+   "B": [
+    "sol-low"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-minimal",
+    "sol-low-bo3"
+   ],
+   "E": [
+    "sol-minimal-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 9,
+   "C": 10,
+   "D": 9,
+   "E": 9
+  }
+ },
+ {
+  "id": "ru-4cfd36a82adf",
+  "lang": "ru",
+  "srcHash": "4cfd36a82adf",
+  "letters": {
+   "A": [
+    "sol-medium",
+    "sol-minimal-bo3",
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-low"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-minimal"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 10,
+   "C": 10,
+   "D": 10
+  }
+ },
+ {
+  "id": "ru-ba5f15cbf789",
+  "lang": "ru",
+  "srcHash": "ba5f15cbf789",
+  "letters": {
+   "A": [
+    "luna-bo3"
+   ],
+   "B": [
+    "sol-minimal-bo3"
+   ],
+   "C": [
+    "sol-medium"
+   ],
+   "D": [
+    "sol-minimal"
+   ],
+   "E": [
+    "sol-low"
+   ],
+   "F": [
+    "sol-low-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 4,
+   "B": 9,
+   "C": 8,
+   "D": 7,
+   "E": 8,
+   "F": 8
+  }
+ },
+ {
+  "id": "ru-9485e7d3b7a6",
+  "lang": "ru",
+  "srcHash": "9485e7d3b7a6",
+  "letters": {
+   "A": [
+    "luna-bo3"
+   ],
+   "B": [
+    "sol-minimal"
+   ],
+   "C": [
+    "sol-low"
+   ],
+   "D": [
+    "sol-minimal-bo3"
+   ],
+   "E": [
+    "sol-medium"
+   ],
+   "F": [
+    "sol-low-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 8,
+   "B": 9,
+   "C": 9,
+   "D": 9,
+   "E": 9,
+   "F": 9
+  }
+ },
+ {
+  "id": "ru-2493355ce14b",
+  "lang": "ru",
+  "srcHash": "2493355ce14b",
+  "letters": {
+   "A": [
+    "sol-minimal-bo3"
+   ],
+   "B": [
+    "sol-medium"
+   ],
+   "C": [
+    "sol-low"
+   ],
+   "D": [
+    "sol-low-bo3"
+   ],
+   "E": [
+    "luna-bo3"
+   ],
+   "F": [
+    "sol-minimal"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 9,
+   "C": 8,
+   "D": 9,
+   "E": 6,
+   "F": 9
+  }
+ },
+ {
+  "id": "ru-342e4f694b4d",
+  "lang": "ru",
+  "srcHash": "342e4f694b4d",
+  "letters": {
+   "A": [
+    "sol-low"
+   ],
+   "B": [
+    "sol-low-bo3"
+   ],
+   "C": [
+    "sol-minimal"
+   ],
+   "D": [
+    "luna-bo3"
+   ],
+   "E": [
+    "sol-medium"
+   ],
+   "F": [
+    "sol-minimal-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 8,
+   "B": 7,
+   "C": 9,
+   "D": 9,
+   "E": 8,
+   "F": 9
+  }
+ },
+ {
+  "id": "ja-ea76fad8fb36",
+  "lang": "ja",
+  "srcHash": "ea76fad8fb36",
+  "letters": {
+   "A": [
+    "sol-medium"
+   ],
+   "B": [
+    "sol-low"
+   ],
+   "C": [
+    "sol-minimal"
+   ],
+   "D": [
+    "sol-minimal-bo3"
+   ],
+   "E": [
+    "sol-low-bo3"
+   ],
+   "F": [
+    "luna-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 10,
+   "C": 10,
+   "D": 10,
+   "E": 10,
+   "F": 9
+  }
+ },
+ {
+  "id": "ja-61b9441af212",
+  "lang": "ja",
+  "srcHash": "61b9441af212",
+  "letters": {
+   "A": [
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-medium"
+   ],
+   "C": [
+    "sol-minimal"
+   ],
+   "D": [
+    "luna-bo3"
+   ],
+   "E": [
+    "sol-minimal-bo3"
+   ],
+   "F": [
+    "sol-low"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 7,
+   "C": 7,
+   "D": 8,
+   "E": 8,
+   "F": 4
+  }
+ },
+ {
+  "id": "ja-1481f8b28b28",
+  "lang": "ja",
+  "srcHash": "1481f8b28b28",
+  "letters": {
+   "A": [
+    "sol-minimal"
+   ],
+   "B": [
+    "sol-low"
+   ],
+   "C": [
+    "sol-medium"
+   ],
+   "D": [
+    "sol-minimal-bo3"
+   ],
+   "E": [
+    "luna-bo3"
+   ],
+   "F": [
+    "sol-low-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 4,
+   "B": 9,
+   "C": 9,
+   "D": 4,
+   "E": 10,
+   "F": 9
+  }
+ },
+ {
+  "id": "ja-9ab63ac15581",
+  "lang": "ja",
+  "srcHash": "9ab63ac15581",
+  "letters": {
+   "A": [
+    "sol-minimal-bo3"
+   ],
+   "B": [
+    "luna-bo3"
+   ],
+   "C": [
+    "sol-low"
+   ],
+   "D": [
+    "sol-medium"
+   ],
+   "E": [
+    "sol-low-bo3"
+   ],
+   "F": [
+    "sol-minimal"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 8,
+   "C": 10,
+   "D": 10,
+   "E": 10,
+   "F": 10
+  }
+ },
+ {
+  "id": "ja-221d178b0e14",
+  "lang": "ja",
+  "srcHash": "221d178b0e14",
+  "letters": {
+   "A": [
+    "sol-minimal"
+   ],
+   "B": [
+    "sol-medium"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-minimal-bo3"
+   ],
+   "E": [
+    "sol-low"
+   ],
+   "F": [
+    "sol-low-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 10,
+   "C": 10,
+   "D": 10,
+   "E": 10,
+   "F": 10
+  }
+ },
+ {
+  "id": "ja-a76524461d0c",
+  "lang": "ja",
+  "srcHash": "a76524461d0c",
+  "letters": {
+   "A": [
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-minimal"
+   ],
+   "C": [
+    "sol-minimal-bo3"
+   ],
+   "D": [
+    "luna-bo3"
+   ],
+   "E": [
+    "sol-medium"
+   ],
+   "F": [
+    "sol-low"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 9,
+   "C": 9,
+   "D": 8,
+   "E": 9,
+   "F": 9
+  }
+ },
+ {
+  "id": "ja-3ea5b5e16ce6",
+  "lang": "ja",
+  "srcHash": "3ea5b5e16ce6",
+  "letters": {
+   "A": [
+    "sol-minimal"
+   ],
+   "B": [
+    "sol-minimal-bo3"
+   ],
+   "C": [
+    "sol-medium"
+   ],
+   "D": [
+    "sol-low"
+   ],
+   "E": [
+    "sol-low-bo3"
+   ],
+   "F": [
+    "luna-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 9,
+   "C": 9,
+   "D": 9,
+   "E": 9,
+   "F": 10
+  }
+ },
+ {
+  "id": "ja-41021608caa9",
+  "lang": "ja",
+  "srcHash": "41021608caa9",
+  "letters": {
+   "A": [
+    "sol-minimal"
+   ],
+   "B": [
+    "sol-low"
+   ],
+   "C": [
+    "sol-low-bo3"
+   ],
+   "D": [
+    "luna-bo3"
+   ],
+   "E": [
+    "sol-minimal-bo3"
+   ],
+   "F": [
+    "sol-medium"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 9,
+   "C": 9,
+   "D": 10,
+   "E": 9,
+   "F": 10
+  }
+ },
+ {
+  "id": "ja-e51859935f51",
+  "lang": "ja",
+  "srcHash": "e51859935f51",
+  "letters": {
+   "A": [
+    "luna-bo3"
+   ],
+   "B": [
+    "sol-low"
+   ],
+   "C": [
+    "sol-minimal"
+   ],
+   "D": [
+    "sol-minimal-bo3"
+   ],
+   "E": [
+    "sol-medium"
+   ],
+   "F": [
+    "sol-low-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 10,
+   "C": 10,
+   "D": 9,
+   "E": 10,
+   "F": 10
+  }
+ },
+ {
+  "id": "ja-e3a1c24abd66",
+  "lang": "ja",
+  "srcHash": "e3a1c24abd66",
+  "letters": {
+   "A": [
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-minimal"
+   ],
+   "C": [
+    "sol-minimal-bo3"
+   ],
+   "D": [
+    "sol-medium"
+   ],
+   "E": [
+    "sol-low"
+   ],
+   "F": [
+    "luna-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 9,
+   "C": 9,
+   "D": 4,
+   "E": 9,
+   "F": 9
+  }
+ },
+ {
+  "id": "ja-4cfd36a82adf",
+  "lang": "ja",
+  "srcHash": "4cfd36a82adf",
+  "letters": {
+   "A": [
+    "luna-bo3"
+   ],
+   "B": [
+    "sol-minimal"
+   ],
+   "C": [
+    "sol-medium",
+    "sol-minimal-bo3",
+    "sol-low-bo3"
+   ],
+   "D": [
+    "sol-low"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 10,
+   "C": 10,
+   "D": 10
+  }
+ },
+ {
+  "id": "ja-ba5f15cbf789",
+  "lang": "ja",
+  "srcHash": "ba5f15cbf789",
+  "letters": {
+   "A": [
+    "sol-medium"
+   ],
+   "B": [
+    "sol-minimal-bo3"
+   ],
+   "C": [
+    "sol-low"
+   ],
+   "D": [
+    "sol-low-bo3"
+   ],
+   "E": [
+    "luna-bo3"
+   ],
+   "F": [
+    "sol-minimal"
+   ]
+  },
+  "judgeScores": {
+   "A": 8,
+   "B": 9,
+   "C": 9,
+   "D": 9,
+   "E": 9,
+   "F": 9
+  }
+ },
+ {
+  "id": "ja-9485e7d3b7a6",
+  "lang": "ja",
+  "srcHash": "9485e7d3b7a6",
+  "letters": {
+   "A": [
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-minimal-bo3"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-low"
+   ],
+   "E": [
+    "sol-minimal"
+   ],
+   "F": [
+    "sol-medium"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 9,
+   "C": 8,
+   "D": 9,
+   "E": 9,
+   "F": 9
+  }
+ },
+ {
+  "id": "ja-2493355ce14b",
+  "lang": "ja",
+  "srcHash": "2493355ce14b",
+  "letters": {
+   "A": [
+    "sol-medium"
+   ],
+   "B": [
+    "sol-low-bo3"
+   ],
+   "C": [
+    "sol-low"
+   ],
+   "D": [
+    "luna-bo3"
+   ],
+   "E": [
+    "sol-minimal"
+   ],
+   "F": [
+    "sol-minimal-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 8,
+   "B": 9,
+   "C": 9,
+   "D": 7,
+   "E": 8,
+   "F": 10
+  }
+ },
+ {
+  "id": "ja-342e4f694b4d",
+  "lang": "ja",
+  "srcHash": "342e4f694b4d",
+  "letters": {
+   "A": [
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-low"
+   ],
+   "C": [
+    "sol-minimal"
+   ],
+   "D": [
+    "sol-minimal-bo3"
+   ],
+   "E": [
+    "luna-bo3"
+   ],
+   "F": [
+    "sol-medium"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 9,
+   "C": 7,
+   "D": 9,
+   "E": 8,
+   "F": 9
+  }
+ },
+ {
+  "id": "fi-ea76fad8fb36",
+  "lang": "fi",
+  "srcHash": "ea76fad8fb36",
+  "letters": {
+   "A": [
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-medium"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-minimal-bo3"
+   ],
+   "E": [
+    "sol-minimal"
+   ],
+   "F": [
+    "sol-low"
+   ]
+  },
+  "judgeScores": {
+   "A": 8,
+   "B": 8,
+   "C": 9,
+   "D": 8,
+   "E": 8,
+   "F": 8
+  }
+ },
+ {
+  "id": "fi-61b9441af212",
+  "lang": "fi",
+  "srcHash": "61b9441af212",
+  "letters": {
+   "A": [
+    "luna-bo3"
+   ],
+   "B": [
+    "sol-minimal"
+   ],
+   "C": [
+    "sol-low",
+    "sol-minimal-bo3",
+    "sol-low-bo3"
+   ],
+   "D": [
+    "sol-medium"
+   ]
+  },
+  "judgeScores": {
+   "A": 6,
+   "B": 6,
+   "C": 7,
+   "D": 9
+  }
+ },
+ {
+  "id": "fi-1481f8b28b28",
+  "lang": "fi",
+  "srcHash": "1481f8b28b28",
+  "letters": {
+   "A": [
+    "sol-minimal-bo3"
+   ],
+   "B": [
+    "sol-low-bo3"
+   ],
+   "C": [
+    "sol-minimal"
+   ],
+   "D": [
+    "luna-bo3"
+   ],
+   "E": [
+    "sol-low"
+   ],
+   "F": [
+    "sol-medium"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 8,
+   "C": 9,
+   "D": 7,
+   "E": 8,
+   "F": 8
+  }
+ },
+ {
+  "id": "fi-9ab63ac15581",
+  "lang": "fi",
+  "srcHash": "9ab63ac15581",
+  "letters": {
+   "A": [
+    "sol-minimal-bo3"
+   ],
+   "B": [
+    "luna-bo3"
+   ],
+   "C": [
+    "sol-low"
+   ],
+   "D": [
+    "sol-medium"
+   ],
+   "E": [
+    "sol-minimal"
+   ],
+   "F": [
+    "sol-low-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 10,
+   "C": 9,
+   "D": 10,
+   "E": 9,
+   "F": 10
+  }
+ },
+ {
+  "id": "fi-221d178b0e14",
+  "lang": "fi",
+  "srcHash": "221d178b0e14",
+  "letters": {
+   "A": [
+    "sol-minimal-bo3"
+   ],
+   "B": [
+    "sol-minimal"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-low"
+   ],
+   "E": [
+    "sol-medium"
+   ],
+   "F": [
+    "sol-low-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 10,
+   "C": 9,
+   "D": 10,
+   "E": 10,
+   "F": 10
+  }
+ },
+ {
+  "id": "fi-a76524461d0c",
+  "lang": "fi",
+  "srcHash": "a76524461d0c",
+  "letters": {
+   "A": [
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-minimal"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-low"
+   ],
+   "E": [
+    "sol-minimal-bo3"
+   ],
+   "F": [
+    "sol-medium"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 10,
+   "C": 10,
+   "D": 10,
+   "E": 9,
+   "F": 10
+  }
+ },
+ {
+  "id": "fi-3ea5b5e16ce6",
+  "lang": "fi",
+  "srcHash": "3ea5b5e16ce6",
+  "letters": {
+   "A": [
+    "luna-bo3"
+   ],
+   "B": [
+    "sol-minimal",
+    "sol-low",
+    "sol-low-bo3"
+   ],
+   "C": [
+    "sol-medium"
+   ],
+   "D": [
+    "sol-minimal-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 8,
+   "C": 9,
+   "D": 9
+  }
+ },
+ {
+  "id": "fi-41021608caa9",
+  "lang": "fi",
+  "srcHash": "41021608caa9",
+  "letters": {
+   "A": [
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-medium"
+   ],
+   "C": [
+    "sol-low"
+   ],
+   "D": [
+    "sol-minimal"
+   ],
+   "E": [
+    "luna-bo3"
+   ],
+   "F": [
+    "sol-minimal-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 10,
+   "C": 8,
+   "D": 9,
+   "E": 10,
+   "F": 9
+  }
+ },
+ {
+  "id": "fi-e51859935f51",
+  "lang": "fi",
+  "srcHash": "e51859935f51",
+  "letters": {
+   "A": [
+    "sol-low"
+   ],
+   "B": [
+    "sol-low-bo3"
+   ],
+   "C": [
+    "sol-minimal-bo3"
+   ],
+   "D": [
+    "sol-medium"
+   ],
+   "E": [
+    "sol-minimal"
+   ],
+   "F": [
+    "luna-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 9,
+   "C": 9,
+   "D": 9,
+   "E": 9,
+   "F": 9
+  }
+ },
+ {
+  "id": "fi-e3a1c24abd66",
+  "lang": "fi",
+  "srcHash": "e3a1c24abd66",
+  "letters": {
+   "A": [
+    "sol-minimal-bo3"
+   ],
+   "B": [
+    "sol-low-bo3"
+   ],
+   "C": [
+    "sol-medium"
+   ],
+   "D": [
+    "sol-low"
+   ],
+   "E": [
+    "luna-bo3"
+   ],
+   "F": [
+    "sol-minimal"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 10,
+   "C": 10,
+   "D": 10,
+   "E": 10,
+   "F": 10
+  }
+ },
+ {
+  "id": "fi-4cfd36a82adf",
+  "lang": "fi",
+  "srcHash": "4cfd36a82adf",
+  "letters": {
+   "A": [
+    "luna-bo3"
+   ],
+   "B": [
+    "sol-low-bo3"
+   ],
+   "C": [
+    "sol-minimal"
+   ],
+   "D": [
+    "sol-minimal-bo3"
+   ],
+   "E": [
+    "sol-low",
+    "sol-medium"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 10,
+   "C": 10,
+   "D": 10,
+   "E": 10
+  }
+ },
+ {
+  "id": "fi-ba5f15cbf789",
+  "lang": "fi",
+  "srcHash": "ba5f15cbf789",
+  "letters": {
+   "A": [
+    "sol-medium",
+    "sol-low-bo3"
+   ],
+   "B": [
+    "sol-minimal-bo3"
+   ],
+   "C": [
+    "sol-low"
+   ],
+   "D": [
+    "luna-bo3"
+   ],
+   "E": [
+    "sol-minimal"
+   ]
+  },
+  "judgeScores": {
+   "A": 9,
+   "B": 10,
+   "C": 8,
+   "D": 8,
+   "E": 9
+  }
+ },
+ {
+  "id": "fi-9485e7d3b7a6",
+  "lang": "fi",
+  "srcHash": "9485e7d3b7a6",
+  "letters": {
+   "A": [
+    "sol-low"
+   ],
+   "B": [
+    "sol-minimal"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-minimal-bo3"
+   ],
+   "E": [
+    "sol-medium"
+   ],
+   "F": [
+    "sol-low-bo3"
+   ]
+  },
+  "judgeScores": {
+   "A": 10,
+   "B": 10,
+   "C": 9,
+   "D": 8,
+   "E": 10,
+   "F": 10
+  }
+ },
+ {
+  "id": "fi-2493355ce14b",
+  "lang": "fi",
+  "srcHash": "2493355ce14b",
+  "letters": {
+   "A": [
+    "sol-medium"
+   ],
+   "B": [
+    "sol-minimal-bo3"
+   ],
+   "C": [
+    "luna-bo3"
+   ],
+   "D": [
+    "sol-low"
+   ],
+   "E": [
+    "sol-low-bo3"
+   ],
+   "F": [
+    "sol-minimal"
+   ]
+  },
+  "judgeScores": {
+   "A": 8,
+   "B": 9,
+   "C": 8,
+   "D": 9,
+   "E": 9,
+   "F": 9
+  }
+ },
+ {
+  "id": "fi-342e4f694b4d",
+  "lang": "fi",
+  "srcHash": "342e4f694b4d",
+  "letters": {
+   "A": [
+    "sol-low-bo3"
+   ],
+   "B": [
+    "luna-bo3"
+   ],
+   "C": [
+    "sol-minimal"
+   ],
+   "D": [
+    "sol-medium"
+   ],
+   "E": [
+    "sol-minimal-bo3"
+   ],
+   "F": [
+    "sol-low"
+   ]
+  },
+  "judgeScores": {
+   "A": 7,
+   "B": 5,
+   "C": 8,
+   "D": 7,
+   "E": 8,
+   "F": 8
+  }
+ }
+]

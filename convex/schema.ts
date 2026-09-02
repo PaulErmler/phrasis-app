@@ -1746,6 +1746,11 @@ export default defineSchema({
     // ?expand=invoices). The overdue dialog's primary CTA. Paying this is
     // what actually settles the debt; the billing portal only swaps cards.
     pastDueInvoiceUrl: v.optional(v.string()),
+    // When a course-usage reconcile was last scheduled (ms). Debounces the
+    // release-only self-heal in `syncAllFeatures` (usage/helpers.ts) so a
+    // sync that still sees a stale Autumn counter, e.g. while a release is
+    // in flight, cannot fire it again for a day.
+    lastCourseReconcileAt: v.optional(v.number()),
   }).index('by_userId', ['userId']),
 
   // E2E-only planStatus overrides, applied inside syncAllFeatures when the

@@ -303,6 +303,7 @@ Mutations that change metered usage call `consumeQuota` or `releaseQuota`. Only 
 | `completeOnboarding` (course creation) | `convex/features/courses.ts` | `COURSES` | consume 1 |
 | `unarchiveCourse` | `convex/features/courses.ts` | `COURSES` | consume 1 |
 | `archiveCourse` | `convex/features/courses.ts` | `COURSES` | release 1 (track `-1`) |
+| `syncAllFeatures` (auto-archive on downgrade) | `convex/usage/helpers.ts` | `COURSES` | release N (track `-N`, one per archived course) |
 | `addCardsFromCollection` | `convex/features/decks.ts` | `SENTENCES` | batch size |
 | `addSingleTextFromCollection` | `convex/features/decks.ts` | `SENTENCES` | 1 |
 
@@ -346,6 +347,12 @@ When Autumn reports a plan as past due, `syncAllFeatures` stamps `pastDueSince` 
 **Admin routes are excluded** from the dialog: /app/admin nests under the same layout, and an admin whose own account goes past due would otherwise lose access to the dashboard. `requireAdmin` still guards the underlying data.
 
 **Course auto-archive is deferred while past due.** The auto-archive in `syncAllFeatures` is deliberately suppressed during the past-due window; it runs in the follow-on sync after a cancel, once the plan really has shrunk to Free. That is the archival the cancel confirmation warns about.
+
+### Course usage counter: release on auto-archive, release-only reconcile
+
+`courses` is a continuous-use feature in Autumn (`consumable: false`, no reset interval), so its `usage` counter only ever moves through `/track` events and must equal the number of active courses. Every path that archives a course therefore tracks a release: the manual `archiveCourse`, and since 2026-09-02 the auto-archive in `syncAllFeatures` as well (it used to skip the release, which left a ghost per archived course; a lapsed subscriber who came back then hit `USAGE_LIMIT` on unarchive with free slots on the plan).
+
+Accounts that drifted before the fix are repaired by `reconcileCourseUsage` (`convex/usage/tracking.ts`), which `syncAllFeatures` schedules with a 10-second settle delay whenever a sync sees the counter above the active count, at most once a day per user (`lastCourseReconcileAt` on `usageQuotas`). The action re-reads Autumn fresh and tracks the negative difference. It is **release-only by design**: a counter below the active count (a manual grant, a hand-lowered counter, an in-flight consume) is never raised, so the self-heal can only ever give slots back, never take them away. It also skips unlimited features and past-due customers.
 
 E2E coverage: `e2e/payment-overdue.spec.ts` forces the synced past-due state via the `E2E_TEST_HOOKS`-gated helpers in `convex/usage/testing.ts`.
 

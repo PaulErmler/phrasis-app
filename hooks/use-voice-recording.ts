@@ -65,6 +65,22 @@ export function useVoiceRecording(
     api.features.chat.transcribe.transcribeAudio,
   );
 
+  const stopRecording = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state !== 'recording') return;
+    // Both flags flip in one commit, and BEFORE stop(). The upload starts in
+    // `onstop`, which runs on a later task, so setting `isTranscribing` there
+    // leaves a render with neither flag set: the button falls back to its
+    // idle mic icon between the stop click and the upload, and a click in
+    // that window starts a fresh recording on top of the one still being
+    // transcribed. Every consumer disables the button while `isTranscribing`,
+    // so claiming it here closes the gap. `onstop` releases it again when
+    // there turns out to be no audio to send.
+    setIsRecording(false);
+    setIsTranscribing(true);
+    recorder.stop();
+  }, []);
+
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -100,47 +116,47 @@ export function useVoiceRecording(
         stream.getTracks().forEach((track) => track.stop());
         const actualMimeType = mediaRecorder.mimeType || chosenMime;
 
-        if (audioChunksRef.current.length > 0) {
-          setIsTranscribing(true);
-          try {
-            const audioBlob = new Blob(audioChunksRef.current, {
-              type: actualMimeType,
-            });
-            const arrayBuffer = await audioBlob.arrayBuffer();
+        if (audioChunksRef.current.length === 0) {
+          // Nothing was captured, so there is nothing to send. Release the
+          // state the stop claimed, or the button spins forever.
+          setIsTranscribing(false);
+          return;
+        }
 
-            const transcript = await transcribeAudio({
-              audio: arrayBuffer as ArrayBuffer,
-              mimeType: actualMimeType,
-              ...(language ? { language } : {}),
-            });
+        setIsTranscribing(true);
+        try {
+          const audioBlob = new Blob(audioChunksRef.current, {
+            type: actualMimeType,
+          });
+          const arrayBuffer = await audioBlob.arrayBuffer();
 
-            onTranscript(transcript);
-            if (!quiet) toast.success(tVoice('transcribed'));
-          } catch (error) {
-            if (isPaymentPastDueError(error)) {
-              // Silent: the reactive payment-overdue dialog is the
-              // canonical surface for this state.
-            } else if (convexErrorCode(error) === 'USAGE_LIMIT') {
-              onUsageLimit?.();
-            } else {
-              reportError(error, { op: 'transcribeAudio' });
-              toast.error(tErrors('failedToTranscribe'));
-            }
-          } finally {
-            setIsTranscribing(false);
+          const transcript = await transcribeAudio({
+            audio: arrayBuffer as ArrayBuffer,
+            mimeType: actualMimeType,
+            ...(language ? { language } : {}),
+          });
+
+          onTranscript(transcript);
+          if (!quiet) toast.success(tVoice('transcribed'));
+        } catch (error) {
+          if (isPaymentPastDueError(error)) {
+            // Silent: the reactive payment-overdue dialog is the
+            // canonical surface for this state.
+          } else if (convexErrorCode(error) === 'USAGE_LIMIT') {
+            onUsageLimit?.();
+          } else {
+            reportError(error, { op: 'transcribeAudio' });
+            toast.error(tErrors('failedToTranscribe'));
           }
+        } finally {
+          setIsTranscribing(false);
         }
       };
 
       mediaRecorder.start();
       setIsRecording(true);
       if (maxDurationMs) {
-        maxDurationTimerRef.current = setTimeout(() => {
-          if (mediaRecorderRef.current?.state === 'recording') {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-          }
-        }, maxDurationMs);
+        maxDurationTimerRef.current = setTimeout(stopRecording, maxDurationMs);
       }
     } catch (error) {
       // Deliberately not reportError: this is overwhelmingly the user
@@ -156,16 +172,10 @@ export function useVoiceRecording(
     language,
     maxDurationMs,
     quiet,
+    stopRecording,
     tErrors,
     tVoice,
   ]);
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  }, [isRecording]);
 
   const handleVoiceClick = useCallback(() => {
     if (isRecording) {
