@@ -48,6 +48,7 @@ function reviewingState(courseSettings: Settings): LearningState {
     fsrsState: null,
     radioPlayCount: 0,
     goodReviewCount: 0,
+    dailyReviewsToday: 0,
     getReviewInitiatedByThisTab: () => false,
     handleNext: vi.fn(),
     resetReviewFlag: vi.fn(),
@@ -90,22 +91,37 @@ describe('useLearningAudio: free-play faces', () => {
     const state = reviewingState(freePlay('audio'));
     renderHook(() => useLearningAudio(state));
     act(() => {
-      (player.lastProps?.onScheduleComplete as () => void)();
+      (player.lastProps?.onScheduleComplete as () => boolean)();
     });
     expect(
       state.status === 'reviewing' && state.handleNext,
     ).toHaveBeenCalledTimes(1);
   });
 
+  it('lets the audio run ahead of the server in the listening face', () => {
+    // The player hands the element the prefetched next blob only when this
+    // returns true. Radio never rates, so no celebration can interfere.
+    const state = reviewingState(freePlay('audio'));
+    renderHook(() => useLearningAudio(state));
+    let ahead: boolean | undefined;
+    act(() => {
+      ahead = (player.lastProps?.onScheduleComplete as () => boolean)();
+    });
+    expect(ahead).toBe(true);
+  });
+
   it('never auto-advances in the writing face', () => {
     const state = reviewingState(freePlay('full'));
     renderHook(() => useLearningAudio(state));
     act(() => {
-      (player.lastProps?.onScheduleComplete as () => void)();
+      (player.lastProps?.onScheduleComplete as () => boolean)();
     });
     expect(
       state.status === 'reviewing' && state.handleNext,
     ).not.toHaveBeenCalled();
+    expect((player.lastProps?.onScheduleComplete as () => boolean)()).toBe(
+      false,
+    );
     // Writing also strips the trailing pause-before-advance from the blob.
     expect((player.lastProps?.settings as Settings).autoAdvance).toBe(false);
   });
@@ -269,7 +285,7 @@ describe('useLearningAudio: the Radio settings split', () => {
     const { result } = renderHook(() => useLearningAudio(state));
     expect(result.current.userAutoPlay).toBe(true);
     act(() => {
-      (player.lastProps?.onScheduleComplete as () => void)();
+      (player.lastProps?.onScheduleComplete as () => boolean)();
     });
     expect(
       state.status === 'reviewing' && state.handleNext,
