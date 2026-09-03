@@ -6,6 +6,7 @@ import { CardShell } from './CardShell';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
 import { AnnotationLines } from './AnnotationLines';
+import { useLocalPlaySignals } from './useLocalPlaySignals';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import { useCardPlayback, displayReviewCount } from './useCardPlayback';
 import type { CardPresentation } from './cardPresentation';
@@ -71,6 +72,8 @@ export function LearningCardContent({
   } = presentation;
   const { buttonPlayback, activeClip, clockBinding } =
     useCardPlayback(mergedPlayback);
+  // Tapping a row's IPA line plays that row's clip.
+  const ipaPlay = useLocalPlaySignals();
 
   const [manuallyRevealed, setManuallyRevealed] = useState<Set<string>>(
     new Set(),
@@ -242,6 +245,11 @@ export function LearningCardContent({
                           ? 'blur-sm select-none cursor-pointer'
                           : 'transition-[filter] duration-300'
                       }
+                      onIpaClick={
+                        isBlurred
+                          ? undefined
+                          : () => ipaPlay.bump(translation.language)
+                      }
                     />
                   </div>
                   <div className="flex items-center">
@@ -252,7 +260,10 @@ export function LearningCardContent({
                       onTimeUpdate={buttonPlayback.onTimeUpdate}
                       onStop={buttonPlayback.onStop}
                       speed={effectiveSpeed}
-                      playSignal={index === 0 ? replayTargetSignal : undefined}
+                      playSignal={ipaPlay.signalFor(
+                        translation.language,
+                        index === 0 ? replayTargetSignal : undefined,
+                      )}
                     />
                     {onSpeedCycle && (
                       <CardSpeedBadge
