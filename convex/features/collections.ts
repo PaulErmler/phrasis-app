@@ -26,6 +26,7 @@ import {
   getCourseLanguages,
 } from '../lib/cardContent';
 import {
+  enqueueVersionBumpRegen,
   scheduleMissingContent,
   scheduleTranslationForLanguage,
   scheduleAudioForLanguage,
@@ -461,13 +462,12 @@ export async function scheduleMissingTranslationsForText(
         q.eq('textId', text._id).eq('targetLanguage', lang),
       )
       .first();
-    let preferredRegionVariant: string | undefined;
     if (existing) {
       // Version-stale rows regenerate here too, so browsing a collection
-      // already upgrades its translations to the current version, otherwise
-      // the card-add sweep (scheduleMissingContent) deletes exactly what the
-      // preview just showed. Shares that sweep's provenance gate so the two
-      // can't disagree about what is regenerable.
+      // already upgrades its translations to the current version, and the
+      // card-add sweep (scheduleMissingContent) finds nothing left to do.
+      // Shares that sweep's provenance gate so the two can't disagree about
+      // what is regenerable.
       const isStale =
         mayRegenerateTranslation(text, existing) &&
         isTranslationVersionStale(lang, existing.translationVersion);
@@ -493,34 +493,34 @@ export async function scheduleMissingTranslationsForText(
         }
         continue;
       }
-      // Mirror the sweep's deferrals: never delete under an active TTS claim
-      // (races the pending audio write) or a fresh LLM claim (the in-flight
-      // retranslation overwrites the row anyway).
+      // Mirror the sweep's deferrals: never regenerate under an active TTS
+      // claim (the in-flight audio would race the replacement) or a fresh
+      // LLM claim (the in-flight retranslation overwrites the row anyway).
       if (await hasActiveTtsClaim(ctx, text._id, lang)) continue;
       const llmClaim = await getLlmClaim(ctx, text._id, lang);
       if (llmClaim && isClaimFresh(llmClaim)) {
         continue;
       }
-      // Keep mixed-dialect rows on their pinned dialect across regeneration.
-      preferredRegionVariant = existing.regionVariant;
-      await ctx.db.delete(existing._id);
-      // The old audio was synthesized from the deleted wording. Drop it so
-      // the new translation can't pair with mismatched audio (reference-aware,
-      // like the card sweep's delete).
-      const staleAudio = await ctx.db
-        .query('audioRecordings')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', text._id).eq('language', lang),
-        )
-        .first();
-      if (staleAudio) {
-        await deleteAudioRow(ctx, staleAudio);
+      // Version-stale: regenerate IN PLACE. The row and its audio keep
+      // serving until the new wording lands, and the write choke point
+      // archives the old wording for any cards that reference the text.
+      // Same helper as the card sweep, so the two paths cannot drift.
+      if (
+        await enqueueVersionBumpRegen(ctx, text, existing, {
+          audioSpeakerGender,
+          requestedByUserId: opts?.requestedByUserId,
+          skipTts: true,
+          priority: 'background',
+          llmPriority: opts?.llmPriority,
+        })
+      ) {
+        scheduled++;
       }
+      continue;
     }
     if (
       await scheduleTranslationForLanguage(ctx, text, lang, {
         audioSpeakerGender,
-        preferredRegionVariant,
         requestedByUserId: opts?.requestedByUserId,
         skipTts: true,
         // Warm work. If the landing translation still triggers TTS (a card

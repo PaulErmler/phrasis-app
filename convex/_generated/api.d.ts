@@ -49,6 +49,7 @@ import type * as db_stats_reviewDepthAccuracy from "../db/stats/reviewDepthAccur
 import type * as db_stats_weeklyStats from "../db/stats/weeklyStats.js";
 import type * as db_stats_wordTracking from "../db/stats/wordTracking.js";
 import type * as db_stats_yearlyStats from "../db/stats/yearlyStats.js";
+import type * as db_translationReads from "../db/translationReads.js";
 import type * as db_translationSeed from "../db/translationSeed.js";
 import type * as db_userProfiles from "../db/userProfiles.js";
 import type * as db_users from "../db/users.js";
@@ -220,6 +221,7 @@ declare const fullApi: ApiFromModules<{
   "db/stats/weeklyStats": typeof db_stats_weeklyStats;
   "db/stats/wordTracking": typeof db_stats_wordTracking;
   "db/stats/yearlyStats": typeof db_stats_yearlyStats;
+  "db/translationReads": typeof db_translationReads;
   "db/translationSeed": typeof db_translationSeed;
   "db/userProfiles": typeof db_userProfiles;
   "db/users": typeof db_users;

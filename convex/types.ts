@@ -402,6 +402,10 @@ export const cardEditKindValidator = v.union(
   v.literal('manual_edit'), // the Edit Card dialog (features/scheduling:editCard)
   v.literal('chat_also_correct'), // chat replace (chat/cardApprovals)
   v.literal('flag'), // the Flag button (features/scheduling:flagTranslation)
+  // The Flag button on a card pinned to a superseded curriculum wording: the
+  // card was moved to the latest wording instead of retranslating
+  // (features/scheduling:flagTranslation, see `translationArchive`).
+  v.literal('accept_latest'),
 );
 export type CardEditKind = Infer<typeof cardEditKindValidator>;
 
@@ -472,13 +476,18 @@ export const translationReasonValidator = v.union(
   v.literal('fill'), // fill or regenerate a missing/stale language
   v.literal('flag'), // the user flagged the translation as wrong
   v.literal('curriculum_fix'), // the user retyped a curriculum translation
+  // The language's `translationVersion` was bumped above the row's stamp: a
+  // keep-row regeneration whose write archives the old wording for existing
+  // cards (see `translationArchive` in schema.ts). Carries no previous
+  // translation: the point is a fresh rendering, not a reconsideration.
+  v.literal('version_bump'),
 );
 export type TranslationReason = Infer<typeof translationReasonValidator>;
 
 /**
  * The two reasons that mean "a user is telling us this translation is wrong".
  * Both carry the user's own wording and want the previous translation in the
- * prompt; 'fill' wants neither.
+ * prompt; 'fill' and 'version_bump' want neither.
  */
 export function isRetranslationReason(
   reason: TranslationReason | undefined,

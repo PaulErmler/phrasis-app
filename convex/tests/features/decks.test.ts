@@ -1582,11 +1582,10 @@ describe('features/decks', () => {
   });
 
   describe('scheduleMissingContent: translation version regen', () => {
-    // No language sets `translationVersion` today, so a row stamped at 0 (strictly
-    // below the default current version 1) is the only way to exercise the stale
-    // branch. `speakerGender` matches `audioSpeakerGender` so ONLY the version
-    // check fires (no gender drift), and the audio matches provider+gender+version
-    // so it is deleted purely as the cascade of the stale translation.
+    // A row stamped at 0 is strictly below every language's current version,
+    // so the stale branch fires. `speakerGender` matches `audioSpeakerGender`
+    // so ONLY the version check fires (no gender drift), and the audio matches
+    // provider+gender+version so the audio validity sweep leaves it alone.
     async function seedStaleTranslation(
       t: TestConvex<typeof schema>,
       userCreated: boolean,
@@ -1653,13 +1652,26 @@ describe('features/decks', () => {
       });
     }
 
-    it('deletes a premade stale translation + its audio and schedules regeneration', async () => {
+    it('regenerates a premade stale translation IN PLACE: row and audio keep serving, replacement job scheduled', async () => {
       const t = convexTest(schema, modules);
-      const { textId } = await seedStaleTranslation(t, false);
+      const { textId, trId, audioId } = await seedStaleTranslation(t, false);
       const { result, tr, audio } = await runSweep(t, textId);
-      expect(tr).toBeNull(); // version-stale translation deleted
-      expect(audio).toBeNull(); // its audio cascade-deleted
-      expect(result.translationsScheduled).toBeGreaterThan(0); // regen scheduled
+      // Nothing is deleted up front: the old wording (and its audio) serves
+      // until the version-bump replacement lands, and the write choke point
+      // then archives it for existing cards (see translationArchive.test.ts).
+      expect(tr?._id).toBe(trId);
+      expect(tr?.translatedText).toBe('Hola');
+      expect(audio?._id).toBe(audioId);
+      expect(result.translationsScheduled).toBe(1); // in-place regen counted
+      const claim = await t.run((ctx) =>
+        ctx.db
+          .query('llmTranslationClaims')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', textId).eq('targetLanguage', 'es'),
+          )
+          .first(),
+      );
+      expect(claim).not.toBeNull();
     });
 
     it('keeps a user-created stale translation (the !userCreated guard) and its audio', async () => {

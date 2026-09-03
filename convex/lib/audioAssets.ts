@@ -202,17 +202,36 @@ export async function upsertAudioPointer(
   if (existing.assetId === assetId) return;
   const previousAssetId = existing.assetId;
   await ctx.db.patch(existing._id, { assetId });
-  const stillPointed = await ctx.db
-    .query('audioRecordings')
-    .withIndex('by_assetId', (q) => q.eq('assetId', previousAssetId))
-    .first();
-  if (!stillPointed) {
+  if (!(await isAudioAssetReferenced(ctx, previousAssetId))) {
     const previousAsset = await ctx.db.get(previousAssetId);
     if (previousAsset) {
       await ctx.db.delete(previousAsset._id);
       await scheduleBlobSwapDelete(ctx, previousAsset.storageId);
     }
   }
+}
+
+/**
+ * Whether anything still serves this asset: a live `audioRecordings` pointer,
+ * or a `translationArchive` row whose pinned cards play the superseded
+ * wording. Both garbage-collection sites (`deleteAudioRow` and the re-point
+ * above) ask this, so an archived revision can never lose its audio to a
+ * different text dropping its pointer to the same content-addressed asset.
+ */
+export async function isAudioAssetReferenced(
+  ctx: QueryCtx | MutationCtx,
+  assetId: Id<'audioAssets'>,
+): Promise<boolean> {
+  const pointer = await ctx.db
+    .query('audioRecordings')
+    .withIndex('by_assetId', (q) => q.eq('assetId', assetId))
+    .first();
+  if (pointer) return true;
+  const archived = await ctx.db
+    .query('translationArchive')
+    .withIndex('by_audioAssetId', (q) => q.eq('audioAssetId', assetId))
+    .first();
+  return archived !== null;
 }
 
 /**

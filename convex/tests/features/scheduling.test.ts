@@ -3234,7 +3234,7 @@ describe('features/scheduling', () => {
           cardId,
         },
       );
-      expect(res).toEqual({ retranslated: true });
+      expect(res).toEqual({ retranslated: true, updatedToLatest: false });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(1);
@@ -3288,7 +3288,7 @@ describe('features/scheduling', () => {
           cardId,
         },
       );
-      expect(res).toEqual({ retranslated: false });
+      expect(res).toEqual({ retranslated: false, updatedToLatest: false });
 
       expect(llmEnqueues()).toHaveLength(0);
 
@@ -3383,7 +3383,7 @@ describe('features/scheduling', () => {
           cardId,
         },
       );
-      expect(res).toEqual({ retranslated: true });
+      expect(res).toEqual({ retranslated: true, updatedToLatest: false });
 
       // Both translation rows got their flagCount bumped.
       const translations = await t.run(async (ctx) =>
@@ -3430,7 +3430,7 @@ describe('features/scheduling', () => {
           cardId,
         },
       );
-      expect(res).toEqual({ retranslated: true });
+      expect(res).toEqual({ retranslated: true, updatedToLatest: false });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(2);
@@ -3464,7 +3464,7 @@ describe('features/scheduling', () => {
           cardId,
         },
       );
-      expect(res).toEqual({ retranslated: false });
+      expect(res).toEqual({ retranslated: false, updatedToLatest: false });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(3);
@@ -3501,7 +3501,7 @@ describe('features/scheduling', () => {
           cardId,
         },
       );
-      expect(res).toEqual({ retranslated: false });
+      expect(res).toEqual({ retranslated: false, updatedToLatest: false });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(1);

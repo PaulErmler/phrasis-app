@@ -1,3 +1,4 @@
+import { cardPinAt, servedTranslatedText } from '../translationReads';
 import { MutationCtx } from '../../_generated/server';
 import { Doc } from '../../_generated/dataModel';
 import { ConvexError } from 'convex/values';
@@ -287,14 +288,14 @@ export async function recordReviewStats(
       }
       for (const lang of untrackedLanguages) {
         if (lang === text.language) continue;
-        const translation = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('targetLanguage', lang),
-          )
-          .first();
-        if (translation) {
-          langTexts.push({ language: lang, text: translation.translatedText });
+        // Count the words the learner actually reviewed: the served revision.
+        const translated = await servedTranslatedText(ctx, {
+          textId: card.textId,
+          targetLanguage: lang,
+          pinAt: cardPinAt(card),
+        });
+        if (translated !== null) {
+          langTexts.push({ language: lang, text: translated });
         }
       }
       if (langTexts.length > 0) {

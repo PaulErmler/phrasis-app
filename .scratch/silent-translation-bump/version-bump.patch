@@ -1,0 +1,568 @@
+--- a/lib/languages.ts
++++ b/lib/languages.ts
+@@ -427,7 +427,7 @@
+     supportsStt: true,
+     translationPromptNotes:
+       'vosotros for the informal plural, peninsular vocabulary.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'es_latam',
+@@ -455,7 +455,7 @@
+     supportsStt: true,
+     translationPromptNotes:
+       'ustedes for the plural, regionally neutral Latin American vocabulary.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'es_mixed',
+@@ -486,7 +486,7 @@
+     ipaVoice: 'es-419',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'fr',
+@@ -503,7 +503,7 @@
+     ipaVoice: 'fr',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'de',
+@@ -520,7 +520,7 @@
+     ipaVoice: 'de',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'it',
+@@ -537,7 +537,7 @@
+     ipaVoice: 'it',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'pt',
+@@ -556,7 +556,7 @@
+     ipaVoice: 'pt-br',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'pt_pt',
+@@ -581,7 +581,7 @@
+     ttsVersion: 2,
+     translationPromptNotes:
+       'European Portuguese vocabulary, spelling, and phonetics.',
+-    translationVersion: 2,
++    translationVersion: 3,
+     needsRomanization: false,
+     ipaVoice: 'pt-pt',
+     supportsKaraoke: true,
+@@ -602,7 +602,7 @@
+     ipaVoice: 'ro',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'ca',
+@@ -617,6 +617,8 @@
+     flag: '🇦🇩',
+     category: 'romance',
+     llmSupportTier: 'tier1',
++    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
++    translationVersion: 2,
+     ttsProvider: 'gemini',
+     needsRomanization: false,
+     ipaVoice: 'ca',
+@@ -640,7 +642,7 @@
+     // Cyrillic. Karaoke off (non-Latin script policy).
+     supportsKaraoke: false,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'pl',
+@@ -657,7 +659,7 @@
+     ipaVoice: 'pl',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'sk',
+@@ -674,7 +676,7 @@
+     ipaVoice: 'sk',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'cs',
+@@ -692,7 +694,7 @@
+     ipaVoice: 'cs',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'hr',
+@@ -705,6 +707,8 @@
+     flag: '🇭🇷',
+     category: 'slavic',
+     llmSupportTier: 'tier2',
++    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
++    translationVersion: 2,
+     ttsProvider: 'gemini',
+     needsRomanization: false,
+     ipaVoice: 'hr',
+@@ -722,6 +726,8 @@
+     flag: '🇸🇮',
+     category: 'slavic',
+     llmSupportTier: 'tier2',
++    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
++    translationVersion: 2,
+     ttsProvider: 'gemini',
+     needsRomanization: false,
+     ipaVoice: 'sl',
+@@ -740,6 +746,8 @@
+     flag: '🇺🇦',
+     category: 'slavic',
+     llmSupportTier: 'tier1',
++    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
++    translationVersion: 2,
+     ttsProvider: 'gemini',
+     needsRomanization: true,
+     ipaVoice: 'uk',
+@@ -776,7 +784,7 @@
+       'Use Cyrillic (ћирилица) exclusively; never the Latin alphabet.',
+     // v2: prompt pins Cyrillic. Regenerate pre-existing (possibly
+     // Latin-script) translations.
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'bg',
+@@ -792,6 +800,8 @@
+     flag: '🇧🇬',
+     category: 'slavic',
+     llmSupportTier: 'tier2',
++    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
++    translationVersion: 2,
+     ttsProvider: 'gemini',
+     needsRomanization: true,
+     ipaVoice: 'bg',
+@@ -812,6 +822,8 @@
+     flag: '🇱🇹',
+     category: 'baltic',
+     llmSupportTier: 'tier2',
++    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
++    translationVersion: 2,
+     ttsProvider: 'gemini',
+     needsRomanization: false,
+     ipaVoice: 'lt',
+@@ -828,6 +840,8 @@
+     flag: '🇱🇻',
+     category: 'baltic',
+     llmSupportTier: 'tier2',
++    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
++    translationVersion: 2,
+     ttsProvider: 'gemini',
+     needsRomanization: false,
+     ipaVoice: 'lv',
+@@ -847,6 +861,8 @@
+     // neighbours in the picker. Learners look for it next to lt/lv.
+     category: 'baltic',
+     llmSupportTier: 'tier2',
++    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
++    translationVersion: 2,
+     ttsProvider: 'gemini',
+     needsRomanization: false,
+     ipaVoice: 'et',
+@@ -868,7 +884,7 @@
+     ipaVoice: 'nl',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'sv',
+@@ -886,7 +902,7 @@
+     ipaVoice: 'sv',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     // Re-enabled Jul 2026 on Gemini TTS (the pre-staged entry was Google-era).
+@@ -901,6 +917,8 @@
+     flag: '🇳🇴',
+     category: 'germanic',
+     llmSupportTier: 'tier1',
++    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
++    translationVersion: 2,
+     ttsProvider: 'gemini',
+     needsRomanization: false,
+     ipaVoice: 'nb',
+@@ -923,7 +941,7 @@
+     ipaVoice: 'da',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'is',
+@@ -949,7 +967,7 @@
+     // Icelandic rows (archaic register, wrong imperatives), so Icelandic,
+     // and only Icelandic. Lazily regenerates its existing translations
+     // through the new rule.
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'fi',
+@@ -970,7 +988,7 @@
+     supportsStt: true,
+     translationPromptNotes:
+       'The formal/informal distinction is minimal; focus on naturalness.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'el',
+@@ -994,7 +1012,7 @@
+     // Disambiguates from Ancient/Koine Greek in the translation prompt
+     // (same rationale as Hebrew's 'Modern Hebrew').
+     translationName: 'Modern Greek',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'hi',
+@@ -1015,7 +1033,7 @@
+     supportsKaraoke: false,
+     supportsStt: true,
+     translationPromptNotes: 'Informal → तुम form; formal → आप form.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'bn',
+@@ -1040,7 +1058,7 @@
+     // Bengali script. Karaoke off (non-Latin script policy).
+     supportsKaraoke: false,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'ta',
+@@ -1054,6 +1072,8 @@
+     flag: '🇮🇳',
+     category: 'south-asian',
+     llmSupportTier: 'tier2',
++    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
++    translationVersion: 2,
+     ttsProvider: 'gemini',
+     needsRomanization: true,
+     ipaVoice: 'ta',
+@@ -1073,6 +1093,8 @@
+     flag: '🇮🇳',
+     category: 'south-asian',
+     llmSupportTier: 'tier2',
++    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
++    translationVersion: 2,
+     ttsProvider: 'gemini',
+     // Telugu script. Google v3 romanizeText 400s on `te` ("Source language
+     // is unsupported") despite still listing it in the docs table; ISO 15919
+@@ -1098,7 +1120,7 @@
+     ipaVoice: 'tr',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'hu',
+@@ -1117,7 +1139,7 @@
+     ipaVoice: 'hu',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'zh',
+@@ -1143,7 +1165,7 @@
+     supportsStt: true,
+     translationPromptNotes:
+       'Simplified Chinese characters, Mainland Mandarin vocabulary.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'zh_traditional',
+@@ -1178,7 +1200,7 @@
+     translationName: 'Taiwanese Mandarin (Traditional characters)',
+     // v3: prompt pins Taiwanese Mandarin. Regenerate translations made under
+     // the bare "Chinese (Traditional)" label.
+-    translationVersion: 3,
++    translationVersion: 4,
+   },
+   {
+     code: 'yue',
+@@ -1215,7 +1237,7 @@
+       'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
+     // v3: prompt pins the spoken-vernacular register. Regenerate
+     // translations made under the bare "Cantonese" label.
+-    translationVersion: 3,
++    translationVersion: 4,
+   },
+   {
+     code: 'yue_traditional',
+@@ -1251,7 +1273,7 @@
+       'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
+     // v3: prompt pins the spoken-vernacular register. Regenerate
+     // translations made under the bare "Cantonese" label.
+-    translationVersion: 3,
++    translationVersion: 4,
+   },
+   {
+     code: 'ja',
+@@ -1280,7 +1302,7 @@
+     supportsStt: true,
+     translationPromptNotes:
+       'Match the source formality: informal → plain form (だ／する), formal → polite form (です／ます).',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'ko',
+@@ -1302,7 +1324,7 @@
+     supportsStt: true,
+     translationPromptNotes:
+       'Informal → 반말; formal → 해요체 or 합쇼체 as appropriate.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'vi',
+@@ -1330,7 +1352,7 @@
+     translationName: 'Northern Vietnamese',
+     translationPromptNotes:
+       'Northern (Hanoi) Vietnamese vocabulary and particles.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'vi_south',
+@@ -1352,6 +1374,8 @@
+     flag: '🇻🇳',
+     category: 'asian-southeast',
+     llmSupportTier: 'tier1',
++    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
++    translationVersion: 2,
+     ttsProvider: 'gemini',
+     ttsPromptName: 'Southern Vietnamese',
+     needsRomanization: false,
+@@ -1389,7 +1413,7 @@
+     translationName: 'Standard Thai',
+     translationPromptNotes:
+       'Polite particles (ครับ/ค่ะ) only when the source register is formal.',
+-    translationVersion: 3,
++    translationVersion: 4,
+   },
+   {
+     code: 'id',
+@@ -1406,7 +1430,7 @@
+     ipaVoice: 'id',
+     supportsKaraoke: true,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'ms',
+@@ -1419,6 +1443,8 @@
+     flag: '🇲🇾',
+     category: 'asian-southeast',
+     llmSupportTier: 'tier1',
++    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
++    translationVersion: 2,
+     ttsProvider: 'gemini',
+     needsRomanization: false,
+     ipaVoice: 'ms',
+@@ -1450,7 +1476,7 @@
+     // Models index far more data under "Tagalog" than "Filipino", same
+     // collapse the legacy path does via `googleTranslateCode: 'tl'`.
+     translationName: 'Filipino (Tagalog)',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'ar',
+@@ -1482,7 +1508,7 @@
+     translationName: 'Modern Standard Arabic',
+     translationPromptNotes:
+       'MSA grammar; when the source does not specify gender, pick a grammatically valid form without letting that choice influence any gender metadata.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'ar_sa',
+@@ -1512,7 +1538,7 @@
+     translationName: 'Saudi Arabic',
+     translationPromptNotes:
+       'MSA-leaning but with Hejazi/Najdi colloquial markers where natural.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'ar_eg',
+@@ -1543,7 +1569,7 @@
+     // so the model produces actual dialect, not MSA with a region hint.
+     translationName: 'Egyptian Arabic',
+     translationPromptNotes: 'Colloquial Cairene Arabic, not MSA.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'ar_iq',
+@@ -1572,7 +1598,7 @@
+     // so the model produces actual dialect, not MSA with a region hint.
+     translationName: 'Iraqi Arabic',
+     translationPromptNotes: 'Colloquial Iraqi Arabic, not MSA.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'ar_lev',
+@@ -1604,7 +1630,7 @@
+     // so the model produces actual dialect, not MSA with a region hint.
+     translationName: 'Levantine Arabic',
+     translationPromptNotes: 'Colloquial register, not MSA.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'he',
+@@ -1630,7 +1656,7 @@
+     // Disambiguates from Biblical Hebrew in the translation prompt.
+     translationName: 'Modern Hebrew',
+     translationPromptNotes: 'Match speaker gender to the verb form.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'fa',
+@@ -1659,7 +1685,7 @@
+     // Non-Latin script. Karaoke highlighting off (matches Arabic/Hebrew).
+     supportsKaraoke: false,
+     supportsStt: true,
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'sw',
+@@ -1681,7 +1707,7 @@
+     supportsStt: true,
+     translationPromptNotes:
+       'Standard Kiswahili as spoken in Kenya, Sheng-free.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+   {
+     code: 'sw_tz',
+@@ -1712,7 +1738,7 @@
+     // no per-word timings, no karaoke.
+     supportsStt: false,
+     translationPromptNotes: 'Standard Kiswahili sanifu, Tanzanian vocabulary.',
+-    translationVersion: 2,
++    translationVersion: 3,
+   },
+ ];
+ 
+--- a/convex/tests/lib/languages.test.ts
++++ b/convex/tests/lib/languages.test.ts
+@@ -7,6 +7,7 @@
+   getTranslationConfigForLanguage,
+   postProcessTranslation,
+   resolveTranslationStages,
++  SUPPORTED_LANGUAGES,
+ } from '../../../lib/languages';
+ 
+ describe('lib/languages: postProcessTranslation', () => {
+@@ -126,20 +127,39 @@
+     );
+   });
+ 
+-  it('bumps translationVersion for languages whose prompt pins script or register', () => {
+-    // Serbian: prompt now pins Cyrillic output.
+-    expect(getCurrentTranslationVersion('sr')).toBe(2);
+-    // Taiwanese Mandarin / Cantonese: prompt now pins vocabulary + register.
+-    expect(getCurrentTranslationVersion('zh_traditional')).toBe(3);
+-    expect(getCurrentTranslationVersion('yue')).toBe(3);
+-    expect(getCurrentTranslationVersion('yue_traditional')).toBe(3);
+-    expect(getCurrentTranslationVersion('th')).toBe(3);
+-    // Icelandic: bumped with the Aug 2026 Luna best-of-3 switch. The only
+-    // language whose existing rows regenerate under the new rule (native
+-    // speaker flagged systematic register/imperative errors).
+-    expect(getCurrentTranslationVersion('is')).toBe(2);
++  it('every translated language was bumped with the Sep 2026 Sol switch (+1 on the prior stamp)', () => {
++    // Prior stamps: most languages 2, the four script/register-pinned ones 3.
++    // Serbian: prompt pins Cyrillic output.
++    expect(getCurrentTranslationVersion('sr')).toBe(3);
++    // Taiwanese Mandarin / Cantonese / Thai: prompt pins vocabulary + register.
++    expect(getCurrentTranslationVersion('zh_traditional')).toBe(4);
++    expect(getCurrentTranslationVersion('yue')).toBe(4);
++    expect(getCurrentTranslationVersion('yue_traditional')).toBe(4);
++    expect(getCurrentTranslationVersion('th')).toBe(4);
++    // Icelandic: bumped with the Aug 2026 Luna switch, then again with Sol.
++    expect(getCurrentTranslationVersion('is')).toBe(3);
++    expect(getCurrentTranslationVersion('de')).toBe(3);
++    // Languages that had never been stamped got their first bump (1 → 2), so
++    // their existing rows regenerate like everyone else's.
++    expect(getCurrentTranslationVersion('bg')).toBe(2);
++    expect(getCurrentTranslationVersion('vi_south')).toBe(2);
++    // Source-only English variants carry no translation version.
++    expect(getCurrentTranslationVersion('en')).toBe(1);
+   });
+ 
++  it('every non-English language carries a translationVersion above the v1 baseline', () => {
++    // Guards the bump against the miss it almost had: an entry with no stamp
++    // resolves to the baseline, so its rows (stamped 1) never look stale and
++    // the language silently sits out the regeneration.
++    for (const lang of SUPPORTED_LANGUAGES) {
++      if (lang.code.startsWith('en')) continue;
++      expect(
++        getCurrentTranslationVersion(lang.code),
++        `code=${lang.code}`,
++      ).toBeGreaterThanOrEqual(2);
++    }
++  });
++
+   it('populates targetRegion correctly for region-specific variants', () => {
+     expect(getTranslationConfigForLanguage('es').targetRegion).toBe('Spain');
+     expect(getTranslationConfigForLanguage('es_latam').targetRegion).toBe(

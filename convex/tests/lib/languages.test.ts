@@ -127,18 +127,37 @@ describe('lib/languages: getTranslationConfigForLanguage', () => {
     );
   });
 
-  it('bumps translationVersion for languages whose prompt pins script or register', () => {
-    // Serbian: prompt now pins Cyrillic output.
-    expect(getCurrentTranslationVersion('sr')).toBe(2);
-    // Taiwanese Mandarin / Cantonese: prompt now pins vocabulary + register.
-    expect(getCurrentTranslationVersion('zh_traditional')).toBe(3);
-    expect(getCurrentTranslationVersion('yue')).toBe(3);
-    expect(getCurrentTranslationVersion('yue_traditional')).toBe(3);
-    expect(getCurrentTranslationVersion('th')).toBe(3);
-    // Icelandic: bumped with the Aug 2026 Luna best-of-3 switch. The only
-    // language whose existing rows regenerate under the new rule (native
-    // speaker flagged systematic register/imperative errors).
-    expect(getCurrentTranslationVersion('is')).toBe(2);
+  it('every translated language was bumped with the Sep 2026 Sol switch (+1 on the prior stamp)', () => {
+    // Prior stamps: most languages 2, the four script/register-pinned ones 3.
+    // Serbian: prompt pins Cyrillic output.
+    expect(getCurrentTranslationVersion('sr')).toBe(3);
+    // Taiwanese Mandarin / Cantonese / Thai: prompt pins vocabulary + register.
+    expect(getCurrentTranslationVersion('zh_traditional')).toBe(4);
+    expect(getCurrentTranslationVersion('yue')).toBe(4);
+    expect(getCurrentTranslationVersion('yue_traditional')).toBe(4);
+    expect(getCurrentTranslationVersion('th')).toBe(4);
+    // Icelandic: bumped with the Aug 2026 Luna switch, then again with Sol.
+    expect(getCurrentTranslationVersion('is')).toBe(3);
+    expect(getCurrentTranslationVersion('de')).toBe(3);
+    // Languages that had never been stamped got their first bump (1 → 2), so
+    // their existing rows regenerate like everyone else's.
+    expect(getCurrentTranslationVersion('bg')).toBe(2);
+    expect(getCurrentTranslationVersion('vi_south')).toBe(2);
+    // Source-only English variants carry no translation version.
+    expect(getCurrentTranslationVersion('en')).toBe(1);
+  });
+
+  it('every non-English language carries a translationVersion above the v1 baseline', () => {
+    // Guards the bump against the miss it almost had: an entry with no stamp
+    // resolves to the baseline, so its rows (stamped 1) never look stale and
+    // the language silently sits out the regeneration.
+    for (const lang of SUPPORTED_LANGUAGES) {
+      if (lang.code.startsWith('en')) continue;
+      expect(
+        getCurrentTranslationVersion(lang.code),
+        `code=${lang.code}`,
+      ).toBeGreaterThanOrEqual(2);
+    }
   });
 
   it('populates targetRegion correctly for region-specific variants', () => {
@@ -190,16 +209,19 @@ describe('lib/languages: getTranslationConfigForLanguage', () => {
 });
 
 describe('lib/languages: resolveTranslationStages', () => {
-  it('returns the default luna_bo3 chain (Luna best-of-3 + Gemini fallback) for an unruled language', () => {
+  it('returns the default sol_minimal chain (Sol floor → Sol standard → Luna best-of-3 → Gemini) for an unruled language', () => {
     const stages = resolveTranslationStages('nl', 50);
-    expect(stages.length).toBe(2);
-    expect(stages[0].model).toBe('openai/gpt-5.6-luna:nitro');
-    expect(stages[0].reasoning).toBe('none');
-    expect(stages[0].samples).toEqual({ total: 3, extraTemperature: 1 });
-    // The fallback is Gemini 3.7 Flash Nitro (minimal), before the Google
-    // safety net.
-    expect(stages[1].model).toBe('google/gemini-3.7-flash:nitro');
-    expect(stages[1].reasoning).toBe('minimal');
+    expect(stages.length).toBe(4);
+    expect(stages[0].model).toBe('openai/gpt-5.6-sol:floor');
+    expect(stages[0].reasoning).toBe('minimal');
+    expect(stages[0].samples).toBeUndefined();
+    expect(stages[1].model).toBe('openai/gpt-5.6-sol');
+    expect(stages[2].model).toBe('openai/gpt-5.6-luna:nitro');
+    expect(stages[2].samples).toEqual({ total: 3, extraTemperature: 1 });
+    // The last LLM fallback is Gemini 3.7 Flash Nitro (minimal), before the
+    // Google safety net.
+    expect(stages[3].model).toBe('google/gemini-3.7-flash:nitro');
+    expect(stages[3].reasoning).toBe('minimal');
   });
 
   it('is length-agnostic (length-hybrid branching was retired)', () => {
@@ -208,13 +230,15 @@ describe('lib/languages: resolveTranslationStages', () => {
     );
   });
 
-  it('de and fr use the luna_bo3 default (Luna best-of-3 + Gemini fallback)', () => {
+  it('de and fr use the sol_minimal default (Sol floor → Sol standard → Luna best-of-3 → Gemini)', () => {
     for (const code of ['de', 'fr']) {
       const stages = resolveTranslationStages(code, 50);
-      expect(stages.length).toBe(2);
-      expect(stages[0].model).toBe('openai/gpt-5.6-luna:nitro');
-      expect(stages[0].judge?.model).toBe('openai/gpt-5.6-luna:nitro');
-      expect(stages[1]).toEqual({
+      expect(stages.length).toBe(4);
+      expect(stages[0].model).toBe('openai/gpt-5.6-sol:floor');
+      expect(stages[0].provider).toEqual({ max_price: { completion: 22.1 } });
+      expect(stages[2].model).toBe('openai/gpt-5.6-luna:nitro');
+      expect(stages[2].judge?.model).toBe('openai/gpt-5.6-luna:nitro');
+      expect(stages[3]).toEqual({
         model: 'google/gemini-3.7-flash:nitro',
         reasoning: 'minimal',
         maxOutputTokens: 4_000,

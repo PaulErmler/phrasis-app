@@ -1,3 +1,4 @@
+import { cardPinAt } from '../db/translationReads';
 import { QueryCtx } from '../_generated/server';
 import { Id } from '../_generated/dataModel';
 import { getAuthUserId, getUserSettings } from '../db/users';
@@ -86,6 +87,7 @@ export async function getDeckCardsHandler(
         sourceIpa: text.ipaText ?? undefined,
         sourceFurigana: text.furiganaText ?? undefined,
         userCreated: text.userCreated,
+        pinAt: cardPinAt(card),
       };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);

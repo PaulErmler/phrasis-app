@@ -1,0 +1,24 @@
+
+=== Results (20 cases x de,ja,zh,ru,is,sw,ar,ar_eg,ar_lev) ===
+
+condition     | mean  | vs luna-bo3 (W/T/L) | fails | real cost | cost/sentence | speechAct ends '?' | contrast stays '.'
+----------------------------------------------------------------------------------------------------------------------
+luna-bo3      |  9.13 |          (baseline) |     0 |   $0.0539 |       $0.0003 |               100% |               100%
+sol-minimal   |  9.47 |           25/145/10 |     0 |   $0.1525 |       $0.0008 |               100% |               100%
+sol-bo3-luna  |  9.40 |           25/145/10 |     0 |   $0.2306 |       $0.0013 |               100% |               100%
+sol-bo3-sol   |  9.48 |           26/143/11 |     0 |   $0.2573 |       $0.0014 |               100% |               100%
+
+Per-kind mean scores (the complaint is the first three kinds; the last two are controls):
+  luna-bo3      speechAct=9.78  generality=9.54  idiomFunction=7.33  register=9.00  contrast=9.72
+  sol-minimal   speechAct=9.96  generality=9.72  idiomFunction=8.22  register=9.28  contrast=9.89
+  sol-bo3-luna  speechAct=9.91  generality=9.78  idiomFunction=7.89  register=9.28  contrast=9.89
+  sol-bo3-sol   speechAct=9.87  generality=9.78  idiomFunction=8.36  register=9.28  contrast=9.89
+
+Per-language mean scores:
+  luna-bo3      de=9.80  ja=9.15  zh=9.05  ru=9.65  is=9.20  sw=8.10  ar=9.30  ar_eg=8.80  ar_lev=9.15
+  sol-minimal   de=9.80  ja=9.50  zh=9.60  ru=9.85  is=9.65  sw=9.45  ar=9.20  ar_eg=8.95  ar_lev=9.20
+  sol-bo3-luna  de=9.85  ja=9.35  zh=9.80  ru=9.95  is=9.30  sw=9.10  ar=9.25  ar_eg=9.40  ar_lev=8.60
+  sol-bo3-sol   de=9.85  ja=9.70  zh=9.60  ru=9.90  is=9.65  sw=9.10  ar=9.20  ar_eg=9.40  ar_lev=8.95
+
+Judge cost: $0.5739   Spent this run (incl. cache misses only): $0.2830
+Token totals per condition (in/out incl. reasoning + bo3 judges): luna-bo3=211044/5672  sol-minimal=63793/2206  sol-bo3-luna=204539/7440  sol-bo3-sol=197603/7429

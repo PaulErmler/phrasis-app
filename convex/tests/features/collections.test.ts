@@ -609,7 +609,7 @@ describe('features/collections', () => {
       expect(ttsClaims).toEqual([]);
     });
 
-    it('regenerates version-stale translations while browsing (marked missing, then deleted + rescheduled)', async () => {
+    it('regenerates version-stale translations while browsing (marked missing, regenerated in place)', async () => {
       const t = convexTest(schema, modules);
       const { collId } = await seedCourseWithTexts(t, 1);
       // An en curriculum text whose es translation is stamped below the
@@ -674,8 +674,11 @@ describe('features/collections', () => {
       const userRow = browsed.page.find((r) => r._id === userTextId)!;
       expect(userRow.missingTranslationLanguages).not.toContain('es');
 
-      // The preview mutation deletes the stale row + its paired audio and
-      // reschedules the translation.
+      // The preview mutation regenerates the stale row IN PLACE: the old
+      // wording and its paired audio keep serving until the version-bump
+      // replacement lands (and the write choke point archives them for any
+      // cards that show them, see translationArchive.test.ts).
+      vi.mocked(llmPool.enqueueAction).mockClear();
       const res = await asUser.mutation(
         api.features.collections.requestPreviewTranslations,
         { collectionId: collId, textIds: [enTextId, userTextId] },
@@ -685,15 +688,33 @@ describe('features/collections', () => {
         translations: await ctx.db.query('translations').collect(),
         audio: await ctx.db.query('audioRecordings').collect(),
       }));
-      expect(translations.filter((tr) => tr.textId === enTextId)).toEqual([]);
-      expect(audio.filter((a) => a.textId === enTextId)).toEqual([]);
+      expect(
+        translations.find((tr) => tr.textId === enTextId)?.translatedText,
+      ).toBe('Hola viejo');
+      expect(audio.filter((a) => a.textId === enTextId).length).toBe(1);
+      const regen = vi.mocked(llmPool.enqueueAction).mock.calls.map(
+        (c) =>
+          c[2] as {
+            textId: Id<'texts'>;
+            replaceExisting?: boolean;
+            translationReason?: string;
+            skipTts?: boolean;
+          },
+      );
+      expect(regen.length).toBe(1);
+      expect(regen[0]).toMatchObject({
+        textId: enTextId,
+        replaceExisting: true,
+        translationReason: 'version_bump',
+        skipTts: true,
+      });
       // The user-provided sibling survived untouched.
       expect(
         translations.find((tr) => tr.textId === userTextId)?.translatedText,
       ).toBe('Hola de nuevo');
 
-      // Re-requesting while the regen claim is in flight is a no-op. The
-      // row is gone but the LLM claim gates a duplicate enqueue.
+      // Re-requesting while the regen claim is in flight is a no-op: the
+      // LLM claim gates a duplicate enqueue.
       const again = await asUser.mutation(
         api.features.collections.requestPreviewTranslations,
         { collectionId: collId, textIds: [enTextId] },

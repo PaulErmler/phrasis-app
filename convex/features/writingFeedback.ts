@@ -1,3 +1,4 @@
+import { cardPinAt, servedTranslatedText } from '../db/translationReads';
 import { ConvexError, v, type Infer } from 'convex/values';
 import { action, internalMutation, internalQuery } from '../_generated/server';
 import { internal } from '../_generated/api';
@@ -173,13 +174,13 @@ export const getGradingContext = internalQuery({
     if (text.language === language) {
       expected = text.text;
     } else {
-      const row = await ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', card.textId).eq('targetLanguage', language),
-        )
-        .first();
-      expected = row?.translatedText ?? null;
+      // The wording the card shows (a pinned card may be on a superseded
+      // revision), which is what the learner was asked to write.
+      expected = await servedTranslatedText(ctx, {
+        textId: card.textId,
+        targetLanguage: language,
+        pinAt: cardPinAt(card),
+      });
     }
     if (expected === null) return null;
 

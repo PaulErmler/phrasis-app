@@ -126,7 +126,13 @@ export function useCardActions(options: UseCardActionsOptions): CardActions {
     (cardId: Id<'cards'>) => {
       flagTranslationMutation({ cardId })
         .then((result) => {
-          if (result && result.retranslated === false) {
+          // A pinned card that was moved to the latest curriculum wording
+          // is not "flagged": its content updates reactively instead.
+          if (
+            result &&
+            result.retranslated === false &&
+            !result.updatedToLatest
+          ) {
             setFlaggedCardIds((prev) => {
               if (prev.has(cardId)) return prev;
               const next = new Set(prev);

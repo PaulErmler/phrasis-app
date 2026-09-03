@@ -21,12 +21,14 @@ const KIND_FILTERS: Array<{ value: CardEditKind | 'all'; label: string }> = [
   { value: 'manual_edit', label: 'Manual edit' },
   { value: 'chat_also_correct', label: 'Chat replace' },
   { value: 'flag', label: 'Flag' },
+  { value: 'accept_latest', label: 'Accepted latest' },
 ];
 
 const KIND_LABELS: Record<CardEditKind, string> = {
   manual_edit: 'manual edit',
   chat_also_correct: 'chat replace',
   flag: 'flag',
+  accept_latest: 'accepted latest wording',
 };
 
 // Green = the retranslation landed. Amber = still in flight or deliberately

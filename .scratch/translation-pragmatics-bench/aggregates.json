@@ -1,0 +1,351 @@
+{
+  "args": {
+    "langs": [
+      "de",
+      "ja",
+      "zh",
+      "ru",
+      "is",
+      "sw",
+      "ar",
+      "ar_eg",
+      "ar_lev"
+    ],
+    "limit": 20,
+    "budget": 1.5,
+    "concurrency": 4,
+    "conditions": [
+      "luna-bo3",
+      "sol-minimal",
+      "sol-bo3-luna",
+      "sol-bo3-sol"
+    ],
+    "smoke": false,
+    "judgeOnly": false,
+    "exportBlind": false
+  },
+  "aggs": {
+    "luna-bo3": {
+      "n": 180,
+      "fails": 0,
+      "scoreSum": 1644,
+      "scored": 180,
+      "wins": 0,
+      "ties": 0,
+      "losses": 0,
+      "inputTokens": 211044,
+      "outputTokens": 5672,
+      "realCostUsd": 0.053916720000000085,
+      "perLang": {
+        "de": {
+          "scoreSum": 196,
+          "scored": 20
+        },
+        "ja": {
+          "scoreSum": 183,
+          "scored": 20
+        },
+        "zh": {
+          "scoreSum": 181,
+          "scored": 20
+        },
+        "ru": {
+          "scoreSum": 193,
+          "scored": 20
+        },
+        "is": {
+          "scoreSum": 184,
+          "scored": 20
+        },
+        "sw": {
+          "scoreSum": 162,
+          "scored": 20
+        },
+        "ar": {
+          "scoreSum": 186,
+          "scored": 20
+        },
+        "ar_eg": {
+          "scoreSum": 176,
+          "scored": 20
+        },
+        "ar_lev": {
+          "scoreSum": 183,
+          "scored": 20
+        }
+      },
+      "perKind": {
+        "speechAct": {
+          "scoreSum": 528,
+          "scored": 54
+        },
+        "generality": {
+          "scoreSum": 515,
+          "scored": 54
+        },
+        "idiomFunction": {
+          "scoreSum": 264,
+          "scored": 36
+        },
+        "register": {
+          "scoreSum": 162,
+          "scored": 18
+        },
+        "contrast": {
+          "scoreSum": 175,
+          "scored": 18
+        }
+      },
+      "speechActQuestion": {
+        "yes": 54,
+        "n": 54
+      },
+      "contrastStatement": {
+        "yes": 18,
+        "n": 18
+      }
+    },
+    "sol-minimal": {
+      "n": 180,
+      "fails": 0,
+      "scoreSum": 1704,
+      "scored": 180,
+      "wins": 25,
+      "ties": 145,
+      "losses": 10,
+      "inputTokens": 63793,
+      "outputTokens": 2206,
+      "realCostUsd": 0.15247100000000002,
+      "perLang": {
+        "de": {
+          "scoreSum": 196,
+          "scored": 20
+        },
+        "ja": {
+          "scoreSum": 190,
+          "scored": 20
+        },
+        "zh": {
+          "scoreSum": 192,
+          "scored": 20
+        },
+        "ru": {
+          "scoreSum": 197,
+          "scored": 20
+        },
+        "is": {
+          "scoreSum": 193,
+          "scored": 20
+        },
+        "sw": {
+          "scoreSum": 189,
+          "scored": 20
+        },
+        "ar": {
+          "scoreSum": 184,
+          "scored": 20
+        },
+        "ar_eg": {
+          "scoreSum": 179,
+          "scored": 20
+        },
+        "ar_lev": {
+          "scoreSum": 184,
+          "scored": 20
+        }
+      },
+      "perKind": {
+        "speechAct": {
+          "scoreSum": 538,
+          "scored": 54
+        },
+        "generality": {
+          "scoreSum": 525,
+          "scored": 54
+        },
+        "idiomFunction": {
+          "scoreSum": 296,
+          "scored": 36
+        },
+        "register": {
+          "scoreSum": 167,
+          "scored": 18
+        },
+        "contrast": {
+          "scoreSum": 178,
+          "scored": 18
+        }
+      },
+      "speechActQuestion": {
+        "yes": 54,
+        "n": 54
+      },
+      "contrastStatement": {
+        "yes": 18,
+        "n": 18
+      }
+    },
+    "sol-bo3-luna": {
+      "n": 180,
+      "fails": 0,
+      "scoreSum": 1692,
+      "scored": 180,
+      "wins": 25,
+      "ties": 145,
+      "losses": 10,
+      "inputTokens": 204539,
+      "outputTokens": 7440,
+      "realCostUsd": 0.23060939999999958,
+      "perLang": {
+        "de": {
+          "scoreSum": 197,
+          "scored": 20
+        },
+        "ja": {
+          "scoreSum": 187,
+          "scored": 20
+        },
+        "zh": {
+          "scoreSum": 196,
+          "scored": 20
+        },
+        "ru": {
+          "scoreSum": 199,
+          "scored": 20
+        },
+        "is": {
+          "scoreSum": 186,
+          "scored": 20
+        },
+        "sw": {
+          "scoreSum": 182,
+          "scored": 20
+        },
+        "ar": {
+          "scoreSum": 185,
+          "scored": 20
+        },
+        "ar_eg": {
+          "scoreSum": 188,
+          "scored": 20
+        },
+        "ar_lev": {
+          "scoreSum": 172,
+          "scored": 20
+        }
+      },
+      "perKind": {
+        "speechAct": {
+          "scoreSum": 535,
+          "scored": 54
+        },
+        "generality": {
+          "scoreSum": 528,
+          "scored": 54
+        },
+        "idiomFunction": {
+          "scoreSum": 284,
+          "scored": 36
+        },
+        "register": {
+          "scoreSum": 167,
+          "scored": 18
+        },
+        "contrast": {
+          "scoreSum": 178,
+          "scored": 18
+        }
+      },
+      "speechActQuestion": {
+        "yes": 54,
+        "n": 54
+      },
+      "contrastStatement": {
+        "yes": 18,
+        "n": 18
+      }
+    },
+    "sol-bo3-sol": {
+      "n": 180,
+      "fails": 0,
+      "scoreSum": 1707,
+      "scored": 180,
+      "wins": 26,
+      "ties": 143,
+      "losses": 11,
+      "inputTokens": 197603,
+      "outputTokens": 7429,
+      "realCostUsd": 0.257271,
+      "perLang": {
+        "de": {
+          "scoreSum": 197,
+          "scored": 20
+        },
+        "ja": {
+          "scoreSum": 194,
+          "scored": 20
+        },
+        "zh": {
+          "scoreSum": 192,
+          "scored": 20
+        },
+        "ru": {
+          "scoreSum": 198,
+          "scored": 20
+        },
+        "is": {
+          "scoreSum": 193,
+          "scored": 20
+        },
+        "sw": {
+          "scoreSum": 182,
+          "scored": 20
+        },
+        "ar": {
+          "scoreSum": 184,
+          "scored": 20
+        },
+        "ar_eg": {
+          "scoreSum": 188,
+          "scored": 20
+        },
+        "ar_lev": {
+          "scoreSum": 179,
+          "scored": 20
+        }
+      },
+      "perKind": {
+        "speechAct": {
+          "scoreSum": 533,
+          "scored": 54
+        },
+        "generality": {
+          "scoreSum": 528,
+          "scored": 54
+        },
+        "idiomFunction": {
+          "scoreSum": 301,
+          "scored": 36
+        },
+        "register": {
+          "scoreSum": 167,
+          "scored": 18
+        },
+        "contrast": {
+          "scoreSum": 178,
+          "scored": 18
+        }
+      },
+      "speechActQuestion": {
+        "yes": 54,
+        "n": 54
+      },
+      "contrastStatement": {
+        "yes": 18,
+        "n": 18
+      }
+    }
+  },
+  "judgeCost": 0.573928,
+  "spentUsd": 0.28301699999999996
+}

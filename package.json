@@ -34,6 +34,7 @@
     "landing:audio": "tsx --env-file=.env.local scripts/generate-landing-audio.mts",
     "eval:feedback": "tsx --env-file=.env.local scripts/eval-writing-feedback.ts",
     "eval:autofill": "tsx --env-file=.env.local scripts/eval-translation-autofill.ts",
+    "eval:pragmatics": "tsx --env-file=.env.local scripts/eval-translation-pragmatics.ts",
     "store:assets": "tsx scripts/store-screenshots.ts",
     "store:squares": "tsx scripts/store-squares.ts",
     "cap:local": "node scripts/cap-sync.mjs local",
