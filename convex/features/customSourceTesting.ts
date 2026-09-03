@@ -180,8 +180,8 @@ export const cleanupSeededTexts = internalMutation({
 
     let cardsDeleted = 0;
     let textsDeleted = 0;
-    const removedPerCollection = new Map<string, number>();
-    const touchedCollections = new Set<string>();
+    const removedPerCollection = new Map<Id<'collections'>, number>();
+    const touchedCollections = new Set<Id<'collections'>>();
 
     for (const textId of args.textIds) {
       const text = await ctx.db.get(textId);
@@ -195,7 +195,7 @@ export const cleanupSeededTexts = internalMutation({
         for (const card of cards) {
           await ctx.db.delete(card._id);
           cardsDeleted++;
-          const key = card.collectionId?.toString();
+          const key = card.collectionId;
           if (key) {
             removedPerCollection.set(
               key,
@@ -208,7 +208,7 @@ export const cleanupSeededTexts = internalMutation({
       await ctx.db.delete(textId);
       textsDeleted++;
       if (text.collectionId) {
-        touchedCollections.add(text.collectionId.toString());
+        touchedCollections.add(text.collectionId);
         const coll = await ctx.db.get(text.collectionId);
         if (coll) {
           await ctx.db.patch(coll._id, {
@@ -218,11 +218,10 @@ export const cleanupSeededTexts = internalMutation({
       }
     }
 
-    for (const key of new Set([
+    for (const collectionId of new Set([
       ...removedPerCollection.keys(),
       ...touchedCollections,
     ])) {
-      const collectionId = key as Id<'collections'>;
       const progress = await getCollectionProgress(
         ctx,
         userId,
@@ -232,7 +231,7 @@ export const cleanupSeededTexts = internalMutation({
       if (!progress) continue;
 
       const patch: { cardsAdded?: number; lastRankProcessed?: number } = {};
-      const removed = removedPerCollection.get(key) ?? 0;
+      const removed = removedPerCollection.get(collectionId) ?? 0;
       if (removed > 0) {
         patch.cardsAdded = Math.max(0, (progress.cardsAdded ?? 0) - removed);
       }

@@ -9,7 +9,6 @@ import { useIsNativeApp } from '@/hooks/use-native-app';
 import {
   findCurrentPaidPlan,
   normalizePlans,
-  type AutumnCustomerLike,
 } from '@/lib/autumn/customer-shape';
 import {
   clearCheckoutMarker,
@@ -81,7 +80,7 @@ function fireOnce(
 export function OpenAIPixelConversions() {
   const status = useConsentStatus();
   const isNative = useIsNativeApp();
-  const user = useQuery(api.auth.getAuthUser) as AuthUserLike;
+  const user = useQuery(api.auth.getAuthUser);
   // Same arguments as FreePlanUpgradeBadge so autumn-js serves both from one
   // fetch instead of two.
   const { customer } = useCustomer({
@@ -104,9 +103,7 @@ export function OpenAIPixelConversions() {
     if (!armed || !customer) return;
     const checkoutPlanId = readCheckoutMarker();
     if (checkoutPlanId === null) return;
-    const paid = findCurrentPaidPlan(
-      normalizePlans(customer as AutumnCustomerLike),
-    );
+    const paid = findCurrentPaidPlan(normalizePlans(customer));
     // Autumn may not have processed the Stripe webhook yet on the very first
     // load back; keep the marker and try again on the next customer refresh.
     // A paid plan OTHER than the one checked out is the same case from a

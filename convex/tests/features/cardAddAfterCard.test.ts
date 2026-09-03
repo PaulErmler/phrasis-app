@@ -69,7 +69,7 @@ async function seedCourseWithTexts(
         }),
       );
     }
-    return { collId, deckId, textIds };
+    return { collId, courseId, deckId, textIds };
   });
 }
 
@@ -165,6 +165,80 @@ describe('addCardsFromCollection: batch added behind the card on screen', () => 
     const dues = await dueDatesOfOtherCards(t, deckId, shownCard);
     for (const due of dues) {
       expect(due).toBeLessThan(shownDue);
+    }
+  });
+
+  it('custom cards that top up a drained premade half queue behind the shown card too', async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    // The level collection's only text is the shown card itself, so the
+    // premade half has nothing left to add.
+    const { collId, courseId, deckId, textIds } = await seedCourseWithTexts(
+      t,
+      1,
+    );
+    const customColl = await t.run(async (ctx) => {
+      const customColl = await ctx.db.insert('collections', {
+        name: 'custom-abc',
+        origin: 'custom',
+        textCount: 5,
+      });
+      await ctx.db.insert('courseSettings', {
+        courseId,
+        initialReviewCount: 3,
+        activeCollectionId: collId,
+        activeCustomCollectionIds: [customColl],
+      });
+      for (let i = 1; i <= 5; i++) {
+        await ctx.db.insert('texts', {
+          text: `Custom ${i}`,
+          language: 'es',
+          userCreated: true,
+          // The custom scan is scoped by owner (`forUserId`).
+          userId: USER,
+          collectionId: customColl,
+          collectionRank: i,
+        });
+      }
+      return customColl;
+    });
+    const shownDue = Date.now() - 30_000;
+    const shownCard = await seedRecentlyDueCard(
+      t,
+      deckId,
+      textIds[0],
+      collId,
+      shownDue,
+    );
+    const asUser = t.withIdentity({ subject: USER });
+
+    // Every coin lands on premade, which comes up empty, so the whole batch
+    // arrives through the custom top-up pass (Phase 3), the path that used
+    // to drop the floor.
+    const coin = vi.spyOn(Math, 'random').mockReturnValue(0.9);
+    try {
+      const res = await asUser.mutation(
+        api.features.decks.addCardsFromCollection,
+        { collectionId: collId, batchSize: 3, afterCardId: shownCard },
+      );
+      expect(res.cardsAdded).toBe(3);
+    } finally {
+      coin.mockRestore();
+    }
+
+    const added = await t.run(async (ctx) =>
+      (
+        await ctx.db
+          .query('cards')
+          .withIndex('by_deckId', (q) => q.eq('deckId', deckId))
+          .collect()
+      ).filter((c) => c._id !== shownCard),
+    );
+    expect(added).toHaveLength(3);
+    for (const card of added) {
+      expect(card.collectionId).toBe(customColl);
+      expect(card.dueDate).toBeGreaterThan(shownDue);
+      expect(card.dueDate).toBeLessThanOrEqual(Date.now());
     }
   });
 

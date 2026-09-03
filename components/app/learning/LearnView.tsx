@@ -201,7 +201,7 @@ function WrappedChatPanel({
               type="button"
               variant="ghost"
               size="icon"
-              className="col-start-3 size-9"
+              className="col-start-3 h-9 w-9"
               onClick={onNewChat}
               aria-label={t('sidebar.newChat')}
               title={t('sidebar.newChat')}

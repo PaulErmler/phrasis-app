@@ -842,7 +842,7 @@ function NoCardsDueWithFilter({
 
   return (
     <NoCardsDueState
-      onAddCards={handleAddCards}
+      onAddCards={() => handleAddCards()}
       isAddingCards={isAddingCards}
       batchSize={batchSize}
       sentencesRemaining={sentencesRemaining}

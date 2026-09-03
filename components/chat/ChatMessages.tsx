@@ -186,7 +186,7 @@ function FailedReplyNotice({
     <div
       role="alert"
       data-testid="chat-reply-failed"
-      className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-xs text-muted-foreground"
+      className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-xs text-muted-foreground"
     >
       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive/70" />
       <span>{label}</span>

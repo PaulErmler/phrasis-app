@@ -348,6 +348,38 @@ describe('storeTranslationAndScheduleTTS with translationReason version_bump', (
     expect(asset).not.toBeNull();
   });
 
+  it('different wording, referencing card, but no audio yet: plain replacement, card reads live and reports audio missing', async () => {
+    // A warmed row (preview / warmup, skipTts) replaced before its first TTS.
+    // Archiving it would pin the card to a wording nothing ever voices, and
+    // archived entries never report gaps, so the card would stay mute.
+    const t = convexTest(schema, modules);
+    const { textId, translationId, pinAt } = await seed(t);
+    await t.run(async (ctx) => {
+      for (const row of await ctx.db
+        .query('audioRecordings')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', textId).eq('language', 'de'),
+        )
+        .collect()) {
+        await deleteAudioRow(ctx, row);
+      }
+    });
+
+    await bump(t, textId, NEW_DE);
+
+    const row = await liveRow(t, textId);
+    expect(row._id).toBe(translationId);
+    expect(row.translatedText).toBe(NEW_DE);
+    expect(row.lastArchivedAt).toBeUndefined();
+    expect(await archiveRows(t, textId)).toEqual([]);
+
+    const pinned = await hydrate(t, textId, pinAt);
+    expect(pinned.text).toBe(NEW_DE);
+    expect(pinned.audioUrl).toBeNull();
+    // The self-heal must be able to fill the new wording's audio.
+    expect(pinned.hasMissingContent).toBe(true);
+  });
+
   it('different wording with no referencing card: plain replacement, no archive row', async () => {
     const t = convexTest(schema, modules);
     const { textId } = await seed(t, { withCard: false });
@@ -399,6 +431,29 @@ describe('served revision resolution (convex/db/translationReads.ts)', () => {
     expect(unpinned.hasMissingContent).toBe(true);
   });
 
+  it('an archive row without audio is never served (pre-rule rows fall through to live)', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, translationId, pinAt } = await seed(t);
+    await t.run(async (ctx) => {
+      const supersededAt = Date.now();
+      await ctx.db.insert('translationArchive', {
+        textId,
+        targetLanguage: 'de',
+        translatedText: OLD_DE,
+        translationVersion: 1,
+        supersededAt,
+      });
+      await ctx.db.patch(translationId, {
+        translatedText: NEW_DE,
+        lastArchivedAt: supersededAt,
+      });
+    });
+
+    const pinned = await hydrate(t, textId, pinAt);
+    expect(pinned.text).toBe(NEW_DE);
+    expect(pinned.retranslating).toBe(false);
+  });
+
   it('a card pinned after the bump is served the live wording', async () => {
     const t = convexTest(schema, modules);
     const { textId } = await seed(t);
@@ -413,6 +468,21 @@ describe('served revision resolution (convex/db/translationReads.ts)', () => {
     const { textId, pinAt } = await seed(t);
     await bump(t, textId, NEW_DE);
     const between = (await liveRow(t, textId)).lastArchivedAt! + 1;
+    // The middle wording gets its audio (the bump above skipped TTS), so the
+    // second bump has something to archive; an unvoiced wording is replaced
+    // in place instead, see the "no audio yet" case above.
+    await t.run(async (ctx) => {
+      await insertAudioFixture(ctx, {
+        textId,
+        language: 'de',
+        voiceName: DE_VOICE,
+        storageId: await ctx.storage.store(new Blob([new Uint8Array([7])])),
+        ttsQuality: 'validated',
+        ttsProvider: getTtsProviderForLanguage('de'),
+        voiceGender: 'female',
+        spokenText: NEW_DE,
+      });
+    });
     // Guarantee the second archive's supersededAt is strictly later.
     await new Promise((resolve) => setTimeout(resolve, 5));
     await bump(t, textId, 'Ist alles gut?');

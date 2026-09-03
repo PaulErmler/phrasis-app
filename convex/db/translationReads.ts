@@ -119,7 +119,11 @@ export async function resolveServedFromLive(
     )
     .order('asc')
     .first();
-  if (!archived) {
+  // No row, or a row without audio (never written by the current pipeline,
+  // which only archives spoken wordings; guards rows from before that rule):
+  // serve live. A pinned entry reports no content gaps, so an audio-less
+  // archive row would leave the card mute for good.
+  if (!archived || archived.audioAssetId === undefined) {
     return {
       live,
       row: live,

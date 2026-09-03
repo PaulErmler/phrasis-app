@@ -10,7 +10,7 @@ import { upsertDailyStats } from './dailyStats';
 import { upsertWeeklyStats, getISOWeekString } from './weeklyStats';
 import { upsertMonthlyStats, getMonthString } from './monthlyStats';
 import { upsertYearlyStats, getYearString } from './yearlyStats';
-import type { StatsReviewMode } from '../../types';
+import { emptyByMode, type StatsReviewMode } from '../../types';
 
 const MAX_TIME_PER_PLAY_MS = 180_000; // 3 minutes — same cap as reviews
 
@@ -72,17 +72,11 @@ export async function recordFreePlayStats(
 
   // --- Course-level counters ---
   const prevModeReviews: Record<StatsReviewMode, number> = {
-    audio: 0,
-    full: 0,
-    radio: 0,
-    freeStudy: 0,
+    ...emptyByMode(),
     ...(stats.totalReviewsByMode ?? {}),
   };
   const prevModeTime: Record<StatsReviewMode, number> = {
-    audio: 0,
-    full: 0,
-    radio: 0,
-    freeStudy: 0,
+    ...emptyByMode(),
     ...(stats.totalTimeMsByMode ?? {}),
   };
   await ctx.db.patch(stats._id, {

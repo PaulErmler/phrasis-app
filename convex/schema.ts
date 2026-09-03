@@ -601,7 +601,12 @@ export default defineSchema({
 
   // Superseded revisions of curriculum translations, one row per wording a
   // version-bump regeneration replaced while at least one card referenced the
-  // text. Cards created before `supersededAt` (and not since re-pinned via
+  // text AND the wording had audio. A wording replaced before its first TTS
+  // (a warmed row) is overwritten in place instead: nobody has heard it, and
+  // an archive row without audio would pin its cards to a wording the
+  // pipeline never voices (archived entries report no content gaps), so the
+  // reader treats such a row as absent. Cards created before `supersededAt`
+  // (and not since re-pinned via
   // `cards.translationsAcceptedAt`) keep being served this wording and its
   // audio, so a bump never changes what an existing learner sees. Flag and
   // curriculum-fix retranslations do NOT archive: they are corrections that

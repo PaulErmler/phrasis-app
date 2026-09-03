@@ -189,8 +189,8 @@ function doAggregate(scoresPath: string) {
   let agreePairs = 0;
   let sumMine = 0;
   let sumJudge = 0;
-  let prodMine: number[] = [];
-  let prodJudge: number[] = [];
+  const prodMine: number[] = [];
+  const prodJudge: number[] = [];
   let missingItems = 0;
 
   for (const item of mapping) {
@@ -270,9 +270,7 @@ const argv = process.argv.slice(2);
 if (argv.includes('--export')) {
   doExport();
 } else if (argv.includes('--aggregate')) {
-  const scoresPath = argv
-    .find((a) => a.startsWith('--scores='))
-    ?.split('=')[1];
+  const scoresPath = argv.find((a) => a.startsWith('--scores='))?.split('=')[1];
   if (!scoresPath || !existsSync(scoresPath)) {
     console.error('Pass --scores=<path to scores JSON>');
     process.exit(1);

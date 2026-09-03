@@ -493,6 +493,7 @@ export const syncAllFeatures = internalMutation({
     if (newIncluded !== undefined && !stillPastDue) {
       const activeCourses = await getActiveCourses(ctx, args.userId);
       const overLimit = activeCourses.length > newIncluded;
+      let archivedThisSync = false;
       if (overLimit) {
         const settings = await getUserSettings(ctx, args.userId);
         const protectedId = settings?.activeCourseId;
@@ -519,6 +520,7 @@ export const syncAllFeatures = internalMutation({
         // construction: these courses were active when Autumn's snapshot was
         // taken, so it counted them, and nothing else releases them.
         if (toArchive.length > 0) {
+          archivedThisSync = true;
           await releaseQuota(
             ctx,
             args.userId,
@@ -541,8 +543,13 @@ export const syncAllFeatures = internalMutation({
           ? coursesEntry.used - activeCourses.length
           : 0;
       const lastReconcile = doc?.lastCourseReconcileAt ?? 0;
+      // Not in a sync that archived courses itself: their release is still
+      // in flight, and a reconcile that reads Autumn before it lands would
+      // count them as ghosts and release them twice. Tomorrow's sync sees
+      // the settled counter and repairs any real drift.
       if (
         drift > 0 &&
+        !archivedThisSync &&
         now - lastReconcile >= COURSE_RECONCILE_MIN_INTERVAL_MS
       ) {
         await ctx.db.patch(docId, { lastCourseReconcileAt: now });

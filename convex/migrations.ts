@@ -22,7 +22,7 @@ import { getFuriganaSource } from './lib/textAnnotations';
 import { buildSearchableTextPatchForCard } from './lib/cardContent';
 import type { Id } from './_generated/dataModel';
 import { isPremadeLevelCollection } from './lib/collections';
-import type { StatsReviewMode } from './types';
+import { emptyByMode, type StatsReviewMode } from './types';
 import {
   cardsByOriginStateAndDueDate,
   cardsByOriginWritingStateAndDueDate,
@@ -786,12 +786,7 @@ export const recountDeckCardCountContinue = internalMutation({
  * mid-session. `migrations/
  * recalcUserCardAggregates.ts` stays available as a per-user repair tool.
  */
-const STAT_MODES: readonly StatsReviewMode[] = [
-  'audio',
-  'full',
-  'radio',
-  'freeStudy',
-];
+const STAT_MODES = Object.keys(emptyByMode()) as StatsReviewMode[];
 
 /**
  * Sum the per-mode time buckets over a course's daily rows. Days written
@@ -803,12 +798,7 @@ const STAT_MODES: readonly StatsReviewMode[] = [
 export function sumDailyTimeMsByMode(
   rows: ReadonlyArray<Pick<Doc<'dailyStats'>, 'timeMsByMode'>>,
 ): Record<StatsReviewMode, number> {
-  const sum: Record<StatsReviewMode, number> = {
-    audio: 0,
-    full: 0,
-    radio: 0,
-    freeStudy: 0,
-  };
+  const sum = emptyByMode();
   for (const row of rows) {
     for (const mode of STAT_MODES) sum[mode] += row.timeMsByMode?.[mode] ?? 0;
   }

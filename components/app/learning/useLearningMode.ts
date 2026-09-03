@@ -173,7 +173,8 @@ interface NoCardsDueState extends BaseState {
   courseSettings: CourseSettings;
   baseLanguages: string[];
   targetLanguages: string[];
-  handleAddCards: () => void;
+  /** Add the next batch. `afterCardId` queues it behind the card on screen. */
+  handleAddCards: (options?: { afterCardId?: Id<'cards'> }) => void;
   isAddingCards: boolean;
   batchSize: number;
   sentencesRemaining: number | null;
@@ -832,8 +833,6 @@ export function useLearningMode(
         courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE;
       setIsAddingCards(true);
       try {
-        // The Add button hands its click event in here; only an explicit id
-        // counts.
         const afterCardId = options?.afterCardId;
         const args = {
           collectionId,

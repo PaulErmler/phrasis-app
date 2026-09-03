@@ -563,6 +563,11 @@ export const reviewsByModeValidator = v.object({
 // parameters so a new mode can't be added to the validator but missed there.
 export type StatsReviewMode = keyof Infer<typeof reviewsByModeValidator>;
 
+/** Every bucket at zero, the seed for read-modify-write on a per-mode counter. */
+export function emptyByMode(): Record<StatsReviewMode, number> {
+  return { audio: 0, full: 0, radio: 0, freeStudy: 0 };
+}
+
 // Which slice of a per-mode counter (reps or time) a home-card tile shows.
 // Tapping a tile cycles all -> learn -> radio -> freeStudy; each tile stores
 // its own choice on userSettings (`repsStatFilter`, `timeStatFilter`).

@@ -5,6 +5,7 @@ import { internalAction, type ActionCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { type FeatureState } from './helpers';
 import { FEATURE_IDS } from '../features/featureIds';
+import { EVENTS, track } from '../analytics';
 import {
   currentPlans,
   FREE_PLAN_ID,
@@ -273,10 +274,6 @@ export const reconcileCourseUsage = internalAction({
     const ghosts = entry.usage - activeCount;
     if (ghosts <= 0) return null;
 
-    console.warn(
-      `Releasing ${ghosts} ghost course slot(s) for ${args.userId} ` +
-        `(Autumn usage ${entry.usage}, active courses ${activeCount}).`,
-    );
     await trackAndSync(
       ctx,
       secretKey,
@@ -284,6 +281,11 @@ export const reconcileCourseUsage = internalAction({
       FEATURE_IDS.COURSES,
       -ghosts,
     );
+    await track(ctx, args.userId, EVENTS.COURSE_SLOTS_RECONCILED, {
+      released: ghosts,
+      active: activeCount,
+      autumn_usage_before: entry.usage,
+    });
     return null;
   },
 });

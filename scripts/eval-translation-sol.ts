@@ -74,10 +74,7 @@ const FLORES_PATH = resolve(
   '../data_preparation/translation_eval/data/flores_sample.csv',
 );
 
-function solStage(
-  reasoning: ReasoningEffort,
-  bo3: boolean,
-): ModelStage {
+function solStage(reasoning: ReasoningEffort, bo3: boolean): ModelStage {
   return {
     model: SOL,
     reasoning,
@@ -491,9 +488,11 @@ async function main() {
   }
 
   // ── Judging ──────────────────────────────────────────────────────────────
-  const judgeCacheKey = (lang: string, hash: string) =>
-    `judge|${lang}|${hash}`;
-  type JudgeRecord = { scores: Record<string, number>; telemetry: CallRecord['telemetry'] };
+  const judgeCacheKey = (lang: string, hash: string) => `judge|${lang}|${hash}`;
+  type JudgeRecord = {
+    scores: Record<string, number>;
+    telemetry: CallRecord['telemetry'];
+  };
   const judgeWork: { row: FloresRow; lang: string }[] = [];
   for (const lang of args.langs)
     for (const row of rows) judgeWork.push({ row, lang });
@@ -639,7 +638,9 @@ async function main() {
     });
     p(`  ${condition.padEnd(16)} ${parts.join('  ')}`);
   }
-  p(`\nJudge cost: ${fmtUsd(judgeCost)}   Total spent this+cached runs: ${fmtUsd(spentUsd)}`);
+  p(
+    `\nJudge cost: ${fmtUsd(judgeCost)}   Total spent this+cached runs: ${fmtUsd(spentUsd)}`,
+  );
   p(
     `Token totals per condition (in/out incl. reasoning + bo3 judges): ` +
       conditionNames
@@ -648,10 +649,7 @@ async function main() {
   );
 
   mkdirSync(OUT_DIR, { recursive: true });
-  writeFileSync(
-    resolve(OUT_DIR, 'report.txt'),
-    lines.join('\n') + '\n',
-  );
+  writeFileSync(resolve(OUT_DIR, 'report.txt'), lines.join('\n') + '\n');
   writeFileSync(
     resolve(OUT_DIR, 'aggregates.json'),
     JSON.stringify({ args, aggs, judgeCost, spentUsd }, null, 2),

@@ -136,7 +136,7 @@ export function LearningHeader({
             variant="ghost"
             size="icon"
             onClick={onNewChat}
-            className="ml-auto size-9 -mr-1 z-10 lg:hidden"
+            className="ml-auto h-9 w-9 -mr-1 z-10 lg:hidden"
             aria-label={tChat('newChat')}
             data-testid="learn-chat-new-mobile"
           >
@@ -229,7 +229,7 @@ export function LearningHeader({
             variant="ghost"
             size="icon"
             onClick={onSettingsOpen}
-            className="size-9 -mr-1"
+            className="h-9 w-9 -mr-1"
             data-tutorial={TUTORIAL_ANCHORS.settingsButton}
             data-testid="learn-settings"
           >

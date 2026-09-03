@@ -1150,6 +1150,7 @@ export async function addCardsFromCollectionHandler(
     deck,
     course,
     userId,
+    notBefore,
   });
   totalCardsInserted += topUp.inserted;
   if (topUp.scanIncomplete) scanIncomplete = true;

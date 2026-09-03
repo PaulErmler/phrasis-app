@@ -692,19 +692,17 @@ function defined<T extends Record<string, unknown>>(value: T): T {
  * Move the live row's current wording into `translationArchive` together
  * with the asset its audio plays, and mark the live row so card-facing
  * readers know to consult the archive for cards pinned before now. Called
- * only when at least one card references the text: an archive nobody can be
- * served is a row for nothing.
+ * only when at least one card references the text AND the wording has
+ * audio (`audioAssetId`): an archive nobody can be served is a row for
+ * nothing, and an archive without audio would pin its cards to a wording
+ * the pipeline never fills again (archived entries report no gaps), i.e. a
+ * card that is mute for good.
  */
 async function archiveTranslationRevision(
   ctx: MutationCtx,
   existing: Doc<'translations'>,
+  audioAssetId: Id<'audioAssets'>,
 ): Promise<void> {
-  const audio = await ctx.db
-    .query('audioRecordings')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', existing.textId).eq('language', existing.targetLanguage),
-    )
-    .first();
   const supersededAt = Date.now();
   await ctx.db.insert(
     'translationArchive',
@@ -722,7 +720,7 @@ async function archiveTranslationRevision(
       regionVariant: existing.regionVariant,
       speakerGender: existing.speakerGender,
       translationVersion: existing.translationVersion,
-      audioAssetId: audio?.assetId,
+      audioAssetId,
       supersededAt,
     }),
   );
@@ -737,9 +735,13 @@ async function archiveTranslationRevision(
  *  - identical wording → restamp the version (and source); annotations,
  *    audio and search strings are untouched. The common case for short
  *    curriculum sentences, and it costs no TTS.
- *  - a card references the text → archive the old wording (with its audio
- *    asset) so every existing card keeps it, then the normal replacement.
- *  - nothing references the text → the normal replacement.
+ *  - a card references the text and the wording has audio → archive the
+ *    old wording with its asset so every existing card keeps it, then the
+ *    normal replacement.
+ *  - nothing references the text, or the wording never got audio (a warmed
+ *    row replaced before its first TTS) → the normal replacement. Nobody
+ *    has heard the old wording, and pinning a card to an audio-less archive
+ *    row would leave it mute: archived entries never report missing content.
  *
  * Flag and curriculum-fix retranslations never come here: they overwrite
  * for every learner, as the schema comment on `cardEditRetranslations`
@@ -772,7 +774,15 @@ async function replaceForVersionBump(
     .withIndex('by_textId', (q) => q.eq('textId', args.textId))
     .first();
   if (referencingCard) {
-    await archiveTranslationRevision(ctx, existing);
+    const audio = await ctx.db
+      .query('audioRecordings')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('language', args.targetLanguage),
+      )
+      .first();
+    if (audio) {
+      await archiveTranslationRevision(ctx, existing, audio.assetId);
+    }
   }
   return replaceTranslationRow(
     ctx,

@@ -16,7 +16,11 @@ import { upsertDailyLanguageStats } from './dailyLanguageStats';
 import { upsertLanguageStats } from './languageStats';
 import { upsertReviewDepthAccuracy } from './reviewDepthAccuracy';
 import { trackNewWords } from './wordTracking';
-import type { StatsReviewMode, SchedulingTrack } from '../../types';
+import {
+  emptyByMode,
+  type StatsReviewMode,
+  type SchedulingTrack,
+} from '../../types';
 // Shared with the per-card running averages (cards.reviewTimeStats) so the
 // daily time series and the per-card means clamp samples identically.
 import { REVIEW_TIME_CLAMP_MAX_MS as MAX_TIME_PER_CARD_MS } from '../../lib/reviewTimeStats';
@@ -152,10 +156,7 @@ export async function recordReviewStats(
   // --- Course-level stats ---
   const prevModeReviews = stats.totalReviewsByMode ?? { audio: 0, full: 0 };
   const prevModeTime: Record<StatsReviewMode, number> = {
-    audio: 0,
-    full: 0,
-    radio: 0,
-    freeStudy: 0,
+    ...emptyByMode(),
     ...(stats.totalTimeMsByMode ?? {}),
   };
   await ctx.db.patch(stats._id, {
