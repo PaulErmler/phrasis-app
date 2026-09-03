@@ -975,8 +975,10 @@ export async function addCardsFromCollectionHandler(
   );
 
   // Premade cards are the ones that cost SENTENCES credits, so the balance is
-  // the cap. Mirrors the Phase 2 gate below: an unsynced quota doc (no doc
-  // yet) is treated as allowed, and `allowed` already covers unlimited plans.
+  // the cap: an unsynced quota doc (no doc yet) is treated as allowed, and
+  // `allowed` already covers unlimited plans. This is the only quota read;
+  // the premade pass below never asks for more than this cap, so it cannot
+  // be refused, and `consumeQuota` still guards the actual spend.
   const premadeEligible = isLevelCollection && !skipPremadeSource;
   let premadeQuotaBlocked = false;
   let premadeCap = 0;
@@ -1016,31 +1018,12 @@ export async function addCardsFromCollectionHandler(
   // --- Phase 2: the premade half, plus whatever custom couldn't fill ------
   // Still capped by the credits: the spillover buys the premade source more
   // slots, never more balance.
-  let remainingBatch = Math.min(
+  const remainingBatch = Math.min(
     premadeBudget + (customBudget - customPass.picked),
     premadeCap,
   );
   const premadeWanted = remainingBatch;
   let premadePicked = 0;
-
-  if (premadeEligible && remainingBatch > 0) {
-    // Re-checked against the amount actually being asked for; the cap above
-    // was computed for the whole batch.
-    const quota = await checkQuota(
-      ctx,
-      userId,
-      FEATURE_IDS.SENTENCES,
-      remainingBatch,
-    );
-    if (quota.synced && !quota.allowed) {
-      if (quota.balance > 0) {
-        remainingBatch = quota.balance;
-      } else {
-        remainingBatch = 0;
-        premadeQuotaBlocked = true;
-      }
-    }
-  }
 
   if (premadeEligible && remainingBatch > 0) {
     const progress = await getCollectionProgressHelper(

@@ -33,42 +33,45 @@
  * The key is read from the environment by name. Nothing here opens .env.local.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parse } from 'csv-parse/sync';
-import { generateText } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import {
-  translateTextWithLLM,
-  translateBestOfN,
-  openrouterCallOptions,
   type TranslationPromptArgs,
-  type LlmCallTelemetry,
   type ReasoningEffort,
 } from '../convex/features/translationLLM';
-import {
-  openrouterCostUsd,
-  openrouterGenerationId,
-} from '../convex/lib/posthogAi';
 import {
   LUNA_BO3,
   getTranslationConfigForLanguage,
   type ModelStage,
 } from '../lib/languages';
+import {
+  argValue,
+  Bench,
+  contextLines,
+  createOpenRouterFromEnv,
+  fmtUsd,
+  judgeCandidates,
+  pool,
+  seededShuffle,
+  type JudgeOutcome,
+  type OpenRouterClient,
+} from './eval/lib/bench';
 
 // ------------------------------------------------------------------- config
 
 const SOL = 'openai/gpt-5.6-sol';
-const JUDGE_MODEL = 'google/gemini-3.1-pro-preview';
-const JUDGE_REASONING: ReasoningEffort = 'low';
-const JUDGE_MAX_OUTPUT_TOKENS = 4_000;
 
 /** Assumed production pricing for Sol, per the task: $4/M in, $20/M out. */
 const SOL_ASSUMED_IN_PER_TOKEN = 4 / 1e6;
 const SOL_ASSUMED_OUT_PER_TOKEN = 20 / 1e6;
 
 const OUT_DIR = resolve(__dirname, '../.scratch/sol-translation-bench');
-const CACHE_PATH = resolve(OUT_DIR, 'cache.json');
+const bench = new Bench({
+  outDir: OUT_DIR,
+  budgetUsd: 1.8,
+  budgetHint: 're-run with a smaller --limit/--langs or raise --budget',
+});
 const FLORES_PATH = resolve(
   __dirname,
   '../data_preparation/translation_eval/data/flores_sample.csv',
@@ -110,12 +113,7 @@ type Args = {
 };
 
 function parseArgs(argv: string[]): Args {
-  const get = (name: string) =>
-    argv
-      .find((a) => a.startsWith(`--${name}=`))
-      ?.split('=')
-      .slice(1)
-      .join('=');
+  const get = (name: string) => argValue(argv, name);
   const smoke = argv.includes('--smoke');
   return {
     langs: (get('langs') ?? (smoke ? 'de' : 'de,ru,ja,fi'))
@@ -191,156 +189,14 @@ function promptArgsFor(row: FloresRow, lang: string): TranslationPromptArgs {
   };
 }
 
-// -------------------------------------------------------------------- cache
-
-type CallRecord = {
-  text: string | null; // null = the stage failed
-  failReason?: string;
-  telemetry: {
-    model: string;
-    inputTokens: number;
-    outputTokens: number;
-    costUsd?: number;
-    latencyMs: number;
-    role?: string;
-  }[];
-};
-
-type Cache = Record<string, CallRecord>; // `${condition}|${lang}|${src_hash}`
-
-function loadCache(): Cache {
-  if (!existsSync(CACHE_PATH)) return {};
-  return JSON.parse(readFileSync(CACHE_PATH, 'utf8')) as Cache;
-}
-
-let cache: Cache = {};
-function saveCache() {
-  mkdirSync(OUT_DIR, { recursive: true });
-  writeFileSync(CACHE_PATH, JSON.stringify(cache, null, 1));
-}
-
-// ------------------------------------------------------------- budget guard
-
-let spentUsd = 0;
-let budgetUsd = 1.8;
-function recordSpend(telemetry: { costUsd?: number }[]) {
-  for (const t of telemetry) spentUsd += t.costUsd ?? 0;
-  if (spentUsd > budgetUsd) {
-    saveCache();
-    console.error(
-      `\nBUDGET GUARD: spent $${spentUsd.toFixed(3)} > $${budgetUsd}. ` +
-        `Cache saved; re-run with a smaller --limit/--langs or raise --budget.`,
-    );
-    process.exit(2);
-  }
-}
-
-// ------------------------------------------------------------- translation
-
-function slimTelemetry(
-  list: (LlmCallTelemetry & { role?: string })[],
-): CallRecord['telemetry'] {
-  return list.map((t) => ({
-    model: t.model,
-    inputTokens: t.inputTokens,
-    outputTokens: t.outputTokens,
-    costUsd: t.costUsd,
-    latencyMs: t.latencyMs,
-    role: t.role,
-  }));
-}
-
-async function runOne(
-  condition: string,
-  stage: ModelStage,
-  row: FloresRow,
-  lang: string,
-): Promise<CallRecord> {
-  const key = `${condition}|${lang}|${row.src_hash}`;
-  if (cache[key]) return cache[key];
-  const args = promptArgsFor(row, lang);
-
-  let record: CallRecord;
-  if (stage.samples) {
-    const res = await translateBestOfN({ ...args, stage });
-    record = {
-      text: res.result.ok ? res.result.text : null,
-      ...(res.result.ok ? {} : { failReason: res.result.reason }),
-      telemetry: slimTelemetry(res.telemetryList),
-    };
-  } else {
-    const res = await translateTextWithLLM({
-      ...args,
-      model: stage.model,
-      reasoning: stage.reasoning,
-      maxOutputTokens: stage.maxOutputTokens,
-      provider: stage.provider,
-    });
-    record = {
-      text: res.ok ? res.text : null,
-      ...(res.ok ? {} : { failReason: res.reason }),
-      telemetry: res.telemetry ? slimTelemetry([res.telemetry]) : [],
-    };
-  }
-  cache[key] = record;
-  recordSpend(record.telemetry);
-  return record;
-}
-
-async function pool<T>(
-  items: T[],
-  concurrency: number,
-  fn: (item: T) => Promise<void>,
-) {
-  let i = 0;
-  const workers = Array.from(
-    { length: Math.min(concurrency, items.length) },
-    async () => {
-      while (i < items.length) {
-        const item = items[i++];
-        await fn(item);
-      }
-    },
-  );
-  await Promise.all(workers);
-}
-
 // ------------------------------------------------------------------- judge
-
-/** Seeded shuffle (same scheme as translationLLM's) so reruns re-judge identically. */
-function seededShuffle<T>(items: T[], seed: string): T[] {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  const next = () => {
-    h = (Math.imul(h, 1664525) + 1013904223) >>> 0;
-    return h / 4294967296;
-  };
-  const arr = [...items];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(next() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
 
 function buildScoringPrompt(
   args: TranslationPromptArgs,
   reference: string,
   candidates: string[],
 ): string {
-  const ctx: string[] = [
-    `  <speaker_gender>${args.speakerGender ?? 'unspecified'}</speaker_gender>`,
-    `  <referent_gender>${args.referentGender}</referent_gender>`,
-  ];
-  if (args.addressesSomeone) {
-    ctx.push(
-      `  <addressee_gender>${args.addresseeGender ?? 'unspecified'}</addressee_gender>`,
-      `  <register>${args.formality ?? 'neutral'}</register>`,
-    );
-  }
+  const ctx = contextLines(args);
   return [
     `You are a professional English-to-${args.targetLangName} translation evaluator. Score each candidate ${args.targetLangName} translation of the English source on a 0-10 scale.`,
     ``,
@@ -364,13 +220,8 @@ function buildScoringPrompt(
   ].join('\n');
 }
 
-type JudgeOutcome = {
-  scores: Record<string, number>; // candidate text -> score
-  telemetry: CallRecord['telemetry'];
-};
-
 async function judgeSentence(
-  openrouter: ReturnType<typeof createOpenRouter>,
+  openrouter: OpenRouterClient,
   args: TranslationPromptArgs,
   reference: string,
   uniqueCandidates: string[],
@@ -378,47 +229,7 @@ async function judgeSentence(
 ): Promise<JudgeOutcome | null> {
   const shuffled = seededShuffle(uniqueCandidates, seed);
   const prompt = buildScoringPrompt(args, reference, shuffled);
-  const providerOptions = openrouterCallOptions(JUDGE_REASONING);
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const startedAt = Date.now();
-    try {
-      const res = await generateText({
-        model: openrouter(JUDGE_MODEL),
-        prompt,
-        temperature: 0,
-        maxOutputTokens: JUDGE_MAX_OUTPUT_TOKENS,
-        ...(providerOptions ? { providerOptions } : {}),
-      });
-      const telemetry = [
-        {
-          model: JUDGE_MODEL,
-          inputTokens: res.usage.inputTokens ?? 0,
-          outputTokens: res.usage.outputTokens ?? 0,
-          costUsd: openrouterCostUsd(res.providerMetadata),
-          latencyMs: Date.now() - startedAt,
-          role: 'quality-judge',
-          generationId: openrouterGenerationId(res.providerMetadata),
-        },
-      ];
-      recordSpend(telemetry);
-      const match = res.text.match(/\[[\s\d,.]*\]/);
-      if (!match) throw new Error(`unparseable: ${res.text.slice(0, 80)}`);
-      const parsed = JSON.parse(match[0]) as number[];
-      if (parsed.length !== shuffled.length) {
-        throw new Error(
-          `expected ${shuffled.length} scores, got ${parsed.length}`,
-        );
-      }
-      const scores: Record<string, number> = {};
-      shuffled.forEach((text, i) => (scores[text] = parsed[i]));
-      return { scores, telemetry };
-    } catch (err) {
-      console.warn(
-        `  judge attempt ${attempt} failed: ${err instanceof Error ? err.message.slice(0, 120) : err}`,
-      );
-    }
-  }
-  return null;
+  return judgeCandidates(bench, openrouter, prompt, shuffled);
 }
 
 // ----------------------------------------------------------------- reporting
@@ -437,32 +248,19 @@ type ConditionAgg = {
   perLang: Record<string, { scoreSum: number; scored: number }>;
 };
 
-function fmtUsd(x: number): string {
-  return `$${x.toFixed(4)}`;
-}
-
 // --------------------------------------------------------------------- main
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  budgetUsd = args.budget;
-  cache = loadCache();
-
-  if (!process.env.OPENROUTER_API_KEY) {
-    console.error(
-      'OPENROUTER_API_KEY is not set. Run via: pnpm tsx --env-file=.env.local scripts/eval-translation-sol.ts',
-    );
-    process.exit(1);
-  }
-  const openrouter = createOpenRouter({
-    apiKey: process.env.OPENROUTER_API_KEY,
-    extraBody: { usage: { include: true } },
-  });
+  bench.budgetUsd = args.budget;
+  const openrouter = createOpenRouterFromEnv(
+    'pnpm tsx --env-file=.env.local scripts/eval-translation-sol.ts',
+  );
 
   const rows = loadRows(args.limit);
   const conditionNames = args.conditions.filter((c) => c in CONDITIONS);
   console.log(
-    `Benchmark: ${rows.length} sentences x ${args.langs.join(',')} x [${conditionNames.join(', ')}], budget $${budgetUsd}`,
+    `Benchmark: ${rows.length} sentences x ${args.langs.join(',')} x [${conditionNames.join(', ')}], budget $${bench.budgetUsd}`,
   );
 
   // ── Translation sweep ────────────────────────────────────────────────────
@@ -475,24 +273,24 @@ async function main() {
     }
     let done = 0;
     await pool(work, args.concurrency, async ({ condition, row, lang }) => {
-      await runOne(condition, CONDITIONS[condition], row, lang);
+      await bench.translateCached(
+        `${condition}|${lang}|${row.src_hash}`,
+        CONDITIONS[condition],
+        promptArgsFor(row, lang),
+      );
       done++;
       if (done % 20 === 0 || done === work.length) {
-        saveCache();
+        bench.save();
         console.log(
-          `  translated ${done}/${work.length}  (spent ${fmtUsd(spentUsd)})`,
+          `  translated ${done}/${work.length}  (spent ${fmtUsd(bench.spentUsd)})`,
         );
       }
     });
-    saveCache();
+    bench.save();
   }
 
   // ── Judging ──────────────────────────────────────────────────────────────
   const judgeCacheKey = (lang: string, hash: string) => `judge|${lang}|${hash}`;
-  type JudgeRecord = {
-    scores: Record<string, number>;
-    telemetry: CallRecord['telemetry'];
-  };
   const judgeWork: { row: FloresRow; lang: string }[] = [];
   for (const lang of args.langs)
     for (const row of rows) judgeWork.push({ row, lang });
@@ -501,19 +299,13 @@ async function main() {
     const jk = judgeCacheKey(lang, row.src_hash);
     const texts = new Set<string>();
     for (const condition of conditionNames) {
-      const rec = cache[`${condition}|${lang}|${row.src_hash}`];
+      const rec = bench.cache[`${condition}|${lang}|${row.src_hash}`];
       if (rec?.text) texts.add(rec.text);
     }
     if (texts.size === 0) return;
     // Re-judge only when a candidate is missing from the cached verdict (a
     // new condition produced a translation the judge has never scored).
-    if (cache[jk]) {
-      const cached = JSON.parse(cache[jk].text ?? '{}') as Record<
-        string,
-        number
-      >;
-      if ([...texts].every((t) => cached[t] !== undefined)) return;
-    }
+    if (bench.hasJudgedAll(jk, texts)) return;
     const reference = row[`ref_${lang}`];
     if (!reference) {
       console.warn(`  no FLORES reference for ${lang}, skipping judge`);
@@ -526,15 +318,9 @@ async function main() {
       [...texts],
       `${lang}:${row.src_hash}`,
     );
-    if (outcome) {
-      cache[jk] = {
-        text: JSON.stringify(outcome.scores),
-        telemetry: outcome.telemetry,
-      } as CallRecord;
-      saveCache();
-    }
+    if (outcome) bench.storeJudge(jk, outcome);
   });
-  saveCache();
+  bench.save();
 
   // ── Aggregate ────────────────────────────────────────────────────────────
   const aggs: Record<string, ConditionAgg> = {};
@@ -558,22 +344,18 @@ async function main() {
   for (const lang of args.langs) {
     for (const row of rows) {
       const jk = judgeCacheKey(lang, row.src_hash);
-      const judgeRec = cache[jk] as JudgeRecord | undefined;
-      const scores: Record<string, number> = judgeRec
-        ? JSON.parse((judgeRec as unknown as CallRecord).text ?? '{}')
-        : {};
+      const judgeRec = bench.cache[jk];
+      const scores = bench.judgeScores(jk);
       if (judgeRec) {
-        for (const t of (judgeRec as unknown as CallRecord).telemetry) {
-          judgeCost += t.costUsd ?? 0;
-        }
+        for (const t of judgeRec.telemetry) judgeCost += t.costUsd ?? 0;
       }
-      const baselineRec = cache[`luna-bo3|${lang}|${row.src_hash}`];
+      const baselineRec = bench.cache[`luna-bo3|${lang}|${row.src_hash}`];
       const baselineScore = baselineRec?.text
         ? scores[baselineRec.text]
         : undefined;
 
       for (const condition of conditionNames) {
-        const rec = cache[`${condition}|${lang}|${row.src_hash}`];
+        const rec = bench.cache[`${condition}|${lang}|${row.src_hash}`];
         if (!rec) continue;
         const agg = aggs[condition];
         agg.n++;
@@ -639,7 +421,7 @@ async function main() {
     p(`  ${condition.padEnd(16)} ${parts.join('  ')}`);
   }
   p(
-    `\nJudge cost: ${fmtUsd(judgeCost)}   Total spent this+cached runs: ${fmtUsd(spentUsd)}`,
+    `\nJudge cost: ${fmtUsd(judgeCost)}   Total spent this+cached runs: ${fmtUsd(bench.spentUsd)}`,
   );
   p(
     `Token totals per condition (in/out incl. reasoning + bo3 judges): ` +
@@ -648,17 +430,16 @@ async function main() {
         .join('  '),
   );
 
-  mkdirSync(OUT_DIR, { recursive: true });
-  writeFileSync(resolve(OUT_DIR, 'report.txt'), lines.join('\n') + '\n');
-  writeFileSync(
-    resolve(OUT_DIR, 'aggregates.json'),
-    JSON.stringify({ args, aggs, judgeCost, spentUsd }, null, 2),
-  );
-  console.log(`\nWrote ${OUT_DIR}/report.txt and aggregates.json`);
+  bench.writeReport(lines, {
+    args,
+    aggs,
+    judgeCost,
+    spentUsd: bench.spentUsd,
+  });
 }
 
 main().catch((err) => {
-  saveCache();
+  bench.save();
   console.error(err);
   process.exit(1);
 });

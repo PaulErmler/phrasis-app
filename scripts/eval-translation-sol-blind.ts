@@ -24,6 +24,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parse } from 'csv-parse/sync';
+import { seededShuffle } from './eval/lib/bench';
 
 const OUT_DIR = resolve(__dirname, '../.scratch/sol-translation-bench');
 const CACHE_PATH = resolve(OUT_DIR, 'cache.json');
@@ -53,24 +54,6 @@ type FloresRow = {
 };
 
 type CacheRecord = { text: string | null; telemetry: unknown };
-
-function seededShuffle<T>(items: T[], seed: string): T[] {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  const next = () => {
-    h = (Math.imul(h, 1664525) + 1013904223) >>> 0;
-    return h / 4294967296;
-  };
-  const arr = [...items];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(next() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
 
 function loadAll() {
   const cache = JSON.parse(readFileSync(CACHE_PATH, 'utf8')) as Record<

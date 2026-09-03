@@ -157,6 +157,18 @@ export function LearningChatLayout({
   const isChatOpenRef = useRef(false);
   isChatOpenRef.current = effectiveChatOpen;
   useEffect(() => {
+    // A stale tag on the entry this view mounts into (the chat's own entry,
+    // reached again through back/forward after the view unmounted on top
+    // of it) would make the popstate handler read a later swipe-back as
+    // "still the chat's entry" and leave the chat open. Untag it first.
+    if (typeof window === 'undefined') return;
+    const state = window.history.state;
+    if (state?.[CHAT_HISTORY_KEY]) {
+      const { [CHAT_HISTORY_KEY]: _tag, ...rest } = state;
+      window.history.replaceState(rest, '', window.location.href);
+    }
+  }, []);
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     if (effectiveChatOpen && !isDesktop) {
       if (chatHistoryPushedRef.current) return;
@@ -188,6 +200,18 @@ export function LearningChatLayout({
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+  useEffect(() => {
+    // Unmounting with the chat open (session end, the celebration screen)
+    // would leave the chat's entry on top of the stack, so the next back
+    // press lands on a dead entry. Pop it while it is still the current
+    // entry. Once the app has pushed another page on top the entry is out
+    // of reach; the mount effect above untags it when it is reached again.
+    return () => {
+      if (!chatHistoryPushedRef.current) return;
+      chatHistoryPushedRef.current = false;
+      if (window.history.state?.[CHAT_HISTORY_KEY]) window.history.back();
+    };
   }, []);
 
   const openChat = useCallback(() => {

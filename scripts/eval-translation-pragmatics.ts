@@ -35,22 +35,9 @@
  * The key is read from the environment by name. Nothing here opens .env.local.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { generateText } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import {
-  translateTextWithLLM,
-  translateBestOfN,
-  openrouterCallOptions,
-  type TranslationPromptArgs,
-  type LlmCallTelemetry,
-  type ReasoningEffort,
-} from '../convex/features/translationLLM';
-import {
-  openrouterCostUsd,
-  openrouterGenerationId,
-} from '../convex/lib/posthogAi';
+import { type TranslationPromptArgs } from '../convex/features/translationLLM';
 import {
   LUNA_BO3,
   LUNA_PROVIDER_CONSTRAINTS,
@@ -64,12 +51,20 @@ import {
   type CaseKind,
   type PragmaticsCase,
 } from './eval/translation-pragmatics-cases';
+import {
+  argValue,
+  Bench,
+  contextLines,
+  createOpenRouterFromEnv,
+  fmtUsd,
+  judgeCandidates,
+  pool,
+  seededShuffle,
+  type JudgeOutcome,
+  type OpenRouterClient,
+} from './eval/lib/bench';
 
 // ------------------------------------------------------------------- config
-
-const JUDGE_MODEL = 'google/gemini-3.1-pro-preview';
-const JUDGE_REASONING: ReasoningEffort = 'low';
-const JUDGE_MAX_OUTPUT_TOKENS = 4_000;
 
 const DEFAULT_LANGS = [
   'de',
@@ -93,7 +88,11 @@ const KINDS: CaseKind[] = [
 ];
 
 const OUT_DIR = resolve(__dirname, '../.scratch/translation-pragmatics-bench');
-const CACHE_PATH = resolve(OUT_DIR, 'cache.json');
+const bench = new Bench({
+  outDir: OUT_DIR,
+  budgetUsd: 2.0,
+  budgetHint: 're-run with fewer --langs/--conditions or raise --budget',
+});
 
 /** `LUNA_BO3` without sampling and judge: one temp-0 call. */
 const LUNA_SINGLE: ModelStage = {
@@ -161,12 +160,7 @@ type Args = {
 };
 
 function parseArgs(argv: string[]): Args {
-  const get = (name: string) =>
-    argv
-      .find((a) => a.startsWith(`--${name}=`))
-      ?.split('=')
-      .slice(1)
-      .join('=');
+  const get = (name: string) => argValue(argv, name);
   const smoke = argv.includes('--smoke');
   return {
     langs: (get('langs') ?? (smoke ? 'de' : DEFAULT_LANGS.join(',')))
@@ -218,143 +212,7 @@ function promptArgsFor(c: PragmaticsCase, lang: string): TranslationPromptArgs {
   };
 }
 
-// -------------------------------------------------------------------- cache
-
-type CallRecord = {
-  text: string | null; // null = the stage failed
-  failReason?: string;
-  failDetail?: string;
-  telemetry: {
-    model: string;
-    inputTokens: number;
-    outputTokens: number;
-    costUsd?: number;
-    latencyMs: number;
-    role?: string;
-  }[];
-};
-
-type Cache = Record<string, CallRecord>; // `${condition}|${lang}|${caseKey}` and `judge|${lang}|${caseKey}`
-
-function loadCache(): Cache {
-  if (!existsSync(CACHE_PATH)) return {};
-  return JSON.parse(readFileSync(CACHE_PATH, 'utf8')) as Cache;
-}
-
-let cache: Cache = {};
-function saveCache() {
-  mkdirSync(OUT_DIR, { recursive: true });
-  writeFileSync(CACHE_PATH, JSON.stringify(cache, null, 1));
-}
-
-// ------------------------------------------------------------- budget guard
-
-let spentUsd = 0;
-let budgetUsd = 2.0;
-function recordSpend(telemetry: { costUsd?: number }[]) {
-  for (const t of telemetry) spentUsd += t.costUsd ?? 0;
-  if (spentUsd > budgetUsd) {
-    saveCache();
-    console.error(
-      `\nBUDGET GUARD: spent $${spentUsd.toFixed(3)} > $${budgetUsd}. ` +
-        `Cache saved; re-run with fewer --langs/--conditions or raise --budget.`,
-    );
-    process.exit(2);
-  }
-}
-
-// ------------------------------------------------------------- translation
-
-function slimTelemetry(
-  list: (LlmCallTelemetry & { role?: string })[],
-): CallRecord['telemetry'] {
-  return list.map((t) => ({
-    model: t.model,
-    inputTokens: t.inputTokens,
-    outputTokens: t.outputTokens,
-    costUsd: t.costUsd,
-    latencyMs: t.latencyMs,
-    role: t.role,
-  }));
-}
-
-async function runOne(
-  condition: string,
-  stage: ModelStage,
-  c: PragmaticsCase,
-  lang: string,
-): Promise<CallRecord> {
-  const key = `${condition}|${lang}|${caseKey(c)}`;
-  if (cache[key]) return cache[key];
-  const args = promptArgsFor(c, lang);
-
-  let record: CallRecord;
-  if (stage.samples) {
-    const res = await translateBestOfN({ ...args, stage });
-    record = {
-      text: res.result.ok ? res.result.text : null,
-      ...(res.result.ok ? {} : { failReason: res.result.reason }),
-      telemetry: slimTelemetry(res.telemetryList),
-    };
-  } else {
-    const res = await translateTextWithLLM({
-      ...args,
-      model: stage.model,
-      reasoning: stage.reasoning,
-      maxOutputTokens: stage.maxOutputTokens,
-      provider: stage.provider,
-    });
-    record = {
-      text: res.ok ? res.text : null,
-      ...(res.ok
-        ? {}
-        : { failReason: res.reason, failDetail: res.detail?.slice(0, 300) }),
-      telemetry: res.telemetry ? slimTelemetry([res.telemetry]) : [],
-    };
-  }
-  cache[key] = record;
-  recordSpend(record.telemetry);
-  return record;
-}
-
-async function pool<T>(
-  items: T[],
-  concurrency: number,
-  fn: (item: T) => Promise<void>,
-) {
-  let i = 0;
-  const workers = Array.from(
-    { length: Math.min(concurrency, items.length) },
-    async () => {
-      while (i < items.length) {
-        const item = items[i++];
-        await fn(item);
-      }
-    },
-  );
-  await Promise.all(workers);
-}
-
 // ------------------------------------------------------------------- judge
-
-/** Seeded shuffle (same scheme as translationLLM's) so reruns re-judge identically. */
-function seededShuffle<T>(items: T[], seed: string): T[] {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  const next = () => {
-    h = (Math.imul(h, 1664525) + 1013904223) >>> 0;
-    return h / 4294967296;
-  };
-  const arr = [...items];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(next() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
 
 function isDialectTarget(lang: string): boolean {
   return (
@@ -369,16 +227,7 @@ function buildScoringPrompt(
   c: PragmaticsCase,
   candidates: string[],
 ): string {
-  const ctx: string[] = [
-    `  <speaker_gender>${args.speakerGender ?? 'unspecified'}</speaker_gender>`,
-    `  <referent_gender>${args.referentGender}</referent_gender>`,
-  ];
-  if (args.addressesSomeone) {
-    ctx.push(
-      `  <addressee_gender>${args.addresseeGender ?? 'unspecified'}</addressee_gender>`,
-      `  <register>${args.formality ?? 'neutral'}</register>`,
-    );
-  }
+  const ctx = contextLines(args);
   const dialectLine = isDialectTarget(args.targetLang)
     ? ` The target is the ${args.targetLangName} spoken in ${args.targetRegion}: a candidate written in the standard/formal written variety instead of that spoken variety scores at most 4.`
     : '';
@@ -406,13 +255,8 @@ function buildScoringPrompt(
   ].join('\n');
 }
 
-type JudgeOutcome = {
-  scores: Record<string, number>; // candidate text -> score
-  telemetry: CallRecord['telemetry'];
-};
-
 async function judgeCase(
-  openrouter: ReturnType<typeof createOpenRouter>,
+  openrouter: OpenRouterClient,
   c: PragmaticsCase,
   lang: string,
   uniqueCandidates: string[],
@@ -420,47 +264,13 @@ async function judgeCase(
   const args = promptArgsFor(c, lang);
   const shuffled = seededShuffle(uniqueCandidates, `${lang}:${caseKey(c)}`);
   const prompt = buildScoringPrompt(args, c, shuffled);
-  const providerOptions = openrouterCallOptions(JUDGE_REASONING);
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const startedAt = Date.now();
-    try {
-      const res = await generateText({
-        model: openrouter(JUDGE_MODEL),
-        prompt,
-        temperature: 0,
-        maxOutputTokens: JUDGE_MAX_OUTPUT_TOKENS,
-        ...(providerOptions ? { providerOptions } : {}),
-      });
-      const telemetry = [
-        {
-          model: JUDGE_MODEL,
-          inputTokens: res.usage.inputTokens ?? 0,
-          outputTokens: res.usage.outputTokens ?? 0,
-          costUsd: openrouterCostUsd(res.providerMetadata),
-          latencyMs: Date.now() - startedAt,
-          role: 'quality-judge',
-          generationId: openrouterGenerationId(res.providerMetadata),
-        },
-      ];
-      recordSpend(telemetry);
-      const match = res.text.match(/\[[\s\d,.]*\]/);
-      if (!match) throw new Error(`unparseable: ${res.text.slice(0, 80)}`);
-      const parsed = JSON.parse(match[0]) as number[];
-      if (parsed.length !== shuffled.length) {
-        throw new Error(
-          `expected ${shuffled.length} scores, got ${parsed.length}`,
-        );
-      }
-      const scores: Record<string, number> = {};
-      shuffled.forEach((text, i) => (scores[text] = parsed[i]));
-      return { scores, telemetry };
-    } catch (err) {
-      console.warn(
-        `  judge attempt ${attempt} failed (${lang}/${c.id}): ${err instanceof Error ? err.message.slice(0, 120) : err}`,
-      );
-    }
-  }
-  return null;
+  return judgeCandidates(
+    bench,
+    openrouter,
+    prompt,
+    shuffled,
+    `${lang}/${c.id}`,
+  );
 }
 
 // -------------------------------------------------------------- mechanical
@@ -496,14 +306,14 @@ function exportBlind(
       const id = `${lang}-${c.id}`;
       const byText = new Map<string, string[]>();
       for (const cond of conditionNames) {
-        const rec = cache[`${cond}|${lang}|${caseKey(c)}`];
+        const rec = bench.cache[`${cond}|${lang}|${caseKey(c)}`];
         if (rec?.text)
           byText.set(rec.text, [...(byText.get(rec.text) ?? []), cond]);
       }
       if (byText.size === 0) continue;
       const shuffled = seededShuffle([...byText.keys()], `blind:${id}`);
       const letters: Record<string, string[]> = {};
-      const judgeRaw = cache[`judge|${lang}|${caseKey(c)}`]?.text;
+      const judgeRaw = bench.cache[`judge|${lang}|${caseKey(c)}`]?.text;
       const judgeScores = judgeRaw
         ? (JSON.parse(judgeRaw) as Record<string, number>)
         : null;
@@ -570,9 +380,6 @@ type ConditionAgg = {
   contrastStatement: { yes: number; n: number };
 };
 
-function fmtUsd(x: number): string {
-  return `$${x.toFixed(4)}`;
-}
 function mean(b: Bucket | undefined): string {
   return b?.scored ? (b.scoreSum / b.scored).toFixed(2) : 'n/a';
 }
@@ -584,8 +391,7 @@ function pct(x: { yes: number; n: number }): string {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  budgetUsd = args.budget;
-  cache = loadCache();
+  bench.budgetUsd = args.budget;
 
   const cases = CASES.slice(0, args.limit);
   const conditionNames = args.conditions.filter((c) => c in CONDITIONS);
@@ -610,19 +416,12 @@ async function main() {
     return;
   }
 
-  if (!process.env.OPENROUTER_API_KEY) {
-    console.error(
-      'OPENROUTER_API_KEY is not set. Run via: pnpm eval:pragmatics (tsx --env-file=.env.local)',
-    );
-    process.exit(1);
-  }
-  const openrouter = createOpenRouter({
-    apiKey: process.env.OPENROUTER_API_KEY,
-    extraBody: { usage: { include: true } },
-  });
+  const openrouter = createOpenRouterFromEnv(
+    'pnpm eval:pragmatics (tsx --env-file=.env.local)',
+  );
 
   console.log(
-    `Benchmark: ${cases.length} cases x ${args.langs.join(',')} x [${conditionNames.join(', ')}], budget $${budgetUsd}`,
+    `Benchmark: ${cases.length} cases x ${args.langs.join(',')} x [${conditionNames.join(', ')}], budget $${bench.budgetUsd}`,
   );
 
   // ── Translation sweep ────────────────────────────────────────────────────
@@ -635,16 +434,20 @@ async function main() {
     }
     let done = 0;
     await pool(work, args.concurrency, async ({ condition, c, lang }) => {
-      await runOne(condition, CONDITIONS[condition], c, lang);
+      await bench.translateCached(
+        `${condition}|${lang}|${caseKey(c)}`,
+        CONDITIONS[condition],
+        promptArgsFor(c, lang),
+      );
       done++;
       if (done % 20 === 0 || done === work.length) {
-        saveCache();
+        bench.save();
         console.log(
-          `  translated ${done}/${work.length}  (spent ${fmtUsd(spentUsd)})`,
+          `  translated ${done}/${work.length}  (spent ${fmtUsd(bench.spentUsd)})`,
         );
       }
     });
-    saveCache();
+    bench.save();
   }
 
   // ── Judging ──────────────────────────────────────────────────────────────
@@ -658,28 +461,16 @@ async function main() {
     const jk = judgeKey(lang, c);
     const texts = new Set<string>();
     for (const condition of conditionNames) {
-      const rec = cache[`${condition}|${lang}|${caseKey(c)}`];
+      const rec = bench.cache[`${condition}|${lang}|${caseKey(c)}`];
       if (rec?.text) texts.add(rec.text);
     }
     if (texts.size === 0) return;
     // Re-judge only when a candidate is missing from the cached verdict.
-    if (cache[jk]) {
-      const cached = JSON.parse(cache[jk].text ?? '{}') as Record<
-        string,
-        number
-      >;
-      if ([...texts].every((t) => cached[t] !== undefined)) return;
-    }
+    if (bench.hasJudgedAll(jk, texts)) return;
     const outcome = await judgeCase(openrouter, c, lang, [...texts]);
-    if (outcome) {
-      cache[jk] = {
-        text: JSON.stringify(outcome.scores),
-        telemetry: outcome.telemetry,
-      };
-      saveCache();
-    }
+    if (outcome) bench.storeJudge(jk, outcome);
   });
-  saveCache();
+  bench.save();
 
   // ── Aggregate ────────────────────────────────────────────────────────────
   const aggs: Record<string, ConditionAgg> = {};
@@ -707,21 +498,19 @@ async function main() {
   for (const lang of args.langs) {
     for (const c of cases) {
       const jk = judgeKey(lang, c);
-      const judgeRec = cache[jk];
-      const scores: Record<string, number> = judgeRec
-        ? (JSON.parse(judgeRec.text ?? '{}') as Record<string, number>)
-        : {};
+      const judgeRec = bench.cache[jk];
+      const scores = bench.judgeScores(jk);
       if (judgeRec && !seenJudge.has(jk)) {
         seenJudge.add(jk);
         for (const t of judgeRec.telemetry) judgeCost += t.costUsd ?? 0;
       }
-      const baselineRec = cache[`${BASELINE}|${lang}|${caseKey(c)}`];
+      const baselineRec = bench.cache[`${BASELINE}|${lang}|${caseKey(c)}`];
       const baselineScore = baselineRec?.text
         ? scores[baselineRec.text]
         : undefined;
 
       for (const condition of conditionNames) {
-        const rec = cache[`${condition}|${lang}|${caseKey(c)}`];
+        const rec = bench.cache[`${condition}|${lang}|${caseKey(c)}`];
         if (!rec) continue;
         const agg = aggs[condition];
         agg.n++;
@@ -799,7 +588,7 @@ async function main() {
     );
   }
   p(
-    `\nJudge cost: ${fmtUsd(judgeCost)}   Spent this run (incl. cache misses only): ${fmtUsd(spentUsd)}`,
+    `\nJudge cost: ${fmtUsd(judgeCost)}   Spent this run (incl. cache misses only): ${fmtUsd(bench.spentUsd)}`,
   );
   p(
     `Token totals per condition (in/out incl. reasoning + bo3 judges): ` +
@@ -808,17 +597,16 @@ async function main() {
         .join('  '),
   );
 
-  mkdirSync(OUT_DIR, { recursive: true });
-  writeFileSync(resolve(OUT_DIR, 'report.txt'), lines.join('\n') + '\n');
-  writeFileSync(
-    resolve(OUT_DIR, 'aggregates.json'),
-    JSON.stringify({ args, aggs, judgeCost, spentUsd }, null, 2),
-  );
-  console.log(`\nWrote ${OUT_DIR}/report.txt and aggregates.json`);
+  bench.writeReport(lines, {
+    args,
+    aggs,
+    judgeCost,
+    spentUsd: bench.spentUsd,
+  });
 }
 
 main().catch((err) => {
-  saveCache();
+  bench.save();
   console.error(err);
   process.exit(1);
 });

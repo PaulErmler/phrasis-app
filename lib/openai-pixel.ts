@@ -170,18 +170,40 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
+/**
+ * The fired list, or empty when the stored value is not a list of strings.
+ * localStorage is writable by anything on the origin, and a value of the
+ * wrong shape would throw inside the conversions effect, which is the one
+ * place a broken pixel must never reach.
+ */
+function readFired(): string[] {
+  const stored = readJson<unknown>(FIRED_KEY);
+  return Array.isArray(stored) && stored.every((v) => typeof v === 'string')
+    ? stored
+    : [];
+}
+
 /** Has this conversion (by `event_id`) already been reported from this device? */
 export function hasFired(eventId: string): boolean {
-  return readJson<string[]>(FIRED_KEY)?.includes(eventId) ?? false;
+  return readFired().includes(eventId);
 }
 
 export function markFired(eventId: string): void {
-  const fired = readJson<string[]>(FIRED_KEY) ?? [];
+  const fired = readFired();
   if (fired.includes(eventId)) return;
   writeJson(FIRED_KEY, [...fired, eventId].slice(-FIRED_LIMIT));
 }
 
 type CheckoutMarker = { planId: string; at: number };
+
+function isCheckoutMarker(value: unknown): value is CheckoutMarker {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as CheckoutMarker).planId === 'string' &&
+    typeof (value as CheckoutMarker).at === 'number'
+  );
+}
 
 /**
  * Remember that the user just left for Stripe to buy `planId`. The customer
@@ -198,8 +220,12 @@ export function markCheckoutStarted(planId: string): void {
 
 /** The plan a still-fresh checkout marker points at, or null. Expired markers are dropped. */
 export function readCheckoutMarker(): string | null {
-  const marker = readJson<CheckoutMarker>(CHECKOUT_KEY);
-  if (!marker) return null;
+  const marker = readJson<unknown>(CHECKOUT_KEY);
+  if (!isCheckoutMarker(marker)) {
+    // Absent, or not something this module wrote: nothing to attribute.
+    if (marker !== null) clearCheckoutMarker();
+    return null;
+  }
   if (Date.now() - marker.at > CHECKOUT_MARKER_TTL_MS) {
     clearCheckoutMarker();
     return null;

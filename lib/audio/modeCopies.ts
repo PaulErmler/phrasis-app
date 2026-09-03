@@ -1,6 +1,11 @@
 // Relative, not `@/`: this module is imported by Convex server code
-// (features/courses.ts), whose bundler resolves relative paths only.
-import type { CourseSettings } from '../../components/app/learning/types';
+// (features/courses.ts), whose bundler resolves relative paths only. The
+// schema type comes from the generated data model rather than the learning
+// components' re-export of it, so the backend never reaches into
+// `components/`.
+import type { Doc } from '../../convex/_generated/dataModel';
+
+type CourseSettings = Doc<'courseSettings'>;
 
 /**
  * The write-side half of the per-mode settings rule. `resolveModeSetting`
@@ -10,6 +15,11 @@ import type { CourseSettings } from '../../components/app/learning/types';
  * Web Audio.
  */
 export type ModeCopySuffix = 'Full' | 'Transcribe' | 'Radio';
+
+/** The suffixes of `Base` that name a real column: `${Base}${suffix}` is in the schema. */
+type SchemaCopiesOf<Base extends string> = {
+  [S in ModeCopySuffix]: `${Base}${S}` extends keyof CourseSettings ? S : never;
+}[ModeCopySuffix];
 
 /**
  * Which per-mode copies actually exist in the schema, per writable playback
@@ -37,10 +47,13 @@ export const MODE_COPIES = {
   targetBeforeUntilGoodReps: ['Radio'],
   targetBeforeListeningStrategy: ['Radio'],
   // Partial, not Record: the point is that every key listed IS a real
-  // CourseSettings field, not that every field is listed.
-} as const satisfies Partial<
-  Record<keyof CourseSettings, readonly ModeCopySuffix[]>
->;
+  // CourseSettings field, not that every field is listed. Each suffix is
+  // checked as well: `SchemaCopiesOf<K>` keeps only the suffixes whose
+  // `${K}${suffix}` column exists, so a copy the schema doesn't have fails
+  // to compile here instead of being written as a dead field.
+} as const satisfies {
+  [K in keyof CourseSettings & string]?: readonly SchemaCopiesOf<K>[];
+};
 
 /** Base field names that have at least one per-mode copy. */
 export type ModeCopyBaseField = keyof typeof MODE_COPIES;

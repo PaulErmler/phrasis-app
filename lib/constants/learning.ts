@@ -62,6 +62,26 @@ export const UNDO_DEPTH = 3;
 /** Interrupt the learning flow with a celebration screen every N reviews (per day). */
 export const PROGRESS_DISPLAY_INTERVAL = 20;
 
+/**
+ * Whether the review about to be submitted lands on a celebration milestone.
+ * A client-side prediction from the local daily count, which can be stale
+ * across tabs; the server's `triggerCelebration` (features/reviewPipeline.ts)
+ * is the authoritative verdict. Shared by the review handler, which latches
+ * the celebration screen before the mutation resolves, and the auto-advance
+ * path, which must not let the next card's audio run ahead into it.
+ */
+export function predictsMilestone(
+  dailyReviewsToday: number,
+  enabled: boolean,
+): boolean {
+  const predictedCount = dailyReviewsToday + 1;
+  return (
+    enabled &&
+    predictedCount > 0 &&
+    predictedCount % PROGRESS_DISPLAY_INTERVAL === 0
+  );
+}
+
 /** How long the celebration screen stays before auto-advancing (ms). */
 export const PROGRESS_DISPLAY_DURATION_MS = 7000;
 

@@ -100,6 +100,39 @@ describe('LearningChatLayout on a phone', () => {
   });
 });
 
+describe('LearningChatLayout history hygiene', () => {
+  it('pops its entry when unmounted with the chat open', async () => {
+    const { unmount } = renderLayout();
+    fireEvent.click(screen.getByTestId('open'));
+    await waitFor(() => expect(window.history.state?.learnChatOpen).toBe(true));
+
+    act(() => {
+      unmount();
+    });
+    await waitFor(() =>
+      expect(window.history.state?.learnChatOpen).toBeFalsy(),
+    );
+    expect(window.location.pathname).toBe('/app/learn');
+  });
+
+  it('untags a stale chat entry on mount so a later swipe-back still closes the chat', async () => {
+    window.history.replaceState({ learnChatOpen: true }, '', '/app/learn');
+    renderLayout();
+    await waitFor(() =>
+      expect(window.history.state?.learnChatOpen).toBeFalsy(),
+    );
+
+    fireEvent.click(screen.getByTestId('open'));
+    await waitFor(() => expect(window.history.state?.learnChatOpen).toBe(true));
+    act(() => {
+      window.history.back();
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('open-state')).toHaveTextContent('closed'),
+    );
+  });
+});
+
 describe('LearningChatLayout on desktop', () => {
   it('does not touch history for the sidebar', async () => {
     installMatchMedia(true);

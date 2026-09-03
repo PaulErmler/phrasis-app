@@ -126,6 +126,22 @@ describe('openai-pixel', () => {
     expect(pixel.hasFired('evt-29')).toBe(true);
   });
 
+  it('treats storage of the wrong shape as empty instead of throwing', async () => {
+    const pixel = await load('pix_test');
+    pixel.loadOpenAIPixel();
+    window.localStorage.setItem('flexling_oaiq_fired', '{"not":"a list"}');
+    window.localStorage.setItem('flexling_oaiq_checkout', '"pro"');
+    expect(pixel.hasFired('a')).toBe(false);
+    expect(pixel.readCheckoutMarker()).toBeNull();
+    // A junk marker is swept so it cannot keep coming back.
+    expect(window.localStorage.getItem('flexling_oaiq_checkout')).toBeNull();
+    // Recording over the junk list starts a fresh one.
+    pixel.markFired('a');
+    expect(pixel.hasFired('a')).toBe(true);
+    window.localStorage.setItem('flexling_oaiq_fired', 'not json');
+    expect(pixel.hasFired('a')).toBe(false);
+  });
+
   it('checkout marker: only after load, round-trips, expires', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-01T10:00:00Z'));

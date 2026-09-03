@@ -421,10 +421,11 @@ export function LearningModeSettings({
     return field;
   };
 
-  // Single-field write against the current mode's copy. No cast: because
-  // `modeFieldName` returns the literal union `K | ${K}${ModeCopySuffix}`,
-  // the computed key still checks against CourseSettingsPatch, so a copy the
-  // schema doesn't have fails to compile here rather than writing a dead field.
+  // Single-field write against the current mode's copy. A computed key
+  // widens to a string index, so this call cannot check the field name
+  // itself; the guard is the `satisfies` clause on MODE_COPIES, which checks
+  // every listed suffix against the schema, so each name `modeFieldName`
+  // can produce is a real CourseSettings column.
   const setModeField = <K extends ModeCopyBaseField>(
     field: K,
     value: CourseSettings[K],

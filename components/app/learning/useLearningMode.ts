@@ -42,7 +42,7 @@ import {
   ENSURE_CONTENT_RETRY_MS,
   MAX_UNSERVED_ADD_RUNS,
   ENSURE_CONTENT_REVIEW_INTERVAL,
-  PROGRESS_DISPLAY_INTERVAL,
+  predictsMilestone,
 } from '@/lib/constants/learning';
 import { DEFAULT_AUTO_ADVANCE } from '@/lib/constants/audioPlayback';
 import { collectionRemaining } from '@/convex/lib/collections';
@@ -1095,11 +1095,10 @@ export function useLearningMode(
       // true and the audio for the next card never starts. This is best-effort
       // (the local count can be stale across tabs); the server's
       // `triggerCelebration` is the authoritative verdict.
-      const predictedCount = dailyReviewsToday + 1;
-      const predictedMilestone =
-        progressDisplayEnabled &&
-        predictedCount > 0 &&
-        predictedCount % PROGRESS_DISPLAY_INTERVAL === 0;
+      const predictedMilestone = predictsMilestone(
+        dailyReviewsToday,
+        progressDisplayEnabled,
+      );
       if (predictedMilestone) {
         setProgressDisplayActive(true);
       }

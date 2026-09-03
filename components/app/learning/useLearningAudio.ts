@@ -10,7 +10,7 @@ import {
   type AudioSettingsMode,
 } from '@/lib/audio/mergeAudio';
 import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
-import { PROGRESS_DISPLAY_INTERVAL } from '@/lib/constants/learning';
+import { predictsMilestone } from '@/lib/constants/learning';
 import type { LearningState } from './useLearningMode';
 
 const alwaysFalse = () => false;
@@ -169,8 +169,10 @@ export function useLearningAudio(
     state.handleNext();
     const willCelebrate =
       !isFreePlay &&
-      (cs?.progressDisplayEnabled ?? true) &&
-      (state.dailyReviewsToday + 1) % PROGRESS_DISPLAY_INTERVAL === 0;
+      predictsMilestone(
+        state.dailyReviewsToday,
+        cs?.progressDisplayEnabled ?? true,
+      );
     return !willCelebrate;
   }, [
     state,
