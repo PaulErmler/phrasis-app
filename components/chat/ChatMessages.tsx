@@ -370,6 +370,13 @@ interface ChatMessagesProps {
   contentClassName?: string;
   /** Rendered inside the empty state, below the intro bullets (e.g. quick-action tiles). */
   emptyStateExtra?: ReactNode;
+  /**
+   * Show the empty state while the thread's messages are still loading
+   * instead of a blank pane. For surfaces whose threads are known to be
+   * empty on arrival (the learn view rotates to a fresh thread per card), so
+   * the quick-action tiles appear at once rather than after a round trip.
+   */
+  emptyStateWhileLoading?: boolean;
   /** Composer status. Shows thinking before the assistant message exists. */
   status?: ChatStatus;
   /** Generate a failed reply again; the failed row offers a retry button when set. */
@@ -388,6 +395,7 @@ export function ChatMessages({
   messageFooter,
   contentClassName,
   emptyStateExtra,
+  emptyStateWhileLoading = false,
   status,
   onRetry,
 }: ChatMessagesProps) {
@@ -434,7 +442,7 @@ export function ChatMessages({
                 </Message>
               ) : null}
             </>
-          ) : !isLoading ? (
+          ) : !isLoading || emptyStateWhileLoading ? (
             <ConversationEmptyState>
               <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
                 <BotIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" />

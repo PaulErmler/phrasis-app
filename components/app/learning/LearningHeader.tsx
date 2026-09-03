@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   CircleCheck,
   EyeOff,
+  MessageSquarePlus,
   NotebookPen,
   Pencil,
   Radio,
@@ -23,6 +24,12 @@ import type { SchedulingMode } from '@/convex/types';
 
 interface LearningHeaderProps {
   onBack: () => void;
+  /**
+   * Starts a fresh conversation. Rendered as an icon at the right of the
+   * mobile app bar while the chat is open (the desktop chat sidebar has its
+   * own header with the same action).
+   */
+  onNewChat?: () => void;
   onSettingsOpen: () => void;
   onRestartTutorial?: () => void;
   onHelpOpen?: () => void;
@@ -39,6 +46,7 @@ interface LearningHeaderProps {
 
 export function LearningHeader({
   onBack,
+  onNewChat,
   onSettingsOpen,
   onRestartTutorial,
   onHelpOpen,
@@ -49,6 +57,7 @@ export function LearningHeader({
   const t = useTranslations('LearningMode');
   const tApp = useTranslations('AppPage');
   const tSettings = useTranslations('LearningMode.settingsPanel');
+  const tChat = useTranslations('Chat.sidebar');
   const chatContext = useLearningChatToggle();
   if (!chatContext) {
     throw new Error(
@@ -86,7 +95,12 @@ export function LearningHeader({
 
         <div className="flex-1 min-w-0 flex items-center justify-center">
           {isChatOpen ? (
-            <span className="heading-section lg:hidden">{t('chat')}</span>
+            // Absolutely centered in the bar: the back button and the
+            // new-chat icon differ in width, so centering within the
+            // leftover flex space would sit the title off-center.
+            <span className="heading-section lg:hidden absolute left-1/2 -translate-x-1/2 whitespace-nowrap">
+              {t('chat')}
+            </span>
           ) : (
             <span
               className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground"
@@ -115,6 +129,20 @@ export function LearningHeader({
             </span>
           )}
         </div>
+
+        {/* Mobile, chat open: new-chat icon on the title's line, right. */}
+        {isChatOpen && onNewChat && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onNewChat}
+            className="ml-auto size-9 -mr-1 z-10 lg:hidden"
+            aria-label={tChat('newChat')}
+            data-testid="learn-chat-new-mobile"
+          >
+            <MessageSquarePlus className="h-5 w-5" />
+          </Button>
+        )}
 
         <div
           className={`ml-auto flex items-center gap-1 z-10 ${isChatOpen ? 'hidden lg:flex' : 'flex'}`}

@@ -59,6 +59,32 @@ describe('useThread', () => {
   });
 
   /**
+   * Rotation keeps the current thread mounted until the replacement lands.
+   * Nulling it first unmounted the learn view's chat panel into a spinner
+   * on every card change after a conversation and on "New chat".
+   */
+  it('getOrCreateEmptyThread keeps the current threadId while the mutation is in flight', async () => {
+    let resolve!: (id: string) => void;
+    mutationMock.mockReturnValue(
+      new Promise<string>((r) => {
+        resolve = r;
+      }),
+    );
+    const { result } = renderHook(() => useThread({ threadId: 'old' }));
+    let pending!: Promise<string>;
+    act(() => {
+      pending = result.current.getOrCreateEmptyThread();
+    });
+    expect(result.current.threadId).toBe('old');
+    await act(async () => {
+      resolve('fresh');
+      await pending;
+    });
+    expect(result.current.threadId).toBe('fresh');
+    expect(result.current.isLoading).toBe(false);
+  });
+
+  /**
    * Regression: the app shell mounts before Convex's auth handshake completes,
    * and Convex sends requests unauthenticated rather than queueing them. This
    * effect is one-shot, so firing it early used to mean a permanent

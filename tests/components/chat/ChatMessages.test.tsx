@@ -120,3 +120,32 @@ describe('ChatMessages: failed reply', () => {
     expect(screen.queryByTestId('chat-reply-failed')).not.toBeInTheDocument();
   });
 });
+
+describe('ChatMessages: empty state while loading', () => {
+  it('hides the empty state while loading by default', () => {
+    render(
+      <ChatMessages
+        messages={[]}
+        isLoading
+        threadId="t"
+        status="ready"
+        emptyStateExtra={<div data-testid="tiles" />}
+      />,
+    );
+    expect(screen.queryByTestId('tiles')).toBeNull();
+  });
+
+  it('shows the empty state at once when the thread is known to be empty', () => {
+    render(
+      <ChatMessages
+        messages={[]}
+        isLoading
+        threadId="t"
+        status="ready"
+        emptyStateExtra={<div data-testid="tiles" />}
+        emptyStateWhileLoading
+      />,
+    );
+    expect(screen.getByTestId('tiles')).toBeInTheDocument();
+  });
+});
