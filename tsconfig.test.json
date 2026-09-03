@@ -1,7 +1,8 @@
 {
   /* Typechecks the test dirs that the base config excludes (tests/,
    * convex/tests/, e2e/) alongside the sources they import. Run via
-   * `pnpm typecheck:tests`. */
+   * `pnpm typecheck:tests`. CLI scripts stay out — they are not the
+   * app and are not tests. */
   "extends": "./tsconfig.json",
   "compilerOptions": {
     /* Extra typeRoot resolves the `/// <reference types="vite/client" />`
@@ -18,5 +19,5 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "scripts"]
 }

@@ -22,6 +22,7 @@ import { getFuriganaSource } from './lib/textAnnotations';
 import { buildSearchableTextPatchForCard } from './lib/cardContent';
 import type { Id } from './_generated/dataModel';
 import { isPremadeLevelCollection } from './lib/collections';
+import { emptyByMode, type StatsReviewMode } from './types';
 import {
   cardsByOriginStateAndDueDate,
   cardsByOriginWritingStateAndDueDate,
@@ -785,6 +786,62 @@ export const recountDeckCardCountContinue = internalMutation({
  * mid-session. `migrations/
  * recalcUserCardAggregates.ts` stays available as a per-user repair tool.
  */
+const STAT_MODES = Object.keys(emptyByMode()) as StatsReviewMode[];
+
+/**
+ * Sum the per-mode time buckets over a course's daily rows. Days written
+ * before `dailyStats.timeMsByMode` existed contribute nothing, so the sum can
+ * be below `courseStats.totalTimeMs`; the home tile's subtraction rule
+ * (`statForFilter` in lib/statFilter.ts) shows that remainder as learn time,
+ * which is what it was.
+ */
+export function sumDailyTimeMsByMode(
+  rows: ReadonlyArray<Pick<Doc<'dailyStats'>, 'timeMsByMode'>>,
+): Record<StatsReviewMode, number> {
+  const sum = emptyByMode();
+  for (const row of rows) {
+    for (const mode of STAT_MODES) sum[mode] += row.timeMsByMode?.[mode] ?? 0;
+  }
+  return sum;
+}
+
+/**
+ * One courseStats row of `courseStatsTimeByModeBackfill`, exported for the
+ * migration tests. Rows that already carry the split are left alone, so the
+ * live writers (which stamp it on every review) win over a late re-run.
+ */
+export async function courseStatsTimeByModeBackfillOne(
+  ctx: MutationCtx,
+  doc: Doc<'courseStats'>,
+): Promise<Partial<Doc<'courseStats'>> | undefined> {
+  if (doc.totalTimeMsByMode !== undefined) return undefined;
+  const days = await ctx.db
+    .query('dailyStats')
+    .withIndex('by_userId_and_courseId_and_date', (q) =>
+      q.eq('userId', doc.userId).eq('courseId', doc.courseId),
+    )
+    .collect();
+  return { totalTimeMsByMode: sumDailyTimeMsByMode(days) };
+}
+
+/**
+ * Backfill `courseStats.totalTimeMsByMode` (see
+ * docs/migrations/course-time-by-mode-backfill.md) from the per-day split
+ * that `dailyStats.timeMsByMode` has carried since the mode split shipped.
+ * Deployment does not depend on it: an unstamped row reads as "all time is
+ * learn time" until the sweep reaches it, and every review stamps the field
+ * from then on.
+ *
+ * Small batches on purpose: each row collects a course's whole dailyStats
+ * history (one doc per active day), so a 100-row batch could read tens of
+ * thousands of documents and trip the per-transaction read limit.
+ */
+export const courseStatsTimeByModeBackfill = migrations.define({
+  table: 'courseStats',
+  batchSize: 10,
+  migrateOne: courseStatsTimeByModeBackfillOne,
+});
+
 export const runAll = migrations.runner([
   internal.migrations.perModeSettingsBackfill,
   internal.migrations.stripTrailingUnderscores,
@@ -807,4 +864,5 @@ export const runAll = migrations.runner([
   internal.migrations.backfillTranslationFurigana,
   internal.migrations.recountDeckCardCounts,
   internal.migrations.stabilityBucketAggregateBackfill,
+  internal.migrations.courseStatsTimeByModeBackfill,
 ]);

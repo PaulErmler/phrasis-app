@@ -16,6 +16,11 @@ import {
   type CardEditChange,
 } from './cardEditAudit';
 import { buildCardSearchableText } from '../lib/cardContent';
+import {
+  cardPinAt,
+  resolveServedFromLive,
+  type ServedTranslation,
+} from '../db/translationReads';
 import { patchCard } from '../db/stats/cardAggregates';
 import { randomOrderKey } from '../lib/freePlay';
 import { updateWordTextsForEdit } from '../db/stats/wordTracking';
@@ -40,8 +45,15 @@ export type CardEditPlan = {
   allLanguages: string[];
   /** language → submitted text, for the languages the caller sent. */
   submittedMap: Map<string, string>;
-  /** language → existing translations row (non-source languages only). */
+  /** language → LIVE translations row (non-source languages only). */
   existingTranslationMap: Map<string, Doc<'translations'>>;
+  /**
+   * language → what the learner's card shows. Equals the live row unless the
+   * card is pinned to a superseded revision (convex/db/translationReads.ts).
+   * The diff, the audit's "before" and the fork's carried-over wording all
+   * read this; Path A patches the live rows by id.
+   */
+  servedTranslationMap: Map<string, ServedTranslation>;
   /** Languages whose stored text differs from the submitted text. */
   changedLanguages: Set<string>;
   /** Audio-relevant subset of `changedLanguages` (see `resolveCardEditPlan`). */
@@ -110,6 +122,14 @@ export async function resolveCardEditPlan(
       existingTranslationMap.set(lang, existingTranslations[i]!);
     }
   });
+  const pinAt = cardPinAt(card);
+  const servedTranslationMap = new Map<string, ServedTranslation>();
+  for (const [lang, live] of existingTranslationMap) {
+    servedTranslationMap.set(
+      lang,
+      await resolveServedFromLive(ctx, live, pinAt),
+    );
+  }
 
   // Build a map of submitted texts
   const submittedMap = new Map<string, string>();
@@ -125,8 +145,8 @@ export async function resolveCardEditPlan(
     if (lang === sourceLanguage) {
       if (submitted !== text.text) changedLanguages.add(lang);
     } else {
-      const existing = existingTranslationMap.get(lang);
-      if (submitted !== (existing?.translatedText ?? ''))
+      const served = servedTranslationMap.get(lang);
+      if (submitted !== (served?.row.translatedText ?? ''))
         changedLanguages.add(lang);
     }
   }
@@ -150,7 +170,7 @@ export async function resolveCardEditPlan(
     const oldText =
       lang === sourceLanguage
         ? text.text
-        : (existingTranslationMap.get(lang)?.translatedText ?? '');
+        : (servedTranslationMap.get(lang)?.row.translatedText ?? '');
     if (!soundsSame(submittedMap.get(lang)!, oldText)) {
       audioChangedLanguages.add(lang);
     }
@@ -161,6 +181,7 @@ export async function resolveCardEditPlan(
     allLanguages,
     submittedMap,
     existingTranslationMap,
+    servedTranslationMap,
     changedLanguages,
     audioChangedLanguages,
     isUserOwned,
@@ -213,6 +234,7 @@ export async function recordCardEditAuditStart(
     sourceLanguage,
     submittedMap,
     existingTranslationMap,
+    servedTranslationMap,
     changedLanguages,
     audioChangedLanguages,
     isUserOwned,
@@ -220,18 +242,18 @@ export async function recordCardEditAuditStart(
 
   const auditChanges: CardEditChange[] = [...changedLanguages].map((lang) => {
     const isSourceLanguage = lang === sourceLanguage;
-    const existing = existingTranslationMap.get(lang);
+    const served = servedTranslationMap.get(lang);
     return {
       language: lang,
       role: languageRole(course, lang),
       isSourceLanguage,
-      before: isSourceLanguage ? text.text : (existing?.translatedText ?? ''),
+      before: isSourceLanguage ? text.text : (served?.row.translatedText ?? ''),
       after: submittedMap.get(lang)!,
       ...(isSourceLanguage
         ? {}
         : {
-            beforeTranslationSource: existing?.translationSource,
-            beforeFlagCount: existing?.flagCount,
+            beforeTranslationSource: served?.row.translationSource,
+            beforeFlagCount: existingTranslationMap.get(lang)?.flagCount,
           }),
       soundsSame: !audioChangedLanguages.has(lang),
     };
@@ -351,7 +373,7 @@ export async function forkSharedTextForEdit(
     sourceLanguage,
     allLanguages,
     submittedMap,
-    existingTranslationMap,
+    servedTranslationMap,
     changedLanguages,
     audioChangedLanguages,
     audioGenderStamp,
@@ -394,10 +416,12 @@ export async function forkSharedTextForEdit(
   //   - User-edited rows: tag as `'user-provided'`; carry no annotations.
   //   - Unchanged rows: copy `translatedText` + `translationSource` +
   //     every present annotation pair (romanization, IPA) so we don't
-  //     lose the original tags on the logical-copy operation.
+  //     lose the original tags on the logical-copy operation. The copy is
+  //     of the SERVED revision: a card pinned to a superseded wording forks
+  //     the wording the learner has been studying, not the live row.
   for (const lang of allLanguages) {
     if (lang === sourceLanguage) continue;
-    const existing = existingTranslationMap.get(lang);
+    const existing = servedTranslationMap.get(lang)?.row;
     const changed = changedLanguages.has(lang);
     const translatedText = changed
       ? (submittedMap.get(lang) ?? '')
@@ -443,9 +467,24 @@ export async function forkSharedTextForEdit(
   }
 
   // Copy audio recordings for languages whose audio is still valid.
-  // Unchanged ones AND punctuation-only edits (audibly identical).
+  // Unchanged ones AND punctuation-only edits (audibly identical). A pinned
+  // language points at the asset its archived revision recorded (the live
+  // pointer now speaks the new wording); an archived revision without audio
+  // gets none, and the fork's own ensure sweep fills it for the carried
+  // wording.
   for (const lang of allLanguages) {
     if (audioChangedLanguages.has(lang)) continue;
+    const served = servedTranslationMap.get(lang);
+    if (served?.archived) {
+      if (served.audioAssetId) {
+        await ctx.db.insert('audioRecordings', {
+          textId: newTextId,
+          language: lang,
+          assetId: served.audioAssetId,
+        });
+      }
+      continue;
+    }
     const audioRows = await ctx.db
       .query('audioRecordings')
       .withIndex('by_text_and_language', (q) =>

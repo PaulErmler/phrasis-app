@@ -75,8 +75,9 @@ describe('createHomeTour: workload step', () => {
     const tour = createHomeTour(t, { reviewMode: 'audio' });
     const elements = tour.steps.map((s) => s.element);
     const workloadIdx = elements.indexOf('[data-tutorial="workload-forecast"]');
-    // The card renders below the progress card, whose two steps must both
-    // come first or the tour scrolls down and back up.
+    // The card renders below the chat input (after the progress card),
+    // whose two steps must both come first or the tour scrolls down and
+    // back up.
     expect(workloadIdx).toBeGreaterThan(
       elements.indexOf('[data-tutorial="projections"]'),
     );

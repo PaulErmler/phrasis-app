@@ -191,6 +191,223 @@ describe('resolveAudioSettings: per-mode precedence (`*Transcribe ?? *Full ?? un
   });
 });
 
+describe('resolveAudioSettings: radio branches off audio (`*Radio ?? unsuffixed`)', () => {
+  // Every level distinct, including a *Full the radio branch must NOT reach.
+  // This doc is the whole point of the suite: if radio ever chains through the
+  // writing copies, `reps` comes back as { es: 2 } instead of { es: 9 }.
+  const allLevels = cs({
+    languageRepetitions: { es: 1 },
+    languageRepetitionsFull: { es: 2 },
+    languageRepetitionsTranscribe: { es: 3 },
+    languageRepetitionsRadio: { es: 9 },
+    languageRepetitionPauses: { es: 1.5 },
+    languageRepetitionPausesFull: { es: 2.5 },
+    languageRepetitionPausesRadio: { es: 0 },
+    languagePlaybackSpeeds: { es: 0.8 },
+    languagePlaybackSpeedsFull: { es: 1.0 },
+    languagePlaybackSpeedsRadio: { es: 1.4 },
+    pauseTargetToTarget: 1,
+    pauseTargetToTargetFull: 2,
+    pauseTargetToTargetRadio: 7,
+    pauseBaseToBase: 4,
+    pauseBaseToBaseFull: 5,
+    pauseBaseToBaseRadio: 11,
+    pauseBaseToTarget: 6,
+    pauseBaseToTargetFull: 7,
+    pauseBaseToTargetRadio: 12,
+    pauseBeforeAutoAdvance: 8,
+    pauseBeforeAutoAdvanceFull: 9,
+    pauseBeforeAutoAdvanceRadio: 13,
+  });
+
+  it('radio reads its own copies, never the writing ones', () => {
+    const r = resolveAudioSettings(allLevels, undefined, 'radio');
+    expect(r.reps).toEqual({ es: 9 });
+    expect(r.repPauses).toEqual({ es: 0 });
+    expect(r.speeds).toEqual({ es: 1.4 });
+    expect(r.pauseT2T).toBe(7);
+    expect(r.pauseB2B).toBe(11);
+    expect(r.pauseB2T).toBe(12);
+    expect(r.pauseBeforeAdvance).toBe(13);
+  });
+
+  it('radio keeps the AUDIO target-reps fallback, not the writing one', () => {
+    // Radio is the hands-free face of audio mode. Lumping it in with the
+    // writing modes here would silently drop every unset language to one play.
+    expect(
+      resolveAudioSettings(allLevels, undefined, 'radio').defaultTargetReps,
+    ).toBe(DEFAULT_REPETITIONS_TARGET);
+    expect(
+      resolveAudioSettings(null, undefined, 'radio').defaultTargetReps,
+    ).toBe(DEFAULT_REPETITIONS_TARGET);
+  });
+
+  it('the other three modes are untouched by a *Radio value', () => {
+    const audio = resolveAudioSettings(allLevels, undefined, 'audio');
+    const full = resolveAudioSettings(allLevels, undefined, 'full');
+    const transcribe = resolveAudioSettings(allLevels, undefined, 'transcribe');
+    expect(audio.reps).toEqual({ es: 1 });
+    expect(full.reps).toEqual({ es: 2 });
+    expect(transcribe.reps).toEqual({ es: 3 });
+    expect(audio.pauseB2B).toBe(4);
+    expect(full.pauseB2B).toBe(5);
+    expect(transcribe.pauseB2B).toBe(5);
+  });
+
+  it('with no *Radio copy, radio falls back to unsuffixed and NOT to *Full', () => {
+    // The branch-not-chain rule, stated against a doc where the two differ.
+    const audioAndFull = cs({
+      languageRepetitions: { es: 1 },
+      languageRepetitionsFull: { es: 2 },
+      pauseTargetToTarget: 1,
+      pauseTargetToTargetFull: 2,
+      pauseBaseToBase: 4,
+      pauseBaseToBaseFull: 5,
+    });
+    const r = resolveAudioSettings(audioAndFull, undefined, 'radio');
+    expect(r.reps).toEqual({ es: 1 });
+    expect(r.pauseT2T).toBe(1);
+    expect(r.pauseB2B).toBe(4);
+  });
+
+  it('resolves identically to audio mode when nothing radio-specific is stored', () => {
+    // The dormant case: the split is off, so the caller asks for 'audio' even
+    // though *Radio values sit in the doc. Nothing radio-specific leaks.
+    const audioOnly = cs({
+      languageRepetitions: { es: 2 },
+      languageRepetitionPauses: { es: 3 },
+      pauseBaseToBase: 4,
+    });
+    expect(resolveAudioSettings(audioOnly, undefined, 'radio')).toEqual(
+      resolveAudioSettings(audioOnly, undefined, 'audio'),
+    );
+  });
+
+  it('a stored 0 is a value, not a gap', () => {
+    const r = resolveAudioSettings(
+      cs({ pauseTargetToTarget: 5, pauseTargetToTargetRadio: 0 }),
+      undefined,
+      'radio',
+    );
+    expect(r.pauseT2T).toBe(0);
+  });
+
+  it('applies the global defaults when no level stores a value', () => {
+    const r = resolveAudioSettings(null, undefined, 'radio');
+    expect(r.reps).toEqual({});
+    expect(r.pauseT2T).toBe(DEFAULT_PAUSE_BETWEEN_LANGUAGES);
+    expect(r.pauseB2B).toBe(DEFAULT_PAUSE_BETWEEN_LANGUAGES);
+    expect(r.pauseB2T).toBe(DEFAULT_PAUSE_BASE_TO_TARGET);
+    expect(r.pauseBeforeAdvance).toBe(DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE);
+  });
+});
+
+describe('resolveAudioSettings: Practice Listening forks per mode too', () => {
+  // These fields have a *Radio twin but no *Full twin, the asymmetry that
+  // forced ModeResolvableSetting to accept either.
+  const doc = cs({
+    playTargetBeforeBase: true,
+    playTargetAfterBase: true,
+    playTargetBeforeBaseRadio: false,
+    targetBeforeRepetitions: { es: 2 },
+    targetBeforeRepetitionsRadio: { es: 1 },
+    targetBeforeRepetitionPauses: { es: 3 },
+    targetBeforeRepetitionPausesRadio: { es: 0 },
+    targetBeforePlaybackSpeeds: { es: 0.9 },
+    targetBeforePlaybackSpeedsRadio: { es: 1.3 },
+    pauseTargetToBase: 4,
+    pauseTargetToBaseRadio: 1,
+    targetBeforeListeningStrategy: 'untilGood',
+    targetBeforeListeningStrategyRadio: 'continuous',
+    targetBeforeOnlyNewReps: 5,
+    targetBeforeOnlyNewRepsRadio: 2,
+    targetBeforeUntilGoodReps: 4,
+    targetBeforeUntilGoodRepsRadio: 1,
+  });
+
+  it('radio reads its own Practice Listening copies', () => {
+    const r = resolveAudioSettings(doc, undefined, 'radio');
+    expect(r.playTargetBefore).toBe(false);
+    expect(r.beforeReps).toEqual({ es: 1 });
+    expect(r.beforeRepPauses).toEqual({ es: 0 });
+    expect(r.beforeSpeeds).toEqual({ es: 1.3 });
+    expect(r.pauseT2B).toBe(1);
+    expect(r.listeningStrategy).toBe('continuous');
+    expect(r.beforeOnlyNewReps).toBe(2);
+    expect(r.beforeUntilGoodReps).toBe(1);
+  });
+
+  it('audio keeps its own, and the writing modes fall through to audio', () => {
+    for (const mode of ['audio', 'full', 'transcribe'] as const) {
+      const r = resolveAudioSettings(doc, undefined, mode);
+      expect(r.beforeReps).toEqual({ es: 2 });
+      expect(r.beforeRepPauses).toEqual({ es: 3 });
+      expect(r.pauseT2B).toBe(4);
+      expect(r.listeningStrategy).toBe('untilGood');
+      expect(r.beforeOnlyNewReps).toBe(5);
+      expect(r.beforeUntilGoodReps).toBe(4);
+    }
+  });
+
+  it('a radio-only toggle does not disturb the audio pair', () => {
+    const r = resolveAudioSettings(doc, undefined, 'audio');
+    expect(r.playTargetBefore).toBe(true);
+    expect(r.playTargetAfter).toBe(true);
+  });
+
+  it('the untilGood window falls back to the shared one, never to *Full', () => {
+    const noRadioCopy = cs({
+      targetBeforeUntilGoodReps: 3,
+      // Present purely to prove radio does not chain through the writing
+      // side; there is no *Full twin for this field, so this is inert.
+      targetBeforeOnlyNewReps: 9,
+    });
+    expect(
+      resolveAudioSettings(noRadioCopy, undefined, 'radio').beforeUntilGoodReps,
+    ).toBe(3);
+    // Nothing stored anywhere floors at 1, same as every other mode.
+    expect(
+      resolveAudioSettings(null, undefined, 'radio').beforeUntilGoodReps,
+    ).toBe(1);
+  });
+
+  it("an inherited 'untilGood' still graduates a card in radio", () => {
+    // The reason the strategy has to stay VISIBLE under the Radio scope:
+    // radio plays never rate a card, but the good count it already carries
+    // does graduate it, so an inherited 'untilGood' is not a no-op there.
+    const inherited = cs({
+      playTargetBeforeBase: true,
+      playTargetAfterBase: true,
+      targetBeforeListeningStrategy: 'untilGood',
+      targetBeforeUntilGoodReps: 2,
+    });
+    const r = resolveAudioSettings(inherited, undefined, 'radio');
+    expect(r.listeningStrategy).toBe('untilGood');
+    expect(
+      applyOnlyNewListening(r, { reviewCount: 0, goodReviewCount: 1 })
+        .playTargetBefore,
+    ).toBe(true);
+    expect(
+      applyOnlyNewListening(r, { reviewCount: 0, goodReviewCount: 2 })
+        .playTargetBefore,
+    ).toBe(false);
+  });
+
+  it('the legacy strategy inference runs per mode', () => {
+    // No stored strategy anywhere: each mode infers from ITS OWN rep window.
+    const legacy = cs({
+      targetBeforeOnlyNewReps: 3,
+      targetBeforeOnlyNewRepsRadio: 0,
+    });
+    expect(
+      resolveAudioSettings(legacy, undefined, 'audio').listeningStrategy,
+    ).toBe('onlyNew');
+    expect(
+      resolveAudioSettings(legacy, undefined, 'radio').listeningStrategy,
+    ).toBe('continuous');
+  });
+});
+
 describe('resolveAudioSettings: target before/after base', () => {
   it('defaults to the historical base→target sequence (after on, before off)', () => {
     const r = resolveAudioSettings(null);

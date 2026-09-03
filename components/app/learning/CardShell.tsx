@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AudioButton } from './AudioButton';
+import { useLocalPlaySignals } from './useLocalPlaySignals';
 import { AudioProgressBar } from './AudioProgressBar';
 import { CardActionsMenu } from './CardActionsMenu';
 import { CardSpeedBadge } from './CardSpeedBadge';
@@ -129,6 +130,9 @@ export function CardShell({
   const t = useTranslations('LearningMode');
   const baseTranslations = translations.filter((tr) => tr.isBaseLanguage);
   const targetTranslations = translations.filter((tr) => tr.isTargetLanguage);
+  // Tapping a base row's IPA line plays that row's clip (the target rows do
+  // the same in their own surfaces).
+  const ipaPlay = useLocalPlaySignals();
   const masterActive = isMastered || isPendingMaster;
   const hideActive = isHidden || isPendingHide;
 
@@ -293,6 +297,11 @@ export function CardShell({
                         ? 'blur-sm select-none cursor-pointer'
                         : 'transition-[filter] duration-300'
                     }
+                    onIpaClick={
+                      isBlurred
+                        ? undefined
+                        : () => ipaPlay.bump(translation.language)
+                    }
                   />
                 </div>
                 <div className="flex items-center">
@@ -303,6 +312,7 @@ export function CardShell({
                     onTimeUpdate={onButtonTimeUpdate}
                     onStop={onButtonStop}
                     speed={effectiveSpeed}
+                    playSignal={ipaPlay.signalFor(translation.language)}
                   />
                   {onSpeedCycle && (
                     <CardSpeedBadge

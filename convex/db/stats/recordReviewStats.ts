@@ -1,3 +1,4 @@
+import { cardPinAt, servedTranslatedText } from '../translationReads';
 import { MutationCtx } from '../../_generated/server';
 import { Doc } from '../../_generated/dataModel';
 import { ConvexError } from 'convex/values';
@@ -15,7 +16,11 @@ import { upsertDailyLanguageStats } from './dailyLanguageStats';
 import { upsertLanguageStats } from './languageStats';
 import { upsertReviewDepthAccuracy } from './reviewDepthAccuracy';
 import { trackNewWords } from './wordTracking';
-import type { SchedulingTrack } from '../../types';
+import {
+  emptyByMode,
+  type StatsReviewMode,
+  type SchedulingTrack,
+} from '../../types';
 // Shared with the per-card running averages (cards.reviewTimeStats) so the
 // daily time series and the per-card means clamp samples identically.
 import { REVIEW_TIME_CLAMP_MAX_MS as MAX_TIME_PER_CARD_MS } from '../../lib/reviewTimeStats';
@@ -141,11 +146,26 @@ export async function recordReviewStats(
         : (card.fsrsState ?? null);
   const fsrsCardState = priorFsrsState?.state ?? 0;
 
+  // Default to 'audio' when the caller omits a mode. This path is the
+  // active-review path (free play uses `recordFreePlayStats`), so the review
+  // must count toward the audio/full buckets for the milestone math, and the
+  // course-level time split must agree with the daily one it is backfilled
+  // from.
+  const reviewModeForStats = args.reviewMode ?? 'audio';
+
   // --- Course-level stats ---
   const prevModeReviews = stats.totalReviewsByMode ?? { audio: 0, full: 0 };
+  const prevModeTime: Record<StatsReviewMode, number> = {
+    ...emptyByMode(),
+    ...(stats.totalTimeMsByMode ?? {}),
+  };
   await ctx.db.patch(stats._id, {
     totalRepetitions: stats.totalRepetitions + 1,
     totalTimeMs: stats.totalTimeMs + clampedTime,
+    totalTimeMsByMode: {
+      ...prevModeTime,
+      [reviewModeForStats]: prevModeTime[reviewModeForStats] + clampedTime,
+    },
     totalCards: stats.totalCards + (isFirstReview ? 1 : 0),
     currentStreak: newStreak,
     lastActivityDate: newLastActivityDate,
@@ -184,10 +204,6 @@ export async function recordReviewStats(
   // `dailyReviewsToday` here is the non-radio review count (audio + full) so
   // that radio plays don't inflate the celebration milestone or the in-learn
   // progress bar. `repsAfter` (total reps incl. radio) is intentionally unused.
-  // Default to 'audio' when the caller omits a mode. This path is the
-  // active-review path (free play uses `recordFreePlayStats`), so the review
-  // must count toward `reviewsByMode.audio`/`full` for the milestone math.
-  const reviewModeForStats = args.reviewMode ?? 'audio';
   const {
     isFirstActivityToday,
     activeReviewsAfter: dailyReviewsToday,
@@ -273,14 +289,14 @@ export async function recordReviewStats(
       }
       for (const lang of untrackedLanguages) {
         if (lang === text.language) continue;
-        const translation = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('targetLanguage', lang),
-          )
-          .first();
-        if (translation) {
-          langTexts.push({ language: lang, text: translation.translatedText });
+        // Count the words the learner actually reviewed: the served revision.
+        const translated = await servedTranslatedText(ctx, {
+          textId: card.textId,
+          targetLanguage: lang,
+          pinAt: cardPinAt(card),
+        });
+        if (translated !== null) {
+          langTexts.push({ language: lang, text: translated });
         }
       }
       if (langTexts.length > 0) {

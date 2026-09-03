@@ -4,7 +4,7 @@ import type { Doc } from '@/convex/_generated/dataModel';
 // Shared constants
 // ============================================================================
 
-export const DEFAULT_BATCH_SIZE = 5;
+export const DEFAULT_BATCH_SIZE = 3;
 
 // ============================================================================
 // Shared types for card data returned by Convex queries

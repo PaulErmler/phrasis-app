@@ -31,13 +31,15 @@ import { chromium, type Browser } from '@playwright/test';
 import sharp from 'sharp';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  CAPTURE_VIEWPORT as CAPTURE,
+  captureScreen,
+} from './lib/captureScreens';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 const OUT = join(process.cwd(), 'store-assets');
 const RAW = join(OUT, 'raw');
 
-/** CSS viewport for raw captures; @3x = 1320×2868 (exact 6.9" size). */
-const CAPTURE = { width: 440, height: 956, scale: 3 };
 const SCREEN_ASPECT = CAPTURE.height / CAPTURE.width;
 
 const IOS = { width: 1320, height: 2868 };
@@ -415,26 +417,14 @@ async function main() {
 
   // ---- 1. Raw captures --------------------------------------------------
   for (const spec of SCREENS) {
-    const page = await browser.newPage({
-      viewport: { width: CAPTURE.width, height: CAPTURE.height },
-      deviceScaleFactor: CAPTURE.scale,
-      colorScheme: spec.theme,
-    });
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto(`${BASE_URL}/screenshots/${spec.slug}`, {
-      waitUntil: 'networkidle',
-    });
-    await page.addStyleTag({
-      content: [
-        '*, *::before, *::after { animation: none !important; transition: none !important; caret-color: transparent !important; }',
-        '[data-testid="consent-banner"] { display: none !important; }',
-        'nextjs-portal { display: none !important; }',
-      ].join('\n'),
-    });
-    await page.waitForTimeout(spec.settleMs ?? 500);
     const rawPath = join(RAW, `${spec.slug}-${spec.theme}.png`);
-    await page.screenshot({ path: rawPath });
-    await page.close();
+    await captureScreen(browser, {
+      slug: spec.slug,
+      theme: spec.theme,
+      outPath: rawPath,
+      baseUrl: BASE_URL,
+      settleMs: spec.settleMs ?? 500,
+    });
     console.log(`raw: ${rawPath}`);
   }
 

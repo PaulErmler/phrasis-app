@@ -66,6 +66,15 @@ export const CLIENT_EVENTS = {
   /** The browser's `appinstalled` event. Fires however the install started
    *  (our dialog, the omnibox icon, browser menu), Chromium-only. */
   PWA_INSTALLED: 'pwa_installed',
+
+  /**
+   * `audio.play()` on the card player rejected with NotAllowedError. Carries
+   * `path` ('manual' | 'auto' | 'resume' | 'handoff') and `visibility`
+   * (document.visibilityState at the time). A cluster of `handoff` +
+   * `hidden` is a browser refusing to continue Radio / auto-advance while
+   * the screen is locked.
+   */
+  AUDIO_PLAY_BLOCKED: 'audio_play_blocked',
 } as const;
 
 export type ClientEvent = (typeof CLIENT_EVENTS)[keyof typeof CLIENT_EVENTS];

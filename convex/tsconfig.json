@@ -12,6 +12,15 @@
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
 
+    /* The `@/` alias from the root tsconfig, resolved relative to this file
+     * (no baseUrl needed since TS 4.4). Convex functions themselves import by
+     * relative path, but this project includes everything under convex/, which
+     * drags in whatever those functions reach through lib/ and components/,
+     * and those files use the alias. Without this, running tsc against this
+     * config fails on an app file it only sees transitively (for example
+     * courses.ts to lib/audio/modeCopies to components/app/learning/types). */
+    "paths": { "@/*": ["../*"] },
+
     /* These compiler options are required by Convex */
     "target": "ESNext",
     "lib": ["ES2021", "ES2022.Intl", "dom"],

@@ -72,7 +72,7 @@ export function RotatingProjection({
 }: {
   skip: boolean;
   replayKey: number | string;
-  /** Steers the first frame: session yield before studying, counterfactual after. */
+  /** Steers the first frame: session yield before studying. */
   hasStudiedToday: boolean;
   cacheSuffix?: string;
   className?: string;
@@ -106,11 +106,8 @@ export function RotatingProjection({
       (i) => i.kind !== 'empty',
     );
     if (indicators.length === 0) return [];
-    const firstKind = hasStudiedToday
-      ? indicators.some((i) => i.kind === 'counterfactualWords')
-        ? 'counterfactualWords'
-        : null
-      : indicators.some((i) => i.kind === 'sessionYield')
+    const firstKind =
+      !hasStudiedToday && indicators.some((i) => i.kind === 'sessionYield')
         ? 'sessionYield'
         : null;
     const first = indicators.filter((i) => i.kind === firstKind);
@@ -310,11 +307,6 @@ function renderFrame(
         label: t('endOfMonthLabel', {
           month: format.dateTime(toDate(frame.monthDate), { month: 'long' }),
         }),
-      };
-    case 'counterfactualWords':
-      return {
-        big: t('wordsBig', { words: approx(frame.boostedWords, frame.capped) }),
-        label: t('counterfactualLabel'),
       };
     case 'sessionYield':
       return {

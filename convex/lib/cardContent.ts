@@ -16,6 +16,12 @@ import {
   audioPayloadFromRowAndAsset,
   type ResolvedAudioPayload,
 } from './audioAssets';
+import {
+  cardPinAt,
+  getLiveTranslation,
+  resolveServedFromLive,
+  type ServedTranslation,
+} from '../db/translationReads';
 
 type ContentCtx = QueryCtx | MutationCtx;
 
@@ -116,6 +122,14 @@ interface TextContentInput {
    * to each caller.
    */
   userCreated: boolean;
+  /**
+   * The card's translation pin (`cardPinAt(card)`) when this content is shown
+   * ON A CARD: each translation resolves to the revision that was live at
+   * that instant (convex/db/translationReads.ts), audio included, so a
+   * version bump never changes an existing card. Omit for readers with no
+   * card (collection preview, placement), which show the live row.
+   */
+  pinAt?: number;
 }
 
 export function getCourseLanguages(
@@ -152,6 +166,7 @@ export async function buildTextContentBatchForLanguages(
     lang: string;
     textId: Id<'texts'>;
     userCreated: boolean;
+    pinAt: number | undefined;
   }> = [];
   const audioFetches: Array<{
     key: string;
@@ -167,6 +182,7 @@ export async function buildTextContentBatchForLanguages(
           lang,
           textId: input.textId,
           userCreated: input.userCreated,
+          pinAt: input.pinAt,
         });
       }
       audioFetches.push({ key: input.key, lang, textId: input.textId });
@@ -205,6 +221,18 @@ export async function buildTextContentBatchForLanguages(
     ),
   ]);
 
+  // Pin resolution: only a pinned (card, language) pair whose live row has
+  // been archived since the pin does a further read; everything else
+  // resolves synchronously to the live row.
+  const servedResults: (ServedTranslation | null)[] = await Promise.all(
+    translationFetches.map((item, idx) => {
+      const live = translationResults[idx];
+      return live
+        ? resolveServedFromLive(ctx, live, item.pinAt)
+        : Promise.resolve(null);
+    }),
+  );
+
   const translationMap = new Map<
     string,
     {
@@ -214,40 +242,73 @@ export async function buildTextContentBatchForLanguages(
       furigana?: string;
       llmClaimedAt: number | null;
       versionStale: boolean;
+      /**
+       * The card is pinned to a superseded revision. Frozen content: it
+       * never regenerates, so nothing about it counts as missing.
+       */
+      archived: boolean;
     }
   >();
+  // Audio for an archived revision comes from the asset the archive row
+  // recorded, not from the live pointer (which now speaks the new wording).
+  const archivedAudioByKeyAndLang = new Map<string, Id<'audioAssets'>>();
   translationFetches.forEach((item, idx) => {
-    const row = translationResults[idx];
+    const served = servedResults[idx];
+    const row = served?.row;
     const claim = claimResults[idx];
+    const archived = served?.archived ?? false;
     translationMap.set(`${item.key}:${item.lang}`, {
       text: row?.translatedText ?? '',
       romanization: row?.romanizedText ?? undefined,
       ipa: row?.ipaText ?? undefined,
       furigana: row?.furiganaText ?? undefined,
-      llmClaimedAt: claim?.claimedAt ?? null,
+      // A retranslation in flight replaces the LIVE row; a pinned card will
+      // not see it, so the pill stays off for archived entries.
+      llmClaimedAt: archived ? null : (claim?.claimedAt ?? null),
       versionStale:
-        row != null &&
-        mayRegenerateTranslation({ userCreated: item.userCreated }, row) &&
-        isTranslationVersionStale(item.lang, row.translationVersion),
+        served != null &&
+        !archived &&
+        mayRegenerateTranslation(
+          { userCreated: item.userCreated },
+          served.live,
+        ) &&
+        isTranslationVersionStale(item.lang, served.live.translationVersion),
+      archived,
     });
+    if (served?.archived && served.audioAssetId) {
+      archivedAudioByKeyAndLang.set(
+        `${item.key}:${item.lang}`,
+        served.audioAssetId,
+      );
+    }
   });
 
   // Resolve each audio row's payload through its shared `audioAssets` doc.
   // One deduped point-read per unique asset per batch. Decks repeat
   // sentences, so the dedup matters.
   const assetIds = [
-    ...new Set(audioResults.flatMap((row) => (row ? [row.assetId] : []))),
+    ...new Set([
+      ...audioResults.flatMap((row) => (row ? [row.assetId] : [])),
+      ...archivedAudioByKeyAndLang.values(),
+    ]),
   ];
   const assetDocs = await Promise.all(assetIds.map((id) => ctx.db.get(id)));
   const assetById = new Map(assetIds.map((id, i) => [id, assetDocs[i]]));
 
   const payloadByKeyAndLang = new Map<string, ResolvedAudioPayload | null>();
   audioFetches.forEach((item, idx) => {
+    const keyAndLang = `${item.key}:${item.lang}`;
+    const entry = translationMap.get(keyAndLang);
     const row = audioResults[idx];
+    // An archived revision plays its own asset, or nothing: the live
+    // pointer's audio speaks a wording this card does not show.
+    const assetId = entry?.archived
+      ? archivedAudioByKeyAndLang.get(keyAndLang)
+      : row?.assetId;
     payloadByKeyAndLang.set(
-      `${item.key}:${item.lang}`,
-      row
-        ? audioPayloadFromRowAndAsset(assetById.get(row.assetId) ?? null)
+      keyAndLang,
+      assetId
+        ? audioPayloadFromRowAndAsset(assetById.get(assetId) ?? null)
         : null,
     );
   });
@@ -337,10 +398,17 @@ export async function buildTextContentBatchForLanguages(
       };
     });
 
+    // Archived (pinned) entries are frozen: the pipeline only ever fills the
+    // live row, so counting a pinned entry's gaps would make the client
+    // self-heal ask forever for work nothing will do.
+    const isArchived = (lang: string) =>
+      translationMap.get(`${input.key}:${lang}`)?.archived === true;
     const hasMissingTranslation = translations.some(
       (tr) => tr.language !== input.sourceLanguage && !tr.text,
     );
-    const hasMissingAudio = audioRecordings.some((audio) => !audio.url);
+    const hasMissingAudio = audioRecordings.some(
+      (audio) => !audio.url && !isArchived(audio.language),
+    );
     // Read the STORED annotations, not the projected ones: those are display
     // values, already blanked for languages the caller didn't ask about.
     // `=== undefined` (not `!stored`) mirrors the schedulers in decks.ts,
@@ -351,6 +419,7 @@ export async function buildTextContentBatchForLanguages(
     // term is what wires both kinds into the client self-heal
     // (useEnsureContent → ensureCardContent → scheduleMissingContent).
     const hasMissingAnnotation = allLanguages.some((lang) => {
+      if (isArchived(lang)) return false;
       const stored =
         lang === input.sourceLanguage
           ? {
@@ -375,6 +444,7 @@ export async function buildTextContentBatchForLanguages(
       (audio) =>
         audio.url !== null &&
         audio.wordTimings === null &&
+        !isArchived(audio.language) &&
         languageSupportsStt(audio.language),
     );
 
@@ -392,6 +462,76 @@ export async function buildTextContentBatchForLanguages(
   return result;
 }
 
+/** The live translation rows for a text, in course-language order. */
+async function loadLiveTranslationRows(
+  ctx: ContentCtx,
+  textId: Id<'texts'>,
+  courseLanguages: string[],
+): Promise<(Doc<'translations'> | null)[]> {
+  return Promise.all(
+    courseLanguages.map((lang) => getLiveTranslation(ctx, textId, lang)),
+  );
+}
+
+type SearchableEntry = { lang: string; text: string; romanization?: string };
+
+/**
+ * Resolve the rows a card pinned at `pinAt` is served, as search entries,
+ * plus a key identifying that exact set of revisions (for memoizing the
+ * built string across cards of the same text).
+ */
+async function servedSearchableEntries(
+  ctx: ContentCtx,
+  courseLanguages: string[],
+  liveRows: (Doc<'translations'> | null)[],
+  pinAt: number | undefined,
+): Promise<{ entries: SearchableEntry[]; revisionKey: string }> {
+  const served = await Promise.all(
+    liveRows.map((live) =>
+      live ? resolveServedFromLive(ctx, live, pinAt) : Promise.resolve(null),
+    ),
+  );
+  const entries: SearchableEntry[] = [];
+  const keyParts: string[] = [];
+  courseLanguages.forEach((lang, i) => {
+    const s = served[i];
+    if (!s) {
+      keyParts.push('-');
+      return;
+    }
+    entries.push({
+      lang,
+      text: s.row.translatedText,
+      romanization: s.row.romanizedText,
+    });
+    keyParts.push(s.revisionId);
+  });
+  return { entries, revisionKey: keyParts.join(',') };
+}
+
+function composeSearchableText(
+  resolvedText: Doc<'texts'> | null,
+  sourceText: string,
+  entries: SearchableEntry[],
+): { searchableText: string; searchableTextLanguages: string[] } {
+  // CJK/Thai parts get their Intl.Segmenter word tokens appended so Convex's
+  // whitespace/punctuation tokenizer can match mid-sentence words (it has no
+  // CJK segmentation of its own). Romanizations are Latin and stay as-is.
+  const parts = [
+    resolvedText?.language
+      ? appendSearchSegments(sourceText, resolvedText.language)
+      : sourceText,
+    resolvedText?.romanizedText,
+    ...entries.map((t) => appendSearchSegments(t.text, t.lang)),
+    ...entries.map((t) => t.romanization),
+  ];
+
+  return {
+    searchableText: parts.filter(Boolean).join(' '),
+    searchableTextLanguages: entries.map((t) => t.lang),
+  };
+}
+
 /**
  * Builds `searchableText` and `searchableTextLanguages` for a card by querying
  * the translations table for each course language individually.
@@ -402,6 +542,10 @@ export async function buildTextContentBatchForLanguages(
  *
  * Pass `text` when the caller already has the doc. Avoids a redundant
  * `ctx.db.get` on the review hot path.
+ *
+ * `pinAt` (`cardPinAt(card)`) makes the string hold the words the learner's
+ * card actually shows when the card is pinned to a superseded revision. Omit
+ * it for a card being created now (it is served the live rows either way).
  */
 export async function buildCardSearchableText(
   ctx: ContentCtx,
@@ -409,48 +553,19 @@ export async function buildCardSearchableText(
   sourceText: string,
   courseLanguages: string[],
   text?: Doc<'texts'> | null,
+  pinAt?: number,
 ): Promise<{ searchableText: string; searchableTextLanguages: string[] }> {
-  const [resolvedText, translationResults] = await Promise.all([
+  const [resolvedText, liveRows] = await Promise.all([
     text !== undefined ? Promise.resolve(text) : ctx.db.get(textId),
-    Promise.all(
-      courseLanguages.map(async (lang) => {
-        const translation = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', lang),
-          )
-          .unique();
-        return translation
-          ? {
-              lang,
-              text: translation.translatedText,
-              romanization: translation.romanizedText,
-            }
-          : null;
-      }),
-    ),
+    loadLiveTranslationRows(ctx, textId, courseLanguages),
   ]);
-
-  const foundTranslations = translationResults.filter(
-    (t): t is NonNullable<typeof t> => t !== null,
+  const { entries } = await servedSearchableEntries(
+    ctx,
+    courseLanguages,
+    liveRows,
+    pinAt,
   );
-
-  // CJK/Thai parts get their Intl.Segmenter word tokens appended so Convex's
-  // whitespace/punctuation tokenizer can match mid-sentence words (it has no
-  // CJK segmentation of its own). Romanizations are Latin and stay as-is.
-  const parts = [
-    resolvedText?.language
-      ? appendSearchSegments(sourceText, resolvedText.language)
-      : sourceText,
-    resolvedText?.romanizedText,
-    ...foundTranslations.map((t) => appendSearchSegments(t.text, t.lang)),
-    ...foundTranslations.map((t) => t.romanization),
-  ];
-
-  return {
-    searchableText: parts.filter(Boolean).join(' '),
-    searchableTextLanguages: foundTranslations.map((t) => t.lang),
-  };
+  return composeSearchableText(resolvedText, sourceText, entries);
 }
 
 /** Caches for `buildSearchableTextPatchForCard`, scoped by the caller. */
@@ -458,8 +573,15 @@ export interface SearchableTextRebuildCaches {
   /** deck → course languages (null when the deck/course no longer resolves). */
   deckLanguages: Map<Id<'decks'>, string[] | null>;
   /**
-   * Optional memo of built results keyed by (textId, languages), valid
-   * across cards because the build depends only on those two inputs.
+   * Optional memo of the live translation rows keyed by (textId, languages).
+   * Every card of a text shares them; only the pin-dependent revision choice
+   * differs per card, and that costs nothing for un-archived rows.
+   */
+  liveRows?: Map<string, (Doc<'translations'> | null)[]>;
+  /**
+   * Optional memo of built results keyed by (textId, languages, served
+   * revisions), valid across cards because the build depends only on those
+   * inputs.
    */
   built?: Map<
     string,
@@ -472,14 +594,20 @@ export interface SearchableTextRebuildCaches {
  * (`rebuildSearchableTextForText` in features/decks.ts) and the migration
  * (`rebuildCardSearchableText` in migrations.ts): resolve the card's deck →
  * course languages (memoized in the caller-provided cache), build the search
- * string, and return it as a patch, or `undefined` when the deck/course no
- * longer resolves or the stored fields are already current.
+ * string for the revisions this card is served, and return it as a patch, or
+ * `undefined` when the deck/course no longer resolves or the stored fields
+ * are already current.
  */
 export async function buildSearchableTextPatchForCard(
   ctx: ContentCtx,
   card: Pick<
     Doc<'cards'>,
-    'deckId' | 'textId' | 'searchableText' | 'searchableTextLanguages'
+    | '_creationTime'
+    | 'deckId'
+    | 'textId'
+    | 'searchableText'
+    | 'searchableTextLanguages'
+    | 'translationsAcceptedAt'
   >,
   text: Doc<'texts'>,
   caches: SearchableTextRebuildCaches,
@@ -497,16 +625,22 @@ export async function buildSearchableTextPatchForCard(
   }
   if (!languages) return undefined;
 
-  const builtKey = `${card.textId}|${languages.join('|')}`;
+  const liveKey = `${card.textId}|${languages.join('|')}`;
+  let liveRows = caches.liveRows?.get(liveKey);
+  if (!liveRows) {
+    liveRows = await loadLiveTranslationRows(ctx, card.textId, languages);
+    caches.liveRows?.set(liveKey, liveRows);
+  }
+  const { entries, revisionKey } = await servedSearchableEntries(
+    ctx,
+    languages,
+    liveRows,
+    cardPinAt(card),
+  );
+  const builtKey = `${liveKey}|${revisionKey}`;
   let built = caches.built?.get(builtKey);
   if (!built) {
-    built = await buildCardSearchableText(
-      ctx,
-      card.textId,
-      text.text,
-      languages,
-      text,
-    );
+    built = composeSearchableText(text, text.text, entries);
     caches.built?.set(builtKey, built);
   }
   return isSearchableTextCurrent(card, built) ? undefined : built;

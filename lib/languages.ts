@@ -173,9 +173,12 @@ export interface Language {
   /**
    * Translation-method version (defaults to 1 via `getCurrentTranslationVersion`).
    * Bump when changing the model/prompt for this language to lazily regenerate
-   * its existing non-custom translations (and their audio) on next view. See the
-   * content-versioning helpers below and `translations.translationVersion` in
-   * convex/schema.ts.
+   * its existing non-custom translations (and their audio) on next view. The
+   * regeneration happens in place: a card that already shows the old wording
+   * keeps it (and its audio) via `translationArchive`, only cards added
+   * afterwards get the new one. See the content-versioning helpers below and
+   * `translations.translationVersion` in convex/schema.ts. Last bumped for
+   * every language in Sep 2026 with the switch to `SOL_MINIMAL`.
    */
   translationVersion?: number;
   /**
@@ -424,7 +427,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     translationPromptNotes:
       'vosotros for the informal plural, peninsular vocabulary.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'es_latam',
@@ -452,7 +455,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     translationPromptNotes:
       'ustedes for the plural, regionally neutral Latin American vocabulary.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'es_mixed',
@@ -483,7 +486,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'es-419',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'fr',
@@ -500,7 +503,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'fr',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'de',
@@ -517,7 +520,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'de',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'it',
@@ -534,7 +537,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'it',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'pt',
@@ -553,7 +556,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'pt-br',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'pt_pt',
@@ -578,7 +581,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsVersion: 2,
     translationPromptNotes:
       'European Portuguese vocabulary, spelling, and phonetics.',
-    translationVersion: 2,
+    translationVersion: 3,
     needsRomanization: false,
     ipaVoice: 'pt-pt',
     supportsKaraoke: true,
@@ -599,7 +602,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'ro',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ca',
@@ -614,6 +617,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇦🇩',
     category: 'romance',
     llmSupportTier: 'tier1',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'ca',
@@ -637,7 +642,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Cyrillic. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'pl',
@@ -654,7 +659,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'pl',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'sk',
@@ -671,7 +676,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'sk',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'cs',
@@ -689,7 +694,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'cs',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'hr',
@@ -702,6 +707,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇭🇷',
     category: 'slavic',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'hr',
@@ -719,6 +726,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇸🇮',
     category: 'slavic',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'sl',
@@ -737,6 +746,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇺🇦',
     category: 'slavic',
     llmSupportTier: 'tier1',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'uk',
@@ -773,7 +784,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
       'Use Cyrillic (ћирилица) exclusively; never the Latin alphabet.',
     // v2: prompt pins Cyrillic. Regenerate pre-existing (possibly
     // Latin-script) translations.
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'bg',
@@ -789,6 +800,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇧🇬',
     category: 'slavic',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'bg',
@@ -809,6 +822,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇱🇹',
     category: 'baltic',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'lt',
@@ -825,6 +840,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇱🇻',
     category: 'baltic',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'lv',
@@ -844,6 +861,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // neighbours in the picker. Learners look for it next to lt/lv.
     category: 'baltic',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'et',
@@ -865,7 +884,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'nl',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'sv',
@@ -883,7 +902,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'sv',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     // Re-enabled Jul 2026 on Gemini TTS (the pre-staged entry was Google-era).
@@ -898,6 +917,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇳🇴',
     category: 'germanic',
     llmSupportTier: 'tier1',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'nb',
@@ -920,7 +941,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'da',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'is',
@@ -946,7 +967,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Icelandic rows (archaic register, wrong imperatives), so Icelandic,
     // and only Icelandic. Lazily regenerates its existing translations
     // through the new rule.
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'fi',
@@ -967,7 +988,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     translationPromptNotes:
       'The formal/informal distinction is minimal; focus on naturalness.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'el',
@@ -991,7 +1012,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Disambiguates from Ancient/Koine Greek in the translation prompt
     // (same rationale as Hebrew's 'Modern Hebrew').
     translationName: 'Modern Greek',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'hi',
@@ -1012,7 +1033,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: false,
     supportsStt: true,
     translationPromptNotes: 'Informal → तुम form; formal → आप form.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'bn',
@@ -1037,7 +1058,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Bengali script. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ta',
@@ -1051,6 +1072,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇳',
     category: 'south-asian',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'ta',
@@ -1070,6 +1093,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇳',
     category: 'south-asian',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     // Telugu script. Google v3 romanizeText 400s on `te` ("Source language
     // is unsupported") despite still listing it in the docs table; ISO 15919
@@ -1095,7 +1120,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'tr',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'hu',
@@ -1114,7 +1139,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'hu',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'zh',
@@ -1140,7 +1165,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     translationPromptNotes:
       'Simplified Chinese characters, Mainland Mandarin vocabulary.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'zh_traditional',
@@ -1175,7 +1200,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationName: 'Taiwanese Mandarin (Traditional characters)',
     // v3: prompt pins Taiwanese Mandarin. Regenerate translations made under
     // the bare "Chinese (Traditional)" label.
-    translationVersion: 3,
+    translationVersion: 4,
   },
   {
     code: 'yue',
@@ -1212,7 +1237,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
       'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
     // v3: prompt pins the spoken-vernacular register. Regenerate
     // translations made under the bare "Cantonese" label.
-    translationVersion: 3,
+    translationVersion: 4,
   },
   {
     code: 'yue_traditional',
@@ -1248,7 +1273,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
       'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
     // v3: prompt pins the spoken-vernacular register. Regenerate
     // translations made under the bare "Cantonese" label.
-    translationVersion: 3,
+    translationVersion: 4,
   },
   {
     code: 'ja',
@@ -1277,7 +1302,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     translationPromptNotes:
       'Match the source formality: informal → plain form (だ／する), formal → polite form (です／ます).',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ko',
@@ -1299,7 +1324,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     translationPromptNotes:
       'Informal → 반말; formal → 해요체 or 합쇼체 as appropriate.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'vi',
@@ -1327,7 +1352,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationName: 'Northern Vietnamese',
     translationPromptNotes:
       'Northern (Hanoi) Vietnamese vocabulary and particles.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'vi_south',
@@ -1349,6 +1374,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇻🇳',
     category: 'asian-southeast',
     llmSupportTier: 'tier1',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     ttsPromptName: 'Southern Vietnamese',
     needsRomanization: false,
@@ -1386,7 +1413,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationName: 'Standard Thai',
     translationPromptNotes:
       'Polite particles (ครับ/ค่ะ) only when the source register is formal.',
-    translationVersion: 3,
+    translationVersion: 4,
   },
   {
     code: 'id',
@@ -1403,7 +1430,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'id',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ms',
@@ -1416,6 +1443,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇲🇾',
     category: 'asian-southeast',
     llmSupportTier: 'tier1',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'ms',
@@ -1447,7 +1476,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Models index far more data under "Tagalog" than "Filipino", same
     // collapse the legacy path does via `googleTranslateCode: 'tl'`.
     translationName: 'Filipino (Tagalog)',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ar',
@@ -1479,7 +1508,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationName: 'Modern Standard Arabic',
     translationPromptNotes:
       'MSA grammar; when the source does not specify gender, pick a grammatically valid form without letting that choice influence any gender metadata.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ar_sa',
@@ -1509,7 +1538,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationName: 'Saudi Arabic',
     translationPromptNotes:
       'MSA-leaning but with Hejazi/Najdi colloquial markers where natural.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ar_eg',
@@ -1540,7 +1569,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // so the model produces actual dialect, not MSA with a region hint.
     translationName: 'Egyptian Arabic',
     translationPromptNotes: 'Colloquial Cairene Arabic, not MSA.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ar_iq',
@@ -1569,7 +1598,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // so the model produces actual dialect, not MSA with a region hint.
     translationName: 'Iraqi Arabic',
     translationPromptNotes: 'Colloquial Iraqi Arabic, not MSA.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ar_lev',
@@ -1601,7 +1630,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // so the model produces actual dialect, not MSA with a region hint.
     translationName: 'Levantine Arabic',
     translationPromptNotes: 'Colloquial register, not MSA.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'he',
@@ -1627,7 +1656,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Disambiguates from Biblical Hebrew in the translation prompt.
     translationName: 'Modern Hebrew',
     translationPromptNotes: 'Match speaker gender to the verb form.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'fa',
@@ -1656,7 +1685,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Non-Latin script. Karaoke highlighting off (matches Arabic/Hebrew).
     supportsKaraoke: false,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'sw',
@@ -1678,7 +1707,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     translationPromptNotes:
       'Standard Kiswahili as spoken in Kenya, Sheng-free.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'sw_tz',
@@ -1709,7 +1738,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // no per-word timings, no karaoke.
     supportsStt: false,
     translationPromptNotes: 'Standard Kiswahili sanifu, Tanzanian vocabulary.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
 ];
 
@@ -1862,7 +1891,7 @@ export function isTranslationVersionStale(
 //   1. Define a new entry in TRANSLATION_RULES below.
 //   2. Set `translationRule: '<id>'` on the Language entries that should use it.
 //   3. If a language has no `translationRule` (currently: all of them), it
-//      falls back to `luna_bo3`.
+//      falls back to `sol_minimal`.
 // ---------------------------------------------------------------------------
 
 /**
@@ -2073,7 +2102,8 @@ export const LUNA_PROVIDER_CONSTRAINTS: StageProviderConstraints = {
   order: ['amazon-bedrock/us-east-1'],
 };
 
-// GPT-5.6 Luna best-of-3. The translation workhorse since Aug 2026.
+// GPT-5.6 Luna best-of-3. The translation workhorse Aug–Sep 2026, now a
+// fallback of `sol_minimal` and the revert rule.
 // Selected by a multi-round eval (FLORES de/is, native-speaker feedback set,
 // 500 Tatoeba EN→IS with COMET-22 + blind ratings): no-thinking Luna beat
 // Gemini 3.6 Flash minimal on every signal at ~6% of its cost, and the
@@ -2093,6 +2123,64 @@ export const LUNA_BO3: ModelStage = {
     provider: LUNA_PROVIDER_CONSTRAINTS,
     maxRetries: 2,
   },
+};
+
+/**
+ * GPT-5.6 Terra, single call, no thinking. Evaluated 2026-09-03 as a
+ * replacement for `LUNA_BO3` by scripts/eval-translation-pragmatics.ts and
+ * NOT wired into any rule: it tied the Luna best-of-3 pipeline overall
+ * (9.24 vs 9.12 on the judge, 20 wins / 18 losses over 180 items) at ~3x
+ * the cost, lost on Icelandic and on formal register, and Sol-minimal beat
+ * it at the same per-sentence price. Kept so the bench keeps measuring the
+ * exact stage that was rejected. Standard endpoint pricing is $2/M in,
+ * $12/M out; `max_price` keeps the $24/M "fast" endpoint out while still
+ * allowing Bedrock/Azure at $13.2. `reasoning: 'none'` is load-bearing for
+ * the same reason as Luna's.
+ */
+export const TERRA_SINGLE: ModelStage = {
+  model: 'openai/gpt-5.6-terra',
+  reasoning: 'none',
+  maxOutputTokens: 4_000,
+  provider: { max_price: { completion: 13.2 } },
+};
+
+/**
+ * GPT-5.6 Sol, one call, `minimal` thinking, cheapest endpoint first. The
+ * translation workhorse since Sep 2026, replacing `LUNA_BO3` on two benches:
+ * FLORES (2026-09-01: 8.92 vs 8.48) and the speech-act / generality set in
+ * scripts/eval-translation-pragmatics.ts (2026-09-03: 9.46 vs 9.12, best in
+ * every category and in 7 of 9 languages, Arabic dialects included). Best-of-3
+ * added nothing for Sol and `medium` thinking made it worse, so one call at
+ * the `minimal` floor (Sol cannot disable thinking).
+ *
+ * Routing: `:floor` sorts endpoints by price AND opts into OpenAI's flex
+ * service tier ($1/M in, $5/M out; base slugs never match flex), so the
+ * cheapest endpoint is always tried first. When flex is unavailable the sort
+ * falls through to standard ($10/M out), fast ($20) and Bedrock ($22). The
+ * $22.1 ceiling admits all of those and excludes only Azure ($30 to $33).
+ * Verified with the `sol-floor` bench condition on 2026-09-03: $0.00054 per
+ * call against $0.00079 on the standard endpoint, median latency 1.6 s vs
+ * 1.35 s, but 2 of 40 calls came back as HTTP errors that OpenRouter did
+ * not route around, hence `SOL_MINIMAL_STANDARD` as the first fallback.
+ */
+export const SOL_MINIMAL: ModelStage = {
+  model: 'openai/gpt-5.6-sol:floor',
+  reasoning: 'minimal',
+  maxOutputTokens: 6_000,
+  provider: { max_price: { completion: 22.1 } },
+};
+
+/**
+ * Same model and thinking as `SOL_MINIMAL` on the default-routed (standard,
+ * $2/$10) endpoint: the first fallback of `sol_minimal`, so a flex-tier
+ * refusal costs one retry at twice the price instead of dropping the
+ * sentence to Luna. Zero failures in 220 bench calls on this routing.
+ */
+export const SOL_MINIMAL_STANDARD: ModelStage = {
+  model: 'openai/gpt-5.6-sol',
+  reasoning: 'minimal',
+  maxOutputTokens: 6_000,
+  provider: { max_price: { completion: 22.1 } },
 };
 
 /**
@@ -2116,15 +2204,36 @@ export const TRANSLATION_RULES = {
   /**
    * Default for every language, no entry sets an explicit
    * `translationRule` anymore (set one only to route a language off this
-   * default, e.g. if Luna regresses on it). Used for the initial LLM
+   * default, e.g. if Sol regresses on it). Used for the initial LLM
    * translation of premade curriculum sentences and placement-test
-   * material. Swapped in from `gemini_35_flash_nitro_minimal` in Aug 2026
-   * on eval evidence (see `LUNA_BO3`); existing translations are not
-   * mass-regenerated by the rule swap, only new/missing rows (and
-   * languages whose `translationVersion` was bumped, currently Icelandic)
-   * go through Luna. The Gemini stage stays as the fallback so a Luna
-   * outage degrades to the previous production config before the Google
-   * safety net.
+   * material. Swapped in from `luna_bo3` in Sep 2026 on eval evidence (see
+   * `SOL_MINIMAL`). Existing translations regenerate lazily once a
+   * language's `translationVersion` is bumped, keeping their old wording
+   * for the cards that already show it (see `translationArchive` in
+   * convex/schema.ts). A flex-tier refusal retries on Sol's standard
+   * endpoint; a Sol outage degrades to `LUNA_BO3`, then Gemini, then the
+   * Google safety net.
+   */
+  sol_minimal: {
+    id: 'sol_minimal',
+    label:
+      'Sol (minimal, cheapest endpoint) → Sol (minimal, standard) → Luna best-of-3 → Gemini 3.7 Flash Nitro (minimal) → Google',
+    branches: [
+      {
+        maxChars: Infinity,
+        primary: SOL_MINIMAL,
+        fallbacks: [
+          SOL_MINIMAL_STANDARD,
+          LUNA_BO3,
+          GEMINI_35_FLASH_NITRO_MINIMAL,
+        ],
+      },
+    ],
+  },
+  /**
+   * The Aug–Sep 2026 default, kept as the revert path and as a fallback
+   * stage of `sol_minimal`. No language routes here by default anymore.
+   * Selected in Aug 2026 on eval evidence (see `LUNA_BO3`).
    */
   luna_bo3: {
     id: 'luna_bo3',
@@ -2139,8 +2248,8 @@ export const TRANSLATION_RULES = {
     ],
   },
   /**
-   * The pre-Aug-2026 default, kept as the revert path and as the in-rule
-   * fallback stage of `luna_bo3`. No language routes here by default
+   * The pre-Aug-2026 default, kept as the last LLM fallback stage of
+   * `sol_minimal` and `luna_bo3`. No language routes here by default
    * anymore.
    */
   gemini_35_flash_nitro_minimal: {
@@ -2196,8 +2305,8 @@ export type TranslationRuleId = keyof typeof TRANSLATION_RULES;
 /**
  * Resolve the ordered stages the translation worker should try for a given
  * (language, source-text-length) pair. Returns `[primary, ...fallbacks]` from
- * the matching branch of the language's rule (or the `luna_bo3` default when
- * the language doesn't set one).
+ * the matching branch of the language's rule (or the `sol_minimal` default
+ * when the language doesn't set one).
  *
  * `opts.ruleOverride` bypasses the per-language rule lookup. Used by
  * `flagTranslation` to force the `retranslation_high` chain regardless of the
@@ -2210,7 +2319,7 @@ export function resolveTranslationStages(
 ): ModelStage[] {
   const lang = getLanguageByCode(code);
   const ruleId: TranslationRuleId =
-    opts?.ruleOverride ?? lang?.translationRule ?? 'luna_bo3';
+    opts?.ruleOverride ?? lang?.translationRule ?? 'sol_minimal';
   // Cast through `TranslationRule` so each branch is typed as the union with
   // optional `fallbacks`. `satisfies` above narrows literals (some branches
   // don't declare `fallbacks`), which would otherwise drop that property

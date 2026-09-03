@@ -398,7 +398,6 @@
       "endOfYearLabel": "bis Ende {year}",
       "oneYearLabel": "in einem Jahr",
       "endOfMonthLabel": "bis Ende {month}",
-      "counterfactualLabel": "wenn jeder Tag wie heute wäre",
       "sessionYieldBig": "etwa +{words} neue Wörter",
       "sessionYieldLabel": "pro {goal}-Min.-Einheit",
       "perStudyHourLabel": "pro Lernstunde",
@@ -419,9 +418,17 @@
     "stats": {
       "streak": "Serie",
       "reps": "Wiederholungen",
+      "repsLearn": "Lern-Wdh.",
+      "repsRadio": "Radio-Wdh.",
+      "repsFreeStudy": "Freies-Üben-Wdh.",
+      "repsCycleHint": "Tippen, um zwischen allen, Lern-, Radio- und Freies-Üben-Wiederholungen zu wechseln",
       "sentences": "Sätze",
       "words": "Wörter",
       "time": "Zeit",
+      "timeLearn": "Lernzeit",
+      "timeRadio": "Radiozeit",
+      "timeFreeStudy": "Freies-Üben-Zeit",
+      "timeCycleHint": "Tippen, um zwischen gesamter, Lern-, Radio- und Freies-Üben-Zeit zu wechseln",
       "today": "heute",
       "new": "neu"
     },
@@ -653,6 +660,13 @@
       "reviewModeFullDescription": "Tippe die Übersetzungen ein und sieh einen zeichengenauen Vergleich mit der richtigen Antwort. Ideal für aktives Üben — fördert Erinnerung und Rechtschreibung.",
       "separateModeTracking": "Getrennter Fortschritt pro Modus",
       "separateModeTrackingDescription": "Shadowing und Schreiben führen für jeden Satz einen eigenen Wiederholungsplan",
+      "separateRadioSettings": "Getrennte Radio-Einstellungen",
+      "separateRadioSettingsDescription": "Radio behält eigene Wiederholungen, Pausen und Geschwindigkeiten. Aus: Radio folgt Lernen & Wiederholen",
+      "audioSettingsFor": "Audio-Einstellungen für",
+      "audioScopeReview": "Wiederholen",
+      "audioScopeRadio": "Radio",
+      "audioScopeReviewDescription": "Die Einstellungen unten gelten beim Lernen und Wiederholen.",
+      "audioScopeRadioDescription": "Die Einstellungen unten gelten für die freihändige Radio-Wiedergabe.",
       "fullReviewTargetAudio": "Zielsprache automatisch abspielen",
       "fullReviewTargetAudioDescription": "Wann soll das Audio der Zielsprache abgespielt werden",
       "fullReviewTargetAudio_always": "Nach Basis-Audio",
@@ -843,6 +857,7 @@
     "errors": {
       "failedToCreateThread": "Die neue Unterhaltung konnte nicht erstellt werden.",
       "failedToSend": "Die Nachricht konnte nicht gesendet werden.",
+      "retryFailed": "Die Antwort konnte nicht erneut angefordert werden. Bitte versuche es gleich noch einmal.",
       "failedToTranscribe": "Die Aufnahme konnte nicht transkribiert werden.",
       "microphoneAccess": "Kein Zugriff auf das Mikrofon möglich.",
       "messageTooLong": "Deine Nachricht ist zu lang. Bitte kürze sie und sende sie erneut."
@@ -898,6 +913,10 @@
     },
     "messageError": {
       "title": "Diese Nachricht konnte nicht angezeigt werden",
+      "retry": "Erneut versuchen"
+    },
+    "replyFailed": {
+      "title": "Der Tutor konnte gerade nicht antworten. Der KI-Dienst war kurz ausgelastet.",
       "retry": "Erneut versuchen"
     },
     "chatError": {

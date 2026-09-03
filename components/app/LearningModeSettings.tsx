@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
@@ -9,6 +9,12 @@ import {
   resolveModeSetting,
   type AudioSettingsMode,
 } from '@/lib/audio/mergeAudio';
+import {
+  MODE_COPIES,
+  MODE_WRITE_CHAIN,
+  type ModeCopyBaseField,
+  type ModeCopySuffix,
+} from '@/lib/audio/modeCopies';
 import {
   Sheet,
   SheetContent,
@@ -27,6 +33,7 @@ import {
   Settings2,
   Languages,
   Ear,
+  Radio as RadioIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -51,6 +58,11 @@ import {
   clampPlaybackSpeed,
 } from '@/lib/constants/audioPlayback';
 import { MAX_CARDS_PER_BATCH } from '@/lib/constants/learning';
+import {
+  clampInitialReviewCount,
+  MAX_INITIAL_REVIEW_COUNT,
+  MIN_INITIAL_REVIEW_COUNT,
+} from '@/lib/scheduling';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
 import { resolveShowFurigana } from '@/lib/furigana';
 import {
@@ -305,7 +317,27 @@ export function LearningModeSettings({
   const tSaveError = useTranslations('AppPage.courses.manage');
   const locale = useLocale();
   const [courseSettingsOpen, setCourseSettingsOpen] = useState(false);
+  // The scope the running session is actually playing, read from the same
+  // signal as `resolveSettingsMode` on the audio side. Opening the sheet
+  // mid-Radio-session therefore lands on the copy the user is hearing: the
+  // steppers, the preview timeline and the audio all agree, and a nudge can't
+  // write to the copy nothing is playing.
+  const liveScope: 'review' | 'radio' =
+    courseSettings?.schedulingMode === 'radio' ? 'radio' : 'review';
+  // Which copy of the playback settings the sheet is editing while the Radio
+  // split is on. Purely local: it selects the fields the controls write, and
+  // never touches `schedulingMode`, so opening settings can't change what the
+  // user is about to do. Null = follow the session; the pill sets it, and
+  // closing the sheet clears it so the next open follows the session again.
+  const [scopeOverride, setScopeOverride] = useState<'review' | 'radio' | null>(
+    null,
+  );
+  const audioScope = scopeOverride ?? liveScope;
   const updateSettings = useUpdateCourseSettings();
+
+  useEffect(() => {
+    if (!open) setScopeOverride(null);
+  }, [open]);
 
   if (!courseSettings) return null;
   const baseLanguages = resolveLanguageOrder(
@@ -364,35 +396,45 @@ export function LearningModeSettings({
     void setField('cardsToAddBatchSize', value);
   };
 
+  // Clamped, not rejected — `clampInitialReviewCount` is the contract on every
+  // write path. Dropping the write instead would strand a stored value above
+  // the max: `StepperControl` disables its minus at `value >= max`, so the
+  // control would freeze with no way back into range.
   const handleInitialReviewsChange = (value: number) => {
-    if (value < 1 || value > 20) return;
-    void setField('initialReviewCount', value);
+    void setField('initialReviewCount', clampInitialReviewCount(value));
   };
 
   // ---- audio playback setting handlers ----
-  // In writing ("full") mode these write the `*Full` counterpart fields (in
-  // transcribe the `*Transcribe` ones) so the modes stay independent. Record
-  // handlers spread the *effective* map (mode-resolved, see the resolved-values
-  // section below), so the first writing-mode edit snapshots the audio values
-  // for every language instead of dropping them.
+  // Each mode writes its own copy of a playback field, so the modes stay
+  // independent. Record handlers spread the *effective* map (mode-resolved,
+  // see the resolved-values section below), so a mode's first edit snapshots
+  // the inherited values for every language instead of dropping them.
+
+  // The field name the current mode writes for `field`. See MODE_COPIES.
+  const modeFieldName = <K extends ModeCopyBaseField>(
+    field: K,
+  ): K | `${K}${ModeCopySuffix}` => {
+    const copies: readonly ModeCopySuffix[] = MODE_COPIES[field];
+    for (const copy of MODE_WRITE_CHAIN[settingsMode]) {
+      if (copies.includes(copy)) return `${field}${copy}`;
+    }
+    return field;
+  };
+
+  // Single-field write against the current mode's copy. No cast: because
+  // `modeFieldName` returns the literal union `K | ${K}${ModeCopySuffix}`,
+  // the computed key still checks against CourseSettingsPatch, so a copy the
+  // schema doesn't have fails to compile here rather than writing a dead field.
+  const setModeField = <K extends ModeCopyBaseField>(
+    field: K,
+    value: CourseSettings[K],
+  ) => setFields({ [modeFieldName(field)]: value });
 
   const handleAutoPlayChange = (checked: boolean) =>
-    setFields(
-      isTranscribe
-        ? { autoPlayAudioTranscribe: checked }
-        : isFull
-          ? { autoPlayAudioFull: checked }
-          : { autoPlayAudio: checked },
-    );
+    setModeField('autoPlayAudio', checked);
 
   const handleHighlightWordsChange = (checked: boolean) =>
-    setFields(
-      isTranscribe
-        ? { highlightWordsTranscribe: checked }
-        : isFull
-          ? { highlightWordsFull: checked }
-          : { highlightWords: checked },
-    );
+    setModeField('highlightWords', checked);
 
   const handleHideTargetLanguagesChange = (checked: boolean) =>
     setFields({
@@ -408,71 +450,40 @@ export function LearningModeSettings({
 
   const handleRepetitionChange = (language: string, value: number) => {
     if (value < 0 || value > 10) return;
-    const next = { ...reps, [language]: value };
-    void setFields(
-      isTranscribe
-        ? { languageRepetitionsTranscribe: next }
-        : isFull
-          ? { languageRepetitionsFull: next }
-          : { languageRepetitions: next },
-    );
+    void setModeField('languageRepetitions', { ...reps, [language]: value });
   };
 
   const handleRepetitionPauseChange = (language: string, value: number) => {
     if (value < 0 || value > 30) return;
     const next = { ...repPauses, [language]: value };
-    void setFields(
-      isTranscribe
-        ? { languageRepetitionPausesTranscribe: next }
-        : isFull
-          ? { languageRepetitionPausesFull: next }
-          : { languageRepetitionPauses: next },
-    );
+    void setModeField('languageRepetitionPauses', next);
   };
 
   const handleLanguageSpeedChange = (language: string, value: number) => {
-    const next = { ...speeds, [language]: clampPlaybackSpeed(value) };
-    void setFields(
-      isTranscribe
-        ? { languagePlaybackSpeedsTranscribe: next }
-        : isFull
-          ? { languagePlaybackSpeedsFull: next }
-          : { languagePlaybackSpeeds: next },
-    );
+    void setModeField('languagePlaybackSpeeds', {
+      ...speeds,
+      [language]: clampPlaybackSpeed(value),
+    });
   };
 
   const handlePauseBaseToBaseChange = (value: number) => {
     if (value < 0 || value > 30) return;
-    void setFields(
-      isFull ? { pauseBaseToBaseFull: value } : { pauseBaseToBase: value },
-    );
+    void setModeField('pauseBaseToBase', value);
   };
 
   const handlePauseBaseToTargetChange = (value: number) => {
     if (value < 0 || value > 30) return;
-    void setFields(
-      isFull ? { pauseBaseToTargetFull: value } : { pauseBaseToTarget: value },
-    );
+    void setModeField('pauseBaseToTarget', value);
   };
 
   const handlePauseTargetToTargetChange = (value: number) => {
     if (value < 0 || value > 30) return;
-    void setFields(
-      isTranscribe
-        ? { pauseTargetToTargetTranscribe: value }
-        : isFull
-          ? { pauseTargetToTargetFull: value }
-          : { pauseTargetToTarget: value },
-    );
+    void setModeField('pauseTargetToTarget', value);
   };
 
   const handlePauseBeforeAutoAdvanceChange = (value: number) => {
     if (value < 0 || value > 10) return;
-    void setFields(
-      isFull
-        ? { pauseBeforeAutoAdvanceFull: value }
-        : { pauseBeforeAutoAdvance: value },
-    );
+    void setModeField('pauseBeforeAutoAdvance', value);
   };
 
   // ---- target before/after base ("Practice Listening" / "Practice Speaking") ----
@@ -485,41 +496,42 @@ export function LearningModeSettings({
   // per-control handler writes only one of them (speed-only / pause-only / rep-
   // only), and on a default course the rep map seeds empty, so checking reps
   // alone would never latch and would re-seed away a lone speed/pause tweak.
+  // Reads and writes the CURRENT mode's copies (mode-resolved `beforeReps` etc.
+  // in, `modeFieldName` out), so enabling Listening under the Radio scope seeds
+  // Radio's before-group from Radio's target settings and leaves Review's alone.
   const beforeSeedIfEmpty = () =>
-    Object.keys(courseSettings.targetBeforeRepetitions ?? {}).length === 0 &&
-    Object.keys(courseSettings.targetBeforeRepetitionPauses ?? {}).length ===
-      0 &&
-    Object.keys(courseSettings.targetBeforePlaybackSpeeds ?? {}).length === 0
+    Object.keys(beforeReps).length === 0 &&
+    Object.keys(beforeRepPauses).length === 0 &&
+    Object.keys(beforeSpeeds).length === 0
       ? {
-          targetBeforeRepetitions: {
-            ...(courseSettings.languageRepetitions ?? {}),
-          },
-          targetBeforeRepetitionPauses: {
-            ...(courseSettings.languageRepetitionPauses ?? {}),
-          },
-          targetBeforePlaybackSpeeds: {
-            ...(courseSettings.languagePlaybackSpeeds ?? {}),
-          },
+          [modeFieldName('targetBeforeRepetitions')]: { ...reps },
+          [modeFieldName('targetBeforeRepetitionPauses')]: { ...repPauses },
+          [modeFieldName('targetBeforePlaybackSpeeds')]: { ...speeds },
         }
       : {};
 
   const handlePlayTargetBeforeBaseChange = (checked: boolean) =>
     setFields({
-      playTargetBeforeBase: checked,
+      [modeFieldName('playTargetBeforeBase')]: checked,
       // Cannot disable both: if turning this off while "after" is already off,
       // auto-enable "after".
-      ...(!checked && !playTargetAfter ? { playTargetAfterBase: true } : {}),
+      ...(!checked && !playTargetAfter
+        ? { [modeFieldName('playTargetAfterBase')]: true }
+        : {}),
       // Mirror current target settings on first enable.
       ...(checked ? beforeSeedIfEmpty() : {}),
     });
 
   const handlePlayTargetAfterBaseChange = (checked: boolean) =>
     setFields({
-      playTargetAfterBase: checked,
+      [modeFieldName('playTargetAfterBase')]: checked,
       // Cannot disable both: auto-enable "before" (and seed it) when turning
       // this off while "before" is already off.
       ...(!checked && !playTargetBefore
-        ? { playTargetBeforeBase: true, ...beforeSeedIfEmpty() }
+        ? {
+            [modeFieldName('playTargetBeforeBase')]: true,
+            ...beforeSeedIfEmpty(),
+          }
         : {}),
     });
 
@@ -528,8 +540,8 @@ export function LearningModeSettings({
     value: number,
   ) => {
     if (value < 0 || value > 10) return;
-    void setField('targetBeforeRepetitions', {
-      ...(courseSettings.targetBeforeRepetitions ?? {}),
+    void setModeField('targetBeforeRepetitions', {
+      ...beforeReps,
       [language]: value,
     });
   };
@@ -539,22 +551,22 @@ export function LearningModeSettings({
     value: number,
   ) => {
     if (value < 0 || value > 30) return;
-    void setField('targetBeforeRepetitionPauses', {
-      ...(courseSettings.targetBeforeRepetitionPauses ?? {}),
+    void setModeField('targetBeforeRepetitionPauses', {
+      ...beforeRepPauses,
       [language]: value,
     });
   };
 
   const handleTargetBeforeSpeedChange = (language: string, value: number) => {
-    void setField('targetBeforePlaybackSpeeds', {
-      ...(courseSettings.targetBeforePlaybackSpeeds ?? {}),
+    void setModeField('targetBeforePlaybackSpeeds', {
+      ...beforeSpeeds,
       [language]: clampPlaybackSpeed(value),
     });
   };
 
   const handlePauseTargetToBaseChange = (value: number) => {
     if (value < 0 || value > 30) return;
-    void setField('pauseTargetToBase', value);
+    void setModeField('pauseTargetToBase', value);
   };
 
   // ---- transcribe post-submit replay group ("Translation Entered") ----
@@ -598,23 +610,23 @@ export function LearningModeSettings({
   const handleListeningStrategyChange = (value: string) => {
     const strategy = value as 'onlyNew' | 'untilGood' | 'continuous';
     void setFields({
-      targetBeforeListeningStrategy: strategy,
+      [modeFieldName('targetBeforeListeningStrategy')]: strategy,
       ...(strategy === 'onlyNew' && !(onlyNewStored && onlyNewStored > 0)
-        ? { targetBeforeOnlyNewReps: 1 }
+        ? { [modeFieldName('targetBeforeOnlyNewReps')]: 1 }
         : {}),
     });
   };
 
   // "Only new" rep window: integer 1-10 (∞ lives on the 'continuous' strategy).
   const handleTargetBeforeOnlyNewChange = (value: number) =>
-    setField(
+    setModeField(
       'targetBeforeOnlyNewReps',
       Math.min(10, Math.max(1, Math.floor(value))),
     );
 
   // "Until rated Good" threshold: integer 1-10.
   const handleTargetBeforeUntilGoodChange = (value: number) =>
-    setField(
+    setModeField(
       'targetBeforeUntilGoodReps',
       Math.min(10, Math.max(1, Math.floor(value))),
     );
@@ -643,14 +655,23 @@ export function LearningModeSettings({
     courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit';
   const writingInputMode = courseSettings.writingInputMode ?? 'translate';
   const isTranscribe = isFull && writingInputMode === 'transcribe';
+  // Radio is the hands-free face of Shadowing, so its split only exists in
+  // audio mode. `audioScope` is ignored (and the pill hidden) while the split
+  // is off, which is what makes turning it off fall straight back to the
+  // shared review values.
+  const splitRadio = courseSettings.separateRadioSettings === true;
+  const isRadioScope = !isFull && splitRadio && audioScope === 'radio';
   const settingsMode: AudioSettingsMode = isTranscribe
     ? 'transcribe'
     : isFull
       ? 'full'
-      : 'audio';
-  // Each mode edits its own copy of the playback settings; the effective
-  // value resolves `*Transcribe ?? *Full ?? unsuffixed` so an untweaked mode
-  // shows (and seeds its first write from) the previous mode in the chain.
+      : isRadioScope
+        ? 'radio'
+        : 'audio';
+  // Each mode edits its own copy of the playback settings; the effective value
+  // resolves `*Transcribe ?? *Full ?? unsuffixed` for the writing modes and
+  // `*Radio ?? unsuffixed` for radio, so an untweaked mode shows (and seeds its
+  // first write from) the mode it inherits from.
   // Resolved through the SAME code path as actual playback
   // (useLearningAudio → resolveAudioSettings), so the preview timeline and
   // the merged audio can never disagree. Includes the playback defaults,
@@ -688,14 +709,25 @@ export function LearningModeSettings({
   // Raw "Only new" window, read by handleListeningStrategyChange's legacy-∞
   // normalization and the stepper below (the resolved settings map it to
   // Infinity, which is not what the 1-10 stepper displays).
-  const onlyNewStored = courseSettings.targetBeforeOnlyNewReps;
+  const onlyNewStored = resolveModeSetting(
+    courseSettings,
+    'targetBeforeOnlyNewReps',
+    settingsMode,
+  );
   // Per-strategy X values. "Only new" no longer owns an ∞ position (that is
   // the 'continuous' strategy now), so its stepper floors at 1.
   const onlyNewUiValue =
     onlyNewStored && onlyNewStored > 0 ? Math.min(10, onlyNewStored) : 1;
   const untilGoodUiValue = Math.min(
     10,
-    Math.max(1, courseSettings.targetBeforeUntilGoodReps ?? 1),
+    Math.max(
+      1,
+      resolveModeSetting(
+        courseSettings,
+        'targetBeforeUntilGoodReps',
+        settingsMode,
+      ) ?? 1,
+    ),
   );
   // The after-base target section shows in audio mode only when "Practice
   // Speaking" is on; full mode keeps its existing "always" gating (the
@@ -815,7 +847,79 @@ export function LearningModeSettings({
                 setField('separateModeTracking', checked)
               }
             />
+            {/* Split playback settings: on = Radio edits its own `*Radio`
+                copies; off = Radio reads the shared review values. The copies
+                are left in place when it goes off (freeze-and-keep, like
+                separateModeTracking), so re-enabling resumes where the user
+                left off. Shadowing only: Radio is the hands-free face of
+                audio mode, and free play while typing is Free Study, which
+                keeps the writing settings. */}
+            {!isFull && (
+              <SettingSwitchRow
+                id="separateRadioSettings"
+                label={t('separateRadioSettings')}
+                description={t('separateRadioSettingsDescription')}
+                checked={splitRadio}
+                onCheckedChange={(checked) => {
+                  // Leaving the scope on 'radio' with the split off would
+                  // strand the sheet editing a copy nothing reads. Clearing
+                  // the override also hands the scope back to the session.
+                  if (!checked) setScopeOverride(null);
+                  void setField('separateRadioSettings', checked);
+                }}
+              />
+            )}
           </div>
+
+          {/* Audio scope. The Shadowing counterpart of the Writing style
+              sub-switcher below: same slot, same markup. Selects which copy of
+              the playback settings the sheet edits, and writes nothing itself.
+              `schedulingMode` is untouched, so opening settings never changes
+              which mode the user is about to run. */}
+          {!isFull && splitRadio && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                {t('audioSettingsFor')}
+              </p>
+              <div className="flex w-full rounded-lg border bg-muted/50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setScopeOverride('review')}
+                  data-testid="settings-scope-review"
+                  className={cn(
+                    'flex-1 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all whitespace-nowrap',
+                    !isRadioScope
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <Headphones className="h-4 w-4" />
+                  {t('audioScopeReview')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScopeOverride('radio')}
+                  data-testid="settings-scope-radio"
+                  className={cn(
+                    'flex-1 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all whitespace-nowrap',
+                    isRadioScope
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <RadioIcon className="h-4 w-4" />
+                  {t('audioScopeRadio')}
+                </button>
+              </div>
+              <p className="text-muted-xs">
+                {t(
+                  isRadioScope
+                    ? 'audioScopeRadioDescription'
+                    : 'audioScopeReviewDescription',
+                )}
+              </p>
+            </div>
+          )}
 
           {/* Writing style. Sub-switcher shown when Writing is selected:
               Translate (base audio plays, type the translation) vs Transcribe
@@ -893,8 +997,9 @@ export function LearningModeSettings({
             </div>
           </div>
 
-          {/* Initial reviews. Audio mode only */}
-          {reviewMode === 'audio' && (
+          {/* Initial reviews. Audio mode only, and not under the Radio scope:
+              free play has no FSRS scheduling. */}
+          {reviewMode === 'audio' && !isRadioScope && (
             <div className="space-y-1">
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-0.5">
@@ -907,8 +1012,8 @@ export function LearningModeSettings({
                 </div>
                 <StepperControl
                   value={courseSettings.initialReviewCount}
-                  min={1}
-                  max={20}
+                  min={MIN_INITIAL_REVIEW_COUNT}
+                  max={MAX_INITIAL_REVIEW_COUNT}
                   onChange={handleInitialReviewsChange}
                 />
               </div>
@@ -924,8 +1029,9 @@ export function LearningModeSettings({
             onCheckedChange={(checked) => setField('autoAddCards', checked)}
           />
 
-          {/* Auto-advance. Audio mode only */}
-          {reviewMode === 'audio' && (
+          {/* Auto-advance. Audio mode only. Radio forces it on, so the switch
+              would be a lie under the Radio scope. */}
+          {reviewMode === 'audio' && !isRadioScope && (
             <SettingSwitchRow
               id="autoAdvance"
               label={t('autoAdvance')}
@@ -935,7 +1041,13 @@ export function LearningModeSettings({
             />
           )}
 
-          {/* Instant proceed on rating, both modes */}
+          {/* Instant proceed on rating, both modes. Radio never rates, so the
+              switch does nothing there — but it's the Shadowing copy either
+              way and the Radio split doesn't fork it, so it stays visible
+              under both scopes rather than becoming unreachable mid-Radio
+              (the pill follows the live session, see `liveScope`). Contrast
+              auto-advance and auto-play above, which Radio FORCES on: showing
+              those under the Radio scope would show a switch that lies. */}
           <SettingSwitchRow
             id="instantProceed"
             label={t('instantProceed')}
@@ -949,7 +1061,9 @@ export function LearningModeSettings({
             }
           />
 
-          {/* Show every-N-cards celebration screen */}
+          {/* Show every-N-cards celebration screen. One global field with no
+              per-mode copy at all, so the Radio scope has nothing to say about
+              it — hiding it there would strand a global setting behind a pill. */}
           <SettingSwitchRow
             id="progressDisplayEnabled"
             label={t('progressDisplayEnabled')}
@@ -1070,18 +1184,21 @@ export function LearningModeSettings({
             onCheckedChange={handleHighlightWordsChange}
           />
 
-          {/* Auto-play audio */}
-          <SettingSwitchRow
-            id="autoPlayAudio"
-            label={t('autoPlay')}
-            description={t(
-              isTranscribe
-                ? 'autoPlayDescriptionTranscribe'
-                : 'autoPlayDescription',
-            )}
-            checked={autoPlay}
-            onCheckedChange={handleAutoPlayChange}
-          />
+          {/* Auto-play audio. Radio forces it on (useLearningAudio), so the
+              switch is hidden rather than shown lying. */}
+          {!isRadioScope && (
+            <SettingSwitchRow
+              id="autoPlayAudio"
+              label={t('autoPlay')}
+              description={t(
+                isTranscribe
+                  ? 'autoPlayDescriptionTranscribe'
+                  : 'autoPlayDescription',
+              )}
+              checked={autoPlay}
+              onCheckedChange={handleAutoPlayChange}
+            />
+          )}
 
           {/* Practice Listening / Speaking. Target before/after base (audio mode only).
               At least one must stay enabled; toggling the last-on one auto-enables
@@ -1129,6 +1246,12 @@ export function LearningModeSettings({
                         />
                       }
                     />
+                    {/* Shown under the Radio scope too. Radio plays never
+                        rate a card, so they can't advance the count — but the
+                        count a card already carries still graduates it there
+                        (applyOnlyNewListening reads the stored
+                        goodReviewCount), so hiding the row would leave an
+                        inherited 'untilGood' silently in charge. */}
                     <ListeningStrategyRow
                       value="untilGood"
                       active={listeningStrategy === 'untilGood'}
@@ -1388,9 +1511,11 @@ export function LearningModeSettings({
               </>
             )}
 
-            {/* Pause before auto-advance (only shown when auto-advance is enabled, audio mode only) */}
+            {/* Pause before auto-advance. Audio mode only, and only when
+                auto-advance actually happens: the user's switch under the
+                Review scope, unconditionally under Radio (which forces it). */}
             {reviewMode === 'audio' &&
-              autoAdvance &&
+              (autoAdvance || isRadioScope) &&
               (baseLanguages.length > 0 || targetLanguages.length > 0) && (
                 <StepperPauseConnector
                   label={t('pauseBeforeAutoAdvance')}
@@ -1400,9 +1525,11 @@ export function LearningModeSettings({
                 />
               )}
 
-            {/* End-of-sequence indicator */}
+            {/* End-of-sequence indicator. Same gate as the pause stepper
+                above: Radio forces auto-advance, so the "no auto-advance" end
+                marker would contradict the stepper right above it. */}
             <div className="mt-2 flex items-center gap-2 text-muted-xs">
-              {reviewMode === 'audio' && autoAdvance ? (
+              {reviewMode === 'audio' && (autoAdvance || isRadioScope) ? (
                 <>
                   <div className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[6px] border-t-primary" />
                   <span>{t('autoAdvanceIndicator')}</span>

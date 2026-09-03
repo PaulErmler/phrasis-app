@@ -35,7 +35,6 @@ function baseInputs(
     currentWords: 1200,
     currentSentences: 390,
     totalTimeMs: 58 * 3_600_000,
-    todayWords: 0,
     dailyWords: recentDays(20, 90),
     dailyNewCards: recentDays(5, 90),
     curriculumShare: 1,
@@ -192,19 +191,6 @@ describe('computeIndicators', () => {
       | undefined;
     expect(eom).toBeDefined();
     expect(eom!.capped).toBe(false);
-  });
-
-  it('counterfactual appears only on a strong day and only positively', () => {
-    const weak = computeIndicators(baseInputs({ todayWords: 10 }));
-    expect(byKind(weak.indicators, 'counterfactualWords')).toBeUndefined();
-
-    const strong = computeIndicators(baseInputs({ todayWords: 60 }));
-    const cf = byKind(strong.indicators, 'counterfactualWords') as {
-      boostedWords: number;
-      baselineWords: number;
-    };
-    expect(cf).toBeDefined();
-    expect(cf.boostedWords).toBeGreaterThan(cf.baselineWords);
   });
 
   it('sessionYield is "+words per goal-length session"', () => {
@@ -421,7 +407,6 @@ describe('computeIndicators', () => {
     expect(oneYear.words).toBeLessThan(30 + ((30 / 10) * 20 * 365) / 2);
     // Rate stats need observed basis.
     expect(byKind(indicators, 'sentencesPerHour')).toBeUndefined();
-    expect(byKind(indicators, 'counterfactualWords')).toBeUndefined();
   });
 
   /**

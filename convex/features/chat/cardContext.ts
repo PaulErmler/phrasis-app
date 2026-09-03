@@ -1,5 +1,6 @@
 import type { MutationCtx } from '../../_generated/server';
 import type { Id } from '../../_generated/dataModel';
+import { cardPinAt, servedTranslatedText } from '../../db/translationReads';
 
 /**
  * Look up a card's source text, course-scoped translations, and course
@@ -46,21 +47,24 @@ export async function resolveCardContext(
   ]);
   courseLangs.delete(text.language);
 
-  // One indexed read for the whole text instead of one query per course
-  // language; re-ordered to the course-language order afterwards so the
-  // prompt context stays stable.
-  const translationRows = await ctx.db
-    .query('translations')
-    .withIndex('by_textId', (q) => q.eq('textId', card.textId))
-    // Bounded in practice by the number of course languages; the cap is a
-    // pure backstop against an unbounded read.
-    .take(500);
-  const textByLanguage = new Map(
-    translationRows.map((t) => [t.targetLanguage, t.translatedText]),
+  // One point read per course language (single digits), in course-language
+  // order so the prompt context stays stable, through the served-revision
+  // accessor: the tutor must see the wording the learner's card shows, which
+  // for a card pinned before a version bump is not the live row.
+  const pinAt = cardPinAt(card);
+  const served = await Promise.all(
+    [...courseLangs].map(async (lang) => ({
+      language: lang,
+      text: await servedTranslatedText(ctx, {
+        textId: card.textId,
+        targetLanguage: lang,
+        pinAt,
+      }),
+    })),
   );
-  const translations = [...courseLangs]
-    .filter((lang) => textByLanguage.has(lang))
-    .map((lang) => ({ language: lang, text: textByLanguage.get(lang)! }));
+  const translations = served.filter(
+    (t): t is { language: string; text: string } => t.text !== null,
+  );
 
   return {
     sourceText: text.text,

@@ -88,8 +88,13 @@ export function useThread({
     t,
   ]);
 
+  // The current thread stays in place until the replacement id lands. Nulling
+  // it first unmounted the learn view's chat panel into a spinner on every
+  // card-change rotation and on "New chat", even when the server handed back
+  // the very same (still empty) thread. Callers that want an optimistic
+  // empty state while the new thread's queries load see
+  // `ChatPanel.emptyStateWhileLoading`.
   const getOrCreateEmptyThread = useCallback(async () => {
-    setThreadId(null);
     setIsLoading(true);
     try {
       const id = await getOrCreateEmptyThreadMutation({});

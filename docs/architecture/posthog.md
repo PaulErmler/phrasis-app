@@ -105,6 +105,9 @@ customer id. Deviating fragments one person into two ghosts that never meet.
 
 ## Consent
 
+The OpenAI Ads pixel piggybacks on this consent record; see
+`docs/architecture/openai-ads-pixel.md`.
+
 There is no CMP dependency. c15t (5 packages) was removed along with ~96 lines of
 `!important` CSS overrides in `globals.css`. After this change PostHog is the only
 non-essential storage in the app, and PostHog's own consent primitives cover it.

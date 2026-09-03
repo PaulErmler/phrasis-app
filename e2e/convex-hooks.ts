@@ -41,3 +41,51 @@ export function deckDuplicateTextCount(email: string): number {
     email,
   }) as number;
 }
+
+/** Cards in the active-course decks split by the source they came from. */
+export function deckCardCountsBySource(email: string): {
+  premade: number;
+  custom: number;
+  total: number;
+} {
+  return convexRun('features/deckTesting:cardCountsBySource', { email }) as {
+    premade: number;
+    custom: number;
+    total: number;
+  };
+}
+
+/**
+ * Push currently-due cards out of the learn queue. Auto-add only runs
+ * when nothing is due; the home collection "Add 5" button is exclusive
+ * and never mixes sources.
+ */
+export function deferDueCards(email: string): { deferred: number } {
+  return convexRun('features/customSourceTesting:deferDueCards', {
+    email,
+  }) as { deferred: number };
+}
+
+/** Put `count` pending texts in the user's Custom collection. */
+export function seedCustomTexts(
+  email: string,
+  count: number,
+  marker: string,
+): { collectionId: string; textIds: string[] } {
+  return convexRun('features/customSourceTesting:seedCustomTexts', {
+    email,
+    count,
+    marker,
+  }) as { collectionId: string; textIds: string[] };
+}
+
+/** Undo `seedCustomTexts`: the texts, their cards, and the progress booked. */
+export function cleanupSeededTexts(
+  email: string,
+  textIds: string[],
+): { textsDeleted: number; cardsDeleted: number } {
+  return convexRun('features/customSourceTesting:cleanupSeededTexts', {
+    email,
+    textIds,
+  }) as { textsDeleted: number; cardsDeleted: number };
+}

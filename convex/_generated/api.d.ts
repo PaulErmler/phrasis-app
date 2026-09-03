@@ -49,6 +49,7 @@ import type * as db_stats_reviewDepthAccuracy from "../db/stats/reviewDepthAccur
 import type * as db_stats_weeklyStats from "../db/stats/weeklyStats.js";
 import type * as db_stats_wordTracking from "../db/stats/wordTracking.js";
 import type * as db_stats_yearlyStats from "../db/stats/yearlyStats.js";
+import type * as db_translationReads from "../db/translationReads.js";
 import type * as db_translationSeed from "../db/translationSeed.js";
 import type * as db_userProfiles from "../db/userProfiles.js";
 import type * as db_users from "../db/users.js";
@@ -73,6 +74,7 @@ import type * as features_collections from "../features/collections.js";
 import type * as features_consent from "../features/consent.js";
 import type * as features_courses from "../features/courses.js";
 import type * as features_curriculumFlagTesting from "../features/curriculumFlagTesting.js";
+import type * as features_customSourceTesting from "../features/customSourceTesting.js";
 import type * as features_customTexts from "../features/customTexts.js";
 import type * as features_deckBrowse from "../features/deckBrowse.js";
 import type * as features_deckContent from "../features/deckContent.js";
@@ -219,6 +221,7 @@ declare const fullApi: ApiFromModules<{
   "db/stats/weeklyStats": typeof db_stats_weeklyStats;
   "db/stats/wordTracking": typeof db_stats_wordTracking;
   "db/stats/yearlyStats": typeof db_stats_yearlyStats;
+  "db/translationReads": typeof db_translationReads;
   "db/translationSeed": typeof db_translationSeed;
   "db/userProfiles": typeof db_userProfiles;
   "db/users": typeof db_users;
@@ -243,6 +246,7 @@ declare const fullApi: ApiFromModules<{
   "features/consent": typeof features_consent;
   "features/courses": typeof features_courses;
   "features/curriculumFlagTesting": typeof features_curriculumFlagTesting;
+  "features/customSourceTesting": typeof features_customSourceTesting;
   "features/customTexts": typeof features_customTexts;
   "features/deckBrowse": typeof features_deckBrowse;
   "features/deckContent": typeof features_deckContent;

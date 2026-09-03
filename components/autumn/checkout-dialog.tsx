@@ -27,6 +27,7 @@ import { useAction } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useLocale, useTranslations } from 'next-intl';
 import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
+import { markCheckoutStarted } from '@/lib/openai-pixel';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { getCheckoutContent } from '@/lib/autumn/checkout-content';
@@ -195,6 +196,9 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
                       product_id: checkoutResult.product.id,
                       flow: 'trial_switch',
                     });
+                    // Same bookend as useNewPlanCheckout: lets the ad pixel
+                    // attribute the plan the customer returns with.
+                    markCheckoutStarted(checkoutResult.product.id);
                     window.location.href = result.paymentUrl;
                     return;
                   }

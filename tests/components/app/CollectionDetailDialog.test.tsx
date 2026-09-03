@@ -388,6 +388,30 @@ describe('CollectionDetailDialog browse query wiring', () => {
     });
     expect(screen.getByTestId('collection-text-added')).toBeInTheDocument();
   });
+
+  it('the added-count stat toggles the same history feed as "show added"', async () => {
+    setEarlierPage([
+      makeRow({ _id: 'old1', status: 'added', collectionRank: 1 }),
+    ]);
+    const { user } = await openDialog();
+
+    await user.click(screen.getByTestId('collection-added-stat'));
+
+    expect(screen.getByTestId('collection-show-added-toggle')).toHaveAttribute(
+      'data-state',
+      'on',
+    );
+    expect(screen.getByTestId('collection-text-added')).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('collection-added-stat'));
+    expect(screen.getByTestId('collection-show-added-toggle')).toHaveAttribute(
+      'data-state',
+      'off',
+    );
+    expect(
+      screen.queryByTestId('collection-text-added'),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe('CollectionDetailDialog row actions', () => {

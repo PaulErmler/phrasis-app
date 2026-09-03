@@ -4,6 +4,7 @@ import {
   toAzureSttLocale,
   toAzureSttLocales,
   buildAutoDetectLocales,
+  supportsMultilingualModel,
   AUTO_DETECT_LOCALES,
 } from '../../../lib/stt/languageCodes';
 import { SUPPORTED_LANGUAGES } from '../../../../lib/languages';
@@ -124,26 +125,57 @@ describe('toAzureSttLocales', () => {
   });
 });
 
+describe('supportsMultilingualModel', () => {
+  it('is true when every course language is covered by the model', () => {
+    expect(supportsMultilingualModel(['en', 'es'])).toBe(true);
+    expect(supportsMultilingualModel(['de', 'ja'])).toBe(true);
+    // es_mixed expands to es-ES + es-MX, both covered.
+    expect(supportsMultilingualModel(['en', 'es_mixed'])).toBe(true);
+    // Regional English variants map onto covered locales.
+    expect(supportsMultilingualModel(['en_gb', 'pt'])).toBe(true);
+  });
+
+  it('is false when any course language falls outside the model', () => {
+    expect(supportsMultilingualModel(['en', 'sv'])).toBe(false);
+    expect(supportsMultilingualModel(['en', 'ar'])).toBe(false);
+    expect(supportsMultilingualModel(['en', 'hi'])).toBe(false);
+    // Traditional Chinese is zh-TW; the model only covers zh-CN.
+    expect(supportsMultilingualModel(['en', 'zh_traditional'])).toBe(false);
+  });
+
+  it('is false with no course context, so language-ID stays the default', () => {
+    expect(supportsMultilingualModel([])).toBe(false);
+  });
+});
+
 describe('buildAutoDetectLocales', () => {
   it('returns the 8-locale base unchanged when no course context is given', () => {
     expect(buildAutoDetectLocales()).toEqual([...AUTO_DETECT_LOCALES]);
     expect(buildAutoDetectLocales([])).toEqual([...AUTO_DETECT_LOCALES]);
   });
 
+  it('asks for the multi-lingual model when the model covers the course', () => {
+    // Empty list is Azure's documented request for the multi-lingual model,
+    // the only mode that transcribes a code-switched recording.
+    expect(buildAutoDetectLocales(['en', 'es'])).toEqual([]);
+    expect(buildAutoDetectLocales(['de', 'ja'])).toEqual([]);
+  });
+
   it('appends novel course locales after the base, deduped', () => {
-    const result = buildAutoDetectLocales(['de', 'ja']);
+    const result = buildAutoDetectLocales(['sv', 'ja']);
     expect(result.slice(0, 8)).toEqual([...AUTO_DETECT_LOCALES]);
-    expect(result).toContain('de-DE');
+    expect(result).toContain('sv-SE');
     expect(result).toContain('ja-JP');
   });
 
   it('does not duplicate a course locale already in the base', () => {
-    const result = buildAutoDetectLocales(['en', 'es']); // both already in base
+    // hi keeps this course off the multi-lingual model; en/es are in the base.
+    const result = buildAutoDetectLocales(['en', 'es', 'hi']);
     expect(result).toEqual([...AUTO_DETECT_LOCALES]);
   });
 
   it('expands a mixed-dialect course code into its variants', () => {
-    const result = buildAutoDetectLocales(['es_mixed']);
+    const result = buildAutoDetectLocales(['es_mixed', 'sv']);
     // es-ES already in base; es-MX is the novel one appended.
     expect(result).toContain('es-MX');
   });

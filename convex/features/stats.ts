@@ -1,3 +1,4 @@
+import { cardPinAt } from '../db/translationReads';
 import { v } from 'convex/values';
 import {
   paginationOptsValidator,
@@ -712,6 +713,7 @@ export const getSentencesForWord = query({
           sourceFurigana: text.furiganaText ?? undefined,
           userCreated: text.userCreated,
           card: cardDocs[i] ?? null,
+          ...(cardDocs[i] ? { pinAt: cardPinAt(cardDocs[i]) } : {}),
         };
       })
       .filter((input): input is NonNullable<typeof input> => input !== null);

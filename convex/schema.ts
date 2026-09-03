@@ -26,6 +26,7 @@ import {
   voiceGenderValidator,
   featureStateValidator,
   reviewsByModeValidator,
+  statFilterValidator,
   translationEntriesValidator,
   collectionOriginValidator,
   collectionOriginBucketValidator,
@@ -93,6 +94,49 @@ export const courseSettingsFields = {
   transcribeAfterRepetitions: v.optional(v.record(v.string(), v.number())),
   transcribeAfterRepetitionPauses: v.optional(v.record(v.string(), v.number())),
   transcribeAfterPlaybackSpeeds: v.optional(v.record(v.string(), v.number())),
+  // Radio's copy of the playback settings, gated by `separateRadioSettings`.
+  // Radio is a `schedulingMode`, not a `reviewMode`, so it BRANCHES off the
+  // audio fields rather than chaining through the writing ones: the resolution
+  // rule is `*Radio ?? unsuffixed ?? DEFAULT_*`, never `?? *Full`. Undefined
+  // means "same as Learn & Review", so a doc that never enabled the split
+  // behaves exactly as before and no migration is needed. Turning the split
+  // back off leaves these values in place (freeze-and-keep, matching
+  // `separateModeTracking`), so re-enabling resumes where the user left off.
+  // Only applies to the hands-free Radio face (`schedulingMode 'radio'` AND
+  // `reviewMode 'audio'`); Free Study keeps the writing copies.
+  separateRadioSettings: v.optional(v.boolean()),
+  highlightWordsRadio: v.optional(v.boolean()),
+  languageRepetitionsRadio: v.optional(v.record(v.string(), v.number())),
+  languageRepetitionPausesRadio: v.optional(v.record(v.string(), v.number())),
+  languagePlaybackSpeedsRadio: v.optional(v.record(v.string(), v.number())),
+  pauseBaseToBaseRadio: v.optional(v.number()),
+  pauseBaseToTargetRadio: v.optional(v.number()),
+  pauseTargetToTargetRadio: v.optional(v.number()),
+  pauseBeforeAutoAdvanceRadio: v.optional(v.number()),
+  // Radio copies of the Practice Listening group. Unlike the fields above these
+  // have no `*Full` twin (writing mode has never forked them), which is why
+  // `ModeResolvableSetting` in lib/audio/mergeAudio.ts accepts EITHER twin.
+  // The 'untilGood' strategy forks too: radio PLAYS can't advance a card's
+  // good-rating count (radio never rates), but the count a card already
+  // carries still graduates it out of Practice Listening in radio, so the
+  // window has to be visible and separately settable there.
+  playTargetBeforeBaseRadio: v.optional(v.boolean()),
+  playTargetAfterBaseRadio: v.optional(v.boolean()),
+  targetBeforeRepetitionsRadio: v.optional(v.record(v.string(), v.number())),
+  targetBeforeRepetitionPausesRadio: v.optional(
+    v.record(v.string(), v.number()),
+  ),
+  targetBeforePlaybackSpeedsRadio: v.optional(v.record(v.string(), v.number())),
+  pauseTargetToBaseRadio: v.optional(v.number()),
+  targetBeforeOnlyNewRepsRadio: v.optional(v.number()),
+  targetBeforeUntilGoodRepsRadio: v.optional(v.number()),
+  targetBeforeListeningStrategyRadio: v.optional(
+    v.union(
+      v.literal('onlyNew'),
+      v.literal('untilGood'),
+      v.literal('continuous'),
+    ),
+  ),
   // Target-before-base ("Practice Listening") vs target-after-base ("Practice Speaking").
   // At least one must be enabled; the client enforces this. Defaults reproduce the
   // historical base→target sequence (after on, before off).
@@ -132,9 +176,9 @@ export const courseSettingsFields = {
     ),
   ),
   targetBeforeUntilGoodReps: v.optional(v.number()), // 1-10, default 1 (no ∞ — that's 'continuous')
-  // Writing mode: show the target translation above the input on a card's
-  // first N reviews so the user copy-types it ("Abschreiben"); the unassisted
-  // test starts afterwards. Unset = true (on). The rep window mirrors
+  // Writing mode (translate and transcribe): show the target sentence above
+  // the input on a card's first N reviews so the user copy-types it
+  // ("Abschreiben"); the unassisted test starts afterwards. Unset = true (on). The rep window mirrors
   // targetBeforeOnlyNewReps: 0 = always show (∞), 1-10 = first N reviews
   // (preReviewCount + FSRS reps), default 1.
   showTranslationOnNew: v.optional(v.boolean()),
@@ -544,9 +588,72 @@ export default defineSchema({
     // Every row on a userCreated text, plus user-provided / curated-manual
     // rows anywhere. Are skipped by the sweep regardless of their stamp.
     translationVersion: v.optional(v.number()),
+    // Set (to the same timestamp as the archive row's `supersededAt`) each
+    // time a version-bump regeneration replaced this row's wording while
+    // cards referenced the text. Card-facing readers consult
+    // `translationArchive` only when this is later than the card's pin
+    // (`cardPinAt` in convex/db/translationReads.ts), so the rows never
+    // revised, the overwhelming majority, cost no extra read.
+    lastArchivedAt: v.optional(v.number()),
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'targetLanguage']),
+
+  // Superseded revisions of curriculum translations, one row per wording a
+  // version-bump regeneration replaced while at least one card referenced the
+  // text AND the wording had audio. A wording replaced before its first TTS
+  // (a warmed row) is overwritten in place instead: nobody has heard it, and
+  // an archive row without audio would pin its cards to a wording the
+  // pipeline never voices (archived entries report no content gaps), so the
+  // reader treats such a row as absent. Cards created before `supersededAt`
+  // (and not since re-pinned via
+  // `cards.translationsAcceptedAt`) keep being served this wording and its
+  // audio, so a bump never changes what an existing learner sees. Flag and
+  // curriculum-fix retranslations do NOT archive: they are corrections that
+  // land for everyone, as they always have. Rows are kept for good; the table
+  // is bounded by translations x bumps. `audioAssetId` is a real reference:
+  // the asset garbage collection in convex/lib/audio.ts and
+  // convex/lib/audioAssets.ts checks `by_audioAssetId` before deleting an
+  // asset.
+  //
+  // Retiring the archive later (moving every card to the newest wording)
+  // needs no data beyond what is here: (1) clear `translations.lastArchivedAt`
+  // on the revised rows (`by_textId` scan, or any full sweep); every card then
+  // resolves to the live row with zero card writes, since `cardPinAt` is only
+  // consulted when `lastArchivedAt` is set. (2) Delete the archive rows; for
+  // each, an `audioAssetId` that `isAudioAssetReferenced` no longer finds is
+  // garbage (delete the asset and schedule its blob delete). (3) Run the
+  // existing `rebuildCardSearchableText` migration so formerly pinned cards
+  // index the live words. `cards.translationsAcceptedAt` can stay: it is a
+  // no-op pin once nothing is archived.
+  translationArchive: defineTable({
+    textId: v.id('texts'),
+    targetLanguage: v.string(),
+    translatedText: v.string(),
+    romanizedText: v.optional(v.string()),
+    romanizationSource: v.optional(v.string()),
+    ipaText: v.optional(v.string()),
+    ipaSource: v.optional(v.string()),
+    furiganaText: v.optional(v.string()),
+    furiganaSource: v.optional(v.string()),
+    translationSource: v.optional(v.string()),
+    regionVariant: v.optional(v.string()),
+    speakerGender: v.optional(voiceGenderValidator),
+    translationVersion: v.optional(v.number()),
+    // The audio that spoke this wording at the moment it was superseded, if
+    // the language had audio. The live row's pointer was detached with
+    // `keepAsset`, so the asset lives on for the pinned cards.
+    audioAssetId: v.optional(v.id('audioAssets')),
+    // When the live row stopped carrying this wording. A card whose pin is
+    // earlier than this (and later than any earlier archive row's) sees it.
+    supersededAt: v.number(),
+  })
+    .index('by_text_language_supersededAt', [
+      'textId',
+      'targetLanguage',
+      'supersededAt',
+    ])
+    .index('by_audioAssetId', ['audioAssetId']),
 
   // Content-addressed audio store. One row per unique
   // (language, voiceGender, regionVariant, spoken string), every text whose
@@ -681,6 +788,12 @@ export default defineSchema({
     // and naming rationale as hideDueCounts: explicit `false` = show, unset
     // or true = hidden. Independent of hideDueCounts.
     hideWorkloadForecast: v.optional(v.boolean()),
+    // Which slice of the per-mode counters the home card's reps and time
+    // tiles show. Tapping a tile cycles all -> learn -> radio -> freeStudy and
+    // writes through here, so the face follows the account across devices.
+    // One field per tile: the two are independent. Unset ≡ 'all'.
+    repsStatFilter: v.optional(statFilterValidator),
+    timeStatFilter: v.optional(statFilterValidator),
   }).index('by_userId', ['userId']),
 
   // Onboarding progress table. Stores the user's onboarding answers.
@@ -786,6 +899,12 @@ export default defineSchema({
     searchableTextLanguages: v.optional(v.array(v.string())), // Language codes included in searchableText; used to detect staleness when course languages change
     wordsTrackedLanguages: v.optional(v.array(v.string())), // Languages for which words have been counted in stats
     audioSpeedOverrides: v.optional(v.record(v.string(), v.number())), // Per-card per-language playback speed override (range CARD_OVERRIDE_SPEED_MIN-CARD_OVERRIDE_SPEED_MAX, see lib/constants/audioPlayback). Missing entry = use general courseSettings.languagePlaybackSpeeds.
+    // Translation pin. A card is served the curriculum translations that were
+    // live at this instant (see `translationArchive`); undefined means the
+    // card's `_creationTime`. Moved to "now" when the learner flags a card
+    // whose wording the curriculum has since revised (they accept the latest
+    // wording). Never indexed: it is only ever read off the card itself.
+    translationsAcceptedAt: v.optional(v.number()),
   })
     // INDEX BUDGET — read before adding an index here. This table carries 23
     // database indexes (limit 32) and EVERY card write pays for updating all
@@ -1004,6 +1123,12 @@ export default defineSchema({
     totalCardsEdited: v.optional(v.number()),
     totalCardsAddedManually: v.optional(v.number()),
     totalReviewsByMode: v.optional(reviewsByModeValidator),
+    // Per-mode split of totalTimeMs, same buckets as totalReviewsByMode and
+    // dailyStats.timeMsByMode. Graded reviews without an explicit mode land
+    // in `audio`, mirroring the daily writer. Backfilled from the daily rows
+    // by courseStatsTimeByModeBackfill; days before the daily split existed
+    // carry no breakdown, so the tile's subtraction rule shows them as learn.
+    totalTimeMsByMode: v.optional(reviewsByModeValidator),
     totalAccuracySum: v.optional(v.number()),
     totalAccuracyCount: v.optional(v.number()),
     // Writing accuracy split by punctuation handling, so the headline number
@@ -1690,6 +1815,11 @@ export default defineSchema({
     // ?expand=invoices). The overdue dialog's primary CTA. Paying this is
     // what actually settles the debt; the billing portal only swaps cards.
     pastDueInvoiceUrl: v.optional(v.string()),
+    // When a course-usage reconcile was last scheduled (ms). Debounces the
+    // release-only self-heal in `syncAllFeatures` (usage/helpers.ts) so a
+    // sync that still sees a stale Autumn counter, e.g. while a release is
+    // in flight, cannot fire it again for a day.
+    lastCourseReconcileAt: v.optional(v.number()),
   }).index('by_userId', ['userId']),
 
   // E2E-only planStatus overrides, applied inside syncAllFeatures when the

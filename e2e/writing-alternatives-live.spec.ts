@@ -9,6 +9,7 @@ import {
   gotoAuthedApp,
   isSelectedTestId,
   neutralizeTours,
+  waitForInViewport,
 } from './helpers';
 import { extractJsonResult } from './cli-json-output';
 
@@ -113,6 +114,44 @@ async function setReviewMode(
     await btn.click({ force: true });
     await expect
       .poll(() => isSelectedTestId(page, `settings-mode-${mode}`), {
+        timeout: 8_000,
+      })
+      .toBe(true);
+  }
+  await page.keyboard.press('Escape').catch(() => {});
+  await page.waitForTimeout(400);
+}
+
+/**
+ * Writing style is independent of review mode. Earlier chromium-serial
+ * specs (course-settings-sweep, learning-settings) flip Transcribe and
+ * try to restore Translate; if that restore races a mode write, this
+ * user can still be on Transcribe, where stored alternatives grant no
+ * credit and the local gate never fires.
+ */
+async function setWritingStyle(
+  page: Page,
+  style: 'translate' | 'transcribe',
+): Promise<void> {
+  await openSettingsSheet(page);
+  const fullBtn = page.getByTestId('settings-mode-full').first();
+  await expect(fullBtn).toBeVisible({ timeout: 8_000 });
+  if (!(await isSelectedTestId(page, 'settings-mode-full'))) {
+    await fullBtn.click({ force: true });
+    await expect
+      .poll(() => isSelectedTestId(page, 'settings-mode-full'), {
+        timeout: 8_000,
+      })
+      .toBe(true);
+  }
+  const btn = page.getByTestId(`settings-writing-${style}`).first();
+  await expect(btn).toBeVisible({ timeout: 8_000 });
+  if (!(await isSelectedTestId(page, `settings-writing-${style}`))) {
+    await btn.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await waitForInViewport(page, btn);
+    await btn.click({ force: true });
+    await expect
+      .poll(() => isSelectedTestId(page, `settings-writing-${style}`), {
         timeout: 8_000,
       })
       .toBe(true);
@@ -232,6 +271,7 @@ test.describe('writing alternatives lifecycle (live)', { tag: '@live' }, () => {
     await dismissTour(page, 'audio_review_intro', 500);
     await dismissTour(page, 'full_review_intro', 500);
     await setReviewMode(page, 'full');
+    await setWritingStyle(page, 'translate');
     await dismissTour(page, 'full_review_intro', 500);
 
     // The seed parked the card at dueDate 0, so it is the head of the queue.

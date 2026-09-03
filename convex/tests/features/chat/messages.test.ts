@@ -878,4 +878,109 @@ describe('features/chat/messages', () => {
       expect(thread?.title).toBe('New Chat');
     });
   });
+
+  describe('retryResponse', () => {
+    beforeEach(() => llm.reset());
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    type UiMessage = { id: string; role?: string; status?: string };
+
+    async function listAssistant(
+      asUser: ReturnType<TestConvex<typeof schema>['withIdentity']>,
+      threadId: string,
+    ) {
+      const messages = await asUser.query(
+        api.features.chat.messages.listMessages,
+        { threadId, paginationOpts: { numItems: 20, cursor: null } },
+      );
+      return (messages.page as unknown as UiMessage[]).filter(
+        (m) => m.role === 'assistant',
+      );
+    }
+
+    /** A thread whose first tutor reply failed mid-stream (the scheduled
+     *  generation ran against a model that threw), so the thread holds a
+     *  user message and a failed assistant placeholder. */
+    async function seedFailedTurn(t: TestConvex<typeof schema>) {
+      await seedUserWithCredits(t, 50);
+      const asUser = t.withIdentity({ subject: USER });
+      const threadId = await asUser.mutation(
+        api.features.chat.threads.getOrCreateEmptyThread,
+        {},
+      );
+      vi.useFakeTimers();
+      await asUser.mutation(api.features.chat.messages.sendMessage, {
+        threadId,
+        prompt: "What does 'hola' mean?",
+      });
+      llm.failStream = true;
+      await drainScheduled(t);
+      llm.failStream = false;
+      const [failed] = await listAssistant(asUser, threadId);
+      expect(failed?.status).toBe('failed');
+      return { asUser, threadId, failed };
+    }
+
+    it('generates the reply again for a failed turn without charging another credit', async () => {
+      const t = setup();
+      const { asUser, threadId, failed } = await seedFailedTurn(t);
+      expect(await creditsBalance(t)).toBe(49);
+
+      llm.responseText = 'It means hello.';
+      await asUser.mutation(api.features.chat.messages.retryResponse, {
+        threadId,
+        messageId: failed.id,
+      });
+      await drainScheduled(t);
+
+      const assistant = await listAssistant(asUser, threadId);
+      // The failed placeholder is gone; the thread reads as one clean reply.
+      expect(assistant.map((m) => m.status)).toEqual(['success']);
+      expect(assistant.map(textOf)).toEqual(['It means hello.']);
+      // The send prepaid this turn; the failed attempt cost nothing.
+      expect(await creditsBalance(t)).toBe(49);
+    });
+
+    it('refuses a turn whose reply did not fail (no free regeneration)', async () => {
+      const t = setup();
+      await seedUserWithCredits(t, 50);
+      const asUser = t.withIdentity({ subject: USER });
+      const threadId = await asUser.mutation(
+        api.features.chat.threads.getOrCreateEmptyThread,
+        {},
+      );
+      vi.useFakeTimers();
+      await asUser.mutation(api.features.chat.messages.sendMessage, {
+        threadId,
+        prompt: 'hi',
+      });
+      await drainScheduled(t);
+      const [reply] = await listAssistant(asUser, threadId);
+      expect(reply?.status).toBe('success');
+
+      await expectConvexErrorCode(
+        asUser.mutation(api.features.chat.messages.retryResponse, {
+          threadId,
+          messageId: reply.id,
+        }),
+        'NOT_RETRYABLE',
+      );
+      expect(llm.streamCalls).toBe(1);
+    });
+
+    it("refuses another user's thread", async () => {
+      const t = setup();
+      const { threadId, failed } = await seedFailedTurn(t);
+      const asOther = t.withIdentity({ subject: 'user_B' });
+      await expectConvexErrorCode(
+        asOther.mutation(api.features.chat.messages.retryResponse, {
+          threadId,
+          messageId: failed.id,
+        }),
+        'NOT_FOUND',
+      );
+    });
+  });
 });

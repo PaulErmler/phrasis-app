@@ -20,6 +20,7 @@ import {
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
 import { AnnotationLines } from './AnnotationLines';
+import { useLocalPlaySignals } from './useLocalPlaySignals';
 import type { CardPresentation } from './cardPresentation';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import {
@@ -1106,6 +1107,12 @@ function TargetLanguageInput({
   const isActive = activeClip?.language === translation.language;
   const t = useTranslations('LearningMode');
   const tChat = useTranslations('Chat');
+  // Tapping an IPA line plays the clip it transcribes: the row's main
+  // button for the card sentence (and the diff's shown alternative, whose
+  // clip the header carries after submit), each other-accepted row's own.
+  const ipaPlay = useLocalPlaySignals();
+  const mainPlaySignal = ipaPlay.signalFor('main', playSignal);
+  const playMainFromIpa = () => ipaPlay.bump('main');
   // Nullable. Absent outside learning mode (e.g. landing demo); the Discuss
   // button simply doesn't render then.
   const chatContext = useLearningChatToggle();
@@ -1472,6 +1479,7 @@ function TargetLanguageInput({
       ipa={translation.ipa}
       showRomanization={showRomanization}
       showIpa={showIpa}
+      onIpaClick={playMainFromIpa}
     />
   );
 
@@ -1491,7 +1499,7 @@ function TargetLanguageInput({
           onButtonTimeUpdate={onButtonTimeUpdate}
           onButtonStop={onButtonStop}
           speed={speed}
-          playSignal={playSignal}
+          playSignal={mainPlaySignal}
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
           onSpeedCycle={onSpeedCycle}
@@ -1553,6 +1561,7 @@ function TargetLanguageInput({
         ipa={diffTargetItem.ipa}
         showRomanization={showRomanization}
         showIpa={showIpa}
+        onIpaClick={playMainFromIpa}
       />
     ) : null
   ) : (
@@ -1584,7 +1593,7 @@ function TargetLanguageInput({
           onButtonTimeUpdate={onButtonTimeUpdate}
           onButtonStop={onButtonStop}
           speed={speed}
-          playSignal={playSignal}
+          playSignal={mainPlaySignal}
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
           onSpeedCycle={onSpeedCycle}
@@ -1677,6 +1686,7 @@ function TargetLanguageInput({
                     ipa={item.ipa}
                     showRomanization={showRomanization}
                     showIpa={showIpa}
+                    onIpaClick={() => ipaPlay.bump(item.text)}
                   />
                 </div>
                 <div
@@ -1690,6 +1700,7 @@ function TargetLanguageInput({
                     onTimeUpdate={onButtonTimeUpdate}
                     onStop={onButtonStop}
                     speed={speed}
+                    playSignal={ipaPlay.signalFor(item.text)}
                   />
                 </div>
               </div>
@@ -1761,7 +1772,7 @@ function TargetLanguageInput({
                 onTimeUpdate={onButtonTimeUpdate}
                 onStop={onButtonStop}
                 speed={speed}
-                playSignal={playSignal}
+                playSignal={mainPlaySignal}
               />
               {onSpeedCycle && (
                 <CardSpeedBadge
@@ -1782,7 +1793,7 @@ function TargetLanguageInput({
           onButtonTimeUpdate={onButtonTimeUpdate}
           onButtonStop={onButtonStop}
           speed={speed}
-          playSignal={playSignal}
+          playSignal={mainPlaySignal}
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
           onSpeedCycle={onSpeedCycle}

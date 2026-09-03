@@ -2858,6 +2858,7 @@ describe('features/scheduling', () => {
         expect(stats?.totalRepetitions).toBe(1);
         expect(stats?.totalTimeMs).toBe(4000);
         expect(stats?.totalReviewsByMode?.radio).toBe(1);
+        expect(stats?.totalTimeMsByMode?.radio).toBe(4000);
         // Radio doesn't graduate cards or count "first review". totalCards
         // should stay at the seeded value (0).
         expect(stats?.totalCards).toBe(0);
@@ -3233,7 +3234,7 @@ describe('features/scheduling', () => {
           cardId,
         },
       );
-      expect(res).toEqual({ retranslated: true });
+      expect(res).toEqual({ retranslated: true, updatedToLatest: false });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(1);
@@ -3287,7 +3288,7 @@ describe('features/scheduling', () => {
           cardId,
         },
       );
-      expect(res).toEqual({ retranslated: false });
+      expect(res).toEqual({ retranslated: false, updatedToLatest: false });
 
       expect(llmEnqueues()).toHaveLength(0);
 
@@ -3382,7 +3383,7 @@ describe('features/scheduling', () => {
           cardId,
         },
       );
-      expect(res).toEqual({ retranslated: true });
+      expect(res).toEqual({ retranslated: true, updatedToLatest: false });
 
       // Both translation rows got their flagCount bumped.
       const translations = await t.run(async (ctx) =>
@@ -3429,7 +3430,7 @@ describe('features/scheduling', () => {
           cardId,
         },
       );
-      expect(res).toEqual({ retranslated: true });
+      expect(res).toEqual({ retranslated: true, updatedToLatest: false });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(2);
@@ -3463,7 +3464,7 @@ describe('features/scheduling', () => {
           cardId,
         },
       );
-      expect(res).toEqual({ retranslated: false });
+      expect(res).toEqual({ retranslated: false, updatedToLatest: false });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(3);
@@ -3500,7 +3501,7 @@ describe('features/scheduling', () => {
           cardId,
         },
       );
-      expect(res).toEqual({ retranslated: false });
+      expect(res).toEqual({ retranslated: false, updatedToLatest: false });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(1);

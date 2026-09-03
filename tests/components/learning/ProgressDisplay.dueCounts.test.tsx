@@ -43,15 +43,20 @@ vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }));
 
-class FakeAudio {
+class FakeAudio extends EventTarget {
   preload = '';
   ended = false;
+  paused = true;
   currentTime = 0;
   duration = 1;
   play() {
+    this.paused = false;
     return Promise.resolve();
   }
-  pause() {}
+  pause() {
+    this.paused = true;
+  }
+  load() {}
 }
 
 vi.stubGlobal('Audio', FakeAudio);

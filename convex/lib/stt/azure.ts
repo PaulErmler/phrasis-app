@@ -48,15 +48,43 @@ export interface TranscribeOptions {
    */
   regionVariant?: string;
   /**
-   * Course languages (internal codes) used when auto-detecting. Appended to
-   * the 8 most-common base locales, deduped, capped at Azure's 10-locale
+   * Course languages (internal codes) used when auto-detecting. When the
+   * multi-lingual model covers all of them, the request switches to that model
+   * (mixed-language audio transcribes continuously). Otherwise they're appended
+   * to the 8 most-common base locales, deduped, capped at Azure's 10-locale
    * limit. Pass the active course's base ∪ target codes; `es_mixed` is
    * automatically expanded to `es-ES` + `es-MX`.
    */
   autoDetectCourseLanguages?: readonly string[];
+  /**
+   * Request Azure's multi-lingual model outright, whatever the course
+   * languages say. Used as the last-resort retry when candidate-locale
+   * language-ID has already refused mixed audio and there's no course target
+   * language to pin to. Ignored when `internalLanguageCode` is set.
+   */
+  forceMultilingualModel?: boolean;
 }
 
 const API_VERSION = '2024-11-15';
+
+/**
+ * Thrown when Azure's candidate-locale language-ID refuses the audio because
+ * it contains more than one language (HTTP 422 / `MultipleLanguagesIdentified`).
+ * Distinct from a generic upstream failure because it's recoverable: retry the
+ * same audio either on the multi-lingual model or pinned to a single locale.
+ * See `features/chat/transcribe.ts` for the recovery policy.
+ */
+export class AzureMultipleLanguagesError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AzureMultipleLanguagesError';
+  }
+}
+
+/** Azure's 422 body carries the reason in `innerError.code`. */
+function isMultipleLanguagesBody(body: string): boolean {
+  return body.includes('MultipleLanguagesIdentified');
+}
 
 /** Word-level timing relative to the audio blob (seconds). */
 export type WordTiming = { word: string; start: number; end: number };
@@ -87,8 +115,13 @@ interface AzureTranscriptionResponse {
  * text and word-level timestamps (seconds).
  *
  * When `internalLanguageCode` is provided, the corresponding Azure locale is
- * passed as the only candidate. Best accuracy. When omitted, Azure auto-
- * detects from `AUTO_DETECT_LOCALES`.
+ * passed as the only candidate. Best accuracy. When omitted, the locale list
+ * comes from `buildAutoDetectLocales`, which either returns candidate locales
+ * for language-ID or an empty list — Azure's request for its multi-lingual
+ * model, the mode that transcribes code-switched audio continuously.
+ *
+ * Throws `AzureMultipleLanguagesError` when candidate-locale language-ID can't
+ * settle on one dominant language, so callers can retry in another mode.
  */
 export async function transcribeAudio(
   blob: Blob,
@@ -104,8 +137,12 @@ export async function transcribeAudio(
 
   const locales = internalLanguageCode
     ? toAzureSttLocales(internalLanguageCode, opts.regionVariant)
-    : buildAutoDetectLocales(opts.autoDetectCourseLanguages);
+    : opts.forceMultilingualModel
+      ? []
+      : buildAutoDetectLocales(opts.autoDetectCourseLanguages);
 
+  // An empty `locales` array is meaningful, not a bug: it's how Azure is asked
+  // for the multi-lingual model (see `buildAutoDetectLocales`).
   const definition = JSON.stringify({
     locales,
     diarization: { enabled: false },
@@ -131,7 +168,11 @@ export async function transcribeAudio(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Azure STT API error: ${response.status} - ${errorText}`);
+    const message = `Azure STT API error: ${response.status} - ${errorText}`;
+    if (response.status === 422 && isMultipleLanguagesBody(errorText)) {
+      throw new AzureMultipleLanguagesError(message);
+    }
+    throw new Error(message);
   }
 
   const data = (await response.json()) as AzureTranscriptionResponse;

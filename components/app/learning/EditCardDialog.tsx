@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useLayoutEffect, useMemo } from 'react';
+import { useState, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -75,17 +75,25 @@ export function EditCardDialog({
   // block, and its draft lives only in this state.
   useReloadBlock(open);
 
+  // Seed the drafts when the dialog opens (or is re-pointed at another card
+  // while open), and only then. The learning view rebuilds `translations`
+  // per render, so keying the reset on its identity wiped the typed values
+  // back to the stored ones whenever the parent re-rendered: visibly for a
+  // frame while Save was pending (the old sentence flashed in the fields),
+  // silently if anything re-rendered the parent mid-typing. The ref reads
+  // the current prop without making it a trigger.
+  const translationsRef = useRef(translations);
+  translationsRef.current = translations;
   useLayoutEffect(() => {
-    if (open) {
-      const initial: Record<string, string> = {};
-      for (const tr of translations) {
-        initial[tr.language] = tr.text;
-      }
-      setEditedTexts(initial);
-      setEditedAlternatives({});
-      setDeletedAlternatives(new Set());
+    if (!open) return;
+    const initial: Record<string, string> = {};
+    for (const tr of translationsRef.current) {
+      initial[tr.language] = tr.text;
     }
-  }, [open, translations]);
+    setEditedTexts(initial);
+    setEditedAlternatives({});
+    setDeletedAlternatives(new Set());
+  }, [open, cardId]);
 
   const alternativesByLanguage = useMemo(() => {
     const map = new Map<string, NonNullable<typeof alternativeRows>>();

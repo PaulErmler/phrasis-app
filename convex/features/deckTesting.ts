@@ -79,3 +79,45 @@ export const duplicateTextCount = internalQuery({
     return duplicates;
   },
 });
+
+/**
+ * Cards in the user's active-course decks, split by where they came from.
+ *
+ * The subject of the source-mixing e2e (`e2e/auto-add-sources.spec.ts`).
+ * "Half the batch came from each source" is a proportion, and proportions
+ * are exactly what a presence-style assertion ("a card appeared") cannot
+ * see: the old behaviour — drain every custom text first, then start on the
+ * course — passes every such check while producing a batch that is 100%
+ * custom.
+ *
+ * `collectionId` is stamped on the card at insert, so the split is read off
+ * the cards themselves rather than reconstructed from progress counters.
+ * A card whose collection is gone counts as neither.
+ */
+export const cardCountsBySource = internalQuery({
+  args: { email: v.string() },
+  returns: v.object({
+    premade: v.number(),
+    custom: v.number(),
+    total: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    assertTestHooksEnabled();
+    const cards = await collectDeckCards(ctx, args.email);
+    const originByCollection = new Map<string, string | undefined>();
+    let premade = 0;
+    let custom = 0;
+    for (const card of cards) {
+      const key = card.collectionId?.toString();
+      if (!key) continue;
+      if (!originByCollection.has(key)) {
+        const coll = await ctx.db.get(card.collectionId!);
+        originByCollection.set(key, coll?.origin);
+      }
+      const origin = originByCollection.get(key);
+      if (origin === 'premade') premade++;
+      else if (origin === 'custom' || origin === 'chat') custom++;
+    }
+    return { premade, custom, total: cards.length };
+  },
+});

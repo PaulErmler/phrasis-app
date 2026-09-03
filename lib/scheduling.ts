@@ -39,19 +39,19 @@ export const MIN_INITIAL_REVIEW_COUNT = 2;
 export const MAX_INITIAL_REVIEW_COUNT = 10;
 
 /**
- * Validate that an initialReviewCount is an integer within the allowed range.
- * Throws a ConvexError if invalid.
+ * Coerce an initialReviewCount into the supported range.
+ *
+ * Clamped rather than rejected, and on every write path: a client on a stale
+ * bundle used to offer 1-20, and throwing on its out-of-range value failed the
+ * whole save with a generic toast. Non-finite input falls back to the default
+ * — `Math.floor(NaN)` passes straight through a min/max clamp.
  */
-export function validateInitialReviewCount(value: number): void {
-  if (
-    !Number.isInteger(value) ||
-    value < MIN_INITIAL_REVIEW_COUNT ||
-    value > MAX_INITIAL_REVIEW_COUNT
-  ) {
-    throw new Error(
-      `initialReviewCount must be an integer between ${MIN_INITIAL_REVIEW_COUNT} and ${MAX_INITIAL_REVIEW_COUNT}`,
-    );
-  }
+export function clampInitialReviewCount(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_INITIAL_REVIEW_COUNT;
+  return Math.max(
+    MIN_INITIAL_REVIEW_COUNT,
+    Math.min(MAX_INITIAL_REVIEW_COUNT, Math.floor(value)),
+  );
 }
 
 /** Default desired retention used by the backend. */

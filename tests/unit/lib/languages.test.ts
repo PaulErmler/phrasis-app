@@ -440,12 +440,6 @@ describe('content versioning', () => {
       expect(getCurrentTranslationVersion('en')).toBe(DEFAULT_CONTENT_VERSION);
       expect(getCurrentTtsVersion('en')).toBe(DEFAULT_CONTENT_VERSION);
     });
-    it('returns bumped translationVersion for de (Gemini 3.5 Flash Nitro rollout)', () => {
-      expect(getCurrentTranslationVersion('de')).toBe(2);
-    });
-    it('returns bumped translationVersion for fr (Gemini 3.5 Flash Nitro rollout)', () => {
-      expect(getCurrentTranslationVersion('fr')).toBe(2);
-    });
     it('defaults to 1 for an unknown code', () => {
       expect(getCurrentTtsVersion('xx')).toBe(1);
       expect(getCurrentTranslationVersion('xx')).toBe(1);
@@ -509,15 +503,15 @@ describe('content versioning', () => {
   });
 
   it('isTranslationVersionStale mirrors the config version per language', () => {
-    // de bumped to v2. A v1 stamp is stale; undefined is still not stale.
-    expect(getCurrentTranslationVersion('de')).toBe(2);
-    expect(isTranslationVersionStale('de', 2)).toBe(false);
-    expect(isTranslationVersionStale('de', 1)).toBe(true);
-    expect(isTranslationVersionStale('de', undefined)).toBe(false);
-    // fr bumped to v2, same semantics as de.
-    expect(getCurrentTranslationVersion('fr')).toBe(2);
-    expect(isTranslationVersionStale('fr', 2)).toBe(false);
-    expect(isTranslationVersionStale('fr', 1)).toBe(true);
-    expect(isTranslationVersionStale('fr', undefined)).toBe(false);
+    // The literal per-language numbers live in convex/tests/lib/languages.test.ts
+    // (with the every-language-stamped invariant); here only the staleness
+    // semantics are pinned, so a bump does not have to touch this file.
+    for (const code of ['de', 'fr']) {
+      const current = getCurrentTranslationVersion(code);
+      expect(current).toBeGreaterThanOrEqual(2);
+      expect(isTranslationVersionStale(code, current)).toBe(false);
+      expect(isTranslationVersionStale(code, current - 1)).toBe(true);
+      expect(isTranslationVersionStale(code, undefined)).toBe(false);
+    }
   });
 });

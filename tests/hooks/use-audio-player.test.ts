@@ -110,7 +110,7 @@ function baseOptions(
     autoPlay: false,
     settingsOpen: false,
     getReviewInitiatedByThisTab: () => false,
-    onScheduleComplete: () => {},
+    onScheduleComplete: () => false,
     onResetReviewFlag: () => {},
     onNext: () => {},
     ...overrides,
@@ -454,6 +454,181 @@ describe('useAudioPlayer', () => {
       unmount();
       expect(revokeCallsFor(r2.blobUrl)).toBe(1);
       expect(revokeCallsFor(r3.blobUrl)).toBe(1);
+      expect(revokeCallsFor(r1.blobUrl)).toBe(1);
+    });
+  });
+
+  describe('gapless advance', () => {
+    const nextRecordings = [rec('en', 'en-B'), rec('es', 'es-B')];
+
+    /** Card 1 merged and playing, card 2 prefetched and cached. */
+    async function primeWithPrefetch(
+      overrides: Partial<UseAudioPlayerOptions>,
+    ) {
+      const hook = renderPlayer({ autoPlay: true, ...overrides });
+      const r1 = await resolveMerge(0, makeResult({ durationSec: 3 }));
+      hook.rerender(
+        baseOptions({
+          autoPlay: true,
+          ...overrides,
+          nextCard: { cardId: 'card-2', audioRecordings: nextRecordings },
+        }),
+      );
+      const r2 = await resolveMerge(1, makeResult({ durationSec: 7 }));
+      playMock.mockClear();
+      return { ...hook, r1, r2 };
+    }
+
+    const ended = (audio: HTMLAudioElement) =>
+      act(() => {
+        audio.dispatchEvent(new Event('ended'));
+      });
+
+    it('starts the prefetched next blob inside the `ended` handler when the caller advances', async () => {
+      const onScheduleComplete = vi.fn(() => true);
+      const { result, r1, r2 } = await primeWithPrefetch({
+        onScheduleComplete,
+      });
+      const audio = result.current.audioRef.current!;
+
+      ended(audio);
+
+      expect(onScheduleComplete).toHaveBeenCalledTimes(1);
+      // Same tick: no rerender with the next card has happened yet.
+      expect(audio.src).toBe(r2.blobUrl);
+      expect(playMock).toHaveBeenCalledTimes(1);
+      expect(result.current.durationSec).toBe(7);
+      expect(revokeCallsFor(r1.blobUrl)).toBe(1);
+      expect(revokeCallsFor(r2.blobUrl)).toBe(0);
+    });
+
+    it('adopts the running audio when the server serves that card, without a teardown or a second play', async () => {
+      const onScheduleComplete = vi.fn(() => true);
+      const onResetReviewFlag = vi.fn();
+      const { result, rerender, r2 } = await primeWithPrefetch({
+        onScheduleComplete,
+        onResetReviewFlag,
+      });
+      const audio = result.current.audioRef.current!;
+      ended(audio);
+
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          onResetReviewFlag,
+          cardId: 'card-2',
+          audioRecordings: nextRecordings,
+          nextCard: null,
+        }),
+      );
+
+      expect(mergeCardAudioMock).toHaveBeenCalledTimes(2);
+      expect(audio.src).toBe(r2.blobUrl);
+      expect(playMock).toHaveBeenCalledTimes(1);
+      expect(result.current.isMerging).toBe(false);
+      expect(result.current.durationSec).toBe(7);
+      expect(onResetReviewFlag).toHaveBeenCalledTimes(1);
+      expect(revokeCallsFor(r2.blobUrl)).toBe(0);
+    });
+
+    it('pauses the adopted audio when autoplay was muted in the meantime (celebration)', async () => {
+      const onScheduleComplete = vi.fn(() => true);
+      const { result, rerender } = await primeWithPrefetch({
+        onScheduleComplete,
+      });
+      const audio = result.current.audioRef.current!;
+      ended(audio);
+      // jsdom pins `paused` at true; model a playing element so the adoption
+      // path has something to stop. `pause` is already a shared mock from the
+      // test setup, so clear its history rather than counting the whole file.
+      Object.defineProperty(audio, 'paused', {
+        configurable: true,
+        get: () => false,
+      });
+      const pauseSpy = vi.spyOn(audio, 'pause');
+      pauseSpy.mockClear();
+
+      rerender(
+        baseOptions({
+          autoPlay: false,
+          onScheduleComplete,
+          cardId: 'card-2',
+          audioRecordings: nextRecordings,
+          nextCard: null,
+        }),
+      );
+
+      expect(pauseSpy).toHaveBeenCalledTimes(1);
+      expect(mergeCardAudioMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('leaves the element ended when the caller does not advance', async () => {
+      const { result, r1 } = await primeWithPrefetch({
+        onScheduleComplete: () => false,
+      });
+      const audio = result.current.audioRef.current!;
+
+      ended(audio);
+
+      expect(audio.src).toBe(r1.blobUrl);
+      expect(playMock).not.toHaveBeenCalled();
+      expect(result.current.isPlaying).toBe(false);
+    });
+
+    it('tears the handoff down when the server serves a different card', async () => {
+      const onScheduleComplete = vi.fn(() => true);
+      const { result, rerender, r2 } = await primeWithPrefetch({
+        onScheduleComplete,
+      });
+      const audio = result.current.audioRef.current!;
+      ended(audio);
+      expect(audio.src).toBe(r2.blobUrl);
+
+      const otherRecordings = [rec('en', 'en-C'), rec('es', 'es-C')];
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          cardId: 'card-3',
+          audioRecordings: otherRecordings,
+          nextCard: null,
+        }),
+      );
+
+      // Ordinary path: the handoff blob is released and card-3 merges afresh.
+      expect(mergeCardAudioMock).toHaveBeenCalledTimes(3);
+      expect(pendingMerges[2].recordings).toBe(otherRecordings);
+      expect(revokeCallsFor(r2.blobUrl)).toBe(1);
+      expect(audio.src).not.toBe(r2.blobUrl);
+    });
+
+    it('hands off from the prefetch completion when the card ended before the prefetch finished', async () => {
+      const onScheduleComplete = vi.fn(() => true);
+      const { result, rerender } = renderPlayer({
+        autoPlay: true,
+        onScheduleComplete,
+      });
+      const r1 = await resolveMerge(0, makeResult({ durationSec: 3 }));
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          nextCard: { cardId: 'card-2', audioRecordings: nextRecordings },
+        }),
+      );
+      expect(mergeCardAudioMock).toHaveBeenCalledTimes(2);
+      const audio = result.current.audioRef.current!;
+      playMock.mockClear();
+
+      // Prefetch still in flight: nothing to hand off yet.
+      ended(audio);
+      expect(audio.src).toBe(r1.blobUrl);
+      expect(playMock).not.toHaveBeenCalled();
+
+      const r2 = await resolveMerge(1, makeResult({ durationSec: 7 }));
+      expect(audio.src).toBe(r2.blobUrl);
+      expect(playMock).toHaveBeenCalledTimes(1);
       expect(revokeCallsFor(r1.blobUrl)).toBe(1);
     });
   });

@@ -402,6 +402,10 @@ export const cardEditKindValidator = v.union(
   v.literal('manual_edit'), // the Edit Card dialog (features/scheduling:editCard)
   v.literal('chat_also_correct'), // chat replace (chat/cardApprovals)
   v.literal('flag'), // the Flag button (features/scheduling:flagTranslation)
+  // The Flag button on a card pinned to a superseded curriculum wording: the
+  // card was moved to the latest wording instead of retranslating
+  // (features/scheduling:flagTranslation, see `translationArchive`).
+  v.literal('accept_latest'),
 );
 export type CardEditKind = Infer<typeof cardEditKindValidator>;
 
@@ -472,13 +476,18 @@ export const translationReasonValidator = v.union(
   v.literal('fill'), // fill or regenerate a missing/stale language
   v.literal('flag'), // the user flagged the translation as wrong
   v.literal('curriculum_fix'), // the user retyped a curriculum translation
+  // The language's `translationVersion` was bumped above the row's stamp: a
+  // keep-row regeneration whose write archives the old wording for existing
+  // cards (see `translationArchive` in schema.ts). Carries no previous
+  // translation: the point is a fresh rendering, not a reconsideration.
+  v.literal('version_bump'),
 );
 export type TranslationReason = Infer<typeof translationReasonValidator>;
 
 /**
  * The two reasons that mean "a user is telling us this translation is wrong".
  * Both carry the user's own wording and want the previous translation in the
- * prompt; 'fill' wants neither.
+ * prompt; 'fill' and 'version_bump' want neither.
  */
 export function isRetranslationReason(
   reason: TranslationReason | undefined,
@@ -553,6 +562,23 @@ export const reviewsByModeValidator = v.object({
 // 'freeStudy'). Single source of truth for the stats writers' `reviewMode`
 // parameters so a new mode can't be added to the validator but missed there.
 export type StatsReviewMode = keyof Infer<typeof reviewsByModeValidator>;
+
+/** Every bucket at zero, the seed for read-modify-write on a per-mode counter. */
+export function emptyByMode(): Record<StatsReviewMode, number> {
+  return { audio: 0, full: 0, radio: 0, freeStudy: 0 };
+}
+
+// Which slice of a per-mode counter (reps or time) a home-card tile shows.
+// Tapping a tile cycles all -> learn -> radio -> freeStudy; each tile stores
+// its own choice on userSettings (`repsStatFilter`, `timeStatFilter`).
+// 'learn' is the graded FSRS reviews, 'radio' and 'freeStudy' are the two
+// free-play buckets above, shown separately. Unset ≡ 'all'.
+export const statFilterValidator = v.union(
+  v.literal('all'),
+  v.literal('learn'),
+  v.literal('radio'),
+  v.literal('freeStudy'),
+);
 
 // `{language, text}` translation-entry list used by the cardApprovals
 // table/mutations. Also the stored document shape. Do not widen; producers

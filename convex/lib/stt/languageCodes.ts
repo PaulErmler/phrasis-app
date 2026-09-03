@@ -72,19 +72,78 @@ const AUTO_DETECT_BASE: readonly string[] = [
 ] as const;
 
 /**
- * Build the candidate-locale list for auto-detection. Starts from the 8
- * globally most-spoken locales, appends each course-language locale (deduped),
- * caps the result at Azure's 10-locale limit, and expands mixed-dialect codes
- * (today: `es_mixed` → `es-ES` + `es-MX`) into their underlying variants.
+ * Audio locales Azure's multi-lingual Fast Transcription model can recognize.
+ * Requesting that model is what makes code-switched audio ("how do you say
+ * *guten Morgen* in Spanish?") transcribable at all: candidate-locale
+ * language-ID is documented to pick ONE dominant locale per file and returns
+ * 422 `MultipleLanguagesIdentified` when the audio genuinely mixes languages.
+ *
+ * Source: fast transcription REST docs, multi-lingual transcription tab
+ * (api-version 2024-11-15 onwards). Keep in sync when Azure widens the model.
+ */
+const MULTILINGUAL_MODEL_LOCALES: ReadonlySet<string> = new Set([
+  'de-DE',
+  'en-AU',
+  'en-CA',
+  'en-GB',
+  'en-IN',
+  'en-US',
+  'es-ES',
+  'es-MX',
+  'fr-CA',
+  'fr-FR',
+  'it-IT',
+  'ja-JP',
+  'ko-KR',
+  'pt-BR',
+  'zh-CN',
+]);
+
+/** True when Azure's multi-lingual model covers this Azure locale. */
+export function isMultilingualModelLocale(locale: string): boolean {
+  return MULTILINGUAL_MODEL_LOCALES.has(locale);
+}
+
+/**
+ * True when every language of the given course is covered by the multi-lingual
+ * model, i.e. we can ask Azure to transcribe mixed-language audio continuously
+ * instead of forcing it to pick one dominant locale. Empty input is false: with
+ * no course context we can't rule out a language the model doesn't cover.
+ */
+export function supportsMultilingualModel(
+  courseLanguages: readonly string[],
+): boolean {
+  if (courseLanguages.length === 0) return false;
+  return courseLanguages.every((code) =>
+    toAzureSttLocales(code).every(isMultilingualModelLocale),
+  );
+}
+
+/**
+ * Build the candidate-locale list for auto-detection.
+ *
+ * Returns an EMPTY array — Azure's documented request for its multi-lingual
+ * model — when every course language is covered by that model. That is the
+ * common case for chat voice input (the user speaks their base language, the
+ * target language, or a mix of the two) and is the only mode that transcribes
+ * code-switched audio instead of failing with `MultipleLanguagesIdentified`.
+ * The model auto-detects across all 15 of its locales, so this is also a wider
+ * net than the base 8 for those languages.
+ *
+ * Otherwise falls back to candidate-locale language-ID: the 8 globally
+ * most-spoken locales, plus each course-language locale (deduped), capped at
+ * Azure's 10-locale limit, with mixed-dialect codes (today: `es_mixed` →
+ * `es-ES` + `es-MX`) expanded into their variants. Mixed-language audio can
+ * still 422 on this path — callers that care handle the retry.
  *
  * Pass the active course's `baseLanguages` ∪ `targetLanguages` as
- * `courseLanguages`. Returns the base 8 unchanged when the array is empty.
- * Preserves the previous behavior for chat voice input on users without a
- * selected course.
+ * `courseLanguages`. Returns the base 8 when the array is empty.
  */
 export function buildAutoDetectLocales(
   courseLanguages: readonly string[] = [],
 ): string[] {
+  if (supportsMultilingualModel(courseLanguages)) return [];
+
   const result: string[] = [...AUTO_DETECT_BASE];
   const seen = new Set(result);
   const courseLocales: string[] = [];

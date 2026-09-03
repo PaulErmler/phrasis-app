@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 import { LearningModeSettings } from '@/components/app/LearningModeSettings';
 import type { CourseSettings } from '@/components/app/learning/types';
 import type { Id } from '@/convex/_generated/dataModel';
+import {
+  MAX_INITIAL_REVIEW_COUNT,
+  MIN_INITIAL_REVIEW_COUNT,
+} from '@/lib/scheduling';
 
 /**
  * The client-side clamp handlers (speed round-to-tenth + 0.6–2.0 clamp, the
@@ -185,7 +189,7 @@ describe('LearningModeSettings: client clamp handlers', () => {
       playTargetBeforeBase: true,
       playTargetAfterBase: true,
     });
-    // cardsPerBatch is min 1/uncapped-ish, initial reviews min 1/max 20. The
+    // cardsPerBatch is min 1/uncapped-ish, initial reviews min 2/max 10. The
     // two strategy steppers ("Only new" reps, "Until rated Good" count) are
     // the only 1..10 ranges, rendered in that order.
     const strategySteppers = steppers.filter(
@@ -215,5 +219,114 @@ describe('LearningModeSettings: client clamp handlers', () => {
         targetBeforeUntilGoodReps: expected,
       });
     }
+  });
+
+  /**
+   * Regression: the stepper offered 1-20 while the server rejected anything
+   * outside MIN/MAX_INITIAL_REVIEW_COUNT with a hard throw, so stepping past
+   * 10 (or below 2) failed the whole save with a generic error toast.
+   */
+  it('bounds the initial-reviews stepper by the shared scheduling constants', async () => {
+    renderSettings({ reviewMode: 'audio' });
+    const initialReviews = steppers.find(
+      (s) =>
+        s.min === MIN_INITIAL_REVIEW_COUNT &&
+        s.max === MAX_INITIAL_REVIEW_COUNT,
+    );
+    expect(initialReviews).toBeDefined();
+
+    // The real StepperControl never emits outside [min, max]; an out-of-range
+    // value is CLAMPED rather than dropped, matching `clampInitialReviewCount`
+    // on the write paths. Dropping it would strand a stored value above the
+    // max: StepperControl disables its minus at `value >= max`, so the control
+    // would freeze with no way back into range.
+    for (const [out, expected] of [
+      [MIN_INITIAL_REVIEW_COUNT - 1, MIN_INITIAL_REVIEW_COUNT],
+      [MAX_INITIAL_REVIEW_COUNT + 1, MAX_INITIAL_REVIEW_COUNT],
+    ]) {
+      updateSettings.mockClear();
+      await initialReviews!.onChange(out);
+      expect(updateSettings).toHaveBeenCalledWith({
+        courseId: COURSE_ID,
+        initialReviewCount: expected,
+      });
+    }
+
+    updateSettings.mockClear();
+    await initialReviews!.onChange(MAX_INITIAL_REVIEW_COUNT);
+    expect(updateSettings).toHaveBeenCalledWith({
+      courseId: COURSE_ID,
+      initialReviewCount: MAX_INITIAL_REVIEW_COUNT,
+    });
+  });
+});
+
+describe('LearningModeSettings: the Radio scope clamps into its own fields', () => {
+  beforeEach(() => {
+    updateSettings.mockClear();
+    timelineCards.length = 0;
+    steppers.length = 0;
+  });
+
+  /** Renders with the split on and clicks through to the Radio scope. */
+  const inRadioScope = (settings: Partial<CourseSettings>) => {
+    renderSettings({
+      reviewMode: 'audio',
+      separateRadioSettings: true,
+      ...settings,
+    });
+    // Cleared BEFORE the click: the click is what re-renders the sheet under
+    // the Radio scope, so the steppers captured after it are the radio ones.
+    steppers.length = 0;
+    fireEvent.click(screen.getByTestId('settings-scope-radio'));
+    updateSettings.mockClear();
+  };
+
+  it('both strategy steppers write the *Radio window, clamped to 1-10', async () => {
+    inRadioScope({ playTargetBeforeBase: true, playTargetAfterBase: true });
+    const strategySteppers = steppers.filter(
+      (s) => s.min === 1 && s.max === 10,
+    );
+    // "Until rated Good" is rendered under the Radio scope too: radio plays
+    // can't advance a card's good count, but the count it already carries
+    // still graduates it, so the window has to be settable here.
+    expect(strategySteppers).toHaveLength(2);
+    const [onlyNew, untilGood] = strategySteppers;
+
+    for (const [input, expected] of [
+      [-1, 1],
+      [0, 1],
+      [50, 10],
+      [3.7, 3],
+    ] as const) {
+      updateSettings.mockClear();
+      await onlyNew.onChange(input);
+      expect(updateSettings).toHaveBeenCalledWith({
+        courseId: COURSE_ID,
+        targetBeforeOnlyNewRepsRadio: expected,
+      });
+
+      updateSettings.mockClear();
+      await untilGood.onChange(input);
+      expect(updateSettings).toHaveBeenCalledWith({
+        courseId: COURSE_ID,
+        targetBeforeUntilGoodRepsRadio: expected,
+      });
+    }
+  });
+
+  it('the same steppers still write the shared fields under the Review scope', () => {
+    renderSettings({
+      reviewMode: 'audio',
+      separateRadioSettings: true,
+      playTargetBeforeBase: true,
+      playTargetAfterBase: true,
+    });
+    const [, untilGood] = steppers.filter((s) => s.min === 1 && s.max === 10);
+    void untilGood.onChange(5);
+    expect(updateSettings).toHaveBeenCalledWith({
+      courseId: COURSE_ID,
+      targetBeforeUntilGoodReps: 5,
+    });
   });
 });

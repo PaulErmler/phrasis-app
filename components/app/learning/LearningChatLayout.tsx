@@ -26,6 +26,13 @@ interface PendingPrompt {
 
 interface LearningChatContextValue {
   isChatOpen: boolean;
+  /**
+   * The open chat covers the card (narrow layout). On desktop the chat sits
+   * beside the card, and the session shortcuts stay live for keys pressed on
+   * the card side; the panel itself is marked `data-learning-chat-panel` so
+   * keys pressed inside it are left to the chat.
+   */
+  chatCoversCard: boolean;
   openChat: () => void;
   closeChat: () => void;
   toggleChat: () => void;
@@ -48,6 +55,11 @@ export function useLearningChatToggle(): LearningChatContextValue | null {
 }
 
 // -- Layout component --------------------------------------------------------
+
+/** Duration of the mobile chat slide, matching the card's `duration-300`. */
+const MOBILE_CHAT_SLIDE_MS = 300;
+/** `history.state` tag on the entry pushed for the open mobile chat. */
+const CHAT_HISTORY_KEY = 'learnChatOpen';
 
 interface LearningChatLayoutProps {
   header: ReactNode;
@@ -102,6 +114,82 @@ export function LearningChatLayout({
   // true and the effect's `setIsChatOpen(false)` landing.
   const effectiveChatOpen = isChatOpen && !hideChatToggle;
 
+  // ----- Mobile slide -----
+  // The chat panel pushes in from the right while the card slides out to the
+  // left, and the reverse on close, both over the same 300 ms ease-out. The
+  // slide is a CSS keyframe animation (tw-animate-css `animate-in` /
+  // `animate-out`), not a transform transition: a keyframe animation starts
+  // the moment the panel leaves `display:none`, whereas a transition needs
+  // the off-screen transform painted in a frame of its own first, and React
+  // could commit the "slid in" transform before that paint happened, so the
+  // panel snapped into place instead of sliding. `mobileChatMounted` keeps
+  // the panel displayed for the slide-out, then restores `display:none`.
+  // Resting at `display:none` (not `translate-x-full`) is what stops a
+  // desktop→mobile viewport flip from animating the closed panel across the
+  // screen (see the panel comment below).
+  const [mobileChatMounted, setMobileChatMounted] = useState(false);
+  useEffect(() => {
+    if (isDesktop) {
+      setMobileChatMounted(false);
+      return;
+    }
+    if (effectiveChatOpen) {
+      setMobileChatMounted(true);
+      return;
+    }
+    const timer = setTimeout(
+      () => setMobileChatMounted(false),
+      MOBILE_CHAT_SLIDE_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [effectiveChatOpen, isDesktop]);
+
+  // ----- Mobile history entry -----
+  // On a phone the open chat covers the card like a pushed page, so it gets
+  // a history entry of its own: an edge-swipe / hardware back then closes
+  // the chat instead of leaving the learn session (the (main) layout's
+  // popstate handler keeps /app/learn open because the URL is unchanged).
+  // The entry is tagged in `history.state` so this component can tell "the
+  // chat entry was popped" from any other popstate. A programmatic close
+  // (header back button, celebration) pops the entry itself so the stack
+  // doesn't keep a dead entry that would make the next swipe-back a no-op.
+  const chatHistoryPushedRef = useRef(false);
+  const isChatOpenRef = useRef(false);
+  isChatOpenRef.current = effectiveChatOpen;
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (effectiveChatOpen && !isDesktop) {
+      if (chatHistoryPushedRef.current) return;
+      chatHistoryPushedRef.current = true;
+      window.history.pushState(
+        { ...(window.history.state ?? {}), [CHAT_HISTORY_KEY]: true },
+        '',
+        window.location.href,
+      );
+      return;
+    }
+    if (!effectiveChatOpen && chatHistoryPushedRef.current) {
+      chatHistoryPushedRef.current = false;
+      if (window.history.state?.[CHAT_HISTORY_KEY]) {
+        window.history.back();
+      }
+    }
+  }, [effectiveChatOpen, isDesktop]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onPopState = () => {
+      if (window.history.state?.[CHAT_HISTORY_KEY]) return;
+      if (!chatHistoryPushedRef.current) return;
+      // The chat's entry was popped (swipe-back / back button). Clear the
+      // flag BEFORE the state update so the close effect above doesn't pop
+      // a second entry.
+      chatHistoryPushedRef.current = false;
+      if (isChatOpenRef.current) setIsChatOpen(false);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
   const openChat = useCallback(() => {
     setIsChatOpen(true);
     onChatOpen?.();
@@ -147,6 +235,7 @@ export function LearningChatLayout({
     <LearningChatContext.Provider
       value={{
         isChatOpen: effectiveChatOpen,
+        chatCoversCard: effectiveChatOpen && !isDesktop,
         openChat,
         closeChat,
         toggleChat,
@@ -207,14 +296,14 @@ export function LearningChatLayout({
           )}
 
           {/* Chat. Fixed React tree position. Desktop: collapsible sidebar
-              (width 0 ↔ open). Mobile: shown when open, fully hidden
-              (display:none) when closed so the wrapper can't run any
-              transform transition on viewport flip (the prior approach with
-              `translate-x-full` would animate from no-transform to off-screen
-              when going from desktop-closed to mobile-closed, briefly
-              flashing the chat into view). Trade-off: no slide-in/out
-              animation on mobile toggle. The chat snaps in/out. */}
+              (width 0 ↔ open). Mobile: slides in from the right over the
+              card and back out on close. At rest while closed it is fully
+              hidden (display:none), never parked at `translate-x-full`: a
+              resting transform would animate from no-transform to
+              off-screen on a desktop-closed → mobile-closed viewport flip,
+              briefly flashing the chat into view. */}
           <div
+            data-learning-chat-panel=""
             className={cn(
               'min-w-0 min-h-0 bg-background overflow-hidden',
               isDesktop
@@ -222,8 +311,13 @@ export function LearningChatLayout({
                     'flex shrink-0 border-l relative z-10 transition-[width] duration-300 ease-out',
                     effectiveChatOpen ? 'w-[calc(33vw-1rem)]' : 'w-0',
                   )
-                : effectiveChatOpen
-                  ? 'absolute inset-0 flex flex-col'
+                : mobileChatMounted
+                  ? cn(
+                      'absolute inset-0 flex flex-col duration-300 ease-out fill-mode-forwards will-change-transform',
+                      effectiveChatOpen
+                        ? 'animate-in slide-in-from-right'
+                        : 'animate-out slide-out-to-right',
+                    )
                   : 'hidden',
             )}
             {...(effectiveChatOpen

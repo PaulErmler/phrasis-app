@@ -23,20 +23,42 @@ import {
 import {
   GEMINI_35_FLASH_NITRO_MINIMAL,
   LUNA_BO3,
+  SOL_MINIMAL,
+  SOL_MINIMAL_STANDARD,
   resolveTranslationStages,
 } from '../../../lib/languages';
 
 describe('features/translationLLM', () => {
   describe('translation rules', () => {
-    it('default rule: Luna best-of-3 primary, Gemini 3.7 Flash Nitro fallback', () => {
-      // No language sets `translationRule` → all default to `luna_bo3`
-      // (Aug 2026 eval winner). The Gemini stage stays as the fallback so a
-      // Luna outage degrades to the previous production config before the
-      // Google safety net.
+    it('default rule: Sol minimal on the cheapest endpoint, then Sol standard, Luna best-of-3, Gemini', () => {
+      // No language sets `translationRule` → all default to `sol_minimal`
+      // (Sep 2026 eval winner). A flex-tier refusal retries on Sol's
+      // standard endpoint; a Sol outage degrades to the previous production
+      // config (Luna best-of-3), then Gemini, before the Google safety net.
       const stages = resolveTranslationStages('nl', 12);
-      expect(stages.length).toBe(2);
-      expect(stages[0]).toEqual(LUNA_BO3);
-      expect(stages[1]).toEqual(GEMINI_35_FLASH_NITRO_MINIMAL);
+      expect(stages.length).toBe(4);
+      expect(stages[0]).toEqual(SOL_MINIMAL);
+      expect(stages[1]).toEqual(SOL_MINIMAL_STANDARD);
+      expect(stages[2]).toEqual(LUNA_BO3);
+      expect(stages[3]).toEqual(GEMINI_35_FLASH_NITRO_MINIMAL);
+    });
+
+    it('SOL_MINIMAL stage shape: floor routing (flex first), minimal thinking, single call, $22.1 ceiling', () => {
+      expect(SOL_MINIMAL).toEqual({
+        model: 'openai/gpt-5.6-sol:floor',
+        reasoning: 'minimal',
+        maxOutputTokens: 6_000,
+        provider: { max_price: { completion: 22.1 } },
+      });
+      // Single-shot on purpose: best-of-3 added nothing for Sol.
+      expect(SOL_MINIMAL.samples).toBeUndefined();
+      expect(SOL_MINIMAL.judge).toBeUndefined();
+      expect(SOL_MINIMAL_STANDARD).toEqual({
+        model: 'openai/gpt-5.6-sol',
+        reasoning: 'minimal',
+        maxOutputTokens: 6_000,
+        provider: { max_price: { completion: 22.1 } },
+      });
     });
 
     it('LUNA_BO3 stage shape: no-thinking Luna, price cap, 1+2 sampling, no-thinking judge', () => {
@@ -69,13 +91,24 @@ describe('features/translationLLM', () => {
       expect(short).toEqual(long);
     });
 
-    it('de and fr use the luna_bo3 default', () => {
+    it('de and fr use the sol_minimal default', () => {
       for (const code of ['de', 'fr']) {
         const stages = resolveTranslationStages(code, 12);
-        expect(stages.length).toBe(2);
-        expect(stages[0]).toEqual(LUNA_BO3);
-        expect(stages[1]).toEqual(GEMINI_35_FLASH_NITRO_MINIMAL);
+        expect(stages.length).toBe(4);
+        expect(stages[0]).toEqual(SOL_MINIMAL);
+        expect(stages[1]).toEqual(SOL_MINIMAL_STANDARD);
+        expect(stages[2]).toEqual(LUNA_BO3);
+        expect(stages[3]).toEqual(GEMINI_35_FLASH_NITRO_MINIMAL);
       }
+    });
+
+    it('luna_bo3 stays available as the revert rule via ruleOverride', () => {
+      const stages = resolveTranslationStages('de', 12, {
+        ruleOverride: 'luna_bo3',
+      });
+      expect(stages.length).toBe(2);
+      expect(stages[0]).toEqual(LUNA_BO3);
+      expect(stages[1]).toEqual(GEMINI_35_FLASH_NITRO_MINIMAL);
     });
 
     it('retranslation_high: forced via ruleOverride uses Gemini 3.1 Pro (medium) as a second opinion', () => {
@@ -108,20 +141,22 @@ describe('features/translationLLM', () => {
       });
     });
 
-    it('zh uses the luna_bo3 default (with a translationVersion bump)', () => {
+    it('zh uses the sol_minimal default', () => {
       const stages = resolveTranslationStages('zh', 12);
-      expect(stages.length).toBe(2);
-      expect(stages[0].model).toBe('openai/gpt-5.6-luna:nitro');
-      expect(stages[0].samples).toEqual({ total: 3, extraTemperature: 1 });
-      expect(stages[1].model).toBe('google/gemini-3.7-flash:nitro');
-      expect(stages[1].reasoning).toBe('minimal');
+      expect(stages.length).toBe(4);
+      expect(stages[0].model).toBe('openai/gpt-5.6-sol:floor');
+      expect(stages[0].samples).toBeUndefined();
+      expect(stages[2].model).toBe('openai/gpt-5.6-luna:nitro');
+      expect(stages[2].samples).toEqual({ total: 3, extraTemperature: 1 });
+      expect(stages[3].model).toBe('google/gemini-3.7-flash:nitro');
+      expect(stages[3].reasoning).toBe('minimal');
     });
 
     it('unknown language code falls through to the default rule', () => {
       const stages = resolveTranslationStages('zz', 100);
-      expect(stages.length).toBe(2);
-      expect(stages[0].model).toBe('openai/gpt-5.6-luna:nitro');
-      expect(stages[1].model).toBe('google/gemini-3.7-flash:nitro');
+      expect(stages.length).toBe(4);
+      expect(stages[0].model).toBe('openai/gpt-5.6-sol:floor');
+      expect(stages[3].model).toBe('google/gemini-3.7-flash:nitro');
     });
   });
 

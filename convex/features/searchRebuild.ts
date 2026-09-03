@@ -1,6 +1,6 @@
 import { MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
-import { Id } from '../_generated/dataModel';
+import { Doc, Id } from '../_generated/dataModel';
 import { buildSearchableTextPatchForCard } from '../lib/cardContent';
 
 /**
@@ -81,11 +81,13 @@ export async function rebuildSearchableTextForTextHandler(
       cursor: args.cursor ?? null,
     });
 
-  // Shared per-page caches: deck→languages resolved once per deck, built
-  // strings memoized per (textId, languages), every card here shares one
-  // text, so the build runs once per distinct language list.
+  // Shared per-page caches: deck→languages resolved once per deck, live rows
+  // read once per language list, built strings memoized per (textId,
+  // languages, served revisions). Every card here shares one text, so the
+  // build runs once per distinct language list and revision set.
   const caches = {
     deckLanguages: new Map<Id<'decks'>, string[] | null>(),
+    liveRows: new Map<string, (Doc<'translations'> | null)[]>(),
     built: new Map<
       string,
       { searchableText: string; searchableTextLanguages: string[] }

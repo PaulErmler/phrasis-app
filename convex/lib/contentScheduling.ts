@@ -22,7 +22,7 @@ import {
   upsertAudioPointer,
 } from './audioAssets';
 import { llmPool, llmWarmPool } from './workpools';
-import type { TtsPriority, LlmPriority } from '../types';
+import type { TtsPriority, LlmPriority, TranslationReason } from '../types';
 import {
   claimTtsIfAvailable,
   hasActiveTtsClaim,
@@ -102,6 +102,15 @@ export async function scheduleTranslationForLanguage(
      * background/self-heal sweeps.
      */
     requestedByUserId?: string;
+    /**
+     * Overwrite semantics for the landing write (see the `replaceExisting`
+     * arg of `storeTranslationAndScheduleTTS`). Set together with
+     * `translationReason: 'version_bump'` by `enqueueVersionBumpRegen`;
+     * absent on every ordinary fill of a missing language.
+     */
+    replaceExisting?: boolean;
+    /** Why the translation is requested; see translationReasonValidator. */
+    translationReason?: TranslationReason;
   },
 ): Promise<boolean> {
   const tCfg = getTranslationConfigForLanguage(targetLanguage);
@@ -148,6 +157,8 @@ export async function scheduleTranslationForLanguage(
           priority: opts.priority,
           llmPriority: opts.llmPriority,
           requestedByUserId: opts.requestedByUserId,
+          replaceExisting: opts.replaceExisting,
+          translationReason: opts.translationReason,
         },
       },
     );
@@ -170,6 +181,8 @@ export async function scheduleTranslationForLanguage(
       skipTts: opts.skipTts,
       priority: opts.priority,
       requestedByUserId: opts.requestedByUserId,
+      replaceExisting: opts.replaceExisting,
+      translationReason: opts.translationReason,
     },
     {
       onComplete:
@@ -178,6 +191,41 @@ export async function scheduleTranslationForLanguage(
     },
   );
   return true;
+}
+
+/**
+ * Regenerate a version-stale translation IN PLACE. The row keeps serving its
+ * current wording and audio until the new wording lands; the write choke
+ * point (`storeTranslationAndScheduleTTS`, reason `'version_bump'`) then
+ * restamps an identical result, or archives the old wording for the cards
+ * that reference the text before replacing it (see `translationArchive` in
+ * schema.ts). Nothing is deleted up front, so a learner never sees a gap and
+ * never sees their card's wording change. Shared by the card sweep and the
+ * collection preview / warmup path so the two cannot drift. Returns true iff
+ * a job was enqueued; in probe mode throws ProbeNeedsWork iff it would.
+ */
+export async function enqueueVersionBumpRegen(
+  ctx: MutationCtx,
+  text: Doc<'texts'>,
+  translation: Doc<'translations'>,
+  opts: {
+    audioSpeakerGender?: string;
+    skipTts?: boolean;
+    priority?: TtsPriority;
+    llmPriority?: LlmPriority;
+    probe?: boolean;
+    requestedByUserId?: string;
+  },
+): Promise<boolean> {
+  return scheduleTranslationForLanguage(ctx, text, translation.targetLanguage, {
+    ...opts,
+    // The row survives, so its dialect pin is still on it; forwarding it
+    // keeps the Google path and a swept-then-refilled race on the same
+    // variant either way.
+    preferredRegionVariant: translation.regionVariant,
+    replaceExisting: true,
+    translationReason: 'version_bump',
+  });
 }
 
 /**
@@ -556,7 +604,10 @@ async function sweepInvalidAudio(
  *     voice reading wrong-grammar text.
  *
  * A third trigger is a version-stale row: the language's `translationVersion`
- * config was bumped above the row's stamp (a new model/prompt).
+ * config was bumped above the row's stamp (a new model/prompt). That one is
+ * NOT a delete: the wording is still correct, so it keeps serving while a
+ * replacement is generated in place (`enqueueVersionBumpRegen`), and the
+ * write choke point archives it for existing cards before overwriting.
  *
  * Legacy rows without an audio drift signal are left alone. We have no
  * evidence they're wrong, and a blanket invalidation would cause a regen
@@ -576,7 +627,9 @@ async function sweepInvalidAudio(
  * Mutates `state.translationMap` / `state.audioMap`. Returns the
  * regionVariant of each swept row, captured BEFORE the delete (the row is
  * gone by the time the regen enqueue below runs) so mixed-dialect cards
- * keep their dialect across regeneration instead of re-rolling it.
+ * keep their dialect across regeneration instead of re-rolling it, plus the
+ * number of in-place version-bump regenerations it enqueued (which the fill
+ * loop never sees, the rows still exist).
  */
 async function sweepStaleTranslations(
   ctx: MutationCtx,
@@ -586,8 +639,12 @@ async function sweepStaleTranslations(
   state: ContentSweepState,
   langsWithAudioGenderDrift: Set<string>,
   opts: ContentSweepOpts | undefined,
-): Promise<Map<string, string>> {
+): Promise<{
+  sweptRegionVariants: Map<string, string>;
+  regenScheduled: number;
+}> {
   const sweptRegionVariants = new Map<string, string>();
+  let regenScheduled = 0;
   for (const [lang, translation] of state.translationMap) {
     if (!translation) continue;
     // The one provenance gate for all three triggers below. Covers
@@ -617,6 +674,27 @@ async function sweepStaleTranslations(
     const llmClaim = state.llmClaimMap.get(lang) ?? null;
     if (llmClaim && isClaimFresh(llmClaim)) continue;
 
+    if (!isDrifted && !isLegacyAlongsideDriftedAudio) {
+      // Pure version staleness: keep the row and its audio serving, and
+      // regenerate in place. The helper throws ProbeNeedsWork in probe mode
+      // iff it would enqueue, matching the fill path's probe semantics.
+      const enqueued = await enqueueVersionBumpRegen(ctx, text, translation, {
+        audioSpeakerGender,
+        priority: opts?.priority,
+        llmPriority: opts?.llmPriority,
+        probe: opts?.probe,
+        requestedByUserId: opts?.requestedByUserId,
+      });
+      if (enqueued) {
+        regenScheduled++;
+        // The fresh claim makes `scheduleLanguageContent` defer this pass's
+        // TTS for the language, so no audio is synthesized for the wording
+        // about to be replaced.
+        state.llmClaimMap.set(lang, await getLlmClaim(ctx, textId, lang));
+      }
+      continue;
+    }
+
     if (opts?.probe) throw new ProbeNeedsWork();
     if (translation.regionVariant) {
       sweptRegionVariants.set(lang, translation.regionVariant);
@@ -638,7 +716,7 @@ async function sweepStaleTranslations(
       state.audioMap.set(lang, null);
     }
   }
-  return sweptRegionVariants;
+  return { sweptRegionVariants, regenScheduled };
 }
 
 /**
@@ -890,7 +968,7 @@ export async function scheduleMissingContent(
     opts,
   );
 
-  const sweptRegionVariants = await sweepStaleTranslations(
+  const { sweptRegionVariants, regenScheduled } = await sweepStaleTranslations(
     ctx,
     textId,
     text,
@@ -902,7 +980,7 @@ export async function scheduleMissingContent(
 
   await scheduleMissingSourceAnnotations(ctx, textId, text, opts);
 
-  let translationsScheduled = 0;
+  let translationsScheduled = regenScheduled;
   let audioScheduled = 0;
   for (const lang of allRequiredLanguages) {
     const scheduled = await scheduleLanguageContent(

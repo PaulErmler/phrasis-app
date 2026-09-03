@@ -12,6 +12,7 @@ import {
   learningStyleValidator,
   currentLevelValidator,
   reviewsByModeValidator,
+  statFilterValidator,
 } from '../types';
 import { tutorialIdValidator } from './tutorialIds';
 import {
@@ -55,7 +56,7 @@ import {
 import { FEATURE_IDS } from './featureIds';
 import {
   DEFAULT_INITIAL_REVIEW_COUNT,
-  validateInitialReviewCount,
+  clampInitialReviewCount,
 } from '../../lib/scheduling';
 import { validateAutoRateThresholds } from '../../lib/autoRating';
 import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
@@ -78,6 +79,25 @@ import {
   onboardingProgressDocValidator,
 } from '../schema';
 import { normalizePinnedCardActions } from '../../lib/cardActions';
+import { modeCopyKeys } from '../../lib/audio/modeCopies';
+
+// Fields sharing one clamp, derived from the per-mode copy table rather than
+// listed by hand: a setting's copies are validated the moment the schema grows
+// them, instead of slipping through until someone remembers to add an arm.
+const ONLY_NEW_REP_KEYS: ReadonlySet<string> = new Set([
+  ...modeCopyKeys('targetBeforeOnlyNewReps'),
+  // No per-mode copies of its own; it just shares the 0-10 window.
+  'showTranslationOnlyNewReps',
+]);
+const UNTIL_GOOD_REP_KEYS: ReadonlySet<string> = new Set(
+  modeCopyKeys('targetBeforeUntilGoodReps'),
+);
+const PLAYBACK_SPEED_KEYS: ReadonlySet<string> = new Set([
+  ...modeCopyKeys('languagePlaybackSpeeds'),
+  ...modeCopyKeys('targetBeforePlaybackSpeeds'),
+  // The transcribe post-submit replay group is its own setting, not a copy.
+  'transcribeAfterPlaybackSpeeds',
+]);
 
 async function validateLanguageLimits(
   ctx: MutationCtx,
@@ -172,6 +192,8 @@ export const getUserSettings = query({
       analyticsConsent: v.optional(v.boolean()),
       hideDueCounts: v.optional(v.boolean()),
       hideWorkloadForecast: v.optional(v.boolean()),
+      repsStatFilter: v.optional(statFilterValidator),
+      timeStatFilter: v.optional(statFilterValidator),
     }),
     v.null(),
   ),
@@ -370,6 +392,7 @@ export const getCourseStats = query({
       totalCardsEdited: v.optional(v.number()),
       totalCardsAddedManually: v.optional(v.number()),
       totalReviewsByMode: v.optional(reviewsByModeValidator),
+      totalTimeMsByMode: v.optional(reviewsByModeValidator),
       totalAccuracySum: v.optional(v.number()),
       totalAccuracyCount: v.optional(v.number()),
       // Course language config. Exposed so the home view can label the
@@ -426,6 +449,7 @@ export const getCourseStats = query({
         totalCardsEdited: stats.totalCardsEdited,
         totalCardsAddedManually: stats.totalCardsAddedManually,
         totalReviewsByMode: stats.totalReviewsByMode,
+        totalTimeMsByMode: stats.totalTimeMsByMode,
         totalAccuracySum: stats.totalAccuracySum,
         totalAccuracyCount: stats.totalAccuracyCount,
         targetLanguages: active.course.targetLanguages,
@@ -449,6 +473,7 @@ export const getTodayStats = query({
       newCards: v.number(),
       timeMs: v.number(),
       reviewsByMode: v.optional(reviewsByModeValidator),
+      timeMsByMode: v.optional(reviewsByModeValidator),
       accuracyAvg: v.optional(v.number()),
       chatMessagesSent: v.optional(v.number()),
       chatCardsApproved: v.optional(v.number()),
@@ -470,6 +495,7 @@ export const getTodayStats = query({
       newCards: daily.newCards,
       timeMs: daily.timeMs,
       reviewsByMode: daily.reviewsByMode,
+      timeMsByMode: daily.timeMsByMode,
       accuracyAvg:
         daily.accuracyCount && daily.accuracyCount > 0
           ? (daily.accuracySum ?? 0) / daily.accuracyCount
@@ -785,9 +811,11 @@ export const createCourse = mutation({
       args.targetLanguages,
     );
 
-    const initialReviewCount =
-      args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
-    validateInitialReviewCount(initialReviewCount);
+    // Same contract as the update path below: out-of-range values are clamped,
+    // never thrown on, so a stale client can't fail course creation outright.
+    const initialReviewCount = clampInitialReviewCount(
+      args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
+    );
 
     await enforceCourseHardCap(ctx, userId);
     await consumeQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
@@ -1177,9 +1205,6 @@ export const updateCourseSettings = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
 
-    if (args.initialReviewCount !== undefined) {
-      validateInitialReviewCount(args.initialReviewCount);
-    }
     if (args.autoRateThresholds !== undefined) {
       validateAutoRateThresholds(args.autoRateThresholds);
     }
@@ -1210,18 +1235,20 @@ export const updateCourseSettings = mutation({
       if (key === 'cardsToAddBatchSize' && typeof value === 'number') {
         value = Math.max(1, Math.min(MAX_CARDS_PER_BATCH, Math.floor(value)));
       }
+      // Clamped rather than rejected, like every other numeric field here:
+      // a client on a stale bundle used to offer 1-20 and its out-of-range
+      // writes threw, so the whole settings save failed with a generic toast.
+      if (key === 'initialReviewCount' && typeof value === 'number') {
+        value = clampInitialReviewCount(value);
+      }
       // "Only new" Practice-Listening limit: integer 1-10, or 0 for ∞ (always).
       // Same window for the writing-mode "Show translation on new sentences".
-      if (
-        (key === 'targetBeforeOnlyNewReps' ||
-          key === 'showTranslationOnlyNewReps') &&
-        typeof value === 'number'
-      ) {
+      if (ONLY_NEW_REP_KEYS.has(key) && typeof value === 'number') {
         value = Math.max(0, Math.min(10, Math.floor(value)));
       }
       // "Until rated good" needs at least one good rating. 0 would mean
       // Listening never plays rather than always, so the floor is 1.
-      if (key === 'targetBeforeUntilGoodReps' && typeof value === 'number') {
+      if (UNTIL_GOOD_REP_KEYS.has(key) && typeof value === 'number') {
         value = Math.max(1, Math.min(10, Math.floor(value)));
       }
       if (key === 'dailyTimeGoalMinutes' && typeof value === 'number') {
@@ -1229,15 +1256,7 @@ export const updateCourseSettings = mutation({
         // never returns undefined here.
         value = clampDailyGoal(value);
       }
-      if (
-        (key === 'languagePlaybackSpeeds' ||
-          key === 'languagePlaybackSpeedsFull' ||
-          key === 'languagePlaybackSpeedsTranscribe' ||
-          key === 'transcribeAfterPlaybackSpeeds' ||
-          key === 'targetBeforePlaybackSpeeds') &&
-        value &&
-        typeof value === 'object'
-      ) {
+      if (PLAYBACK_SPEED_KEYS.has(key) && value && typeof value === 'object') {
         const clamped: Record<string, number> = {};
         for (const [lang, speed] of Object.entries(
           value as Record<string, number>,
@@ -1277,6 +1296,30 @@ export const updateCourseSettings = mutation({
       }
     }
 
+    // Same safety net for Radio's copy of the pair. Radio resolves
+    // `*Radio ?? unsuffixed`, so an explicit false/false here would silence
+    // Radio even though the unsuffixed pair is fine. Note the fallbacks chain
+    // through the unsuffixed values, matching resolveModeSetting: an unset
+    // radio toggle means "same as Learn & Review", not "off".
+    if (
+      args.playTargetBeforeBaseRadio !== undefined ||
+      args.playTargetAfterBaseRadio !== undefined
+    ) {
+      const effectiveBeforeRadio =
+        args.playTargetBeforeBaseRadio ??
+        existing?.playTargetBeforeBaseRadio ??
+        existing?.playTargetBeforeBase ??
+        DEFAULT_PLAY_TARGET_BEFORE_BASE;
+      const effectiveAfterRadio =
+        args.playTargetAfterBaseRadio ??
+        existing?.playTargetAfterBaseRadio ??
+        existing?.playTargetAfterBase ??
+        DEFAULT_PLAY_TARGET_AFTER_BASE;
+      if (!effectiveBeforeRadio && !effectiveAfterRadio) {
+        patch.playTargetAfterBaseRadio = true;
+      }
+    }
+
     // Enable transition for separateModeTracking: reset the seed bookkeeping
     // so the sweep below starts (or restarts, after a disable) from scratch.
     // Cards created while the split was off get seeded, previously-seeded
@@ -1299,8 +1342,9 @@ export const updateCourseSettings = mutation({
       await ctx.db.insert('courseSettings', {
         courseId: args.courseId,
         ...patch,
+        // From `patch`, not `args`: the loop's clamp has to survive here too.
         initialReviewCount:
-          args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
+          patch.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
       });
     }
 
@@ -1455,17 +1499,29 @@ export const updateUserSettings = mutation({
   args: {
     hideDueCounts: v.optional(v.boolean()),
     hideWorkloadForecast: v.optional(v.boolean()),
+    repsStatFilter: v.optional(statFilterValidator),
+    timeStatFilter: v.optional(statFilterValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
-    const patch: { hideDueCounts?: boolean; hideWorkloadForecast?: boolean } =
-      {};
+    const patch: {
+      hideDueCounts?: boolean;
+      hideWorkloadForecast?: boolean;
+      repsStatFilter?: Infer<typeof statFilterValidator>;
+      timeStatFilter?: Infer<typeof statFilterValidator>;
+    } = {};
     if (args.hideDueCounts !== undefined) {
       patch.hideDueCounts = args.hideDueCounts;
     }
     if (args.hideWorkloadForecast !== undefined) {
       patch.hideWorkloadForecast = args.hideWorkloadForecast;
+    }
+    if (args.repsStatFilter !== undefined) {
+      patch.repsStatFilter = args.repsStatFilter;
+    }
+    if (args.timeStatFilter !== undefined) {
+      patch.timeStatFilter = args.timeStatFilter;
     }
     if (Object.keys(patch).length === 0) return null;
 

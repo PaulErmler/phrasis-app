@@ -1,15 +1,17 @@
-import { v, ConvexError } from 'convex/values';
+import { v, ConvexError, type Infer } from 'convex/values';
 import { mutation, query, MutationCtx, QueryCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import {
+  buildCardSearchableText,
   buildTextContentBatchForLanguages,
   type CardAlternativeContent,
 } from '../lib/cardContent';
+import { cardPinAt, resolveServedFromLive } from '../db/translationReads';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getCourseSettings } from '../db/courseSettings';
-import { getCollectionProgress } from '../db/collections';
+import { hasPendingCustomCardsToAdd } from '../db/collections';
 import { getDeckByCourseId } from '../db/decks';
 import { trackEvent } from '../db/stats/dailyStats';
 import { EVENTS, track } from '../analytics';
@@ -53,11 +55,7 @@ import {
   type FreePlayFace,
   type CardEditLanguageRole,
 } from '../types';
-import {
-  cardOriginPillFields,
-  isCollectionComplete,
-  originsForFilter,
-} from '../lib/collections';
+import { cardOriginPillFields, originsForFilter } from '../lib/collections';
 import {
   FREE_PLAY_MODES,
   fetchFreePlayRotation,
@@ -238,6 +236,35 @@ async function fetchDueCardsWithFilter(
   );
 }
 
+/**
+ * `getCardForReview`'s result. Hoisted so the handler can be annotated with
+ * it: a Convex function's client-facing return type is inferred from the
+ * HANDLER, not from `returns`, so an optional field declared only in the
+ * validator (`nextCard`, see below) would still reach the client as
+ * required and reject the optimistic advance's "unknown" preview.
+ */
+const getCardForReviewResult = v.union(
+  v.object({
+    ...cardResultFields,
+    /** The card served after this one. `null` means the server found no
+     * other card due now, i.e. this is the last of the queue (the client
+     * pre-adds the next batch on that signal). Never omitted by the server;
+     * `undefined` is reserved for the client's optimistic advance, which
+     * cannot know the next preview until this query answers again. */
+    nextCard: v.optional(v.union(cardResultValidator, v.null())),
+    /** Today's non-radio review count (audio + full) for the active course,
+     * mirroring what drives `triggerCelebration` in `reviewCard`. 0 when
+     * `timezone` is omitted (caller opted out of the side-channel). */
+    dailyReviewsToday: v.number(),
+    /** How many reviews the undo button can take back (0..UNDO_DEPTH).
+     * Bundled here so the learn view needs a single subscription that
+     * invalidates once per review, not this query plus a separate
+     * `getUndoableReviewCount`. */
+    undoableCount: v.number(),
+  }),
+  v.null(),
+);
+
 export const getCardForReview = query({
   // `timezone` is optional so callers that don't care about the daily-count
   // side-channel (tests, the layout warm-up) can still call `{}`. The learn
@@ -254,23 +281,8 @@ export const getCardForReview = query({
   // side-channel's "today" is derived from the same `now` so the two can
   // never disagree. A skewed `now` only shifts the caller's own queue.
   args: { timezone: v.optional(v.string()), now: v.optional(v.number()) },
-  returns: v.union(
-    v.object({
-      ...cardResultFields,
-      nextCard: v.union(cardResultValidator, v.null()),
-      /** Today's non-radio review count (audio + full) for the active course,
-       * mirroring what drives `triggerCelebration` in `reviewCard`. 0 when
-       * `timezone` is omitted (caller opted out of the side-channel). */
-      dailyReviewsToday: v.number(),
-      /** How many reviews the undo button can take back (0..UNDO_DEPTH).
-       * Bundled here so the learn view needs a single subscription that
-       * invalidates once per review, not this query plus a separate
-       * `getUndoableReviewCount`. */
-      undoableCount: v.number(),
-    }),
-    v.null(),
-  ),
-  handler: async (ctx, args) => {
+  returns: getCardForReviewResult,
+  handler: async (ctx, args): Promise<Infer<typeof getCardForReviewResult>> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
@@ -330,6 +342,7 @@ export const getCardForReview = query({
               sourceIpa: text.ipaText ?? undefined,
               sourceFurigana: text.furiganaText ?? undefined,
               userCreated: text.userCreated,
+              pinAt: cardPinAt(card),
             },
           ]
         : [];
@@ -495,36 +508,6 @@ export const getCardForReview = query({
  *   - 'all_caught_up'  : the deck has cards but none are due right now
  *                        (filter not the cause).
  */
-/**
- * True iff any of the user's active custom collections has at least one text
- * the deck hasn't pulled in yet. The auto-add Phase 1 (custom/chat) consumes
- * no `SENTENCES` quota, so when this returns `true` the user can still get
- * more cards without paying. The UI must NOT show the upgrade button in
- * that case (see decks.ts:`addCardsFromCollection`).
- *
- * `activeCustomCollectionIds` is the canonical source-of-truth: when the
- * user creates a chat or custom collection it's appended here (see
- * collections.ts:`getOrCreateChatCollection` / `getOrCreateCustomCollection`).
- */
-async function hasPendingCustomCardsToAdd(
-  ctx: QueryCtx,
-  userId: string,
-  courseId: Id<'courses'>,
-  activeCustomCollectionIds: Id<'collections'>[] | undefined,
-): Promise<boolean> {
-  if (!activeCustomCollectionIds || activeCustomCollectionIds.length === 0) {
-    return false;
-  }
-  for (const collId of activeCustomCollectionIds) {
-    const coll = await ctx.db.get(collId);
-    if (!coll) continue;
-    const prog = await getCollectionProgress(ctx, userId, courseId, collId);
-    // Ignored texts are excluded from auto-add, so they aren't pending.
-    if (!isCollectionComplete(coll.textCount, prog)) return true;
-  }
-  return false;
-}
-
 export const getCardForReviewEmptyReason = query({
   // `now` bounds the due-card probes; same optional back-compat contract as
   // getCardForReview above (no-wall-clock query guideline).
@@ -1670,6 +1653,15 @@ async function suggestCurriculumFixesForEdit(
  * was over-cap or claim-contested. If `consumeQuota` throws USAGE_LIMIT,
  * the whole mutation rolls back. Counters and any prior claim/audio
  * deletion are reverted.
+ *
+ * Pinned cards: a card created before a version bump keeps showing the
+ * superseded wording (see `translationArchive` in schema.ts). Flagging such a
+ * card disputes wording the curriculum has already moved past, so the card
+ * is moved to the latest revision (`translationsAcceptedAt = now`) instead of
+ * counting a complaint against the live row; only languages whose live row
+ * IS what the learner saw continue into the retranslation path. The result
+ * carries `updatedToLatest` so the client can say so instead of showing the
+ * "Flagged" pill.
  */
 export const flagTranslation = mutation({
   args: {
@@ -1677,6 +1669,7 @@ export const flagTranslation = mutation({
   },
   returns: v.object({
     retranslated: v.boolean(),
+    updatedToLatest: v.optional(v.boolean()),
   }),
   handler: async (ctx, args) => {
     const { userId, card, course } = await authorizeCardAccess(
@@ -1718,12 +1711,80 @@ export const flagTranslation = mutation({
 
     // Drop languages with no translation row (the card simply doesn't
     // have a translation in that language yet, nothing to flag).
-    const nonSourceTranslations = fetched.filter(
+    const liveRows = fetched.filter(
       (tr): tr is NonNullable<typeof tr> => tr !== null,
     );
 
-    if (nonSourceTranslations.length === 0) {
+    if (liveRows.length === 0) {
       return { retranslated: false };
+    }
+
+    // What the learner's card actually shows per language. A served row that
+    // is archived means the curriculum already revised this wording after
+    // the card was pinned: the fix for that learner is the latest wording,
+    // not another retranslation.
+    const pinAt = cardPinAt(card);
+    const served = await Promise.all(
+      liveRows.map((tr) => resolveServedFromLive(ctx, tr, pinAt)),
+    );
+    const moved = served.filter((s) => s.archived);
+    const updatedToLatest = moved.length > 0;
+    if (updatedToLatest) {
+      const now = Date.now();
+      const courseLanguages = [
+        ...course.baseLanguages,
+        ...course.targetLanguages,
+      ];
+      const search = await buildCardSearchableText(
+        ctx,
+        card.textId,
+        text.text,
+        courseLanguages,
+        text,
+        now,
+      );
+      // Raw patch: no card aggregate keys on the pin or the search fields.
+      await ctx.db.patch(card._id, {
+        translationsAcceptedAt: now,
+        ...search,
+      });
+      await recordCardEdit(ctx, {
+        userId,
+        course,
+        kind: 'accept_latest',
+        path: 'none',
+        cardIdBefore: card._id,
+        cardIdAfter: card._id,
+        textIdBefore: card.textId,
+        textIdAfter: card.textId,
+        collectionOrigin: card.collectionOrigin,
+        textWasUserCreated: text.userCreated,
+        sourceLanguage: text.language,
+        sourceText: text.text,
+        changes: moved.map((s) => ({
+          language: s.live.targetLanguage,
+          role: languageRole(course, s.live.targetLanguage),
+          isSourceLanguage: false,
+          before: s.row.translatedText,
+          after: s.live.translatedText,
+          beforeTranslationSource: s.row.translationSource,
+          beforeFlagCount: s.live.flagCount,
+        })),
+      });
+    }
+    // Only the languages whose live row is what the learner disputed carry
+    // on as a complaint about the curriculum.
+    const nonSourceTranslations = served
+      .filter((s) => !s.archived)
+      .map((s) => s.live);
+
+    if (nonSourceTranslations.length === 0) {
+      await trackCardAction(ctx, userId, 'flag_translation', card, {
+        retranslated: false,
+        updated_to_latest: true,
+        target_languages: course.targetLanguages,
+      });
+      return { retranslated: false, updatedToLatest };
     }
 
     // 1) Compute the post-patch count once per row and persist it. Doing the
@@ -1773,7 +1834,7 @@ export const flagTranslation = mutation({
     // "Flagged" UI pill for the user and admin triage; that's the full
     // workflow. No quota charge, no audio invalidation, no enqueue.
     if (isUserCreatedText(text)) {
-      return { retranslated: false };
+      return { retranslated: false, updatedToLatest };
     }
 
     // 2) Per-language: over-cap rows record their skip (counter already rose
@@ -1820,17 +1881,18 @@ export const flagTranslation = mutation({
       // Everything was over-cap. Counters incremented and skips recorded,
       // no quota charge, no retranslations, no analytics event (unchanged
       // from before the loop merge).
-      return { retranslated: false };
+      return { retranslated: false, updatedToLatest };
     }
 
     // Flag volume per language is the clearest quality signal the app has for
     // the translation pipeline.
     await trackCardAction(ctx, userId, 'flag_translation', card, {
       retranslated: anyEnqueued,
+      updated_to_latest: updatedToLatest,
       target_languages: course.targetLanguages,
     });
 
-    return { retranslated: anyEnqueued };
+    return { retranslated: anyEnqueued, updatedToLatest };
   },
 });
 

@@ -708,8 +708,8 @@ describe('features/llmTranslationQueue', () => {
         baseArgs(textId),
       );
 
-      // Translations row created (first stage won, 3 identical bo3
-      // candidates, judge skipped).
+      // Translations row created (first stage won: the Sol default is a
+      // single call, no sampling, no judge).
       const translations = await t.run(async (ctx) =>
         ctx.db
           .query('translations')
@@ -722,7 +722,7 @@ describe('features/llmTranslationQueue', () => {
       expect(translations[0].translatedText).toBe(
         'Haben Sie ins Handschuhfach geschaut?',
       );
-      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(3);
+      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(1);
 
       // Claim untouched. Release is onLlmTranslationComplete's job.
       const claim = await getClaim(t, textId);
@@ -764,10 +764,11 @@ describe('features/llmTranslationQueue', () => {
         ),
       ).rejects.toThrow(/stage chain failed/);
 
-      // 'de' resolves to the luna_bo3 chain: 3 parallel bo3 candidates
-      // (all truncated → no judge) + the single-call Gemini fallback. All
-      // tried before the worker gives up and throws.
-      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(4);
+      // 'de' resolves to the sol_minimal chain: Sol floor + Sol standard
+      // (one call each) + 3 parallel Luna bo3 candidates (all truncated → no
+      // judge) + the single-call Gemini fallback. All tried before the
+      // worker gives up and throws.
+      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(6);
 
       // No translation written, and the worker did NOT enqueue the Google
       // fallback itself. That belongs to onLlmTranslationComplete after the
@@ -800,7 +801,7 @@ describe('features/llmTranslationQueue', () => {
           { ...baseArgs(textId), text: 'Hi.' },
         ),
       ).rejects.toThrow(/stage chain failed/);
-      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(4);
+      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(6);
     });
 
     it('on HTTP error on every stage: THROWS', async () => {
@@ -817,7 +818,7 @@ describe('features/llmTranslationQueue', () => {
           { ...baseArgs(textId), text: 'Hi.' },
         ),
       ).rejects.toThrow(/stage chain failed/);
-      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(4);
+      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(6);
 
       const translations = await t.run(async (ctx) =>
         ctx.db
@@ -834,15 +835,14 @@ describe('features/llmTranslationQueue', () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
 
-      // All 3 bo3 candidates truncate, then the Gemini fallback succeeds.
+      // The Sol floor (flex) stage truncates, then the Sol standard-endpoint
+      // fallback succeeds: the sentence stays on Sol, one retry later.
       const truncated = {
         text: '',
         finishReason: 'length',
         usage: { inputTokens: 120, outputTokens: 5000, totalTokens: 5120 },
       } as any;
       vi.mocked(generateText)
-        .mockResolvedValueOnce(truncated)
-        .mockResolvedValueOnce(truncated)
         .mockResolvedValueOnce(truncated)
         .mockResolvedValueOnce({
           text: 'Haben Sie ins Handschuhfach geschaut?',
@@ -855,7 +855,7 @@ describe('features/llmTranslationQueue', () => {
         baseArgs(textId),
       );
 
-      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(4);
+      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(2);
       const translations = await t.run(async (ctx) =>
         ctx.db
           .query('translations')

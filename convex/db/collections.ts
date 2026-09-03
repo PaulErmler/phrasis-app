@@ -193,6 +193,38 @@ export async function getCollectionProgress(
 }
 
 /**
+ * Whether any of the user's selected custom collections still has a text the
+ * deck hasn't pulled in yet.
+ *
+ * The auto-add custom pass consumes no `SENTENCES` quota, so when this is
+ * `true` the user can still get more cards without paying — which is why it
+ * gates both the upgrade prompt on the empty state and the client's decision
+ * to keep auto-adding once the credit balance hits zero.
+ *
+ * `activeCustomCollectionIds` is the canonical source-of-truth: when the
+ * user creates a chat or custom collection it's appended here (see
+ * `getOrCreateChatCollection` / `getOrCreateCustomCollection` below).
+ */
+export async function hasPendingCustomCardsToAdd(
+  ctx: QueryCtx,
+  userId: string,
+  courseId: Id<'courses'>,
+  activeCustomCollectionIds: Id<'collections'>[] | undefined,
+): Promise<boolean> {
+  if (!activeCustomCollectionIds || activeCustomCollectionIds.length === 0) {
+    return false;
+  }
+  for (const collId of activeCustomCollectionIds) {
+    const coll = await ctx.db.get(collId);
+    if (!coll) continue;
+    const prog = await getCollectionProgress(ctx, userId, courseId, collId);
+    // Ignored texts are excluded from auto-add, so they aren't pending.
+    if (!isCollectionComplete(coll.textCount, prog)) return true;
+  }
+  return false;
+}
+
+/**
  * Get every collectionProgress row for a user/course in one indexed scan.
  * Used by the home view to render all 20 premade levels + custom collections
  * with monotonic progress counters.

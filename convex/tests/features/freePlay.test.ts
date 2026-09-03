@@ -545,6 +545,8 @@ describe('features/scheduling: free play', () => {
       expect(stats?.totalTimeMs).toBe(4000);
       expect(stats?.totalReviewsByMode?.freeStudy).toBe(1);
       expect(stats?.totalReviewsByMode?.radio ?? 0).toBe(0);
+      expect(stats?.totalTimeMsByMode?.freeStudy).toBe(4000);
+      expect(stats?.totalTimeMsByMode?.radio ?? 0).toBe(0);
       expect(stats?.totalCards).toBe(0);
       expect(stats?.currentStreak).toBe(1);
     });

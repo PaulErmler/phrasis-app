@@ -5,10 +5,12 @@ import { useAudioPlayer } from '@/hooks/use-audio-player';
 import {
   resolveAudioSettings,
   resolveModeSetting,
+  resolveSettingsMode,
   applyOnlyNewListening,
   type AudioSettingsMode,
 } from '@/lib/audio/mergeAudio';
 import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
+import { PROGRESS_DISPLAY_INTERVAL } from '@/lib/constants/learning';
 import type { LearningState } from './useLearningMode';
 
 const alwaysFalse = () => false;
@@ -70,11 +72,12 @@ export function useLearningAudio(
   // It carries its own settings copy, chained `*Transcribe ?? *Full ?? audio`.
   const isTranscribe =
     isFullMode && (cs?.writingInputMode ?? 'translate') === 'transcribe';
-  const settingsMode: AudioSettingsMode = isTranscribe
-    ? 'transcribe'
-    : isFullMode
-      ? 'full'
-      : 'audio';
+  // Which copy of the playback settings this session reads. Radio can carry
+  // its own, gated by the `separateRadioSettings` switch; only the hands-free
+  // face qualifies, so Free Study (free play while typing) keeps the writing
+  // copies, per the note above. Shared with the card view via
+  // `resolveSettingsMode` so the two cannot disagree about the mode.
+  const settingsMode: AudioSettingsMode = resolveSettingsMode(cs);
   // The user's mode-resolved auto-play setting, before the disable gates.
   // Also returned to callers that need to re-trigger playback after a gate
   // releases (e.g. a tutorial popover being dismissed).
@@ -141,24 +144,41 @@ export function useLearningAudio(
   // auto-advance. Free play's listening face forces auto-advance even if the
   // user has it off (Radio is a continuous-playback queue and stalling on
   // each card defeats the point); its writing face does not.
-  const handleScheduleComplete = useCallback(() => {
+  //
+  // Returns whether the audio may run ahead of the server (the player then
+  // starts the prefetched next blob in the same tick, see `tryHandoff` in
+  // useAudioPlayer). That is every advance except one about to trigger the
+  // milestone celebration: `handleReview` predicts it the same way and mutes
+  // autoplay for it, and audio started before that prediction lands would
+  // talk over the celebration. Free play never rates, so it never celebrates.
+  const handleScheduleComplete = useCallback((): boolean => {
     if (
-      state.status === 'reviewing' &&
-      reviewMode === 'audio' &&
-      (audioSettings.autoAdvance || isHandsFree) &&
-      !disableAutoAdvance
+      !(
+        state.status === 'reviewing' &&
+        reviewMode === 'audio' &&
+        (audioSettings.autoAdvance || isHandsFree) &&
+        !disableAutoAdvance
+      )
     ) {
-      // Notify the auto-next consumer (e.g. onboarding wrapper's
-      // `onCardRated`) BEFORE advancing so the snapshot is captured
-      // against the just-completed card, not the next one.
-      onAutoNext?.();
-      state.handleNext();
+      return false;
     }
+    // Notify the auto-next consumer (e.g. onboarding wrapper's
+    // `onCardRated`) BEFORE advancing so the snapshot is captured
+    // against the just-completed card, not the next one.
+    onAutoNext?.();
+    state.handleNext();
+    const willCelebrate =
+      !isFreePlay &&
+      (cs?.progressDisplayEnabled ?? true) &&
+      (state.dailyReviewsToday + 1) % PROGRESS_DISPLAY_INTERVAL === 0;
+    return !willCelebrate;
   }, [
     state,
+    cs,
     reviewMode,
     audioSettings.autoAdvance,
     isHandsFree,
+    isFreePlay,
     disableAutoAdvance,
     onAutoNext,
   ]);

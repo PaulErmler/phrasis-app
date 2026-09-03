@@ -263,12 +263,19 @@ export function CollectionDetailDialog({
 
           {/* Stats row */}
           <div className="flex flex-wrap gap-3 text-xs">
-            <div className="flex items-center gap-1">
+            <Toggle
+              pressed={browse.showAdded}
+              onPressedChange={browse.setShowAdded}
+              size="sm"
+              className="h-auto min-w-0 gap-1 px-1.5 py-0.5 -mx-1.5 text-xs font-normal"
+              title={t('showAdded')}
+              data-testid="collection-added-stat"
+            >
               <Layers className="h-3 w-3 text-muted-foreground" />
               <span>
                 {cardsAdded} {t('added')}
               </span>
-            </div>
+            </Toggle>
             <div className="flex items-center gap-1">
               <ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
               <span>
