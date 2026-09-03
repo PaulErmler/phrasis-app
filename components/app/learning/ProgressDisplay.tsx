@@ -24,14 +24,15 @@ import { useAppData } from '@/components/app/AppDataProvider';
 import { cn } from '@/lib/utils';
 import { isComposingKeyEvent } from '@/hooks/use-ime-safe-enter';
 import { ConfettiBurst } from '@/components/effects/ConfettiBurst';
-import {
-  PROGRESS_DISPLAY_DURATION_MS,
-  PROGRESS_SOUND_URL,
-} from '@/lib/constants/learning';
+import { PROGRESS_DISPLAY_DURATION_MS } from '@/lib/constants/learning';
 import {
   setupMediaSession,
   setMediaSessionPlaybackState,
 } from '@/lib/audio/mediaSession';
+import {
+  playCelebrationSound,
+  stopCelebrationSound,
+} from '@/lib/audio/celebrationSound';
 import {
   formatCappedCount,
   mergedDueCount,
@@ -87,6 +88,11 @@ function formatCappedNewWords(displayed: number, trueValue: number): string {
 // Counter timing tuned to the bundled audio file (progress-success.mp3 ≈ 3.4s).
 // Hero lands ~700 ms before the audio finishes; supporting cells finish a hair
 // earlier so the eye lands on the hero as the "final" beat of the swell.
+//
+// Every offset below is measured from the moment the audio ACTUALLY starts
+// playing (`audioStarted` in CelebrationContent), not from mount: `play()`
+// on a cold buffer begins hundreds of ms late on mobile, and a mount-based
+// clock ran the counters ahead of the sound.
 const COUNTER_DELAY_MS = 320;
 const COUNTER_DURATION_MS = 1850; // hero — finishes well before the audio ends
 const SUB_COUNTER_DURATION_MS = 1400; // 450 ms shorter so hero finishes last
@@ -98,6 +104,12 @@ const SUB_COUNTER_DURATION_MS = 1400; // 450 ms shorter so hero finishes last
 const AUDIO_PEAK_3RD_LAST_MS = 1290;
 const AUDIO_PEAK_2ND_LAST_MS = 1610;
 const AUDIO_PEAK_LAST_MS = 1925;
+
+// If the sound hasn't started this long after mount (still downloading on a
+// slow connection, or a stalled element), run the animation anyway rather
+// than leaving the screen frozen on zeros. A refused `play()` (autoplay
+// policy) starts the animation immediately instead of waiting this out.
+const AUDIO_START_FALLBACK_MS = 1500;
 
 /**
  * Builds the hero counter's easing function so the last three integer ticks
@@ -349,8 +361,17 @@ function CelebrationContent({
     [heroAnimTarget],
   );
 
+  // The animation clock starts when the sound is actually heard, see
+  // `AUDIO_START_FALLBACK_MS`. Until then every counter targets 0 (== its
+  // `from`), which `useAnimatedCounter` treats as "not yet running", so the
+  // delayed sweep begins fresh the moment the targets flip to their real
+  // values. The easing is built from the real target so it doesn't change
+  // under the running sweep.
+  const [audioStarted, setAudioStarted] = useState(false);
+  const gate = (n: number) => (audioStarted ? n : 0);
+
   const animHero = useAnimatedCounter(
-    heroAnimTarget,
+    gate(heroAnimTarget),
     0,
     COUNTER_DURATION_MS,
     COUNTER_DELAY_MS,
@@ -358,21 +379,21 @@ function CelebrationContent({
     heroEasing,
   );
   const animReviews = useAnimatedCounter(
-    dailyReviewsToday,
+    gate(dailyReviewsToday),
     0,
     SUB_COUNTER_DURATION_MS,
     COUNTER_DELAY_MS,
     true,
   );
   const animTime = useAnimatedCounter(
-    dailyTimeMsToday,
+    gate(dailyTimeMsToday),
     0,
     SUB_COUNTER_DURATION_MS,
     COUNTER_DELAY_MS,
     true,
   );
   const animTodayWords = useAnimatedCounter(
-    Math.min(dailyNewWordsToday, NEW_WORDS_CAP),
+    gate(Math.min(dailyNewWordsToday, NEW_WORDS_CAP)),
     0,
     SUB_COUNTER_DURATION_MS,
     COUNTER_DELAY_MS,
@@ -465,12 +486,25 @@ function CelebrationContent({
   }, [pauseSync, resumeSync]);
 
   useEffect(() => {
-    const audio = new Audio(PROGRESS_SOUND_URL);
-    audio.preload = 'auto';
+    // Shared, gesture-unlocked element (see lib/audio/celebrationSound.ts);
+    // a fresh `new Audio()` here was refused by WebKit's autoplay policy
+    // because the celebration never mounts inside a user gesture.
+    const { element: audio, started } = playCelebrationSound();
     audioRef.current = audio;
-    audio.play().catch(() => {
-      // Autoplay may be blocked. Silently ignore; the visual celebration still runs.
-    });
+
+    // Start the animation clock with real playback. If the browser refuses
+    // (autoplay blocked) start it right away; if playback merely hasn't
+    // begun yet, wait up to the fallback so the counters aren't ahead of a
+    // sound that's about to start.
+    let settled = false; // animation clock started, or effect torn down
+    const begin = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(fallback);
+      setAudioStarted(true);
+    };
+    const fallback = setTimeout(begin, AUDIO_START_FALLBACK_MS);
+    started.then(begin, begin);
 
     const teardown = setupMediaSession({
       title: mediaSessionTitle,
@@ -492,8 +526,9 @@ function CelebrationContent({
     setMediaSessionPlaybackState('playing');
 
     return () => {
-      audio.pause();
-      audio.src = '';
+      settled = true;
+      clearTimeout(fallback);
+      stopCelebrationSound();
       audioRef.current = null;
       setMediaSessionPlaybackState('none');
       teardown();
@@ -536,12 +571,14 @@ function CelebrationContent({
 
   // ----- Confetti burst on the final ding -----
   // Fires once at the moment of the last hero integer tick. Aligned to the
-  // last audio peak so the burst lands with the click.
+  // last audio peak so the burst lands with the click, measured from the
+  // same audio-start instant as the counters.
   const [confettiBurst, setConfettiBurst] = useState(false);
   useEffect(() => {
+    if (!audioStarted) return;
     const timer = setTimeout(() => setConfettiBurst(true), AUDIO_PEAK_LAST_MS);
     return () => clearTimeout(timer);
-  }, []);
+  }, [audioStarted]);
 
   const showPerLanguagePills =
     hero.kind === 'sessionNew' && sessionWordCounts.perLanguage.length > 1;

@@ -46,7 +46,10 @@ import {
   resolveSettingsMode,
   type AudioSettingsMode,
 } from '@/lib/audio/mergeAudio';
-import { PROGRESS_SOUND_URL } from '@/lib/constants/learning';
+import {
+  installCelebrationSoundUnlock,
+  warmCelebrationSound,
+} from '@/lib/audio/celebrationSound';
 import { resolveShowFurigana } from '@/lib/furigana';
 
 interface LearningModeProps {
@@ -121,14 +124,14 @@ export function LearningMode({
     setWritingAccuracy(null);
   }, [cardId, reviewingReviewMode, reviewingWritingInputMode]);
 
-  // Warm the celebration sound's HTTP cache at session start so the very
-  // first celebration's animation timeline (hardcoded peaks at 1290/1610/
-  // 1925 ms in ProgressDisplay) isn't ahead of audio playback on mobile
-  // cold-cache loads.
+  // Warm the celebration sound at session start and unlock its shared
+  // element on the first tap / key. The celebration itself mounts after a
+  // mutation resolves (never inside a gesture), so without this WebKit
+  // refuses its `play()` and the milestone screen runs silent. See
+  // lib/audio/celebrationSound.ts.
   useEffect(() => {
-    const audio = new Audio(PROGRESS_SOUND_URL);
-    audio.preload = 'auto';
-    audio.load();
+    warmCelebrationSound();
+    return installCelebrationSoundUnlock();
   }, []);
 
   // Pause card audio while the celebration screen is showing. The success
