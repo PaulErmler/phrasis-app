@@ -398,7 +398,6 @@
       "endOfYearLabel": "by end of {year}",
       "oneYearLabel": "one year from today",
       "endOfMonthLabel": "by end of {month}",
-      "counterfactualLabel": "if every day were like today",
       "sessionYieldBig": "about +{words} new words",
       "sessionYieldLabel": "per {goal}-min session",
       "perStudyHourLabel": "per study-hour",

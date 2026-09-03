@@ -52,13 +52,6 @@ const indicatorValidator = v.union(
     monthDate: v.string(),
   }),
   v.object({
-    kind: v.literal('counterfactualWords'),
-    boostedWords: v.number(),
-    baselineWords: v.number(),
-    capped: v.boolean(),
-    horizonDate: v.string(),
-  }),
-  v.object({
     kind: v.literal('sessionYield'),
     words: v.number(),
     goalMinutes: v.number(),
@@ -293,7 +286,6 @@ export const getProjections = query({
       currentWords,
       currentSentences: totalDeckCards,
       totalTimeMs,
-      todayWords: wordsByDate.get(today) ?? 0,
       dailyWords,
       dailyNewCards,
       dailyCurriculumCards,

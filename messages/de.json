@@ -398,7 +398,6 @@
       "endOfYearLabel": "bis Ende {year}",
       "oneYearLabel": "in einem Jahr",
       "endOfMonthLabel": "bis Ende {month}",
-      "counterfactualLabel": "wenn jeder Tag wie heute wäre",
       "sessionYieldBig": "etwa +{words} neue Wörter",
       "sessionYieldLabel": "pro {goal}-Min.-Einheit",
       "perStudyHourLabel": "pro Lernstunde",
