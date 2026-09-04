@@ -103,9 +103,7 @@ describe('LearningModeSettings: Practice Listening cannot be the only audio', ()
     });
     lastCard('target', undefined)!.onPlaysChange(0);
     expect(updateSettings).not.toHaveBeenCalled();
-    expect(toastError).toHaveBeenCalledWith(
-      'listeningOnlyBlocked',
-    );
+    expect(toastError).toHaveBeenCalledWith('listeningOnlyBlocked');
   });
 
   it('saves a decrement that leaves another non-listening repetition', () => {
@@ -159,6 +157,20 @@ describe('LearningModeSettings: Practice Listening cannot be the only audio', ()
       languageRepetitions: { en: 0, it: 1 },
     });
     fireEvent.click(screen.getByRole('switch', { name: 'practiceSpeaking' }));
+    expect(updateSettings).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses turning Practice Speaking off when base is at 0x and Listening is off', () => {
+    renderSettings({
+      reviewMode: 'audio',
+      playTargetBeforeBase: false,
+      playTargetAfterBase: true,
+      languageRepetitions: { en: 0, it: 1 },
+    });
+    fireEvent.click(screen.getByRole('switch', { name: 'practiceSpeaking' }));
+    // Both toggles cannot be off, so this write would auto-enable Listening
+    // over an all-0x base: exactly the state the guard exists to refuse.
     expect(updateSettings).not.toHaveBeenCalled();
     expect(toastError).toHaveBeenCalledTimes(1);
   });

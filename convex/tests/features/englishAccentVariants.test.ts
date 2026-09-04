@@ -158,6 +158,37 @@ describe('English accent variants', () => {
       );
       expect(llmEnqueues().map((e) => e.targetLanguage)).toEqual(['en_gb']);
     });
+
+    it('a custom sentence typed on a UK course is served verbatim to a Mixed English base', async () => {
+      const t = convexTest(schema, modules);
+      // Custom texts carry the course code they were typed under.
+      const textId = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert('collections', {
+          name: 'custom',
+          textCount: 0,
+        });
+        return ctx.db.insert('texts', {
+          text: 'Mind the gap',
+          language: 'en_gb',
+          userCreated: true,
+          userId: 'user_A',
+          collectionId,
+          collectionRank: 1,
+          speakerGender: 'female',
+          audioSpeakerGender: 'female',
+        });
+      });
+
+      await sweep(t, textId, ['en'], ['es']);
+
+      const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en'));
+      expect(row).toMatchObject({
+        translatedText: 'Mind the gap',
+        translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
+      });
+      // Only Spanish went to a model; English was not "translated" into English.
+      expect(llmEnqueues().map((e) => e.targetLanguage)).toEqual(['es']);
+    });
   });
 
   describe('one audio cache across accents', () => {

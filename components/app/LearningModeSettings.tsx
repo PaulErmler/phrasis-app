@@ -521,6 +521,9 @@ export function LearningModeSettings({
       : {};
 
   const handlePlayTargetBeforeBaseChange = (checked: boolean) => {
+    // Turning Listening OFF needs no guard: it only removes the listening
+    // group (and auto-enables Speaking when that was off too), so nothing
+    // outside listening practice gets quieter.
     if (checked && listeningWouldBeAlone(reps, true, playTargetAfter)) {
       rejectListeningOnly();
       return;
@@ -538,7 +541,12 @@ export function LearningModeSettings({
   };
 
   const handlePlayTargetAfterBaseChange = (checked: boolean) => {
-    if (!checked && listeningWouldBeAlone(reps, playTargetBefore, false)) {
+    // Turning Speaking off always leaves Listening on: either it already was,
+    // or the write below auto-enables it because both cannot be off. Guard
+    // against the state the write produces, not the current one, or an
+    // all-0x base with Listening off would slip through and come back as
+    // listening-only.
+    if (!checked && listeningWouldBeAlone(reps, true, false)) {
       rejectListeningOnly();
       return;
     }

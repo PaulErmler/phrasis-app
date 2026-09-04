@@ -26,6 +26,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Mp3Encoder } from '@breezystack/lamejs';
+import { ttsDeliveryInstruction } from '../convex/lib/tts/deliveryInstruction';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
@@ -37,9 +38,10 @@ const MESSAGES_DIR = join(REPO_ROOT, 'messages', 'landing');
 // voice below) invalidates every existing clip and forces regeneration. This is
 // distinct from the ElevenLabs model id the old hashes used, so the switch to
 // Gemini regenerates all landing audio on the next run.
-// `-f` suffix: the 2026-09-04 no-performing prompt (see buildStyledInput in
-// convex/lib/tts/gemini.ts). Bumped so the next `pnpm landing:audio` run
-// regenerates every demo clip with the calmer delivery users hear in-app.
+// `-f` suffix: the 2026-09-04 no-performing prompt (`ttsDeliveryInstruction`
+// in convex/lib/tts/deliveryInstruction.ts). Bumped so the next
+// `pnpm landing:audio` run regenerates every demo clip with the calmer
+// delivery users hear in-app.
 const TTS_MODEL_LABEL = 'gemini-3.1-flash-tts-f';
 
 // Mirrors the in-app synthesis speed (scheduleMissingContent enqueues TTS at
@@ -233,9 +235,10 @@ async function synthesize(
   const { voiceName, locale } = parseVoiceApiCode(voiceApiCode);
   const languageCode = locale ?? GEMINI_LOCALE[lang] ?? lang;
   const languageName = GEMINI_LANG_NAME[lang] ?? lang;
-  // Matches the in-app "## Instruction … ## Transcript …" prompt shape.
+  // Matches the in-app "## Instruction … ## Transcript …" prompt shape, with
+  // the same instruction text the app sends.
   const input =
-    `## Instruction: Speak the following text in a natural way like a native ${languageName} speaker would in a way that fits the sentence in an everyday conversations. Do not act it out or perform it. No dramatic emphasis, no exaggerated emotion, no presenter or audiobook voice.\n\n` +
+    `## Instruction: ${ttsDeliveryInstruction(languageName)}\n\n` +
     `## Transcript: ${text}`;
 
   const res = await fetch(GEMINI_ENDPOINT, {

@@ -330,7 +330,10 @@ export function useAudioPlayer(
     if (endBridge(audio)) {
       // The user stopped a bridge: nothing real is loaded, so unload the
       // silence rather than leave a Play tap resuming it. The card's blob
-      // lands paused when its merge finishes (`hasAutoPlayed` is set above).
+      // lands paused when its merge finishes (`hasAutoPlayed` is set above),
+      // and the prefetch the bridge was waiting for must not hand off into
+      // playback either: a pause is the user's answer to "keep going".
+      awaitingHandoffRef.current = null;
       audio.pause();
       audio.removeAttribute('src');
       audio.load();
@@ -347,6 +350,7 @@ export function useAudioPlayer(
     const audio = audioRef.current;
     if (audio) {
       if (endBridge(audio)) {
+        awaitingHandoffRef.current = null;
         audio.removeAttribute('src');
         audio.load();
       }
@@ -620,7 +624,25 @@ export function useAudioPlayer(
       bridgingRef.current = true;
       audio.loop = true;
       audio.src = getSilenceBlobUrl();
-      audio.play().catch(ignorePlayInterrupt('Bridge play failed:', 'bridge'));
+      const reportBlocked = ignorePlayInterrupt(
+        'Bridge play failed:',
+        'bridge',
+      );
+      audio.play().catch((err: { name?: string }) => {
+        reportBlocked(err);
+        // The browser refused the silence: there is no continuous playback
+        // to hand the next card, so the bridge must not be treated as one
+        // (the merge path would otherwise skip the tab-initiated gate on its
+        // strength). Unload and fall back to the plain paused state.
+        if (err.name === 'NotAllowedError' && bridgingRef.current) {
+          endBridge(audio);
+          audio.removeAttribute('src');
+          audio.load();
+          setIsPlaying(false);
+          setMediaSessionPlaybackState('paused');
+          releaseWebLockDelayed();
+        }
+      });
       bridgeTimeoutRef.current = setTimeout(() => {
         bridgeTimeoutRef.current = null;
         if (!bridgingRef.current) return;
@@ -833,9 +855,14 @@ export function useAudioPlayer(
 
       const audio = getAudio();
       // A bridge goes straight from silence to the blob (the src swap
-      // interrupts the loop by itself), the same as a handoff.
+      // interrupts the loop by itself), the same as a handoff. Unless
+      // autoplay is muted: then nothing will start the blob, so pause first
+      // so the `pause` event lands and the playing state follows the element
+      // (a src swap alone flips `paused` without firing it).
       const wasBridging = endBridge(audio);
-      if (!wasBridging && !audio.paused) audio.pause();
+      if (!audio.paused && (!wasBridging || !autoPlayRef.current)) {
+        audio.pause();
+      }
       audio.src = cached.result.blobUrl;
 
       const initiatedByThisTab = getReviewInitiatedByThisTab();
@@ -899,9 +926,11 @@ export function useAudioPlayer(
 
         // Stop current playback before swapping the source. A bridge is
         // not stopped: the src swap below takes the element straight from
-        // silence to the blob.
+        // silence to the blob. Unless autoplay is muted, in which case the
+        // blob will not be started and the pause has to land now (see the
+        // cache-hit path above).
         const wasBridging = endBridge(audio);
-        if (!wasBridging && !audio.paused) {
+        if (!audio.paused && (!wasBridging || !autoPlayRef.current)) {
           audio.pause();
         }
 

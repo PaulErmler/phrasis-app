@@ -147,6 +147,7 @@ import type * as lib_testHooks from "../lib/testHooks.js";
 import type * as lib_textAnnotations from "../lib/textAnnotations.js";
 import type * as lib_textComparison from "../lib/textComparison.js";
 import type * as lib_translationAutofillPrompt from "../lib/translationAutofillPrompt.js";
+import type * as lib_tts_deliveryInstruction from "../lib/tts/deliveryInstruction.js";
 import type * as lib_tts_gemini from "../lib/tts/gemini.js";
 import type * as lib_tts_google from "../lib/tts/google.js";
 import type * as lib_tts_index from "../lib/tts/index.js";
@@ -325,6 +326,7 @@ declare const fullApi: ApiFromModules<{
   "lib/textAnnotations": typeof lib_textAnnotations;
   "lib/textComparison": typeof lib_textComparison;
   "lib/translationAutofillPrompt": typeof lib_translationAutofillPrompt;
+  "lib/tts/deliveryInstruction": typeof lib_tts_deliveryInstruction;
   "lib/tts/gemini": typeof lib_tts_gemini;
   "lib/tts/google": typeof lib_tts_google;
   "lib/tts/index": typeof lib_tts_index;

@@ -739,7 +739,18 @@ describe('useAudioPlayer', () => {
     });
 
     it('does not start the merged card when autoplay was muted during the bridge', async () => {
-      const { rerender, audio, onScheduleComplete } = await primeBridge();
+      const { result, rerender, audio, onScheduleComplete } =
+        await primeBridge();
+      // The element is mid-silence. jsdom reports `paused` as true and leaves
+      // pause() unimplemented; back both with the browser's behaviour so the
+      // hook's pause-before-swap can land its `pause` event.
+      Object.defineProperty(audio, 'paused', {
+        configurable: true,
+        get: () => false,
+      });
+      vi.spyOn(audio, 'pause').mockImplementation(() => {
+        audio.dispatchEvent(new Event('pause'));
+      });
 
       rerender(
         baseOptions({
@@ -753,6 +764,81 @@ describe('useAudioPlayer', () => {
       const r2 = await resolveMerge(1, makeResult({ durationSec: 7 }));
       expect(audio.src).toBe(r2.blobUrl);
       expect(audio.loop).toBe(false);
+      expect(playMock).toHaveBeenCalledTimes(1);
+      // Nothing plays, so nothing may claim to: a src swap alone flips the
+      // element to paused without firing `pause`, so the hook pauses first.
+      expect(result.current.isPlaying).toBe(false);
+    });
+
+    it('a pause during the bridge is not overridden when the prefetch lands', async () => {
+      const onScheduleComplete = vi.fn(() => true);
+      const { result, rerender } = renderPlayer({
+        autoPlay: true,
+        onScheduleComplete,
+      });
+      await resolveMerge(0, makeResult({ durationSec: 3 }));
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          nextCard: { cardId: 'card-2', audioRecordings: nextRecordings },
+        }),
+      );
+      expect(mergeCardAudioMock).toHaveBeenCalledTimes(2);
+      const audio = result.current.audioRef.current!;
+      playMock.mockClear();
+      ended(audio);
+      expect(audio.src).toBe(SILENCE_URL);
+      act(() => {
+        audio.dispatchEvent(new Event('play'));
+      });
+      vi.spyOn(audio, 'pause').mockImplementation(() => {});
+
+      act(() => result.current.pause());
+      expect(result.current.isPlaying).toBe(false);
+
+      // The prefetch the bridge was waiting for lands. The user said stop, so
+      // it must not hand off into playback.
+      const r2 = await resolveMerge(1, makeResult({ durationSec: 7 }));
+      expect(audio.getAttribute('src')).toBeNull();
+      expect(audio.src).not.toBe(r2.blobUrl);
+      expect(playMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops a bridge the browser refused instead of treating it as playback', async () => {
+      const onScheduleComplete = vi.fn(() => true);
+      const { result, rerender } = renderPlayer({
+        autoPlay: true,
+        onScheduleComplete,
+      });
+      await resolveMerge(0, makeResult({ durationSec: 3 }));
+      const audio = result.current.audioRef.current!;
+      playMock.mockClear();
+      playMock.mockRejectedValueOnce(
+        new DOMException('autoplay blocked', 'NotAllowedError'),
+      );
+      await act(async () => {
+        audio.dispatchEvent(new Event('ended'));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(playMock).toHaveBeenCalledTimes(1);
+      expect(audio.getAttribute('src')).toBeNull();
+      expect(audio.loop).toBe(false);
+      expect(result.current.isPlaying).toBe(false);
+
+      // The merge that follows takes the ordinary autoplay gates. This tab
+      // did not initiate the review, so nothing starts on its own.
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          cardId: 'card-2',
+          audioRecordings: nextRecordings,
+          nextCard: null,
+        }),
+      );
+      await resolveMerge(1, makeResult({ durationSec: 7 }));
       expect(playMock).toHaveBeenCalledTimes(1);
     });
 

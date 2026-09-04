@@ -41,6 +41,15 @@ describe('English accent variants are pickable and share the en text', () => {
     expect(usesSourceTextVerbatim(code, 'de')).toBe(false);
   });
 
+  it('the verbatim rule holds in both directions between accents of one language', () => {
+    // A custom sentence typed on an English (UK) course is `en_gb` text; a
+    // Mixed or US English base on that course shows it as it is.
+    expect(usesSourceTextVerbatim('en', 'en_gb')).toBe(true);
+    expect(usesSourceTextVerbatim('en_us', 'en_gb')).toBe(true);
+    expect(usesSourceTextVerbatim('en_gb', 'en_gb')).toBe(false);
+    expect(usesSourceTextVerbatim('de', 'en_gb')).toBe(false);
+  });
+
   it('non-variant codes never take the verbatim path', () => {
     expect(getSharedTextLanguage('en')).toBeUndefined();
     expect(getSharedTextLanguage('es_latam')).toBeUndefined();

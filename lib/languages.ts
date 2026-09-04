@@ -2715,16 +2715,23 @@ export function getSharedTextLanguage(code: string): string | undefined {
 
 /**
  * True when a text written in `textLanguage` is served verbatim on a
- * `targetCode` course instead of being translated: the target is an
- * accent-only variant of the text's own language. The translation path
- * stores a `source-verbatim` row (same wording, own voice pool) in that case.
+ * `targetCode` course instead of being translated: the two codes are accents
+ * of one language (`en` and `en_gb`, `en_gb` and `en_us`), in either
+ * direction. A custom sentence typed on an English (UK) course is stored as
+ * `en_gb` text, and a Mixed or US English base on that course must show it
+ * verbatim just as a UK course shows an `en` curriculum sentence. The
+ * translation path stores a `source-verbatim` row (same wording, own voice
+ * pool) in that case. False for the same code on both sides (nothing to
+ * translate at all) and for unrelated languages.
  */
 export function usesSourceTextVerbatim(
   targetCode: string,
   textLanguage: string,
 ): boolean {
-  const shared = getSharedTextLanguage(targetCode);
-  return shared !== undefined && shared === textLanguage;
+  if (targetCode === textLanguage) return false;
+  return (
+    getAudioAssetLanguage(targetCode) === getAudioAssetLanguage(textLanguage)
+  );
 }
 
 /**

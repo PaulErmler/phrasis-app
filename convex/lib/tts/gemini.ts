@@ -7,6 +7,7 @@ import {
   getTtsPromptNameForLocale,
 } from '../../../lib/languages';
 import { trimTailHiccup } from './tailTrim';
+import { ttsDeliveryInstruction } from './deliveryInstruction';
 
 // Gemini 3.1 Flash TTS, reached through OpenRouter's OpenAI-compatible speech
 // endpoint. OpenRouter emits ONLY raw PCM for this model. Its response_format
@@ -35,16 +36,10 @@ const MP3_KBPS = 48;
 const HOST_IS_LITTLE_ENDIAN =
   new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
-// Prompt "F" from the 2026-09-04 listening test (.scratch/tts-intonation):
-// the earlier instruction plus an explicit no-performing clause, after a user
-// found the delivery "over-the-top and uncanny". Calmer variants that also
-// asked for a relaxed pace came out too quiet; this one leaves volume and
-// pace alone. Wording kept exactly as tested (including "an everyday
-// conversations"), a prompt-only change on an already-Gemini language does
-// not regenerate stored audio without a `ttsVersion` bump (lib/languages.ts).
+// The instruction text lives in deliveryInstruction.ts (shared with the
+// landing-audio script); see the note there on regeneration.
 function buildStyledInput(text: string, languageName: string): string {
-  const context = `Speak the following text in a natural way like a native ${languageName} speaker would in a way that fits the sentence in an everyday conversations. Do not act it out or perform it. No dramatic emphasis, no exaggerated emotion, no presenter or audiobook voice.`;
-  return `## Instruction: ${context}\n\n## Transcript: ${text}`;
+  return `## Instruction: ${ttsDeliveryInstruction(languageName)}\n\n## Transcript: ${text}`;
 }
 
 /**
