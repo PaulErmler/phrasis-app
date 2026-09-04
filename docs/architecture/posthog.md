@@ -160,9 +160,11 @@ therefore only be captured client-side.
 
 ## AI cost attribution
 
-Every provider call emits `$ai_generation`. PostHog prices OpenRouter calls itself
-from OpenRouter's pricing table; for Google TTS, Google Translate and Azure STT we
-compute `$ai_total_cost_usd` from `convex/config/aiCosts.ts`.
+Every provider call emits `$ai_generation`. PostHog prices OpenRouter LLM calls
+itself from OpenRouter's pricing table; for Google TTS and Google Translate we
+compute `$ai_total_cost_usd` from `convex/config/aiCosts.ts`. OpenRouter STT
+(MAI-Transcribe-2) reports its exact charge in the transcription response's
+`usage.cost`; the rate table only covers a response that came back without it.
 
 | Feature | Provider | Cost source |
 |---|---|---|
@@ -174,8 +176,9 @@ compute `$ai_total_cost_usd` from `convex/config/aiCosts.ts`.
 | `tts_validation_judge` | OpenRouter | exact USD |
 | `tts_synthesis` | Google | characters × rate |
 | `tts_synthesis` | Gemini/OpenRouter | ⚠️ volume only, no USD, see below |
-| `tts_validation_stt` | Azure | billed audio duration × rate |
-| `chat_voice_input` | Azure | billed audio duration × rate |
+| `tts_synthesis` (STT leg) | OpenRouter | exact USD from `usage.cost`, folded into the clip's event as `stt_cost_usd` |
+| `word_timing_backfill` | OpenRouter | exact USD from `usage.cost` |
+| `chat_voice_input` | OpenRouter | exact USD from `usage.cost` |
 | `machine_translation` | Google | characters × rate |
 
 ### Attribution policy
@@ -250,6 +253,6 @@ not the Logs product.
    profile that rejected consent → the event still arrives, **without**
    `$ai_input`/`$ai_output_choices` (the content gate).
 8. Add cards from a collection → `$ai_generation` for translation, TTS **and** the
-   Azure STT validation pass. Cross-check the sum against the OpenRouter dashboard.
+   STT validation pass. Cross-check the sum against the OpenRouter dashboard.
 9. Throw a deliberate error client-side and in a Convex mutation → both appear in
    Error Tracking; the client one has an unminified stack trace (proves source maps).

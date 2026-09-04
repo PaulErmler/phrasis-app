@@ -833,9 +833,8 @@ async function scheduleTimingsBackfillIfNeeded(
   // has them needs no backfill.
   const payload = state.audioPayloadMap.get(lang);
   if (!audio || !payload || payload.wordTimings) return;
-  // Languages without STT support (e.g. `el`, Azure Fast Transcription
-  // can't transcribe `el-GR`) will never get word timings, so don't waste
-  // a claim on a backfill that's guaranteed to no-op.
+  // Languages without STT support will never get word timings, so don't
+  // waste a claim on a backfill that's guaranteed to no-op.
   if (!languageSupportsStt(lang)) return;
   if (opts?.probe) {
     // Claim-held = a job (synthesis or backfill) already owns the slot —
@@ -846,14 +845,15 @@ async function scheduleTimingsBackfillIfNeeded(
   }
   const claimed = await claimTtsIfAvailable(ctx, textId, lang);
   if (!claimed) return;
-  // Forward the persisted regionVariant for mixed-dialect rows so STT runs
-  // against the same locale the voice was synthesized in. Undefined for
-  // non-mixed languages and for the source-language (no translations row).
-  const regionVariant = state.translationMap.get(lang)?.regionVariant;
   await ctx.scheduler.runAfter(
     0,
     internal.features.ttsProcessing.backfillWordTimings,
-    { textId, language: lang, storageId: payload.storageId, regionVariant },
+    {
+      textId,
+      language: lang,
+      storageId: payload.storageId,
+      requestedByUserId: opts?.requestedByUserId,
+    },
   );
 }
 

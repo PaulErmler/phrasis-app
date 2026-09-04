@@ -777,6 +777,15 @@ export function FullReviewCardContent({
       if (!answer) continue;
 
       const language = tr.language;
+      // No expected translation yet: the card's content pipeline is still
+      // running and the review query serves the row with an empty string
+      // rather than dropping it. Nothing to grade against, so mark the row
+      // handled ('error' renders nothing, leaving the plain diff view) instead
+      // of spending a round trip on a grade the server can only degrade.
+      if (!tr.text.trim()) {
+        setFeedback((prev) => new Map(prev).set(language, { status: 'error' }));
+        continue;
+      }
       // Local gate, mirroring the server's (writingAnswersMatch): exact
       // punctuation/case-insensitive EQUALITY against the primary or any
       // stored accepted alternative needs no grader. Deliberately not a
@@ -1828,9 +1837,10 @@ function TargetLanguageInput({
             ? { 'data-testid': 'learn-translation-input' }
             : {})}
         />
-        {/* Azure Fast Transcription rejects some locales outright (el-GR,
-            sw-TZ — the supportsStt:false languages); rendering the mic there
-            would consume a transcription quota unit and then fail every time. */}
+        {/* Every catalogue language supports STT as of Sep 2026, so this
+            gate is defensive: a code the catalogue doesn't know reports no
+            STT support, and rendering the mic there would consume a
+            transcription quota unit and then fail every time. */}
         {languageSupportsStt(translation.language) && (
           <WritingVoiceButton
             language={translation.language}

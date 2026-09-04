@@ -11,7 +11,7 @@ import { minimaxTts } from './minimax';
 
 // 'azure' and 'elevenlabs' are retired: they linger in `TtsProvider` only as
 // stored-value tombstones (historical `audioRecordings.ttsProvider` rows) and
-// are not dispatchable. Azure Speech is still used for STT (convex/lib/stt).
+// are not dispatchable.
 const providers: Partial<Record<TtsProvider, TTSProvider>> = {
   google: googleTts,
   gemini: geminiTts,

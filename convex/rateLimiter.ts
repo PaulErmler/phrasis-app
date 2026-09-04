@@ -18,11 +18,11 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     shards: 8,
   },
   // Gemini 3.1 Flash TTS via OpenRouter (/audio/speech). Capped BELOW the
-  // azureStt budget (100 per 10s ≈ 600/min), not at OpenRouter's ceiling:
-  // every gemini synthesis is STT-validated, so gemini demand converts 1:1
-  // (2:1 on a validation retry) into azureStt demand, and that bucket is
-  // shared with google validation, word-timing backfill, and chat voice.
-  // 180 leaves headroom for those.
+  // openrouterStt budget (100 per 10s ≈ 600/min): every gemini synthesis is
+  // STT-validated, so gemini demand converts 1:1 (2:1 on a validation retry)
+  // into openrouterStt demand, and that bucket is shared with google
+  // validation, word-timing backfill, and chat voice. 180 leaves headroom
+  // for those.
   geminiTts: {
     kind: 'token bucket',
     rate: 180,
@@ -31,8 +31,8 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     shards: 32,
   },
   // MiniMax Speech 2.8 Turbo via OpenRouter (/audio/speech), Cantonese only.
-  // Same reasoning as geminiTts: the binding constraint is the azureStt
-  // validation budget it converts into, not OpenRouter's ceiling. Sized well
+  // Same reasoning as geminiTts: the binding constraint is the openrouterStt
+  // validation budget it converts into. Sized well
   // below geminiTts because it serves two languages rather than most of the
   // catalogue; without its own bucket it falls back to `googleTts` and spends
   // Google's budget instead.
@@ -43,13 +43,14 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 60,
     shards: 8,
   },
-  // Azure Speech-to-Text Fast Transcription S0 tier. Hit by TTS validation
-  // (synthesizeAndValidate), word-timing backfill, and chat voice
-  // transcription. 100 per 10s matches Microsoft's documented S0 cap of
-  // 600 req/min per resource (adjustable via support ticket); the short
-  // period keeps bursts smooth so Azure autoscaling doesn't 429 during
-  // sharp ramps.
-  azureStt: {
+  // MAI-Transcribe-2 via OpenRouter (/audio/transcriptions). Hit by TTS
+  // validation (synthesizeAndValidate), word-timing backfill, and chat voice
+  // transcription. OpenRouter does not document a per-key limit for the
+  // audio endpoint, so this keeps the 100 per 10s (≈ 600/min) budget the
+  // previous Azure S0 resource ran on without 429s; re-tune once the soak
+  // after the Sep 2026 cutover shows what the endpoint tolerates. The short
+  // period keeps bursts smooth during sharp ramps.
+  openrouterStt: {
     kind: 'token bucket',
     rate: 100,
     period: 10 * SECOND,
@@ -121,8 +122,8 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
 
 // Partial because 'azure' and 'elevenlabs' linger in `TtsProvider` only as
 // stored-value tombstones. They are never dispatched, so they need no
-// rate-limit bucket (Azure Speech keeps its separate `azureStt` bucket). The
-// dispatch lookup falls back to 'googleTts' for any unmapped provider.
+// rate-limit bucket. The dispatch lookup falls back to 'googleTts' for any
+// unmapped provider.
 export const TTS_RATE_LIMIT_BY_PROVIDER: Partial<
   Record<TtsProvider, 'googleTts' | 'geminiTts' | 'minimaxTts'>
 > = {

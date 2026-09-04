@@ -3,9 +3,11 @@ import { render, screen } from '@testing-library/react';
 
 /**
  * Voice-input gating in FullReviewCardContent: the mic button must not render
- * for target languages Azure STT rejects (supportsStt: false — el, sw_tz).
- * Transcription quota is consumed before the STT call, so an always-rendered
- * mic would charge those users for a request that can only fail.
+ * for a target language without STT support (`supportsStt: false`, or a code
+ * the catalogue doesn't know). Transcription quota is consumed before the
+ * STT call, so an always-rendered mic would charge those users for a request
+ * that can only fail. Every catalogue language supports STT as of Sep 2026,
+ * so the hide case uses an unknown code.
  */
 
 vi.mock('convex/react', async (importOriginal) => {
@@ -50,8 +52,8 @@ function renderWithTarget(language: string, text: string) {
 }
 
 describe('FullReviewCardContent: writing voice button gating', () => {
-  it('hides the mic for a supportsStt:false target language (el)', () => {
-    renderWithTarget('el', 'Καλημέρα.');
+  it('hides the mic for a target language without STT support', () => {
+    renderWithTarget('xx', 'Hello.');
     expect(screen.getByTestId('learn-translation-input')).toBeInTheDocument();
     expect(
       screen.queryByTestId('writing-voice-button'),
@@ -60,6 +62,11 @@ describe('FullReviewCardContent: writing voice button gating', () => {
 
   it('shows the mic for an STT-supported target language (es)', () => {
     renderWithTarget('es', 'Buenos días.');
+    expect(screen.getByTestId('writing-voice-button')).toBeInTheDocument();
+  });
+
+  it('shows the mic for Greek, STT-supported since Sep 2026', () => {
+    renderWithTarget('el', 'Καλημέρα.');
     expect(screen.getByTestId('writing-voice-button')).toBeInTheDocument();
   });
 });

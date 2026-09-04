@@ -12,7 +12,7 @@ import {
  * record → stop → transcribe round trip against the real backend, with
  * Chromium's fake media stream standing in for the microphone.
  *
- * The fake device feeds a synthetic tone, so the Azure transcript content
+ * The fake device feeds a synthetic tone, so the STT transcript content
  * is not assertable — what IS asserted is the state machine around it: the
  * button records on first click (destructive ring), leaves the recording
  * state on the second, and settles back to idle instead of wedging in the

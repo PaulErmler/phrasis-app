@@ -11,7 +11,18 @@ vi.mock('sonner', () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
-import { useVoiceRecording } from '@/hooks/use-voice-recording';
+// The STT provider rejects the recorder's own container, so the hook
+// re-encodes to WAV before upload. Mocked at the module boundary: jsdom has
+// no Web Audio, and the transcode has its own unit test.
+const recordingToWavMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/audio/recordingToWav', () => ({
+  recordingToWav: recordingToWavMock,
+}));
+
+import {
+  useVoiceRecording,
+  DEFAULT_MAX_RECORDING_MS,
+} from '@/hooks/use-voice-recording';
 
 class FakeMediaRecorder {
   static isTypeSupported = vi.fn().mockReturnValue(true);
@@ -33,6 +44,7 @@ class FakeMediaRecorder {
 describe('useVoiceRecording', () => {
   beforeEach(() => {
     actionMock.mockReset();
+    recordingToWavMock.mockReset().mockResolvedValue(new ArrayBuffer(8));
     // @ts-expect-error shim
     window.MediaRecorder = FakeMediaRecorder;
     Object.defineProperty(navigator, 'mediaDevices', {
@@ -108,6 +120,78 @@ describe('useVoiceRecording', () => {
     await waitFor(() => expect(onTranscript).toHaveBeenCalledWith('hola'));
     expect(actionMock).toHaveBeenCalledWith(
       expect.objectContaining({ language: 'es' }),
+    );
+  });
+
+  it('uploads the transcoded WAV rather than the recorder container', async () => {
+    const onTranscript = vi.fn();
+    const wav = new ArrayBuffer(16);
+    recordingToWavMock.mockResolvedValue(wav);
+    actionMock.mockResolvedValue('ok');
+    const { result } = renderHook(() => useVoiceRecording(onTranscript));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await act(async () => {
+      result.current.stopRecording();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(onTranscript).toHaveBeenCalledWith('ok'));
+    // The recorder's blob (audio/webm here) goes to the transcoder, and only
+    // the WAV it returns goes to the action.
+    expect(recordingToWavMock).toHaveBeenCalledTimes(1);
+    expect((recordingToWavMock.mock.calls[0][0] as Blob).type).toBe(
+      'audio/webm',
+    );
+    expect(actionMock).toHaveBeenCalledWith({
+      audio: wav,
+      mimeType: 'audio/wav',
+    });
+  });
+
+  it('reports a transcode failure and settles without calling the action', async () => {
+    const { toast } = await import('sonner');
+    vi.mocked(toast.error).mockClear();
+    recordingToWavMock.mockRejectedValue(new Error('decode failed'));
+    const onTranscript = vi.fn();
+    const { result } = renderHook(() => useVoiceRecording(onTranscript));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await act(async () => {
+      result.current.stopRecording();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(result.current.isTranscribing).toBe(false));
+    expect(toast.error).toHaveBeenCalled();
+    expect(actionMock).not.toHaveBeenCalled();
+    expect(onTranscript).not.toHaveBeenCalled();
+  });
+
+  it('auto-stops at the default cap when the caller sets none', async () => {
+    const onTranscript = vi.fn();
+    actionMock.mockResolvedValue('long message');
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(() => useVoiceRecording(onTranscript));
+      await act(async () => {
+        await result.current.startRecording();
+      });
+      expect(result.current.isRecording).toBe(true);
+      await act(async () => {
+        vi.advanceTimersByTime(DEFAULT_MAX_RECORDING_MS - 1);
+      });
+      expect(result.current.isRecording).toBe(true);
+      await act(async () => {
+        vi.advanceTimersByTime(1);
+        await vi.runAllTimersAsync();
+      });
+      expect(result.current.isRecording).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+    await waitFor(() =>
+      expect(onTranscript).toHaveBeenCalledWith('long message'),
     );
   });
 

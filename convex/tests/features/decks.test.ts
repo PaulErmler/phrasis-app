@@ -21,6 +21,7 @@ import { ttsPool, ttsWarmPool } from '../../lib/workpools';
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
+import { openrouterSttBody, isOpenrouterSttUrl } from '../lib/sttFixtures';
 import { sha256Hex } from '../../lib/sha256';
 import {
   getCurrentTtsVersion,
@@ -707,30 +708,11 @@ describe('features/decks', () => {
       vi.useFakeTimers();
       vi.stubEnv('GOOGLE_TTS_API_KEY', 'dummy');
       vi.stubEnv('GOOGLE_TRANSLATE_API_KEY', 'dummy');
-      vi.stubEnv('AZURE_SPEECH_API_KEY', 'dummy');
-      vi.stubEnv('AZURE_SPEECH_REGION', 'westeurope');
 
       const translateBody = JSON.stringify({
         data: { translations: [{ translatedText: 'translated' }] },
       });
-      const azureSttBody = JSON.stringify({
-        combinedPhrases: [{ text: 'translated' }],
-        phrases: [
-          {
-            offsetMilliseconds: 0,
-            durationMilliseconds: 500,
-            text: 'translated',
-            locale: 'en-US',
-            words: [
-              {
-                text: 'translated',
-                offsetMilliseconds: 0,
-                durationMilliseconds: 500,
-              },
-            ],
-          },
-        ],
-      });
+      const sttBody = openrouterSttBody('translated');
       const googleTtsBody = JSON.stringify({
         audioContent: Buffer.from('fake-mp3-bytes').toString('base64'),
       });
@@ -743,8 +725,8 @@ describe('features/decks', () => {
             headers: { 'Content-Type': 'application/json' },
           });
         }
-        if (u.includes('speechtotext/transcriptions:transcribe')) {
-          return new Response(azureSttBody, {
+        if (isOpenrouterSttUrl(u)) {
+          return new Response(sttBody, {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
           });

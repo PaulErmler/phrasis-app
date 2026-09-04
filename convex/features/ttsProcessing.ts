@@ -8,12 +8,15 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Doc, Id } from '../_generated/dataModel';
+import { synthesizeSpeech } from './tts';
 import {
-  synthesizeSpeech,
   transcribeAudio,
-  reserveAzureSttSlot,
+  reserveSttSlot,
+  normalizeTranscriptScript,
+  sttCostForEvent,
+  type TranscriptionResult,
   type WordTiming,
-} from './tts';
+} from '../lib/stt';
 import { languageSupportsStt } from '../../lib/languages';
 import { textsMatchForLanguage } from '../lib/textComparison';
 import {
@@ -21,7 +24,7 @@ import {
   type SemanticValidationTelemetry,
 } from '../lib/ttsSemanticValidation';
 import { captureGeneration } from '../lib/posthogAi';
-import { costForAudioMs, costForCharacters } from '../config/aiCosts';
+import { costForCharacters } from '../config/aiCosts';
 import { OPENROUTER_MODELS } from '../config/aiModels';
 import { deleteStorageBlobIfUnreferenced } from '../lib/audio';
 import {
@@ -76,7 +79,7 @@ const TTS_CLAIM_STALE_MS = 10 * 60 * 1000;
  * bucket, 150/min, project ~10s) or the throw path is unreachable and a
  * single saturated provider parks sleeping workers on all 24 shared slots,
  * starving the other providers' jobs queued behind it. At 5s one bucket can
- * pin at most ~rate×5s slots (google ~12, gemini ~15, azure ~16); workers
+ * pin at most ~rate×5s slots (google ~12, gemini ~15, minimax ~5); workers
  * past that threshold throw, free their slot, and the pool's backoff retries.
  */
 const TTS_TOKEN_MAX_WAIT_MS = 5_000;
@@ -92,12 +95,12 @@ const TTS_TOKEN_MAX_WAIT_MS = 5_000;
 const TTS_WARM_TOKEN_MAX_WAIT_MS = 1_000;
 
 /**
- * Longest azureStt refill wait a caller rides out before an STT call
+ * Longest openrouterStt refill wait a caller rides out before an STT call
  * (validation roundtrip, word-timing backfill). Deliberately looser than the
  * synthesis cap: a mid-validation throw wastes the synthesis that just
- * happened, and in-pool demand alone can only project ~7s (24 workers on a
- * 200/min bucket), so 15s never fires on ordinary pool contention and only
- * trips when out-of-pool consumers (backfills, chat voice) genuinely
+ * happened, and in-pool demand alone can only project ~2.5s (24 workers on
+ * a 100-per-10s bucket), so 15s never fires on ordinary pool contention and
+ * only trips when out-of-pool consumers (backfills, chat voice) genuinely
  * oversubscribe the bucket, which previously slept workers indefinitely.
  */
 const STT_TOKEN_MAX_WAIT_MS = 15_000;
@@ -234,11 +237,11 @@ async function synthesizeAndValidate(
     voiceGender: VoiceGender;
     speed: number;
     /**
-     * Azure STT locale (e.g. `'es-US'`) when the row's language is a
+     * Voice-locale prefix (e.g. `'es-US'`) when the row's language is a
      * mixed-dialect code whose concrete variant was chosen at translation
-     * time. Forwarded to `transcribeAudio` so language-ID is skipped and STT
-     * runs against the same locale the voice was synthesized in. Undefined
-     * for non-mixed languages.
+     * time. Written to the audio row so the asset key matches the voice that
+     * was used. STT takes bare language codes and does not need it.
+     * Undefined for non-mixed languages.
      */
     regionVariant?: string;
     /**
@@ -262,10 +265,10 @@ async function synthesizeAndValidate(
   lastStorageId: Id<'_storage'> | null;
   wordTimings: WordTiming[] | null;
 }> {
-  // Azure Fast Transcription is the only STT backend; if it doesn't speak
-  // this language, the validation loop is pure waste (every attempt 400s,
-  // every retry re-synthesizes). Synthesize once, accept it, and skip
-  // straight to unvalidated. wordTimings are unavailable here too.
+  // MAI-Transcribe-2 is the only STT backend; if it doesn't cover this
+  // language, the validation loop is pure waste (every attempt fails, every
+  // retry re-synthesizes). Synthesize once, accept it, and skip straight to
+  // unvalidated. wordTimings are unavailable here too.
   const canValidate = languageSupportsStt(args.language);
 
   const rateLimitName =
@@ -302,20 +305,22 @@ async function synthesizeAndValidate(
         ? costForCharacters('googleTts', args.text.length)
         : undefined;
     // ONE event per synthesized clip, covering both the synthesis and its
-    // Azure STT validation round-trip (they fire 1:1, and as separate events
-    // they doubled TTS event volume in PostHog). Every exit path of this
-    // attempt emits exactly once, with `stt_status` recording whether the
-    // validation leg ran; `cost_usd` is the sum of both legs.
+    // STT validation round-trip (they fire 1:1, and as separate events they
+    // doubled TTS event volume in PostHog). Every exit path of this attempt
+    // emits exactly once, with `stt_status` recording whether the validation
+    // leg ran; `cost_usd` is the sum of both legs. The STT leg's cost is the
+    // exact figure OpenRouter reports; the rate table is the fallback for a
+    // response that came back without one.
     const emitTtsEvent = (stt: {
       status: 'ok' | 'error' | 'skipped' | 'backpressure';
       latencyMs?: number;
       audioDurationMs?: number;
+      billedSeconds?: number;
+      costUsd?: number;
       error?: string;
     }) => {
-      const sttCostUsd =
-        stt.audioDurationMs !== undefined
-          ? costForAudioMs('azureStt', stt.audioDurationMs)
-          : undefined;
+      const { costUsd: sttCostUsd, source: sttCostSource } =
+        sttCostForEvent(stt);
       return captureGeneration(ctx, {
         distinctId: args.requestedByUserId,
         feature: 'tts_synthesis',
@@ -338,6 +343,7 @@ async function synthesizeAndValidate(
             args.provider === 'google' ? 'rate_table' : 'unavailable',
           stt_status: stt.status,
           stt_cost_usd: sttCostUsd,
+          stt_cost_source: sttCostSource,
           stt_latency_ms: stt.latencyMs,
           audio_duration_ms: stt.audioDurationMs,
           stt_error: stt.error,
@@ -381,13 +387,13 @@ async function synthesizeAndValidate(
     }
 
     // Backpressure, not an STT failure. Kept OUTSIDE the try/catch below so
-    // a saturated azureStt bucket throws out of the worker (the pool's
+    // a saturated openrouterStt bucket throws out of the worker (the pool's
     // backoff retries the whole job once the bucket drains) instead of being
     // swallowed as a transcription error and accepting unvalidated audio
     // over a transient queue spike. The synthesis money was still spent, so
     // its event fires before the throw; the retried job emits its own.
     try {
-      await reserveAzureSttSlot(ctx, { maxWaitMs: STT_TOKEN_MAX_WAIT_MS });
+      await reserveSttSlot(ctx, { maxWaitMs: STT_TOKEN_MAX_WAIT_MS });
     } catch (backpressureErr) {
       await emitTtsEvent({ status: 'backpressure' });
       throw backpressureErr;
@@ -395,21 +401,29 @@ async function synthesizeAndValidate(
 
     const sttStartedAt = Date.now();
     try {
+      // The transcript is converted into the language's script before any
+      // comparison: the model returns Latin Serbian and Simplified Mandarin
+      // regardless of the target, and the comparator has no script leniency.
       const {
         text: transcribed,
         wordTimings,
         audioDurationMs,
-      } = await transcribeAudio(blob, args.language, {
-        regionVariant: args.regionVariant,
-      });
+        billedSeconds,
+        costUsd: sttCostUsd,
+      } = normalizeTranscriptScript(
+        await transcribeAudio(blob, args.language),
+        args.language,
+      );
 
-      // Every synthesized clip is round-tripped through Azure to validate it.
-      // That makes it one of the largest spend lines in the app, folded into
-      // the clip's event here (rate-table cost from the audio duration).
+      // Every synthesized clip is round-tripped through STT to validate it.
+      // That makes it one of the larger spend lines in the app, folded into
+      // the clip's event here.
       await emitTtsEvent({
         status: 'ok',
         latencyMs: Date.now() - sttStartedAt,
         audioDurationMs,
+        billedSeconds,
+        costUsd: sttCostUsd,
       });
 
       // Cheap strict check first. For Chinese/Korean this compares
@@ -855,18 +869,17 @@ export const backfillWordTimings = internalAction({
     textId: v.id('texts'),
     language: v.string(),
     storageId: v.id('_storage'),
-    // Same purpose as on `processTTSForCard`. The row's persisted Azure STT
-    // locale for mixed-dialect languages. Supplied by `scheduleMissingContent`
-    // from the translation row when the language is mixed.
-    regionVariant: v.optional(v.string()),
+    // User whose view of the card triggered the sweep, for the cost event
+    // (same semantics as on ttsJobArgsValidator). Absent = system bucket.
+    requestedByUserId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
-      // Azure Fast Transcription is the gate on word timings; if it can't
-      // process this locale, the scheduler shouldn't have been called, but
-      // guard the action too so a stale scheduler call from before the
-      // language was filtered doesn't 400 against Azure.
+      // STT support is the gate on word timings; if the model doesn't cover
+      // this language, the scheduler shouldn't have been called, but guard
+      // the action too so a stale scheduler call from before the language
+      // was filtered doesn't spend a call that returns nothing usable.
       if (!languageSupportsStt(args.language)) return null;
 
       const blob = await ctx.storage.get(args.storageId);
@@ -877,9 +890,58 @@ export const backfillWordTimings = internalAction({
         });
         return null;
       }
-      await reserveAzureSttSlot(ctx, { maxWaitMs: STT_TOKEN_MAX_WAIT_MS });
-      const { wordTimings } = await transcribeAudio(blob, args.language, {
-        regionVariant: args.regionVariant,
+      await reserveSttSlot(ctx, { maxWaitMs: STT_TOKEN_MAX_WAIT_MS });
+
+      // One `ai_cost` event per STT call, success or failure: this path
+      // spends real money per asset and used to report none of it.
+      const sttStartedAt = Date.now();
+      const emitBackfillEvent = (stt: {
+        audioDurationMs?: number;
+        billedSeconds?: number;
+        costUsd?: number;
+        wordCount?: number;
+        error?: string;
+      }) => {
+        const cost = sttCostForEvent(stt);
+        return captureGeneration(ctx, {
+          distinctId: args.requestedByUserId,
+          feature: 'word_timing_backfill',
+          model: OPENROUTER_MODELS.stt,
+          provider: 'openrouter',
+          latencyMs: Date.now() - sttStartedAt,
+          costUsd: cost.costUsd,
+          isError: stt.error !== undefined,
+          error: stt.error,
+          sharedContent: true,
+          extra: {
+            text_id: args.textId,
+            language: args.language,
+            audio_duration_ms: stt.audioDurationMs,
+            billed_seconds: stt.billedSeconds,
+            word_count: stt.wordCount,
+            cost_source: cost.source,
+          },
+        });
+      };
+
+      let result: TranscriptionResult;
+      try {
+        result = normalizeTranscriptScript(
+          await transcribeAudio(blob, args.language),
+          args.language,
+        );
+      } catch (sttErr) {
+        await emitBackfillEvent({
+          error: sttErr instanceof Error ? sttErr.message : String(sttErr),
+        });
+        throw sttErr;
+      }
+      const { wordTimings, audioDurationMs, billedSeconds, costUsd } = result;
+      await emitBackfillEvent({
+        audioDurationMs,
+        billedSeconds,
+        costUsd,
+        wordCount: wordTimings.length,
       });
       if (wordTimings.length === 0) return null;
       await ctx.runMutation(

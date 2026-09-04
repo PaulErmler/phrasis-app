@@ -240,15 +240,17 @@ describe('buildTextContentBatchForLanguages: IPA sentinel', () => {
 describe('buildTextContentBatchForLanguages: word timings', () => {
   // `scheduleTimingsBackfillIfNeeded` refuses to schedule a backfill for
   // languages our STT backend can't transcribe, so flagging those cards as
-  // incomplete asks for work that is deliberately never done.
+  // incomplete asks for work that is deliberately never done. Every
+  // catalogue language supports STT as of Sep 2026, so the only code that
+  // still reports no support is one the catalogue doesn't know.
   it('does not report missing timings for a language without STT support', async () => {
     const t = convexTest(schema, modules);
     const textId = await seedCard(t, {
       sourceLanguage: 'en',
-      translations: [{ language: 'sw_tz' }],
-      languagesWithoutTimings: ['sw_tz'],
+      translations: [{ language: 'xx' }],
+      languagesWithoutTimings: ['xx'],
     });
-    expect(await hasMissingContent(t, textId, 'en', ['en'], ['sw_tz'])).toBe(
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['xx'])).toBe(
       false,
     );
   });

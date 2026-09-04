@@ -366,10 +366,9 @@ describe('Persian (fa) language record', () => {
     expect(fa?.name).toBe('Persian');
   });
 
-  it('routes TTS through Gemini (fa-IR) with Azure STT', () => {
+  it('routes TTS through Gemini (fa-IR) with STT enabled', () => {
     expect(fa?.ttsProvider).toBe('gemini');
     expect(fa?.geminiBcp47).toBe('fa-IR');
-    expect(fa?.azureSttLocale).toBe('fa-IR');
     expect(fa?.supportsStt).toBe(true);
   });
 
@@ -402,12 +401,12 @@ describe('Bulgarian (bg) language record', () => {
 });
 
 describe('languageSupportsStt', () => {
-  // Azure Fast Transcription rejects el-GR and sw-TZ; UI surfaces (the
-  // writing-mode mic) gate on this flag so those users never pay a
-  // transcription quota unit for a request that can only 400.
-  it('is false for the Azure-rejected locales', () => {
-    expect(languageSupportsStt('el')).toBe(false);
-    expect(languageSupportsStt('sw_tz')).toBe(false);
+  // Greek and Tanzanian Swahili were STT-off while Azure lacked their
+  // locales; MAI-Transcribe-2 (Sep 2026) covers both, which re-enabled the
+  // writing-mode mic, validation roundtrips and word timings for them.
+  it('is true for the languages Azure used to reject', () => {
+    expect(languageSupportsStt('el')).toBe(true);
+    expect(languageSupportsStt('sw_tz')).toBe(true);
   });
 
   it('is true for mainstream STT languages and false for unknown codes', () => {
