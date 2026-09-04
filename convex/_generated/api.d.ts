@@ -11,6 +11,7 @@
 import type * as admin_activateDataset from "../admin/activateDataset.js";
 import type * as admin_backfillIpa from "../admin/backfillIpa.js";
 import type * as admin_cardEdits from "../admin/cardEdits.js";
+import type * as admin_convertTranslationArchive from "../admin/convertTranslationArchive.js";
 import type * as admin_dashboard from "../admin/dashboard.js";
 import type * as admin_deleteUser from "../admin/deleteUser.js";
 import type * as admin_lib from "../admin/lib.js";
@@ -183,6 +184,7 @@ declare const fullApi: ApiFromModules<{
   "admin/activateDataset": typeof admin_activateDataset;
   "admin/backfillIpa": typeof admin_backfillIpa;
   "admin/cardEdits": typeof admin_cardEdits;
+  "admin/convertTranslationArchive": typeof admin_convertTranslationArchive;
   "admin/dashboard": typeof admin_dashboard;
   "admin/deleteUser": typeof admin_deleteUser;
   "admin/lib": typeof admin_lib;

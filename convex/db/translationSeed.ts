@@ -3,6 +3,7 @@ import { internalMutation } from '../_generated/server';
 import { deleteAudioRow } from '../lib/audio';
 import { resolveAudioPayload } from '../lib/audioAssets';
 import { clearedAnnotationFields } from '../lib/textAnnotations';
+import { liveTranslation } from './translationReads';
 
 const SPANISH_VOICE_PREFIXES: Record<string, string> = {
   es: 'es-ES',
@@ -130,12 +131,7 @@ export const batchUpsertTranslations = internalMutation({
       }
 
       for (const tr of item.translations) {
-        const existing = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', tr.language),
-          )
-          .first();
+        const existing = await liveTranslation(ctx, textId, tr.language);
 
         if (!existing) {
           await ctx.db.insert('translations', {

@@ -70,6 +70,7 @@ export {
   isCollectionAccessible,
   requireAccessibleText,
 } from '../lib/collectionAccess';
+import { liveTranslation } from '../db/translationReads';
 
 // ============================================================================
 // QUERIES
@@ -456,12 +457,7 @@ export async function scheduleMissingTranslationsForText(
   let scheduled = 0;
   for (const lang of languages) {
     if (lang === text.language) continue;
-    const existing = await ctx.db
-      .query('translations')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', text._id).eq('targetLanguage', lang),
-      )
-      .first();
+    const existing = await liveTranslation(ctx, text._id, lang);
     if (existing) {
       // Version-stale rows regenerate here too, so browsing a collection
       // already upgrades its translations to the current version, and the
@@ -722,12 +718,7 @@ export const requestPreviewAudio = mutation({
     const translation =
       args.language === text.language
         ? null
-        : await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', args.textId).eq('targetLanguage', args.language),
-            )
-            .first();
+        : await liveTranslation(ctx, args.textId, args.language);
     if (args.language !== text.language && !translation) {
       // Translation still generating. The click raced it. Nothing to
       // synthesize yet; the client retries once the translation row lands.

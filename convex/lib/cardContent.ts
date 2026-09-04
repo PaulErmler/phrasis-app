@@ -18,7 +18,7 @@ import {
 } from './audioAssets';
 import {
   cardPinAt,
-  getLiveTranslation,
+  liveTranslation,
   resolveServedFromLive,
   type ServedTranslation,
 } from '../db/translationReads';
@@ -192,12 +192,7 @@ export async function buildTextContentBatchForLanguages(
   const [translationResults, audioResults, claimResults] = await Promise.all([
     Promise.all(
       translationFetches.map((item) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', item.textId).eq('targetLanguage', item.lang),
-          )
-          .first(),
+        liveTranslation(ctx, item.textId, item.lang),
       ),
     ),
     Promise.all(
@@ -469,7 +464,7 @@ async function loadLiveTranslationRows(
   courseLanguages: string[],
 ): Promise<(Doc<'translations'> | null)[]> {
   return Promise.all(
-    courseLanguages.map((lang) => getLiveTranslation(ctx, textId, lang)),
+    courseLanguages.map((lang) => liveTranslation(ctx, textId, lang)),
   );
 }
 

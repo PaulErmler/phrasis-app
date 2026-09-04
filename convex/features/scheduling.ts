@@ -6,7 +6,11 @@ import {
   buildTextContentBatchForLanguages,
   type CardAlternativeContent,
 } from '../lib/cardContent';
-import { cardPinAt, resolveServedFromLive } from '../db/translationReads';
+import {
+  cardPinAt,
+  liveTranslation,
+  resolveServedFromLive,
+} from '../db/translationReads';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -1699,14 +1703,7 @@ export const flagTranslation = mutation({
     // composite index. Faster than a single `by_textId` collect + JS
     // filter when only a subset of the text's translations matter.
     const fetched = await Promise.all(
-      cardLanguages.map((lang) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('targetLanguage', lang),
-          )
-          .first(),
-      ),
+      cardLanguages.map((lang) => liveTranslation(ctx, card.textId, lang)),
     );
 
     // Drop languages with no translation row (the card simply doesn't

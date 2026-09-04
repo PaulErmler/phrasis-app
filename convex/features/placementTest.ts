@@ -3,6 +3,7 @@ import { query } from '../_generated/server';
 import type { Doc } from '../_generated/dataModel';
 import { resolveAudioPayload } from '../lib/audioAssets';
 import { PLACEMENT_SENTENCES_QUERY_CAP } from '../../lib/constants/onboarding';
+import { liveTranslation } from '../db/translationReads';
 
 /**
  * Placement-test backend.
@@ -71,12 +72,11 @@ export const getPlacementSentence = query({
     let resolvedSourceText = text.text;
     let resolvedSourceLanguage = text.language;
     if (sourceLanguage && sourceLanguage !== text.language) {
-      const sourceTranslation = await ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', text._id).eq('targetLanguage', sourceLanguage),
-        )
-        .first();
+      const sourceTranslation = await liveTranslation(
+        ctx,
+        text._id,
+        sourceLanguage,
+      );
       if (sourceTranslation) {
         resolvedSourceText = sourceTranslation.translatedText;
         resolvedSourceLanguage = sourceLanguage;
@@ -99,12 +99,7 @@ export const getPlacementSentence = query({
     let translation: Doc<'translations'> | null = null;
     let targetAudio: Doc<'audioRecordings'> | null = null;
     if (targetLanguage && targetLanguage !== text.language) {
-      translation = await ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', text._id).eq('targetLanguage', targetLanguage),
-        )
-        .first();
+      translation = await liveTranslation(ctx, text._id, targetLanguage);
       targetAudio = await ctx.db
         .query('audioRecordings')
         .withIndex('by_text_and_language', (q) =>
@@ -177,12 +172,11 @@ export const getPlacementPreviewSentences = query({
         // the stored English text so a sentence always shows.
         let resolvedSourceText = text.text;
         if (sourceLanguage && sourceLanguage !== text.language) {
-          const sourceTranslation = await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', text._id).eq('targetLanguage', sourceLanguage),
-            )
-            .first();
+          const sourceTranslation = await liveTranslation(
+            ctx,
+            text._id,
+            sourceLanguage,
+          );
           if (sourceTranslation) {
             resolvedSourceText = sourceTranslation.translatedText;
           }
@@ -190,12 +184,7 @@ export const getPlacementPreviewSentences = query({
 
         let translation: Doc<'translations'> | null = null;
         if (targetLanguage && targetLanguage !== text.language) {
-          translation = await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', text._id).eq('targetLanguage', targetLanguage),
-            )
-            .first();
+          translation = await liveTranslation(ctx, text._id, targetLanguage);
         }
 
         return {

@@ -4,21 +4,26 @@ import type { MutationCtx, QueryCtx } from '../_generated/server';
 type ContentCtx = QueryCtx | MutationCtx;
 
 /**
- * Card-facing translation reads.
+ * Card-facing translation reads, and the ONLY module that queries the
+ * `translations.by_text_language_supersededAt` index
+ * (convex/tests/lib/translationsIndexInvariant.test.ts enforces that).
  *
  * A curriculum translation row is shared by every learner's card for that
  * text. When a version bump regenerates the row's wording, the previous
- * wording moves to `translationArchive` (see schema.ts) and the live row
- * remembers `lastArchivedAt`. A card is served the wording that was live at
- * its PIN: `translationsAcceptedAt` when set, else `_creationTime`. So an
- * existing learner keeps seeing (and hearing) exactly what they learned,
- * while a card added later gets the new wording, with zero per-card writes.
+ * wording is copied into a second row of the same table with `supersededAt`
+ * set (see schema.ts) and the live row remembers `lastArchivedAt`. A card is
+ * served the wording that was live at its PIN: `translationsAcceptedAt` when
+ * set, else `_creationTime`. So an existing learner keeps seeing (and
+ * hearing) exactly what they learned, while a card added later gets the new
+ * wording, with zero per-card writes.
  *
  * Every reader that shows a translation ON A CARD goes through
  * `resolveServedTranslation` / `resolveServedFromLive` with the card's pin.
  * Readers with no card in hand (collection preview, placement test, the
- * content pipeline itself) keep reading the live row: they describe the
- * curriculum, not a learner's card.
+ * content pipeline itself) read the live row through `liveTranslation`: they
+ * describe the curriculum, not a learner's card. Sweeps that must reach the
+ * superseded revisions too (annotation fills, audio repair) read the whole
+ * range through `translationRevisions`.
  */
 
 /** The instant a card's translations are pinned to. */
@@ -28,64 +33,102 @@ export function cardPinAt(
   return card.translationsAcceptedAt ?? card._creationTime;
 }
 
-/** The fields the two row shapes share, which is all a card reader needs. */
-export type ServedTranslationRow = Pick<
-  Doc<'translations'>,
-  | 'translatedText'
-  | 'romanizedText'
-  | 'romanizationSource'
-  | 'ipaText'
-  | 'ipaSource'
-  | 'furiganaText'
-  | 'furiganaSource'
-  | 'translationSource'
-  | 'regionVariant'
-  | 'speakerGender'
-  | 'translationVersion'
->;
+/** True iff `row` is a superseded revision rather than the live row. */
+export function isSupersededRow(
+  row: Pick<Doc<'translations'>, 'supersededAt'>,
+): boolean {
+  return row.supersededAt !== undefined;
+}
 
-export type ServedTranslation = {
-  /** The live row for (text, language). */
-  live: Doc<'translations'>;
-  /**
-   * What the card shows: the live row, or the archived revision that was
-   * live at the card's pin.
-   */
-  row: ServedTranslationRow;
-  /** True iff `row` is an archive row, i.e. the curriculum has moved on. */
-  archived: boolean;
-  /**
-   * Identity of the served revision (the archive row's id, or the live row's),
-   * for callers that memoize per revision.
-   */
-  revisionId: Id<'translations'> | Id<'translationArchive'>;
-  /**
-   * For an archived row: the asset that speaks its wording, when the
-   * language had audio at the time. The card plays this instead of the live
-   * row's pointer. Undefined for live rows (use the `audioRecordings` row)
-   * and for archived rows that never had audio.
-   */
-  audioAssetId: Id<'audioAssets'> | undefined;
-};
-
-/** Raw live-row read; the one index read the accessors below build on. */
-export async function getLiveTranslation(
+/**
+ * The live row for (text, language): the one without `supersededAt`. Convex
+ * orders `undefined` before every other value, so it is the first row of the
+ * index range anyway; the explicit `.eq(undefined)` is what keeps a
+ * superseded row from ever being read as live, whatever the order.
+ */
+export async function liveTranslation(
   ctx: ContentCtx,
   textId: Id<'texts'>,
   targetLanguage: string,
 ): Promise<Doc<'translations'> | null> {
   return ctx.db
     .query('translations')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', textId).eq('targetLanguage', targetLanguage),
+    .withIndex('by_text_language_supersededAt', (q) =>
+      q
+        .eq('textId', textId)
+        .eq('targetLanguage', targetLanguage)
+        .eq('supersededAt', undefined),
     )
     .first();
 }
 
 /**
+ * Every row of (text, language): the live row first (when one exists), then
+ * the superseded revisions, oldest-superseded first. For the sweeps that
+ * treat superseded revisions as content in their own right.
+ */
+export async function translationRevisions(
+  ctx: ContentCtx,
+  textId: Id<'texts'>,
+  targetLanguage: string,
+): Promise<Doc<'translations'>[]> {
+  return ctx.db
+    .query('translations')
+    .withIndex('by_text_language_supersededAt', (q) =>
+      q.eq('textId', textId).eq('targetLanguage', targetLanguage),
+    )
+    .order('asc')
+    .collect();
+}
+
+/** Split a `translationRevisions` range into the live row and the rest. */
+export function splitRevisions(rows: Doc<'translations'>[]): {
+  live: Doc<'translations'> | null;
+  superseded: Doc<'translations'>[];
+} {
+  let live: Doc<'translations'> | null = null;
+  const superseded: Doc<'translations'>[] = [];
+  for (const row of rows) {
+    if (isSupersededRow(row)) superseded.push(row);
+    else live = row;
+  }
+  return { live, superseded };
+}
+
+export type ServedTranslation = {
+  /** The live row for (text, language). */
+  live: Doc<'translations'>;
+  /**
+   * What the card shows: the live row, or the superseded revision that was
+   * live at the card's pin.
+   */
+  row: Doc<'translations'>;
+  /** True iff `row` is a superseded revision, i.e. the curriculum moved on. */
+  archived: boolean;
+  /** Identity of the served revision, for callers that memoize per revision. */
+  revisionId: Id<'translations'>;
+  /**
+   * For a superseded revision: the asset that speaks its wording. The card
+   * plays this instead of the live row's pointer. Undefined for the live row
+   * (use the `audioRecordings` row).
+   */
+  audioAssetId: Id<'audioAssets'> | undefined;
+};
+
+function servedLive(live: Doc<'translations'>): ServedTranslation {
+  return {
+    live,
+    row: live,
+    archived: false,
+    revisionId: live._id,
+    audioAssetId: undefined,
+  };
+}
+
+/**
  * Pick the revision a card pinned at `pinAt` is served, given the live row.
  * Costs nothing unless the row has been archived since the pin: only then is
- * the archive consulted, for the earliest revision superseded after the pin,
+ * the index consulted, for the earliest revision superseded after the pin,
  * which is the one that was live at that instant (or, for a card older than
  * the row's first wording, the first wording it was ever shown).
  *
@@ -101,16 +144,10 @@ export async function resolveServedFromLive(
     live.lastArchivedAt === undefined ||
     live.lastArchivedAt <= pinAt
   ) {
-    return {
-      live,
-      row: live,
-      archived: false,
-      revisionId: live._id,
-      audioAssetId: undefined,
-    };
+    return servedLive(live);
   }
   const archived = await ctx.db
-    .query('translationArchive')
+    .query('translations')
     .withIndex('by_text_language_supersededAt', (q) =>
       q
         .eq('textId', live.textId)
@@ -121,16 +158,9 @@ export async function resolveServedFromLive(
     .first();
   // No row, or a row without audio (never written by the current pipeline,
   // which only archives spoken wordings; guards rows from before that rule):
-  // serve live. A pinned entry reports no content gaps, so an audio-less
-  // archive row would leave the card mute for good.
+  // serve live rather than pin the card to a wording nothing voices.
   if (!archived || archived.audioAssetId === undefined) {
-    return {
-      live,
-      row: live,
-      archived: false,
-      revisionId: live._id,
-      audioAssetId: undefined,
-    };
+    return servedLive(live);
   }
   return {
     live,
@@ -141,7 +171,7 @@ export async function resolveServedFromLive(
   };
 }
 
-/** `getLiveTranslation` + `resolveServedFromLive` in one call. */
+/** `liveTranslation` + `resolveServedFromLive` in one call. */
 export async function resolveServedTranslation(
   ctx: ContentCtx,
   args: {
@@ -150,7 +180,7 @@ export async function resolveServedTranslation(
     pinAt: number | undefined;
   },
 ): Promise<ServedTranslation | null> {
-  const live = await getLiveTranslation(ctx, args.textId, args.targetLanguage);
+  const live = await liveTranslation(ctx, args.textId, args.targetLanguage);
   if (!live) return null;
   return resolveServedFromLive(ctx, live, args.pinAt);
 }

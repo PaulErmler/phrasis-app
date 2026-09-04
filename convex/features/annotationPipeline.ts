@@ -9,6 +9,7 @@ import {
   type AnnotationKind,
 } from '../lib/textAnnotations';
 import { scheduleSearchableTextRebuild } from './searchRebuild';
+import { liveTranslation } from '../db/translationReads';
 
 /**
  * Romanization/annotation pipeline: the worker actions that romanize source
@@ -147,12 +148,7 @@ export async function storeTranslationAnnotationHandler(
   },
 ): Promise<null> {
   const spec = TEXT_ANNOTATIONS[args.kind];
-  const translation = await ctx.db
-    .query('translations')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', args.textId).eq('targetLanguage', args.language),
-    )
-    .first();
+  const translation = await liveTranslation(ctx, args.textId, args.language);
   if (
     args.forText !== undefined &&
     translation &&

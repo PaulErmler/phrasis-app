@@ -5,6 +5,7 @@ import schema from '../../schema';
 import { internal, api } from '../../_generated/api';
 import { IPA_SOURCES } from '../../lib/textAnnotations';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+import { liveTranslation } from '../../db/translationReads';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -136,13 +137,7 @@ describe('processIpaFor* actions (stubbed engine)', () => {
       language: 'fr',
     });
     const row = await t.run(
-      async (ctx) =>
-        (await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'fr'),
-          )
-          .unique())!,
+      async (ctx) => (await liveTranslation(ctx, textId, 'fr'))!,
     );
     expect(row.ipaText).toBe(MOCK_IPA);
     expect(row.ipaSource).toBe(IPA_SOURCES.espeakNg);

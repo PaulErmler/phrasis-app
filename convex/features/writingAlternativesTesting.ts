@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { internalMutation, internalQuery } from '../_generated/server';
 import { assertTestHooksEnabled, requireUserIdByEmail } from '../lib/testHooks';
 import { storeWritingAlternative } from './writingAlternatives';
+import { liveTranslation } from '../db/translationReads';
 
 /**
  * E2E test hooks for the writing-mode accepted-alternatives lifecycle
@@ -67,12 +68,11 @@ export const seedAlternative = internalMutation({
       for (const card of cards) {
         const text = await ctx.db.get(card.textId);
         if (!text || !text.text.includes(args.sourceMarker)) continue;
-        const translation = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('targetLanguage', args.language),
-          )
-          .first();
+        const translation = await liveTranslation(
+          ctx,
+          card.textId,
+          args.language,
+        );
         if (!translation) {
           throw new Error(
             `Card ${card._id} has no "${args.language}" translation`,

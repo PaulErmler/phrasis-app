@@ -9,6 +9,7 @@ import { FLAG_AUTO_RETRANSLATION_MAX } from '../../../lib/languages';
 import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+import { liveTranslation } from '../../db/translationReads';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -434,14 +435,7 @@ describe('features/curriculumFlagTesting', () => {
         const forked = await t.run(async (ctx) => {
           const card = (await ctx.db.get(cardId))!;
           expect(card.textId).not.toBe(textId);
-          return ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q
-                .eq('textId', card.textId)
-                .eq('targetLanguage', probe.targetLanguage),
-            )
-            .first();
+          return liveTranslation(ctx, card.textId, probe.targetLanguage);
         });
         expect(forked?.translatedText).toBe(edited);
 

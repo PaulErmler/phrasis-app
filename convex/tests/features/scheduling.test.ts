@@ -13,6 +13,7 @@ import { scheduleMissingContent } from '../../features/decks';
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
+import { liveTranslation } from '../../db/translationReads';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -1470,12 +1471,7 @@ describe('features/scheduling', () => {
 
       // The exposure: a user-owned card carrying machine provenance.
       const carried = await t.run(async (ctx) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', newTextId).eq('targetLanguage', 'en'),
-          )
-          .first(),
+        liveTranslation(ctx, newTextId, 'en'),
       );
       expect(carried?.translationSource).toBe(
         'google/gemini-3.1-flash-lite-high',
@@ -1496,12 +1492,7 @@ describe('features/scheduling', () => {
         const text = (await ctx.db.get(newTextId))!;
         await scheduleMissingContent(ctx, newTextId, text, ['en'], ['sv']);
         return {
-          translation: await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', newTextId).eq('targetLanguage', 'en'),
-            )
-            .first(),
+          translation: await liveTranslation(ctx, newTextId, 'en'),
           audio: await ctx.db
             .query('audioRecordings')
             .withIndex('by_text_and_language', (q) =>
@@ -1633,12 +1624,7 @@ describe('features/scheduling', () => {
         const cards = await ctx.db.query('cards').collect();
         const replacement = cards.find((c) => c.textId !== textId);
         return replacement
-          ? ctx.db
-              .query('translations')
-              .withIndex('by_text_and_language', (q) =>
-                q.eq('textId', replacement.textId).eq('targetLanguage', 'en'),
-              )
-              .first()
+          ? liveTranslation(ctx, replacement.textId, 'en')
           : null;
       });
       expect(forked?.translatedText).toBe('Hi there');

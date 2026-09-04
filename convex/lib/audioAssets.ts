@@ -213,10 +213,11 @@ export async function upsertAudioPointer(
 
 /**
  * Whether anything still serves this asset: a live `audioRecordings` pointer,
- * or a `translationArchive` row whose pinned cards play the superseded
- * wording. Both garbage-collection sites (`deleteAudioRow` and the re-point
- * above) ask this, so an archived revision can never lose its audio to a
- * different text dropping its pointer to the same content-addressed asset.
+ * or a superseded `translations` row whose pinned cards play the old
+ * wording (`translations.audioAssetId`). Both garbage-collection sites
+ * (`deleteAudioRow` and the re-point above) ask this, so an archived
+ * revision can never lose its audio to a different text dropping its
+ * pointer to the same content-addressed asset.
  */
 export async function isAudioAssetReferenced(
   ctx: QueryCtx | MutationCtx,
@@ -227,11 +228,21 @@ export async function isAudioAssetReferenced(
     .withIndex('by_assetId', (q) => q.eq('assetId', assetId))
     .first();
   if (pointer) return true;
-  const archived = await ctx.db
+  const superseded = await ctx.db
+    .query('translations')
+    .withIndex('by_audioAssetId', (q) => q.eq('audioAssetId', assetId))
+    .first();
+  if (superseded) return true;
+  // Transition only: staging still holds rows in the deprecated
+  // `translationArchive` table until `admin/convertTranslationArchive` has
+  // run. Deleting an asset one of them references would leave the moved row
+  // mute, so they count as references until the table is dropped (remove
+  // this lookup together with the table definition in schema.ts).
+  const legacyArchived = await ctx.db
     .query('translationArchive')
     .withIndex('by_audioAssetId', (q) => q.eq('audioAssetId', assetId))
     .first();
-  return archived !== null;
+  return legacyArchived !== null;
 }
 
 /**

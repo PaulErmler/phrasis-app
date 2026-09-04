@@ -40,6 +40,7 @@ import {
   voiceGenderValidator,
   asVoiceGender,
 } from '../types';
+import { liveTranslation } from '../db/translationReads';
 
 /**
  * Translation write pipeline: the legacy Google Translate worker action and
@@ -255,12 +256,7 @@ export async function getTranslationForTextLanguageHandler(
   romanizedText?: string;
   regionVariant?: string;
 } | null> {
-  const row = await ctx.db
-    .query('translations')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
-    )
-    .first();
+  const row = await liveTranslation(ctx, args.textId, args.targetLanguage);
   if (!row) return null;
   return {
     translatedText: row.translatedText,
@@ -519,12 +515,7 @@ async function guardTranslationWrite(
     }
   }
 
-  const existing = await ctx.db
-    .query('translations')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
-    )
-    .first();
+  const existing = await liveTranslation(ctx, args.textId, args.targetLanguage);
 
   if (existing && args.replaceExisting && isUserCreatedText(text)) {
     await resolveRetranslation(
@@ -689,14 +680,13 @@ function defined<T extends Record<string, unknown>>(value: T): T {
 }
 
 /**
- * Move the live row's current wording into `translationArchive` together
- * with the asset its audio plays, and mark the live row so card-facing
- * readers know to consult the archive for cards pinned before now. Called
- * only when at least one card references the text AND the wording has
- * audio (`audioAssetId`): an archive nobody can be served is a row for
- * nothing, and an archive without audio would pin its cards to a wording
- * the pipeline never fills again (archived entries report no gaps), i.e. a
- * card that is mute for good.
+ * Copy the live row's current wording into a superseded row of the same
+ * table together with the asset its audio plays, and mark the live row so
+ * card-facing readers know to consult the superseded rows for cards pinned
+ * before now. Called only when at least one card references the text AND
+ * the wording has audio (`audioAssetId`): a revision nobody can be served is
+ * a row for nothing, and a revision without audio would pin its cards to a
+ * wording no pointer voices.
  */
 async function archiveTranslationRevision(
   ctx: MutationCtx,
@@ -705,7 +695,7 @@ async function archiveTranslationRevision(
 ): Promise<void> {
   const supersededAt = Date.now();
   await ctx.db.insert(
-    'translationArchive',
+    'translations',
     defined({
       textId: existing.textId,
       targetLanguage: existing.targetLanguage,

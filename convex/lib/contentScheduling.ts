@@ -34,6 +34,7 @@ import {
   hasBlockingLlmClaim,
   isClaimFresh,
 } from '../features/llmTranslationQueue';
+import { splitRevisions, translationRevisions } from '../db/translationReads';
 
 /**
  * Content-scheduling helpers: the shared "fill whatever this text is missing"
@@ -423,7 +424,15 @@ type ResolvedAudioPayload = NonNullable<
  * refills the language).
  */
 type ContentSweepState = {
+  /** The LIVE translation row per language (null when none exists). */
   translationMap: Map<string, Doc<'translations'> | null>;
+  /**
+   * The superseded revisions per language (`supersededAt` set, see
+   * schema.ts), oldest first. Pinned cards are still served these, so the
+   * sweep fills their annotations and repairs their audio exactly like the
+   * live row's; it never regenerates their wording.
+   */
+  supersededMap: Map<string, Doc<'translations'>[]>;
   audioMap: Map<string, Doc<'audioRecordings'> | null>;
   llmClaimMap: Map<string, Doc<'llmTranslationClaims'> | null>;
   /** Resolved payloads for the audio rows that SURVIVED the validity sweep. */
@@ -446,36 +455,37 @@ async function loadContentState(
   allRequiredLanguages: string[],
   langsNeedingTranslation: string[],
 ): Promise<ContentSweepState> {
-  const [existingTranslations, existingAudio, existingLlmClaims] =
-    await Promise.all([
-      Promise.all(
-        langsNeedingTranslation.map((lang) =>
-          ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('targetLanguage', lang),
-            )
-            .first(),
-        ),
+  const [revisions, existingAudio, existingLlmClaims] = await Promise.all([
+    Promise.all(
+      langsNeedingTranslation.map((lang) =>
+        translationRevisions(ctx, textId, lang),
       ),
-      Promise.all(
-        allRequiredLanguages.map((lang) =>
-          ctx.db
-            .query('audioRecordings')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('language', lang),
-            )
-            .first(),
-        ),
+    ),
+    Promise.all(
+      allRequiredLanguages.map((lang) =>
+        ctx.db
+          .query('audioRecordings')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', textId).eq('language', lang),
+          )
+          .first(),
       ),
-      Promise.all(
-        langsNeedingTranslation.map((lang) => getLlmClaim(ctx, textId, lang)),
-      ),
-    ]);
+    ),
+    Promise.all(
+      langsNeedingTranslation.map((lang) => getLlmClaim(ctx, textId, lang)),
+    ),
+  ]);
 
+  // One index range per language returns the live row and its superseded
+  // revisions together; rows never bumped have no revisions, so this costs
+  // exactly what the live-row read used to.
+  const split = revisions.map(splitRevisions);
   return {
     translationMap: new Map(
-      langsNeedingTranslation.map((lang, i) => [lang, existingTranslations[i]]),
+      langsNeedingTranslation.map((lang, i) => [lang, split[i].live]),
+    ),
+    supersededMap: new Map(
+      langsNeedingTranslation.map((lang, i) => [lang, split[i].superseded]),
     ),
     audioMap: new Map(
       allRequiredLanguages.map((lang, i) => [lang, existingAudio[i]]),

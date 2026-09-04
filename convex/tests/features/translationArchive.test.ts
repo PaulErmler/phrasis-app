@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import schema from '../../schema';
 import { api, internal } from '../../_generated/api';
-import type { Doc, Id } from '../../_generated/dataModel';
+import type { Id } from '../../_generated/dataModel';
 import { llmPool } from '@/convex/lib/workpools';
 import {
   buildCardSearchableText,
@@ -18,7 +18,13 @@ import {
   forkSharedTextForEdit,
   resolveCardEditPlan,
 } from '../../features/cardEditPipeline';
-import { cardPinAt, resolveServedFromLive } from '../../db/translationReads';
+import {
+  cardPinAt,
+  liveTranslation,
+  resolveServedFromLive,
+  splitRevisions,
+  translationRevisions,
+} from '../../db/translationReads';
 import {
   getCurrentTranslationVersion,
   getTtsProviderForLanguage,
@@ -218,25 +224,14 @@ function bump(
 }
 
 function liveRow(t: TestConvex<typeof schema>, textId: Id<'texts'>) {
-  return t.run(
-    async (ctx) =>
-      (await ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', textId).eq('targetLanguage', 'de'),
-        )
-        .unique())!,
-  );
+  return t.run(async (ctx) => (await liveTranslation(ctx, textId, 'de'))!);
 }
 
+/** The superseded `de` revisions of a text, oldest-superseded first. */
 function archiveRows(t: TestConvex<typeof schema>, textId: Id<'texts'>) {
-  return t.run((ctx) =>
-    ctx.db
-      .query('translationArchive')
-      .withIndex('by_text_language_supersededAt', (q) =>
-        q.eq('textId', textId).eq('targetLanguage', 'de'),
-      )
-      .collect(),
+  return t.run(
+    async (ctx) =>
+      splitRevisions(await translationRevisions(ctx, textId, 'de')).superseded,
   );
 }
 
@@ -436,7 +431,7 @@ describe('served revision resolution (convex/db/translationReads.ts)', () => {
     const { textId, translationId, pinAt } = await seed(t);
     await t.run(async (ctx) => {
       const supersededAt = Date.now();
-      await ctx.db.insert('translationArchive', {
+      await ctx.db.insert('translations', {
         textId,
         targetLanguage: 'de',
         translatedText: OLD_DE,
@@ -500,12 +495,7 @@ describe('served revision resolution (convex/db/translationReads.ts)', () => {
     const t = convexTest(schema, modules);
     const { textId, pinAt } = await seed(t);
     const before = await t.run(async (ctx) => {
-      const live = (await ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', textId).eq('targetLanguage', 'de'),
-        )
-        .unique())!;
+      const live = (await liveTranslation(ctx, textId, 'de'))!;
       return resolveServedFromLive(ctx, live, pinAt);
     });
     expect(before.archived).toBe(false);
@@ -809,12 +799,7 @@ describe('editing a pinned card', () => {
         text,
         plan: unchanged,
       });
-      const forkedDe = await ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', forkedTextId).eq('targetLanguage', 'de'),
-        )
-        .unique();
+      const forkedDe = await liveTranslation(ctx, forkedTextId, 'de');
       const forkedAudio = await ctx.db
         .query('audioRecordings')
         .withIndex('by_text_and_language', (q) =>
@@ -884,7 +869,7 @@ describe('archived audio survives garbage collection', () => {
         ttsProvider: 'google',
         spokenText: OLD_DE,
       });
-      const archiveId = await ctx.db.insert('translationArchive', {
+      const archiveId = await ctx.db.insert('translations', {
         textId: textA,
         targetLanguage: 'de',
         translatedText: OLD_DE,
@@ -917,18 +902,18 @@ describe('archived audio survives garbage collection', () => {
   });
 });
 
-describe('type plumbing', () => {
-  it('a Doc<"translationArchive"> carries every field a served row needs', () => {
-    // Compile-time check: the archive row shape satisfies the served-row
-    // pick used by every card-facing reader.
-    const row: Doc<'translationArchive'> = {
-      _id: 'x' as Id<'translationArchive'>,
-      _creationTime: 0,
-      textId: 'y' as Id<'texts'>,
-      targetLanguage: 'de',
-      translatedText: OLD_DE,
-      supersededAt: 0,
-    };
-    expect(row.translatedText).toBe(OLD_DE);
+describe('the live row is never a superseded one', () => {
+  it('liveTranslation skips superseded rows however they were written', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, translationId } = await seed(t);
+    await bump(t, textId, NEW_DE);
+    const live = await liveRow(t, textId);
+    expect(live._id).toBe(translationId);
+    expect(live.supersededAt).toBeUndefined();
+    const revisions = await t.run((ctx) =>
+      translationRevisions(ctx, textId, 'de'),
+    );
+    expect(revisions.map((r) => r.translatedText)).toEqual([NEW_DE, OLD_DE]);
+    expect(revisions[0]._id).toBe(translationId);
   });
 });

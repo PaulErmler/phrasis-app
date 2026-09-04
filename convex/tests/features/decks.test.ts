@@ -26,6 +26,7 @@ import {
   getCurrentTtsVersion,
   getCurrentTranslationVersion,
 } from '../../../lib/languages';
+import { liveTranslation } from '../../db/translationReads';
 
 // Partial module mock: every real language's voice pickers only ever return
 // curated apiCodes, so `scheduleAudioForLanguage`'s "not in the curated voice
@@ -1051,12 +1052,7 @@ describe('features/decks', () => {
       });
 
       const row = await t.run(async (ctx) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'de'),
-          )
-          .first(),
+        liveTranslation(ctx, textId, 'de'),
       );
       expect(row?.translatedText).toBe('Sie ist da drüben');
     });
@@ -1146,12 +1142,7 @@ describe('features/decks', () => {
       });
 
       const row = await t.run(async (ctx) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'es'),
-          )
-          .first(),
+        liveTranslation(ctx, textId, 'es'),
       );
       expect(row?.translatedText).toBe('Hola.');
       expect(row?.romanizedText).toBe('Hola');
@@ -1393,12 +1384,7 @@ describe('features/decks', () => {
       return t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
         await scheduleMissingContent(ctx, textId, text, ['en'], ['es']);
-        return ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'es'),
-          )
-          .first();
+        return liveTranslation(ctx, textId, 'es');
       });
     }
 
@@ -1636,12 +1622,7 @@ describe('features/decks', () => {
           ['en'],
           ['es'],
         );
-        const tr = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'es'),
-          )
-          .first();
+        const tr = await liveTranslation(ctx, textId, 'es');
         const audio = await ctx.db
           .query('audioRecordings')
           .withIndex('by_text_and_language', (q) =>
@@ -2055,12 +2036,7 @@ describe('features/decks', () => {
       });
       const res = await t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
-        const translation = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'es'),
-          )
-          .first();
+        const translation = await liveTranslation(ctx, textId, 'es');
         return scheduleAudioForLanguage(ctx, text, 'es', 'female', translation);
       });
       expect(res).toBe(false);
@@ -2114,12 +2090,7 @@ describe('features/decks', () => {
       try {
         const res = await t.run(async (ctx) => {
           const text = (await ctx.db.get(textId))!;
-          const translation = await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('targetLanguage', 'es'),
-            )
-            .first();
+          const translation = await liveTranslation(ctx, textId, 'es');
           return scheduleAudioForLanguage(
             ctx,
             text,
@@ -2162,12 +2133,7 @@ describe('features/decks', () => {
       try {
         const res = await t.run(async (ctx) => {
           const text = (await ctx.db.get(textId))!;
-          const translation = await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('targetLanguage', 'es_mixed'),
-            )
-            .first();
+          const translation = await liveTranslation(ctx, textId, 'es_mixed');
           return scheduleAudioForLanguage(
             ctx,
             text,
@@ -2270,12 +2236,7 @@ describe('features/decks', () => {
       });
 
       const row = await t.run(async (ctx) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'es'),
-          )
-          .first(),
+        liveTranslation(ctx, textId, 'es'),
       );
       expect(row?.translatedText).toBe('Hola');
       expect(mockEnqueueTts).not.toHaveBeenCalled();
