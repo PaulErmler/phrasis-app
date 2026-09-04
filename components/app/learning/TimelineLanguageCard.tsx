@@ -13,6 +13,9 @@ import {
 interface TimelineLanguageCardProps {
   code: string;
   type: 'base' | 'target';
+  /** Caption shown above the language row, naming the group the card belongs
+   *  to when the same language appears twice in the timeline. */
+  label?: string;
   plays: number;
   repPause: number;
   speed: number;
@@ -31,6 +34,7 @@ interface TimelineLanguageCardProps {
 export function TimelineLanguageCard({
   code,
   type,
+  label,
   plays,
   repPause,
   speed,
@@ -58,6 +62,11 @@ export function TimelineLanguageCard({
             : 'border-timeline-target-border bg-timeline-target'
         } ${isDisabled ? 'opacity-50' : ''}`}
       >
+        {label && (
+          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            {label}
+          </p>
+        )}
         <div className="flex items-center gap-2">
           {showReorderButtons && (canMoveUp || canMoveDown) && (
             <div className="grid grid-rows-2 gap-0 -my-1 w-[14px] place-items-center shrink-0">

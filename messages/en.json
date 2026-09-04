@@ -610,6 +610,8 @@
       "practiceListeningDescription": "Play the target language before the base language",
       "practiceSpeaking": "Practice Speaking",
       "practiceSpeakingDescription": "Play the target language after the base language",
+      "listeningPracticeLabel": "Listening Practice",
+      "listeningOnlyBlocked": "You need at least one repetition outside Listening Practice.",
       "onlyNew": "Only new",
       "strategyOnlyNew": "Only new sentences",
       "strategyOnlyNewDescription": "Practice listening for this many first repetitions of a sentence",

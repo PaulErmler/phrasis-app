@@ -6,11 +6,13 @@
 /** Maximum number of cards that can be added per batch (settings and backend clamp). */
 export const MAX_CARDS_PER_BATCH = 15;
 
-/** How many upcoming due cards to pre-generate content for during review.
- * Sized to stay ahead of LLM translation latency (queued OpenRouter call per
- * non-source language), matches MAX_CARDS_PER_BATCH so a fresh add-batch is
- * fully primed before the learner can outrun it. */
-export const ENSURE_CONTENT_LOOKAHEAD = 15;
+/** How many upcoming cards to pre-generate content for, per scheduling mode
+ * (due queues and both free-play rotations alike). Sized to stay ahead of LLM
+ * translation latency (queued OpenRouter call per non-source language) and
+ * to absorb a translation/TTS version bump, which turns already-served
+ * content stale and re-queues it; a fresh add-batch (MAX_CARDS_PER_BATCH)
+ * is fully primed before the learner can outrun it. */
+export const ENSURE_CONTENT_LOOKAHEAD = 20;
 
 /** Re-trigger content pre-generation every N reviews. */
 export const ENSURE_CONTENT_REVIEW_INTERVAL = 4;

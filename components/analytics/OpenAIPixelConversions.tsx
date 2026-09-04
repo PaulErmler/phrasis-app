@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useQuery } from 'convex/react';
+import { useQuery, usePreloadedQuery } from 'convex/react';
 import { useCustomer } from 'autumn-js/react';
 
 import { api } from '@/convex/_generated/api';
+import { useAppData } from '@/components/app/AppDataProvider';
 import { useIsNativeApp } from '@/hooks/use-native-app';
 import {
   findCurrentPaidPlan,
@@ -17,6 +18,7 @@ import {
   markFired,
   measureConversion,
   readCheckoutMarker,
+  SIGNUP_CUSTOM_EVENT_NAME,
   type ConversionEvent,
 } from '@/lib/openai-pixel';
 import { useConsentStatus } from '@/lib/posthog/consent';
@@ -54,28 +56,46 @@ function fireOnce(
   eventId: string,
   event: ConversionEvent,
   data: Record<string, unknown>,
+  options?: { custom_event_name?: string },
 ): void {
   if (hasFired(eventId)) return;
   loadOpenAIPixel();
-  if (measureConversion(event, data, { event_id: eventId })) markFired(eventId);
+  if (measureConversion(event, data, { ...options, event_id: eventId })) {
+    markFired(eventId);
+  }
 }
 
 /**
- * Reports the two conversions ChatGPT ad campaigns are optimized on.
+ * Reports the conversions ChatGPT ad campaigns are optimized on.
  *
- * - `registration_completed`: the signed-in user's account was created within
- *   the last 24 hours. Covers every signup path (email + OTP, Google, Apple)
- *   because it reads the account, not the form.
+ * - `signup` (a custom event): the signed-in user's account was created
+ *   within the last 24 hours. Reads the account, not the form, so it covers
+ *   every signup path (email + OTP, Google, Apple).
+ * - `registration_completed`: the signed-in user finished the onboarding
+ *   wizard (`hasCompletedOnboarding`), on that same fresh account. The
+ *   standard name goes to the stronger moment on purpose: an account that
+ *   never picks a language pair is worth nothing, so it is finishing the
+ *   wizard the campaigns optimize on. Reading the flag rather than hooking the
+ *   wizard's finish handler means it still reports for someone who accepts
+ *   the cookie banner afterwards, and a reload mid-finish cannot lose it.
+ *   `finalizeOnboarding` flips the flag optimistically (see `OnboardingGuard`),
+ *   so a mutation that then fails still reports; the user is bounced back into
+ *   the wizard and finishing again is deduped by `event_id`.
  * - `subscription_created` / `trial_started`: a paid Autumn plan is present
  *   AND a checkout was started from this browser recently (see
  *   `markCheckoutStarted`). The marker is what stops long-time subscribers
  *   from being counted on their first app open after deploy.
  *
- * Every effect re-runs when consent flips to granted, so a registration made
- * before the banner was accepted still reports. Subscriptions do not get that
- * grace: the checkout marker is only written after consent, so a checkout
- * started before accepting is unattributed. Renders nothing; mount once
- * inside the authenticated boundary next to `PostHogIdentify`.
+ * The 24 h account-age window on the first two is load-bearing: every
+ * existing user is signed up and onboarded, so without it the first app open
+ * after a deploy would report the whole user base as conversions.
+ *
+ * Every effect re-runs when consent flips to granted, so a signup or an
+ * onboarding finished before the banner was accepted still reports.
+ * Subscriptions do not get that grace: the checkout marker is only written
+ * after consent, so a checkout started before accepting is unattributed.
+ * Renders nothing; mount once inside the authenticated boundary next to
+ * `PostHogIdentify`.
  */
 export function OpenAIPixelConversions() {
   const status = useConsentStatus();
@@ -88,16 +108,33 @@ export function OpenAIPixelConversions() {
     expand: ['trials_used'],
   });
 
+  // The subscription this reads is AppDataProvider's, already live for every
+  // /app route; `usePreloadedQuery` on the same handle costs nothing extra.
+  const { preloadedSettings } = useAppData();
+  const settings = usePreloadedQuery(preloadedSettings);
+
   const { userId, createdAt } = readUser(user);
+  const hasCompletedOnboarding = settings?.hasCompletedOnboarding === true;
   const armed = status === 'granted' && !isNative && userId !== null;
 
   useEffect(() => {
     if (!armed || createdAt === null) return;
     if (Date.now() - createdAt > FRESH_SIGNUP_WINDOW_MS) return;
+    fireOnce(
+      `signup:${userId}`,
+      'custom',
+      { type: 'custom' },
+      { custom_event_name: SIGNUP_CUSTOM_EVENT_NAME },
+    );
+  }, [armed, userId, createdAt]);
+
+  useEffect(() => {
+    if (!armed || createdAt === null || !hasCompletedOnboarding) return;
+    if (Date.now() - createdAt > FRESH_SIGNUP_WINDOW_MS) return;
     fireOnce(`registration:${userId}`, 'registration_completed', {
       type: 'customer_action',
     });
-  }, [armed, userId, createdAt]);
+  }, [armed, userId, createdAt, hasCompletedOnboarding]);
 
   useEffect(() => {
     if (!armed || !customer) return;

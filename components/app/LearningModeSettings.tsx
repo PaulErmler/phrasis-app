@@ -221,6 +221,8 @@ interface TimelineLanguageListProps {
   repPauses: Record<string, number>;
   speeds: Record<string, number>;
   defaultReps: number;
+  /** Caption above every card in the group (e.g. "Listening Practice"). */
+  cardLabel?: string;
   onPlaysChange: (language: string, value: number) => void;
   onRepPauseChange: (language: string, value: number) => void;
   onSpeedChange: (language: string, value: number) => void;
@@ -246,6 +248,7 @@ function TimelineLanguageList({
   repPauses,
   speeds,
   defaultReps,
+  cardLabel,
   onPlaysChange,
   onRepPauseChange,
   onSpeedChange,
@@ -273,6 +276,7 @@ function TimelineLanguageList({
             <TimelineLanguageCard
               code={code}
               type={type}
+              label={cardLabel}
               plays={plays}
               repPause={repPause}
               speed={speeds[code] ?? DEFAULT_PLAYBACK_SPEED}
@@ -451,7 +455,12 @@ export function LearningModeSettings({
 
   const handleRepetitionChange = (language: string, value: number) => {
     if (value < 0 || value > 10) return;
-    void setModeField('languageRepetitions', { ...reps, [language]: value });
+    const next = { ...reps, [language]: value };
+    if (listeningWouldBeAlone(next, playTargetBefore, playTargetAfter)) {
+      rejectListeningOnly();
+      return;
+    }
+    void setModeField('languageRepetitions', next);
   };
 
   const handleRepetitionPauseChange = (language: string, value: number) => {
@@ -511,8 +520,12 @@ export function LearningModeSettings({
         }
       : {};
 
-  const handlePlayTargetBeforeBaseChange = (checked: boolean) =>
-    setFields({
+  const handlePlayTargetBeforeBaseChange = (checked: boolean) => {
+    if (checked && listeningWouldBeAlone(reps, true, playTargetAfter)) {
+      rejectListeningOnly();
+      return;
+    }
+    return setFields({
       [modeFieldName('playTargetBeforeBase')]: checked,
       // Cannot disable both: if turning this off while "after" is already off,
       // auto-enable "after".
@@ -522,9 +535,14 @@ export function LearningModeSettings({
       // Mirror current target settings on first enable.
       ...(checked ? beforeSeedIfEmpty() : {}),
     });
+  };
 
-  const handlePlayTargetAfterBaseChange = (checked: boolean) =>
-    setFields({
+  const handlePlayTargetAfterBaseChange = (checked: boolean) => {
+    if (!checked && listeningWouldBeAlone(reps, playTargetBefore, false)) {
+      rejectListeningOnly();
+      return;
+    }
+    return setFields({
       [modeFieldName('playTargetAfterBase')]: checked,
       // Cannot disable both: auto-enable "before" (and seed it) when turning
       // this off while "before" is already off.
@@ -535,6 +553,7 @@ export function LearningModeSettings({
           }
         : {}),
     });
+  };
 
   const handleTargetBeforeRepetitionChange = (
     language: string,
@@ -739,6 +758,34 @@ export function LearningModeSettings({
       ? playTargetAfter
       : isTranscribe || fullReviewTargetAudioMode === 'always';
   const showBeforeTarget = reviewMode === 'audio' && playTargetBefore;
+
+  // "Practice Listening" can never be the only thing that plays. Its group
+  // drops out of a card once the listening strategy graduates it, and a card
+  // whose base and after-base groups are all at 0x would then play nothing at
+  // all. Every write that could reach that state (a rep stepped to 0, the
+  // Listening toggle turned on over an all-0x timeline, the Speaking toggle
+  // turned off with base at 0x) is refused with a toast instead. Audio mode
+  // only: the writing modes ignore the before/after toggles.
+  const listeningWouldBeAlone = (
+    nextReps: Record<string, number>,
+    nextPlayTargetBefore: boolean,
+    nextPlayTargetAfter: boolean,
+  ) => {
+    if (reviewMode !== 'audio' || !nextPlayTargetBefore) return false;
+    let audible = 0;
+    for (const code of baseLanguages) {
+      audible += nextReps[code] ?? DEFAULT_REPETITIONS_BASE;
+    }
+    if (nextPlayTargetAfter) {
+      for (const code of targetLanguages) {
+        audible += nextReps[code] ?? defaultTargetReps;
+      }
+    }
+    return audible === 0;
+  };
+  const rejectListeningOnly = () => {
+    toast.error(t('listeningOnlyBlocked'));
+  };
   // Transcribe never plays base audio, so its timeline has no base cards.
   const showBaseTimeline = !isTranscribe;
   // Post-submit target playback group ("Translation Entered"): in Translate
@@ -1346,6 +1393,7 @@ export function LearningModeSettings({
                   languages={targetLanguages}
                   keyPrefix="before-target-"
                   type="target"
+                  cardLabel={t('listeningPracticeLabel')}
                   reps={beforeReps}
                   repPauses={beforeRepPauses}
                   speeds={beforeSpeeds}

@@ -20,10 +20,15 @@ import type { ReviewMode, SchedulingMode } from '@/convex/types';
 
 import { reportError } from '@/lib/report-error';
 
-// Module-level guard so the all-modes content warm fires at most once per
-// course per page session (not on every HomeView re-render or remount). Keyed
-// by courseId so switching the active course re-warms.
-const warmedCourseIds = new Set<string>();
+// Module-level throttle for the all-modes content warm: at most once per
+// course per cooldown, not on every HomeView re-render or remount. Keyed by
+// courseId so switching the active course re-warms. A cooldown rather than
+// once-per-session: every return to Home (after a session, after a deploy
+// whose version bump turned served content stale) re-sweeps the upcoming
+// cards of every mode, and the sweep is a read-only probe when nothing needs
+// work, so re-firing it is cheap.
+const lastWarmAtByCourseId = new Map<string, number>();
+const HOME_WARM_COOLDOWN_MS = 5 * 60_000;
 
 export function HomeView({
   onLearnOpen,
@@ -105,17 +110,22 @@ export function HomeView({
   // Pre-warm card content (translations + TTS) for the upcoming cards of every
   // scheduling mode while the user is on Home, so whichever mode they pick
   // starts without waiting on content generation. Skipped while HomeView is
-  // hidden (user mid-LearnView, where useLearningMode already warms content).
+  // hidden (user mid-LearnView, where useLearningMode already warms content)
+  // and re-armed each time Home becomes visible again, subject to the
+  // cooldown above.
   const courseId = courseSettings?.courseId;
   useEffect(() => {
     if (isHidden) return;
     if (!courseId) return;
-    if (warmedCourseIds.has(courseId)) return;
+    const lastWarmAt = lastWarmAtByCourseId.get(courseId);
+    const now = Date.now();
+    if (lastWarmAt !== undefined && now - lastWarmAt < HOME_WARM_COOLDOWN_MS)
+      return;
 
-    warmedCourseIds.add(courseId);
+    lastWarmAtByCourseId.set(courseId, now);
     ensureAllModesContent().catch((error) => {
       reportError(error, { op: 'ensureAllModesContent' });
-      warmedCourseIds.delete(courseId);
+      lastWarmAtByCourseId.delete(courseId);
     });
   }, [isHidden, courseId, ensureAllModesContent]);
 

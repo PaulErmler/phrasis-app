@@ -92,6 +92,27 @@ describe('openai-pixel', () => {
     ]);
   });
 
+  it('sends a custom conversion under its custom_event_name', async () => {
+    const pixel = await load('pix_test');
+    pixel.loadOpenAIPixel();
+    pixel.measureConversion(
+      'custom',
+      { type: 'custom' },
+      {
+        custom_event_name: pixel.SIGNUP_CUSTOM_EVENT_NAME,
+        event_id: 'signup:u1',
+      },
+    );
+    // The vendor identifies the conversion by custom_event_name; the event
+    // name is the literal string 'custom' for every one of them.
+    expect(queued().at(-1)).toEqual([
+      'measure',
+      'custom',
+      { type: 'custom' },
+      { custom_event_name: 'signup', event_id: 'signup:u1' },
+    ]);
+  });
+
   it('deny before any load writes nothing', async () => {
     const pixel = await load('pix_test');
     pixel.syncOpenAIPixelConsent(false);
