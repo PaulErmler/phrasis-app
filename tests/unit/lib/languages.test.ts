@@ -210,6 +210,7 @@ describe('getLocalizedLanguageNameByCode', () => {
   // them, so the "single source of truth" refactor (overrides on the Language
   // record) provably preserves the localized picker labels.
   const EXPECTED_NAMES: Record<string, { en: string; de: string }> = {
+    en: { en: 'English (Mixed)', de: 'Englisch (Gemischt)' },
     en_gb: { en: 'English (UK)', de: 'Englisch (UK)' },
     en_us: { en: 'English (US)', de: 'Englisch (USA)' },
     en_au: { en: 'English (Australia)', de: 'Englisch (Australien)' },
@@ -446,10 +447,12 @@ describe('content versioning', () => {
   });
 
   describe('prompt-fix languages have their ttsVersion bumped so audio regenerates lazily', () => {
-    // pt_pt / en_gb / en_au changed only the Gemini prompt (provider stays
+    // pt_pt and es_mixed changed only the Gemini prompt (provider stays
     // gemini), so the provider-mismatch regen wouldn't fire. The ttsVersion
     // bump is what forces regeneration. Guard that the bump is present.
-    it.each(['pt_pt', 'en_gb', 'en_au'])(
+    // (en_gb / en_au once carried the same bump; their audio is now cached
+    // under `en`, see the accent-variant suite.)
+    it.each(['pt_pt', 'es_mixed'])(
       'language %s has ttsVersion > DEFAULT so old (v1/undefined-stamped) audio is stale',
       (code) => {
         const current = getCurrentTtsVersion(code);

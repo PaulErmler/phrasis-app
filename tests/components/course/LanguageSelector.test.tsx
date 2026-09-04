@@ -68,9 +68,10 @@ function renderSelector(
   );
 }
 
-// The selector hides any language with `hiddenFromPicker: true` (currently
-// the English sub-variants), so the rendered row count compares against the
-// picker-visible subset, not the full SUPPORTED_LANGUAGES list.
+// The selector hides any language with `hiddenFromPicker: true` (none at the
+// moment; the English accent variants were hidden until 2026-09), so the
+// rendered row count compares against the picker-visible subset rather than
+// assuming the full SUPPORTED_LANGUAGES list.
 const PICKER_LANGUAGES = SUPPORTED_LANGUAGES.filter((l) => !l.hiddenFromPicker);
 
 describe('LanguageSelector', () => {

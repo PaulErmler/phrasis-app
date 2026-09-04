@@ -28,6 +28,10 @@ export const EVENTS = {
 
   // Learning loop
   CARD_ACTION: 'card_action',
+  /** The user changed which card actions sit on the card surface. Carries
+   *  the resulting `pinned` list plus `added` / `removed` versus the previous
+   *  set, so both the popularity of each pin and the churn are one query. */
+  CARD_ACTION_PINS_CHANGED: 'card_action_pins_changed',
   CARDS_ADDED: 'cards_added',
 
   // Chat

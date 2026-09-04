@@ -23,8 +23,7 @@ import {
   getMixedVariantByRegion,
   getTranslationConfigForLanguage,
   getTranslationSourceFromStage,
-  getVoiceForLanguage,
-  getVoiceForLanguageVariant,
+  getVoiceForText,
   isMixedLanguage,
   resolveMixedVariant,
   resolveTranslationStages,
@@ -735,14 +734,14 @@ async function storeLlmTranslationResult(
 
   // For mixed languages, pick a voice matching the resolved regional
   // variant so the synthesized audio agrees with the persisted
-  // `regionVariant`. Non-mixed languages fall through to the simple picker.
-  const voiceName = pin.regionVariant
-    ? getVoiceForLanguageVariant(
-        args.targetLanguage,
-        pin.regionVariant,
-        args.audioSpeakerGender,
-      )
-    : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
+  // `regionVariant`. Other languages get the text's deterministic accent
+  // (mixed-accent pools) or the plain gender-preferring pick.
+  const voiceName = getVoiceForText(
+    args.targetLanguage,
+    args.textId,
+    pin.regionVariant,
+    args.audioSpeakerGender,
+  );
 
   // Source resolved from `cfgLanguageCode` (the sub-code for mixed
   // dialects) so the recorded source matches what `romanizeText` ran on.

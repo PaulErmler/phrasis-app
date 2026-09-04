@@ -1477,6 +1477,9 @@ export const updatePinnedCardActions = mutation({
     const userId = await requireAuthUserId(ctx);
     const normalized = normalizePinnedCardActions(args.actions);
     const settings = await dbGetUserSettings(ctx, userId);
+    // What the user saw before this change: their stored pins, or the
+    // default set when they had never customised.
+    const previous = normalizePinnedCardActions(settings?.pinnedCardActions);
     if (settings) {
       await ctx.db.patch(settings._id, { pinnedCardActions: normalized });
     } else {
@@ -1486,6 +1489,12 @@ export const updatePinnedCardActions = mutation({
         pinnedCardActions: normalized,
       });
     }
+    await track(ctx, userId, EVENTS.CARD_ACTION_PINS_CHANGED, {
+      pinned: normalized,
+      pinned_count: normalized.length,
+      added: normalized.filter((a) => !previous.includes(a)),
+      removed: previous.filter((a) => !normalized.includes(a)),
+    });
     return null;
   },
 });

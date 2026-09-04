@@ -16,7 +16,9 @@ import {
 } from '../../lib/constants/learning';
 import { normalizeForComparison } from '../lib/textComparison';
 import {
+  buildAudioAssetKey,
   findAudioAssetByKey,
+  findAudioAssetInAnyAccent,
   scheduleBlobSwapDelete,
   upsertAudioAsset,
 } from '../lib/audioAssets';
@@ -303,11 +305,11 @@ export const getAlternativeContext = internalQuery({
     ];
     let reusableAssetId: Id<'audioAssets'> | null = null;
     for (const voiceGender of genders) {
-      const asset = await findAudioAssetByKey(ctx, {
+      // Alternatives have no text id, so no per-text accent: any accent of
+      // the language will do (same as approval audio).
+      const asset = await findAudioAssetInAnyAccent(ctx, {
         language: row.language,
         voiceGender,
-        // Alternatives carry no dialect pin, matching approval audio keys.
-        regionVariant: undefined,
         spokenText: row.text,
       });
       if (asset) {
@@ -371,12 +373,13 @@ export const saveAlternativeAudio = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const key = {
+    const key = buildAudioAssetKey({
       language: args.language,
       voiceGender: args.voiceGender,
+      voiceName: args.voiceName,
       regionVariant: undefined,
       spokenText: args.spokenText,
-    };
+    });
     const existing = await findAudioAssetByKey(ctx, key);
     let assetId: Id<'audioAssets'>;
     if (existing && existing.ttsQuality !== 'unknown') {

@@ -41,6 +41,17 @@ vi.mock('@/lib/voices', async (importOriginal) => {
       code === 'zz_uncurated'
         ? 'zz-uncurated-voice'
         : actual.getVoiceForLanguage(code, speakerGender),
+    // The enqueue paths pick through `getVoiceForText` (per-text accent);
+    // route the sentinel there too, everything else stays real.
+    getVoiceForText: (
+      code: string,
+      textId: string,
+      regionVariant: string | undefined,
+      speakerGender?: string,
+    ) =>
+      code === 'zz_uncurated'
+        ? 'zz-uncurated-voice'
+        : actual.getVoiceForText(code, textId, regionVariant, speakerGender),
   };
 });
 

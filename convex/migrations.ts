@@ -10,7 +10,8 @@ import {
   DEFAULT_PAUSE_BASE_TO_TARGET,
   DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
 } from '../lib/constants/audioPlayback';
-import { postProcessTranslation } from '../lib/languages';
+import { getLanguageByCode, postProcessTranslation } from '../lib/languages';
+import { getVoiceLocale, getVoiceLocalesForLanguage } from '../lib/voices';
 import {
   getRomanizationSource,
   romanizeLocal,
@@ -844,6 +845,72 @@ export const courseStatsTimeByModeBackfill = migrations.define({
   migrateOne: courseStatsTimeByModeBackfillOne,
 });
 
+/**
+ * One `audioAssets` row of `backfillAudioAssetAccent`, exported for the
+ * migration tests. Stamps `regionVariant` on rows written before the accent
+ * was part of the cache key (`buildAudioAssetKey` in
+ * convex/lib/audioAssets.ts), so the accent-aware lookups and the
+ * accent-drift sweep (`audioAccentDrifted`) can see them.
+ *
+ * Which accent depends on the pool that made the clip:
+ *
+ *  - A pool with ONE locale (`en_gb`, all "@en-GB", and the prompt named
+ *    the accent): the voice tag is the truth. Stamp it.
+ *  - A pool that MIXES locales (`en`): the voice tag is not the truth.
+ *    Those clips were made with a prompt that only said "English", and by
+ *    ear they came out in Gemini's default accent whatever the tag said
+ *    (the drift this whole change fixes). Stamp the language's default
+ *    locale (`geminiBcp47`, en-US) so they serve English (US) courses and
+ *    the texts that hash to US, and so the drift sweep re-voices the
+ *    others instead of filing an American clip as British.
+ *
+ * Only when the language's ACTIVE pool still produces that locale: a
+ * dormant Chirp3 clip on a language that moved to bare Gemini voices
+ * ("de-DE-Chirp3-HD-Leda" on `de`) is left accent-less, since every lookup
+ * for `de` tries the accent-less key and stamping it would only hide the
+ * clip. Rows with a pin already (es_mixed) and bare voices are skipped.
+ */
+export function audioAssetAccentPatch(
+  doc: Pick<Doc<'audioAssets'>, 'language' | 'voiceName' | 'regionVariant'>,
+): Partial<Doc<'audioAssets'>> | undefined {
+  if (doc.regionVariant !== undefined) return undefined;
+  const voiceLocale = getVoiceLocale(doc.voiceName);
+  if (voiceLocale === undefined) return undefined;
+  const poolLocales = getVoiceLocalesForLanguage(doc.language).filter(
+    (l): l is string => l !== undefined,
+  );
+  if (!poolLocales.includes(voiceLocale)) return undefined;
+  if (poolLocales.length === 1) return { regionVariant: voiceLocale };
+  const defaultLocale = getLanguageByCode(doc.language)?.geminiBcp47;
+  if (defaultLocale === undefined || !poolLocales.includes(defaultLocale)) {
+    return undefined;
+  }
+  return { regionVariant: defaultLocale };
+}
+
+/**
+ * Backfill `audioAssets.regionVariant` (see `audioAssetAccentPatch`).
+ * Deployment does not depend on it: existing `audioRecordings` pointers
+ * keep serving their assets regardless of key, and the accent-drift sweep
+ * ignores un-stamped assets. Until it has run, a NEW text whose sentence
+ * already has an un-stamped mixed-English clip misses the cache and
+ * synthesizes once more. After it, every pre-fix mixed-English clip is an
+ * `en-US` asset: English (US) courses and US-hashed texts keep using it,
+ * and GB/AU-hashed texts get re-voiced lazily on view, the old clip kept.
+ *
+ * Clips made under the old variant keys (`language: 'en_gb'` etc., from
+ * before the variants were hidden in 2026-05) are stamped too but keep
+ * their language, so new lookups (all under `en`) never see them. They go
+ * on serving their existing pointers and are collected when the last
+ * pointer goes. Re-keying them to `en` would risk two assets on one key
+ * where a mixed clip of the same sentence already exists.
+ */
+export const backfillAudioAssetAccent = migrations.define({
+  table: 'audioAssets',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => audioAssetAccentPatch(doc),
+});
+
 export const runAll = migrations.runner([
   internal.migrations.perModeSettingsBackfill,
   internal.migrations.stripTrailingUnderscores,
@@ -867,4 +934,5 @@ export const runAll = migrations.runner([
   internal.migrations.recountDeckCardCounts,
   internal.migrations.stabilityBucketAggregateBackfill,
   internal.migrations.courseStatsTimeByModeBackfill,
+  internal.migrations.backfillAudioAssetAccent,
 ]);

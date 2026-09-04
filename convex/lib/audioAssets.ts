@@ -2,9 +2,15 @@ import { MutationCtx, QueryCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
 import { internal } from '../_generated/api';
 import {
+  getAudioAssetLanguage,
   getTtsProviderForLanguage,
   isTtsVersionStale,
 } from '../../lib/languages';
+import {
+  getVoiceGenderByApiCode,
+  getVoiceLocale,
+  getVoiceLocalesForLanguage,
+} from '../../lib/voices';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import { sha256Hex } from './sha256';
 import type { TtsProvider, VoiceGender } from '../types';
@@ -14,7 +20,35 @@ import type { TtsProvider, VoiceGender } from '../types';
  * (language, voiceGender, regionVariant, spokenTextHash) and OWNS its storage
  * blob; `audioRecordings` rows are thin (textId, language) → assetId pointers.
  * See the schema comments for the full model.
+ *
+ * `language` in the key is the CACHE language (`getAudioAssetLanguage`):
+ * accent-only variants share their text language's cache (`en_gb` → `en`),
+ * and the accent rides in `regionVariant` as the voice locale (`en-GB`).
+ * Build keys with `buildAudioAssetKey` so no caller keys by a raw course code.
  */
+
+/**
+ * The asset key for audio spoken in `language` (a course/row language code)
+ * by `voiceName`. Maps the language to its cache language and, when the
+ * caller has no dialect pin of its own (es_mixed rows carry the translation's
+ * `regionVariant`), takes the accent from the voice's locale so a mixed-pool
+ * clip (`Leda@en-GB` picked for `en`) is stored as British and later found by
+ * an `en_gb` lookup.
+ */
+export function buildAudioAssetKey(args: {
+  language: string;
+  voiceGender: VoiceGender;
+  voiceName: string;
+  regionVariant: string | undefined;
+  spokenText: string;
+}): AudioAssetKey {
+  return {
+    language: getAudioAssetLanguage(args.language),
+    voiceGender: args.voiceGender,
+    regionVariant: args.regionVariant ?? getVoiceLocale(args.voiceName),
+    spokenText: args.spokenText,
+  };
+}
 
 /**
  * Delay before a blob replaced by an in-place asset swap is reference-checked
@@ -99,6 +133,62 @@ export async function findReusableAudioAsset(
   // place (upsertAudioAsset), healing every text that shares it.
   if ((await ctx.db.system.get(asset.storageId)) === null) return null;
   return asset;
+}
+
+/**
+ * Cache lookup for the enqueue paths, by course language + the voice that
+ * would otherwise be synthesized (`getVoiceForText`, which already carries
+ * the text's deterministic accent). The key is exactly the one the job's
+ * completion would upsert (`buildAudioAssetKey`), so a mixed-English text that
+ * hashed to British finds the clip an English (UK) course made of the same
+ * sentence, and never a clip in another accent: the text's accent is
+ * stable, reuse only happens within it. `regionVariant` is the translation
+ * row's dialect pin (es_mixed). Returns null when the voice is not in the
+ * curated list.
+ */
+export async function findReusableAudioAssetForVoice(
+  ctx: QueryCtx,
+  args: {
+    language: string;
+    voiceName: string;
+    regionVariant: string | undefined;
+    spokenText: string;
+  },
+): Promise<Doc<'audioAssets'> | null> {
+  const voiceGender = getVoiceGenderByApiCode(args.voiceName);
+  if (voiceGender === undefined) return null;
+  return findReusableAudioAsset(
+    ctx,
+    buildAudioAssetKey({ ...args, voiceGender }),
+  );
+}
+
+/**
+ * Exact-key lookup for callers that have no text id and no voice yet, and
+ * are happy with a clip in ANY accent of the language (chat proposal
+ * playback, writing alternatives): tries every accent the language's active
+ * pool produces, then the accent-less legacy key. Not a reusability check
+ * (no version/provider/blob gate), matching `findAudioAssetByKey`.
+ */
+export async function findAudioAssetInAnyAccent(
+  ctx: QueryCtx,
+  args: { language: string; voiceGender: VoiceGender; spokenText: string },
+): Promise<Doc<'audioAssets'> | null> {
+  const language = getAudioAssetLanguage(args.language);
+  const accents = [...getVoiceLocalesForLanguage(args.language), undefined];
+  const tried = new Set<string | undefined>();
+  for (const regionVariant of accents) {
+    if (tried.has(regionVariant)) continue;
+    tried.add(regionVariant);
+    const asset = await findAudioAssetByKey(ctx, {
+      language,
+      voiceGender: args.voiceGender,
+      regionVariant,
+      spokenText: args.spokenText,
+    });
+    if (asset) return asset;
+  }
+  return null;
 }
 
 /**

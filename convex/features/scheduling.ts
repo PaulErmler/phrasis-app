@@ -71,7 +71,10 @@ import { getTodayInTimezone, resolveClientNow } from '../lib/dateUtils';
 import { dateInTimezone } from '../../lib/dateStrings';
 import { deleteAudioRow, deleteAudioRowsForTextLanguage } from '../lib/audio';
 import { normalizeForComparison } from '../lib/textComparison';
-import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
+import {
+  FLAG_AUTO_RETRANSLATION_MAX,
+  usesSourceTextVerbatim,
+} from '../../lib/languages';
 import {
   isUserCreatedText,
   mayRegenerateTranslation,
@@ -1606,6 +1609,10 @@ async function suggestCurriculumFixesForEdit(
 
   for (const lang of changedLanguages) {
     if (lang === originalText.language) continue;
+    // Accent-only variant of the source (`en_gb` on an `en` sentence): the
+    // row is the source text verbatim, so there is no curriculum wording to
+    // correct and nothing a model could improve. Same rule as `flagTranslation`.
+    if (usesSourceTextVerbatim(lang, originalText.language)) continue;
 
     const served = servedTranslationMap.get(lang);
     // No shared row for this language: the curriculum never had a translation
@@ -1701,9 +1708,14 @@ export const flagTranslation = mutation({
     // set via the `by_text_and_language` index lets us skip orphan
     // translation rows that may exist for languages the user has since
     // removed from their course. We shouldn't bump flagCount on those.
+    // Accent-only variants of the source (`en_gb` on an `en` sentence) show
+    // the source text verbatim: nothing to dispute, nothing to retranslate.
     const cardLanguages = Array.from(
       new Set([...course.baseLanguages, ...course.targetLanguages]),
-    ).filter((lang) => lang !== text.language);
+    ).filter(
+      (lang) =>
+        lang !== text.language && !usesSourceTextVerbatim(lang, text.language),
+    );
 
     if (cardLanguages.length === 0) {
       return { retranslated: false };

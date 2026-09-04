@@ -2,17 +2,22 @@ import { MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id, Doc } from '../_generated/dataModel';
 import {
-  getVoiceForLanguage,
-  getVoiceForLanguageVariant,
+  getVoiceForText,
   getVoiceGenderByApiCode,
   resolveCardSpeakerGenders,
   getTtsProviderForLanguage,
   getTranslationConfigForLanguage,
+  isMixedLanguage,
   isTtsVersionStale,
   isTranslationVersionStale,
   languageSupportsStt,
+  pickAccentForText,
+  usesSourceTextVerbatim,
 } from '../../lib/languages';
-import { mayRegenerateTranslation } from '../../lib/translationProvenance';
+import {
+  mayRegenerateTranslation,
+  SOURCE_VERBATIM_TRANSLATION_SOURCE,
+} from '../../lib/translationProvenance';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
   missingAnnotationKinds,
@@ -21,12 +26,18 @@ import {
 } from './textAnnotations';
 import { deleteAudioRow } from './audio';
 import {
-  findReusableAudioAsset,
+  findReusableAudioAssetForVoice,
   resolveAudioPayload,
   upsertAudioPointer,
 } from './audioAssets';
+import { storeTranslationAndScheduleTTSHandler } from '../features/translationPipeline';
 import { llmPool, llmWarmPool } from './workpools';
-import type { TtsPriority, LlmPriority, TranslationReason } from '../types';
+import {
+  asVoiceGender,
+  type TtsPriority,
+  type LlmPriority,
+  type TranslationReason,
+} from '../types';
 import {
   claimTtsIfAvailable,
   hasActiveTtsClaim,
@@ -118,6 +129,34 @@ export async function scheduleTranslationForLanguage(
     translationReason?: TranslationReason;
   },
 ): Promise<boolean> {
+  // Accent-only variant of the text's own language (an `en` sentence on an
+  // `en_gb` course): the wording is the source text itself, so store it
+  // verbatim instead of asking a model to re-spell it. The write choke point
+  // does the rest (version stamp, archive-on-bump, annotations, TTS against
+  // the variant's own voice pool). No LLM claim is involved.
+  if (usesSourceTextVerbatim(targetLanguage, text.language)) {
+    if (opts.probe) throw new ProbeNeedsWork();
+    await storeTranslationAndScheduleTTSHandler(ctx, {
+      textId: text._id,
+      targetLanguage,
+      translatedText: text.text,
+      voiceName: getVoiceForText(
+        targetLanguage,
+        text._id,
+        undefined,
+        opts.audioSpeakerGender,
+      ),
+      translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
+      speakerGender: asVoiceGender(opts.audioSpeakerGender),
+      skipTts: opts.skipTts,
+      priority: opts.priority,
+      requestedByUserId: opts.requestedByUserId,
+      replaceExisting: opts.replaceExisting,
+      translationReason: opts.translationReason,
+    });
+    return true;
+  }
+
   const tCfg = getTranslationConfigForLanguage(targetLanguage);
   if (opts.probe) {
     // A fresh LLM claim means a job already owns this translation: the real
@@ -339,26 +378,27 @@ export async function scheduleAudioForLanguage(
   }
   // For mixed-dialect rows, prefer a voice in the same locale that was
   // picked at translation time and forward the variant to TTS so the
-  // validation roundtrip uses the matching STT locale.
+  // validation roundtrip uses the matching STT locale. Mixed-ACCENT pools
+  // (`en`) get the text's deterministic accent inside `getVoiceForText`.
   const regionVariant = isSource ? undefined : translation!.regionVariant;
-  const voiceName = regionVariant
-    ? getVoiceForLanguageVariant(language, regionVariant, audioSpeakerGender)
-    : getVoiceForLanguage(language, audioSpeakerGender);
+  const voiceName = getVoiceForText(
+    language,
+    text._id,
+    regionVariant,
+    audioSpeakerGender,
+  );
   const spokenText = isSource ? text.text : translation!.translatedText;
 
   if (!opts?.forceRegen) {
-    const voiceGender = getVoiceGenderByApiCode(voiceName);
-    if (voiceGender !== undefined) {
-      const asset = await findReusableAudioAsset(ctx, {
-        language,
-        voiceGender,
-        regionVariant,
-        spokenText,
-      });
-      if (asset) {
-        await upsertAudioPointer(ctx, text._id, language, asset._id);
-        return true;
-      }
+    const asset = await findReusableAudioAssetForVoice(ctx, {
+      language,
+      voiceName,
+      regionVariant,
+      spokenText,
+    });
+    if (asset) {
+      await upsertAudioPointer(ctx, text._id, language, asset._id);
+      return true;
     }
   }
 
@@ -413,24 +453,24 @@ export async function regenerateSupersededRevisionAudio(
   // The wording was generated for the revision's own gender; only a legacy
   // row without a stamp falls back to the card's current gender.
   const gender = revision.speakerGender ?? opts.audioSpeakerGender;
-  const voiceName = revision.regionVariant
-    ? getVoiceForLanguageVariant(language, revision.regionVariant, gender)
-    : getVoiceForLanguage(language, gender);
+  const voiceName = getVoiceForText(
+    language,
+    text._id,
+    revision.regionVariant,
+    gender,
+  );
   if (!opts.forceRegen) {
-    const voiceGender = getVoiceGenderByApiCode(voiceName);
-    if (voiceGender !== undefined) {
-      const asset = await findReusableAudioAsset(ctx, {
-        language,
-        voiceGender,
-        regionVariant: revision.regionVariant,
-        spokenText: revision.translatedText,
-      });
-      if (asset) {
-        if (asset._id !== revision.audioAssetId) {
-          await ctx.db.patch(revision._id, { audioAssetId: asset._id });
-        }
-        return true;
+    const asset = await findReusableAudioAssetForVoice(ctx, {
+      language,
+      voiceName,
+      regionVariant: revision.regionVariant,
+      spokenText: revision.translatedText,
+    });
+    if (asset) {
+      if (asset._id !== revision.audioAssetId) {
+        await ctx.db.patch(revision._id, { audioAssetId: asset._id });
       }
+      return true;
     }
   }
   const claimed = await claimTtsIfAvailable(
@@ -476,6 +516,32 @@ function audioAssetMismatch(
     ),
     versionMismatch: isTtsVersionStale(lang, asset.ttsVersion),
   };
+}
+
+/**
+ * Whether the clip a text points at speaks a different accent than the text
+ * is assigned (`pickAccentForText`, the per-text hash for mixed-accent pools
+ * such as `en`). This is what turns the existing English catalogue mixed
+ * over time: the pointer is dropped and re-filled in the text's accent on
+ * next view, while the old clip stays in the cache (`keepAsset`) for the
+ * pinned-accent course and the texts that hash to its accent.
+ *
+ * Silent in three cases so it can never storm: a language whose pool has
+ * no locales (`de`, no target accent); an asset without a stamped accent
+ * (written before the accent was part of the key and not yet backfilled by
+ * `backfillAudioAssetAccent`, accent unknown); and mixed-DIALECT languages
+ * (`es_mixed`), whose accent is pinned on the translation row rather than
+ * hashed, so the hash would be the wrong reference.
+ */
+function audioAccentDrifted(
+  lang: string,
+  textId: Id<'texts'>,
+  asset: Pick<Doc<'audioAssets'>, 'regionVariant'>,
+): boolean {
+  if (isMixedLanguage(lang)) return false;
+  if (asset.regionVariant === undefined) return false;
+  const target = pickAccentForText(lang, textId);
+  return target !== undefined && target !== asset.regionVariant;
 }
 
 /** Options threaded through the whole `scheduleMissingContent` sweep. */
@@ -660,21 +726,31 @@ async function sweepInvalidAudio(
         lang,
         payload,
       );
+      const accentMismatch = audioAccentDrifted(lang, textId, payload.asset);
       if (genderMismatch) {
         langsWithAudioGenderDrift.add(lang);
       }
-      if (genderMismatch || providerMismatch || versionMismatch) {
+      if (
+        genderMismatch ||
+        providerMismatch ||
+        versionMismatch ||
+        accentMismatch
+      ) {
         if (opts?.probe) throw new ProbeNeedsWork();
         // Reference-aware delete: a shared asset (or an `editCard`-copied
         // legacy blob) survives while anything else still points at it.
-        // Gender drift additionally keeps the asset+blob even as the last
-        // pointer: that audio is still CORRECT for this string+voice. It
-        // stays in the content-addressed cache so flipping the gender back
-        // (or any other text with the same sentence) reuses it for free.
+        // Gender and accent drift additionally keep the asset+blob even as
+        // the last pointer: that audio is still CORRECT for this
+        // string+voice+accent. It stays in the content-addressed cache so
+        // flipping the gender back, a pinned-accent course, or any other
+        // text with the same sentence and accent reuses it for free.
         // Provider/ttsVersion migrations are true obsolescence (a new TTS
         // system) and keep the full garbage collection.
         await deleteAudioRow(ctx, audio, {
-          keepAsset: genderMismatch && !providerMismatch && !versionMismatch,
+          keepAsset:
+            (genderMismatch || accentMismatch) &&
+            !providerMismatch &&
+            !versionMismatch,
         });
         state.audioMap.set(lang, null);
       } else {

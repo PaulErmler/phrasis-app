@@ -12,7 +12,7 @@
  * `getLanguageByCode` from languages.ts to read each language's active
  * provider when filtering voices.
  */
-import { getLanguageByCode, type TtsProvider } from './languages';
+import { fnv1a, getLanguageByCode, type TtsProvider } from './languages';
 
 export type { TtsProvider };
 
@@ -552,6 +552,80 @@ export function getLocaleFromApiCode(apiCode: string): string | null {
   if (!apiCode.includes('-Chirp3-HD-')) return null;
   const parts = apiCode.split('-Chirp3-HD-');
   return parts[0] || null;
+}
+
+/**
+ * The accent a voice is pinned to, in either apiCode encoding: the Gemini
+ * `@<locale>` suffix ("Leda@en-GB" → "en-GB") or the Chirp3 prefix
+ * ("en-GB-Chirp3-HD-Leda" → "en-GB"). Undefined for a bare voice ("Kore"),
+ * whose accent comes from the language code alone. This is the
+ * `regionVariant` an `audioAssets` row is keyed under, so the accent of a
+ * cached clip is known and a British clip is never served as American.
+ */
+export function getVoiceLocale(apiCode: string): string | undefined {
+  const at = apiCode.indexOf('@');
+  if (at !== -1) return apiCode.slice(at + 1) || undefined;
+  return getLocaleFromApiCode(apiCode) ?? undefined;
+}
+
+/**
+ * Every accent the active voice pool of `code` can produce, as
+ * `regionVariant` values (`undefined` for bare voices). A mixed pool (`en`)
+ * yields several; a pinned dialect (`en_gb`) yields one. Used by the audio
+ * cache lookup so a mixed-accent course accepts a cached clip in any of its
+ * accents.
+ */
+export function getVoiceLocalesForLanguage(
+  code: string,
+): (string | undefined)[] {
+  const locales = getVoicesByLanguageCode(code).map((v) =>
+    getVoiceLocale(v.apiCode),
+  );
+  return [...new Set(locales)];
+}
+
+/**
+ * The accent a text speaks in a language whose pool mixes several (`en`:
+ * en-US / en-GB / en-AU). Deterministic in `seed` (the text id), the same
+ * FNV-1a coin the gender resolution and es_mixed's variant pick use, so a
+ * text keeps its accent across regenerations, gender flips and superseded
+ * revisions instead of re-rolling on every synthesis. Seeded with a suffix so
+ * it doesn't correlate with the gender bit of the same id.
+ *
+ * A pinned pool (`en_gb`, all `@en-GB`) returns its one locale; a bare pool
+ * (`de`) returns undefined. Locales are sorted so the pick is independent of
+ * pool order.
+ */
+export function pickAccentForText(
+  code: string,
+  seed: string,
+): string | undefined {
+  const locales = getVoiceLocalesForLanguage(code)
+    .filter((l): l is string => l !== undefined)
+    .sort();
+  if (locales.length === 0) return undefined;
+  if (locales.length === 1) return locales[0];
+  return locales[fnv1a(`${seed}:accent`) % locales.length];
+}
+
+/**
+ * The voice to synthesize `textId` in `language`: honours a translation
+ * row's dialect pin (`regionVariant`, es_mixed) and otherwise the text's
+ * deterministic accent (`pickAccentForText`), then the gender preference of
+ * `getVoiceForLanguage`. Every TTS enqueue path picks through here so the
+ * accent rule has one home.
+ */
+export function getVoiceForText(
+  language: string,
+  textId: string,
+  regionVariant: string | undefined,
+  speakerGender?: string,
+): string {
+  return getVoiceForLanguageVariant(
+    language,
+    regionVariant ?? pickAccentForText(language, textId),
+    speakerGender,
+  );
 }
 
 /**

@@ -667,11 +667,18 @@ export default defineSchema({
   // pointer goes. See convex/lib/audioAssets.ts for the key/lookup helpers.
   audioAssets: defineTable({
     // ---- content-address key ----
-    language: v.string(), // Base language code (e.g., "en", "es", "de")
+    // Cache language (`getAudioAssetLanguage` in lib/languages.ts): a base
+    // code such as "en", "es", "de". Accent-only variants key under their
+    // text language (`en_gb` clips are "en" assets) so every English accent
+    // shares one cache; the `audioRecordings` pointer keeps the course code.
+    language: v.string(),
     voiceGender: voiceGenderValidator, // Gender-level key — voice pick within a gender is random anyway
-    // Concrete dialect pin for mixed-language rows (e.g. 'es-ES' vs 'es-US'),
-    // part of the key so accents never collide. Undefined for non-mixed
-    // languages and source-language audio.
+    // Accent of the clip, part of the key so accents never collide: the
+    // translation's dialect pin for mixed-language rows ('es-ES' vs 'es-US'),
+    // otherwise the synthesizing voice's locale ('en-GB' from "Leda@en-GB",
+    // see `buildAudioAssetKey`). Undefined for bare voices whose accent is the
+    // language's own (de, sv) and on legacy rows written before the voice
+    // locale was keyed (`backfillAudioAssetAccent` in convex/migrations.ts).
     regionVariant: v.optional(v.string()),
     // SHA-256 hex of the RAW spoken string (exactly what was sent to TTS, no
     // trimming/normalization; that belongs to card-edit comparison only).

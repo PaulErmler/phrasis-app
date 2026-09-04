@@ -1,7 +1,7 @@
 /**
  * Threshold at which the embedded onboarding lesson completes. Larger
- * than `ONBOARDING_INITIAL_SEED_CARDS` on purpose. The first 5 are the
- * seeded batch, the next 5 are drawn from whichever cards become due
+ * than `ONBOARDING_INITIAL_SEED_CARDS` on purpose. The first 3 are the
+ * seeded batch, the rest are drawn from whichever cards become due
  * again (audio warm-up + FSRS "Again/Hard") or, if nothing is due, from
  * auto-add (`ONBOARDING_CARDS_BATCH_SIZE` at a time, as often as the deck
  * runs dry). This gives the user a meaningfully longer first lesson
@@ -11,10 +11,10 @@ export const ONBOARDING_FIRST_LESSON_CARDS = 10;
 
 /**
  * Number of cards seeded upfront when `completeOnboarding` creates the deck.
- * Matched with `ONBOARDING_FIRST_LESSON_CARDS`. The lesson finishes the
- * moment the seed is exhausted; auto-add and FSRS take over from there.
+ * The first lesson completes at `ONBOARDING_FIRST_LESSON_CARDS` reviews;
+ * auto-add (`ONBOARDING_CARDS_BATCH_SIZE`) fills the gap.
  */
-export const ONBOARDING_INITIAL_SEED_CARDS = 5;
+export const ONBOARDING_INITIAL_SEED_CARDS = 3;
 
 /**
  * Default `cardsToAddBatchSize` written to `courseSettings` for onboarded

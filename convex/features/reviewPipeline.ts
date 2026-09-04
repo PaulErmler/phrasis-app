@@ -201,8 +201,10 @@ export function applyFsrsTransition(params: {
   // Run the shared scheduling algorithm
   const result = scheduleCard(cardState, rating, initialReviewCount);
 
-  // Add a random jitter of 0–60 seconds to spread cards apart in the queue.
-  const jitterMs = (Math.random() - 0.5) * 60_000;
+  // Pull the due date back by up to 30s so cards that would share an FSRS
+  // timestamp don't stack, without ever scheduling them later than FSRS.
+  // Math.random() is [0, 1) → jitter is (-30s, 0s].
+  const jitterMs = -Math.random() * 30_000;
   const dueDateWithJitter = result.dueDate + jitterMs;
 
   return { cardState, result, dueDateWithJitter };

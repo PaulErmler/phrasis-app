@@ -7,9 +7,7 @@ import { captureGeneration } from '../lib/posthogAi';
 import { costForCharacters } from '../config/aiCosts';
 import { getRomanizationSource } from '../lib/localRomanization';
 import {
-  getVoiceForLanguage,
-  getVoiceForLanguageVariant,
-  getVoiceGenderByApiCode,
+  getVoiceForText,
   getMixedVariantByRegion,
   resolveMixedVariant,
   ROMANIZATION_LANGUAGES,
@@ -29,7 +27,10 @@ import {
   resolveRetranslationIfPending,
 } from './cardEditAudit';
 import { deleteAudioRowsForTextLanguage } from '../lib/audio';
-import { findReusableAudioAsset, upsertAudioPointer } from '../lib/audioAssets';
+import {
+  findReusableAudioAssetForVoice,
+  upsertAudioPointer,
+} from '../lib/audioAssets';
 import { claimTtsIfAvailable } from './ttsProcessing';
 import { getLlmClaim } from './llmTranslationQueue';
 import { enqueueTtsForVoice } from '../lib/contentScheduling';
@@ -372,13 +373,12 @@ export async function processTranslationForCardHandler(
     }
   }
 
-  const voiceName = regionVariant
-    ? getVoiceForLanguageVariant(
-        args.targetLanguage,
-        regionVariant,
-        args.audioSpeakerGender,
-      )
-    : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
+  const voiceName = getVoiceForText(
+    args.targetLanguage,
+    args.textId,
+    regionVariant,
+    args.audioSpeakerGender,
+  );
 
   // Source travels with the romanization value (real or sentinel) so a
   // future strategy swap can target rows produced by the old method.
@@ -999,16 +999,12 @@ async function scheduleTtsForLandedTranslation(
     // case attaching the pointer is all that's needed. Any drift the
     // existing-audio skip above leaves behind (e.g. a stale gender) is the
     // sweep's job, which reads through the same asset payload.
-    const voiceGender = getVoiceGenderByApiCode(args.voiceName);
-    const asset =
-      voiceGender !== undefined
-        ? await findReusableAudioAsset(ctx, {
-            language: args.targetLanguage,
-            voiceGender,
-            regionVariant: args.regionVariant,
-            spokenText: translatedText,
-          })
-        : null;
+    const asset = await findReusableAudioAssetForVoice(ctx, {
+      language: args.targetLanguage,
+      voiceName: args.voiceName,
+      regionVariant: args.regionVariant,
+      spokenText: translatedText,
+    });
     if (asset) {
       await upsertAudioPointer(
         ctx,

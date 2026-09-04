@@ -37,7 +37,10 @@ const MESSAGES_DIR = join(REPO_ROOT, 'messages', 'landing');
 // voice below) invalidates every existing clip and forces regeneration. This is
 // distinct from the ElevenLabs model id the old hashes used, so the switch to
 // Gemini regenerates all landing audio on the next run.
-const TTS_MODEL_LABEL = 'gemini-3.1-flash-tts';
+// `-f` suffix: the 2026-09-04 no-performing prompt (see buildStyledInput in
+// convex/lib/tts/gemini.ts). Bumped so the next `pnpm landing:audio` run
+// regenerates every demo clip with the calmer delivery users hear in-app.
+const TTS_MODEL_LABEL = 'gemini-3.1-flash-tts-f';
 
 // Mirrors the in-app synthesis speed (scheduleMissingContent enqueues TTS at
 // speed 1), so landing audio sounds like what users hear inside the app.
@@ -232,7 +235,7 @@ async function synthesize(
   const languageName = GEMINI_LANG_NAME[lang] ?? lang;
   // Matches the in-app "## Instruction … ## Transcript …" prompt shape.
   const input =
-    `## Instruction: Speak the following text in a natural way like a native ${languageName} speaker would in a way that fits the sentence.\n\n` +
+    `## Instruction: Speak the following text in a natural way like a native ${languageName} speaker would in a way that fits the sentence in an everyday conversations. Do not act it out or perform it. No dramatic emphasis, no exaggerated emotion, no presenter or audiobook voice.\n\n` +
     `## Transcript: ${text}`;
 
   const res = await fetch(GEMINI_ENDPOINT, {

@@ -2,7 +2,10 @@ import type { SpeakInput, SpeakResult, TTSProvider } from './types';
 import { requireEnv } from '../env';
 import { Mp3Encoder } from '@breezystack/lamejs';
 import { toGeminiBcp47 } from './languageCodes';
-import { getLanguageByCode } from '../../../lib/languages';
+import {
+  getLanguageByCode,
+  getTtsPromptNameForLocale,
+} from '../../../lib/languages';
 import { trimTailHiccup } from './tailTrim';
 
 // Gemini 3.1 Flash TTS, reached through OpenRouter's OpenAI-compatible speech
@@ -32,8 +35,15 @@ const MP3_KBPS = 48;
 const HOST_IS_LITTLE_ENDIAN =
   new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
+// Prompt "F" from the 2026-09-04 listening test (.scratch/tts-intonation):
+// the earlier instruction plus an explicit no-performing clause, after a user
+// found the delivery "over-the-top and uncanny". Calmer variants that also
+// asked for a relaxed pace came out too quiet; this one leaves volume and
+// pace alone. Wording kept exactly as tested (including "an everyday
+// conversations"), a prompt-only change on an already-Gemini language does
+// not regenerate stored audio without a `ttsVersion` bump (lib/languages.ts).
 function buildStyledInput(text: string, languageName: string): string {
-  const context = `Speak the following text in a natural way like a native ${languageName} speaker would in a way that fits the sentence.`;
+  const context = `Speak the following text in a natural way like a native ${languageName} speaker would in a way that fits the sentence in an everyday conversations. Do not act it out or perform it. No dramatic emphasis, no exaggerated emotion, no presenter or audiobook voice.`;
   return `## Instruction: ${context}\n\n## Transcript: ${text}`;
 }
 
@@ -199,15 +209,20 @@ export const geminiTts: TTSProvider = {
     // US/GB/AU); otherwise derive it from the language code.
     const languageCode = locale ?? toGeminiBcp47(input.language);
     // Name of the target language for the "## Instruction" block so Gemini locks
-    // pronunciation to it. Normally the region-stripped base name ("English
-    // (US)" → "English") since the accent is already pinned by `language_code`
-    // above. But some dialects can't be pinned by the locale (e.g. Levantine
-    // Arabic → `ar-001`, shared with MSA/Saudi/Iraqi), so they set an explicit
-    // `ttsPromptName` ("Levantine Arabic") to name the dialect in the prose.
-    // The only signal Gemini gets to distinguish it. Falls back to the raw code.
+    // pronunciation to it. Three sources, in order:
+    //   1. The language's own `ttsPromptName` (Levantine Arabic → `ar-001` is
+    //      shared with MSA/Saudi/Iraqi, so the prose is the only dialect
+    //      signal; en_gb / es pin their accent the same way).
+    //   2. For a mixed pool whose voice carries an `@locale` (en, es_mixed):
+    //      the accent named by the language that pins that locale
+    //      (`Leda@en-GB` → "British English"). `language_code` alone drifts
+    //      toward American English / Latin American Spanish.
+    //   3. The region-stripped base name ("English (US)" → "English"), or the
+    //      raw code for an unknown language.
     const lang = getLanguageByCode(input.language);
     const languageName =
       lang?.ttsPromptName ??
+      (locale !== undefined ? getTtsPromptNameForLocale(locale) : undefined) ??
       (lang?.name ?? input.language).replace(/\s*\([^)]*\)\s*$/, '');
 
     let pcm = new Uint8Array(0);

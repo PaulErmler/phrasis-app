@@ -225,11 +225,22 @@ export interface Language {
    * voice lookups, `getLanguageByCode`, and existing course data referring
    * to the code keep working, only the *picker* surfaces hide it.
    *
-   * Used today to retire the English sub-variants (`en_gb`, `en_us`,
-   * `en_au`) from course-creation UIs while their voice + display metadata
-   * stays available for any rows already referencing them.
+   * Nothing sets it right now. It retired the English sub-variants
+   * (`en_gb`, `en_us`, `en_au`) between 2026-05 and 2026-09; they are
+   * pickable again as accent-only variants (see `sharesTextWith`).
    */
   hiddenFromPicker?: boolean;
+  /**
+   * Accent-only variant: courses on this code show the `sharesTextWith`
+   * language's text verbatim instead of translating it; only the TTS side
+   * (voice pool, locale, prompt) differs. `scheduleTranslationForLanguage`
+   * writes a `source-verbatim` translation row for such a target whenever
+   * the text's own language IS the shared one (an `en` curriculum sentence
+   * on an `en_gb` course). When the text is in some other language (a user's
+   * German custom sentence with an `en_gb` target) the normal translation
+   * path runs and `translationPromptNotes` still apply.
+   */
+  sharesTextWith?: string;
   /**
    * When `true`, picker surfaces (`LanguageSelector`) show a user-facing
    * "Experimental" badge next to this language. Independent of the
@@ -329,6 +340,18 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     code: 'en',
     displayCode: 'en',
     geminiBcp47: 'en-US',
+    // Pickers show "English (Mixed)" (explicit `en` override, the picker
+    // label is localized through NAME_OVERRIDES) while `name` and
+    // `nativeName` stay plain "English": they feed LLM prompts ("reply in
+    // English", the autofill prompt's "name (nativeName)" form), course
+    // names and admin emails, none of which should say "(Mixed)".
+    displayNameOverrides: { en: 'English (Mixed)', de: 'Englisch (Gemischt)' },
+    // Mixed accents: the voice pool tags the four Gemini voices with en-US,
+    // en-GB and en-AU locales (lib/voices.ts); each text gets one accent
+    // deterministically (`pickAccentForText`) and the accent is named in the
+    // TTS prompt from the picked voice's locale (`getTtsPromptNameForLocale`),
+    // since the locale alone drifts toward American. The dialect codes below
+    // pin one accent.
     name: 'English',
     nativeName: 'English',
     flag: '🌎',
@@ -356,15 +379,18 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     // Pin the accent in the prompt too. `geminiBcp47: 'en-GB'` alone can drift
-    // toward Gemini's default American English. ttsVersion bump regenerates
-    // existing en_gb audio (prompt-only change on an already-Gemini language).
+    // toward Gemini's default American English. No `ttsVersion` here: audio
+    // for accent variants is cached under `en` (`getAudioAssetLanguage`), so
+    // `en`'s version is the one that counts.
     ttsPromptName: 'British English',
-    ttsVersion: 2,
     needsRomanization: false,
     ipaVoice: 'en-gb',
     supportsKaraoke: true,
     supportsStt: true,
-    hiddenFromPicker: true,
+    sharesTextWith: 'en',
+    // v2: rows are verbatim copies of the `en` text (`sharesTextWith`); the
+    // bump lazily replaces the earlier LLM British-spelling rewrites.
+    translationVersion: 2,
     translationPromptNotes:
       'British spelling and vocabulary (colour, lift, queue).',
   },
@@ -382,11 +408,17 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     category: 'germanic',
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
+    // Named so the mixed `en` pool's `@en-US` voices get an explicit accent
+    // in the prompt too (`getTtsPromptNameForLocale`). No ttsVersion bump:
+    // existing en_us audio was already American.
+    ttsPromptName: 'American English',
     needsRomanization: false,
     ipaVoice: 'en-us',
     supportsKaraoke: true,
     supportsStt: true,
-    hiddenFromPicker: true,
+    sharesTextWith: 'en',
+    // v2: verbatim copies of the `en` text, see en_gb.
+    translationVersion: 2,
     translationPromptNotes:
       'American spelling and vocabulary (color, elevator, line).',
   },
@@ -405,15 +437,16 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     // Pin the accent in the prompt too. `geminiBcp47: 'en-AU'` alone can drift
-    // toward Gemini's default American English. ttsVersion bump regenerates
-    // existing en_au audio (prompt-only change on an already-Gemini language).
+    // toward Gemini's default American English. No `ttsVersion`: cached under
+    // `en`, see en_gb.
     ttsPromptName: 'Australian English',
-    ttsVersion: 2,
     needsRomanization: false,
     ipaVoice: 'en',
     supportsKaraoke: true,
     supportsStt: true,
-    hiddenFromPicker: true,
+    sharesTextWith: 'en',
+    // v2: verbatim copies of the `en` text, see en_gb.
+    translationVersion: 2,
     translationPromptNotes:
       'Closer to British spelling; Australian vocabulary where natural.',
   },
@@ -489,8 +522,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Runs on Gemini TTS. The per-text accent (Spain vs Latin America) is pinned
     // by the chosen voice's `@es-ES` / `@es-US` locale suffix (see the es_mixed
     // Gemini pool in lib/voices.ts and `getVoiceForLanguageVariant`), so no
-    // single `ttsPromptName` applies here. The locale on the voice carries it.
+    // single `ttsPromptName` applies here. The TTS prompt names the accent
+    // from that locale via `getTtsPromptNameForLocale` (es / es_latam's
+    // `ttsPromptName`); the locale alone drifted toward Latin American.
     ttsProvider: 'gemini',
+    // v2 (2026-09-04): prompt-only change (accent named per voice locale +
+    // the no-performing instruction), so existing clips must be re-spoken
+    // by a version bump; the provider-mismatch regen wouldn't fire.
+    ttsVersion: 2,
     needsRomanization: false,
     ipaVoice: 'es-419',
     supportsKaraoke: true,
@@ -1811,9 +1850,30 @@ export function postProcessTranslation(code: string, text: string): string {
   return TRANSLATION_POST_PROCESSORS[id](text);
 }
 
-/** Current TTS-setup version for a language (1 when unset). */
+/**
+ * The language code an `audioAssets` row is keyed under. Accent-only
+ * variants (`en_gb`, `en_us`, `en_au`) share one cache with their text
+ * language (`en`): the accent lives in the asset's `regionVariant` (the
+ * voice locale, `en-GB`), so a British clip synthesized for a mixed-English
+ * course serves an English (UK) course and vice versa. Identity for every
+ * other code.
+ */
+export function getAudioAssetLanguage(code: string): string {
+  return getSharedTextLanguage(code) ?? code;
+}
+
+/**
+ * Current TTS-setup version for a language (1 when unset). Resolved on the
+ * audio-cache language (`getAudioAssetLanguage`): an accent variant's
+ * assets are `en` assets, so they carry and are checked against `en`'s
+ * version. A `ttsVersion` on `en_gb` itself would be ignored; bump `en` to
+ * regenerate English audio in every accent.
+ */
 export function getCurrentTtsVersion(code: string): number {
-  return getLanguageByCode(code)?.ttsVersion ?? DEFAULT_CONTENT_VERSION;
+  return (
+    getLanguageByCode(getAudioAssetLanguage(code))?.ttsVersion ??
+    DEFAULT_CONTENT_VERSION
+  );
 }
 
 /**
@@ -2363,7 +2423,10 @@ export function getLanguageShortLabel(code: string | null | undefined): string {
   const normalized = code.toLowerCase();
   if (normalized === 'es' || normalized === 'es_latam') return 'ES';
   const language = getLanguageByCode(code);
-  return language ? language.code.toUpperCase() : code.toUpperCase();
+  if (!language) return code.toUpperCase();
+  // Accent-only variants (en_gb, en_us, en_au) badge as their shared text
+  // language: "EN", never "EN_GB".
+  return (language.sharesTextWith ?? language.code).toUpperCase();
 }
 
 /** Resolve an array of codes to Language objects, dropping unknowns. */
@@ -2643,12 +2706,48 @@ export function isMixedLanguage(code: string): boolean {
 }
 
 /**
+ * The language whose text an accent-only variant shows verbatim (`en` for
+ * `en_gb`), or undefined for every other code. See `Language.sharesTextWith`.
+ */
+export function getSharedTextLanguage(code: string): string | undefined {
+  return getLanguageByCode(code)?.sharesTextWith;
+}
+
+/**
+ * True when a text written in `textLanguage` is served verbatim on a
+ * `targetCode` course instead of being translated: the target is an
+ * accent-only variant of the text's own language. The translation path
+ * stores a `source-verbatim` row (same wording, own voice pool) in that case.
+ */
+export function usesSourceTextVerbatim(
+  targetCode: string,
+  textLanguage: string,
+): boolean {
+  const shared = getSharedTextLanguage(targetCode);
+  return shared !== undefined && shared === textLanguage;
+}
+
+/**
+ * Accent name to put in the Gemini TTS prompt for a voice locale, resolved
+ * from the language that pins that locale and names it (`en-GB` → the
+ * `en_gb` entry's 'British English', `es-US` → es_latam's 'Latin American
+ * Spanish'). Used for mixed pools (`en`, `es_mixed`) whose voices carry an
+ * `@locale` suffix but whose own `ttsPromptName` can't name a single accent.
+ * Undefined when no language pins the locale with a prompt name.
+ */
+export function getTtsPromptNameForLocale(locale: string): string | undefined {
+  return SUPPORTED_LANGUAGES.find(
+    (l) => l.geminiBcp47 === locale && l.ttsPromptName !== undefined,
+  )?.ttsPromptName;
+}
+
+/**
  * Deterministic FNV-1a hash for short strings. Used to seed the per-text
  * variant pick for mixed-dialect languages. Re-running translation for the
  * same textId always lands on the same variant, so the persisted
  * `regionVariant` and the synthesized voice stay in agreement across retries.
  */
-function fnv1a(str: string): number {
+export function fnv1a(str: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
     h ^= str.charCodeAt(i);
@@ -2721,10 +2820,14 @@ export {
   getRandomVoiceForLanguage,
   getVoiceForLanguage,
   getVoiceForLanguageVariant,
+  getVoiceForText,
   getVoiceGenderByApiCode,
   getProviderByApiCode,
   getLocaleFromApiCode,
   getLocalesByLanguageCode,
+  getVoiceLocale,
+  getVoiceLocalesForLanguage,
+  pickAccentForText,
   resolveAudioSpeakerGender,
   resolveCardSpeakerGenders,
 } from './voices';

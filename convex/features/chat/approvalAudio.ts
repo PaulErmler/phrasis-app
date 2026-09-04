@@ -10,7 +10,9 @@ import { internal } from '../../_generated/api';
 import type { Doc } from '../../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../../db/users';
 import {
+  buildAudioAssetKey,
   findAudioAssetByKey,
+  findAudioAssetInAnyAccent,
   scheduleBlobSwapDelete,
   upsertAudioAsset,
 } from '../../lib/audioAssets';
@@ -70,13 +72,13 @@ async function findAssetForLine(
   spokenText: string,
 ): Promise<Doc<'audioAssets'> | null> {
   for (const voiceGender of approvalGenderCandidates(approvalId)) {
-    const asset = await findAudioAssetByKey(ctx, {
+    // Proposal lines have no text id yet, so no per-text accent: any accent
+    // of the language will do for playback. The clip's own accent (from the
+    // voice that made it) is in its key, so a mixed-English line made by
+    // "Leda@en-GB" is a British asset the card pipeline can reuse later.
+    const asset = await findAudioAssetInAnyAccent(ctx, {
       language,
       voiceGender,
-      // Proposal translations carry no dialect pin. Matches the rows
-      // `processApproval` later inserts (also variant-free), so the ensure
-      // sweep looks up the exact same key.
-      regionVariant: undefined,
       spokenText,
     });
     if (asset) return asset;
@@ -293,12 +295,13 @@ export const saveApprovalAudioAsset = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const key = {
+    const key = buildAudioAssetKey({
       language: args.language,
       voiceGender: args.voiceGender,
+      voiceName: args.voiceName,
       regionVariant: undefined,
       spokenText: args.spokenText,
-    };
+    });
     const existing = await findAudioAssetByKey(ctx, key);
     if (existing && existing.ttsQuality !== 'unknown') {
       // Completed audio (possibly validated) beat us to the key. Keep it.
