@@ -61,7 +61,7 @@ const ttsEnqueues = () =>
         text: string;
         language: string;
         forceRegen?: boolean;
-        archivedTranslationId?: Id<'translations'>;
+        supersededTranslationId?: Id<'translations'>;
       },
   );
 beforeEach(() => {
@@ -1181,7 +1181,7 @@ describe('a superseded revision is content like any other', () => {
       textId,
       language: 'de',
       text: OLD_DE,
-      archivedTranslationId: copy._id,
+      supersededTranslationId: copy._id,
     });
     expect(jobs[0].forceRegen).toBeFalsy();
 
@@ -1200,7 +1200,7 @@ describe('a superseded revision is content like any other', () => {
       voiceGender: 'female',
       speed: 1,
       spokenText: OLD_DE,
-      archivedTranslationId: copy._id,
+      supersededTranslationId: copy._id,
     });
     const repaired = (await t.run((ctx) => ctx.db.get(copy._id)))!;
     expect(repaired.audioAssetId).toBeDefined();
@@ -1245,11 +1245,11 @@ describe('a superseded revision is content like any other', () => {
       await scheduleMissingContent(ctx, textId, text, ['en'], ['de']);
     });
     const archivedJobs = ttsEnqueues().filter(
-      (j) => j.archivedTranslationId !== undefined,
+      (j) => j.supersededTranslationId !== undefined,
     );
     expect(archivedJobs.length).toBe(1);
     expect(archivedJobs[0]).toMatchObject({
-      archivedTranslationId: copy._id,
+      supersededTranslationId: copy._id,
       text: OLD_DE,
       forceRegen: true,
     });
@@ -1290,7 +1290,7 @@ describe('a superseded revision is content like any other', () => {
     expect(de[0]).toMatchObject({
       text: OLD_DE,
       forceRegen: true,
-      archivedTranslationId: copy._id,
+      supersededTranslationId: copy._id,
     });
     // Source-language audio took the normal regenerate path.
     expect(jobs.some((j) => j.language === 'en' && j.forceRegen)).toBe(true);
@@ -1414,7 +1414,7 @@ describe('editing a pinned card, afterwards', () => {
       textId: card.textId,
       text: 'Alles gut?',
     });
-    expect(jobs[0].archivedTranslationId).toBeUndefined();
+    expect(jobs[0].supersededTranslationId).toBeUndefined();
     // The curriculum row was edited from the learner's own copy: no complaint.
     expect((await t.run((ctx) => ctx.db.get(translationId)))!.flagCount).toBe(
       undefined,

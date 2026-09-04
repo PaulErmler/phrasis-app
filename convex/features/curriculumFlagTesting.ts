@@ -3,7 +3,10 @@ import { internalMutation, internalQuery } from '../_generated/server';
 import { assertTestHooksEnabled, requireUserIdByEmail } from '../lib/testHooks';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
-import { isSupersededRow, liveTranslation } from '../db/translationReads';
+import {
+  liveTranslation,
+  liveTranslationsForText,
+} from '../db/translationReads';
 
 /**
  * E2E test hooks for "a manual edit of a curriculum card is also a complaint"
@@ -86,12 +89,7 @@ export const armProbe = internalMutation({
         // no shared row to complain about.
         if (!text || text.userCreated) continue;
 
-        const translations = (
-          await ctx.db
-            .query('translations')
-            .withIndex('by_textId', (q) => q.eq('textId', text._id))
-            .take(20)
-        ).filter((tr) => !isSupersededRow(tr));
+        const translations = await liveTranslationsForText(ctx, text._id, 20);
 
         const flaggable = translations.find(
           (tr) =>

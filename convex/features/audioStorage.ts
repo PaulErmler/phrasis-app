@@ -3,7 +3,7 @@ import { MutationCtx } from '../_generated/server';
 import { getCurrentTtsVersion } from '../../lib/languages';
 import { deleteStorageBlobIfUnreferenced } from '../lib/audio';
 import {
-  isAudioAssetReferenced,
+  releaseAudioAssetIfUnreferenced,
   scheduleBlobSwapDelete,
   upsertAudioAsset,
   upsertAudioPointer,
@@ -52,7 +52,7 @@ const vStoreAudioRecordingArgs = v.object({
   // revision (see `supersededAt` in schema.ts): the asset is upserted by key
   // as usual, but the (text, language) pointer is left alone (it speaks the
   // live wording) and the revision's `audioAssetId` is re-pointed instead.
-  archivedTranslationId: v.optional(v.id('translations')),
+  supersededTranslationId: v.optional(v.id('translations')),
 });
 export const storeAudioRecordingArgs = vStoreAudioRecordingArgs.fields;
 export type StoreAudioRecordingArgs = Infer<typeof vStoreAudioRecordingArgs>;
@@ -117,24 +117,18 @@ export async function storeAudioRecordingHandler(
       ttsVersion: getCurrentTtsVersion(args.language),
     },
   );
-  if (args.archivedTranslationId !== undefined) {
+  if (args.supersededTranslationId !== undefined) {
     // Audio for a superseded revision: never touch the live pointer. The
     // asset was found or recreated by key; make sure the revision points at
     // it (a repair after a lost asset gets a fresh id).
-    const revision = await ctx.db.get(args.archivedTranslationId);
+    const revision = await ctx.db.get(args.supersededTranslationId);
     if (revision && revision.audioAssetId !== result.assetId) {
       const previousAssetId = revision.audioAssetId;
       await ctx.db.patch(revision._id, { audioAssetId: result.assetId });
+      // The revision was the reference keeping its old asset alive; if
+      // nothing else does, collect it like a re-pointed pointer would.
       if (previousAssetId !== undefined) {
-        // The revision was the reference keeping its old asset alive; if
-        // nothing else does, collect it like a re-pointed pointer would.
-        if (!(await isAudioAssetReferenced(ctx, previousAssetId))) {
-          const previousAsset = await ctx.db.get(previousAssetId);
-          if (previousAsset) {
-            await ctx.db.delete(previousAsset._id);
-            await scheduleBlobSwapDelete(ctx, previousAsset.storageId);
-          }
-        }
+        await releaseAudioAssetIfUnreferenced(ctx, previousAssetId);
       }
     }
   } else {

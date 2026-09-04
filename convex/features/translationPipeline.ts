@@ -41,10 +41,7 @@ import {
   asVoiceGender,
 } from '../types';
 import { liveTranslation } from '../db/translationReads';
-import {
-  missingAnnotationKinds,
-  TEXT_ANNOTATIONS,
-} from '../lib/textAnnotations';
+import { scheduleTranslationAnnotations } from '../lib/textAnnotations';
 
 /**
  * Translation write pipeline: the legacy Google Translate worker action and
@@ -723,17 +720,7 @@ async function archiveTranslationRevision(
     }),
   );
   await ctx.db.patch(existing._id, { lastArchivedAt: supersededAt });
-  for (const kind of missingAnnotationKinds(
-    existing.targetLanguage,
-    existing,
-  )) {
-    await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].translationAction, {
-      textId: existing.textId,
-      text: existing.translatedText,
-      language: existing.targetLanguage,
-      translationId: supersededId,
-    });
-  }
+  await scheduleTranslationAnnotations(ctx, existing, supersededId);
 }
 
 /**

@@ -30,14 +30,17 @@ describe('lib/stt/languages toSttLanguage', () => {
   it('has an STT decision for every supported code (no silent gaps)', () => {
     // A new language whose bare code the model does not list must be probed
     // live and either added to STT_UNLISTED_BUT_WORKING or shipped with
-    // supportsStt: false. Landing here by accident is the failure this guards.
-    const gaps = SUPPORTED_LANGUAGES.map((l) => l.code).filter((code) => {
-      const stt = toSttLanguage(code);
-      return (
-        !MAI_TRANSCRIBE_2_LANGUAGES.has(stt) &&
-        !STT_UNLISTED_BUT_WORKING.has(stt)
-      );
-    });
+    // supportsStt: false (which is the decision, so such a language is not a
+    // gap). Landing here by accident is the failure this guards.
+    const gaps = SUPPORTED_LANGUAGES.filter((l) => l.supportsStt)
+      .map((l) => l.code)
+      .filter((code) => {
+        const stt = toSttLanguage(code);
+        return (
+          !MAI_TRANSCRIBE_2_LANGUAGES.has(stt) &&
+          !STT_UNLISTED_BUT_WORKING.has(stt)
+        );
+      });
     expect(gaps).toEqual([]);
   });
 
@@ -48,12 +51,5 @@ describe('lib/stt/languages toSttLanguage', () => {
       expect(MAI_TRANSCRIBE_2_LANGUAGES.has(code)).toBe(false);
     }
     expect([...STT_UNLISTED_BUT_WORKING].sort()).toEqual(['hr', 'sr']);
-  });
-
-  it('marks every catalogue language as STT-capable', () => {
-    const off = SUPPORTED_LANGUAGES.filter((l) => !l.supportsStt).map(
-      (l) => l.code,
-    );
-    expect(off).toEqual([]);
   });
 });

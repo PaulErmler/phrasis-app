@@ -1,7 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { transcribeAudio } from '../../../lib/stt/openrouter';
-import { ID3_HEADER, WAV_HEADER, openrouterSttBody } from '../sttFixtures';
+import {
+  SttRejectedContainerError,
+  transcribeAudio,
+} from '../../../lib/stt/openrouter';
+import {
+  ID3_HEADER,
+  MP4_HEADER,
+  WAV_HEADER,
+  WEBM_HEADER,
+  openrouterSttBody,
+} from '../sttFixtures';
 
 /**
  * The OpenRouter transcription wire contract: what goes into the multipart
@@ -90,6 +99,16 @@ describe('lib/stt/openrouter transcribeAudio', () => {
       (c) => (formOf(c).get('file') as File).name,
     );
     expect(names).toEqual(['audio.mp3', 'audio.ogg', 'audio.mp3']);
+  });
+
+  it('refuses a WebM or MP4 blob before any upload', async () => {
+    await expect(
+      transcribeAudio(new Blob([WEBM_HEADER], { type: 'audio/webm' })),
+    ).rejects.toBeInstanceOf(SttRejectedContainerError);
+    await expect(
+      transcribeAudio(new Blob([MP4_HEADER], { type: 'audio/mp4' })),
+    ).rejects.toBeInstanceOf(SttRejectedContainerError);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('maps the verbose_json response to text, timings, duration and cost', async () => {

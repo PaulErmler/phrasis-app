@@ -10,10 +10,12 @@ import { fileURLToPath } from 'node:url';
  * therefore decide whether it wants the live row, the superseded ones, or
  * all of them, and that decision lives in ONE module:
  * convex/db/translationReads.ts (`liveTranslation`, `translationRevisions`,
- * `resolveServedFromLive`). A raw `.withIndex('by_text_language_supersededAt'`
- * anywhere else would happen to return the live row first (Convex orders
- * `undefined` before every value), which is exactly the accident that turns
- * into a bug the day someone adds `.order('desc')` or `.collect()`.
+ * `liveTranslationsForText`, `resolveServedFromLive`). A raw
+ * `.withIndex('by_text_language_supersededAt'` (or the per-text
+ * `by_textId_supersededAt`) anywhere else would happen to return the live
+ * row first (Convex orders `undefined` before every value), which is exactly
+ * the accident that turns into a bug the day someone adds `.order('desc')`
+ * or `.collect()`.
  */
 
 const CONVEX_ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -21,7 +23,10 @@ const THIS_FILE = relative(CONVEX_ROOT, fileURLToPath(import.meta.url))
   .split('\\')
   .join('/');
 const ALLOWED = new Set(['schema.ts', 'db/translationReads.ts', THIS_FILE]);
-const INDEX_LITERAL = "'by_text_language_supersededAt'";
+const INDEX_LITERALS = [
+  "'by_text_language_supersededAt'",
+  "'by_textId_supersededAt'",
+];
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -45,9 +50,9 @@ function sources(): Array<{ rel: string; src: string }> {
 }
 
 describe('translations index invariant', () => {
-  it('only schema.ts and db/translationReads.ts name the index', () => {
+  it('only schema.ts and db/translationReads.ts name the indexes', () => {
     const offenders = sources()
-      .filter(({ src }) => src.includes(INDEX_LITERAL))
+      .filter(({ src }) => INDEX_LITERALS.some((lit) => src.includes(lit)))
       .map(({ rel }) => rel);
     expect(offenders).toEqual([]);
   });

@@ -80,6 +80,15 @@ export type LanguageCategory =
 /** Whether tier-1 LLMs reliably handle this language for translation/teaching. */
 export type LlmSupportTier = 'tier1' | 'tier2';
 
+/**
+ * Script conversion applied to a speech-to-text transcript of a language
+ * (convex/lib/stt/scriptNormalize.ts), see `Language.sttScriptFix`.
+ */
+export type SttScriptFix =
+  | 'latinToCyrillic'
+  | 'simplifiedToTraditional'
+  | 'traditionalToSimplified';
+
 export interface Language {
   code: string; // Internal language code (e.g. "en", "es_latam", "zh")
   displayCode: string; // BCP 47 tag for display (e.g. "es-MX", "zh-CN")
@@ -176,7 +185,8 @@ export interface Language {
    * Bump when changing the model/prompt for this language to lazily regenerate
    * its existing non-custom translations (and their audio) on next view. The
    * regeneration happens in place: a card that already shows the old wording
-   * keeps it (and its audio) via `translationArchive`, only cards added
+   * keeps it (and its audio) as a superseded revision
+   * (`translations.supersededAt`), only cards added
    * afterwards get the new one. See the content-versioning helpers below and
    * `translations.translationVersion` in convex/schema.ts. Last bumped for
    * every language in Sep 2026 with the switch to `SOL_MINIMAL`.
@@ -252,6 +262,16 @@ export interface Language {
    * pass the internal code through unchanged.
    */
   googleTranslateCode?: string;
+  /**
+   * Script fix for speech-to-text transcripts (`scriptConverterFor` in
+   * convex/lib/stt/scriptNormalize.ts). MAI-Transcribe-2 picks its own
+   * script whatever the hint: Latin for Serbian, Simplified for Mandarin,
+   * Traditional for Cantonese. Set when the catalogue script differs from
+   * what the model writes, so the transcript matches the stored wording
+   * before the TTS validation comparator or the writing grader see it. Omit
+   * when the two agree.
+   */
+  sttScriptFix?: SttScriptFix;
   /**
    * Intl.Segmenter locale for answer text-comparison (`getCompareConfig`).
    * Omit to default to the internal code.
@@ -745,8 +765,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     romanizationBackend: 'google-v3',
     // Cyrillic-script Serbian: the catalog standard is Cyrillic (Google
     // romanize-v3's `sr` expects it, and romanization gives learners the
-    // Latin rendering anyway). STT returns Latin whatever hint it gets;
-    // convex/lib/stt/scriptNormalize.ts converts transcripts to Cyrillic.
+    // Latin rendering anyway). STT returns Latin whatever hint it gets.
+    sttScriptFix: 'latinToCyrillic',
     name: 'Serbian',
     nativeName: 'Српски',
     flag: '🇷🇸',
@@ -1141,6 +1161,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     geminiBcp47: 'cmn-TW',
     googleTranslateCode: 'zh-TW',
     compareLocale: 'zh-TW',
+    // STT writes Mandarin in Simplified characters whatever the hint.
+    sttScriptFix: 'simplifiedToTraditional',
     hasWordBoundaries: false,
     romanizationBackend: 'local',
     displayNameOverrides: { de: 'Chinesisch (Traditionell)' },
@@ -1173,6 +1195,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'yue-Hans-HK',
     regionLabel: 'Hong Kong (simplified script)',
     compareLocale: 'yue-Hans-HK',
+    // STT writes Cantonese in Traditional characters whatever the hint.
+    sttScriptFix: 'traditionalToSimplified',
     hasWordBoundaries: false,
     romanizationBackend: 'local',
     displayNameOverrides: { de: 'Kantonesisch (Vereinfacht)' },
@@ -1210,6 +1234,11 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     regionLabel: 'Hong Kong (traditional script)',
     googleTranslateCode: 'yue',
     compareLocale: 'yue-Hant-HK',
+    // No `sttScriptFix`: STT already writes Cantonese in Traditional
+    // characters (verified live, 2026-09-04). A Simplified→Traditional pass
+    // over Traditional text is not safe either: 后, 干, 里, 只 are both a
+    // Simplified form and a Traditional character in their own right, and
+    // the converter would rewrite them.
     hasWordBoundaries: false,
     romanizationBackend: 'local',
     displayNameOverrides: { de: 'Kantonesisch (Traditionell)' },
@@ -2159,7 +2188,7 @@ export const TRANSLATION_RULES = {
    * material. Swapped in from `luna_bo3` in Sep 2026 on eval evidence (see
    * `SOL_MINIMAL`). Existing translations regenerate lazily once a
    * language's `translationVersion` is bumped, keeping their old wording
-   * for the cards that already show it (see `translationArchive` in
+   * for the cards that already show it (see `supersededAt` in
    * convex/schema.ts). A flex-tier refusal retries on Sol's standard
    * endpoint; a Sol outage degrades to `LUNA_BO3`, then Gemini, then the
    * Google safety net.

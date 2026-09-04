@@ -10,6 +10,7 @@ import {
   cardPinAt,
   liveTranslation,
   resolveServedFromLive,
+  resolveServedTranslation,
   type ServedTranslation,
 } from '../db/translationReads';
 import { Id, Doc } from '../_generated/dataModel';
@@ -1942,14 +1943,16 @@ export const regenerateCardAudio = mutation({
     // so those languages re-synthesize their archived asset in place instead
     // and keep the live pointer as it is.
     const pinAt = cardPinAt(card);
-    const archivedLanguages = new Set<string>();
+    const supersededLanguages = new Set<string>();
     for (const lang of allLanguages) {
       if (lang === text.language) continue;
-      const live = await liveTranslation(ctx, card.textId, lang);
-      if (!live) continue;
-      const served = await resolveServedFromLive(ctx, live, pinAt);
-      if (served.archived) {
-        archivedLanguages.add(lang);
+      const served = await resolveServedTranslation(ctx, {
+        textId: card.textId,
+        targetLanguage: lang,
+        pinAt,
+      });
+      if (served?.archived) {
+        supersededLanguages.add(lang);
         await regenerateSupersededRevisionAudio(ctx, text, served.row, {
           audioSpeakerGender: text.audioSpeakerGender,
           // The button means "synthesize anew": bypass the asset cache (a
@@ -1959,10 +1962,10 @@ export const regenerateCardAudio = mutation({
         });
       }
     }
-    // The live pointers of the archived languages stay, so the sweep below
-    // sees their audio as present and regenerates nothing for them.
+    // The live pointers of the superseded languages stay, so the sweep
+    // below sees their audio as present and regenerates nothing for them.
     for (const lang of allLanguages) {
-      if (archivedLanguages.has(lang)) continue;
+      if (supersededLanguages.has(lang)) continue;
       await deleteAudioRowsForTextLanguage(ctx, card.textId, lang);
     }
 

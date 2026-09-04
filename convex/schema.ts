@@ -650,7 +650,12 @@ export default defineSchema({
       'targetLanguage',
       'supersededAt',
     ])
-    .index('by_audioAssetId', ['audioAssetId']),
+    .index('by_audioAssetId', ['audioAssetId'])
+    // Every LIVE row of a text (`.eq('supersededAt', undefined)`), for the
+    // readers that list a text's translations without naming a language.
+    // Queried ONLY through `liveTranslationsForText` in
+    // convex/db/translationReads.ts, same invariant test.
+    .index('by_textId_supersededAt', ['textId', 'supersededAt']),
 
   // Content-addressed audio store. One row per unique
   // (language, voiceGender, regionVariant, spoken string), every text whose

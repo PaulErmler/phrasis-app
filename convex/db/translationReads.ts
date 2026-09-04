@@ -5,7 +5,8 @@ type ContentCtx = QueryCtx | MutationCtx;
 
 /**
  * Card-facing translation reads, and the ONLY module that queries the
- * `translations.by_text_language_supersededAt` index
+ * `translations.by_text_language_supersededAt` and
+ * `translations.by_textId_supersededAt` indexes
  * (convex/tests/lib/translationsIndexInvariant.test.ts enforces that).
  *
  * A curriculum translation row is shared by every learner's card for that
@@ -23,7 +24,8 @@ type ContentCtx = QueryCtx | MutationCtx;
  * content pipeline itself) read the live row through `liveTranslation`: they
  * describe the curriculum, not a learner's card. Sweeps that must reach the
  * superseded revisions too (annotation fills, audio repair) read the whole
- * range through `translationRevisions`.
+ * range through `translationRevisions`. Readers that list a text's live
+ * rows without naming a language use `liveTranslationsForText`.
  */
 
 /** The instant a card's translations are pinned to. */
@@ -63,6 +65,32 @@ export async function liveTranslation(
 }
 
 /**
+ * The live rows of a text across languages, at most `limit` of them. For
+ * readers that list a text's translations without naming a language (the
+ * admin content view, the e2e flag probe).
+ */
+export async function liveTranslationsForText(
+  ctx: ContentCtx,
+  textId: Id<'texts'>,
+  limit: number,
+): Promise<Doc<'translations'>[]> {
+  return ctx.db
+    .query('translations')
+    .withIndex('by_textId_supersededAt', (q) =>
+      q.eq('textId', textId).eq('supersededAt', undefined),
+    )
+    .take(limit);
+}
+
+/**
+ * A (text, language) range is one live row plus one superseded row per
+ * version bump whose wording differed, so it is a handful at most. The cap
+ * only bounds the read for the guideline's sake; a text would need 31 bumps
+ * to reach it.
+ */
+const MAX_TRANSLATION_REVISIONS = 32;
+
+/**
  * Every row of (text, language): the live row first (when one exists), then
  * the superseded revisions, oldest-superseded first. For the sweeps that
  * treat superseded revisions as content in their own right.
@@ -78,7 +106,7 @@ export async function translationRevisions(
       q.eq('textId', textId).eq('targetLanguage', targetLanguage),
     )
     .order('asc')
-    .collect();
+    .take(MAX_TRANSLATION_REVISIONS);
 }
 
 /** Split a `translationRevisions` range into the live row and the rest. */

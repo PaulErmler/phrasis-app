@@ -47,6 +47,7 @@ import {
 } from '../../lib/languages';
 import {
   missingAnnotationKinds,
+  scheduleTranslationAnnotations,
   TEXT_ANNOTATIONS,
 } from '../lib/textAnnotations';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
@@ -476,17 +477,7 @@ export async function scheduleMissingTranslationsForText(
         // rows are usually not cards), so those rows rendered with a bare
         // annotation gap until the text was added to a deck. Mirrors that
         // sweep's loop in decks.ts.
-        for (const kind of missingAnnotationKinds(lang, existing)) {
-          await ctx.scheduler.runAfter(
-            0,
-            TEXT_ANNOTATIONS[kind].translationAction,
-            {
-              textId: text._id,
-              text: existing.translatedText,
-              language: lang,
-            },
-          );
-        }
+        await scheduleTranslationAnnotations(ctx, existing, undefined);
         continue;
       }
       // Mirror the sweep's deferrals: never regenerate under an active TTS

@@ -514,3 +514,17 @@ describe('content versioning', () => {
     }
   });
 });
+
+describe('sttScriptFix', () => {
+  it('is set exactly where STT writes a different script than the catalogue', () => {
+    const fixed = SUPPORTED_LANGUAGES.filter((l) => l.sttScriptFix).map((l) => [
+      l.code,
+      l.sttScriptFix,
+    ]);
+    expect(fixed).toEqual([
+      ['sr', 'latinToCyrillic'],
+      ['zh_traditional', 'simplifiedToTraditional'],
+      ['yue', 'traditionalToSimplified'],
+    ]);
+  });
+});

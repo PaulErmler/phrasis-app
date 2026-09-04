@@ -14,7 +14,11 @@ import {
 } from '../../lib/languages';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
-import { missingAnnotationKinds, TEXT_ANNOTATIONS } from './textAnnotations';
+import {
+  missingAnnotationKinds,
+  scheduleTranslationAnnotations,
+  TEXT_ANNOTATIONS,
+} from './textAnnotations';
 import { deleteAudioRow } from './audio';
 import {
   findReusableAudioAsset,
@@ -246,7 +250,7 @@ export async function enqueueTtsForVoice(
     forceRegen,
     priority,
     requestedByUserId,
-    archivedTranslationId,
+    supersededTranslationId,
   }: {
     textId: Id<'texts'>;
     text: string;
@@ -258,7 +262,7 @@ export async function enqueueTtsForVoice(
     /** Requester attribution for the synthesis cost event. */
     requestedByUserId?: string;
     /** Audio for a superseded revision; see ttsJobArgsValidator. */
-    archivedTranslationId?: Id<'translations'>;
+    supersededTranslationId?: Id<'translations'>;
   },
 ): Promise<void> {
   const voiceGender = getVoiceGenderByApiCode(voiceName);
@@ -280,7 +284,7 @@ export async function enqueueTtsForVoice(
       forceRegen,
       priority,
       requestedByUserId,
-      archivedTranslationId,
+      supersededTranslationId,
     },
   });
 }
@@ -385,7 +389,7 @@ export async function scheduleAudioForLanguage(
  * and the regenerate-audio button. The job never touches the live
  * (text, language) pointer, which speaks the live wording; it upserts the
  * asset by key and re-points the revision's `audioAssetId`
- * (`archivedTranslationId`, see ttsProcessing.ts and audioStorage.ts).
+ * (`supersededTranslationId`, see ttsProcessing.ts and audioStorage.ts).
  *
  * Without `forceRegen` a fresh content-addressed asset for the same string
  * is attached to the revision with no synthesis at all (a lost asset doc).
@@ -445,9 +449,33 @@ export async function regenerateSupersededRevisionAudio(
     forceRegen: opts.forceRegen,
     priority: opts.priority,
     requestedByUserId: opts.requestedByUserId,
-    archivedTranslationId: revision._id,
+    supersededTranslationId: revision._id,
   });
   return true;
+}
+
+/**
+ * Whether an asset is obsolete AS AUDIO for `lang`, independent of the
+ * text it speaks. Provider: only the (current, existing) matchups listed in
+ * lib/ttsPrecedence.ts force a re-synth (e.g. google overwrote azure to
+ * migrate the Arabic dialects); unlisted pairs keep the audio. Assets from
+ * before the provider field are legacy Google. Version: the language's
+ * `ttsVersion` was bumped above the asset's stamp (a new voice pool, Gemini
+ * prompt or provider); `isTtsVersionStale` treats an unstamped asset as
+ * current so un-backfilled rows never storm. Shared by the live pointer's
+ * validity sweep and the superseded-revision repair.
+ */
+function audioAssetMismatch(
+  lang: string,
+  asset: Pick<Doc<'audioAssets'>, 'ttsProvider' | 'ttsVersion'>,
+): { providerMismatch: boolean; versionMismatch: boolean } {
+  return {
+    providerMismatch: shouldOverwriteProvider(
+      getTtsProviderForLanguage(lang),
+      asset.ttsProvider ?? 'google',
+    ),
+    versionMismatch: isTtsVersionStale(lang, asset.ttsVersion),
+  };
 }
 
 /** Options threaded through the whole `scheduleMissingContent` sweep. */
@@ -628,22 +656,10 @@ async function sweepInvalidAudio(
       const genderMismatch =
         (audioSpeakerGender === 'male' || audioSpeakerGender === 'female') &&
         payload.voiceGender !== audioSpeakerGender;
-      // Assets carried over from pre-provider-field audio are legacy Google.
-      const existingProvider = payload.ttsProvider ?? 'google';
-      const currentProvider = getTtsProviderForLanguage(lang);
-      // Provider regen is now gated by lib/ttsPrecedence.ts, only the
-      // (current, existing) matchups listed there force a delete + re-synth
-      // (e.g. google now overwrites azure, to migrate the Arabic dialects
-      // off Azure). Unlisted pairs keep the existing audio.
-      const providerMismatch = shouldOverwriteProvider(
-        currentProvider,
-        existingProvider,
+      const { providerMismatch, versionMismatch } = audioAssetMismatch(
+        lang,
+        payload,
       );
-      // Version-stale audio: the language's `ttsVersion` config was bumped
-      // above what this audio was stamped with (a new voice pool / Gemini prompt
-      // / provider). Regenerate. `isTtsVersionStale` encodes the "undefined ===
-      // current" rule so un-backfilled rows never storm.
-      const versionMismatch = isTtsVersionStale(lang, payload.ttsVersion);
       if (genderMismatch) {
         langsWithAudioGenderDrift.add(lang);
       }
@@ -876,32 +892,20 @@ async function scheduleSupersededRevisionContent(
   opts: ContentSweepOpts | undefined,
 ): Promise<void> {
   for (const revision of state.supersededMap.get(lang) ?? []) {
-    for (const kind of missingAnnotationKinds(lang, revision)) {
-      if (opts?.probe) throw new ProbeNeedsWork();
-      await ctx.scheduler.runAfter(
-        0,
-        TEXT_ANNOTATIONS[kind].translationAction,
-        {
-          textId,
-          text: revision.translatedText,
-          language: lang,
-          translationId: revision._id,
-        },
-      );
+    if (opts?.probe && missingAnnotationKinds(lang, revision).length > 0) {
+      throw new ProbeNeedsWork();
     }
+    await scheduleTranslationAnnotations(ctx, revision, revision._id);
     // A revision that was never voiced is never served (the reader falls
     // through to the live row), so there is no audio to keep alive.
     if (revision.audioAssetId === undefined) continue;
     const asset = await ctx.db.get(revision.audioAssetId);
     const blobExists =
       asset !== null && (await ctx.db.system.get(asset.storageId)) !== null;
+    const mismatch = asset === null ? null : audioAssetMismatch(lang, asset);
     const stale =
-      asset !== null &&
-      (isTtsVersionStale(lang, asset.ttsVersion) ||
-        shouldOverwriteProvider(
-          getTtsProviderForLanguage(lang),
-          asset.ttsProvider ?? 'google',
-        ));
+      mismatch !== null &&
+      (mismatch.providerMismatch || mismatch.versionMismatch);
     if (asset === null || !blobExists || stale) {
       if (opts?.probe) {
         if (await hasBlockingTtsClaim(ctx, textId, lang, opts?.priority)) {
@@ -1025,14 +1029,10 @@ async function scheduleLanguageContent(
   // Translation exists. Backfill missing annotations (romanization,
   // IPA). Same `=== undefined` sentinel semantics as the source-text
   // loop above.
-  for (const kind of missingAnnotationKinds(lang, translation)) {
-    if (opts?.probe) throw new ProbeNeedsWork();
-    await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].translationAction, {
-      textId,
-      text: translation.translatedText,
-      language: lang,
-    });
+  if (opts?.probe && missingAnnotationKinds(lang, translation).length > 0) {
+    throw new ProbeNeedsWork();
   }
+  await scheduleTranslationAnnotations(ctx, translation, undefined);
   if (!hasAudio) {
     // Defer TTS while an LLM retranslation is in flight for this
     // (textId, lang). Without this guard, `flagTranslation` (which

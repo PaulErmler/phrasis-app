@@ -9,16 +9,15 @@
  * sometimes missing (storage blobs) or wrong.
  */
 
-export type AudioContainer =
-  | 'wav'
-  | 'mp3'
-  | 'flac'
-  | 'ogg'
-  | 'webm'
-  | 'mp4'
-  | 'unknown';
+/** Containers the STT provider accepts: the only ones ever uploaded. */
+export type SttContainer = 'wav' | 'mp3' | 'flac' | 'ogg';
+export type AudioContainer = SttContainer | 'webm' | 'mp4' | 'unknown';
 
-/** Containers the STT provider refuses. */
+/**
+ * Containers the STT provider refuses. Detected so the callers can refuse
+ * them first: `transcribe.ts` before the quota spend, `transcribeAudio`
+ * before the upload.
+ */
 export const STT_REJECTED_CONTAINERS: ReadonlySet<AudioContainer> = new Set([
   'webm',
   'mp4',
@@ -72,28 +71,30 @@ export async function containerOfBlob(blob: Blob): Promise<AudioContainer> {
   );
 }
 
-const FILENAME_BY_CONTAINER: Record<
-  Exclude<AudioContainer, 'unknown'>,
-  string
-> = {
+const FILENAME_BY_CONTAINER: Record<SttContainer, string> = {
   wav: 'audio.wav',
   mp3: 'audio.mp3',
   flac: 'audio.flac',
   ogg: 'audio.ogg',
-  webm: 'audio.webm',
-  mp4: 'audio.m4a',
 };
+
+export function isSttContainer(
+  container: AudioContainer,
+): container is SttContainer {
+  return container in FILENAME_BY_CONTAINER;
+}
 
 /**
  * Multipart filename for the upload. When the bytes don't identify
  * themselves, fall back to the blob's mime label, then to MP3: every clip the
  * pipeline synthesizes is MP3, and storage blobs sometimes come back untyped.
+ * A rejected container never gets this far (`transcribeAudio` throws first).
  */
 export function sttFilename(
   container: AudioContainer,
   mimeType: string,
 ): string {
-  if (container !== 'unknown') return FILENAME_BY_CONTAINER[container];
+  if (isSttContainer(container)) return FILENAME_BY_CONTAINER[container];
   const base = mimeType.split(';')[0].trim().toLowerCase();
   if (base === 'audio/wav' || base === 'audio/x-wav' || base === 'audio/wave') {
     return 'audio.wav';

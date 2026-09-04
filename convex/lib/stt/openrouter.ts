@@ -33,7 +33,12 @@ import { OPENROUTER_MODELS } from '../../config/aiModels';
 import { requireEnv } from '../env';
 import { MAX_RETRIES, isRetryableStatus, retryDelayMs } from '../httpRetry';
 import { reserveRateLimitToken } from '../rateLimitReserve';
-import { containerOfBlob, sttFilename } from './audioContainer';
+import {
+  containerOfBlob,
+  sttFilename,
+  STT_REJECTED_CONTAINERS,
+  type AudioContainer,
+} from './audioContainer';
 import { toSttLanguage } from './languages';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/audio/transcriptions';
@@ -99,6 +104,20 @@ function finiteOrUndefined(value: unknown): number | undefined {
 }
 
 /**
+ * Thrown before any upload when the blob is a container the provider
+ * refuses (WebM, MP4). Callers with a user in front of them reject earlier
+ * (`transcribe.ts`, before the quota spend); this guards every other path.
+ */
+export class SttRejectedContainerError extends Error {
+  constructor(readonly container: AudioContainer) {
+    super(
+      `STT provider rejects ${container} audio; upload WAV, MP3, FLAC or OGG`,
+    );
+    this.name = 'SttRejectedContainerError';
+  }
+}
+
+/**
  * Transcribe an audio Blob. Returns the text, word-level timestamps
  * (seconds), and the provider's own duration and cost figures.
  *
@@ -116,7 +135,11 @@ export async function transcribeAudio(
   const apiKey = requireEnv('OPENROUTER_API_KEY');
   const maxRetries = opts.maxRetries ?? MAX_RETRIES;
 
-  const filename = sttFilename(await containerOfBlob(blob), blob.type);
+  const container = await containerOfBlob(blob);
+  if (STT_REJECTED_CONTAINERS.has(container)) {
+    throw new SttRejectedContainerError(container);
+  }
+  const filename = sttFilename(container, blob.type);
 
   let lastError = '';
   for (let attempt = 0; attempt <= maxRetries; attempt++) {

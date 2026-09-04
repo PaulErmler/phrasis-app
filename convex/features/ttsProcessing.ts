@@ -257,7 +257,7 @@ async function synthesizeAndValidate(
     /** Requester attribution for the cost events (see ttsJobArgsValidator). */
     requestedByUserId?: string;
     /** Audio for a superseded revision; see ttsJobArgsValidator. */
-    archivedTranslationId?: Id<'translations'>;
+    supersededTranslationId?: Id<'translations'>;
   },
   maxAttempts: number,
 ): Promise<{
@@ -365,7 +365,7 @@ async function synthesizeAndValidate(
         speed: args.speed,
         spokenText: args.text,
         regionVariant: args.regionVariant,
-        archivedTranslationId: args.archivedTranslationId,
+        supersededTranslationId: args.supersededTranslationId,
       });
     } else if (attempt > 0) {
       await ctx.runMutation(
@@ -376,7 +376,7 @@ async function synthesizeAndValidate(
           ttsQuality: 'unknown' as const,
           storageId,
           preserveOldStorage: true,
-          archivedTranslationId: args.archivedTranslationId,
+          supersededTranslationId: args.supersededTranslationId,
         },
       );
     }
@@ -552,7 +552,7 @@ const ttsJobArgsValidator = v.object({
   // asset by key as usual but never touch the (text, language) pointer,
   // which speaks the live wording; the revision's `audioAssetId` is
   // re-pointed instead (convex/features/audioStorage.ts).
-  archivedTranslationId: v.optional(v.id('translations')),
+  supersededTranslationId: v.optional(v.id('translations')),
 });
 
 type TtsJobArgs = Infer<typeof ttsJobArgsValidator>;
@@ -616,7 +616,7 @@ export const processTTSForCard = internalAction({
         wordTimings: validated && wordTimings ? wordTimings : undefined,
         spokenText: args.text,
         regionVariant: args.regionVariant,
-        archivedTranslationId: args.archivedTranslationId,
+        supersededTranslationId: args.supersededTranslationId,
       });
     } else {
       console.error(
@@ -686,7 +686,7 @@ export const enqueueTtsJob = internalMutation({
         forceRegen: args.forceRegen,
         priority: args.priority,
         requestedByUserId: args.requestedByUserId,
-        archivedTranslationId: args.archivedTranslationId,
+        supersededTranslationId: args.supersededTranslationId,
         provider,
       },
       {
@@ -764,13 +764,13 @@ export const updateAudioRecordingQuality = internalMutation({
     preserveOldStorage: v.optional(v.boolean()),
     // See ttsJobArgsValidator: the asset behind a superseded revision, not
     // the one behind the live pointer.
-    archivedTranslationId: v.optional(v.id('translations')),
+    supersededTranslationId: v.optional(v.id('translations')),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     let assetId: Id<'audioAssets'> | undefined;
-    if (args.archivedTranslationId !== undefined) {
-      const revision = await ctx.db.get(args.archivedTranslationId);
+    if (args.supersededTranslationId !== undefined) {
+      const revision = await ctx.db.get(args.supersededTranslationId);
       assetId = revision?.audioAssetId;
     } else {
       const record = await ctx.db

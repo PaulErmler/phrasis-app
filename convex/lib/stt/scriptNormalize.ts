@@ -22,6 +22,7 @@ import * as OpenCCToSimplified from 'opencc-js/t2cn';
 import { serbianLatinToCyrillic } from '../serbianTranslit';
 import { toSttLanguage } from './languages';
 import type { WordTiming } from './openrouter';
+import { getLanguageByCode, type SttScriptFix } from '../../../lib/languages';
 
 type Converter = (text: string) => string;
 
@@ -33,30 +34,23 @@ const simplifiedToTaiwan: Converter = (text) =>
 const hongKongToSimplified: Converter = (text) =>
   (hkToCn ??= OpenCCToSimplified.Converter({ from: 'hk', to: 'cn' }))(text);
 
+// The `tw` preset converts characters only; `twp` would also swap regional
+// vocabulary and change what the speaker said.
+const CONVERTER_BY_FIX: Record<SttScriptFix, Converter> = {
+  latinToCyrillic: serbianLatinToCyrillic,
+  simplifiedToTraditional: simplifiedToTaiwan,
+  traditionalToSimplified: hongKongToSimplified,
+};
+
 /**
  * The converter that moves STT output into `targetLanguage`'s script, or
- * `null` when the model already writes the script the app expects. The
- * `tw` preset converts characters only; `twp` would also swap regional
- * vocabulary and change what the speaker said.
+ * `null` when the model already writes the script the app expects. Which
+ * fix a language needs is the `sttScriptFix` field on its `Language` record
+ * (lib/languages.ts), where the per-language reasoning lives.
  */
 export function scriptConverterFor(targetLanguage: string): Converter | null {
-  switch (targetLanguage) {
-    case 'sr':
-      return serbianLatinToCyrillic;
-    case 'zh_traditional':
-      return simplifiedToTaiwan;
-    case 'yue_traditional':
-      // The model writes Cantonese in Traditional already (verified live,
-      // 2026-09-04). Running cn→hk over Traditional text is not safe: a
-      // handful of characters are both a Simplified form and a Traditional
-      // character in their own right (后, 干, 里, 只), and the converter
-      // would rewrite them.
-      return null;
-    case 'yue':
-      return hongKongToSimplified;
-    default:
-      return null;
-  }
+  const fix = getLanguageByCode(targetLanguage)?.sttScriptFix;
+  return fix === undefined ? null : CONVERTER_BY_FIX[fix];
 }
 
 /** Apply `scriptConverterFor(targetLanguage)` to the text and every word. */

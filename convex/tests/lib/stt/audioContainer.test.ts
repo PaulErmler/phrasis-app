@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import {
   detectAudioContainer,
+  isSttContainer,
   sttFilename,
   STT_REJECTED_CONTAINERS,
 } from '../../../lib/stt/audioContainer';
@@ -40,6 +41,11 @@ describe('lib/stt/audioContainer', () => {
 
   it('rejects exactly the two MediaRecorder containers', () => {
     expect([...STT_REJECTED_CONTAINERS].sort()).toEqual(['mp4', 'webm']);
+    for (const container of STT_REJECTED_CONTAINERS) {
+      expect(isSttContainer(container)).toBe(false);
+    }
+    expect(isSttContainer('unknown')).toBe(false);
+    expect(isSttContainer('wav')).toBe(true);
   });
 
   it('names the upload from the container, then the mime label, then MP3', () => {
