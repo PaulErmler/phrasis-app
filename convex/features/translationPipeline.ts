@@ -41,6 +41,10 @@ import {
   asVoiceGender,
 } from '../types';
 import { liveTranslation } from '../db/translationReads';
+import {
+  missingAnnotationKinds,
+  TEXT_ANNOTATIONS,
+} from '../lib/textAnnotations';
 
 /**
  * Translation write pipeline: the legacy Google Translate worker action and
@@ -187,7 +191,7 @@ const vStoreTranslationAndScheduleTtsArgs = v.object({
    * write: an identical result merely restamps the version, and a different
    * one is archived for existing cards before the row is replaced. Every
    * other reason (and absence) keeps the historical replace / fill
-   * semantics. See `translationArchive` in schema.ts.
+   * semantics. See `supersededAt` in schema.ts.
    */
   translationReason: v.optional(translationReasonValidator),
   /**
@@ -687,6 +691,10 @@ function defined<T extends Record<string, unknown>>(value: T): T {
  * the wording has audio (`audioAssetId`): a revision nobody can be served is
  * a row for nothing, and a revision without audio would pin its cards to a
  * wording no pointer voices.
+ *
+ * The copy carries the wording's annotations as they are; whatever is still
+ * missing is scheduled right away with the copy's own id, so a pinned card
+ * gets its IPA / furigana / romanization exactly like a live one would.
  */
 async function archiveTranslationRevision(
   ctx: MutationCtx,
@@ -694,7 +702,7 @@ async function archiveTranslationRevision(
   audioAssetId: Id<'audioAssets'>,
 ): Promise<void> {
   const supersededAt = Date.now();
-  await ctx.db.insert(
+  const supersededId = await ctx.db.insert(
     'translations',
     defined({
       textId: existing.textId,
@@ -715,6 +723,17 @@ async function archiveTranslationRevision(
     }),
   );
   await ctx.db.patch(existing._id, { lastArchivedAt: supersededAt });
+  for (const kind of missingAnnotationKinds(
+    existing.targetLanguage,
+    existing,
+  )) {
+    await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].translationAction, {
+      textId: existing.textId,
+      text: existing.translatedText,
+      language: existing.targetLanguage,
+      translationId: supersededId,
+    });
+  }
 }
 
 /**

@@ -651,6 +651,8 @@ export const backfillTranslationFurigana = migrations.define({
         textId: doc.textId,
         text: doc.translatedText,
         language: doc.targetLanguage,
+        // By row id: a superseded revision gets its own furigana.
+        translationId: doc._id,
       },
     );
   },

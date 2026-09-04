@@ -232,17 +232,7 @@ export async function isAudioAssetReferenced(
     .query('translations')
     .withIndex('by_audioAssetId', (q) => q.eq('audioAssetId', assetId))
     .first();
-  if (superseded) return true;
-  // Transition only: staging still holds rows in the deprecated
-  // `translationArchive` table until `admin/convertTranslationArchive` has
-  // run. Deleting an asset one of them references would leave the moved row
-  // mute, so they count as references until the table is dropped (remove
-  // this lookup together with the table definition in schema.ts).
-  const legacyArchived = await ctx.db
-    .query('translationArchive')
-    .withIndex('by_audioAssetId', (q) => q.eq('audioAssetId', assetId))
-    .first();
-  return legacyArchived !== null;
+  return superseded !== null;
 }
 
 /**

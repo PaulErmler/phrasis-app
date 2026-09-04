@@ -21,7 +21,13 @@ import { IPA_LANGUAGES } from '../../lib/languages';
  */
 
 export interface BackfillPage {
-  items: Array<{ textId: Id<'texts'>; language: string; text: string }>;
+  items: Array<{
+    textId: Id<'texts'>;
+    language: string;
+    text: string;
+    /** The exact `translations` row (superseded revisions included); absent for texts. */
+    translationId?: Id<'translations'>;
+  }>;
   isDone: boolean;
   continueCursor: string;
 }
@@ -43,6 +49,7 @@ export const pageIpaCandidates = internalQuery({
         textId: v.id('texts'),
         language: v.string(),
         text: v.string(),
+        translationId: v.optional(v.id('translations')),
       }),
     ),
     isDone: v.boolean(),
@@ -72,10 +79,13 @@ export const pageIpaCandidates = internalQuery({
             t.ipaText === undefined &&
             t.translatedText.length > 0,
         )
+        // By row id, so a superseded revision (see `supersededAt` in
+        // schema.ts) gets its own IPA instead of the live row's.
         .map((t) => ({
           textId: t.textId,
           language: t.targetLanguage,
           text: t.translatedText,
+          translationId: t._id,
         })),
       isDone: page.isDone,
       continueCursor: page.continueCursor,

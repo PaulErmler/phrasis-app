@@ -253,6 +253,8 @@ async function synthesizeAndValidate(
     priority?: TtsPriority;
     /** Requester attribution for the cost events (see ttsJobArgsValidator). */
     requestedByUserId?: string;
+    /** Audio for a superseded revision; see ttsJobArgsValidator. */
+    archivedTranslationId?: Id<'translations'>;
   },
   maxAttempts: number,
 ): Promise<{
@@ -357,6 +359,7 @@ async function synthesizeAndValidate(
         speed: args.speed,
         spokenText: args.text,
         regionVariant: args.regionVariant,
+        archivedTranslationId: args.archivedTranslationId,
       });
     } else if (attempt > 0) {
       await ctx.runMutation(
@@ -367,6 +370,7 @@ async function synthesizeAndValidate(
           ttsQuality: 'unknown' as const,
           storageId,
           preserveOldStorage: true,
+          archivedTranslationId: args.archivedTranslationId,
         },
       );
     }
@@ -529,6 +533,12 @@ const ttsJobArgsValidator = v.object({
   // edit, custom card, …). The cost event bills to them as "spend this user
   // caused" (see convex/lib/posthogAi.ts); absent = system bucket.
   requestedByUserId: v.optional(v.string()),
+  // Audio for a SUPERSEDED translation revision (see `supersededAt` in
+  // schema.ts): the wording a pinned card still shows. The writes upsert the
+  // asset by key as usual but never touch the (text, language) pointer,
+  // which speaks the live wording; the revision's `audioAssetId` is
+  // re-pointed instead (convex/features/audioStorage.ts).
+  archivedTranslationId: v.optional(v.id('translations')),
 });
 
 type TtsJobArgs = Infer<typeof ttsJobArgsValidator>;
@@ -592,6 +602,7 @@ export const processTTSForCard = internalAction({
         wordTimings: validated && wordTimings ? wordTimings : undefined,
         spokenText: args.text,
         regionVariant: args.regionVariant,
+        archivedTranslationId: args.archivedTranslationId,
       });
     } else {
       console.error(
@@ -660,6 +671,8 @@ export const enqueueTtsJob = internalMutation({
         regionVariant: args.regionVariant,
         forceRegen: args.forceRegen,
         priority: args.priority,
+        requestedByUserId: args.requestedByUserId,
+        archivedTranslationId: args.archivedTranslationId,
         provider,
       },
       {
@@ -735,18 +748,28 @@ export const updateAudioRecordingQuality = internalMutation({
     ttsQuality: ttsQualityValidator,
     storageId: v.optional(v.id('_storage')),
     preserveOldStorage: v.optional(v.boolean()),
+    // See ttsJobArgsValidator: the asset behind a superseded revision, not
+    // the one behind the live pointer.
+    archivedTranslationId: v.optional(v.id('translations')),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const record = await ctx.db
-      .query('audioRecordings')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('language', args.language),
-      )
-      .first();
-    if (!record) return null;
+    let assetId: Id<'audioAssets'> | undefined;
+    if (args.archivedTranslationId !== undefined) {
+      const revision = await ctx.db.get(args.archivedTranslationId);
+      assetId = revision?.audioAssetId;
+    } else {
+      const record = await ctx.db
+        .query('audioRecordings')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', args.textId).eq('language', args.language),
+        )
+        .first();
+      assetId = record?.assetId;
+    }
+    if (assetId === undefined) return null;
 
-    const asset = await ctx.db.get(record.assetId);
+    const asset = await ctx.db.get(assetId);
     if (!asset || asset.ttsQuality !== 'unknown') return null;
     if (args.storageId && args.storageId !== asset.storageId) {
       // Same dead-asset guard as storeAudioRecording: never re-point the
@@ -906,15 +929,15 @@ export const persistBackfilledWordTimings = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const record = await ctx.db
-      .query('audioRecordings')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('language', args.language),
-      )
+    // By blob, not through the (text, language) pointer: the timings belong
+    // to whichever asset still owns the transcribed blob, which is the live
+    // pointer's asset or the asset of a superseded revision alike. A swapped
+    // blob simply finds no asset and the stale timings are dropped.
+    const asset = await ctx.db
+      .query('audioAssets')
+      .withIndex('by_storageId', (q) => q.eq('storageId', args.storageId))
       .first();
-    if (!record) return null;
-    const asset = await ctx.db.get(record.assetId);
-    if (!asset || asset.storageId !== args.storageId) return null;
+    if (!asset) return null;
     await ctx.db.patch(asset._id, { wordTimings: args.wordTimings });
     return null;
   },

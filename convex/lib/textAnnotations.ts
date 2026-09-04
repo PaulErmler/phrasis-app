@@ -57,6 +57,12 @@ type AnnotationActionArgs = {
   textId: Id<'texts'>;
   text: string;
   language: string;
+  /**
+   * The exact `translations` row to annotate. Required for a superseded
+   * revision (the store cannot find those by (text, language)); absent means
+   * the live row. Ignored by the source-text actions.
+   */
+  translationId?: Id<'translations'>;
 };
 type AnnotationAction = FunctionReference<
   'action',
@@ -311,6 +317,7 @@ export async function runTranslationAnnotation(
     value,
     source,
     forText: args.text,
+    translationId: args.translationId,
   });
   return null;
 }

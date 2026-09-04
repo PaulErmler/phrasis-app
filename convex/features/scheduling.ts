@@ -10,6 +10,7 @@ import {
   cardPinAt,
   liveTranslation,
   resolveServedFromLive,
+  type ServedTranslation,
 } from '../db/translationReads';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
@@ -76,7 +77,10 @@ import {
 } from '../../lib/translationProvenance';
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
-import { scheduleMissingContent } from '../lib/contentScheduling';
+import {
+  regenerateSupersededRevisionAudio,
+  scheduleMissingContent,
+} from '../lib/contentScheduling';
 import { fetchTrackDueCards } from '../lib/dueQueue';
 import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
 import { WRITING_ALTERNATIVES_MAX } from '../../lib/constants/learning';
@@ -1590,7 +1594,7 @@ async function suggestCurriculumFixesForEdit(
   originalText: Doc<'texts'>,
   changedLanguages: Set<string>,
   submittedMap: Map<string, string>,
-  existingTranslationMap: Map<string, Doc<'translations'>>,
+  servedTranslationMap: Map<string, ServedTranslation>,
   audit: {
     cardEditId: Id<'cardEdits'>;
     userId: string;
@@ -1602,10 +1606,15 @@ async function suggestCurriculumFixesForEdit(
   for (const lang of changedLanguages) {
     if (lang === originalText.language) continue;
 
-    const existing = existingTranslationMap.get(lang);
+    const served = servedTranslationMap.get(lang);
     // No shared row for this language: the curriculum never had a translation
     // here, so there is nothing to correct and nothing to count.
-    if (!existing) continue;
+    if (!served) continue;
+    // A pinned card shows a superseded wording. The learner corrected THAT,
+    // not the live row they never saw, so the live row gets no complaint
+    // and no retranslation (same rule as `flagTranslation`).
+    if (served.archived) continue;
+    const existing = served.live;
 
     // Hand-curated and user-provided rows are never second-guessed by the
     // pipeline. Skip them whole, counter included: a flag we will never act on
@@ -1659,7 +1668,7 @@ async function suggestCurriculumFixesForEdit(
  * deletion are reverted.
  *
  * Pinned cards: a card created before a version bump keeps showing the
- * superseded wording (see `translationArchive` in schema.ts). Flagging such a
+ * superseded wording (see `supersededAt` in schema.ts). Flagging such a
  * card disputes wording the curriculum has already moved past, so the card
  * is moved to the latest revision (`translationsAcceptedAt = now`) instead of
  * counting a complaint against the live row; only languages whose live row
@@ -1927,7 +1936,33 @@ export const regenerateCardAudio = mutation({
     const allLanguages = [
       ...new Set([...course.baseLanguages, ...course.targetLanguages]),
     ];
+    // A pinned card plays the asset of a superseded revision, not the live
+    // pointer's audio (see `supersededAt` in schema.ts). Regenerating the
+    // live audio would spend the quota unit on a clip this card never plays,
+    // so those languages re-synthesize their archived asset in place instead
+    // and keep the live pointer as it is.
+    const pinAt = cardPinAt(card);
+    const archivedLanguages = new Set<string>();
     for (const lang of allLanguages) {
+      if (lang === text.language) continue;
+      const live = await liveTranslation(ctx, card.textId, lang);
+      if (!live) continue;
+      const served = await resolveServedFromLive(ctx, live, pinAt);
+      if (served.archived) {
+        archivedLanguages.add(lang);
+        await regenerateSupersededRevisionAudio(ctx, text, served.row, {
+          audioSpeakerGender: text.audioSpeakerGender,
+          // The button means "synthesize anew": bypass the asset cache (a
+          // hit would hand back the very asset being replaced).
+          forceRegen: true,
+          requestedByUserId: userId,
+        });
+      }
+    }
+    // The live pointers of the archived languages stay, so the sweep below
+    // sees their audio as present and regenerates nothing for them.
+    for (const lang of allLanguages) {
+      if (archivedLanguages.has(lang)) continue;
       await deleteAudioRowsForTextLanguage(ctx, card.textId, lang);
     }
 
@@ -2101,7 +2136,7 @@ export async function applyCardEdit(
         text,
         changedLanguages,
         plan.submittedMap,
-        plan.existingTranslationMap,
+        plan.servedTranslationMap,
         { cardEditId, userId, course },
       );
     }

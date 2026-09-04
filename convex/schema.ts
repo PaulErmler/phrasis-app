@@ -652,40 +652,6 @@ export default defineSchema({
     ])
     .index('by_audioAssetId', ['audioAssetId']),
 
-  // DEPRECATED. Superseded revisions live in `translations` now (see
-  // `supersededAt` there). Kept defined only until staging's rows have been
-  // moved by `admin/convertTranslationArchive`: Convex cannot drop a table
-  // that still holds documents, so this definition goes in the deploy after
-  // the conversion. Prod never had rows here.
-  translationArchive: defineTable({
-    textId: v.id('texts'),
-    targetLanguage: v.string(),
-    translatedText: v.string(),
-    romanizedText: v.optional(v.string()),
-    romanizationSource: v.optional(v.string()),
-    ipaText: v.optional(v.string()),
-    ipaSource: v.optional(v.string()),
-    furiganaText: v.optional(v.string()),
-    furiganaSource: v.optional(v.string()),
-    translationSource: v.optional(v.string()),
-    regionVariant: v.optional(v.string()),
-    speakerGender: v.optional(voiceGenderValidator),
-    translationVersion: v.optional(v.number()),
-    // The audio that spoke this wording at the moment it was superseded, if
-    // the language had audio. The live row's pointer was detached with
-    // `keepAsset`, so the asset lives on for the pinned cards.
-    audioAssetId: v.optional(v.id('audioAssets')),
-    // When the live row stopped carrying this wording. A card whose pin is
-    // earlier than this (and later than any earlier archive row's) sees it.
-    supersededAt: v.number(),
-  })
-    .index('by_text_language_supersededAt', [
-      'textId',
-      'targetLanguage',
-      'supersededAt',
-    ])
-    .index('by_audioAssetId', ['audioAssetId']),
-
   // Content-addressed audio store. One row per unique
   // (language, voiceGender, regionVariant, spoken string), every text whose
   // audio speaks that exact string points at the same asset via
@@ -726,7 +692,7 @@ export default defineSchema({
     // legacy rows carried over by the backfill, which is also "completed").
     ttsQuality: v.optional(ttsQualityValidator),
     speed: v.number(),
-    // Word-level timestamps from Azure Fast Transcription, captured during TTS
+    // Word-level timestamps from the STT validation pass (convex/lib/stt), captured during TTS
     // validation. Seconds relative to the audio blob. Only populated when
     // validation succeeded.
     wordTimings: v.optional(
@@ -931,7 +897,7 @@ export default defineSchema({
     wordsTrackedLanguages: v.optional(v.array(v.string())), // Languages for which words have been counted in stats
     audioSpeedOverrides: v.optional(v.record(v.string(), v.number())), // Per-card per-language playback speed override (range CARD_OVERRIDE_SPEED_MIN-CARD_OVERRIDE_SPEED_MAX, see lib/constants/audioPlayback). Missing entry = use general courseSettings.languagePlaybackSpeeds.
     // Translation pin. A card is served the curriculum translations that were
-    // live at this instant (see `translationArchive`); undefined means the
+    // live at this instant (see `translations.supersededAt`); undefined means the
     // card's `_creationTime`. Moved to "now" when the learner flags a card
     // whose wording the curriculum has since revised (they accept the latest
     // wording). Never indexed: it is only ever read off the card itself.

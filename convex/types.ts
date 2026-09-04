@@ -84,7 +84,7 @@ export const audioRecordingValidator = v.object({
   language: v.string(),
   voiceName: v.union(v.string(), v.null()),
   url: v.union(v.string(), v.null()),
-  // Word-level timings from Azure Fast Transcription, captured during TTS validation.
+  // Word-level timings from the STT validation pass (convex/lib/stt).
   // The schema field is `v.optional(v.array(...))` so DB rows can be `undefined`,
   // but this validator is stricter: `null | array` only. Callers building a
   // response from a raw audioRecordings row MUST coerce `undefined → null`
@@ -240,8 +240,7 @@ export const ttsQualityValidator = v.union(
 // 'minimax' = MiniMax Speech 2.8 Turbo, both via OpenRouter's /audio/speech
 // endpoint (distinct from 'google' = Cloud Chirp3).
 // 'elevenlabs' (index 1) and 'azure' (index 2) are retired providers retained
-// only so historical stored values still validate, neither is dispatchable
-// (Azure Speech remains in use for STT only; see convex/lib/stt).
+// only so historical stored values still validate; neither is dispatchable.
 export const ttsProviderValidator = v.union(
   v.literal(TTS_PROVIDERS[0]),
   v.literal(TTS_PROVIDERS[1]),
@@ -404,7 +403,7 @@ export const cardEditKindValidator = v.union(
   v.literal('flag'), // the Flag button (features/scheduling:flagTranslation)
   // The Flag button on a card pinned to a superseded curriculum wording: the
   // card was moved to the latest wording instead of retranslating
-  // (features/scheduling:flagTranslation, see `translationArchive`).
+  // (features/scheduling:flagTranslation, see `supersededAt` in schema.ts).
   v.literal('accept_latest'),
 );
 export type CardEditKind = Infer<typeof cardEditKindValidator>;
@@ -478,7 +477,7 @@ export const translationReasonValidator = v.union(
   v.literal('curriculum_fix'), // the user retyped a curriculum translation
   // The language's `translationVersion` was bumped above the row's stamp: a
   // keep-row regeneration whose write archives the old wording for existing
-  // cards (see `translationArchive` in schema.ts). Carries no previous
+  // cards (see `supersededAt` in schema.ts). Carries no previous
   // translation: the point is a fresh rendering, not a reconsideration.
   v.literal('version_bump'),
 );
