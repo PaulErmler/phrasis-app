@@ -18,7 +18,7 @@ import {
 } from './audioAssets';
 import {
   cardPinAt,
-  getLiveTranslation,
+  liveTranslation,
   resolveServedFromLive,
   type ServedTranslation,
 } from '../db/translationReads';
@@ -192,12 +192,7 @@ export async function buildTextContentBatchForLanguages(
   const [translationResults, audioResults, claimResults] = await Promise.all([
     Promise.all(
       translationFetches.map((item) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', item.textId).eq('targetLanguage', item.lang),
-          )
-          .first(),
+        liveTranslation(ctx, item.textId, item.lang),
       ),
     ),
     Promise.all(
@@ -243,8 +238,9 @@ export async function buildTextContentBatchForLanguages(
       llmClaimedAt: number | null;
       versionStale: boolean;
       /**
-       * The card is pinned to a superseded revision. Frozen content: it
-       * never regenerates, so nothing about it counts as missing.
+       * The card is pinned to a superseded revision. Its wording never
+       * regenerates, but its annotations and audio are filled and repaired
+       * by the sweep like a live row's, so its gaps count as missing content.
        */
       archived: boolean;
     }
@@ -257,22 +253,27 @@ export async function buildTextContentBatchForLanguages(
     const row = served?.row;
     const claim = claimResults[idx];
     const archived = served?.archived ?? false;
+    const liveRegenerable =
+      served != null &&
+      mayRegenerateTranslation({ userCreated: item.userCreated }, served.live);
+    const versionStale =
+      liveRegenerable &&
+      isTranslationVersionStale(item.lang, served!.live.translationVersion);
     translationMap.set(`${item.key}:${item.lang}`, {
       text: row?.translatedText ?? '',
       romanization: row?.romanizedText ?? undefined,
       ipa: row?.ipaText ?? undefined,
       furigana: row?.furiganaText ?? undefined,
-      // A retranslation in flight replaces the LIVE row; a pinned card will
-      // not see it, so the pill stays off for archived entries.
-      llmClaimedAt: archived ? null : (claim?.claimedAt ?? null),
-      versionStale:
-        served != null &&
-        !archived &&
-        mayRegenerateTranslation(
-          { userCreated: item.userCreated },
-          served.live,
-        ) &&
-        isTranslationVersionStale(item.lang, served.live.translationVersion),
+      // The "Retranslating" pill. Off for a pinned card (the in-flight job
+      // replaces the LIVE row, which this card does not show) and off while
+      // the row is version-stale: the job holding the claim is then the
+      // silent version-bump regeneration, which must not announce itself on
+      // every existing card right after a bump. A flag retranslation on a
+      // still-stale row loses the pill too; the flagger sees the client-side
+      // "Flagged" pill instead.
+      llmClaimedAt:
+        archived || versionStale ? null : (claim?.claimedAt ?? null),
+      versionStale: !archived && versionStale,
       archived,
     });
     if (served?.archived && served.audioAssetId) {
@@ -398,17 +399,14 @@ export async function buildTextContentBatchForLanguages(
       };
     });
 
-    // Archived (pinned) entries are frozen: the pipeline only ever fills the
-    // live row, so counting a pinned entry's gaps would make the client
-    // self-heal ask forever for work nothing will do.
-    const isArchived = (lang: string) =>
-      translationMap.get(`${input.key}:${lang}`)?.archived === true;
+    // A pinned card's superseded revision counts its gaps exactly like the
+    // live row: `scheduleMissingContent` fills a superseded row's annotations,
+    // backfills its timings and repairs its audio (contentScheduling.ts,
+    // `supersededMap`), so the client self-heal has real work to ask for.
     const hasMissingTranslation = translations.some(
       (tr) => tr.language !== input.sourceLanguage && !tr.text,
     );
-    const hasMissingAudio = audioRecordings.some(
-      (audio) => !audio.url && !isArchived(audio.language),
-    );
+    const hasMissingAudio = audioRecordings.some((audio) => !audio.url);
     // Read the STORED annotations, not the projected ones: those are display
     // values, already blanked for languages the caller didn't ask about.
     // `=== undefined` (not `!stored`) mirrors the schedulers in decks.ts,
@@ -419,7 +417,6 @@ export async function buildTextContentBatchForLanguages(
     // term is what wires both kinds into the client self-heal
     // (useEnsureContent → ensureCardContent → scheduleMissingContent).
     const hasMissingAnnotation = allLanguages.some((lang) => {
-      if (isArchived(lang)) return false;
       const stored =
         lang === input.sourceLanguage
           ? {
@@ -444,7 +441,6 @@ export async function buildTextContentBatchForLanguages(
       (audio) =>
         audio.url !== null &&
         audio.wordTimings === null &&
-        !isArchived(audio.language) &&
         languageSupportsStt(audio.language),
     );
 
@@ -469,7 +465,7 @@ async function loadLiveTranslationRows(
   courseLanguages: string[],
 ): Promise<(Doc<'translations'> | null)[]> {
   return Promise.all(
-    courseLanguages.map((lang) => getLiveTranslation(ctx, textId, lang)),
+    courseLanguages.map((lang) => liveTranslation(ctx, textId, lang)),
   );
 }
 

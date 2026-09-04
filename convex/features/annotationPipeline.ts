@@ -9,6 +9,7 @@ import {
   type AnnotationKind,
 } from '../lib/textAnnotations';
 import { scheduleSearchableTextRebuild } from './searchRebuild';
+import { liveTranslation } from '../db/translationReads';
 
 /**
  * Romanization/annotation pipeline: the worker actions that romanize source
@@ -104,7 +105,12 @@ export async function storeSourceAnnotationHandler(
  */
 export async function processRomanizationForTranslationHandler(
   ctx: ActionCtx,
-  args: { textId: Id<'texts'>; text: string; language: string },
+  args: {
+    textId: Id<'texts'>;
+    text: string;
+    language: string;
+    translationId?: Id<'translations'>;
+  },
 ): Promise<null> {
   let romanized: string;
   try {
@@ -125,6 +131,7 @@ export async function processRomanizationForTranslationHandler(
     value: romanized,
     source: getRomanizationSource(args.language),
     forText: args.text,
+    translationId: args.translationId,
   });
   return null;
 }
@@ -144,15 +151,22 @@ export async function storeTranslationAnnotationHandler(
     source: string;
     // See storeSourceAnnotationHandler: skip when the row's wording moved on.
     forText?: string;
+    // The exact row to patch: a superseded revision (see `supersededAt` in
+    // schema.ts) cannot be found by (text, language). Absent = the live row.
+    translationId?: Id<'translations'>;
   },
 ): Promise<null> {
   const spec = TEXT_ANNOTATIONS[args.kind];
-  const translation = await ctx.db
-    .query('translations')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', args.textId).eq('targetLanguage', args.language),
-    )
-    .first();
+  const byId =
+    args.translationId !== undefined
+      ? await ctx.db.get(args.translationId)
+      : null;
+  const translation =
+    args.translationId !== undefined
+      ? byId && byId.textId === args.textId
+        ? byId
+        : null
+      : await liveTranslation(ctx, args.textId, args.language);
   if (
     args.forText !== undefined &&
     translation &&

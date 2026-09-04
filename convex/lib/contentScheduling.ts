@@ -14,7 +14,11 @@ import {
 } from '../../lib/languages';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
-import { missingAnnotationKinds, TEXT_ANNOTATIONS } from './textAnnotations';
+import {
+  missingAnnotationKinds,
+  scheduleTranslationAnnotations,
+  TEXT_ANNOTATIONS,
+} from './textAnnotations';
 import { deleteAudioRow } from './audio';
 import {
   findReusableAudioAsset,
@@ -34,6 +38,7 @@ import {
   hasBlockingLlmClaim,
   isClaimFresh,
 } from '../features/llmTranslationQueue';
+import { splitRevisions, translationRevisions } from '../db/translationReads';
 
 /**
  * Content-scheduling helpers: the shared "fill whatever this text is missing"
@@ -198,7 +203,7 @@ export async function scheduleTranslationForLanguage(
  * current wording and audio until the new wording lands; the write choke
  * point (`storeTranslationAndScheduleTTS`, reason `'version_bump'`) then
  * restamps an identical result, or archives the old wording for the cards
- * that reference the text before replacing it (see `translationArchive` in
+ * that reference the text before replacing it (see `supersededAt` in
  * schema.ts). Nothing is deleted up front, so a learner never sees a gap and
  * never sees their card's wording change. Shared by the card sweep and the
  * collection preview / warmup path so the two cannot drift. Returns true iff
@@ -245,6 +250,7 @@ export async function enqueueTtsForVoice(
     forceRegen,
     priority,
     requestedByUserId,
+    supersededTranslationId,
   }: {
     textId: Id<'texts'>;
     text: string;
@@ -255,6 +261,8 @@ export async function enqueueTtsForVoice(
     priority?: TtsPriority;
     /** Requester attribution for the synthesis cost event. */
     requestedByUserId?: string;
+    /** Audio for a superseded revision; see ttsJobArgsValidator. */
+    supersededTranslationId?: Id<'translations'>;
   },
 ): Promise<void> {
   const voiceGender = getVoiceGenderByApiCode(voiceName);
@@ -276,6 +284,7 @@ export async function enqueueTtsForVoice(
       forceRegen,
       priority,
       requestedByUserId,
+      supersededTranslationId,
     },
   });
 }
@@ -373,6 +382,102 @@ export async function scheduleAudioForLanguage(
   return true;
 }
 
+/**
+ * Voice or repair the audio of a SUPERSEDED translation revision (see
+ * `supersededAt` in schema.ts): the wording a pinned card still shows.
+ * Shared by the ensure sweep's repair (`scheduleSupersededRevisionContent`)
+ * and the regenerate-audio button. The job never touches the live
+ * (text, language) pointer, which speaks the live wording; it upserts the
+ * asset by key and re-points the revision's `audioAssetId`
+ * (`supersededTranslationId`, see ttsProcessing.ts and audioStorage.ts).
+ *
+ * Without `forceRegen` a fresh content-addressed asset for the same string
+ * is attached to the revision with no synthesis at all (a lost asset doc).
+ * With it, the existing asset is replaced in place, attempt-0 early write
+ * skipped, so it keeps playing until the final write swaps its blob (dead
+ * blob, stale ttsVersion or provider, the regenerate button). Returns true
+ * iff audio was attached or a job was enqueued.
+ */
+export async function regenerateSupersededRevisionAudio(
+  ctx: MutationCtx,
+  text: Doc<'texts'>,
+  revision: Doc<'translations'>,
+  opts: {
+    audioSpeakerGender: string | undefined;
+    forceRegen?: boolean;
+    priority?: TtsPriority;
+    requestedByUserId?: string;
+  },
+): Promise<boolean> {
+  const language = revision.targetLanguage;
+  // The wording was generated for the revision's own gender; only a legacy
+  // row without a stamp falls back to the card's current gender.
+  const gender = revision.speakerGender ?? opts.audioSpeakerGender;
+  const voiceName = revision.regionVariant
+    ? getVoiceForLanguageVariant(language, revision.regionVariant, gender)
+    : getVoiceForLanguage(language, gender);
+  if (!opts.forceRegen) {
+    const voiceGender = getVoiceGenderByApiCode(voiceName);
+    if (voiceGender !== undefined) {
+      const asset = await findReusableAudioAsset(ctx, {
+        language,
+        voiceGender,
+        regionVariant: revision.regionVariant,
+        spokenText: revision.translatedText,
+      });
+      if (asset) {
+        if (asset._id !== revision.audioAssetId) {
+          await ctx.db.patch(revision._id, { audioAssetId: asset._id });
+        }
+        return true;
+      }
+    }
+  }
+  const claimed = await claimTtsIfAvailable(
+    ctx,
+    text._id,
+    language,
+    opts.priority,
+  );
+  if (!claimed) return false;
+  await enqueueTtsForVoice(ctx, {
+    textId: text._id,
+    text: revision.translatedText,
+    language,
+    voiceName,
+    regionVariant: revision.regionVariant,
+    forceRegen: opts.forceRegen,
+    priority: opts.priority,
+    requestedByUserId: opts.requestedByUserId,
+    supersededTranslationId: revision._id,
+  });
+  return true;
+}
+
+/**
+ * Whether an asset is obsolete AS AUDIO for `lang`, independent of the
+ * text it speaks. Provider: only the (current, existing) matchups listed in
+ * lib/ttsPrecedence.ts force a re-synth (e.g. google overwrote azure to
+ * migrate the Arabic dialects); unlisted pairs keep the audio. Assets from
+ * before the provider field are legacy Google. Version: the language's
+ * `ttsVersion` was bumped above the asset's stamp (a new voice pool, Gemini
+ * prompt or provider); `isTtsVersionStale` treats an unstamped asset as
+ * current so un-backfilled rows never storm. Shared by the live pointer's
+ * validity sweep and the superseded-revision repair.
+ */
+function audioAssetMismatch(
+  lang: string,
+  asset: Pick<Doc<'audioAssets'>, 'ttsProvider' | 'ttsVersion'>,
+): { providerMismatch: boolean; versionMismatch: boolean } {
+  return {
+    providerMismatch: shouldOverwriteProvider(
+      getTtsProviderForLanguage(lang),
+      asset.ttsProvider ?? 'google',
+    ),
+    versionMismatch: isTtsVersionStale(lang, asset.ttsVersion),
+  };
+}
+
 /** Options threaded through the whole `scheduleMissingContent` sweep. */
 type ContentSweepOpts = {
   /**
@@ -423,7 +528,15 @@ type ResolvedAudioPayload = NonNullable<
  * refills the language).
  */
 type ContentSweepState = {
+  /** The LIVE translation row per language (null when none exists). */
   translationMap: Map<string, Doc<'translations'> | null>;
+  /**
+   * The superseded revisions per language (`supersededAt` set, see
+   * schema.ts), oldest first. Pinned cards are still served these, so the
+   * sweep fills their annotations and repairs their audio exactly like the
+   * live row's; it never regenerates their wording.
+   */
+  supersededMap: Map<string, Doc<'translations'>[]>;
   audioMap: Map<string, Doc<'audioRecordings'> | null>;
   llmClaimMap: Map<string, Doc<'llmTranslationClaims'> | null>;
   /** Resolved payloads for the audio rows that SURVIVED the validity sweep. */
@@ -446,36 +559,37 @@ async function loadContentState(
   allRequiredLanguages: string[],
   langsNeedingTranslation: string[],
 ): Promise<ContentSweepState> {
-  const [existingTranslations, existingAudio, existingLlmClaims] =
-    await Promise.all([
-      Promise.all(
-        langsNeedingTranslation.map((lang) =>
-          ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('targetLanguage', lang),
-            )
-            .first(),
-        ),
+  const [revisions, existingAudio, existingLlmClaims] = await Promise.all([
+    Promise.all(
+      langsNeedingTranslation.map((lang) =>
+        translationRevisions(ctx, textId, lang),
       ),
-      Promise.all(
-        allRequiredLanguages.map((lang) =>
-          ctx.db
-            .query('audioRecordings')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('language', lang),
-            )
-            .first(),
-        ),
+    ),
+    Promise.all(
+      allRequiredLanguages.map((lang) =>
+        ctx.db
+          .query('audioRecordings')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', textId).eq('language', lang),
+          )
+          .first(),
       ),
-      Promise.all(
-        langsNeedingTranslation.map((lang) => getLlmClaim(ctx, textId, lang)),
-      ),
-    ]);
+    ),
+    Promise.all(
+      langsNeedingTranslation.map((lang) => getLlmClaim(ctx, textId, lang)),
+    ),
+  ]);
 
+  // One index range per language returns the live row and its superseded
+  // revisions together; rows never bumped have no revisions, so this costs
+  // exactly what the live-row read used to.
+  const split = revisions.map(splitRevisions);
   return {
     translationMap: new Map(
-      langsNeedingTranslation.map((lang, i) => [lang, existingTranslations[i]]),
+      langsNeedingTranslation.map((lang, i) => [lang, split[i].live]),
+    ),
+    supersededMap: new Map(
+      langsNeedingTranslation.map((lang, i) => [lang, split[i].superseded]),
     ),
     audioMap: new Map(
       allRequiredLanguages.map((lang, i) => [lang, existingAudio[i]]),
@@ -542,22 +656,10 @@ async function sweepInvalidAudio(
       const genderMismatch =
         (audioSpeakerGender === 'male' || audioSpeakerGender === 'female') &&
         payload.voiceGender !== audioSpeakerGender;
-      // Assets carried over from pre-provider-field audio are legacy Google.
-      const existingProvider = payload.ttsProvider ?? 'google';
-      const currentProvider = getTtsProviderForLanguage(lang);
-      // Provider regen is now gated by lib/ttsPrecedence.ts, only the
-      // (current, existing) matchups listed there force a delete + re-synth
-      // (e.g. google now overwrites azure, to migrate the Arabic dialects
-      // off Azure). Unlisted pairs keep the existing audio.
-      const providerMismatch = shouldOverwriteProvider(
-        currentProvider,
-        existingProvider,
+      const { providerMismatch, versionMismatch } = audioAssetMismatch(
+        lang,
+        payload,
       );
-      // Version-stale audio: the language's `ttsVersion` config was bumped
-      // above what this audio was stamped with (a new voice pool / Gemini prompt
-      // / provider). Regenerate. `isTtsVersionStale` encodes the "undefined ===
-      // current" rule so un-backfilled rows never storm.
-      const versionMismatch = isTtsVersionStale(lang, payload.ttsVersion);
       if (genderMismatch) {
         langsWithAudioGenderDrift.add(lang);
       }
@@ -700,6 +802,15 @@ async function sweepStaleTranslations(
       sweptRegionVariants.set(lang, translation.regionVariant);
     }
     await ctx.db.delete(translation._id);
+    // Drift is a correction for the card's gender, and gender is text-level:
+    // it must reach every card, pinned ones included. The pair's superseded
+    // revisions go with the live row, so the refilled row serves everyone.
+    // Their assets stay in the content-addressed cache, like the live audio
+    // below (keepAsset).
+    for (const revision of state.supersededMap.get(lang) ?? []) {
+      await ctx.db.delete(revision._id);
+    }
+    state.supersededMap.set(lang, []);
     state.translationMap.set(lang, null);
     // Audio for the legacy-alongside-drifted case was already deleted by the
     // validity loop. The block below only fires when the sweep itself owns
@@ -738,9 +849,8 @@ async function scheduleTimingsBackfillIfNeeded(
   // has them needs no backfill.
   const payload = state.audioPayloadMap.get(lang);
   if (!audio || !payload || payload.wordTimings) return;
-  // Languages without STT support (e.g. `el`, Azure Fast Transcription
-  // can't transcribe `el-GR`) will never get word timings, so don't waste
-  // a claim on a backfill that's guaranteed to no-op.
+  // Languages without STT support will never get word timings, so don't
+  // waste a claim on a backfill that's guaranteed to no-op.
   if (!languageSupportsStt(lang)) return;
   if (opts?.probe) {
     // Claim-held = a job (synthesis or backfill) already owns the slot —
@@ -751,15 +861,82 @@ async function scheduleTimingsBackfillIfNeeded(
   }
   const claimed = await claimTtsIfAvailable(ctx, textId, lang);
   if (!claimed) return;
-  // Forward the persisted regionVariant for mixed-dialect rows so STT runs
-  // against the same locale the voice was synthesized in. Undefined for
-  // non-mixed languages and for the source-language (no translations row).
-  const regionVariant = state.translationMap.get(lang)?.regionVariant;
   await ctx.scheduler.runAfter(
     0,
     internal.features.ttsProcessing.backfillWordTimings,
-    { textId, language: lang, storageId: payload.storageId, regionVariant },
+    {
+      textId,
+      language: lang,
+      storageId: payload.storageId,
+      requestedByUserId: opts?.requestedByUserId,
+    },
   );
+}
+
+/**
+ * The superseded revisions of (text, language) are content in their own
+ * right: a pinned card still shows their wording, so their annotations are
+ * filled, their timings backfilled and their audio repaired exactly like the
+ * live row's. Their WORDING is never regenerated. Runs after the live row's
+ * own work so that, under the shared (text, language) TTS claim, live audio
+ * wins a contested pass; the next sweep picks up the rest. Same probe
+ * semantics as the live-row steps.
+ */
+async function scheduleSupersededRevisionContent(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+  text: Doc<'texts'>,
+  lang: string,
+  audioSpeakerGender: string | undefined,
+  state: ContentSweepState,
+  opts: ContentSweepOpts | undefined,
+): Promise<void> {
+  for (const revision of state.supersededMap.get(lang) ?? []) {
+    if (opts?.probe && missingAnnotationKinds(lang, revision).length > 0) {
+      throw new ProbeNeedsWork();
+    }
+    await scheduleTranslationAnnotations(ctx, revision, revision._id);
+    // A revision that was never voiced is never served (the reader falls
+    // through to the live row), so there is no audio to keep alive.
+    if (revision.audioAssetId === undefined) continue;
+    const asset = await ctx.db.get(revision.audioAssetId);
+    const blobExists =
+      asset !== null && (await ctx.db.system.get(asset.storageId)) !== null;
+    const mismatch = asset === null ? null : audioAssetMismatch(lang, asset);
+    const stale =
+      mismatch !== null &&
+      (mismatch.providerMismatch || mismatch.versionMismatch);
+    if (asset === null || !blobExists || stale) {
+      if (opts?.probe) {
+        if (await hasBlockingTtsClaim(ctx, textId, lang, opts?.priority)) {
+          continue;
+        }
+        throw new ProbeNeedsWork();
+      }
+      await regenerateSupersededRevisionAudio(ctx, text, revision, {
+        audioSpeakerGender,
+        // An existing asset (dead blob, stale version or provider) is
+        // replaced in place; a lost one may be re-attached from the cache.
+        forceRegen: asset !== null,
+        priority: opts?.priority,
+        requestedByUserId: opts?.requestedByUserId,
+      });
+      continue;
+    }
+    if (asset.wordTimings === undefined && languageSupportsStt(lang)) {
+      if (opts?.probe) {
+        if (await hasBlockingTtsClaim(ctx, textId, lang, undefined)) continue;
+        throw new ProbeNeedsWork();
+      }
+      const claimed = await claimTtsIfAvailable(ctx, textId, lang);
+      if (!claimed) continue;
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.ttsProcessing.backfillWordTimings,
+        { textId, language: lang, storageId: asset.storageId },
+      );
+    }
+  }
 }
 
 /**
@@ -852,14 +1029,10 @@ async function scheduleLanguageContent(
   // Translation exists. Backfill missing annotations (romanization,
   // IPA). Same `=== undefined` sentinel semantics as the source-text
   // loop above.
-  for (const kind of missingAnnotationKinds(lang, translation)) {
-    if (opts?.probe) throw new ProbeNeedsWork();
-    await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].translationAction, {
-      textId,
-      text: translation.translatedText,
-      language: lang,
-    });
+  if (opts?.probe && missingAnnotationKinds(lang, translation).length > 0) {
+    throw new ProbeNeedsWork();
   }
+  await scheduleTranslationAnnotations(ctx, translation, undefined);
   if (!hasAudio) {
     // Defer TTS while an LLM retranslation is in flight for this
     // (textId, lang). Without this guard, `flagTranslation` (which
@@ -894,6 +1067,15 @@ async function scheduleLanguageContent(
   } else {
     await scheduleTimingsBackfillIfNeeded(ctx, textId, lang, state, opts);
   }
+  await scheduleSupersededRevisionContent(
+    ctx,
+    textId,
+    text,
+    lang,
+    audioSpeakerGender,
+    state,
+    opts,
+  );
   return scheduled;
 }
 

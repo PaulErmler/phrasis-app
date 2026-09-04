@@ -588,72 +588,74 @@ export default defineSchema({
     // Every row on a userCreated text, plus user-provided / curated-manual
     // rows anywhere. Are skipped by the sweep regardless of their stamp.
     translationVersion: v.optional(v.number()),
-    // Set (to the same timestamp as the archive row's `supersededAt`) each
-    // time a version-bump regeneration replaced this row's wording while
-    // cards referenced the text. Card-facing readers consult
-    // `translationArchive` only when this is later than the card's pin
+    // Superseded-revision fields. A version-bump regeneration that produced
+    // a different wording while cards referenced the text AND the wording
+    // had audio copies the old wording into a second row of THIS table with
+    // `supersededAt` set (`archiveTranslationRevision` in
+    // convex/features/translationPipeline.ts) and stamps the live row's
+    // `lastArchivedAt`. A live row never carries `supersededAt`; Convex
+    // orders `undefined` before every other value, so the live row is the
+    // first of its (text, language) index range, and `liveTranslation` in
+    // convex/db/translationReads.ts is the one place that reads it. Cards
+    // created before `supersededAt` (and not since re-pinned via
+    // `cards.translationsAcceptedAt`) keep being served the superseded
+    // wording and its audio (`resolveServedFromLive`), so a bump never
+    // changes what an existing learner sees. Flag and curriculum-fix
+    // retranslations do NOT archive: corrections land for everyone. A
+    // wording replaced before its first TTS is overwritten in place instead
+    // (nobody heard it; a superseded row without audio is never served).
+    // Superseded rows are ordinary rows to every table walk (annotation
+    // fills, backfills, source resets, cascade deletes), which is why they
+    // live here and not in a second table. Kept for good; bounded by
+    // translations x bumps.
+    //
+    // Retiring the archive later (every card onto the newest wording): clear
+    // `lastArchivedAt` on the revised rows (every card then resolves live
+    // with zero card writes), delete the superseded rows by index range,
+    // delete each `audioAssetId` that `isAudioAssetReferenced` no longer
+    // finds, and run `rebuildCardSearchableText`.
+    supersededAt: v.optional(v.number()),
+    // Superseded rows only: the asset that spoke this wording when it was
+    // superseded. The live row's pointer was detached with `keepAsset`, so
+    // the asset lives on for the pinned cards, and `by_audioAssetId` makes
+    // this a real reference for the asset garbage collection
+    // (convex/lib/audio.ts, convex/lib/audioAssets.ts). Live rows use
+    // `audioRecordings` pointers instead.
+    audioAssetId: v.optional(v.id('audioAssets')),
+    // Set (to the same timestamp as the superseded row's `supersededAt`)
+    // each time a version-bump regeneration replaced this row's wording
+    // while cards referenced the text. Card-facing readers consult the
+    // superseded rows only when this is later than the card's pin
     // (`cardPinAt` in convex/db/translationReads.ts), so the rows never
     // revised, the overwhelming majority, cost no extra read.
     lastArchivedAt: v.optional(v.number()),
   })
     .index('by_textId', ['textId'])
-    .index('by_text_and_language', ['textId', 'targetLanguage']),
-
-  // Superseded revisions of curriculum translations, one row per wording a
-  // version-bump regeneration replaced while at least one card referenced the
-  // text AND the wording had audio. A wording replaced before its first TTS
-  // (a warmed row) is overwritten in place instead: nobody has heard it, and
-  // an archive row without audio would pin its cards to a wording the
-  // pipeline never voices (archived entries report no content gaps), so the
-  // reader treats such a row as absent. Cards created before `supersededAt`
-  // (and not since re-pinned via
-  // `cards.translationsAcceptedAt`) keep being served this wording and its
-  // audio, so a bump never changes what an existing learner sees. Flag and
-  // curriculum-fix retranslations do NOT archive: they are corrections that
-  // land for everyone, as they always have. Rows are kept for good; the table
-  // is bounded by translations x bumps. `audioAssetId` is a real reference:
-  // the asset garbage collection in convex/lib/audio.ts and
-  // convex/lib/audioAssets.ts checks `by_audioAssetId` before deleting an
-  // asset.
-  //
-  // Retiring the archive later (moving every card to the newest wording)
-  // needs no data beyond what is here: (1) clear `translations.lastArchivedAt`
-  // on the revised rows (`by_textId` scan, or any full sweep); every card then
-  // resolves to the live row with zero card writes, since `cardPinAt` is only
-  // consulted when `lastArchivedAt` is set. (2) Delete the archive rows; for
-  // each, an `audioAssetId` that `isAudioAssetReferenced` no longer finds is
-  // garbage (delete the asset and schedule its blob delete). (3) Run the
-  // existing `rebuildCardSearchableText` migration so formerly pinned cards
-  // index the live words. `cards.translationsAcceptedAt` can stay: it is a
-  // no-op pin once nothing is archived.
-  translationArchive: defineTable({
-    textId: v.id('texts'),
-    targetLanguage: v.string(),
-    translatedText: v.string(),
-    romanizedText: v.optional(v.string()),
-    romanizationSource: v.optional(v.string()),
-    ipaText: v.optional(v.string()),
-    ipaSource: v.optional(v.string()),
-    furiganaText: v.optional(v.string()),
-    furiganaSource: v.optional(v.string()),
-    translationSource: v.optional(v.string()),
-    regionVariant: v.optional(v.string()),
-    speakerGender: v.optional(voiceGenderValidator),
-    translationVersion: v.optional(v.number()),
-    // The audio that spoke this wording at the moment it was superseded, if
-    // the language had audio. The live row's pointer was detached with
-    // `keepAsset`, so the asset lives on for the pinned cards.
-    audioAssetId: v.optional(v.id('audioAssets')),
-    // When the live row stopped carrying this wording. A card whose pin is
-    // earlier than this (and later than any earlier archive row's) sees it.
-    supersededAt: v.number(),
-  })
+    // Legacy two-column prefix of the index below, kept ON PURPOSE: it
+    // covers ~300k documents, and Convex refuses to drop an index that large
+    // from a non-interactive deploy (the Coolify build) unless the build
+    // passes `--allow-deleting-large-indexes`. Nothing may query it: a
+    // `.first()` on it returns the live row only by accident (creation
+    // order), and `.collect()` returns superseded revisions too; the
+    // invariant test forbids `.query('translations').withIndex(
+    // 'by_text_and_language'`. Drop it in a dedicated deploy run with that
+    // flag.
+    .index('by_text_and_language', ['textId', 'targetLanguage'])
+    // Live lookup (`supersededAt` undefined sorts first) and pin resolution
+    // (`.gt('supersededAt', pinAt)`) on one index. Queried ONLY through
+    // convex/db/translationReads.ts, enforced by
+    // convex/tests/lib/translationsIndexInvariant.test.ts.
     .index('by_text_language_supersededAt', [
       'textId',
       'targetLanguage',
       'supersededAt',
     ])
-    .index('by_audioAssetId', ['audioAssetId']),
+    .index('by_audioAssetId', ['audioAssetId'])
+    // Every LIVE row of a text (`.eq('supersededAt', undefined)`), for the
+    // readers that list a text's translations without naming a language.
+    // Queried ONLY through `liveTranslationsForText` in
+    // convex/db/translationReads.ts, same invariant test.
+    .index('by_textId_supersededAt', ['textId', 'supersededAt']),
 
   // Content-addressed audio store. One row per unique
   // (language, voiceGender, regionVariant, spoken string), every text whose
@@ -695,7 +697,7 @@ export default defineSchema({
     // legacy rows carried over by the backfill, which is also "completed").
     ttsQuality: v.optional(ttsQualityValidator),
     speed: v.number(),
-    // Word-level timestamps from Azure Fast Transcription, captured during TTS
+    // Word-level timestamps from the STT validation pass (convex/lib/stt), captured during TTS
     // validation. Seconds relative to the audio blob. Only populated when
     // validation succeeded.
     wordTimings: v.optional(
@@ -900,7 +902,7 @@ export default defineSchema({
     wordsTrackedLanguages: v.optional(v.array(v.string())), // Languages for which words have been counted in stats
     audioSpeedOverrides: v.optional(v.record(v.string(), v.number())), // Per-card per-language playback speed override (range CARD_OVERRIDE_SPEED_MIN-CARD_OVERRIDE_SPEED_MAX, see lib/constants/audioPlayback). Missing entry = use general courseSettings.languagePlaybackSpeeds.
     // Translation pin. A card is served the curriculum translations that were
-    // live at this instant (see `translationArchive`); undefined means the
+    // live at this instant (see `translations.supersededAt`); undefined means the
     // card's `_creationTime`. Moved to "now" when the learner flags a card
     // whose wording the curriculum has since revised (they accept the latest
     // wording). Never indexed: it is only ever read off the card itself.

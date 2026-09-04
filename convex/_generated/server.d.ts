@@ -31,8 +31,6 @@ type Env = {
   readonly APPLE_PRIVATE_KEY: string | undefined;
   readonly APPLE_TEAM_ID: string | undefined;
   readonly AUTUMN_SECRET_KEY: string | undefined;
-  readonly AZURE_SPEECH_API_KEY: string | undefined;
-  readonly AZURE_SPEECH_REGION: string | undefined;
   readonly CONVEX_BILLING_TOKEN: string | undefined;
   readonly CONVEX_TEAM_ID: string | undefined;
   readonly E2E_TEST_HOOKS: string | undefined;

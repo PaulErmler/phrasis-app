@@ -47,6 +47,7 @@ import {
 } from '../../lib/languages';
 import {
   missingAnnotationKinds,
+  scheduleTranslationAnnotations,
   TEXT_ANNOTATIONS,
 } from '../lib/textAnnotations';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
@@ -70,6 +71,7 @@ export {
   isCollectionAccessible,
   requireAccessibleText,
 } from '../lib/collectionAccess';
+import { liveTranslation } from '../db/translationReads';
 
 // ============================================================================
 // QUERIES
@@ -456,12 +458,7 @@ export async function scheduleMissingTranslationsForText(
   let scheduled = 0;
   for (const lang of languages) {
     if (lang === text.language) continue;
-    const existing = await ctx.db
-      .query('translations')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', text._id).eq('targetLanguage', lang),
-      )
-      .first();
+    const existing = await liveTranslation(ctx, text._id, lang);
     if (existing) {
       // Version-stale rows regenerate here too, so browsing a collection
       // already upgrades its translations to the current version, and the
@@ -480,17 +477,7 @@ export async function scheduleMissingTranslationsForText(
         // rows are usually not cards), so those rows rendered with a bare
         // annotation gap until the text was added to a deck. Mirrors that
         // sweep's loop in decks.ts.
-        for (const kind of missingAnnotationKinds(lang, existing)) {
-          await ctx.scheduler.runAfter(
-            0,
-            TEXT_ANNOTATIONS[kind].translationAction,
-            {
-              textId: text._id,
-              text: existing.translatedText,
-              language: lang,
-            },
-          );
-        }
+        await scheduleTranslationAnnotations(ctx, existing, undefined);
         continue;
       }
       // Mirror the sweep's deferrals: never regenerate under an active TTS
@@ -722,12 +709,7 @@ export const requestPreviewAudio = mutation({
     const translation =
       args.language === text.language
         ? null
-        : await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', args.textId).eq('targetLanguage', args.language),
-            )
-            .first();
+        : await liveTranslation(ctx, args.textId, args.language);
     if (args.language !== text.language && !translation) {
       // Translation still generating. The click raced it. Nothing to
       // synthesize yet; the client retries once the translation row lands.

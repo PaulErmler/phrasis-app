@@ -22,6 +22,7 @@ import { llmPool, llmWarmPool } from '@/convex/lib/workpools';
 import { claimLlmTranslationIfAvailable } from '../../features/llmTranslationQueue';
 import type { WorkId } from '@convex-dev/workpool';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+import { translationRevisions } from '../../db/translationReads';
 
 const mockEnqueue = vi.mocked(llmPool.enqueueAction);
 const mockWarmEnqueue = vi.mocked(llmWarmPool.enqueueAction);
@@ -711,12 +712,7 @@ describe('features/llmTranslationQueue', () => {
       // Translations row created (first stage won: the Sol default is a
       // single call, no sampling, no judge).
       const translations = await t.run(async (ctx) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'de'),
-          )
-          .collect(),
+        translationRevisions(ctx, textId, 'de'),
       );
       expect(translations.length).toBe(1);
       expect(translations[0].translatedText).toBe(
@@ -774,12 +770,7 @@ describe('features/llmTranslationQueue', () => {
       // fallback itself. That belongs to onLlmTranslationComplete after the
       // pool's retry budget is spent.
       const translations = await t.run(async (ctx) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'de'),
-          )
-          .collect(),
+        translationRevisions(ctx, textId, 'de'),
       );
       expect(translations.length).toBe(0);
       expect(mockEnqueue).not.toHaveBeenCalled();
@@ -821,12 +812,7 @@ describe('features/llmTranslationQueue', () => {
       expect(vi.mocked(generateText)).toHaveBeenCalledTimes(6);
 
       const translations = await t.run(async (ctx) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'de'),
-          )
-          .collect(),
+        translationRevisions(ctx, textId, 'de'),
       );
       expect(translations.length).toBe(0);
     });
@@ -857,12 +843,7 @@ describe('features/llmTranslationQueue', () => {
 
       expect(vi.mocked(generateText)).toHaveBeenCalledTimes(2);
       const translations = await t.run(async (ctx) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'de'),
-          )
-          .collect(),
+        translationRevisions(ctx, textId, 'de'),
       );
       expect(translations.length).toBe(1);
       expect(translations[0].translatedText).toBe(

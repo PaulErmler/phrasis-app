@@ -489,6 +489,8 @@ export const processRomanizationForTranslation = internalAction({
     textId: v.id('texts'),
     text: v.string(),
     language: v.string(),
+    // See AnnotationActionArgs in lib/textAnnotations.ts.
+    translationId: v.optional(v.id('translations')),
   },
   returns: v.null(),
   handler: processRomanizationForTranslationHandler,
@@ -508,6 +510,8 @@ export const storeTranslationAnnotation = internalMutation({
     source: v.string(),
     // See storeSourceAnnotation: skip when the row's wording moved on.
     forText: v.optional(v.string()),
+    // The exact row to patch (a superseded revision); absent = the live row.
+    translationId: v.optional(v.id('translations')),
   },
   returns: v.null(),
   handler: storeTranslationAnnotationHandler,

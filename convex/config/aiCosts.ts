@@ -38,13 +38,17 @@ export const AI_COST_RATES = {
     sourceUrl: 'https://cloud.google.com/translate/pricing',
     lastVerified: '2026-07-28',
   },
-  /** Azure Speech. Fast Transcription, billed per hour of audio. */
-  azureStt: {
-    usdPerUnit: 0.36,
+  /**
+   * MAI-Transcribe-2 via OpenRouter, billed per hour of audio (rounded up to
+   * whole seconds). Fallback only: the transcription response carries the
+   * exact charge in `usage.cost`, and callers prefer that. This rate is used
+   * when the field is missing.
+   */
+  openrouterStt: {
+    usdPerUnit: 0.1,
     unit: 'audio_hour',
-    sourceUrl:
-      'https://azure.microsoft.com/pricing/details/cognitive-services/speech-services/',
-    lastVerified: '2026-07-28',
+    sourceUrl: 'https://openrouter.ai/microsoft/mai-transcribe-2',
+    lastVerified: '2026-09-04',
   },
 } as const satisfies Record<string, AiCostRate>;
 
@@ -61,7 +65,7 @@ export function costForCharacters(
 
 /** Cost of transcribing `durationMs` of audio. */
 export function costForAudioMs(
-  provider: 'azureStt',
+  provider: 'openrouterStt',
   durationMs: number,
 ): number {
   if (!Number.isFinite(durationMs) || durationMs <= 0) return 0;

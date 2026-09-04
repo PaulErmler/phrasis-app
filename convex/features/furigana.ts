@@ -188,6 +188,8 @@ export const processFuriganaForTranslation = internalAction({
     textId: v.id('texts'),
     text: v.string(),
     language: v.string(),
+    // See AnnotationActionArgs in lib/textAnnotations.ts.
+    translationId: v.optional(v.id('translations')),
   },
   returns: v.null(),
   handler: (ctx, args) =>

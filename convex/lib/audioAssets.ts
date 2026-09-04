@@ -202,21 +202,33 @@ export async function upsertAudioPointer(
   if (existing.assetId === assetId) return;
   const previousAssetId = existing.assetId;
   await ctx.db.patch(existing._id, { assetId });
-  if (!(await isAudioAssetReferenced(ctx, previousAssetId))) {
-    const previousAsset = await ctx.db.get(previousAssetId);
-    if (previousAsset) {
-      await ctx.db.delete(previousAsset._id);
-      await scheduleBlobSwapDelete(ctx, previousAsset.storageId);
-    }
-  }
+  await releaseAudioAssetIfUnreferenced(ctx, previousAssetId);
+}
+
+/**
+ * After a reference to `assetId` was re-pointed elsewhere (a pointer row, or
+ * a superseded translation revision's `audioAssetId`): delete the asset and
+ * schedule its blob's delete when nothing references it any more. A shared
+ * asset survives untouched.
+ */
+export async function releaseAudioAssetIfUnreferenced(
+  ctx: MutationCtx,
+  assetId: Id<'audioAssets'>,
+): Promise<void> {
+  if (await isAudioAssetReferenced(ctx, assetId)) return;
+  const asset = await ctx.db.get(assetId);
+  if (!asset) return;
+  await ctx.db.delete(asset._id);
+  await scheduleBlobSwapDelete(ctx, asset.storageId);
 }
 
 /**
  * Whether anything still serves this asset: a live `audioRecordings` pointer,
- * or a `translationArchive` row whose pinned cards play the superseded
- * wording. Both garbage-collection sites (`deleteAudioRow` and the re-point
- * above) ask this, so an archived revision can never lose its audio to a
- * different text dropping its pointer to the same content-addressed asset.
+ * or a superseded `translations` row whose pinned cards play the old
+ * wording (`translations.audioAssetId`). Both garbage-collection sites
+ * (`deleteAudioRow` and the re-point above) ask this, so an archived
+ * revision can never lose its audio to a different text dropping its
+ * pointer to the same content-addressed asset.
  */
 export async function isAudioAssetReferenced(
   ctx: QueryCtx | MutationCtx,
@@ -227,11 +239,11 @@ export async function isAudioAssetReferenced(
     .withIndex('by_assetId', (q) => q.eq('assetId', assetId))
     .first();
   if (pointer) return true;
-  const archived = await ctx.db
-    .query('translationArchive')
+  const superseded = await ctx.db
+    .query('translations')
     .withIndex('by_audioAssetId', (q) => q.eq('audioAssetId', assetId))
     .first();
-  return archived !== null;
+  return superseded !== null;
 }
 
 /**

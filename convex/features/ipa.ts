@@ -115,6 +115,8 @@ export const processIpaForTranslation = internalAction({
     textId: v.id('texts'),
     text: v.string(),
     language: v.string(),
+    // See AnnotationActionArgs in lib/textAnnotations.ts.
+    translationId: v.optional(v.id('translations')),
   },
   returns: v.null(),
   handler: (ctx, args) =>
@@ -193,6 +195,7 @@ export const backfillIpaBatch = internalAction({
             value: ipa,
             source: getIpaSource(item.language),
             forText: item.text,
+            translationId: item.translationId,
           },
         );
       }

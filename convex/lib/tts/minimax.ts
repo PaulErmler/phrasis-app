@@ -1,5 +1,6 @@
 import type { SpeakInput, SpeakResult, TTSProvider } from './types';
 import { requireEnv } from '../env';
+import { MAX_RETRIES, isRetryableStatus, retryDelayMs } from '../httpRetry';
 
 // MiniMax Speech 2.8 Turbo, reached through OpenRouter's OpenAI-compatible
 // speech endpoint, same endpoint + OPENROUTER_API_KEY as the Gemini provider,
@@ -30,19 +31,6 @@ function looksLikeMp3(bytes: Uint8Array): boolean {
   const id3 = bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33;
   const frameSync = bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0;
   return id3 || frameSync;
-}
-
-const MAX_RETRIES = 2;
-const RETRY_BASE_DELAY_MS = 1000;
-const RETRY_MAX_DELAY_MS = 30_000;
-
-/** Backoff before re-POSTing: honor Retry-After when present, else 1s/2s. */
-function retryDelayMs(response: Response, attempt: number): number {
-  const retryAfterSeconds = Number(response.headers.get('retry-after'));
-  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-    return Math.min(retryAfterSeconds * 1000, RETRY_MAX_DELAY_MS);
-  }
-  return RETRY_BASE_DELAY_MS * 2 ** attempt;
 }
 
 export const minimaxTts: TTSProvider = {
@@ -76,10 +64,7 @@ export const minimaxTts: TTSProvider = {
 
       if (!response.ok) {
         lastError = `MiniMax TTS API error: ${response.status} - ${await response.text()}`;
-        // 4xx won't get better on retry, except 429; 5xx / upstream flakes
-        // and rate limits deserve a backoff instead of hammering upstream.
-        const retryable = response.status === 429 || response.status >= 500;
-        if (!retryable) throw new Error(lastError);
+        if (!isRetryableStatus(response.status)) throw new Error(lastError);
         if (attempt < MAX_RETRIES) {
           await new Promise((resolve) =>
             setTimeout(resolve, retryDelayMs(response, attempt)),

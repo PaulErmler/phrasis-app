@@ -18,6 +18,7 @@ import {
 import { buildCardSearchableText } from '../lib/cardContent';
 import {
   cardPinAt,
+  liveTranslation,
   resolveServedFromLive,
   type ServedTranslation,
 } from '../db/translationReads';
@@ -107,14 +108,7 @@ export async function resolveCardEditPlan(
     (lang) => lang !== sourceLanguage,
   );
   const existingTranslations = await Promise.all(
-    nonSourceLanguages.map((lang) =>
-      ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', card.textId).eq('targetLanguage', lang),
-        )
-        .first(),
-    ),
+    nonSourceLanguages.map((lang) => liveTranslation(ctx, card.textId, lang)),
   );
   const existingTranslationMap = new Map<string, Doc<'translations'>>();
   nonSourceLanguages.forEach((lang, i) => {

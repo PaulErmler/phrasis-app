@@ -33,6 +33,7 @@ import {
   TRANSCRIBE_VERDICTS,
   VERDICTS,
 } from '../../lib/writingFeedbackPrompt';
+import { liveTranslation } from '../../db/translationReads';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -1072,7 +1073,7 @@ describe('features/writingFeedback', () => {
       expect(mockedGenerateText).not.toHaveBeenCalled();
     });
 
-    it('reports NOT_FOUND for a language the card has no translation for', async () => {
+    it('reports NOT_FOUND for a language the course does not teach', async () => {
       const t = convexTest(schema, modules);
       const { cardId } = await seedCard(t);
       const asUser = t.withIdentity({ subject: 'user_A' });
@@ -1083,6 +1084,32 @@ describe('features/writingFeedback', () => {
           userAnswer: 'Je voudrais un café.',
         }),
       ).rejects.toThrow(/not found/i);
+    });
+
+    it('degrades to the diff view when a course language has no translation row yet', async () => {
+      // A card whose content pipeline has not written the row: the review
+      // query serves the language with an empty string, so writing mode can
+      // render an input for it. Grading has nothing to compare against, but
+      // the card is not missing — no throw, no quota, no LLM call.
+      const t = convexTest(schema, modules);
+      const { textId } = await seedCard(t);
+      const cardId = await t.run(async (ctx) => {
+        const tr = await liveTranslation(ctx, textId, 'es');
+        await ctx.db.delete(tr!._id);
+        const card = await ctx.db
+          .query('cards')
+          .withIndex('by_textId', (q) => q.eq('textId', textId))
+          .unique();
+        return card!._id;
+      });
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      const result = await asUser.action(
+        api.features.writingFeedback.gradeWritingAnswer,
+        { cardId, language: 'es', userAnswer: 'Quisiera un café' },
+      );
+      expect(result).toEqual({ verdict: 'error' });
+      expect(mockedGenerateText).not.toHaveBeenCalled();
+      expect(await aiFeedbackBalance(t)).toBe(10);
     });
 
     it('does not self-heal when the account has no quota doc at all', async () => {

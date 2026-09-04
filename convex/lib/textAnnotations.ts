@@ -25,9 +25,9 @@
  */
 
 import { v } from 'convex/values';
-import type { FunctionReference } from 'convex/server';
+import type { FunctionReference, Scheduler } from 'convex/server';
 import { internal } from '../_generated/api';
-import type { Id } from '../_generated/dataModel';
+import type { Doc, Id } from '../_generated/dataModel';
 import {
   FURIGANA_LANGUAGES,
   IPA_LANGUAGES,
@@ -57,6 +57,12 @@ type AnnotationActionArgs = {
   textId: Id<'texts'>;
   text: string;
   language: string;
+  /**
+   * The exact `translations` row to annotate. Required for a superseded
+   * revision (the store cannot find those by (text, language)); absent means
+   * the live row. Ignored by the source-text actions.
+   */
+  translationId?: Id<'translations'>;
 };
 type AnnotationAction = FunctionReference<
   'action',
@@ -311,6 +317,7 @@ export async function runTranslationAnnotation(
     value,
     source,
     forText: args.text,
+    translationId: args.translationId,
   });
   return null;
 }
@@ -353,4 +360,32 @@ export async function runApprovalAnnotation(
     );
   }
   return null;
+}
+
+/**
+ * Schedule the generate-and-store action for every annotation kind `row`
+ * still lacks (`missingAnnotationKinds`, so the '' sentinel is never
+ * retried). `translationId` names the exact row the store patches: pass the
+ * id for a superseded revision (the store cannot find those by
+ * (text, language)) and `undefined` for the live row, which the store then
+ * resolves itself. Returns the kinds it scheduled.
+ */
+export async function scheduleTranslationAnnotations(
+  ctx: { scheduler: Scheduler },
+  row: Pick<
+    Doc<'translations'>,
+    'textId' | 'targetLanguage' | 'translatedText' | AnnotationField
+  >,
+  translationId: Id<'translations'> | undefined,
+): Promise<AnnotationKind[]> {
+  const kinds = missingAnnotationKinds(row.targetLanguage, row);
+  for (const kind of kinds) {
+    await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].translationAction, {
+      textId: row.textId,
+      text: row.translatedText,
+      language: row.targetLanguage,
+      translationId,
+    });
+  }
+  return kinds;
 }

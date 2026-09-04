@@ -34,24 +34,24 @@ describe('aiCosts', () => {
 
   describe('costForAudioMs', () => {
     it('prices one hour of audio at exactly the published rate', () => {
-      expect(costForAudioMs('azureStt', 3_600_000)).toBe(
-        AI_COST_RATES.azureStt.usdPerUnit,
+      expect(costForAudioMs('openrouterStt', 3_600_000)).toBe(
+        AI_COST_RATES.openrouterStt.usdPerUnit,
       );
     });
 
     it('scales linearly for a short clip', () => {
       // ~3s is the length of a synthesized sentence, which is what the TTS
-      // validation pass round-trips through Azure for every single clip.
-      expect(costForAudioMs('azureStt', 3_000)).toBeCloseTo(
-        (3_000 / 3_600_000) * AI_COST_RATES.azureStt.usdPerUnit,
+      // validation pass round-trips through STT for every single clip.
+      expect(costForAudioMs('openrouterStt', 3_000)).toBeCloseTo(
+        (3_000 / 3_600_000) * AI_COST_RATES.openrouterStt.usdPerUnit,
         12,
       );
     });
 
     it('returns zero rather than NaN for degenerate inputs', () => {
-      expect(costForAudioMs('azureStt', 0)).toBe(0);
-      expect(costForAudioMs('azureStt', -1)).toBe(0);
-      expect(costForAudioMs('azureStt', Number.NaN)).toBe(0);
+      expect(costForAudioMs('openrouterStt', 0)).toBe(0);
+      expect(costForAudioMs('openrouterStt', -1)).toBe(0);
+      expect(costForAudioMs('openrouterStt', Number.NaN)).toBe(0);
     });
   });
 

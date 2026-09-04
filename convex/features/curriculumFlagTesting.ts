@@ -3,6 +3,10 @@ import { internalMutation, internalQuery } from '../_generated/server';
 import { assertTestHooksEnabled, requireUserIdByEmail } from '../lib/testHooks';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
+import {
+  liveTranslation,
+  liveTranslationsForText,
+} from '../db/translationReads';
 
 /**
  * E2E test hooks for "a manual edit of a curriculum card is also a complaint"
@@ -85,10 +89,7 @@ export const armProbe = internalMutation({
         // no shared row to complain about.
         if (!text || text.userCreated) continue;
 
-        const translations = await ctx.db
-          .query('translations')
-          .withIndex('by_textId', (q) => q.eq('textId', text._id))
-          .take(10);
+        const translations = await liveTranslationsForText(ctx, text._id, 20);
 
         const flaggable = translations.find(
           (tr) =>
@@ -134,12 +135,7 @@ export const readTranslation = internalQuery({
   ),
   handler: async (ctx, args) => {
     assertTestHooksEnabled();
-    const row = await ctx.db
-      .query('translations')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
-      )
-      .first();
+    const row = await liveTranslation(ctx, args.textId, args.targetLanguage);
     if (!row) return null;
     return {
       flagCount: row.flagCount ?? null,
@@ -186,12 +182,7 @@ export const restoreProbe = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     assertTestHooksEnabled();
-    const row = await ctx.db
-      .query('translations')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
-      )
-      .first();
+    const row = await liveTranslation(ctx, args.textId, args.targetLanguage);
     if (row) {
       await ctx.db.patch(row._id, {
         flagCount: args.originalFlagCount ?? undefined,

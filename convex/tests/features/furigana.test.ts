@@ -5,6 +5,7 @@ import schema from '../../schema';
 import { internal, api } from '../../_generated/api';
 import { FURIGANA_SOURCES } from '../../lib/textAnnotations';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+import { liveTranslation } from '../../db/translationReads';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -86,13 +87,7 @@ describe('processFuriganaFor* actions (stubbed engine)', () => {
       language: 'ja',
     });
     const row = await t.run(
-      async (ctx) =>
-        (await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'ja'),
-          )
-          .unique())!,
+      async (ctx) => (await liveTranslation(ctx, textId, 'ja'))!,
     );
     expect(row.furiganaText).toBe(ANNOTATED);
     expect(row.furiganaSource).toBe(FURIGANA_SOURCES.linderaIpadic);

@@ -7,7 +7,7 @@ export type RateLimitName =
   | 'googleTts'
   | 'geminiTts'
   | 'minimaxTts'
-  | 'azureStt';
+  | 'openrouterStt';
 
 /**
  * Reserve one token from `name`'s bucket before a provider HTTP call, waiting

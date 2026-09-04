@@ -4,13 +4,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import schema from '../../schema';
 import { api, internal } from '../../_generated/api';
-import type { Doc, Id } from '../../_generated/dataModel';
-import { llmPool } from '@/convex/lib/workpools';
+import type { Id } from '../../_generated/dataModel';
+import { llmPool, ttsPool } from '@/convex/lib/workpools';
 import {
   buildCardSearchableText,
   buildTextContentBatchForLanguages,
 } from '../../lib/cardContent';
 import { ProbeNeedsWork } from '../../lib/contentScheduling';
+import { IPA_SOURCES } from '../../lib/textAnnotations';
 import { deleteAudioRow } from '../../lib/audio';
 import { scheduleMissingContent } from '../../features/decks';
 import { scheduleMissingTranslationsForText } from '../../features/collections';
@@ -18,7 +19,13 @@ import {
   forkSharedTextForEdit,
   resolveCardEditPlan,
 } from '../../features/cardEditPipeline';
-import { cardPinAt, resolveServedFromLive } from '../../db/translationReads';
+import {
+  cardPinAt,
+  liveTranslation,
+  resolveServedFromLive,
+  splitRevisions,
+  translationRevisions,
+} from '../../db/translationReads';
 import {
   getCurrentTranslationVersion,
   getTtsProviderForLanguage,
@@ -46,9 +53,24 @@ const llmEnqueues = () =>
         skipTts?: boolean;
       },
   );
+const ttsEnqueues = () =>
+  vi.mocked(ttsPool.enqueueAction).mock.calls.map(
+    (c) =>
+      c[2] as {
+        textId: Id<'texts'>;
+        text: string;
+        language: string;
+        forceRegen?: boolean;
+        supersededTranslationId?: Id<'translations'>;
+      },
+  );
 beforeEach(() => {
   vi.mocked(llmPool.enqueueAction).mockClear();
+  vi.mocked(ttsPool.enqueueAction).mockClear();
 });
+
+/** What the stubbed espeak engine yields for any input (tests/convexTestSetup.ts). */
+const MOCK_IPA = 'mˈɒkaɪpiːeɪ';
 
 const OLD_DE = 'Alles in Ordnung?';
 const NEW_DE = 'Alles klar?';
@@ -67,6 +89,8 @@ async function seed(
     targetLanguages?: string[];
     extraTranslations?: { lang: string; text: string }[];
     flagsBalance?: number;
+    /** Pre-fill IPA on the seeded German row (so a bump copies a complete revision). */
+    ipaText?: string;
   } = {},
 ) {
   return t.run(async (ctx) => {
@@ -111,6 +135,9 @@ async function seed(
       translationSource: 'openai/gpt-5.6-luna:nitro-none-bo3',
       speakerGender: 'female',
       translationVersion: 1,
+      ...(opts.ipaText !== undefined
+        ? { ipaText: opts.ipaText, ipaSource: IPA_SOURCES.espeakNg }
+        : {}),
     });
     for (const extra of opts.extraTranslations ?? []) {
       await ctx.db.insert('translations', {
@@ -180,6 +207,18 @@ async function seed(
           used: 10 - flagsBalance,
           unlimited: false,
         },
+        audio_regenerations: {
+          balance: 5,
+          included: 5,
+          used: 0,
+          unlimited: false,
+        },
+        card_edits: {
+          balance: 5,
+          included: 5,
+          used: 0,
+          unlimited: false,
+        },
       },
       lastSyncedAt: Date.now(),
     });
@@ -217,26 +256,34 @@ function bump(
   });
 }
 
-function liveRow(t: TestConvex<typeof schema>, textId: Id<'texts'>) {
-  return t.run(
-    async (ctx) =>
-      (await ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', textId).eq('targetLanguage', 'de'),
-        )
-        .unique())!,
-  );
+/**
+ * As if the TTS job a bump enqueued for the new live wording (a card
+ * references the text, so `skipTts` is overridden) had completed: release
+ * its claim and forget the enqueue, so the assertions below see only the
+ * work of the step under test.
+ */
+async function settleTts(t: TestConvex<typeof schema>, textId: Id<'texts'>) {
+  await t.run(async (ctx) => {
+    const claims = await ctx.db
+      .query('ttsGenerationClaims')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', textId).eq('language', 'de'),
+      )
+      .collect();
+    for (const claim of claims) await ctx.db.delete(claim._id);
+  });
+  vi.mocked(ttsPool.enqueueAction).mockClear();
 }
 
+function liveRow(t: TestConvex<typeof schema>, textId: Id<'texts'>) {
+  return t.run(async (ctx) => (await liveTranslation(ctx, textId, 'de'))!);
+}
+
+/** The superseded `de` revisions of a text, oldest-superseded first. */
 function archiveRows(t: TestConvex<typeof schema>, textId: Id<'texts'>) {
-  return t.run((ctx) =>
-    ctx.db
-      .query('translationArchive')
-      .withIndex('by_text_language_supersededAt', (q) =>
-        q.eq('textId', textId).eq('targetLanguage', 'de'),
-      )
-      .collect(),
+  return t.run(
+    async (ctx) =>
+      splitRevisions(await translationRevisions(ctx, textId, 'de')).superseded,
   );
 }
 
@@ -414,7 +461,8 @@ describe('served revision resolution (convex/db/translationReads.ts)', () => {
 
   it('a card pinned before the bump is served the archived wording and its audio, and reports nothing missing', async () => {
     const t = convexTest(schema, modules);
-    const { textId, pinAt } = await seed(t);
+    // The seeded row is complete (IPA filled), so the copy is too.
+    const { textId, pinAt } = await seed(t, { ipaText: 'ˈaləs' });
     await bump(t, textId, NEW_DE);
 
     const pinned = await hydrate(t, textId, pinAt);
@@ -436,7 +484,7 @@ describe('served revision resolution (convex/db/translationReads.ts)', () => {
     const { textId, translationId, pinAt } = await seed(t);
     await t.run(async (ctx) => {
       const supersededAt = Date.now();
-      await ctx.db.insert('translationArchive', {
+      await ctx.db.insert('translations', {
         textId,
         targetLanguage: 'de',
         translatedText: OLD_DE,
@@ -500,12 +548,7 @@ describe('served revision resolution (convex/db/translationReads.ts)', () => {
     const t = convexTest(schema, modules);
     const { textId, pinAt } = await seed(t);
     const before = await t.run(async (ctx) => {
-      const live = (await ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', textId).eq('targetLanguage', 'de'),
-        )
-        .unique())!;
+      const live = (await liveTranslation(ctx, textId, 'de'))!;
       return resolveServedFromLive(ctx, live, pinAt);
     });
     expect(before.archived).toBe(false);
@@ -809,12 +852,7 @@ describe('editing a pinned card', () => {
         text,
         plan: unchanged,
       });
-      const forkedDe = await ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', forkedTextId).eq('targetLanguage', 'de'),
-        )
-        .unique();
+      const forkedDe = await liveTranslation(ctx, forkedTextId, 'de');
       const forkedAudio = await ctx.db
         .query('audioRecordings')
         .withIndex('by_text_and_language', (q) =>
@@ -884,7 +922,7 @@ describe('archived audio survives garbage collection', () => {
         ttsProvider: 'google',
         spokenText: OLD_DE,
       });
-      const archiveId = await ctx.db.insert('translationArchive', {
+      const archiveId = await ctx.db.insert('translations', {
         textId: textA,
         targetLanguage: 'de',
         translatedText: OLD_DE,
@@ -917,18 +955,564 @@ describe('archived audio survives garbage collection', () => {
   });
 });
 
-describe('type plumbing', () => {
-  it('a Doc<"translationArchive"> carries every field a served row needs', () => {
-    // Compile-time check: the archive row shape satisfies the served-row
-    // pick used by every card-facing reader.
-    const row: Doc<'translationArchive'> = {
-      _id: 'x' as Id<'translationArchive'>,
-      _creationTime: 0,
-      textId: 'y' as Id<'texts'>,
-      targetLanguage: 'de',
-      translatedText: OLD_DE,
-      supersededAt: 0,
-    };
-    expect(row.translatedText).toBe(OLD_DE);
+describe('the live row is never a superseded one', () => {
+  it('liveTranslation skips superseded rows however they were written', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, translationId } = await seed(t);
+    await bump(t, textId, NEW_DE);
+    const live = await liveRow(t, textId);
+    expect(live._id).toBe(translationId);
+    expect(live.supersededAt).toBeUndefined();
+    const revisions = await t.run((ctx) =>
+      translationRevisions(ctx, textId, 'de'),
+    );
+    expect(revisions.map((r) => r.translatedText)).toEqual([NEW_DE, OLD_DE]);
+    expect(revisions[0]._id).toBe(translationId);
+  });
+});
+
+describe('a superseded revision is content like any other', () => {
+  it('its annotation gap is a content gap, filled on the copy right after the bump', async () => {
+    vi.useFakeTimers();
+    try {
+      const t = convexTest(schema, modules);
+      // The seeded row has no IPA yet, so the copy starts with a gap.
+      const { textId, translationId, pinAt } = await seed(t);
+      await bump(t, textId, NEW_DE);
+
+      expect((await hydrate(t, textId, pinAt)).hasMissingContent).toBe(true);
+      // The archive write scheduled the fill for the COPY's own id.
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+      const [copy] = await archiveRows(t, textId);
+      expect(copy.ipaText).toBe(MOCK_IPA);
+      expect(copy.ipaSource).toBe(IPA_SOURCES.espeakNg);
+      expect(copy.translatedText).toBe(OLD_DE);
+      // The live row is untouched by the copy's fill (its own IPA comes from
+      // the replacement's follow-up, against the new wording).
+      const live = (await t.run((ctx) => ctx.db.get(translationId)))!;
+      expect(live.translatedText).toBe(NEW_DE);
+      const pinned = await hydrate(t, textId, pinAt);
+      expect(pinned.text).toBe(OLD_DE);
+      expect(pinned.hasMissingContent).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the ensure sweep fills a superseded revision by row id and leaves the live row alone', async () => {
+    vi.useFakeTimers();
+    try {
+      const t = convexTest(schema, modules);
+      const { textId, translationId, assetId } = await seed(t, {
+        ipaText: 'live-ipa',
+      });
+      // A superseded revision written without IPA (as a pre-rule bump or a
+      // failed fill would leave it), served by every card pinned before now.
+      const supersededId = await t.run(async (ctx) => {
+        const supersededAt = Date.now();
+        const id = await ctx.db.insert('translations', {
+          textId,
+          targetLanguage: 'de',
+          translatedText: 'Ist alles in Ordnung?',
+          romanizedText: '',
+          speakerGender: 'female',
+          translationVersion: 1,
+          audioAssetId: assetId,
+          supersededAt,
+        });
+        await ctx.db.patch(translationId, {
+          translationVersion: getCurrentTranslationVersion('de'),
+          lastArchivedAt: supersededAt,
+        });
+        return id;
+      });
+
+      // Probe mode reports the gap as work.
+      await expect(
+        t.run(async (ctx) => {
+          const text = (await ctx.db.get(textId))!;
+          await scheduleMissingContent(ctx, textId, text, ['en'], ['de'], {
+            probe: true,
+          });
+        }),
+      ).rejects.toBeInstanceOf(ProbeNeedsWork);
+
+      await t.run(async (ctx) => {
+        const text = (await ctx.db.get(textId))!;
+        await scheduleMissingContent(ctx, textId, text, ['en'], ['de']);
+      });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+      const superseded = (await t.run((ctx) => ctx.db.get(supersededId)))!;
+      expect(superseded.ipaText).toBe(MOCK_IPA);
+      const live = (await t.run((ctx) => ctx.db.get(translationId)))!;
+      expect(live.ipaText).toBe('live-ipa');
+      expect(live.translatedText).toBe(OLD_DE);
+      expect(llmEnqueues().length).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('its audio without word timings gets the backfill, persisted by blob onto the archived asset', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, translationId, assetId, storageId } = await seed(t, {
+      ipaText: 'live-ipa',
+    });
+    // Live audio already has timings, so only the archived asset needs them.
+    const { archivedStorageId, supersededId } = await t.run(async (ctx) => {
+      await ctx.db.patch(assetId, {
+        wordTimings: [{ word: 'Alles', start: 0, end: 0.4 }],
+      });
+      const archivedStorageId = await ctx.storage.store(
+        new Blob([new Uint8Array([8, 8])]),
+      );
+      const archivedAssetId = await ctx.db.insert('audioAssets', {
+        language: 'de',
+        voiceGender: 'female',
+        spokenTextHash: 'h',
+        spokenText: 'Ist alles in Ordnung?',
+        storageId: archivedStorageId,
+        voiceName: DE_VOICE,
+        ttsQuality: 'validated',
+        ttsProvider: getTtsProviderForLanguage('de'),
+        speed: 1,
+      });
+      const supersededAt = Date.now();
+      const supersededId = await ctx.db.insert('translations', {
+        textId,
+        targetLanguage: 'de',
+        translatedText: 'Ist alles in Ordnung?',
+        romanizedText: '',
+        ipaText: 'x',
+        speakerGender: 'female',
+        translationVersion: 1,
+        audioAssetId: archivedAssetId,
+        supersededAt,
+      });
+      await ctx.db.patch(translationId, {
+        translationVersion: getCurrentTranslationVersion('de'),
+        lastArchivedAt: supersededAt,
+      });
+      return { archivedStorageId, supersededId };
+    });
+
+    await t.run(async (ctx) => {
+      const text = (await ctx.db.get(textId))!;
+      await scheduleMissingContent(ctx, textId, text, ['en'], ['de']);
+    });
+    // A backfill holds a workId-less claim; no synthesis was enqueued.
+    const claim = await t.run((ctx) =>
+      ctx.db
+        .query('ttsGenerationClaims')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', textId).eq('language', 'de'),
+        )
+        .first(),
+    );
+    expect(claim).not.toBeNull();
+    expect(claim!.workId).toBeUndefined();
+    expect(ttsEnqueues().length).toBe(0);
+
+    // The transcription lands on the asset that owns the blob.
+    await t.mutation(
+      internal.features.ttsProcessing.persistBackfilledWordTimings,
+      {
+        textId,
+        language: 'de',
+        storageId: archivedStorageId,
+        wordTimings: [{ word: 'Ist', start: 0, end: 0.2 }],
+      },
+    );
+    const superseded = (await t.run((ctx) => ctx.db.get(supersededId)))!;
+    const archivedAsset = (await t.run((ctx) =>
+      ctx.db.get(superseded.audioAssetId!),
+    ))!;
+    expect(archivedAsset.wordTimings).toEqual([
+      { word: 'Ist', start: 0, end: 0.2 },
+    ]);
+    // The live asset's timings are untouched.
+    const liveAsset = (await t.run((ctx) => ctx.db.get(assetId)))!;
+    expect(liveAsset.wordTimings).toEqual([
+      { word: 'Alles', start: 0, end: 0.4 },
+    ]);
+    expect(liveAsset.storageId).toBe(storageId);
+  });
+
+  it('a lost archived asset is a content gap; the repair job re-voices the wording without touching the live pointer', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, pinAt, assetId } = await seed(t, { ipaText: 'x' });
+    await bump(t, textId, NEW_DE);
+    await settleTts(t, textId);
+    const [copy] = await archiveRows(t, textId);
+    expect(copy.audioAssetId).toBe(assetId);
+    // Live wording gets its own complete audio (timings included, so the
+    // shared TTS claim is free for the repair); then the archived asset
+    // disappears.
+    const { liveAssetId } = await t.run(async (ctx) => {
+      const { assetId: liveAssetId } = await insertAudioFixture(ctx, {
+        textId,
+        language: 'de',
+        voiceName: DE_VOICE,
+        storageId: await ctx.storage.store(new Blob([new Uint8Array([5])])),
+        ttsQuality: 'validated',
+        ttsProvider: getTtsProviderForLanguage('de'),
+        voiceGender: 'female',
+        spokenText: NEW_DE,
+        wordTimings: [{ word: 'Alles', start: 0, end: 0.3 }],
+      });
+      await ctx.db.delete(assetId);
+      return { liveAssetId };
+    });
+
+    const pinned = await hydrate(t, textId, pinAt);
+    expect(pinned.text).toBe(OLD_DE);
+    expect(pinned.audioUrl).toBeNull();
+    expect(pinned.hasMissingContent).toBe(true);
+
+    await t.run(async (ctx) => {
+      const text = (await ctx.db.get(textId))!;
+      await scheduleMissingContent(ctx, textId, text, ['en'], ['de']);
+    });
+    const jobs = ttsEnqueues();
+    expect(jobs.length).toBe(1);
+    expect(jobs[0]).toMatchObject({
+      textId,
+      language: 'de',
+      text: OLD_DE,
+      supersededTranslationId: copy._id,
+    });
+    expect(jobs[0].forceRegen).toBeFalsy();
+
+    // The job's final write: asset recreated by key, revision re-pointed,
+    // live pointer untouched.
+    const newStorageId = await t.run((ctx) =>
+      ctx.storage.store(new Blob([new Uint8Array([6, 6])])),
+    );
+    await t.mutation(internal.features.decks.storeAudioRecording, {
+      textId,
+      language: 'de',
+      voiceName: DE_VOICE,
+      storageId: newStorageId,
+      ttsQuality: 'validated',
+      ttsProvider: getTtsProviderForLanguage('de'),
+      voiceGender: 'female',
+      speed: 1,
+      spokenText: OLD_DE,
+      supersededTranslationId: copy._id,
+    });
+    const repaired = (await t.run((ctx) => ctx.db.get(copy._id)))!;
+    expect(repaired.audioAssetId).toBeDefined();
+    expect(repaired.audioAssetId).not.toBe(assetId);
+    const repairedAsset = (await t.run((ctx) =>
+      ctx.db.get(repaired.audioAssetId!),
+    ))!;
+    expect(repairedAsset.storageId).toBe(newStorageId);
+    expect(repairedAsset.spokenText).toBe(OLD_DE);
+    expect((await audioRows(t, textId)).map((a) => a.assetId)).toEqual([
+      liveAssetId,
+    ]);
+    const afterRepair = await hydrate(t, textId, pinAt);
+    expect(afterRepair.text).toBe(OLD_DE);
+    expect(afterRepair.audioUrl).toEqual(expect.any(String));
+    expect(afterRepair.hasMissingContent).toBe(false);
+  });
+
+  it('an archived asset whose blob is gone is replaced in place', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, assetId, storageId } = await seed(t, { ipaText: 'x' });
+    await bump(t, textId, NEW_DE);
+    await settleTts(t, textId);
+    const [copy] = await archiveRows(t, textId);
+    await t.run(async (ctx) => {
+      await insertAudioFixture(ctx, {
+        textId,
+        language: 'de',
+        voiceName: DE_VOICE,
+        storageId: await ctx.storage.store(new Blob([new Uint8Array([5])])),
+        ttsQuality: 'validated',
+        ttsProvider: getTtsProviderForLanguage('de'),
+        voiceGender: 'female',
+        spokenText: NEW_DE,
+        wordTimings: [{ word: 'Alles', start: 0, end: 0.3 }],
+      });
+      await ctx.storage.delete(storageId);
+    });
+
+    await t.run(async (ctx) => {
+      const text = (await ctx.db.get(textId))!;
+      await scheduleMissingContent(ctx, textId, text, ['en'], ['de']);
+    });
+    const archivedJobs = ttsEnqueues().filter(
+      (j) => j.supersededTranslationId !== undefined,
+    );
+    expect(archivedJobs.length).toBe(1);
+    expect(archivedJobs[0]).toMatchObject({
+      supersededTranslationId: copy._id,
+      text: OLD_DE,
+      forceRegen: true,
+    });
+    // The asset doc survives for the in-place swap.
+    expect(await t.run((ctx) => ctx.db.get(assetId))).not.toBeNull();
+  });
+
+  it('"Regenerate audio" on a pinned card re-voices the archived asset and keeps the live pointer', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, cardId, assetId } = await seed(t, { ipaText: 'x' });
+    await bump(t, textId, NEW_DE);
+    await settleTts(t, textId);
+    const [copy] = await archiveRows(t, textId);
+    const { liveRowId } = await t.run(async (ctx) => {
+      const { rowId: liveRowId } = await insertAudioFixture(ctx, {
+        textId,
+        language: 'de',
+        voiceName: DE_VOICE,
+        storageId: await ctx.storage.store(new Blob([new Uint8Array([5])])),
+        ttsQuality: 'validated',
+        ttsProvider: getTtsProviderForLanguage('de'),
+        voiceGender: 'female',
+        spokenText: NEW_DE,
+        wordTimings: [{ word: 'Alles', start: 0, end: 0.3 }],
+      });
+      return { liveRowId };
+    });
+    const asUser = t.withIdentity({ subject: 'user_A' });
+
+    await asUser.mutation(api.features.scheduling.regenerateCardAudio, {
+      cardId: cardId!,
+      timezone: 'UTC',
+    });
+
+    const jobs = ttsEnqueues();
+    const de = jobs.filter((j) => j.language === 'de');
+    expect(de.length).toBe(1);
+    expect(de[0]).toMatchObject({
+      text: OLD_DE,
+      forceRegen: true,
+      supersededTranslationId: copy._id,
+    });
+    // Source-language audio took the normal regenerate path.
+    expect(jobs.some((j) => j.language === 'en' && j.forceRegen)).toBe(true);
+    // The live German pointer and the archived asset are both still there.
+    expect((await audioRows(t, textId)).map((a) => a._id)).toEqual([liveRowId]);
+    expect(await t.run((ctx) => ctx.db.get(assetId))).not.toBeNull();
+    const quota = await t.run((ctx) =>
+      ctx.db
+        .query('usageQuotas')
+        .withIndex('by_userId', (q) => q.eq('userId', 'user_A'))
+        .first(),
+    );
+    expect(quota?.features.audio_regenerations.balance).toBe(4);
+  });
+});
+
+describe('the "Retranslating" pill during a bump', () => {
+  it('stays off while the version-bump job holds the claim', async () => {
+    const t = convexTest(schema, modules);
+    const { textId } = await seed(t);
+    await t.run(async (ctx) => {
+      const text = (await ctx.db.get(textId))!;
+      await scheduleMissingContent(ctx, textId, text, ['en'], ['de']);
+    });
+    expect(llmEnqueues().length).toBe(1);
+    const view = await hydrate(t, textId, undefined);
+    expect(view.text).toBe(OLD_DE);
+    expect(view.retranslating).toBe(false);
+  });
+
+  it('still shows for a flag retranslation of a current row', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, cardId, translationId } = await seed(t);
+    await t.run((ctx) =>
+      ctx.db.patch(translationId, {
+        translationVersion: getCurrentTranslationVersion('de'),
+      }),
+    );
+    const asUser = t.withIdentity({ subject: 'user_A' });
+    await asUser.mutation(api.features.scheduling.flagTranslation, {
+      cardId: cardId!,
+    });
+    expect(llmEnqueues().length).toBe(1);
+    expect((await hydrate(t, textId, undefined)).retranslating).toBe(true);
+  });
+});
+
+describe('gender drift retires the pair', () => {
+  it('deletes the superseded revisions with the live row and keeps their assets cached', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, translationId, assetId, pinAt } = await seed(t, {
+      ipaText: 'x',
+    });
+    await bump(t, textId, NEW_DE);
+    await settleTts(t, textId);
+    expect((await archiveRows(t, textId)).length).toBe(1);
+    // The card's gender is female (seed); a row stamped male has drifted.
+    await t.run((ctx) =>
+      ctx.db.patch(translationId, {
+        translationVersion: getCurrentTranslationVersion('de'),
+        speakerGender: 'male',
+      }),
+    );
+
+    await t.run(async (ctx) => {
+      const text = (await ctx.db.get(textId))!;
+      await scheduleMissingContent(ctx, textId, text, ['en'], ['de']);
+    });
+
+    expect(await t.run((ctx) => ctx.db.get(translationId))).toBeNull();
+    expect(await archiveRows(t, textId)).toEqual([]);
+    expect(await t.run((ctx) => ctx.db.get(assetId))).not.toBeNull();
+    // The refill is on its way, and the pinned card waits for it like any
+    // other card with a missing translation.
+    expect(llmEnqueues().map((e) => e.targetLanguage)).toEqual(['de']);
+    const pinned = await hydrate(t, textId, pinAt);
+    expect(pinned.text).toBe('');
+    expect(pinned.hasMissingContent).toBe(true);
+  });
+});
+
+describe('editing a pinned card, afterwards', () => {
+  it('is a normal custom card: forked rows carry no archive link and a later bump leaves them alone', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, cardId, translationId, pinAt } = await seed(t, {
+      ipaText: 'x',
+    });
+    await bump(t, textId, NEW_DE);
+    await settleTts(t, textId);
+    const asUser = t.withIdentity({ subject: 'user_A' });
+
+    await asUser.mutation(api.features.scheduling.editCard, {
+      cardId: cardId!,
+      translations: [{ language: 'de', text: 'Alles gut?' }],
+      timezone: 'UTC',
+    });
+
+    const card = (await t.run((ctx) => ctx.db.get(cardId!)))!;
+    expect(card.textId).not.toBe(textId);
+    const forkedText = (await t.run((ctx) => ctx.db.get(card.textId)))!;
+    expect(forkedText.userCreated).toBe(true);
+    const forkedDe = (await t.run((ctx) =>
+      liveTranslation(ctx, card.textId, 'de'),
+    ))!;
+    expect(forkedDe.translatedText).toBe('Alles gut?');
+    expect(forkedDe.translationSource).toBe('user-provided');
+    expect(forkedDe.supersededAt).toBeUndefined();
+    expect(forkedDe.lastArchivedAt).toBeUndefined();
+    expect(
+      await t.run((ctx) => translationRevisions(ctx, card.textId, 'de')),
+    ).toHaveLength(1);
+    // The card resolves live on its own text, pin or no pin.
+    const served = await t.run((ctx) =>
+      resolveServedFromLive(ctx, forkedDe, cardPinAt(card)),
+    );
+    expect(served.archived).toBe(false);
+    // The new wording gets ordinary audio, never an archived-revision job.
+    const jobs = ttsEnqueues().filter((j) => j.language === 'de');
+    expect(jobs.length).toBe(1);
+    expect(jobs[0]).toMatchObject({
+      textId: card.textId,
+      text: 'Alles gut?',
+    });
+    expect(jobs[0].supersededTranslationId).toBeUndefined();
+    // The curriculum row was edited from the learner's own copy: no complaint.
+    expect((await t.run((ctx) => ctx.db.get(translationId)))!.flagCount).toBe(
+      undefined,
+    );
+    // A later bump of the curriculum text does not reach the fork.
+    await bump(t, textId, 'Ist alles gut?');
+    expect(
+      (await t.run((ctx) => liveTranslation(ctx, card.textId, 'de')))!
+        .translatedText,
+    ).toBe('Alles gut?');
+    expect(pinAt).toBeLessThan(Date.now());
+  });
+
+  it('flags nothing for a language whose live wording the learner never saw, and still flags a live one', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, cardId, translationId } = await seed(t, {
+      ipaText: 'x',
+      targetLanguages: ['de', 'fr'],
+      extraTranslations: [{ lang: 'fr', text: 'Tout va bien ?' }],
+    });
+    await bump(t, textId, NEW_DE);
+    await settleTts(t, textId);
+    vi.mocked(llmPool.enqueueAction).mockClear();
+    const asUser = t.withIdentity({ subject: 'user_A' });
+
+    // de is pinned to the superseded wording; fr is the live curriculum row.
+    await asUser.mutation(api.features.scheduling.editCard, {
+      cardId: cardId!,
+      translations: [
+        { language: 'de', text: 'Alles gut?' },
+        { language: 'fr', text: 'Tout va bien chez toi ?' },
+      ],
+      timezone: 'UTC',
+    });
+
+    const rows = await t.run((ctx) =>
+      ctx.db
+        .query('translations')
+        .withIndex('by_textId', (q) => q.eq('textId', textId))
+        .collect(),
+    );
+    const byLang = Object.fromEntries(
+      rows
+        .filter((r) => r.supersededAt === undefined)
+        .map((r) => [r.targetLanguage, r.flagCount]),
+    );
+    expect(byLang).toEqual({ de: undefined, fr: 1 });
+    expect((await t.run((ctx) => ctx.db.get(translationId)))!.flagCount).toBe(
+      undefined,
+    );
+    const fixes = llmEnqueues().filter(
+      (e) => e.translationReason === 'curriculum_fix',
+    );
+    expect(fixes.map((e) => e.targetLanguage)).toEqual(['fr']);
+  });
+});
+
+describe('table walks reach superseded rows', () => {
+  it('the IPA backfill pages a superseded revision by its own id', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, translationId, assetId } = await seed(t, {
+      ipaText: 'live-ipa',
+    });
+    const supersededId = await t.run(async (ctx) => {
+      const supersededAt = Date.now();
+      const id = await ctx.db.insert('translations', {
+        textId,
+        targetLanguage: 'de',
+        translatedText: 'Ist alles in Ordnung?',
+        speakerGender: 'female',
+        translationVersion: 1,
+        audioAssetId: assetId,
+        supersededAt,
+      });
+      await ctx.db.patch(translationId, { lastArchivedAt: supersededAt });
+      return id;
+    });
+
+    const page = await t.query(internal.admin.backfillIpa.pageIpaCandidates, {
+      table: 'translations',
+      paginationOpts: { numItems: 50, cursor: null },
+    });
+    expect(page.items.map((i) => i.translationId)).toEqual([supersededId]);
+
+    await t.mutation(internal.features.decks.storeTranslationAnnotation, {
+      textId,
+      language: 'de',
+      kind: 'ipa',
+      value: 'ɪst',
+      source: IPA_SOURCES.espeakNg,
+      forText: 'Ist alles in Ordnung?',
+      translationId: supersededId,
+    });
+    expect((await t.run((ctx) => ctx.db.get(supersededId)))!.ipaText).toBe(
+      'ɪst',
+    );
+    expect((await t.run((ctx) => ctx.db.get(translationId)))!.ipaText).toBe(
+      'live-ipa',
+    );
   });
 });

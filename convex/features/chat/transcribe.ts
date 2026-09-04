@@ -10,13 +10,17 @@ import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
 import {
   transcribeAudio as runStt,
-  reserveAzureSttSlot,
-  AzureMultipleLanguagesError,
+  reserveSttSlot,
+  normalizeTranscriptScript,
+  resolveScriptTarget,
+  containerOfBuffer,
+  sttCostForEvent,
+  STT_REJECTED_CONTAINERS,
 } from '../../lib/stt';
 import { getActiveCourseForUser } from '../../db/courses';
 import { EVENTS, track } from '../../analytics';
 import { captureGeneration } from '../../lib/posthogAi';
-import { costForAudioMs } from '../../config/aiCosts';
+import { OPENROUTER_MODELS } from '../../config/aiModels';
 
 export const consumeTranscriptionQuota = internalMutation({
   args: { userId: v.string() },
@@ -34,12 +38,12 @@ const courseLanguagesValidator = v.object({
 type CourseLanguages = Infer<typeof courseLanguagesValidator>;
 
 /**
- * Read the active course's base and target language codes so chat-voice
- * transcription knows which languages the utterance is likely to mix. They're
- * returned separately because the two play different roles: the union decides
- * whether Azure's multi-lingual model covers the course, while `target` is the
- * single locale we pin to if language-ID gives up on mixed audio. Both arrays
- * are empty when the user has no active course.
+ * Read the active course's base and target language codes. Auto-detected
+ * chat transcripts use them to settle which script a Mandarin or Cantonese
+ * transcript should be returned in (see `resolveScriptTarget`): the model
+ * reports only `zh` / `yue`, and the course is what says whether that means
+ * Simplified or Traditional here. Both arrays are empty when the user has
+ * no active course.
  */
 export const getActiveCourseLanguages = internalQuery({
   args: { userId: v.string() },
@@ -56,36 +60,48 @@ export const getActiveCourseLanguages = internalQuery({
 });
 
 /**
- * Transcribe audio for chat voice input. Wraps the shared STT helper in
- * `../../lib/stt` with auth + quota.
+ * Transcribe audio for chat and writing-mode voice input. Wraps the shared
+ * STT helper in `../../lib/stt` with auth + quota.
  *
- * Language handling, when nothing is pinned, has two modes and one fallback:
- *  - Course fully covered by Azure's multi-lingual model → that model runs, and
- *    an utterance that switches languages mid-sentence transcribes as spoken.
- *  - Otherwise → candidate-locale language-ID over the 8 most-common languages
- *    plus the course's, so dialect codes (Iraqi Arabic, Cantonese, etc.)
- *    participate even when outside the global top-N.
- *  - Language-ID picks one dominant locale per recording and 422s on genuinely
- *    mixed audio. Rather than losing the recording, retry once pinned to the
- *    course's target language — the one the user is practising, so it's the
- *    half of a mixed utterance worth getting right. With no course to pin to,
- *    the multi-lingual model is the last resort.
+ * The container check runs before the quota is consumed: a client bundle
+ * from before the WAV transcode (hooks/use-voice-recording.ts) still uploads
+ * WebM or MP4, which the provider rejects, and it should get a structured
+ * error rather than a charge. After the quota there is exactly one STT
+ * call. With no pinned language the model auto-detects, and an utterance
+ * that switches languages mid-sentence transcribes as spoken, so there is
+ * no mixed-language retry.
+ *
+ * Script: the model writes Serbian in Latin and Mandarin in Simplified
+ * whatever the app expects. A pinned call converts into the pinned
+ * language's script; an auto-detected call converts when the detected
+ * language plus the course's languages identify one app language.
  */
 export const transcribeAudio = action({
   args: {
     audio: v.bytes(),
     mimeType: v.optional(v.string()),
-    // Pin transcription to one language (internal code) instead of running
-    // language-ID over the course languages. Used by writing-mode voice
-    // input, where the row's target language is already known — a single
-    // locale gives Azure its best accuracy. `regionVariant` narrows a
-    // mixed-dialect code (e.g. es_mixed) to its concrete Azure locale.
+    // Pin transcription to one language (internal code) instead of
+    // auto-detecting. Used by writing-mode voice input, where the row's
+    // target language is already known: the hint gives the model its best
+    // accuracy and decides which script the transcript comes back in.
     language: v.optional(v.string()),
-    regionVariant: v.optional(v.string()),
   },
   returns: v.string(),
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
+
+    const container = containerOfBuffer(args.audio);
+    if (STT_REJECTED_CONTAINERS.has(container)) {
+      // Tracked so a stale-bundle wave shows up next to real failures.
+      await track(ctx, userId, EVENTS.VOICE_TRANSCRIPTION_FAILED, {
+        latency_ms: 0,
+        message: `unsupported audio container: ${container}`,
+      });
+      throw new ConvexError({
+        code: 'UNSUPPORTED_AUDIO',
+        message: `Recording format "${container}" is not supported; reload the app and try again`,
+      });
+    }
 
     await ctx.runMutation(
       internal.features.chat.transcribe.consumeTranscriptionQuota,
@@ -100,62 +116,37 @@ export const transcribeAudio = action({
         );
 
     const startedAt = Date.now();
-    let sttCalls = 0;
-    const runOnce = async (
-      blob: Blob,
-      language: string | undefined,
-      opts: Parameters<typeof runStt>[2],
-    ) => {
-      await reserveAzureSttSlot(ctx, { maxWaitMs: 3000 });
-      sttCalls += 1;
-      return runStt(blob, language, opts);
-    };
-
     try {
-      const baseMime = (args.mimeType ?? 'audio/webm').split(';')[0].trim();
+      const baseMime = (args.mimeType ?? 'audio/wav').split(';')[0].trim();
       const blob = new Blob([args.audio], { type: baseMime });
-      const autoDetectCourseLanguages = [
-        ...new Set([...courseLanguages.base, ...courseLanguages.target]),
-      ];
 
-      let result;
-      try {
-        result = await runOnce(blob, args.language, {
-          ...(args.language
-            ? { regionVariant: args.regionVariant }
-            : { autoDetectCourseLanguages }),
-        });
-      } catch (error) {
-        // Only the auto-detect path can hit this: a pinned language means one
-        // candidate locale, so there's no language-ID to give up.
-        if (args.language || !(error instanceof AzureMultipleLanguagesError)) {
-          throw error;
-        }
-        // Mixed-language audio that candidate-locale language-ID refused.
-        // Pin the target language if we know one, else fall back to the
-        // multi-lingual model and take whatever it covers.
-        const pinned = courseLanguages.target[0];
-        result = pinned
-          ? await runOnce(blob, pinned, {})
-          : await runOnce(blob, undefined, { forceMultilingualModel: true });
-      }
-      const { text, audioDurationMs } = result;
+      await reserveSttSlot(ctx, { maxWaitMs: 3000 });
+      // One retry only: the user is waiting on this call.
+      const raw = await runStt(blob, args.language, { maxRetries: 1 });
+      const scriptTarget =
+        args.language ??
+        resolveScriptTarget(raw.detectedLanguage, [
+          ...courseLanguages.base,
+          ...courseLanguages.target,
+        ]);
+      const { text, audioDurationMs, billedSeconds, detectedLanguage } =
+        normalizeTranscriptScript(raw, scriptTarget);
 
+      const cost = sttCostForEvent(raw);
       await captureGeneration(ctx, {
         distinctId: userId,
         feature: 'chat_voice_input',
-        model: 'azure-fast-transcription',
-        provider: 'azure',
+        model: OPENROUTER_MODELS.stt,
+        provider: 'openrouter',
         latencyMs: Date.now() - startedAt,
-        // Azure bills every attempt, so a retried recording costs twice.
-        costUsd:
-          audioDurationMs !== undefined
-            ? costForAudioMs('azureStt', audioDurationMs) * sttCalls
-            : undefined,
+        costUsd: cost.costUsd,
         extra: {
           audio_duration_ms: audioDurationMs,
+          billed_seconds: billedSeconds,
           transcript_chars: text.length,
-          stt_calls: sttCalls,
+          detected_language: detectedLanguage,
+          pinned_language: args.language,
+          cost_source: cost.source,
         },
       });
       await track(ctx, userId, EVENTS.VOICE_TRANSCRIBED, {

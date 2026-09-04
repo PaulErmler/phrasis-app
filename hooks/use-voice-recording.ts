@@ -6,16 +6,17 @@ import { api } from '@/convex/_generated/api';
 import { toast } from 'sonner';
 
 import { reportError } from '@/lib/report-error';
+import { recordingToWav } from '@/lib/audio/recordingToWav';
 
-function detectDefaultMime(): string {
-  if (
-    typeof navigator !== 'undefined' &&
-    /iPad|iPhone|iPod/.test(navigator.userAgent)
-  ) {
-    return 'audio/mp4';
-  }
-  return 'audio/webm';
-}
+/**
+ * Auto-stop cap when the caller sets none. Chat voice input had no cap while
+ * the upload was a compressed WebM; the WAV upload is 32 KB per second, so
+ * three minutes is ~5.8 MB. Convex caps function arguments at 16 MiB
+ * (docs.convex.dev/production/state/limits; the 1 MB figure elsewhere is
+ * the stored-value limit), and three minutes is far past any message a
+ * learner dictates.
+ */
+export const DEFAULT_MAX_RECORDING_MS = 180_000;
 
 interface UseVoiceRecordingReturn {
   isRecording: boolean;
@@ -28,11 +29,14 @@ interface UseVoiceRecordingReturn {
 interface UseVoiceRecordingOptions {
   /**
    * Pin transcription to one language (internal code) instead of the default
-   * course-wide auto-detect. Writing-mode dictation knows the row's target
-   * language, and a single locale gives Azure its best accuracy.
+   * auto-detect. Writing-mode dictation knows the row's target language; the
+   * hint gives the model its best accuracy and fixes the transcript's script.
    */
   language?: string;
-  /** Auto-stop the recording after this long (and transcribe what's there). */
+  /**
+   * Auto-stop the recording after this long (and transcribe what's there).
+   * Defaults to `DEFAULT_MAX_RECORDING_MS`.
+   */
   maxDurationMs?: number;
   /**
    * Skip the success toast. Writing mode drops the transcript straight into
@@ -96,7 +100,6 @@ export function useVoiceRecording(
         MediaRecorder.isTypeSupported(t),
       );
       const options = mimeType ? { mimeType } : undefined;
-      const chosenMime = mimeType ?? detectDefaultMime();
 
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
@@ -114,7 +117,6 @@ export function useVoiceRecording(
           maxDurationTimerRef.current = null;
         }
         stream.getTracks().forEach((track) => track.stop());
-        const actualMimeType = mediaRecorder.mimeType || chosenMime;
 
         if (audioChunksRef.current.length === 0) {
           // Nothing was captured, so there is nothing to send. Release the
@@ -126,13 +128,23 @@ export function useVoiceRecording(
         setIsTranscribing(true);
         try {
           const audioBlob = new Blob(audioChunksRef.current, {
-            type: actualMimeType,
+            type: mediaRecorder.mimeType || mimeType || '',
           });
-          const arrayBuffer = await audioBlob.arrayBuffer();
+          // The STT provider rejects WebM and MP4, the only containers
+          // MediaRecorder produces, so the clip is re-encoded as 16 kHz mono
+          // WAV first (see lib/audio/recordingToWav.ts).
+          let audio: ArrayBuffer;
+          try {
+            audio = await recordingToWav(audioBlob);
+          } catch (error) {
+            reportError(error, { op: 'recordingToWav' });
+            toast.error(tErrors('failedToTranscribe'));
+            return;
+          }
 
           const transcript = await transcribeAudio({
-            audio: arrayBuffer as ArrayBuffer,
-            mimeType: actualMimeType,
+            audio,
+            mimeType: 'audio/wav',
             ...(language ? { language } : {}),
           });
 
@@ -155,9 +167,10 @@ export function useVoiceRecording(
 
       mediaRecorder.start();
       setIsRecording(true);
-      if (maxDurationMs) {
-        maxDurationTimerRef.current = setTimeout(stopRecording, maxDurationMs);
-      }
+      maxDurationTimerRef.current = setTimeout(
+        stopRecording,
+        maxDurationMs ?? DEFAULT_MAX_RECORDING_MS,
+      );
     } catch (error) {
       // Deliberately not reportError: this is overwhelmingly the user
       // denying mic permission (NotAllowedError) — an expected state like

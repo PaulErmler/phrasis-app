@@ -1,4 +1,4 @@
-import { cardPinAt } from '../db/translationReads';
+import { cardPinAt, liveTranslation } from '../db/translationReads';
 import { QueryCtx } from '../_generated/server';
 import { Id } from '../_generated/dataModel';
 import { getAuthUserId, getUserSettings } from '../db/users';
@@ -312,24 +312,22 @@ export async function getUpcomingSentencesForLevelHandler(
     texts.map(async (text, position) => {
       let sourceText = text.text;
       if (sourceLanguage && sourceLanguage !== text.language) {
-        const sourceTranslation = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', text._id).eq('targetLanguage', sourceLanguage),
-          )
-          .first();
+        const sourceTranslation = await liveTranslation(
+          ctx,
+          text._id,
+          sourceLanguage,
+        );
         if (sourceTranslation) sourceText = sourceTranslation.translatedText;
       }
 
       let targetText: string | undefined;
       let targetRomanization: string | undefined;
       if (targetLanguage && targetLanguage !== text.language) {
-        const targetTranslation = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', text._id).eq('targetLanguage', targetLanguage),
-          )
-          .first();
+        const targetTranslation = await liveTranslation(
+          ctx,
+          text._id,
+          targetLanguage,
+        );
         if (targetTranslation) {
           targetText = targetTranslation.translatedText;
           // Empty string is the "tried and failed" romanization sentinel.
