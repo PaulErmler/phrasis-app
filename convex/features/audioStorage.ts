@@ -3,6 +3,7 @@ import { MutationCtx } from '../_generated/server';
 import { getCurrentTtsVersion } from '../../lib/languages';
 import { deleteStorageBlobIfUnreferenced } from '../lib/audio';
 import {
+  releaseAudioAssetIfUnreferenced,
   scheduleBlobSwapDelete,
   upsertAudioAsset,
   upsertAudioPointer,
@@ -47,6 +48,11 @@ const vStoreAudioRecordingArgs = v.object({
   spokenText: v.string(),
   // Dialect pin for mixed-language rows; part of the asset key.
   regionVariant: v.optional(v.string()),
+  // Set when this audio was synthesized for a SUPERSEDED translation
+  // revision (see `supersededAt` in schema.ts): the asset is upserted by key
+  // as usual, but the (text, language) pointer is left alone (it speaks the
+  // live wording) and the revision's `audioAssetId` is re-pointed instead.
+  supersededTranslationId: v.optional(v.id('translations')),
 });
 export const storeAudioRecordingArgs = vStoreAudioRecordingArgs.fields;
 export type StoreAudioRecordingArgs = Infer<typeof vStoreAudioRecordingArgs>;
@@ -111,7 +117,23 @@ export async function storeAudioRecordingHandler(
       ttsVersion: getCurrentTtsVersion(args.language),
     },
   );
-  await upsertAudioPointer(ctx, args.textId, args.language, result.assetId);
+  if (args.supersededTranslationId !== undefined) {
+    // Audio for a superseded revision: never touch the live pointer. The
+    // asset was found or recreated by key; make sure the revision points at
+    // it (a repair after a lost asset gets a fresh id).
+    const revision = await ctx.db.get(args.supersededTranslationId);
+    if (revision && revision.audioAssetId !== result.assetId) {
+      const previousAssetId = revision.audioAssetId;
+      await ctx.db.patch(revision._id, { audioAssetId: result.assetId });
+      // The revision was the reference keeping its old asset alive; if
+      // nothing else does, collect it like a re-pointed pointer would.
+      if (previousAssetId !== undefined) {
+        await releaseAudioAssetIfUnreferenced(ctx, previousAssetId);
+      }
+    }
+  } else {
+    await upsertAudioPointer(ctx, args.textId, args.language, result.assetId);
+  }
 
   if (result.outcome === 'kept') {
     // The asset already carries completed audio and this was a mid-flight

@@ -24,12 +24,19 @@ vi.mock('../../rateLimiter', () => ({
   },
   TTS_RATE_LIMIT_BY_PROVIDER: {
     google: 'googleTts',
-    azure: 'azureTts',
     gemini: 'geminiTts',
   },
 }));
 
+// Cost events are asserted on (the backfill path emits its own `ai_cost`
+// event); the rest of the module stays real so nothing else changes shape.
+vi.mock('../../lib/posthogAi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/posthogAi')>()),
+  captureGeneration: vi.fn(),
+}));
+
 import { textsMatchSemantic } from '../../lib/ttsSemanticValidation';
+import { captureGeneration } from '../../lib/posthogAi';
 import { rateLimiter } from '../../rateLimiter';
 // The workpools are module-mocked globally (tests/convexTestSetup.ts, outside convex/ on purpose, see vitest.config.ts):
 // `enqueueAction` is a vi.fn() resolving to unique fake workIds
@@ -41,8 +48,10 @@ import { claimTtsIfAvailable } from '../../features/ttsProcessing';
 import { resolveAudioPayload } from '../../lib/audioAssets';
 import { insertAudioFixture } from '../lib/audioFixtures';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+import { openrouterSttBody, isOpenrouterSttUrl } from '../lib/sttFixtures';
 
 const mockSemantic = vi.mocked(textsMatchSemantic);
+const mockCapture = vi.mocked(captureGeneration);
 const mockLimit = vi.mocked(rateLimiter.limit);
 const mockCheck = vi.mocked(rateLimiter.check);
 const mockEnqueue = vi.mocked(ttsPool.enqueueAction);
@@ -56,6 +65,7 @@ const modules = import.meta.glob('/convex/**/*.ts');
 drainSchedulerAfterEach();
 
 beforeEach(() => {
+  mockCapture.mockReset().mockResolvedValue(undefined);
   // Fresh call counts + permissive defaults per test: token reserves succeed
   // instantly unless a test overrides the verdicts.
   mockLimit.mockReset();
@@ -587,7 +597,7 @@ describe('features/ttsProcessing', () => {
   describe('processTTSForCard', () => {
     /**
      * Run the worker action against fully mocked provider HTTP: Google TTS
-     * returns fake audio, Azure STT returns `opts.transcribed` (default:
+     * returns fake audio, STT returns `opts.transcribed` (default:
      * the exact source text, i.e. validation passes strictly).
      */
     async function runPipeline(
@@ -596,31 +606,12 @@ describe('features/ttsProcessing', () => {
       opts: { transcribed?: string } = {},
     ) {
       vi.stubEnv('GOOGLE_TTS_API_KEY', 'dummy');
-      vi.stubEnv('AZURE_SPEECH_API_KEY', 'dummy');
-      vi.stubEnv('AZURE_SPEECH_REGION', 'westeurope');
 
       const transcribed = opts.transcribed ?? 'Hola';
       const googleBody = JSON.stringify({
         audioContent: Buffer.from('fake-mp3-bytes').toString('base64'),
       });
-      const azureSttBody = JSON.stringify({
-        combinedPhrases: [{ text: transcribed }],
-        phrases: [
-          {
-            offsetMilliseconds: 0,
-            durationMilliseconds: 500,
-            text: transcribed,
-            locale: 'es-ES',
-            words: [
-              {
-                text: transcribed,
-                offsetMilliseconds: 0,
-                durationMilliseconds: 500,
-              },
-            ],
-          },
-        ],
-      });
+      const sttBody = openrouterSttBody(transcribed);
       const fetchMock = vi.fn(async (url: string | URL | Request) => {
         const u = typeof url === 'string' ? url : url.toString();
         if (u.includes('texttospeech.googleapis.com')) {
@@ -629,8 +620,8 @@ describe('features/ttsProcessing', () => {
             headers: { 'Content-Type': 'application/json' },
           });
         }
-        if (u.includes('speechtotext/transcriptions:transcribe')) {
-          return new Response(azureSttBody, {
+        if (isOpenrouterSttUrl(u)) {
+          return new Response(sttBody, {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
           });
@@ -696,9 +687,7 @@ describe('features/ttsProcessing', () => {
       expect(audio?.speed).toBe(1);
       const calls = fetchMock.mock.calls.map((c) => String(c[0]));
       expect(calls.some((c) => c.includes('texttospeech'))).toBe(true);
-      expect(
-        calls.some((c) => c.includes('speechtotext/transcriptions:transcribe')),
-      ).toBe(true);
+      expect(calls.some((c) => isOpenrouterSttUrl(c))).toBe(true);
     });
 
     it('a pool job leaves the claim in place, release belongs to onTtsJobComplete', async () => {
@@ -801,8 +790,6 @@ describe('features/ttsProcessing', () => {
         mockSemantic.mockReset();
 
         vi.stubEnv('GOOGLE_TTS_API_KEY', 'dummy');
-        vi.stubEnv('AZURE_SPEECH_API_KEY', 'dummy');
-        vi.stubEnv('AZURE_SPEECH_REGION', 'westeurope');
         const googleBody = JSON.stringify({
           audioContent: Buffer.from('fake').toString('base64'),
         });
@@ -811,31 +798,14 @@ describe('features/ttsProcessing', () => {
         // normalized hanzi are clearly different characters). Pinyin of
         // both is "tā zài jiā". Identical, so strict passes at
         // distance 0.
-        const azureSttBody = JSON.stringify({
-          combinedPhrases: [{ text: '她在家' }],
-          phrases: [
-            {
-              offsetMilliseconds: 0,
-              durationMilliseconds: 500,
-              text: '她在家',
-              locale: 'zh-CN',
-              words: [
-                {
-                  text: '她在家',
-                  offsetMilliseconds: 0,
-                  durationMilliseconds: 500,
-                },
-              ],
-            },
-          ],
-        });
+        const sttBody = openrouterSttBody('她在家');
         const fetchMock = vi.fn(async (url: string | URL | Request) => {
           const u = typeof url === 'string' ? url : url.toString();
           if (u.includes('texttospeech.googleapis.com')) {
             return new Response(googleBody, { status: 200 });
           }
-          if (u.includes('speechtotext/transcriptions:transcribe')) {
-            return new Response(azureSttBody, { status: 200 });
+          if (isOpenrouterSttUrl(u)) {
+            return new Response(sttBody, { status: 200 });
           }
           throw new Error(`Unexpected fetch to ${u}`);
         });
@@ -868,6 +838,87 @@ describe('features/ttsProcessing', () => {
         expect(audio?.ttsQuality).toBe('validated');
         expect(mockSemantic).not.toHaveBeenCalled();
       });
+
+      it('Serbian validates against the Latin-script transcript the model returns', async () => {
+        // The app stores Serbian in Cyrillic; STT returns Latin whatever the
+        // hint. The transcript is converted before the strict compare, so a
+        // correct reading passes at distance 0 with no judge call.
+        const t = convexTest(schema, modules);
+        const srTextId = await t.run(async (ctx) => {
+          const collectionId = await ctx.db.insert('collections', {
+            name: 'A1',
+            textCount: 1,
+          });
+          return ctx.db.insert('texts', {
+            text: 'Данас је леп дан.',
+            language: 'sr',
+            userCreated: false,
+            collectionId,
+            collectionRank: 1,
+          });
+        });
+        mockSemantic.mockReset();
+
+        vi.stubEnv('GOOGLE_TTS_API_KEY', 'dummy');
+        const googleBody = JSON.stringify({
+          audioContent: Buffer.from('fake').toString('base64'),
+        });
+        const sttBody = openrouterSttBody('Danas je lep dan.', {
+          words: [
+            { word: 'Danas', start: 0, end: 0.3 },
+            { word: 'je', start: 0.3, end: 0.4 },
+            { word: 'lep', start: 0.4, end: 0.6 },
+            { word: 'dan.', start: 0.6, end: 0.9 },
+          ],
+          language: 'sr',
+        });
+        const fetchMock = vi.fn(async (url: string | URL | Request) => {
+          const u = typeof url === 'string' ? url : url.toString();
+          if (u.includes('texttospeech.googleapis.com')) {
+            return new Response(googleBody, { status: 200 });
+          }
+          if (isOpenrouterSttUrl(u)) {
+            return new Response(sttBody, { status: 200 });
+          }
+          throw new Error(`Unexpected fetch to ${u}`);
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        try {
+          await t.action(internal.features.ttsProcessing.processTTSForCard, {
+            textId: srTextId,
+            text: 'Данас је леп дан.',
+            language: 'sr',
+            voiceName: 'sr-RS-Chirp3-HD-Leda',
+            provider: 'google' as const,
+            voiceGender: 'female' as const,
+            speed: 1,
+          });
+        } finally {
+          vi.unstubAllGlobals();
+          vi.unstubAllEnvs();
+        }
+
+        const audio = await t.run(async (ctx) => {
+          const row = await ctx.db
+            .query('audioRecordings')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', srTextId).eq('language', 'sr'),
+            )
+            .first();
+          return row ? resolveAudioPayload(ctx, row) : null;
+        });
+        expect(audio?.ttsQuality).toBe('validated');
+        expect(mockSemantic).not.toHaveBeenCalled();
+        // Stored timings carry the converted words, so they align with the
+        // Cyrillic sentence they belong to.
+        expect(audio?.wordTimings?.map((w) => w.word)).toEqual([
+          'Данас',
+          'је',
+          'леп',
+          'дан.',
+        ]);
+      });
     });
 
     describe('rate-limit token metering', () => {
@@ -879,12 +930,14 @@ describe('features/ttsProcessing', () => {
 
         // Mismatch on both attempts → two syntheses (attempt 1 + validation
         // retry), each of which must reserve a googleTts token; each STT
-        // validation call reserves an azureStt token.
+        // validation call reserves an openrouterStt token.
         await runPipeline(t, textId, { transcribed: 'Ola amigo' });
 
         const limitBuckets = mockLimit.mock.calls.map((c) => c[1]);
         expect(limitBuckets.filter((b) => b === 'googleTts').length).toBe(2);
-        expect(limitBuckets.filter((b) => b === 'azureStt').length).toBe(2);
+        expect(limitBuckets.filter((b) => b === 'openrouterStt').length).toBe(
+          2,
+        );
         // The fast-fail peek (non-consuming check) runs once per synthesis.
         const checkBuckets = mockCheck.mock.calls.map((c) => c[1]);
         expect(checkBuckets.filter((b) => b === 'googleTts').length).toBe(2);
@@ -919,7 +972,7 @@ describe('features/ttsProcessing', () => {
         expect(mockLimit).not.toHaveBeenCalled();
       });
 
-      it('a saturated azureStt bucket throws out of the worker instead of sleeping in-slot or accepting unvalidated audio', async () => {
+      it('a saturated openrouterStt bucket throws out of the worker instead of sleeping in-slot or accepting unvalidated audio', async () => {
         // The STT-validation reservation is capped too (STT_TOKEN_MAX_WAIT_MS)
         // and sits OUTSIDE the transcription try/catch: backpressure must
         // free the pool slot for the pool's backoff to retry, not burn a
@@ -927,7 +980,7 @@ describe('features/ttsProcessing', () => {
         const t = convexTest(schema, modules);
         const { textId } = await seedText(t);
         mockCheck.mockImplementation(async (_ctx, name) =>
-          name === 'azureStt'
+          name === 'openrouterStt'
             ? { ok: true, retryAfter: 60_000 }
             : { ok: true, retryAfter: 0 },
         );
@@ -950,7 +1003,7 @@ describe('features/ttsProcessing', () => {
               ...baseJobArgs(textId),
               provider: 'google' as const,
             }),
-          ).rejects.toThrow(/Rate limit azureStt busy/);
+          ).rejects.toThrow(/Rate limit openrouterStt busy/);
         } finally {
           vi.unstubAllGlobals();
           vi.unstubAllEnvs();
@@ -960,7 +1013,9 @@ describe('features/ttsProcessing', () => {
         // consumed nothing.
         const limitBuckets = mockLimit.mock.calls.map((c) => c[1]);
         expect(limitBuckets.filter((b) => b === 'googleTts').length).toBe(1);
-        expect(limitBuckets.filter((b) => b === 'azureStt').length).toBe(0);
+        expect(limitBuckets.filter((b) => b === 'openrouterStt').length).toBe(
+          0,
+        );
       });
 
       it('a provider 429 propagates to the pool, no self-re-enqueue', async () => {
@@ -1228,36 +1283,16 @@ describe('features/ttsProcessing', () => {
     it('persists timings on success and releases the TTS claim', async () => {
       const t = convexTest(schema, modules);
       const { textId, storageId } = await seedAudioAndClaim(t);
-
-      vi.stubEnv('AZURE_SPEECH_API_KEY', 'dummy');
-      vi.stubEnv('AZURE_SPEECH_REGION', 'westeurope');
-      const azureSttBody = JSON.stringify({
-        combinedPhrases: [{ text: 'Hola mundo' }],
-        phrases: [
-          {
-            offsetMilliseconds: 0,
-            durationMilliseconds: 1000,
-            text: 'Hola mundo',
-            locale: 'es-ES',
-            words: [
-              {
-                text: 'Hola',
-                offsetMilliseconds: 0,
-                durationMilliseconds: 400,
-              },
-              {
-                text: 'mundo',
-                offsetMilliseconds: 500,
-                durationMilliseconds: 500,
-              },
-            ],
-          },
+      const sttBody = openrouterSttBody('Hola mundo', {
+        words: [
+          { word: 'Hola', start: 0, end: 0.4 },
+          { word: 'mundo', start: 0.5, end: 1 },
         ],
       });
       const fetchMock = vi.fn(async (url: string | URL | Request) => {
         const u = typeof url === 'string' ? url : url.toString();
-        if (u.includes('speechtotext/transcriptions:transcribe')) {
-          return new Response(azureSttBody, {
+        if (isOpenrouterSttUrl(u)) {
+          return new Response(sttBody, {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
           });
@@ -1271,6 +1306,7 @@ describe('features/ttsProcessing', () => {
           textId,
           language: 'es',
           storageId,
+          requestedByUserId: 'user_sweep',
         });
       } finally {
         vi.unstubAllGlobals();
@@ -1283,23 +1319,38 @@ describe('features/ttsProcessing', () => {
         { word: 'mundo', start: 0.5, end: 1.0 },
       ]);
       expect(await getClaim(t, textId)).toBeNull();
+
+      // The STT call is billed like every other pipeline call: one ai_cost
+      // event, the provider's exact charge, attributed to the requester.
+      const backfillEvents = mockCapture.mock.calls
+        .map((c) => c[1])
+        .filter((e) => e.feature === 'word_timing_backfill');
+      expect(backfillEvents).toHaveLength(1);
+      expect(backfillEvents[0]).toMatchObject({
+        distinctId: 'user_sweep',
+        provider: 'openrouter',
+        model: 'microsoft/mai-transcribe-2',
+        sharedContent: true,
+        isError: false,
+        extra: expect.objectContaining({
+          language: 'es',
+          word_count: 2,
+          billed_seconds: 1,
+          cost_source: 'usage',
+        }),
+      });
+      expect(backfillEvents[0].costUsd).toBeCloseTo((1 / 3600) * 0.1, 10);
     });
 
     it('skips persistence on empty wordTimings but still releases the claim', async () => {
       const t = convexTest(schema, modules);
       const { textId, storageId } = await seedAudioAndClaim(t);
-
-      vi.stubEnv('AZURE_SPEECH_API_KEY', 'dummy');
-      vi.stubEnv('AZURE_SPEECH_REGION', 'westeurope');
       const fetchMock = vi.fn(
         async () =>
-          new Response(
-            JSON.stringify({ combinedPhrases: [{ text: '' }], phrases: [] }),
-            {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' },
-            },
-          ),
+          new Response(openrouterSttBody('', { words: [] }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
       );
       vi.stubGlobal('fetch', fetchMock);
 
@@ -1338,8 +1389,6 @@ describe('features/ttsProcessing', () => {
         throw new Error('STT should not be called when blob is missing');
       });
       vi.stubGlobal('fetch', fetchMock);
-      vi.stubEnv('AZURE_SPEECH_API_KEY', 'dummy');
-      vi.stubEnv('AZURE_SPEECH_REGION', 'westeurope');
 
       try {
         await t.action(internal.features.ttsProcessing.backfillWordTimings, {
@@ -1356,16 +1405,15 @@ describe('features/ttsProcessing', () => {
       expect(await getClaim(t, textId)).toBeNull();
     });
 
-    it('still releases the claim when transcribeAudio throws', async () => {
+    it('still releases the claim when transcribeAudio throws, and bills the failed call', async () => {
       const t = convexTest(schema, modules);
       const { textId, storageId } = await seedAudioAndClaim(t);
-
-      vi.stubEnv('AZURE_SPEECH_API_KEY', 'dummy');
-      vi.stubEnv('AZURE_SPEECH_REGION', 'westeurope');
+      // 400 rather than 5xx: a 5xx is retried with a real backoff, which
+      // this test has no reason to sit through.
       const fetchMock = vi.fn(
         async () =>
           new Response('boom', {
-            status: 500,
+            status: 400,
             headers: { 'Content-Type': 'text/plain' },
           }),
       );
@@ -1385,6 +1433,16 @@ describe('features/ttsProcessing', () => {
       const after = await getAudio(t, textId);
       expect(after?.wordTimings).toBeUndefined();
       expect(await getClaim(t, textId)).toBeNull();
+
+      const backfillEvents = mockCapture.mock.calls
+        .map((c) => c[1])
+        .filter((e) => e.feature === 'word_timing_backfill');
+      expect(backfillEvents).toHaveLength(1);
+      expect(backfillEvents[0]).toMatchObject({
+        isError: true,
+        error: expect.stringMatching(/OpenRouter STT API error: 400/),
+        costUsd: undefined,
+      });
     });
   });
 });

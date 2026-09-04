@@ -42,11 +42,12 @@ import {
   ENSURE_CONTENT_RETRY_MS,
   MAX_UNSERVED_ADD_RUNS,
   ENSURE_CONTENT_REVIEW_INTERVAL,
-  PROGRESS_DISPLAY_INTERVAL,
+  predictsMilestone,
 } from '@/lib/constants/learning';
 import { DEFAULT_AUTO_ADVANCE } from '@/lib/constants/audioPlayback';
 import { collectionRemaining } from '@/convex/lib/collections';
 import { useCelebration } from './useCelebration';
+import { advanceToNextCardOptimistic } from './optimisticAdvance';
 import { useCardActions, type CardActions } from './useCardActions';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { reportError } from '@/lib/report-error';
@@ -172,7 +173,8 @@ interface NoCardsDueState extends BaseState {
   courseSettings: CourseSettings;
   baseLanguages: string[];
   targetLanguages: string[];
-  handleAddCards: () => void;
+  /** Add the next batch. `afterCardId` queues it behind the card on screen. */
+  handleAddCards: (options?: { afterCardId?: Id<'cards'> }) => void;
   isAddingCards: boolean;
   batchSize: number;
   sentencesRemaining: number | null;
@@ -405,10 +407,22 @@ export function useLearningMode(
         ? lastReviewingCardRef.current.undoableCount + 1
         : 0;
 
-  const reviewCardMutation = useMutation(api.features.scheduling.reviewCard);
+  // Both advance mutations show the prefetched next card immediately (see
+  // `advanceToNextCardOptimistic`); the server payload confirms or corrects.
+  const reviewCardMutation = useMutation(
+    api.features.scheduling.reviewCard,
+  ).withOptimisticUpdate((localStore, args) => {
+    advanceToNextCardOptimistic(localStore, args.cardId, {
+      countsAsReview: true,
+    });
+  });
   const advanceFreePlayCardMutation = useMutation(
     api.features.scheduling.advanceFreePlayCard,
-  );
+  ).withOptimisticUpdate((localStore, args) => {
+    advanceToNextCardOptimistic(localStore, args.cardId, {
+      countsAsReview: false,
+    });
+  });
   const undoLastReviewMutation = useMutation(
     api.features.scheduling.undoLastReview,
   );
@@ -486,6 +500,13 @@ export function useLearningMode(
     api.features.decks.getCollectionProgress,
     {},
   );
+  // Custom/chat texts still waiting to be pulled. They cost no SENTENCES
+  // credits, so this is what tells auto-add to keep going on an empty
+  // balance (`addCardsFromCollection` sends every coin flip to the custom
+  // source then). Defaults to false while the query is in flight, which is
+  // the pre-existing behaviour for an empty balance.
+  const customCardsPending =
+    useQuery(api.features.decks.hasPendingCustomCards, {}) === true;
 
   const [isReviewing, setIsReviewing] = useState(false);
   const [isAddingCards, setIsAddingCards] = useState(false);
@@ -797,71 +818,94 @@ export function useLearningMode(
   // isAddingCards flip.
   const autoAddQuotaEmptyRef = useRef(false);
 
-  const handleAddCards = useCallback(async () => {
-    if (!courseSettings?.activeCollectionId || isAddingCards) return;
-    const collectionId = courseSettings.activeCollectionId;
-    const configuredBatch =
-      courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE;
-    const effectiveBatch = sentencesQuota.unlimited
-      ? configuredBatch
-      : Math.min(configuredBatch, Math.max(1, sentencesQuota.balance));
-    setIsAddingCards(true);
-    try {
-      const args = { collectionId, batchSize: effectiveBatch };
-      let result = await addCardsMutation(args);
-      // A 0-card result with scanIncomplete means the scan burned its
-      // per-call read budget on an ignored/direct-added streak; the frontier
-      // already advanced, so re-calling continues past it. Bounded retries.
-      // Mirrors the collection dialog's handleAddCards.
-      let attempts = 1;
-      while (result.cardsAdded === 0 && result.scanIncomplete && attempts < 5) {
-        result = await addCardsMutation(args);
-        attempts++;
-      }
-      if (result.cardsAdded > 0) {
-        autoAddExhaustedForRef.current = null;
-        autoAddQuotaEmptyRef.current = false;
-        unservedAddRunsRef.current++;
-        if (unservedAddRunsRef.current >= MAX_UNSERVED_ADD_RUNS) {
-          // Cards keep getting added but none is ever served: stop auto-add
-          // before it runs the collection dry. Serving a card resets the
-          // counter, so a healthy add-serve-add cadence never trips this.
-          autoAddExhaustedForRef.current = collectionId.toString();
-          reportError(new Error('auto-add stall: cards added, none served'), {
-            op: 'autoAddStall',
-            collectionId,
-            runs: unservedAddRunsRef.current,
-          });
+  const handleAddCards = useCallback(
+    async (options?: {
+      /** The card on screen: the batch queues behind it (pre-add). */
+      afterCardId?: Id<'cards'>;
+    }) => {
+      if (!courseSettings?.activeCollectionId || isAddingCards) return;
+      const collectionId = courseSettings.activeCollectionId;
+      // The full configured batch, credits or not: the server splits it
+      // between the premade and custom sources by coin flip and caps only the
+      // premade half at the balance. Clamping here would shrink the custom
+      // half too, which on an empty balance meant one card per run.
+      const batchSize =
+        courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE;
+      setIsAddingCards(true);
+      try {
+        const afterCardId = options?.afterCardId;
+        const args = {
+          collectionId,
+          batchSize,
+          ...(afterCardId ? { afterCardId } : {}),
+        };
+        let result = await addCardsMutation(args);
+        // A 0-card result with scanIncomplete means the scan burned its
+        // per-call read budget on an ignored/direct-added streak; the frontier
+        // already advanced, so re-calling continues past it. Bounded retries.
+        // Mirrors the collection dialog's handleAddCards.
+        let attempts = 1;
+        while (
+          result.cardsAdded === 0 &&
+          result.scanIncomplete &&
+          attempts < 5
+        ) {
+          result = await addCardsMutation(args);
+          attempts++;
         }
-      } else if (result.quotaLimited) {
-        autoAddQuotaEmptyRef.current = true;
-      } else if (!result.scanIncomplete) {
-        // Proven drained (not just capped, not out of quota). Remembering it
-        // here is what lets the auto-add effect safely depend on
-        // isAddingCards without looping.
+        if (result.cardsAdded > 0) {
+          autoAddExhaustedForRef.current = null;
+          autoAddQuotaEmptyRef.current = false;
+          unservedAddRunsRef.current++;
+          if (unservedAddRunsRef.current >= MAX_UNSERVED_ADD_RUNS) {
+            // Cards keep getting added but none is ever served: stop auto-add
+            // before it runs the collection dry. Serving a card resets the
+            // counter, so a healthy add-serve-add cadence never trips this.
+            autoAddExhaustedForRef.current = collectionId.toString();
+            reportError(new Error('auto-add stall: cards added, none served'), {
+              op: 'autoAddStall',
+              collectionId,
+              runs: unservedAddRunsRef.current,
+            });
+          }
+        } else if (result.quotaLimited) {
+          autoAddQuotaEmptyRef.current = true;
+        } else if (!result.scanIncomplete) {
+          // Proven drained (not just capped, not out of quota). Remembering it
+          // here is what lets the auto-add effect safely depend on
+          // isAddingCards without looping.
+          autoAddExhaustedForRef.current = collectionId.toString();
+        }
+      } catch (error) {
+        reportError(error, { op: 'addCardsFromCollection', collectionId });
+        // Latch failures too: the effect re-fires when isAddingCards flips
+        // back, so a persistent rejection (e.g. QUOTA_NOT_SYNCED before the
+        // quota doc exists) would otherwise retry the mutation in a tight
+        // loop. The noCardsDue screen's manual Add button bypasses the latch
+        // and clears it on the next successful run.
         autoAddExhaustedForRef.current = collectionId.toString();
+      } finally {
+        setIsAddingCards(false);
       }
-    } catch (error) {
-      reportError(error, { op: 'addCardsFromCollection', collectionId });
-      // Latch failures too: the effect re-fires when isAddingCards flips
-      // back, so a persistent rejection (e.g. QUOTA_NOT_SYNCED before the
-      // quota doc exists) would otherwise retry the mutation in a tight
-      // loop. The noCardsDue screen's manual Add button bypasses the latch
-      // and clears it on the next successful run.
-      autoAddExhaustedForRef.current = collectionId.toString();
-    } finally {
-      setIsAddingCards(false);
-    }
-  }, [courseSettings, isAddingCards, addCardsMutation, sentencesQuota]);
+    },
+    [courseSettings, isAddingCards, addCardsMutation],
+  );
 
   // Un-stick the quota latch the moment the reactive balance shows headroom
   // again. Runs before the auto-add effect below (definition order), so the
   // same commit that delivers the refill also resumes auto-add.
   useEffect(() => {
-    if (sentencesQuota.unlimited || sentencesQuota.balance > 0) {
+    // Custom texts appearing un-sticks it too: the latch means "the last run
+    // added nothing and the premade source was out of credits", and a new
+    // chat/custom sentence is something that run couldn't have seen.
+    if (
+      sentencesQuota.unlimited ||
+      sentencesQuota.balance > 0 ||
+      customCardsPending
+    ) {
       autoAddQuotaEmptyRef.current = false;
     }
-  }, [sentencesQuota.unlimited, sentencesQuota.balance]);
+  }, [sentencesQuota.unlimited, sentencesQuota.balance, customCardsPending]);
 
   // Auto-add cards when enabled and no cards due. isAddingCards and
   // activeCollectionId are deliberate deps: a run that adds 0 cards while
@@ -872,12 +916,27 @@ export function useLearningMode(
   // quota-empty, cleared on refill) are what keep this from looping on a
   // drained collection, a persistently failing mutation, or an empty balance.
   const [autoAddHeld, setAutoAddHeld] = useState(false);
+  // The card a pre-add run was already fired for (see `queueEndsHere`).
+  const preAddedForCardRef = useRef<Id<'cards'> | null>(null);
   useEffect(() => {
     // Auto-add default is `true`, only opt out when explicitly false.
     const autoAddEnabled = courseSettings?.autoAddCards !== false;
     const activeCollectionId = courseSettings?.activeCollectionId;
+    const deckEmpty = cardForReview === null;
+    // Pre-add: the card on screen is the last one due. Only the server says
+    // so (`nextCard === null`); the optimistic advance leaves the preview
+    // `undefined` until the server answers, and that must not count. Adding
+    // the next batch now, while the user is still on this card, is what
+    // makes the hand-over seamless instead of a loading gap after the last
+    // submit. Once per card: a run that adds cards shows up as `nextCard`
+    // on the server's next payload, and a run that adds nothing latches
+    // through the same guards as the empty-deck path.
+    const queueEndsHere =
+      cardForReview != null &&
+      cardForReview.nextCard === null &&
+      preAddedForCardRef.current !== cardForReview._id;
     const wantsAutoAdd =
-      cardForReview === null &&
+      (deckEmpty || queueEndsHere) &&
       autoAddEnabled &&
       !!activeCollectionId &&
       courseSettings?.studyContentFilter !== 'custom' &&
@@ -887,10 +946,20 @@ export function useLearningMode(
       autoAddExhaustedForRef.current !== activeCollectionId.toString();
     // Parked behind the difficulty check: surface the intent (opens the
     // dialog) and try again when the hold releases. This effect re-runs on
-    // `holdAutoAdd` changes.
-    setAutoAddHeld(wantsAutoAdd && holdAutoAdd);
+    // `holdAutoAdd` changes. Empty deck only: the pre-add must not pop the
+    // dialog over a card the user is still working on, it simply waits for
+    // the regular path.
+    setAutoAddHeld(deckEmpty && wantsAutoAdd && holdAutoAdd);
     if (wantsAutoAdd && !holdAutoAdd) {
-      handleAddCards();
+      if (queueEndsHere) {
+        preAddedForCardRef.current = cardForReview._id;
+        // Queue the batch behind the card on screen: its backdated due stamp
+        // would otherwise sort ahead of a recently rescheduled card and the
+        // reactive query would swap that card out mid-read.
+        handleAddCards({ afterCardId: cardForReview._id });
+      } else {
+        handleAddCards();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -903,6 +972,7 @@ export function useLearningMode(
     holdAutoAdd,
     sentencesQuota.unlimited,
     sentencesQuota.balance,
+    customCardsPending,
   ]);
 
   // Reset selectedRating, pending master/hide state, exit flag, and card timer when card changes.
@@ -950,6 +1020,18 @@ export function useLearningMode(
   // setter hasn't re-rendered yet), so a double-click would fire the mutation
   // twice. A ref flips immediately and closes that window.
   const exitMutationInFlightRef = useRef(false);
+  // The card whose advance is in flight. Since the optimistic swap
+  // (optimisticAdvance.ts) the NEXT card is on screen and interactive while
+  // that mutation is still pending, so a press on it must not be confused
+  // with a repeat press on the card being reviewed.
+  const inFlightCardIdRef = useRef<Id<'cards'> | null>(null);
+  // An advance asked for on that next card before the pending one settled.
+  // Replayed by the effect below `handleNext` once it does.
+  const queuedAdvanceRef = useRef<{
+    cardId: Id<'cards'>;
+    ratingOverride?: ReviewRating;
+    accuracy?: ReviewAccuracyPayload;
+  } | null>(null);
 
   // Shared shape for mutations that animate the card out (master / hide /
   // delete / radio advance): mark this tab as review initiator, bump the
@@ -980,6 +1062,7 @@ export function useLearningMode(
         }
       } finally {
         exitMutationInFlightRef.current = false;
+        inFlightCardIdRef.current = null;
         setIsReviewing(false);
         if (options?.alwaysClearExiting) {
           setIsExiting(false);
@@ -1000,6 +1083,7 @@ export function useLearningMode(
       // same-tick double submit would record the review twice.
       if (exitMutationInFlightRef.current) return;
       exitMutationInFlightRef.current = true;
+      inFlightCardIdRef.current = cardForReview._id;
       reviewInitiatedByThisTabRef.current = true;
       setCardAnimationKey((k) => k + 1);
       setIsExiting(true);
@@ -1011,11 +1095,10 @@ export function useLearningMode(
       // true and the audio for the next card never starts. This is best-effort
       // (the local count can be stale across tabs); the server's
       // `triggerCelebration` is the authoritative verdict.
-      const predictedCount = dailyReviewsToday + 1;
-      const predictedMilestone =
-        progressDisplayEnabled &&
-        predictedCount > 0 &&
-        predictedCount % PROGRESS_DISPLAY_INTERVAL === 0;
+      const predictedMilestone = predictsMilestone(
+        dailyReviewsToday,
+        progressDisplayEnabled,
+      );
       if (predictedMilestone) {
         setProgressDisplayActive(true);
       }
@@ -1070,6 +1153,7 @@ export function useLearningMode(
         setIsExiting(false);
       } finally {
         exitMutationInFlightRef.current = false;
+        inFlightCardIdRef.current = null;
         setIsReviewing(false);
       }
     },
@@ -1316,7 +1400,23 @@ export function useLearningMode(
 
   const handleNext = useCallback(
     async (ratingOverride?: ReviewRating, accuracy?: ReviewAccuracyPayload) => {
-      if (!cardForReview || isReviewing) return;
+      if (!cardForReview) return;
+      if (isReviewing || exitMutationInFlightRef.current) {
+        // The previous card's advance is still in flight while this one is
+        // already on screen (optimistic swap). Dropping the press here was
+        // what made Enter / Next silently do nothing on a slow connection.
+        // Keep it and replay it once the mutation settles, unless it targets
+        // the very card in flight, where a repeat press stays a no-op.
+        if (inFlightCardIdRef.current !== cardForReview._id) {
+          queuedAdvanceRef.current = {
+            cardId: cardForReview._id,
+            ratingOverride,
+            accuracy,
+          };
+        }
+        return;
+      }
+      inFlightCardIdRef.current = cardForReview._id;
       if (isPendingMaster) {
         await runExitingMutation(
           () => masterCardMutation({ cardId: cardForReview._id }),
@@ -1400,6 +1500,19 @@ export function useLearningMode(
     ],
   );
 
+  // Replay an advance queued while the previous card's mutation was in
+  // flight. Only if the queued card is still the one on screen: a rejected
+  // mutation rolls the optimistic swap back and brings the previous card
+  // back, whose review must not be re-sent with the next card's rating.
+  useEffect(() => {
+    if (isReviewing) return;
+    const queued = queuedAdvanceRef.current;
+    if (!queued) return;
+    queuedAdvanceRef.current = null;
+    if (cardForReview?._id !== queued.cardId) return;
+    void handleNext(queued.ratingOverride, queued.accuracy);
+  }, [isReviewing, cardForReview?._id, handleNext]);
+
   // ============================================================================
   // Return discriminated states
   // ============================================================================
@@ -1475,7 +1588,11 @@ export function useLearningMode(
       autoAddEnabled &&
       !settingsOpen &&
       courseSettings.studyContentFilter !== 'custom' &&
-      (sentencesQuota.unlimited || sentencesQuota.balance > 0) &&
+      // Credits gate the premade half only; pending custom texts are enough
+      // on their own to make a run produce cards.
+      (sentencesQuota.unlimited ||
+        sentencesQuota.balance > 0 ||
+        customCardsPending) &&
       (remainingInCollection === null || remainingInCollection > 0) &&
       // A completed run proved this collection drained. The effect won't
       // re-fire for it, so don't promise a load that will never happen.

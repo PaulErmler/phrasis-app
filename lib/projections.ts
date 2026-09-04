@@ -55,7 +55,6 @@ export const PACE_DECAY = 0.5 ** (1 / PACE_HALF_LIFE_DAYS);
 export const MIN_GAIN_LONG_HORIZON_WORDS = 100; // endOfYear / oneYear
 export const MIN_GAIN_MONTH_WORDS = 20;
 export const MIN_GAIN_LONG_HORIZON_SENTENCES = 30;
-export const MIN_COUNTERFACTUAL_BOOST = 50;
 export const MAX_ETA_DAYS = 365;
 export const MIN_CARDS_PER_DAY_FOR_ETA = 0.2;
 /** endOfYear needs this many days left in the year, else it duplicates the
@@ -92,8 +91,6 @@ export interface ProjectionInputs {
   /** Total sentences (cards) in the deck. */
   currentSentences: number;
   totalTimeMs: number;
-  /** New words learned today (target languages). */
-  todayWords: number;
   dailyWords: DailyEntry[];
   dailyNewCards: DailyEntry[];
   /**
@@ -128,13 +125,6 @@ export type ProjectionIndicator =
       words: number;
       capped: boolean;
       monthDate: string;
-    }
-  | {
-      kind: 'counterfactualWords';
-      boostedWords: number;
-      baselineWords: number;
-      capped: boolean;
-      horizonDate: string;
     }
   | { kind: 'sessionYield'; words: number; goalMinutes: number }
   | { kind: 'endOfYearSentences'; sentences: number; year: string }
@@ -261,7 +251,6 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
     currentWords,
     currentSentences,
     totalTimeMs,
-    todayWords,
     dailyWords,
     dailyNewCards,
     dailyCurriculumCards,
@@ -415,29 +404,6 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
         words: cap(eomRaw),
         capped: isCapped(eomRaw),
         monthDate: monthEndDate,
-      });
-    }
-  }
-
-  // Counterfactual "if every day were like today". Positive-only, observed
-  // basis only (a goal/firstSession baseline makes the comparison unfair).
-  if (basis === 'observed' && todayWords >= Math.max(5, 1.25 * wordsPerDay)) {
-    const horizonDate =
-      daysToYearEnd >= MIN_DAYS_FOR_YEAR_HORIZON
-        ? yearEndDate
-        : addDays(today, 90);
-    const horizonDays = daysBetween(today, horizonDate);
-    const boostedRaw = currentWords + todayWords * horizonDays;
-    const baselineRaw = currentWords + wordsPerDay * horizonDays;
-    const boosted = cap(boostedRaw);
-    const baseline = cap(baselineRaw);
-    if (boosted - baseline >= MIN_COUNTERFACTUAL_BOOST) {
-      indicators.push({
-        kind: 'counterfactualWords',
-        boostedWords: boosted,
-        baselineWords: baseline,
-        capped: isCapped(boostedRaw),
-        horizonDate,
       });
     }
   }

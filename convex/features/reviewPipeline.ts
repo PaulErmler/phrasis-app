@@ -1,3 +1,4 @@
+import { cardPinAt } from '../db/translationReads';
 import { v, ConvexError, type Infer } from 'convex/values';
 import { MutationCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
@@ -257,6 +258,7 @@ export async function resolveSearchableTextRefresh(
       text.text,
       courseLanguages,
       text,
+      cardPinAt(card),
     );
   }
 

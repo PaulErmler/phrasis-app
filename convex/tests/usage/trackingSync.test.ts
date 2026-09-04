@@ -120,6 +120,124 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+describe('usage: reconcileCourseUsage', () => {
+  const coursesBalance = (usage: number, unlimited = false) => ({
+    courses: {
+      feature_id: 'courses',
+      granted: 10,
+      remaining: 10 - usage,
+      usage,
+      unlimited,
+    },
+  });
+
+  const seedActiveCourses = (t: TestConvex<typeof schema>, count: number) =>
+    t.run(async (ctx) => {
+      for (let i = 0; i < count; i++) {
+        await ctx.db.insert('courses', {
+          userId: USER,
+          baseLanguages: ['en'],
+          targetLanguages: ['de'],
+          isArchived: i % 2 === 1 ? undefined : false,
+        });
+      }
+      // An archived course must not count as held.
+      await ctx.db.insert('courses', {
+        userId: USER,
+        baseLanguages: ['en'],
+        targetLanguages: ['fr'],
+        isArchived: true,
+        archivedAt: 1,
+      });
+    });
+
+  const runReconcile = (t: TestConvex<typeof schema>) =>
+    t.action(internal.usage.tracking.reconcileCourseUsage, { userId: USER });
+
+  it('releases exactly the ghost slots and refreshes the mirror', async () => {
+    stubAutumn({
+      '/track': {},
+      '/customers/': customerPayload({
+        balances: { ...BALANCES, ...coursesBalance(5) },
+      }),
+    });
+    const t = convexTest(schema, modules);
+    await seedActiveCourses(t, 2);
+
+    await runReconcile(t);
+
+    expect(callsTo('/track').map((c) => c.body)).toEqual([
+      { customer_id: USER, feature_id: 'courses', value: -3 },
+    ]);
+    // Fresh read before, resync after: the mirror is populated.
+    expect(callsTo('/customers/')).toHaveLength(2);
+    expect((await getQuotaDoc(t))?.features.courses).toMatchObject({
+      used: 5,
+      included: 10,
+    });
+  });
+
+  it('never tracks a positive value when the counter is below the active count', async () => {
+    // A hand-lowered counter or an extra manual grant must survive: the
+    // self-heal may only ever give slots back, never take them.
+    stubAutumn({
+      '/track': {},
+      '/customers/': customerPayload({
+        balances: { ...BALANCES, ...coursesBalance(1) },
+      }),
+    });
+    const t = convexTest(schema, modules);
+    await seedActiveCourses(t, 3);
+
+    await runReconcile(t);
+    expect(callsTo('/track')).toHaveLength(0);
+  });
+
+  it('is a no-op when the counter already matches', async () => {
+    stubAutumn({
+      '/track': {},
+      '/customers/': customerPayload({
+        balances: { ...BALANCES, ...coursesBalance(2) },
+      }),
+    });
+    const t = convexTest(schema, modules);
+    await seedActiveCourses(t, 2);
+
+    await runReconcile(t);
+    expect(callsTo('/track')).toHaveLength(0);
+  });
+
+  it('skips unlimited features and past-due customers', async () => {
+    stubAutumn({
+      '/track': {},
+      '/customers/': customerPayload({
+        balances: { ...BALANCES, ...coursesBalance(5, true) },
+      }),
+    });
+    let t = convexTest(schema, modules);
+    await seedActiveCourses(t, 1);
+    await runReconcile(t);
+    expect(callsTo('/track')).toHaveLength(0);
+
+    calls = [];
+    stubAutumn({
+      '/track': {},
+      'expand=invoices': customerPayload({
+        balances: { ...BALANCES, ...coursesBalance(5) },
+        subscriptions: [subscription({ past_due: true })],
+      }),
+      '/customers/': customerPayload({
+        balances: { ...BALANCES, ...coursesBalance(5) },
+        subscriptions: [subscription({ past_due: true })],
+      }),
+    });
+    t = convexTest(schema, modules);
+    await seedActiveCourses(t, 1);
+    await runReconcile(t);
+    expect(callsTo('/track')).toHaveLength(0);
+  });
+});
+
 describe('usage: trackUsage sync wiring', () => {
   it('past-due customer: blocks, captures the invoice URL, in exactly one extra request', async () => {
     stubAutumn({

@@ -139,9 +139,10 @@ async function seedLevels(
 }
 
 /** A full origin split from the buckets a case actually cares about. */
-const originSplit = (
-  partial: Partial<NewCardsByOrigin>,
-): NewCardsByOrigin => ({ ...ORIGIN_BUCKET_ZEROS, ...partial });
+const originSplit = (partial: Partial<NewCardsByOrigin>): NewCardsByOrigin => ({
+  ...ORIGIN_BUCKET_ZEROS,
+  ...partial,
+});
 
 /** Overwrite the seeded window's per-day origin split. */
 async function setOriginSplit(
@@ -364,7 +365,13 @@ describe('features/projections: getProjections', () => {
     const t = convexTest(schema, modules);
     const { courseId } = await seedActiveCourse(t);
     await seedHistory(t, courseId, 14);
-    // A base-language row that must not inflate word counts.
+    const asUser = t.withIdentity({ subject: 'user_A' });
+    const before = await asUser.query(api.features.projections.getProjections, {
+      timezone: TZ,
+      today: todayUtc(),
+    });
+    // Insert after the baseline read so a leak into the word pace would
+    // change the indicators (500 extra "today words" in a base language).
     await t.run(async (ctx) => {
       await ctx.db.insert('dailyLanguageStats', {
         userId: 'user_A',
@@ -377,15 +384,12 @@ describe('features/projections: getProjections', () => {
         newWordsCount: 500,
       });
     });
-    const asUser = t.withIdentity({ subject: 'user_A' });
-    const res = await asUser.query(api.features.projections.getProjections, {
+    const after = await asUser.query(api.features.projections.getProjections, {
       timezone: TZ,
       today: todayUtc(),
     });
-    // 500 extra "today words" in a base language must not trigger the
-    // counterfactual (20/day pace, today = 20 target words only).
-    const kinds = res!.indicators.map((i) => i.kind);
-    expect(kinds).not.toContain('counterfactualWords');
+    expect(after!.currentWords).toBe(before!.currentWords);
+    expect(after!.indicators).toEqual(before!.indicators);
   });
 
   it('falls back to UTC for an invalid or empty timezone instead of throwing', async () => {

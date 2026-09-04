@@ -25,7 +25,7 @@ export type { TtsProvider };
  * stay in VOICE_POOLS (so re-enabling is a one-line flip) but are filtered
  * out of `getVoicesByLanguageCode`. See convex/lib/tts/index.ts for the
  * provider wiring. (Azure TTS was retired in Jul 2026, its voice pools were
- * removed with it; Azure Speech remains for STT only.)
+ * removed with it; Azure STT followed in Sep 2026.)
  */
 export interface Voice {
   provider: TtsProvider;

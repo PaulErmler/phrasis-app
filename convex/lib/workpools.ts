@@ -46,8 +46,9 @@ export const llmPool = new Workpool(components.llmPool, {
  * thousands of jobs at once. In one FIFO pool those queued ahead of every
  * user-facing translation until they drained.
  *
- * Unlike TTS there is no provider rate limiter behind this (rateLimiter.ts has
- * buckets for the TTS providers and Azure STT, none for OpenRouter), so
+ * Unlike TTS and STT there is no provider rate limiter behind this
+ * (rateLimiter.ts has buckets for the TTS providers and for OpenRouter's
+ * transcription endpoint, none for OpenRouter's LLM endpoints), so
  * maxParallelism is the ONLY pacing knob and warm jobs have no token wait cap
  * to throw against. Interactive demand for a translation a warm job is
  * already holding is handled at the claim instead: see

@@ -20,8 +20,8 @@ const ENDPOINT = 'https://openrouter.ai/api/v1/audio/speech';
 
 // Gemini PCM is 24 kHz / 16-bit / mono. 48 kbps mono MP3 keeps speech clear and
 // matches what the retired Azure TTS provider used, which already passed the
-// same Azure STT validation roundtrip. ~25% smaller than 64 kbps and a
-// fraction of the equivalent WAV.
+// same STT validation roundtrip. ~25% smaller than 64 kbps and a fraction of
+// the equivalent WAV.
 const PCM_SAMPLE_RATE = 24000;
 const MP3_KBPS = 48;
 
@@ -240,7 +240,7 @@ export const geminiTts: TTSProvider = {
     const { pcm: cleaned } = trimTailHiccup(pcm, PCM_SAMPLE_RATE);
 
     // Gemini emits headerless PCM; transcode to MP3 so the stored Blob matches
-    // the other providers' output (google/azure both label it 'audio/mp3') and
+    // the other providers' output (google labels it 'audio/mp3' too) and
     // plays in the browser.
     return {
       audio: new Blob([pcmToMp3(cleaned)], { type: 'audio/mp3' }),

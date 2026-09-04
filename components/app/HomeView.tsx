@@ -201,16 +201,6 @@ export function HomeView({
           hasPlayableCards={hasPlayableCards ?? true}
         />
 
-        {/* 7-day workload forecast. Hidden with the due-count pills
-            (hideDueCounts); pauses its subscription while home is hidden.
-            Keyed on courseId (distinct prefix from ProgressStatsCard —
-            siblings must not share a key) so a course switch remounts it
-            and resets the what-if stepper instead of carrying it over. */}
-        <WorkloadForecastCard
-          key={`workload-${courseSettings?.courseId}`}
-          skip={isHidden}
-        />
-
         {/* Content actions */}
         <div className="card-surface space-y-2 p-3">
           <HomeChatInput onChatCreated={onChatOpen} />
@@ -241,6 +231,17 @@ export function HomeView({
             </Button>
           </div>
         </div>
+
+        {/* 7-day workload forecast. Sits below the chat input so the
+            conversation box is the first thing after progress. Pauses its
+            subscription while home is hidden. Keyed on courseId (distinct
+            prefix from ProgressStatsCard — siblings must not share a key)
+            so a course switch remounts it and resets the what-if stepper
+            instead of carrying it over. */}
+        <WorkloadForecastCard
+          key={`workload-${courseSettings?.courseId}`}
+          skip={isHidden}
+        />
 
         <div className="card-surface space-y-3 p-3">
           {/* Section title lives inside SegmentedHomeSection now, sharing a

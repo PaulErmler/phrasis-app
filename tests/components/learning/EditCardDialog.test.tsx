@@ -184,4 +184,69 @@ describe('EditCardDialog: accepted alternatives', () => {
     expect(screen.getByRole('button', { name: 'save' })).toBeDisabled();
     expect(deleteAlternativeMock).not.toHaveBeenCalled();
   });
+
+  /**
+   * The learning view rebuilds the `translations` array on every render.
+   * The draft used to be re-seeded from it on every identity change, which
+   * flashed the stored sentence back into the fields while Save was pending
+   * and could wipe a draft mid-typing.
+   */
+  it('keeps the typed draft when the parent rebuilds the translations prop while open', () => {
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
+      <EditCardDialog
+        open
+        onOpenChange={onOpenChange}
+        cardId={CARD_ID}
+        translations={TRANSLATIONS}
+      />,
+    );
+    fireEvent.change(screen.getByDisplayValue('Quisiera un café.'), {
+      target: { value: 'Quisiera un té.' },
+    });
+    rerender(
+      <EditCardDialog
+        open
+        onOpenChange={onOpenChange}
+        cardId={CARD_ID}
+        translations={TRANSLATIONS.map((tr) => ({ ...tr }))}
+      />,
+    );
+    expect(screen.getByDisplayValue('Quisiera un té.')).toBeInTheDocument();
+    expect(
+      screen.queryByDisplayValue('Quisiera un café.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('re-seeds the draft when re-opened', () => {
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
+      <EditCardDialog
+        open
+        onOpenChange={onOpenChange}
+        cardId={CARD_ID}
+        translations={TRANSLATIONS}
+      />,
+    );
+    fireEvent.change(screen.getByDisplayValue('Quisiera un café.'), {
+      target: { value: 'Quisiera un té.' },
+    });
+    rerender(
+      <EditCardDialog
+        open={false}
+        onOpenChange={onOpenChange}
+        cardId={CARD_ID}
+        translations={TRANSLATIONS}
+      />,
+    );
+    rerender(
+      <EditCardDialog
+        open
+        onOpenChange={onOpenChange}
+        cardId={CARD_ID}
+        translations={TRANSLATIONS}
+      />,
+    );
+    expect(screen.getByDisplayValue('Quisiera un café.')).toBeInTheDocument();
+  });
 });

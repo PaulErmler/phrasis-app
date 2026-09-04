@@ -51,15 +51,13 @@ const app = defineApp({
     // Numeric Convex team id for the same sweep. Optional: when unset the
     // sweep tries to resolve it from the token via the Management API.
     CONVEX_TEAM_ID: v.optional(v.string()),
-    // LLM + TTS via OpenRouter (convex/lib/openrouter.ts, convex/lib/tts/*)
+    // LLM + TTS + STT via OpenRouter (convex/lib/openrouter.ts,
+    // convex/lib/tts/*, convex/lib/stt/*)
     OPENROUTER_API_KEY: v.optional(v.string()),
     // Google Cloud translation / romanization / TTS
     GOOGLE_TRANSLATE_API_KEY: v.optional(v.string()),
     GOOGLE_SERVICE_ACCOUNT_KEY: v.optional(v.string()),
     GOOGLE_TTS_API_KEY: v.optional(v.string()),
-    // Azure Speech-to-Text (convex/lib/stt/azure.ts)
-    AZURE_SPEECH_API_KEY: v.optional(v.string()),
-    AZURE_SPEECH_REGION: v.optional(v.string()),
     // Non-prod email labeling (convex/lib/emailEnv.ts)
     EMAIL_ENV: v.optional(v.string()),
     // Ops flags (read as raw process.env where noted at the call site)

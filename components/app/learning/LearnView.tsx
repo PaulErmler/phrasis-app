@@ -80,6 +80,7 @@ function WrappedChatPanel({
   } = useCardApprovals(threadId);
   const t = useTranslations('Chat');
   const tQuick = useTranslations('Chat.quickActions');
+  const tMode = useTranslations('LearningMode');
   const locale = useLocale();
   const { targetLanguages } = useCourseLanguages();
 
@@ -181,19 +182,32 @@ function WrappedChatPanel({
           />
         ) : undefined
       }
+      // Every thread this panel receives is empty on arrival (rotation and
+      // "New chat" both go through getOrCreateEmptyThread; the prefetched
+      // thread loads while the panel is still closed), so the tiles can show
+      // before the new thread's queries return.
+      emptyStateWhileLoading
+      // Desktop only. On mobile the app bar carries the centered title and
+      // the new-chat icon (LearningHeader), so a second row would stack under
+      // it. Three-column grid keeps the title centered regardless of the
+      // icon's width.
       header={
         onNewChat ? (
-          <div className="flex items-center justify-end gap-2 border-b px-4 py-1.5">
+          <div className="hidden lg:grid grid-cols-[2.25rem_1fr_2.25rem] items-center border-b px-2 py-1">
+            <span className="col-start-2 text-center heading-section">
+              {tMode('chat')}
+            </span>
             <Button
               type="button"
               variant="ghost"
-              size="sm"
-              className="shrink-0 gap-1.5 text-xs"
+              size="icon"
+              className="col-start-3 h-9 w-9"
               onClick={onNewChat}
+              aria-label={t('sidebar.newChat')}
+              title={t('sidebar.newChat')}
               data-testid="learn-chat-new"
             >
               <MessageSquarePlus className="h-4 w-4" />
-              {t('sidebar.newChat')}
             </Button>
           </div>
         ) : undefined
@@ -398,6 +412,7 @@ function LearnViewInner({
   const header = (
     <LearningHeader
       onBack={goHome}
+      onNewChat={handleNewChat}
       onSettingsOpen={openSettings}
       onRestartTutorial={restartIntro}
       onHelpOpen={audio.pause}

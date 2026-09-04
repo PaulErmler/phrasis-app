@@ -25,8 +25,7 @@
  *
  * 'elevenlabs' and 'azure' are retired providers kept only as tombstones so
  * historical stored `ttsProvider` values still validate, no language routes
- * to them and neither is dispatchable (see convex/lib/tts/index.ts). Azure
- * Speech is still used for STT (convex/lib/stt), just not for synthesis. Do
+ * to them and neither is dispatchable (see convex/lib/tts/index.ts). Do
  * not remove either from this array without first migrating any stored rows
  * that use it.
  */
@@ -81,6 +80,15 @@ export type LanguageCategory =
 /** Whether tier-1 LLMs reliably handle this language for translation/teaching. */
 export type LlmSupportTier = 'tier1' | 'tier2';
 
+/**
+ * Script conversion applied to a speech-to-text transcript of a language
+ * (convex/lib/stt/scriptNormalize.ts), see `Language.sttScriptFix`.
+ */
+export type SttScriptFix =
+  | 'latinToCyrillic'
+  | 'simplifiedToTraditional'
+  | 'traditionalToSimplified';
+
 export interface Language {
   code: string; // Internal language code (e.g. "en", "es_latam", "zh")
   displayCode: string; // BCP 47 tag for display (e.g. "es-MX", "zh-CN")
@@ -104,16 +112,18 @@ export interface Language {
    */
   supportsKaraoke: boolean;
   /**
-   * Whether our STT backend (Azure Fast Transcription, api-version
-   * 2024-11-15) can transcribe audio in this language. Gates two downstream
-   * features: TTS validation roundtrips (synthesize → transcribe → compare)
-   * and per-word audio timings. Karaoke highlighting depends on timings, so
-   * `supportsKaraoke: true` only takes effect when this is also true.
+   * Whether our STT backend (MAI-Transcribe-2 via OpenRouter, see
+   * convex/lib/stt) can transcribe audio in this language. Gates two
+   * downstream features: TTS validation roundtrips (synthesize → transcribe →
+   * compare) and per-word audio timings. Karaoke highlighting depends on
+   * timings, so `supportsKaraoke: true` only takes effect when this is also
+   * true.
    *
-   * Currently false only for Greek (`el`): the locale `el-GR` is absent from
-   * Azure Fast Transcription's supported list, so calls return 400 InvalidLocale.
-   * If you add a language, check the "Fast transcription support" column at
-   * https://learn.microsoft.com/azure/ai-services/speech-service/language-support?tabs=stt
+   * True for every language in the catalogue as of Sep 2026. The model takes
+   * the bare ISO-639-1 code (`toSttLanguage` in convex/lib/stt/languages.ts);
+   * a new language whose bare code is outside `MAI_TRANSCRIBE_2_LANGUAGES`
+   * fails the exhaustiveness test in convex/tests/lib/stt/languages.test.ts,
+   * which is the moment to probe it live and decide this flag.
    */
   supportsStt: boolean;
   /**
@@ -173,9 +183,13 @@ export interface Language {
   /**
    * Translation-method version (defaults to 1 via `getCurrentTranslationVersion`).
    * Bump when changing the model/prompt for this language to lazily regenerate
-   * its existing non-custom translations (and their audio) on next view. See the
-   * content-versioning helpers below and `translations.translationVersion` in
-   * convex/schema.ts.
+   * its existing non-custom translations (and their audio) on next view. The
+   * regeneration happens in place: a card that already shows the old wording
+   * keeps it (and its audio) as a superseded revision
+   * (`translations.supersededAt`), only cards added
+   * afterwards get the new one. See the content-versioning helpers below and
+   * `translations.translationVersion` in convex/schema.ts. Last bumped for
+   * every language in Sep 2026 with the switch to `SOL_MINIMAL`.
    */
   translationVersion?: number;
   /**
@@ -227,7 +241,7 @@ export interface Language {
 
   // --- Provider locale codes + display overrides --------------------------
   // Single source of truth for the per-language data that used to live in
-  // separate maps (REGION_MAP, toGeminiBcp47, toAzureSttLocale,
+  // separate maps (REGION_MAP, toGeminiBcp47,
   // GOOGLE_TRANSLATE_CODE_MAP, textCompare PER_LANGUAGE, NAME_OVERRIDES,
   // MIXED_LANGUAGE_VARIANTS, LOCAL_ROMANIZATION_LANGUAGES). Each derived map is
   // built from these fields; omit a field to take its documented default.
@@ -244,15 +258,20 @@ export interface Language {
    */
   geminiBcp47?: string;
   /**
-   * Locale for Azure Fast Transcription (`toAzureSttLocale`). Omit to take the
-   * `<code>-<UPPER(code)>` default (correct for symmetric ISO-639-1 pairs).
-   */
-  azureSttLocale?: string;
-  /**
    * Google Translate v2 / romanize-v3 code (`toGoogleTranslateCode`). Omit to
    * pass the internal code through unchanged.
    */
   googleTranslateCode?: string;
+  /**
+   * Script fix for speech-to-text transcripts (`scriptConverterFor` in
+   * convex/lib/stt/scriptNormalize.ts). MAI-Transcribe-2 picks its own
+   * script whatever the hint: Latin for Serbian, Simplified for Mandarin,
+   * Traditional for Cantonese. Set when the catalogue script differs from
+   * what the model writes, so the transcript matches the stored wording
+   * before the TTS validation comparator or the writing grader see it. Omit
+   * when the two agree.
+   */
+  sttScriptFix?: SttScriptFix;
   /**
    * Intl.Segmenter locale for answer text-comparison (`getCompareConfig`).
    * Omit to default to the internal code.
@@ -310,7 +329,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     code: 'en',
     displayCode: 'en',
     geminiBcp47: 'en-US',
-    azureSttLocale: 'en-US',
     name: 'English',
     nativeName: 'English',
     flag: '🌎',
@@ -328,7 +346,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'en-GB',
     regionLabel: 'United Kingdom',
     geminiBcp47: 'en-GB',
-    azureSttLocale: 'en-GB',
     googleTranslateCode: 'en',
     compareLocale: 'en-GB',
     displayNameOverrides: { de: 'Englisch (UK)' },
@@ -356,7 +373,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'en-US',
     regionLabel: 'United States',
     geminiBcp47: 'en-US',
-    azureSttLocale: 'en-US',
     googleTranslateCode: 'en',
     compareLocale: 'en-US',
     displayNameOverrides: { de: 'Englisch (USA)' },
@@ -379,7 +395,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'en-AU',
     regionLabel: 'Australia',
     geminiBcp47: 'en-AU',
-    azureSttLocale: 'en-AU',
     googleTranslateCode: 'en',
     compareLocale: 'en-AU',
     displayNameOverrides: { de: 'Englisch (Australien)' },
@@ -407,7 +422,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'es-ES',
     regionLabel: 'Spain',
     geminiBcp47: 'es-ES',
-    azureSttLocale: 'es-ES',
     displayNameOverrides: { de: 'Spanisch (Spanien)' },
     name: 'Spanish (Spain)',
     nativeName: 'Español (España)',
@@ -424,7 +438,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     translationPromptNotes:
       'vosotros for the informal plural, peninsular vocabulary.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'es_latam',
@@ -435,7 +449,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // prompt. This mirrors the `es-US` voiceLocalePrefix `es_mixed` already uses
     // for the es_latam sub-variant.
     geminiBcp47: 'es-US',
-    azureSttLocale: 'es-MX',
     googleTranslateCode: 'es',
     compareLocale: 'es-419',
     displayNameOverrides: { de: 'Spanisch (Lateinamerika)' },
@@ -452,7 +465,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     translationPromptNotes:
       'ustedes for the plural, regionally neutral Latin American vocabulary.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'es_mixed',
@@ -461,7 +474,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // for this code so the displayCode value itself is never user-facing.
     displayCode: 'es',
     geminiBcp47: 'es-ES',
-    azureSttLocale: 'es-ES',
     googleTranslateCode: 'es',
     compareLocale: 'es',
     displayNameOverrides: { de: 'Spanisch (Gemischt)' },
@@ -483,7 +495,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'es-419',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'fr',
@@ -500,7 +512,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'fr',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'de',
@@ -517,7 +529,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'de',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'it',
@@ -534,14 +546,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'it',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'pt',
     displayCode: 'pt',
     regionLabel: 'Brazil',
     geminiBcp47: 'pt-BR',
-    azureSttLocale: 'pt-BR',
     displayNameOverrides: { de: 'Portugiesisch (Brasilien)' },
     name: 'Portuguese (Brazil)',
     nativeName: 'Português',
@@ -553,14 +564,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'pt-br',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'pt_pt',
     displayCode: 'pt-PT',
     regionLabel: 'Portugal',
     geminiBcp47: 'pt-PT',
-    azureSttLocale: 'pt-PT',
     googleTranslateCode: 'pt-PT',
     compareLocale: 'pt-PT',
     displayNameOverrides: { de: 'Portugiesisch (Portugal)' },
@@ -578,7 +588,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsVersion: 2,
     translationPromptNotes:
       'European Portuguese vocabulary, spelling, and phonetics.',
-    translationVersion: 2,
+    translationVersion: 3,
     needsRomanization: false,
     ipaVoice: 'pt-pt',
     supportsKaraoke: true,
@@ -599,14 +609,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'ro',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ca',
     displayCode: 'ca',
     regionLabel: 'Catalonia',
     geminiBcp47: 'ca-ES',
-    azureSttLocale: 'ca-ES',
     name: 'Catalan',
     nativeName: 'Català',
     // Catalonia has no emoji flag; Andorra's flag is the conventional stand-in
@@ -614,6 +623,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇦🇩',
     category: 'romance',
     llmSupportTier: 'tier1',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'ca',
@@ -637,7 +648,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Cyrillic. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'pl',
@@ -654,7 +665,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'pl',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'sk',
@@ -671,14 +682,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'sk',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'cs',
     displayCode: 'cs',
     regionLabel: 'Czechia',
     geminiBcp47: 'cs-CZ',
-    azureSttLocale: 'cs-CZ',
     name: 'Czech',
     nativeName: 'Čeština',
     flag: '🇨🇿',
@@ -689,19 +699,20 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'cs',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'hr',
     displayCode: 'hr',
     regionLabel: 'Croatia',
     geminiBcp47: 'hr-HR',
-    azureSttLocale: 'hr-HR',
     name: 'Croatian',
     nativeName: 'Hrvatski',
     flag: '🇭🇷',
     category: 'slavic',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'hr',
@@ -713,12 +724,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'sl',
     regionLabel: 'Slovenia',
     geminiBcp47: 'sl-SI',
-    azureSttLocale: 'sl-SI',
     name: 'Slovenian',
     nativeName: 'Slovenščina',
     flag: '🇸🇮',
     category: 'slavic',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'sl',
@@ -730,13 +742,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'uk',
     regionLabel: 'Ukraine',
     geminiBcp47: 'uk-UA',
-    azureSttLocale: 'uk-UA',
     romanizationBackend: 'google-v3',
     name: 'Ukrainian',
     nativeName: 'Українська',
     flag: '🇺🇦',
     category: 'slavic',
     llmSupportTier: 'tier1',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'uk',
@@ -749,11 +762,11 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'sr',
     regionLabel: 'Serbia',
     geminiBcp47: 'sr-RS',
-    azureSttLocale: 'sr-RS',
     romanizationBackend: 'google-v3',
-    // Cyrillic-script Serbian: Azure's sr-RS STT locale and Google
-    // romanize-v3's `sr` are both Cyrillic-oriented, so the catalog standard
-    // is Cyrillic (romanization gives learners the Latin rendering anyway).
+    // Cyrillic-script Serbian: the catalog standard is Cyrillic (Google
+    // romanize-v3's `sr` expects it, and romanization gives learners the
+    // Latin rendering anyway). STT returns Latin whatever hint it gets.
+    sttScriptFix: 'latinToCyrillic',
     name: 'Serbian',
     nativeName: 'Српски',
     flag: '🇷🇸',
@@ -773,22 +786,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
       'Use Cyrillic (ћирилица) exclusively; never the Latin alphabet.',
     // v2: prompt pins Cyrillic. Regenerate pre-existing (possibly
     // Latin-script) translations.
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'bg',
     displayCode: 'bg',
     regionLabel: 'Bulgaria',
     geminiBcp47: 'bg-BG',
-    // No `azureSttLocale`: the symmetric default resolves to `bg-BG`, which is
-    // in Azure Fast Transcription's supported list. Worth a live probe before
-    // the language ships. The docs table has been wrong before (see sw_tz).
     romanizationBackend: 'local',
     name: 'Bulgarian',
     nativeName: 'Български',
     flag: '🇧🇬',
     category: 'slavic',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'bg',
@@ -809,6 +821,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇱🇹',
     category: 'baltic',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'lt',
@@ -825,6 +839,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇱🇻',
     category: 'baltic',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'lv',
@@ -836,7 +852,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'et',
     regionLabel: 'Estonia',
     geminiBcp47: 'et-EE',
-    azureSttLocale: 'et-EE',
     name: 'Estonian',
     nativeName: 'Eesti',
     flag: '🇪🇪',
@@ -844,6 +859,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // neighbours in the picker. Learners look for it next to lt/lv.
     category: 'baltic',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'et',
@@ -865,14 +882,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'nl',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'sv',
     displayCode: 'sv',
     regionLabel: 'Sweden',
     geminiBcp47: 'sv-SE',
-    azureSttLocale: 'sv-SE',
     name: 'Swedish',
     nativeName: 'Svenska',
     flag: '🇸🇪',
@@ -883,7 +899,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'sv',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     // Re-enabled Jul 2026 on Gemini TTS (the pre-staged entry was Google-era).
@@ -891,13 +907,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'nb',
     regionLabel: 'Norway',
     geminiBcp47: 'nb-NO',
-    azureSttLocale: 'nb-NO',
     googleTranslateCode: 'no',
     name: 'Norwegian (Bokmål)',
     nativeName: 'Norsk bokmål',
     flag: '🇳🇴',
     category: 'germanic',
     llmSupportTier: 'tier1',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'nb',
@@ -909,7 +926,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'da',
     regionLabel: 'Denmark',
     geminiBcp47: 'da-DK',
-    azureSttLocale: 'da-DK',
     name: 'Danish',
     nativeName: 'Dansk',
     flag: '🇩🇰',
@@ -920,7 +936,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'da',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'is',
@@ -928,9 +944,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     regionLabel: 'Iceland',
     // `is-IS` is a documented Gemini TTS locale (Preview stage as of Jul 2026).
     geminiBcp47: 'is-IS',
-    // No `azureSttLocale`: the symmetric default resolves to `is-IS`, which
-    // Azure Fast Transcription accepts (verified with a live probe, Jul 2026.
-    // The docs table alone has been wrong before, see sw_tz).
     name: 'Icelandic',
     nativeName: 'Íslenska',
     flag: '🇮🇸',
@@ -946,7 +959,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Icelandic rows (archaic register, wrong imperatives), so Icelandic,
     // and only Icelandic. Lazily regenerates its existing translations
     // through the new rule.
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'fi',
@@ -967,14 +980,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     translationPromptNotes:
       'The formal/informal distinction is minimal; focus on naturalness.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'el',
     displayCode: 'el',
     regionLabel: 'Greece',
     geminiBcp47: 'el-GR',
-    azureSttLocale: 'el-GR',
     romanizationBackend: 'local',
     name: 'Greek',
     nativeName: 'Ελληνικά',
@@ -984,21 +996,20 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'el',
-    supportsKaraoke: false,
-    // Azure Fast Transcription doesn't support el-GR; without STT we can't
-    // produce per-word timings, so karaoke highlighting will no-op for Greek.
-    supportsStt: false,
+    supportsKaraoke: true,
+    // STT-off until Sep 2026 (Azure had no el-GR); MAI-Transcribe-2 covers
+    // Greek, verified live on the repo's Greek samples.
+    supportsStt: true,
     // Disambiguates from Ancient/Koine Greek in the translation prompt
     // (same rationale as Hebrew's 'Modern Hebrew').
     translationName: 'Modern Greek',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'hi',
     displayCode: 'hi',
     regionLabel: 'India',
     geminiBcp47: 'hi-IN',
-    azureSttLocale: 'hi-IN',
     romanizationBackend: 'google-v3',
     name: 'Hindi',
     nativeName: 'हिन्दी',
@@ -1012,19 +1023,19 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: false,
     supportsStt: true,
     translationPromptNotes: 'Informal → तुम form; formal → आप form.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'bn',
     displayCode: 'bn',
     regionLabel: 'Bangladesh',
     geminiBcp47: 'bn-BD',
-    azureSttLocale: 'bn-IN',
     romanizationBackend: 'google-v3',
     name: 'Bengali',
     nativeName: 'বাংলা',
-    // Flag is India, not Bangladesh: STT infra is bn-IN (Azure Fast
-    // Transcription only supports bn-IN, not bn-BD).
+    // Flag is India, not Bangladesh: a holdover from the Azure STT era, when
+    // bn-IN was the only Bengali locale it transcribed. Left alone so the
+    // picker doesn't churn for existing learners.
     flag: '🇮🇳',
     category: 'south-asian',
     llmSupportTier: 'tier2',
@@ -1037,20 +1048,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Bengali script. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ta',
     displayCode: 'ta',
     regionLabel: 'India',
     geminiBcp47: 'ta-IN',
-    azureSttLocale: 'ta-IN',
     romanizationBackend: 'google-v3',
     name: 'Tamil',
     nativeName: 'தமிழ்',
     flag: '🇮🇳',
     category: 'south-asian',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: true,
     ipaVoice: 'ta',
@@ -1063,13 +1075,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'te',
     regionLabel: 'India',
     geminiBcp47: 'te-IN',
-    azureSttLocale: 'te-IN',
     romanizationBackend: 'local',
     name: 'Telugu',
     nativeName: 'తెలుగు',
     flag: '🇮🇳',
     category: 'south-asian',
     llmSupportTier: 'tier2',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     // Telugu script. Google v3 romanizeText 400s on `te` ("Source language
     // is unsupported") despite still listing it in the docs table; ISO 15919
@@ -1095,7 +1108,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'tr',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'hu',
@@ -1114,14 +1127,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'hu',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'zh',
     displayCode: 'zh-CN',
     regionLabel: 'Mainland China',
     geminiBcp47: 'cmn-CN',
-    azureSttLocale: 'zh-CN',
     hasWordBoundaries: false,
     romanizationBackend: 'local',
     displayNameOverrides: { de: 'Chinesisch (Vereinfacht)' },
@@ -1140,16 +1152,17 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     translationPromptNotes:
       'Simplified Chinese characters, Mainland Mandarin vocabulary.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'zh_traditional',
     displayCode: 'zh-TW',
     regionLabel: 'Taiwan',
     geminiBcp47: 'cmn-TW',
-    azureSttLocale: 'zh-TW',
     googleTranslateCode: 'zh-TW',
     compareLocale: 'zh-TW',
+    // STT writes Mandarin in Simplified characters whatever the hint.
+    sttScriptFix: 'simplifiedToTraditional',
     hasWordBoundaries: false,
     romanizationBackend: 'local',
     displayNameOverrides: { de: 'Chinesisch (Traditionell)' },
@@ -1175,14 +1188,15 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationName: 'Taiwanese Mandarin (Traditional characters)',
     // v3: prompt pins Taiwanese Mandarin. Regenerate translations made under
     // the bare "Chinese (Traditional)" label.
-    translationVersion: 3,
+    translationVersion: 4,
   },
   {
     code: 'yue',
     displayCode: 'yue-Hans-HK',
     regionLabel: 'Hong Kong (simplified script)',
-    azureSttLocale: 'zh-HK',
     compareLocale: 'yue-Hans-HK',
+    // STT writes Cantonese in Traditional characters whatever the hint.
+    sttScriptFix: 'traditionalToSimplified',
     hasWordBoundaries: false,
     romanizationBackend: 'local',
     displayNameOverrides: { de: 'Kantonesisch (Vereinfacht)' },
@@ -1212,15 +1226,19 @@ export const SUPPORTED_LANGUAGES: Language[] = [
       'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
     // v3: prompt pins the spoken-vernacular register. Regenerate
     // translations made under the bare "Cantonese" label.
-    translationVersion: 3,
+    translationVersion: 4,
   },
   {
     code: 'yue_traditional',
     displayCode: 'yue-Hant-HK',
     regionLabel: 'Hong Kong (traditional script)',
-    azureSttLocale: 'zh-HK',
     googleTranslateCode: 'yue',
     compareLocale: 'yue-Hant-HK',
+    // No `sttScriptFix`: STT already writes Cantonese in Traditional
+    // characters (verified live, 2026-09-04). A Simplified→Traditional pass
+    // over Traditional text is not safe either: 后, 干, 里, 只 are both a
+    // Simplified form and a Traditional character in their own right, and
+    // the converter would rewrite them.
     hasWordBoundaries: false,
     romanizationBackend: 'local',
     displayNameOverrides: { de: 'Kantonesisch (Traditionell)' },
@@ -1248,14 +1266,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
       'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
     // v3: prompt pins the spoken-vernacular register. Regenerate
     // translations made under the bare "Cantonese" label.
-    translationVersion: 3,
+    translationVersion: 4,
   },
   {
     code: 'ja',
     displayCode: 'ja',
     regionLabel: 'Japan',
     geminiBcp47: 'ja-JP',
-    azureSttLocale: 'ja-JP',
     hasWordBoundaries: false,
     romanizationBackend: 'google-v3',
     name: 'Japanese',
@@ -1277,14 +1294,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     translationPromptNotes:
       'Match the source formality: informal → plain form (だ／する), formal → polite form (です／ます).',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ko',
     displayCode: 'ko',
     regionLabel: 'South Korea',
     geminiBcp47: 'ko-KR',
-    azureSttLocale: 'ko-KR',
     romanizationBackend: 'local',
     name: 'Korean',
     nativeName: '한국어',
@@ -1299,14 +1315,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     translationPromptNotes:
       'Informal → 반말; formal → 해요체 or 합쇼체 as appropriate.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'vi',
     displayCode: 'vi',
     regionLabel: 'Vietnam',
     geminiBcp47: 'vi-VN',
-    azureSttLocale: 'vi-VN',
     displayNameOverrides: { de: 'Vietnamesisch (Nord)' },
     name: 'Vietnamese (Northern)',
     nativeName: 'Tiếng Việt (miền Bắc)',
@@ -1327,7 +1342,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationName: 'Northern Vietnamese',
     translationPromptNotes:
       'Northern (Hanoi) Vietnamese vocabulary and particles.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'vi_south',
@@ -1335,10 +1350,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     regionLabel: 'Southern Vietnam',
     // Gemini has no southern-specific locale. `vi-VN` is the only Vietnamese
     // tag it takes, so the dialect is named in the prompt via `ttsPromptName`
-    // (the ar_lev / sw_tz pattern). Azure Fast Transcription likewise only
-    // lists `vi-VN`; it transcribes southern speech fine, so STT stays on.
+    // (the ar_lev / sw_tz pattern). STT takes the bare `vi` code and
+    // transcribes southern speech fine, so STT stays on.
     geminiBcp47: 'vi-VN',
-    azureSttLocale: 'vi-VN',
     googleTranslateCode: 'vi',
     // Explicit: the default would be the internal code `vi_south`, which is not
     // a valid Intl locale for the answer comparator's segmenter.
@@ -1349,6 +1363,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇻🇳',
     category: 'asian-southeast',
     llmSupportTier: 'tier1',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     ttsPromptName: 'Southern Vietnamese',
     needsRomanization: false,
@@ -1386,7 +1402,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationName: 'Standard Thai',
     translationPromptNotes:
       'Polite particles (ครับ/ค่ะ) only when the source register is formal.',
-    translationVersion: 3,
+    translationVersion: 4,
   },
   {
     code: 'id',
@@ -1403,19 +1419,20 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'id',
     supportsKaraoke: true,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ms',
     displayCode: 'ms',
     regionLabel: 'Malaysia',
     geminiBcp47: 'ms-MY',
-    azureSttLocale: 'ms-MY',
     name: 'Malay',
     nativeName: 'Bahasa Melayu',
     flag: '🇲🇾',
     category: 'asian-southeast',
     llmSupportTier: 'tier1',
+    // Stamped with the Sep 2026 Sol switch so existing rows (v1) regenerate.
+    translationVersion: 2,
     ttsProvider: 'gemini',
     needsRomanization: false,
     ipaVoice: 'ms',
@@ -1427,7 +1444,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'fil',
     regionLabel: 'the Philippines',
     geminiBcp47: 'fil-PH',
-    azureSttLocale: 'fil-PH',
     // Google Translate v2 (the legacy fallback path) catalogs Filipino under
     // the Tagalog code `tl`; `fil` isn't in /v2/languages.
     googleTranslateCode: 'tl',
@@ -1437,8 +1453,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     category: 'asian-southeast',
     llmSupportTier: 'tier1',
     // Gemini TTS (fil-PH). See VOICE_POOLS in lib/voices.ts
-    // (`fil: [...GEMINI_CORE]`). Latin script, so no romanization; Azure
-    // fil-PH supports Fast Transcription, so STT + karaoke stay on.
+    // (`fil: [...GEMINI_CORE]`). Latin script, so no romanization; the STT
+    // model lists `fil`, so STT + karaoke stay on.
     ttsProvider: 'gemini',
     needsRomanization: false,
     // No ipaVoice: espeak-ng has no Filipino/Tagalog voice.
@@ -1447,7 +1463,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Models index far more data under "Tagalog" than "Filipino", same
     // collapse the legacy path does via `googleTranslateCode: 'tl'`.
     translationName: 'Filipino (Tagalog)',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ar',
@@ -1455,7 +1471,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'ar',
     regionLabel: 'the Arab world',
     geminiBcp47: 'ar-001',
-    azureSttLocale: 'ar-SA',
     romanizationBackend: 'local',
     displayNameOverrides: { de: 'Arabisch (Hocharabisch)' },
     name: 'Arabic (Modern Standard)',
@@ -1479,7 +1494,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationName: 'Modern Standard Arabic',
     translationPromptNotes:
       'MSA grammar; when the source does not specify gender, pick a grammatically valid form without letting that choice influence any gender metadata.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ar_sa',
@@ -1487,7 +1502,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'ar-SA',
     regionLabel: 'Saudi Arabia',
     geminiBcp47: 'ar-001',
-    azureSttLocale: 'ar-SA',
     googleTranslateCode: 'ar',
     compareLocale: 'ar-SA',
     romanizationBackend: 'local',
@@ -1509,7 +1523,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationName: 'Saudi Arabic',
     translationPromptNotes:
       'MSA-leaning but with Hejazi/Najdi colloquial markers where natural.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ar_eg',
@@ -1517,7 +1531,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'ar-EG',
     regionLabel: 'Egypt',
     geminiBcp47: 'ar-EG',
-    azureSttLocale: 'ar-EG',
     googleTranslateCode: 'ar',
     compareLocale: 'ar-EG',
     romanizationBackend: 'local',
@@ -1540,7 +1553,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // so the model produces actual dialect, not MSA with a region hint.
     translationName: 'Egyptian Arabic',
     translationPromptNotes: 'Colloquial Cairene Arabic, not MSA.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ar_iq',
@@ -1548,7 +1561,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'ar-IQ',
     regionLabel: 'Iraq',
     geminiBcp47: 'ar-001',
-    azureSttLocale: 'ar-IQ',
     googleTranslateCode: 'ar',
     compareLocale: 'ar-IQ',
     romanizationBackend: 'local',
@@ -1569,7 +1581,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // so the model produces actual dialect, not MSA with a region hint.
     translationName: 'Iraqi Arabic',
     translationPromptNotes: 'Colloquial Iraqi Arabic, not MSA.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'ar_lev',
@@ -1577,7 +1589,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'ar-LB',
     regionLabel: 'the Levant (Lebanon, Syria, Palestine, Jordan)',
     geminiBcp47: 'ar-001',
-    azureSttLocale: 'ar-LB',
     googleTranslateCode: 'ar',
     compareLocale: 'ar-LB',
     romanizationBackend: 'local',
@@ -1601,7 +1612,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // so the model produces actual dialect, not MSA with a region hint.
     translationName: 'Levantine Arabic',
     translationPromptNotes: 'Colloquial register, not MSA.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'he',
@@ -1609,7 +1620,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'he',
     regionLabel: 'Israel',
     geminiBcp47: 'he-IL',
-    azureSttLocale: 'he-IL',
     romanizationBackend: 'local',
     name: 'Hebrew',
     nativeName: 'עברית',
@@ -1627,7 +1637,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Disambiguates from Biblical Hebrew in the translation prompt.
     translationName: 'Modern Hebrew',
     translationPromptNotes: 'Match speaker gender to the verb form.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'fa',
@@ -1635,7 +1645,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'fa',
     regionLabel: 'Iran',
     geminiBcp47: 'fa-IR',
-    azureSttLocale: 'fa-IR',
     name: 'Persian',
     nativeName: 'فارسی',
     flag: '🇮🇷',
@@ -1656,14 +1665,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Non-Latin script. Karaoke highlighting off (matches Arabic/Hebrew).
     supportsKaraoke: false,
     supportsStt: true,
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'sw',
     displayCode: 'sw-KE',
     regionLabel: 'Kenya',
     geminiBcp47: 'sw-KE',
-    azureSttLocale: 'sw-KE',
     compareLocale: 'sw-KE',
     displayNameOverrides: { de: 'Swahili (Kenia)' },
     name: 'Swahili (Kenya)',
@@ -1678,14 +1686,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     translationPromptNotes:
       'Standard Kiswahili as spoken in Kenya, Sheng-free.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
   {
     code: 'sw_tz',
     displayCode: 'sw-TZ',
     regionLabel: 'Tanzania',
     geminiBcp47: 'sw-KE',
-    azureSttLocale: 'sw-TZ',
     googleTranslateCode: 'sw',
     compareLocale: 'sw-TZ',
     displayNameOverrides: { de: 'Swahili (Tansania)' },
@@ -1703,13 +1710,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsPromptName: 'Tanzanian Swahili',
     needsRomanization: false,
     ipaVoice: 'sw',
-    supportsKaraoke: false,
-    // Azure Fast Transcription rejects sw-TZ (May 2026). sw-KE is supported;
-    // sw_tz courses inherit the Greek pattern, no validation roundtrips,
-    // no per-word timings, no karaoke.
-    supportsStt: false,
+    // Karaoke and STT were both off while Azure rejected sw-TZ (the flag
+    // existed only because no timings could be produced). MAI-Transcribe-2
+    // takes the bare `sw` code and transcribed a Swahili sample correctly
+    // (Sep 2026), so both follow Kenyan Swahili now.
+    supportsKaraoke: true,
+    supportsStt: true,
     translationPromptNotes: 'Standard Kiswahili sanifu, Tanzanian vocabulary.',
-    translationVersion: 2,
+    translationVersion: 3,
   },
 ];
 
@@ -1862,7 +1870,7 @@ export function isTranslationVersionStale(
 //   1. Define a new entry in TRANSLATION_RULES below.
 //   2. Set `translationRule: '<id>'` on the Language entries that should use it.
 //   3. If a language has no `translationRule` (currently: all of them), it
-//      falls back to `luna_bo3`.
+//      falls back to `sol_minimal`.
 // ---------------------------------------------------------------------------
 
 /**
@@ -2073,7 +2081,8 @@ export const LUNA_PROVIDER_CONSTRAINTS: StageProviderConstraints = {
   order: ['amazon-bedrock/us-east-1'],
 };
 
-// GPT-5.6 Luna best-of-3. The translation workhorse since Aug 2026.
+// GPT-5.6 Luna best-of-3. The translation workhorse Aug–Sep 2026, now a
+// fallback of `sol_minimal` and the revert rule.
 // Selected by a multi-round eval (FLORES de/is, native-speaker feedback set,
 // 500 Tatoeba EN→IS with COMET-22 + blind ratings): no-thinking Luna beat
 // Gemini 3.6 Flash minimal on every signal at ~6% of its cost, and the
@@ -2093,6 +2102,64 @@ export const LUNA_BO3: ModelStage = {
     provider: LUNA_PROVIDER_CONSTRAINTS,
     maxRetries: 2,
   },
+};
+
+/**
+ * GPT-5.6 Terra, single call, no thinking. Evaluated 2026-09-03 as a
+ * replacement for `LUNA_BO3` by scripts/eval-translation-pragmatics.ts and
+ * NOT wired into any rule: it tied the Luna best-of-3 pipeline overall
+ * (9.24 vs 9.12 on the judge, 20 wins / 18 losses over 180 items) at ~3x
+ * the cost, lost on Icelandic and on formal register, and Sol-minimal beat
+ * it at the same per-sentence price. Kept so the bench keeps measuring the
+ * exact stage that was rejected. Standard endpoint pricing is $2/M in,
+ * $12/M out; `max_price` keeps the $24/M "fast" endpoint out while still
+ * allowing Bedrock/Azure at $13.2. `reasoning: 'none'` is load-bearing for
+ * the same reason as Luna's.
+ */
+export const TERRA_SINGLE: ModelStage = {
+  model: 'openai/gpt-5.6-terra',
+  reasoning: 'none',
+  maxOutputTokens: 4_000,
+  provider: { max_price: { completion: 13.2 } },
+};
+
+/**
+ * GPT-5.6 Sol, one call, `minimal` thinking, cheapest endpoint first. The
+ * translation workhorse since Sep 2026, replacing `LUNA_BO3` on two benches:
+ * FLORES (2026-09-01: 8.92 vs 8.48) and the speech-act / generality set in
+ * scripts/eval-translation-pragmatics.ts (2026-09-03: 9.46 vs 9.12, best in
+ * every category and in 7 of 9 languages, Arabic dialects included). Best-of-3
+ * added nothing for Sol and `medium` thinking made it worse, so one call at
+ * the `minimal` floor (Sol cannot disable thinking).
+ *
+ * Routing: `:floor` sorts endpoints by price AND opts into OpenAI's flex
+ * service tier ($1/M in, $5/M out; base slugs never match flex), so the
+ * cheapest endpoint is always tried first. When flex is unavailable the sort
+ * falls through to standard ($10/M out), fast ($20) and Bedrock ($22). The
+ * $22.1 ceiling admits all of those and excludes only Azure ($30 to $33).
+ * Verified with the `sol-floor` bench condition on 2026-09-03: $0.00054 per
+ * call against $0.00079 on the standard endpoint, median latency 1.6 s vs
+ * 1.35 s, but 2 of 40 calls came back as HTTP errors that OpenRouter did
+ * not route around, hence `SOL_MINIMAL_STANDARD` as the first fallback.
+ */
+export const SOL_MINIMAL: ModelStage = {
+  model: 'openai/gpt-5.6-sol:floor',
+  reasoning: 'minimal',
+  maxOutputTokens: 6_000,
+  provider: { max_price: { completion: 22.1 } },
+};
+
+/**
+ * Same model and thinking as `SOL_MINIMAL` on the default-routed (standard,
+ * $2/$10) endpoint: the first fallback of `sol_minimal`, so a flex-tier
+ * refusal costs one retry at twice the price instead of dropping the
+ * sentence to Luna. Zero failures in 220 bench calls on this routing.
+ */
+export const SOL_MINIMAL_STANDARD: ModelStage = {
+  model: 'openai/gpt-5.6-sol',
+  reasoning: 'minimal',
+  maxOutputTokens: 6_000,
+  provider: { max_price: { completion: 22.1 } },
 };
 
 /**
@@ -2116,15 +2183,36 @@ export const TRANSLATION_RULES = {
   /**
    * Default for every language, no entry sets an explicit
    * `translationRule` anymore (set one only to route a language off this
-   * default, e.g. if Luna regresses on it). Used for the initial LLM
+   * default, e.g. if Sol regresses on it). Used for the initial LLM
    * translation of premade curriculum sentences and placement-test
-   * material. Swapped in from `gemini_35_flash_nitro_minimal` in Aug 2026
-   * on eval evidence (see `LUNA_BO3`); existing translations are not
-   * mass-regenerated by the rule swap, only new/missing rows (and
-   * languages whose `translationVersion` was bumped, currently Icelandic)
-   * go through Luna. The Gemini stage stays as the fallback so a Luna
-   * outage degrades to the previous production config before the Google
-   * safety net.
+   * material. Swapped in from `luna_bo3` in Sep 2026 on eval evidence (see
+   * `SOL_MINIMAL`). Existing translations regenerate lazily once a
+   * language's `translationVersion` is bumped, keeping their old wording
+   * for the cards that already show it (see `supersededAt` in
+   * convex/schema.ts). A flex-tier refusal retries on Sol's standard
+   * endpoint; a Sol outage degrades to `LUNA_BO3`, then Gemini, then the
+   * Google safety net.
+   */
+  sol_minimal: {
+    id: 'sol_minimal',
+    label:
+      'Sol (minimal, cheapest endpoint) → Sol (minimal, standard) → Luna best-of-3 → Gemini 3.7 Flash Nitro (minimal) → Google',
+    branches: [
+      {
+        maxChars: Infinity,
+        primary: SOL_MINIMAL,
+        fallbacks: [
+          SOL_MINIMAL_STANDARD,
+          LUNA_BO3,
+          GEMINI_35_FLASH_NITRO_MINIMAL,
+        ],
+      },
+    ],
+  },
+  /**
+   * The Aug–Sep 2026 default, kept as the revert path and as a fallback
+   * stage of `sol_minimal`. No language routes here by default anymore.
+   * Selected in Aug 2026 on eval evidence (see `LUNA_BO3`).
    */
   luna_bo3: {
     id: 'luna_bo3',
@@ -2139,8 +2227,8 @@ export const TRANSLATION_RULES = {
     ],
   },
   /**
-   * The pre-Aug-2026 default, kept as the revert path and as the in-rule
-   * fallback stage of `luna_bo3`. No language routes here by default
+   * The pre-Aug-2026 default, kept as the last LLM fallback stage of
+   * `sol_minimal` and `luna_bo3`. No language routes here by default
    * anymore.
    */
   gemini_35_flash_nitro_minimal: {
@@ -2196,8 +2284,8 @@ export type TranslationRuleId = keyof typeof TRANSLATION_RULES;
 /**
  * Resolve the ordered stages the translation worker should try for a given
  * (language, source-text-length) pair. Returns `[primary, ...fallbacks]` from
- * the matching branch of the language's rule (or the `luna_bo3` default when
- * the language doesn't set one).
+ * the matching branch of the language's rule (or the `sol_minimal` default
+ * when the language doesn't set one).
  *
  * `opts.ruleOverride` bypasses the per-language rule lookup. Used by
  * `flagTranslation` to force the `retranslation_high` chain regardless of the
@@ -2210,7 +2298,7 @@ export function resolveTranslationStages(
 ): ModelStage[] {
   const lang = getLanguageByCode(code);
   const ruleId: TranslationRuleId =
-    opts?.ruleOverride ?? lang?.translationRule ?? 'luna_bo3';
+    opts?.ruleOverride ?? lang?.translationRule ?? 'sol_minimal';
   // Cast through `TranslationRule` so each branch is typed as the union with
   // optional `fallbacks`. `satisfies` above narrows literals (some branches
   // don't declare `fallbacks`), which would otherwise drop that property
@@ -2502,8 +2590,9 @@ export function languageSupportsKaraoke(code: string): boolean {
 /**
  * Whether our STT backend can transcribe audio in this language. Single
  * source of truth gating both TTS validation roundtrips and per-word
- * timings. Defaults to false for unknown codes. Azure Fast Transcription
- * rejects unsupported locales with a 400, so not-trying is the safe default.
+ * timings. Defaults to false for unknown codes: an unsupported language
+ * would spend an STT call on a transcript nobody can use, so not-trying is
+ * the safe default.
  */
 export function languageSupportsStt(code: string): boolean {
   return getLanguageByCode(code)?.supportsStt ?? false;

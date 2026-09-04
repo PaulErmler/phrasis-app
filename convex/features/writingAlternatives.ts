@@ -1,3 +1,4 @@
+import { cardPinAt, servedTranslatedText } from '../db/translationReads';
 import { ConvexError, v } from 'convex/values';
 import {
   internalAction,
@@ -150,13 +151,12 @@ async function primaryTextForLanguage(
   const text = await ctx.db.get(card.textId);
   if (!text) return null;
   if (text.language === language) return text.text;
-  const row = await ctx.db
-    .query('translations')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', card.textId).eq('targetLanguage', language),
-    )
-    .first();
-  return row?.translatedText ?? null;
+  // The served revision, not necessarily the live row (pinned cards).
+  return servedTranslatedText(ctx, {
+    textId: card.textId,
+    targetLanguage: language,
+    pinAt: cardPinAt(card),
+  });
 }
 
 /**

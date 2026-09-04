@@ -29,6 +29,8 @@ export default defineConfig([
       'public/**',
       '*.min.js',
       'coverage/**',
+      'playwright-report/**',
+      'test-results/**',
     ],
   },
 

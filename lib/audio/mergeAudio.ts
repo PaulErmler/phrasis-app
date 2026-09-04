@@ -63,16 +63,24 @@ export interface ResolvedAudioSettings {
 }
 
 /**
- * The three per-mode copies a playback setting can have: audio/Shadowing mode
- * owns the unsuffixed field, writing ("full") mode the `*Full` copy, and the
- * transcribe writing style the `*Transcribe` copy.
+ * The per-mode copies a playback setting can have: audio/Shadowing mode owns
+ * the unsuffixed field, writing ("full") mode the `*Full` copy, the transcribe
+ * writing style the `*Transcribe` copy, and hands-free Radio the `*Radio` copy.
+ *
+ * The writing modes CHAIN (`*Transcribe ?? *Full ?? unsuffixed`); radio
+ * BRANCHES off audio (`*Radio ?? unsuffixed`) and never reads a writing copy.
+ * Radio is a `schedulingMode`, not a `reviewMode`, so it is a sibling of audio
+ * rather than a step further down the writing chain.
  */
-export type AudioSettingsMode = 'audio' | 'full' | 'transcribe';
+export type AudioSettingsMode = 'audio' | 'full' | 'transcribe' | 'radio';
 
 /**
- * Settings that resolve along the per-mode chain
- * `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*`: every base field name
- * whose `*Full` copy exists in the schema. `hideBaseLanguages` also has a
+ * Settings that resolve per mode: every base field name with a `*Full` copy in
+ * the schema (the writing chain) OR a `*Radio` copy (the radio branch). The
+ * Practice Listening group only ever got `*Radio` twins, so requiring `*Full`
+ * would leave those fields uncallable here. A field present on one side but
+ * not the other still resolves: the missing variant reads as undefined, which
+ * is exactly the fall-through. `hideBaseLanguages` also has a
  * `Full` twin, but that pair is deliberately independent (writing mode
  * defaults per input style, it never falls back to the audio value), so it
  * is excluded from the chain.
@@ -80,15 +88,30 @@ export type AudioSettingsMode = 'audio' | 'full' | 'transcribe';
 export type ModeResolvableSetting = Exclude<
   {
     [K in keyof CourseSettings &
-      string]: `${K}Full` extends keyof CourseSettings ? K : never;
+      string]: `${K}Full` extends keyof CourseSettings
+      ? K
+      : `${K}Radio` extends keyof CourseSettings
+        ? K
+        : never;
   }[keyof CourseSettings & string],
   'hideBaseLanguages'
 >;
 
 /**
- * THE per-mode precedence rule, in one place: resolve `field` for `mode`
- * along `*Transcribe ?? *Full ?? unsuffixed`. Undefined at a level means
- * "same as the previous mode in the chain", so unmigrated/untweaked docs
+ * THE per-mode precedence rule, in one place:
+ *
+ *   transcribe: `*Transcribe ?? *Full ?? unsuffixed`
+ *   full:       `*Full ?? unsuffixed`
+ *   radio:      `*Radio ?? unsuffixed`      <- branch, NOT `?? *Full`
+ *   audio:      `unsuffixed`
+ *
+ * Radio deliberately skips the writing copies: it is the hands-free face of
+ * audio mode, so borrowing a Writing/Transcribe value would be wrong. Whether
+ * radio is asked for at all is the caller's call (it gates on
+ * `separateRadioSettings`); this stays a pure precedence rule.
+ *
+ * Undefined at a level means
+ * "same as the mode it falls back to", so unmigrated/untweaked docs
  * behave identically (see docs/migrations/per-mode-settings-backfill.md);
  * a field with no `*Transcribe` copy (base-group pauses, auto-advance pause)
  * resolves like full mode there. Callers apply their own `?? DEFAULT_*`.
@@ -107,10 +130,13 @@ export function resolveModeSetting<K extends ModeResolvableSetting>(
   // doesn't have reads as undefined, which is exactly the chain's
   // fall-through. The compiler can't see that convention through a computed
   // key, hence the localized cast.
-  const variant = (suffix: 'Full' | 'Transcribe') =>
+  const variant = (suffix: 'Full' | 'Transcribe' | 'Radio') =>
     (cs as Record<string, unknown>)[`${field}${suffix}`] as
       | CourseSettings[K]
       | undefined;
+  if (mode === 'radio') {
+    return variant('Radio') ?? cs[field];
+  }
   if (mode === 'transcribe') {
     return variant('Transcribe') ?? variant('Full') ?? cs[field];
   }
@@ -118,6 +144,36 @@ export function resolveModeSetting<K extends ModeResolvableSetting>(
     return variant('Full') ?? cs[field];
   }
   return cs[field];
+}
+
+/**
+ * Which copy of the playback settings a LIVE session reads, from the settings
+ * doc alone. The counterpart to `resolveModeSetting`: that one owns the
+ * precedence rule, this one owns "which mode am I in".
+ *
+ * Every consumer that renders or plays the current session must go through
+ * here — the hook that builds the merged blob, and the view that renders the
+ * card. They used to derive it separately, and the card's copy silently kept
+ * reading the audio-mode fields after Radio grew its own.
+ *
+ * The settings SHEET is deliberately not a caller: the copy it edits is chosen
+ * by its Review/Radio pill, not by what the user is about to run.
+ */
+export function resolveSettingsMode(
+  cs: CourseSettings | null | undefined,
+): AudioSettingsMode {
+  // Writing wins over free play: free play while typing is Free Study, a
+  // typing session that keeps the writing copies rather than Radio's.
+  if ((cs?.reviewMode ?? 'audio') !== 'audio') {
+    return (cs?.writingInputMode ?? 'translate') === 'transcribe'
+      ? 'transcribe'
+      : 'full';
+  }
+  // Radio: free play's hands-free face, and only while the split is on. Unset
+  // means "same as Learn & Review", so untouched docs never move.
+  return cs?.schedulingMode === 'radio' && cs?.separateRadioSettings === true
+    ? 'radio'
+    : 'audio';
 }
 
 /**
@@ -143,10 +199,19 @@ export function resolveAudioSettings(
   cardOverrides?: Record<string, number>,
   mode: AudioSettingsMode = 'audio',
 ): ResolvedAudioSettings {
-  // Each mode has its own copy of the playback settings, resolved along the
-  // chain `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*` — implemented
-  // once in `resolveModeSetting` above.
+  // Each mode has its own copy of the playback settings, resolved by
+  // `resolveModeSetting` above: the writing modes chain
+  // `*Transcribe ?? *Full ?? unsuffixed`, radio branches `*Radio ?? unsuffixed`,
+  // and every caller applies its own `?? DEFAULT_*` here.
   const autoAdvance = cs?.autoAdvance ?? DEFAULT_AUTO_ADVANCE;
+  // Practice Listening graduation, resolved once per mode: the legacy strategy
+  // inference below consults the same rep window.
+  const onlyNewReps = resolveModeSetting(cs, 'targetBeforeOnlyNewReps', mode);
+  const untilGoodReps = resolveModeSetting(
+    cs,
+    'targetBeforeUntilGoodReps',
+    mode,
+  );
   return {
     reps: resolveModeSetting(cs, 'languageRepetitions', mode) ?? {},
     repPauses: resolveModeSetting(cs, 'languageRepetitionPauses', mode) ?? {},
@@ -154,8 +219,10 @@ export function resolveAudioSettings(
       resolveModeSetting(cs, 'languagePlaybackSpeeds', mode) ?? {},
       cardOverrides,
     ),
+    // Radio is the hands-free face of audio mode, so it keeps the audio
+    // fallback (2). Only the writing modes drop to one play.
     defaultTargetReps:
-      mode === 'audio'
+      mode === 'audio' || mode === 'radio'
         ? DEFAULT_REPETITIONS_TARGET
         : DEFAULT_REPETITIONS_TARGET_WRITING,
     pauseB2B:
@@ -172,35 +239,37 @@ export function resolveAudioSettings(
       resolveModeSetting(cs, 'pauseBeforeAutoAdvance', mode) ??
       DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
     playTargetBefore:
-      cs?.playTargetBeforeBase ?? DEFAULT_PLAY_TARGET_BEFORE_BASE,
-    playTargetAfter: cs?.playTargetAfterBase ?? DEFAULT_PLAY_TARGET_AFTER_BASE,
-    beforeReps: cs?.targetBeforeRepetitions ?? {},
-    beforeRepPauses: cs?.targetBeforeRepetitionPauses ?? {},
+      resolveModeSetting(cs, 'playTargetBeforeBase', mode) ??
+      DEFAULT_PLAY_TARGET_BEFORE_BASE,
+    playTargetAfter:
+      resolveModeSetting(cs, 'playTargetAfterBase', mode) ??
+      DEFAULT_PLAY_TARGET_AFTER_BASE,
+    beforeReps: resolveModeSetting(cs, 'targetBeforeRepetitions', mode) ?? {},
+    beforeRepPauses:
+      resolveModeSetting(cs, 'targetBeforeRepetitionPauses', mode) ?? {},
     // Card-level speed overrides apply to the before-base group too (same language).
     beforeSpeeds: mergeSpeeds(
-      cs?.targetBeforePlaybackSpeeds ?? {},
+      resolveModeSetting(cs, 'targetBeforePlaybackSpeeds', mode) ?? {},
       cardOverrides,
     ),
-    pauseT2B: cs?.pauseTargetToBase ?? DEFAULT_PAUSE_TARGET_TO_BASE,
+    pauseT2B:
+      resolveModeSetting(cs, 'pauseTargetToBase', mode) ??
+      DEFAULT_PAUSE_TARGET_TO_BASE,
     // Stored 0 / undefined means "always" (∞); 1-10 limits to that many initial reviews.
-    beforeOnlyNewReps:
-      cs?.targetBeforeOnlyNewReps && cs.targetBeforeOnlyNewReps > 0
-        ? cs.targetBeforeOnlyNewReps
-        : Infinity,
+    beforeOnlyNewReps: onlyNewReps && onlyNewReps > 0 ? onlyNewReps : Infinity,
     // Legacy inference: docs from before the strategy field encode
     // "continuously" as onlyNewReps 0/undefined (the old ∞ position). A
     // stored strategy always wins; without one, a positive rep window means
     // 'onlyNew' and anything else means 'continuous'. Behavior-identical to
     // the pre-strategy resolution, so old docs never change behavior.
     listeningStrategy:
-      cs?.targetBeforeListeningStrategy ??
-      (cs?.targetBeforeOnlyNewReps && cs.targetBeforeOnlyNewReps > 0
-        ? 'onlyNew'
-        : 'continuous'),
-    beforeUntilGoodReps:
-      cs?.targetBeforeUntilGoodReps && cs.targetBeforeUntilGoodReps > 0
-        ? cs.targetBeforeUntilGoodReps
-        : 1,
+      resolveModeSetting(cs, 'targetBeforeListeningStrategy', mode) ??
+      (onlyNewReps && onlyNewReps > 0 ? 'onlyNew' : 'continuous'),
+    // Forked per mode like the rest of the group. Radio plays can't advance a
+    // card's good-rating count, but the count it already carries still
+    // graduates it here, so radio needs its own window rather than silently
+    // inheriting Learn & Review's. See applyOnlyNewListening.
+    beforeUntilGoodReps: untilGoodReps && untilGoodReps > 0 ? untilGoodReps : 1,
   };
 }
 

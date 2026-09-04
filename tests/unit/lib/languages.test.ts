@@ -366,10 +366,9 @@ describe('Persian (fa) language record', () => {
     expect(fa?.name).toBe('Persian');
   });
 
-  it('routes TTS through Gemini (fa-IR) with Azure STT', () => {
+  it('routes TTS through Gemini (fa-IR) with STT enabled', () => {
     expect(fa?.ttsProvider).toBe('gemini');
     expect(fa?.geminiBcp47).toBe('fa-IR');
-    expect(fa?.azureSttLocale).toBe('fa-IR');
     expect(fa?.supportsStt).toBe(true);
   });
 
@@ -402,12 +401,12 @@ describe('Bulgarian (bg) language record', () => {
 });
 
 describe('languageSupportsStt', () => {
-  // Azure Fast Transcription rejects el-GR and sw-TZ; UI surfaces (the
-  // writing-mode mic) gate on this flag so those users never pay a
-  // transcription quota unit for a request that can only 400.
-  it('is false for the Azure-rejected locales', () => {
-    expect(languageSupportsStt('el')).toBe(false);
-    expect(languageSupportsStt('sw_tz')).toBe(false);
+  // Greek and Tanzanian Swahili were STT-off while Azure lacked their
+  // locales; MAI-Transcribe-2 (Sep 2026) covers both, which re-enabled the
+  // writing-mode mic, validation roundtrips and word timings for them.
+  it('is true for the languages Azure used to reject', () => {
+    expect(languageSupportsStt('el')).toBe(true);
+    expect(languageSupportsStt('sw_tz')).toBe(true);
   });
 
   it('is true for mainstream STT languages and false for unknown codes', () => {
@@ -439,12 +438,6 @@ describe('content versioning', () => {
       // source-only, so it never got the 3.5 Flash translationVersion bump).
       expect(getCurrentTranslationVersion('en')).toBe(DEFAULT_CONTENT_VERSION);
       expect(getCurrentTtsVersion('en')).toBe(DEFAULT_CONTENT_VERSION);
-    });
-    it('returns bumped translationVersion for de (Gemini 3.5 Flash Nitro rollout)', () => {
-      expect(getCurrentTranslationVersion('de')).toBe(2);
-    });
-    it('returns bumped translationVersion for fr (Gemini 3.5 Flash Nitro rollout)', () => {
-      expect(getCurrentTranslationVersion('fr')).toBe(2);
     });
     it('defaults to 1 for an unknown code', () => {
       expect(getCurrentTtsVersion('xx')).toBe(1);
@@ -509,15 +502,29 @@ describe('content versioning', () => {
   });
 
   it('isTranslationVersionStale mirrors the config version per language', () => {
-    // de bumped to v2. A v1 stamp is stale; undefined is still not stale.
-    expect(getCurrentTranslationVersion('de')).toBe(2);
-    expect(isTranslationVersionStale('de', 2)).toBe(false);
-    expect(isTranslationVersionStale('de', 1)).toBe(true);
-    expect(isTranslationVersionStale('de', undefined)).toBe(false);
-    // fr bumped to v2, same semantics as de.
-    expect(getCurrentTranslationVersion('fr')).toBe(2);
-    expect(isTranslationVersionStale('fr', 2)).toBe(false);
-    expect(isTranslationVersionStale('fr', 1)).toBe(true);
-    expect(isTranslationVersionStale('fr', undefined)).toBe(false);
+    // The literal per-language numbers live in convex/tests/lib/languages.test.ts
+    // (with the every-language-stamped invariant); here only the staleness
+    // semantics are pinned, so a bump does not have to touch this file.
+    for (const code of ['de', 'fr']) {
+      const current = getCurrentTranslationVersion(code);
+      expect(current).toBeGreaterThanOrEqual(2);
+      expect(isTranslationVersionStale(code, current)).toBe(false);
+      expect(isTranslationVersionStale(code, current - 1)).toBe(true);
+      expect(isTranslationVersionStale(code, undefined)).toBe(false);
+    }
+  });
+});
+
+describe('sttScriptFix', () => {
+  it('is set exactly where STT writes a different script than the catalogue', () => {
+    const fixed = SUPPORTED_LANGUAGES.filter((l) => l.sttScriptFix).map((l) => [
+      l.code,
+      l.sttScriptFix,
+    ]);
+    expect(fixed).toEqual([
+      ['sr', 'latinToCyrillic'],
+      ['zh_traditional', 'simplifiedToTraditional'],
+      ['yue', 'traditionalToSimplified'],
+    ]);
   });
 });

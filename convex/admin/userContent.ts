@@ -3,6 +3,7 @@ import { paginationOptsValidator } from 'convex/server';
 import { components } from '../_generated/api';
 import { listUIMessages } from '@convex-dev/agent';
 import { adminQuery } from './lib';
+import { liveTranslationsForText } from '../db/translationReads';
 
 const agentComponent = components.agent;
 
@@ -127,10 +128,7 @@ export const listUserTexts = adminQuery({
           const collection = await ctx.db.get(text.collectionId);
           originByCollection.set(text.collectionId, collection?.origin);
         }
-        const translations = await ctx.db
-          .query('translations')
-          .withIndex('by_textId', (q) => q.eq('textId', text._id))
-          .take(10);
+        const translations = await liveTranslationsForText(ctx, text._id, 10);
         return {
           _id: text._id,
           text: text.text,

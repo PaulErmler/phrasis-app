@@ -200,7 +200,7 @@ export function AudioButton({
    * Release the spinner. `abandonPlay` decides whether the *intent* to play
    * survives:
    *   - timeout  → keep it. Synthesis routinely outlives the spinner (an
-   *     OpenRouter round-trip plus up to two Azure STT validation passes), and
+   *     OpenRouter round-trip plus up to two STT validation passes), and
    *     dropping it here is what made a slow clip land silently: the URL
    *     arrived, but the auto-play effect is gated on `pendingPlayRef`.
    *   - `{scheduled:false}` or a thrown error → drop it. No URL is coming from

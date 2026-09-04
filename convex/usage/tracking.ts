@@ -4,6 +4,8 @@ import { v } from 'convex/values';
 import { internalAction, type ActionCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { type FeatureState } from './helpers';
+import { FEATURE_IDS } from '../features/featureIds';
+import { EVENTS, track } from '../analytics';
 import {
   currentPlans,
   FREE_PLAN_ID,
@@ -192,32 +194,98 @@ export const trackUsage = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    await trackAndSync(
+      ctx,
+      getSecretKey(),
+      args.userId,
+      args.featureId,
+      args.value,
+    );
+    return null;
+  },
+});
+
+/** `POST /track`, then pull the customer and refresh the local mirror. */
+async function trackAndSync(
+  ctx: Pick<ActionCtx, 'runMutation'>,
+  secretKey: string,
+  userId: string,
+  featureId: string,
+  value: number,
+): Promise<void> {
+  const trackRes = await fetch(`${AUTUMN_API}/track`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${secretKey}`,
+      'Content-Type': 'application/json',
+      'x-api-version': AUTUMN_API_VERSION,
+    },
+    body: JSON.stringify({
+      customer_id: userId,
+      feature_id: featureId,
+      value,
+    }),
+  });
+
+  if (!trackRes.ok) {
+    const body = await trackRes.text();
+    console.error(`Autumn track failed (${trackRes.status}): ${body}`);
+    return;
+  }
+
+  const customerData = await fetchCustomerData(secretKey, userId);
+  if (!customerData) return;
+
+  await pushCustomerState(ctx, secretKey, userId, customerData);
+}
+
+/**
+ * Bring Autumn's `courses` usage counter back down to the number of active
+ * courses. Scheduled (with a settle delay) by `syncAllFeatures` when a sync
+ * sees the counter above the active count, a state the old auto-archive
+ * path left behind for every lapsed subscriber.
+ *
+ * Release-only, by design: the counter is only ever LOWERED. A counter below
+ * the active count (a manual grant, a hand-lowered counter, an in-flight
+ * consume) is left untouched, so this can never take a slot away from a
+ * user. Everything is re-read fresh here rather than trusted from the
+ * scheduling sync: that snapshot may predate a release that has since
+ * landed, and acting on it would over-release.
+ */
+export const reconcileCourseUsage = internalAction({
+  args: { userId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
     const secretKey = getSecretKey();
-
-    const trackRes = await fetch(`${AUTUMN_API}/track`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${secretKey}`,
-        'Content-Type': 'application/json',
-        'x-api-version': AUTUMN_API_VERSION,
-      },
-      body: JSON.stringify({
-        customer_id: args.userId,
-        feature_id: args.featureId,
-        value: args.value,
-      }),
-    });
-
-    if (!trackRes.ok) {
-      const body = await trackRes.text();
-      console.error(`Autumn track failed (${trackRes.status}): ${body}`);
-      return null;
-    }
-
     const customerData = await fetchCustomerData(secretKey, args.userId);
     if (!customerData) return null;
 
-    await pushCustomerState(ctx, secretKey, args.userId, customerData);
+    // Same deferral as the auto-archive: a delinquent account may be
+    // carrying revoked entitlements, not a state worth reconciling against.
+    if (derivePlan(customerData).anyPastDue) return null;
+
+    const entry = customerData.balances?.[FEATURE_IDS.COURSES];
+    if (!entry || entry.unlimited) return null;
+
+    const activeCount = await ctx.runQuery(
+      internal.usage.helpers.countActiveCourses,
+      { userId: args.userId },
+    );
+    const ghosts = entry.usage - activeCount;
+    if (ghosts <= 0) return null;
+
+    await trackAndSync(
+      ctx,
+      secretKey,
+      args.userId,
+      FEATURE_IDS.COURSES,
+      -ghosts,
+    );
+    await track(ctx, args.userId, EVENTS.COURSE_SLOTS_RECONCILED, {
+      released: ghosts,
+      active: activeCount,
+      autumn_usage_before: entry.usage,
+    });
     return null;
   },
 });

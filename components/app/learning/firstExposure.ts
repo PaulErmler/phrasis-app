@@ -2,9 +2,7 @@ import type { CourseSettings } from './types';
 
 /**
  * Transcribe = writing mode with the input driven by target audio rather than
- * the base sentence. Shared with `shouldShowTranslationAssist`'s gate and the
- * render path in LearningMode, which need the same answer at different points
- * in the component body.
+ * the base sentence. Used by the render path in LearningMode.
  */
 export function isTranscribeMode(
   settings:
@@ -19,8 +17,9 @@ export function isTranscribeMode(
 }
 
 /**
- * "Show translation on new sentences" (writing mode): should the card render
- * the target translation above the input for copy-typing ("Abschreiben")?
+ * "Show translation on new sentences" (writing mode, both styles): should the
+ * card render the target sentence above the input for copy-typing
+ * ("Abschreiben")?
  *
  * True while the card's exposure count is below the configured window. Window
  * semantics mirror `targetBeforeOnlyNewReps`: 0 = always show (∞), 1-10 = first
@@ -36,9 +35,10 @@ export function isTranscribeMode(
  * exposures without either one double-counting the other, mirroring how the
  * listening face folds in `radioPlayCount`.
  *
- * Never in transcribe mode: there the target audio IS the prompt, so printing
- * the target sentence above the input would hand over the answer (the
- * transcribe hideBaseLanguages default exists for the same reason).
+ * Applies in transcribe too (since 2026-09-02): the shown sentence is what
+ * the audio says, so the first passes are copy-work rather than a test,
+ * exactly as in translate. The auto-rating gate in LearningMode treats both
+ * the same way, a copied answer never preselects a rating.
  */
 export function shouldShowTranslationAssist(
   settings:
@@ -50,10 +50,8 @@ export function shouldShowTranslationAssist(
     | undefined,
   preReviewCount: number,
   fsrsReps: number,
-  isTranscribe = false,
   freeStudyPlayCount = 0,
 ): boolean {
-  if (isTranscribe) return false;
   if (!(settings?.showTranslationOnNew ?? true)) return false;
   const reps = settings?.showTranslationOnlyNewReps ?? 1;
   const limit = reps <= 0 ? Infinity : reps;

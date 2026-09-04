@@ -12,7 +12,7 @@ import { FEATURE_IDS } from '@/convex/features/featureIds';
 const MAX_RECORDING_MS = 30_000;
 
 interface WritingVoiceButtonProps {
-  /** Row's target language; pins Azure to one locale instead of language-ID. */
+  /** Row's target language; pins the STT model to it instead of auto-detect. */
   language: string;
   /** Receives the transcript; the caller fills the input and submits. */
   onTranscript: (text: string) => void;

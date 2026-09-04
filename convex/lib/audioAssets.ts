@@ -202,17 +202,48 @@ export async function upsertAudioPointer(
   if (existing.assetId === assetId) return;
   const previousAssetId = existing.assetId;
   await ctx.db.patch(existing._id, { assetId });
-  const stillPointed = await ctx.db
+  await releaseAudioAssetIfUnreferenced(ctx, previousAssetId);
+}
+
+/**
+ * After a reference to `assetId` was re-pointed elsewhere (a pointer row, or
+ * a superseded translation revision's `audioAssetId`): delete the asset and
+ * schedule its blob's delete when nothing references it any more. A shared
+ * asset survives untouched.
+ */
+export async function releaseAudioAssetIfUnreferenced(
+  ctx: MutationCtx,
+  assetId: Id<'audioAssets'>,
+): Promise<void> {
+  if (await isAudioAssetReferenced(ctx, assetId)) return;
+  const asset = await ctx.db.get(assetId);
+  if (!asset) return;
+  await ctx.db.delete(asset._id);
+  await scheduleBlobSwapDelete(ctx, asset.storageId);
+}
+
+/**
+ * Whether anything still serves this asset: a live `audioRecordings` pointer,
+ * or a superseded `translations` row whose pinned cards play the old
+ * wording (`translations.audioAssetId`). Both garbage-collection sites
+ * (`deleteAudioRow` and the re-point above) ask this, so an archived
+ * revision can never lose its audio to a different text dropping its
+ * pointer to the same content-addressed asset.
+ */
+export async function isAudioAssetReferenced(
+  ctx: QueryCtx | MutationCtx,
+  assetId: Id<'audioAssets'>,
+): Promise<boolean> {
+  const pointer = await ctx.db
     .query('audioRecordings')
-    .withIndex('by_assetId', (q) => q.eq('assetId', previousAssetId))
+    .withIndex('by_assetId', (q) => q.eq('assetId', assetId))
     .first();
-  if (!stillPointed) {
-    const previousAsset = await ctx.db.get(previousAssetId);
-    if (previousAsset) {
-      await ctx.db.delete(previousAsset._id);
-      await scheduleBlobSwapDelete(ctx, previousAsset.storageId);
-    }
-  }
+  if (pointer) return true;
+  const superseded = await ctx.db
+    .query('translations')
+    .withIndex('by_audioAssetId', (q) => q.eq('audioAssetId', assetId))
+    .first();
+  return superseded !== null;
 }
 
 /**

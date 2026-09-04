@@ -6,6 +6,8 @@
  * fallbacks when the courseSettings record has no stored value yet.
  */
 
+import { cycleNext } from '../cycle';
+
 // ---------------------------------------------------------------------------
 // Repetitions. How many times each language's audio is played per card
 // ---------------------------------------------------------------------------
@@ -106,9 +108,7 @@ export const CARD_OVERRIDE_SPEED_MAX = 1.0;
 export function nextCardOverrideValue(
   current: number | null,
 ): CardOverrideValue {
-  const idx = CARD_OVERRIDE_CYCLE.findIndex((v) => v === current);
-  const nextIdx = (idx + 1) % CARD_OVERRIDE_CYCLE.length;
-  return CARD_OVERRIDE_CYCLE[nextIdx];
+  return cycleNext(CARD_OVERRIDE_CYCLE, current);
 }
 
 /**

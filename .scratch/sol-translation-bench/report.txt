@@ -1,0 +1,22 @@
+
+=== Results (15 sentences x de,ru,ja,fi) ===
+
+condition        | mean score | vs baseline (W/T/L) | fails | real cost | cost/sentence | assumed $4/$20 cost/sentence
+------------------------------------------------------------------------------------------------------------------------
+luna-bo3         |       8.48 |          (baseline) |     0 |   $0.0354 |       $0.0006 |      $0.0006
+sol-minimal      |       8.92 |            29/18/13 |     0 |   $0.0909 |       $0.0015 |      $0.0030
+sol-low          |       8.92 |            30/17/13 |     0 |   $0.0907 |       $0.0015 |      $0.0030
+sol-medium       |       8.78 |            28/17/15 |     0 |   $0.1409 |       $0.0023 |      $0.0047
+sol-minimal-bo3  |       8.95 |            30/16/14 |     0 |   $0.3459 |       $0.0058 |      $0.0115
+sol-low-bo3      |       8.97 |            32/14/14 |     0 |   $0.3404 |       $0.0057 |      $0.0113
+
+Per-language mean scores:
+  luna-bo3         de=8.13  ru=8.20  ja=8.93  fi=8.67
+  sol-minimal      de=9.00  ru=9.00  ja=8.73  fi=8.93
+  sol-low          de=9.20  ru=8.67  ja=9.00  fi=8.80
+  sol-medium       de=8.73  ru=8.47  ja=8.80  fi=9.13
+  sol-minimal-bo3  de=8.80  ru=9.07  ja=8.93  fi=9.00
+  sol-low-bo3      de=8.87  ru=8.80  ja=9.33  fi=8.87
+
+Judge cost: $0.4850   Total spent this+cached runs: $0.5394
+Token totals per condition (in/out incl. reasoning + bo3 judges): luna-bo3=94771/10998  sol-minimal=22494/4591  sol-low=22494/4576  sol-medium=22494/9594  sol-minimal-bo3=93647/15860  sol-low-bo3=93785/15281

@@ -769,6 +769,7 @@ async function storeLlmTranslationResult(
       translationSource,
       regionVariant: pin.regionVariant,
       replaceExisting: args.replaceExisting,
+      translationReason: args.translationReason,
       speakerGender: asVoiceGender(args.audioSpeakerGender),
       // Single-writer gate: skip the write if the claim this job was
       // enqueued under has been reclaimed by a newer job mid-flight.
@@ -978,6 +979,7 @@ export const onLlmTranslationComplete = internalMutation({
         audioSpeakerGender: context.audioSpeakerGender,
         requestedByUserId: context.requestedByUserId,
         replaceExisting: context.replaceExisting,
+        translationReason: context.translationReason,
         preferredRegionVariant: context.preferredRegionVariant,
         skipTts: context.skipTts,
         priority: context.priority,

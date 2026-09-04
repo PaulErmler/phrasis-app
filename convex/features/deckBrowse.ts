@@ -1,3 +1,4 @@
+import { cardPinAt, liveTranslation } from '../db/translationReads';
 import { QueryCtx } from '../_generated/server';
 import { Id } from '../_generated/dataModel';
 import { getAuthUserId, getUserSettings } from '../db/users';
@@ -9,6 +10,7 @@ import {
   getCollectionProgress as getCollectionProgressHelper,
   getNextTextsFromRank,
   getPremadeLevelCollections,
+  hasPendingCustomCardsToAdd,
 } from '../db/collections';
 import {
   ogteLevelToCollectionCode,
@@ -85,6 +87,7 @@ export async function getDeckCardsHandler(
         sourceIpa: text.ipaText ?? undefined,
         sourceFurigana: text.furiganaText ?? undefined,
         userCreated: text.userCreated,
+        pinAt: cardPinAt(card),
       };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -193,6 +196,38 @@ export async function getCollectionProgressQueryHandler(ctx: QueryCtx): Promise<
   return result;
 }
 
+/**
+ * Handler body of `hasPendingCustomCards`.
+ *
+ * The learn view's answer to "can auto-add still produce a card without
+ * credits?". Custom/chat texts cost no `SENTENCES` quota, so with this true
+ * the view keeps auto-adding (and keeps showing the seamless loading state)
+ * on an empty balance instead of dropping to the no-cards-due screen.
+ *
+ * Cheap by construction: one doc + one progress row per selected custom
+ * collection, and users have a handful at most.
+ */
+export async function hasPendingCustomCardsHandler(
+  ctx: QueryCtx,
+): Promise<boolean> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) return false;
+  const active = await getActiveCourseForUser(ctx, userId);
+  if (!active) return false;
+  const settings = await getCourseSettings(ctx, active.course._id);
+  // The 'course' filter makes the add path set `skipCustomSources`, so pending
+  // custom texts cannot produce a card no matter how many are waiting. Saying
+  // yes here would keep the view on its seamless-loading state for a run that
+  // adds nothing (see `addCardsHandler`'s `skipCustomSources`).
+  if ((settings?.studyContentFilter ?? 'both') === 'course') return false;
+  return hasPendingCustomCardsToAdd(
+    ctx,
+    userId,
+    active.course._id,
+    settings?.activeCustomCollectionIds,
+  );
+}
+
 /** Handler body of `getActiveDifficultyLevel`. */
 export async function getActiveDifficultyLevelHandler(
   ctx: QueryCtx,
@@ -277,24 +312,22 @@ export async function getUpcomingSentencesForLevelHandler(
     texts.map(async (text, position) => {
       let sourceText = text.text;
       if (sourceLanguage && sourceLanguage !== text.language) {
-        const sourceTranslation = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', text._id).eq('targetLanguage', sourceLanguage),
-          )
-          .first();
+        const sourceTranslation = await liveTranslation(
+          ctx,
+          text._id,
+          sourceLanguage,
+        );
         if (sourceTranslation) sourceText = sourceTranslation.translatedText;
       }
 
       let targetText: string | undefined;
       let targetRomanization: string | undefined;
       if (targetLanguage && targetLanguage !== text.language) {
-        const targetTranslation = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', text._id).eq('targetLanguage', targetLanguage),
-          )
-          .first();
+        const targetTranslation = await liveTranslation(
+          ctx,
+          text._id,
+          targetLanguage,
+        );
         if (targetTranslation) {
           targetText = targetTranslation.translatedText;
           // Empty string is the "tried and failed" romanization sentinel.

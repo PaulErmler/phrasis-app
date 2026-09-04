@@ -1,6 +1,6 @@
 ---
 title: 'Datenschutzerklärung'
-lastUpdated: '2026-08-09'
+lastUpdated: '2026-09-01'
 ---
 
 # Datenschutzerklärung
@@ -69,7 +69,7 @@ Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Erfüllung des Nutzungsvertrags). D
 Wir messen, wie unsere Dienste genutzt werden, um sie zu verbessern. Details zum Anbieter finden Sie in Abschnitt 5C.
 
 - **Ohne Einwilligung** erfolgt die Messung cookielos: Es werden weder Daten auf Ihrem Endgerät gespeichert noch von diesem ausgelesen, es finden keine Sitzungsaufzeichnungen statt, und Besuche werden über einen serverseitigen, täglich neu erzeugten Hashwert gezählt. Bei angemeldeten Nutzerinnen und Nutzern werden zusätzlich einzelne serverseitig erzeugte Nutzungsereignisse (z. B. dass eine Nachricht gesendet oder ein Kurs erstellt wurde) mit Ihrer pseudonymen Konto-ID verknüpft. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse: Verbesserung, Absicherung und Kostensteuerung unserer Dienste). Sie können dieser Verarbeitung jederzeit widersprechen (Art. 21 DSGVO, siehe Abschnitt 10).
-- **Erst nach Ihrer ausdrücklichen Einwilligung** über unser Cookie-Banner setzen wir zusätzlich Analyse-Cookies ein, zeichnen Sitzungen auf (sämtliche Texteingaben werden bereits im Browser maskiert) und übermitteln die Inhalte von KI-Chatnachrichten zur Qualitätsanalyse (siehe Abschnitt 6). Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO i. V. m. § 25 Abs. 1 TTDSG.
+- **Erst nach Ihrer ausdrücklichen Einwilligung** über unser Cookie-Banner setzen wir zusätzlich Analyse-Cookies ein, zeichnen Sitzungen auf (sämtliche Texteingaben werden bereits im Browser maskiert), übermitteln die Inhalte von KI-Chatnachrichten zur Qualitätsanalyse (siehe Abschnitt 6) und laden ein Werbe-Pixel, das misst, ob ein Besuch über eine Anzeige in ChatGPT zu einer Registrierung oder einem Abonnement geführt hat (siehe Abschnitt 5C). Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO i. V. m. § 25 Abs. 1 TTDSG.
 
 ## 5. Drittanbieter und Auftragsverarbeiter
 
@@ -135,7 +135,7 @@ Datenschutzerklärung: [https://resend.com/legal/privacy-policy](https://resend.
 
 ### C) Analyse und optionale Dienste
 
-Der Newsletter wird ausschließlich nach Ihrer ausdrücklichen Einwilligung genutzt. Für die Analyse sind die Rechtsgrundlagen geteilt, wie beim nachfolgenden Dienst beschrieben: Die cookielose Nutzungsmessung stützt sich auf berechtigtes Interesse; alles, was Daten auf Ihrem Endgerät speichert, Ihren Bildschirm aufzeichnet oder KI-Chatinhalte übermittelt, erfordert Ihre Einwilligung über das Cookie-Banner und kann jederzeit widerrufen werden.
+Der Newsletter wird ausschließlich nach Ihrer ausdrücklichen Einwilligung genutzt. Für die Analyse sind die Rechtsgrundlagen geteilt, wie beim nachfolgenden Dienst beschrieben: Die cookielose Nutzungsmessung stützt sich auf berechtigtes Interesse; alles, was Daten auf Ihrem Endgerät speichert, Ihren Bildschirm aufzeichnet, KI-Chatinhalte übermittelt oder Werbe-Conversions misst, erfordert Ihre Einwilligung über das Cookie-Banner und kann jederzeit widerrufen werden.
 
 **Resend – Newsletter**
 Wenn Sie unseren Newsletter abonnieren, nutzen wir Resend auch für den Newsletter-Versand. Die Anmeldung erfolgt im Double-Opt-In-Verfahren: Sie erhalten nach der Anmeldung eine Bestätigungs-E-Mail und müssen Ihre Adresse aktiv bestätigen. Die Abmeldung ist jederzeit über den Abmeldelink in jeder E-Mail möglich.
@@ -158,10 +158,20 @@ Speicherdauer: Analyse-Ereignisse und Fehlerberichte bis zu 12 Monate; Sitzungsa
 Drittlandtransfer: Die Verarbeitung erfolgt auf EU-Servern in Frankfurt; bei Verarbeitung außerhalb der EU Absicherung durch SCCs.
 Datenschutzerklärung: [https://posthog.com/privacy](https://posthog.com/privacy)
 
+**OpenAI – Messung von Werbe-Conversions** (OpenAI Ireland Ltd. / OpenAI Inc., USA)
+Zweck: Messung, ob ein Besuch, der über eine Anzeige in ChatGPT begonnen hat, zu einer Registrierung oder einem bezahlten Abonnement geführt hat, um die Wirksamkeit unserer Werbekampagnen zu bewerten. Dies ist unabhängig von den in Abschnitt 6 beschriebenen KI-Funktionen.
+Funktionsweise: Erst nach Ihrer Einwilligung wird ein Mess-Skript (das „OpenAI-Pixel") von `bzrcdn.openai.com` geladen, das an `bzr.openai.com` berichtet. Wenn Sie über eine ChatGPT-Anzeige zu uns gelangt sind, enthält der Anzeigenlink eine Klick-Kennung (`oppref`), die das Skript in einem Cookie speichert, damit eine spätere Registrierung oder ein Abonnement dieser Anzeige zugeordnet werden kann. Ohne Einwilligung wird das Skript nicht geladen und es gelangen keine Daten an OpenAI.
+Daten: Klick-Kennung, Browser-Kennung, das Conversion-Ereignis (Registrierung abgeschlossen; Abonnement oder Testphase gestartet, einschließlich Tarifname), eine aus Ihrer Konto-ID abgeleitete pseudonyme Ereignis-Kennung (ausschließlich zur Vermeidung von Doppelzählungen), Seiten-URL, IP-Adresse und Browserinformationen. Name, E-Mail-Adresse oder Inhalte Ihrer Lernmaterialien werden nicht übermittelt.
+Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO i. V. m. § 25 Abs. 1 TTDSG (Einwilligung über das Cookie-Banner, jederzeit widerrufbar über den Link „Cookie-Einstellungen"). Mit dem Widerruf werden die Cookies des Pixels auf Ihrem Endgerät gelöscht.
+Speicherdauer: Abgesehen von den in Abschnitt 7 genannten Einträgen auf Ihrem Endgerät speichern wir diese Daten nicht selbst. Die Speicherdauer bei OpenAI richtet sich nach dessen Datenschutzerklärung.
+Drittlandtransfer: OpenAI ist nach dem EU-U.S. Data Privacy Framework zertifiziert (Art. 45 DSGVO).
+Datenschutzerklärung: [https://openai.com/policies/privacy-policy](https://openai.com/policies/privacy-policy)
+
 | Anbieter    | Zweck              | Daten                         | Standort      |
 |-------------|--------------------|-------------------------------|---------------|
 | Resend      | Newsletter         | E-Mail-Adresse                | USA (SCCs)    |
 | PostHog     | Produktanalyse, Session Replay, Fehlerberichte | IP, Klicks, Nutzungsverhalten, maskierte Bildschirmaufzeichnungen, Fehlerberichte, KI-Chatinhalte | EU (Frankfurt) |
+| OpenAI      | Messung von Werbe-Conversions (ChatGPT-Anzeigen) | Klick-Kennung, Conversion-Ereignis, IP, Browserinformationen | USA (DPF) |
 
 ## 6. KI-Funktionen und Drittanbieter-KI-Dienste
 
@@ -210,7 +220,9 @@ Wir verwenden Cookies und ähnliche Technologien gemäß § 25 TTDSG und Art. 6 
 
 **Technisch notwendige Cookies:** Diese sind für den Betrieb der Website erforderlich und werden ohne Einwilligung gesetzt. Rechtsgrundlage: § 25 Abs. 2 Nr. 2 TTDSG i. V. m. Art. 6 Abs. 1 lit. f DSGVO. Dies sind: Ihre Anmeldesitzung, Ihre gewählte Oberflächensprache und Ihre Seitenleisten-Einstellung.
 
-**Analyse-Cookies:** Diese werden nur nach Ihrer ausdrücklichen Einwilligung über unser Cookie-Banner gesetzt und ausschließlich für PostHog verwendet (siehe Abschnitt 5C). Rechtsgrundlage: § 25 Abs. 1 TTDSG i. V. m. Art. 6 Abs. 1 lit. a DSGVO. Marketing- oder Werbe-Cookies setzen wir nicht ein.
+**Analyse-Cookies:** Diese werden nur nach Ihrer ausdrücklichen Einwilligung über unser Cookie-Banner gesetzt und für PostHog verwendet (siehe Abschnitt 5C). Rechtsgrundlage: § 25 Abs. 1 TTDSG i. V. m. Art. 6 Abs. 1 lit. a DSGVO.
+
+**Werbe-Conversion-Cookies:** Ebenfalls nur nach Ihrer ausdrücklichen Einwilligung speichert das OpenAI-Werbe-Pixel (siehe Abschnitt 5C) die Cookies `__oppref` (Klick-Kennung einer ChatGPT-Anzeige), `__obref` (Browser-Kennung) und `__oaiq_consent` sowie den Local-Storage-Eintrag `oaiq_consent` (Ihr Einwilligungsstatus für das Pixel). Zusätzlich legen wir Local-Storage-Einträge mit dem Präfix `flexling_oaiq_` an, die festhalten, welche Conversions aus diesem Browser bereits gemeldet wurden, damit keine doppelt gezählt wird. Rechtsgrundlage: § 25 Abs. 1 TTDSG i. V. m. Art. 6 Abs. 1 lit. a DSGVO. All diese Einträge werden gelöscht, wenn Sie Ihre Einwilligung widerrufen. Andere Marketing- oder Werbe-Cookies setzen wir nicht ein.
 
 Bis zu Ihrer Entscheidung werden über die oben genannten technisch notwendigen Cookies hinaus keine Daten auf Ihrem Endgerät gespeichert oder von diesem ausgelesen.
 

@@ -1,5 +1,5 @@
 /**
- * TTS provider interface. One class per provider (Google, Azure, Gemini);
+ * TTS provider interface. One object per provider (Google, Gemini, MiniMax);
  * all synthesis flows through `getTtsProvider(id).speak(...)` so callers
  * never touch provider-specific HTTP calls.
  */
@@ -9,7 +9,7 @@ export interface SpeakInput {
   text: string;
   /** Internal language code (e.g. `'en'`, `'es_latam'`, `'zh'`). */
   language: string;
-  /** Provider-specific voice id, e.g. Google voice name or Azure short name. */
+  /** Provider-specific voice id, e.g. Google voice name or MiniMax voice id. */
   voiceApiCode: string;
   /** Playback speed; 1.0 = normal. */
   speed: number;

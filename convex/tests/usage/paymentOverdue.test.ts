@@ -9,20 +9,32 @@ import { ARCHIVE_COOLDOWN_MS } from '../../../lib/constants/courses';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
-// consumeQuota/releaseQuota schedule the REAL trackUsage action, and
-// convex-test executes scheduled jobs on a timer, with fetch unstubbed that
-// job would hit the live Autumn API whenever AUTUMN_SECRET_KEY happens to be
-// in the runner's env. Stubbed at module scope (not per-test) so a job that
-// fires after a test's cleanup still hits the stub, never the network.
-// The mock reference is kept so individual tests can reroute specific
-// endpoints (see the chargeExtraChatCredits describe).
+// consumeQuota/releaseQuota (and now the auto-archive in syncAllFeatures)
+// schedule the REAL trackUsage action, and convex-test executes scheduled
+// jobs on a timer, with fetch unstubbed that job would hit the live Autumn
+// API whenever AUTUMN_SECRET_KEY happens to be in the runner's env. Stubbed
+// at module scope (not per-test) so a job that fires after a test's cleanup
+// still hits the stub, never the network.
+//
+// The GET /customers leg is failed deliberately: a successful `{}` reply
+// would make the job's post-track sync overwrite the features record with
+// an empty payload, racing every balance assertion in this file. Failing it
+// makes each job a deterministic no-op after the (harmless) POST /track.
 const okResponse = () => ({
   ok: true,
   status: 200,
   text: async () => '{}',
   json: async () => ({}),
 });
-const fetchMock = vi.fn(async (..._args: unknown[]) => okResponse());
+const failedResponse = () => ({
+  ok: false,
+  status: 500,
+  text: async () => 'stubbed failure',
+  json: async () => ({}),
+});
+const fetchMock = vi.fn(async (...args: unknown[]) =>
+  String(args[0]).includes('/customers') ? failedResponse() : okResponse(),
+);
 vi.stubGlobal('fetch', fetchMock);
 
 beforeEach(() => {
@@ -51,11 +63,12 @@ function sync(
     anyPastDue?: boolean;
     features?: typeof FEATURES;
     pastDueInvoiceUrl?: string;
+    userId?: string;
   } = {},
 ) {
   const planId = planStatus === undefined ? undefined : 'pro';
   return t.mutation(internal.usage.helpers.syncAllFeatures, {
-    userId: 'user_A',
+    userId: opts.userId ?? 'user_A',
     features: opts.features ?? FEATURES,
     anyPastDue: opts.anyPastDue ?? planStatus === 'past_due',
     productsMissing: opts.productsMissing ?? false,
@@ -66,11 +79,11 @@ function sync(
   });
 }
 
-async function getQuotaDoc(t: TestConvex<typeof schema>) {
+async function getQuotaDoc(t: TestConvex<typeof schema>, userId = 'user_A') {
   return t.run(async (ctx) =>
     ctx.db
       .query('usageQuotas')
-      .withIndex('by_userId', (q) => q.eq('userId', 'user_A'))
+      .withIndex('by_userId', (q) => q.eq('userId', userId))
       .first(),
   );
 }
@@ -90,14 +103,15 @@ const withCourses = (state: {
 async function seedCourses(
   t: TestConvex<typeof schema>,
   count: number,
-  opts: { activeIndex?: number } = {},
+  opts: { activeIndex?: number; userId?: string } = {},
 ): Promise<Id<'courses'>[]> {
+  const userId = opts.userId ?? 'user_A';
   return t.run(async (ctx) => {
     const ids: Id<'courses'>[] = [];
     for (let i = 0; i < count; i++) {
       ids.push(
         await ctx.db.insert('courses', {
-          userId: 'user_A',
+          userId,
           baseLanguages: ['en'],
           targetLanguages: ['de'],
           isArchived: false,
@@ -106,7 +120,7 @@ async function seedCourses(
     }
     if (opts.activeIndex !== undefined) {
       await ctx.db.insert('userSettings', {
-        userId: 'user_A',
+        userId,
         hasCompletedOnboarding: true,
         activeCourseId: ids[opts.activeIndex],
       });
@@ -442,6 +456,129 @@ describe('usage: course auto-archival on healthy downgrade', () => {
   });
 });
 
+describe('usage: course auto-archival releases the Autumn quota', () => {
+  // The bug this pins: `courses` is a continuous-use feature in Autumn (no
+  // reset interval), so an archive that never tracks a release inflates the
+  // counter forever. A lapsed Pro user came back, Autumn still counted the
+  // ghosts, and every unarchive hit the paywall on a plan with free slots.
+  //
+  // Own user id: the module-scope fetch mock accumulates calls from jobs
+  // that earlier tests scheduled for user_A on real timers, and those can
+  // fire at any point during these tests.
+  const USER = 'user_release';
+  const withUser = { userId: USER };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    fetchMock.mockClear();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const bodiesTo = (path: string) =>
+    fetchMock.mock.calls
+      .filter(([url, init]) => String(url).includes(path) && init)
+      .map(([, init]) => JSON.parse((init as { body: string }).body))
+      .filter((b) => b.customer_id === USER);
+
+  const customerGets = () =>
+    fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes(`/customers/${USER}`),
+    );
+
+  it('tracks one release per auto-archived course, and none for the survivor', async () => {
+    const t = convexTest(schema, modules);
+    await seedCourses(t, 3, { activeIndex: 1, ...withUser });
+
+    // What Autumn actually reports at downgrade time: 3 held, 1 granted.
+    await sync(t, 'active', {
+      ...withUser,
+      features: withCourses({ balance: -2, included: 1, used: 3 }),
+    });
+
+    // The local mirror is corrected in the same transaction, so the user
+    // doesn't sit on a negative balance until the round-trip lands.
+    const doc = await getQuotaDoc(t, USER);
+    expect(doc?.features.courses).toMatchObject({ balance: 0, used: 1 });
+    // The snapshot already matched the active count; no drift to repair.
+    expect(doc?.lastCourseReconcileAt).toBeUndefined();
+
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(bodiesTo('/track')).toEqual([
+      { customer_id: USER, feature_id: 'courses', value: -2 },
+    ]);
+  });
+
+  it('schedules a reconcile only when the counter exceeds the active count', async () => {
+    // Ghosts left behind by the old archive path: 1 course held, Autumn
+    // counts 3. Only the ghosts are worth a run; a counter at or below the
+    // active count is never touched, so a manual grant stays a grant.
+    const t = convexTest(schema, modules);
+    await seedCourses(t, 1, withUser);
+
+    await sync(t, 'active', {
+      ...withUser,
+      features: withCourses({ balance: 9, included: 10, used: 1 }),
+    });
+    expect((await getQuotaDoc(t, USER))?.lastCourseReconcileAt).toBeUndefined();
+
+    await sync(t, 'active', {
+      ...withUser,
+      features: withCourses({ balance: 12, included: 10, used: 0 }),
+    });
+    expect((await getQuotaDoc(t, USER))?.lastCourseReconcileAt).toBeUndefined();
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(customerGets()).toHaveLength(0);
+
+    const before = Date.now();
+    await sync(t, 'active', {
+      ...withUser,
+      features: withCourses({ balance: 7, included: 10, used: 3 }),
+    });
+    expect(
+      (await getQuotaDoc(t, USER))?.lastCourseReconcileAt,
+    ).toBeGreaterThanOrEqual(before);
+    // The action's fresh read is the observable proof it was scheduled
+    // (the stubbed GET fails, so it stops there).
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(customerGets()).toHaveLength(1);
+    expect(bodiesTo('/track')).toHaveLength(0);
+  });
+
+  it('runs at most once a day, so a stale snapshot cannot re-fire it', async () => {
+    const t = convexTest(schema, modules);
+    await seedCourses(t, 1, withUser);
+    const drifted = withCourses({ balance: 7, included: 10, used: 3 });
+
+    await sync(t, 'active', { ...withUser, features: drifted });
+    const first = (await getQuotaDoc(t, USER))?.lastCourseReconcileAt;
+    expect(first).toBeDefined();
+
+    vi.advanceTimersByTime(60 * 60 * 1000);
+    await sync(t, 'active', { ...withUser, features: drifted });
+    expect((await getQuotaDoc(t, USER))?.lastCourseReconcileAt).toBe(first);
+
+    vi.advanceTimersByTime(24 * 60 * 60 * 1000);
+    await sync(t, 'active', { ...withUser, features: drifted });
+    expect((await getQuotaDoc(t, USER))?.lastCourseReconcileAt).toBeGreaterThan(
+      first!,
+    );
+  });
+
+  it('does not reconcile while past due', async () => {
+    // Same deferral as the auto-archive: revoked entitlements during
+    // dunning are not a state worth reconciling against.
+    const t = convexTest(schema, modules);
+    await seedCourses(t, 1, withUser);
+    await sync(t, 'past_due', {
+      ...withUser,
+      features: withCourses({ balance: 7, included: 10, used: 3 }),
+    });
+    expect((await getQuotaDoc(t, USER))?.lastCourseReconcileAt).toBeUndefined();
+  });
+});
+
 describe('usage: pastDueInvoiceUrl lifecycle in syncAllFeatures', () => {
   it('keeps the last known URL across non-expanded syncs, clears on recovery', async () => {
     // The hosted invoice page is the only CTA that actually settles the
@@ -767,27 +904,6 @@ describe('usage: e2e test hooks gating', () => {
 });
 
 describe('usage: chargeExtraChatCredits past-due exemption', () => {
-  beforeEach(() => {
-    // The charge schedules the REAL trackUsage, whose post-track sync would
-    // overwrite the features record with the stub's empty payload. Racing
-    // the balance assertions below. Failing the GET /customers leg makes
-    // that job a deterministic no-op after the (harmless) POST /track.
-    fetchMock.mockImplementation(async (...args: unknown[]) =>
-      String(args[0]).includes('/customers')
-        ? {
-            ok: false,
-            status: 500,
-            text: async () => 'stubbed failure',
-            json: async () => ({}),
-          }
-        : okResponse(),
-    );
-  });
-
-  afterEach(() => {
-    fetchMock.mockImplementation(async () => okResponse());
-  });
-
   it('still charges the post-generation remainder while blocked', async () => {
     // By the time this runs the LLM cost is already incurred. Gating it
     // behind the past-due block would hand delinquent users free chat

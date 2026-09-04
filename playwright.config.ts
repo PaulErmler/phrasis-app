@@ -102,6 +102,7 @@ export default defineConfig({
         /(^|\/)free-study\.spec\.ts$/,
         /(^|\/)course-settings-sweep\.spec\.ts$/,
         /(^|\/)add-cards-live\.spec\.ts$/,
+        /(^|\/)auto-add-sources\.spec\.ts$/,
         /(^|\/)add-cards-import-live\.spec\.ts$/,
         /(^|\/)content-filter-live\.spec\.ts$/,
         /(^|\/)curriculum-edit-flag\.spec\.ts$/,

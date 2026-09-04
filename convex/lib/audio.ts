@@ -1,6 +1,6 @@
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
-import { resolveAudioPayload } from './audioAssets';
+import { isAudioAssetReferenced, resolveAudioPayload } from './audioAssets';
 
 /**
  * Delete an `audioRecordings` pointer row; when it was the LAST pointer at
@@ -34,11 +34,8 @@ export async function deleteAudioRow(
   await ctx.db.delete(row._id);
   if (opts?.keepAsset) return;
 
-  const stillPointed = await ctx.db
-    .query('audioRecordings')
-    .withIndex('by_assetId', (q) => q.eq('assetId', row.assetId))
-    .first();
-  if (stillPointed) return;
+  // Pointer rows AND archived translation revisions count as references.
+  if (await isAudioAssetReferenced(ctx, row.assetId)) return;
   const asset = await ctx.db.get(row.assetId);
   if (!asset) return;
   await ctx.db.delete(asset._id);

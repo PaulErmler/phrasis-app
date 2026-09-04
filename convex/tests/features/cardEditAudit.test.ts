@@ -9,6 +9,7 @@ import { isRetranslationReason } from '../../types';
 import { llmPool } from '@/convex/lib/workpools';
 import { getVoiceForLanguage } from '../../../lib/languages';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+import { liveTranslation } from '../../db/translationReads';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -536,12 +537,7 @@ describe('features/cardEditAudit', () => {
       });
 
       const translation = await t.run(async (ctx) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'en'),
-          )
-          .first(),
+        liveTranslation(ctx, textId, 'en'),
       );
       expect(translation?.translatedText).toBe('Hey there');
     });

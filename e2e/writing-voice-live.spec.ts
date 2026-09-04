@@ -12,7 +12,7 @@ import {
  * record → stop → transcribe round trip against the real backend, with
  * Chromium's fake media stream standing in for the microphone.
  *
- * The fake device feeds a synthetic tone, so the Azure transcript content
+ * The fake device feeds a synthetic tone, so the STT transcript content
  * is not assertable — what IS asserted is the state machine around it: the
  * button records on first click (destructive ring), leaves the recording
  * state on the second, and settles back to idle instead of wedging in the
@@ -112,33 +112,46 @@ test.describe('writing voice input (live)', { tag: '@live' }, () => {
     await page.waitForTimeout(1_500);
     await mic.click();
 
-    // The transcribe round trip must complete rather than wedge: the
-    // button settles back to the enabled idle state. While waiting, watch
-    // for the empty-transcript toast — sonner dismisses it after a few
-    // seconds, so it has to be caught during the settle poll, not after.
+    // The transcribe round trip must complete rather than wedge. Wait on
+    // the terminal OUTCOME, not on the button label: `useVoiceRecording`
+    // clears `isRecording` synchronously on the stop click but only sets
+    // `isTranscribing` inside MediaRecorder's async `onstop`, so the button
+    // re-renders with its IDLE label in between. Polling the label alone
+    // matches in that gap — before transcription has even started — and
+    // then reads a row that is still empty simply because nothing has come
+    // back yet. The empty-transcript toast is equally un-samplable after
+    // the fact: it lands a frame later and sonner dismisses it a few
+    // seconds on, so latch it on every poll pass.
     const input = page.getByTestId('learn-translation-input').first();
     const emptyToast = page.getByText(/no speech detected/i).first();
     let sawEmptyToast = false;
+    let inputStillOpen = true;
+    let inputValue = '';
     await expect
       .poll(
         async () => {
           sawEmptyToast ||= await emptyToast.isVisible().catch(() => false);
-          return mic.getAttribute('aria-label');
+          inputStillOpen = await input.isVisible().catch(() => false);
+          inputValue = inputStillOpen
+            ? await input.inputValue().catch(() => '')
+            : '';
+          // Terminal outcome is transcript-dependent, but never a silent
+          // blank submit: an empty transcript toasts and leaves the row
+          // open; a non-empty one fills the input and submits it (input
+          // gone or filled).
+          return sawEmptyToast || !inputStillOpen || inputValue.trim() !== '';
         },
         { timeout: 90_000 },
       )
+      .toBe(true);
+
+    // Only now is an idle label meaningful: the round trip is over, so the
+    // button must have recovered instead of wedging in `transcribing`.
+    await expect
+      .poll(() => mic.getAttribute('aria-label'), { timeout: 15_000 })
       .toBe(idleLabel);
     await expect(mic).toBeEnabled();
 
-    // Terminal outcome is transcript-dependent, but never a silent blank
-    // submit: an empty transcript toasts and leaves the row open; a
-    // non-empty one fills the input and submits it (input gone or filled).
-    const inputStillOpen = await input.isVisible().catch(() => false);
-    const inputValue = inputStillOpen
-      ? await input.inputValue().catch(() => '')
-      : '';
-    const submitted = !inputStillOpen || inputValue.trim() !== '';
-    expect(sawEmptyToast || submitted).toBe(true);
     if (sawEmptyToast) {
       // The guard must not have submitted a blank answer.
       expect(inputStillOpen).toBe(true);

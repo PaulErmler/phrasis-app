@@ -20,6 +20,7 @@ import {
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
 import { AnnotationLines } from './AnnotationLines';
+import { useLocalPlaySignals } from './useLocalPlaySignals';
 import type { CardPresentation } from './cardPresentation';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import {
@@ -776,6 +777,15 @@ export function FullReviewCardContent({
       if (!answer) continue;
 
       const language = tr.language;
+      // No expected translation yet: the card's content pipeline is still
+      // running and the review query serves the row with an empty string
+      // rather than dropping it. Nothing to grade against, so mark the row
+      // handled ('error' renders nothing, leaving the plain diff view) instead
+      // of spending a round trip on a grade the server can only degrade.
+      if (!tr.text.trim()) {
+        setFeedback((prev) => new Map(prev).set(language, { status: 'error' }));
+        continue;
+      }
       // Local gate, mirroring the server's (writingAnswersMatch): exact
       // punctuation/case-insensitive EQUALITY against the primary or any
       // stored accepted alternative needs no grader. Deliberately not a
@@ -1106,6 +1116,12 @@ function TargetLanguageInput({
   const isActive = activeClip?.language === translation.language;
   const t = useTranslations('LearningMode');
   const tChat = useTranslations('Chat');
+  // Tapping an IPA line plays the clip it transcribes: the row's main
+  // button for the card sentence (and the diff's shown alternative, whose
+  // clip the header carries after submit), each other-accepted row's own.
+  const ipaPlay = useLocalPlaySignals();
+  const mainPlaySignal = ipaPlay.signalFor('main', playSignal);
+  const playMainFromIpa = () => ipaPlay.bump('main');
   // Nullable. Absent outside learning mode (e.g. landing demo); the Discuss
   // button simply doesn't render then.
   const chatContext = useLearningChatToggle();
@@ -1472,6 +1488,7 @@ function TargetLanguageInput({
       ipa={translation.ipa}
       showRomanization={showRomanization}
       showIpa={showIpa}
+      onIpaClick={playMainFromIpa}
     />
   );
 
@@ -1491,7 +1508,7 @@ function TargetLanguageInput({
           onButtonTimeUpdate={onButtonTimeUpdate}
           onButtonStop={onButtonStop}
           speed={speed}
-          playSignal={playSignal}
+          playSignal={mainPlaySignal}
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
           onSpeedCycle={onSpeedCycle}
@@ -1553,6 +1570,7 @@ function TargetLanguageInput({
         ipa={diffTargetItem.ipa}
         showRomanization={showRomanization}
         showIpa={showIpa}
+        onIpaClick={playMainFromIpa}
       />
     ) : null
   ) : (
@@ -1584,7 +1602,7 @@ function TargetLanguageInput({
           onButtonTimeUpdate={onButtonTimeUpdate}
           onButtonStop={onButtonStop}
           speed={speed}
-          playSignal={playSignal}
+          playSignal={mainPlaySignal}
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
           onSpeedCycle={onSpeedCycle}
@@ -1677,6 +1695,7 @@ function TargetLanguageInput({
                     ipa={item.ipa}
                     showRomanization={showRomanization}
                     showIpa={showIpa}
+                    onIpaClick={() => ipaPlay.bump(item.text)}
                   />
                 </div>
                 <div
@@ -1690,6 +1709,7 @@ function TargetLanguageInput({
                     onTimeUpdate={onButtonTimeUpdate}
                     onStop={onButtonStop}
                     speed={speed}
+                    playSignal={ipaPlay.signalFor(item.text)}
                   />
                 </div>
               </div>
@@ -1761,7 +1781,7 @@ function TargetLanguageInput({
                 onTimeUpdate={onButtonTimeUpdate}
                 onStop={onButtonStop}
                 speed={speed}
-                playSignal={playSignal}
+                playSignal={mainPlaySignal}
               />
               {onSpeedCycle && (
                 <CardSpeedBadge
@@ -1782,7 +1802,7 @@ function TargetLanguageInput({
           onButtonTimeUpdate={onButtonTimeUpdate}
           onButtonStop={onButtonStop}
           speed={speed}
-          playSignal={playSignal}
+          playSignal={mainPlaySignal}
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
           onSpeedCycle={onSpeedCycle}
@@ -1817,9 +1837,10 @@ function TargetLanguageInput({
             ? { 'data-testid': 'learn-translation-input' }
             : {})}
         />
-        {/* Azure Fast Transcription rejects some locales outright (el-GR,
-            sw-TZ — the supportsStt:false languages); rendering the mic there
-            would consume a transcription quota unit and then fail every time. */}
+        {/* Every catalogue language supports STT as of Sep 2026, so this
+            gate is defensive: a code the catalogue doesn't know reports no
+            STT support, and rendering the mic there would consume a
+            transcription quota unit and then fail every time. */}
         {languageSupportsStt(translation.language) && (
           <WritingVoiceButton
             language={translation.language}

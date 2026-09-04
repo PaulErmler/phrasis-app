@@ -14,6 +14,7 @@ export type AiFeature =
   | 'sentence_metadata'
   | 'tts_synthesis'
   | 'tts_validation_judge'
+  | 'word_timing_backfill'
   | 'machine_translation'
   | 'writing_feedback';
 
@@ -34,6 +35,7 @@ const PIPELINE_FEATURES: ReadonlySet<AiFeature> = new Set([
   'sentence_metadata',
   'tts_synthesis',
   'tts_validation_judge',
+  'word_timing_backfill',
 ]);
 
 export type CaptureGenerationArgs = {

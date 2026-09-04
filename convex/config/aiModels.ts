@@ -50,6 +50,11 @@ export const OPENROUTER_MODELS = {
    *  text, so that regression would ship broken audio. Re-test before
    *  moving this off 3.1. */
   ttsValidation: 'google/gemini-3.1-flash-lite',
+  /** Speech-to-text for TTS validation, word-timing backfill and voice
+   *  input (convex/lib/stt/openrouter.ts). 60 languages, word timestamps,
+   *  auto language detection with code switching, $0.10 per audio hour.
+   *  Replaced Azure Fast Transcription in Sep 2026. */
+  stt: 'microsoft/mai-transcribe-2',
 } as const;
 
 /**

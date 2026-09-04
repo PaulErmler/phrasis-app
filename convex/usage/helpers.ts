@@ -1,7 +1,12 @@
 import { v, ConvexError } from 'convex/values';
-import { MutationCtx, QueryCtx, internalMutation } from '../_generated/server';
+import {
+  MutationCtx,
+  QueryCtx,
+  internalMutation,
+  internalQuery,
+} from '../_generated/server';
 import { internal } from '../_generated/api';
-import { Doc } from '../_generated/dataModel';
+import { Doc, Id } from '../_generated/dataModel';
 import {
   CREDIT_COSTS,
   FEATURE_IDS,
@@ -19,6 +24,22 @@ import { FREE_PLAN_ID } from '../../lib/autumn/customer-shape';
  * `error.data.code` contract as USAGE_LIMIT / QUOTA_NOT_SYNCED below.
  */
 export const PAYMENT_PAST_DUE = 'PAYMENT_PAST_DUE';
+
+/**
+ * Debounce for the course-usage reconcile scheduled by `syncAllFeatures`.
+ * One repair per day is plenty: the leak it repairs is closed at the source
+ * (auto-archive now releases), so a discrepancy that persists across syncs
+ * is historical drift, not a stream of new leaks.
+ */
+export const COURSE_RECONCILE_MIN_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Delay before the reconcile action re-reads Autumn. Long enough for any
+ * release/consume `trackUsage` job scheduled before this sync to land, so
+ * the fresh read reflects them and a stale snapshot can't be mistaken for
+ * drift (which would over-release).
+ */
+export const COURSE_RECONCILE_DELAY_MS = 10_000;
 
 // Definitions live in convex/types.ts (so schema.ts can share them without
 // importing this module); re-exported here for the existing importers.
@@ -438,14 +459,16 @@ export const syncAllFeatures = internalMutation({
             : undefined,
         };
 
+    let docId: Id<'usageQuotas'>;
     if (doc) {
+      docId = doc._id;
       await ctx.db.patch(doc._id, {
         features: args.features,
         lastSyncedAt: now,
         ...billingFields,
       });
     } else {
-      await ctx.db.insert('usageQuotas', {
+      docId = await ctx.db.insert('usageQuotas', {
         userId: args.userId,
         features: args.features,
         lastSyncedAt: now,
@@ -470,6 +493,7 @@ export const syncAllFeatures = internalMutation({
     if (newIncluded !== undefined && !stillPastDue) {
       const activeCourses = await getActiveCourses(ctx, args.userId);
       const overLimit = activeCourses.length > newIncluded;
+      let archivedThisSync = false;
       if (overLimit) {
         const settings = await getUserSettings(ctx, args.userId);
         const protectedId = settings?.activeCourseId;
@@ -480,15 +504,60 @@ export const syncAllFeatures = internalMutation({
         const excess = activeCourses.length - Math.max(newIncluded, 1);
         toArchive = toArchive.slice(0, excess);
 
-        // NOTE: We intentionally do NOT call releaseQuota() here.
-        // The features record was just overwritten with Autumn's authoritative
-        // state, so the balance already reflects the new plan limits.
         for (const course of toArchive) {
           await ctx.db.patch(course._id, {
             isArchived: true,
             archivedAt: now,
           });
         }
+
+        // Same release the manual `archiveCourse` performs. `courses` is a
+        // continuous-use feature in Autumn (no reset interval), so its usage
+        // counter only ever moves through track events, and one that is
+        // never sent for an archived course inflates the counter forever:
+        // the user re-subscribes, Autumn still counts the ghosts, and every
+        // unarchive hits USAGE_LIMIT on a plan with free slots. Exact by
+        // construction: these courses were active when Autumn's snapshot was
+        // taken, so it counted them, and nothing else releases them.
+        if (toArchive.length > 0) {
+          archivedThisSync = true;
+          await releaseQuota(
+            ctx,
+            args.userId,
+            FEATURE_IDS.COURSES,
+            toArchive.length,
+          );
+        }
+      }
+
+      // Self-heal for accounts that already drifted before the release
+      // above existed. `activeCourses` is the pre-archive list, so the
+      // ghosts are whatever Autumn's counter holds beyond it; the courses
+      // just archived are covered by their own release. Release-only: a
+      // counter BELOW the active count is left alone, so a manual grant or
+      // a hand-lowered counter is never clawed back. The action re-reads
+      // Autumn before acting, this only decides whether it is worth a run.
+      const coursesEntry = args.features[FEATURE_IDS.COURSES];
+      const drift =
+        coursesEntry && coursesEntry.unlimited !== true
+          ? coursesEntry.used - activeCourses.length
+          : 0;
+      const lastReconcile = doc?.lastCourseReconcileAt ?? 0;
+      // Not in a sync that archived courses itself: their release is still
+      // in flight, and a reconcile that reads Autumn before it lands would
+      // count them as ghosts and release them twice. Tomorrow's sync sees
+      // the settled counter and repairs any real drift.
+      if (
+        drift > 0 &&
+        !archivedThisSync &&
+        now - lastReconcile >= COURSE_RECONCILE_MIN_INTERVAL_MS
+      ) {
+        await ctx.db.patch(docId, { lastCourseReconcileAt: now });
+        await ctx.scheduler.runAfter(
+          COURSE_RECONCILE_DELAY_MS,
+          internal.usage.tracking.reconcileCourseUsage,
+          { userId: args.userId },
+        );
       }
     }
 
@@ -572,6 +641,16 @@ export const syncAllFeatures = internalMutation({
     }
 
     return null;
+  },
+});
+
+/** Active (non-archived) course count, for the reconcile action. */
+export const countActiveCourses = internalQuery({
+  args: { userId: v.string() },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const active = await getActiveCourses(ctx, args.userId);
+    return active.length;
   },
 });
 

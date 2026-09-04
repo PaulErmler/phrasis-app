@@ -43,9 +43,13 @@ import { COACHMARK_ANCHORS, TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
 import {
   resolveModeSetting,
+  resolveSettingsMode,
   type AudioSettingsMode,
 } from '@/lib/audio/mergeAudio';
-import { PROGRESS_SOUND_URL } from '@/lib/constants/learning';
+import {
+  installCelebrationSoundUnlock,
+  warmCelebrationSound,
+} from '@/lib/audio/celebrationSound';
 import { resolveShowFurigana } from '@/lib/furigana';
 
 interface LearningModeProps {
@@ -120,14 +124,14 @@ export function LearningMode({
     setWritingAccuracy(null);
   }, [cardId, reviewingReviewMode, reviewingWritingInputMode]);
 
-  // Warm the celebration sound's HTTP cache at session start so the very
-  // first celebration's animation timeline (hardcoded peaks at 1290/1610/
-  // 1925 ms in ProgressDisplay) isn't ahead of audio playback on mobile
-  // cold-cache loads.
+  // Warm the celebration sound at session start and unlock its shared
+  // element on the first tap / key. The celebration itself mounts after a
+  // mutation resolves (never inside a gesture), so without this WebKit
+  // refuses its `play()` and the milestone screen runs silent. See
+  // lib/audio/celebrationSound.ts.
   useEffect(() => {
-    const audio = new Audio(PROGRESS_SOUND_URL);
-    audio.preload = 'auto';
-    audio.load();
+    warmCelebrationSound();
+    return installCelebrationSoundUnlock();
   }, []);
 
   // Pause card audio while the celebration screen is showing. The success
@@ -238,7 +242,6 @@ export function LearningMode({
       state.courseSettings,
       state.preReviewCount,
       state.fsrsState?.reps ?? 0,
-      isTranscribeMode(state.courseSettings),
       state.freeStudyPlayCount,
     );
   const autoRateEnabled =
@@ -464,21 +467,20 @@ export function LearningMode({
       ? (state.courseSettings.instantProceedFull ?? true)
       : (state.courseSettings.instantProceedAudio ?? false);
   const isTranscribe = isTranscribeMode(state.courseSettings);
-  // Settings mode for the writing-only lookups below: this branch of the
-  // component only renders writing ("full") review, so the mode is never
-  // 'audio' here.
-  const writingSettingsMode: AudioSettingsMode = isTranscribe
-    ? 'transcribe'
-    : 'full';
+  // Which copy of the playback settings this session reads. The SAME helper
+  // useLearningAudio uses to build the merged blob, so the card's display
+  // (word highlighting, speed badges, manual row taps) can never resolve a
+  // different mode than the audio playing over it — which is exactly what
+  // happened when this branch read the raw fields and Radio grew its own.
+  const settingsMode: AudioSettingsMode = resolveSettingsMode(
+    state.courseSettings,
+  );
   // Transcribe: the post-submit replay rides the same per-language afterSubmit
   // machinery as Translate, gated by the transcribe auto-play setting
   // (chained `*Transcribe ?? *Full ?? audio` via resolveModeSetting).
   const writingAutoPlay =
-    resolveModeSetting(
-      state.courseSettings,
-      'autoPlayAudio',
-      writingSettingsMode,
-    ) ?? DEFAULT_AUTO_PLAY;
+    resolveModeSetting(state.courseSettings, 'autoPlayAudio', settingsMode) ??
+    DEFAULT_AUTO_PLAY;
 
   // Flagging acts at the card level. The mutation retranslates every
   // non-source-language translation on the card. We hide the button when
@@ -508,17 +510,17 @@ export function LearningMode({
     t,
   );
 
-  // "Show translation on new sentences" (writing mode): the answer is shown
-  // above the input to copy-type on the card's first N reviews, never in
-  // transcribe, where the shown target would BE the answer (gate lives in
-  // the helper). freeStudyPlayCount is passed because free play advances
-  // neither preReviewCount nor the FSRS reps, so without it the assist would
-  // never retire in the Free Study face.
+  // "Show translation on new sentences" (both writing styles): the answer
+  // is shown above the input to copy-type on the card's first N reviews. In
+  // transcribe the sentence IS what the audio says, and that is the point:
+  // the first passes are copy-work, the unassisted test starts afterwards.
+  // freeStudyPlayCount is passed because free play advances neither
+  // preReviewCount nor the FSRS reps, so without it the assist would never
+  // retire in the Free Study face.
   const firstExposure = shouldShowTranslationAssist(
     state.courseSettings,
     state.preReviewCount,
     state.fsrsState?.reps ?? 0,
-    isTranscribe,
     state.freeStudyPlayCount,
   );
 
@@ -626,13 +628,13 @@ export function LearningMode({
           resolveModeSetting(
             state.courseSettings,
             'highlightWords',
-            writingSettingsMode,
+            settingsMode,
           ) === true
         }
         languagePlaybackSpeeds={resolveModeSetting(
           state.courseSettings,
           'languagePlaybackSpeeds',
-          writingSettingsMode,
+          settingsMode,
         )}
       />
     ) : (
@@ -647,8 +649,18 @@ export function LearningMode({
         revealedLanguages={audio.revealedLanguages}
         revealAllSignal={audioRevealNonce}
         onAllTargetsRevealedChange={setAudioAllTargetsRevealed}
-        highlightEnabled={state.courseSettings.highlightWords === true}
-        languagePlaybackSpeeds={state.courseSettings.languagePlaybackSpeeds}
+        highlightEnabled={
+          resolveModeSetting(
+            state.courseSettings,
+            'highlightWords',
+            settingsMode,
+          ) === true
+        }
+        languagePlaybackSpeeds={resolveModeSetting(
+          state.courseSettings,
+          'languagePlaybackSpeeds',
+          settingsMode,
+        )}
       />
     );
 
@@ -723,13 +735,17 @@ export function LearningMode({
           // shortcuts, with a confirm dialog open, a stray ← would undo
           // the previous review behind the modal. Dialogs/menus that manage
           // their own open state (help, card menu) are caught structurally in
-          // LearningControls' handler; the chat panel isn't a dialog and traps
-          // no focus, so it must be listed here.
+          // LearningControls' handler. The chat only counts as an overlay in
+          // the narrow layout, where it covers the card; beside the card
+          // (desktop) the shortcuts stay live, and keys pressed inside the
+          // panel are filtered by its marker in the same handler. Silencing
+          // them wholesale there left the writing card without Enter, Space
+          // or R for as long as the chat stayed open.
           state.settingsOpen ||
           editDialogOpen ||
           state.cardActions.deleteConfirmOpen ||
           state.cardActions.flagConfirmOpen ||
-          chatContext.isChatOpen
+          chatContext.chatCoversCard
         }
         isAudioReview={reviewMode === 'audio'}
         audioAllTargetsRevealed={audioAllTargetsRevealed}
@@ -826,7 +842,7 @@ function NoCardsDueWithFilter({
 
   return (
     <NoCardsDueState
-      onAddCards={handleAddCards}
+      onAddCards={() => handleAddCards()}
       isAddingCards={isAddingCards}
       batchSize={batchSize}
       sentencesRemaining={sentencesRemaining}

@@ -23,6 +23,7 @@ import {
 import type { CardAudioRecording } from '@/components/app/learning/types';
 
 import { reportError } from '@/lib/report-error';
+import { capture, CLIENT_EVENTS } from '@/lib/posthog/events';
 
 export interface UseAudioPlayerOptions {
   cardId: string | null;
@@ -42,7 +43,16 @@ export interface UseAudioPlayerOptions {
    *  start instead of resuming the prior position. */
   settingsOpen: boolean;
   getReviewInitiatedByThisTab: () => boolean;
-  onScheduleComplete: () => void;
+  /**
+   * Fired when the merged blob plays to its end. Return `true` when the
+   * caller advanced to the next card in response: the player then hands the
+   * element the prefetched next blob in the same tick (see `tryHandoff`), so
+   * playback never pauses while the server round-trip and re-render happen.
+   * Return `false` to leave the element ended and wait for the next card the
+   * ordinary way (no advance, or the advance is about to show a celebration
+   * that must not have audio talking over it).
+   */
+  onScheduleComplete: () => boolean;
   onResetReviewFlag: () => void;
   onNext: () => void;
 }
@@ -79,12 +89,30 @@ export interface AudioPlayerState {
   speedByLanguage: Record<string, number>;
 }
 
-// Shared catch handler for `audio.play()` promises: interruption/autoplay-
-// policy rejections (AbortError/NotAllowedError) are expected and silently
-// ignored; anything else is a real playback failure worth the exception feed.
-function ignorePlayInterrupt(label: string) {
+/** Which code path asked the element to play. Carried on the blocked-play
+ *  event so a hidden-tab refusal can be told apart from a foreground one. */
+type PlayPath = 'manual' | 'auto' | 'resume' | 'handoff';
+
+// Shared catch handler for `audio.play()` promises. An AbortError (play
+// interrupted by a pause/src swap) is routine and dropped. A NotAllowedError
+// is the autoplay policy saying no; it is expected on a cold page but not
+// mid-session, and a browser refusing to start the next card while the screen
+// is locked would otherwise be invisible, so it goes out as a product event
+// (not the exception feed, see `reportError`'s note). Anything else is a real
+// playback failure.
+function ignorePlayInterrupt(label: string, path: PlayPath = 'manual') {
   return (err: { name?: string }) => {
-    if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
+    if (err.name === 'AbortError') return;
+    if (err.name === 'NotAllowedError') {
+      capture(CLIENT_EVENTS.AUDIO_PLAY_BLOCKED, {
+        path,
+        visibility:
+          typeof document === 'undefined'
+            ? 'unknown'
+            : document.visibilityState,
+      });
+      return;
+    }
     reportError(err, { op: 'audioPlay', label });
   };
 }
@@ -170,6 +198,24 @@ export function useAudioPlayer(
   const speedByLanguageRef = useRef<Record<string, number>>({});
   const webLockResolveRef = useRef<(() => void) | null>(null);
   const webLockTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Gapless advance bookkeeping. `handoffRef` records that the element is
+  // already playing the prefetched blob of a card the server has not served
+  // yet, with the keys that blob was merged under, so the merge effect can
+  // adopt it when that card arrives. `awaitingHandoffRef` covers the slow
+  // case: the card ended before its successor's prefetch finished, so the
+  // prefetch completion performs the handoff instead.
+  const handoffRef = useRef<{
+    cardId: string;
+    audioIdentityKey: string;
+    settingsKey: string;
+    compositionKey: string;
+  } | null>(null);
+  const awaitingHandoffRef = useRef<{
+    fromCardId: string | null;
+    nextCardId: string;
+  } | null>(null);
+  const currentCardIdRef = useRef(cardId);
+  currentCardIdRef.current = cardId;
 
   // Stable refs for callbacks to avoid re-triggering effects
   const onScheduleCompleteRef = useRef(onScheduleComplete);
@@ -178,6 +224,10 @@ export function useAudioPlayer(
   onResetReviewFlagRef.current = onResetReviewFlag;
   const onNextRef = useRef(onNext);
   onNextRef.current = onNext;
+  // The `ended` listener is bound once, so it reads the current next-card
+  // preview through a ref.
+  const nextCardRef = useRef(nextCard);
+  nextCardRef.current = nextCard;
   // Latest autoPlay value, read at the moment of `.play()` instead of from
   // the merge effect's captured closure. The merge effect's async pipeline
   // (fetch → decode → merge → loadedmetadata) takes 50-200ms; if the
@@ -290,6 +340,8 @@ export function useAudioPlayer(
       blobUrlRef.current = null;
     }
 
+    handoffRef.current = null;
+    awaitingHandoffRef.current = null;
     languageCuesRef.current = [];
     speedByLanguageRef.current = {};
     setDurationSec(0);
@@ -300,101 +352,6 @@ export function useAudioPlayer(
     setSpeedByLanguage({});
     setMediaSessionPlaybackState('none');
   }, [getAudio, clock]);
-
-  // --------------------------------------------------------------------------
-  // Wire audio element events
-  // --------------------------------------------------------------------------
-  useEffect(() => {
-    const audio = getAudio();
-
-    const acquireWebLock = () => {
-      if (webLockResolveRef.current) return; // already held
-      if (webLockTimeoutRef.current) {
-        clearTimeout(webLockTimeoutRef.current);
-        webLockTimeoutRef.current = null;
-        return; // lock still held from delayed release
-      }
-      if (!navigator.locks) return;
-      navigator.locks.request('audio-playback', () => {
-        return new Promise<void>((resolve) => {
-          webLockResolveRef.current = resolve;
-        });
-      });
-    };
-
-    const releaseWebLockDelayed = () => {
-      if (webLockTimeoutRef.current) clearTimeout(webLockTimeoutRef.current);
-      webLockTimeoutRef.current = setTimeout(() => {
-        webLockTimeoutRef.current = null;
-        webLockResolveRef.current?.();
-        webLockResolveRef.current = null;
-      }, 180_000);
-    };
-
-    const handlePlay = () => {
-      setIsPlaying(true);
-      setMediaSessionPlaybackState('playing');
-      acquireWebLock();
-    };
-
-    const handlePause = () => {
-      setIsPlaying(false);
-      setMediaSessionPlaybackState('paused');
-      releaseWebLockDelayed();
-    };
-
-    /** Un-blur every revealing language whose cue is at or before `timeSec`. */
-    const revealThrough = (timeSec: number) => {
-      const cues = languageCuesRef.current;
-      if (cues.length === 0) return;
-      setRevealedLanguages((prev) => {
-        const toReveal = cues.filter(
-          (c) =>
-            c.reveals !== false &&
-            c.startSec <= timeSec &&
-            !prev.has(c.language),
-        );
-        if (toReveal.length === 0) return prev;
-        const next = new Set(prev);
-        for (const c of toReveal) next.add(c.language);
-        return next;
-      });
-    };
-
-    const handleEnded = () => {
-      // Playback reached the end, so every revealing cue is behind us. The last
-      // cue can sit exactly at the blob duration. A silent placeholder for a
-      // zero-repetition language in the final group, and `timeupdate` is not
-      // guaranteed to fire on that last sample, so sweep the remainder here.
-      revealThrough(Infinity);
-      setIsPlaying(false);
-      setMediaSessionPlaybackState('paused');
-      releaseWebLockDelayed();
-      onScheduleCompleteRef.current();
-    };
-
-    const handleLoadedMetadata = () => {
-      if (audio.duration && isFinite(audio.duration)) {
-        setDurationSec(audio.duration);
-      }
-    };
-
-    const handleTimeUpdate = () => revealThrough(audio.currentTime);
-
-    audio.addEventListener('play', handlePlay);
-    audio.addEventListener('pause', handlePause);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-
-    return () => {
-      audio.removeEventListener('play', handlePlay);
-      audio.removeEventListener('pause', handlePause);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-    };
-  }, [getAudio]);
 
   // --------------------------------------------------------------------------
   // Drive the playback clock from the playing state. The clock runs its own
@@ -482,6 +439,167 @@ export function useAudioPlayer(
   // for "user just asked to hear this card under a new audio layout."
   const compositionKey = `${baseOrderKey}|${targetOrderKey}`;
 
+  /**
+   * Gapless advance: move the element onto the prefetched blob of the peeked
+   * next card without waiting for the server to serve it. Returns `false`
+   * (and does nothing) when there is no usable prefetch: no next card, not
+   * merged yet, or merged under settings that no longer match. The merge
+   * effect below adopts the running audio once the card arrives, or tears it
+   * down if the server served something else.
+   */
+  const tryHandoff = (): boolean => {
+    const next = nextCardRef.current;
+    if (!next) return false;
+    const entry = prefetchCacheRef.current.get(next.cardId);
+    if (
+      !entry ||
+      entry.audioIdentityKey !== nextAudioIdentityKey ||
+      entry.settingsKey !== settingsKey ||
+      entry.compositionKey !== compositionKey
+    ) {
+      return false;
+    }
+    prefetchCacheRef.current.delete(next.cardId);
+
+    const audio = getAudio();
+    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    blobUrlRef.current = entry.result.blobUrl;
+    languageCuesRef.current = entry.result.languageCues;
+    speedByLanguageRef.current = entry.result.speedByLanguage;
+    setLanguageCues(entry.result.languageCues);
+    setSpeedByLanguage(entry.result.speedByLanguage);
+    setDurationSec(entry.result.durationSec);
+    setRevealedLanguages(new Set());
+    hasAutoPlayedForCardRef.current = true;
+    handoffRef.current = {
+      cardId: next.cardId,
+      audioIdentityKey: entry.audioIdentityKey,
+      settingsKey: entry.settingsKey,
+      compositionKey: entry.compositionKey,
+    };
+    audio.src = entry.result.blobUrl;
+    clock.notifyOnce();
+    audio.play().catch(ignorePlayInterrupt('Handoff play failed:', 'handoff'));
+    return true;
+  };
+  // Published through a ref for the once-bound `ended` listener below. The
+  // listener effect is declared after this line on purpose: the React
+  // Compiler forbids mutating a ref in render once an effect has read it.
+  const tryHandoffRef = useRef(tryHandoff);
+  tryHandoffRef.current = tryHandoff;
+
+  // --------------------------------------------------------------------------
+  // Wire audio element events
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    const audio = getAudio();
+
+    const acquireWebLock = () => {
+      if (webLockResolveRef.current) return; // already held
+      if (webLockTimeoutRef.current) {
+        clearTimeout(webLockTimeoutRef.current);
+        webLockTimeoutRef.current = null;
+        return; // lock still held from delayed release
+      }
+      if (!navigator.locks) return;
+      navigator.locks.request('audio-playback', () => {
+        return new Promise<void>((resolve) => {
+          webLockResolveRef.current = resolve;
+        });
+      });
+    };
+
+    const releaseWebLockDelayed = () => {
+      if (webLockTimeoutRef.current) clearTimeout(webLockTimeoutRef.current);
+      webLockTimeoutRef.current = setTimeout(() => {
+        webLockTimeoutRef.current = null;
+        webLockResolveRef.current?.();
+        webLockResolveRef.current = null;
+      }, 180_000);
+    };
+
+    const handlePlay = () => {
+      // Playback resumed on its own (user replay, media-session play): a late
+      // prefetch must not hijack the element any more.
+      awaitingHandoffRef.current = null;
+      setIsPlaying(true);
+      setMediaSessionPlaybackState('playing');
+      acquireWebLock();
+    };
+
+    const handlePause = () => {
+      setIsPlaying(false);
+      setMediaSessionPlaybackState('paused');
+      releaseWebLockDelayed();
+    };
+
+    /** Un-blur every revealing language whose cue is at or before `timeSec`. */
+    const revealThrough = (timeSec: number) => {
+      const cues = languageCuesRef.current;
+      if (cues.length === 0) return;
+      setRevealedLanguages((prev) => {
+        const toReveal = cues.filter(
+          (c) =>
+            c.reveals !== false &&
+            c.startSec <= timeSec &&
+            !prev.has(c.language),
+        );
+        if (toReveal.length === 0) return prev;
+        const next = new Set(prev);
+        for (const c of toReveal) next.add(c.language);
+        return next;
+      });
+    };
+
+    const handleEnded = () => {
+      // Playback reached the end, so every revealing cue is behind us. The last
+      // cue can sit exactly at the blob duration. A silent placeholder for a
+      // zero-repetition language in the final group, and `timeupdate` is not
+      // guaranteed to fire on that last sample, so sweep the remainder here.
+      revealThrough(Infinity);
+      // Auto-advance. When the caller moves on to the next card, start that
+      // card's prefetched blob right here, in the same task as `ended`, before
+      // the server round-trip and re-render. A hidden tab (phone screen
+      // locked) that lets the element sit empty while a mutation, a query
+      // update and a fresh media load all complete is where mobile browsers
+      // drop continuous playback; an element that goes straight from one blob
+      // to the next never gives them the chance.
+      const advancing = onScheduleCompleteRef.current();
+      if (advancing) {
+        if (tryHandoffRef.current()) return;
+        const next = nextCardRef.current;
+        awaitingHandoffRef.current = next
+          ? { fromCardId: currentCardIdRef.current, nextCardId: next.cardId }
+          : null;
+      }
+      setIsPlaying(false);
+      setMediaSessionPlaybackState('paused');
+      releaseWebLockDelayed();
+    };
+
+    const handleLoadedMetadata = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setDurationSec(audio.duration);
+      }
+    };
+
+    const handleTimeUpdate = () => revealThrough(audio.currentTime);
+
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+
+    return () => {
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [getAudio]);
+
   const prevCardIdRef = useRef<string | null>(null);
   const prevCompositionKeyRef = useRef<string | null>(null);
 
@@ -511,6 +629,38 @@ export function useAudioPlayer(
     // mode instead of returning to its blurred initial state.
     if (isCompositionChange) {
       setRevealedLanguages(new Set());
+    }
+
+    // A card change settles any pending gapless advance. If the element is
+    // already playing this very card's prefetched blob (see `tryHandoff`),
+    // adopt it: no teardown, no merge, and the auto-play already happened.
+    // Any mismatch (the server served a different card, or this card
+    // resolves to other settings or audio than the blob was merged under)
+    // falls through to the ordinary clear-and-merge path, which stops the
+    // running audio and plays the right thing.
+    if (isCardChange) awaitingHandoffRef.current = null;
+    const handoff = handoffRef.current;
+    if (handoff && isCardChange) {
+      handoffRef.current = null;
+      if (
+        handoff.cardId === cardId &&
+        handoff.audioIdentityKey === audioIdentityKey &&
+        handoff.settingsKey === settingsKey &&
+        handoff.compositionKey === compositionKey
+      ) {
+        mergeAbortRef.current?.abort();
+        mergeAbortRef.current = null;
+        setIsMerging(false);
+        hasAutoPlayedForCardRef.current = true;
+        onResetReviewFlagRef.current();
+        // The caller muted autoplay since the handoff (the server confirmed a
+        // milestone celebration): the card is here, its audio must not be.
+        if (!autoPlayRef.current) {
+          const audio = getAudio();
+          if (!audio.paused) audio.pause();
+        }
+        return;
+      }
     }
 
     const audioBefore = audioRef.current;
@@ -605,7 +755,7 @@ export function useAudioPlayer(
         ) {
           hasAutoPlayedForCardRef.current = true;
           onResetReviewFlagRef.current();
-          audio.play().catch(ignorePlayInterrupt('Auto-play failed:'));
+          audio.play().catch(ignorePlayInterrupt('Auto-play failed:', 'auto'));
         }
       };
 
@@ -722,11 +872,15 @@ export function useAudioPlayer(
                 !hasAutoPlayedForCardRef.current &&
                 initiatedByThisTab));
           if (shouldResumePlay) {
-            audio.play().catch(ignorePlayInterrupt('Resume playback failed:'));
+            audio
+              .play()
+              .catch(ignorePlayInterrupt('Resume playback failed:', 'resume'));
           } else if (shouldAutoPlay) {
             hasAutoPlayedForCardRef.current = true;
             onResetReviewFlagRef.current();
-            audio.play().catch(ignorePlayInterrupt('Auto-play failed:'));
+            audio
+              .play()
+              .catch(ignorePlayInterrupt('Auto-play failed:', 'auto'));
           }
         };
 
@@ -835,6 +989,21 @@ export function useAudioPlayer(
           const stale = prefetchCacheRef.current.get(oldestKey);
           if (stale) URL.revokeObjectURL(stale.result.blobUrl);
           prefetchCacheRef.current.delete(oldestKey);
+        }
+
+        // The current card already ended waiting for exactly this blob (slow
+        // network), and nothing has moved since: hand off now. Still-the-same
+        // card and still-paused are the checks that a user replay or a
+        // server-served card has not overtaken us in the meantime.
+        const awaiting = awaitingHandoffRef.current;
+        if (
+          awaiting &&
+          awaiting.nextCardId === targetCardId &&
+          awaiting.fromCardId === currentCardIdRef.current &&
+          getAudio().paused
+        ) {
+          awaitingHandoffRef.current = null;
+          tryHandoffRef.current();
         }
       } catch (err) {
         if (

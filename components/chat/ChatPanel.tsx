@@ -42,6 +42,8 @@ interface ChatPanelProps {
   aboveFooterAction?: ReactNode;
   /** Rendered inside the empty-thread state (e.g. quick-action tiles). */
   emptyStateExtra?: ReactNode;
+  /** See `ChatMessages.emptyStateWhileLoading`. */
+  emptyStateWhileLoading?: boolean;
   /** When true, delays showing messages until approvals have loaded */
   approvalsLoading?: boolean;
   /** When false, prevents the chat input from auto-focusing on mount */
@@ -85,6 +87,7 @@ export function ChatPanel({
   suggestionsAction,
   aboveFooterAction,
   emptyStateExtra,
+  emptyStateWhileLoading,
   approvalsLoading = false,
   autoFocus,
   noBottomPadding = false,
@@ -219,7 +222,9 @@ export function ChatPanel({
             messageFooter={messageFooter}
             contentClassName={aboveFooterAction ? 'pb-12 lg:pb-6' : 'pb-6'}
             emptyStateExtra={emptyStateExtra}
+            emptyStateWhileLoading={emptyStateWhileLoading}
             status={chat.status}
+            onRetry={chat.retryResponse}
           />
           {aboveFooterAction && (
             <div className="absolute bottom-3 left-4 lg:hidden z-10">

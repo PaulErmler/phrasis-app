@@ -9,6 +9,10 @@ import {
   PLAYBACK_SPEED_MIN,
 } from '../../../lib/constants/audioPlayback';
 import { MAX_CARDS_PER_BATCH } from '../../../lib/constants/learning';
+import {
+  MAX_INITIAL_REVIEW_COUNT,
+  MIN_INITIAL_REVIEW_COUNT,
+} from '../../../lib/scheduling';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -985,6 +989,74 @@ describe('features/courses', () => {
       expect(settings?.hideWorkloadForecast).toBe(false);
       expect(settings?.hideDueCounts).toBe(true);
     });
+
+    it('round-trips repsStatFilter on an existing row', async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) =>
+        ctx.db.insert('userSettings', {
+          userId: 'user_A',
+          hasCompletedOnboarding: true,
+          hideDueCounts: true,
+        }),
+      );
+      const asUser = t.withIdentity({ subject: 'user_A' });
+
+      // Unset means 'all'; the field is only written once the user taps.
+      let settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      expect(settings?.repsStatFilter).toBeUndefined();
+
+      for (const filter of ['learn', 'radio', 'freeStudy', 'all'] as const) {
+        await asUser.mutation(api.features.courses.updateUserSettings, {
+          repsStatFilter: filter,
+        });
+        settings = await asUser.query(api.features.courses.getUserSettings, {});
+        expect(settings?.repsStatFilter).toBe(filter);
+      }
+      // Untouched by the reps taps.
+      expect(settings?.hideDueCounts).toBe(true);
+    });
+
+    it('keeps timeStatFilter independent of repsStatFilter', async () => {
+      const t = convexTest(schema, modules);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      await asUser.mutation(api.features.courses.updateUserSettings, {
+        repsStatFilter: 'radio',
+      });
+      await asUser.mutation(api.features.courses.updateUserSettings, {
+        timeStatFilter: 'freeStudy',
+      });
+      let settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      expect(settings?.repsStatFilter).toBe('radio');
+      expect(settings?.timeStatFilter).toBe('freeStudy');
+
+      await asUser.mutation(api.features.courses.updateUserSettings, {
+        timeStatFilter: 'all',
+      });
+      settings = await asUser.query(api.features.courses.getUserSettings, {});
+      expect(settings?.repsStatFilter).toBe('radio');
+      expect(settings?.timeStatFilter).toBe('all');
+    });
+
+    it('creates a settings row when repsStatFilter is the first write', async () => {
+      const t = convexTest(schema, modules);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      await asUser.mutation(api.features.courses.updateUserSettings, {
+        repsStatFilter: 'radio',
+      });
+      const settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      expect(settings?.repsStatFilter).toBe('radio');
+      expect(settings?.hasCompletedOnboarding).toBe(false);
+      expect(settings?.hideDueCounts).toBeUndefined();
+    });
   });
 
   describe('updateCourseSettings: audio playback', () => {
@@ -1038,6 +1110,41 @@ describe('features/courses', () => {
         {},
       );
       expect(settings?.ignorePunctuation).toBe(true);
+    });
+
+    // Regression: initialReviewCount was the one numeric field here that threw
+    // instead of clamping, so a client offering a wider range (the stepper used
+    // to allow 1-20) failed the entire save with a generic error toast.
+    it('clamps initialReviewCount on first insert instead of throwing', async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        initialReviewCount: MAX_INITIAL_REVIEW_COUNT + 1,
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.initialReviewCount).toBe(MAX_INITIAL_REVIEW_COUNT);
+    });
+
+    it('clamps initialReviewCount on an existing row', async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        showRomanization: true,
+      });
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        initialReviewCount: MIN_INITIAL_REVIEW_COUNT - 1,
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.initialReviewCount).toBe(MIN_INITIAL_REVIEW_COUNT);
     });
 
     it('defaults ignorePunctuation to undefined (punctuation counts)', async () => {
@@ -1205,6 +1312,170 @@ describe('features/courses', () => {
         {},
       );
       expect(settings?.autoRateFromAccuracy).toBe(false);
+    });
+
+    // ---- Radio's copy of the playback settings -------------------------
+    // The point of the split is that the two sets move independently, so every
+    // test here asserts BOTH directions: the field written, and its twin still
+    // holding its own value.
+
+    it('a radio write leaves the shared review field alone, and vice versa', async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        separateRadioSettings: true,
+        languageRepetitions: { de: 2 },
+        languageRepetitionPauses: { de: 3 },
+      });
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        languageRepetitionsRadio: { de: 1 },
+        languageRepetitionPausesRadio: { de: 0 },
+      });
+      let settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.separateRadioSettings).toBe(true);
+      expect(settings?.languageRepetitionsRadio).toEqual({ de: 1 });
+      expect(settings?.languageRepetitionPausesRadio).toEqual({ de: 0 });
+      // Review side untouched by the radio write.
+      expect(settings?.languageRepetitions).toEqual({ de: 2 });
+      expect(settings?.languageRepetitionPauses).toEqual({ de: 3 });
+
+      // Now the other direction: editing review must not disturb radio.
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        languageRepetitions: { de: 5 },
+      });
+      settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.languageRepetitions).toEqual({ de: 5 });
+      expect(settings?.languageRepetitionsRadio).toEqual({ de: 1 });
+    });
+
+    it('turning the split off keeps the radio values dormant', async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        separateRadioSettings: true,
+        languageRepetitionsRadio: { de: 1 },
+        pauseBaseToBaseRadio: 0,
+      });
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        separateRadioSettings: false,
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.separateRadioSettings).toBe(false);
+      // Freeze-and-keep: re-enabling has to resume, not restart.
+      expect(settings?.languageRepetitionsRadio).toEqual({ de: 1 });
+      expect(settings?.pauseBaseToBaseRadio).toBe(0);
+    });
+
+    it('persists the radio Practice Listening copies on first insert', async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        targetBeforeRepetitionsRadio: { de: 1 },
+        pauseTargetToBaseRadio: 1,
+        targetBeforeListeningStrategyRadio: 'continuous',
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.targetBeforeRepetitionsRadio).toEqual({ de: 1 });
+      expect(settings?.pauseTargetToBaseRadio).toBe(1);
+      expect(settings?.targetBeforeListeningStrategyRadio).toBe('continuous');
+    });
+
+    it('clamps both radio speed records', async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        languagePlaybackSpeedsRadio: { de: 9, en: 0.01 },
+        targetBeforePlaybackSpeedsRadio: { de: 9 },
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.languagePlaybackSpeedsRadio?.de).toBeLessThanOrEqual(2);
+      expect(settings?.languagePlaybackSpeedsRadio?.en).toBeGreaterThanOrEqual(
+        0.6,
+      );
+      expect(settings?.targetBeforePlaybackSpeedsRadio?.de).toBeLessThanOrEqual(
+        2,
+      );
+    });
+
+    it('clamps the radio "only new" window to 0-10', async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        targetBeforeOnlyNewRepsRadio: 99,
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.targetBeforeOnlyNewRepsRadio).toBe(10);
+    });
+
+    it('clamps the radio "until rated good" window to 1-10', async () => {
+      // Same floor as the shared field: 0 would mean Listening never plays
+      // rather than always.
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        targetBeforeUntilGoodRepsRadio: 0,
+      });
+      let settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.targetBeforeUntilGoodRepsRadio).toBe(1);
+
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        targetBeforeUntilGoodRepsRadio: 99,
+      });
+      settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.targetBeforeUntilGoodRepsRadio).toBe(10);
+    });
+
+    it('never lets both radio target positions persist false', async () => {
+      // Radio resolves `*Radio ?? unsuffixed`, so an explicit false/false here
+      // would silence Radio even with a healthy unsuffixed pair.
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        playTargetBeforeBaseRadio: false,
+        playTargetAfterBaseRadio: false,
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.playTargetAfterBaseRadio).toBe(true);
+      // And the shared pair was not dragged along.
+      expect(settings?.playTargetAfterBase).toBeUndefined();
     });
 
     it('persists autoRateThresholds on first insert', async () => {

@@ -10,7 +10,7 @@
  * run regenerates every clip — run with `--prune` to drop the old mp3s.
  *
  * Each generated mp3 is also validated round-trip: the audio is transcribed
- * with Azure Fast Transcription and the transcription is compared
+ * with MAI-Transcribe-2 (via OpenRouter) and the transcription is compared
  * (normalized, Levenshtein ≤ 1) to the original text. On mismatch the script
  * retries up to 3 times, then surfaces the failure in the summary so a human
  * can listen.
@@ -264,57 +264,36 @@ async function synthesize(
 }
 
 // ---------------------------------------------------------------------------
-// Azure Fast Transcription + comparison (mirrors convex/lib/stt/azure.ts and
-// convex/lib/textComparison.ts — kept inline so the script has no runtime
-// dependency on Convex code)
+// OpenRouter transcription (MAI-Transcribe-2) + comparison (mirrors
+// convex/lib/stt/openrouter.ts and convex/lib/textComparison.ts — kept inline
+// so the script has no runtime dependency on Convex code)
 // ---------------------------------------------------------------------------
 
-const STT_LOCALE_MAP: Record<string, string> = {
-  en: 'en-US',
-  de: 'de-DE',
-  es: 'es-ES',
-  fr: 'fr-FR',
-  hi: 'hi-IN',
-};
+const STT_MODEL = 'microsoft/mai-transcribe-2';
 
-interface AzureStt {
-  apiKey: string;
-  region: string;
-}
-
-async function transcribe(
-  buf: Buffer,
-  languageCode: string,
-  stt: AzureStt,
-): Promise<string> {
-  const locale = STT_LOCALE_MAP[languageCode] ?? languageCode;
-  const definition = JSON.stringify({
-    locales: [locale],
-    diarization: { enabled: false },
-    profanityFilterMode: 'None',
-  });
+async function transcribe(buf: Buffer, languageCode: string): Promise<string> {
   const fd = new FormData();
-  fd.append('definition', definition);
+  fd.append('model', STT_MODEL);
+  fd.append('response_format', 'json');
+  // Bare ISO-639-1 code, which is what the landing pairs already use.
+  fd.append('language', languageCode);
   fd.append(
-    'audio',
-    new Blob([new Uint8Array(buf)], { type: 'audio/mp3' }),
+    'file',
+    new Blob([new Uint8Array(buf)], { type: 'audio/mpeg' }),
     'audio.mp3',
   );
 
-  const res = await fetch(
-    `https://${stt.region}.api.cognitive.microsoft.com/speechtotext/transcriptions:transcribe?api-version=2024-11-15`,
-    {
-      method: 'POST',
-      headers: { 'Ocp-Apim-Subscription-Key': stt.apiKey },
-      body: fd,
-    },
-  );
+  const res = await fetch('https://openrouter.ai/api/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` },
+    body: fd,
+  });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Azure STT ${res.status}: ${body.slice(0, 300)}`);
+    throw new Error(`OpenRouter STT ${res.status}: ${body.slice(0, 300)}`);
   }
-  const data = (await res.json()) as { combinedPhrases?: { text: string }[] };
-  return data.combinedPhrases?.[0]?.text ?? '';
+  const data = (await res.json()) as { text?: string };
+  return data.text ?? '';
 }
 
 function normalize(s: string): string {
@@ -351,7 +330,7 @@ function levenshtein(a: string, b: string): number {
 //   - dragged vowels ("estás" → "estaaaaás" — +4 chars)
 //   - trailing mumbles ("están" → "están mmm ahí están" — +12 chars)
 // All trigger a MISMATCH and force a retry. A 1-character difference is
-// allowed because the STT (Azure Fast Transcription) occasionally misses a
+// allowed because the STT model occasionally misses a
 // diacritic or trailing punct.
 const MAX_EDIT_DISTANCE = 1;
 
@@ -366,7 +345,7 @@ const MAX_VALIDATION_ATTEMPTS = 3;
 
 /**
  * Allowlist of (text → expected-STT-transcription) pairs where the audio
- * is verified-correct but the STT (Azure Fast Transcription) consistently
+ * is verified-correct but the STT model consistently
  * transcribes it differently. Mostly script-mixing artifacts: e.g. Hindi
  * speakers pronounce English loanwords in Latin and the STT transcribes the
  * loanword in Latin script even though our source text uses Devanagari.
@@ -403,19 +382,10 @@ function hashFor(text: string, lang: string, voiceApiCode: string): string {
 async function main() {
   if (!process.env.OPENROUTER_API_KEY) {
     console.error(
-      'OPENROUTER_API_KEY is required for Gemini TTS (load via --env-file=.env.local)',
+      'OPENROUTER_API_KEY is required for Gemini TTS and STT validation (load via --env-file=.env.local)',
     );
     process.exit(1);
   }
-  const azureKey = process.env.AZURE_SPEECH_API_KEY;
-  const azureRegion = process.env.AZURE_SPEECH_REGION;
-  if (!azureKey || !azureRegion) {
-    console.error(
-      'AZURE_SPEECH_API_KEY and AZURE_SPEECH_REGION are required for STT validation',
-    );
-    process.exit(1);
-  }
-  const stt: AzureStt = { apiKey: azureKey, region: azureRegion };
 
   const prune = process.argv.includes('--prune');
   const revalidate = process.argv.includes('--revalidate');
@@ -496,7 +466,7 @@ async function main() {
       try {
         const buf = await readFile(absFile);
         await new Promise((r) => setTimeout(r, 80));
-        const heard = await transcribe(buf, lang, stt);
+        const heard = await transcribe(buf, lang);
         if (acceptTranscription(heard)) {
           console.log(
             allowedAlt && !transcriptionMatches(text, heard)
@@ -537,7 +507,7 @@ async function main() {
         process.stdout.write(`${buf.length}b  validating … `);
         // Stay polite to the API between calls.
         await new Promise((r) => setTimeout(r, 80));
-        lastTranscribed = await transcribe(buf, lang, stt);
+        lastTranscribed = await transcribe(buf, lang);
         if (acceptTranscription(lastTranscribed)) {
           console.log(
             allowedAlt && !transcriptionMatches(text, lastTranscribed)

@@ -136,6 +136,26 @@ async function ensureWritingStyle(
     .toBe(true);
 }
 
+/** Mirror of ensureWritingStyle for the Radio settings scope. The pill only
+ *  renders once `separateRadioSettings` is on and the sheet is in audio mode;
+ *  it writes nothing itself, so no optimistic-rollback backoff is needed. */
+async function ensureAudioScope(
+  page: Page,
+  scope: 'review' | 'radio',
+): Promise<void> {
+  const btn = page.getByTestId(`settings-scope-${scope}`).first();
+  await expect(btn).toBeVisible({ timeout: 8_000 });
+  if (await isSelectedTestId(page, `settings-scope-${scope}`)) return;
+  await btn.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await waitForInViewport(page, btn);
+  await btn.click({ force: true });
+  await expect
+    .poll(() => isSelectedTestId(page, `settings-scope-${scope}`), {
+      timeout: 8_000,
+    })
+    .toBe(true);
+}
+
 // Generic switch access by DOM id (CSS selectors ignore the aria-hidden Radix
 // sometimes sets on the sheet). Used for the per-mode auto-play switch and the
 // writing-mode hide-base pair.
@@ -583,6 +603,92 @@ test.describe('learning settings', () => {
     await setSwitchById(page, 'autoPlayAudio', fullAutoPlay);
     await ensureAudioMode(page);
     await setSwitchById(page, 'autoPlayAudio', audioAutoPlay);
+    await page.keyboard.press('Escape').catch(() => {});
+  });
+
+  test('playback settings are independent between Review and Radio', async ({
+    page,
+  }) => {
+    await gotoAuthedApp(
+      page,
+      '/app/learn',
+      page.getByTestId('learn-settings').first(),
+    );
+    await dismissTour(page, 'audio_review_intro', 500);
+
+    await openSettingsSheet(page);
+    await ensureAudioMode(page);
+
+    // The scope pill is gated on the split, so turn it on first.
+    await setSwitchById(page, 'separateRadioSettings', true);
+    await expect(page.getByTestId('settings-scope-radio').first()).toBeVisible({
+      timeout: 8_000,
+    });
+
+    // Highlight-words is the switch both scopes own a copy of. Read Review's
+    // current value, then diverge Radio from it.
+    await ensureAudioScope(page, 'review');
+    const reviewHighlight = await isSwitchOnById(page, 'highlightWords');
+
+    await ensureAudioScope(page, 'radio');
+    await setSwitchById(page, 'highlightWords', !reviewHighlight);
+    await expect
+      .poll(() => isSwitchOnById(page, 'highlightWords'), { timeout: 8_000 })
+      .toBe(!reviewHighlight);
+
+    // Radio hides the rows it FORCES; Review shows them again. Rows radio
+    // merely ignores (instantProceed) are not forked by the split, so they
+    // stay reachable under both scopes.
+    await expect(switchById(page, 'autoPlayAudio')).toHaveCount(0);
+    await expect(switchById(page, 'instantProceed')).toHaveCount(1);
+
+    await ensureAudioScope(page, 'review');
+    await expect(switchById(page, 'autoPlayAudio')).toHaveCount(1);
+    await expect
+      .poll(() => isSwitchOnById(page, 'highlightWords'), { timeout: 8_000 })
+      .toBe(reviewHighlight);
+
+    // The mirror direction: editing Review leaves Radio alone. Flip Review to
+    // !R (both copies now agree), then put Radio back to R, so the two end up
+    // CROSSED: Review !R, Radio R. Every assertion past here compares the two
+    // scopes against different values, which is what makes them able to fail
+    // if a scope's write lands on the other scope's field.
+    await setSwitchById(page, 'highlightWords', !reviewHighlight);
+    await ensureAudioScope(page, 'radio');
+    await setSwitchById(page, 'highlightWords', reviewHighlight);
+    await ensureAudioScope(page, 'review');
+    await expect
+      .poll(() => isSwitchOnById(page, 'highlightWords'), { timeout: 8_000 })
+      .toBe(!reviewHighlight);
+
+    // Both copies survive a reload, so this was persistence and not local
+    // component state. The polls above read `aria-checked`, which is the
+    // OPTIMISTIC patch — an un-acked mutation dies with the websocket the
+    // reload tears down (see `ensureTogglesSaved` in helpers.ts for the full
+    // race). `ensureTogglesSaved` itself can't drive this one: it re-reads the
+    // same locator after its reload, and the scope pill this test depends on
+    // is gone until the sheet is reopened. So take its flush window instead —
+    // a bounded pause that lets the last write reach the server first.
+    await page.waitForTimeout(1_000);
+    await page.reload();
+    await openSettingsSheet(page);
+    await ensureAudioMode(page);
+    await ensureAudioScope(page, 'radio');
+    await expect
+      .poll(() => isSwitchOnById(page, 'highlightWords'), { timeout: 8_000 })
+      .toBe(reviewHighlight);
+    await ensureAudioScope(page, 'review');
+    await expect
+      .poll(() => isSwitchOnById(page, 'highlightWords'), { timeout: 8_000 })
+      .toBe(!reviewHighlight);
+
+    // Turning the split off hides the pill and hands Radio back to the shared
+    // values, without discarding the copy.
+    await setSwitchById(page, 'separateRadioSettings', false);
+    await expect(page.getByTestId('settings-scope-radio')).toHaveCount(0);
+
+    // Restore.
+    await setSwitchById(page, 'highlightWords', reviewHighlight);
     await page.keyboard.press('Escape').catch(() => {});
   });
 

@@ -7,7 +7,7 @@ The `/learn` page supports two review modes that users can switch between via th
 
 There is also a *free play* mode at the scheduling level (`courseSettings.schedulingMode: 'radio'`), an endless round-robin through the whole deck that never touches the FSRS schedule. It is a single scheduling mode with two **faces**, chosen by the review mode rather than stored:
 
-- **Radio** (`reviewMode: 'audio'`). Hands-free background playback that loops cards on its own, forcing autoplay and auto-advance regardless of the user's settings.
+- **Radio** (`reviewMode: 'audio'`). Hands-free background playback that loops cards on its own, forcing autoplay and auto-advance regardless of the user's settings. With `separateRadioSettings` on it also keeps its own repetitions, pauses and playback speeds — see [The Radio branch](#the-radio-branch) below.
 - **Free Study** (`reviewMode: 'full'`). The typing counterpart: same endless shuffle, but user-paced like any other Writing session.
 
 Flipping the Shadowing/Writing switcher mid-session therefore switches faces live. Queue, playback behaviour, card UI and the header pill all follow. The two faces keep **separate per-card rotations** (`cards.radio*` vs `cards.freeStudy*`, one index pair each), so practising a card by listening never counts as having typed it, and vice versa. The active face is derived by `freePlayFace()` in `convex/types.ts`; `reviewLogs.kind` stores it so undo restores the right rotation.
@@ -64,9 +64,8 @@ Shadowing):
 
 Playback settings are split per mode: the unsuffixed `courseSettings` fields
 (`languageRepetitions`, `pauseBaseToBase`, `autoPlayAudio`, `highlightWords`,
-…) remain authoritative for Shadowing (including free play's Radio face; its
-Free Study face resolves the Writing chain like any other typing session), the `*Full` counterparts
-hold the Writing/Translate values, and the `*Transcribe` counterparts hold the
+…) are the Shadowing values, the `*Full` counterparts hold the
+Writing/Translate values, and the `*Transcribe` counterparts hold the
 Writing/Transcribe values. Writing resolves every playback value along the
 chain
 
@@ -79,6 +78,46 @@ so documents without the suffixed fields behave identically in all modes. The
 first edit of a setting in a mode snapshots the effective value into that
 mode's field, after which the modes diverge for that field. Full details (and
 the pending backfill migration) in `docs/migrations/per-mode-settings-backfill.md`.
+
+#### The Radio branch
+
+Radio can hold its own copy on top of that, gated by
+`courseSettings.separateRadioSettings`. Radio is a *scheduling* mode, not a
+review mode, so its copy **branches** off the audio fields rather than
+extending the writing chain:
+
+```
+Radio:  *Radio ?? <unsuffixed audio field> ?? DEFAULT_*        — never ?? *Full
+```
+
+Three consequences worth holding onto:
+
+- **Only the Radio face.** The branch applies when `schedulingMode` is
+  `'radio'` *and* `reviewMode` is `'audio'`. Free play's Free Study face keeps
+  resolving the Writing chain like any other typing session.
+- **Undefined means "same as Learn & Review".** A document that never enabled
+  the split behaves exactly as it did before the fields existed, so no
+  migration is needed.
+- **Freeze-and-keep on disable.** Turning the split back off leaves the
+  `*Radio` values in place (matching `separateModeTracking`), so re-enabling
+  resumes where the user left off rather than starting from the shared values.
+
+The Practice Listening group (`playTargetBeforeBase`, `targetBefore*`,
+`targetBeforeListeningStrategy`, …) forks for Radio too, and those fields have
+no `*Full` twin — which is why `ModeResolvableSetting` in
+`lib/audio/mergeAudio.ts` accepts either twin. The `'untilGood'` strategy forks
+in behaviour as well: Radio plays can't advance a card's good-rating count
+(Radio never rates), but the count a card already carries still graduates it
+out of Practice Listening in Radio, so the window has to be visible and
+separately settable there.
+
+The settings sheet edits one scope at a time. The scope pill defaults to the
+scope the running session is actually playing (`liveScope` in
+`components/app/LearningModeSettings.tsx`) and is purely local — it selects the
+fields the controls write and never touches `schedulingMode`. Settings that
+Radio *forces* (auto-play, auto-advance) are hidden under the Radio scope
+rather than shown lying; settings that simply have no `*Radio` copy stay
+visible under both.
 
 ### Flow (as seen in Translate; Transcribe differs only in the prompt)
 

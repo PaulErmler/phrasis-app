@@ -398,7 +398,6 @@
       "endOfYearLabel": "by end of {year}",
       "oneYearLabel": "one year from today",
       "endOfMonthLabel": "by end of {month}",
-      "counterfactualLabel": "if every day were like today",
       "sessionYieldBig": "about +{words} new words",
       "sessionYieldLabel": "per {goal}-min session",
       "perStudyHourLabel": "per study-hour",
@@ -419,9 +418,17 @@
     "stats": {
       "streak": "Streak",
       "reps": "Reps",
+      "repsLearn": "Learn reps",
+      "repsRadio": "Radio reps",
+      "repsFreeStudy": "Free Study reps",
+      "repsCycleHint": "Tap to switch between all, learn, radio and free study reps",
       "sentences": "Sentences",
       "words": "Words",
       "time": "Time",
+      "timeLearn": "Learn time",
+      "timeRadio": "Radio time",
+      "timeFreeStudy": "Free Study time",
+      "timeCycleHint": "Tap to switch between all, learn, radio and free study time",
       "today": "today",
       "new": "new"
     },
@@ -653,6 +660,13 @@
       "reviewModeFullDescription": "Type the translations and see a character-level comparison with the correct answer. Best for active practice — engages recall and spelling.",
       "separateModeTracking": "Separate progress per mode",
       "separateModeTrackingDescription": "Shadowing and Writing each keep their own review schedule for every sentence",
+      "separateRadioSettings": "Separate Radio settings",
+      "separateRadioSettingsDescription": "Radio keeps its own repetitions, pauses and speeds. Off, it follows Learn & Review",
+      "audioSettingsFor": "Audio settings for",
+      "audioScopeReview": "Review",
+      "audioScopeRadio": "Radio",
+      "audioScopeReviewDescription": "The settings below apply while you learn and review.",
+      "audioScopeRadioDescription": "The settings below apply to hands-free Radio playback.",
       "fullReviewTargetAudio": "Auto-play target audio",
       "fullReviewTargetAudioDescription": "When to play target language audio",
       "fullReviewTargetAudio_always": "After base audio",
@@ -843,6 +857,7 @@
     "errors": {
       "failedToCreateThread": "Failed to create new conversation",
       "failedToSend": "Failed to send message",
+      "retryFailed": "Couldn't ask for the reply again. Please try once more in a moment.",
       "failedToTranscribe": "Failed to transcribe audio",
       "microphoneAccess": "Failed to access microphone",
       "messageTooLong": "Your message is too long. Please shorten it and send again."
@@ -898,6 +913,10 @@
     },
     "messageError": {
       "title": "This message couldn't be displayed",
+      "retry": "Try again"
+    },
+    "replyFailed": {
+      "title": "The tutor couldn't answer right now. The AI service was busy for a moment.",
       "retry": "Try again"
     },
     "chatError": {

@@ -32,6 +32,7 @@ import { insertAudioFixture } from '../../lib/audioFixtures';
 // Module-mocked globally (tests/convexTestSetup.ts), used to assert on the
 // voice the replace path enqueues and to prove it enqueues no retranslation.
 import { ttsPool, llmPool } from '../../../lib/workpools';
+import { liveTranslation } from '../../../db/translationReads';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -366,12 +367,7 @@ describe('features/chat/alsoCorrect', () => {
       );
 
       const sharedTranslation = await t.run(async (ctx) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'en'),
-          )
-          .first(),
+        liveTranslation(ctx, textId, 'en'),
       );
       expect(sharedTranslation?.flagCount).toBeUndefined();
       expect(sharedTranslation?.translatedText).toBe('I want a coffee.');

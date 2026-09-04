@@ -1,3 +1,4 @@
+import { cardPinAt, servedTranslatedText } from '../db/translationReads';
 import { ConvexError, v, type Infer } from 'convex/values';
 import { action, internalMutation, internalQuery } from '../_generated/server';
 import { internal } from '../_generated/api';
@@ -148,7 +149,14 @@ export const getGradingContext = internalQuery({
       baseText: v.string(),
       baseLanguage: v.string(),
       notesLanguage: v.string(),
-      expected: v.string(),
+      /**
+       * The wording the learner was asked to write, or `null` when the
+       * language IS one of the course's but its translation row has not been
+       * generated yet (a freshly added card whose content pipeline is still
+       * running). The whole context is `null` only when the card, deck, course
+       * or text is gone, or the course is not the caller's.
+       */
+      expected: v.union(v.string(), v.null()),
       alternatives: v.array(v.string()),
       metadata: v.object({
         register: v.optional(v.string()),
@@ -173,15 +181,25 @@ export const getGradingContext = internalQuery({
     if (text.language === language) {
       expected = text.text;
     } else {
-      const row = await ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', card.textId).eq('targetLanguage', language),
-        )
-        .first();
-      expected = row?.translatedText ?? null;
+      // The wording the card shows (a pinned card may be on a superseded
+      // revision), which is what the learner was asked to write.
+      expected = await servedTranslatedText(ctx, {
+        textId: card.textId,
+        targetLanguage: language,
+        pinAt: cardPinAt(card),
+      });
     }
-    if (expected === null) return null;
+    // A language the course does not teach is a bogus request (nothing on
+    // screen can produce it) and stays a hard miss. A course language whose
+    // row the content pipeline has not written yet flows through with
+    // `expected: null` — see the field's comment above.
+    if (
+      expected === null &&
+      !course.targetLanguages.includes(language) &&
+      !course.baseLanguages.includes(language)
+    ) {
+      return null;
+    }
 
     const alternativeRows = await ctx.db
       .query('writingAlternatives')
@@ -357,7 +375,7 @@ export const gradeWritingAnswer = action({
       baseText: string;
       baseLanguage: string;
       notesLanguage: string;
-      expected: string;
+      expected: string | null;
       alternatives: string[];
       metadata: {
         register?: string;
@@ -373,11 +391,21 @@ export const gradeWritingAnswer = action({
     if (!context) {
       throw new ConvexError({ code: 'NOT_FOUND', message: 'Card not found' });
     }
+    // The card is fine; its translation for this language just has not been
+    // generated yet (content pipeline still running on a freshly added card).
+    // `buildTextContentBatchForLanguages` serves such a row as an empty string
+    // rather than dropping it, so writing mode renders an input for it and the
+    // learner can answer, with nothing to grade against. Degrade to the
+    // diff-only view like a failed grader call. This threw NOT_FOUND "Card not
+    // found" before: the wrong diagnosis of a transient content state, raised
+    // as an uncaught server error.
+    const expected = context.expected;
+    if (expected === null) return { verdict: 'error' as const };
 
     // Local gate: no quota, no LLM. In transcribe only the card's sentence
     // counts — an accepted alternative is a different sentence than the
     // audio, so it must not grant credit there.
-    if (writingAnswersMatch(context.expected, userAnswer, args.language)) {
+    if (writingAnswersMatch(expected, userAnswer, args.language)) {
       return { verdict: 'correct' as const, matched: 'primary' as const };
     }
     if (!transcribe) {
@@ -399,7 +427,7 @@ export const gradeWritingAnswer = action({
       ? buildTranscribeGraderUserPrompt({
           targetLanguage: args.language,
           notesLanguage: context.notesLanguage,
-          expected: context.expected,
+          expected,
           metadata: context.metadata,
           userAnswer,
         })
@@ -408,7 +436,7 @@ export const gradeWritingAnswer = action({
           targetLanguage: args.language,
           notesLanguage: context.notesLanguage,
           baseText: context.baseText,
-          expected: context.expected,
+          expected,
           metadata: context.metadata,
           userAnswer,
         });
@@ -572,7 +600,7 @@ export const gradeWritingAnswer = action({
           language: args.language,
           // The polished form when the model produced one, else the raw answer.
           text: parsed.corrected ?? userAnswer,
-          primary: context.expected,
+          primary: expected,
         },
       );
     }

@@ -438,4 +438,64 @@ describe('LearningControls: window shortcuts', () => {
       expect(event.defaultPrevented).toBe(false);
     });
   });
+
+  /**
+   * Since the optimistic advance the next card is on screen while the
+   * previous review is still in flight. A press made then is queued by the
+   * hook, so the controls must hand it over instead of dropping it.
+   */
+  it('Enter reaches onNext while a review is in flight (the hook queues it)', () => {
+    const handlers = makeHandlers();
+    renderControls(handlers, { isReviewing: true });
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(handlers.onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('the Next button stays clickable while a review is in flight', () => {
+    const handlers = makeHandlers();
+    renderControls(handlers, { isReviewing: true });
+    fireEvent.click(screen.getByTestId('learn-next'));
+    expect(handlers.onNext).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * The chat panel beside the card is neither a dialog nor a focus trap.
+   * Keys pressed inside it belong to the chat; keys pressed on the card
+   * side keep driving the session (they used to be silenced wholesale
+   * whenever the chat was open).
+   */
+  it('ignores every shortcut when the event target sits inside the chat panel', () => {
+    const handlers = makeHandlers();
+    render(
+      <>
+        <div data-learning-chat-panel="">
+          <button data-testid="chat-button">approve card</button>
+        </div>
+        <LearningControls
+          validRatings={RATINGS}
+          activeRating="good"
+          ratingIntervals={{}}
+          isPlaying={false}
+          isMerging={false}
+          durationSec={12}
+          undoDisabled={false}
+          isReviewing={false}
+          {...handlers}
+        />
+      </>,
+    );
+    const inChat = screen.getByTestId('chat-button');
+    for (const key of ['Enter', ' ', '1', 'ArrowLeft', 'r', 't']) {
+      fireEvent.keyDown(inChat, { key });
+    }
+    expect(handlers.onNext).not.toHaveBeenCalled();
+    expect(handlers.onPlay).not.toHaveBeenCalled();
+    expect(handlers.onSelectRating).not.toHaveBeenCalled();
+    expect(handlers.onBack).not.toHaveBeenCalled();
+    expect(handlers.onSeek).not.toHaveBeenCalled();
+    expect(handlers.onReplayTarget).not.toHaveBeenCalled();
+    // The card side is unaffected.
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(handlers.onNext).toHaveBeenCalledTimes(1);
+  });
 });

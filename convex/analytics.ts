@@ -33,12 +33,18 @@ export const EVENTS = {
   // Chat
   CHAT_MESSAGE_SENT: 'chat_message_sent',
   CHAT_CARD_APPROVAL: 'chat_card_approval',
+  /** The user asked for a failed tutor reply to be generated again. */
+  CHAT_RESPONSE_RETRIED: 'chat_response_retried',
   VOICE_TRANSCRIBED: 'voice_transcribed',
   VOICE_TRANSCRIPTION_FAILED: 'voice_transcription_failed',
 
   // Courses
   COURSE_CREATED: 'course_created',
   COURSE_ARCHIVED: 'course_archived',
+  /** The self-heal in usage/tracking.ts lowered Autumn's `courses` counter
+   *  to the number of active courses (ghost slots from the old auto-archive
+   *  path). Carries `released` and `active`. */
+  COURSE_SLOTS_RECONCILED: 'course_slots_reconciled',
 
   // Onboarding
   ONBOARDING_COMPLETED: 'onboarding_completed',

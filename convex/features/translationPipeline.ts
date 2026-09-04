@@ -36,9 +36,12 @@ import { enqueueTtsForVoice } from '../lib/contentScheduling';
 import { scheduleSearchableTextRebuild } from './searchRebuild';
 import {
   ttsPriorityValidator,
+  translationReasonValidator,
   voiceGenderValidator,
   asVoiceGender,
 } from '../types';
+import { liveTranslation } from '../db/translationReads';
+import { scheduleTranslationAnnotations } from '../lib/textAnnotations';
 
 /**
  * Translation write pipeline: the legacy Google Translate worker action and
@@ -83,6 +86,13 @@ const vProcessTranslationForCardArgs = v.object({
    * as a re-drive backoff.
    */
   replaceExisting: v.optional(v.boolean()),
+  /**
+   * Why the translation was requested (translationReasonValidator).
+   * Forwarded to `storeTranslationAndScheduleTTS`, whose `'version_bump'`
+   * branch archives the old wording for existing cards before replacing it.
+   * Absent = 'fill'.
+   */
+  translationReason: v.optional(translationReasonValidator),
   /**
    * Single-writer token, forwarded to `storeTranslationAndScheduleTTS` as
    * `expectedClaimId`. Set by the LLM-fallback dispatch (the claim the
@@ -149,9 +159,11 @@ const vStoreTranslationAndScheduleTtsArgs = v.object({
   regionVariant: v.optional(v.string()),
   /**
    * Retranslation flag. Set by callers that deliberately want to overwrite
-   * an existing translation. Today only `flagTranslation` (the user
-   * reported a bad translation and we want the new LLM output to replace
-   * the displayed text).
+   * an existing translation: `flagTranslation` and the curriculum-fix path
+   * (the user reported a bad translation and the new LLM output replaces
+   * the displayed text for everyone), and the version-bump regeneration
+   * (`translationReason: 'version_bump'`, which first archives the old
+   * wording for the cards that already show it, see `replaceForVersionBump`).
    *
    * When `true` AND a translation row already exists, the mutation
    * replaces `translatedText`, `romanizedText` (matched with its source),
@@ -171,6 +183,14 @@ const vStoreTranslationAndScheduleTtsArgs = v.object({
    * fires after another write already landed.
    */
   replaceExisting: v.optional(v.boolean()),
+  /**
+   * Why the translation was requested. Only `'version_bump'` changes the
+   * write: an identical result merely restamps the version, and a different
+   * one is archived for existing cards before the row is replaced. Every
+   * other reason (and absence) keeps the historical replace / fill
+   * semantics. See `supersededAt` in schema.ts.
+   */
+  translationReason: v.optional(translationReasonValidator),
   /**
    * Speaker gender ('male' | 'female') the translation was produced under
    * The card's resolved `audioSpeakerGender`. Persisted on the translation
@@ -237,12 +257,7 @@ export async function getTranslationForTextLanguageHandler(
   romanizedText?: string;
   regionVariant?: string;
 } | null> {
-  const row = await ctx.db
-    .query('translations')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
-    )
-    .first();
+  const row = await liveTranslation(ctx, args.textId, args.targetLanguage);
   if (!row) return null;
   return {
     translatedText: row.translatedText,
@@ -389,6 +404,7 @@ export async function processTranslationForCardHandler(
       translationSource: GOOGLE_TRANSLATE_SOURCE,
       regionVariant,
       replaceExisting: args.replaceExisting,
+      translationReason: args.translationReason,
       speakerGender: asVoiceGender(args.audioSpeakerGender),
       expectedClaimId: args.claimId,
       skipTts: args.skipTts,
@@ -410,8 +426,12 @@ export async function processTranslationForCardHandler(
  * audit-resolution tail.
  */
 type TranslationWriteResult = {
-  /** Which of the three write shapes ran. */
-  outcome: 'inserted' | 'replaced' | 'metadata_filled';
+  /**
+   * Which write shape ran. `'restamped'`: a version-bump regeneration that
+   * produced the identical wording, so only the version stamp (and source)
+   * moved; nothing downstream needs to run.
+   */
+  outcome: 'inserted' | 'replaced' | 'restamped' | 'metadata_filled';
   /**
    * Set on the replace branch when the retranslation is a punctuation-only
    * change. Audio was kept and TTS must not be enqueued.
@@ -496,12 +516,7 @@ async function guardTranslationWrite(
     }
   }
 
-  const existing = await ctx.db
-    .query('translations')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
-    )
-    .first();
+  const existing = await liveTranslation(ctx, args.textId, args.targetLanguage);
 
   if (existing && args.replaceExisting && isUserCreatedText(text)) {
     await resolveRetranslation(
@@ -658,6 +673,122 @@ async function replaceTranslationRow(
   };
 }
 
+/** Copy of `value` with every `undefined` property dropped, for inserts. */
+function defined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, v]) => v !== undefined),
+  ) as T;
+}
+
+/**
+ * Copy the live row's current wording into a superseded row of the same
+ * table together with the asset its audio plays, and mark the live row so
+ * card-facing readers know to consult the superseded rows for cards pinned
+ * before now. Called only when at least one card references the text AND
+ * the wording has audio (`audioAssetId`): a revision nobody can be served is
+ * a row for nothing, and a revision without audio would pin its cards to a
+ * wording no pointer voices.
+ *
+ * The copy carries the wording's annotations as they are; whatever is still
+ * missing is scheduled right away with the copy's own id, so a pinned card
+ * gets its IPA / furigana / romanization exactly like a live one would.
+ */
+async function archiveTranslationRevision(
+  ctx: MutationCtx,
+  existing: Doc<'translations'>,
+  audioAssetId: Id<'audioAssets'>,
+): Promise<void> {
+  const supersededAt = Date.now();
+  const supersededId = await ctx.db.insert(
+    'translations',
+    defined({
+      textId: existing.textId,
+      targetLanguage: existing.targetLanguage,
+      translatedText: existing.translatedText,
+      romanizedText: existing.romanizedText,
+      romanizationSource: existing.romanizationSource,
+      ipaText: existing.ipaText,
+      ipaSource: existing.ipaSource,
+      furiganaText: existing.furiganaText,
+      furiganaSource: existing.furiganaSource,
+      translationSource: existing.translationSource,
+      regionVariant: existing.regionVariant,
+      speakerGender: existing.speakerGender,
+      translationVersion: existing.translationVersion,
+      audioAssetId,
+      supersededAt,
+    }),
+  );
+  await ctx.db.patch(existing._id, { lastArchivedAt: supersededAt });
+  await scheduleTranslationAnnotations(ctx, existing, supersededId);
+}
+
+/**
+ * The `replaceExisting` write of a `'version_bump'` job. Three outcomes, all
+ * inside this one mutation, so there is never a window in which a card sees
+ * the new wording before its old one is safe:
+ *
+ *  - identical wording → restamp the version (and source); annotations,
+ *    audio and search strings are untouched. The common case for short
+ *    curriculum sentences, and it costs no TTS.
+ *  - a card references the text and the wording has audio → archive the
+ *    old wording with its asset so every existing card keeps it, then the
+ *    normal replacement.
+ *  - nothing references the text, or the wording never got audio (a warmed
+ *    row replaced before its first TTS) → the normal replacement. Nobody
+ *    has heard the old wording, and pinning a card to an audio-less archive
+ *    row would leave it mute: archived entries never report missing content.
+ *
+ * Flag and curriculum-fix retranslations never come here: they overwrite
+ * for every learner, as the schema comment on `cardEditRetranslations`
+ * documents.
+ */
+async function replaceForVersionBump(
+  ctx: MutationCtx,
+  args: StoreTranslationAndScheduleTtsArgs,
+  existing: Doc<'translations'>,
+  translatedText: string,
+  romanizedText: string | undefined,
+): Promise<TranslationWriteResult> {
+  if (existing.translatedText === translatedText) {
+    await ctx.db.patch(existing._id, {
+      translationVersion: getCurrentTranslationVersion(args.targetLanguage),
+      ...(args.translationSource
+        ? { translationSource: args.translationSource }
+        : {}),
+    });
+    return {
+      outcome: 'restamped',
+      audioUnchangedBySound: true,
+      searchableContentChanged: false,
+      ipaMissingAfterWrite: existing.ipaText === undefined,
+      furiganaMissingAfterWrite: existing.furiganaText === undefined,
+    };
+  }
+  const referencingCard = await ctx.db
+    .query('cards')
+    .withIndex('by_textId', (q) => q.eq('textId', args.textId))
+    .first();
+  if (referencingCard) {
+    const audio = await ctx.db
+      .query('audioRecordings')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('language', args.targetLanguage),
+      )
+      .first();
+    if (audio) {
+      await archiveTranslationRevision(ctx, existing, audio.assetId);
+    }
+  }
+  return replaceTranslationRow(
+    ctx,
+    args,
+    existing,
+    translatedText,
+    romanizedText,
+  );
+}
+
 /**
  * Concurrent-write protection (no `replaceExisting`): the existing
  * `translatedText` is never overwritten; metadata is patched only when
@@ -773,7 +904,8 @@ async function resolveAuditForWriteOutcome(
   await resolveRetranslation(
     ctx,
     args.retranslationAuditId,
-    write.outcome === 'replaced' && write.audioUnchangedBySound
+    (write.outcome === 'replaced' && write.audioUnchangedBySound) ||
+      write.outcome === 'restamped'
       ? 'applied_audio_kept'
       : 'applied',
     {
@@ -908,7 +1040,7 @@ async function scheduleTtsForLandedTranslation(
 
 /**
  * Handler body of `storeTranslationAndScheduleTTS`: guard → post-process →
- * one of three row writes (insert / replace / fill-metadata) → audit
+ * one of the row writes (insert / replace / version-bump replace / fill-metadata) → audit
  * resolution → follow-ups (search rebuild, IPA/furigana, TTS). See the arg
  * validator docs above for the semantics of each mode.
  */
@@ -935,13 +1067,21 @@ export async function storeTranslationAndScheduleTTSHandler(
   const write = !existing
     ? await insertTranslationRow(ctx, args, translatedText, romanizedText)
     : args.replaceExisting
-      ? await replaceTranslationRow(
-          ctx,
-          args,
-          existing,
-          translatedText,
-          romanizedText,
-        )
+      ? args.translationReason === 'version_bump'
+        ? await replaceForVersionBump(
+            ctx,
+            args,
+            existing,
+            translatedText,
+            romanizedText,
+          )
+        : await replaceTranslationRow(
+            ctx,
+            args,
+            existing,
+            translatedText,
+            romanizedText,
+          )
       : await fillTranslationMetadata(ctx, args, existing, romanizedText);
 
   await resolveAuditForWriteOutcome(ctx, args, write, translatedText);

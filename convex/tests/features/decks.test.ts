@@ -21,11 +21,13 @@ import { ttsPool, ttsWarmPool } from '../../lib/workpools';
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
+import { openrouterSttBody, isOpenrouterSttUrl } from '../lib/sttFixtures';
 import { sha256Hex } from '../../lib/sha256';
 import {
   getCurrentTtsVersion,
   getCurrentTranslationVersion,
 } from '../../../lib/languages';
+import { liveTranslation } from '../../db/translationReads';
 
 // Partial module mock: every real language's voice pickers only ever return
 // curated apiCodes, so `scheduleAudioForLanguage`'s "not in the curated voice
@@ -706,30 +708,11 @@ describe('features/decks', () => {
       vi.useFakeTimers();
       vi.stubEnv('GOOGLE_TTS_API_KEY', 'dummy');
       vi.stubEnv('GOOGLE_TRANSLATE_API_KEY', 'dummy');
-      vi.stubEnv('AZURE_SPEECH_API_KEY', 'dummy');
-      vi.stubEnv('AZURE_SPEECH_REGION', 'westeurope');
 
       const translateBody = JSON.stringify({
         data: { translations: [{ translatedText: 'translated' }] },
       });
-      const azureSttBody = JSON.stringify({
-        combinedPhrases: [{ text: 'translated' }],
-        phrases: [
-          {
-            offsetMilliseconds: 0,
-            durationMilliseconds: 500,
-            text: 'translated',
-            locale: 'en-US',
-            words: [
-              {
-                text: 'translated',
-                offsetMilliseconds: 0,
-                durationMilliseconds: 500,
-              },
-            ],
-          },
-        ],
-      });
+      const sttBody = openrouterSttBody('translated');
       const googleTtsBody = JSON.stringify({
         audioContent: Buffer.from('fake-mp3-bytes').toString('base64'),
       });
@@ -742,8 +725,8 @@ describe('features/decks', () => {
             headers: { 'Content-Type': 'application/json' },
           });
         }
-        if (u.includes('speechtotext/transcriptions:transcribe')) {
-          return new Response(azureSttBody, {
+        if (isOpenrouterSttUrl(u)) {
+          return new Response(sttBody, {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
           });
@@ -1051,12 +1034,7 @@ describe('features/decks', () => {
       });
 
       const row = await t.run(async (ctx) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'de'),
-          )
-          .first(),
+        liveTranslation(ctx, textId, 'de'),
       );
       expect(row?.translatedText).toBe('Sie ist da drüben');
     });
@@ -1146,12 +1124,7 @@ describe('features/decks', () => {
       });
 
       const row = await t.run(async (ctx) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'es'),
-          )
-          .first(),
+        liveTranslation(ctx, textId, 'es'),
       );
       expect(row?.translatedText).toBe('Hola.');
       expect(row?.romanizedText).toBe('Hola');
@@ -1393,12 +1366,7 @@ describe('features/decks', () => {
       return t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
         await scheduleMissingContent(ctx, textId, text, ['en'], ['es']);
-        return ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'es'),
-          )
-          .first();
+        return liveTranslation(ctx, textId, 'es');
       });
     }
 
@@ -1582,11 +1550,10 @@ describe('features/decks', () => {
   });
 
   describe('scheduleMissingContent: translation version regen', () => {
-    // No language sets `translationVersion` today, so a row stamped at 0 (strictly
-    // below the default current version 1) is the only way to exercise the stale
-    // branch. `speakerGender` matches `audioSpeakerGender` so ONLY the version
-    // check fires (no gender drift), and the audio matches provider+gender+version
-    // so it is deleted purely as the cascade of the stale translation.
+    // A row stamped at 0 is strictly below every language's current version,
+    // so the stale branch fires. `speakerGender` matches `audioSpeakerGender`
+    // so ONLY the version check fires (no gender drift), and the audio matches
+    // provider+gender+version so the audio validity sweep leaves it alone.
     async function seedStaleTranslation(
       t: TestConvex<typeof schema>,
       userCreated: boolean,
@@ -1637,12 +1604,7 @@ describe('features/decks', () => {
           ['en'],
           ['es'],
         );
-        const tr = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'es'),
-          )
-          .first();
+        const tr = await liveTranslation(ctx, textId, 'es');
         const audio = await ctx.db
           .query('audioRecordings')
           .withIndex('by_text_and_language', (q) =>
@@ -1653,13 +1615,26 @@ describe('features/decks', () => {
       });
     }
 
-    it('deletes a premade stale translation + its audio and schedules regeneration', async () => {
+    it('regenerates a premade stale translation IN PLACE: row and audio keep serving, replacement job scheduled', async () => {
       const t = convexTest(schema, modules);
-      const { textId } = await seedStaleTranslation(t, false);
+      const { textId, trId, audioId } = await seedStaleTranslation(t, false);
       const { result, tr, audio } = await runSweep(t, textId);
-      expect(tr).toBeNull(); // version-stale translation deleted
-      expect(audio).toBeNull(); // its audio cascade-deleted
-      expect(result.translationsScheduled).toBeGreaterThan(0); // regen scheduled
+      // Nothing is deleted up front: the old wording (and its audio) serves
+      // until the version-bump replacement lands, and the write choke point
+      // then archives it for existing cards (see translationArchive.test.ts).
+      expect(tr?._id).toBe(trId);
+      expect(tr?.translatedText).toBe('Hola');
+      expect(audio?._id).toBe(audioId);
+      expect(result.translationsScheduled).toBe(1); // in-place regen counted
+      const claim = await t.run((ctx) =>
+        ctx.db
+          .query('llmTranslationClaims')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', textId).eq('targetLanguage', 'es'),
+          )
+          .first(),
+      );
+      expect(claim).not.toBeNull();
     });
 
     it('keeps a user-created stale translation (the !userCreated guard) and its audio', async () => {
@@ -2043,12 +2018,7 @@ describe('features/decks', () => {
       });
       const res = await t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
-        const translation = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'es'),
-          )
-          .first();
+        const translation = await liveTranslation(ctx, textId, 'es');
         return scheduleAudioForLanguage(ctx, text, 'es', 'female', translation);
       });
       expect(res).toBe(false);
@@ -2102,12 +2072,7 @@ describe('features/decks', () => {
       try {
         const res = await t.run(async (ctx) => {
           const text = (await ctx.db.get(textId))!;
-          const translation = await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('targetLanguage', 'es'),
-            )
-            .first();
+          const translation = await liveTranslation(ctx, textId, 'es');
           return scheduleAudioForLanguage(
             ctx,
             text,
@@ -2150,12 +2115,7 @@ describe('features/decks', () => {
       try {
         const res = await t.run(async (ctx) => {
           const text = (await ctx.db.get(textId))!;
-          const translation = await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('targetLanguage', 'es_mixed'),
-            )
-            .first();
+          const translation = await liveTranslation(ctx, textId, 'es_mixed');
           return scheduleAudioForLanguage(
             ctx,
             text,
@@ -2258,12 +2218,7 @@ describe('features/decks', () => {
       });
 
       const row = await t.run(async (ctx) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', 'es'),
-          )
-          .first(),
+        liveTranslation(ctx, textId, 'es'),
       );
       expect(row?.translatedText).toBe('Hola');
       expect(mockEnqueueTts).not.toHaveBeenCalled();
