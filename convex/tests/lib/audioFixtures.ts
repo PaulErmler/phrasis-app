@@ -10,7 +10,7 @@ export interface AudioFixtureArgs {
   spokenText?: string;
   voiceName?: string;
   voiceGender?: 'male' | 'female';
-  ttsQuality?: 'unknown' | 'validated' | 'unvalidated';
+  ttsQuality?: 'unknown' | 'validated' | 'unvalidated' | 'unchecked';
   ttsProvider?: Doc<'audioAssets'>['ttsProvider'];
   speed?: number;
   wordTimings?: { word: string; start: number; end: number }[];

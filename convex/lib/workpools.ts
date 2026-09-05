@@ -97,8 +97,9 @@ export const ttsWarmPool = new Workpool(components.ttsWarmPool, {
 });
 
 /**
- * Background data-sweep pool, currently only the separateModeTracking
- * writing-track seed (convex/migrations/seedWritingTrack.ts).
+ * Background data-sweep pool: the separateModeTracking writing-track seed
+ * (convex/migrations/seedWritingTrack.ts) and the one-off study-day due-date
+ * snap (convex/migrations/snapDueDatesToStudyDay.ts).
  *
  * Deliberately NO retry config: the pool does not retry mutations (Convex
  * already retries them on OCC and transient failures, and they're

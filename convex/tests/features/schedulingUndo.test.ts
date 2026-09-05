@@ -187,7 +187,7 @@ describe('features/scheduling: undoLastReview', () => {
     const after = await getCard(t, cardId);
     expect(after?.schedulingPhase).toBe('preReview');
     expect(after?.preReviewCount).toBe(0);
-    expect(after?.dueDate).toBe(before?.dueDate); // exact, jitter and all
+    expect(after?.dueDate).toBe(before?.dueDate); // exact, slot and all
     expect(after?.fsrsState).toBeUndefined();
     expect(after?.isGraduated).toBeUndefined();
     expect(after?.lastReviewedAt).toBeUndefined();
@@ -393,7 +393,7 @@ describe('features/scheduling: undoLastReview', () => {
     ).toBe(UNDO_DEPTH);
 
     // Each undo steps LIFO back through the exact intermediate states
-    // (jittered dueDates and all).
+    // (slotted dueDates and all).
     for (let k = 1; k <= UNDO_DEPTH; k++) {
       const res = await asUser.mutation(
         api.features.scheduling.undoLastReview,

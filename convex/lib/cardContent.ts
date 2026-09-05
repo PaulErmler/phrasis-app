@@ -2,6 +2,7 @@ import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import {
   isTranslationVersionStale,
+  languageSupportsStt,
   languageSupportsWordTimings,
 } from '../../lib/languages';
 import {
@@ -14,6 +15,7 @@ import { getLlmClaim, isClaimFresh } from '../features/llmTranslationQueue';
 import { appendSearchSegments } from '../../lib/wordTokenize';
 import {
   audioPayloadFromRowAndAsset,
+  sttBackfillExhausted,
   type ResolvedAudioPayload,
 } from './audioAssets';
 import {
@@ -520,10 +522,14 @@ export async function buildTextContentBatchForLanguages(
       // the card shows the source wording meanwhile, but the row is
       // required content and the sweep must be asked for it.
       allLanguages.some((lang) => resolution(input, lang).accentRowMissing);
+    // The source slot is listed when the accent row it reads is missing or
+    // version-stale (the entry carries the accent row's `versionStale`), so
+    // browsing a collection regenerates a stale rewrite like any other row.
     const missingTranslationLanguages = translations
       .filter((tr) =>
         tr.language === input.sourceLanguage
-          ? resolution(input, tr.language).accentRowMissing
+          ? resolution(input, tr.language).accentRowMissing ||
+            tr.versionStale === true
           : !tr.text || tr.versionStale === true,
       )
       .map((tr) => tr.language);
@@ -559,11 +565,32 @@ export async function buildTextContentBatchForLanguages(
     // actually run. `scheduleTimingsBackfillIfNeeded` skips languages our STT
     // backend can't transcribe, so without this gate those cards would ask for
     // work that is deliberately never done.
+    // Both STT-backfill terms stop asking once the asset has used up its
+    // attempts (`sttBackfillExhausted`): the sweep would schedule nothing,
+    // and a clip STT keeps failing on must not keep every view of the card
+    // asking for it.
+    const backfillExhausted = (lang: string) => {
+      const payload = payloadByKeyAndLang.get(
+        resolution(input, lang).audioSlot,
+      );
+      return payload ? sttBackfillExhausted(payload.asset) : false;
+    };
     const hasMissingWordTimings = audioRecordings.some(
       (audio) =>
         audio.url !== null &&
         audio.wordTimings === null &&
-        languageSupportsWordTimings(audio.language),
+        languageSupportsWordTimings(audio.language) &&
+        !backfillExhausted(audio.language),
+    );
+    // A clip stored without a verdict because STT failed at synthesis time:
+    // the sweep re-validates it (`scheduleTimingsBackfillIfNeeded`), so it
+    // is missing content wherever STT can answer, timings or not.
+    const hasUncheckedAudio = audioRecordings.some(
+      (audio) =>
+        audio.url !== null &&
+        audio.ttsQuality === 'unchecked' &&
+        languageSupportsStt(audio.language) &&
+        !backfillExhausted(audio.language),
     );
 
     result.set(input.key, {
@@ -574,6 +601,7 @@ export async function buildTextContentBatchForLanguages(
         hasMissingTranslation ||
         hasMissingAudio ||
         hasMissingAnnotation ||
+        hasUncheckedAudio ||
         (!opts?.ignoreMissingWordTimings && hasMissingWordTimings),
     });
   }

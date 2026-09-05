@@ -45,31 +45,37 @@ export function dateInTimezone(ms: number, timezone: string): string {
 }
 
 /**
- * UTC timestamp of local midnight of `dateStr` in `timezone`.
+ * UTC timestamp of local `hour` o'clock (default midnight) of `dateStr` in
+ * `timezone`.
  *
  * DST-safe by construction rather than by offset tables: start from the UTC
- * midnight of the date string, measure the zone's wall clock there via Intl,
- * and shift by the difference to the desired wall clock (00:00:00). One
- * repeat absorbs an offset change between the guess and the target. On a
- * spring-forward gap, where local midnight does not exist (clocks jump
- * straight past it), returns the first existing instant of that day (the gap
- * end), found by walking forward in 15-minute steps — the granularity of
+ * instant of the target wall clock, measure the zone's wall clock there via
+ * Intl, and shift by the difference to the desired wall clock. One repeat
+ * absorbs an offset change between the guess and the target. On a
+ * spring-forward gap, where the target wall clock does not exist (clocks
+ * jump straight past it), returns the first existing instant after it (the
+ * gap end), found by walking forward in 15-minute steps — the granularity of
  * real-world zone offsets.
  *
  * Used for bucketing due-date timestamps into user-local days (workload
- * forecast); the exact instant chosen inside a gap only shifts which side of
- * a 23-hour day a card lands on.
+ * forecast) and for the study-day rollover (lib/scheduling.ts
+ * `studyDayStart`); the exact instant chosen inside a gap only shifts which
+ * side of a 23-hour day a card lands on.
  */
-export function startOfDayMs(dateStr: string, timezone: string): number {
-  const desired = toUtcMs(dateStr);
-  let ts = desired; // UTC-midnight guess
+export function startOfDayMs(
+  dateStr: string,
+  timezone: string,
+  hour = 0,
+): number {
+  const desired = toUtcMs(dateStr) + hour * 3_600_000;
+  let ts = desired; // UTC guess
   for (let i = 0; i < 2; i++) {
     const delta = desired - wallClockUtcMs(ts, timezone);
     if (delta === 0) break;
     ts += delta;
   }
   let steps = 0;
-  while (dateInTimezone(ts, timezone) < dateStr && steps < 16) {
+  while (wallClockUtcMs(ts, timezone) < desired && steps < 16) {
     ts += 15 * 60_000;
     steps++;
   }

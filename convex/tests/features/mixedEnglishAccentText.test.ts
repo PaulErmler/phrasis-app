@@ -11,8 +11,15 @@ import {
   buildCardSearchableText,
   buildTextContentBatchForLanguages,
 } from '../../lib/cardContent';
-import { servedSourceText, type SourceView } from '../../db/translationReads';
-import { getMixedAccentTextLanguage } from '../../../lib/languages';
+import {
+  liveTranslation,
+  servedSourceText,
+  type SourceView,
+} from '../../db/translationReads';
+import {
+  getCurrentTranslationVersion,
+  getMixedAccentTextLanguage,
+} from '../../../lib/languages';
 import { llmPool, ttsPool } from '../../lib/workpools';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
@@ -89,7 +96,7 @@ async function seedAccentRowAndAudio(
       targetLanguage: 'en_gb',
       translatedText: 'The colour of the lift',
       translationSource: 'openai/gpt-5.6-luna:nitro-none',
-      translationVersion: 3,
+      translationVersion: getCurrentTranslationVersion('en_gb'),
       ipaText: 'ipa-gb',
       speakerGender: 'female',
     });
@@ -301,6 +308,41 @@ describe('Mixed English reads the accent row its card stored', () => {
       expect(slot.hasMissingContent).toBe(true);
       // The preview's request list names the source language for it.
       expect(slot.missingTranslationLanguages).toEqual(['en']);
+    });
+
+    it('a preview lists the source language when its accent row is version-stale', async () => {
+      const t = convexTest(schema, modules);
+      const textId = await seedEnglishTextWithAccentRow(t, 'en_gb');
+      await seedAccentRowAndAudio(t, textId);
+      await t.run(async (ctx) => {
+        const row = (await liveTranslation(ctx, textId, 'en_gb'))!;
+        await ctx.db.patch(row._id, {
+          translationVersion: getCurrentTranslationVersion('en_gb') - 1,
+        });
+      });
+
+      const missing = await t.run(async (ctx) => {
+        const text = (await ctx.db.get(textId))!;
+        const map = await buildTextContentBatchForLanguages(
+          ctx,
+          [
+            {
+              key: 'k',
+              textId,
+              sourceText: text.text,
+              sourceLanguage: 'en',
+              userCreated: false,
+              view: null,
+            },
+          ],
+          ['en'],
+          ['es'],
+          { markVersionStale: true },
+        );
+        return map.get('k')!.missingTranslationLanguages;
+      });
+
+      expect(missing).toEqual(['en']);
     });
 
     it('a card with the American accent reads the source wording', async () => {

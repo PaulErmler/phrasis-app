@@ -155,7 +155,11 @@ export const CASES: AccentCase[] = [
     id: 'vo-line',
     kind: 'vocabulary',
     text: 'We waited in line for an hour.',
-    expect: both({ must: [/queue/], mustNot: [/in line/] }),
+    // The replacement must stay grammatical: "in queue" is not English.
+    expect: both({
+      must: [/in a queue|queued/],
+      mustNot: [/in line|in queue\b/],
+    }),
   },
   {
     id: 'vo-gas-station',
@@ -488,6 +492,101 @@ export const CASES: AccentCase[] = [
   },
 
   // ── controls (must come back unchanged) ───────────────────────────────
+  // "just" in the present tense means "simply": the past-simple rule
+  // ("I just ate" -> "I've just eaten") must not touch these. Luna turned
+  // "I just feel tired" into "I've just felt tired" in production (2026-09-05).
+  {
+    id: 'ct-just-feel',
+    kind: 'control',
+    text: 'I just feel tired.',
+    expect: UNCHANGED,
+  },
+  {
+    id: 'ct-just-want',
+    kind: 'control',
+    text: 'I just want to go home.',
+    expect: UNCHANGED,
+  },
+  {
+    id: 'ct-just-looks',
+    kind: 'control',
+    text: 'She just looks tired today.',
+    expect: UNCHANGED,
+  },
+  // Over-edits from the 2026-09-05 500-sentence review: proofreading,
+  // register flattening and a hyphen. None of these is an accent marker.
+  {
+    id: 'ct-social',
+    kind: 'control',
+    text: 'Sami is a social person.',
+    expect: UNCHANGED,
+  },
+  {
+    id: 'ct-work-out',
+    kind: 'control',
+    text: 'How often do you work out?',
+    expect: UNCHANGED,
+  },
+  {
+    id: 'ct-tip',
+    kind: 'control',
+    text: 'He blew on the tip of his fingers.',
+    expect: UNCHANGED,
+  },
+  {
+    id: 'ct-not-here-too',
+    kind: 'control',
+    text: 'The girl is not here too.',
+    expect: UNCHANGED,
+  },
+  {
+    id: 'ct-doing-video',
+    kind: 'control',
+    text: 'Sami is doing a new video.',
+    expect: UNCHANGED,
+  },
+  {
+    id: 'ct-deep-sea',
+    kind: 'control',
+    text: 'She trained for deep sea diving.',
+    expect: UNCHANGED,
+  },
+  {
+    id: 'ct-way-taller',
+    kind: 'control',
+    text: "Mary is way taller than me, isn't she?",
+    expect: UNCHANGED,
+  },
+  {
+    id: 'ct-phone-charging',
+    kind: 'control',
+    text: "My phone's charging.",
+    expect: UNCHANGED,
+  },
+  {
+    id: 'ct-right-away',
+    kind: 'control',
+    text: 'Make sure you clean up any spills right away.',
+    expect: UNCHANGED,
+  },
+  {
+    id: 'ct-to-the-hospital',
+    kind: 'control',
+    text: 'It is no less than ten miles to the hospital.',
+    expect: UNCHANGED,
+  },
+  {
+    id: 'ct-vice-president',
+    kind: 'control',
+    text: 'He would leave the job to his vice president.',
+    expect: UNCHANGED,
+  },
+  {
+    id: 'ct-openings',
+    kind: 'control',
+    text: 'There are some openings at our company.',
+    expect: UNCHANGED,
+  },
   {
     id: 'ct-house',
     kind: 'control',

@@ -13,6 +13,7 @@ import {
   viewOfCard,
 } from '../../db/translationReads';
 import {
+  getCurrentTranslationVersion,
   getMixedAccentTextLanguage,
   getTtsProviderForLanguage,
   getVoiceForLanguage,
@@ -143,7 +144,7 @@ async function seed(
           accentRow === 'rewrite'
             ? 'openai/gpt-5.6-luna:nitro-none'
             : 'source-verbatim',
-        translationVersion: 3,
+        translationVersion: getCurrentTranslationVersion('en_gb'),
         ipaText: 'ipa-gb',
         speakerGender: 'female',
       });
@@ -412,7 +413,7 @@ describe('regenerating audio', () => {
         targetLanguage: 'en_au',
         translatedText: 'The colour of the lift',
         translationSource: 'openai/gpt-5.6-luna:nitro-none',
-        translationVersion: 3,
+        translationVersion: getCurrentTranslationVersion('en_gb'),
         speakerGender: 'female',
       });
       await insertAudioFixture(ctx, {

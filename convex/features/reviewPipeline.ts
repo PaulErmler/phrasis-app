@@ -8,7 +8,9 @@ import {
   type CardSchedulingState,
   type ScheduleResult,
   type SchedulingPhase,
+  type StudyDay,
 } from '../../lib/scheduling';
+import { pickUniqueDueSlot } from '../lib/dueSlots';
 import {
   reviewRatingValidator,
   reviewModeValidator,
@@ -161,26 +163,49 @@ export function resolveValidatedPhase(
 
 /** Output of `applyFsrsTransition`: the state the review was scheduled FROM
  * (`cardState`, lazy-seed resolved on the writing track), the scheduler's
- * verdict, and the jittered due date every downstream phase persists. */
+ * verdict, and the due date every downstream phase persists (the verdict's
+ * own `dueDate` spread into its unique slot when it was snapped to a study
+ * day). */
 export type ReviewTransition = {
   cardState: CardSchedulingState;
   result: ScheduleResult;
-  dueDateWithJitter: number;
+  dueDate: number;
 };
 
 /**
  * Run the shared FSRS scheduling algorithm over the reviewed track's current
- * state and jitter the resulting due date.
+ * state and resolve the due date the card is persisted with.
+ *
+ * Day-scale results come back from `scheduleCard` as a study-day start
+ * (`snappedToStudyDay`) and get a unique random slot inside that day's
+ * window here (`pickUniqueDueSlot`). Minute-scale steps keep FSRS's exact
+ * instant. Nothing is jittered any more: reviews within a deck are
+ * sequential and ms-resolved, and the index breaks any residual tie on
+ * `_creationTime`, so the served order is deterministic either way.
  */
-export function applyFsrsTransition(params: {
-  card: Doc<'cards'>;
-  track: SchedulingTrack;
-  writing: WritingBaseline;
-  phase: SchedulingPhase;
-  rating: ReviewRating;
-  initialReviewCount: number;
-}): ReviewTransition {
-  const { card, track, writing, phase, rating, initialReviewCount } = params;
+export async function applyFsrsTransition(
+  ctx: MutationCtx,
+  params: {
+    card: Doc<'cards'>;
+    track: SchedulingTrack;
+    writing: WritingBaseline;
+    phase: SchedulingPhase;
+    rating: ReviewRating;
+    initialReviewCount: number;
+    now: number;
+    studyDay: StudyDay | undefined;
+  },
+): Promise<ReviewTransition> {
+  const {
+    card,
+    track,
+    writing,
+    phase,
+    rating,
+    initialReviewCount,
+    now,
+    studyDay,
+  } = params;
 
   // Build current scheduling state from the reviewed track
   const cardState: CardSchedulingState =
@@ -199,15 +224,25 @@ export function applyFsrsTransition(params: {
         };
 
   // Run the shared scheduling algorithm
-  const result = scheduleCard(cardState, rating, initialReviewCount);
+  const result = scheduleCard(
+    cardState,
+    rating,
+    initialReviewCount,
+    now,
+    undefined,
+    studyDay,
+  );
 
-  // Pull the due date back by up to 30s so cards that would share an FSRS
-  // timestamp don't stack, without ever scheduling them later than FSRS.
-  // Math.random() is [0, 1) → jitter is (-30s, 0s].
-  const jitterMs = -Math.random() * 30_000;
-  const dueDateWithJitter = result.dueDate + jitterMs;
+  // A snapped result whose day window turns out to have no free slot (16
+  // probes, practically unreachable) keeps FSRS's exact instant rather than
+  // failing the review.
+  const dueDate = result.snappedToStudyDay
+    ? ((await pickUniqueDueSlot(ctx, card.deckId, track, result.dueDate)) ??
+      result.fsrsState?.due ??
+      result.dueDate)
+    : result.dueDate;
 
-  return { cardState, result, dueDateWithJitter };
+  return { cardState, result, dueDate };
 }
 
 /**
@@ -296,7 +331,7 @@ export async function applyReviewPatchToCard(
     searchableTextPatch,
     newWordsTrackedLanguages,
   } = params;
-  const { result, dueDateWithJitter } = params.transition;
+  const { result, dueDate } = params.transition;
 
   // Flip isGraduated once the card reaches FSRS Review state (one-way flag)
   const isGraduatedPatch =
@@ -334,7 +369,7 @@ export async function applyReviewPatchToCard(
       ctx,
       card._id,
       {
-        writingDueDate: dueDateWithJitter,
+        writingDueDate: dueDate,
         writingLastReviewedAt: Date.now(),
         // `lastReviewedAt` is the track-agnostic activity timestamp (the
         // Library sorts and displays it; even free-play stamps it), so a
@@ -368,7 +403,7 @@ export async function applyReviewPatchToCard(
       {
         schedulingPhase: result.schedulingPhase,
         preReviewCount: result.preReviewCount,
-        dueDate: dueDateWithJitter,
+        dueDate,
         lastReviewedAt: Date.now(),
         // Only FSRS good/easy count (never pre-review "understood"), drives
         // the "until rated good" Practice-Listening strategy.
@@ -418,7 +453,7 @@ export async function recordReviewHistoryRow(
     wasFirstReview,
     writingUnseeded,
   } = params;
-  const { cardState, result, dueDateWithJitter } = params.transition;
+  const { cardState, result, dueDate } = params.transition;
 
   return insertReviewHistory(ctx, {
     userId,
@@ -444,7 +479,7 @@ export async function recordReviewHistoryRow(
       : {}),
     sessionId: args.sessionId,
     prevDueDate: cardState.dueDate,
-    newDueDate: dueDateWithJitter,
+    newDueDate: dueDate,
     ...(track === 'shared' ? { prevPreReviewCount: card.preReviewCount } : {}),
     prevFsrsState: cardState.fsrsState ?? undefined,
     newFsrsState: result.fsrsState ?? undefined,

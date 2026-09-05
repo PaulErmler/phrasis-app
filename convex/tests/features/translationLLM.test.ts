@@ -212,6 +212,32 @@ describe('features/translationLLM', () => {
       expect(prompt).toContain('<suggestion>use me</suggestion>');
     });
 
+    it('the rewrite prompt freezes tense, aspect and mood, and scopes the "just" rule to the past simple', () => {
+      // Luna turned "I just feel tired" into "I've just felt tired" in
+      // production (2026-09-05): the past-simple hint applied to a
+      // present-tense sentence, a meaning change.
+      const prompt = buildAccentRewritePrompt(
+        getAccentRewriteConfig('en_gb', 'en')!,
+        'I just feel tired.',
+      );
+      expect(prompt).toContain('the tense, aspect and mood of every verb');
+      expect(prompt).toContain(
+        '"I just want to go home", "she just looks tired" stay word for word',
+      );
+      expect(prompt).toContain('Only "just" with a past-simple verb changes');
+      // The 2026-09-05 500-sentence review: the model proofread, flattened
+      // informal register and localised a place-bound name.
+      expect(prompt).toContain('you are not proofreading');
+      expect(prompt).toContain('"way taller", "work out", "real sorry" stay');
+      expect(prompt).toContain('"the New York subway" stays');
+      expect(getAccentRewriteConfig('en_gb', 'en')!.grammar).toContain(
+        'present tense and stay',
+      );
+      expect(getAccentRewriteConfig('en_au', 'en')!.grammar).toContain(
+        'present tense and stay',
+      );
+    });
+
     it('the rewrite prompt carries no flag context by default', () => {
       const prompt = buildPrompt({
         ...base,
@@ -228,11 +254,11 @@ describe('features/translationLLM', () => {
       );
       expect(prompt).toContain('Australian readers');
       expect(prompt).toContain('footpath');
-      expect(prompt).toContain('return the sentence unchanged');
+      expect(prompt).toContain('return it unchanged');
       expect(prompt).toContain('currencies, units, numbers, dates');
       expect(prompt).toContain('quotation marks');
-      expect(prompt).toContain('do not add slang');
-      expect(prompt).toContain('Output only the rewritten sentence');
+      expect(prompt).toContain('no slang or regional colour added');
+      expect(prompt).toContain('Return only the sentence');
     });
 
     it('without accentRewrite the normal translator prompt is unchanged', () => {

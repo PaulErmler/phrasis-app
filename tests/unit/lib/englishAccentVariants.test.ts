@@ -162,10 +162,10 @@ describe('English accent variants are pickable and share the en text', () => {
   });
 
   it('variants carry a translationVersion bump so older rows regenerate', () => {
-    // en_gb / en_au: v3 replaces the v2 verbatim copies with accent
-    // rewrites; en_us stays on v2 (still verbatim).
-    expect(getLanguageByCode('en_gb')?.translationVersion).toBe(3);
-    expect(getLanguageByCode('en_au')?.translationVersion).toBe(3);
+    // en_gb / en_au: v4 (the tuned rewrite prompt) replaces v3's first
+    // rewrites, v2's verbatim copies and v1's full rewrites alike.
+    expect(getLanguageByCode('en_gb')?.translationVersion).toBe(4);
+    expect(getLanguageByCode('en_au')?.translationVersion).toBe(4);
     expect(getLanguageByCode('en_us')?.translationVersion).toBe(2);
   });
 });

@@ -54,6 +54,19 @@ type TrackDueQueries = {
     now: number,
     take: number,
   ) => Promise<Doc<'cards'>[]>;
+  /** The active card holding exactly this due instant, if any. */
+  at: (
+    ctx: QueryCtx,
+    deckId: Id<'decks'>,
+    due: number,
+  ) => Promise<Doc<'cards'> | null>;
+  /** Active cards due strictly after `afterDue`, ascending. */
+  after: (
+    ctx: QueryCtx,
+    deckId: Id<'decks'>,
+    afterDue: number,
+    take: number,
+  ) => Promise<Doc<'cards'>[]>;
 };
 
 const TRACK_DUE_QUERIES: Record<SchedulingTrack, TrackDueQueries> = {
@@ -108,6 +121,29 @@ const TRACK_DUE_QUERIES: Record<SchedulingTrack, TrackDueQueries> = {
             .eq('collectionOrigin', origin)
             .eq('isGraduated', false)
             .lte('dueDate', now),
+        )
+        .order('asc')
+        .take(take),
+    at: (ctx, deckId, due) =>
+      ctx.db
+        .query('cards')
+        .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
+          q
+            .eq('deckId', deckId)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .eq('dueDate', due),
+        )
+        .first(),
+    after: (ctx, deckId, afterDue, take) =>
+      ctx.db
+        .query('cards')
+        .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
+          q
+            .eq('deckId', deckId)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .gt('dueDate', afterDue),
         )
         .order('asc')
         .take(take),
@@ -174,8 +210,59 @@ const TRACK_DUE_QUERIES: Record<SchedulingTrack, TrackDueQueries> = {
         )
         .order('asc')
         .take(take),
+    at: (ctx, deckId, due) =>
+      ctx.db
+        .query('cards')
+        .withIndex('by_deck_hidden_mastered_writingDue', (q) =>
+          q
+            .eq('deckId', deckId)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .eq('writingDueDate', due),
+        )
+        .first(),
+    after: (ctx, deckId, afterDue, take) =>
+      ctx.db
+        .query('cards')
+        .withIndex('by_deck_hidden_mastered_writingDue', (q) =>
+          q
+            .eq('deckId', deckId)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .gt('writingDueDate', afterDue),
+        )
+        .order('asc')
+        .take(take),
   },
 };
+
+/** The due timestamp of `card` on `track` (the merge-sort key). */
+export function trackDueOf(card: Doc<'cards'>, track: SchedulingTrack): number {
+  return TRACK_DUE_QUERIES[track].dueOf(card);
+}
+
+/** The active card of `deckId` due at exactly `due` on `track`, if any.
+ * Point lookup on the track's due index; what `pickUniqueDueSlot` probes. */
+export function fetchTrackCardAtDue(
+  ctx: QueryCtx,
+  deckId: Id<'decks'>,
+  track: SchedulingTrack,
+  due: number,
+): Promise<Doc<'cards'> | null> {
+  return TRACK_DUE_QUERIES[track].at(ctx, deckId, due);
+}
+
+/** Active cards of `deckId` due strictly after `afterDue` on `track`,
+ * ascending; the cursor walk of the study-day snap sweep. */
+export function fetchTrackCardsAfterDue(
+  ctx: QueryCtx,
+  deckId: Id<'decks'>,
+  track: SchedulingTrack,
+  afterDue: number,
+  take: number,
+): Promise<Doc<'cards'>[]> {
+  return TRACK_DUE_QUERIES[track].after(ctx, deckId, afterDue, take);
+}
 
 /**
  * Fetch the top-K due cards of one scheduling track, honoring the

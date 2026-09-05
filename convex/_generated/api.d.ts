@@ -122,6 +122,7 @@ import type * as lib_collections from "../lib/collections.js";
 import type * as lib_contentScheduling from "../lib/contentScheduling.js";
 import type * as lib_dateUtils from "../lib/dateUtils.js";
 import type * as lib_dueQueue from "../lib/dueQueue.js";
+import type * as lib_dueSlots from "../lib/dueSlots.js";
 import type * as lib_emailEnv from "../lib/emailEnv.js";
 import type * as lib_env from "../lib/env.js";
 import type * as lib_freePlay from "../lib/freePlay.js";
@@ -166,6 +167,7 @@ import type * as migrations_datasetMigration_cutoverUser from "../migrations/dat
 import type * as migrations_recalcUserCardAggregates from "../migrations/recalcUserCardAggregates.js";
 import type * as migrations_seedPlacementTestSentences from "../migrations/seedPlacementTestSentences.js";
 import type * as migrations_seedWritingTrack from "../migrations/seedWritingTrack.js";
+import type * as migrations_snapDueDatesToStudyDay from "../migrations/snapDueDatesToStudyDay.js";
 import type * as migrations_updateEssentialGreetings from "../migrations/updateEssentialGreetings.js";
 import type * as posthog from "../posthog.js";
 import type * as rateLimiter from "../rateLimiter.js";
@@ -302,6 +304,7 @@ declare const fullApi: ApiFromModules<{
   "lib/contentScheduling": typeof lib_contentScheduling;
   "lib/dateUtils": typeof lib_dateUtils;
   "lib/dueQueue": typeof lib_dueQueue;
+  "lib/dueSlots": typeof lib_dueSlots;
   "lib/emailEnv": typeof lib_emailEnv;
   "lib/env": typeof lib_env;
   "lib/freePlay": typeof lib_freePlay;
@@ -346,6 +349,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/recalcUserCardAggregates": typeof migrations_recalcUserCardAggregates;
   "migrations/seedPlacementTestSentences": typeof migrations_seedPlacementTestSentences;
   "migrations/seedWritingTrack": typeof migrations_seedWritingTrack;
+  "migrations/snapDueDatesToStudyDay": typeof migrations_snapDueDatesToStudyDay;
   "migrations/updateEssentialGreetings": typeof migrations_updateEssentialGreetings;
   posthog: typeof posthog;
   rateLimiter: typeof rateLimiter;

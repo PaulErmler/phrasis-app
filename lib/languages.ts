@@ -450,19 +450,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     sharesTextWith: 'en',
-    // v3: rows are light-touch British rewrites of the `en` text
-    // (`accentRewrite`, generated on view like every other translation).
-    // v2 were verbatim copies, v1 the earlier full LLM rewrites; the bump
-    // lazily replaces both.
-    translationVersion: 3,
+    // v4 (2026-09-05): the rewrite prompt tuned on two 500-sentence samples
+    // (no proofreading, no tense changes, place-bound names kept; see
+    // scripts/eval-translation-accents.ts). v3 were the first light-touch
+    // British rewrites of the `en` text (`accentRewrite`, generated on view
+    // like every other translation), v2 verbatim copies, v1 the earlier
+    // full LLM rewrites; the bump lazily replaces all of them.
+    translationVersion: 4,
     accentRewrite: {
       name: 'British',
       spelling:
         'colour, centre, organise, travelling, tyre, cheque; "programme" for TV and events but "program" for computers',
       vocabulary:
-        'lift, flat, holiday, queue, pavement, lorry, sweets, aubergine, mobile phone, car park',
+        'lift, flat, holiday, queue, pavement, lorry, sweets, aubergine, pepper (for bell pepper), cinema (for movie theater), mobile phone, car park',
       grammar:
-        '"gotten" -> "got", "on the weekend" -> "at the weekend", "in the hospital" -> "in hospital", "Monday through Friday" -> "Monday to Friday", "I just ate" -> "I\'ve just eaten", "write me" -> "write to me"',
+        '"gotten" -> "got", "on the weekend" -> "at the weekend", "in the hospital" -> "in hospital" (a patient being treated only; "drive to the hospital", "near the hospital" stay), "Monday through Friday" -> "Monday to Friday", "I just ate" -> "I\'ve just eaten" (past-simple verb only; "I just want", "I just feel" are present tense and stay), "write me" -> "write to me"',
     },
     translationPromptNotes:
       'British spelling and vocabulary (colour, lift, queue).',
@@ -523,8 +525,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     sharesTextWith: 'en',
-    // v3: light-touch Australian rewrites of the `en` text, see en_gb.
-    translationVersion: 3,
+    // v4 (2026-09-05): tuned rewrite prompt, see en_gb.
+    translationVersion: 4,
     accentRewrite: {
       name: 'Australian',
       spelling:
@@ -532,7 +534,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
       vocabulary:
         'lift, flat, holiday, queue, footpath, truck, lollies, eggplant, capsicum, mobile phone, car park',
       grammar:
-        '"gotten" -> "got", "in the hospital" -> "in hospital", "Monday through Friday" -> "Monday to Friday", "I just ate" -> "I\'ve just eaten", "write me" -> "write to me"',
+        '"gotten" -> "got", "in the hospital" -> "in hospital" (a patient being treated only; "drive to the hospital", "near the hospital" stay), "Monday through Friday" -> "Monday to Friday", "I just ate" -> "I\'ve just eaten" (past-simple verb only; "I just want", "I just feel" are present tense and stay), "write me" -> "write to me"',
     },
     translationPromptNotes:
       'Closer to British spelling; Australian vocabulary where natural.',

@@ -17,7 +17,8 @@ import {
   viewOfCard,
 } from '../db/translationReads';
 import { Id, Doc } from '../_generated/dataModel';
-import { getAuthUserId, requireAuthUserId } from '../db/users';
+import { getAuthUserId, getUserSettings, requireAuthUserId } from '../db/users';
+import { studyDayFromSettings } from '../lib/dueSlots';
 import { getActiveCourseForUser } from '../db/courses';
 import { getCourseSettings } from '../db/courseSettings';
 import { hasPendingCustomCardsToAdd } from '../db/collections';
@@ -705,15 +706,22 @@ export const reviewCard = mutation({
       track,
     );
     const phase = resolveValidatedPhase(card, track, args);
-    const transition = applyFsrsTransition({
+    // Study-day snapping is a per-user preference (default on), so this is
+    // the one extra read on the review hot path. The client's zone is what
+    // the day boundary is computed in; an invalid one falls back to exact
+    // instants rather than failing the review.
+    const userSettings = await getUserSettings(ctx, userId);
+    const transition = await applyFsrsTransition(ctx, {
       card,
       track,
       writing,
       phase,
       rating: args.rating,
       initialReviewCount,
+      now: Date.now(),
+      studyDay: studyDayFromSettings(userSettings, args.timezone),
     });
-    const { result, dueDateWithJitter } = transition;
+    const { result, dueDate } = transition;
 
     // Stale searchable-text refresh; also fetches the text doc once when
     // word tracking (inside recordReviewStats) will need it.
@@ -818,7 +826,7 @@ export const reviewCard = mutation({
     return {
       schedulingPhase: result.schedulingPhase,
       preReviewCount: result.preReviewCount,
-      dueDate: dueDateWithJitter,
+      dueDate,
       phaseTransitioned: result.phaseTransitioned,
       fsrsState: result.fsrsState,
       dailyReviewsToday: floorToCelebration(

@@ -11,6 +11,7 @@ import {
   isMixedLanguage,
   isTtsVersionStale,
   isTranslationVersionStale,
+  languageSupportsStt,
   languageSupportsWordTimings,
   pickAccentForText,
   usesSourceTextVerbatim,
@@ -26,6 +27,7 @@ import { deleteAudioRow } from './audio';
 import {
   findReusableAudioAssetForVoice,
   resolveAudioPayload,
+  sttBackfillExhausted,
   upsertAudioPointer,
 } from './audioAssets';
 import {
@@ -902,10 +904,13 @@ async function sweepStaleTranslations(
 }
 
 /**
- * Schedule a Scribe backfill for an existing audio row that lacks timings.
- * A no-op unless the row survived the validity sweep (its payload is in
- * `state.audioPayloadMap`), the shared asset has no timings yet, and the
- * language supports STT at all.
+ * Schedule an STT backfill for an existing audio row that lacks timings, or
+ * that was stored 'unchecked' because STT failed at synthesis time (the
+ * backfill then delivers the verdict too). A no-op unless the row survived
+ * the validity sweep (its payload is in `state.audioPayloadMap`), the
+ * language's STT can produce what is missing, and the asset has backfill
+ * attempts left (`sttBackfillExhausted`): a clip STT keeps failing on is
+ * left alone rather than retried on every view.
  */
 async function scheduleTimingsBackfillIfNeeded(
   ctx: MutationCtx,
@@ -919,11 +924,17 @@ async function scheduleTimingsBackfillIfNeeded(
   // shared-asset timings serve every pointing text, so an asset that already
   // has them needs no backfill.
   const payload = state.audioPayloadMap.get(lang);
-  if (!audio || !payload || payload.wordTimings) return;
+  if (!audio || !payload) return;
+  if (sttBackfillExhausted(payload.asset)) return;
   // Languages whose STT backend yields no word timings (none, or the
   // text-only Gemini fallback) will never get them, so don't waste a claim
-  // on a backfill that's guaranteed to no-op.
-  if (!languageSupportsWordTimings(lang)) return;
+  // on a backfill that's guaranteed to no-op; a text-only backend still
+  // gives an unchecked clip its verdict.
+  const needsTimings =
+    !payload.wordTimings && languageSupportsWordTimings(lang);
+  const needsVerdict =
+    payload.ttsQuality === 'unchecked' && languageSupportsStt(lang);
+  if (!needsTimings && !needsVerdict) return;
   if (opts?.probe) {
     // Claim-held = a job (synthesis or backfill) already owns the slot —
     // unless it's a background claim the real (priority-less, hence
@@ -995,7 +1006,11 @@ async function scheduleSupersededRevisionContent(
       });
       continue;
     }
-    if (asset.wordTimings === undefined && languageSupportsWordTimings(lang)) {
+    if (
+      !sttBackfillExhausted(asset) &&
+      ((asset.wordTimings === undefined && languageSupportsWordTimings(lang)) ||
+        (asset.ttsQuality === 'unchecked' && languageSupportsStt(lang)))
+    ) {
       if (opts?.probe) {
         if (await hasBlockingTtsClaim(ctx, textId, lang, undefined)) continue;
         throw new ProbeNeedsWork();

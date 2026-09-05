@@ -8,6 +8,7 @@
  *   pnpm eval:accents
  *   pnpm eval:accents --conditions=verbatim,luna,flash-lite --judge-only
  *   pnpm eval:accents --wild=0 --no-judge
+ *   pnpm eval:accents --conditions=luna --accents=en_gb --wild=500 --seed=round-2 --no-judge
  *
  * Before 2026-09-05 `en_gb` / `en_au` courses showed the `en` text verbatim,
  * so the `verbatim` condition is the baseline: doing nothing, at zero cost.
@@ -47,7 +48,10 @@ import {
   postProcessTranslation,
   type ModelStage,
 } from '../lib/languages';
-import type { TranslationPromptArgs } from '../convex/features/translationLLM';
+import {
+  buildPrompt,
+  type TranslationPromptArgs,
+} from '../convex/features/translationLLM';
 import {
   CASES,
   type Accent,
@@ -118,6 +122,7 @@ type Args = {
   smoke: boolean;
   judgeOnly: boolean;
   noJudge: boolean;
+  seed: string;
 };
 
 function parseArgs(argv: string[]): Args {
@@ -134,6 +139,9 @@ function parseArgs(argv: string[]): Args {
       .split(',')
       .filter((a): a is Accent => a === 'en_gb' || a === 'en_au'),
     wild: Number(get('wild') ?? (smoke ? 0 : 100)),
+    // A different `--seed` draws a different wild sample (a generalisation
+    // check after tuning on the default draw).
+    seed: get('seed') ?? 'accents-wild',
     limit: Number(get('limit') ?? (smoke ? 5 : CASES.length)),
     budget: Number(get('budget') ?? 1.0),
     concurrency: Number(get('concurrency') ?? 4),
@@ -177,7 +185,7 @@ function curatedItems(limit: number): Item[] {
 }
 
 /** A seeded sample of the catalogue, equal counts per CEFR level. */
-function wildItems(n: number): Item[] {
+function wildItems(n: number, seed: string): Item[] {
   if (n <= 0) return [];
   const rows = parse(readFileSync(WILD_CSV, 'utf8'), {
     columns: true,
@@ -187,14 +195,14 @@ function wildItems(n: number): Item[] {
   const picked: Item[] = [];
   for (const level of WILD_LEVELS) {
     const pool = rows.filter((r) => r.difficulty === level);
-    for (const r of seededShuffle(pool, `accents-wild:${level}`).slice(
+    for (const r of seededShuffle(pool, `${seed}:${level}`).slice(
       0,
       perLevel,
     )) {
       picked.push({ id: `wild-${level}-${r.id}`, kind: 'wild', text: r.text });
     }
   }
-  return seededShuffle(picked, 'accents-wild:order').slice(0, n);
+  return seededShuffle(picked, `${seed}:order`).slice(0, n);
 }
 
 // ------------------------------------------------------------------- prompt
@@ -243,8 +251,19 @@ function cleanOutput(raw: string): string {
   return postProcessTranslation('en', s);
 }
 
+/**
+ * The prompt a condition sends for an accent, fingerprinted so a prompt
+ * change (in `buildAccentRewritePrompt` or the accent's hints) invalidates
+ * the cached outputs instead of silently reusing the old prompt's answers.
+ * The baseline has no prompt.
+ */
+function promptFingerprint(condition: string, accent: Accent): string {
+  if (condition === BASELINE) return 'none';
+  return fnv(buildPrompt(promptArgsFor(accent, '')));
+}
+
 function cacheKey(condition: string, accent: Accent, it: Item): string {
-  return `${condition}|${accent}|${itemKey(it)}`;
+  return `${condition}|${accent}|${promptFingerprint(condition, accent)}|${itemKey(it)}`;
 }
 
 /** The cleaned text a condition produced for an item, null for a failure. */
@@ -421,6 +440,38 @@ function writeDiffSheet(lines: DiffLine[]): void {
   console.log(`Wrote ${byItem.size} items to ${OUT_DIR}/diff-sheet.md`);
 }
 
+/**
+ * Every item, changed or not, one line per (condition, accent): the sheet a
+ * reviewer reads to catch both over-edits and missed Americanisms.
+ */
+function writeAllPairs(
+  items: Item[],
+  conditionNames: string[],
+  accents: Accent[],
+): void {
+  const md: string[] = [
+    `# Accent rewrite pairs (every item)`,
+    ``,
+    `Format: id | source | condition/accent -> output. "(unchanged)" marks a byte-identical output.`,
+    ``,
+  ];
+  for (const it of items) {
+    for (const condition of conditionNames) {
+      if (condition === BASELINE) continue;
+      for (const accent of accents) {
+        const out = outputText(condition, accent, it);
+        if (out === null) continue;
+        const same = out === it.text ? ' (unchanged)' : '';
+        md.push(
+          `- ${it.id} | ${it.text} | ${condition}/${accent} -> ${out}${same}`,
+        );
+      }
+    }
+  }
+  writeFileSync(resolve(OUT_DIR, 'all-pairs.md'), md.join('\n'));
+  console.log(`Wrote ${items.length} items to ${OUT_DIR}/all-pairs.md`);
+}
+
 // --------------------------------------------------------------------- main
 
 async function main() {
@@ -436,7 +487,10 @@ async function main() {
   }
   const conditionNames = args.conditions;
   const paid = conditionNames.filter((c) => CONDITIONS[c] !== null);
-  const items = [...curatedItems(args.limit), ...wildItems(args.wild)];
+  const items = [
+    ...curatedItems(args.limit),
+    ...wildItems(args.wild, args.seed),
+  ];
 
   const openrouter = createOpenRouterFromEnv(
     'pnpm eval:accents (tsx --env-file=.env.local)',
@@ -631,6 +685,7 @@ async function main() {
 
   bench.writeReport(lines, { args, aggs, judgeCost, spentUsd: bench.spentUsd });
   writeDiffSheet(diffLines);
+  writeAllPairs(items, conditionNames, args.accents);
 }
 
 main().catch((err) => {

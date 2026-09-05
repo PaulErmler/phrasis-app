@@ -707,7 +707,19 @@ export default defineSchema({
     // 'unknown' = a synthesis job is mid-flight on this asset (attempt-0 early
     // write); completed audio is 'validated'/'unvalidated' (or undefined on
     // legacy rows carried over by the backfill, which is also "completed").
+    // 'unchecked' = completed audio whose STT validation failed for reasons
+    // unrelated to the clip (rate limit, outage): kept, played, and given a
+    // verdict later by `backfillWordTimings`. 'unvalidated' is FINAL and is
+    // never re-checked; 'unchecked' is temporary and bounded by
+    // `revalidationAttempts`.
     ttsQuality: v.optional(ttsQualityValidator),
+    // How many STT backfill runs (re-validation of an unchecked clip, or a
+    // word-timing backfill) have failed on this asset. At
+    // `MAX_STT_BACKFILL_ATTEMPTS` (convex/lib/audioAssets.ts) the sweep
+    // stops scheduling backfills for it and an unchecked clip becomes
+    // 'unvalidated' for good, so an STT outage can never turn into an
+    // endless per-view retry.
+    revalidationAttempts: v.optional(v.number()),
     speed: v.number(),
     // Word-level timestamps from the STT validation pass (convex/lib/stt), captured during TTS
     // validation. Seconds relative to the audio blob. Only populated when
@@ -808,6 +820,15 @@ export default defineSchema({
     // One field per tile: the two are independent. Unset ≡ 'all'.
     repsStatFilter: v.optional(statFilterValidator),
     timeStatFilter: v.optional(statFilterValidator),
+    // Study-day scheduling (lib/scheduling.ts: DEFAULT_DUE_BY_DAY /
+    // DEFAULT_DAY_START_HOUR). Day-scale FSRS due dates snap to the start of
+    // the learner's study day so a morning-only learner reaches everything
+    // due that day. NOT exposed in any settings UI yet, and not accepted by
+    // `updateUserSettings`; the fields exist so a later settings row has
+    // somewhere to write. Unset = on, rollover at 04:00 local. Only an
+    // explicit `false` turns snapping off.
+    dueByDay: v.optional(v.boolean()),
+    dayStartHour: v.optional(v.number()),
   }).index('by_userId', ['userId']),
 
   // Onboarding progress table. Stores the user's onboarding answers.

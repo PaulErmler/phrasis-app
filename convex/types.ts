@@ -101,7 +101,9 @@ export const audioRecordingValidator = v.object({
   ),
   // TTS validation status: 'unknown' while a synthesis attempt is in flight
   // (or between retries), 'validated' once transcription matched, 'unvalidated'
-  // for languages without STT support or when all retries mismatched. Surfaced
+  // for languages without STT support or when all retries mismatched,
+  // 'unchecked' when STT itself failed (rate limit, outage) so the clip was
+  // kept without a verdict and the sweep re-validates it later. Surfaced
   // so the "Retranslating" pill in the learning view can stay visible while
   // ttsQuality === 'unknown' (the audio row exists but the audio it points
   // to may still be a not-yet-validated synthesis). Nullable for rows that
@@ -231,6 +233,7 @@ export const ttsQualityValidator = v.union(
   v.literal('unknown'),
   v.literal('validated'),
   v.literal('unvalidated'),
+  v.literal('unchecked'),
 );
 
 // Single source of truth for the provider list is `TTS_PROVIDERS` in

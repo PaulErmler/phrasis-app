@@ -57,6 +57,21 @@ export function buildAudioAssetKey(args: {
  */
 export const BLOB_SWAP_DELETE_DELAY_MS = 10 * 60 * 1000;
 
+/**
+ * How many failed STT backfill runs an asset gets before the sweep stops
+ * asking (`scheduleTimingsBackfillIfNeeded`, `hasMissingContent`) and an
+ * 'unchecked' clip is settled as 'unvalidated'. Bounds the cost of an STT
+ * outage to a handful of calls per clip instead of one per card view.
+ */
+export const MAX_STT_BACKFILL_ATTEMPTS = 3;
+
+/** True once an asset has used up its STT backfill attempts. */
+export function sttBackfillExhausted(
+  asset: Pick<Doc<'audioAssets'>, 'revalidationAttempts'>,
+): boolean {
+  return (asset.revalidationAttempts ?? 0) >= MAX_STT_BACKFILL_ATTEMPTS;
+}
+
 export interface AudioAssetKey {
   language: string;
   voiceGender: VoiceGender;
@@ -70,7 +85,7 @@ export interface AudioAssetPayload {
   storageId: Id<'_storage'>;
   voiceName: string;
   ttsProvider?: TtsProvider;
-  ttsQuality?: 'unknown' | 'validated' | 'unvalidated';
+  ttsQuality?: 'unknown' | 'validated' | 'unvalidated' | 'unchecked';
   speed: number;
   wordTimings?: { word: string; start: number; end: number }[];
   ttsVersion?: number;
@@ -254,9 +269,12 @@ export async function upsertAudioAsset(
   }
 
   const incomingIsFinal =
-    payload.ttsQuality === 'validated' || payload.ttsQuality === 'unvalidated';
+    payload.ttsQuality === 'validated' ||
+    payload.ttsQuality === 'unvalidated' ||
+    payload.ttsQuality === 'unchecked';
   // 'unknown' marks a mid-flight asset; undefined (legacy backfill) and the
-  // final qualities are completed audio.
+  // final qualities are completed audio ('unchecked' is complete audio
+  // awaiting a verdict from the sweep's re-validation).
   const existingInFlight = existing.ttsQuality === 'unknown';
   if (!incomingIsFinal && !existingInFlight) {
     return { assetId: existing._id, outcome: 'kept', replacedStorageId: null };
@@ -371,7 +389,7 @@ export async function scheduleBlobSwapDelete(
 export interface ResolvedAudioPayload {
   storageId: Id<'_storage'>;
   voiceName: string;
-  ttsQuality: 'unknown' | 'validated' | 'unvalidated' | undefined;
+  ttsQuality: 'unknown' | 'validated' | 'unvalidated' | 'unchecked' | undefined;
   ttsProvider: TtsProvider | undefined;
   voiceGender: VoiceGender;
   speed: number;
