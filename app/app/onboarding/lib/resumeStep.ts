@@ -42,7 +42,7 @@ export const LEGACY_STEP_AFTER_FIRST_LESSON = 9;
 /**
  * Map a persisted 1-based step number onto the current wizard order.
  *
- * `priorApps` tells the two orders apart: the `prior-apps` step blocks
+ * `priorApps` tells the two orders apart. The `prior-apps` step blocks
  * Continue on an empty pick, so every row saved past step 3 under the
  * current order carries it, and a row without it at step 3 or later was
  * saved under an older order.
@@ -53,13 +53,13 @@ export function resumeStepId(
 ): StepId {
   // Steps 1-2 line up with every past wizard order. `prior-apps` was inserted
   // at 3 later, so an older in-progress row resumes one step earlier than it
-  // left: on the new question, with its saved answers intact. The one place
-  // that shift lands wrong is the old last step: 7 was review-mode under the
+  // left, on the new question, with its saved answers intact. The one place
+  // that shift lands wrong is the old last step. 7 was review-mode under the
   // previous order and customizing under the 12-step flow, and both users
   // had already settled their level, so they resume on review-mode rather
-  // than on the level picker (which would overwrite a finished placement
-  // test with the slider). 8 (mid-first-lesson) is an old-flow row whose
-  // user never settled a review mode; it lands on review-mode too.
+  // than on the level picker, which would overwrite a finished placement
+  // test with the slider. 8, mid-first-lesson, is an old-flow row whose
+  // user never settled a review mode. It lands on review-mode too.
   // `completeOnboarding` is idempotent, so users whose course already exists
   // (old flow got past customizing) just re-confirm the mode and finish.
   // Rows at 9+ never reach here. They graduate out first.

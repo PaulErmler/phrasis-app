@@ -42,7 +42,7 @@ import {
 } from './translationPipeline';
 import { romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
-import { llmPool, llmWarmPool } from '../lib/workpools';
+import { llmPool, llmWarmPool, type PoolRunResult } from '../lib/workpools';
 import {
   asVoiceGender,
   llmPriorityValidator,
@@ -290,14 +290,8 @@ const llmCompletionContextValidator = llmJobArgsValidator.omit(
 
 type LlmJobArgs = Infer<typeof llmJobArgsValidator>;
 
-// Explicit handler param types throughout this file: handlers reference
-// same-file functions via `internal.…` (enqueue → worker → onComplete), and
-// letting TS infer their types through the generated `internal` object is
-// circular. Inference collapses to `any` for every handler in the module.
-type PoolRunResult =
-  | { kind: 'success'; returnValue: unknown }
-  | { kind: 'failed'; error: string }
-  | { kind: 'canceled' };
+// Handler params are typed explicitly throughout this file; see
+// `PoolRunResult` in convex/lib/workpools.ts for why.
 
 /**
  * Enqueue an LLM translation into the pool and stamp the pool's workId onto
@@ -733,10 +727,10 @@ async function storeLlmTranslationResult(
   translatedText: string,
   winningStage: TranslationStage,
   /**
-   * An accent rewrite that came back as the source text (most catalogue
-   * sentences): stored as a verbatim row, same wording, so the audio clip
-   * stays shared across accents and nothing claims the model did work it
-   * did not do.
+   * An accent rewrite that came back as the source text, which most
+   * catalogue sentences do. Stored as a verbatim row with the same wording,
+   * so the audio clip stays shared across accents and nothing claims the
+   * model did work it did not do.
    */
   isVerbatimAccentRewrite: boolean,
 ): Promise<void> {
@@ -861,8 +855,8 @@ export const processLlmTranslationForCard = internalAction({
     // An accent sibling of the text's own language runs the fixed rewrite
     // chain whatever the target's translation rule or a flag's override
     // says: the job is a copy-edit, not a translation, and the rules were
-    // tuned for the latter. `promptArgs.accentRewrite` is the one place the
-    // job decides it is a rewrite (off the text row).
+    // tuned for the latter. `promptArgs.accentRewrite`, derived from the
+    // text row, is the one place the job decides it is a rewrite.
     const stages = promptArgs.accentRewrite
       ? ACCENT_REWRITE_STAGES
       : resolveTranslationStages(
@@ -890,7 +884,7 @@ export const processLlmTranslationForCard = internalAction({
 
     // The reply was normalised on its way out of the LLM call
     // (`normalizeModelOutput`), so the source goes through the same step
-    // before the comparison: a sentence wrapped in quotation marks is still
+    // before the comparison. A sentence wrapped in quotation marks is still
     // verbatim when the model returns it unchanged.
     const isVerbatimAccentRewrite =
       promptArgs.accentRewrite !== undefined &&
@@ -989,7 +983,7 @@ export const onLlmTranslationComplete = internalMutation({
     }
 
     // Off the text row, like the worker (`resolvePromptMetadata`), never off
-    // the job's `sourceLanguage`: a stale arg must not turn a rewrite into
+    // the job's `sourceLanguage`. A stale arg must not turn a rewrite into
     // a Google translation, or the reverse.
     const textRow = await ctx.db.get(context.textId);
     if (

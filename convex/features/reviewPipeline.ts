@@ -161,11 +161,11 @@ export function resolveValidatedPhase(
   return phase;
 }
 
-/** Output of `applyFsrsTransition`: the state the review was scheduled FROM
+/** Output of `applyFsrsTransition`. The state the review was scheduled from
  * (`cardState`, lazy-seed resolved on the writing track), the scheduler's
- * verdict, and the due date every downstream phase persists (the verdict's
- * own `dueDate` spread into its unique slot when it was snapped to a study
- * day). */
+ * verdict, and the due date every downstream phase persists, which is the
+ * verdict's own `dueDate` spread into its unique slot when it was snapped
+ * to a study day. */
 export type ReviewTransition = {
   cardState: CardSchedulingState;
   result: ScheduleResult;
@@ -179,7 +179,7 @@ export type ReviewTransition = {
  * Day-scale results come back from `scheduleCard` as a study-day start
  * (`snappedToStudyDay`) and get a unique random slot inside that day's
  * window here (`pickUniqueDueSlot`). Minute-scale steps keep FSRS's exact
- * instant. Nothing is jittered any more: reviews within a deck are
+ * instant. Nothing is jittered any more. Reviews within a deck are
  * sequential and ms-resolved, and the index breaks any residual tie on
  * `_creationTime`, so the served order is deterministic either way.
  */
@@ -233,9 +233,9 @@ export async function applyFsrsTransition(
     studyDay,
   );
 
-  // A snapped result whose day window turns out to have no free slot (16
-  // probes, practically unreachable) keeps FSRS's exact instant rather than
-  // failing the review.
+  // A snapped result whose day window has no free slot after 16 probes,
+  // which is practically unreachable, keeps FSRS's exact instant rather
+  // than failing the review.
   const dueDate = result.snappedToStudyDay
     ? ((await pickUniqueDueSlot(ctx, card.deckId, track, result.dueDate)) ??
       result.fsrsState?.due ??

@@ -68,8 +68,10 @@ describe('lib/languages: postProcessTranslation', () => {
       expect(postProcessTranslation('uz', "O'zbek._")).toBe('Oʻzbek.');
     });
 
-    it('does not touch other languages', () => {
-      expect(postProcessTranslation('en', 'don’t')).toBe('don’t');
+    it('does not give other languages the Uzbek modifier letters', () => {
+      // Other languages fold a word-internal apostrophe to ASCII instead.
+      expect(postProcessTranslation('en', 'don’t')).toBe("don't");
+      expect(postProcessTranslation('en', "o'zbek")).toBe("o'zbek");
     });
   });
 });

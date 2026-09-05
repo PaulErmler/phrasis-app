@@ -11,6 +11,40 @@ export function isOpenrouterSttUrl(url: string): boolean {
   return url.includes(OPENROUTER_STT_URL_FRAGMENT);
 }
 
+/**
+ * A Blob that behaves like the one `ctx.storage.get` returns: its bytes can
+ * be read once, and any second read (a slice, a stream, another
+ * `arrayBuffer`) throws the runtime's "Can't re-read streaming Blob".
+ */
+export class OnceReadableBlob extends Blob {
+  private consumed = false;
+
+  private take(): void {
+    if (this.consumed) throw new TypeError("Can't re-read streaming Blob");
+    this.consumed = true;
+  }
+
+  override arrayBuffer(): Promise<ArrayBuffer> {
+    this.take();
+    return super.arrayBuffer();
+  }
+
+  override slice(start?: number, end?: number, contentType?: string): Blob {
+    this.take();
+    return super.slice(start, end, contentType);
+  }
+
+  override stream(): ReturnType<Blob['stream']> {
+    this.take();
+    return super.stream();
+  }
+
+  override text(): Promise<string> {
+    this.take();
+    return super.text();
+  }
+}
+
 /** Leading bytes of each container, enough for `detectAudioContainer`. */
 export const WAV_HEADER = new Uint8Array([
   0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45, 0x66, 0x6d, 0x74,

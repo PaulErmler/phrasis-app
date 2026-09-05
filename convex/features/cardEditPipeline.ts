@@ -9,6 +9,7 @@ import {
 import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../lib/translationProvenance';
 import { deleteAudioRowsForTextLanguage } from '../lib/audio';
 import { soundsSame } from '../lib/textComparison';
+import { canonicalizeApostrophes } from '../../lib/languages';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
 import {
   languageRole,
@@ -47,18 +48,19 @@ export type CardEditPlan = {
   /** Deduped course base + target languages. */
   allLanguages: string[];
   /**
-   * Course language → the row language the card reads for it
-   * (`cardRowLanguage`): itself, except the source slot of a Mixed English
-   * card, which reads its accent row (`en` → `en_gb`). Every map below is
-   * keyed by the COURSE language, the one the dialog submits.
+   * Course language to the row language the card reads for it
+   * (`cardRowLanguage`). That is the language itself, except the source
+   * slot of a Mixed English card, which reads its accent row (`en` to
+   * `en_gb`). Every map below is keyed by the course language, the one the
+   * dialog submits.
    */
   rowLanguages: Map<string, string>;
   /** language → submitted text, for the languages the caller sent. */
   submittedMap: Map<string, string>;
   /**
-   * language → LIVE translations row, for every language backed by a row:
-   * the non-source languages, and the source slot when it reads an accent
-   * row.
+   * language to LIVE translations row, for every language backed by a row.
+   * Those are the non-source languages, and the source slot when it reads
+   * an accent row.
    */
   existingTranslationMap: Map<string, Doc<'translations'>>;
   /**
@@ -69,19 +71,19 @@ export type CardEditPlan = {
    */
   servedTranslationMap: Map<string, ServedTranslation>;
   /**
-   * The wording the card shows for a course language: the served row, or
-   * for the source slot the source text (also while the accent row it
-   * should read has not landed). What every submitted line is diffed
-   * against, so an untouched line never counts as an edit.
+   * The wording the card shows for a course language. The served row, or
+   * the source text for the source slot, also while the accent row it
+   * should read has not landed. Every submitted line is diffed against
+   * this, so an untouched line never counts as an edit.
    */
   shownText: (lang: string) => string;
   /** Languages whose stored text differs from the submitted text. */
   changedLanguages: Set<string>;
   /**
-   * The source WORDING changed: the source line was edited on a card that
+   * The source wording changed. The source line was edited on a card that
    * shows the source text itself. False when the edited source line is an
-   * accent row, which is a translation row like any other: the other
-   * lines still describe the same curriculum sentence.
+   * accent row, which is a translation row like any other, since the
+   * other lines still describe the same curriculum sentence.
    */
   sourceWordingChanged: boolean;
   /** Audio-relevant subset of `changedLanguages` (see `resolveCardEditPlan`). */
@@ -134,21 +136,21 @@ export async function resolveCardEditPlan(
     allLanguages.map((lang) => [lang, cardRowLanguage(text, view, lang)]),
   );
 
-  // Load the live row of every language the card reads a row for: the
-  // non-source languages, and the source slot when it reads an accent row.
-  const rowBackedLanguages = allLanguages.filter(
-    (lang) => rowLanguages.get(lang) !== sourceLanguage,
+  // Load the live row of every language the card reads a row for. Those
+  // are the non-source languages, and the source slot when it reads an
+  // accent row.
+  const rowBackedLanguages = [...rowLanguages].filter(
+    ([, rowLang]) => rowLang !== sourceLanguage,
   );
   const existingTranslations = await Promise.all(
-    rowBackedLanguages.map((lang) =>
-      liveTranslation(ctx, card.textId, rowLanguages.get(lang)!),
+    rowBackedLanguages.map(([, rowLang]) =>
+      liveTranslation(ctx, card.textId, rowLang),
     ),
   );
   const existingTranslationMap = new Map<string, Doc<'translations'>>();
-  rowBackedLanguages.forEach((lang, i) => {
-    if (existingTranslations[i]) {
-      existingTranslationMap.set(lang, existingTranslations[i]!);
-    }
+  rowBackedLanguages.forEach(([lang], i) => {
+    const row = existingTranslations[i];
+    if (row) existingTranslationMap.set(lang, row);
   });
   const servedTranslationMap = new Map<string, ServedTranslation>();
   for (const [lang, live] of existingTranslationMap) {
@@ -351,7 +353,7 @@ export async function applyInPlaceTextEdit(
       // as user-provided so a future strategy swap doesn't overwrite
       // the user's edit.
       await ctx.db.patch(existing._id, {
-        translatedText: submittedMap.get(lang)!,
+        translatedText: canonicalizeApostrophes(lang, submittedMap.get(lang)!),
         ...clearedAnnotationFields(),
         translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
         // Stamp with the card's current gender so the mismatch sweep in
@@ -364,7 +366,7 @@ export async function applyInPlaceTextEdit(
       await ctx.db.insert('translations', {
         textId: card.textId,
         targetLanguage: lang,
-        translatedText: submittedMap.get(lang)!,
+        translatedText: canonicalizeApostrophes(lang, submittedMap.get(lang)!),
         translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
         ...(audioGenderStamp ? { speakerGender: audioGenderStamp } : {}),
       });
@@ -413,9 +415,9 @@ export async function forkSharedTextForEdit(
 
   const submittedSource = submittedMap.get(sourceLanguage);
   const sourceChanged = changedLanguages.has(sourceLanguage);
-  // The copy's own text is the wording the learner saw: the accent row on a
-  // Mixed English card (with that row's annotations), else the source text.
-  // A user-owned copy has no accent rows of its own.
+  // The copy's own text is the wording the learner saw. On a Mixed English
+  // card that is the accent row, with that row's annotations, else the
+  // source text. A user-owned copy has no accent rows of its own.
   const sourceRow = servedTranslationMap.get(sourceLanguage)?.row;
   const newTextId = await ctx.db.insert('texts', {
     text:
@@ -463,7 +465,7 @@ export async function forkSharedTextForEdit(
     const existing = servedTranslationMap.get(lang)?.row;
     const changed = changedLanguages.has(lang);
     const translatedText = changed
-      ? (submittedMap.get(lang) ?? '')
+      ? canonicalizeApostrophes(lang, submittedMap.get(lang) ?? '')
       : (existing?.translatedText ?? '');
     // Never persist a blank row. `scheduleLanguageContent` treats any row as
     // "translation exists", and the stale-translation sweep never deletes a
@@ -524,9 +526,9 @@ export async function forkSharedTextForEdit(
       }
       continue;
     }
-    // The clip the card played for this slot: the accent row's for the
-    // source slot of a Mixed English card, stored under the copy's own
-    // language since the copy shows that wording as its text.
+    // The clip the card played for this slot. For the source slot of a
+    // Mixed English card that is the accent row's clip, stored under the
+    // copy's own language since the copy shows that wording as its text.
     const audioRows = await ctx.db
       .query('audioRecordings')
       .withIndex('by_text_and_language', (q) =>
@@ -586,8 +588,8 @@ export async function repointCardAtEditedText(
     });
 
   const courseLanguages = [...course.baseLanguages, ...course.targetLanguages];
-  // A user-owned text has no accent rows (Path B forks into one, Path A
-  // edits one), so the card's accent is cleared with the repoint and the
+  // A user-owned text has no accent rows. Path B forks into one and Path A
+  // edits one, so the card's accent is cleared with the repoint and the
   // search string holds the copy's own words.
   const { searchableText, searchableTextLanguages } =
     await buildCardSearchableText(ctx, resolvedTextId, courseLanguages, {

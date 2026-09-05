@@ -97,8 +97,8 @@ export interface TextContentResult {
   audioRecordings: CardAudioContent[];
   hasMissingContent: boolean;
   /**
-   * Course languages whose translation entry is empty or (with
-   * `markVersionStale`) version-stale, plus the text's own language when
+   * Course languages whose translation entry is empty or, with
+   * `markVersionStale`, version-stale, plus the text's own language when
    * the accent row it should read has not landed. What a preview hands to
    * `requestPreviewTranslations`.
    */
@@ -135,13 +135,13 @@ interface TextContentInput {
    */
   userCreated: boolean;
   /**
-   * The card this content is shown on (`viewOfCard(card)`): its pin picks
+   * The card this content is shown on (`viewOfCard(card)`). Its pin picks
    * the revision each translation resolves to (convex/db/translationReads.ts),
-   * audio included, so a version bump never changes an existing card; its
+   * audio included, so a version bump never changes an existing card. Its
    * `accentLanguage` picks the accent row the source slot reads on a
-   * mixed-accent course. Omit (or pass null) for readers with no card
-   * (collection preview, placement), which show the live rows and the
-   * accent row a new card would get.
+   * mixed-accent course. Omit it, or pass null, for readers with no card
+   * such as the collection preview and the placement test. They show the
+   * live rows and the accent row a new card would get.
    */
   view?: SourceView | null;
 }
@@ -386,7 +386,7 @@ export async function buildTextContentBatchForLanguages(
     );
   });
 
-  // Per (input, course language): the accent row entry the source slot is
+  // Per input and course language, the accent row entry the source slot is
   // served, when the slot reads one and the row has landed, and the audio
   // slot that renders. While the accent row is missing the slot shows the
   // source wording and plays the source audio. Resolved once here so the
@@ -416,7 +416,7 @@ export async function buildTextContentBatchForLanguages(
     slotResolutions.get(`${input.key}:${lang}`)!;
 
   // Storage URLs only for the slots that render, one `getUrl` per distinct
-  // blob (a verbatim accent row shares the source clip's asset).
+  // blob. A verbatim accent row shares the source clip's asset.
   const renderedSlots = new Set(
     [...slotResolutions.values()].map((r) => r.audioSlot),
   );
@@ -523,7 +523,7 @@ export async function buildTextContentBatchForLanguages(
       // required content and the sweep must be asked for it.
       allLanguages.some((lang) => resolution(input, lang).accentRowMissing);
     // The source slot is listed when the accent row it reads is missing or
-    // version-stale (the entry carries the accent row's `versionStale`), so
+    // version-stale. The entry carries the accent row's `versionStale`, so
     // browsing a collection regenerates a stale rewrite like any other row.
     const missingTranslationLanguages = translations
       .filter((tr) =>
@@ -566,7 +566,7 @@ export async function buildTextContentBatchForLanguages(
     // backend can't transcribe, so without this gate those cards would ask for
     // work that is deliberately never done.
     // Both STT-backfill terms stop asking once the asset has used up its
-    // attempts (`sttBackfillExhausted`): the sweep would schedule nothing,
+    // attempts (`sttBackfillExhausted`). The sweep would schedule nothing,
     // and a clip STT keeps failing on must not keep every view of the card
     // asking for it.
     const backfillExhausted = (lang: string) => {
@@ -582,8 +582,8 @@ export async function buildTextContentBatchForLanguages(
         languageSupportsWordTimings(audio.language) &&
         !backfillExhausted(audio.language),
     );
-    // A clip stored without a verdict because STT failed at synthesis time:
-    // the sweep re-validates it (`scheduleTimingsBackfillIfNeeded`), so it
+    // A clip stored without a verdict because STT failed at synthesis time.
+    // The sweep re-validates it (`scheduleTimingsBackfillIfNeeded`), so it
     // is missing content wherever STT can answer, timings or not.
     const hasUncheckedAudio = audioRecordings.some(
       (audio) =>
@@ -690,12 +690,12 @@ function composeSearchableText(
  * Pass `text` when the caller already has the doc. Avoids a redundant
  * `ctx.db.get` on the review hot path.
  *
- * `view` is the card's (`viewOfCard`): its pin makes the string hold the
+ * `view` is the card's (`viewOfCard`). Its pin makes the string hold the
  * words the learner's card actually shows when the card is pinned to a
  * superseded revision, and its `accentLanguage` picks the accent row the
  * source words come from on a Mixed English course. A card being created
- * now passes just its `accentLanguage` (it is served the live rows either
- * way).
+ * now passes just its `accentLanguage`, since it is served the live rows
+ * either way.
  */
 export async function buildCardSearchableText(
   ctx: ContentCtx,
@@ -795,8 +795,8 @@ export async function buildSearchableTextPatchForCard(
   );
   // Same rule as `buildCardSearchableText`: a Mixed English card searches
   // its accent row's words. The accent live row is memoized like the other
-  // live rows (every card of a text that has an accent has the same one),
-  // and only the pin-dependent revision choice runs per card. The served
+  // live rows, since every card of a text that has an accent has the same
+  // one, and only the pin-dependent revision choice runs per card. The served
   // accent revision joins the memo key like the other revisions do.
   const accent = languages.includes(text.language)
     ? servedAccentRow(text, view)

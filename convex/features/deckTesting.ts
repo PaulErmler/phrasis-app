@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { internalQuery, type QueryCtx } from '../_generated/server';
 import type { Doc } from '../_generated/dataModel';
 import { assertTestHooksEnabled, requireUserIdByEmail } from '../lib/testHooks';
+import { pickAccentVariantForText } from '../../lib/languages';
 
 /**
  * E2E test hooks for deck-integrity invariants (e2e/deck-integrity.spec.ts
@@ -119,5 +120,53 @@ export const cardCountsBySource = internalQuery({
       else if (origin === 'custom' || origin === 'chat') custom++;
     }
     return { premade, custom, total: cards.length };
+  },
+});
+
+/**
+ * The accent invariant of a Mixed English course
+ * (`cards.accentLanguage`, convex/schema.ts): every card of a curriculum
+ * text in the course's own language stores the accent variant its text
+ * hash picks (`pickAccentVariantForText`), and no other card stores one.
+ * The subject of the accent check in `e2e/deck-integrity.spec.ts`: the
+ * card-creation path is the only writer of the field, so a card without
+ * it, or with a different one, means text and voice can disagree.
+ */
+export const accentIntegrity = internalQuery({
+  args: { email: v.string() },
+  returns: v.object({
+    total: v.number(),
+    withAccent: v.number(),
+    mismatched: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    assertTestHooksEnabled();
+    const userId = await requireUserIdByEmail(ctx, args.email);
+    const settings = await ctx.db
+      .query('userSettings')
+      .withIndex('by_userId', (q) => q.eq('userId', userId))
+      .first();
+    const course = settings?.activeCourseId
+      ? await ctx.db.get(settings.activeCourseId)
+      : null;
+    if (!course) throw new Error(`No active course for "${args.email}"`);
+    const courseLanguages = [
+      ...course.baseLanguages,
+      ...course.targetLanguages,
+    ];
+    const cards = await collectDeckCards(ctx, args.email);
+    let withAccent = 0;
+    let mismatched = 0;
+    for (const card of cards) {
+      const text = await ctx.db.get(card.textId);
+      if (!text) continue;
+      const expected =
+        !text.userCreated && courseLanguages.includes(text.language)
+          ? pickAccentVariantForText(text.language, text._id)
+          : undefined;
+      if (card.accentLanguage !== undefined) withAccent++;
+      if (card.accentLanguage !== expected) mismatched++;
+    }
+    return { total: cards.length, withAccent, mismatched };
   },
 });

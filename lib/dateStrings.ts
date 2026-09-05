@@ -54,7 +54,7 @@ export function dateInTimezone(ms: number, timezone: string): string {
  * absorbs an offset change between the guess and the target. On a
  * spring-forward gap, where the target wall clock does not exist (clocks
  * jump straight past it), returns the first existing instant after it (the
- * gap end), found by walking forward in 15-minute steps — the granularity of
+ * gap end), found by walking forward in 15-minute steps, the granularity of
  * real-world zone offsets.
  *
  * Used for bucketing due-date timestamps into user-local days (workload

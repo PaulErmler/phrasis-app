@@ -193,8 +193,8 @@ export const requestApprovalAudio = mutation({
         spokenText: entry.text,
         voiceGender,
         userId,
-        // No text id yet (the card does not exist), so the proposal id seeds
-        // the accent pick: stable across clicks, like a text's.
+        // No text id yet, since the card does not exist, so the proposal id
+        // seeds the accent pick. It is stable across clicks, like a text's.
         voiceName: getVoiceForText(
           args.language,
           args.approvalId,

@@ -17,6 +17,8 @@
  * `getVoiceForLanguage` from `lib/languages` keep working.
  */
 
+import { APOSTROPHE_LIKE_CHARS } from './textCompare/normalize';
+
 /**
  * Identifier for which TTS backend a language currently uses. Must stay in sync
  * with `ttsProviderValidator` in `convex/types.ts` (the Convex-side source of
@@ -422,7 +424,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     // A card on this course stores the accent its text speaks in
     // (`cards.accentLanguage`, picked by `pickAccentVariantForText`) and
-    // reads the en_gb / en_au rewrite for it; cards from before that field
+    // reads the en_gb / en_au rewrite for it. Cards from before that field
     // existed keep the source wording.
     translationPromptNotes: 'No strong British or American spelling bias.',
   },
@@ -450,12 +452,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     sharesTextWith: 'en',
-    // v4 (2026-09-05): the rewrite prompt tuned on two 500-sentence samples
-    // (no proofreading, no tense changes, place-bound names kept; see
-    // scripts/eval-translation-accents.ts). v3 were the first light-touch
-    // British rewrites of the `en` text (`accentRewrite`, generated on view
-    // like every other translation), v2 verbatim copies, v1 the earlier
-    // full LLM rewrites; the bump lazily replaces all of them.
+    // v4 (2026-09-05) is the rewrite prompt tuned on two 500-sentence
+    // samples: no proofreading, no tense changes, place-bound names kept
+    // (scripts/eval-translation-accents.ts). v3 were the first light-touch
+    // British rewrites of the `en` text, generated on view like every other
+    // translation (`accentRewrite`). v2 were verbatim copies and v1 the
+    // earlier full LLM rewrites. The bump lazily replaces all of them.
     translationVersion: 4,
     accentRewrite: {
       name: 'British',
@@ -1959,9 +1961,9 @@ export type TranslationPostProcessId = 'default' | 'uzbekLatin';
  * `<final>` / `</final>` wrapper (GPT-5.6 Sol on the `:floor` endpoint
  * appended one to 3 of 344 short answers in the 2026-09-05 accent bench;
  * never seen from the standard endpoint) and trailing underscores or
- * whitespace (observed on Arabic: "…متأسفة._", where the Buckwalter-style
- * romanization then carried the same "_"). Interior underscores are kept:
- * they can be a deliberate blank.
+ * whitespace. The latter was observed on Arabic ("…متأسفة._"), where the
+ * Buckwalter-style romanization then carried the same "_". Interior
+ * underscores are kept, since they can be a deliberate blank.
  */
 const stripModelArtifacts = (text: string): string =>
   text
@@ -1970,12 +1972,12 @@ const stripModelArtifacts = (text: string): string =>
     .trimStart();
 
 /**
- * Every character models and keyboards use where Uzbek Latin wants a
- * modifier letter: ASCII apostrophe, the curly single quotes, grave/acute
- * accents, the modifier apostrophes themselves (so the step is idempotent)
- * and the modifier reversed comma.
+ * Every character models and keyboards use where a language wants its own
+ * apostrophe: the comparator's fold set (curly quotes, grave and acute
+ * accents, the Uzbek modifier letters) plus ASCII `'` itself, so each rule
+ * below is idempotent.
  */
-const UZBEK_APOSTROPHE_LIKE = "['‘’ʻʼʽ`´]";
+const APOSTROPHE_LIKE = `['${APOSTROPHE_LIKE_CHARS}]`;
 
 /**
  * Canonicalise Uzbek Latin apostrophes. The alphabet has two: the letters
@@ -1992,36 +1994,61 @@ export function canonicalizeUzbekApostrophes(text: string): string {
 }
 
 /**
- * oʻ / gʻ: an apostrophe-like after o/g and before a letter (so a closing
- * quote after a word ending in o or g, as in ‘Hugo’, is left alone).
+ * oʻ / gʻ. An apostrophe-like after o/g and before a letter, so a closing
+ * quote after a word ending in o or g, as in ‘Hugo’, is left alone.
  */
-const UZBEK_OKINA_RE = new RegExp(
-  `([oOgG])${UZBEK_APOSTROPHE_LIKE}(?=\\p{L})`,
-  'gu',
-);
-/** The tutuq belgisi: an apostrophe-like between two letters, not after o/g. */
+const UZBEK_OKINA_RE = new RegExp(`([oOgG])${APOSTROPHE_LIKE}(?=\\p{L})`, 'gu');
+/** The tutuq belgisi. An apostrophe-like between two letters, not after o/g. */
 const UZBEK_TUTUQ_RE = new RegExp(
-  `(?<=\\p{L})(?<![oOgG])${UZBEK_APOSTROPHE_LIKE}(?=\\p{L})`,
+  `(?<=\\p{L})(?<![oOgG])${APOSTROPHE_LIKE}(?=\\p{L})`,
   'gu',
 );
 
-const TRANSLATION_POST_PROCESSORS: Record<
+/**
+ * An apostrophe-like between two letters ("J’aime", "J´aime", "don‘t"),
+ * folded to ASCII `'` so stored text and the word tokenizer agree on one
+ * spelling. Quotation marks around a word have a non-letter on one side and
+ * stay. Not applied to Uzbek Latin, whose modifier letters are letters.
+ */
+const WORD_INTERNAL_APOSTROPHE_RE = new RegExp(
+  `(?<=\\p{L})${APOSTROPHE_LIKE}(?=\\p{L})`,
+  'gu',
+);
+
+export function foldWordInternalApostrophes(text: string): string {
+  return text.replace(WORD_INTERNAL_APOSTROPHE_RE, "'");
+}
+
+/** The apostrophe rule of each post-processing step. */
+const APOSTROPHE_RULES: Record<
   TranslationPostProcessId,
   (text: string) => string
 > = {
-  default: stripModelArtifacts,
-  uzbekLatin: (text) => canonicalizeUzbekApostrophes(stripModelArtifacts(text)),
+  default: foldWordInternalApostrophes,
+  uzbekLatin: canonicalizeUzbekApostrophes,
 };
 
 /**
+ * The apostrophe spelling stored text uses in `code`: Uzbek Latin's
+ * modifier letters, ASCII `'` inside words everywhere else. For user-typed
+ * translations, which skip the rest of `postProcessTranslation` on purpose
+ * (a deliberate trailing "_" must survive) but must still store the one
+ * spelling the tokenizer and the comparator expect.
+ */
+export function canonicalizeApostrophes(code: string, text: string): string {
+  const id = getLanguageByCode(code)?.translationPostProcess ?? 'default';
+  return APOSTROPHE_RULES[id](text);
+}
+
+/**
  * Apply the language's post-processing step to machine-generated translation
- * output. Also applied to the derived `romanizedText` (it inherits the same
+ * output: the model artifacts come off, then the language's apostrophe rule
+ * runs. Also applied to the derived `romanizedText` (it inherits the same
  * artifacts) and by the `stripTrailingUnderscores` backfill migration.
  * Idempotent. Safe to run at both the producer and the storage choke point.
  */
 export function postProcessTranslation(code: string, text: string): string {
-  const id = getLanguageByCode(code)?.translationPostProcess ?? 'default';
-  return TRANSLATION_POST_PROCESSORS[id](text);
+  return canonicalizeApostrophes(code, stripModelArtifacts(text));
 }
 
 /**
@@ -2979,12 +3006,13 @@ export function usesSourceTextVerbatim(
 }
 
 /**
- * The Gemini TTS prompt fields for a voice: the language's own
- * `ttsPromptName` / `ttsPromptNotes`, else those of the language that pins
- * the voice's `@locale` (a mixed pool's `Leda@en-GB` takes English (UK)'s
- * "British English" and its notes; `Leda@en-AU` Australian English's). The
- * name falls back to the language's region-stripped display name
- * ("English (US)" → "English"), or the raw code for an unknown language.
+ * The Gemini TTS prompt fields for a voice. The language's own
+ * `ttsPromptName` and `ttsPromptNotes` win. Otherwise those of the language
+ * that pins the voice's `@locale` apply, so a mixed pool's `Leda@en-GB`
+ * takes English (UK)'s "British English" and its notes, and `Leda@en-AU`
+ * takes Australian English's. The name falls back to the language's
+ * region-stripped display name, "English (US)" becoming "English", or the
+ * raw code for an unknown language.
  */
 export function resolveTtsPrompt(
   code: string,

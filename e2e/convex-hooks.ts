@@ -56,6 +56,22 @@ export function deckCardCountsBySource(email: string): {
 }
 
 /**
+ * The accent invariant of the fixture user's deck: how many cards carry
+ * `accentLanguage`, and how many disagree with what their text hash picks.
+ */
+export function deckAccentIntegrity(email: string): {
+  total: number;
+  withAccent: number;
+  mismatched: number;
+} {
+  return convexRun('features/deckTesting:accentIntegrity', { email }) as {
+    total: number;
+    withAccent: number;
+    mismatched: number;
+  };
+}
+
+/**
  * Push currently-due cards out of the learn queue. Auto-add only runs
  * when nothing is due; the home collection "Add 5" button is exclusive
  * and never mixes sources.

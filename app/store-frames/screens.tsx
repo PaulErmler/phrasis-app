@@ -325,7 +325,6 @@ export function HomeProjectionScreen() {
           <CumulativeLineChart
             dailyData={fx.dailyData}
             monthlyData={fx.monthlyData}
-            weeklyData={fx.weeklyData}
             languageDailyData={fx.languageDailyData}
             timezone={fx.TZ}
           />

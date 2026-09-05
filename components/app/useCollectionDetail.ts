@@ -11,7 +11,9 @@ import { FEATURE_IDS } from '@/convex/features/featureIds';
 import { toast } from 'sonner';
 import {
   COLLECTION_PREVIEW_SIZE,
-  MAX_PREVIEW_PAGE_SIZE,
+  PREVIEW_FIRST_PAGE_SIZE,
+  PREVIEW_PAGE_SIZE,
+  PREVIEW_TRANSLATION_BATCH_SIZE,
   settledCount,
 } from '@/convex/lib/collections';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
@@ -303,7 +305,9 @@ export function useCollectionDetail({
           direction: 'after' as const,
         }
       : 'skip',
-    { initialNumItems: MAX_PREVIEW_PAGE_SIZE },
+    // The first page is the warmed-up handful, so the dialog opens with
+    // content; "Show more" then reveals a full page.
+    { initialNumItems: PREVIEW_FIRST_PAGE_SIZE },
   );
   // Added-history feed above the anchor, only mounted while "show added" is
   // on (toggling it off unmounts; toggling back on refetches page 1).
@@ -316,7 +320,7 @@ export function useCollectionDetail({
           direction: 'upTo' as const,
         }
       : 'skip',
-    { initialNumItems: MAX_PREVIEW_PAGE_SIZE },
+    { initialNumItems: PREVIEW_PAGE_SIZE },
   );
 
   const forwardRowsRaw = forward.results;
@@ -404,15 +408,19 @@ export function useCollectionDetail({
       )
       .map((row) => row._id);
     if (pending.length === 0) return;
-    const batch = pending.slice(0, MAX_PREVIEW_PAGE_SIZE);
-    for (const id of batch) requestedTranslationsRef.current.add(id);
-    requestTranslations({
-      collectionId: openCollectionId as Id<'collections'>,
-      textIds: batch,
-    }).catch((error) => {
-      reportError(error, { op: 'requestPreviewTranslations' });
-      for (const id of batch) requestedTranslationsRef.current.delete(id);
-    });
+    // A revealed page is larger than one request's cap, so every batch is
+    // sent now rather than waiting for a later render to pick up the rest.
+    for (let i = 0; i < pending.length; i += PREVIEW_TRANSLATION_BATCH_SIZE) {
+      const batch = pending.slice(i, i + PREVIEW_TRANSLATION_BATCH_SIZE);
+      for (const id of batch) requestedTranslationsRef.current.add(id);
+      requestTranslations({
+        collectionId: openCollectionId as Id<'collections'>,
+        textIds: batch,
+      }).catch((error) => {
+        reportError(error, { op: 'requestPreviewTranslations' });
+        for (const id of batch) requestedTranslationsRef.current.delete(id);
+      });
+    }
   }, [
     forwardRowsRaw,
     earlierRowsRaw,
@@ -486,11 +494,11 @@ export function useCollectionDetail({
       () => setRevealBoundary(null),
       REVEAL_TIMEOUT_MS,
     );
-    forward.loadMore(MAX_PREVIEW_PAGE_SIZE);
+    forward.loadMore(PREVIEW_PAGE_SIZE);
   }, [forward, forwardRowsRaw.length]);
 
   const handleLoadEarlier = useCallback(() => {
-    earlier.loadMore(MAX_PREVIEW_PAGE_SIZE);
+    earlier.loadMore(PREVIEW_PAGE_SIZE);
   }, [earlier]);
 
   const effectiveBatchSize = sentencesQuota.unlimited

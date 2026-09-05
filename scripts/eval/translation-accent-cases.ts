@@ -155,7 +155,7 @@ export const CASES: AccentCase[] = [
     id: 'vo-line',
     kind: 'vocabulary',
     text: 'We waited in line for an hour.',
-    // The replacement must stay grammatical: "in queue" is not English.
+    // The replacement must stay grammatical. "in queue" is not English.
     expect: both({
       must: [/in a queue|queued/],
       mustNot: [/in line|in queue\b/],
@@ -492,8 +492,8 @@ export const CASES: AccentCase[] = [
   },
 
   // ── controls (must come back unchanged) ───────────────────────────────
-  // "just" in the present tense means "simply": the past-simple rule
-  // ("I just ate" -> "I've just eaten") must not touch these. Luna turned
+  // "just" in the present tense means "simply". The past-simple rule,
+  // "I just ate" -> "I've just eaten", must not touch these. Luna turned
   // "I just feel tired" into "I've just felt tired" in production (2026-09-05).
   {
     id: 'ct-just-feel',

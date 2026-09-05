@@ -49,6 +49,18 @@ describe('tokenizeText: space-delimited language (en)', () => {
     ]);
   });
 
+  it('folds every apostrophe variant to ASCII so the spellings share one key', () => {
+    const keys = (text: string, language: string) =>
+      tokenizeText(text, language).map((t) => t.normalized);
+    // U+2019 is a word character for the segmenter; U+00B4 is not and used
+    // to split "J´aime" into "j" and "aime".
+    expect(keys("J'aime", 'fr')).toEqual(["j'aime"]);
+    expect(keys('J’aime', 'fr')).toEqual(["j'aime"]);
+    expect(keys('J´aime', 'fr')).toEqual(["j'aime"]);
+    expect(keys('l’homme', 'fr')).toEqual(keys("l'homme", 'fr'));
+    expect(originals('J’aime', 'fr')).toEqual(["J'aime"]);
+  });
+
   it('splits hyphenated compounds at the hyphen', () => {
     expect(originals('a well-known fact', 'en')).toEqual([
       'a',

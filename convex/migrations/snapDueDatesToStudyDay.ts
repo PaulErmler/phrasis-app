@@ -6,7 +6,7 @@ import type { Id } from '../_generated/dataModel';
 import { patchCard } from '../db/stats/cardAggregates';
 import { getCourseStatsForMutation } from '../db/courseStats';
 import { getUserSettings } from '../db/users';
-import { seedPool } from '../lib/workpools';
+import { seedPool, type PoolRunResult } from '../lib/workpools';
 import { trackException } from '../analytics';
 import { pickUniqueDueSlot, studyDayFromSettings } from '../lib/dueSlots';
 import { fetchTrackCardsAfterDue, trackDueOf } from '../lib/dueQueue';
@@ -30,16 +30,16 @@ import {
  * Run once after deploy from the dashboard:
  *   npx convex run migrations/snapDueDatesToStudyDay:kickOff --prod
  *
- * Shape, borrowed from seedWritingTrack.ts: batches run on `seedPool` so a
- * batch that throws still reaches its onComplete supervisor, which
- * re-enqueues the same args (a bounded number of times) instead of letting
- * the chain die silently. The batch DOES carry a cursor (`afterDue`), unlike
- * the writing seed: snapped cards move EARLIER and would otherwise sit at
- * the head of the ascending range forever, so restarting from the kick time
- * cannot find the remaining work. The cursor is safe to carry because a
- * failed batch's writes roll back and the supervisor resumes from the same
- * args. A moved card always lands below its own old due date and therefore
- * below the cursor, so it is neither revisited nor lost.
+ * The shape is borrowed from seedWritingTrack.ts. Batches run on `seedPool`
+ * so a batch that throws still reaches its onComplete supervisor, which
+ * re-enqueues the same args a bounded number of times instead of letting
+ * the chain die silently. Unlike the writing seed, the batch carries a
+ * cursor (`afterDue`). Snapped cards move earlier and would otherwise sit
+ * at the head of the ascending range forever, so restarting from the kick
+ * time could not find the remaining work. The cursor is safe to carry
+ * because a failed batch's writes roll back and the supervisor resumes from
+ * the same args. A moved card always lands below its own old due date and
+ * therefore below the cursor, so it is neither revisited nor lost.
  */
 
 const BATCH_SIZE = 50;
@@ -60,11 +60,6 @@ type BatchArgs = Infer<typeof batchArgsValidator>;
 const completionContextValidator = batchArgsValidator.extend({
   attempts: v.number(),
 });
-
-type PoolRunResult =
-  | { kind: 'success'; returnValue: unknown }
-  | { kind: 'failed'; error: string }
-  | { kind: 'canceled' };
 
 /**
  * Enqueue one shared-track sweep per deck, paging through `decks` by
@@ -105,16 +100,16 @@ export const kickOff = internalMutation({
 
 /**
  * Snap one page of a deck's future-due cards on one track. Walks the
- * track's due index ascending from `afterDue`; a card is moved when it has
+ * track's due index ascending from `afterDue`. A card is moved when it has
  * a day-scale FSRS interval and does not already sit inside its study day's
- * slot window. Overdue cards (due <= kick time) are never touched: they are
- * already available.
+ * slot window. Cards due at or before the kick time are never touched, as
+ * they are already available.
  *
- * The study day is the same rule `reviewCard` applies
- * (`studyDayFromSettings`): the learner's `userSettings`, with the zone as
- * last recorded on `courseStats` (refreshed on every review). UTC when the
- * course was never reviewed, in which case there is nothing day-scale to
- * move anyway. A learner with `dueByDay: false` is skipped entirely.
+ * The study day follows the same rule `reviewCard` applies
+ * (`studyDayFromSettings`), the learner's `userSettings` with the zone last
+ * recorded on `courseStats`, which every review refreshes. A course that
+ * was never reviewed gets UTC, and has nothing day-scale to move anyway. A
+ * learner with `dueByDay: false` is skipped entirely.
  */
 export const processBatch = internalMutation({
   args: batchArgsValidator.fields,
@@ -163,9 +158,9 @@ export const processBatch = internalMutation({
       return { snapped, isDone: false };
     }
     if (args.track === 'shared') {
-      // Shared track exhausted: walk the writing track from the kick time
-      // (NOT from the shared cursor, which has moved on). Cards without a
-      // writing track have no writingDueDate and fall outside the range.
+      // The shared track is exhausted. Walk the writing track from the kick
+      // time, not from the shared cursor, which has moved on. Cards without
+      // a writing track have no writingDueDate and fall outside the range.
       await enqueueBatch(
         ctx,
         { ...args, track: 'writing', afterDue: args.kickTime },

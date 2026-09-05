@@ -261,8 +261,11 @@ test.describe('add cards: import', () => {
       await clickNext(page);
       await clickNext(page);
 
-      // Row index 1 (data-row) has empty English
-      await expect(page.getByText(/english: empty/i)).toBeVisible();
+      // Row index 1 (data-row) has empty English. The base language's label
+      // is its display name, "English (Mixed)" for the `en` course.
+      await expect(
+        page.getByText(/english( \(mixed\))?: empty/i),
+      ).toBeVisible();
       await expect(page.getByTestId('import-submit').first()).toBeDisabled();
     });
 
@@ -301,7 +304,9 @@ test.describe('add cards: import', () => {
       await editor.fill('Bye');
       await editor.press('Enter');
 
-      await expect(page.getByText(/english: empty/i)).toHaveCount(0);
+      await expect(
+        page.getByText(/english( \(mixed\))?: empty/i),
+      ).toHaveCount(0);
       await expect(page.getByTestId('import-submit').first()).toBeEnabled();
     });
 

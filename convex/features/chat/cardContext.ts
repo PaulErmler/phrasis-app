@@ -53,7 +53,7 @@ export async function resolveCardContext(
 
   // One point read per course language (single digits), in course-language
   // order so the prompt context stays stable, through the served-revision
-  // accessors: the tutor must see the wording the learner's card shows,
+  // accessors. The tutor must see the wording the learner's card shows,
   // which for a card pinned before a version bump is not the live row, and
   // for the source line on a Mixed English card is the accent row.
   const view = viewOfCard(card);

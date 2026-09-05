@@ -43,7 +43,10 @@ import {
   openrouterCostUsd,
   openrouterGenerationId,
 } from '../lib/posthogAi';
-import { resolveAudioSpeakerGender } from '../../lib/languages';
+import {
+  canonicalizeApostrophes,
+  resolveAudioSpeakerGender,
+} from '../../lib/languages';
 
 export const consumeAutoFillQuota = internalMutation({
   args: { userId: v.string() },
@@ -440,7 +443,7 @@ export const createCustomText = mutation({
       await ctx.db.insert('translations', {
         textId,
         targetLanguage: entry.language,
-        translatedText: entry.text,
+        translatedText: canonicalizeApostrophes(entry.language, entry.text),
         ...(entry.regionVariant ? { regionVariant: entry.regionVariant } : {}),
         // The client tags autofilled entries with the model slug and
         // everything else as user-provided (EnterTextsView). Default here
@@ -621,7 +624,7 @@ export const createCustomTextsBatch = mutation({
         await ctx.db.insert('translations', {
           textId,
           targetLanguage: entry.language,
-          translatedText: entry.text,
+          translatedText: canonicalizeApostrophes(entry.language, entry.text),
           // Bulk-import is exclusively manual, no autofill path here, so
           // every inserted translation is user-typed. Tag it explicitly so
           // a future strategy swap doesn't regenerate text the user wrote.

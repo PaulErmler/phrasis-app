@@ -11,7 +11,6 @@ import {
   HOURLY_DISTRIBUTION,
   dailySeries,
   languageDailySeries,
-  weeklySeries,
 } from '../fixtures';
 
 /**
@@ -56,7 +55,6 @@ export function StatsScreen() {
           <CumulativeLineChart
             dailyData={daily}
             monthlyData={[]}
-            weeklyData={weeklySeries()}
             languageDailyData={languageDailySeries()}
             timezone={tz}
           />

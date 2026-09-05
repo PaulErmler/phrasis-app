@@ -7,6 +7,7 @@ import {
 import {
   ID3_HEADER,
   MP4_HEADER,
+  OnceReadableBlob,
   WAV_HEADER,
   WEBM_HEADER,
   openrouterSttBody,
@@ -195,6 +196,31 @@ describe('lib/stt/openrouter transcribeAudio', () => {
 
     expect(result.text).toBe('hola');
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('reads a storage blob once: the sniff and every upload attempt share the bytes', async () => {
+    // `ctx.storage.get` hands back a streaming Blob. Sniffing it and then
+    // uploading it read it twice and threw "Can't re-read streaming Blob",
+    // which broke every timing backfill.
+    vi.useFakeTimers();
+    fetchMock
+      .mockResolvedValueOnce(errorResponse(503, 'busy'))
+      .mockResolvedValueOnce(okResponse(openrouterSttBody('hola')));
+
+    const pending = transcribeAudio(
+      new OnceReadableBlob([WAV_HEADER], { type: 'audio/wav' }),
+      'es',
+    );
+    await vi.runAllTimersAsync();
+    const result = await pending;
+
+    expect(result.text).toBe('hola');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const call of fetchMock.mock.calls) {
+      const file = formOf(call).get('file') as File;
+      expect(file.name).toBe('audio.wav');
+      expect(file.size).toBe(WAV_HEADER.byteLength);
+    }
   });
 
   it('retries a 5xx up to maxRetries and then throws the last error', async () => {

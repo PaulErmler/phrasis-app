@@ -858,8 +858,8 @@ function renderStep({
           freeText={data.priorAppsFreeText}
           onToggle={(app) => {
             const priorApps = togglePriorApp(data.priorApps, app);
-            // The free text belongs to "other": dropping that option (or
-            // picking "none") drops the text with it, so the signup email
+            // The free text belongs to "other". Dropping that option, or
+            // picking "none", drops the text with it, so the signup email
             // never reads `none, "Memrise"`.
             persist({
               priorApps,

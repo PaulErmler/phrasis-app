@@ -205,7 +205,8 @@ import { useCollectionDetail } from '@/components/app/useCollectionDetail';
 import type { CollectionProgressItem } from '@/components/app/CollectionCarouselUI';
 import {
   COLLECTION_PREVIEW_SIZE,
-  MAX_PREVIEW_PAGE_SIZE,
+  PREVIEW_FIRST_PAGE_SIZE,
+  PREVIEW_PAGE_SIZE,
 } from '@/convex/lib/collections';
 
 const COLLECTION: CollectionProgressItem = {
@@ -356,7 +357,7 @@ describe('CollectionDetailDialog browse query wiring', () => {
       direction: 'after',
     });
     expect(forwardCall?.[2]).toEqual({
-      initialNumItems: MAX_PREVIEW_PAGE_SIZE,
+      initialNumItems: PREVIEW_FIRST_PAGE_SIZE,
     });
     // The added-history feed stays skipped until "show added" is toggled on.
     const earlierCall = usePaginatedQueryMock.mock.calls.find(
@@ -566,7 +567,7 @@ describe('CollectionDetailDialog pagination', () => {
     expect(loadMoreButton).not.toBeDisabled();
     await user.click(loadMoreButton);
 
-    expect(forwardLoadMore).toHaveBeenCalledWith(MAX_PREVIEW_PAGE_SIZE);
+    expect(forwardLoadMore).toHaveBeenCalledWith(PREVIEW_PAGE_SIZE);
     // Reveal gate: while the new page is fetching/translating the button
     // stays as a disabled spinner.
     expect(screen.getByTestId('collection-load-more')).toBeDisabled();
@@ -596,6 +597,6 @@ describe('CollectionDetailDialog pagination', () => {
 
     await user.click(screen.getByTestId('collection-show-added-toggle'));
     await user.click(screen.getByTestId('collection-load-earlier'));
-    expect(earlierLoadMore).toHaveBeenCalledWith(MAX_PREVIEW_PAGE_SIZE);
+    expect(earlierLoadMore).toHaveBeenCalledWith(PREVIEW_PAGE_SIZE);
   });
 });

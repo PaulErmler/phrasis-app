@@ -7,7 +7,12 @@ import {
 } from '../../../lib/stt/gemini';
 import { transcribeAudio, sttModelForLanguage } from '../../../lib/stt';
 import { SttRejectedContainerError } from '../../../lib/stt/openrouter';
-import { WAV_HEADER, WEBM_HEADER, openrouterSttBody } from '../sttFixtures';
+import {
+  OnceReadableBlob,
+  WAV_HEADER,
+  WEBM_HEADER,
+  openrouterSttBody,
+} from '../sttFixtures';
 
 /**
  * The Gemini STT wire contract (chat completion with `input_audio`), how
@@ -115,6 +120,19 @@ describe('lib/stt/gemini transcribeAudioWithGemini', () => {
       /400/,
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads a storage blob once, across a retry', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('busy', { status: 503 }))
+      .mockResolvedValueOnce(okResponse(chatBody('Salom.')));
+    const result = await transcribeAudioWithGemini(
+      new OnceReadableBlob([WAV_HEADER], { type: 'audio/wav' }),
+      'uz',
+      { maxRetries: 1 },
+    );
+    expect(result.text).toBe('Salom.');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('bytesToBase64 matches Buffer for a chunk-crossing payload', () => {

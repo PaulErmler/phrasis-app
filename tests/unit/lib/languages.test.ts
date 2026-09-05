@@ -33,6 +33,7 @@ import {
   languageSupportsWordTimings,
   getSttBackend,
   postProcessTranslation,
+  canonicalizeApostrophes,
 } from '@/lib/languages';
 
 describe('getLanguageByCode', () => {
@@ -456,6 +457,24 @@ describe('postProcessTranslation', () => {
         postProcessTranslation('en', '<final>x</final>'),
       ),
     );
+  });
+
+  it('folds an apostrophe inside a word to ASCII and leaves quotation marks alone', () => {
+    expect(postProcessTranslation('fr', 'J’aime ça.')).toBe("J'aime ça.");
+    expect(postProcessTranslation('fr', 'J´aime l‘homme.')).toBe(
+      "J'aime l'homme.",
+    );
+    expect(postProcessTranslation('en', '‘Hugo’ said “no”.')).toBe(
+      '‘Hugo’ said “no”.',
+    );
+    // Uzbek keeps its modifier letters (canonicalizeUzbekApostrophes).
+    expect(postProcessTranslation('uz', "o'zbek ta'kid")).toBe('oʻzbek taʼkid');
+  });
+
+  it('canonicalizeApostrophes gives user-typed text the same spelling without the rest of the step', () => {
+    expect(canonicalizeApostrophes('fr', 'J’aime ça._')).toBe("J'aime ça._");
+    expect(canonicalizeApostrophes('uz', "o'zbek")).toBe('oʻzbek');
+    expect(canonicalizeApostrophes('en', '‘Hugo’')).toBe('‘Hugo’');
   });
 });
 

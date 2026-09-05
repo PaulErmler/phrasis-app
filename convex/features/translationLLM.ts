@@ -409,18 +409,19 @@ export function buildJudgePrompt(
   ].join('\n');
 }
 
-/** Strip a wrapping quote pair if present (some models still wrap despite instructions). */
 /**
- * The post-processing every model reply goes through before storage:
- * wrapping quotes off, then the language's `postProcessTranslation` step.
- * Exported so a caller comparing a reply against its source text (the
- * accent-rewrite identity check) can put the source through the same
- * normalisation rather than compare a cleaned reply against a raw source.
+ * The post-processing every model reply goes through before storage.
+ * Wrapping quotes come off, then the language's `postProcessTranslation`
+ * step runs. Exported so a caller comparing a reply against its source
+ * text, as the accent-rewrite identity check does, can put the source
+ * through the same normalisation rather than compare a cleaned reply
+ * against a raw source.
  */
 export function normalizeModelOutput(targetLang: string, raw: string): string {
   return postProcessTranslation(targetLang, stripWrappingQuotes(raw.trim()));
 }
 
+/** Strip a wrapping quote pair if present (some models still wrap despite instructions). */
 function stripWrappingQuotes(s: string): string {
   if (s.length < 2) return s;
   const first = s[0];

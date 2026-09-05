@@ -32,11 +32,11 @@ import { isUserCreatedText } from '../../lib/translationProvenance';
  */
 
 /**
- * Chart languages as translation targets. `en` is in the list not for a
- * translation (English is source-only) but so `scheduleMissingContent` sees
- * a Mixed English course and derives the en_gb / en_au accent row each
- * text reads there (`getMixedAccentTextLanguage`); its source audio was
- * always ensured.
+ * Chart languages as translation targets. `en` is in the list so
+ * `scheduleMissingContent` sees a Mixed English course and derives the
+ * en_gb / en_au accent row each text reads there
+ * (`getMixedAccentTextLanguage`), not for a translation, since English is
+ * source-only. Its source audio was always ensured.
  */
 const DEFAULT_WARMUP_LANGUAGES = [
   'en',

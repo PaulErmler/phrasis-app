@@ -138,6 +138,15 @@ export const getStatsPageData = query({
       languageWordCounts: v.array(
         v.object({ language: v.string(), words: v.number() }),
       ),
+      // New words per (month, language) over the same month range, for the
+      // progress chart's year view (months, or quarters over a long history).
+      languageMonthlyWords: v.array(
+        v.object({
+          month: v.string(),
+          language: v.string(),
+          newWordsCount: v.number(),
+        }),
+      ),
     }),
   ),
   handler: async (ctx, args) => {
@@ -200,7 +209,8 @@ export const getStatsPageData = query({
             .gte('month', args.startMonth)
             .lte('month', args.endMonth),
         )
-        .take(24);
+        // One row per month: a decade of history is 120 rows.
+        .take(120);
 
       monthlyStats = rows.map((r) => ({
         month: r.month,
@@ -208,6 +218,43 @@ export const getStatsPageData = query({
         totalNewCards: r.totalNewCards,
         totalTimeMs: r.totalTimeMs,
       }));
+    }
+
+    // Per-language new words by month, folded from the daily rows (there is
+    // no monthly per-language table). Rows are sparse (a language only has a
+    // row on days it gained words); the cap covers several years of a
+    // three-language course.
+    const languageMonthlyWords: Array<{
+      month: string;
+      language: string;
+      newWordsCount: number;
+    }> = [];
+    if (
+      isValidMonthString(args.startMonth) &&
+      isValidMonthString(args.endMonth)
+    ) {
+      const langRows = await ctx.db
+        .query('dailyLanguageStats')
+        .withIndex('by_userId_and_courseId_and_date', (q) =>
+          q
+            .eq('userId', userId)
+            .eq('courseId', courseId)
+            .gte('date', `${args.startMonth}-01`)
+            .lte('date', `${args.endMonth}-31`),
+        )
+        .take(6000);
+      const byMonthLanguage = new Map<string, number>();
+      for (const row of langRows) {
+        const key = `${row.date.slice(0, 7)}|${row.language}`;
+        byMonthLanguage.set(
+          key,
+          (byMonthLanguage.get(key) ?? 0) + row.newWordsCount,
+        );
+      }
+      for (const [key, newWordsCount] of byMonthLanguage) {
+        const [month, language] = key.split('|');
+        languageMonthlyWords.push({ month, language, newWordsCount });
+      }
     }
 
     // Weekly stats
@@ -296,6 +343,7 @@ export const getStatsPageData = query({
       baseLanguages,
       targetLanguages,
       languageWordCounts,
+      languageMonthlyWords,
     };
   },
 });

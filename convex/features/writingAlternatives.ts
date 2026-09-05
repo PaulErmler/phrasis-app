@@ -319,8 +319,8 @@ export const getAlternativeContext = internalQuery({
     ];
     let reusableAssetId: Id<'audioAssets'> | null = null;
     for (const voiceGender of genders) {
-      // The card text's accent first (what the learner hears on the card),
-      // then any accent of the language: a clip is a clip.
+      // The card text's accent first, which is what the learner hears on the
+      // card, then any accent of the language. A clip is a clip.
       const asset = await findAudioAssetInAnyAccent(ctx, {
         language: row.language,
         voiceGender,
@@ -451,8 +451,8 @@ export const generateAlternativeAudio = internalAction({
 
     const voiceGender = context.genders[0];
     const provider = getTtsProviderForLanguage(context.language);
-    // The card text's accent (a Mixed English card's alternative speaks in
-    // the card's accent); the alternative id seeds the pick when the card
+    // The card text's accent, so a Mixed English card's alternative speaks
+    // in the card's accent. The alternative id seeds the pick when the card
     // is gone.
     const voiceName = getVoiceForText(
       context.language,

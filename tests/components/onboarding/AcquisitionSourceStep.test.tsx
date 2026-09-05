@@ -43,7 +43,7 @@ describe('AcquisitionSourceStep: free-text char limit', () => {
     expect(counter.textContent).toBe(
       `${length}/${MAX_ONBOARDING_FREE_TEXT_LENGTH}`,
     );
-    expect(counter.className).toContain('text-muted-foreground');
+    expect(counter.className).toContain('text-muted-xs');
     expect(counter.className).not.toContain('text-destructive');
   });
 

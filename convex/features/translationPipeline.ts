@@ -766,8 +766,8 @@ async function replaceForVersionBump(
       furiganaMissingAfterWrite: existing.furiganaText === undefined,
     };
   }
-  // A verbatim row (`source-verbatim`: an accent variant's copy of the
-  // source text) is never archived: its wording is the catalogue text every
+  // A verbatim row, an accent variant's `source-verbatim` copy of the
+  // source text, is never archived. Its wording is the catalogue text every
   // card without an accent row shows anyway, so no learner loses wording
   // they learned, and archiving it would pin the first Mixed English or UK
   // card of the text to the un-rewritten copy for good.
@@ -1044,8 +1044,8 @@ async function scheduleTtsForLandedTranslation(
 }
 
 /**
- * The write for a verbatim row: an accent-only variant's copy of the text's
- * own wording (`source-verbatim`), voiced in the variant's accent. Built
+ * The write for a verbatim row, an accent-only variant's `source-verbatim`
+ * copy of the text's own wording, voiced in the variant's accent. Built
  * here for the scheduler's verbatim branch and the LLM queue's
  * rewrite-exhausted fallback, so the two never drift.
  */

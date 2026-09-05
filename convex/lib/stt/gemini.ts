@@ -23,7 +23,7 @@ import { requireEnv } from '../env';
 import { stripJsonFences } from '../llmJson';
 import { MAX_RETRIES, isRetryableStatus, retryDelayMs } from '../httpRetry';
 import {
-  containerOfBlob,
+  containerOfBuffer,
   isSttContainer,
   STT_REJECTED_CONTAINERS,
   type AudioContainer,
@@ -121,11 +121,14 @@ export async function transcribeAudioWithGemini(
   const apiKey = requireEnv('OPENROUTER_API_KEY');
   const maxRetries = opts.maxRetries ?? MAX_RETRIES;
 
-  const container = await containerOfBlob(blob);
+  // A blob from `ctx.storage.get` streams and can be read once, so the
+  // bytes are read once and both the sniff and the payload use them.
+  const bytes = await blob.arrayBuffer();
+  const container = containerOfBuffer(bytes);
   if (STT_REJECTED_CONTAINERS.has(container)) {
     throw new SttRejectedContainerError(container);
   }
-  const data = bytesToBase64(new Uint8Array(await blob.arrayBuffer()));
+  const data = bytesToBase64(new Uint8Array(bytes));
   const body = JSON.stringify({
     model: OPENROUTER_MODELS.sttGemini,
     usage: { include: true },

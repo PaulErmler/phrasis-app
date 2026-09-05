@@ -708,13 +708,13 @@ export default defineSchema({
     // write); completed audio is 'validated'/'unvalidated' (or undefined on
     // legacy rows carried over by the backfill, which is also "completed").
     // 'unchecked' = completed audio whose STT validation failed for reasons
-    // unrelated to the clip (rate limit, outage): kept, played, and given a
-    // verdict later by `backfillWordTimings`. 'unvalidated' is FINAL and is
-    // never re-checked; 'unchecked' is temporary and bounded by
-    // `revalidationAttempts`.
+    // unrelated to the clip, such as a rate limit or an outage. It is kept,
+    // played, and given a verdict later by `backfillWordTimings`.
+    // 'unvalidated' is final and never re-checked. 'unchecked' is temporary
+    // and bounded by `revalidationAttempts`.
     ttsQuality: v.optional(ttsQualityValidator),
-    // How many STT backfill runs (re-validation of an unchecked clip, or a
-    // word-timing backfill) have failed on this asset. At
+    // How many STT backfill runs have failed on this asset, whether
+    // re-validations of an unchecked clip or word-timing backfills. At
     // `MAX_STT_BACKFILL_ATTEMPTS` (convex/lib/audioAssets.ts) the sweep
     // stops scheduling backfills for it and an unchecked clip becomes
     // 'unvalidated' for good, so an STT outage can never turn into an
@@ -820,13 +820,13 @@ export default defineSchema({
     // One field per tile: the two are independent. Unset ≡ 'all'.
     repsStatFilter: v.optional(statFilterValidator),
     timeStatFilter: v.optional(statFilterValidator),
-    // Study-day scheduling (lib/scheduling.ts: DEFAULT_DUE_BY_DAY /
-    // DEFAULT_DAY_START_HOUR). Day-scale FSRS due dates snap to the start of
+    // Study-day scheduling, see DEFAULT_DUE_BY_DAY and DEFAULT_DAY_START_HOUR
+    // in lib/scheduling.ts. Day-scale FSRS due dates snap to the start of
     // the learner's study day so a morning-only learner reaches everything
-    // due that day. NOT exposed in any settings UI yet, and not accepted by
-    // `updateUserSettings`; the fields exist so a later settings row has
-    // somewhere to write. Unset = on, rollover at 04:00 local. Only an
-    // explicit `false` turns snapping off.
+    // due that day. Not exposed in any settings UI yet, and not accepted by
+    // `updateUserSettings`. The fields exist so a later settings row has
+    // somewhere to write. Unset means on, with rollover at 04:00 local.
+    // Only an explicit `false` turns snapping off.
     dueByDay: v.optional(v.boolean()),
     dayStartHour: v.optional(v.number()),
   }).index('by_userId', ['userId']),
@@ -940,16 +940,17 @@ export default defineSchema({
     // whose wording the curriculum has since revised (they accept the latest
     // wording). Never indexed: it is only ever read off the card itself.
     translationsAcceptedAt: v.optional(v.number()),
-    // The accent this card's text speaks in on a mixed-accent course
-    // (`en_us` | `en_gb` | `en_au`), stored once at creation from the text's
-    // voice hash (`pickAccentVariantForText` in lib/voices.ts). The card
-    // reads that variant's translation row in place of the source text when
-    // the variant has its own wording (`accentRowLanguage`: en_gb / en_au),
-    // and the source text otherwise (en_us, or no field). Cards from before
-    // the field existed have none and keep the catalogue wording and their
-    // clip for good; nothing backfills it. Set only when the course shows
-    // the text's own language and the text is not user-created; cleared
-    // when an edit forks the text into a user-owned copy. Never indexed.
+    // The accent this card's text speaks in on a mixed-accent course, one
+    // of `en_us`, `en_gb` and `en_au`. Stored once at creation from the
+    // text's voice hash (`pickAccentVariantForText` in lib/voices.ts). The
+    // card reads that variant's translation row in place of the source text
+    // when the variant has its own wording, which `accentRowLanguage` says
+    // for en_gb and en_au, and the source text otherwise, for en_us or no
+    // field. Cards from before the field existed have none and keep the
+    // catalogue wording and their clip for good. Nothing backfills it. Set
+    // only when the course shows the text's own language and the text is
+    // not user-created. Cleared when an edit forks the text into a
+    // user-owned copy. Never indexed.
     accentLanguage: v.optional(v.string()),
   })
     // INDEX BUDGET — read before adding an index here. This table carries 23

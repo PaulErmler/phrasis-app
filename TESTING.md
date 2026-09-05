@@ -107,10 +107,11 @@ not typecheck.
   analyzes every non-test module under `convex/`, and a top-level `vi.mock`
   there crashes the push with `InvalidModules` (see the comment in
   `vitest.config.ts`). Per-test `vi.mock(...)` can override either as needed.
-- **Playwright.** `playwright.config.ts` defines eleven projects (currently:
+- **Playwright.** `playwright.config.ts` defines twelve projects (currently:
   `setup`, `tutorial`, `chromium-parallel`, `chromium-serial`, `billing-live`,
   `settings-serial`, `course-management`, `payment-overdue`, `email-auth`,
-  `account-deletion`, `billing-clock`) with an explicit dependency chain —
+  `account-deletion`, `onboarding-resume`, `billing-clock`) with an explicit
+  dependency chain —
   ordering exists because tours are one-shot per user, some specs mutate shared
   user state, and course-management archives the onboarding course. The config
   file is the authority on the chain; don't trust prose summaries of it,

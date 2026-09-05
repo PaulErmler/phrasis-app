@@ -14,6 +14,7 @@ import { llmPool, ttsPool } from '../../lib/workpools';
 import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+import { MAX_PREVIEW_PAGE_SIZE } from '../../lib/collections';
 import { insertAudioFixture } from '../lib/audioFixtures';
 
 const modules = import.meta.glob('/convex/**/*.ts');
@@ -224,9 +225,12 @@ describe('features/collections', () => {
       expect(res.page[0].sourceLanguage).toBe('es');
     });
 
-    it('clamps the page size to 25', async () => {
+    it('clamps the page size to MAX_PREVIEW_PAGE_SIZE', async () => {
       const t = convexTest(schema, modules);
-      const { collId } = await seedCourseWithTexts(t, 30);
+      const { collId } = await seedCourseWithTexts(
+        t,
+        MAX_PREVIEW_PAGE_SIZE + 10,
+      );
       const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.query(
         api.features.collections.browseCollectionTexts,
@@ -237,7 +241,8 @@ describe('features/collections', () => {
           paginationOpts: { numItems: 100, cursor: null },
         },
       );
-      expect(res.page.length).toBeLessThanOrEqual(25);
+      expect(res.page.length).toBeLessThanOrEqual(MAX_PREVIEW_PAGE_SIZE);
+      expect(res.page.length).toBeLessThan(100);
       expect(res.isDone).toBe(false);
     });
 

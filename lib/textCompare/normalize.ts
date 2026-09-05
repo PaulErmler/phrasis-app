@@ -29,7 +29,8 @@ export function isPunctuationOnly(text: string): boolean {
  * are Unicode letters (`Lm`), so `ignorePunctuation` would otherwise keep
  * them and `o'zbek` vs `oʻzbek` could never match.
  */
-const APOSTROPHE_LIKE_RE = /[‘’ʻʼʽ`´]/gu;
+export const APOSTROPHE_LIKE_CHARS = '‘’ʻʼʽ`´';
+const APOSTROPHE_LIKE_RE = new RegExp(`[${APOSTROPHE_LIKE_CHARS}]`, 'gu');
 
 export function foldApostrophes(text: string): string {
   return text.replace(APOSTROPHE_LIKE_RE, "'");

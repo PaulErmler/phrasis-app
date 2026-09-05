@@ -39,6 +39,7 @@ import {
 import {
   COLLECTION_PREVIEW_SIZE,
   MAX_PREVIEW_PAGE_SIZE,
+  PREVIEW_TRANSLATION_BATCH_SIZE,
   canUserAccessCollectionText,
   isPremadeLevelCollection,
 } from '../lib/collections';
@@ -259,8 +260,8 @@ export const browseCollectionTexts = query({
       sourceFurigana: row.text.furiganaText ?? undefined,
       userCreated: row.text.userCreated,
       // The learner's card when they have one, so the preview shows the
-      // wording that card shows (its pin and its accent), else the live
-      // rows and the accent row a new card would get.
+      // wording that card shows, with its pin and its accent. Otherwise the
+      // live rows and the accent row a new card would get.
       view: row.card ? viewOfCard(row.card) : null,
     }));
     const contentMap = await buildTextContentBatchForLanguages(
@@ -473,7 +474,7 @@ export async function scheduleMissingTranslationsForText(
       ? [...languages, accentLang]
       : languages;
 
-  // The rows are independent: one parallel read per language, then the
+  // The rows are independent, so one parallel read per language, then the
   // per-language decisions in order.
   const rowLanguages = wantedLanguages.filter((lang) => lang !== text.language);
   const existingRows = await Promise.all(
@@ -547,8 +548,9 @@ export async function scheduleMissingTranslationsForText(
 }
 
 /**
- * Generate missing translations (NO audio) for up to MAX_PREVIEW_PAGE_SIZE
- * texts of a collection. Called by the preview as pages are revealed.
+ * Generate missing translations (NO audio) for up to
+ * PREVIEW_TRANSLATION_BATCH_SIZE texts of a collection. Called by the preview
+ * as pages are revealed, one call per batch.
  * Dedup comes from the existing per-(textId, language) claims, so re-calls
  * while jobs are in flight are cheap no-ops. Deliberately not quota-gated:
  * translations are the cheap part; audio (the dominant cost) only happens on
@@ -573,7 +575,7 @@ export const requestPreviewTranslations = mutation({
     const collection = await ctx.db.get(args.collectionId);
     if (!collection) return { translationsScheduled: 0 };
 
-    const textIds = args.textIds.slice(0, MAX_PREVIEW_PAGE_SIZE);
+    const textIds = args.textIds.slice(0, PREVIEW_TRANSLATION_BATCH_SIZE);
     const languages = getCourseLanguages(
       course.baseLanguages,
       course.targetLanguages,
@@ -606,12 +608,13 @@ export const requestPreviewTranslations = mutation({
 });
 
 /**
- * Prewarm the NEXT page of translations (NO audio): schedules skipTts
- * translation jobs for the next MAX_PREVIEW_PAGE_SIZE texts after `afterRank`
- * in rank order. The client calls this whenever a page finishes loading
- * (dialog open included), so by the time the user clicks "show more" the next
- * page's translations are usually already stored and the rows render
- * instantly. Claim-deduped like all preview generation; never quota-gated.
+ * Prewarm the translations (NO audio) behind the loaded rows: schedules
+ * skipTts translation jobs for the next PREVIEW_TRANSLATION_BATCH_SIZE texts
+ * after `afterRank` in rank order, which is exactly the next "show more"
+ * page. The client calls this whenever a page finishes loading (dialog open
+ * included), so by the time the user clicks the page's translations are
+ * usually already stored and the rows render instantly. Claim-deduped like
+ * all preview generation; never quota-gated.
  */
 export const prewarmPreviewTranslations = mutation({
   args: {
@@ -635,7 +638,7 @@ export const prewarmPreviewTranslations = mutation({
       ctx,
       args.collectionId,
       args.afterRank,
-      MAX_PREVIEW_PAGE_SIZE,
+      PREVIEW_TRANSLATION_BATCH_SIZE,
       isLevelCollection ? { onlyCurriculum: true } : { forUserId: userId },
     );
     const languages = getCourseLanguages(
@@ -693,9 +696,10 @@ export const requestPreviewAudio = mutation({
 
     // The row whose clip the preview plays for `args.language`. For the
     // text's own language on a Mixed English course that is the accent row
-    // (`servedSourceText`, no card so no pin): the preview reads that row's
-    // wording and audio, so voicing the source row would leave the button
-    // dead. `translation` is the row to voice; null for the source text.
+    // from `servedSourceText`, with no card and so no pin. The preview reads
+    // that row's wording and audio, so voicing the source row would leave
+    // the button dead. `translation` is the row to voice, null for the
+    // source text.
     const source =
       args.language === text.language
         ? await servedSourceText(ctx, text, null)
@@ -740,12 +744,11 @@ export const requestPreviewAudio = mutation({
       await ctx.db.patch(args.textId, genderPatch);
     }
 
-    const translation =
-      audioLanguage === text.language
+    const translation = source?.served
+      ? source.served.live
+      : audioLanguage === text.language
         ? null
-        : source
-          ? source.served!.live
-          : await liveTranslation(ctx, args.textId, audioLanguage);
+        : await liveTranslation(ctx, args.textId, audioLanguage);
     if (audioLanguage !== text.language && !translation) {
       // Translation still generating. The click raced it. Nothing to
       // synthesize yet; the client retries once the translation row lands.

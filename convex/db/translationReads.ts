@@ -231,12 +231,12 @@ export async function servedTranslatedText(
 }
 
 /**
- * What a reader sees of a card, for the two per-card choices a read depends
- * on: the pin (`cardPinAt`: which superseded revision) and the accent the
- * card's text speaks in (`cards.accentLanguage`: which row stands in for
- * the source text). `null` is a reader with no card (collection preview,
- * placement test, level picker): the live rows, and the accent row a card
- * created now would store.
+ * What a reader sees of a card. Two per-card choices decide a read. The pin
+ * (`cardPinAt`) picks which superseded revision, and the accent the card's
+ * text speaks in (`cards.accentLanguage`) picks which row stands in for the
+ * source text. `null` is a reader with no card, such as the collection
+ * preview, the placement test or the level picker. Those get the live rows
+ * and the accent row a card created now would store.
  */
 export type SourceView = {
   pinAt?: number;
@@ -256,12 +256,12 @@ export function viewOfCard(
 /**
  * The accent-variant row a mixed-accent course (`en`) shows in place of the
  * source wording for this text, or undefined when it shows the source text
- * itself. A card reads the row of the accent it stored at creation
- * (`accentRowLanguage`: `en_gb` / `en_au` carry their own wording, `en_us`
- * and a card without the field read the catalogue), so no existing card
- * ever changes wording. A reader with no card takes the row a new card
- * would store (`getMixedAccentTextLanguage`, the text's voice hash). A
- * user-created text is always shown as typed.
+ * itself. A card reads the row of the accent it stored at creation. In
+ * `accentRowLanguage`, `en_gb` and `en_au` carry their own wording, while
+ * `en_us` and a card without the field read the catalogue. So no existing
+ * card ever changes wording. A reader with no card takes the row a new card
+ * would store, from the text's voice hash (`getMixedAccentTextLanguage`).
+ * A user-created text is always shown as typed.
  */
 export function servedAccentRow(
   text: Pick<Doc<'texts'>, '_id' | 'language' | 'userCreated'>,
@@ -273,7 +273,7 @@ export function servedAccentRow(
 }
 
 /**
- * The row language a card reads for the course language `lang`: the accent
+ * The row language a card reads for the course language `lang`. The accent
  * row when `lang` is the text's own language and the card has one, else
  * `lang` itself.
  */
@@ -287,11 +287,11 @@ export function cardRowLanguage(
 }
 
 /**
- * The row languages a card shows for a course, deduped: the course
- * languages with the text's own language replaced by its accent row when
- * the card has one. Flag, edit, regenerate-audio, chat and the audit all
- * iterate this list, so the accent row is a translation row like any other
- * to every one of them and none re-derives the rule.
+ * The row languages a card shows for a course, deduped. These are the
+ * course languages with the text's own language replaced by its accent row
+ * when the card has one. Flag, edit, regenerate-audio, chat and the audit
+ * all iterate this list, so to every one of them the accent row is a
+ * translation row like any other and none re-derives the rule.
  */
 export function cardRowLanguages(
   text: Pick<Doc<'texts'>, '_id' | 'language' | 'userCreated'>,
@@ -305,26 +305,25 @@ export function cardRowLanguages(
   ];
 }
 
+/**
+ * What a course shows for the text's own language. `text` is the wording;
+ * `language` names the rows that voice and annotate it, which audio lookups
+ * key on while user-facing labels keep the text's language. Either the
+ * accent row is served, and `language` is the accent code, or the source
+ * text is shown and `served` is null.
+ */
 export type ServedSourceText = {
-  /** The wording shown for the text's own language. */
   text: string;
-  /**
-   * The language whose rows voice and annotate that wording: the accent
-   * code when an accent row is served, else the text's own language. Audio
-   * lookups key on it; user-facing labels keep the text's language.
-   */
   language: string;
   romanizedText: string | undefined;
   ipaText: string | undefined;
   furiganaText: string | undefined;
-  /** The accent row when one is served, for callers that key on revisions. */
-  served: ServedTranslation | null;
-};
+} & ({ served: ServedTranslation } | { served: null });
 
 /**
  * What a course shows for the text's OWN language. The source text, except
- * when `servedAccentRow` names an accent row: then that row's served
- * revision (pin-aware like any translation), with the source text as the
+ * when `servedAccentRow` names an accent row. Then it is that row's served
+ * revision, pin-aware like any translation, with the source text as the
  * fallback while the row has not landed. Every reader that renders,
  * indexes, compares or counts the source-language side of a card goes
  * through here, so all of them agree with the card.

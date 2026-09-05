@@ -5,7 +5,7 @@ import { internal } from '../_generated/api';
 import { Doc, Id } from '../_generated/dataModel';
 import { getCourseSettings } from '../db/courseSettings';
 import { patchCard } from '../db/stats/cardAggregates';
-import { seedPool } from '../lib/workpools';
+import { seedPool, type PoolRunResult } from '../lib/workpools';
 import { trackException } from '../analytics';
 
 const BATCH_SIZE = 50;
@@ -30,14 +30,6 @@ const MAX_DECKS = 100;
 const seedCompletionContextValidator = v.object({
   courseId: v.id('courses'),
 });
-
-// Same shape the other pool consumers declare (llmTranslationQueue,
-// ttsProcessing), see their note on why handler params are typed explicitly
-// rather than inferred through the generated `internal` object.
-type PoolRunResult =
-  | { kind: 'success'; returnValue: unknown }
-  | { kind: 'failed'; error: string }
-  | { kind: 'canceled' };
 
 /**
  * Seed the writing track (separateModeTracking) for every card in a course.

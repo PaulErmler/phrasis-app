@@ -23,6 +23,8 @@ import {
   ROMANIZATION_SOURCES,
 } from './lib/localRomanization';
 import { isProtectedTranslationSource } from '../lib/translationProvenance';
+import { foldApostrophes } from '../lib/textCompare/normalize';
+import { isAllLowercase, MAX_TEXTS_PER_WORD } from './db/stats/wordTracking';
 import { FURIGANA_LANGUAGES } from '../lib/languages';
 import { getFuriganaSource } from './lib/textAnnotations';
 import { buildSearchableTextPatchForCard } from './lib/cardContent';
@@ -917,11 +919,12 @@ export const backfillAudioAssetAccent = migrations.define({
 });
 
 /**
- * The dialect pin a legacy mixed-dialect translation row (es_mixed, written
- * before `translations.regionVariant` existed) gets: the same coin the
- * translator used for its wording (`resolveMixedVariant` on the text id),
- * so the row's voice stops depending on `getVoiceForText`'s fallback. Rows
- * with a pin, and rows of non-mixed languages, are left alone.
+ * The dialect pin a legacy mixed-dialect translation row gets, meaning an
+ * es_mixed row written before `translations.regionVariant` existed. It is
+ * the same coin the translator used for its wording (`resolveMixedVariant`
+ * on the text id), so the row's voice stops depending on
+ * `getVoiceForText`'s fallback. Rows with a pin, and rows of non-mixed
+ * languages, are left alone.
  */
 export function mixedDialectPinPatch(
   doc: Pick<Doc<'translations'>, 'textId' | 'targetLanguage' | 'regionVariant'>,
@@ -934,7 +937,7 @@ export function mixedDialectPinPatch(
 
 /**
  * Stamp `regionVariant` on the mixed-dialect translation rows that lack it
- * (see `mixedDialectPinPatch`). Not in `runAll`: run it by hand once the
+ * (see `mixedDialectPinPatch`). Not in `runAll`. Run it by hand once the
  * prod count of such rows is known to be non-zero.
  *
  *   npx convex run migrations:run '{"fn": "migrations:backfillMixedDialectPin"}'
@@ -943,6 +946,110 @@ export const backfillMixedDialectPin = migrations.define({
   table: 'translations',
   batchSize: CHECK_SWEEP_BATCH_SIZE,
   migrateOne: (_ctx, doc) => mixedDialectPinPatch(doc),
+});
+
+/**
+ * Re-key a `userWords` row whose word carries a curly, grave or acute
+ * apostrophe ("j’aime", "j´aime") onto the ASCII spelling the tokenizer now
+ * produces (`foldApostrophes` in lib/wordTokenize.ts). When the learner
+ * already has the ASCII row, the two are one word: the duplicate's
+ * sentence links move over (up to `MAX_TEXTS_PER_WORD`), the duplicate is
+ * deleted and `languageStats.totalWords` drops by one. Otherwise the row is
+ * patched in place. Rows with a plain word are untouched.
+ */
+export async function dedupeApostropheWordOne(
+  ctx: MutationCtx,
+  doc: Doc<'userWords'>,
+): Promise<Partial<Doc<'userWords'>> | undefined> {
+  const folded = foldApostrophes(doc.word);
+  if (folded === doc.word) return undefined;
+  const displayPatch =
+    doc.displayWord !== undefined
+      ? { displayWord: foldApostrophes(doc.displayWord) }
+      : {};
+
+  const existing = await ctx.db
+    .query('userWords')
+    .withIndex('by_userId_and_courseId_and_language_and_word', (q) =>
+      q
+        .eq('userId', doc.userId)
+        .eq('courseId', doc.courseId)
+        .eq('language', doc.language)
+        .eq('word', folded),
+    )
+    .first();
+  if (!existing) return { word: folded, ...displayPatch };
+
+  if (doc.courseId !== undefined) {
+    const courseId = doc.courseId;
+    const linksOf = (word: string) =>
+      ctx.db
+        .query('userWordTexts')
+        .withIndex('by_userId_courseId_language_word', (q) =>
+          q
+            .eq('userId', doc.userId)
+            .eq('courseId', courseId)
+            .eq('language', doc.language)
+            .eq('word', word),
+        )
+        .take(MAX_TEXTS_PER_WORD);
+    const [duplicateLinks, keptLinks] = await Promise.all([
+      linksOf(doc.word),
+      linksOf(folded),
+    ]);
+    const linkedTexts = new Set(keptLinks.map((link) => link.textId));
+    for (const link of duplicateLinks) {
+      if (
+        linkedTexts.has(link.textId) ||
+        linkedTexts.size >= MAX_TEXTS_PER_WORD
+      ) {
+        await ctx.db.delete(link._id);
+        continue;
+      }
+      await ctx.db.patch(link._id, { word: folded });
+      linkedTexts.add(link.textId);
+    }
+
+    const langStat = await ctx.db
+      .query('languageStats')
+      .withIndex('by_userId_and_courseId_and_language', (q) =>
+        q
+          .eq('userId', doc.userId)
+          .eq('courseId', courseId)
+          .eq('language', doc.language),
+      )
+      .first();
+    if (langStat) {
+      await ctx.db.patch(langStat._id, {
+        totalWords: Math.max(0, langStat.totalWords - 1),
+      });
+    }
+  }
+
+  // The kept row takes the lowercase display form when only the duplicate
+  // has it, the same rule `trackNewWords` applies.
+  const duplicateDisplay = displayPatch.displayWord;
+  if (
+    duplicateDisplay !== undefined &&
+    (existing.displayWord === undefined ||
+      (isAllLowercase(duplicateDisplay) &&
+        !isAllLowercase(existing.displayWord)))
+  ) {
+    await ctx.db.patch(existing._id, { displayWord: duplicateDisplay });
+  }
+  await ctx.db.delete(doc._id);
+  return undefined;
+}
+
+/**
+ * Runs with `runAll` after the apostrophe fold landed in the tokenizer.
+ * Idempotent: a row whose word is already ASCII is skipped, so later runs
+ * find nothing to do.
+ */
+export const dedupeApostropheWords = migrations.define({
+  table: 'userWords',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (ctx, doc) => dedupeApostropheWordOne(ctx, doc),
 });
 
 export const runAll = migrations.runner([
@@ -969,4 +1076,5 @@ export const runAll = migrations.runner([
   internal.migrations.stabilityBucketAggregateBackfill,
   internal.migrations.courseStatsTimeByModeBackfill,
   internal.migrations.backfillAudioAssetAccent,
+  internal.migrations.dedupeApostropheWords,
 ]);

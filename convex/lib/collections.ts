@@ -53,10 +53,29 @@ export const LEGACY_TO_NEW_CODE: Record<string, string> = {
 export const COLLECTION_PREVIEW_SIZE = 5;
 
 /**
- * Max page size for the paginated collection browse view. Also caps the
- * per-call batch of `requestPreviewTranslations`.
+ * The collection preview's first page: the sentences the course-creation
+ * warmup already translated (`ensureFirstSentencesForCollection`), so the
+ * dialog opens with content instead of spinners.
  */
-export const MAX_PREVIEW_PAGE_SIZE = 25;
+export const PREVIEW_FIRST_PAGE_SIZE = COLLECTION_PREVIEW_SIZE;
+
+/**
+ * What one "Show more" click reveals (and one page of the added history).
+ * Equal to the translation batch below, so a revealed page is exactly what
+ * the prewarm behind the loaded rows already translated and one
+ * `requestPreviewTranslations` call covers.
+ */
+export const PREVIEW_PAGE_SIZE = 25;
+
+/** Server-side clamp for the paginated collection browse view. */
+export const MAX_PREVIEW_PAGE_SIZE = PREVIEW_PAGE_SIZE;
+
+/**
+ * Texts per `requestPreviewTranslations` call and per prewarm: one mutation
+ * that stays well inside the transaction limits. The client still splits
+ * its request list into batches of this size in case the two ever differ.
+ */
+export const PREVIEW_TRANSLATION_BATCH_SIZE = PREVIEW_PAGE_SIZE;
 
 /**
  * The user's collectionProgress counters that define "settled": every text

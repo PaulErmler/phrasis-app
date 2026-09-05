@@ -139,8 +139,8 @@ function parseArgs(argv: string[]): Args {
       .split(',')
       .filter((a): a is Accent => a === 'en_gb' || a === 'en_au'),
     wild: Number(get('wild') ?? (smoke ? 0 : 100)),
-    // A different `--seed` draws a different wild sample (a generalisation
-    // check after tuning on the default draw).
+    // A different `--seed` draws a different wild sample, a generalisation
+    // check after tuning on the default draw.
     seed: get('seed') ?? 'accents-wild',
     limit: Number(get('limit') ?? (smoke ? 5 : CASES.length)),
     budget: Number(get('budget') ?? 1.0),
@@ -253,7 +253,7 @@ function cleanOutput(raw: string): string {
 
 /**
  * The prompt a condition sends for an accent, fingerprinted so a prompt
- * change (in `buildAccentRewritePrompt` or the accent's hints) invalidates
+ * change, in `buildAccentRewritePrompt` or the accent's hints, invalidates
  * the cached outputs instead of silently reusing the old prompt's answers.
  * The baseline has no prompt.
  */
@@ -441,8 +441,8 @@ function writeDiffSheet(lines: DiffLine[]): void {
 }
 
 /**
- * Every item, changed or not, one line per (condition, accent): the sheet a
- * reviewer reads to catch both over-edits and missed Americanisms.
+ * Every item, changed or not, one line per condition and accent. The sheet
+ * a reviewer reads to catch both over-edits and missed Americanisms.
  */
 function writeAllPairs(
   items: Item[],

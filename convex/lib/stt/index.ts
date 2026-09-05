@@ -19,12 +19,12 @@ import {
 } from './openrouter';
 
 /**
- * Where a language's speech recognition runs: the backend and the OpenRouter
- * model slug the cost event is labelled with. Without a language hint (chat
- * voice input auto-detect) MAI runs: it is the backend that detects
- * languages and handles code switching. The one lookup behind both
- * `transcribeAudio` and `sttModelForLanguage`, so the label can never name
- * a different backend than the one that transcribed.
+ * Where a language's speech recognition runs, as the backend and the
+ * OpenRouter model slug the cost event is labelled with. Without a language
+ * hint, as with chat voice input auto-detect, MAI runs, since it is the
+ * backend that detects languages and handles code switching. The one
+ * lookup behind both `transcribeAudio` and `sttModelForLanguage`, so the
+ * label can never name a different backend than the one that transcribed.
  */
 export function sttRouteForLanguage(internalLanguageCode?: string): {
   backend: SttBackend;

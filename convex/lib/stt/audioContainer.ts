@@ -64,13 +64,6 @@ export function containerOfBuffer(audio: ArrayBuffer): AudioContainer {
   );
 }
 
-/** `detectAudioContainer` over the head of a Blob (storage or upload). */
-export async function containerOfBlob(blob: Blob): Promise<AudioContainer> {
-  return detectAudioContainer(
-    new Uint8Array(await blob.slice(0, SNIFF_BYTES).arrayBuffer()),
-  );
-}
-
 const FILENAME_BY_CONTAINER: Record<SttContainer, string> = {
   wav: 'audio.wav',
   mp3: 'audio.mp3',

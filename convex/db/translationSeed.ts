@@ -1,3 +1,4 @@
+import { canonicalizeApostrophes } from '../../lib/languages';
 import { v } from 'convex/values';
 import { internalMutation } from '../_generated/server';
 import { deleteAudioRow } from '../lib/audio';
@@ -137,7 +138,7 @@ export const batchUpsertTranslations = internalMutation({
           await ctx.db.insert('translations', {
             textId,
             targetLanguage: tr.language,
-            translatedText: tr.text,
+            translatedText: canonicalizeApostrophes(tr.language, tr.text),
             ...(tr.translationSource
               ? { translationSource: tr.translationSource }
               : {}),

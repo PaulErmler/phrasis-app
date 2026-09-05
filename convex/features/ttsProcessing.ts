@@ -33,12 +33,13 @@ import { costForCharacters } from '../config/aiCosts';
 import { OPENROUTER_MODELS } from '../config/aiModels';
 import { deleteStorageBlobIfUnreferenced } from '../lib/audio';
 import {
+  audioAssetByStorageId,
   MAX_STT_BACKFILL_ATTEMPTS,
   scheduleBlobSwapDelete,
 } from '../lib/audioAssets';
 import { TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
 import { reserveRateLimitToken } from '../lib/rateLimitReserve';
-import { ttsPool, ttsWarmPool } from '../lib/workpools';
+import { ttsPool, ttsWarmPool, type PoolRunResult } from '../lib/workpools';
 import type { WorkId } from '@convex-dev/workpool';
 import {
   ttsQualityValidator,
@@ -125,6 +126,25 @@ async function getTtsClaim(
 }
 
 /**
+ * The timings a stored clip keeps: only with validated audio, since a
+ * mismatched transcription points at the wrong words, and never an empty
+ * array. An empty array means the backend has none (Gemini STT). It is
+ * stored as undefined so `hasMissingWordTimings` and the backfill still see
+ * the gap once the language gains a timings backend.
+ */
+export function persistedWordTimings(
+  validated: boolean,
+  wordTimings:
+    | { word: string; start: number; end: number }[]
+    | null
+    | undefined,
+): { word: string; start: number; end: number }[] | undefined {
+  return validated && wordTimings && wordTimings.length > 0
+    ? wordTimings
+    : undefined;
+}
+
+/**
  * Atomically check-and-insert a TTS generation claim. Returns the new claim's
  * `_id` iff the caller acquired the claim (and should enqueue the job), or
  * null when a fresh claim already exists (another mutation already scheduled
@@ -143,25 +163,6 @@ async function getTtsClaim(
  *
  * Must be called inside a mutation context so Convex OCC prevents duplicates.
  */
-/**
- * The timings a stored clip keeps: only alongside validated audio
- * (mismatched transcriptions point to the wrong words), and never an empty
- * array. An empty array is "the backend has none" (Gemini STT), not a
- * timing set: left undefined so `hasMissingWordTimings` and the backfill
- * still see the gap once the language gains a timings backend.
- */
-export function persistedWordTimings(
-  validated: boolean,
-  wordTimings:
-    | { word: string; start: number; end: number }[]
-    | null
-    | undefined,
-): { word: string; start: number; end: number }[] | undefined {
-  return validated && wordTimings && wordTimings.length > 0
-    ? wordTimings
-    : undefined;
-}
-
 export async function claimTtsIfAvailable(
   ctx: MutationCtx,
   textId: Id<'texts'>,
@@ -289,9 +290,9 @@ async function synthesizeAndValidate(
   lastStorageId: Id<'_storage'> | null;
   wordTimings: WordTiming[] | null;
   /**
-   * STT itself failed (rate limit, outage), so the clip carries no verdict:
-   * it is kept as 'unchecked' rather than re-synthesized, and the sweep's
-   * backfill re-validates it once STT answers again.
+   * STT itself failed, from a rate limit or an outage, so the clip carries
+   * no verdict. It is kept as 'unchecked' rather than re-synthesized, and
+   * the sweep's backfill re-validates it once STT answers again.
    */
   sttErrored: boolean;
 }> {
@@ -528,11 +529,10 @@ async function synthesizeAndValidate(
         attempt: attempt + 1,
       });
     } catch (transcriptionErr) {
-      // STT failed, not the clip: a rate limit or an outage says nothing
+      // STT failed, not the clip. A rate limit or an outage says nothing
       // about the audio. Re-synthesizing would spend a second TTS call on a
-      // clip that is probably fine, so the clip is kept without a verdict
-      // ('unchecked') and the sweep re-validates it once STT answers again
-      // (`backfillWordTimings`).
+      // clip that is probably fine, so the clip is kept as 'unchecked' and
+      // `backfillWordTimings` re-validates it once STT answers again.
       console.error(
         `Transcription failed (attempt ${attempt + 1}/${maxAttempts}); keeping the clip unchecked:`,
         transcriptionErr,
@@ -597,14 +597,8 @@ const ttsJobArgsValidator = v.object({
 
 type TtsJobArgs = Infer<typeof ttsJobArgsValidator>;
 
-// Explicit handler param types throughout this file: handlers reference
-// same-file functions via `internal.…` (enqueue → worker → onComplete), and
-// letting TS infer their types through the generated `internal` object is
-// circular. Inference collapses to `any` for every handler in the module.
-type PoolRunResult =
-  | { kind: 'success'; returnValue: unknown }
-  | { kind: 'failed'; error: string }
-  | { kind: 'canceled' };
+// Handler params are typed explicitly throughout this file; see
+// `PoolRunResult` in convex/lib/workpools.ts for why.
 
 /**
  * Worker action: synthesize + validate + persist audio for one
@@ -897,17 +891,18 @@ export const storeTtsMismatch = internalMutation({
 
 /**
  * Backfill word-level timestamps for an existing audio recording that was
- * generated before timings were captured (no `wordTimings` field), and give
- * an 'unchecked' clip (STT failed at synthesis time) its verdict. Called
+ * generated before timings were captured, with no `wordTimings` field, and
+ * give an 'unchecked' clip, where STT failed at synthesis time, its verdict.
+ * Called
  * from `scheduleMissingContent` after acquiring a TTS claim on (textId, lang).
  *
  * Re-downloads the stored audio blob, runs it through STT, and persists the
  * resulting timings, but only if the storageId still matches, so a
  * concurrent voice swap doesn't get clobbered with stale alignment. For an
  * unchecked asset the transcript is compared with the spoken text the same
- * way the synthesis loop does (strict, then the Gemini judge): a match
- * stores 'validated' with the timings, a mismatch 'unvalidated' with a
- * `ttsMismatches` record and no timings.
+ * way the synthesis loop does, strict first and then the Gemini judge. A
+ * match stores 'validated' with the timings. A mismatch stores 'unvalidated'
+ * with a `ttsMismatches` record and no timings.
  */
 export const backfillWordTimings = internalAction({
   args: {
@@ -921,10 +916,10 @@ export const backfillWordTimings = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
-      // Without an STT backend there is nothing to transcribe with; the
+      // Without an STT backend there is nothing to transcribe with. The
       // scheduler shouldn't have called, but guard the action too. A
-      // text-only backend (Gemini) still yields a verdict for an unchecked
-      // clip, just no timings.
+      // text-only backend such as Gemini still yields a verdict for an
+      // unchecked clip, just no timings.
       if (!languageSupportsStt(args.language)) return null;
 
       const asset = await ctx.runQuery(
@@ -988,7 +983,7 @@ export const backfillWordTimings = internalAction({
         await emitBackfillEvent({
           error: sttErr instanceof Error ? sttErr.message : String(sttErr),
         });
-        // Count the failure against the asset: at the cap the sweep stops
+        // Count the failure against the asset. At the cap the sweep stops
         // scheduling backfills for it and an unchecked clip settles as
         // 'unvalidated', so a dead STT can never loop per view.
         await ctx.runMutation(
@@ -1062,7 +1057,7 @@ export const backfillWordTimings = internalAction({
         }
       }
       // The transcript's timings are stored whatever the verdict, as the
-      // legacy timing backfill always did for unvalidated clips: with them
+      // legacy timing backfill always did for unvalidated clips. With them
       // in place nothing asks for this asset again. A backend without
       // timings still delivers the verdict.
       if (wordTimings.length === 0 && verdict === undefined) return null;
@@ -1118,14 +1113,8 @@ export const persistBackfilledWordTimings = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // By blob, not through the (text, language) pointer: the timings belong
-    // to whichever asset still owns the transcribed blob, which is the live
-    // pointer's asset or the asset of a superseded revision alike. A swapped
-    // blob simply finds no asset and the stale timings are dropped.
-    const asset = await ctx.db
-      .query('audioAssets')
-      .withIndex('by_storageId', (q) => q.eq('storageId', args.storageId))
-      .first();
+    // By blob, so a swapped blob finds no asset and stale timings are dropped.
+    const asset = await audioAssetByStorageId(ctx, args.storageId);
     if (!asset) return null;
     await ctx.db.patch(asset._id, {
       ...(args.wordTimings.length > 0 ? { wordTimings: args.wordTimings } : {}),
@@ -1137,17 +1126,15 @@ export const persistBackfilledWordTimings = internalMutation({
 
 /**
  * One more failed STT backfill on the asset owning `storageId`. At
- * `MAX_STT_BACKFILL_ATTEMPTS` an 'unchecked' clip becomes 'unvalidated':
- * final, played as it is, never re-checked. Returns the new count.
+ * `MAX_STT_BACKFILL_ATTEMPTS` an 'unchecked' clip becomes 'unvalidated',
+ * which is final. It is played as it is and never re-checked. Returns the
+ * new count.
  */
 export const recordSttBackfillFailure = internalMutation({
   args: { storageId: v.id('_storage') },
   returns: v.number(),
   handler: async (ctx, args) => {
-    const asset = await ctx.db
-      .query('audioAssets')
-      .withIndex('by_storageId', (q) => q.eq('storageId', args.storageId))
-      .first();
+    const asset = await audioAssetByStorageId(ctx, args.storageId);
     if (!asset) return 0;
     const attempts = (asset.revalidationAttempts ?? 0) + 1;
     const settle =
@@ -1178,10 +1165,7 @@ export const getAudioAssetByStorageId = internalQuery({
     }),
   ),
   handler: async (ctx, args) => {
-    const asset = await ctx.db
-      .query('audioAssets')
-      .withIndex('by_storageId', (q) => q.eq('storageId', args.storageId))
-      .first();
+    const asset = await audioAssetByStorageId(ctx, args.storageId);
     if (!asset) return null;
     return {
       spokenText: asset.spokenText,

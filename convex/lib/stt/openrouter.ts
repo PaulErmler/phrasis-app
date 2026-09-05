@@ -34,7 +34,7 @@ import { requireEnv } from '../env';
 import { MAX_RETRIES, isRetryableStatus, retryDelayMs } from '../httpRetry';
 import { reserveRateLimitToken } from '../rateLimitReserve';
 import {
-  containerOfBlob,
+  containerOfBuffer,
   sttFilename,
   STT_REJECTED_CONTAINERS,
   type AudioContainer,
@@ -135,7 +135,10 @@ export async function transcribeAudio(
   const apiKey = requireEnv('OPENROUTER_API_KEY');
   const maxRetries = opts.maxRetries ?? MAX_RETRIES;
 
-  const container = await containerOfBlob(blob);
+  // A blob from `ctx.storage.get` streams and can be read once. The bytes
+  // are read here, sniffed, and wrapped in a fresh Blob per upload attempt.
+  const bytes = await blob.arrayBuffer();
+  const container = containerOfBuffer(bytes);
   if (STT_REJECTED_CONTAINERS.has(container)) {
     throw new SttRejectedContainerError(container);
   }
@@ -151,7 +154,7 @@ export async function transcribeAudio(
     if (internalLanguageCode) {
       formData.append('language', toSttLanguage(internalLanguageCode));
     }
-    formData.append('file', blob, filename);
+    formData.append('file', new Blob([bytes], { type: blob.type }), filename);
 
     const response = await fetch(ENDPOINT, {
       method: 'POST',

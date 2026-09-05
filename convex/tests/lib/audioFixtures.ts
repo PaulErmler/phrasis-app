@@ -1,6 +1,7 @@
 import type { MutationCtx } from '../../_generated/server';
 import type { Doc, Id } from '../../_generated/dataModel';
 import { sha256Hex } from '../../lib/sha256';
+import type { TtsQuality } from '../../lib/audioAssets';
 
 export interface AudioFixtureArgs {
   textId: Id<'texts'>;
@@ -10,7 +11,7 @@ export interface AudioFixtureArgs {
   spokenText?: string;
   voiceName?: string;
   voiceGender?: 'male' | 'female';
-  ttsQuality?: 'unknown' | 'validated' | 'unvalidated' | 'unchecked';
+  ttsQuality?: TtsQuality;
   ttsProvider?: Doc<'audioAssets'>['ttsProvider'];
   speed?: number;
   wordTimings?: { word: string; start: number; end: number }[];

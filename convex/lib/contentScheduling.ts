@@ -718,10 +718,11 @@ async function sweepInvalidAudio(
         lang,
         payload,
       );
-      // A user-created text keeps the accent it was voiced in: its clip was
-      // made for its own hash (or, for a card-edit copy, carried over from
-      // the shared text the learner heard), so a drift here would only be
-      // the copy's new id re-rolling the accent the learner already knows.
+      // A user-created text keeps the accent it was voiced in. Its clip was
+      // made for its own hash, or carried over from the shared text the
+      // learner heard when it is a card-edit copy, so a drift here would
+      // only be the copy's new id re-rolling the accent the learner already
+      // knows.
       const accentMismatch =
         !text.userCreated && audioAccentDrifted(lang, textId, payload.asset);
       if (genderMismatch) {
@@ -905,12 +906,12 @@ async function sweepStaleTranslations(
 
 /**
  * Schedule an STT backfill for an existing audio row that lacks timings, or
- * that was stored 'unchecked' because STT failed at synthesis time (the
- * backfill then delivers the verdict too). A no-op unless the row survived
- * the validity sweep (its payload is in `state.audioPayloadMap`), the
- * language's STT can produce what is missing, and the asset has backfill
- * attempts left (`sttBackfillExhausted`): a clip STT keeps failing on is
- * left alone rather than retried on every view.
+ * that was stored 'unchecked' because STT failed at synthesis time, in
+ * which case the backfill delivers the verdict too. A no-op unless the row
+ * survived the validity sweep, so its payload is in `state.audioPayloadMap`,
+ * the language's STT can produce what is missing, and the asset has
+ * backfill attempts left (`sttBackfillExhausted`). A clip STT keeps failing
+ * on is left alone rather than retried on every view.
  */
 async function scheduleTimingsBackfillIfNeeded(
   ctx: MutationCtx,
@@ -928,7 +929,7 @@ async function scheduleTimingsBackfillIfNeeded(
   if (sttBackfillExhausted(payload.asset)) return;
   // Languages whose STT backend yields no word timings (none, or the
   // text-only Gemini fallback) will never get them, so don't waste a claim
-  // on a backfill that's guaranteed to no-op; a text-only backend still
+  // on a backfill that's guaranteed to no-op. A text-only backend still
   // gives an unchecked clip its verdict.
   const needsTimings =
     !payload.wordTimings && languageSupportsWordTimings(lang);

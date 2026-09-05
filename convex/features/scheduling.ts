@@ -706,9 +706,9 @@ export const reviewCard = mutation({
       track,
     );
     const phase = resolveValidatedPhase(card, track, args);
-    // Study-day snapping is a per-user preference (default on), so this is
-    // the one extra read on the review hot path. The client's zone is what
-    // the day boundary is computed in; an invalid one falls back to exact
+    // Study-day snapping is a per-user preference, on by default, so this
+    // is the one extra read on the review hot path. The day boundary is
+    // computed in the client's zone. An invalid zone falls back to exact
     // instants rather than failing the review.
     const userSettings = await getUserSettings(ctx, userId);
     const transition = await applyFsrsTransition(ctx, {
@@ -1620,14 +1620,16 @@ async function suggestCurriculumFixesForEdit(
   const flagged: string[] = [];
 
   for (const lang of changedLanguages) {
-    // The row the card read for this course language (`CardEditPlan.
-    // rowLanguages`): the accent row for the source slot of a Mixed English
-    // card, which is a curriculum row the edit can correct like any other.
+    // The row the card read for this course language
+    // (`CardEditPlan.rowLanguages`). For the source slot of a Mixed English
+    // card that is the accent row, a curriculum row the edit can correct
+    // like any other.
     const rowLang = rowLanguages.get(lang) ?? lang;
     if (rowLang === originalText.language) continue;
-    // Accent-only variant of the source that shows the source text verbatim
-    // (`en_us` on an `en` sentence): there is no curriculum wording to
-    // correct and nothing a model could improve. Same rule as `flagTranslation`.
+    // An accent-only variant of the source that shows the source text
+    // verbatim, such as `en_us` on an `en` sentence. There is no curriculum
+    // wording to correct and nothing a model could improve. Same rule as
+    // `flagTranslation`.
     if (usesSourceTextVerbatim(rowLang, originalText.language)) continue;
 
     const served = servedTranslationMap.get(lang);
@@ -1718,14 +1720,14 @@ export const flagTranslation = mutation({
     if (!text)
       throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
 
-    // Languages we need translations for: every row the card shows
-    // (`cardRowLanguages`: the course languages, with the source slot's
+    // Languages we need translations for. Every row the card shows
+    // (`cardRowLanguages`, the course languages with the source slot's
     // accent row in place of the source on a Mixed English card) except the
     // source text itself. Fetching this exact set lets us skip orphan
     // translation rows for languages the user has since removed from their
     // course. We shouldn't bump flagCount on those. Accent-only variants
-    // that show the source text verbatim (`en_us` on an `en` sentence) have
-    // nothing to dispute and nothing to retranslate.
+    // that show the source text verbatim, such as `en_us` on an `en`
+    // sentence, have nothing to dispute and nothing to retranslate.
     const view = viewOfCard(card);
     const source = await servedSourceText(ctx, text, view);
     const cardLanguages = cardRowLanguages(text, view, [
@@ -1971,7 +1973,7 @@ export const regenerateCardAudio = mutation({
     // so those languages re-synthesize their archived asset in place instead
     // and keep the live pointer as it is.
     const view = viewOfCard(card);
-    // The rows this card plays: a Mixed English card plays its accent row's
+    // The rows this card plays. A Mixed English card plays its accent row's
     // clip for the source slot (`cardRowLanguages`), so that row is the one
     // regenerated, not the source clip the card never plays.
     const audioLanguages = cardRowLanguages(text, view, allLanguages);

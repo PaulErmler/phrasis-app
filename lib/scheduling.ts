@@ -32,12 +32,12 @@ import { addDays, dateInTimezone, startOfDayMs } from './dateStrings';
 
 /**
  * Day-scale FSRS intervals are due at the start of the learner's study day,
- * not at the exact instant FSRS computes (Anki's model: review cards carry a
- * day, only intraday learning steps carry a clock time). Reviewing a card a
- * few hours early costs nothing at day-scale intervals, and a card whose
- * due hour drifted past someone's fixed study window is otherwise out of
- * reach for a whole cycle. Both defaults apply until a settings row exists
- * for them; `userSettings.dueByDay` / `dayStartHour` override per user.
+ * not at the exact instant FSRS computes. This is Anki's model. Review
+ * cards carry a day and only intraday learning steps carry a clock time.
+ * Reviewing a card a few hours early costs nothing at day-scale intervals,
+ * while a card whose due hour drifted past someone's fixed study window is
+ * out of reach for a whole cycle. `userSettings.dueByDay` and
+ * `dayStartHour` override these defaults per user.
  */
 export const DEFAULT_DUE_BY_DAY = true;
 
@@ -46,10 +46,10 @@ export const DEFAULT_DUE_BY_DAY = true;
 export const DEFAULT_DAY_START_HOUR = 4;
 
 /**
- * Cards snapped to a study day are spread over the first minute of it
- * (`dayStart + [0, DUE_SLOT_WINDOW_MS)`), one unique millisecond each, in
- * random order. The sweep that migrates legacy exact-instant cards treats
- * "already inside the window" as "already snapped" (`isInsideSlotWindow`).
+ * Cards snapped to a study day are spread over its first minute, one unique
+ * millisecond each, in random order. The sweep that migrates legacy
+ * exact-instant cards treats a card already inside the window as already
+ * snapped (`isInsideSlotWindow`).
  */
 export const DUE_SLOT_WINDOW_MS = 60_000;
 
@@ -159,18 +159,18 @@ export interface ScheduleResult {
   phaseTransitioned: boolean;
   /**
    * True when `dueDate` is a study-day start rather than FSRS's exact
-   * instant (see `StudyDay`). The caller then owns spreading it into a
-   * unique slot inside the day's window; the scheduler cannot, since that
-   * needs a database read.
+   * instant (see `StudyDay`). The caller spreads it into a unique slot
+   * inside the day's window. The scheduler cannot, since that needs a
+   * database read.
    */
   snappedToStudyDay?: boolean;
 }
 
 /**
- * The learner's study-day boundary: an IANA zone and the local hour the day
- * rolls over. Present = snap day-scale due dates to the day start; absent =
- * exact instants (the pre-2026-09 behaviour, still what previews and
- * simulations use).
+ * The learner's study-day boundary, an IANA zone and the local hour the day
+ * rolls over. When present, day-scale due dates snap to the day start.
+ * When absent, due dates are exact instants, which is the pre-2026-09
+ * behaviour and still what previews and simulations use.
  */
 export interface StudyDay {
   timezone: string;
@@ -178,15 +178,15 @@ export interface StudyDay {
 }
 
 /**
- * UTC timestamp of the start of the study day that contains `ms`: the most
- * recent `dayStartHour` o'clock in `timezone` at or before `ms`. Built on
- * the DST-safe `startOfDayMs`, so the rollover lands on the wall-clock hour
- * even on a 23- or 25-hour transition day.
+ * UTC timestamp of the start of the study day that contains `ms`, which is
+ * the most recent `dayStartHour` o'clock in `timezone` at or before `ms`.
+ * Built on the DST-safe `startOfDayMs`, so the rollover lands on the
+ * wall-clock hour even on a 23- or 25-hour transition day.
  *
  * The candidate date comes from shifting `ms` back by the rollover hour and
- * reading the local date. That is exact on 24-hour days; on a transition
- * day the hour between the old and new offset can land one date off, which
- * the two neighbour checks correct.
+ * reading the local date. That is exact on 24-hour days. On a transition
+ * day the hour between the old and new offset can land one date off, and
+ * the two neighbour checks correct that.
  */
 export function studyDayStart(ms: number, studyDay: StudyDay): number {
   const { timezone, dayStartHour } = studyDay;
@@ -399,16 +399,16 @@ function scheduleFsrsReview(
   const newFsrsState = serializeFsrsCard(result.card);
   const exactDue = result.card.due.getTime();
 
-  // Gate on the interval length, not the FSRS state: the 1m/10m learning
-  // and relearning steps have scheduled_days 0 and must keep their clock
-  // time, whatever state they are in. `fsrsState.due` keeps FSRS's exact
-  // instant; `dueDate` is when the card is served.
+  // Gate on the interval length, not the FSRS state. The 1m/10m learning
+  // and relearning steps have scheduled_days 0 and keep their clock time
+  // whatever state they are in. `fsrsState.due` keeps FSRS's exact instant.
+  // `dueDate` is when the card is served.
   const snap = studyDay !== undefined && result.card.scheduled_days >= 1;
   let dueDate = exactDue;
   if (snap) {
     dueDate = studyDayStart(exactDue, studyDay);
     // On a 25-hour DST fall-back day a 1-day interval rated in the hour
-    // before rollover lands in the study day that already started, i.e. in
+    // before rollover lands in the study day that already started, so in
     // the past, and every re-rating would land there again until the clock
     // passed rollover. "One day later" means the next study day, so move
     // there. 25 h always reaches the next start without skipping one.

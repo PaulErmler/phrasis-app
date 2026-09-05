@@ -13,7 +13,14 @@ import {
 } from '../../lib/voices';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import { sha256Hex } from './sha256';
-import type { TtsProvider, VoiceGender } from '../types';
+import type { Infer } from 'convex/values';
+import {
+  ttsQualityValidator,
+  type TtsProvider,
+  type VoiceGender,
+} from '../types';
+
+export type TtsQuality = Infer<typeof ttsQualityValidator>;
 
 /**
  * Content-addressed audio store helpers. An `audioAssets` row is keyed by
@@ -65,6 +72,23 @@ export const BLOB_SWAP_DELETE_DELAY_MS = 10 * 60 * 1000;
  */
 export const MAX_STT_BACKFILL_ATTEMPTS = 3;
 
+/**
+ * The asset that owns a storage blob. The backfill addresses assets by blob
+ * rather than through the (text, language) pointer: the pointer may have
+ * moved to a new asset, or the blob may belong to a superseded revision's
+ * asset, and either way the timings belong to the asset still holding it.
+ * A swapped blob finds nothing.
+ */
+export async function audioAssetByStorageId(
+  ctx: QueryCtx | MutationCtx,
+  storageId: Id<'_storage'>,
+): Promise<Doc<'audioAssets'> | null> {
+  return ctx.db
+    .query('audioAssets')
+    .withIndex('by_storageId', (q) => q.eq('storageId', storageId))
+    .unique();
+}
+
 /** True once an asset has used up its STT backfill attempts. */
 export function sttBackfillExhausted(
   asset: Pick<Doc<'audioAssets'>, 'revalidationAttempts'>,
@@ -85,7 +109,7 @@ export interface AudioAssetPayload {
   storageId: Id<'_storage'>;
   voiceName: string;
   ttsProvider?: TtsProvider;
-  ttsQuality?: 'unknown' | 'validated' | 'unvalidated' | 'unchecked';
+  ttsQuality?: TtsQuality;
   speed: number;
   wordTimings?: { word: string; start: number; end: number }[];
   ttsVersion?: number;
@@ -191,7 +215,7 @@ export async function findAudioAssetInAnyAccent(
     language: string;
     voiceGender: VoiceGender;
     spokenText: string;
-    /** Tried first: the accent the card's text speaks in, when known. */
+    /** Tried first. The accent the card's text speaks in, when known. */
     preferredAccent?: string;
   },
 ): Promise<Doc<'audioAssets'> | null> {
@@ -273,8 +297,8 @@ export async function upsertAudioAsset(
     payload.ttsQuality === 'unvalidated' ||
     payload.ttsQuality === 'unchecked';
   // 'unknown' marks a mid-flight asset; undefined (legacy backfill) and the
-  // final qualities are completed audio ('unchecked' is complete audio
-  // awaiting a verdict from the sweep's re-validation).
+  // final qualities are completed audio. 'unchecked' is complete audio
+  // awaiting a verdict from the sweep's re-validation.
   const existingInFlight = existing.ttsQuality === 'unknown';
   if (!incomingIsFinal && !existingInFlight) {
     return { assetId: existing._id, outcome: 'kept', replacedStorageId: null };
@@ -389,7 +413,7 @@ export async function scheduleBlobSwapDelete(
 export interface ResolvedAudioPayload {
   storageId: Id<'_storage'>;
   voiceName: string;
-  ttsQuality: 'unknown' | 'validated' | 'unvalidated' | 'unchecked' | undefined;
+  ttsQuality: TtsQuality | undefined;
   ttsProvider: TtsProvider | undefined;
   voiceGender: VoiceGender;
   speed: number;

@@ -241,8 +241,8 @@ export function trackDueOf(card: Doc<'cards'>, track: SchedulingTrack): number {
   return TRACK_DUE_QUERIES[track].dueOf(card);
 }
 
-/** The active card of `deckId` due at exactly `due` on `track`, if any.
- * Point lookup on the track's due index; what `pickUniqueDueSlot` probes. */
+/** The active card of `deckId` due at exactly `due` on `track`, if any. A
+ * point lookup on the track's due index, the probe `pickUniqueDueSlot` runs. */
 export function fetchTrackCardAtDue(
   ctx: QueryCtx,
   deckId: Id<'decks'>,
@@ -253,7 +253,7 @@ export function fetchTrackCardAtDue(
 }
 
 /** Active cards of `deckId` due strictly after `afterDue` on `track`,
- * ascending; the cursor walk of the study-day snap sweep. */
+ * ascending. The cursor walk of the study-day snap sweep. */
 export function fetchTrackCardsAfterDue(
   ctx: QueryCtx,
   deckId: Id<'decks'>,

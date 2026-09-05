@@ -89,6 +89,7 @@ import type * as features_ipa from "../features/ipa.js";
 import type * as features_library from "../features/library.js";
 import type * as features_llmTranslationQueue from "../features/llmTranslationQueue.js";
 import type * as features_onboarding from "../features/onboarding.js";
+import type * as features_onboardingTesting from "../features/onboardingTesting.js";
 import type * as features_paymentSync from "../features/paymentSync.js";
 import type * as features_placementTest from "../features/placementTest.js";
 import type * as features_projections from "../features/projections.js";
@@ -271,6 +272,7 @@ declare const fullApi: ApiFromModules<{
   "features/library": typeof features_library;
   "features/llmTranslationQueue": typeof features_llmTranslationQueue;
   "features/onboarding": typeof features_onboarding;
+  "features/onboardingTesting": typeof features_onboardingTesting;
   "features/paymentSync": typeof features_paymentSync;
   "features/placementTest": typeof features_placementTest;
   "features/projections": typeof features_projections;
