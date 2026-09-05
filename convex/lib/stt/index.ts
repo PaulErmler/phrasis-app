@@ -9,7 +9,7 @@
  * themselves. Only the surface the features layer uses is re-exported;
  * tests import the modules directly.
  */
-import { getSttBackend } from '../../../lib/languages';
+import { getSttBackend, type SttBackend } from '../../../lib/languages';
 import { OPENROUTER_MODELS } from '../../config/aiModels';
 import { transcribeAudioWithGemini } from './gemini';
 import {
@@ -19,29 +19,44 @@ import {
 } from './openrouter';
 
 /**
- * Transcribe an audio Blob with the backend the language is routed to.
- * Without a language hint (chat voice input auto-detect) MAI runs: it is the
- * backend that detects languages and handles code switching.
+ * Where a language's speech recognition runs: the backend and the OpenRouter
+ * model slug the cost event is labelled with. Without a language hint (chat
+ * voice input auto-detect) MAI runs: it is the backend that detects
+ * languages and handles code switching. The one lookup behind both
+ * `transcribeAudio` and `sttModelForLanguage`, so the label can never name
+ * a different backend than the one that transcribed.
  */
+export function sttRouteForLanguage(internalLanguageCode?: string): {
+  backend: SttBackend;
+  model: string;
+} {
+  const backend = internalLanguageCode
+    ? getSttBackend(internalLanguageCode)
+    : 'mai-transcribe-2';
+  return {
+    backend,
+    model:
+      backend === 'gemini-flash-lite'
+        ? OPENROUTER_MODELS.sttGemini
+        : OPENROUTER_MODELS.stt,
+  };
+}
+
+/** Transcribe an audio Blob with the backend the language is routed to. */
 export function transcribeAudio(
   blob: Blob,
   internalLanguageCode?: string,
   opts: TranscribeOptions = {},
 ): Promise<TranscriptionResult> {
-  const backend = internalLanguageCode
-    ? getSttBackend(internalLanguageCode)
-    : 'mai-transcribe-2';
-  return backend === 'gemini-flash-lite'
+  return sttRouteForLanguage(internalLanguageCode).backend ===
+    'gemini-flash-lite'
     ? transcribeAudioWithGemini(blob, internalLanguageCode, opts)
     : transcribeAudioWithMai(blob, internalLanguageCode, opts);
 }
 
 /** OpenRouter model slug the language's STT runs on, for cost-event labels. */
 export function sttModelForLanguage(internalLanguageCode?: string): string {
-  return internalLanguageCode &&
-    getSttBackend(internalLanguageCode) === 'gemini-flash-lite'
-    ? OPENROUTER_MODELS.sttGemini
-    : OPENROUTER_MODELS.stt;
+  return sttRouteForLanguage(internalLanguageCode).model;
 }
 
 export {

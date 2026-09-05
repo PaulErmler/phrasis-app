@@ -1,4 +1,4 @@
-import { cardPinAt } from '../db/translationReads';
+import { viewOfCard } from '../db/translationReads';
 import { v, ConvexError, type Infer } from 'convex/values';
 import { MutationCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
@@ -257,10 +257,8 @@ export async function resolveSearchableTextRefresh(
     searchableTextPatch = await buildCardSearchableText(
       ctx,
       card.textId,
-      text.text,
       courseLanguages,
-      text,
-      cardPinAt(card),
+      { text, view: viewOfCard(card) },
     );
   }
 

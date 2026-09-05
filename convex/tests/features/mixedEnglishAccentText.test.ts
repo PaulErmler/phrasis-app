@@ -11,11 +11,8 @@ import {
   buildCardSearchableText,
   buildTextContentBatchForLanguages,
 } from '../../lib/cardContent';
-import { servedSourceText } from '../../db/translationReads';
-import {
-  getMixedAccentTextLanguage,
-  getMixedAccentTextSince,
-} from '../../../lib/languages';
+import { servedSourceText, type SourceView } from '../../db/translationReads';
+import { getMixedAccentTextLanguage } from '../../../lib/languages';
 import { llmPool, ttsPool } from '../../lib/workpools';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
@@ -34,7 +31,12 @@ beforeEach(() => {
   vi.mocked(ttsPool.enqueueAction).mockClear();
 });
 
-const SINCE = getMixedAccentTextSince('en')!;
+/** A card that stored the British accent at creation. */
+const GB_CARD: SourceView = { accentLanguage: 'en_gb' };
+/** A card that stored the American accent: reads the catalogue as is. */
+const US_CARD: SourceView = { accentLanguage: 'en_us' };
+/** A card from before the accent field existed. */
+const OLD_CARD: SourceView = {};
 
 /**
  * A premade `en` sentence whose id hashes to the wanted accent row
@@ -130,7 +132,7 @@ async function seedAccentRowAndAudio(
 async function englishSlot(
   t: TestConvex<typeof schema>,
   textId: Id<'texts'>,
-  pinAt: number | undefined,
+  view: SourceView | null,
   opts?: { userCreated?: boolean },
 ) {
   return t.run(async (ctx) => {
@@ -145,7 +147,7 @@ async function englishSlot(
           sourceLanguage: 'en',
           sourceIpa: 'ipa-source',
           userCreated: opts?.userCreated ?? text.userCreated,
-          pinAt,
+          view,
         },
       ],
       ['en'],
@@ -156,11 +158,12 @@ async function englishSlot(
       text: result.translations.find((tr) => tr.language === 'en')!,
       audio: result.audioRecordings.find((a) => a.language === 'en')!,
       hasMissingContent: result.hasMissingContent,
+      missingTranslationLanguages: result.missingTranslationLanguages,
     };
   });
 }
 
-describe('Mixed English reads the accent row its voice accent points at', () => {
+describe('Mixed English reads the accent row its card stored', () => {
   describe('the ensure sweep', () => {
     it('asks for the en_gb rewrite of a British-voiced text on a Mixed English course', async () => {
       const t = convexTest(schema, modules);
@@ -213,26 +216,27 @@ describe('Mixed English reads the accent row its voice accent points at', () => 
   });
 
   describe('card content', () => {
-    it('a card pinned after the cutover reads the British wording, its annotations and its clip', async () => {
+    it('a card with the British accent reads the British wording, its annotations and its clip', async () => {
       const t = convexTest(schema, modules);
       const textId = await seedEnglishTextWithAccentRow(t, 'en_gb');
       await seedAccentRowAndAudio(t, textId);
 
-      const slot = await englishSlot(t, textId, SINCE + 1);
+      const slot = await englishSlot(t, textId, GB_CARD);
 
       expect(slot.text.text).toBe('The colour of the lift');
       expect(slot.text.ipa).toBe('ipa-gb');
       expect(slot.audio.voiceName).toBe('Leda@en-GB');
       expect(slot.audio.url).not.toBeNull();
       expect(slot.hasMissingContent).toBe(false);
+      expect(slot.missingTranslationLanguages).toEqual([]);
     });
 
-    it('a card pinned before the cutover keeps the source wording and its own clip for good', async () => {
+    it('a card from before the accent field keeps the source wording and its own clip for good', async () => {
       const t = convexTest(schema, modules);
       const textId = await seedEnglishTextWithAccentRow(t, 'en_gb');
       await seedAccentRowAndAudio(t, textId);
 
-      const slot = await englishSlot(t, textId, SINCE - 1);
+      const slot = await englishSlot(t, textId, OLD_CARD);
 
       expect(slot.text.text).toBe('The color of the elevator');
       expect(slot.text.ipa).toBe('ipa-source');
@@ -245,7 +249,7 @@ describe('Mixed English reads the accent row its voice accent points at', () => 
       const textId = await seedEnglishTextWithAccentRow(t, 'en_gb');
       await seedAccentRowAndAudio(t, textId);
 
-      const slot = await englishSlot(t, textId, undefined);
+      const slot = await englishSlot(t, textId, null);
 
       expect(slot.text.text).toBe('The colour of the lift');
     });
@@ -257,7 +261,7 @@ describe('Mixed English reads the accent row its voice accent points at', () => 
       });
       await seedAccentRowAndAudio(t, textId);
 
-      const slot = await englishSlot(t, textId, SINCE + 1);
+      const slot = await englishSlot(t, textId, GB_CARD);
 
       expect(slot.text.text).toBe('The color of the elevator');
       expect(slot.audio.voiceName).toBe('Leda@en-US');
@@ -290,31 +294,34 @@ describe('Mixed English reads the accent row its voice accent points at', () => 
         });
       });
 
-      const slot = await englishSlot(t, textId, SINCE + 1);
+      const slot = await englishSlot(t, textId, GB_CARD);
 
       expect(slot.text.text).toBe('The color of the elevator');
       expect(slot.audio.voiceName).toBe('Leda@en-US');
       expect(slot.hasMissingContent).toBe(true);
+      // The preview's request list names the source language for it.
+      expect(slot.missingTranslationLanguages).toEqual(['en']);
     });
 
-    it('a US-voiced text reads the source wording whatever its pin', async () => {
+    it('a card with the American accent reads the source wording', async () => {
       const t = convexTest(schema, modules);
-      const textId = await seedEnglishTextWithAccentRow(t, undefined);
+      const textId = await seedEnglishTextWithAccentRow(t, 'en_gb');
       await seedAccentRowAndAudio(t, textId);
 
-      const slot = await englishSlot(t, textId, SINCE + 1);
+      const slot = await englishSlot(t, textId, US_CARD);
 
       expect(slot.text.text).toBe('The color of the elevator');
       expect(slot.audio.voiceName).toBe('Leda@en-US');
+      expect(slot.hasMissingContent).toBe(false);
     });
   });
 
   describe('every other reader follows the same accessor', () => {
-    it('servedSourceText: accent row after the cutover, source text before, source text while the row is missing', async () => {
+    it('servedSourceText: the accent row for a card with the accent, the source text without, and while the row is missing', async () => {
       const t = convexTest(schema, modules);
       const textId = await seedEnglishTextWithAccentRow(t, 'en_gb');
       const before = await t.run(async (ctx) =>
-        servedSourceText(ctx, (await ctx.db.get(textId))!, SINCE + 1),
+        servedSourceText(ctx, (await ctx.db.get(textId))!, GB_CARD),
       );
       expect(before).toMatchObject({
         text: 'The color of the elevator',
@@ -322,51 +329,45 @@ describe('Mixed English reads the accent row its voice accent points at', () => 
         served: null,
       });
       await seedAccentRowAndAudio(t, textId);
-      const [after, pinnedBefore] = await t.run(async (ctx) => {
+      const [withAccent, oldCard, preview] = await t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
         return Promise.all([
-          servedSourceText(ctx, text, SINCE + 1),
-          servedSourceText(ctx, text, SINCE - 1),
+          servedSourceText(ctx, text, GB_CARD),
+          servedSourceText(ctx, text, OLD_CARD),
+          servedSourceText(ctx, text, null),
         ]);
       });
-      expect(after).toMatchObject({
+      expect(withAccent).toMatchObject({
         text: 'The colour of the lift',
         language: 'en_gb',
         ipaText: 'ipa-gb',
       });
-      expect(after.served?.row.targetLanguage).toBe('en_gb');
-      expect(pinnedBefore.text).toBe('The color of the elevator');
+      expect(withAccent.served?.row.targetLanguage).toBe('en_gb');
+      expect(oldCard.text).toBe('The color of the elevator');
+      expect(preview.text).toBe('The colour of the lift');
     });
 
-    it('search text holds the British words for a card pinned after the cutover, the source words before', async () => {
+    it('search text holds the British words for a card with the accent, the source words for an old card', async () => {
       const t = convexTest(schema, modules);
       const textId = await seedEnglishTextWithAccentRow(t, 'en_gb');
       await seedAccentRowAndAudio(t, textId);
-      const [after, before] = await t.run(async (ctx) => {
+      const [withAccent, oldCard] = await t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
         return Promise.all([
-          buildCardSearchableText(
-            ctx,
-            textId,
-            text.text,
-            ['en', 'es'],
+          buildCardSearchableText(ctx, textId, ['en', 'es'], {
             text,
-            SINCE + 1,
-          ),
-          buildCardSearchableText(
-            ctx,
-            textId,
-            text.text,
-            ['en', 'es'],
+            view: GB_CARD,
+          }),
+          buildCardSearchableText(ctx, textId, ['en', 'es'], {
             text,
-            SINCE - 1,
-          ),
+            view: OLD_CARD,
+          }),
         ]);
       });
-      expect(after.searchableText).toContain('colour of the lift');
-      expect(after.searchableText).not.toContain('color of the elevator');
-      expect(before.searchableText).toContain('color of the elevator');
-      expect(before.searchableText).not.toContain('colour');
+      expect(withAccent.searchableText).toContain('colour of the lift');
+      expect(withAccent.searchableText).not.toContain('color of the elevator');
+      expect(oldCard.searchableText).toContain('color of the elevator');
+      expect(oldCard.searchableText).not.toContain('colour');
     });
 
     it('the placement test renders and voices the accent row', async () => {
@@ -401,6 +402,35 @@ describe('Mixed English reads the accent row its voice accent points at', () => 
       );
       expect(preview.map((row) => row.targetText)).toEqual([
         'The colour of the lift',
+      ]);
+    });
+
+    it('the placement test falls back to the source text on the target side while the accent row is missing', async () => {
+      const t = convexTest(schema, modules);
+      const textId = await seedEnglishTextWithAccentRow(t, 'en_gb');
+      await t.run((ctx) =>
+        ctx.db.insert('placementTestSentences', {
+          level: 1,
+          position: 1,
+          textId,
+        }),
+      );
+      const sentence = await t.query(
+        api.features.placementTest.getPlacementSentence,
+        {
+          level: 1,
+          position: 1,
+          targetLanguage: 'en',
+          sourceLanguage: 'es',
+        },
+      );
+      expect(sentence?.targetText).toBe('The color of the elevator');
+      const preview = await t.query(
+        api.features.placementTest.getPlacementPreviewSentences,
+        { targetLanguage: 'en', sourceLanguage: 'es' },
+      );
+      expect(preview.map((row) => row.targetText)).toEqual([
+        'The color of the elevator',
       ]);
     });
 

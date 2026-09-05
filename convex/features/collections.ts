@@ -73,7 +73,11 @@ export {
   isCollectionAccessible,
   requireAccessibleText,
 } from '../lib/collectionAccess';
-import { liveTranslation } from '../db/translationReads';
+import {
+  liveTranslation,
+  servedSourceText,
+  viewOfCard,
+} from '../db/translationReads';
 
 // ============================================================================
 // QUERIES
@@ -254,6 +258,10 @@ export const browseCollectionTexts = query({
       sourceIpa: row.text.ipaText ?? undefined,
       sourceFurigana: row.text.furiganaText ?? undefined,
       userCreated: row.text.userCreated,
+      // The learner's card when they have one, so the preview shows the
+      // wording that card shows (its pin and its accent), else the live
+      // rows and the accent row a new card would get.
+      view: row.card ? viewOfCard(row.card) : null,
     }));
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
@@ -272,14 +280,10 @@ export const browseCollectionTexts = query({
       // stale text still ships in `translations` for display until the
       // regenerated row lands. `versionStale` already carries the full
       // `mayRegenerateTranslation` gate (user-created texts never report
-      // stale), so there is nothing to re-check here.
-      const missingTranslationLanguages = content.translations
-        .filter(
-          (tr) =>
-            tr.language !== row.text.language &&
-            (!tr.text || tr.versionStale === true),
-        )
-        .map((tr) => tr.language);
+      // stale), so there is nothing to re-check here. The text's own
+      // language is in the list when the accent row a Mixed English course
+      // shows for it has not landed, so browsing requests that row too.
+      const missingTranslationLanguages = content.missingTranslationLanguages;
       // Rows whose translations are all present can still be missing an
       // annotation (romanization after an engine swap, IPA on rows predating
       // the feature). The client's requestPreviewTranslations batching keys
@@ -469,10 +473,15 @@ export async function scheduleMissingTranslationsForText(
       ? [...languages, accentLang]
       : languages;
 
+  // The rows are independent: one parallel read per language, then the
+  // per-language decisions in order.
+  const rowLanguages = wantedLanguages.filter((lang) => lang !== text.language);
+  const existingRows = await Promise.all(
+    rowLanguages.map((lang) => liveTranslation(ctx, text._id, lang)),
+  );
   let scheduled = 0;
-  for (const lang of wantedLanguages) {
-    if (lang === text.language) continue;
-    const existing = await liveTranslation(ctx, text._id, lang);
+  for (const [i, lang] of rowLanguages.entries()) {
+    const existing = existingRows[i];
     if (existing) {
       // Version-stale rows regenerate here too, so browsing a collection
       // already upgrades its translations to the current version, and the
@@ -682,10 +691,21 @@ export const requestPreviewAudio = mutation({
       });
     }
 
+    // The row whose clip the preview plays for `args.language`. For the
+    // text's own language on a Mixed English course that is the accent row
+    // (`servedSourceText`, no card so no pin): the preview reads that row's
+    // wording and audio, so voicing the source row would leave the button
+    // dead. `translation` is the row to voice; null for the source text.
+    const source =
+      args.language === text.language
+        ? await servedSourceText(ctx, text, null)
+        : null;
+    const audioLanguage = source?.language ?? args.language;
+
     const existingAudio = await ctx.db
       .query('audioRecordings')
       .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('language', args.language),
+        q.eq('textId', args.textId).eq('language', audioLanguage),
       )
       .first();
     if (existingAudio) {
@@ -704,7 +724,7 @@ export const requestPreviewAudio = mutation({
       // Don't race an in-flight job: `processTTSForCard` attaches its row
       // before the blob is necessarily resolvable, and deleting it here
       // would make the completing job patch a row that no longer exists.
-      if (await hasActiveTtsClaim(ctx, args.textId, args.language)) {
+      if (await hasActiveTtsClaim(ctx, args.textId, audioLanguage)) {
         return { scheduled: false };
       }
       // Reference-aware: a shared asset survives while other texts point at
@@ -721,10 +741,12 @@ export const requestPreviewAudio = mutation({
     }
 
     const translation =
-      args.language === text.language
+      audioLanguage === text.language
         ? null
-        : await liveTranslation(ctx, args.textId, args.language);
-    if (args.language !== text.language && !translation) {
+        : source
+          ? source.served!.live
+          : await liveTranslation(ctx, args.textId, audioLanguage);
+    if (audioLanguage !== text.language && !translation) {
       // Translation still generating. The click raced it. Nothing to
       // synthesize yet; the client retries once the translation row lands.
       return { scheduled: false };
@@ -733,7 +755,7 @@ export const requestPreviewAudio = mutation({
     const scheduled = await scheduleAudioForLanguage(
       ctx,
       text,
-      args.language,
+      audioLanguage,
       audioSpeakerGender,
       translation,
       { requestedByUserId: userId },

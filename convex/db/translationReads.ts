@@ -1,8 +1,8 @@
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 import {
+  accentRowLanguage,
   getMixedAccentTextLanguage,
-  getMixedAccentTextSince,
 } from '../../lib/languages';
 
 type ContentCtx = QueryCtx | MutationCtx;
@@ -231,32 +231,78 @@ export async function servedTranslatedText(
 }
 
 /**
- * The accent-variant row a mixed-accent course (`en`) shows in place of the
- * source wording for this text, or undefined when the course shows the
- * source text itself. A British-voiced curriculum text reads the `en_gb`
- * rewrite, an Australian one `en_au` (`getMixedAccentTextLanguage`), so the
- * learner reads what they hear. Three cases keep the source wording: a
- * user-created text (the wording is the user's), a language with no
- * cutover, and a card pinned before the cutover
- * (`Language.mixedAccentTextSince`): the learner keeps the wording and
- * audio they learned, exactly as a version bump keeps a pinned card on its
- * archived revision. `pinAt` undefined (a reader with no card) reads the
- * accent row. Data-driven: any language whose variants declare
- * `accentRewrite` and that sets a cutover behaves the same.
+ * What a reader sees of a card, for the two per-card choices a read depends
+ * on: the pin (`cardPinAt`: which superseded revision) and the accent the
+ * card's text speaks in (`cards.accentLanguage`: which row stands in for
+ * the source text). `null` is a reader with no card (collection preview,
+ * placement test, level picker): the live rows, and the accent row a card
+ * created now would store.
  */
-export function mixedAccentRowLanguage(
-  input: {
-    userCreated: boolean;
-    pinAt?: number | undefined;
-    textId: Id<'texts'>;
-  },
-  lang: string,
+export type SourceView = {
+  pinAt?: number;
+  accentLanguage?: string;
+};
+
+/** The `SourceView` of an existing card. */
+export function viewOfCard(
+  card: Pick<
+    Doc<'cards'>,
+    '_creationTime' | 'translationsAcceptedAt' | 'accentLanguage'
+  >,
+): SourceView {
+  return { pinAt: cardPinAt(card), accentLanguage: card.accentLanguage };
+}
+
+/**
+ * The accent-variant row a mixed-accent course (`en`) shows in place of the
+ * source wording for this text, or undefined when it shows the source text
+ * itself. A card reads the row of the accent it stored at creation
+ * (`accentRowLanguage`: `en_gb` / `en_au` carry their own wording, `en_us`
+ * and a card without the field read the catalogue), so no existing card
+ * ever changes wording. A reader with no card takes the row a new card
+ * would store (`getMixedAccentTextLanguage`, the text's voice hash). A
+ * user-created text is always shown as typed.
+ */
+export function servedAccentRow(
+  text: Pick<Doc<'texts'>, '_id' | 'language' | 'userCreated'>,
+  view: SourceView | null,
 ): string | undefined {
-  if (input.userCreated) return undefined;
-  const since = getMixedAccentTextSince(lang);
-  if (since === undefined) return undefined;
-  if (input.pinAt !== undefined && input.pinAt < since) return undefined;
-  return getMixedAccentTextLanguage(lang, input.textId);
+  if (text.userCreated) return undefined;
+  if (view) return accentRowLanguage(view.accentLanguage);
+  return getMixedAccentTextLanguage(text.language, text._id);
+}
+
+/**
+ * The row language a card reads for the course language `lang`: the accent
+ * row when `lang` is the text's own language and the card has one, else
+ * `lang` itself.
+ */
+export function cardRowLanguage(
+  text: Pick<Doc<'texts'>, '_id' | 'language' | 'userCreated'>,
+  view: SourceView | null,
+  lang: string,
+): string {
+  if (lang !== text.language) return lang;
+  return servedAccentRow(text, view) ?? lang;
+}
+
+/**
+ * The row languages a card shows for a course, deduped: the course
+ * languages with the text's own language replaced by its accent row when
+ * the card has one. Flag, edit, regenerate-audio, chat and the audit all
+ * iterate this list, so the accent row is a translation row like any other
+ * to every one of them and none re-derives the rule.
+ */
+export function cardRowLanguages(
+  text: Pick<Doc<'texts'>, '_id' | 'language' | 'userCreated'>,
+  view: SourceView | null,
+  courseLanguages: string[],
+): string[] {
+  return [
+    ...new Set(
+      courseLanguages.map((lang) => cardRowLanguage(text, view, lang)),
+    ),
+  ];
 }
 
 export type ServedSourceText = {
@@ -277,26 +323,23 @@ export type ServedSourceText = {
 
 /**
  * What a course shows for the text's OWN language. The source text, except
- * on a mixed-accent course where `mixedAccentRowLanguage` names an accent
- * row: then that row's served revision (pin-aware like any translation),
- * with the source text as the fallback while the row has not landed. Every
- * reader that renders, indexes, compares or counts the source-language
- * side of a card goes through here, so all of them agree with the card.
+ * when `servedAccentRow` names an accent row: then that row's served
+ * revision (pin-aware like any translation), with the source text as the
+ * fallback while the row has not landed. Every reader that renders,
+ * indexes, compares or counts the source-language side of a card goes
+ * through here, so all of them agree with the card.
  */
 export async function servedSourceText(
   ctx: ContentCtx,
   text: Doc<'texts'>,
-  pinAt: number | undefined,
+  view: SourceView | null,
 ): Promise<ServedSourceText> {
-  const accent = mixedAccentRowLanguage(
-    { userCreated: text.userCreated, pinAt, textId: text._id },
-    text.language,
-  );
+  const accent = servedAccentRow(text, view);
   if (accent !== undefined) {
     const served = await resolveServedTranslation(ctx, {
       textId: text._id,
       targetLanguage: accent,
-      pinAt,
+      pinAt: view?.pinAt,
     });
     if (served) {
       return {
@@ -317,24 +360,4 @@ export async function servedSourceText(
     furiganaText: text.furiganaText,
     served: null,
   };
-}
-
-/**
- * The wording a course language shows for a text: `servedSourceText` for
- * the text's own language, the served translation otherwise (null while it
- * is missing).
- */
-export async function servedTextForLanguage(
-  ctx: ContentCtx,
-  text: Doc<'texts'>,
-  lang: string,
-  pinAt: number | undefined,
-): Promise<string | null> {
-  if (lang === text.language)
-    return (await servedSourceText(ctx, text, pinAt)).text;
-  return servedTranslatedText(ctx, {
-    textId: text._id,
-    targetLanguage: lang,
-    pinAt,
-  });
 }

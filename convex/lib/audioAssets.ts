@@ -172,10 +172,20 @@ export async function findReusableAudioAssetForVoice(
  */
 export async function findAudioAssetInAnyAccent(
   ctx: QueryCtx,
-  args: { language: string; voiceGender: VoiceGender; spokenText: string },
+  args: {
+    language: string;
+    voiceGender: VoiceGender;
+    spokenText: string;
+    /** Tried first: the accent the card's text speaks in, when known. */
+    preferredAccent?: string;
+  },
 ): Promise<Doc<'audioAssets'> | null> {
   const language = getAudioAssetLanguage(args.language);
-  const accents = [...getVoiceLocalesForLanguage(args.language), undefined];
+  const accents = [
+    ...(args.preferredAccent !== undefined ? [args.preferredAccent] : []),
+    ...getVoiceLocalesForLanguage(args.language),
+    undefined,
+  ];
   const tried = new Set<string | undefined>();
   for (const regionVariant of accents) {
     if (tried.has(regionVariant)) continue;

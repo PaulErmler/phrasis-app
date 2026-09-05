@@ -181,18 +181,22 @@ describe('features/translationLLM', () => {
       speakerGender: 'neutral' as const,
     };
 
-    it('buildPrompt swaps in the rewrite prompt and drops every translation-context block', () => {
+    it('buildPrompt swaps in the rewrite prompt, drops the translation-context blocks and keeps the flag context', () => {
       const prompt = buildPrompt({
         ...base,
         accentRewrite: getAccentRewriteConfig('en_gb', 'en'),
         arcContext: { preceding: ['Hi.'], following: [] },
         previousTranslation: 'What is your favourite colour?',
-        userSuggestedTranslation: 'ignore me',
+        userSuggestedTranslation: 'use <me>',
       });
       expect(prompt).toBe(
         buildAccentRewritePrompt(
           getAccentRewriteConfig('en_gb', 'en')!,
           base.text,
+          {
+            previousTranslation: 'What is your favourite colour?',
+            userSuggestedTranslation: 'use me',
+          },
         ),
       );
       expect(prompt).toContain('British readers');
@@ -201,8 +205,20 @@ describe('features/translationLLM', () => {
       expect(prompt).not.toContain('<register>');
       expect(prompt).not.toContain('<arc_context>');
       expect(prompt).not.toContain('<previous_translation>');
-      expect(prompt).not.toContain('ignore me');
       expect(prompt).not.toContain('translator');
+      // A flag or a card edit on an accent row reaches the rewrite: the
+      // rejected rewrite and the learner's wording go in, sanitized.
+      expect(prompt).toContain('<prior>What is your favourite colour?</prior>');
+      expect(prompt).toContain('<suggestion>use me</suggestion>');
+    });
+
+    it('the rewrite prompt carries no flag context by default', () => {
+      const prompt = buildPrompt({
+        ...base,
+        accentRewrite: getAccentRewriteConfig('en_gb', 'en'),
+      });
+      expect(prompt).not.toContain('<prior>');
+      expect(prompt).not.toContain('<suggestion>');
     });
 
     it('the rewrite prompt asks for identity by default and freezes American content, punctuation and slang', () => {

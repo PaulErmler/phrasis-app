@@ -919,6 +919,17 @@ export default defineSchema({
     // whose wording the curriculum has since revised (they accept the latest
     // wording). Never indexed: it is only ever read off the card itself.
     translationsAcceptedAt: v.optional(v.number()),
+    // The accent this card's text speaks in on a mixed-accent course
+    // (`en_us` | `en_gb` | `en_au`), stored once at creation from the text's
+    // voice hash (`pickAccentVariantForText` in lib/voices.ts). The card
+    // reads that variant's translation row in place of the source text when
+    // the variant has its own wording (`accentRowLanguage`: en_gb / en_au),
+    // and the source text otherwise (en_us, or no field). Cards from before
+    // the field existed have none and keep the catalogue wording and their
+    // clip for good; nothing backfills it. Set only when the course shows
+    // the text's own language and the text is not user-created; cleared
+    // when an edit forks the text into a user-owned copy. Never indexed.
+    accentLanguage: v.optional(v.string()),
   })
     // INDEX BUDGET — read before adding an index here. This table carries 23
     // database indexes (limit 32) and EVERY card write pays for updating all

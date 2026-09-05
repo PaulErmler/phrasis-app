@@ -8,12 +8,13 @@ import {
   type CardAlternativeContent,
 } from '../lib/cardContent';
 import {
-  cardPinAt,
+  type ServedTranslation,
+  cardRowLanguages,
   liveTranslation,
   resolveServedFromLive,
   resolveServedTranslation,
   servedSourceText,
-  type ServedTranslation,
+  viewOfCard,
 } from '../db/translationReads';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
@@ -356,7 +357,7 @@ export const getCardForReview = query({
               sourceIpa: text.ipaText ?? undefined,
               sourceFurigana: text.furiganaText ?? undefined,
               userCreated: text.userCreated,
-              pinAt: cardPinAt(card),
+              view: viewOfCard(card),
             },
           ]
         : [];
@@ -1601,6 +1602,7 @@ async function suggestCurriculumFixesForEdit(
   changedLanguages: Set<string>,
   submittedMap: Map<string, string>,
   servedTranslationMap: Map<string, ServedTranslation>,
+  rowLanguages: Map<string, string>,
   audit: {
     cardEditId: Id<'cardEdits'>;
     userId: string;
@@ -1610,11 +1612,15 @@ async function suggestCurriculumFixesForEdit(
   const flagged: string[] = [];
 
   for (const lang of changedLanguages) {
-    if (lang === originalText.language) continue;
-    // Accent-only variant of the source (`en_gb` on an `en` sentence): the
-    // row is the source text verbatim, so there is no curriculum wording to
+    // The row the card read for this course language (`CardEditPlan.
+    // rowLanguages`): the accent row for the source slot of a Mixed English
+    // card, which is a curriculum row the edit can correct like any other.
+    const rowLang = rowLanguages.get(lang) ?? lang;
+    if (rowLang === originalText.language) continue;
+    // Accent-only variant of the source that shows the source text verbatim
+    // (`en_us` on an `en` sentence): there is no curriculum wording to
     // correct and nothing a model could improve. Same rule as `flagTranslation`.
-    if (usesSourceTextVerbatim(lang, originalText.language)) continue;
+    if (usesSourceTextVerbatim(rowLang, originalText.language)) continue;
 
     const served = servedTranslationMap.get(lang);
     // No shared row for this language: the curriculum never had a translation
@@ -1637,7 +1643,7 @@ async function suggestCurriculumFixesForEdit(
     await ctx.db.patch(existing._id, { flagCount: nextCount });
     flagged.push(lang);
 
-    await retranslateOrRecordCapSkip(ctx, originalText, lang, {
+    await retranslateOrRecordCapSkip(ctx, originalText, rowLang, {
       reason: 'curriculum_fix',
       cardEditId: audit.cardEditId,
       userId: audit.userId,
@@ -1704,17 +1710,20 @@ export const flagTranslation = mutation({
     if (!text)
       throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
 
-    // Languages we need translations for: every base + target language in
-    // the user's course except the source. Dedupe in case a language is
-    // both base and target (unusual but possible). Fetching this exact
-    // set via the `by_text_and_language` index lets us skip orphan
-    // translation rows that may exist for languages the user has since
-    // removed from their course. We shouldn't bump flagCount on those.
-    // Accent-only variants of the source (`en_gb` on an `en` sentence) show
-    // the source text verbatim: nothing to dispute, nothing to retranslate.
-    const cardLanguages = Array.from(
-      new Set([...course.baseLanguages, ...course.targetLanguages]),
-    ).filter(
+    // Languages we need translations for: every row the card shows
+    // (`cardRowLanguages`: the course languages, with the source slot's
+    // accent row in place of the source on a Mixed English card) except the
+    // source text itself. Fetching this exact set lets us skip orphan
+    // translation rows for languages the user has since removed from their
+    // course. We shouldn't bump flagCount on those. Accent-only variants
+    // that show the source text verbatim (`en_us` on an `en` sentence) have
+    // nothing to dispute and nothing to retranslate.
+    const view = viewOfCard(card);
+    const source = await servedSourceText(ctx, text, view);
+    const cardLanguages = cardRowLanguages(text, view, [
+      ...course.baseLanguages,
+      ...course.targetLanguages,
+    ]).filter(
       (lang) =>
         lang !== text.language && !usesSourceTextVerbatim(lang, text.language),
     );
@@ -1744,9 +1753,8 @@ export const flagTranslation = mutation({
     // is archived means the curriculum already revised this wording after
     // the card was pinned: the fix for that learner is the latest wording,
     // not another retranslation.
-    const pinAt = cardPinAt(card);
     const served = await Promise.all(
-      liveRows.map((tr) => resolveServedFromLive(ctx, tr, pinAt)),
+      liveRows.map((tr) => resolveServedFromLive(ctx, tr, view.pinAt)),
     );
     const moved = served.filter((s) => s.archived);
     const updatedToLatest = moved.length > 0;
@@ -1759,10 +1767,8 @@ export const flagTranslation = mutation({
       const search = await buildCardSearchableText(
         ctx,
         card.textId,
-        text.text,
         courseLanguages,
-        text,
-        now,
+        { text, view: { pinAt: now, accentLanguage: card.accentLanguage } },
       );
       // Raw patch: no card aggregate keys on the pin or the search fields.
       await ctx.db.patch(card._id, {
@@ -1781,7 +1787,7 @@ export const flagTranslation = mutation({
         collectionOrigin: card.collectionOrigin,
         textWasUserCreated: text.userCreated,
         sourceLanguage: text.language,
-        sourceText: text.text,
+        sourceText: source.text,
         changes: moved.map((s) => ({
           language: s.live.targetLanguage,
           role: languageRole(course, s.live.targetLanguage),
@@ -1836,7 +1842,7 @@ export const flagTranslation = mutation({
       collectionOrigin: card.collectionOrigin,
       textWasUserCreated: text.userCreated,
       sourceLanguage: text.language,
-      sourceText: text.text,
+      sourceText: source.text,
       // No `after`/`soundsSame`: a flag disputes the wording without proposing
       // a replacement, so there is nothing to diff.
       changes: withCounts.map(({ tr, nextCount }) => ({
@@ -1956,21 +1962,18 @@ export const regenerateCardAudio = mutation({
     // live audio would spend the quota unit on a clip this card never plays,
     // so those languages re-synthesize their archived asset in place instead
     // and keep the live pointer as it is.
-    const pinAt = cardPinAt(card);
-    // A Mixed English card may play its accent row's clip for the source
-    // slot (`servedSourceText`); that language's audio is regenerated too.
-    const source = await servedSourceText(ctx, text, pinAt);
-    const audioLanguages =
-      source.language === text.language
-        ? allLanguages
-        : [...new Set([...allLanguages, source.language])];
+    const view = viewOfCard(card);
+    // The rows this card plays: a Mixed English card plays its accent row's
+    // clip for the source slot (`cardRowLanguages`), so that row is the one
+    // regenerated, not the source clip the card never plays.
+    const audioLanguages = cardRowLanguages(text, view, allLanguages);
     const supersededLanguages = new Set<string>();
     for (const lang of audioLanguages) {
       if (lang === text.language) continue;
       const served = await resolveServedTranslation(ctx, {
         textId: card.textId,
         targetLanguage: lang,
-        pinAt,
+        pinAt: view.pinAt,
       });
       if (served?.archived) {
         supersededLanguages.add(lang);
@@ -2152,7 +2155,7 @@ export async function applyCardEdit(
     // so offering it as a correction would compare two different sentences.
     if (
       args.suggestCurriculumFix &&
-      !changedLanguages.has(plan.sourceLanguage) &&
+      !plan.sourceWordingChanged &&
       cardEditId !== undefined
     ) {
       flaggedLanguages = await suggestCurriculumFixesForEdit(
@@ -2161,6 +2164,7 @@ export async function applyCardEdit(
         changedLanguages,
         plan.submittedMap,
         plan.servedTranslationMap,
+        plan.rowLanguages,
         { cardEditId, userId, course },
       );
     }

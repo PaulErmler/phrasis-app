@@ -8,9 +8,10 @@ import { isUserCreatedText } from '../../lib/translationProvenance';
 /**
  * Proactive content warmup for the high-traffic languages (the Jul 2026 usage
  * chart: Arabic MSA, Chinese Simplified, Spanish Spain + LatAm, German,
- * French, Italian, Japanese, Russian, Korean, Greek. English is source-only
- * and gets its audio ensured automatically for every processed text, since
- * `scheduleMissingContent` always includes the text's own language).
+ * French, Italian, Japanese, Russian, Korean, Greek, plus English for the
+ * accent rows a Mixed English course shows; English audio itself is ensured
+ * for every processed text, since `scheduleMissingContent` always includes
+ * the text's own language).
  *
  * Deliberately NOT a full-table sweep: it warms exactly the content a new
  * user hits first. The first {@link TEXTS_PER_COLLECTION} premade sentences
@@ -30,8 +31,15 @@ import { isUserCreatedText } from '../../lib/translationProvenance';
  * to warm a different set.
  */
 
-/** Chart languages as translation targets ('en' handled via source-audio). */
+/**
+ * Chart languages as translation targets. `en` is in the list not for a
+ * translation (English is source-only) but so `scheduleMissingContent` sees
+ * a Mixed English course and derives the en_gb / en_au accent row each
+ * text reads there (`getMixedAccentTextLanguage`); its source audio was
+ * always ensured.
+ */
 const DEFAULT_WARMUP_LANGUAGES = [
+  'en',
   'ar',
   'zh',
   'es',

@@ -15,9 +15,10 @@ import {
 import { internal } from '../_generated/api';
 import { Doc, Id } from '../_generated/dataModel';
 import {
+  type ReasoningEffort,
+  normalizeModelOutput,
   translateBestOfN,
   translateTextWithLLM,
-  type ReasoningEffort,
 } from './translationLLM';
 import {
   ACCENT_REWRITE_STAGES,
@@ -35,7 +36,10 @@ import {
   type TranslationRuleId,
 } from '../../lib/languages';
 import { SOURCE_VERBATIM_TRANSLATION_SOURCE } from '../../lib/translationProvenance';
-import { storeTranslationAndScheduleTTSHandler } from './translationPipeline';
+import {
+  storeTranslationAndScheduleTTSHandler,
+  verbatimTranslationArgs,
+} from './translationPipeline';
 import { romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
 import { llmPool, llmWarmPool } from '../lib/workpools';
@@ -728,7 +732,13 @@ async function storeLlmTranslationResult(
   pin: { cfgLanguageCode: string; regionVariant: string | undefined },
   translatedText: string,
   winningStage: TranslationStage,
-  promptArgs: Pick<LlmPromptArgs, 'text' | 'accentRewrite'>,
+  /**
+   * An accent rewrite that came back as the source text (most catalogue
+   * sentences): stored as a verbatim row, same wording, so the audio clip
+   * stays shared across accents and nothing claims the model did work it
+   * did not do.
+   */
+  isVerbatimAccentRewrite: boolean,
 ): Promise<void> {
   // `romanizeText` already retries up to 3 times internally; on full
   // exhaustion we persist an empty-string sentinel so ensureContent
@@ -766,14 +776,10 @@ async function storeLlmTranslationResult(
 
   // Translation source: derived from the stage that actually produced
   // the result (not the primary), so a row that succeeded on a fallback
-  // is tagged with the fallback's model/reasoning. An accent rewrite that
-  // came back unchanged (most catalogue sentences) is a verbatim row: same
-  // wording, so the audio clip stays shared across accents, and nothing
-  // claims the model did work it did not do.
-  const translationSource =
-    promptArgs.accentRewrite && translatedText === promptArgs.text
-      ? SOURCE_VERBATIM_TRANSLATION_SOURCE
-      : getTranslationSourceFromStage(winningStage);
+  // is tagged with the fallback's model/reasoning.
+  const translationSource = isVerbatimAccentRewrite
+    ? SOURCE_VERBATIM_TRANSLATION_SOURCE
+    : getTranslationSourceFromStage(winningStage);
 
   await ctx.runMutation(
     internal.features.decks.storeTranslationAndScheduleTTS,
@@ -844,17 +850,27 @@ export const processLlmTranslationForCard = internalAction({
       args.ruleOverride && args.ruleOverride in TRANSLATION_RULES
         ? (args.ruleOverride as TranslationRuleId)
         : undefined;
+    const promptArgs = await resolvePromptMetadata(
+      ctx,
+      args,
+      text,
+      cfg,
+      pin.cfgLanguageCode,
+    );
+
     // An accent sibling of the text's own language runs the fixed rewrite
     // chain whatever the target's translation rule or a flag's override
     // says: the job is a copy-edit, not a translation, and the rules were
-    // tuned for the latter.
-    const stages = getAccentRewriteConfig(args.targetLanguage, text.language)
+    // tuned for the latter. `promptArgs.accentRewrite` is the one place the
+    // job decides it is a rewrite (off the text row).
+    const stages = promptArgs.accentRewrite
       ? ACCENT_REWRITE_STAGES
       : resolveTranslationStages(
           pin.cfgLanguageCode,
           text.text.length,
           ruleOverride ? { ruleOverride } : undefined,
         );
+
     if (cfg.provider !== 'openrouter' || stages.length === 0) {
       // Misrouted: the pool worker should only ever receive openrouter
       // languages. Deterministic config error, retrying can't help, so
@@ -865,14 +881,6 @@ export const processLlmTranslationForCard = internalAction({
       );
     }
 
-    const promptArgs = await resolvePromptMetadata(
-      ctx,
-      args,
-      text,
-      cfg,
-      pin.cfgLanguageCode,
-    );
-
     const { translatedText, winningStage } = await runTranslationStageChain(
       ctx,
       args,
@@ -880,13 +888,20 @@ export const processLlmTranslationForCard = internalAction({
       promptArgs,
     );
 
+    // The reply was normalised on its way out of the LLM call
+    // (`normalizeModelOutput`), so the source goes through the same step
+    // before the comparison: a sentence wrapped in quotation marks is still
+    // verbatim when the model returns it unchanged.
+    const isVerbatimAccentRewrite =
+      promptArgs.accentRewrite !== undefined &&
+      translatedText === normalizeModelOutput(args.targetLanguage, text.text);
     await storeLlmTranslationResult(
       ctx,
       args,
       pin,
       translatedText,
       winningStage,
-      promptArgs,
+      isVerbatimAccentRewrite,
     );
     return null;
   },
@@ -973,8 +988,13 @@ export const onLlmTranslationComplete = internalMutation({
       return null;
     }
 
+    // Off the text row, like the worker (`resolvePromptMetadata`), never off
+    // the job's `sourceLanguage`: a stale arg must not turn a rewrite into
+    // a Google translation, or the reverse.
+    const textRow = await ctx.db.get(context.textId);
     if (
-      getAccentRewriteConfig(context.targetLanguage, context.sourceLanguage)
+      textRow &&
+      getAccentRewriteConfig(context.targetLanguage, textRow.language)
     ) {
       // An accent rewrite has no Google fallback: same-language "translation"
       // is meaningless there. The source text itself is the safety net, the
@@ -990,22 +1010,14 @@ export const onLlmTranslationComplete = internalMutation({
         },
       );
       await storeTranslationAndScheduleTTSHandler(ctx, {
-        textId: context.textId,
-        targetLanguage: context.targetLanguage,
-        translatedText: context.text,
-        voiceName: getVoiceForText(
-          context.targetLanguage,
-          context.textId,
-          undefined,
-          context.audioSpeakerGender,
-        ),
-        translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
-        speakerGender: asVoiceGender(context.audioSpeakerGender),
-        skipTts: context.skipTts,
-        priority: context.priority,
-        requestedByUserId: context.requestedByUserId,
-        replaceExisting: context.replaceExisting,
-        translationReason: context.translationReason,
+        ...verbatimTranslationArgs(textRow, context.targetLanguage, {
+          audioSpeakerGender: context.audioSpeakerGender,
+          skipTts: context.skipTts,
+          priority: context.priority,
+          requestedByUserId: context.requestedByUserId,
+          replaceExisting: context.replaceExisting,
+          translationReason: context.translationReason,
+        }),
         expectedClaimId: claim._id,
         retranslationAuditId: context.retranslationAuditId,
       });

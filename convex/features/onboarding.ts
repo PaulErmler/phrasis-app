@@ -707,6 +707,7 @@ export const finalizeOnboarding = mutation({
       await track(ctx, userId, EVENTS.ONBOARDING_COMPLETED, {
         acquisition_source: progress?.acquisitionSource,
         learning_goals: progress?.learningGoals,
+        prior_apps: progress?.priorApps,
         daily_time_goal_minutes: progress?.dailyTimeGoalMinutes,
         current_level: progress?.currentLevel,
         base_languages: progress?.baseLanguages,

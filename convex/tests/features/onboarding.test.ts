@@ -696,6 +696,19 @@ describe('saveOnboardingProgress: free-text length guard', () => {
       }),
     ).rejects.toThrow(/learningGoalFreeText/);
   });
+
+  it('rejects priorAppsFreeText longer than the cap', async () => {
+    const t = convexTest(schema, modules);
+    const asUser = t.withIdentity({ subject: 'user_A' });
+
+    await expect(
+      asUser.mutation(api.features.courses.saveOnboardingProgress, {
+        step: 3,
+        priorApps: ['other'],
+        priorAppsFreeText: 'x'.repeat(MAX_ONBOARDING_FREE_TEXT_LENGTH + 1),
+      }),
+    ).rejects.toThrow(/priorAppsFreeText/);
+  });
 });
 
 describe('finalizeOnboarding', () => {
@@ -1156,6 +1169,8 @@ describe('getOnboardingProgress', () => {
         acquisitionSourceFreeText: 'saw a post about it',
         learningGoals: ['travel', 'work'],
         learningGoalFreeText: 'order food abroad',
+        priorApps: ['anki', 'other'],
+        priorAppsFreeText: 'Memrise',
         dailyTimeGoalMinutes: 20,
         firstLessonCardsRated: 4,
         firstLessonSessionId: 'sess_1',
@@ -1197,6 +1212,8 @@ describe('getOnboardingProgress', () => {
       acquisitionSourceFreeText: 'saw a post about it',
       learningGoals: ['travel', 'work'],
       learningGoalFreeText: 'order food abroad',
+      priorApps: ['anki', 'other'],
+      priorAppsFreeText: 'Memrise',
       dailyTimeGoalMinutes: 20,
       firstLessonCardsRated: 4,
       firstLessonSessionId: 'sess_1',

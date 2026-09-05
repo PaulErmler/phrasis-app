@@ -12,6 +12,27 @@ const COUNTER_TESTID = 'prior-apps-other-char-count';
 const INPUT_TESTID = 'prior-apps-other-input';
 
 describe('PriorAppsStep: options', () => {
+  it('keeps Other last among the shuffled apps and None last overall', () => {
+    render(
+      <PriorAppsStep
+        selected={[]}
+        freeText=""
+        onToggle={() => {}}
+        onFreeText={() => {}}
+      />,
+    );
+    const buttons = screen.getAllByTestId(/prior-apps-option-/);
+    expect(buttons).toHaveLength(7);
+    expect(buttons.at(-2)).toHaveAttribute(
+      'data-testid',
+      'prior-apps-option-other',
+    );
+    expect(buttons.at(-1)).toHaveAttribute(
+      'data-testid',
+      'prior-apps-option-none',
+    );
+  });
+
   it('renders every app option plus "other" and "none"', () => {
     render(
       <PriorAppsStep

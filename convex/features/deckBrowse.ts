@@ -1,7 +1,7 @@
 import {
-  cardPinAt,
   liveTranslation,
   servedSourceText,
+  viewOfCard,
 } from '../db/translationReads';
 import { QueryCtx } from '../_generated/server';
 import { Id } from '../_generated/dataModel';
@@ -94,7 +94,7 @@ export async function getDeckCardsHandler(
         sourceIpa: text.ipaText ?? undefined,
         sourceFurigana: text.furiganaText ?? undefined,
         userCreated: text.userCreated,
-        pinAt: cardPinAt(card),
+        view: viewOfCard(card),
       };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -328,7 +328,7 @@ export async function getUpcomingSentencesForLevelHandler(
       } else {
         // The text's own language as a card would show it (accent row on a
         // Mixed English course; no card, so no pin).
-        sourceText = (await servedSourceText(ctx, text, undefined)).text;
+        sourceText = (await servedSourceText(ctx, text, null)).text;
       }
 
       let targetText: string | undefined;
@@ -345,7 +345,7 @@ export async function getUpcomingSentencesForLevelHandler(
           targetRomanization = targetTranslation.romanizedText || undefined;
         }
       } else if (targetLanguage && targetLanguage === text.language) {
-        const source = await servedSourceText(ctx, text, undefined);
+        const source = await servedSourceText(ctx, text, null);
         targetText = source.text;
         targetRomanization = source.romanizedText || undefined;
       }

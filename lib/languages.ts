@@ -300,18 +300,6 @@ export interface Language {
    */
   accentRewrite?: AccentRewriteConfig;
   /**
-   * Mixed-accent language only (`en`): the instant from which a card on a
-   * course in this language reads the accent-variant row its voice accent
-   * points at (`getMixedAccentTextLanguage`: a British-voiced text reads
-   * the `en_gb` rewrite) instead of the source wording. Cards pinned before
-   * it (`cardPinAt`, convex/db/translationReads.ts) keep the source text
-   * and its audio for good, so no existing learner's card changes. Set to
-   * the deploy time of the feature; a card created after that instant reads
-   * the accent row from its first view. Unset means every card reads the
-   * source wording.
-   */
-  mixedAccentTextSince?: number;
-  /**
    * When `true`, picker surfaces (`LanguageSelector`) show a user-facing
    * "Experimental" badge next to this language. Independent of the
    * internal-only `llmSupportTier`. Set it on newly added languages while
@@ -432,10 +420,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'en-us',
     supportsKaraoke: true,
     supportsStt: true,
-    // Cards created from this instant read the en_gb / en_au rewrite that
-    // matches their voice accent; older cards keep the source wording.
-    // Set to the deploy of the accent-text feature (2026-09-06).
-    mixedAccentTextSince: Date.UTC(2026, 8, 6),
+    // A card on this course stores the accent its text speaks in
+    // (`cards.accentLanguage`, picked by `pickAccentVariantForText`) and
+    // reads the en_gb / en_au rewrite for it; cards from before that field
+    // existed keep the source wording.
     translationPromptNotes: 'No strong British or American spelling bias.',
   },
   {
@@ -1964,16 +1952,14 @@ export function getCurrentTranslationVersion(code: string): number {
  */
 export type TranslationPostProcessId = 'default' | 'uzbekLatin';
 
-// LLMs occasionally emit a stray trailing underscore (observed on Arabic:
-// "…متأسفة._". The Buckwalter-style romanization then carries the same
-// "_"). Strip trailing runs of underscores/whitespace; interior
-// underscores are kept (could be a deliberate blank).
 /**
  * Artifacts a model leaves on an otherwise correct answer: a literal
  * `<final>` / `</final>` wrapper (GPT-5.6 Sol on the `:floor` endpoint
  * appended one to 3 of 344 short answers in the 2026-09-05 accent bench;
  * never seen from the standard endpoint) and trailing underscores or
- * whitespace.
+ * whitespace (observed on Arabic: "…متأسفة._", where the Buckwalter-style
+ * romanization then carried the same "_"). Interior underscores are kept:
+ * they can be a deliberate blank.
  */
 const stripModelArtifacts = (text: string): string =>
   text
@@ -2000,10 +1986,22 @@ const UZBEK_APOSTROPHE_LIKE = "['‘’ʻʼʽ`´]";
  * variant back to ASCII on both sides before comparing.
  */
 export function canonicalizeUzbekApostrophes(text: string): string {
-  return text
-    .replace(new RegExp(`([oOgG])${UZBEK_APOSTROPHE_LIKE}`, 'gu'), '$1ʻ')
-    .replace(new RegExp(`(?<![oOgG])${UZBEK_APOSTROPHE_LIKE}`, 'gu'), 'ʼ');
+  return text.replace(UZBEK_OKINA_RE, '$1ʻ').replace(UZBEK_TUTUQ_RE, 'ʼ');
 }
+
+/**
+ * oʻ / gʻ: an apostrophe-like after o/g and before a letter (so a closing
+ * quote after a word ending in o or g, as in ‘Hugo’, is left alone).
+ */
+const UZBEK_OKINA_RE = new RegExp(
+  `([oOgG])${UZBEK_APOSTROPHE_LIKE}(?=\\p{L})`,
+  'gu',
+);
+/** The tutuq belgisi: an apostrophe-like between two letters, not after o/g. */
+const UZBEK_TUTUQ_RE = new RegExp(
+  `(?<=\\p{L})(?<![oOgG])${UZBEK_APOSTROPHE_LIKE}(?=\\p{L})`,
+  'gu',
+);
 
 const TRANSLATION_POST_PROCESSORS: Record<
   TranslationPostProcessId,
@@ -2958,14 +2956,6 @@ export function getAccentRewriteConfig(
 }
 
 /**
- * The cutover from which cards on a mixed-accent course read their accent
- * row (see `Language.mixedAccentTextSince`), or undefined when they never do.
- */
-export function getMixedAccentTextSince(code: string): number | undefined {
-  return getLanguageByCode(code)?.mixedAccentTextSince;
-}
-
-/**
  * True when a text written in `textLanguage` is served verbatim on a
  * `targetCode` course instead of being translated or rewritten: the two
  * codes are accents of one language and the target declares no
@@ -2987,28 +2977,49 @@ export function usesSourceTextVerbatim(
 }
 
 /**
- * Accent name to put in the Gemini TTS prompt for a voice locale, resolved
- * from the language that pins that locale and names it (`en-GB` → the
- * `en_gb` entry's 'British English', `es-US` → es_latam's 'Latin American
- * Spanish'). Used for mixed pools (`en`, `es_mixed`) whose voices carry an
- * `@locale` suffix but whose own `ttsPromptName` can't name a single accent.
- * Undefined when no language pins the locale with a prompt name.
+ * The Gemini TTS prompt fields for a voice: the language's own
+ * `ttsPromptName` / `ttsPromptNotes`, else those of the language that pins
+ * the voice's `@locale` (a mixed pool's `Leda@en-GB` takes English (UK)'s
+ * "British English" and its notes; `Leda@en-AU` Australian English's). The
+ * name falls back to the language's region-stripped display name
+ * ("English (US)" → "English"), or the raw code for an unknown language.
  */
-export function getTtsPromptNameForLocale(locale: string): string | undefined {
-  return SUPPORTED_LANGUAGES.find(
-    (l) => l.geminiBcp47 === locale && l.ttsPromptName !== undefined,
-  )?.ttsPromptName;
+export function resolveTtsPrompt(
+  code: string,
+  locale: string | undefined,
+): { name: string; notes: string | undefined } {
+  const lang = getLanguageByCode(code);
+  return {
+    name:
+      lang?.ttsPromptName ??
+      getTtsPromptNameForLocale(locale) ??
+      (lang?.name ?? code).replace(/\s*\([^)]*\)\s*$/, ''),
+    notes: lang?.ttsPromptNotes ?? getTtsPromptNotesForLocale(locale),
+  };
 }
 
-/**
- * `ttsPromptNotes` of the language pinning a voice locale, for mixed pools
- * (`en` with a `Leda@en-AU` voice takes Australian English's notes).
- * Undefined when no language pins the locale with notes.
- */
-export function getTtsPromptNotesForLocale(locale: string): string | undefined {
+function ttsPromptFieldForLocale(
+  locale: string | undefined,
+  field: 'ttsPromptName' | 'ttsPromptNotes',
+): string | undefined {
+  if (locale === undefined) return undefined;
   return SUPPORTED_LANGUAGES.find(
-    (l) => l.geminiBcp47 === locale && l.ttsPromptNotes !== undefined,
-  )?.ttsPromptNotes;
+    (l) => l.geminiBcp47 === locale && l[field] !== undefined,
+  )?.[field];
+}
+
+/** `ttsPromptName` of the language pinning a voice locale (`en-GB` → "British English"). */
+export function getTtsPromptNameForLocale(
+  locale: string | undefined,
+): string | undefined {
+  return ttsPromptFieldForLocale(locale, 'ttsPromptName');
+}
+
+/** `ttsPromptNotes` of the language pinning a voice locale (`en-AU` → the mild-accent note). */
+export function getTtsPromptNotesForLocale(
+  locale: string | undefined,
+): string | undefined {
+  return ttsPromptFieldForLocale(locale, 'ttsPromptNotes');
 }
 
 /**
@@ -3097,8 +3108,10 @@ export {
   getLocalesByLanguageCode,
   getVoiceLocale,
   getVoiceLocalesForLanguage,
+  accentRowLanguage,
   getMixedAccentTextLanguage,
   pickAccentForText,
+  pickAccentVariantForText,
   resolveAudioSpeakerGender,
   resolveCardSpeakerGenders,
 } from './voices';

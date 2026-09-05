@@ -202,7 +202,25 @@ export type TranslationPromptArgs = {
 export function buildAccentRewritePrompt(
   cfg: AccentRewriteConfig,
   text: string,
+  opts?: {
+    /** A flagged rewrite: the model may return it again if it stands by it. */
+    previousTranslation?: string;
+    /** The learner's own wording, from a card edit; already sanitized. */
+    userSuggestedTranslation?: string;
+  },
 ): string {
+  const previous = opts?.previousTranslation
+    ? [
+        ``,
+        `A previous rewrite, <prior>${opts.previousTranslation}</prior>, was flagged as wrong by a learner. Reconsider it: if it is the right ${cfg.name} rendering, return it again; otherwise return the rewrite you stand behind.`,
+      ]
+    : [];
+  const suggestion = opts?.userSuggestedTranslation
+    ? [
+        ``,
+        `A learner suggested <suggestion>${opts.userSuggestedTranslation}</suggestion>. Use it if it is correct ${cfg.name} English for the source; otherwise ignore it.`,
+      ]
+    : [];
   return [
     `You are a copy editor localising a short English sentence for ${cfg.name} readers.`,
     `Rewrite the sentence inside <source> so it reads as natural ${cfg.name} English.`,
@@ -220,6 +238,8 @@ export function buildAccentRewritePrompt(
     ``,
     `If nothing needs to change, return the sentence unchanged.`,
     `Output only the rewritten sentence, nothing else.`,
+    ...previous,
+    ...suggestion,
     ``,
     `<source>${text}</source>`,
   ].join('\n');
@@ -275,7 +295,12 @@ function fullLanguageName(args: TranslationPromptArgs): string {
 /** Build the user-message string for one translation call. */
 export function buildPrompt(args: TranslationPromptArgs): string {
   if (args.accentRewrite) {
-    return buildAccentRewritePrompt(args.accentRewrite, args.text);
+    return buildAccentRewritePrompt(args.accentRewrite, args.text, {
+      previousTranslation: args.previousTranslation,
+      userSuggestedTranslation: args.userSuggestedTranslation
+        ? sanitizeUntrustedForPrompt(args.userSuggestedTranslation)
+        : undefined,
+    });
   }
   const contextLines = buildContextLines(args);
   const fullName = fullLanguageName(args);
@@ -383,6 +408,17 @@ export function buildJudgePrompt(
 }
 
 /** Strip a wrapping quote pair if present (some models still wrap despite instructions). */
+/**
+ * The post-processing every model reply goes through before storage:
+ * wrapping quotes off, then the language's `postProcessTranslation` step.
+ * Exported so a caller comparing a reply against its source text (the
+ * accent-rewrite identity check) can put the source through the same
+ * normalisation rather than compare a cleaned reply against a raw source.
+ */
+export function normalizeModelOutput(targetLang: string, raw: string): string {
+  return postProcessTranslation(targetLang, stripWrappingQuotes(raw.trim()));
+}
+
 function stripWrappingQuotes(s: string): string {
   if (s.length < 2) return s;
   const first = s[0];
@@ -507,10 +543,7 @@ export async function translateTextWithLLM(
   const finishReason = result.finishReason;
   // Post-process before the result leaves this module so downstream
   // romanization and storage both see the cleaned text.
-  const mt = postProcessTranslation(
-    args.targetLang,
-    stripWrappingQuotes(result.text.trim()),
-  );
+  const mt = normalizeModelOutput(args.targetLang, result.text);
   const inputTokens = result.usage.inputTokens ?? 0;
   const outputTokens = result.usage.outputTokens ?? 0;
   const telemetry: LlmCallTelemetry = {

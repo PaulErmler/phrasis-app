@@ -556,8 +556,8 @@ describe('CJK search (no-word-boundary languages)', () => {
       const built = await buildCardSearchableText(
         ctx,
         card.textId,
-        (await ctx.db.get(card.textId))!.text,
         [...course.baseLanguages, ...course.targetLanguages],
+        { view: { accentLanguage: card.accentLanguage } },
       );
       await ctx.db.patch(cardId, built);
     });

@@ -142,6 +142,25 @@ async function getTtsClaim(
  *
  * Must be called inside a mutation context so Convex OCC prevents duplicates.
  */
+/**
+ * The timings a stored clip keeps: only alongside validated audio
+ * (mismatched transcriptions point to the wrong words), and never an empty
+ * array. An empty array is "the backend has none" (Gemini STT), not a
+ * timing set: left undefined so `hasMissingWordTimings` and the backfill
+ * still see the gap once the language gains a timings backend.
+ */
+export function persistedWordTimings(
+  validated: boolean,
+  wordTimings:
+    | { word: string; start: number; end: number }[]
+    | null
+    | undefined,
+): { word: string; start: number; end: number }[] | undefined {
+  return validated && wordTimings && wordTimings.length > 0
+    ? wordTimings
+    : undefined;
+}
+
 export async function claimTtsIfAvailable(
   ctx: MutationCtx,
   textId: Id<'texts'>,
@@ -615,9 +634,7 @@ export const processTTSForCard = internalAction({
         ttsProvider: args.provider,
         voiceGender: args.voiceGender,
         speed: args.speed,
-        // Only persist timings alongside validated audio. Mismatched
-        // transcriptions point to the wrong words.
-        wordTimings: validated && wordTimings ? wordTimings : undefined,
+        wordTimings: persistedWordTimings(validated, wordTimings),
         spokenText: args.text,
         regionVariant: args.regionVariant,
         supersededTranslationId: args.supersededTranslationId,

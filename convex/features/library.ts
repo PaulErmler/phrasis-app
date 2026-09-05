@@ -1,4 +1,4 @@
-import { cardPinAt } from '../db/translationReads';
+import { viewOfCard } from '../db/translationReads';
 import { v } from 'convex/values';
 import { query } from '../_generated/server';
 import { Doc } from '../_generated/dataModel';
@@ -342,7 +342,7 @@ export const getLibraryCards = query({
           sourceIpa: text.ipaText ?? undefined,
           sourceFurigana: text.furiganaText ?? undefined,
           userCreated: text.userCreated,
-          pinAt: cardPinAt(card),
+          view: viewOfCard(card),
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);

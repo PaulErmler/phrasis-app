@@ -2,6 +2,7 @@ import {
   cardPinAt,
   servedSourceText,
   servedTranslatedText,
+  viewOfCard,
 } from '../translationReads';
 import { MutationCtx } from '../../_generated/server';
 import { Doc } from '../../_generated/dataModel';
@@ -291,7 +292,7 @@ export async function recordReviewStats(
       if (untrackedLanguages.includes(text.language)) {
         // The words the learner actually read: the accent row on a Mixed
         // English course, the source text otherwise.
-        const source = await servedSourceText(ctx, text, cardPinAt(card));
+        const source = await servedSourceText(ctx, text, viewOfCard(card));
         langTexts.push({ language: text.language, text: source.text });
       }
       for (const lang of untrackedLanguages) {

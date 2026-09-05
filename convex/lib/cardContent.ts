@@ -17,12 +17,13 @@ import {
   type ResolvedAudioPayload,
 } from './audioAssets';
 import {
-  cardPinAt,
   liveTranslation,
-  mixedAccentRowLanguage,
   resolveServedFromLive,
+  servedAccentRow,
   servedSourceText,
+  viewOfCard,
   type ServedTranslation,
+  type SourceView,
 } from '../db/translationReads';
 
 type ContentCtx = QueryCtx | MutationCtx;
@@ -93,6 +94,13 @@ export interface TextContentResult {
   translations: CardTranslationContent[];
   audioRecordings: CardAudioContent[];
   hasMissingContent: boolean;
+  /**
+   * Course languages whose translation entry is empty or (with
+   * `markVersionStale`) version-stale, plus the text's own language when
+   * the accent row it should read has not landed. What a preview hands to
+   * `requestPreviewTranslations`.
+   */
+  missingTranslationLanguages: string[];
 }
 
 interface TextContentInput {
@@ -125,13 +133,15 @@ interface TextContentInput {
    */
   userCreated: boolean;
   /**
-   * The card's translation pin (`cardPinAt(card)`) when this content is shown
-   * ON A CARD: each translation resolves to the revision that was live at
-   * that instant (convex/db/translationReads.ts), audio included, so a
-   * version bump never changes an existing card. Omit for readers with no
-   * card (collection preview, placement), which show the live row.
+   * The card this content is shown on (`viewOfCard(card)`): its pin picks
+   * the revision each translation resolves to (convex/db/translationReads.ts),
+   * audio included, so a version bump never changes an existing card; its
+   * `accentLanguage` picks the accent row the source slot reads on a
+   * mixed-accent course. Omit (or pass null) for readers with no card
+   * (collection preview, placement), which show the live rows and the
+   * accent row a new card would get.
    */
-  pinAt?: number;
+  view?: SourceView | null;
 }
 
 export function getCourseLanguages(
@@ -149,9 +159,9 @@ function sourceAudioSlot(slot: string): string {
 /**
  * The wording a card payload's `sourceText` field carries: what the batch
  * resolved for the text's own language (the accent row on a Mixed English
- * course, see `mixedAccentRowLanguage`) when that language is on the
- * course, else the source text. Keeps the media-session title, the edit
- * dialog and the source fallback line in step with the card's entries.
+ * course, see `servedAccentRow`) when that language is on the course, else
+ * the source text. Keeps the media-session title, the edit dialog and the
+ * source fallback line in step with the card's entries.
  */
 export function sourceTextFromContent(
   content: Pick<TextContentResult, 'translations'>,
@@ -187,7 +197,7 @@ export async function buildTextContentBatchForLanguages(
   const allLanguages = getCourseLanguages(baseLanguages, targetLanguages);
   // `lang` is the course language the entry is reported under; `rowLang` is
   // the language the rows are read from. They differ only for a mixed-accent
-  // source slot, which reads its accent row (`mixedAccentRowLanguage`).
+  // source slot, which reads its accent row (`servedAccentRow`).
   const translationFetches: Array<{
     key: string;
     lang: string;
@@ -208,6 +218,7 @@ export async function buildTextContentBatchForLanguages(
   const accentSlots = new Map<string, string>();
 
   for (const input of inputs) {
+    const pinAt = input.view?.pinAt;
     for (const lang of allLanguages) {
       const slot = `${input.key}:${lang}`;
       if (lang !== input.sourceLanguage) {
@@ -217,12 +228,19 @@ export async function buildTextContentBatchForLanguages(
           rowLang: lang,
           textId: input.textId,
           userCreated: input.userCreated,
-          pinAt: input.pinAt,
+          pinAt,
         });
         audioFetches.push({ slot, rowLang: lang, textId: input.textId });
         continue;
       }
-      const accent = mixedAccentRowLanguage(input, lang);
+      const accent = servedAccentRow(
+        {
+          _id: input.textId,
+          language: input.sourceLanguage,
+          userCreated: input.userCreated,
+        },
+        input.view ?? null,
+      );
       if (accent !== undefined) {
         accentSlots.set(slot, accent);
         translationFetches.push({
@@ -231,7 +249,7 @@ export async function buildTextContentBatchForLanguages(
           rowLang: accent,
           textId: input.textId,
           userCreated: input.userCreated,
-          pinAt: input.pinAt,
+          pinAt,
         });
         audioFetches.push({ slot, rowLang: accent, textId: input.textId });
       }
@@ -282,23 +300,21 @@ export async function buildTextContentBatchForLanguages(
     }),
   );
 
-  const translationMap = new Map<
-    string,
-    {
-      text: string;
-      romanization?: string;
-      ipa?: string;
-      furigana?: string;
-      llmClaimedAt: number | null;
-      versionStale: boolean;
-      /**
-       * The card is pinned to a superseded revision. Its wording never
-       * regenerates, but its annotations and audio are filled and repaired
-       * by the sweep like a live row's, so its gaps count as missing content.
-       */
-      archived: boolean;
-    }
-  >();
+  type TranslationEntry = {
+    text: string;
+    romanization?: string;
+    ipa?: string;
+    furigana?: string;
+    llmClaimedAt: number | null;
+    versionStale: boolean;
+    /**
+     * The card is pinned to a superseded revision. Its wording never
+     * regenerates, but its annotations and audio are filled and repaired
+     * by the sweep like a live row's, so its gaps count as missing content.
+     */
+    archived: boolean;
+  };
+  const translationMap = new Map<string, TranslationEntry>();
   // Audio for an archived revision comes from the asset the archive row
   // recorded, not from the live pointer (which now speaks the new wording).
   const archivedAudioByKeyAndLang = new Map<string, Id<'audioAssets'>>();
@@ -368,43 +384,68 @@ export async function buildTextContentBatchForLanguages(
     );
   });
 
+  // Per (input, course language): the accent row entry the source slot is
+  // served, when the slot reads one and the row has landed, and the audio
+  // slot that renders. While the accent row is missing the slot shows the
+  // source wording and plays the source audio. Resolved once here so the
+  // entries, the audio, the URL step and the missing-content terms below
+  // all read the same answer.
+  type SlotResolution = {
+    accentEntry: TranslationEntry | undefined;
+    accentRowMissing: boolean;
+    audioSlot: string;
+  };
+  const slotResolutions = new Map<string, SlotResolution>();
+  for (const input of inputs) {
+    for (const lang of allLanguages) {
+      const slot = `${input.key}:${lang}`;
+      const readsAccentRow = accentSlots.has(slot);
+      const entry = readsAccentRow ? translationMap.get(slot) : undefined;
+      const accentEntry = entry?.text ? entry : undefined;
+      const accentRowMissing = readsAccentRow && accentEntry === undefined;
+      slotResolutions.set(slot, {
+        accentEntry,
+        accentRowMissing,
+        audioSlot: accentRowMissing ? sourceAudioSlot(slot) : slot,
+      });
+    }
+  }
+  const resolution = (input: TextContentInput, lang: string) =>
+    slotResolutions.get(`${input.key}:${lang}`)!;
+
+  // Storage URLs only for the slots that render, one `getUrl` per distinct
+  // blob (a verbatim accent row shares the source clip's asset).
+  const renderedSlots = new Set(
+    [...slotResolutions.values()].map((r) => r.audioSlot),
+  );
   const audioWithStorage = audioFetches
-    .map((item, idx) => ({
+    .map((item) => ({
       key: item.slot,
       payload: payloadByKeyAndLang.get(item.slot) ?? null,
-      idx,
     }))
     .filter(
-      (
-        item,
-      ): item is { key: string; payload: ResolvedAudioPayload; idx: number } =>
-        item.payload !== null,
+      (item): item is { key: string; payload: ResolvedAudioPayload } =>
+        item.payload !== null && renderedSlots.has(item.key),
     );
-
+  const storageIds = [
+    ...new Set(audioWithStorage.map((item) => item.payload.storageId)),
+  ];
   const storageUrls = await Promise.all(
-    audioWithStorage.map((item) => ctx.storage.getUrl(item.payload.storageId)),
+    storageIds.map((storageId) => ctx.storage.getUrl(storageId)),
   );
-  const urlMap = new Map<string, string | null>();
-  audioWithStorage.forEach((item, idx) => {
-    urlMap.set(item.key, storageUrls[idx]);
+  const urlByStorageId = new Map<Id<'_storage'>, string | null>();
+  storageIds.forEach((storageId, idx) => {
+    urlByStorageId.set(storageId, storageUrls[idx]);
   });
+  const urlMap = new Map<string, string | null>();
+  for (const item of audioWithStorage) {
+    urlMap.set(item.key, urlByStorageId.get(item.payload.storageId) ?? null);
+  }
 
   const result = new Map<string, TextContentResult>();
   for (const input of inputs) {
-    // The accent row a mixed-accent source slot is served, when it exists.
-    // While it is missing the slot shows the source wording and audio.
-    const servedAccentEntry = (lang: string) => {
-      const slot = `${input.key}:${lang}`;
-      if (!accentSlots.has(slot)) return undefined;
-      const entry = translationMap.get(slot);
-      return entry?.text ? entry : undefined;
-    };
     const audioRecordings = allLanguages.map((lang) => {
-      const slot = `${input.key}:${lang}`;
-      const audioSlot =
-        accentSlots.has(slot) && servedAccentEntry(lang) === undefined
-          ? sourceAudioSlot(slot)
-          : slot;
+      const { audioSlot } = resolution(input, lang);
       const payload = payloadByKeyAndLang.get(audioSlot) ?? null;
       return {
         language: lang,
@@ -430,7 +471,7 @@ export async function buildTextContentBatchForLanguages(
         opts?.rawRomanization || supports('romanization');
       const langNeedsIpa = supports('ipa');
       const langNeedsFurigana = supports('furigana');
-      const accentEntry = servedAccentEntry(lang);
+      const { accentEntry } = resolution(input, lang);
       if (lang === input.sourceLanguage && accentEntry === undefined) {
         return {
           language: lang,
@@ -478,11 +519,14 @@ export async function buildTextContentBatchForLanguages(
       // A mixed-accent source slot whose accent row has not landed yet:
       // the card shows the source wording meanwhile, but the row is
       // required content and the sweep must be asked for it.
-      allLanguages.some(
-        (lang) =>
-          accentSlots.has(`${input.key}:${lang}`) &&
-          servedAccentEntry(lang) === undefined,
-      );
+      allLanguages.some((lang) => resolution(input, lang).accentRowMissing);
+    const missingTranslationLanguages = translations
+      .filter((tr) =>
+        tr.language === input.sourceLanguage
+          ? resolution(input, tr.language).accentRowMissing
+          : !tr.text || tr.versionStale === true,
+      )
+      .map((tr) => tr.language);
     const hasMissingAudio = audioRecordings.some((audio) => !audio.url);
     // Read the STORED annotations, not the projected ones: those are display
     // values, already blanked for languages the caller didn't ask about.
@@ -495,7 +539,8 @@ export async function buildTextContentBatchForLanguages(
     // (useEnsureContent → ensureCardContent → scheduleMissingContent).
     const hasMissingAnnotation = allLanguages.some((lang) => {
       const stored =
-        lang === input.sourceLanguage && servedAccentEntry(lang) === undefined
+        lang === input.sourceLanguage &&
+        resolution(input, lang).accentEntry === undefined
           ? {
               romanization: input.sourceRomanization,
               ipa: input.sourceIpa,
@@ -524,6 +569,7 @@ export async function buildTextContentBatchForLanguages(
     result.set(input.key, {
       translations,
       audioRecordings,
+      missingTranslationLanguages,
       hasMissingContent:
         hasMissingTranslation ||
         hasMissingAudio ||
@@ -616,37 +662,34 @@ function composeSearchableText(
  * Pass `text` when the caller already has the doc. Avoids a redundant
  * `ctx.db.get` on the review hot path.
  *
- * `pinAt` (`cardPinAt(card)`) makes the string hold the words the learner's
- * card actually shows when the card is pinned to a superseded revision. Omit
- * it for a card being created now (it is served the live rows either way).
+ * `view` is the card's (`viewOfCard`): its pin makes the string hold the
+ * words the learner's card actually shows when the card is pinned to a
+ * superseded revision, and its `accentLanguage` picks the accent row the
+ * source words come from on a Mixed English course. A card being created
+ * now passes just its `accentLanguage` (it is served the live rows either
+ * way).
  */
 export async function buildCardSearchableText(
   ctx: ContentCtx,
   textId: Id<'texts'>,
-  sourceText: string,
   courseLanguages: string[],
-  text?: Doc<'texts'> | null,
-  pinAt?: number,
+  opts: { text?: Doc<'texts'> | null; view: SourceView | null },
 ): Promise<{ searchableText: string; searchableTextLanguages: string[] }> {
   const [resolvedText, liveRows] = await Promise.all([
-    text !== undefined ? Promise.resolve(text) : ctx.db.get(textId),
+    opts.text !== undefined ? Promise.resolve(opts.text) : ctx.db.get(textId),
     loadLiveTranslationRows(ctx, textId, courseLanguages),
   ]);
   // The source-language words a Mixed English card shows are its accent
   // row's (`servedSourceText`), so those are the ones searched.
-  const source =
+  const [source, { entries }] = await Promise.all([
     resolvedText && courseLanguages.includes(resolvedText.language)
-      ? await servedSourceText(ctx, resolvedText, pinAt)
-      : null;
-  const { entries } = await servedSearchableEntries(
-    ctx,
-    courseLanguages,
-    liveRows,
-    pinAt,
-  );
+      ? servedSourceText(ctx, resolvedText, opts.view)
+      : Promise.resolve(null),
+    servedSearchableEntries(ctx, courseLanguages, liveRows, opts.view?.pinAt),
+  ]);
   return composeSearchableText(
     resolvedText,
-    source?.text ?? sourceText,
+    source?.text ?? resolvedText?.text ?? '',
     entries,
   );
 }
@@ -691,6 +734,7 @@ export async function buildSearchableTextPatchForCard(
     | 'searchableText'
     | 'searchableTextLanguages'
     | 'translationsAcceptedAt'
+    | 'accentLanguage'
   >,
   text: Doc<'texts'>,
   caches: SearchableTextRebuildCaches,
@@ -714,23 +758,42 @@ export async function buildSearchableTextPatchForCard(
     liveRows = await loadLiveTranslationRows(ctx, card.textId, languages);
     caches.liveRows?.set(liveKey, liveRows);
   }
-  const pinAt = cardPinAt(card);
+  const view = viewOfCard(card);
   const { entries, revisionKey } = await servedSearchableEntries(
     ctx,
     languages,
     liveRows,
-    pinAt,
+    view.pinAt,
   );
   // Same rule as `buildCardSearchableText`: a Mixed English card searches
-  // its accent row's words. The served accent revision joins the memo key,
-  // since it depends on the pin like the other revisions do.
-  const source = languages.includes(text.language)
-    ? await servedSourceText(ctx, text, pinAt)
-    : null;
-  const builtKey = `${liveKey}|${revisionKey}|${source?.served?.revisionId ?? '-'}`;
+  // its accent row's words. The accent live row is memoized like the other
+  // live rows (every card of a text that has an accent has the same one),
+  // and only the pin-dependent revision choice runs per card. The served
+  // accent revision joins the memo key like the other revisions do.
+  const accent = languages.includes(text.language)
+    ? servedAccentRow(text, view)
+    : undefined;
+  let sourceServed: ServedTranslation | null = null;
+  if (accent !== undefined) {
+    const accentKey = `${card.textId}|${accent}`;
+    let accentRows = caches.liveRows?.get(accentKey);
+    if (!accentRows) {
+      accentRows = [await liveTranslation(ctx, card.textId, accent)];
+      caches.liveRows?.set(accentKey, accentRows);
+    }
+    const live = accentRows[0];
+    sourceServed = live
+      ? await resolveServedFromLive(ctx, live, view.pinAt)
+      : null;
+  }
+  const builtKey = `${liveKey}|${revisionKey}|${sourceServed?.revisionId ?? '-'}`;
   let built = caches.built?.get(builtKey);
   if (!built) {
-    built = composeSearchableText(text, source?.text ?? text.text, entries);
+    built = composeSearchableText(
+      text,
+      sourceServed?.row.translatedText ?? text.text,
+      entries,
+    );
     caches.built?.set(builtKey, built);
   }
   return isSearchableTextCurrent(card, built) ? undefined : built;

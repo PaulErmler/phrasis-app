@@ -2,6 +2,7 @@ import {
   cardPinAt,
   servedSourceText,
   servedTranslatedText,
+  viewOfCard,
 } from '../db/translationReads';
 import { ConvexError, v, type Infer } from 'convex/values';
 import { action, internalMutation, internalQuery } from '../_generated/server';
@@ -184,7 +185,7 @@ export const getGradingContext = internalQuery({
     // The source side as the card shows it (the accent row on a Mixed
     // English course), so the base line and the expected wording match
     // what the learner read.
-    const source = await servedSourceText(ctx, text, cardPinAt(card));
+    const source = await servedSourceText(ctx, text, viewOfCard(card));
     let expected: string | null;
     if (text.language === language) {
       expected = source.text;

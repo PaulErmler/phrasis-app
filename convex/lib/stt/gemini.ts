@@ -20,6 +20,7 @@ import {
 } from '../../../lib/languages';
 import { OPENROUTER_MODELS } from '../../config/aiModels';
 import { requireEnv } from '../env';
+import { stripJsonFences } from '../llmJson';
 import { MAX_RETRIES, isRetryableStatus, retryDelayMs } from '../httpRetry';
 import {
   containerOfBlob,
@@ -32,6 +33,7 @@ import {
   SttRejectedContainerError,
   type TranscribeOptions,
   type TranscriptionResult,
+  isRecord,
 } from './openrouter';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
@@ -78,10 +80,6 @@ interface ChatCompletion {
   usage?: unknown;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
 /** Content of the first choice, or '' when the body has none. */
 function transcriptOf(raw: unknown): string {
   const data: ChatCompletion = isRecord(raw) ? raw : {};
@@ -100,11 +98,11 @@ function transcriptOf(raw: unknown): string {
             .join('')
         : '';
   // Models occasionally wrap the transcript in quotes or a code fence
-  // despite the instruction; both are never part of what was said.
-  return text
-    .trim()
-    .replace(/^```[a-z]*\s*|\s*```$/g, '')
-    .replace(/^["“„'‘]([\s\S]*)["”'’]$/u, '$1')
+  // despite the instruction; both are never part of what was said. The
+  // quote pair is only stripped when nothing inside is quoted, so a
+  // transcript with two quoted spans keeps both.
+  return stripJsonFences(text.trim())
+    .replace(/^["“„'‘]([^"“”„'‘’]*)["”'’]$/u, '$1')
     .trim();
 }
 

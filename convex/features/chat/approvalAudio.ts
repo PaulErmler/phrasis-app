@@ -23,7 +23,7 @@ import {
   getTtsProviderForLanguage,
 } from '../../../lib/languages';
 import {
-  getVoiceForLanguage,
+  getVoiceForText,
   resolveAudioSpeakerGender,
 } from '../../../lib/voices';
 import { reserveRateLimitToken } from '../../lib/rateLimitReserve';
@@ -193,7 +193,14 @@ export const requestApprovalAudio = mutation({
         spokenText: entry.text,
         voiceGender,
         userId,
-        voiceName: getVoiceForLanguage(args.language, voiceGender),
+        // No text id yet (the card does not exist), so the proposal id seeds
+        // the accent pick: stable across clicks, like a text's.
+        voiceName: getVoiceForText(
+          args.language,
+          args.approvalId,
+          undefined,
+          voiceGender,
+        ),
         provider: getTtsProviderForLanguage(args.language),
       },
     );

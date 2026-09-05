@@ -15,6 +15,8 @@
 import {
   fnv1a,
   getLanguageByCode,
+  isMixedLanguage,
+  resolveMixedVariant,
   SUPPORTED_LANGUAGES,
   type TtsProvider,
 } from './languages';
@@ -616,17 +618,16 @@ export function pickAccentForText(
 }
 
 /**
- * The accent-variant code whose translation rows a mixed-accent course
- * (`en`) shows for a text, or undefined when the course shows the source
- * wording. A text whose voice accent (`pickAccentForText`) is British reads
- * the `en_gb` row, an Australian one the `en_au` row, so what a Mixed
- * English learner reads matches what they hear. Undefined for a US-hashed
- * text (no variant declares an `accentRewrite` for en-US), for a code that
- * is itself a variant (`en_gb` has no siblings of its own) and for a pool
- * with a single accent. Callers skip user-created texts: their wording is
- * the user's.
+ * The accent-variant code (`en_us`, `en_gb`, `en_au`) a text speaks in on a
+ * mixed-accent course (`en`): the variant that shares the course's text and
+ * pins the text's voice accent (`pickAccentForText`). This is what a new
+ * card stores as `cards.accentLanguage` (convex/schema.ts), so the wording
+ * and the voice of a card agree for good, whatever the pool does later.
+ * Undefined for a code that is itself a variant (`en_gb` has no siblings of
+ * its own), for a pool with a single accent, and for a locale no variant
+ * pins.
  */
-export function getMixedAccentTextLanguage(
+export function pickAccentVariantForText(
   code: string,
   seed: string,
 ): string | undefined {
@@ -635,11 +636,37 @@ export function getMixedAccentTextLanguage(
   const locale = pickAccentForText(code, seed);
   if (locale === undefined) return undefined;
   return SUPPORTED_LANGUAGES.find(
-    (l) =>
-      l.sharesTextWith === code &&
-      l.geminiBcp47 === locale &&
-      l.accentRewrite !== undefined,
+    (l) => l.sharesTextWith === code && l.geminiBcp47 === locale,
   )?.code;
+}
+
+/**
+ * The translation row a card with `accentLanguage` reads for the text's own
+ * language, or undefined when it shows the source text: a variant with an
+ * `accentRewrite` (`en_gb`, `en_au`) has its own wording, one without
+ * (`en_us`) reads the catalogue as is, exactly like a card with no accent.
+ */
+export function accentRowLanguage(
+  accentVariant: string | undefined,
+): string | undefined {
+  if (accentVariant === undefined) return undefined;
+  return getLanguageByCode(accentVariant)?.accentRewrite !== undefined
+    ? accentVariant
+    : undefined;
+}
+
+/**
+ * The accent row a mixed-accent course shows for a text that has no card
+ * yet (previews, the placement test, the content sweeps), or undefined for
+ * the source wording. `pickAccentVariantForText` narrowed to the variants
+ * with their own wording, the same value a card created now would store.
+ * Callers skip user-created texts: their wording is the user's.
+ */
+export function getMixedAccentTextLanguage(
+  code: string,
+  seed: string,
+): string | undefined {
+  return accentRowLanguage(pickAccentVariantForText(code, seed));
 }
 
 /**
@@ -655,9 +682,16 @@ export function getVoiceForText(
   regionVariant: string | undefined,
   speakerGender?: string,
 ): string {
+  // A mixed-DIALECT language (es_mixed) pins its dialect on the translation
+  // row; a row from before that column falls back to the coin the
+  // translator used (`resolveMixedVariant`), never to the accent hash,
+  // which is a different coin and could voice Spain wording Latin American.
+  const fallback = isMixedLanguage(language)
+    ? resolveMixedVariant(language, textId)?.regionVariant
+    : pickAccentForText(language, textId);
   return getVoiceForLanguageVariant(
     language,
-    regionVariant ?? pickAccentForText(language, textId),
+    regionVariant ?? fallback,
     speakerGender,
   );
 }

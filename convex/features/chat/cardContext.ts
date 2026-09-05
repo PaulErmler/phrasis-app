@@ -1,6 +1,10 @@
 import type { MutationCtx } from '../../_generated/server';
 import type { Id } from '../../_generated/dataModel';
-import { cardPinAt, servedTranslatedText } from '../../db/translationReads';
+import {
+  servedSourceText,
+  servedTranslatedText,
+  viewOfCard,
+} from '../../db/translationReads';
 
 /**
  * Look up a card's source text, course-scoped translations, and course
@@ -49,25 +53,29 @@ export async function resolveCardContext(
 
   // One point read per course language (single digits), in course-language
   // order so the prompt context stays stable, through the served-revision
-  // accessor: the tutor must see the wording the learner's card shows, which
-  // for a card pinned before a version bump is not the live row.
-  const pinAt = cardPinAt(card);
-  const served = await Promise.all(
-    [...courseLangs].map(async (lang) => ({
-      language: lang,
-      text: await servedTranslatedText(ctx, {
-        textId: card.textId,
-        targetLanguage: lang,
-        pinAt,
-      }),
-    })),
-  );
+  // accessors: the tutor must see the wording the learner's card shows,
+  // which for a card pinned before a version bump is not the live row, and
+  // for the source line on a Mixed English card is the accent row.
+  const view = viewOfCard(card);
+  const [source, served] = await Promise.all([
+    servedSourceText(ctx, text, view),
+    Promise.all(
+      [...courseLangs].map(async (lang) => ({
+        language: lang,
+        text: await servedTranslatedText(ctx, {
+          textId: card.textId,
+          targetLanguage: lang,
+          pinAt: view.pinAt,
+        }),
+      })),
+    ),
+  ]);
   const translations = served.filter(
     (t): t is { language: string; text: string } => t.text !== null,
   );
 
   return {
-    sourceText: text.text,
+    sourceText: source.text,
     sourceLanguage: text.language,
     translations,
     baseLanguages: course.baseLanguages,

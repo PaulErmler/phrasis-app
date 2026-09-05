@@ -20,6 +20,7 @@ import {
 import {
   GOOGLE_TRANSLATE_SOURCE,
   isUserCreatedText,
+  SOURCE_VERBATIM_TRANSLATION_SOURCE,
 } from '../../lib/translationProvenance';
 import { soundsSame } from '../lib/textComparison';
 import {
@@ -765,10 +766,18 @@ async function replaceForVersionBump(
       furiganaMissingAfterWrite: existing.furiganaText === undefined,
     };
   }
-  const referencingCard = await ctx.db
-    .query('cards')
-    .withIndex('by_textId', (q) => q.eq('textId', args.textId))
-    .first();
+  // A verbatim row (`source-verbatim`: an accent variant's copy of the
+  // source text) is never archived: its wording is the catalogue text every
+  // card without an accent row shows anyway, so no learner loses wording
+  // they learned, and archiving it would pin the first Mixed English or UK
+  // card of the text to the un-rewritten copy for good.
+  const referencingCard =
+    existing.translationSource === SOURCE_VERBATIM_TRANSLATION_SOURCE
+      ? null
+      : await ctx.db
+          .query('cards')
+          .withIndex('by_textId', (q) => q.eq('textId', args.textId))
+          .first();
   if (referencingCard) {
     const audio = await ctx.db
       .query('audioRecordings')
@@ -1032,6 +1041,44 @@ async function scheduleTtsForLandedTranslation(
       }
     }
   }
+}
+
+/**
+ * The write for a verbatim row: an accent-only variant's copy of the text's
+ * own wording (`source-verbatim`), voiced in the variant's accent. Built
+ * here for the scheduler's verbatim branch and the LLM queue's
+ * rewrite-exhausted fallback, so the two never drift.
+ */
+export function verbatimTranslationArgs(
+  text: Pick<Doc<'texts'>, '_id' | 'text'>,
+  targetLanguage: string,
+  opts: Pick<
+    StoreTranslationAndScheduleTtsArgs,
+    | 'skipTts'
+    | 'priority'
+    | 'requestedByUserId'
+    | 'replaceExisting'
+    | 'translationReason'
+  > & { audioSpeakerGender?: string },
+): StoreTranslationAndScheduleTtsArgs {
+  return {
+    textId: text._id,
+    targetLanguage,
+    translatedText: text.text,
+    voiceName: getVoiceForText(
+      targetLanguage,
+      text._id,
+      undefined,
+      opts.audioSpeakerGender,
+    ),
+    translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
+    speakerGender: asVoiceGender(opts.audioSpeakerGender),
+    skipTts: opts.skipTts,
+    priority: opts.priority,
+    requestedByUserId: opts.requestedByUserId,
+    replaceExisting: opts.replaceExisting,
+    translationReason: opts.translationReason,
+  };
 }
 
 /**

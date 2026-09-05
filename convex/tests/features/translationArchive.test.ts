@@ -189,8 +189,8 @@ async function seed(
       const built = await buildCardSearchableText(
         ctx,
         textId,
-        'Everything okay?',
         ['en', ...(opts.targetLanguages ?? ['de'])],
+        { view: {} },
       );
       cardId = await ctx.db.insert('cards', {
         deckId,
@@ -329,7 +329,7 @@ async function hydrate(
           sourceIpa: text.ipaText ?? undefined,
           sourceFurigana: text.furiganaText ?? undefined,
           userCreated: text.userCreated,
-          ...(pinAt !== undefined ? { pinAt } : {}),
+          view: { pinAt },
         },
       ],
       ['en'],
@@ -573,18 +573,12 @@ describe('search strings follow the served revision', () => {
     await bump(t, textId, NEW_DE);
 
     const { pinned, live } = await t.run(async (ctx) => ({
-      pinned: await buildCardSearchableText(
-        ctx,
-        textId,
-        'Everything okay?',
-        ['en', 'de'],
-        undefined,
-        pinAt,
-      ),
-      live: await buildCardSearchableText(ctx, textId, 'Everything okay?', [
-        'en',
-        'de',
-      ]),
+      pinned: await buildCardSearchableText(ctx, textId, ['en', 'de'], {
+        view: { pinAt },
+      }),
+      live: await buildCardSearchableText(ctx, textId, ['en', 'de'], {
+        view: {},
+      }),
     }));
     expect(pinned.searchableText).toContain('Ordnung');
     expect(pinned.searchableText).not.toContain('klar');

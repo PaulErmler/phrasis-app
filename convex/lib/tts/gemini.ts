@@ -2,11 +2,7 @@ import type { SpeakInput, SpeakResult, TTSProvider } from './types';
 import { requireEnv } from '../env';
 import { Mp3Encoder } from '@breezystack/lamejs';
 import { toGeminiBcp47 } from './languageCodes';
-import {
-  getLanguageByCode,
-  getTtsPromptNameForLocale,
-  getTtsPromptNotesForLocale,
-} from '../../../lib/languages';
+import { resolveTtsPrompt } from '../../../lib/languages';
 import { trimTailHiccup } from './tailTrim';
 import { ttsDeliveryInstruction } from './deliveryInstruction';
 
@@ -222,16 +218,10 @@ export const geminiTts: TTSProvider = {
     //      toward American English / Latin American Spanish.
     //   3. The region-stripped base name ("English (US)" → "English"), or the
     //      raw code for an unknown language.
-    const lang = getLanguageByCode(input.language);
-    const languageName =
-      lang?.ttsPromptName ??
-      (locale !== undefined ? getTtsPromptNameForLocale(locale) : undefined) ??
-      (lang?.name ?? input.language).replace(/\s*\([^)]*\)\s*$/, '');
-    // Same two sources for the per-language delivery notes (accent strength
-    // and the like); most languages have none.
-    const promptNotes =
-      lang?.ttsPromptNotes ??
-      (locale !== undefined ? getTtsPromptNotesForLocale(locale) : undefined);
+    const { name: languageName, notes: promptNotes } = resolveTtsPrompt(
+      input.language,
+      locale,
+    );
 
     let pcm = new Uint8Array(0);
     for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {

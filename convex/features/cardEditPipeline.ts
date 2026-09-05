@@ -18,8 +18,10 @@ import {
 import { buildCardSearchableText } from '../lib/cardContent';
 import {
   cardPinAt,
+  cardRowLanguage,
   liveTranslation,
   resolveServedFromLive,
+  viewOfCard,
   type ServedTranslation,
 } from '../db/translationReads';
 import { patchCard } from '../db/stats/cardAggregates';
@@ -44,9 +46,20 @@ export type CardEditPlan = {
   sourceLanguage: string;
   /** Deduped course base + target languages. */
   allLanguages: string[];
+  /**
+   * Course language → the row language the card reads for it
+   * (`cardRowLanguage`): itself, except the source slot of a Mixed English
+   * card, which reads its accent row (`en` → `en_gb`). Every map below is
+   * keyed by the COURSE language, the one the dialog submits.
+   */
+  rowLanguages: Map<string, string>;
   /** language → submitted text, for the languages the caller sent. */
   submittedMap: Map<string, string>;
-  /** language → LIVE translations row (non-source languages only). */
+  /**
+   * language → LIVE translations row, for every language backed by a row:
+   * the non-source languages, and the source slot when it reads an accent
+   * row.
+   */
   existingTranslationMap: Map<string, Doc<'translations'>>;
   /**
    * language → what the learner's card shows. Equals the live row unless the
@@ -55,8 +68,22 @@ export type CardEditPlan = {
    * read this; Path A patches the live rows by id.
    */
   servedTranslationMap: Map<string, ServedTranslation>;
+  /**
+   * The wording the card shows for a course language: the served row, or
+   * for the source slot the source text (also while the accent row it
+   * should read has not landed). What every submitted line is diffed
+   * against, so an untouched line never counts as an edit.
+   */
+  shownText: (lang: string) => string;
   /** Languages whose stored text differs from the submitted text. */
   changedLanguages: Set<string>;
+  /**
+   * The source WORDING changed: the source line was edited on a card that
+   * shows the source text itself. False when the edited source line is an
+   * accent row, which is a translation row like any other: the other
+   * lines still describe the same curriculum sentence.
+   */
+  sourceWordingChanged: boolean;
   /** Audio-relevant subset of `changedLanguages` (see `resolveCardEditPlan`). */
   audioChangedLanguages: Set<string>;
   /** The text row is user-created and owned by this user (Path A). */
@@ -102,28 +129,39 @@ export async function resolveCardEditPlan(
   const allLanguages = [
     ...new Set([...course.baseLanguages, ...course.targetLanguages]),
   ];
+  const view = viewOfCard(card);
+  const rowLanguages = new Map(
+    allLanguages.map((lang) => [lang, cardRowLanguage(text, view, lang)]),
+  );
 
-  // Load existing translations for non-source languages
-  const nonSourceLanguages = allLanguages.filter(
-    (lang) => lang !== sourceLanguage,
+  // Load the live row of every language the card reads a row for: the
+  // non-source languages, and the source slot when it reads an accent row.
+  const rowBackedLanguages = allLanguages.filter(
+    (lang) => rowLanguages.get(lang) !== sourceLanguage,
   );
   const existingTranslations = await Promise.all(
-    nonSourceLanguages.map((lang) => liveTranslation(ctx, card.textId, lang)),
+    rowBackedLanguages.map((lang) =>
+      liveTranslation(ctx, card.textId, rowLanguages.get(lang)!),
+    ),
   );
   const existingTranslationMap = new Map<string, Doc<'translations'>>();
-  nonSourceLanguages.forEach((lang, i) => {
+  rowBackedLanguages.forEach((lang, i) => {
     if (existingTranslations[i]) {
       existingTranslationMap.set(lang, existingTranslations[i]!);
     }
   });
-  const pinAt = cardPinAt(card);
   const servedTranslationMap = new Map<string, ServedTranslation>();
   for (const [lang, live] of existingTranslationMap) {
     servedTranslationMap.set(
       lang,
-      await resolveServedFromLive(ctx, live, pinAt),
+      await resolveServedFromLive(ctx, live, view.pinAt),
     );
   }
+  const shownText = (lang: string): string => {
+    const served = servedTranslationMap.get(lang)?.row.translatedText;
+    if (served !== undefined) return served;
+    return lang === sourceLanguage ? text.text : '';
+  };
 
   // Build a map of submitted texts
   const submittedMap = new Map<string, string>();
@@ -136,14 +174,11 @@ export async function resolveCardEditPlan(
   for (const lang of allLanguages) {
     const submitted = submittedMap.get(lang);
     if (submitted === undefined) continue;
-    if (lang === sourceLanguage) {
-      if (submitted !== text.text) changedLanguages.add(lang);
-    } else {
-      const served = servedTranslationMap.get(lang);
-      if (submitted !== (served?.row.translatedText ?? ''))
-        changedLanguages.add(lang);
-    }
+    if (submitted !== shownText(lang)) changedLanguages.add(lang);
   }
+  const sourceWordingChanged =
+    changedLanguages.has(sourceLanguage) &&
+    !servedTranslationMap.has(sourceLanguage);
 
   const isUserOwned = text.userCreated && text.userId === userId;
   // Path B must also run for a no-text-change call that requires ownership
@@ -161,11 +196,7 @@ export async function resolveCardEditPlan(
   // `changedLanguages` set.
   const audioChangedLanguages = new Set<string>();
   for (const lang of changedLanguages) {
-    const oldText =
-      lang === sourceLanguage
-        ? text.text
-        : (servedTranslationMap.get(lang)?.row.translatedText ?? '');
-    if (!soundsSame(submittedMap.get(lang)!, oldText)) {
+    if (!soundsSame(submittedMap.get(lang)!, shownText(lang))) {
       audioChangedLanguages.add(lang);
     }
   }
@@ -173,10 +204,13 @@ export async function resolveCardEditPlan(
   return {
     sourceLanguage,
     allLanguages,
+    rowLanguages,
     submittedMap,
     existingTranslationMap,
     servedTranslationMap,
+    shownText,
     changedLanguages,
+    sourceWordingChanged,
     audioChangedLanguages,
     isUserOwned,
     needsCopy,
@@ -229,6 +263,7 @@ export async function recordCardEditAuditStart(
     submittedMap,
     existingTranslationMap,
     servedTranslationMap,
+    shownText,
     changedLanguages,
     audioChangedLanguages,
     isUserOwned,
@@ -236,19 +271,21 @@ export async function recordCardEditAuditStart(
 
   const auditChanges: CardEditChange[] = [...changedLanguages].map((lang) => {
     const isSourceLanguage = lang === sourceLanguage;
+    // The source slot of a Mixed English card is an accent row, so it
+    // carries row provenance like any translation.
     const served = servedTranslationMap.get(lang);
     return {
       language: lang,
       role: languageRole(course, lang),
       isSourceLanguage,
-      before: isSourceLanguage ? text.text : (served?.row.translatedText ?? ''),
+      before: shownText(lang),
       after: submittedMap.get(lang)!,
-      ...(isSourceLanguage
-        ? {}
-        : {
-            beforeTranslationSource: served?.row.translationSource,
+      ...(served
+        ? {
+            beforeTranslationSource: served.row.translationSource,
             beforeFlagCount: existingTranslationMap.get(lang)?.flagCount,
-          }),
+          }
+        : {}),
       soundsSame: !audioChangedLanguages.has(lang),
     };
   });
@@ -265,7 +302,7 @@ export async function recordCardEditAuditStart(
     collectionOrigin: card.collectionOrigin,
     textWasUserCreated: text.userCreated,
     sourceLanguage,
-    sourceText: text.text,
+    sourceText: shownText(sourceLanguage),
     changes: auditChanges,
   });
 }
@@ -366,6 +403,7 @@ export async function forkSharedTextForEdit(
   const {
     sourceLanguage,
     allLanguages,
+    rowLanguages,
     submittedMap,
     servedTranslationMap,
     changedLanguages,
@@ -375,14 +413,21 @@ export async function forkSharedTextForEdit(
 
   const submittedSource = submittedMap.get(sourceLanguage);
   const sourceChanged = changedLanguages.has(sourceLanguage);
+  // The copy's own text is the wording the learner saw: the accent row on a
+  // Mixed English card (with that row's annotations), else the source text.
+  // A user-owned copy has no accent rows of its own.
+  const sourceRow = servedTranslationMap.get(sourceLanguage)?.row;
   const newTextId = await ctx.db.insert('texts', {
-    text: sourceChanged && submittedSource ? submittedSource : text.text,
+    text:
+      sourceChanged && submittedSource
+        ? submittedSource
+        : (sourceRow?.translatedText ?? text.text),
     language: text.language,
     // Annotations (romanization, IPA) travel with their source tags:
     // copy when unchanged (so we keep pointing at whichever engine
     // produced the carried-over text); drop when changed (next
     // ensureContent regenerates and re-tags).
-    ...(sourceChanged ? {} : carriedAnnotationFields(text)),
+    ...(sourceChanged ? {} : carriedAnnotationFields(sourceRow ?? text)),
     userCreated: true,
     userId,
     collectionId: text.collectionId,
@@ -479,10 +524,15 @@ export async function forkSharedTextForEdit(
       }
       continue;
     }
+    // The clip the card played for this slot: the accent row's for the
+    // source slot of a Mixed English card, stored under the copy's own
+    // language since the copy shows that wording as its text.
     const audioRows = await ctx.db
       .query('audioRecordings')
       .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', card.textId).eq('language', lang),
+        q
+          .eq('textId', card.textId)
+          .eq('language', rowLanguages.get(lang) ?? lang),
       )
       .take(20);
     for (const row of audioRows) {
@@ -490,7 +540,7 @@ export async function forkSharedTextForEdit(
       // ttsVersion stamp) travels with the asset itself.
       await ctx.db.insert('audioRecordings', {
         textId: newTextId,
-        language: row.language,
+        language: lang,
         assetId: row.assetId,
       });
     }
@@ -536,19 +586,21 @@ export async function repointCardAtEditedText(
     });
 
   const courseLanguages = [...course.baseLanguages, ...course.targetLanguages];
+  // A user-owned text has no accent rows (Path B forks into one, Path A
+  // edits one), so the card's accent is cleared with the repoint and the
+  // search string holds the copy's own words.
   const { searchableText, searchableTextLanguages } =
-    await buildCardSearchableText(
-      ctx,
-      resolvedTextId,
-      resolvedText.text,
-      courseLanguages,
-    );
+    await buildCardSearchableText(ctx, resolvedTextId, courseLanguages, {
+      text: resolvedText,
+      view: { pinAt: cardPinAt(card) },
+    });
 
   await patchCard(
     ctx,
     card._id,
     {
       textId: resolvedTextId,
+      accentLanguage: undefined,
       searchableText,
       searchableTextLanguages,
       // Backfill defaults for cards predating these fields, applied on

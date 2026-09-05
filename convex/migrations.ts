@@ -10,7 +10,12 @@ import {
   DEFAULT_PAUSE_BASE_TO_TARGET,
   DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
 } from '../lib/constants/audioPlayback';
-import { getLanguageByCode, postProcessTranslation } from '../lib/languages';
+import {
+  getLanguageByCode,
+  isMixedLanguage,
+  postProcessTranslation,
+  resolveMixedVariant,
+} from '../lib/languages';
 import { getVoiceLocale, getVoiceLocalesForLanguage } from '../lib/voices';
 import {
   getRomanizationSource,
@@ -909,6 +914,35 @@ export const backfillAudioAssetAccent = migrations.define({
   table: 'audioAssets',
   batchSize: CHECK_SWEEP_BATCH_SIZE,
   migrateOne: (_ctx, doc) => audioAssetAccentPatch(doc),
+});
+
+/**
+ * The dialect pin a legacy mixed-dialect translation row (es_mixed, written
+ * before `translations.regionVariant` existed) gets: the same coin the
+ * translator used for its wording (`resolveMixedVariant` on the text id),
+ * so the row's voice stops depending on `getVoiceForText`'s fallback. Rows
+ * with a pin, and rows of non-mixed languages, are left alone.
+ */
+export function mixedDialectPinPatch(
+  doc: Pick<Doc<'translations'>, 'textId' | 'targetLanguage' | 'regionVariant'>,
+): Partial<Doc<'translations'>> | undefined {
+  if (doc.regionVariant !== undefined) return undefined;
+  if (!isMixedLanguage(doc.targetLanguage)) return undefined;
+  const pick = resolveMixedVariant(doc.targetLanguage, doc.textId);
+  return pick ? { regionVariant: pick.regionVariant } : undefined;
+}
+
+/**
+ * Stamp `regionVariant` on the mixed-dialect translation rows that lack it
+ * (see `mixedDialectPinPatch`). Not in `runAll`: run it by hand once the
+ * prod count of such rows is known to be non-zero.
+ *
+ *   npx convex run migrations:run '{"fn": "migrations:backfillMixedDialectPin"}'
+ */
+export const backfillMixedDialectPin = migrations.define({
+  table: 'translations',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => mixedDialectPinPatch(doc),
 });
 
 export const runAll = migrations.runner([

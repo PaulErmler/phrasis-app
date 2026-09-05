@@ -8,10 +8,12 @@ import {
   getLocalizedLanguageNameByCode,
   getSharedTextLanguage,
   getAccentRewriteConfig,
+  accentRowLanguage,
   getMixedAccentTextLanguage,
-  getMixedAccentTextSince,
+  pickAccentVariantForText,
   getTtsPromptNameForLocale,
   isAccentSiblingOf,
+  resolveMixedVariant,
   usesSourceTextVerbatim,
 } from '@/lib/languages';
 import {
@@ -98,11 +100,58 @@ describe('English accent variants are pickable and share the en text', () => {
     expect(getMixedAccentTextLanguage('de', 'text-1')).toBeUndefined();
   });
 
-  it('only Mixed English has a cutover for reading accent rows', () => {
-    expect(getMixedAccentTextSince('en')).toBe(Date.UTC(2026, 8, 6));
-    for (const code of ENGLISH_VARIANTS) {
-      expect(getMixedAccentTextSince(code)).toBeUndefined();
+  it('a new card stores the accent variant of its voice hash, US included', () => {
+    const seen = new Map<string | undefined, string | undefined>();
+    for (let i = 0; i < 60; i++) {
+      const seed = `text-${i}`;
+      seen.set(
+        pickAccentForText('en', seed),
+        pickAccentVariantForText('en', seed),
+      );
     }
+    expect(seen.get('en-GB')).toBe('en_gb');
+    expect(seen.get('en-AU')).toBe('en_au');
+    expect(seen.get('en-US')).toBe('en_us');
+    // A pinned accent has no siblings of its own; a single-accent pool
+    // never mixes.
+    expect(pickAccentVariantForText('en_gb', 'text-1')).toBeUndefined();
+    expect(pickAccentVariantForText('de', 'text-1')).toBeUndefined();
+  });
+
+  it('a mixed-dialect row without a stamp is voiced by the translator coin', () => {
+    // es_mixed pins its dialect on the translation row; a row from before
+    // that column falls back to `resolveMixedVariant`, the same coin the
+    // translator used, never to the accent hash (a different coin).
+    for (let i = 0; i < 20; i++) {
+      const seed = `text-${i}`;
+      const expected = resolveMixedVariant('es_mixed', seed)!.regionVariant;
+      expect(getVoiceLocale(getVoiceForText('es_mixed', seed, undefined))).toBe(
+        expected,
+      );
+      // A stamped row keeps its stamp whatever the coin says.
+      expect(getVoiceLocale(getVoiceForText('es_mixed', seed, 'es-US'))).toBe(
+        'es-US',
+      );
+    }
+  });
+
+  it('only the variants with their own wording are read as a row', () => {
+    expect(accentRowLanguage('en_gb')).toBe('en_gb');
+    expect(accentRowLanguage('en_au')).toBe('en_au');
+    // en_us reads the catalogue as is, like a card with no accent.
+    expect(accentRowLanguage('en_us')).toBeUndefined();
+    expect(accentRowLanguage(undefined)).toBeUndefined();
+  });
+
+  it('the mixed pool hash is pinned: a pool change would re-roll every text', () => {
+    // Cards persist their accent, but previews, the placement test and the
+    // content sweeps derive it from this list; adding or removing an accent
+    // changes which row they read for existing texts.
+    expect(getVoiceLocalesForLanguage('en')).toEqual([
+      'en-US',
+      'en-GB',
+      'en-AU',
+    ]);
   });
 
   it('badges every English variant as EN, never EN_GB', () => {

@@ -1,4 +1,5 @@
 import { ConvexError } from 'convex/values';
+import { pickAccentVariantForText } from '../../lib/languages';
 import { MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id, Doc } from '../_generated/dataModel';
@@ -322,17 +323,23 @@ export async function createCardsFromTexts(
         ...course.baseLanguages,
         ...course.targetLanguages,
       ];
+      // The accent this card speaks its text in, fixed for the card's life
+      // (see `cards.accentLanguage` in schema.ts). Only when the course
+      // shows the text's own language; a user's own sentence has no accent.
+      const accentLanguage =
+        !text.userCreated && courseLanguages.includes(text.language)
+          ? pickAccentVariantForText(text.language, text._id)
+          : undefined;
       const { searchableText, searchableTextLanguages } =
-        await buildCardSearchableText(
-          ctx,
-          text._id,
-          text.text,
-          courseLanguages,
-        );
+        await buildCardSearchableText(ctx, text._id, courseLanguages, {
+          text,
+          view: { accentLanguage },
+        });
 
       await insertCard(ctx, {
         deckId: deck._id,
         textId: text._id,
+        ...(accentLanguage !== undefined ? { accentLanguage } : {}),
         collectionId,
         collectionOrigin,
         dueDate: dueBase + cardsInserted,

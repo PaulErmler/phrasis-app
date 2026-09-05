@@ -15,10 +15,7 @@ import {
   pickAccentForText,
   usesSourceTextVerbatim,
 } from '../../lib/languages';
-import {
-  mayRegenerateTranslation,
-  SOURCE_VERBATIM_TRANSLATION_SOURCE,
-} from '../../lib/translationProvenance';
+import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
   missingAnnotationKinds,
@@ -31,10 +28,12 @@ import {
   resolveAudioPayload,
   upsertAudioPointer,
 } from './audioAssets';
-import { storeTranslationAndScheduleTTSHandler } from '../features/translationPipeline';
+import {
+  storeTranslationAndScheduleTTSHandler,
+  verbatimTranslationArgs,
+} from '../features/translationPipeline';
 import { llmPool, llmWarmPool } from './workpools';
 import {
-  asVoiceGender,
   type TtsPriority,
   type LlmPriority,
   type TranslationReason,
@@ -140,24 +139,10 @@ export async function scheduleTranslationForLanguage(
   // below like any translation; the worker swaps in the rewrite prompt.
   if (usesSourceTextVerbatim(targetLanguage, text.language)) {
     if (opts.probe) throw new ProbeNeedsWork();
-    await storeTranslationAndScheduleTTSHandler(ctx, {
-      textId: text._id,
-      targetLanguage,
-      translatedText: text.text,
-      voiceName: getVoiceForText(
-        targetLanguage,
-        text._id,
-        undefined,
-        opts.audioSpeakerGender,
-      ),
-      translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
-      speakerGender: asVoiceGender(opts.audioSpeakerGender),
-      skipTts: opts.skipTts,
-      priority: opts.priority,
-      requestedByUserId: opts.requestedByUserId,
-      replaceExisting: opts.replaceExisting,
-      translationReason: opts.translationReason,
-    });
+    await storeTranslationAndScheduleTTSHandler(
+      ctx,
+      verbatimTranslationArgs(text, targetLanguage, opts),
+    );
     return true;
   }
 
@@ -692,6 +677,7 @@ async function loadContentState(
 async function sweepInvalidAudio(
   ctx: MutationCtx,
   textId: Id<'texts'>,
+  text: Pick<Doc<'texts'>, 'userCreated'>,
   audioSpeakerGender: string | undefined,
   state: ContentSweepState,
   opts: ContentSweepOpts | undefined,
@@ -730,7 +716,12 @@ async function sweepInvalidAudio(
         lang,
         payload,
       );
-      const accentMismatch = audioAccentDrifted(lang, textId, payload.asset);
+      // A user-created text keeps the accent it was voiced in: its clip was
+      // made for its own hash (or, for a card-edit copy, carried over from
+      // the shared text the learner heard), so a drift here would only be
+      // the copy's new id re-rolling the accent the learner already knows.
+      const accentMismatch =
+        !text.userCreated && audioAccentDrifted(lang, textId, payload.asset);
       if (genderMismatch) {
         langsWithAudioGenderDrift.add(lang);
       }
@@ -1241,6 +1232,7 @@ export async function scheduleMissingContent(
   const langsWithAudioGenderDrift = await sweepInvalidAudio(
     ctx,
     textId,
+    text,
     audioSpeakerGender,
     state,
     opts,

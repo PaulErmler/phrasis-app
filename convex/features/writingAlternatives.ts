@@ -2,6 +2,7 @@ import {
   cardPinAt,
   servedSourceText,
   servedTranslatedText,
+  viewOfCard,
 } from '../db/translationReads';
 import { ConvexError, v } from 'convex/values';
 import {
@@ -31,11 +32,10 @@ import { synthesizeSpeech } from './tts';
 import {
   getCurrentTtsVersion,
   getTtsProviderForLanguage,
+  getVoiceForText,
+  pickAccentForText,
 } from '../../lib/languages';
-import {
-  getVoiceForLanguage,
-  resolveAudioSpeakerGender,
-} from '../../lib/voices';
+import { resolveAudioSpeakerGender } from '../../lib/voices';
 import { reserveRateLimitToken } from '../lib/rateLimitReserve';
 import { TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
 import { requireAuthUserId } from '../db/users';
@@ -158,7 +158,7 @@ async function primaryTextForLanguage(
   if (!text) return null;
   if (text.language === language) {
     // As the card shows it: the accent row on a Mixed English course.
-    return (await servedSourceText(ctx, text, cardPinAt(card))).text;
+    return (await servedSourceText(ctx, text, viewOfCard(card))).text;
   }
   // The served revision, not necessarily the live row (pinned cards).
   return servedTranslatedText(ctx, {
@@ -277,6 +277,12 @@ const alternativeContextValidator = v.union(
     hasAudio: v.boolean(),
     /** Owner of the alternative; synthesis cost bills to them. */
     userId: v.string(),
+    /**
+     * The card's text, whose accent the alternative is voiced in
+     * (`getVoiceForText`), so a British card's alternative is not read by
+     * an Australian voice. Absent when the card is gone.
+     */
+    textId: v.optional(v.id('texts')),
   }),
 );
 
@@ -287,6 +293,7 @@ export type AlternativeContext = {
   reusableAssetId: Id<'audioAssets'> | null;
   hasAudio: boolean;
   userId: string;
+  textId?: Id<'texts'>;
 } | null;
 
 /**
@@ -312,12 +319,15 @@ export const getAlternativeContext = internalQuery({
     ];
     let reusableAssetId: Id<'audioAssets'> | null = null;
     for (const voiceGender of genders) {
-      // Alternatives have no text id, so no per-text accent: any accent of
-      // the language will do (same as approval audio).
+      // The card text's accent first (what the learner hears on the card),
+      // then any accent of the language: a clip is a clip.
       const asset = await findAudioAssetInAnyAccent(ctx, {
         language: row.language,
         voiceGender,
         spokenText: row.text,
+        preferredAccent: card
+          ? pickAccentForText(row.language, card.textId)
+          : undefined,
       });
       if (asset) {
         reusableAssetId = asset._id;
@@ -331,6 +341,7 @@ export const getAlternativeContext = internalQuery({
       reusableAssetId,
       hasAudio: row.audioAssetId !== undefined,
       userId: row.userId,
+      ...(card ? { textId: card.textId } : {}),
     };
   },
 });
@@ -440,7 +451,15 @@ export const generateAlternativeAudio = internalAction({
 
     const voiceGender = context.genders[0];
     const provider = getTtsProviderForLanguage(context.language);
-    const voiceName = getVoiceForLanguage(context.language, voiceGender);
+    // The card text's accent (a Mixed English card's alternative speaks in
+    // the card's accent); the alternative id seeds the pick when the card
+    // is gone.
+    const voiceName = getVoiceForText(
+      context.language,
+      context.textId ?? alternativeId,
+      undefined,
+      voiceGender,
+    );
     await reserveRateLimitToken(
       ctx,
       TTS_RATE_LIMIT_BY_PROVIDER[provider] ?? 'googleTts',
