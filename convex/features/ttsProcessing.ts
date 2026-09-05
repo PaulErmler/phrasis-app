@@ -14,10 +14,14 @@ import {
   reserveSttSlot,
   normalizeTranscriptScript,
   sttCostForEvent,
+  sttModelForLanguage,
   type TranscriptionResult,
   type WordTiming,
 } from '../lib/stt';
-import { languageSupportsStt } from '../../lib/languages';
+import {
+  languageSupportsStt,
+  languageSupportsWordTimings,
+} from '../../lib/languages';
 import { textsMatchForLanguage } from '../lib/textComparison';
 import {
   textsMatchSemantic,
@@ -265,10 +269,10 @@ async function synthesizeAndValidate(
   lastStorageId: Id<'_storage'> | null;
   wordTimings: WordTiming[] | null;
 }> {
-  // MAI-Transcribe-2 is the only STT backend; if it doesn't cover this
-  // language, the validation loop is pure waste (every attempt fails, every
-  // retry re-synthesizes). Synthesize once, accept it, and skip straight to
-  // unvalidated. wordTimings are unavailable here too.
+  // If no STT backend covers this language, the validation loop is pure
+  // waste (every attempt fails, every retry re-synthesizes). Synthesize
+  // once, accept it, and skip straight to unvalidated. wordTimings are
+  // unavailable here too (and stay empty on the text-only Gemini backend).
   const canValidate = languageSupportsStt(args.language);
 
   const rateLimitName =
@@ -876,11 +880,12 @@ export const backfillWordTimings = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
-      // STT support is the gate on word timings; if the model doesn't cover
-      // this language, the scheduler shouldn't have been called, but guard
-      // the action too so a stale scheduler call from before the language
-      // was filtered doesn't spend a call that returns nothing usable.
-      if (!languageSupportsStt(args.language)) return null;
+      // Word timings need the MAI backend; if this language has no STT or
+      // runs on the text-only Gemini backend, the scheduler shouldn't have
+      // been called, but guard the action too so a stale scheduler call from
+      // before the language was filtered doesn't spend a call that returns
+      // nothing usable.
+      if (!languageSupportsWordTimings(args.language)) return null;
 
       const blob = await ctx.storage.get(args.storageId);
       if (!blob) {
@@ -906,7 +911,7 @@ export const backfillWordTimings = internalAction({
         return captureGeneration(ctx, {
           distinctId: args.requestedByUserId,
           feature: 'word_timing_backfill',
-          model: OPENROUTER_MODELS.stt,
+          model: sttModelForLanguage(args.language),
           provider: 'openrouter',
           latencyMs: Date.now() - sttStartedAt,
           costUsd: cost.costUsd,

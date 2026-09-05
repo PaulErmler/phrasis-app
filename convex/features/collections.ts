@@ -24,6 +24,7 @@ import {
 import {
   buildTextContentBatchForLanguages,
   getCourseLanguages,
+  sourceTextFromContent,
 } from '../lib/cardContent';
 import {
   enqueueVersionBumpRegen,
@@ -42,6 +43,7 @@ import {
   isPremadeLevelCollection,
 } from '../lib/collections';
 import {
+  getMixedAccentTextLanguage,
   isTranslationVersionStale,
   resolveCardSpeakerGenders,
 } from '../../lib/languages';
@@ -300,7 +302,7 @@ export const browseCollectionTexts = query({
         );
       return {
         _id: row.text._id,
-        text: row.text.text,
+        text: sourceTextFromContent(content, row.text),
         sourceLanguage: row.text.language,
         collectionRank: row.text.collectionRank,
         // 'readd' is internal bookkeeping (un-marked below the frontier,
@@ -455,8 +457,20 @@ export async function scheduleMissingTranslationsForText(
     });
   }
 
+  // A Mixed English course shows a British- or Australian-voiced text its
+  // accent row (`servedSourceText`), so the preview requests that row with
+  // the rest. Never for a user-created text: its wording is the user's.
+  const accentLang =
+    !text.userCreated && languages.includes(text.language)
+      ? getMixedAccentTextLanguage(text.language, text._id)
+      : undefined;
+  const wantedLanguages =
+    accentLang !== undefined && !languages.includes(accentLang)
+      ? [...languages, accentLang]
+      : languages;
+
   let scheduled = 0;
-  for (const lang of languages) {
+  for (const lang of wantedLanguages) {
     if (lang === text.language) continue;
     const existing = await liveTranslation(ctx, text._id, lang);
     if (existing) {

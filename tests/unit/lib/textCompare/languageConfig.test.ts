@@ -75,6 +75,7 @@ const EXPECTED_COMPARE: Record<
   et: { locale: 'et', hasWordBoundaries: true },
   ta: { locale: 'ta', hasWordBoundaries: true },
   te: { locale: 'te', hasWordBoundaries: true },
+  uz: { locale: 'uz', hasWordBoundaries: true },
 };
 
 describe('getCompareConfig', () => {

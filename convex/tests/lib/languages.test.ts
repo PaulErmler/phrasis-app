@@ -42,6 +42,36 @@ describe('lib/languages: postProcessTranslation', () => {
   it('applies the default for unknown language codes too', () => {
     expect(postProcessTranslation('not-a-language', 'x_')).toBe('x');
   });
+
+  describe('uzbekLatin', () => {
+    it('spells oʻ / gʻ with U+02BB whatever apostrophe the model used', () => {
+      expect(postProcessTranslation('uz', "O'zbek tili go'zal.")).toBe(
+        'Oʻzbek tili goʻzal.',
+      );
+      expect(postProcessTranslation('uz', 'Tug‘ilgan kuning bilan!')).toBe(
+        'Tugʻilgan kuning bilan!',
+      );
+      expect(postProcessTranslation('uz', 'to’dalari ko`chalarda')).toBe(
+        'toʻdalari koʻchalarda',
+      );
+    });
+
+    it('spells the tutuq belgisi with U+02BC', () => {
+      expect(postProcessTranslation('uz', "ta'kidlagan mas’uliyati")).toBe(
+        'taʼkidlagan masʼuliyati',
+      );
+    });
+
+    it('is idempotent on canonical text and still strips trailing underscores', () => {
+      const canonical = 'Oʻzbek taʼkid.';
+      expect(postProcessTranslation('uz', canonical)).toBe(canonical);
+      expect(postProcessTranslation('uz', "O'zbek._")).toBe('Oʻzbek.');
+    });
+
+    it('does not touch other languages', () => {
+      expect(postProcessTranslation('en', 'don’t')).toBe('don’t');
+    });
+  });
 });
 
 describe('lib/languages: getTextDirection', () => {

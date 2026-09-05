@@ -26,7 +26,10 @@
 import { generateText, type JSONValue } from 'ai';
 import { tryGetOpenRouter } from '../lib/openrouter';
 import { openrouterCostUsd, openrouterGenerationId } from '../lib/posthogAi';
-import { postProcessTranslation } from '../../lib/languages';
+import {
+  postProcessTranslation,
+  type AccentRewriteConfig,
+} from '../../lib/languages';
 import type { ModelStage, StageProviderConstraints } from '../../lib/languages';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
 
@@ -176,7 +179,51 @@ export type TranslationPromptArgs = {
    * sees what was rejected and what the user would rather it said.
    */
   userSuggestedTranslation?: string;
+  /**
+   * Accent rewrite instead of a translation (`Language.accentRewrite`: an
+   * `en` sentence on an `en_gb` course). `buildPrompt` then returns
+   * `buildAccentRewritePrompt` and ignores every context field above: the
+   * text is already English, so gender, register and arc context have no
+   * bearing, and feeding them in would only invite a re-translation.
+   */
+  accentRewrite?: AccentRewriteConfig;
 };
+
+/**
+ * The prompt for a light-touch accent rewrite. Everything in it is a
+ * deliberate constraint from the 2026-09-05 bench
+ * (scripts/eval-translation-accents.ts): identity is the expected answer
+ * for most inputs and is asked for by name; slang injection is the main
+ * failure mode for "Australian" and is forbidden by example; American
+ * content (names, units, currency, dates) and punctuation are frozen so a
+ * localiser cannot convert Fahrenheit or re-quote a sentence; "program" is
+ * the one word whose British spelling depends on sense and is called out.
+ */
+export function buildAccentRewritePrompt(
+  cfg: AccentRewriteConfig,
+  text: string,
+): string {
+  return [
+    `You are a copy editor localising a short English sentence for ${cfg.name} readers.`,
+    `Rewrite the sentence inside <source> so it reads as natural ${cfg.name} English.`,
+    ``,
+    `Change as little as possible. Only change what marks the accent:`,
+    `- spelling (${cfg.spelling})`,
+    `- vocabulary that has a different everyday word in ${cfg.name} English (${cfg.vocabulary})`,
+    `- grammar and usage that sounds American (${cfg.grammar})`,
+    ``,
+    `Keep everything else exactly as it is:`,
+    `- the meaning, tone, register and sentence structure`,
+    `- names, places, brands, currencies, units, numbers, dates and times, even when they are American (a sentence about New York or dollars stays about New York and dollars)`,
+    `- punctuation, capitalisation, quotation marks and line breaks`,
+    `- do not add slang, regional colour or filler ("mate", "reckon", "whilst", "bloody", "arvo"); a plain sentence stays plain`,
+    ``,
+    `If nothing needs to change, return the sentence unchanged.`,
+    `Output only the rewritten sentence, nothing else.`,
+    ``,
+    `<source>${text}</source>`,
+  ].join('\n');
+}
 
 /**
  * Neutralize free-form user input before it is interpolated into a prompt.
@@ -227,6 +274,9 @@ function fullLanguageName(args: TranslationPromptArgs): string {
 
 /** Build the user-message string for one translation call. */
 export function buildPrompt(args: TranslationPromptArgs): string {
+  if (args.accentRewrite) {
+    return buildAccentRewritePrompt(args.accentRewrite, args.text);
+  }
   const contextLines = buildContextLines(args);
   const fullName = fullLanguageName(args);
 

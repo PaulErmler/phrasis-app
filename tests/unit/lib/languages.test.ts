@@ -29,6 +29,10 @@ import {
   isTtsVersionStale,
   isTranslationVersionStale,
   languageSupportsStt,
+  languageSupportsKaraoke,
+  languageSupportsWordTimings,
+  getSttBackend,
+  postProcessTranslation,
 } from '@/lib/languages';
 
 describe('getLanguageByCode', () => {
@@ -291,6 +295,7 @@ describe('IPA helpers', () => {
     expect(getIpaVoice('pt')).toBe('pt-br');
     expect(getIpaVoice('ar_eg')).toBe('ar');
     expect(getIpaVoice('vi_south')).toBe('vi-vn-x-south');
+    expect(getIpaVoice('uz')).toBe('uz');
     expect(getIpaVoice('ja')).toBeNull();
   });
 });
@@ -410,10 +415,47 @@ describe('languageSupportsStt', () => {
     expect(languageSupportsStt('sw_tz')).toBe(true);
   });
 
+  it('is true for Uzbek via the text-only Gemini backend, without timings', () => {
+    expect(languageSupportsStt('uz')).toBe(true);
+    expect(getSttBackend('uz')).toBe('gemini-flash-lite');
+    expect(languageSupportsWordTimings('uz')).toBe(false);
+    expect(languageSupportsKaraoke('uz')).toBe(false);
+  });
+
+  it('keeps word timings for MAI-routed languages', () => {
+    expect(getSttBackend('es')).toBe('mai-transcribe-2');
+    expect(languageSupportsWordTimings('es')).toBe(true);
+    expect(languageSupportsWordTimings('not-a-language')).toBe(false);
+  });
+
   it('is true for mainstream STT languages and false for unknown codes', () => {
     expect(languageSupportsStt('es')).toBe(true);
     expect(languageSupportsStt('ja')).toBe(true);
     expect(languageSupportsStt('not-a-language')).toBe(false);
+  });
+});
+
+describe('postProcessTranslation', () => {
+  it('strips a leaked <final> wrapper and trailing underscores, and nothing else', () => {
+    // Seen on GPT-5.6 Sol's :floor endpoint (3/344 calls, 2026-09-05).
+    expect(
+      postProcessTranslation('en', 'How far is the village?</final>'),
+    ).toBe('How far is the village?');
+    expect(
+      postProcessTranslation('de', '<final>Wie weit ist es?</final>'),
+    ).toBe('Wie weit ist es?');
+    expect(postProcessTranslation('de', 'Wie weit ist es? __ ')).toBe(
+      'Wie weit ist es?',
+    );
+    expect(postProcessTranslation('de', 'Das ist final.')).toBe(
+      'Das ist final.',
+    );
+    expect(postProcessTranslation('en', '<final>x</final>')).toBe(
+      postProcessTranslation(
+        'en',
+        postProcessTranslation('en', '<final>x</final>'),
+      ),
+    );
   });
 });
 

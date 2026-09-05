@@ -38,9 +38,13 @@ GENERAL (any script):
 - Numbers as digits or words (e.g., "5" vs "five", "2024" vs "twenty twenty-four", "1st" vs "first")
 - Abbreviations vs full forms (e.g., "Mr." vs "mister", "Dr." vs "doctor", "km" vs "kilometres")
 - Punctuation, capitalization, whitespace, or quote-style differences
+- Currency, unit and other symbols spoken as words, in either direction (e.g., "30 $" vs "30 dólares", "5 %" vs "five percent", "€20" vs "twenty euros", "25 °C" vs "25 degrees", "&" vs "and"). The quantity itself must still agree: "5 %" vs "fifty percent" IS a mismatch.
+- Codes, identifiers, product names and other alphanumeric strings read aloud (e.g., "e2eImportms6e05af" vs "E2E import MS6E05AF", "AB12cd" vs "A B 12 C D"). The transcriber cannot spell an arbitrary token: casing, spacing, punctuation and even a letter or digit or two inside such a token differ; it is a match as long as the token is recognizably the same thing being read.
+- Contractions or elisions of the same words (e.g., "Tu es" vs "T'es", "do not" vs "don't")
 - One Latin letter inserted, dropped, or swapped — almost always Scribe noise
 
 CJK (Chinese / Japanese / Korean):
+- Spaces inserted between characters or words (the transcriber segments; the original does not).
 - Homophone character swaps where the transcribed character has the same pronunciation as the original (e.g., Mandarin 在 vs 再, 做 vs 作, 他 vs 她 vs 它). Same sound, different character = transcription artifact, not a reading error.
 - A single CJK character inserted, dropped, or swapped.
 - Two or more differing characters in a row, OR a non-homophone substitution, IS a mismatch.

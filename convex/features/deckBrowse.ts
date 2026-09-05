@@ -1,4 +1,8 @@
-import { cardPinAt, liveTranslation } from '../db/translationReads';
+import {
+  cardPinAt,
+  liveTranslation,
+  servedSourceText,
+} from '../db/translationReads';
 import { QueryCtx } from '../_generated/server';
 import { Id } from '../_generated/dataModel';
 import { getAuthUserId, getUserSettings } from '../db/users';
@@ -16,7 +20,10 @@ import {
   ogteLevelToCollectionCode,
   collectionCodeToOgteLevel,
 } from '../../lib/constants/onboarding';
-import { buildTextContentBatchForLanguages } from '../lib/cardContent';
+import {
+  buildTextContentBatchForLanguages,
+  sourceTextFromContent,
+} from '../lib/cardContent';
 import {
   LEGACY_LEVEL_ORDER,
   effectiveTextCount,
@@ -109,7 +116,7 @@ export async function getDeckCardsHandler(
       _id: card._id,
       _creationTime: card._creationTime,
       textId: card.textId,
-      sourceText: text.text,
+      sourceText: sourceTextFromContent(content, text),
       sourceLanguage: text.language,
       translations: content.translations,
       audioRecordings: content.audioRecordings,
@@ -318,6 +325,10 @@ export async function getUpcomingSentencesForLevelHandler(
           sourceLanguage,
         );
         if (sourceTranslation) sourceText = sourceTranslation.translatedText;
+      } else {
+        // The text's own language as a card would show it (accent row on a
+        // Mixed English course; no card, so no pin).
+        sourceText = (await servedSourceText(ctx, text, undefined)).text;
       }
 
       let targetText: string | undefined;
@@ -334,8 +345,9 @@ export async function getUpcomingSentencesForLevelHandler(
           targetRomanization = targetTranslation.romanizedText || undefined;
         }
       } else if (targetLanguage && targetLanguage === text.language) {
-        targetText = text.text;
-        targetRomanization = text.romanizedText || undefined;
+        const source = await servedSourceText(ctx, text, undefined);
+        targetText = source.text;
+        targetRomanization = source.romanizedText || undefined;
       }
 
       return { position, sourceText, targetText, targetRomanization };

@@ -4,6 +4,7 @@ import { internal } from '../_generated/api';
 import {
   buildCardSearchableText,
   buildTextContentBatchForLanguages,
+  sourceTextFromContent,
   type CardAlternativeContent,
 } from '../lib/cardContent';
 import {
@@ -11,6 +12,7 @@ import {
   liveTranslation,
   resolveServedFromLive,
   resolveServedTranslation,
+  servedSourceText,
   type ServedTranslation,
 } from '../db/translationReads';
 import { Id, Doc } from '../_generated/dataModel';
@@ -431,7 +433,7 @@ export const getCardForReview = query({
         _id: card._id,
         _creationTime: card._creationTime,
         textId: card.textId,
-        sourceText: text.text,
+        sourceText: sourceTextFromContent(content, text),
         sourceLanguage: text.language,
         translations: content.translations.map((tr) => {
           const alternatives = alternativesByCardLang.get(
@@ -1955,8 +1957,15 @@ export const regenerateCardAudio = mutation({
     // so those languages re-synthesize their archived asset in place instead
     // and keep the live pointer as it is.
     const pinAt = cardPinAt(card);
+    // A Mixed English card may play its accent row's clip for the source
+    // slot (`servedSourceText`); that language's audio is regenerated too.
+    const source = await servedSourceText(ctx, text, pinAt);
+    const audioLanguages =
+      source.language === text.language
+        ? allLanguages
+        : [...new Set([...allLanguages, source.language])];
     const supersededLanguages = new Set<string>();
-    for (const lang of allLanguages) {
+    for (const lang of audioLanguages) {
       if (lang === text.language) continue;
       const served = await resolveServedTranslation(ctx, {
         textId: card.textId,
@@ -1976,7 +1985,7 @@ export const regenerateCardAudio = mutation({
     }
     // The live pointers of the superseded languages stay, so the sweep
     // below sees their audio as present and regenerates nothing for them.
-    for (const lang of allLanguages) {
+    for (const lang of audioLanguages) {
       if (supersededLanguages.has(lang)) continue;
       await deleteAudioRowsForTextLanguage(ctx, card.textId, lang);
     }

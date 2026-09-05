@@ -15,12 +15,12 @@ import {
   resolveScriptTarget,
   containerOfBuffer,
   sttCostForEvent,
+  sttModelForLanguage,
   STT_REJECTED_CONTAINERS,
 } from '../../lib/stt';
 import { getActiveCourseForUser } from '../../db/courses';
 import { EVENTS, track } from '../../analytics';
 import { captureGeneration } from '../../lib/posthogAi';
-import { OPENROUTER_MODELS } from '../../config/aiModels';
 
 export const consumeTranscriptionQuota = internalMutation({
   args: { userId: v.string() },
@@ -136,7 +136,7 @@ export const transcribeAudio = action({
       await captureGeneration(ctx, {
         distinctId: userId,
         feature: 'chat_voice_input',
-        model: OPENROUTER_MODELS.stt,
+        model: sttModelForLanguage(args.language),
         provider: 'openrouter',
         latencyMs: Date.now() - startedAt,
         costUsd: cost.costUsd,

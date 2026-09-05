@@ -75,6 +75,8 @@ const SCRIPT_CLASSES: ScriptClass[] = [
       'sw_tz',
       'de',
       'it',
+      // Uzbek Latin: oʻ/gʻ carry a modifier letter (Lm), not a mark.
+      'uz',
     ],
     query: 'I will go to school tomorrow and meet my friends',
     triggersLegacyBug: false,

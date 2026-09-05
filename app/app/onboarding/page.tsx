@@ -30,6 +30,7 @@ import { reportError } from '@/lib/report-error';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { convexErrorCode } from '@/lib/utils';
 import { shouldAdvanceOnEnter } from './lib/enterToAdvance';
+import { togglePriorApp } from './lib/togglePriorApp';
 
 /**
  * One sink for the wizard's swallow points: console + error tracking (the
@@ -55,6 +56,7 @@ import type {
   WritingInputMode,
   AcquisitionSource,
   LearningReason,
+  PriorApp,
   DailyTimeGoalMinutes,
   PlacementTestState,
 } from './types';
@@ -68,6 +70,7 @@ import {
 import { LanguagePairStep } from './steps/LanguagePairStep';
 import { AcquisitionSourceStep } from './steps/AcquisitionSourceStep';
 import { LearningGoalStep } from './steps/LearningGoalStep';
+import { PriorAppsStep } from './steps/PriorAppsStep';
 import { DailyTimeGoalStep } from './steps/DailyTimeGoalStep';
 import { ProficiencyBranchStep } from './steps/ProficiencyBranchStep';
 import { CefrSelfPickStep } from './steps/CefrSelfPickStep';
@@ -80,13 +83,14 @@ import { ReviewModeStep, type ReviewModeChoice } from './steps/ReviewModeStep';
  *
  * Step / id / next:
  *   1.  language-pair         → acquisition
- *   2.  acquisition           → goal
- *   3.  goal                  → daily-time
- *   4.  daily-time            → proficiency
- *   5.  proficiency           → cefr-pick | placement-test | review-mode (depends on branch)
- *   6a. cefr-pick             → review-mode
- *   6b. placement-test        → review-mode
- *   7.  review-mode           → done: Continue runs `completeOnboarding`
+ *   2.  acquisition           → prior-apps
+ *   3.  prior-apps            → goal
+ *   4.  goal                  → daily-time
+ *   5.  daily-time            → proficiency
+ *   6.  proficiency           → cefr-pick | placement-test | review-mode (depends on branch)
+ *   7a. cefr-pick             → review-mode
+ *   7b. placement-test        → review-mode
+ *   8.  review-mode           → done: Continue runs `completeOnboarding`
  *                               (course + deck + seeded cards) then
  *                               `finalizeOnboarding`, and lands the user in
  *                               the REAL learning mode at /app/learn: no
@@ -103,6 +107,7 @@ import { ReviewModeStep, type ReviewModeChoice } from './steps/ReviewModeStep';
 type StepId =
   | 'language-pair'
   | 'acquisition'
+  | 'prior-apps'
   | 'goal'
   | 'daily-time'
   | 'proficiency'
@@ -113,6 +118,7 @@ type StepId =
 const PROGRESS_STEP_ORDER: StepId[] = [
   'language-pair',
   'acquisition',
+  'prior-apps',
   'goal',
   'daily-time',
   'proficiency',
@@ -134,12 +140,15 @@ const LEGACY_STEP_AFTER_FIRST_LESSON = 9;
 
 /** Map a persisted 1-based step number onto the current wizard order. */
 function resumeStepId(savedStep: number): StepId {
-  // Steps 1-6 line up with the previous wizard order. 7 (customizing) and 8
-  // (mid-first-lesson) are old-flow rows whose users already answered the
-  // survey but never settled a review mode, so resume them at the final mode
-  // pick. `completeOnboarding` is idempotent, so users whose course already
-  // exists (old flow got past customizing) just re-confirm the mode and
-  // finish. Rows at 9+ never reach here. They graduate out first.
+  // Steps 1-2 line up with every past wizard order. `prior-apps` was inserted
+  // at 3 later, so an older in-progress row resumes one step earlier than it
+  // left: on the new question, with its saved answers intact. 7 (customizing)
+  // and 8 (mid-first-lesson) are old-flow rows whose users already answered
+  // the survey but never settled a review mode; under the current order they
+  // land on cefr-pick / review-mode and finish from there.
+  // `completeOnboarding` is idempotent, so users whose course already exists
+  // (old flow got past customizing) just re-confirm the mode and finish.
+  // Rows at 9+ never reach here. They graduate out first.
   if (savedStep > PROGRESS_STEP_ORDER.length) return 'review-mode';
   return PROGRESS_STEP_ORDER[savedStep - 1] ?? 'language-pair';
 }
@@ -304,6 +313,8 @@ function OnboardingContent() {
               | LearningReason[]
               | undefined) ?? [],
           learningGoalFreeText: onboardingProgress.learningGoalFreeText ?? null,
+          priorApps: (onboardingProgress.priorApps as PriorApp[]) ?? [],
+          priorAppsFreeText: onboardingProgress.priorAppsFreeText ?? null,
           dailyTimeGoalMinutes:
             (onboardingProgress.dailyTimeGoalMinutes as DailyTimeGoalMinutes) ??
             null,
@@ -351,6 +362,8 @@ interface SaveProgressArgs {
   acquisitionSourceFreeText?: string;
   learningGoals?: string[];
   learningGoalFreeText?: string;
+  priorApps?: string[];
+  priorAppsFreeText?: string;
   dailyTimeGoalMinutes?: number;
   placementTest?: Omit<PlacementTestState, 'strategyVersion'> & {
     strategyVersion?: number;
@@ -404,6 +417,8 @@ export function buildProgressPayload(
     acquisitionSourceFreeText: fd.acquisitionSourceFreeText ?? undefined,
     learningGoals: fd.learningGoals.length > 0 ? fd.learningGoals : undefined,
     learningGoalFreeText: fd.learningGoalFreeText ?? undefined,
+    priorApps: fd.priorApps.length > 0 ? fd.priorApps : undefined,
+    priorAppsFreeText: fd.priorAppsFreeText ?? undefined,
     dailyTimeGoalMinutes: fd.dailyTimeGoalMinutes ?? undefined,
     placementTest: fd.placementTest ?? undefined,
   };
@@ -699,6 +714,8 @@ function OnboardingWizard({
         return !isLanguagePairValid;
       case 'acquisition':
         return data.acquisitionSource === null;
+      case 'prior-apps':
+        return data.priorApps.length === 0;
       case 'goal':
         return data.learningGoals.length === 0;
       case 'daily-time':
@@ -720,6 +737,9 @@ function OnboardingWizard({
         await onLanguagePairContinue();
         return;
       case 'acquisition':
+        advance('prior-apps');
+        return;
+      case 'prior-apps':
         advance('goal');
         return;
       case 'goal':
@@ -872,6 +892,17 @@ function renderStep({
           freeText={data.acquisitionSourceFreeText}
           onSelect={(s) => persist({ acquisitionSource: s })}
           onFreeText={(t) => persist({ acquisitionSourceFreeText: t })}
+        />
+      );
+    case 'prior-apps':
+      return (
+        <PriorAppsStep
+          selected={data.priorApps}
+          freeText={data.priorAppsFreeText}
+          onToggle={(app) =>
+            persist({ priorApps: togglePriorApp(data.priorApps, app) })
+          }
+          onFreeText={(t) => persist({ priorAppsFreeText: t })}
         />
       );
     case 'goal':

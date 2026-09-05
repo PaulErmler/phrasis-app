@@ -5,7 +5,10 @@ import { Doc } from '../_generated/dataModel';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId } from '../db/decks';
-import { buildTextContentBatchForLanguages } from '../lib/cardContent';
+import {
+  buildTextContentBatchForLanguages,
+  sourceTextFromContent,
+} from '../lib/cardContent';
 import { cardOriginPillFields } from '../lib/collections';
 import { searchSegments } from '../../lib/wordTokenize';
 import {
@@ -366,7 +369,7 @@ export const getLibraryCards = query({
           _id: card._id,
           _creationTime: card._creationTime,
           textId: card.textId,
-          sourceText: text.text,
+          sourceText: sourceTextFromContent(content, text),
           sourceLanguage: text.language,
           translations: content.translations,
           audioRecordings: content.audioRecordings,

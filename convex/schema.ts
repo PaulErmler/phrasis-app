@@ -332,6 +332,11 @@ export const onboardingProgressFields = {
   acquisitionSourceFreeText: v.optional(v.string()),
   learningGoals: v.optional(v.array(v.string())),
   learningGoalFreeText: v.optional(v.string()),
+  // Language apps the user has tried before ('anki' | 'glossika' |
+  // 'clozemaster' | 'babbel' | 'duolingo' | 'other' | 'none'), plus the
+  // free-text list behind 'other'. Reported in the new-signup notification.
+  priorApps: v.optional(v.array(v.string())),
+  priorAppsFreeText: v.optional(v.string()),
   dailyTimeGoalMinutes: v.optional(v.number()),
   // Placement-test working state. `history` accumulates as the user answers;
   // `finalLevel` is set when the strategy reports `nextQuestionLevel() === null`.

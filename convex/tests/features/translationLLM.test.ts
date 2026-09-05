@@ -14,12 +14,18 @@ vi.mock('@openrouter/ai-sdk-provider', () => ({
 
 import { generateText } from 'ai';
 import {
+  buildAccentRewritePrompt,
   buildJudgePrompt,
   buildPrompt,
   MAX_OUTPUT_TOKENS,
   translateBestOfN,
   translateTextWithLLM,
 } from '../../features/translationLLM';
+import {
+  ACCENT_REWRITE_STAGES,
+  LUNA_PROVIDER_CONSTRAINTS,
+  getAccentRewriteConfig,
+} from '../../../lib/languages';
 import {
   GEMINI_35_FLASH_NITRO_MINIMAL,
   LUNA_BO3,
@@ -157,6 +163,86 @@ describe('features/translationLLM', () => {
       expect(stages.length).toBe(4);
       expect(stages[0].model).toBe('openai/gpt-5.6-sol:floor');
       expect(stages[3].model).toBe('google/gemini-3.7-flash:nitro');
+    });
+  });
+
+  describe('accent rewrite (en on an en_gb / en_au course)', () => {
+    const base = {
+      text: 'What is your favorite color?',
+      sourceLang: 'en',
+      targetLang: 'en_gb',
+      targetLangName: 'English (UK)',
+      targetLangNativeName: 'English (UK)',
+      targetRegion: 'United Kingdom',
+      addressesSomeone: true,
+      addresseeGender: 'female' as const,
+      formality: 'formal' as const,
+      referentGender: 'male' as const,
+      speakerGender: 'neutral' as const,
+    };
+
+    it('buildPrompt swaps in the rewrite prompt and drops every translation-context block', () => {
+      const prompt = buildPrompt({
+        ...base,
+        accentRewrite: getAccentRewriteConfig('en_gb', 'en'),
+        arcContext: { preceding: ['Hi.'], following: [] },
+        previousTranslation: 'What is your favourite colour?',
+        userSuggestedTranslation: 'ignore me',
+      });
+      expect(prompt).toBe(
+        buildAccentRewritePrompt(
+          getAccentRewriteConfig('en_gb', 'en')!,
+          base.text,
+        ),
+      );
+      expect(prompt).toContain('British readers');
+      expect(prompt).toContain('<source>What is your favorite color?</source>');
+      expect(prompt).not.toContain('<context>');
+      expect(prompt).not.toContain('<register>');
+      expect(prompt).not.toContain('<arc_context>');
+      expect(prompt).not.toContain('<previous_translation>');
+      expect(prompt).not.toContain('ignore me');
+      expect(prompt).not.toContain('translator');
+    });
+
+    it('the rewrite prompt asks for identity by default and freezes American content, punctuation and slang', () => {
+      const prompt = buildAccentRewritePrompt(
+        getAccentRewriteConfig('en_au', 'en')!,
+        'It is 90 degrees Fahrenheit.',
+      );
+      expect(prompt).toContain('Australian readers');
+      expect(prompt).toContain('footpath');
+      expect(prompt).toContain('return the sentence unchanged');
+      expect(prompt).toContain('currencies, units, numbers, dates');
+      expect(prompt).toContain('quotation marks');
+      expect(prompt).toContain('do not add slang');
+      expect(prompt).toContain('Output only the rewritten sentence');
+    });
+
+    it('without accentRewrite the normal translator prompt is unchanged', () => {
+      const prompt = buildPrompt(base);
+      expect(prompt).toContain(
+        'professional English-to-English (UK) translator',
+      );
+      expect(prompt).toContain('<context>');
+    });
+
+    it('ACCENT_REWRITE_STAGES: no-thinking Luna with a tight cap, Sol standard as the fallback', () => {
+      expect(ACCENT_REWRITE_STAGES).toHaveLength(2);
+      expect(ACCENT_REWRITE_STAGES[0]).toEqual({
+        model: 'openai/gpt-5.6-luna:nitro',
+        reasoning: 'none',
+        maxOutputTokens: 1_000,
+        provider: LUNA_PROVIDER_CONSTRAINTS,
+      });
+      expect(ACCENT_REWRITE_STAGES[1]).toMatchObject({
+        model: 'openai/gpt-5.6-sol',
+        reasoning: 'minimal',
+        maxOutputTokens: 1_000,
+      });
+      for (const stage of ACCENT_REWRITE_STAGES) {
+        expect(stage.samples).toBeUndefined();
+      }
     });
   });
 

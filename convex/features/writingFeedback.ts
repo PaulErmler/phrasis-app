@@ -1,4 +1,8 @@
-import { cardPinAt, servedTranslatedText } from '../db/translationReads';
+import {
+  cardPinAt,
+  servedSourceText,
+  servedTranslatedText,
+} from '../db/translationReads';
 import { ConvexError, v, type Infer } from 'convex/values';
 import { action, internalMutation, internalQuery } from '../_generated/server';
 import { internal } from '../_generated/api';
@@ -177,9 +181,13 @@ export const getGradingContext = internalQuery({
     const text = await ctx.db.get(card.textId);
     if (!text) return null;
 
+    // The source side as the card shows it (the accent row on a Mixed
+    // English course), so the base line and the expected wording match
+    // what the learner read.
+    const source = await servedSourceText(ctx, text, cardPinAt(card));
     let expected: string | null;
     if (text.language === language) {
-      expected = text.text;
+      expected = source.text;
     } else {
       // The wording the card shows (a pinned card may be on a superseded
       // revision), which is what the learner was asked to write.
@@ -209,7 +217,7 @@ export const getGradingContext = internalQuery({
       .take(WRITING_ALTERNATIVES_MAX * 2);
 
     return {
-      baseText: text.text,
+      baseText: source.text,
       baseLanguage: text.language,
       notesLanguage: course.baseLanguages[0] ?? text.language,
       expected,

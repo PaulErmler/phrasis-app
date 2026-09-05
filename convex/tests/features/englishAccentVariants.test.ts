@@ -74,13 +74,13 @@ async function sweep(
 
 describe('English accent variants', () => {
   describe('verbatim text', () => {
-    it('an en sentence on an English (UK) course gets a verbatim row, British audio, and no LLM job', async () => {
+    it('an en sentence on an English (US) course gets a verbatim row, American audio, and no LLM job', async () => {
       const t = convexTest(schema, modules);
       const textId = await seedEnglishText(t, 'Hello world');
 
-      await sweep(t, textId, ['en_gb'], ['es']);
+      await sweep(t, textId, ['en_us'], ['es']);
 
-      const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_gb'));
+      const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_us'));
       expect(row).toMatchObject({
         translatedText: 'Hello world',
         translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
@@ -89,12 +89,12 @@ describe('English accent variants', () => {
       });
       // Only Spanish went to a model.
       expect(llmEnqueues().map((e) => e.targetLanguage)).toEqual(['es']);
-      // Audio for the UK course speaks in a British voice; the source `en`
+      // Audio for the US course speaks in an American voice; the source `en`
       // audio (always filled) speaks in the text's deterministic accent.
       const tts = ttsEnqueues();
-      const gb = tts.find((e) => e.language === 'en_gb');
-      expect(gb).toBeDefined();
-      expect(getVoiceLocale(gb!.voiceName)).toBe('en-GB');
+      const us = tts.find((e) => e.language === 'en_us');
+      expect(us).toBeDefined();
+      expect(getVoiceLocale(us!.voiceName)).toBe('en-US');
       const en = tts.find((e) => e.language === 'en');
       expect(en).toBeDefined();
       expect(getVoiceLocale(en!.voiceName)).toBe(
@@ -107,29 +107,62 @@ describe('English accent variants', () => {
       expect(claims.map((c) => c.targetLanguage)).toEqual(['es']);
     });
 
-    it('an old LLM British-spelling rewrite is replaced verbatim by the version sweep', async () => {
+    it('an en sentence on an English (UK) course is sent to the accent rewrite like a translation', async () => {
+      const t = convexTest(schema, modules);
+      const textId = await seedEnglishText(t, 'Hello world');
+
+      await sweep(t, textId, ['en_gb'], ['es']);
+
+      // No row yet: the wording comes from the model, not from a copy.
+      expect(await t.run((ctx) => liveTranslation(ctx, textId, 'en_gb'))).toBe(
+        null,
+      );
+      const jobs = llmEnqueues() as {
+        targetLanguage: string;
+        sourceLanguage?: string;
+      }[];
+      expect(jobs.map((e) => e.targetLanguage).sort()).toEqual(['en_gb', 'es']);
+      expect(jobs.find((e) => e.targetLanguage === 'en_gb')).toMatchObject({
+        sourceLanguage: 'en',
+      });
+      // The rewrite holds a model slot like any translation; its audio waits
+      // for the wording. The source `en` audio is filled regardless.
+      const claims = await t.run((ctx) =>
+        ctx.db.query('llmTranslationClaims').collect(),
+      );
+      expect(claims.map((c) => c.targetLanguage).sort()).toEqual([
+        'en_gb',
+        'es',
+      ]);
+      expect(ttsEnqueues().map((e) => e.language)).toEqual(['en']);
+    });
+
+    it('an old verbatim copy on a UK course is replaced in place by the accent rewrite on the version sweep', async () => {
       const t = convexTest(schema, modules);
       const textId = await seedEnglishText(t, 'The color of the elevator');
-      await t.run((ctx) =>
+      const rowId = await t.run((ctx) =>
         ctx.db.insert('translations', {
           textId,
           targetLanguage: 'en_gb',
-          translatedText: 'The colour of the lift',
-          translationSource: 'google/gemini-3.1-flash-lite-high',
-          translationVersion: 1,
+          translatedText: 'The color of the elevator',
+          translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
+          translationVersion: 2,
           speakerGender: 'female',
         }),
       );
 
       await sweep(t, textId, ['en_gb'], []);
 
+      // The row keeps serving until the new wording lands (silent bump).
       const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_gb'));
-      expect(row).toMatchObject({
-        translatedText: 'The color of the elevator',
-        translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
-        translationVersion: 2,
-      });
-      expect(llmEnqueues()).toEqual([]);
+      expect(row?._id).toBe(rowId);
+      expect(llmEnqueues()).toMatchObject([
+        {
+          targetLanguage: 'en_gb',
+          replaceExisting: true,
+          translationReason: 'version_bump',
+        },
+      ]);
     });
 
     it('a custom German sentence with an en_gb target is still translated by a model', async () => {
@@ -448,7 +481,7 @@ describe('English accent variants', () => {
   });
 
   describe('flagTranslation', () => {
-    it('on a UK course retranslates only the real translation, the verbatim row is untouched', async () => {
+    it('on a US course retranslates only the real translation, the verbatim row is untouched', async () => {
       const t = convexTest(schema, modules);
       const { cardId, gbRowId, esRowId } = await t.run(async (ctx) => {
         const collectionId = await ctx.db.insert('collections', {
@@ -457,7 +490,7 @@ describe('English accent variants', () => {
         });
         const courseId = await ctx.db.insert('courses', {
           userId: 'user_A',
-          baseLanguages: ['en_gb'],
+          baseLanguages: ['en_us'],
           targetLanguages: ['es'],
         });
         await ctx.db.insert('userSettings', {
@@ -481,7 +514,7 @@ describe('English accent variants', () => {
         });
         const gbRowId = await ctx.db.insert('translations', {
           textId,
-          targetLanguage: 'en_gb',
+          targetLanguage: 'en_us',
           translatedText: 'Hello world',
           translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
         });

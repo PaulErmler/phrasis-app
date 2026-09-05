@@ -1,0 +1,1 @@
+English (UK) and English (Australia) courses now show sentences in British or Australian wording (colour, lift, footpath) instead of the shared catalogue text, and Mixed English cards read the wording that matches the accent they are spoken in. Cards you already have keep the wording you learned.

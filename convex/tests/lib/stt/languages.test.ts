@@ -5,7 +5,7 @@ import {
   STT_UNLISTED_BUT_WORKING,
   toSttLanguage,
 } from '../../../lib/stt/languages';
-import { SUPPORTED_LANGUAGES } from '../../../../lib/languages';
+import { SUPPORTED_LANGUAGES, getSttBackend } from '../../../../lib/languages';
 
 describe('lib/stt/languages toSttLanguage', () => {
   it('collapses regional and script variants onto the bare code', () => {
@@ -29,10 +29,13 @@ describe('lib/stt/languages toSttLanguage', () => {
 
   it('has an STT decision for every supported code (no silent gaps)', () => {
     // A new language whose bare code the model does not list must be probed
-    // live and either added to STT_UNLISTED_BUT_WORKING or shipped with
-    // supportsStt: false (which is the decision, so such a language is not a
-    // gap). Landing here by accident is the failure this guards.
-    const gaps = SUPPORTED_LANGUAGES.filter((l) => l.supportsStt)
+    // live and either added to STT_UNLISTED_BUT_WORKING, routed to the
+    // Gemini backend, or shipped with supportsStt: false (each is a
+    // decision, so such a language is not a gap). Landing here by accident
+    // is the failure this guards.
+    const gaps = SUPPORTED_LANGUAGES.filter(
+      (l) => l.supportsStt && getSttBackend(l.code) === 'mai-transcribe-2',
+    )
       .map((l) => l.code)
       .filter((code) => {
         const stt = toSttLanguage(code);
@@ -51,5 +54,15 @@ describe('lib/stt/languages toSttLanguage', () => {
       expect(MAI_TRANSCRIBE_2_LANGUAGES.has(code)).toBe(false);
     }
     expect([...STT_UNLISTED_BUT_WORKING].sort()).toEqual(['hr', 'sr']);
+  });
+
+  it('routes to Gemini only languages MAI does not list', () => {
+    const geminiRouted = SUPPORTED_LANGUAGES.filter(
+      (l) => l.supportsStt && getSttBackend(l.code) === 'gemini-flash-lite',
+    ).map((l) => l.code);
+    expect(geminiRouted).toEqual(['uz']);
+    for (const code of geminiRouted) {
+      expect(MAI_TRANSCRIBE_2_LANGUAGES.has(toSttLanguage(code))).toBe(false);
+    }
   });
 });

@@ -2,7 +2,7 @@ import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import {
   isTranslationVersionStale,
-  languageSupportsStt,
+  languageSupportsWordTimings,
 } from '../../lib/languages';
 import {
   ANNOTATION_KINDS,
@@ -19,7 +19,9 @@ import {
 import {
   cardPinAt,
   liveTranslation,
+  mixedAccentRowLanguage,
   resolveServedFromLive,
+  servedSourceText,
   type ServedTranslation,
 } from '../db/translationReads';
 
@@ -139,6 +141,28 @@ export function getCourseLanguages(
   return [...new Set([...baseLanguages, ...targetLanguages])];
 }
 
+/** Audio slot of the source wording when the card also fetches an accent row. */
+function sourceAudioSlot(slot: string): string {
+  return `${slot}:source`;
+}
+
+/**
+ * The wording a card payload's `sourceText` field carries: what the batch
+ * resolved for the text's own language (the accent row on a Mixed English
+ * course, see `mixedAccentRowLanguage`) when that language is on the
+ * course, else the source text. Keeps the media-session title, the edit
+ * dialog and the source fallback line in step with the card's entries.
+ */
+export function sourceTextFromContent(
+  content: Pick<TextContentResult, 'translations'>,
+  text: Pick<Doc<'texts'>, 'text' | 'language'>,
+): string {
+  return (
+    content.translations.find((tr) => tr.language === text.language)?.text ||
+    text.text
+  );
+}
+
 export async function buildTextContentBatchForLanguages(
   ctx: ContentCtx,
   inputs: TextContentInput[],
@@ -161,38 +185,68 @@ export async function buildTextContentBatchForLanguages(
   },
 ): Promise<Map<string, TextContentResult>> {
   const allLanguages = getCourseLanguages(baseLanguages, targetLanguages);
+  // `lang` is the course language the entry is reported under; `rowLang` is
+  // the language the rows are read from. They differ only for a mixed-accent
+  // source slot, which reads its accent row (`mixedAccentRowLanguage`).
   const translationFetches: Array<{
     key: string;
     lang: string;
+    rowLang: string;
     textId: Id<'texts'>;
     userCreated: boolean;
     pinAt: number | undefined;
   }> = [];
   const audioFetches: Array<{
-    key: string;
-    lang: string;
+    slot: string;
+    rowLang: string;
     textId: Id<'texts'>;
   }> = [];
+  // `${key}:${lang}` -> accent code, for the source slots that read an
+  // accent row. Such a slot fetches the accent row's audio under the slot
+  // and the source audio under `sourceAudioSlot`, and falls back to the
+  // source wording + audio while the row is missing.
+  const accentSlots = new Map<string, string>();
 
   for (const input of inputs) {
     for (const lang of allLanguages) {
+      const slot = `${input.key}:${lang}`;
       if (lang !== input.sourceLanguage) {
         translationFetches.push({
           key: input.key,
           lang,
+          rowLang: lang,
           textId: input.textId,
           userCreated: input.userCreated,
           pinAt: input.pinAt,
         });
+        audioFetches.push({ slot, rowLang: lang, textId: input.textId });
+        continue;
       }
-      audioFetches.push({ key: input.key, lang, textId: input.textId });
+      const accent = mixedAccentRowLanguage(input, lang);
+      if (accent !== undefined) {
+        accentSlots.set(slot, accent);
+        translationFetches.push({
+          key: input.key,
+          lang,
+          rowLang: accent,
+          textId: input.textId,
+          userCreated: input.userCreated,
+          pinAt: input.pinAt,
+        });
+        audioFetches.push({ slot, rowLang: accent, textId: input.textId });
+      }
+      audioFetches.push({
+        slot: accent !== undefined ? sourceAudioSlot(slot) : slot,
+        rowLang: lang,
+        textId: input.textId,
+      });
     }
   }
 
   const [translationResults, audioResults, claimResults] = await Promise.all([
     Promise.all(
       translationFetches.map((item) =>
-        liveTranslation(ctx, item.textId, item.lang),
+        liveTranslation(ctx, item.textId, item.rowLang),
       ),
     ),
     Promise.all(
@@ -200,7 +254,7 @@ export async function buildTextContentBatchForLanguages(
         ctx.db
           .query('audioRecordings')
           .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', item.textId).eq('language', item.lang),
+            q.eq('textId', item.textId).eq('language', item.rowLang),
           )
           .first(),
       ),
@@ -211,7 +265,7 @@ export async function buildTextContentBatchForLanguages(
     // clicks "regenerate audio" (no LLM phase, no claim).
     Promise.all(
       translationFetches.map((item) =>
-        getLlmClaim(ctx, item.textId, item.lang),
+        getLlmClaim(ctx, item.textId, item.rowLang),
       ),
     ),
   ]);
@@ -258,7 +312,7 @@ export async function buildTextContentBatchForLanguages(
       mayRegenerateTranslation({ userCreated: item.userCreated }, served.live);
     const versionStale =
       liveRegenerable &&
-      isTranslationVersionStale(item.lang, served!.live.translationVersion);
+      isTranslationVersionStale(item.rowLang, served!.live.translationVersion);
     translationMap.set(`${item.key}:${item.lang}`, {
       text: row?.translatedText ?? '',
       romanization: row?.romanizedText ?? undefined,
@@ -298,7 +352,7 @@ export async function buildTextContentBatchForLanguages(
 
   const payloadByKeyAndLang = new Map<string, ResolvedAudioPayload | null>();
   audioFetches.forEach((item, idx) => {
-    const keyAndLang = `${item.key}:${item.lang}`;
+    const keyAndLang = item.slot;
     const entry = translationMap.get(keyAndLang);
     const row = audioResults[idx];
     // An archived revision plays its own asset, or nothing: the live
@@ -316,8 +370,8 @@ export async function buildTextContentBatchForLanguages(
 
   const audioWithStorage = audioFetches
     .map((item, idx) => ({
-      key: `${item.key}:${item.lang}`,
-      payload: payloadByKeyAndLang.get(`${item.key}:${item.lang}`) ?? null,
+      key: item.slot,
+      payload: payloadByKeyAndLang.get(item.slot) ?? null,
       idx,
     }))
     .filter(
@@ -337,12 +391,25 @@ export async function buildTextContentBatchForLanguages(
 
   const result = new Map<string, TextContentResult>();
   for (const input of inputs) {
+    // The accent row a mixed-accent source slot is served, when it exists.
+    // While it is missing the slot shows the source wording and audio.
+    const servedAccentEntry = (lang: string) => {
+      const slot = `${input.key}:${lang}`;
+      if (!accentSlots.has(slot)) return undefined;
+      const entry = translationMap.get(slot);
+      return entry?.text ? entry : undefined;
+    };
     const audioRecordings = allLanguages.map((lang) => {
-      const payload = payloadByKeyAndLang.get(`${input.key}:${lang}`) ?? null;
+      const slot = `${input.key}:${lang}`;
+      const audioSlot =
+        accentSlots.has(slot) && servedAccentEntry(lang) === undefined
+          ? sourceAudioSlot(slot)
+          : slot;
+      const payload = payloadByKeyAndLang.get(audioSlot) ?? null;
       return {
         language: lang,
         voiceName: payload?.voiceName ?? null,
-        url: urlMap.get(`${input.key}:${lang}`) ?? null,
+        url: urlMap.get(audioSlot) ?? null,
         wordTimings: payload?.wordTimings ?? null,
         ttsQuality: payload?.ttsQuality ?? null,
       };
@@ -363,7 +430,8 @@ export async function buildTextContentBatchForLanguages(
         opts?.rawRomanization || supports('romanization');
       const langNeedsIpa = supports('ipa');
       const langNeedsFurigana = supports('furigana');
-      if (lang === input.sourceLanguage) {
+      const accentEntry = servedAccentEntry(lang);
+      if (lang === input.sourceLanguage && accentEntry === undefined) {
         return {
           language: lang,
           text: input.sourceText,
@@ -377,7 +445,7 @@ export async function buildTextContentBatchForLanguages(
           retranslating: false,
         };
       }
-      const entry = translationMap.get(`${input.key}:${lang}`);
+      const entry = accentEntry ?? translationMap.get(`${input.key}:${lang}`);
       const translatedText = entry?.text ?? '';
       const claimedAt = entry?.llmClaimedAt ?? null;
       const llmClaimHeld = claimedAt !== null && isClaimFresh({ claimedAt });
@@ -403,9 +471,18 @@ export async function buildTextContentBatchForLanguages(
     // live row: `scheduleMissingContent` fills a superseded row's annotations,
     // backfills its timings and repairs its audio (contentScheduling.ts,
     // `supersededMap`), so the client self-heal has real work to ask for.
-    const hasMissingTranslation = translations.some(
-      (tr) => tr.language !== input.sourceLanguage && !tr.text,
-    );
+    const hasMissingTranslation =
+      translations.some(
+        (tr) => tr.language !== input.sourceLanguage && !tr.text,
+      ) ||
+      // A mixed-accent source slot whose accent row has not landed yet:
+      // the card shows the source wording meanwhile, but the row is
+      // required content and the sweep must be asked for it.
+      allLanguages.some(
+        (lang) =>
+          accentSlots.has(`${input.key}:${lang}`) &&
+          servedAccentEntry(lang) === undefined,
+      );
     const hasMissingAudio = audioRecordings.some((audio) => !audio.url);
     // Read the STORED annotations, not the projected ones: those are display
     // values, already blanked for languages the caller didn't ask about.
@@ -418,7 +495,7 @@ export async function buildTextContentBatchForLanguages(
     // (useEnsureContent → ensureCardContent → scheduleMissingContent).
     const hasMissingAnnotation = allLanguages.some((lang) => {
       const stored =
-        lang === input.sourceLanguage
+        lang === input.sourceLanguage && servedAccentEntry(lang) === undefined
           ? {
               romanization: input.sourceRomanization,
               ipa: input.sourceIpa,
@@ -441,7 +518,7 @@ export async function buildTextContentBatchForLanguages(
       (audio) =>
         audio.url !== null &&
         audio.wordTimings === null &&
-        languageSupportsStt(audio.language),
+        languageSupportsWordTimings(audio.language),
     );
 
     result.set(input.key, {
@@ -555,13 +632,23 @@ export async function buildCardSearchableText(
     text !== undefined ? Promise.resolve(text) : ctx.db.get(textId),
     loadLiveTranslationRows(ctx, textId, courseLanguages),
   ]);
+  // The source-language words a Mixed English card shows are its accent
+  // row's (`servedSourceText`), so those are the ones searched.
+  const source =
+    resolvedText && courseLanguages.includes(resolvedText.language)
+      ? await servedSourceText(ctx, resolvedText, pinAt)
+      : null;
   const { entries } = await servedSearchableEntries(
     ctx,
     courseLanguages,
     liveRows,
     pinAt,
   );
-  return composeSearchableText(resolvedText, sourceText, entries);
+  return composeSearchableText(
+    resolvedText,
+    source?.text ?? sourceText,
+    entries,
+  );
 }
 
 /** Caches for `buildSearchableTextPatchForCard`, scoped by the caller. */
@@ -627,16 +714,23 @@ export async function buildSearchableTextPatchForCard(
     liveRows = await loadLiveTranslationRows(ctx, card.textId, languages);
     caches.liveRows?.set(liveKey, liveRows);
   }
+  const pinAt = cardPinAt(card);
   const { entries, revisionKey } = await servedSearchableEntries(
     ctx,
     languages,
     liveRows,
-    cardPinAt(card),
+    pinAt,
   );
-  const builtKey = `${liveKey}|${revisionKey}`;
+  // Same rule as `buildCardSearchableText`: a Mixed English card searches
+  // its accent row's words. The served accent revision joins the memo key,
+  // since it depends on the pin like the other revisions do.
+  const source = languages.includes(text.language)
+    ? await servedSourceText(ctx, text, pinAt)
+    : null;
+  const builtKey = `${liveKey}|${revisionKey}|${source?.served?.revisionId ?? '-'}`;
   let built = caches.built?.get(builtKey);
   if (!built) {
-    built = composeSearchableText(text, text.text, entries);
+    built = composeSearchableText(text, source?.text ?? text.text, entries);
     caches.built?.set(builtKey, built);
   }
   return isSearchableTextCurrent(card, built) ? undefined : built;

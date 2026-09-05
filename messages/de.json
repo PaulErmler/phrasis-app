@@ -1173,6 +1173,21 @@
       "otherLabel": "Sag uns, wo (optional)",
       "otherPlaceholder": "z.B. TikTok, Podcast, Sprachlehrer..."
     },
+    "priorApps": {
+      "title": "Welche davon hast du schon benutzt?",
+      "subtitle": "Wähle alles aus, was zutrifft — so wissen wir, was du gewohnt bist.",
+      "options": {
+        "anki": "Anki",
+        "glossika": "Glossika",
+        "clozemaster": "Clozemaster",
+        "babbel": "Babbel",
+        "duolingo": "Duolingo",
+        "other": "Eine andere App",
+        "none": "Keine davon"
+      },
+      "otherLabel": "Welche? (optional)",
+      "otherPlaceholder": "z.B. Memrise, Pimsleur, LingQ..."
+    },
     "goal": {
       "title": "Warum lernst du diese Sprache?",
       "subtitle": "Wähl alles, was passt — so viel du möchtest.",

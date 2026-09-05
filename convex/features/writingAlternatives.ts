@@ -1,4 +1,8 @@
-import { cardPinAt, servedTranslatedText } from '../db/translationReads';
+import {
+  cardPinAt,
+  servedSourceText,
+  servedTranslatedText,
+} from '../db/translationReads';
 import { ConvexError, v } from 'convex/values';
 import {
   internalAction,
@@ -152,7 +156,10 @@ async function primaryTextForLanguage(
   if (!card) return null;
   const text = await ctx.db.get(card.textId);
   if (!text) return null;
-  if (text.language === language) return text.text;
+  if (text.language === language) {
+    // As the card shows it: the accent row on a Mixed English course.
+    return (await servedSourceText(ctx, text, cardPinAt(card))).text;
+  }
   // The served revision, not necessarily the live row (pinned cards).
   return servedTranslatedText(ctx, {
     textId: card.textId,

@@ -85,6 +85,8 @@ export interface SignupNotificationInput {
     | 'dailyTimeGoalMinutes'
     | 'learningGoals'
     | 'learningGoalFreeText'
+    | 'priorApps'
+    | 'priorAppsFreeText'
     | 'acquisitionSource'
     | 'acquisitionSourceFreeText'
   > | null;
@@ -171,6 +173,16 @@ export function buildSignupNotification(input: SignupNotificationInput): {
         : []),
     ];
     if (goals.length > 0) lines.push(`Goals: ${goals.join(', ')}`);
+    // 'none' is a real answer here ("used none of these"), so it prints.
+    const priorApps = [
+      ...(onboarding.priorApps ?? []),
+      ...(onboarding.priorAppsFreeText
+        ? [`"${onboarding.priorAppsFreeText}"`]
+        : []),
+    ];
+    if (priorApps.length > 0) {
+      lines.push(`Apps used before: ${priorApps.join(', ')}`);
+    }
     if (onboarding.acquisitionSource) {
       lines.push(
         `Found us via: ${onboarding.acquisitionSource}${

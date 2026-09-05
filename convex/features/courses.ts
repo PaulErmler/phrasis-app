@@ -739,6 +739,15 @@ export const saveOnboardingProgress = mutation({
         message: `learningGoalFreeText exceeds ${MAX_ONBOARDING_FREE_TEXT_LENGTH} characters`,
       });
     }
+    if (
+      args.priorAppsFreeText &&
+      args.priorAppsFreeText.length > MAX_ONBOARDING_FREE_TEXT_LENGTH
+    ) {
+      throw new ConvexError({
+        code: 'INVALID_ARGUMENT',
+        message: `priorAppsFreeText exceeds ${MAX_ONBOARDING_FREE_TEXT_LENGTH} characters`,
+      });
+    }
 
     // Same clamp window as updateCourseSettings, completeOnboarding copies
     // this value onto courseSettings, so an unclamped write here would be a

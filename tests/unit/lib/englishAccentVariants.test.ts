@@ -7,7 +7,11 @@ import {
   getLanguageShortLabel,
   getLocalizedLanguageNameByCode,
   getSharedTextLanguage,
+  getAccentRewriteConfig,
+  getMixedAccentTextLanguage,
+  getMixedAccentTextSince,
   getTtsPromptNameForLocale,
+  isAccentSiblingOf,
   usesSourceTextVerbatim,
 } from '@/lib/languages';
 import {
@@ -36,9 +40,25 @@ describe('English accent variants are pickable and share the en text', () => {
 
   it.each(ENGLISH_VARIANTS)('%s shares its text with en', (code) => {
     expect(getSharedTextLanguage(code)).toBe('en');
-    expect(usesSourceTextVerbatim(code, 'en')).toBe(true);
+    expect(isAccentSiblingOf(code, 'en')).toBe(true);
     // A German custom sentence with an en_gb target is still translated.
+    expect(isAccentSiblingOf(code, 'de')).toBe(false);
     expect(usesSourceTextVerbatim(code, 'de')).toBe(false);
+    expect(getAccentRewriteConfig(code, 'de')).toBeUndefined();
+  });
+
+  it('en_gb and en_au rewrite an en sentence; en_us shows it verbatim', () => {
+    expect(getAccentRewriteConfig('en_gb', 'en')?.name).toBe('British');
+    expect(getAccentRewriteConfig('en_au', 'en')?.name).toBe('Australian');
+    expect(usesSourceTextVerbatim('en_gb', 'en')).toBe(false);
+    expect(usesSourceTextVerbatim('en_au', 'en')).toBe(false);
+    expect(getAccentRewriteConfig('en_us', 'en')).toBeUndefined();
+    expect(usesSourceTextVerbatim('en_us', 'en')).toBe(true);
+    // Between two pinned accents the target decides: a British custom
+    // sentence is australianised on an AU course and shown as typed on a
+    // US one.
+    expect(getAccentRewriteConfig('en_au', 'en_gb')?.name).toBe('Australian');
+    expect(usesSourceTextVerbatim('en_us', 'en_gb')).toBe(true);
   });
 
   it('the verbatim rule holds in both directions between accents of one language', () => {
@@ -47,6 +67,7 @@ describe('English accent variants are pickable and share the en text', () => {
     expect(usesSourceTextVerbatim('en', 'en_gb')).toBe(true);
     expect(usesSourceTextVerbatim('en_us', 'en_gb')).toBe(true);
     expect(usesSourceTextVerbatim('en_gb', 'en_gb')).toBe(false);
+    expect(getAccentRewriteConfig('en_gb', 'en_gb')).toBeUndefined();
     expect(usesSourceTextVerbatim('de', 'en_gb')).toBe(false);
   });
 
@@ -57,6 +78,33 @@ describe('English accent variants are pickable and share the en text', () => {
     expect(usesSourceTextVerbatim('es_mixed', 'es')).toBe(false);
   });
 
+  it('a Mixed English text reads the accent row its voice accent points at', () => {
+    // Deterministic in the seed: sweep seeds until every accent shows up.
+    const seen = new Map<string | undefined, string | undefined>();
+    for (let i = 0; i < 200 && seen.size < 3; i++) {
+      const seed = `text-${i}`;
+      seen.set(
+        pickAccentForText('en', seed),
+        getMixedAccentTextLanguage('en', seed),
+      );
+    }
+    expect(seen.get('en-GB')).toBe('en_gb');
+    expect(seen.get('en-AU')).toBe('en_au');
+    // US-voiced texts keep the catalogue wording: en_us declares no rewrite.
+    expect(seen.get('en-US')).toBeUndefined();
+    // A pinned accent has no siblings of its own; a single-accent pool
+    // never mixes.
+    expect(getMixedAccentTextLanguage('en_gb', 'text-1')).toBeUndefined();
+    expect(getMixedAccentTextLanguage('de', 'text-1')).toBeUndefined();
+  });
+
+  it('only Mixed English has a cutover for reading accent rows', () => {
+    expect(getMixedAccentTextSince('en')).toBe(Date.UTC(2026, 8, 6));
+    for (const code of ENGLISH_VARIANTS) {
+      expect(getMixedAccentTextSince(code)).toBeUndefined();
+    }
+  });
+
   it('badges every English variant as EN, never EN_GB', () => {
     for (const code of ['en', ...ENGLISH_VARIANTS]) {
       expect(getLanguageShortLabel(code)).toBe('EN');
@@ -64,10 +112,12 @@ describe('English accent variants are pickable and share the en text', () => {
     expect(getLanguageShortLabel('es_mixed')).toBe('ES_MIXED');
   });
 
-  it('variants carry a translationVersion bump so old LLM rewrites regenerate', () => {
-    for (const code of ENGLISH_VARIANTS) {
-      expect(getLanguageByCode(code)?.translationVersion).toBe(2);
-    }
+  it('variants carry a translationVersion bump so older rows regenerate', () => {
+    // en_gb / en_au: v3 replaces the v2 verbatim copies with accent
+    // rewrites; en_us stays on v2 (still verbatim).
+    expect(getLanguageByCode('en_gb')?.translationVersion).toBe(3);
+    expect(getLanguageByCode('en_au')?.translationVersion).toBe(3);
+    expect(getLanguageByCode('en_us')?.translationVersion).toBe(2);
   });
 });
 

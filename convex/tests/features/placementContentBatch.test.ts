@@ -137,9 +137,12 @@ describe('placement content sweep: upfront batch fan-out', () => {
     expect(scheduleMissingContentSpy).toHaveBeenCalledTimes(1);
     const [, , , baseLanguages, targetLanguages] =
       scheduleMissingContentSpy.mock.calls[0];
-    // Source audio comes from the text's own language ("en"); the two chosen
-    // languages become translation targets (text's own language filtered out).
-    expect(baseLanguages).toEqual(['en']);
+    // The sweep covers the text's own language ("en") on its own and never
+    // translates into it, so the two chosen languages go through unfiltered
+    // as targets and no base language is passed. (A user who chose Mixed
+    // English would pass "en" here too, which is what lets the sweep derive
+    // the accent row for that course.)
+    expect(baseLanguages).toEqual([]);
     expect(new Set(targetLanguages as string[])).toEqual(new Set(['es', 'de']));
   });
 

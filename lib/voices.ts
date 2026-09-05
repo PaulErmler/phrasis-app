@@ -12,7 +12,12 @@
  * `getLanguageByCode` from languages.ts to read each language's active
  * provider when filtering voices.
  */
-import { fnv1a, getLanguageByCode, type TtsProvider } from './languages';
+import {
+  fnv1a,
+  getLanguageByCode,
+  SUPPORTED_LANGUAGES,
+  type TtsProvider,
+} from './languages';
 
 export type { TtsProvider };
 
@@ -309,6 +314,8 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   // Persian runs on Gemini TTS (fa-IR). No Google Chirp3-HD fa voices, so
   // Gemini is the only pool (mirrors pt_pt).
   fa: [...GEMINI_CORE],
+  // Uzbek (Sep 2026): Gemini-only, no Google Chirp3 uz pool exists.
+  uz: [...GEMINI_CORE],
   sw: [...GEMINI_CORE],
   // Tanzanian Swahili runs on Gemini TTS (sw-KE locale + 'Tanzanian Swahili'
   // named in the prompt, Gemini has no sw-TZ locale).
@@ -606,6 +613,33 @@ export function pickAccentForText(
   if (locales.length === 0) return undefined;
   if (locales.length === 1) return locales[0];
   return locales[fnv1a(`${seed}:accent`) % locales.length];
+}
+
+/**
+ * The accent-variant code whose translation rows a mixed-accent course
+ * (`en`) shows for a text, or undefined when the course shows the source
+ * wording. A text whose voice accent (`pickAccentForText`) is British reads
+ * the `en_gb` row, an Australian one the `en_au` row, so what a Mixed
+ * English learner reads matches what they hear. Undefined for a US-hashed
+ * text (no variant declares an `accentRewrite` for en-US), for a code that
+ * is itself a variant (`en_gb` has no siblings of its own) and for a pool
+ * with a single accent. Callers skip user-created texts: their wording is
+ * the user's.
+ */
+export function getMixedAccentTextLanguage(
+  code: string,
+  seed: string,
+): string | undefined {
+  const lang = getLanguageByCode(code);
+  if (!lang || lang.sharesTextWith !== undefined) return undefined;
+  const locale = pickAccentForText(code, seed);
+  if (locale === undefined) return undefined;
+  return SUPPORTED_LANGUAGES.find(
+    (l) =>
+      l.sharesTextWith === code &&
+      l.geminiBcp47 === locale &&
+      l.accentRewrite !== undefined,
+  )?.code;
 }
 
 /**

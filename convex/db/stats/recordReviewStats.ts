@@ -1,4 +1,8 @@
-import { cardPinAt, servedTranslatedText } from '../translationReads';
+import {
+  cardPinAt,
+  servedSourceText,
+  servedTranslatedText,
+} from '../translationReads';
 import { MutationCtx } from '../../_generated/server';
 import { Doc } from '../../_generated/dataModel';
 import { ConvexError } from 'convex/values';
@@ -285,7 +289,10 @@ export async function recordReviewStats(
       const langTexts: Array<{ language: string; text: string }> = [];
       // Include source text if its language is untracked
       if (untrackedLanguages.includes(text.language)) {
-        langTexts.push({ language: text.language, text: text.text });
+        // The words the learner actually read: the accent row on a Mixed
+        // English course, the source text otherwise.
+        const source = await servedSourceText(ctx, text, cardPinAt(card));
+        langTexts.push({ language: text.language, text: source.text });
       }
       for (const lang of untrackedLanguages) {
         if (lang === text.language) continue;

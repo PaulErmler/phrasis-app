@@ -13,7 +13,10 @@ import {
   findNextIncompleteCollection,
   getActiveDataset,
 } from '../../db/collections';
-import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
+import {
+  SOURCE_VERBATIM_TRANSLATION_SOURCE,
+  USER_PROVIDED_TRANSLATION_SOURCE,
+} from '../../../lib/translationProvenance';
 // The workpools are module-mocked globally (tests/convexTestSetup.ts):
 // `enqueueAction` is a vi.fn() resolving to unique fake workIds
 // ('test-tts-work-N'), so tests can assert the enqueue payload directly.
@@ -25,6 +28,7 @@ import { openrouterSttBody, isOpenrouterSttUrl } from '../lib/sttFixtures';
 import { sha256Hex } from '../../lib/sha256';
 import {
   getCurrentTtsVersion,
+  getMixedAccentTextLanguage,
   getCurrentTranslationVersion,
 } from '../../../lib/languages';
 import { liveTranslation } from '../../db/translationReads';
@@ -1734,6 +1738,33 @@ describe('features/decks', () => {
           ttsVersion: getCurrentTtsVersion('en'),
           spokenText: 'Hello there',
         });
+        // A Mixed English course also requires the accent row of a
+        // British- or Australian-voiced text (`getMixedAccentTextLanguage`,
+        // decided by the random id). Seed it complete so the steady-state
+        // tests stay about the Spanish side.
+        const accentLang = getMixedAccentTextLanguage('en', textId);
+        if (accentLang !== undefined) {
+          await ctx.db.insert('translations', {
+            textId,
+            targetLanguage: accentLang,
+            translatedText: 'Hello there',
+            translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
+            speakerGender: 'female',
+            translationVersion: getCurrentTranslationVersion(accentLang),
+            ipaText: 'həlˈoʊ ðɛr',
+          });
+          await insertAudioFixture(ctx, {
+            textId,
+            language: accentLang,
+            storageId: await ctx.storage.store(new Blob([new Uint8Array([4])])),
+            ttsQuality: 'validated',
+            ttsProvider: 'gemini',
+            voiceGender: 'female',
+            wordTimings: timings,
+            ttsVersion: getCurrentTtsVersion(accentLang),
+            spokenText: 'Hello there',
+          });
+        }
         if (opts.esAudio === 'complete') {
           const esBlob = await ctx.storage.store(
             new Blob([new Uint8Array([2])]),

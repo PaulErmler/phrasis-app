@@ -139,6 +139,7 @@ import type * as lib_serbianTranslit from "../lib/serbianTranslit.js";
 import type * as lib_sha256 from "../lib/sha256.js";
 import type * as lib_stt_audioContainer from "../lib/stt/audioContainer.js";
 import type * as lib_stt_cost from "../lib/stt/cost.js";
+import type * as lib_stt_gemini from "../lib/stt/gemini.js";
 import type * as lib_stt_index from "../lib/stt/index.js";
 import type * as lib_stt_languages from "../lib/stt/languages.js";
 import type * as lib_stt_openrouter from "../lib/stt/openrouter.js";
@@ -318,6 +319,7 @@ declare const fullApi: ApiFromModules<{
   "lib/sha256": typeof lib_sha256;
   "lib/stt/audioContainer": typeof lib_stt_audioContainer;
   "lib/stt/cost": typeof lib_stt_cost;
+  "lib/stt/gemini": typeof lib_stt_gemini;
   "lib/stt/index": typeof lib_stt_index;
   "lib/stt/languages": typeof lib_stt_languages;
   "lib/stt/openrouter": typeof lib_stt_openrouter;

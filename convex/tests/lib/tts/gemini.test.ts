@@ -163,6 +163,41 @@ describe('geminiTts.speak: empty-response retry', () => {
     );
   });
 
+  it('appends ttsPromptNotes for the language or the voice locale, and nothing otherwise', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(pcmResponse(4096));
+    vi.stubGlobal('fetch', fetchMock);
+
+    // The Australian course: its own notes tone the accent down.
+    await geminiTts.speak({
+      text: 'Hello.',
+      language: 'en_au',
+      voiceApiCode: 'Leda@en-AU',
+      speed: 1,
+    });
+    const auInput = bodyOf(fetchMock.mock.calls[0]).input;
+    expect(auInput).toContain('native Australian English speaker');
+    expect(auInput).toContain('Keep the Australian accent mild.');
+    // Notes belong to the instruction, never to the spoken transcript.
+    expect(transcriptOf(fetchMock.mock.calls[0])).toBe('Hello.');
+
+    // The mixed English pool picking an Australian voice gets them too.
+    await geminiTts.speak({
+      text: 'Hello.',
+      language: 'en',
+      voiceApiCode: 'Leda@en-AU',
+      speed: 1,
+    });
+    expect(bodyOf(fetchMock.mock.calls[1]).input).toContain(
+      'Keep the Australian accent mild.',
+    );
+
+    // A language without notes keeps the bare instruction.
+    await geminiTts.speak(INPUT);
+    expect(bodyOf(fetchMock.mock.calls[2]).input).not.toContain(
+      'Keep the Australian accent mild.',
+    );
+  });
+
   it('rejects a voice apiCode with a trailing "@" and no locale', async () => {
     // "Kore@" would otherwise yield an empty language_code and hard-400.
     const fetchMock = vi.fn();

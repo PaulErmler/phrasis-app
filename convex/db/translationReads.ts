@@ -1,5 +1,9 @@
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
+import {
+  getMixedAccentTextLanguage,
+  getMixedAccentTextSince,
+} from '../../lib/languages';
 
 type ContentCtx = QueryCtx | MutationCtx;
 
@@ -224,4 +228,113 @@ export async function servedTranslatedText(
 ): Promise<string | null> {
   const served = await resolveServedTranslation(ctx, args);
   return served ? served.row.translatedText : null;
+}
+
+/**
+ * The accent-variant row a mixed-accent course (`en`) shows in place of the
+ * source wording for this text, or undefined when the course shows the
+ * source text itself. A British-voiced curriculum text reads the `en_gb`
+ * rewrite, an Australian one `en_au` (`getMixedAccentTextLanguage`), so the
+ * learner reads what they hear. Three cases keep the source wording: a
+ * user-created text (the wording is the user's), a language with no
+ * cutover, and a card pinned before the cutover
+ * (`Language.mixedAccentTextSince`): the learner keeps the wording and
+ * audio they learned, exactly as a version bump keeps a pinned card on its
+ * archived revision. `pinAt` undefined (a reader with no card) reads the
+ * accent row. Data-driven: any language whose variants declare
+ * `accentRewrite` and that sets a cutover behaves the same.
+ */
+export function mixedAccentRowLanguage(
+  input: {
+    userCreated: boolean;
+    pinAt?: number | undefined;
+    textId: Id<'texts'>;
+  },
+  lang: string,
+): string | undefined {
+  if (input.userCreated) return undefined;
+  const since = getMixedAccentTextSince(lang);
+  if (since === undefined) return undefined;
+  if (input.pinAt !== undefined && input.pinAt < since) return undefined;
+  return getMixedAccentTextLanguage(lang, input.textId);
+}
+
+export type ServedSourceText = {
+  /** The wording shown for the text's own language. */
+  text: string;
+  /**
+   * The language whose rows voice and annotate that wording: the accent
+   * code when an accent row is served, else the text's own language. Audio
+   * lookups key on it; user-facing labels keep the text's language.
+   */
+  language: string;
+  romanizedText: string | undefined;
+  ipaText: string | undefined;
+  furiganaText: string | undefined;
+  /** The accent row when one is served, for callers that key on revisions. */
+  served: ServedTranslation | null;
+};
+
+/**
+ * What a course shows for the text's OWN language. The source text, except
+ * on a mixed-accent course where `mixedAccentRowLanguage` names an accent
+ * row: then that row's served revision (pin-aware like any translation),
+ * with the source text as the fallback while the row has not landed. Every
+ * reader that renders, indexes, compares or counts the source-language
+ * side of a card goes through here, so all of them agree with the card.
+ */
+export async function servedSourceText(
+  ctx: ContentCtx,
+  text: Doc<'texts'>,
+  pinAt: number | undefined,
+): Promise<ServedSourceText> {
+  const accent = mixedAccentRowLanguage(
+    { userCreated: text.userCreated, pinAt, textId: text._id },
+    text.language,
+  );
+  if (accent !== undefined) {
+    const served = await resolveServedTranslation(ctx, {
+      textId: text._id,
+      targetLanguage: accent,
+      pinAt,
+    });
+    if (served) {
+      return {
+        text: served.row.translatedText,
+        language: accent,
+        romanizedText: served.row.romanizedText,
+        ipaText: served.row.ipaText,
+        furiganaText: served.row.furiganaText,
+        served,
+      };
+    }
+  }
+  return {
+    text: text.text,
+    language: text.language,
+    romanizedText: text.romanizedText,
+    ipaText: text.ipaText,
+    furiganaText: text.furiganaText,
+    served: null,
+  };
+}
+
+/**
+ * The wording a course language shows for a text: `servedSourceText` for
+ * the text's own language, the served translation otherwise (null while it
+ * is missing).
+ */
+export async function servedTextForLanguage(
+  ctx: ContentCtx,
+  text: Doc<'texts'>,
+  lang: string,
+  pinAt: number | undefined,
+): Promise<string | null> {
+  if (lang === text.language)
+    return (await servedSourceText(ctx, text, pinAt)).text;
+  return servedTranslatedText(ctx, {
+    textId: text._id,
+    targetLanguage: lang,
+    pinAt,
+  });
 }

@@ -40,19 +40,28 @@ drainSchedulerAfterEach();
 
 // The workpools are module-mocked globally (tests/convexTestSetup.ts); the
 // LLM pool's enqueue calls carry the worker's fnArgs as the third argument.
+// A Mixed English base also asks for the text's accent row (`en_gb` /
+// `en_au`, depending on the text id's voice accent; see
+// `getMixedAccentTextLanguage`). These tests are about the `de` row, so
+// those jobs are filtered out rather than counted.
+const isAccentRowJob = (job: { targetLanguage: string }) =>
+  job.targetLanguage === 'en_gb' || job.targetLanguage === 'en_au';
 const llmEnqueues = () =>
-  vi.mocked(llmPool.enqueueAction).mock.calls.map(
-    (c) =>
-      c[2] as {
-        textId: Id<'texts'>;
-        targetLanguage: string;
-        replaceExisting?: boolean;
-        translationReason?: string;
-        ruleOverride?: string;
-        preferredRegionVariant?: string;
-        skipTts?: boolean;
-      },
-  );
+  vi
+    .mocked(llmPool.enqueueAction)
+    .mock.calls.map(
+      (c) =>
+        c[2] as {
+          textId: Id<'texts'>;
+          targetLanguage: string;
+          replaceExisting?: boolean;
+          translationReason?: string;
+          ruleOverride?: string;
+          preferredRegionVariant?: string;
+          skipTts?: boolean;
+        },
+    )
+    .filter((job) => !isAccentRowJob(job));
 const ttsEnqueues = () =>
   vi.mocked(ttsPool.enqueueAction).mock.calls.map(
     (c) =>

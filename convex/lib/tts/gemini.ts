@@ -5,6 +5,7 @@ import { toGeminiBcp47 } from './languageCodes';
 import {
   getLanguageByCode,
   getTtsPromptNameForLocale,
+  getTtsPromptNotesForLocale,
 } from '../../../lib/languages';
 import { trimTailHiccup } from './tailTrim';
 import { ttsDeliveryInstruction } from './deliveryInstruction';
@@ -38,8 +39,15 @@ const HOST_IS_LITTLE_ENDIAN =
 
 // The instruction text lives in deliveryInstruction.ts (shared with the
 // landing-audio script); see the note there on regeneration.
-function buildStyledInput(text: string, languageName: string): string {
-  return `## Instruction: ${ttsDeliveryInstruction(languageName)}\n\n## Transcript: ${text}`;
+function buildStyledInput(
+  text: string,
+  languageName: string,
+  promptNotes?: string,
+): string {
+  const instruction = promptNotes
+    ? `${ttsDeliveryInstruction(languageName)} ${promptNotes}`
+    : ttsDeliveryInstruction(languageName);
+  return `## Instruction: ${instruction}\n\n## Transcript: ${text}`;
 }
 
 /**
@@ -219,13 +227,18 @@ export const geminiTts: TTSProvider = {
       lang?.ttsPromptName ??
       (locale !== undefined ? getTtsPromptNameForLocale(locale) : undefined) ??
       (lang?.name ?? input.language).replace(/\s*\([^)]*\)\s*$/, '');
+    // Same two sources for the per-language delivery notes (accent strength
+    // and the like); most languages have none.
+    const promptNotes =
+      lang?.ttsPromptNotes ??
+      (locale !== undefined ? getTtsPromptNotesForLocale(locale) : undefined);
 
     let pcm = new Uint8Array(0);
     for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {
       // First attempt sends the sentence as-is; retries randomly pad edge spaces.
       const sentence = attempt === 0 ? input.text : padRandomSpaces(input.text);
       pcm = await requestGeminiPcm(apiKey, {
-        input: buildStyledInput(sentence, languageName),
+        input: buildStyledInput(sentence, languageName, promptNotes),
         voiceName,
         languageCode,
         speed: input.speed,

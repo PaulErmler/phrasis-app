@@ -2,6 +2,7 @@ import { MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id, Doc } from '../_generated/dataModel';
 import {
+  getMixedAccentTextLanguage,
   getVoiceForText,
   getVoiceGenderByApiCode,
   resolveCardSpeakerGenders,
@@ -10,7 +11,7 @@ import {
   isMixedLanguage,
   isTtsVersionStale,
   isTranslationVersionStale,
-  languageSupportsStt,
+  languageSupportsWordTimings,
   pickAccentForText,
   usesSourceTextVerbatim,
 } from '../../lib/languages';
@@ -129,11 +130,14 @@ export async function scheduleTranslationForLanguage(
     translationReason?: TranslationReason;
   },
 ): Promise<boolean> {
-  // Accent-only variant of the text's own language (an `en` sentence on an
-  // `en_gb` course): the wording is the source text itself, so store it
-  // verbatim instead of asking a model to re-spell it. The write choke point
-  // does the rest (version stamp, archive-on-bump, annotations, TTS against
-  // the variant's own voice pool). No LLM claim is involved.
+  // Accent-only variant of the text's own language with no rewrite of its
+  // own (an `en` sentence on an `en_us` course, a British custom sentence
+  // on a Mixed English base): the wording is the source text itself, so
+  // store it verbatim. The write choke point does the rest (version stamp,
+  // archive-on-bump, annotations, TTS against the variant's own voice
+  // pool). No LLM claim is involved. Variants that declare an
+  // `accentRewrite` (`en_gb`, `en_au`) fall through to the OpenRouter path
+  // below like any translation; the worker swaps in the rewrite prompt.
   if (usesSourceTextVerbatim(targetLanguage, text.language)) {
     if (opts.probe) throw new ProbeNeedsWork();
     await storeTranslationAndScheduleTTSHandler(ctx, {
@@ -925,9 +929,10 @@ async function scheduleTimingsBackfillIfNeeded(
   // has them needs no backfill.
   const payload = state.audioPayloadMap.get(lang);
   if (!audio || !payload || payload.wordTimings) return;
-  // Languages without STT support will never get word timings, so don't
-  // waste a claim on a backfill that's guaranteed to no-op.
-  if (!languageSupportsStt(lang)) return;
+  // Languages whose STT backend yields no word timings (none, or the
+  // text-only Gemini fallback) will never get them, so don't waste a claim
+  // on a backfill that's guaranteed to no-op.
+  if (!languageSupportsWordTimings(lang)) return;
   if (opts?.probe) {
     // Claim-held = a job (synthesis or backfill) already owns the slot —
     // unless it's a background claim the real (priority-less, hence
@@ -999,7 +1004,7 @@ async function scheduleSupersededRevisionContent(
       });
       continue;
     }
-    if (asset.wordTimings === undefined && languageSupportsStt(lang)) {
+    if (asset.wordTimings === undefined && languageSupportsWordTimings(lang)) {
       if (opts?.probe) {
         if (await hasBlockingTtsClaim(ctx, textId, lang, undefined)) continue;
         throw new ProbeNeedsWork();
@@ -1200,8 +1205,23 @@ export async function scheduleMissingContent(
   // any other text where the user's variant differs from the text's
   // actual language code (`es` vs `es_latam`, etc.). The Set dedupes
   // when `baseLanguages`/`targetLanguages` already contain the source.
+  //
+  // A mixed-accent course (`en`) shows a British- or Australian-voiced
+  // curriculum text the `en_gb` / `en_au` rewrite instead of the source
+  // wording (`getMixedAccentTextLanguage`, read by cardContent.ts), so that
+  // row is required content on such a course as well. Never for a
+  // user-created text: its wording is the user's.
+  const courseLanguages = [...baseLanguages, ...targetLanguages];
+  const mixedAccentLanguage =
+    !text.userCreated && courseLanguages.includes(sourceLanguage)
+      ? getMixedAccentTextLanguage(sourceLanguage, textId)
+      : undefined;
   const allRequiredLanguages = [
-    ...new Set([sourceLanguage, ...baseLanguages, ...targetLanguages]),
+    ...new Set([
+      sourceLanguage,
+      ...courseLanguages,
+      ...(mixedAccentLanguage ? [mixedAccentLanguage] : []),
+    ]),
   ];
 
   // Languages that need translation (all except source). `sourceLanguage`

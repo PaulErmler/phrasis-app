@@ -4,7 +4,10 @@ import { describe, it, expect, vi } from 'vitest';
 import schema from '../../schema';
 import { api } from '../../_generated/api';
 import { MARK_READ_LIMIT } from '../../db/collectionTextMarks';
-import type { Id } from '../../_generated/dataModel';
+import type { Doc, Id } from '../../_generated/dataModel';
+import type { MutationCtx } from '../../_generated/server';
+import type { WithoutSystemFields } from 'convex/server';
+import { getMixedAccentTextLanguage } from '../../../lib/languages';
 // Mocked globally in tests/convexTestSetup.ts. Imported here to assert on
 // the enqueue boundary (the pools never run jobs under convex-test).
 import { llmPool, ttsPool } from '../../lib/workpools';
@@ -14,6 +17,24 @@ import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
 
 const modules = import.meta.glob('/convex/**/*.ts');
+
+/**
+ * Insert an `en` curriculum text whose id hashes to the US accent, so a
+ * Mixed English course asks for no accent row for it
+ * (`getMixedAccentTextLanguage`) and the counts under test stay about the
+ * target language. Ids are random: insert and delete until one fits.
+ */
+async function insertUsVoicedText(
+  ctx: MutationCtx,
+  fields: Omit<WithoutSystemFields<Doc<'texts'>>, 'language'>,
+): Promise<Id<'texts'>> {
+  for (let i = 0; i < 200; i++) {
+    const id = await ctx.db.insert('texts', { ...fields, language: 'en' });
+    if (getMixedAccentTextLanguage('en', id) === undefined) return id;
+    await ctx.db.delete(id);
+  }
+  throw new Error('no US-voiced text id found');
+}
 
 // Tests here schedule content work on 0ms timers - drain it inside the test
 // context so its logs don't race vitest teardown.
@@ -617,9 +638,8 @@ describe('features/collections', () => {
       // 3.5flash bump), plus paired audio synthesized from the old wording,
       // plus a user-provided sibling row that must never be swept.
       const { enTextId, userTextId } = await t.run(async (ctx) => {
-        const enTextId = await ctx.db.insert('texts', {
+        const enTextId = await insertUsVoicedText(ctx, {
           text: 'Hello there',
-          language: 'en',
           userCreated: false,
           collectionId: collId,
           collectionRank: 2,
@@ -636,9 +656,8 @@ describe('features/collections', () => {
           voiceName: 'es-ES-test-voice',
           storageId: await ctx.storage.store(new Blob(['fake-mp3'])),
         });
-        const userTextId = await ctx.db.insert('texts', {
+        const userTextId = await insertUsVoicedText(ctx, {
           text: 'Hello again',
-          language: 'en',
           userCreated: false,
           collectionId: collId,
           collectionRank: 3,
@@ -743,9 +762,8 @@ describe('features/collections', () => {
           hasCompletedOnboarding: true,
           activeCourseId: courseId,
         });
-        const textId = await ctx.db.insert('texts', {
+        const textId = await insertUsVoicedText(ctx, {
           text: 'Hello',
-          language: 'en',
           userCreated: false,
           collectionId: collId,
           collectionRank: 1,
