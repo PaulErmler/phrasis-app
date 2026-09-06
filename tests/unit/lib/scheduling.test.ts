@@ -344,6 +344,44 @@ describe('scheduleCard with a study day', () => {
     expect(r.snappedToStudyDay).toBe(true);
   });
 
+  it('rated minutes before rollover, a 1-day interval moves to the following study day', () => {
+    // 03:50 CEST on the 10th: a 1-day interval is exact-due 03:50 on the
+    // 11th, whose study day starts at 04:00 on the 10th, ten minutes away.
+    // That would re-serve the card in the same sitting, so it goes to the
+    // 11th instead (`MIN_STUDY_DAY_LEAD_MS`).
+    const now = T('2026-09-10T01:50:00Z');
+    const r = scheduleCard(
+      reviewState(now, 0.3),
+      'hard',
+      5,
+      now,
+      undefined,
+      BERLIN,
+    );
+    expect(r.fsrsState!.scheduledDays).toBe(1);
+    expect(studyDayStart(r.fsrsState!.due, BERLIN)).toBe(
+      T('2026-09-10T02:00:00Z'),
+    );
+    expect(r.dueDate).toBe(T('2026-09-11T02:00:00Z'));
+    expect(r.snappedToStudyDay).toBe(true);
+  });
+
+  it('keeps the next study day when it is more than the lead away', () => {
+    // 02:30 CEST: the same 1-day interval snaps to 04:00 today, 90 minutes
+    // out, which is beyond the lead and stays.
+    const now = T('2026-09-10T00:30:00Z');
+    const r = scheduleCard(
+      reviewState(now, 0.3),
+      'hard',
+      5,
+      now,
+      undefined,
+      BERLIN,
+    );
+    expect(r.fsrsState!.scheduledDays).toBe(1);
+    expect(r.dueDate).toBe(T('2026-09-10T02:00:00Z'));
+  });
+
   it('leaves the relearning step exact: Again on a graduated card', () => {
     const now = T('2026-09-10T12:07:00Z');
     const r = scheduleCard(

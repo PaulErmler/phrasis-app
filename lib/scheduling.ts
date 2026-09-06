@@ -53,6 +53,17 @@ export const DEFAULT_DAY_START_HOUR = 4;
  */
 export const DUE_SLOT_WINDOW_MS = 60_000;
 
+/**
+ * A snapped day-scale due date must be at least this far ahead of the
+ * rating. Rated at 03:50 with rollover at 04:00, a 1-day interval would
+ * otherwise snap to 04:00 the same morning and come back in the same
+ * sitting, with FSRS then seeing a day's interval elapse in minutes. Under
+ * the lead the card moves to the following study day instead. One hour
+ * confines the trade (a 1-day card served two days later) to reviews in
+ * the hour before rollover.
+ */
+export const MIN_STUDY_DAY_LEAD_MS = 60 * 60_000;
+
 /** Default number of initial reviews before FSRS scheduling begins. */
 export const DEFAULT_INITIAL_REVIEW_COUNT = 5;
 
@@ -407,12 +418,14 @@ function scheduleFsrsReview(
   let dueDate = exactDue;
   if (snap) {
     dueDate = studyDayStart(exactDue, studyDay);
-    // On a 25-hour DST fall-back day a 1-day interval rated in the hour
-    // before rollover lands in the study day that already started, so in
-    // the past, and every re-rating would land there again until the clock
+    // A 1-day interval rated in the hour before rollover lands at the
+    // start of the study day about to begin, minutes away, and on a
+    // 25-hour DST fall-back day in the study day that already started, so
+    // in the past, where every re-rating would land again until the clock
     // passed rollover. "One day later" means the next study day, so move
-    // there. 25 h always reaches the next start without skipping one.
-    if (dueDate <= now) {
+    // there (`MIN_STUDY_DAY_LEAD_MS`). 25 h always reaches the next start
+    // without skipping one.
+    if (dueDate < now + MIN_STUDY_DAY_LEAD_MS) {
       dueDate = studyDayStart(dueDate + 25 * 3_600_000, studyDay);
     }
   }
