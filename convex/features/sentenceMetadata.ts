@@ -22,10 +22,7 @@ import {
   openrouterCostUsd,
   openrouterGenerationId,
 } from '../lib/posthogAi';
-import {
-  getLanguageByCode,
-  resolveAudioSpeakerGender,
-} from '../../lib/languages';
+import { resolveAudioSpeakerGender } from '../../lib/languages';
 import { isUserCreatedText } from '../../lib/translationProvenance';
 import { retrier } from '../retrier';
 import { stripJsonFences } from '../lib/llmJson';

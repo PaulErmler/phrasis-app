@@ -1276,7 +1276,7 @@
   "gender:hi:उसने कहा, \"मैं थक गई हूँ।\"": {
     "register": "neutral",
     "addresseeNumber": "not_applicable",
-    "speakerGender": "female",
+    "speakerGender": "neutral",
     "addresseeGender": "not_applicable",
     "addressesSomeone": "false"
   },
@@ -1848,7 +1848,7 @@
     "addressesSomeone": "false"
   },
   "gender:ja:弟は「俺は行くぜ」と言いました。": {
-    "register": "informal",
+    "register": "neutral",
     "addresseeNumber": "not_applicable",
     "speakerGender": "neutral",
     "addresseeGender": "not_applicable",
@@ -2506,7 +2506,7 @@
     "addressesSomeone": "true"
   },
   "gender:pt_pt:Obrigada!": {
-    "register": "informal",
+    "register": "neutral",
     "addresseeNumber": "not_applicable",
     "speakerGender": "female",
     "addresseeGender": "not_applicable",
@@ -3116,10 +3116,10 @@
   },
   "gender:th:ขอบคุณครับ": {
     "register": "formal",
-    "addresseeNumber": "singular",
+    "addresseeNumber": "not_applicable",
     "speakerGender": "male",
-    "addresseeGender": "neutral",
-    "addressesSomeone": "true"
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false"
   },
   "gender:th:ขอบคุณค่ะ": {
     "register": "formal",
@@ -3157,7 +3157,7 @@
     "addressesSomeone": "false"
   },
   "gender:th:ผมเป็นครู": {
-    "register": "neutral",
+    "register": "formal",
     "addresseeNumber": "not_applicable",
     "speakerGender": "male",
     "addresseeGender": "not_applicable",
@@ -3439,9 +3439,9 @@
   "gender:vi:Nam nói: “Anh yêu em.”": {
     "register": "informal",
     "addresseeNumber": "singular",
-    "speakerGender": "male",
-    "addresseeGender": "female",
-    "addressesSomeone": "true"
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "false"
   },
   "gender:vi:Tôi là anh trai của Lan.": {
     "register": "neutral",
@@ -3816,7 +3816,7 @@
   },
   "politeness:fr:Pourriez-vous m'aider, s'il vous plaît ?": {
     "register": "formal",
-    "addresseeNumber": "singular",
+    "addresseeNumber": "plural",
     "speakerGender": "neutral",
     "addresseeGender": "neutral",
     "addressesSomeone": "true"
@@ -3977,10 +3977,10 @@
   },
   "politeness:ja:そんなの知らないよ。": {
     "register": "informal",
-    "addresseeNumber": "not_applicable",
+    "addresseeNumber": "singular",
     "speakerGender": "neutral",
-    "addresseeGender": "not_applicable",
-    "addressesSomeone": "false"
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true"
   },
   "politeness:ja:どうぞこちらでお待ちください。": {
     "register": "formal",
@@ -4025,7 +4025,7 @@
     "addressesSomeone": "false"
   },
   "politeness:ja:彼は「もう帰るぞ」と言っていました。": {
-    "register": "informal",
+    "register": "neutral",
     "addresseeNumber": "not_applicable",
     "speakerGender": "neutral",
     "addresseeGender": "not_applicable",
@@ -4396,11 +4396,11 @@
     "addressesSomeone": "true"
   },
   "politeness:th:ท่านประธานกำลังรับประทานอาหารกลางวันอยู่ครับ": {
-    "register": "formal",
-    "addresseeNumber": "not_applicable",
-    "speakerGender": "male",
-    "addresseeGender": "not_applicable",
-    "addressesSomeone": "false"
+    "register": "invalid",
+    "addresseeNumber": "invalid",
+    "speakerGender": "invalid",
+    "addresseeGender": "invalid",
+    "addressesSomeone": "invalid"
   },
   "politeness:th:ร้านนี้เปิดทุกวันตั้งแต่เก้าโมงเช้า": {
     "register": "neutral",
@@ -4434,7 +4434,7 @@
     "register": "informal",
     "addresseeNumber": "singular",
     "speakerGender": "female",
-    "addresseeGender": "female",
+    "addresseeGender": "neutral",
     "addressesSomeone": "true"
   },
   "politeness:th:ไปกันเถอะ เดี๋ยวสายนะ": {

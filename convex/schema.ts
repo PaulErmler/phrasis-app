@@ -694,14 +694,16 @@ export default defineSchema({
       'supersededAt',
     ])
     // Successor of the index above with the rendering variant pinned:
-    // canonical reads use `.eq('variantKey', undefined)`. Declared staged
-    // (~300k rows: the build would otherwise block the deploy); the deploy
-    // that switches convex/db/translationReads.ts onto it removes the flag,
-    // and a later flagged deploy drops `by_text_language_supersededAt`.
-    .index('by_text_language_variant_supersededAt', {
-      fields: ['textId', 'targetLanguage', 'variantKey', 'supersededAt'],
-      staged: true,
-    })
+    // canonical reads use `.eq('variantKey', undefined)`. Added staged in
+    // the dark push (~300k rows: the build would otherwise have blocked the
+    // deploy); this push switches convex/db/translationReads.ts onto it. A
+    // later flagged deploy drops `by_text_language_supersededAt`.
+    .index('by_text_language_variant_supersededAt', [
+      'textId',
+      'targetLanguage',
+      'variantKey',
+      'supersededAt',
+    ])
     .index('by_audioAssetId', ['audioAssetId'])
     // Every LIVE row of a text (`.eq('supersededAt', undefined)`), for the
     // readers that list a text's translations without naming a language.
@@ -819,13 +821,13 @@ export default defineSchema({
   })
     .index('by_textId', ['textId'])
     // Legacy two-column index, kept unqueried until a flagged deploy drops
-    // it (same rule as translations.by_text_and_language).
+    // it (same rule as translations.by_text_and_language); the invariant
+    // test forbids querying it.
     .index('by_text_and_language', ['textId', 'language'])
-    // Staged for the same reason as translations' variant index.
-    .index('by_text_language_variant', {
-      fields: ['textId', 'language', 'variantKey'],
-      staged: true,
-    })
+    // Every pointer read pins all three columns through
+    // convex/db/translationReads.ts (`audioPointer`); a two-column prefix
+    // plus `.first()` would return whichever voice was stored first.
+    .index('by_text_language_variant', ['textId', 'language', 'variantKey'])
     // Reference counting for shared assets: an asset (and its blob) is deleted
     // only when no row points at it any more.
     .index('by_assetId', ['assetId']),
@@ -2051,6 +2053,21 @@ export default defineSchema({
   // email: the attribution lives on the PostHog event, so this financial
   // record needs no handling in the account-deletion purge. Amounts are kept
   // for debugging; Stripe remains the system of record.
+  /**
+   * Run markers for the hand-rolled backfills in convex/migrations/ that the
+   * deploy script starts (`pnpm build:deploy`). One row per job name; a
+   * finished row makes the next start a no-op, so the jobs can be chained
+   * after every deploy like `migrations:runAll` without re-walking their
+   * tables. `force: true` on the job's `run` ignores the marker.
+   */
+  backfillRuns: defineTable({
+    name: v.string(),
+    startedAt: v.number(),
+    finishedAt: v.optional(v.number()),
+    /** The job's own totals, for the dashboard. */
+    summary: v.optional(v.string()),
+  }).index('by_name', ['name']),
+
   paymentEvents: defineTable({
     stripeInvoiceId: v.string(),
     /** Major currency units (EUR), not cents. */

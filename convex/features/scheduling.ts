@@ -15,6 +15,10 @@ import {
   resolveServedTranslation,
   servedSourceText,
   viewOfCard,
+  renderingSettingsOf,
+  renderingTextOf,
+  audioPointer,
+  renderingForView,
 } from '../db/translationReads';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, getUserSettings, requireAuthUserId } from '../db/users';
@@ -88,6 +92,7 @@ import { FEATURE_IDS } from './featureIds';
 import {
   regenerateSupersededRevisionAudio,
   scheduleMissingContent,
+  scheduleMissingRenderings,
 } from '../lib/contentScheduling';
 import { fetchTrackDueCards } from '../lib/dueQueue';
 import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
@@ -315,6 +320,7 @@ export const getCardForReview = query({
       settings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
     const studyContext = studyContextFromSettings(settings);
     const { schedulingMode, studyContentFilter } = studyContext;
+    const renderingSettings = renderingSettingsOf(settings);
 
     const now = resolveClientNow(args.now);
 
@@ -358,17 +364,24 @@ export const getCardForReview = query({
               sourceIpa: text.ipaText ?? undefined,
               sourceFurigana: text.furiganaText ?? undefined,
               userCreated: text.userCreated,
-              view: viewOfCard(card),
+              renderingText: renderingTextOf(text),
+              view: viewOfCard(card, renderingSettings),
             },
           ]
         : [];
     });
+    // Review is the one reader whose self-heal generates rendering
+    // variants (wording and voice), so their gaps count as missing content.
     const contentByKey = await buildTextContentBatchForLanguages(
       ctx,
       contentInputs,
       course.baseLanguages,
       course.targetLanguages,
-      { rawRomanization: true, ignoreMissingWordTimings: true },
+      {
+        rawRomanization: true,
+        ignoreMissingWordTimings: true,
+        includeVariantGaps: true,
+      },
     );
 
     // AI-feedback accepted alternatives, card-scoped (unlike the shared text
@@ -1972,11 +1985,35 @@ export const regenerateCardAudio = mutation({
     // live audio would spend the quota unit on a clip this card never plays,
     // so those languages re-synthesize their archived asset in place instead
     // and keep the live pointer as it is.
-    const view = viewOfCard(card);
+    const renderingSettings = renderingSettingsOf(
+      await getCourseSettings(ctx, course._id),
+    );
+    const view = viewOfCard(card, renderingSettings);
     // The rows this card plays. A Mixed English card plays its accent row's
     // clip for the source slot (`cardRowLanguages`), so that row is the one
     // regenerated, not the source clip the card never plays.
     const audioLanguages = cardRowLanguages(text, view, allLanguages);
+    // A card that follows the course's sentence-form settings plays its
+    // rendering variant's clip: drop that pointer so the variant pass below
+    // re-synthesizes it (docs/architecture/translation-variants.md).
+    const renderingText = renderingTextOf(text);
+    for (const lang of audioLanguages) {
+      if (lang === text.language) continue;
+      const rendering = renderingForView(
+        view,
+        renderingText,
+        card.textId,
+        lang,
+      );
+      if (!rendering.audioVariantKey) continue;
+      const pointer = await audioPointer(
+        ctx,
+        card.textId,
+        lang,
+        rendering.audioVariantKey,
+      );
+      if (pointer) await deleteAudioRow(ctx, pointer);
+    }
     const supersededLanguages = new Set<string>();
     for (const lang of audioLanguages) {
       if (lang === text.language) continue;
@@ -2015,6 +2052,17 @@ export const regenerateCardAudio = mutation({
       course.targetLanguages,
       { forceAudioRegen: true, requestedByUserId: userId },
     );
+    if (card.followsCoursePreferences) {
+      await scheduleMissingRenderings(
+        ctx,
+        card.textId,
+        text,
+        course.baseLanguages,
+        course.targetLanguages,
+        renderingSettings,
+        { forceAudioRegen: true, requestedByUserId: userId },
+      );
+    }
 
     await trackCardAction(ctx, userId, 'regenerate_audio', card);
 

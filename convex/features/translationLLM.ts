@@ -127,7 +127,7 @@ export type LlmTranslationResult =
  * 'neutral' register is intentionally treated as informal in the instructions
  * so German doesn't default to Sie, French to vous, etc.
  */
-const PROMPT_B_INSTRUCTIONS = `Use the supplied speaker, referent, and (if present) addressee gender for any grammatical agreement (verb conjugation, adjective inflection, pronoun choice, gendered noun forms) the target language requires. The referent_gender drives third-party noun forms like German Übersetzer/-in, French traducteur/-rice, Spanish profesor/-a. Use the requested register: 'informal' and 'neutral' both mean the casual T-form (du/tú/tu/おまえ); only 'formal' means the polite V-form or honorific (Sie/usted/vous/敬語 ます-form). DO NOT default to the polite form when the register is neutral. If the target language does not grammatically encode a given feature, translate naturally and ignore it. Do not output any field as a literal word. Only return one translation. Do not return multiple alternative translations or explanations — when several renderings are possible, silently pick the single most natural one.`;
+const PROMPT_B_INSTRUCTIONS = `Use the supplied speaker, referent, and (if present) addressee gender for any grammatical agreement (verb conjugation, adjective inflection, pronoun choice, gendered noun forms) the target language requires. The referent_gender drives third-party noun forms like German Übersetzer/-in, French traducteur/-rice, Spanish profesor/-a. Use the requested register. Three levels exist: casual (the familiar T-form: du/tú/tu/ты, Japanese plain form with 君 or the name for "you", Korean 반말), polite (the level that is safe with anyone: vous/usted/вы/आप, Japanese です・ます, Korean 해요체) and formal (the distance or honorific level: Sie, keigo 尊敬語・謙譲語, Korean 합쇼체). 'informal' and 'neutral' both mean casual; 'formal' means polite. Never the aggressive おまえ. DO NOT default to the polite form when the register is neutral, unless a required politeness form below says otherwise. If the target language does not grammatically encode a given feature, translate naturally and ignore it. Do not output any field as a literal word. Only return one translation. Do not return multiple alternative translations or explanations — when several renderings are possible, silently pick the single most natural one.`;
 
 export type TranslationPromptArgs = {
   text: string;
@@ -206,7 +206,50 @@ export type TranslationPromptArgs = {
    * compares the two; production leaves it unset (= 'product').
    */
   promptWording?: 'product' | 'literature';
+  /**
+   * The canonical wording this job REWRITES for the requested form and
+   * gender (`buildRenderingRewritePrompt`). Set on rendering variant jobs;
+   * `buildPrompt` then returns the rewrite prompt and ignores the arc and
+   * flag context, which describe a translation from the source.
+   */
+  rewriteOf?: string;
 };
+
+/**
+ * The prompt for a rendering VARIANT: rewrite the canonical wording of a
+ * sentence for a requested speaker gender and/or politeness form, changing
+ * only what the form requires. A fresh translation per variant drifted in
+ * unrelated wording on a third of sentences (scripts/eval-gender-relevance.ts,
+ * 2026-09-06: "Je me suis perdu en ville" became "perdue dans la ville"),
+ * which would make every such variant a separate audio clip. A rewrite of
+ * the stored text keeps the sentence identical wherever the form does not
+ * bite, so `sameAsCanonical` is a real signal and unmarked sentences cost
+ * nothing. Same shape as `buildAccentRewritePrompt`: identity is the
+ * expected answer for most inputs and is asked for by name.
+ */
+export function buildRenderingRewritePrompt(args: {
+  targetLang: string;
+  targetLangName: string;
+  sourceText: string;
+  canonicalText: string;
+  requestedGender?: 'male' | 'female';
+  requestedForm?: { id: string; label: string; prompt: string };
+  promptWording?: 'product' | 'literature';
+}): string {
+  const requirements = requestedFormInstruction(args);
+  return [
+    `You are a professional ${args.targetLangName} editor. Below is an English sentence and its ${args.targetLangName} translation. Rewrite the translation so that it satisfies the requirement, and change NOTHING else: keep every word, the word order, the punctuation and the meaning exactly as they are wherever the requirement does not force a change. If the translation already satisfies the requirement, output it unchanged, character for character.`,
+    ``,
+    `<requirement>`,
+    ...requirements.map((line) => `  ${line}`),
+    `</requirement>`,
+    ``,
+    `<source>${args.sourceText}</source>`,
+    `<translation>${args.canonicalText}</translation>`,
+    ``,
+    `Output only the rewritten ${args.targetLangName} sentence. No commentary, no tags, no quotation marks, no alternatives.`,
+  ].join('\n');
+}
 
 /**
  * The instruction lines for a requested politeness form and/or speaker
@@ -357,6 +400,17 @@ function fullLanguageName(args: TranslationPromptArgs): string {
 
 /** Build the user-message string for one translation call. */
 export function buildPrompt(args: TranslationPromptArgs): string {
+  if (args.rewriteOf !== undefined) {
+    return buildRenderingRewritePrompt({
+      targetLang: args.targetLang,
+      targetLangName: fullLanguageName(args),
+      sourceText: args.text,
+      canonicalText: args.rewriteOf,
+      requestedGender: args.requestedGender,
+      requestedForm: args.requestedForm,
+      promptWording: args.promptWording,
+    });
+  }
   if (args.accentRewrite) {
     return buildAccentRewritePrompt(args.accentRewrite, args.text, {
       previousTranslation: args.previousTranslation,
@@ -458,7 +512,7 @@ export function buildJudgePrompt(
     `</context>`,
     ``,
     `<instructions>`,
-    `Judge each candidate on: (1) accuracy and completeness of meaning, (2) natural, idiomatic ${plainName} as used in ${args.targetRegion} today, and (3) strict adherence to the context constraints — grammatical agreement with the given speaker/referent/addressee genders, and the requested register ('informal' and 'neutral' both mean the casual T-form; only 'formal' means the polite V-form or honorific). A candidate that violates the gender or register constraints, or uses archaic or unnatural phrasing, loses to one that satisfies them.`,
+    `Judge each candidate on: (1) accuracy and completeness of meaning, (2) natural, idiomatic ${plainName} as used in ${args.targetRegion} today, and (3) strict adherence to the context constraints — grammatical agreement with the given speaker/referent/addressee genders, and the requested register ('informal' and 'neutral' both mean the casual T-form; 'formal' means the polite level, and a required politeness form stated below overrides that rule). A candidate that violates the gender or register constraints, or uses archaic or unnatural phrasing, loses to one that satisfies them.`,
     ...requestedFormInstruction(args),
     `</instructions>`,
     ``,

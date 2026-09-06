@@ -110,7 +110,9 @@ describe('features/renderingClassification', () => {
     const textId = await seedText(t);
     const de = await seedTranslation(t, textId, 'de', 'Kommen Sie?');
     vi.mocked(generateText).mockResolvedValueOnce({
-      text: JSON.stringify([{ i: 1, gender: 'feminine', politeness: 'formal' }]),
+      text: JSON.stringify([
+        { i: 1, gender: 'feminine', politeness: 'formal' },
+      ]),
       usage: { inputTokens: 10, outputTokens: 5 },
       providerMetadata: {},
     } as never);
@@ -166,6 +168,8 @@ describe('migrations/backfillRenderedForms', () => {
     );
     const ru = rows.filter((r) => r.targetLanguage === 'ru');
     expect(ru.every((r) => r.renderedGender !== undefined)).toBe(true);
-    expect(rows.find((r) => r.targetLanguage === 'sv')?.renderedGender).toBeUndefined();
+    expect(
+      rows.find((r) => r.targetLanguage === 'sv')?.renderedGender,
+    ).toBeUndefined();
   });
 });

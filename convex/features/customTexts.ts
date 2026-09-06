@@ -6,6 +6,19 @@ import {
   internalQuery,
 } from '../_generated/server';
 import { internal } from '../_generated/api';
+import { renderingSettingsOf } from '../db/translationReads';
+
+/** The voice a chosen first-person form implies, or undefined for 'both'. */
+function voiceGenderFromSettings(
+  settings:
+    | { firstPersonForms?: 'masculine' | 'feminine' | 'both' }
+    | undefined,
+): 'male' | 'female' | undefined {
+  if (settings?.firstPersonForms === 'masculine') return 'male';
+  if (settings?.firstPersonForms === 'feminine') return 'female';
+  return undefined;
+}
+import { getCourseSettings } from '../db/courseSettings';
 import type { Id } from '../_generated/dataModel';
 import { requireAuthUserId, getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -37,7 +50,10 @@ import {
   parseAutofillResponse,
 } from '../lib/translationAutofillPrompt';
 import { EVENTS, track } from '../analytics';
-import { sourcedTranslationEntriesValidator } from '../types';
+import {
+  sourcedTranslationEntriesValidator,
+  renderingSettingsValidator,
+} from '../types';
 import {
   captureGeneration,
   openrouterCostUsd,
@@ -62,7 +78,13 @@ export const getAllowedLanguagesForAutoFill = internalQuery({
   args: { userId: v.string() },
   returns: v.union(
     v.null(),
-    v.object({ allowedLanguages: v.array(v.string()) }),
+    v.object({
+      allowedLanguages: v.array(v.string()),
+      // The course's sentence-form settings, for the prompt's settings
+      // block (lib/translationAutofillPrompt.ts); null when the course has
+      // none.
+      renderingSettings: v.union(renderingSettingsValidator, v.null()),
+    }),
   ),
   handler: async (ctx, { userId }) => {
     const active = await getActiveCourseForUser(ctx, userId);
@@ -71,7 +93,11 @@ export const getAllowedLanguagesForAutoFill = internalQuery({
     const allowedLanguages = [
       ...new Set([...course.baseLanguages, ...course.targetLanguages]),
     ];
-    return { allowedLanguages };
+    return {
+      allowedLanguages,
+      renderingSettings:
+        renderingSettingsOf(await getCourseSettings(ctx, course._id)) ?? null,
+    };
   },
 });
 
@@ -217,6 +243,8 @@ export const autoFillTranslations = action({
       resolvedTargets: targetLanguages.map(
         (code) => resolutionByRequested.get(code)!.resolved,
       ),
+      settings: courseCtx.renderingSettings ?? undefined,
+      politenessSeed: variantSeed,
     });
 
     const openrouter = getOpenRouter();
@@ -431,8 +459,19 @@ export const createCustomText = mutation({
             // across all target-language translations of this row. Mirrors the
             // logic in applyMetadataAndPrepareCard for the non-auto-fill path.
             referentGender: Math.random() < 0.5 ? 'male' : 'female',
+            // The course's first-person setting replaces the coin flip when
+            // the classifier found no gender in the wording: a user's own
+            // sentence has no rendering variants, so it is voiced (and
+            // stamped) in the chosen gender from the start.
             audioSpeakerGender: resolveAudioSpeakerGender(
-              args.metadata.speakerGender,
+              args.metadata.speakerGender === 'male' ||
+                args.metadata.speakerGender === 'female'
+                ? args.metadata.speakerGender
+                : voiceGenderFromSettings(
+                    renderingSettingsOf(
+                      await getCourseSettings(ctx, active.course._id),
+                    ),
+                  ),
             ),
           }
         : {}),

@@ -19,6 +19,7 @@ import {
   type TtsProvider,
   type VoiceGender,
 } from '../types';
+import { audioPointer } from '../db/translationReads';
 
 export type TtsQuality = Infer<typeof ttsQualityValidator>;
 
@@ -333,15 +334,18 @@ export async function upsertAudioPointer(
   textId: Id<'texts'>,
   language: string,
   assetId: Id<'audioAssets'>,
+  // The rendering variant this pointer speaks (schema.ts); absent =
+  // canonical. Each key is its own pointer row.
+  variantKey?: string,
 ): Promise<void> {
-  const existing = await ctx.db
-    .query('audioRecordings')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', textId).eq('language', language),
-    )
-    .first();
+  const existing = await audioPointer(ctx, textId, language, variantKey);
   if (!existing) {
-    await ctx.db.insert('audioRecordings', { textId, language, assetId });
+    await ctx.db.insert('audioRecordings', {
+      textId,
+      language,
+      assetId,
+      ...(variantKey !== undefined ? { variantKey } : {}),
+    });
     return;
   }
   if (existing.assetId === assetId) return;

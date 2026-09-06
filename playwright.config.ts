@@ -101,6 +101,7 @@ export default defineConfig({
         /(^|\/)daily-goal\.spec\.ts$/,
         /(^|\/)free-study\.spec\.ts$/,
         /(^|\/)course-settings-sweep\.spec\.ts$/,
+        /(^|\/)sentence-forms\.spec\.ts$/,
         /(^|\/)add-cards-live\.spec\.ts$/,
         /(^|\/)auto-add-sources\.spec\.ts$/,
         /(^|\/)add-cards-import-live\.spec\.ts$/,

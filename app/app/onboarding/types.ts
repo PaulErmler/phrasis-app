@@ -1,3 +1,6 @@
+import type { FirstPersonForms } from '@/lib/preferenceResolution';
+import type { PolitenessLevel } from '@/lib/languageForms';
+
 export type ReviewMode = 'audio' | 'full';
 
 /** Writing-mode input style. Mirrors `courseSettings.writingInputMode`. */
@@ -91,6 +94,11 @@ export interface OnboardingData {
   priorAppsFreeText: string | null;
   dailyTimeGoalMinutes: DailyTimeGoalMinutes | null;
   placementTest: PlacementTestState | null;
+  /** The two sentence-form steps (lib/languageForms.ts). Copied onto the
+   *  course settings by `completeOnboarding`. `politenessLevels` stays empty
+   *  until a row is ticked, and is never asked when no target marks it. */
+  firstPersonForms: FirstPersonForms | null;
+  politenessLevels: PolitenessLevel[];
 
   // Branch state, never persisted, only used by the wizard
   proficiencyBranch: 'new' | 'self-pick' | 'test' | null;
@@ -110,5 +118,7 @@ export const EMPTY_ONBOARDING_DATA: OnboardingData = {
   priorAppsFreeText: null,
   dailyTimeGoalMinutes: null,
   placementTest: null,
+  firstPersonForms: null,
+  politenessLevels: [],
   proficiencyBranch: null,
 };

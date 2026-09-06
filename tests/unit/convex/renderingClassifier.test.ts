@@ -13,7 +13,10 @@ describe('renderingAxesFor', () => {
     expect(renderingAxesFor('ja')).toEqual({ gender: true, politeness: true });
     expect(renderingAxesFor('de')).toEqual({ gender: false, politeness: true });
     expect(renderingAxesFor('he')).toEqual({ gender: true, politeness: false });
-    expect(renderingAxesFor('sv')).toEqual({ gender: false, politeness: false });
+    expect(renderingAxesFor('sv')).toEqual({
+      gender: false,
+      politeness: false,
+    });
   });
 });
 
@@ -21,7 +24,11 @@ describe('reportedPolitenessLevels', () => {
   it('reports each distinct form as its lowest level', () => {
     expect(reportedPolitenessLevels('de')).toEqual(['casual', 'formal']);
     expect(reportedPolitenessLevels('fr')).toEqual(['casual', 'polite']);
-    expect(reportedPolitenessLevels('ja')).toEqual(['casual', 'polite', 'formal']);
+    expect(reportedPolitenessLevels('ja')).toEqual([
+      'casual',
+      'polite',
+      'formal',
+    ]);
     expect(reportedPolitenessLevels('en')).toEqual([]);
   });
 });
@@ -68,8 +75,7 @@ describe('parseRenderingClassifications', () => {
   });
 
   it('tolerates fences and falls back to array position', () => {
-    const raw =
-      '```json\n[{"gender":"masculine","politeness":"formal"}]\n```';
+    const raw = '```json\n[{"gender":"masculine","politeness":"formal"}]\n```';
     expect(parseRenderingClassifications('he', raw, 1)).toEqual([
       { gender: 'masculine', politeness: 'unmarked' },
     ]);

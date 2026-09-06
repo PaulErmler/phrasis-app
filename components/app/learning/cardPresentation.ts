@@ -3,6 +3,7 @@ import type { Id } from '@/convex/_generated/dataModel';
 import type { MergedPlayback } from '@/hooks/use-active-cue';
 import type { PinnableCardAction } from '@/lib/cardActions';
 import type { CardOriginPill } from './cardOriginPill';
+import type { FormChip } from './formChips';
 import type { CardActionsMenuProps } from './CardActionsMenu';
 import type { CardTranslation, CardAudioRecording } from './types';
 
@@ -31,6 +32,8 @@ export interface CardPresentation {
   fsrsState?: { reps: number } | null;
   /** Source-collection pill ("A1.2"); absent/null = hidden. */
   originPill?: CardOriginPill | null;
+  /** Sentence-form chips beside the origin pill (formChips.ts). */
+  formChips?: FormChip[];
   sourceText: string;
   translations: CardTranslation[];
   audioRecordings: CardAudioRecording[];

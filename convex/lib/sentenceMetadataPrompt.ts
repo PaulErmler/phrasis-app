@@ -6,7 +6,7 @@ import { getLanguageByCode } from '../../lib/languages';
  * seam as translationAutofillPrompt.ts) so the eval runner
  * (scripts/eval-sentence-metadata.mjs) grades through the EXACT production
  * prompt without dragging in `_generated/server`. features/sentenceMetadata.ts builds its request from
- * the two builders below — change the prompt here and production and the
+ * the two builders below, change the prompt here and production and the
  * evals move together.
  */
 

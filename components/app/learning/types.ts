@@ -46,6 +46,13 @@ export interface CardTranslation {
    * color "Retranslating" pill in the card header.
    */
   retranslating?: boolean;
+  /**
+   * What the served wording is on the sentence-form axes (classifier
+   * stamps, docs/architecture/translation-variants.md); absent when the
+   * axis is unmarked or not yet classified. Drives the header chips.
+   */
+  renderedGender?: 'masculine' | 'feminine';
+  renderedPoliteness?: 'casual' | 'polite' | 'formal';
 }
 
 export interface WordTiming {

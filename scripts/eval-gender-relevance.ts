@@ -27,17 +27,17 @@
  */
 
 import { resolve } from 'node:path';
-import { generateText } from 'ai';
+import { generateText, type JSONValue } from 'ai';
 import {
   buildPrompt,
   normalizeModelOutput,
   type TranslationPromptArgs,
 } from '../convex/features/translationLLM';
+import { getTranslationConfigForLanguage, SOL_MINIMAL } from '../lib/languages';
 import {
-  getTranslationConfigForLanguage,
-  SOL_MINIMAL,
-} from '../lib/languages';
-import { getFirstPersonConfig, languageMarksFirstPerson } from '../lib/languageForms';
+  getFirstPersonConfig,
+  languageMarksFirstPerson,
+} from '../lib/languageForms';
 import {
   argValue,
   Bench,
@@ -48,11 +48,31 @@ import {
   type CallTelemetry,
   type OpenRouterClient,
 } from './eval/lib/bench';
-import { openrouterCostUsd, openrouterGenerationId } from '../convex/lib/posthogAi';
+import {
+  openrouterCostUsd,
+  openrouterGenerationId,
+} from '../convex/lib/posthogAi';
 
 // ------------------------------------------------------------------- config
 
-const DEFAULT_LANGS = ['ru', 'fr', 'es', 'it', 'pl', 'he', 'ar', 'hi', 'th', 'ja', 'ko', 'pt', 'el', 'cs', 'de', 'zh'];
+const DEFAULT_LANGS = [
+  'ru',
+  'fr',
+  'es',
+  'it',
+  'pl',
+  'he',
+  'ar',
+  'hi',
+  'th',
+  'ja',
+  'ko',
+  'pt',
+  'el',
+  'cs',
+  'de',
+  'zh',
+];
 const PREDICTOR_MODEL = 'google/gemini-3.1-flash-lite';
 
 /**
@@ -103,7 +123,11 @@ const bench = new Bench({
 
 // ------------------------------------------------------------------- calls
 
-function promptArgs(lang: string, text: string, gender: 'male' | 'female'): TranslationPromptArgs {
+function promptArgs(
+  lang: string,
+  text: string,
+  gender: 'male' | 'female',
+): TranslationPromptArgs {
   const config = getTranslationConfigForLanguage(lang);
   return {
     text,
@@ -124,7 +148,7 @@ async function rawCall(
   model: string,
   prompt: string,
   role: string,
-  providerOptions?: Record<string, Record<string, unknown>>,
+  providerOptions?: Record<string, Record<string, JSONValue>>,
 ): Promise<string | null> {
   const hit = bench.cache[key];
   if (hit) return hit.text;
@@ -150,7 +174,9 @@ async function rawCall(
       generationId: openrouterGenerationId(res.providerMetadata),
     });
   } catch (err) {
-    console.warn(`  ${role} failed (${key}): ${err instanceof Error ? err.message.slice(0, 120) : err}`);
+    console.warn(
+      `  ${role} failed (${key}): ${err instanceof Error ? err.message.slice(0, 120) : err}`,
+    );
   }
   bench.cache[key] = { text, telemetry };
   bench.recordSpend(telemetry);
@@ -158,7 +184,13 @@ async function rawCall(
   return text;
 }
 
-async function translate(openrouter: OpenRouterClient, lang: string, id: string, text: string, gender: 'male' | 'female') {
+async function translate(
+  openrouter: OpenRouterClient,
+  lang: string,
+  id: string,
+  text: string,
+  gender: 'male' | 'female',
+) {
   const args = promptArgs(lang, text, gender);
   const raw = await rawCall(
     openrouter,
@@ -166,12 +198,21 @@ async function translate(openrouter: OpenRouterClient, lang: string, id: string,
     SOL_MINIMAL.model,
     buildPrompt(args),
     'translate',
-    { openrouter: { reasoning: { effort: SOL_MINIMAL.reasoning ?? 'minimal' } } },
+    {
+      openrouter: { reasoning: { effort: SOL_MINIMAL.reasoning ?? 'minimal' } },
+    },
   );
   return raw ? normalizeModelOutput(lang, raw) : null;
 }
 
-async function judgeDifference(openrouter: OpenRouterClient, lang: string, id: string, source: string, male: string, female: string): Promise<'gender' | 'other' | null> {
+async function judgeDifference(
+  openrouter: OpenRouterClient,
+  lang: string,
+  id: string,
+  source: string,
+  male: string,
+  female: string,
+): Promise<'gender' | 'other' | null> {
   const prompt = `Two translations of the same English sentence into ${getTranslationConfigForLanguage(lang).targetLangName} were produced, one for a male speaker and one for a female speaker.
 
 English: ${source}
@@ -179,12 +220,25 @@ Male speaker: ${male}
 Female speaker: ${female}
 
 Do the two translations differ ONLY because the speaker's gender changes a first-person form (verb, adjective, participle, pronoun, self-reference word, or gender-dependent particle)? Answer with exactly one word: GENDER if every difference is speaker-gender agreement, OTHER if any difference is unrelated to the speaker's gender (a synonym, word order, a different reading).`;
-  const raw = await rawCall(openrouter, `judge|${lang}|${id}`, FLASH_JUDGE_MODEL, prompt, 'judge');
+  const raw = await rawCall(
+    openrouter,
+    `judge|${lang}|${id}`,
+    FLASH_JUDGE_MODEL,
+    prompt,
+    'judge',
+  );
   if (!raw) return null;
-  return /\bGENDER\b/i.test(raw) && !/\bOTHER\b/i.test(raw) ? 'gender' : 'other';
+  return /\bGENDER\b/i.test(raw) && !/\bOTHER\b/i.test(raw)
+    ? 'gender'
+    : 'other';
 }
 
-async function predict(openrouter: OpenRouterClient, lang: string, id: string, text: string): Promise<boolean | null> {
+async function predict(
+  openrouter: OpenRouterClient,
+  lang: string,
+  id: string,
+  text: string,
+): Promise<boolean | null> {
   const config = getFirstPersonConfig(lang);
   const note = config
     ? `${config.intro} Example: "${config.exampleEn}" -> "${config.masculine}" (man) / "${config.feminine}" (woman).`
@@ -196,13 +250,22 @@ ${note}
 Sentence: ${text}
 
 Consider only forms that refer to the speaker (first person). Gender of other people mentioned does not count. Answer with exactly one word: YES or NO.`;
-  const raw = await rawCall(openrouter, `pred|${lang}|${id}`, PREDICTOR_MODEL, prompt, 'predictor');
+  const raw = await rawCall(
+    openrouter,
+    `pred|${lang}|${id}`,
+    PREDICTOR_MODEL,
+    prompt,
+    'predictor',
+  );
   if (!raw) return null;
   return /\bYES\b/i.test(raw);
 }
 
 function heuristic(lang: string, text: string): boolean {
-  return languageMarksFirstPerson(lang) && /\bI\b|\bI'm\b|\bI've\b|\bI'd\b|\bwe\b|\bwe're\b/i.test(text);
+  return (
+    languageMarksFirstPerson(lang) &&
+    /\bI\b|\bI'm\b|\bI've\b|\bI'd\b|\bwe\b|\bwe're\b/i.test(text)
+  );
 }
 
 // -------------------------------------------------------------------- main
@@ -210,8 +273,12 @@ function heuristic(lang: string, text: string): boolean {
 async function main() {
   const argv = process.argv.slice(2);
   const smoke = argv.includes('--smoke');
-  const langs = (argValue(argv, 'langs') ?? DEFAULT_LANGS.join(',')).split(',').filter(Boolean);
-  const limit = argValue(argv, 'limit') ? Number(argValue(argv, 'limit')) : undefined;
+  const langs = (argValue(argv, 'langs') ?? DEFAULT_LANGS.join(','))
+    .split(',')
+    .filter(Boolean);
+  const limit = argValue(argv, 'limit')
+    ? Number(argValue(argv, 'limit'))
+    : undefined;
   let cases = CASES;
   if (smoke) cases = cases.slice(0, 6);
   if (limit) cases = cases.slice(0, limit);
@@ -236,10 +303,30 @@ async function main() {
     const female = await translate(openrouter, lang, c.id, c.text, 'female');
     const differs = male !== null && female !== null && male !== female;
     let verdict: 'gender' | 'other' | null = null;
-    if (differs) verdict = await judgeDifference(openrouter, lang, c.id, c.text, male!, female!);
-    const relevant = male === null || female === null ? null : differs && verdict === 'gender';
+    if (differs)
+      verdict = await judgeDifference(
+        openrouter,
+        lang,
+        c.id,
+        c.text,
+        male!,
+        female!,
+      );
+    const relevant =
+      male === null || female === null ? null : differs && verdict === 'gender';
     const predictor = await predict(openrouter, lang, c.id, c.text);
-    rows.push({ lang, id: c.id, kind: c.kind, relevant, differs, verdict, heuristic: heuristic(lang, c.text), predictor, male, female });
+    rows.push({
+      lang,
+      id: c.id,
+      kind: c.kind,
+      relevant,
+      differs,
+      verdict,
+      heuristic: heuristic(lang, c.text),
+      predictor,
+      male,
+      female,
+    });
   });
 
   const lines: string[] = [];
@@ -247,8 +334,12 @@ async function main() {
     lines.push(line);
     console.log(line);
   };
-  out(`\nGender relevance, ${rows.length} pairs, truth = double generation on ${SOL_MINIMAL.model} judged by ${FLASH_JUDGE_MODEL}`);
-  out(`${'lang'.padEnd(8)} ${'relevant'.padEnd(9)} ${'noise'.padEnd(7)} ${'heur P/R'.padEnd(12)} ${'pred P/R'.padEnd(12)} first-person relevant`);
+  out(
+    `\nGender relevance, ${rows.length} pairs, truth = double generation on ${SOL_MINIMAL.model} judged by ${FLASH_JUDGE_MODEL}`,
+  );
+  out(
+    `${'lang'.padEnd(8)} ${'relevant'.padEnd(9)} ${'noise'.padEnd(7)} ${'heur P/R'.padEnd(12)} ${'pred P/R'.padEnd(12)} first-person relevant`,
+  );
   const prf = (list: Row[], pick: (r: Row) => boolean | null) => {
     let tp = 0;
     let fp = 0;
@@ -275,10 +366,18 @@ async function main() {
       `${lang.padEnd(8)} ${String(relevant).padEnd(9)} ${String(noise).padEnd(7)} ${prf(list, (r) => r.heuristic).padEnd(12)} ${prf(list, (r) => r.predictor).padEnd(12)} ${firstRelevant}/${first.length}`,
     );
   }
-  out('\n== unexpected: "none" sentences that came out relevant, and first-person sentences that did not (marked languages) ==');
+  out(
+    '\n== unexpected: "none" sentences that came out relevant, and first-person sentences that did not (marked languages) ==',
+  );
   for (const r of rows) {
-    if (r.kind === 'none' && r.relevant) out(`  ${r.lang} ${r.id}: ${r.male} | ${r.female}`);
-    if (r.kind === 'first' && r.relevant === false && languageMarksFirstPerson(r.lang)) out(`  ${r.lang} ${r.id} unmarked: ${r.male}`);
+    if (r.kind === 'none' && r.relevant)
+      out(`  ${r.lang} ${r.id}: ${r.male} | ${r.female}`);
+    if (
+      r.kind === 'first' &&
+      r.relevant === false &&
+      languageMarksFirstPerson(r.lang)
+    )
+      out(`  ${r.lang} ${r.id} unmarked: ${r.male}`);
   }
   out(`\nSpent ${fmtUsd(bench.spentUsd)} this run.`);
   bench.writeReport(lines, { rows });

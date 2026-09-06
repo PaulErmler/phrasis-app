@@ -78,7 +78,12 @@ import {
   liveTranslation,
   servedSourceText,
   viewOfCard,
+  audioPointer,
+  previewView,
+  renderingSettingsOf,
+  renderingTextOf,
 } from '../db/translationReads';
+import { getCourseSettings } from '../db/courseSettings';
 
 // ============================================================================
 // QUERIES
@@ -250,6 +255,9 @@ export const browseCollectionTexts = query({
       mark: marks[i],
     }));
 
+    const renderingSettings = renderingSettingsOf(
+      await getCourseSettings(ctx, course._id),
+    );
     const inputs = rows.map((row, i) => ({
       key: String(i),
       textId: row.text._id,
@@ -259,10 +267,14 @@ export const browseCollectionTexts = query({
       sourceIpa: row.text.ipaText ?? undefined,
       sourceFurigana: row.text.furiganaText ?? undefined,
       userCreated: row.text.userCreated,
+      renderingText: renderingTextOf(row.text),
       // The learner's card when they have one, so the preview shows the
-      // wording that card shows, with its pin and its accent. Otherwise the
-      // live rows and the accent row a new card would get.
-      view: row.card ? viewOfCard(row.card) : null,
+      // wording that card shows, with its pin, its accent and its
+      // rendering. Otherwise the live rows, the accent row and the
+      // rendering a new card would get (canonical until the variant lands).
+      view: row.card
+        ? viewOfCard(row.card, renderingSettings)
+        : previewView(renderingSettings),
     }));
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
@@ -706,12 +718,7 @@ export const requestPreviewAudio = mutation({
         : null;
     const audioLanguage = source?.language ?? args.language;
 
-    const existingAudio = await ctx.db
-      .query('audioRecordings')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('language', audioLanguage),
-      )
-      .first();
+    const existingAudio = await audioPointer(ctx, args.textId, audioLanguage);
     if (existingAudio) {
       // A row only counts as "audio exists" if it still resolves to a
       // playable blob. A dangling pointer. Asset row deleted, or asset

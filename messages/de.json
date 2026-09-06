@@ -291,7 +291,13 @@
         "cancel": "Abbrechen",
         "back": "Zurück",
         "next": "Weiter",
-        "create": "Kurs erstellen"
+        "create": "Kurs erstellen",
+        "step5": {
+          "title": "Satzformen",
+          "subtitle": "Lehrplansätze, die du diesem Kurs hinzufügst, folgen diesen Einstellungen. Du kannst sie später ändern.",
+          "firstPersonForms": "Formen der ersten Person",
+          "politeness": "Höflichkeit"
+        }
       },
       "manage": {
         "title": "Kurseinstellungen",
@@ -317,7 +323,11 @@
         "archiveConfirmTitle": "Diesen Kurs archivieren?",
         "archiveConfirmDescription": "Dieser Kurs wird archiviert. Durch das Archivieren wird ein Platz frei, sodass du einen neuen Kurs erstellen kannst. Du kannst ihn nach 30 Tagen wieder aktivieren.",
         "archiveConfirmButton": "Archivieren",
-        "archiveCancel": "Abbrechen"
+        "archiveCancel": "Abbrechen",
+        "formsTitle": "Satzformen",
+        "formsNote": "Gilt für Lehrplankarten, die du ab jetzt hinzufügst. Karten von vor dieser Einstellung und selbst geschriebene Sätze behalten ihre Formulierung.",
+        "firstPersonForms": "Formen der ersten Person",
+        "politeness": "Höflichkeit"
       },
       "archived": "Archiviert",
       "unarchive": "Wiederherstellen",
@@ -723,6 +733,13 @@
         "wordOrder": "Wortstellung",
         "naturalness": "Natürlichkeit"
       }
+    },
+    "formChips": {
+      "masculine": "maskulin",
+      "feminine": "feminin",
+      "casual": "locker",
+      "polite": "höflich",
+      "formal": "formell"
     }
   },
   "Footer": {
@@ -1363,6 +1380,37 @@
         "title": "Fortgeschritten",
         "description": "Ich habe einen großen Wortschatz",
         "wordCount": "8.000+ Wörter"
+      }
+    },
+    "firstPersonForms": {
+      "title": "Welche Formen der ersten Person möchtest du lernen?",
+      "voiceOnly": "Keine deiner Kurssprachen ändert ihre Grammatik je nach Sprecher. Diese Wahl legt die Stimme fest, die du in allen Sprachen hörst.",
+      "exampleLabel": "Beispiel · {language}",
+      "options": {
+        "masculine": {
+          "title": "Maskuline Formen",
+          "description": "Sätze über dich selbst werden in der maskulinen Form geschrieben und gesprochen.",
+          "voice": "Jeder Satz wird von einer männlichen Stimme gesprochen."
+        },
+        "feminine": {
+          "title": "Feminine Formen",
+          "description": "Sätze über dich selbst werden in der femininen Form geschrieben und gesprochen.",
+          "voice": "Jeder Satz wird von einer weiblichen Stimme gesprochen."
+        },
+        "both": {
+          "title": "Beide",
+          "description": "Wo es einen Unterschied macht, je zur Hälfte, damit du beides lernst.",
+          "voice": "Männliche und weibliche Stimmen wechseln sich ab."
+        }
+      }
+    },
+    "politeness": {
+      "title": "Welche Höflichkeitsstufen möchtest du lernen?",
+      "subtitle": "Wähle eine Stufe oder mehrere, um sie zu mischen.",
+      "summary": {
+        "none": "Wähle mindestens eine Stufe.",
+        "single": "Jeder Satz in der Form „{form}“.",
+        "mixed": "Die Sätze wechseln zwischen {forms}, wo die Sprache es unterscheidet."
       }
     }
   },

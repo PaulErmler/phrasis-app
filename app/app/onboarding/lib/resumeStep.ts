@@ -14,6 +14,8 @@ export type StepId =
   | 'proficiency'
   | 'cefr-pick'
   | 'placement-test'
+  | 'first-person-forms'
+  | 'politeness'
   | 'review-mode';
 
 export const PROGRESS_STEP_ORDER: StepId[] = [
@@ -24,6 +26,8 @@ export const PROGRESS_STEP_ORDER: StepId[] = [
   'daily-time',
   'proficiency',
   'cefr-pick', // collapsed with placement-test for progress purposes
+  'first-person-forms',
+  'politeness', // skipped when no target language marks politeness
   'review-mode',
 ];
 
@@ -47,9 +51,25 @@ export const LEGACY_STEP_AFTER_FIRST_LESSON = 9;
  * current order carries it, and a row without it at step 3 or later was
  * saved under an older order.
  */
+/**
+ * Whether a persisted row belongs to the retired 12-step flow, for the
+ * graduation rule. Under the current order a row at step 9 or 10 is on the
+ * politeness or review-mode step and always carries a first-person answer
+ * (that step blocks Continue on an empty pick); an old-flow row never does.
+ */
+export function isLegacyFlowRow(progress: {
+  step: number;
+  firstPersonForms?: string;
+}): boolean {
+  return (
+    progress.step >= LEGACY_STEP_AFTER_FIRST_LESSON &&
+    progress.firstPersonForms === undefined
+  );
+}
+
 export function resumeStepId(
   savedStep: number,
-  progress: { priorApps?: string[] },
+  progress: { priorApps?: string[]; firstPersonForms?: string },
 ): StepId {
   // Steps 1-2 line up with every past wizard order. `prior-apps` was inserted
   // at 3 later, so an older in-progress row resumes one step earlier than it
@@ -63,8 +83,20 @@ export function resumeStepId(
   // `completeOnboarding` is idempotent, so users whose course already exists
   // (old flow got past customizing) just re-confirm the mode and finish.
   // Rows at 9+ never reach here. They graduate out first.
-  if (savedStep > PROGRESS_STEP_ORDER.length) return 'review-mode';
+  // A row that would land on review-mode without a first-person answer
+  // takes the new questions first: every course gets an explicit setting
+  // (lib/languageForms.ts), and review-mode's Continue creates the course.
+  const lastStep =
+    progress.firstPersonForms === undefined
+      ? 'first-person-forms'
+      : 'review-mode';
+  if (savedStep > PROGRESS_STEP_ORDER.length) return lastStep;
   const isOlderOrder = savedStep >= 3 && progress.priorApps === undefined;
-  if (isOlderOrder && savedStep === 7) return 'review-mode';
+  if (isOlderOrder && savedStep === 7) return lastStep;
+  // The two sentence-form steps were inserted before review-mode in Sep
+  // 2026: a row saved at the old step 8 (review-mode) resumes on
+  // first-person-forms, the question it has not seen, with its answers
+  // intact. Rows at 9-10 are new-order rows (an old-flow row at 9+ never
+  // reaches here, see `isLegacyFlowRow`).
   return PROGRESS_STEP_ORDER[savedStep - 1] ?? 'language-pair';
 }

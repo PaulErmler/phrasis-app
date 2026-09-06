@@ -48,7 +48,10 @@ import {
   type RenderedGender,
   type RenderedPoliteness,
 } from '../convex/lib/renderingClassifier';
-import { getPolitenessConfig, distinctPolitenessForms } from '../lib/languageForms';
+import {
+  getPolitenessConfig,
+  distinctPolitenessForms,
+} from '../lib/languageForms';
 import { LUNA_BO3, LUNA_PROVIDER_CONSTRAINTS } from '../lib/languages';
 import {
   argValue,
@@ -61,7 +64,10 @@ import {
   type CallTelemetry,
   type OpenRouterClient,
 } from './eval/lib/bench';
-import { openrouterCostUsd, openrouterGenerationId } from '../convex/lib/posthogAi';
+import {
+  openrouterCostUsd,
+  openrouterGenerationId,
+} from '../convex/lib/posthogAi';
 
 // ------------------------------------------------------------------- config
 
@@ -97,8 +103,8 @@ type Item = {
 function readJsonl(path: string): Record<string, unknown>[] {
   return readFileSync(path, 'utf8')
     .split('\n')
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line) as Record<string, unknown>);
+    .filter((line: string) => line.trim().length > 0)
+    .map((line: string) => JSON.parse(line) as Record<string, unknown>);
 }
 
 /** Gold register -> the level the classifier reports for that form. */
@@ -109,7 +115,8 @@ function politenessLevelFor(
   if (gold === 'neutral') return 'unmarked';
   const config = getPolitenessConfig(language);
   if (!config) return undefined;
-  if (gold !== 'casual' && gold !== 'polite' && gold !== 'formal') return undefined;
+  if (gold !== 'casual' && gold !== 'polite' && gold !== 'formal')
+    return undefined;
   const form = config.forms[gold];
   const entry = distinctPolitenessForms(language).find(
     (d) => d.form.id === form.id,
@@ -178,7 +185,10 @@ function loadWild(path: string, perLanguage: number): Item[] {
   }
   const items: Item[] = [];
   for (const [language, list] of byLanguage) {
-    const sample = seededShuffle(list, `wild:${language}`).slice(0, perLanguage);
+    const sample = seededShuffle(list, `wild:${language}`).slice(
+      0,
+      perLanguage,
+    );
     sample.forEach((row, i) =>
       items.push({
         id: `w:${language}:${i}`,
@@ -193,7 +203,10 @@ function loadWild(path: string, perLanguage: number): Item[] {
 
 // ------------------------------------------------------------------- calls
 
-type Prediction = { gender: RenderedGender; politeness: RenderedPoliteness } | null;
+type Prediction = {
+  gender: RenderedGender;
+  politeness: RenderedPoliteness;
+} | null;
 
 function batchKey(
   model: string,
@@ -201,7 +214,10 @@ function batchKey(
   language: string,
   texts: string[],
 ): string {
-  const hash = createHash('sha1').update(texts.join('\n')).digest('hex').slice(0, 12);
+  const hash = createHash('sha1')
+    .update(texts.join('\n'))
+    .digest('hex')
+    .slice(0, 12);
   return `${model}|${wording}|${language}|${hash}`;
 }
 
@@ -215,12 +231,19 @@ async function classifyBatch(
   const key = batchKey(model, wording, language, texts);
   const hit = bench.cache[key];
   if (hit) {
-    return hit.text ? parseRenderingClassifications(language, hit.text, texts.length) : texts.map(() => null);
+    return hit.text
+      ? parseRenderingClassifications(language, hit.text, texts.length)
+      : texts.map(() => null);
   }
   const startedAt = Date.now();
   const providerOptions =
     model === LUNA_BO3.model
-      ? { openrouter: { reasoning: { enabled: false }, provider: LUNA_PROVIDER_CONSTRAINTS } }
+      ? {
+          openrouter: {
+            reasoning: { enabled: false },
+            provider: LUNA_PROVIDER_CONSTRAINTS,
+          },
+        }
       : undefined;
   let text: string | null = null;
   const telemetry: CallTelemetry[] = [];
@@ -244,12 +267,16 @@ async function classifyBatch(
       generationId: openrouterGenerationId(res.providerMetadata),
     });
   } catch (err) {
-    console.warn(`  ${model} ${language} failed: ${err instanceof Error ? err.message.slice(0, 120) : err}`);
+    console.warn(
+      `  ${model} ${language} failed: ${err instanceof Error ? err.message.slice(0, 120) : err}`,
+    );
   }
   bench.cache[key] = { text, telemetry };
   bench.recordSpend(telemetry);
   bench.save();
-  return text ? parseRenderingClassifications(language, text, texts.length) : texts.map(() => null);
+  return text
+    ? parseRenderingClassifications(language, text, texts.length)
+    : texts.map(() => null);
 }
 
 // -------------------------------------------------------------------- main
@@ -262,16 +289,21 @@ async function main() {
   const modelKeys = (argValue(argv, 'models') ?? DEFAULT_MODELS.join(','))
     .split(',')
     .filter(Boolean);
-  const wordings = (argValue(argv, 'wording') ?? 'both') === 'both'
-    ? WORDINGS
-    : [argValue(argv, 'wording') as PromptWording];
+  const wordings =
+    (argValue(argv, 'wording') ?? 'both') === 'both'
+      ? WORDINGS
+      : [argValue(argv, 'wording') as PromptWording];
   const wildPath = argValue(argv, 'wild');
   const wildN = Number(argValue(argv, 'wild-n') ?? 40);
-  const limit = argValue(argv, 'limit') ? Number(argValue(argv, 'limit')) : undefined;
+  const limit = argValue(argv, 'limit')
+    ? Number(argValue(argv, 'limit'))
+    : undefined;
 
   for (const key of modelKeys) {
     if (!MODELS[key]) {
-      console.error(`Unknown model alias ${key}. Known: ${DEFAULT_MODELS.join(', ')}`);
+      console.error(
+        `Unknown model alias ${key}. Known: ${DEFAULT_MODELS.join(', ')}`,
+      );
       process.exit(1);
     }
   }
@@ -288,7 +320,10 @@ async function main() {
     const langs = new Set(langsArg.split(','));
     items = items.filter((item) => langs.has(item.language));
   }
-  if (smoke) items = items.filter((item) => ['ja', 'de', 'ru'].includes(item.language)).slice(0, 30);
+  if (smoke)
+    items = items
+      .filter((item) => ['ja', 'de', 'ru'].includes(item.language))
+      .slice(0, 30);
   if (limit) items = items.slice(0, limit);
 
   const languages = [...new Set(items.map((item) => item.language))].sort();
@@ -342,7 +377,12 @@ async function main() {
     results.set(key, cell);
   }
   const byLanguage = groupBy(items, (item) => item.language);
-  const jobs: { model: string; wording: PromptWording; language: string; list: Item[] }[] = [];
+  const jobs: {
+    model: string;
+    wording: PromptWording;
+    language: string;
+    list: Item[];
+  }[] = [];
   for (const modelKey of modelKeys)
     for (const wording of wordings)
       for (const [language, list] of byLanguage)
@@ -365,14 +405,20 @@ async function main() {
       chunk.forEach((item, j) => {
         const pred = preds[j];
         if (axes.gender && item.expectedGender) {
-          bump(`${job.model}|${job.wording}|gender|${job.language}|${item.source}`, pred?.gender === item.expectedGender);
+          bump(
+            `${job.model}|${job.wording}|gender|${job.language}|${item.source}`,
+            pred?.gender === item.expectedGender,
+          );
           if (pred && pred.gender !== item.expectedGender) {
             const ck = `${job.model}|${job.wording}|gender|${item.expectedGender}->${pred.gender}`;
             confusion.set(ck, (confusion.get(ck) ?? 0) + 1);
           }
         }
         if (axes.politeness && item.expectedPoliteness) {
-          bump(`${job.model}|${job.wording}|politeness|${job.language}|${item.source}`, pred?.politeness === item.expectedPoliteness);
+          bump(
+            `${job.model}|${job.wording}|politeness|${job.language}|${item.source}`,
+            pred?.politeness === item.expectedPoliteness,
+          );
           if (pred && pred.politeness !== item.expectedPoliteness) {
             const ck = `${job.model}|${job.wording}|politeness|${item.expectedPoliteness}->${pred.politeness}`;
             confusion.set(ck, (confusion.get(ck) ?? 0) + 1);
@@ -388,10 +434,14 @@ async function main() {
     lines.push(line);
     console.log(line);
   };
-  out(`\nRendering detection, ${items.length} items, judge ${FLASH_JUDGE_MODEL} for wild labels`);
+  out(
+    `\nRendering detection, ${items.length} items, judge ${FLASH_JUDGE_MODEL} for wild labels`,
+  );
   for (const axis of ['gender', 'politeness'] as const) {
     out(`\n== ${axis} ==`);
-    out(`${'model'.padEnd(28)} ${'wording'.padEnd(11)} ${'gold'.padEnd(9)} ${'wild'.padEnd(9)} per language`);
+    out(
+      `${'model'.padEnd(28)} ${'wording'.padEnd(11)} ${'gold'.padEnd(9)} ${'wild'.padEnd(9)} per language`,
+    );
     for (const modelKey of modelKeys) {
       for (const wording of wordings) {
         const model = MODELS[modelKey];
@@ -405,24 +455,32 @@ async function main() {
               total += cell.total;
             }
           }
-          return total ? `${((100 * hits) / total).toFixed(1)}% (${total})` : '-';
+          return total
+            ? `${((100 * hits) / total).toFixed(1)}% (${total})`
+            : '-';
         };
         const perLanguage = languages
           .map((language) => {
             let hits = 0;
             let total = 0;
             for (const source of ['gold', 'wild']) {
-              const cell = results.get(`${model}|${wording}|${axis}|${language}|${source}`);
+              const cell = results.get(
+                `${model}|${wording}|${axis}|${language}|${source}`,
+              );
               if (cell) {
                 hits += cell.hits;
                 total += cell.total;
               }
             }
-            return total ? `${language}:${((100 * hits) / total).toFixed(0)}` : null;
+            return total
+              ? `${language}:${((100 * hits) / total).toFixed(0)}`
+              : null;
           })
           .filter(Boolean)
           .join(' ');
-        out(`${modelKey.padEnd(28)} ${wording.padEnd(11)} ${sum('gold').padEnd(9)} ${sum('wild').padEnd(9)} ${perLanguage}`);
+        out(
+          `${modelKey.padEnd(28)} ${wording.padEnd(11)} ${sum('gold').padEnd(9)} ${sum('wild').padEnd(9)} ${perLanguage}`,
+        );
       }
     }
   }

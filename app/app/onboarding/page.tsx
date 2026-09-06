@@ -32,7 +32,7 @@ import { convexErrorCode } from '@/lib/utils';
 import { shouldAdvanceOnEnter } from './lib/enterToAdvance';
 import { togglePriorApp } from './lib/togglePriorApp';
 import {
-  LEGACY_STEP_AFTER_FIRST_LESSON,
+  isLegacyFlowRow,
   PROGRESS_STEP_ORDER,
   resumeStepId,
   type StepId,
@@ -82,6 +82,9 @@ import { ProficiencyBranchStep } from './steps/ProficiencyBranchStep';
 import { CefrSelfPickStep } from './steps/CefrSelfPickStep';
 import { PlacementTestStep } from './steps/PlacementTestStep';
 import { ReviewModeStep, type ReviewModeChoice } from './steps/ReviewModeStep';
+import { FirstPersonFormsStep } from './steps/FirstPersonFormsStep';
+import { PolitenessStep } from './steps/PolitenessStep';
+import { courseAsksPoliteness } from '@/lib/languageForms';
 
 /**
  * Onboarding wizard. Survey + placement only; learning starts for real the
@@ -212,7 +215,8 @@ function OnboardingContent() {
   const isLegacyGraduate =
     !!userSettings?.activeCourseId &&
     !userSettings.hasCompletedOnboarding &&
-    (onboardingProgress?.step ?? 0) >= LEGACY_STEP_AFTER_FIRST_LESSON;
+    !!onboardingProgress &&
+    isLegacyFlowRow(onboardingProgress);
   // Set only when finalize fails. The user then falls back to the wizard
   // (resumed at the mode pick) instead of being stranded on a blank screen.
   const [graduationFailed, setGraduationFailed] = useState(false);
@@ -325,6 +329,8 @@ interface SaveProgressArgs {
   placementTest?: Omit<PlacementTestState, 'strategyVersion'> & {
     strategyVersion?: number;
   };
+  firstPersonForms?: 'masculine' | 'feminine' | 'both';
+  politenessLevels?: ('casual' | 'polite' | 'formal')[];
 }
 
 /**
@@ -378,6 +384,9 @@ export function buildProgressPayload(
     priorAppsFreeText: fd.priorAppsFreeText ?? undefined,
     dailyTimeGoalMinutes: fd.dailyTimeGoalMinutes ?? undefined,
     placementTest: fd.placementTest ?? undefined,
+    firstPersonForms: fd.firstPersonForms ?? undefined,
+    politenessLevels:
+      fd.politenessLevels.length > 0 ? fd.politenessLevels : undefined,
   };
 }
 
@@ -563,7 +572,7 @@ function OnboardingWizard({
   const onProficiencyContinue = () => {
     if (data.proficiencyBranch === 'new') {
       persist({ currentLevel: 'beginner' });
-      advance('review-mode');
+      advance('first-person-forms');
     } else if (data.proficiencyBranch === 'self-pick') {
       advance('cefr-pick');
     } else if (data.proficiencyBranch === 'test') {
@@ -584,7 +593,7 @@ function OnboardingWizard({
         finalLevel: cefrSlidLevel,
       },
     });
-    advance('review-mode');
+    advance('first-person-forms');
   }, [cefrSlidLevel, persist, advance]);
 
   const onPlacementComplete = (result: {
@@ -604,7 +613,7 @@ function OnboardingWizard({
     });
     // Keep the placement test off the Back stack: returning to it restarts
     // the whole adaptive test with no way out. Back lands on `proficiency`.
-    advance('review-mode', { omitFromHistory: true });
+    advance('first-person-forms', { omitFromHistory: true });
   };
 
   /**
@@ -681,6 +690,10 @@ function OnboardingWizard({
         return data.proficiencyBranch === null;
       case 'cefr-pick':
         return false; // slider has a value at all times; button is always enabled
+      case 'first-person-forms':
+        return data.firstPersonForms === null;
+      case 'politeness':
+        return data.politenessLevels.length === 0;
       case 'review-mode':
         return data.reviewMode === null;
       default:
@@ -710,6 +723,18 @@ function OnboardingWizard({
         return;
       case 'cefr-pick':
         onCefrPickContinue();
+        return;
+      case 'first-person-forms':
+        // The politeness question only exists when a target language marks
+        // politeness (lib/languageForms.ts); otherwise straight on.
+        advance(
+          courseAsksPoliteness(data.targetLanguages)
+            ? 'politeness'
+            : 'review-mode',
+        );
+        return;
+      case 'politeness':
+        advance('review-mode');
         return;
       case 'review-mode':
         await onFinishOnboarding();
@@ -915,6 +940,24 @@ function renderStep({
           sourceLanguage={data.baseLanguages[0] ?? 'en'}
           initialOgteLevel={data.placementTest?.finalLevel}
           onComplete={onPlacementComplete}
+        />
+      );
+    case 'first-person-forms':
+      return (
+        <FirstPersonFormsStep
+          targetLanguages={data.targetLanguages}
+          baseLanguages={data.baseLanguages}
+          selected={data.firstPersonForms}
+          onSelect={(choice) => persist({ firstPersonForms: choice })}
+        />
+      );
+    case 'politeness':
+      return (
+        <PolitenessStep
+          targetLanguages={data.targetLanguages}
+          baseLanguages={data.baseLanguages}
+          selected={data.politenessLevels}
+          onChange={(levels) => persist({ politenessLevels: levels })}
         />
       );
     case 'review-mode':

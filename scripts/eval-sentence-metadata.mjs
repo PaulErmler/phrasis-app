@@ -156,7 +156,8 @@ function parseArgs(argv) {
     if (a === '--validate-only') args.validateOnly = true;
     else if (a === '--update-snapshot') args.updateSnapshot = true;
     else if (a === '--from-snapshot') args.fromSnapshot = true;
-    else if (a === '--model') args.models = argv[++i].split(',').filter(Boolean);
+    else if (a === '--model')
+      args.models = argv[++i].split(',').filter(Boolean);
     else if (a === '--corpus') args.corpora = argv[++i].split(',');
     else if (a === '--language') args.languages = argv[++i].split(',');
     else if (a === '--limit') args.limit = Number(argv[++i]);
@@ -305,7 +306,10 @@ function snapshotKey(entry) {
  */
 function wireSettingsFor(model) {
   if (model === LUNA_BO3.model) {
-    return { reasoning: { enabled: false }, provider: LUNA_PROVIDER_CONSTRAINTS };
+    return {
+      reasoning: { enabled: false },
+      provider: LUNA_PROVIDER_CONSTRAINTS,
+    };
   }
   return {};
 }
@@ -425,7 +429,9 @@ function writeSnapshot(model, entries, got) {
 
 /** Stable key order, so a re-recorded snapshot diffs cleanly in git. */
 function sortKeys(obj) {
-  return Object.fromEntries(Object.entries(obj).sort(([a], [b]) => (a < b ? -1 : 1)));
+  return Object.fromEntries(
+    Object.entries(obj).sort(([a], [b]) => (a < b ? -1 : 1)),
+  );
 }
 
 /**
@@ -670,14 +676,18 @@ async function main() {
         console.error(`  no snapshot recorded for ${model}; nothing to score.`);
         process.exit(1);
       }
-      const missing = limited.filter((e) => snapshot[snapshotKey(e)] === undefined);
+      const missing = limited.filter(
+        (e) => snapshot[snapshotKey(e)] === undefined,
+      );
       if (missing.length > 0) {
         console.error(
           `  snapshot is missing ${missing.length} of ${limited.length} entries (first: ${missing[0].loc}). Run live to record them.`,
         );
         process.exit(1);
       }
-      console.log(`Re-scoring ${limited.length} recorded answers for ${model}…`);
+      console.log(
+        `Re-scoring ${limited.length} recorded answers for ${model}…`,
+      );
       got = limited.map((e) => snapshot[snapshotKey(e)]);
       // Scoring its own source would diff every row against itself.
       snapshot = null;
@@ -686,12 +696,16 @@ async function main() {
         `Evaluating ${limited.length} entries with ${model} (concurrency ${args.concurrency})…`,
       );
       let done = 0;
-      const results = await runPool(limited, args.concurrency, async (entry) => {
-        const result = await classify(entry, apiKey, model);
-        done++;
-        if (done % 50 === 0) console.log(`  ${done}/${limited.length}`);
-        return result;
-      });
+      const results = await runPool(
+        limited,
+        args.concurrency,
+        async (entry) => {
+          const result = await classify(entry, apiKey, model);
+          done++;
+          if (done % 50 === 0) console.log(`  ${done}/${limited.length}`);
+          return result;
+        },
+      );
       got = results.map((r) => r.got);
       costUsd = results.reduce((sum, r) => sum + r.costUsd, 0);
     }

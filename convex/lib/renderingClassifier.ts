@@ -106,7 +106,11 @@ function politenessSection(code: string, wording: PromptWording): string {
 }
 
 function languageName(code: string): string {
-  return getLanguageByCode(code)?.translationName ?? getLanguageByCode(code)?.name ?? code;
+  return (
+    getLanguageByCode(code)?.translationName ??
+    getLanguageByCode(code)?.name ??
+    code
+  );
 }
 
 /**

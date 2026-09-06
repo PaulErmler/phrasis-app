@@ -291,7 +291,13 @@
         "cancel": "Cancel",
         "back": "Back",
         "next": "Next",
-        "create": "Create Course"
+        "create": "Create Course",
+        "step5": {
+          "title": "Sentence forms",
+          "subtitle": "Curriculum sentences you add to this course follow these choices. You can change them later.",
+          "firstPersonForms": "First-person forms",
+          "politeness": "Politeness"
+        }
       },
       "manage": {
         "title": "Course Settings",
@@ -317,7 +323,11 @@
         "archiveConfirmTitle": "Archive this course?",
         "archiveConfirmDescription": "This course will be archived. Archiving frees up a slot so you can create a new course. You can unarchive it after 30 days.",
         "archiveConfirmButton": "Archive",
-        "archiveCancel": "Cancel"
+        "archiveCancel": "Cancel",
+        "formsTitle": "Sentence forms",
+        "formsNote": "Applies to curriculum cards you add from now on. Cards added before this setting existed, and sentences you wrote yourself, keep their wording.",
+        "firstPersonForms": "First-person forms",
+        "politeness": "Politeness"
       },
       "archived": "Archived",
       "unarchive": "Unarchive",
@@ -723,6 +733,13 @@
         "wordOrder": "Word order",
         "naturalness": "Naturalness"
       }
+    },
+    "formChips": {
+      "masculine": "masculine",
+      "feminine": "feminine",
+      "casual": "casual",
+      "polite": "polite",
+      "formal": "formal"
     }
   },
   "Footer": {
@@ -1363,6 +1380,37 @@
         "title": "Advanced",
         "description": "I have a broad vocabulary",
         "wordCount": "8,000+ words"
+      }
+    },
+    "firstPersonForms": {
+      "title": "Which first-person forms do you want to learn?",
+      "voiceOnly": "None of your course languages changes its grammar with the speaker. This choice sets the voice you hear in every language.",
+      "exampleLabel": "Example · {language}",
+      "options": {
+        "masculine": {
+          "title": "Masculine forms",
+          "description": "Sentences about yourself are written and voiced in the masculine.",
+          "voice": "Every sentence is spoken by a male voice."
+        },
+        "feminine": {
+          "title": "Feminine forms",
+          "description": "Sentences about yourself are written and voiced in the feminine.",
+          "voice": "Every sentence is spoken by a female voice."
+        },
+        "both": {
+          "title": "Both",
+          "description": "Half the sentences each way where it matters, so you learn both.",
+          "voice": "Male and female voices alternate."
+        }
+      }
+    },
+    "politeness": {
+      "title": "Which politeness levels do you want to learn?",
+      "subtitle": "Choose one level, or several to mix them.",
+      "summary": {
+        "none": "Pick at least one level.",
+        "single": "Every sentence in the {form}.",
+        "mixed": "Sentences alternate between {forms} where the language marks it."
       }
     }
   },

@@ -80,8 +80,6 @@ export type FirstPersonConfig = {
 
 // -------------------------------------------------------------- builders
 
-type FormSpec = Omit<PolitenessForm, 'id'> & { id: string };
-
 /**
  * A two-form language. `split` says where the boundary sits: 'familiar'
  * renders levels 1 and 2 as the low form (German du at "polite"), 'distance'
@@ -92,14 +90,13 @@ function twoForm(spec: {
   split: 'familiar' | 'distance';
   intro: string;
   exampleEn: string;
-  low: FormSpec;
-  high: FormSpec;
+  low: PolitenessForm;
+  high: PolitenessForm;
   mixedSummary: string;
   defaultLevel?: PolitenessLevel;
   sources: string[];
 }): PolitenessConfig {
-  const low: PolitenessForm = spec.low;
-  const high: PolitenessForm = spec.high;
+  const { low, high } = spec;
   return {
     marking: spec.marking,
     intro: spec.intro,
@@ -118,9 +115,9 @@ function threeForm(spec: {
   marking: PolitenessMarking;
   intro: string;
   exampleEn: string;
-  casual: FormSpec;
-  polite: FormSpec;
-  formal: FormSpec;
+  casual: PolitenessForm;
+  polite: PolitenessForm;
+  formal: PolitenessForm;
   mixedSummary: string;
   defaultLevel?: PolitenessLevel;
   sources: string[];
@@ -162,7 +159,9 @@ function tv(spec: {
     },
     high: {
       id: 'v',
-      label: familiar ? `${spec.v.name}-form · formal` : `Polite · ${spec.v.name}`,
+      label: familiar
+        ? `${spec.v.name}-form · formal`
+        : `Polite · ${spec.v.name}`,
       description: spec.v.description,
       example: spec.v.example,
       prompt: spec.v.prompt,
@@ -204,7 +203,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       description: 'Customers, superiors, formal service and business',
       example: 'いただきます。',
       prompt:
-        'Keigo on a です・ます base: 尊敬語 for the listener\'s or a third party\'s actions, 謙譲語 for the speaker\'s own, 丁重語 (ございます, おります, いたします) for neutral statements. Never stack honorifics (no 二重敬語).',
+        "Keigo on a です・ます base: 尊敬語 for the listener's or a third party's actions, 謙譲語 for the speaker's own, 丁重語 (ございます, おります, いたします) for neutral statements. Never stack honorifics (no 二重敬語).",
     },
     mixedSummary:
       'Sentences alternate between plain form, です・ます, and keigo.',
@@ -270,7 +269,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       description: 'Everyone else; ครับ if you are male, ค่ะ if female',
       example: 'ขอบคุณครับ / ขอบคุณค่ะ',
       prompt:
-        'End every sentence with the polite particle for the speaker\'s gender: ครับ for a man; ค่ะ for a woman in statements, คะ in questions. First person ผม (man) or ดิฉัน / ฉัน (woman), second person คุณ.',
+        "End every sentence with the polite particle for the speaker's gender: ครับ for a man; ค่ะ for a woman in statements, คะ in questions. First person ผม (man) or ดิฉัน / ฉัน (woman), second person คุณ.",
     },
     mixedSummary: 'Sentences alternate between with and without ครับ/ค่ะ.',
     defaultLevel: 'polite',
@@ -412,7 +411,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
   }),
   bn: tv({
     intro:
-      'Bengali uses তুমি with friends and family and আপনি with elders, strangers, and people you don\'t know well.',
+      "Bengali uses তুমি with friends and family and আপনি with elders, strangers, and people you don't know well.",
     exampleEn: 'Are you coming?',
     t: {
       name: 'তুমি',
@@ -511,7 +510,8 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
     },
     v: {
       name: 'Sie',
-      description: 'Strangers, customers, officials, older people you don\'t know',
+      description:
+        "Strangers, customers, officials, older people you don't know",
       example: 'Kommen Sie?',
       prompt:
         'Sie (Ihnen, Ihr, capitalised) with third-person plural verb forms; formal greetings (Guten Tag, Auf Wiedersehen).',
@@ -525,15 +525,18 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
     exampleEn: 'Are you coming?',
     t: {
       name: 'tú',
-      description: 'Almost everyone: friends, colleagues, shop staff, strangers',
+      description:
+        'Almost everyone: friends, colleagues, shop staff, strangers',
       example: '¿Vienes?',
-      prompt: 'tú with second-person singular verb forms; vosotros for several people.',
+      prompt:
+        'tú with second-person singular verb forms; vosotros for several people.',
     },
     v: {
       name: 'usted',
       description: 'Elderly people, officials, formal customer service',
       example: '¿Viene usted?',
-      prompt: 'usted with third-person singular verb forms; ustedes for several people.',
+      prompt:
+        'usted with third-person singular verb forms; ustedes for several people.',
     },
     sources: [TV_WIKI],
   }),
@@ -552,7 +555,8 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       name: 'vostè',
       description: 'Older strangers, officials, formal service',
       example: 'Vol un cafè?',
-      prompt: 'vostè with third-person singular verb forms; vostès for several people.',
+      prompt:
+        'vostè with third-person singular verb forms; vostès for several people.',
     },
     sources: [TV_WIKI],
   }),
@@ -590,7 +594,8 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       name: 'o senhor / a senhora',
       description: 'Older people, authorities, formal customer service',
       example: 'O senhor vem?',
-      prompt: 'o senhor / a senhora as the address noun with third-person singular verb forms.',
+      prompt:
+        'o senhor / a senhora as the address noun with third-person singular verb forms.',
     },
     sources: [TV_WIKI],
   }),
@@ -629,7 +634,8 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       name: '您',
       description: 'Customers, elders, business and formal writing',
       example: '您來嗎？',
-      prompt: '您 for the listener with polite lexis (請問, 麻煩您); never 您們.',
+      prompt:
+        '您 for the listener with polite lexis (請問, 麻煩您); never 您們.',
     },
     sources: [TV_WIKI],
   }),
@@ -641,7 +647,8 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       name: 'tu',
       description: 'Friends, family, young people, close colleagues',
       example: 'Vuoi un caffè?',
-      prompt: 'tu with second-person singular verb forms; voi for several people.',
+      prompt:
+        'tu with second-person singular verb forms; voi for several people.',
     },
     v: {
       name: 'Lei',
@@ -679,7 +686,8 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       name: 'sen',
       description: 'Friends, family, people your age',
       example: 'Geliyor musun?',
-      prompt: 'sen with second-person singular suffixes (-sin, imperative gel).',
+      prompt:
+        'sen with second-person singular suffixes (-sin, imperative gel).',
     },
     v: {
       name: 'siz',
@@ -749,7 +757,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
   }),
   fr: tv({
     intro:
-      'French uses tu with friends, family, and children, and vous with strangers, colleagues you don\'t know well, and in shops.',
+      "French uses tu with friends, family, and children, and vous with strangers, colleagues you don't know well, and in shops.",
     exampleEn: 'Are you coming?',
     t: {
       name: 'tu',
@@ -774,19 +782,21 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       name: 'tú',
       description: 'Friends, family, people your age',
       example: '¿Vienes?',
-      prompt: 'tú with second-person singular verb forms; ustedes for several people.',
+      prompt:
+        'tú with second-person singular verb forms; ustedes for several people.',
     },
     v: {
       name: 'usted',
       description: 'Strangers, elders, customers, officials, colleagues',
       example: '¿Viene usted?',
-      prompt: 'usted with third-person singular verb forms; ustedes for several people.',
+      prompt:
+        'usted with third-person singular verb forms; ustedes for several people.',
     },
     sources: [TV_WIKI],
   }),
   ru: tv({
     intro:
-      'Russian uses ты with friends and family and вы with everyone else, including colleagues you don\'t know well.',
+      "Russian uses ты with friends and family and вы with everyone else, including colleagues you don't know well.",
     exampleEn: 'Are you going?',
     t: {
       name: 'ты',
@@ -805,7 +815,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
   }),
   uk: tv({
     intro:
-      'Ukrainian uses ти with friends and family and ви with strangers, elders, and colleagues you don\'t know well.',
+      "Ukrainian uses ти with friends and family and ви with strangers, elders, and colleagues you don't know well.",
     exampleEn: 'Are you going?',
     t: {
       name: 'ти',
@@ -842,7 +852,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
   }),
   cs: tv({
     intro:
-      'Czech uses ty with friends and family and vy with strangers, colleagues, and anyone you\'re not on first-name terms with.',
+      "Czech uses ty with friends and family and vy with strangers, colleagues, and anyone you're not on first-name terms with.",
     exampleEn: 'Are you going?',
     t: {
       name: 'ty',
@@ -861,7 +871,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
   }),
   sk: tv({
     intro:
-      'Slovak uses ty with friends and family and vy with strangers, colleagues, and anyone you\'re not on first-name terms with.',
+      "Slovak uses ty with friends and family and vy with strangers, colleagues, and anyone you're not on first-name terms with.",
     exampleEn: 'Are you going?',
     t: {
       name: 'ty',
@@ -1037,7 +1047,8 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       name: 'إنت',
       description: 'Friends, family, people your age',
       example: 'إنت منين؟',
-      prompt: 'إنت (to a man) / إنتي (to a woman) with second-person verb forms.',
+      prompt:
+        'إنت (to a man) / إنتي (to a woman) with second-person verb forms.',
     },
     v: {
       name: 'حضرتك',
@@ -1395,7 +1406,9 @@ export function selectedPolitenessForms(
 }
 
 /** Whether a course with these TARGET languages asks the politeness question. */
-export function courseAsksPoliteness(targetLanguages: readonly string[]): boolean {
+export function courseAsksPoliteness(
+  targetLanguages: readonly string[],
+): boolean {
   return targetLanguages.some((code) =>
     concreteLanguageCodes(code).some((c) => POLITENESS_CONFIG[c] !== undefined),
   );
@@ -1447,8 +1460,7 @@ export function coursePolitenessRows(
     }));
     rows.push({
       level,
-      label:
-        codes.length === 1 ? perLanguage[0].form.label : LEVEL_WORD[level],
+      label: codes.length === 1 ? perLanguage[0].form.label : LEVEL_WORD[level],
       perLanguage,
     });
   }
@@ -1527,8 +1539,14 @@ export function politenessFlagMismatches(
       out.push(`${lang.code}: flagged ${lang.politenessMarking}, no config`);
     if (!lang.politenessMarking && config)
       out.push(`${lang.code}: config present, no flag`);
-    if (lang.politenessMarking && config && config.marking !== lang.politenessMarking)
-      out.push(`${lang.code}: flag ${lang.politenessMarking} vs config ${config.marking}`);
+    if (
+      lang.politenessMarking &&
+      config &&
+      config.marking !== lang.politenessMarking
+    )
+      out.push(
+        `${lang.code}: flag ${lang.politenessMarking} vs config ${config.marking}`,
+      );
     const first = FIRST_PERSON_CONFIG[lang.code];
     if (lang.firstPersonMarking && !first)
       out.push(`${lang.code}: firstPersonMarking flagged, no config`);

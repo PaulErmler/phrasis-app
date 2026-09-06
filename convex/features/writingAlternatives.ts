@@ -3,6 +3,8 @@ import {
   servedSourceText,
   servedTranslatedText,
   viewOfCard,
+  renderingSettingsOf,
+  renderingTextOf,
 } from '../db/translationReads';
 import { ConvexError, v } from 'convex/values';
 import {
@@ -14,6 +16,8 @@ import {
   type MutationCtx,
 } from '../_generated/server';
 import { internal } from '../_generated/api';
+import { getCourseSettings } from '../db/courseSettings';
+import { resolveCardRendering } from '../../lib/preferenceResolution';
 import type { Id } from '../_generated/dataModel';
 import {
   MAX_CARD_TEXT_LENGTH,
@@ -309,10 +313,25 @@ export const getAlternativeContext = internalQuery({
     if (!row) return null;
     const card = await ctx.db.get(row.cardId);
     const text = card ? await ctx.db.get(card.textId) : null;
-    const primaryGender = resolveAudioSpeakerGender(
-      text?.audioSpeakerGender ?? text?.speakerGender,
-      alternativeId,
-    );
+    // The voice the card is spoken in: its rendering when the course has
+    // sentence-form settings and the card follows them, else the text's
+    // resolved audio speaker (docs/architecture/translation-variants.md).
+    const deck = card ? await ctx.db.get(card.deckId) : null;
+    const settings = deck
+      ? renderingSettingsOf(await getCourseSettings(ctx, deck.courseId))
+      : undefined;
+    const primaryGender =
+      text && card && settings
+        ? resolveCardRendering({
+            text: renderingTextOf(text),
+            textId: text._id,
+            settings,
+            card: { followsCoursePreferences: card.followsCoursePreferences },
+          }).voiceGender
+        : resolveAudioSpeakerGender(
+            text?.audioSpeakerGender ?? text?.speakerGender,
+            alternativeId,
+          );
     const genders: ('male' | 'female')[] = [
       primaryGender,
       primaryGender === 'male' ? 'female' : 'male',

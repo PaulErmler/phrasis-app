@@ -90,7 +90,7 @@ pnpm format            # Prettier over the repo
 # Build & deploy
 pnpm build             # next build
 pnpm start             # production server
-pnpm build:deploy      # convex deploy (runs the build) + prod migrations
+pnpm build:deploy      # convex deploy (runs the build) + prod migrations + one-off backfills
 
 # Convex data snapshots (per git branch)
 pnpm snapshot          # export deployment data to .convex-snapshots/<branch>.zip
@@ -105,7 +105,7 @@ The testing setup (vitest projects, Playwright phases, `@live` tagging, testid c
 
 [Install Git LFS](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage) if you haven't already.
 
-The repo uses **`.lfsconfig`** so the currently largest input files (`data_preparation/data/inputs/sentences.csv`, ~708 MB) is excluded from LFS fetch by default. Other LFS files are still pulled on clone/pull, which keeps deploys (e.g. Coolify) fast and within GitHub LFS quota. 
+The repo uses **`.lfsconfig`** so the currently largest input files (`data_preparation/data/inputs/sentences.csv`, ~708 MB) is excluded from LFS fetch by default. Other LFS files are still pulled on clone/pull, which keeps deploys (e.g. Coolify) fast and within GitHub LFS quota.
 
 - **When you need the big file** (e.g. to run the data-prep pipeline):
   ```bash
@@ -120,6 +120,7 @@ The repo uses **`.lfsconfig`** so the currently largest input files (`data_prepa
 Here are relevant tutorials for making LLMs in cursor more accurate with the tech stack we are using:
 
 ## MCP servers and rules
+
 Convex: https://docs.convex.dev/ai/using-cursor
 BetterAuth: https://www.better-auth.com/docs/introduction#llmstxt
 Follow the turorials on the websites to add MCP servers and docs

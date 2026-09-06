@@ -1,4 +1,5 @@
 import { ConvexError } from 'convex/values';
+import { getCourseSettings } from '../db/courseSettings';
 import { MutationCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
 import { asVoiceGender } from '../types';
@@ -20,10 +21,14 @@ import { buildCardSearchableText } from '../lib/cardContent';
 import {
   cardPinAt,
   cardRowLanguage,
-  liveTranslation,
-  resolveServedFromLive,
   viewOfCard,
   type ServedTranslation,
+  audioPointer,
+  renderingForView,
+  renderingSettingsOf,
+  renderingTextOf,
+  resolveServedRendering,
+  type SourceView,
 } from '../db/translationReads';
 import { patchCard } from '../db/stats/cardAggregates';
 import { randomOrderKey } from '../lib/freePlay';
@@ -44,6 +49,8 @@ import { scheduleMissingContent } from '../lib/contentScheduling';
  * up front by `resolveCardEditPlan`.
  */
 export type CardEditPlan = {
+  /** What the card showed (pin, accent row, rendering variant). */
+  view: SourceView;
   sourceLanguage: string;
   /** Deduped course base + target languages. */
   allLanguages: string[];
@@ -131,7 +138,13 @@ export async function resolveCardEditPlan(
   const allLanguages = [
     ...new Set([...course.baseLanguages, ...course.targetLanguages]),
   ];
-  const view = viewOfCard(card);
+  // What the card shows: its pin, its accent row and, when it follows the
+  // course's sentence-form settings, its rendering variant. The fork copies
+  // the wording the learner has been studying.
+  const view = viewOfCard(
+    card,
+    renderingSettingsOf(await getCourseSettings(ctx, course._id)),
+  );
   const rowLanguages = new Map(
     allLanguages.map((lang) => [lang, cardRowLanguage(text, view, lang)]),
   );
@@ -142,23 +155,25 @@ export async function resolveCardEditPlan(
   const rowBackedLanguages = [...rowLanguages].filter(
     ([, rowLang]) => rowLang !== sourceLanguage,
   );
-  const existingTranslations = await Promise.all(
+  const renderingText = renderingTextOf(text);
+  const servedRenderings = await Promise.all(
     rowBackedLanguages.map(([, rowLang]) =>
-      liveTranslation(ctx, card.textId, rowLang),
+      resolveServedRendering(ctx, {
+        textId: card.textId,
+        targetLanguage: rowLang,
+        text: renderingText,
+        view,
+      }),
     ),
   );
   const existingTranslationMap = new Map<string, Doc<'translations'>>();
-  rowBackedLanguages.forEach(([lang], i) => {
-    const row = existingTranslations[i];
-    if (row) existingTranslationMap.set(lang, row);
-  });
   const servedTranslationMap = new Map<string, ServedTranslation>();
-  for (const [lang, live] of existingTranslationMap) {
-    servedTranslationMap.set(
-      lang,
-      await resolveServedFromLive(ctx, live, view.pinAt),
-    );
-  }
+  rowBackedLanguages.forEach(([lang], i) => {
+    const served = servedRenderings[i].served;
+    if (!served) return;
+    existingTranslationMap.set(lang, served.live);
+    servedTranslationMap.set(lang, served);
+  });
   const shownText = (lang: string): string => {
     const served = servedTranslationMap.get(lang)?.row.translatedText;
     if (served !== undefined) return served;
@@ -204,6 +219,7 @@ export async function resolveCardEditPlan(
   }
 
   return {
+    view,
     sourceLanguage,
     allLanguages,
     rowLanguages,
@@ -526,18 +542,29 @@ export async function forkSharedTextForEdit(
       }
       continue;
     }
-    // The clip the card played for this slot. For the source slot of a
-    // Mixed English card that is the accent row's clip, stored under the
-    // copy's own language since the copy shows that wording as its text.
-    const audioRows = await ctx.db
-      .query('audioRecordings')
-      .withIndex('by_text_and_language', (q) =>
-        q
-          .eq('textId', card.textId)
-          .eq('language', rowLanguages.get(lang) ?? lang),
-      )
-      .take(20);
-    for (const row of audioRows) {
+    // The one clip the card played for this slot: its rendering variant's
+    // pointer when it has one, else the canonical pointer. For the source
+    // slot of a Mixed English card that is the accent row's clip, stored
+    // under the copy's own language since the copy shows that wording as
+    // its text. The copy is a user-owned text that reads canonical rows
+    // only, so the pointer is copied without its key.
+    const rowLang = rowLanguages.get(lang) ?? lang;
+    const rendering = renderingForView(
+      plan.view,
+      renderingTextOf(text),
+      card.textId,
+      rowLang,
+    );
+    const row =
+      (rendering.audioVariantKey
+        ? await audioPointer(
+            ctx,
+            card.textId,
+            rowLang,
+            rendering.audioVariantKey,
+          )
+        : null) ?? (await audioPointer(ctx, card.textId, rowLang));
+    if (row) {
       // The copy shares the same asset. Staleness (the asset's
       // ttsVersion stamp) travels with the asset itself.
       await ctx.db.insert('audioRecordings', {
@@ -603,6 +630,9 @@ export async function repointCardAtEditedText(
     {
       textId: resolvedTextId,
       accentLanguage: undefined,
+      // A user-owned copy never follows the course's sentence-form
+      // settings (schema.ts).
+      followsCoursePreferences: undefined,
       searchableText,
       searchableTextLanguages,
       // Backfill defaults for cards predating these fields, applied on

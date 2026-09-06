@@ -1341,8 +1341,8 @@ describe('the "Retranslating" pill during a bump', () => {
   });
 });
 
-describe('gender drift retires the pair', () => {
-  it('deletes the superseded revisions with the live row and keeps their assets cached', async () => {
+describe('a gender stamp never retires the pair', () => {
+  it('keeps the live row, its superseded revisions and their assets', async () => {
     const t = convexTest(schema, modules);
     const { textId, translationId, assetId, pinAt } = await seed(t, {
       ipaText: 'x',
@@ -1350,7 +1350,9 @@ describe('gender drift retires the pair', () => {
     await bump(t, textId, NEW_DE);
     await settleTts(t, textId);
     expect((await archiveRows(t, textId)).length).toBe(1);
-    // The card's gender is female (seed); a row stamped male has drifted.
+    // The card's gender is female (seed); a row stamped male is a valid
+    // rendering in its own right (docs/architecture/translation-variants.md):
+    // a course that wants the other gender reads a variant instead.
     await t.run((ctx) =>
       ctx.db.patch(translationId, {
         translationVersion: getCurrentTranslationVersion('de'),
@@ -1363,15 +1365,12 @@ describe('gender drift retires the pair', () => {
       await scheduleMissingContent(ctx, textId, text, ['en'], ['de']);
     });
 
-    expect(await t.run((ctx) => ctx.db.get(translationId))).toBeNull();
-    expect(await archiveRows(t, textId)).toEqual([]);
+    expect(await t.run((ctx) => ctx.db.get(translationId))).not.toBeNull();
+    expect((await archiveRows(t, textId)).length).toBe(1);
     expect(await t.run((ctx) => ctx.db.get(assetId))).not.toBeNull();
-    // The refill is on its way, and the pinned card waits for it like any
-    // other card with a missing translation.
-    expect(llmEnqueues().map((e) => e.targetLanguage)).toEqual(['de']);
+    expect(llmEnqueues()).toEqual([]);
     const pinned = await hydrate(t, textId, pinAt);
-    expect(pinned.text).toBe('');
-    expect(pinned.hasMissingContent).toBe(true);
+    expect(pinned.text).not.toBe('');
   });
 });
 

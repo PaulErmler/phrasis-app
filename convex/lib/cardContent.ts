@@ -11,6 +11,10 @@ import {
   type AnnotationKind,
 } from './textAnnotations';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
+import type {
+  LanguageRendering,
+  RenderingText,
+} from '../../lib/preferenceResolution';
 import { getLlmClaim, isClaimFresh } from '../features/llmTranslationQueue';
 import { appendSearchSegments } from '../../lib/wordTokenize';
 import {
@@ -26,6 +30,10 @@ import {
   viewOfCard,
   type ServedTranslation,
   type SourceView,
+  audioPointer,
+  renderingForView,
+  CANONICAL_RENDERING,
+  canonicalSatisfies,
 } from '../db/translationReads';
 
 type ContentCtx = QueryCtx | MutationCtx;
@@ -75,6 +83,14 @@ export interface CardTranslationContent {
    * predicate is applied here. Callers must NOT re-derive any part of it.
    */
   versionStale?: boolean;
+  /**
+   * What the served wording is on the sentence-form axes, from the row's
+   * classifier stamps (docs/architecture/translation-variants.md). Present
+   * only when the axis is marked in this wording; drives the chips in the
+   * card header. A pre-feature card shows what its row IS, not the setting.
+   */
+  renderedGender?: 'masculine' | 'feminine';
+  renderedPoliteness?: 'casual' | 'polite' | 'formal';
 }
 
 export interface CardAudioContent {
@@ -96,6 +112,13 @@ export interface TextContentResult {
   translations: CardTranslationContent[];
   audioRecordings: CardAudioContent[];
   hasMissingContent: boolean;
+  /**
+   * A rendering variant the view resolves to has not landed (its wording
+   * or its audio): the card shows canonical meanwhile. Counted into
+   * `hasMissingContent` only with `opts.includeVariantGaps`, so a reader
+   * that never triggers variant generation does not ask forever.
+   */
+  hasMissingVariant: boolean;
   /**
    * Course languages whose translation entry is empty or, with
    * `markVersionStale`, version-stale, plus the text's own language when
@@ -134,6 +157,12 @@ interface TextContentInput {
    * to each caller.
    */
   userCreated: boolean;
+  /**
+   * The text row's rendering fields (`renderingTextOf(text)`), needed with
+   * `view.settings` to resolve the sentence-form variant per language.
+   * Omit for readers that never serve variants.
+   */
+  renderingText?: RenderingText;
   /**
    * The card this content is shown on (`viewOfCard(card)`). Its pin picks
    * the revision each translation resolves to (convex/db/translationReads.ts),
@@ -194,6 +223,12 @@ export async function buildTextContentBatchForLanguages(
      * query does not treat legacy timing-less audio as a content gap.
      */
     ignoreMissingWordTimings?: boolean;
+    /**
+     * Count a missing rendering variant (wording or audio) as missing
+     * content, so the client self-heal asks the ensure path for it. Only
+     * for readers whose heal generates variants (the review query).
+     */
+    includeVariantGaps?: boolean;
   },
 ): Promise<Map<string, TextContentResult>> {
   const allLanguages = getCourseLanguages(baseLanguages, targetLanguages);
@@ -207,11 +242,15 @@ export async function buildTextContentBatchForLanguages(
     textId: Id<'texts'>;
     userCreated: boolean;
     pinAt: number | undefined;
+    /** The rendering variant the slot reads (docs/architecture/translation-variants.md). */
+    rendering: LanguageRendering;
   }> = [];
   const audioFetches: Array<{
     slot: string;
     rowLang: string;
     textId: Id<'texts'>;
+    /** `audioVariantKey` of the slot, when the view wants a specific voice. */
+    variantKey: string | undefined;
   }> = [];
   // `${key}:${lang}` -> accent code, for the source slots that read an
   // accent row. Such a slot fetches the accent row's audio under the slot
@@ -224,6 +263,15 @@ export async function buildTextContentBatchForLanguages(
     for (const lang of allLanguages) {
       const slot = `${input.key}:${lang}`;
       if (lang !== input.sourceLanguage) {
+        const rendering =
+          input.renderingText && input.view?.settings
+            ? renderingForView(
+                input.view,
+                input.renderingText,
+                input.textId,
+                lang,
+              )
+            : CANONICAL_RENDERING;
         translationFetches.push({
           key: input.key,
           lang,
@@ -231,8 +279,14 @@ export async function buildTextContentBatchForLanguages(
           textId: input.textId,
           userCreated: input.userCreated,
           pinAt,
+          rendering,
         });
-        audioFetches.push({ slot, rowLang: lang, textId: input.textId });
+        audioFetches.push({
+          slot,
+          rowLang: lang,
+          textId: input.textId,
+          variantKey: rendering.audioVariantKey ?? undefined,
+        });
         continue;
       }
       const accent = servedAccentRow(
@@ -252,31 +306,60 @@ export async function buildTextContentBatchForLanguages(
           textId: input.textId,
           userCreated: input.userCreated,
           pinAt,
+          rendering: CANONICAL_RENDERING,
         });
-        audioFetches.push({ slot, rowLang: accent, textId: input.textId });
+        audioFetches.push({
+          slot,
+          rowLang: accent,
+          textId: input.textId,
+          variantKey: undefined,
+        });
       }
       audioFetches.push({
         slot: accent !== undefined ? sourceAudioSlot(slot) : slot,
         rowLang: lang,
         textId: input.textId,
+        variantKey: undefined,
       });
     }
   }
 
-  const [translationResults, audioResults, claimResults] = await Promise.all([
+  // A slot that resolves to a rendering variant fetches the variant row
+  // AND the canonical row: the card shows canonical until the variant has
+  // landed, and a variant stamped `sameAsCanonical` defers to it too. Same
+  // for audio: the canonical pointer plays until the voice variant exists.
+  const [
+    translationResults,
+    variantTranslationResults,
+    audioResults,
+    variantAudioResults,
+    claimResults,
+  ] = await Promise.all([
     Promise.all(
       translationFetches.map((item) =>
         liveTranslation(ctx, item.textId, item.rowLang),
       ),
     ),
     Promise.all(
+      translationFetches.map((item) =>
+        item.rendering.textVariantKey
+          ? liveTranslation(
+              ctx,
+              item.textId,
+              item.rowLang,
+              item.rendering.textVariantKey,
+            )
+          : Promise.resolve(null),
+      ),
+    ),
+    Promise.all(
+      audioFetches.map((item) => audioPointer(ctx, item.textId, item.rowLang)),
+    ),
+    Promise.all(
       audioFetches.map((item) =>
-        ctx.db
-          .query('audioRecordings')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', item.textId).eq('language', item.rowLang),
-          )
-          .first(),
+        item.variantKey
+          ? audioPointer(ctx, item.textId, item.rowLang, item.variantKey)
+          : Promise.resolve(null),
       ),
     ),
     // LLM claim per non-source-language translation slot. A non-stale claim
@@ -295,7 +378,9 @@ export async function buildTextContentBatchForLanguages(
   // resolves synchronously to the live row.
   const servedResults: (ServedTranslation | null)[] = await Promise.all(
     translationFetches.map((item, idx) => {
-      const live = translationResults[idx];
+      const variant = variantTranslationResults[idx];
+      const live =
+        variant && !variant.sameAsCanonical ? variant : translationResults[idx];
       return live
         ? resolveServedFromLive(ctx, live, item.pinAt)
         : Promise.resolve(null);
@@ -315,6 +400,13 @@ export async function buildTextContentBatchForLanguages(
      * by the sweep like a live row's, so its gaps count as missing content.
      */
     archived: boolean;
+    /** Classifier stamps of the served row, for the chips on the card. */
+    renderedGender: Doc<'translations'>['renderedGender'];
+    renderedPoliteness: Doc<'translations'>['renderedPoliteness'];
+    /** The view wants a text variant that has not landed. */
+    textVariantMissing: boolean;
+    /** The served row is a variant with its own wording. */
+    servedVariant: boolean;
   };
   const translationMap = new Map<string, TranslationEntry>();
   // Audio for an archived revision comes from the asset the archive row
@@ -347,6 +439,19 @@ export async function buildTextContentBatchForLanguages(
         archived || versionStale ? null : (claim?.claimedAt ?? null),
       versionStale: !archived && versionStale,
       archived,
+      renderedGender: row?.renderedGender,
+      renderedPoliteness: row?.renderedPoliteness,
+      // Canonical whose stamps already are the requested form is not a
+      // gap (canonicalSatisfies), so browse and review never ask for a
+      // rewrite that would come back identical.
+      textVariantMissing:
+        item.rendering.textVariantKey !== null &&
+        variantTranslationResults[idx] === null &&
+        served !== null &&
+        !canonicalSatisfies(served.live, item.rendering),
+      servedVariant:
+        variantTranslationResults[idx] !== null &&
+        variantTranslationResults[idx]!.sameAsCanonical !== true,
     });
     if (served?.archived && served.audioAssetId) {
       archivedAudioByKeyAndLang.set(
@@ -362,6 +467,7 @@ export async function buildTextContentBatchForLanguages(
   const assetIds = [
     ...new Set([
       ...audioResults.flatMap((row) => (row ? [row.assetId] : [])),
+      ...variantAudioResults.flatMap((row) => (row ? [row.assetId] : [])),
       ...archivedAudioByKeyAndLang.values(),
     ]),
   ];
@@ -369,10 +475,18 @@ export async function buildTextContentBatchForLanguages(
   const assetById = new Map(assetIds.map((id, i) => [id, assetDocs[i]]));
 
   const payloadByKeyAndLang = new Map<string, ResolvedAudioPayload | null>();
+  // Slots whose voice variant has not landed (the canonical clip plays).
+  const audioVariantMissing = new Set<string>();
   audioFetches.forEach((item, idx) => {
     const keyAndLang = item.slot;
     const entry = translationMap.get(keyAndLang);
-    const row = audioResults[idx];
+    const variantRow = variantAudioResults[idx];
+    if (item.variantKey && !variantRow) audioVariantMissing.add(keyAndLang);
+    // A variant WORDING plays only its own clip: the canonical clip speaks
+    // a wording this card does not show (same rule as archived rows). A
+    // canonical wording waiting for its voice variant keeps playing the
+    // canonical clip meanwhile.
+    const row = variantRow ?? (entry?.servedVariant ? null : audioResults[idx]);
     // An archived revision plays its own asset, or nothing: the live
     // pointer's audio speaks a wording this card does not show.
     const assetId = entry?.archived
@@ -507,6 +621,19 @@ export async function buildTextContentBatchForLanguages(
         ...(opts?.markVersionStale
           ? { versionStale: entry?.versionStale ?? false }
           : {}),
+        // The chips: only a stamped, marked axis is shown, and nothing
+        // while the variant the card is about to show has not landed (the
+        // canonical stamps would describe a wording about to change).
+        ...(entry?.renderedGender &&
+        entry.renderedGender !== 'unmarked' &&
+        !entry.textVariantMissing
+          ? { renderedGender: entry.renderedGender }
+          : {}),
+        ...(entry?.renderedPoliteness &&
+        entry.renderedPoliteness !== 'unmarked' &&
+        !entry.textVariantMissing
+          ? { renderedPoliteness: entry.renderedPoliteness }
+          : {}),
       };
     });
 
@@ -593,16 +720,26 @@ export async function buildTextContentBatchForLanguages(
         !backfillExhausted(audio.language),
     );
 
+    const hasMissingVariant = allLanguages.some(
+      (lang) =>
+        lang !== input.sourceLanguage &&
+        ((translationMap.get(`${input.key}:${lang}`)?.textVariantMissing ??
+          false) ||
+          audioVariantMissing.has(`${input.key}:${lang}`)),
+    );
+
     result.set(input.key, {
       translations,
       audioRecordings,
       missingTranslationLanguages,
+      hasMissingVariant,
       hasMissingContent:
         hasMissingTranslation ||
         hasMissingAudio ||
         hasMissingAnnotation ||
         hasUncheckedAudio ||
-        (!opts?.ignoreMissingWordTimings && hasMissingWordTimings),
+        (!opts?.ignoreMissingWordTimings && hasMissingWordTimings) ||
+        (opts?.includeVariantGaps === true && hasMissingVariant),
     });
   }
 

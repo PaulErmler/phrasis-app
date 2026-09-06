@@ -347,7 +347,8 @@ describe('features/translationLLM', () => {
       const form = {
         id: 'v',
         label: 'Sie-form · formal',
-        prompt: 'Sie (Ihnen, Ihr, capitalised) with third-person plural verb forms.',
+        prompt:
+          'Sie (Ihnen, Ihr, capitalised) with third-person plural verb forms.',
       };
 
       it('emits <register> for a requested form even without an addressee', () => {
@@ -413,9 +414,11 @@ describe('features/translationLLM', () => {
 
     it("includes the 'neutral is informal' instruction so German doesn't default to Sie", () => {
       const p = buildPrompt({ ...baseArgs, addressesSomeone: true });
-      expect(p).toMatch(
-        /'informal' and 'neutral' both mean the casual T-form/i,
-      );
+      expect(p).toMatch(/'informal' and 'neutral' both mean casual/i);
+      expect(p).toContain('DO NOT default to the polite form');
+      // Three named levels, and the aggressive exemplar is gone.
+      expect(p).toContain('です・ます');
+      expect(p).not.toContain('おまえ)');
     });
 
     it('mentions the referent_gender role for gendered occupation nouns', () => {

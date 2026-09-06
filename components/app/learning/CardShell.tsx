@@ -93,6 +93,7 @@ export function CardShell({
 }: CardShellProps) {
   const {
     originPill,
+    formChips,
     sourceText,
     translations,
     audioRecordings,
@@ -193,6 +194,17 @@ export function CardShell({
               {originPill.label}
             </Badge>
           )}
+          {formChips?.map((chip) => (
+            <Badge
+              key={chip.testId}
+              variant="outline"
+              className="text-xs font-normal text-muted-foreground"
+              title={chip.title}
+              data-testid={chip.testId}
+            >
+              {chip.label}
+            </Badge>
+          ))}
           {translationStatePill && (
             <Badge
               // Transparent warning fill (15% alpha of theme's --color-warning).

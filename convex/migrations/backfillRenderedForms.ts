@@ -23,17 +23,47 @@ import { MAX_ROWS_PER_CALL } from '../features/renderingClassification';
  * MAX_ROWS_PER_CALL, then continues after `delayMs` so the classifier calls
  * of one page have drained before the next page schedules more.
  *
- * Run from the dashboard:
+ * Started by `pnpm build:deploy` after every deploy (package.json) and
+ * runnable from the dashboard:
  *   migrations/backfillRenderedForms:run {}
- * Optional: { pageSize: 400, delayMs: 8000 }. Progress is logged per page.
+ * Optional: { pageSize: 400, delayMs: 8000, force: true }. A `backfillRuns`
+ * marker makes a finished run a no-op and a run started less than
+ * RUNNING_GRACE_MS ago count as still in flight; `force` ignores both.
+ * Progress is logged per page.
  */
+export const RUN_NAME = 'renderedForms';
+/** A run older than this with no finish is assumed dead and restarted. */
+const RUNNING_GRACE_MS = 6 * 60 * 60 * 1000;
+
 export const run = internalMutation({
   args: {
     pageSize: v.optional(v.number()),
     delayMs: v.optional(v.number()),
+    force: v.optional(v.boolean()),
   },
-  returns: v.object({ status: v.literal('started') }),
+  returns: v.object({
+    status: v.union(
+      v.literal('started'),
+      v.literal('already-done'),
+      v.literal('running'),
+    ),
+  }),
   handler: async (ctx, args) => {
+    const marker = await ctx.db
+      .query('backfillRuns')
+      .withIndex('by_name', (q) => q.eq('name', RUN_NAME))
+      .unique();
+    if (marker && !args.force) {
+      if (marker.finishedAt !== undefined) {
+        return { status: 'already-done' as const };
+      }
+      if (Date.now() - marker.startedAt < RUNNING_GRACE_MS) {
+        return { status: 'running' as const };
+      }
+    }
+    const fields = { startedAt: Date.now(), finishedAt: undefined };
+    if (marker) await ctx.db.patch(marker._id, fields);
+    else await ctx.db.insert('backfillRuns', { name: RUN_NAME, ...fields });
     await ctx.scheduler.runAfter(
       0,
       internal.migrations.backfillRenderedForms.processPage,
@@ -111,6 +141,16 @@ export const processPage = internalMutation({
 
     if (page.isDone) {
       console.log('backfillRenderedForms: done', totals);
+      const marker = await ctx.db
+        .query('backfillRuns')
+        .withIndex('by_name', (q) => q.eq('name', RUN_NAME))
+        .unique();
+      if (marker) {
+        await ctx.db.patch(marker._id, {
+          finishedAt: Date.now(),
+          summary: JSON.stringify(totals),
+        });
+      }
       return null;
     }
     await ctx.scheduler.runAfter(

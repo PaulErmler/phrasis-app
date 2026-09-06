@@ -22,10 +22,7 @@ import {
   parseRenderingClassifications,
   renderingAxesFor,
 } from '../lib/renderingClassifier';
-import {
-  renderedGenderValidator,
-  renderedPolitenessValidator,
-} from '../types';
+import { renderedGenderValidator, renderedPolitenessValidator } from '../types';
 
 /**
  * Stamps `translations.renderedGender` / `renderedPoliteness`: what a stored

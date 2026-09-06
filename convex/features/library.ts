@@ -1,4 +1,8 @@
-import { viewOfCard } from '../db/translationReads';
+import {
+  viewOfCard,
+  renderingSettingsOf,
+  renderingTextOf,
+} from '../db/translationReads';
 import { v } from 'convex/values';
 import { query } from '../_generated/server';
 import { Doc } from '../_generated/dataModel';
@@ -17,6 +21,7 @@ import {
   fsrsStateValidator,
   schedulingPhaseValidator,
 } from '../types';
+import { getCourseSettings } from '../db/courseSettings';
 
 // ============================================================================
 // QUERY
@@ -329,6 +334,9 @@ export const getLibraryCards = query({
       collectionIds.map((id, i) => [id, collectionDocs[i]]),
     );
 
+    const renderingSettings = renderingSettingsOf(
+      await getCourseSettings(ctx, course._id),
+    );
     const inputs = cards
       .map((card, i) => {
         const text = texts[i];
@@ -342,7 +350,8 @@ export const getLibraryCards = query({
           sourceIpa: text.ipaText ?? undefined,
           sourceFurigana: text.furiganaText ?? undefined,
           userCreated: text.userCreated,
-          view: viewOfCard(card),
+          renderingText: renderingTextOf(text),
+          view: viewOfCard(card, renderingSettings),
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);

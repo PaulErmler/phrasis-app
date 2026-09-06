@@ -340,6 +340,12 @@ export async function createCardsFromTexts(
         deckId: deck._id,
         textId: text._id,
         ...(accentLanguage !== undefined ? { accentLanguage } : {}),
+        // A curriculum card follows the course's sentence-form settings
+        // from now on (`cards.followsCoursePreferences` in schema.ts); a
+        // user's own sentence never does.
+        ...(text.userCreated
+          ? {}
+          : { followsCoursePreferences: true as const }),
         collectionId,
         collectionOrigin,
         dueDate: dueBase + cardsInserted,

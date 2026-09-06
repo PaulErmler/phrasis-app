@@ -1,6 +1,8 @@
 import { v, ConvexError } from 'convex/values';
 import { mutation, query, internalMutation } from '../../_generated/server';
 import { internal } from '../../_generated/api';
+import { getCourseSettings } from '../../db/courseSettings';
+import { renderingSettingsOf } from '../../db/translationReads';
 import { getAuthUserId } from '../../db/users';
 import { EVENTS, track } from '../../analytics';
 import { getActiveCourseForUser } from '../../db/courses';
@@ -139,6 +141,24 @@ async function processApproval(
   await ctx.db.patch(chatCollection._id, {
     textCount: chatCollection.textCount + 1,
   });
+
+  // The course's first-person setting picks the voice of a chat card whose
+  // sentence marks no gender of its own (a user-written text has no
+  // rendering variants, so it is born in the chosen voice). A definitive
+  // classifier verdict still wins in `applyTextMetadata`; a neutral one
+  // keeps this stamp instead of the coin flip.
+  const settings = renderingSettingsOf(
+    await getCourseSettings(ctx, course._id),
+  );
+  const voiceFromSettings =
+    settings?.firstPersonForms === 'masculine'
+      ? 'male'
+      : settings?.firstPersonForms === 'feminine'
+        ? 'female'
+        : undefined;
+  if (voiceFromSettings) {
+    await ctx.db.patch(textId, { audioSpeakerGender: voiceFromSettings });
+  }
 
   // Generate linguistic metadata first using all chat-produced translations,
   // then prepareCardContent runs from inside the metadata action so audio is

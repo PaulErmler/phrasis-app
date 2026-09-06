@@ -6,6 +6,11 @@ import {
   quoteSentences,
   targetSentenceLines,
 } from './promptSections';
+import type { RenderingSettings } from '../../../lib/preferenceResolution';
+import {
+  concreteLanguageCodes,
+  selectedPolitenessForms,
+} from '../../../lib/languageForms';
 
 /**
  * Quick actions: the client sends a compact action key (plus a small payload)
@@ -108,6 +113,29 @@ export interface QuickActionContext {
   } | null;
   baseLanguages: string[];
   targetLanguages: string[];
+  /** The course's sentence-form settings; anchors the 'formal' action. */
+  renderingSettings?: RenderingSettings;
+}
+
+/**
+ * The politeness forms the learner studies, named per target language, so
+ * "more formal" starts from the form on the card rather than from casual.
+ */
+function studiedFormsNote(ctx: QuickActionContext): string {
+  const levels = ctx.renderingSettings?.politenessLevels;
+  if (!levels || levels.length === 0) return '';
+  const parts = ctx.targetLanguages.flatMap((code) =>
+    concreteLanguageCodes(code).flatMap((concrete) => {
+      const forms = selectedPolitenessForms(concrete, levels);
+      return forms.length > 0
+        ? [
+            `${languageName(concrete)}: ${forms.map((f) => f.label).join(' / ')}`,
+          ]
+        : [];
+    }),
+  );
+  if (parts.length === 0) return '';
+  return ` The learner's course is set to study ${parts.join('; ')}, so start from that level: every version you give must be MORE formal than the form on the card, and name the form each version is in.`;
 }
 
 function targetSentencesFallback(ctx: QuickActionContext): string {
@@ -168,6 +196,7 @@ function targetSubjectNote(ctx: QuickActionContext): string {
 function sentenceSteering(
   kind: SentenceQuickActionKind,
   sentence: string,
+  ctx: QuickActionContext,
 ): string {
   switch (kind) {
     case 'grammar':
@@ -179,7 +208,7 @@ function sentenceSteering(
     case 'paraphrase':
       return `The user wants different ways to say the same thing as the reviewed sentence: ${sentence}. Give 3-5 natural paraphrases that native speakers actually use, and for each explain briefly how it differs in nuance, register, or emphasis. Create a flashcard (createCard) for every paraphrase.`;
     case 'formal':
-      return `The user wants more formal and polite versions of the reviewed sentence: ${sentence}. Give 2-4 versions of increasing formality. Explain what makes each one formal (pronouns and address forms, verb forms, vocabulary choice, honorifics where the language has them) and in which situations to use it. Create a flashcard (createCard) for every formal version.`;
+      return `The user wants more formal and polite versions of the reviewed sentence: ${sentence}. Give 2-4 versions of increasing formality. Explain what makes each one formal (pronouns and address forms, verb forms, vocabulary choice, honorifics where the language has them) and in which situations to use it. Create a flashcard (createCard) for every formal version.${studiedFormsNote(ctx)}`;
     case 'simpler':
       return `The user wants simpler ways to express the reviewed sentence: ${sentence}. Give 2-4 simpler versions — shorter, higher-frequency words, beginner-friendly structures that native speakers still genuinely use. Explain what was simplified in each. Create a flashcard (createCard) for every simpler version.`;
   }
@@ -245,7 +274,7 @@ export function expandQuickAction(
     case 'paraphrase':
     case 'formal':
     case 'simpler':
-      return `${header} ${sentenceSteering(action.kind, targetSentences(ctx))}${targetSubjectNote(ctx)}${replyNote}`;
+      return `${header} ${sentenceSteering(action.kind, targetSentences(ctx), ctx)}${targetSubjectNote(ctx)}${replyNote}`;
     case 'explainWord':
     case 'synonyms':
     case 'antonyms':

@@ -25,11 +25,12 @@ export const OPENROUTER_MODELS = {
   translationAutoFill: LUNA_BO3.model,
   /** Linguistic metadata inference (register, gender, addresseeNumber) for
    *  newly-created cards. Runs once per row, including during bulk import,
-   *  so we stay on the lite tier. 3.5 Flash Lite is a tier up from 3.1
-   *  ($0.30/$2.50 per M vs $0.25/$1.50), ~33% more per call at identical
-   *  token counts, taken for the newer model's accuracy on cross-lingual
-   *  gender/register inference. */
-  sentenceMetadata: 'google/gemini-3.5-flash-lite',
+   *  so we stay on the lite tier. Back on 3.1 Flash Lite since 2026-09-06:
+   *  with the per-language prompt (lib/sentenceMetadataPrompt.ts) the
+   *  `pnpm eval:metadata` gold run scored 3.1 at register 141/143 and
+   *  speakerGender 501/508 against 133/143 and 500/508 for 3.5, at a lower
+   *  price ($0.25/$1.50 vs $0.30/$2.50 per M). Re-run it before switching. */
+  sentenceMetadata: 'google/gemini-3.1-flash-lite',
   /** Rendering classifier (convex/lib/renderingClassifier.ts): what a stored
    *  translation's wording actually is on the first-person-gender and
    *  politeness axes. Batched 25 rows per call over the whole catalogue in

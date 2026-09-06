@@ -693,6 +693,22 @@ export const finalizeOnboarding = mutation({
             }
           }
 
+          // The sentence-form answers, same no-op-in-the-normal-flow rule.
+          if (
+            progress.firstPersonForms !== undefined &&
+            courseSettings.firstPersonForms !== progress.firstPersonForms
+          ) {
+            patch.firstPersonForms = progress.firstPersonForms;
+          }
+          if (
+            progress.politenessLevels !== undefined &&
+            progress.politenessLevels.length > 0 &&
+            JSON.stringify(courseSettings.politenessLevels ?? []) !==
+              JSON.stringify(progress.politenessLevels)
+          ) {
+            patch.politenessLevels = progress.politenessLevels;
+          }
+
           if (Object.keys(patch).length > 0) {
             await ctx.db.patch(courseSettings._id, patch);
           }

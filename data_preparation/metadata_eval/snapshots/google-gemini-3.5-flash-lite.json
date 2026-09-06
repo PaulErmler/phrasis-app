@@ -245,7 +245,7 @@
     "addressesSomeone": "false"
   },
   "gender:ar_lev:أنا مبسوط.": {
-    "register": "neutral",
+    "register": "informal",
     "addresseeNumber": "not_applicable",
     "speakerGender": "male",
     "addresseeGender": "not_applicable",
@@ -633,7 +633,7 @@
     "register": "informal",
     "addresseeNumber": "singular",
     "speakerGender": "neutral",
-    "addresseeGender": "neutral",
+    "addresseeGender": "female",
     "addressesSomeone": "false"
   },
   "gender:cs:Řekl jsem, že přijdu.": {
@@ -856,7 +856,7 @@
   "gender:en:My husband is a good cook.": {
     "register": "neutral",
     "addresseeNumber": "not_applicable",
-    "speakerGender": "female",
+    "speakerGender": "neutral",
     "addresseeGender": "not_applicable",
     "addressesSomeone": "false"
   },
@@ -1358,7 +1358,7 @@
     "addressesSomeone": "false"
   },
   "gender:hi:मैं रोज़ काम करती हूँ।": {
-    "register": "neutral",
+    "register": "informal",
     "addresseeNumber": "not_applicable",
     "speakerGender": "female",
     "addresseeGender": "not_applicable",
@@ -1438,8 +1438,8 @@
     "register": "informal",
     "addresseeNumber": "singular",
     "speakerGender": "neutral",
-    "addresseeGender": "neutral",
-    "addressesSomeone": "false"
+    "addresseeGender": "female",
+    "addressesSomeone": "true"
   },
   "gender:hr:Radim kod kuće.": {
     "register": "neutral",
@@ -1876,7 +1876,7 @@
     "addressesSomeone": "false"
   },
   "gender:ja:田中さんは毎朝コーヒーを飲みます。": {
-    "register": "neutral",
+    "register": "formal",
     "addresseeNumber": "not_applicable",
     "speakerGender": "neutral",
     "addresseeGender": "not_applicable",
@@ -1946,7 +1946,7 @@
     "addressesSomeone": "false"
   },
   "gender:ko:우리 오빠는 대학생이에요.": {
-    "register": "neutral",
+    "register": "informal",
     "addresseeNumber": "not_applicable",
     "speakerGender": "female",
     "addresseeGender": "not_applicable",
@@ -1991,7 +1991,7 @@
     "register": "informal",
     "addresseeNumber": "singular",
     "speakerGender": "male",
-    "addresseeGender": "neutral",
+    "addresseeGender": "male",
     "addressesSomeone": "true"
   },
   "gender:lt:Aš esu alkana.": {
@@ -2230,7 +2230,7 @@
     "addresseeNumber": "singular",
     "speakerGender": "neutral",
     "addresseeGender": "female",
-    "addressesSomeone": "true"
+    "addressesSomeone": "false"
   },
   "gender:pl:Byłam wczoraj w domu.": {
     "register": "neutral",
@@ -2366,7 +2366,7 @@
     "addressesSomeone": "false"
   },
   "gender:pt:Estou cansado.": {
-    "register": "neutral",
+    "register": "informal",
     "addresseeNumber": "not_applicable",
     "speakerGender": "male",
     "addresseeGender": "not_applicable",
@@ -2443,7 +2443,7 @@
     "addressesSomeone": "false"
   },
   "gender:pt:Obrigado!": {
-    "register": "neutral",
+    "register": "informal",
     "addresseeNumber": "not_applicable",
     "speakerGender": "male",
     "addresseeGender": "not_applicable",
@@ -2459,7 +2459,7 @@
   "gender:pt:Sou brasileiro.": {
     "register": "neutral",
     "addresseeNumber": "not_applicable",
-    "speakerGender": "neutral",
+    "speakerGender": "male",
     "addresseeGender": "not_applicable",
     "addressesSomeone": "false"
   },
@@ -2492,7 +2492,7 @@
     "addressesSomeone": "false"
   },
   "gender:pt_pt:Estou triste.": {
-    "register": "informal",
+    "register": "neutral",
     "addresseeNumber": "not_applicable",
     "speakerGender": "neutral",
     "addresseeGender": "not_applicable",
@@ -2513,8 +2513,8 @@
     "addressesSomeone": "false"
   },
   "gender:pt_pt:Obrigado!": {
-    "register": "neutral",
-    "addresseeNumber": "not_applicable",
+    "register": "informal",
+    "addresseeNumber": "singular",
     "speakerGender": "male",
     "addresseeGender": "not_applicable",
     "addressesSomeone": "false"
@@ -2978,8 +2978,8 @@
     "register": "informal",
     "addresseeNumber": "singular",
     "speakerGender": "neutral",
-    "addresseeGender": "neutral",
-    "addressesSomeone": "false"
+    "addresseeGender": "female",
+    "addressesSomeone": "true"
   },
   "gender:sl:Vsak dan pijem kavo.": {
     "register": "neutral",
@@ -3048,7 +3048,7 @@
     "register": "informal",
     "addresseeNumber": "singular",
     "speakerGender": "neutral",
-    "addresseeGender": "female",
+    "addresseeGender": "not_applicable",
     "addressesSomeone": "false"
   },
   "gender:sr:Радим код куће.": {
@@ -3123,10 +3123,10 @@
   },
   "gender:th:ขอบคุณค่ะ": {
     "register": "neutral",
-    "addresseeNumber": "singular",
+    "addresseeNumber": "not_applicable",
     "speakerGender": "female",
-    "addresseeGender": "neutral",
-    "addressesSomeone": "true"
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false"
   },
   "gender:th:ครูใจดีมาก": {
     "register": "neutral",
@@ -3164,7 +3164,7 @@
     "addressesSomeone": "false"
   },
   "gender:th:พรุ่งนี้จะไปตลาด": {
-    "register": "neutral",
+    "register": "informal",
     "addresseeNumber": "not_applicable",
     "speakerGender": "neutral",
     "addresseeGender": "not_applicable",
@@ -3192,7 +3192,7 @@
     "addressesSomeone": "true"
   },
   "gender:th:สวัสดีค่ะ": {
-    "register": "neutral",
+    "register": "formal",
     "addresseeNumber": "singular",
     "speakerGender": "female",
     "addresseeGender": "neutral",
@@ -3773,7 +3773,7 @@
     "addressesSomeone": "false"
   },
   "politeness:fr:Dites-lui simplement : “appelle-moi demain”.": {
-    "register": "formal",
+    "register": "neutral",
     "addresseeNumber": "singular",
     "speakerGender": "neutral",
     "addresseeGender": "neutral",
@@ -3781,7 +3781,7 @@
   },
   "politeness:fr:Est-ce que vous pourriez répéter, s'il vous plaît ?": {
     "register": "formal",
-    "addresseeNumber": "singular",
+    "addresseeNumber": "plural",
     "speakerGender": "neutral",
     "addresseeGender": "neutral",
     "addressesSomeone": "true"
@@ -3864,7 +3864,7 @@
     "addressesSomeone": "true"
   },
   "politeness:hi:उनसे कहिए: “मुझे कल फ़ोन करो”।": {
-    "register": "informal",
+    "register": "neutral",
     "addresseeNumber": "singular",
     "speakerGender": "neutral",
     "addresseeGender": "neutral",
@@ -3977,10 +3977,10 @@
   },
   "politeness:ja:そんなの知らないよ。": {
     "register": "informal",
-    "addresseeNumber": "singular",
+    "addresseeNumber": "not_applicable",
     "speakerGender": "neutral",
-    "addresseeGender": "neutral",
-    "addressesSomeone": "true"
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false"
   },
   "politeness:ja:どうぞこちらでお待ちください。": {
     "register": "formal",
@@ -4067,11 +4067,11 @@
     "addressesSomeone": "true"
   },
   "politeness:ko:내일 다시 전화할게요.": {
-    "register": "formal",
-    "addresseeNumber": "singular",
+    "register": "informal",
+    "addresseeNumber": "not_applicable",
     "speakerGender": "neutral",
-    "addresseeGender": "neutral",
-    "addressesSomeone": "true"
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false"
   },
   "politeness:ko:너 지금 어디야?": {
     "register": "informal",
@@ -4341,7 +4341,7 @@
   },
   "politeness:ru:Скажите, пожалуйста, который час?": {
     "register": "formal",
-    "addresseeNumber": "singular",
+    "addresseeNumber": "plural",
     "speakerGender": "neutral",
     "addresseeGender": "neutral",
     "addressesSomeone": "true"
@@ -4389,7 +4389,7 @@
     "addressesSomeone": "true"
   },
   "politeness:th:คุณหมอจะมาถึงกี่โมงคะ": {
-    "register": "neutral",
+    "register": "formal",
     "addresseeNumber": "singular",
     "speakerGender": "female",
     "addresseeGender": "neutral",
@@ -4433,7 +4433,7 @@
   "politeness:th:เธอจะไปกับฉันไหม": {
     "register": "informal",
     "addresseeNumber": "singular",
-    "speakerGender": "neutral",
+    "speakerGender": "female",
     "addresseeGender": "neutral",
     "addressesSomeone": "true"
   },

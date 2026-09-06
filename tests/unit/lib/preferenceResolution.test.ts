@@ -74,25 +74,37 @@ describe('resolveCardRendering', () => {
   });
 
   it('needsVoice only when the canonical coin flip landed on the other gender', () => {
-    const canonical = resolveCardSpeakerGenders(premade, textId)
-      .audioSpeakerGender;
+    const canonical = resolveCardSpeakerGenders(
+      premade,
+      textId,
+    ).audioSpeakerGender;
     const same = canonical === 'male' ? 'masculine' : 'feminine';
     const other = canonical === 'male' ? 'feminine' : 'masculine';
-    expect(resolve('de', { firstPersonForms: same }).cardRendering.needsVoice).toBe(false);
-    expect(resolve('de', { firstPersonForms: other }).cardRendering.needsVoice).toBe(true);
+    expect(
+      resolve('de', { firstPersonForms: same }).cardRendering.needsVoice,
+    ).toBe(false);
+    expect(
+      resolve('de', { firstPersonForms: other }).cardRendering.needsVoice,
+    ).toBe(true);
   });
 
-  it('a definitive text gender wins over the setting', () => {
-    const text: RenderingText = { userCreated: false, speakerGender: 'male' };
+  it("a curriculum text's speakerGender stamp is the coin flip, not evidence", () => {
+    // The sweep writes the canonical voice gender back onto premade texts
+    // (resolveCardSpeakerGenders case 3); the setting still applies.
+    const text: RenderingText = {
+      userCreated: false,
+      speakerGender: 'male',
+      audioSpeakerGender: 'male',
+    };
     const { cardRendering, language } = resolve(
       'ru',
       { firstPersonForms: 'feminine' },
       text,
     );
-    expect(cardRendering.gender).toBe('auto');
-    expect(cardRendering.voiceGender).toBe('male');
-    expect(language.textVariantKey).toBeNull();
-    expect(language.audioVariantKey).toBeNull();
+    expect(cardRendering.gender).toBe('feminine');
+    expect(cardRendering.voiceGender).toBe('female');
+    expect(cardRendering.needsVoice).toBe(true);
+    expect(language.textVariantKey).toBe('female|auto');
   });
 
   it('a legacy card ignores the settings', () => {
@@ -127,8 +139,10 @@ describe('resolveLanguageRendering', () => {
   });
 
   it('an unmarked language with a chosen gender needs audio only when the voice differs', () => {
-    const canonical = resolveCardSpeakerGenders(premade, textId)
-      .audioSpeakerGender;
+    const canonical = resolveCardSpeakerGenders(
+      premade,
+      textId,
+    ).audioSpeakerGender;
     const other = canonical === 'male' ? 'feminine' : 'masculine';
     const same = canonical === 'male' ? 'masculine' : 'feminine';
     const differs = resolve('de', { firstPersonForms: other }).language;
@@ -145,9 +159,7 @@ describe('resolveLanguageRendering', () => {
     const { language } = resolve('ja', { politenessLevels: ['polite'] });
     expect(language.form?.id).toBe('desu-masu');
     expect(language.textVariantKey).toBe('auto|desu-masu');
-    expect(language.audioVariantKey).toBe(
-      `${language.voiceGender}|desu-masu`,
-    );
+    expect(language.audioVariantKey).toBe(`${language.voiceGender}|desu-masu`);
   });
 
   it('levels that map to one form on this language do not alternate', () => {
@@ -195,8 +207,8 @@ describe('resolveLanguageRendering', () => {
       addresseeNumber: 'not_applicable',
     };
     expect(
-      resolve('de', { politenessLevels: ['formal'] }, legacyNoAddressee).language
-        .form,
+      resolve('de', { politenessLevels: ['formal'] }, legacyNoAddressee)
+        .language.form,
     ).toBeNull();
     const legacyAddressee: RenderingText = {
       userCreated: false,

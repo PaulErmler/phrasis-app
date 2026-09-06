@@ -144,7 +144,10 @@ describe('course helpers', () => {
 
   it('hidden levels inherit the visible level below them', () => {
     const rows = coursePolitenessRows(['de']);
-    expect(levelsFromTickedRows(rows, ['casual'])).toEqual(['casual', 'polite']);
+    expect(levelsFromTickedRows(rows, ['casual'])).toEqual([
+      'casual',
+      'polite',
+    ]);
     expect(levelsFromTickedRows(rows, ['formal'])).toEqual(['formal']);
     expect(levelsFromTickedRows(rows, ['casual', 'formal'])).toEqual([
       'casual',

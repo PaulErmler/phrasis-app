@@ -1,6 +1,12 @@
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
 import { isAudioAssetReferenced, resolveAudioPayload } from './audioAssets';
+import {
+  audioPointer,
+  audioPointersForTextLanguage,
+} from '../db/translationReads';
+import { AUTO, parseVariantKey } from '../../lib/preferenceResolution';
+import { languageMarksFirstPerson } from '../../lib/languageForms';
 
 /**
  * Delete an `audioRecordings` pointer row; when it was the LAST pointer at
@@ -55,13 +61,20 @@ export async function deleteAudioRowsForTextLanguage(
   language: string,
   opts?: { keepAsset?: boolean },
 ): Promise<void> {
-  const rows = await ctx.db
-    .query('audioRecordings')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', textId).eq('language', language),
-    )
-    .take(10);
+  // The canonical pointer and every AUDIO-ONLY variant: all of them speak
+  // the wording that just changed. A variant with its own wording keeps its
+  // clip: any politeness form, and on a language whose wording marks the
+  // speaker's gender also the `<gender>|auto` key, which there voices a
+  // rewritten sentence rather than the canonical one
+  // (docs/architecture/translation-variants.md, Keys).
+  const rows = await audioPointersForTextLanguage(ctx, textId, language);
+  const genderRewrites = languageMarksFirstPerson(language);
   for (const row of rows) {
+    if (row.variantKey !== undefined) {
+      const { gender, formId } = parseVariantKey(row.variantKey);
+      if (formId !== AUTO) continue;
+      if (gender !== AUTO && genderRewrites) continue;
+    }
     await deleteAudioRow(ctx, row, opts);
   }
 }
@@ -119,14 +132,7 @@ export async function getAudioForText(
   languages: string[],
 ): Promise<AudioResult[]> {
   const records = await Promise.all(
-    languages.map((lang) =>
-      ctx.db
-        .query('audioRecordings')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', textId).eq('language', lang),
-        )
-        .first(),
-    ),
+    languages.map((lang) => audioPointer(ctx, textId, lang)),
   );
 
   const payloads = await Promise.all(

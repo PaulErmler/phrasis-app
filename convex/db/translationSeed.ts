@@ -4,7 +4,11 @@ import { internalMutation } from '../_generated/server';
 import { deleteAudioRow } from '../lib/audio';
 import { resolveAudioPayload } from '../lib/audioAssets';
 import { clearedAnnotationFields } from '../lib/textAnnotations';
-import { liveTranslation } from './translationReads';
+import {
+  liveTranslation,
+  audioPointer,
+  audioPointersForTextLanguage,
+} from './translationReads';
 
 const SPANISH_VOICE_PREFIXES: Record<string, string> = {
   es: 'es-ES',
@@ -119,13 +123,13 @@ export const batchUpsertTranslations = internalMutation({
 
       // Check if source English text changed. Invalidate English audio too
       if (textDoc.text !== item.textEn) {
-        const enAudio = await ctx.db
-          .query('audioRecordings')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('language', 'en'),
-          )
-          .first();
-        if (enAudio) {
+        // Every pointer of the slot: a wording change stales the canonical
+        // clip and every voice variant of it alike.
+        for (const enAudio of await audioPointersForTextLanguage(
+          ctx,
+          textId,
+          'en',
+        )) {
           await deleteAudioRow(ctx, enAudio);
           stats.audioInvalidated++;
         }
@@ -161,13 +165,11 @@ export const batchUpsertTranslations = internalMutation({
           stats.translationsUpdated++;
 
           // Translation text changed. Delete audio so it regenerates on demand
-          const audio = await ctx.db
-            .query('audioRecordings')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('language', tr.language),
-            )
-            .first();
-          if (audio) {
+          for (const audio of await audioPointersForTextLanguage(
+            ctx,
+            textId,
+            tr.language,
+          )) {
             await deleteAudioRow(ctx, audio);
             stats.audioInvalidated++;
           }
@@ -178,12 +180,7 @@ export const batchUpsertTranslations = internalMutation({
         // Spanish voice audit: delete audio using wrong regional voice prefix
         const expectedPrefix = SPANISH_VOICE_PREFIXES[tr.language];
         if (expectedPrefix) {
-          const audioForLang = await ctx.db
-            .query('audioRecordings')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('language', tr.language),
-            )
-            .first();
+          const audioForLang = await audioPointer(ctx, textId, tr.language);
           const payloadForLang = audioForLang
             ? await resolveAudioPayload(ctx, audioForLang)
             : null;

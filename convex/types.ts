@@ -78,6 +78,13 @@ export const translationValidator = v.object({
    * "regenerate audio". That flow has no LLM phase.
    */
   retranslating: v.optional(v.boolean()),
+  // The chips (see CardTranslationContent in convex/lib/cardContent.ts).
+  renderedGender: v.optional(
+    v.union(v.literal('masculine'), v.literal('feminine')),
+  ),
+  renderedPoliteness: v.optional(
+    v.union(v.literal('casual'), v.literal('polite'), v.literal('formal')),
+  ),
 });
 
 export const audioRecordingValidator = v.object({
@@ -527,22 +534,37 @@ const literalUnion = <T extends readonly string[]>(values: T) =>
 // Stored on courseSettings and onboardingProgress; undefined = today's
 // canonical renderings. `politenessLevels` is a SET of global levels; the
 // UI never writes an empty array.
-export const FIRST_PERSON_FORMS_VALUES = ['masculine', 'feminine', 'both'] as const;
+export const FIRST_PERSON_FORMS_VALUES = [
+  'masculine',
+  'feminine',
+  'both',
+] as const;
 export const POLITENESS_LEVEL_VALUES = ['casual', 'polite', 'formal'] as const;
-export const firstPersonFormsValidator = literalUnion(FIRST_PERSON_FORMS_VALUES);
+export const firstPersonFormsValidator = literalUnion(
+  FIRST_PERSON_FORMS_VALUES,
+);
 export const politenessLevelsValidator = v.array(
   literalUnion(POLITENESS_LEVEL_VALUES),
 );
 // What a stored rendering actually is, stamped by the rendering classifier
 // (convex/lib/renderingClassifier.ts) on generation and by the backfill
 // migration on legacy rows. 'unmarked' = the wording carries no such form.
-export const RENDERED_GENDER_VALUES = ['masculine', 'feminine', 'unmarked'] as const;
+export const RENDERED_GENDER_VALUES = [
+  'masculine',
+  'feminine',
+  'unmarked',
+] as const;
 export const RENDERED_POLITENESS_VALUES = [
   'casual',
   'polite',
   'formal',
   'unmarked',
 ] as const;
+/** The two settings together, as readers and job args carry them. */
+export const renderingSettingsValidator = v.object({
+  firstPersonForms: v.optional(firstPersonFormsValidator),
+  politenessLevels: v.optional(politenessLevelsValidator),
+});
 export const renderedGenderValidator = literalUnion(RENDERED_GENDER_VALUES);
 export const renderedPolitenessValidator = literalUnion(
   RENDERED_POLITENESS_VALUES,

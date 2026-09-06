@@ -34,7 +34,7 @@ export type FirstPersonForms = (typeof FIRST_PERSON_FORMS)[number];
 /** The course-settings fields this module reads. Undefined = canonical. */
 export type RenderingSettings = {
   firstPersonForms?: FirstPersonForms;
-  politenessLevels?: readonly PolitenessLevel[];
+  politenessLevels?: PolitenessLevel[];
 };
 
 /** The `texts` fields this module reads. */
@@ -94,12 +94,6 @@ export type LanguageRendering = {
   voiceGender: 'male' | 'female';
 };
 
-function definitiveGender(text: RenderingText): 'male' | 'female' | undefined {
-  return text.speakerGender === 'male' || text.speakerGender === 'female'
-    ? text.speakerGender
-    : undefined;
-}
-
 /**
  * Whether the settings can apply to this card at all. Cards from before the
  * feature (no stamp) and every user-written sentence keep their canonical
@@ -131,10 +125,12 @@ export function resolveCardRendering(args: {
     canonicalVoiceGender,
     needsVoice: false,
   };
+  // Note on `text.speakerGender`: on a curriculum text it is the canonical
+  // coin flip written back by the sweep (`resolveCardSpeakerGenders`, case
+  // 3), never evidence about the sentence, so the setting applies. The one
+  // place it IS evidence, a user-written text stamped by the classifier,
+  // never reaches this line: such texts have no variants.
   if (!cardFollowsPreferences(args.text, args.card)) return base;
-  // Content evidence wins: a sentence that is definitively gendered keeps
-  // its gender for everyone, and the canonical rendering already has it.
-  if (definitiveGender(args.text)) return base;
   const forms = args.settings.firstPersonForms;
   if (forms !== 'masculine' && forms !== 'feminine') return base;
   const voiceGender = forms === 'masculine' ? 'male' : 'female';

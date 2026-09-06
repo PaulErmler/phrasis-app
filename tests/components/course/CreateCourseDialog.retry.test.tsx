@@ -71,7 +71,7 @@ function renderDialog() {
   render(<CreateCourseDialog open onOpenChange={vi.fn()} />);
 }
 
-/** Walk the 4-step wizard from step 1 and submit. */
+/** Walk the 5-step wizard from step 1 and submit. */
 async function completeWizard(
   user: ReturnType<typeof userEvent.setup>,
   { target, base }: { target: string; base: string },
@@ -84,7 +84,25 @@ async function completeWizard(
   await user.click(screen.getByRole('button', { name: /beginner/i }));
   await user.click(screen.getByTestId('course-dialog-next'));
   await user.click(await screen.findByTestId('course-dialog-goal-20'));
+  await user.click(screen.getByTestId('course-dialog-next'));
+  await fillSentenceForms(user);
   await user.click(screen.getByTestId('course-dialog-create'));
+}
+
+/**
+ * Step 5: first-person forms, plus the first politeness row when the target
+ * marks politeness (the rows depend on the language picked in step 1). Both
+ * start preselected on the mixed choice; the clicks keep the flow explicit.
+ */
+async function fillSentenceForms(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByTestId('course-dialog-forms-both'));
+  const rows = screen.queryAllByRole('checkbox');
+  if (
+    rows.length > 0 &&
+    rows.every((r) => r.getAttribute('aria-checked') !== 'true')
+  ) {
+    await user.click(rows[0]);
+  }
 }
 
 /** Step back to the target-language step and switch languages. */
@@ -92,13 +110,14 @@ async function goBackAndSwitchTarget(
   user: ReturnType<typeof userEvent.setup>,
   target: string,
 ) {
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     await user.click(screen.getByTestId('course-dialog-back'));
   }
   await user.click(await screen.findByTestId(`language-option-${target}`));
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     await user.click(screen.getByTestId('course-dialog-next'));
   }
+  await fillSentenceForms(user);
   await user.click(screen.getByTestId('course-dialog-create'));
 }
 

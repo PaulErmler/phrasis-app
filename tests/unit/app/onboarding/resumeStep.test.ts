@@ -3,6 +3,7 @@ import {
   LEGACY_STEP_AFTER_FIRST_LESSON,
   PROGRESS_STEP_ORDER,
   resumeStepId,
+  isLegacyFlowRow,
 } from '@/app/app/onboarding/lib/resumeStep';
 
 describe('resumeStepId', () => {
@@ -22,24 +23,46 @@ describe('resumeStepId', () => {
   it('sends an older-order last step to review-mode, not the level picker', () => {
     // 7 was review-mode under the previous order and customizing under the
     // 12-step flow; both users had settled their level already.
-    expect(resumeStepId(7, {})).toBe('review-mode');
+    // Without a first-person answer the new questions come first (every
+    // course gets an explicit sentence-form setting); with one, review-mode.
+    expect(resumeStepId(7, {})).toBe('first-person-forms');
+    expect(resumeStepId(7, { firstPersonForms: 'both' })).toBe('review-mode');
     // Under the current order 7 is cefr-pick, and such rows carry priorApps.
     expect(resumeStepId(7, { priorApps: ['none'] })).toBe('cefr-pick');
   });
 
   it('sends a row past the wizard to review-mode', () => {
     expect(resumeStepId(PROGRESS_STEP_ORDER.length + 1, {})).toBe(
-      'review-mode',
+      'first-person-forms',
     );
+    expect(
+      resumeStepId(PROGRESS_STEP_ORDER.length + 1, {
+        firstPersonForms: 'feminine',
+      }),
+    ).toBe('review-mode');
   });
 
-  it('keeps headroom between the wizard and the legacy graduation cutoff', () => {
-    // A row at LEGACY_STEP_AFTER_FIRST_LESSON or beyond graduates straight
-    // to the dashboard (`useLegacyGraduation`), so a live wizard step must
-    // never reach that number. Inserting a step without raising the
-    // constant would force-finalize users mid-wizard.
-    expect(PROGRESS_STEP_ORDER.length).toBeLessThan(
+  it('tells a legacy-flow row from a new-order row past the graduation cutoff', () => {
+    // The wizard now has steps at and past LEGACY_STEP_AFTER_FIRST_LESSON
+    // (politeness, review-mode), so the graduation rule cannot key off the
+    // number alone: a new-order row there always carries the first-person
+    // answer, an old-flow row never does.
+    expect(PROGRESS_STEP_ORDER.length).toBeGreaterThanOrEqual(
       LEGACY_STEP_AFTER_FIRST_LESSON,
     );
+    expect(isLegacyFlowRow({ step: 9 })).toBe(true);
+    expect(isLegacyFlowRow({ step: 12 })).toBe(true);
+    expect(isLegacyFlowRow({ step: 9, firstPersonForms: 'both' })).toBe(false);
+    expect(isLegacyFlowRow({ step: 10, firstPersonForms: 'feminine' })).toBe(
+      false,
+    );
+    expect(isLegacyFlowRow({ step: 8 })).toBe(false);
+    expect(resumeStepId(8, { priorApps: ['none'] })).toBe('first-person-forms');
+    expect(
+      resumeStepId(9, { priorApps: ['none'], firstPersonForms: 'both' }),
+    ).toBe('politeness');
+    expect(
+      resumeStepId(10, { priorApps: ['none'], firstPersonForms: 'both' }),
+    ).toBe('review-mode');
   });
 });

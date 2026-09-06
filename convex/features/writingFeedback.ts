@@ -1,8 +1,9 @@
 import {
-  cardPinAt,
   servedSourceText,
-  servedTranslatedText,
   viewOfCard,
+  renderingSettingsOf,
+  renderingTextOf,
+  resolveServedRendering,
 } from '../db/translationReads';
 import { ConvexError, v, type Infer } from 'convex/values';
 import { action, internalMutation, internalQuery } from '../_generated/server';
@@ -46,6 +47,7 @@ import {
   TRANSCRIBE_GRADER_RESPONSE_FORMAT,
   TRANSCRIBE_GRADER_SYSTEM_PROMPT,
 } from '../lib/writingFeedbackPrompt';
+import { getCourseSettings } from '../db/courseSettings';
 
 /**
  * AI feedback for writing mode. One stateless grader call scores the user's
@@ -185,18 +187,42 @@ export const getGradingContext = internalQuery({
     // The source side as the card shows it (the accent row on a Mixed
     // English course), so the base line and the expected wording match
     // what the learner read.
-    const source = await servedSourceText(ctx, text, viewOfCard(card));
+    const view = viewOfCard(
+      card,
+      renderingSettingsOf(await getCourseSettings(ctx, course._id)),
+    );
+    const source = await servedSourceText(ctx, text, view);
     let expected: string | null;
+    // The register and gender the grader judges against: the served row's
+    // classifier stamps when the card shows a rendering variant (a polite
+    // answer on a polite card must not be marked wrong), else the text's
+    // own metadata.
+    let servedRegister: string | undefined;
+    let servedSpeakerGender: string | undefined;
     if (text.language === language) {
       expected = source.text;
     } else {
       // The wording the card shows (a pinned card may be on a superseded
-      // revision), which is what the learner was asked to write.
-      expected = await servedTranslatedText(ctx, {
+      // revision, a settings-following card on a variant), which is what
+      // the learner was asked to write.
+      const rendering = await resolveServedRendering(ctx, {
         textId: card.textId,
         targetLanguage: language,
-        pinAt: cardPinAt(card),
+        text: renderingTextOf(text),
+        view,
       });
+      expected = rendering.served?.row.translatedText ?? null;
+      const row = rendering.served?.row;
+      if (row?.variantKey !== undefined) {
+        if (row.renderedPoliteness && row.renderedPoliteness !== 'unmarked') {
+          servedRegister =
+            row.renderedPoliteness === 'casual' ? 'informal' : 'formal';
+        }
+        if (row.renderedGender && row.renderedGender !== 'unmarked') {
+          servedSpeakerGender =
+            row.renderedGender === 'masculine' ? 'male' : 'female';
+        }
+      }
     }
     // A language the course does not teach is a bogus request (nothing on
     // screen can produce it) and stays a hard miss. A course language whose
@@ -224,8 +250,8 @@ export const getGradingContext = internalQuery({
       expected,
       alternatives: alternativeRows.map((r) => r.text),
       metadata: {
-        register: text.register,
-        speakerGender: text.speakerGender,
+        register: servedRegister ?? text.register,
+        speakerGender: servedSpeakerGender ?? text.speakerGender,
         addresseeGender: text.addresseeGender,
         addresseeNumber: text.addresseeNumber,
         addressesSomeone: text.addressesSomeone,

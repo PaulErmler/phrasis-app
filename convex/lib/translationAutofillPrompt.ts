@@ -11,6 +11,10 @@ import {
 // Type-only, so this module stays free of the Convex runtime at import time.
 import type { ReasoningEffort } from '../features/translationLLM';
 import type { JSONValue } from 'ai';
+import {
+  pickPolitenessForm,
+  type RenderingSettings,
+} from '../../lib/preferenceResolution';
 
 /**
  * Everything the translation auto-fill needs to build a request and read a
@@ -161,6 +165,15 @@ export function describeTargetLanguage(code: string): string {
 export function buildAutofillUserPrompt(args: {
   texts: { language: string; text: string }[];
   resolvedTargets: string[];
+  /**
+   * The course's sentence-form settings (lib/languageForms.ts). When set,
+   * the block below overrides the "neutral default" halves of rules 2 and
+   * 3: a marked source still wins, an unmarked one takes the course's form
+   * and gender. `politenessSeed` picks one form per request when several
+   * levels are selected, so an import alternates like curriculum cards.
+   */
+  settings?: RenderingSettings;
+  politenessSeed?: string;
 }): string {
   const sourceDescription = args.texts
     .map((t) => `[${formatLangLabel(t.language)}]: ${t.text}`)
@@ -168,7 +181,48 @@ export function buildAutofillUserPrompt(args: {
   const targetList = args.resolvedTargets
     .map(describeTargetLanguage)
     .join('\n');
-  return `Source text(s):\n${sourceDescription}\n\nTranslate into these languages:\n${targetList}`;
+  const settingsBlock = buildAutofillSettingsBlock(
+    args.settings,
+    args.resolvedTargets,
+    args.politenessSeed ?? args.texts.map((t) => t.text).join('|'),
+  );
+  return `Source text(s):\n${sourceDescription}\n\nTranslate into these languages:\n${targetList}${settingsBlock}`;
+}
+
+/**
+ * The course-settings block of the user prompt. Politeness is stated per
+ * target that marks it, in that language's own form (lib/languageForms.ts
+ * prompt text), and it replaces rule 2's neutral default: a source
+ * rendering that marks register explicitly still wins, since the user
+ * typed it. Gender replaces rule 3's default for unmarked sources.
+ */
+export function buildAutofillSettingsBlock(
+  settings: RenderingSettings | undefined,
+  resolvedTargets: string[],
+  seed: string,
+): string {
+  if (!settings) return '';
+  const lines: string[] = [];
+  if (
+    settings.firstPersonForms === 'masculine' ||
+    settings.firstPersonForms === 'feminine'
+  ) {
+    const who = settings.firstPersonForms === 'masculine' ? 'a man' : 'a woman';
+    lines.push(
+      `- Speaker: unless a source rendering marks the speaker's gender, the speaker is ${who}: use ${settings.firstPersonForms} first-person forms wherever a target marks them, and report speakerGender as "${settings.firstPersonForms === 'masculine' ? 'male' : 'female'}" (the metadata describes the sentence as written, so the voice and the grader agree with it).`,
+    );
+  }
+  if (settings.politenessLevels && settings.politenessLevels.length > 0) {
+    for (const code of resolvedTargets) {
+      const form = pickPolitenessForm(code, settings.politenessLevels, seed);
+      if (!form) continue;
+      lines.push(
+        `- ${formatLangLabel(code)} politeness: unless a source rendering marks register explicitly, use the ${form.label}. ${form.prompt} Report register as the level you applied ("informal" for a casual form, "formal" for a polite or formal one), so the metadata describes the sentence as written.`,
+      );
+    }
+  }
+  if (lines.length === 0) return '';
+  return `\n\nCourse settings (these replace the "neutral default" of rules 2 and 3 and the "neutral" fallback of the metadata rules; an explicitly marked source rendering still wins):\n${lines.join('\n')}`;
 }
 
 export type ParsedAutofill = {
