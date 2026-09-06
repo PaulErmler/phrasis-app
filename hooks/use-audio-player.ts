@@ -198,6 +198,11 @@ export function useAudioPlayer(
   // Declared up here (not next to its sibling prev*Refs by the merge effect)
   // so it exists before the `pause` callback that also writes it.
   const hasAutoPlayedForCardRef = useRef(false);
+  // Set when the user pauses the silent bridge. The card the bridge was
+  // waiting for has not arrived yet, and the card-change effect below would
+  // otherwise reset `hasAutoPlayedForCardRef` when it does and start it.
+  // Consumed by that effect once, cleared by an explicit play.
+  const pausedDuringBridgeRef = useRef(false);
   const mergeAbortRef = useRef<AbortController | null>(null);
   const mediaSessionCleanupRef = useRef<(() => void) | null>(null);
   const languageCuesRef = useRef<LanguageCue[]>([]);
@@ -293,6 +298,7 @@ export function useAudioPlayer(
   // --------------------------------------------------------------------------
   const play = useCallback(() => {
     const audio = getAudio();
+    pausedDuringBridgeRef.current = false;
     if (!audio.src || audio.src === '') return;
     // Replaying after the audio has run to completion: browsers are
     // inconsistent about what a bare .play() call does on an ended element.
@@ -330,9 +336,12 @@ export function useAudioPlayer(
     if (endBridge(audio)) {
       // The user stopped a bridge: nothing real is loaded, so unload the
       // silence rather than leave a Play tap resuming it. The card's blob
-      // lands paused when its merge finishes (`hasAutoPlayed` is set above),
-      // and the prefetch the bridge was waiting for must not hand off into
-      // playback either: a pause is the user's answer to "keep going".
+      // lands paused when its merge finishes (`hasAutoPlayed` is set above
+      // and, since the next card may still be on its way, held across the
+      // card change by `pausedDuringBridgeRef`), and the prefetch the bridge
+      // was waiting for must not hand off into playback either: a pause is
+      // the user's answer to "keep going".
+      pausedDuringBridgeRef.current = true;
       awaitingHandoffRef.current = null;
       audio.pause();
       audio.removeAttribute('src');
@@ -733,7 +742,10 @@ export function useAudioPlayer(
     prevCompositionKeyRef.current = compositionKey;
 
     if (isCardChange || isCompositionChange) {
-      hasAutoPlayedForCardRef.current = false;
+      // A pause during the silent bridge answers for the card that arrives
+      // next: it lands paused instead of auto-playing.
+      hasAutoPlayedForCardRef.current = pausedDuringBridgeRef.current;
+      pausedDuringBridgeRef.current = false;
     }
 
     // A composition change re-bakes the blob under a new language layout and

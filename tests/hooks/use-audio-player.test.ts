@@ -867,6 +867,48 @@ describe('useAudioPlayer', () => {
       expect(playMock).toHaveBeenCalledTimes(1);
     });
 
+    it('a pause during the bridge holds when the next card arrives after the pause', async () => {
+      // The review was submitted from this tab, the ordering that autoplays
+      // a fresh card. The user paused the bridge before the card came back
+      // from the server, and the card change must not forget that.
+      const initiated = { getReviewInitiatedByThisTab: () => true };
+      const { result, rerender, audio, onScheduleComplete } =
+        await primeBridge(initiated);
+      vi.spyOn(audio, 'pause').mockImplementation(() => {});
+
+      act(() => result.current.pause());
+      expect(result.current.isPlaying).toBe(false);
+
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          cardId: 'card-2',
+          audioRecordings: nextRecordings,
+          nextCard: null,
+          ...initiated,
+        }),
+      );
+      const r2 = await resolveMerge(1, makeResult({ durationSec: 7 }));
+      expect(audio.src).toBe(r2.blobUrl);
+      expect(playMock).toHaveBeenCalledTimes(1);
+      expect(result.current.isPlaying).toBe(false);
+
+      // The pause answered for card 2 only: the card after it autoplays.
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          cardId: 'card-3',
+          audioRecordings: nextRecordings,
+          nextCard: null,
+          ...initiated,
+        }),
+      );
+      await resolveMerge(2, makeResult({ durationSec: 5 }));
+      expect(playMock).toHaveBeenCalledTimes(2);
+    });
+
     it('stops the bridge when the session runs out of cards', async () => {
       const { result, rerender, audio, onScheduleComplete } =
         await primeBridge();
