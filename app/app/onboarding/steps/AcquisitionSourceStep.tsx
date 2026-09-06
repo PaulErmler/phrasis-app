@@ -3,14 +3,10 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
 import { Check } from 'lucide-react';
 import type { AcquisitionSource } from '../types';
 import { shuffleKeepingLast } from '../lib/shuffleKeepingLast';
-import {
-  MAX_ONBOARDING_FREE_TEXT_LENGTH,
-  ONBOARDING_FREE_TEXT_SHOW_COUNT_REMAINING_THRESHOLD,
-} from '@/lib/constants/onboarding';
+import { OtherFreeTextField } from './OtherFreeTextField';
 
 interface Props {
   selected: AcquisitionSource | null;
@@ -78,48 +74,14 @@ export function AcquisitionSourceStep({
           })}
         </div>
         {selected === 'other' ? (
-          <div className="max-w-md mx-auto w-full mt-4 px-4 animate-in fade-in slide-in-from-top-2 duration-300">
-            {(() => {
-              const value = freeText ?? '';
-              const isOverLimit =
-                value.length > MAX_ONBOARDING_FREE_TEXT_LENGTH;
-              const remaining = MAX_ONBOARDING_FREE_TEXT_LENGTH - value.length;
-              const showCharCount =
-                isOverLimit ||
-                remaining <=
-                  ONBOARDING_FREE_TEXT_SHOW_COUNT_REMAINING_THRESHOLD;
-              return (
-                <>
-                  <div className="flex items-baseline justify-between gap-2 mb-2">
-                    <label
-                      htmlFor="other-source"
-                      className="text-sm text-muted-foreground"
-                    >
-                      {t('otherLabel')}
-                    </label>
-                    {showCharCount ? (
-                      <span
-                        data-testid="acquisition-other-char-count"
-                        className={`text-xs tabular-nums shrink-0 ${isOverLimit ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
-                      >
-                        {isOverLimit
-                          ? `+${value.length - MAX_ONBOARDING_FREE_TEXT_LENGTH}`
-                          : `${value.length}/${MAX_ONBOARDING_FREE_TEXT_LENGTH}`}
-                      </span>
-                    ) : null}
-                  </div>
-                  <Input
-                    id="other-source"
-                    data-testid="acquisition-other-input"
-                    placeholder={t('otherPlaceholder')}
-                    value={value}
-                    maxLength={MAX_ONBOARDING_FREE_TEXT_LENGTH}
-                    onChange={(e) => onFreeText(e.target.value)}
-                  />
-                </>
-              );
-            })()}
-          </div>
+          <OtherFreeTextField
+            id="other-source"
+            testIdPrefix="acquisition"
+            label={t('otherLabel')}
+            placeholder={t('otherPlaceholder')}
+            value={freeText}
+            onChange={onFreeText}
+          />
         ) : null}
       </div>
     </div>

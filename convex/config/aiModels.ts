@@ -55,6 +55,12 @@ export const OPENROUTER_MODELS = {
    *  auto language detection with code switching, $0.10 per audio hour.
    *  Replaced Azure Fast Transcription in Sep 2026. */
   stt: 'microsoft/mai-transcribe-2',
+  /** Speech-to-text for languages MAI-Transcribe-2 does not cover
+   *  (convex/lib/stt/gemini.ts): the clip goes in as `input_audio` on a
+   *  chat completion. No word timestamps, so no karaoke; text only. Routed
+   *  per language via `sttBackend` in lib/languages.ts (Uzbek, Sep 2026).
+   *  Measured $0.00012–0.00018 per 6–8 s sentence, under MAI's rate. */
+  sttGemini: 'google/gemini-3.1-flash-lite',
 } as const;
 
 /**

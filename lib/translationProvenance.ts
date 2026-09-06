@@ -41,6 +41,16 @@ export const USER_PROVIDED_TRANSLATION_SOURCE = 'user-provided';
 export const CURATED_TRANSLATION_SOURCE = 'curated-manual';
 
 /**
+ * Provenance slug for rows that copy the source text verbatim: an
+ * accent-only variant (`en_gb` on an `en` sentence, see
+ * `Language.sharesTextWith` in lib/languages.ts) shows the same wording and
+ * differs only in voice. Deliberately NOT protected: a `translationVersion`
+ * sweep must be free to replace the LLM-spelled rows these superseded, and a
+ * verbatim row costs nothing to regenerate.
+ */
+export const SOURCE_VERBATIM_TRANSLATION_SOURCE = 'source-verbatim';
+
+/**
  * Translation provenances that no automated pass may overwrite or delete,
  * *independently of which text they hang off*.
  *

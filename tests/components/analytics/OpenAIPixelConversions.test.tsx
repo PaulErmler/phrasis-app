@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   status: 'granted' as 'granted' | 'denied' | 'pending' | 'initializing',
   native: false,
   user: null as Record<string, unknown> | null | undefined,
+  settings: null as Record<string, unknown> | null,
   customer: null as Record<string, unknown> | null,
   measure: vi.fn((..._args: unknown[]) => true),
   load: vi.fn(),
@@ -21,11 +22,16 @@ vi.mock('@/hooks/use-native-app', () => ({
 }));
 vi.mock('convex/react', () => ({
   useQuery: () => mocks.user,
+  usePreloadedQuery: () => mocks.settings,
+}));
+vi.mock('@/components/app/AppDataProvider', () => ({
+  useAppData: () => ({ preloadedSettings: {} }),
 }));
 vi.mock('autumn-js/react', () => ({
   useCustomer: () => ({ customer: mocks.customer, isLoading: false }),
 }));
 vi.mock('@/lib/openai-pixel', () => ({
+  SIGNUP_CUSTOM_EVENT_NAME: 'signup',
   loadOpenAIPixel: () => mocks.load(),
   measureConversion: (...args: unknown[]) => mocks.measure(...args),
   hasFired: (id: string) => mocks.fired.has(id),
@@ -76,6 +82,7 @@ describe('OpenAIPixelConversions', () => {
     mocks.status = 'granted';
     mocks.native = false;
     mocks.user = freshUser();
+    mocks.settings = { hasCompletedOnboarding: true };
     mocks.customer = freeCustomer();
     mocks.measure.mockClear();
     mocks.load.mockClear();
@@ -89,9 +96,14 @@ describe('OpenAIPixelConversions', () => {
     vi.useRealTimers();
   });
 
-  it('reports a fresh signup once, keyed for cross-channel dedupe', () => {
+  it('reports a signup and a finished onboarding once each, keyed for dedupe', () => {
     const { rerender } = render(<OpenAIPixelConversions />);
-    expect(mocks.measure).toHaveBeenCalledTimes(1);
+    expect(mocks.measure).toHaveBeenCalledTimes(2);
+    expect(mocks.measure).toHaveBeenCalledWith(
+      'custom',
+      { type: 'custom' },
+      { custom_event_name: 'signup', event_id: 'signup:u1' },
+    );
     expect(mocks.measure).toHaveBeenCalledWith(
       'registration_completed',
       { type: 'customer_action' },
@@ -99,7 +111,39 @@ describe('OpenAIPixelConversions', () => {
     );
 
     rerender(<OpenAIPixelConversions />);
+    expect(mocks.measure).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports the signup but waits for the wizard before the registration', () => {
+    // A signup that never picks a language pair is not the conversion the
+    // campaigns optimize on, so only the weaker custom event goes out.
+    mocks.settings = { hasCompletedOnboarding: false };
+    const { rerender } = render(<OpenAIPixelConversions />);
     expect(mocks.measure).toHaveBeenCalledTimes(1);
+    expect(mocks.measure).toHaveBeenCalledWith(
+      'custom',
+      { type: 'custom' },
+      { custom_event_name: 'signup', event_id: 'signup:u1' },
+    );
+
+    mocks.settings = { hasCompletedOnboarding: true };
+    rerender(<OpenAIPixelConversions />);
+    expect(mocks.measure).toHaveBeenCalledWith(
+      'registration_completed',
+      { type: 'customer_action' },
+      { event_id: 'registration:u1' },
+    );
+  });
+
+  it('holds the registration back while settings have not arrived', () => {
+    mocks.settings = null;
+    render(<OpenAIPixelConversions />);
+    expect(mocks.measure).toHaveBeenCalledTimes(1);
+    expect(mocks.measure).not.toHaveBeenCalledWith(
+      'registration_completed',
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   it('loads the pixel itself before measuring, so effect order cannot drop an event', () => {
@@ -108,13 +152,16 @@ describe('OpenAIPixelConversions', () => {
     // effect first. Measuring against an unloaded pixel would return false
     // and the effect deps would never change again.
     render(<OpenAIPixelConversions />);
-    expect(mocks.load).toHaveBeenCalledTimes(1);
+    // Once per conversion; the real loader is idempotent.
+    expect(mocks.load).toHaveBeenCalledTimes(2);
     expect(mocks.load.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.measure.mock.invocationCallOrder[0],
     );
   });
 
   it('does not report an account older than the signup window', () => {
+    // Every existing user carries the completed flag, so the window is what
+    // stops the first app open after deploy reporting the whole user base.
     mocks.user = oldUser();
     render(<OpenAIPixelConversions />);
     expect(mocks.measure).not.toHaveBeenCalled();
@@ -141,7 +188,7 @@ describe('OpenAIPixelConversions', () => {
     mocks.measure.mockReturnValue(true);
     rerender(<OpenAIPixelConversions />);
     // Still deduped by the effect deps, but a later mount would retry.
-    expect(mocks.measure).toHaveBeenCalledTimes(1);
+    expect(mocks.measure).toHaveBeenCalledTimes(2);
   });
 
   it('reports subscription_created for a paid plan only behind a checkout marker', () => {

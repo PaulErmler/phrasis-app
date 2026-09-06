@@ -8,7 +8,7 @@ import {
 
 export { tokenizeText, isAllLowercase, type Token };
 
-const MAX_TEXTS_PER_WORD = 30;
+export const MAX_TEXTS_PER_WORD = 30;
 
 export async function trackNewWords(
   ctx: MutationCtx,

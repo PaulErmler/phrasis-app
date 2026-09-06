@@ -67,6 +67,8 @@ describe('buildSignupNotification', () => {
       dailyTimeGoalMinutes: 20,
       learningGoals: ['travel', 'family'],
       learningGoalFreeText: 'moving to Madrid',
+      priorApps: ['anki', 'duolingo', 'other'],
+      priorAppsFreeText: 'Memrise',
       acquisitionSource: 'tiktok',
       acquisitionSourceFreeText: 'saw a video',
     },
@@ -92,6 +94,7 @@ describe('buildSignupNotification', () => {
       'First lesson: 8 cards · 6 new words · 5 min',
       'Daily goal: 20 min/day',
       'Goals: travel, family, "moving to Madrid"',
+      'Apps used before: anki, duolingo, other, "Memrise"',
       'Found us via: tiktok — "saw a video"',
       'Study so far: 23 reps · 7 min',
     ]);

@@ -242,6 +242,41 @@ describe('addCardsFromCollection: batch added behind the card on screen', () => 
     }
   });
 
+  it('adds the batch behind the shown card only once, whichever tab asks', async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    const { collId, deckId, textIds } = await seedCourseWithTexts(t, 8);
+    const shownDue = Date.now() - 30_000;
+    const shownCard = await seedRecentlyDueCard(
+      t,
+      deckId,
+      textIds[0],
+      collId,
+      shownDue,
+    );
+    const asUser = t.withIdentity({ subject: USER });
+
+    // Two learn views on the same last card each ask for the next batch.
+    const first = await asUser.mutation(
+      api.features.decks.addCardsFromCollection,
+      { collectionId: collId, batchSize: 3, afterCardId: shownCard },
+    );
+    const second = await asUser.mutation(
+      api.features.decks.addCardsFromCollection,
+      { collectionId: collId, batchSize: 3, afterCardId: shownCard },
+    );
+    expect(first.cardsAdded).toBe(3);
+    expect(second.cardsAdded).toBe(0);
+    expect(await dueDatesOfOtherCards(t, deckId, shownCard)).toHaveLength(3);
+
+    // A plain add (no card on screen) is not held back by the queued batch.
+    const plain = await asUser.mutation(
+      api.features.decks.addCardsFromCollection,
+      { collectionId: collId, batchSize: 3 },
+    );
+    expect(plain.cardsAdded).toBe(3);
+  });
+
   it('ignores an afterCardId from another deck', async () => {
     vi.useFakeTimers();
     const t = convexTest(schema, modules);

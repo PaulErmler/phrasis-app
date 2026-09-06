@@ -30,6 +30,13 @@ import { reportError } from '@/lib/report-error';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { convexErrorCode } from '@/lib/utils';
 import { shouldAdvanceOnEnter } from './lib/enterToAdvance';
+import { togglePriorApp } from './lib/togglePriorApp';
+import {
+  LEGACY_STEP_AFTER_FIRST_LESSON,
+  PROGRESS_STEP_ORDER,
+  resumeStepId,
+  type StepId,
+} from './lib/resumeStep';
 
 /**
  * One sink for the wizard's swallow points: console + error tracking (the
@@ -55,6 +62,7 @@ import type {
   WritingInputMode,
   AcquisitionSource,
   LearningReason,
+  PriorApp,
   DailyTimeGoalMinutes,
   PlacementTestState,
 } from './types';
@@ -68,6 +76,7 @@ import {
 import { LanguagePairStep } from './steps/LanguagePairStep';
 import { AcquisitionSourceStep } from './steps/AcquisitionSourceStep';
 import { LearningGoalStep } from './steps/LearningGoalStep';
+import { PriorAppsStep } from './steps/PriorAppsStep';
 import { DailyTimeGoalStep } from './steps/DailyTimeGoalStep';
 import { ProficiencyBranchStep } from './steps/ProficiencyBranchStep';
 import { CefrSelfPickStep } from './steps/CefrSelfPickStep';
@@ -80,13 +89,14 @@ import { ReviewModeStep, type ReviewModeChoice } from './steps/ReviewModeStep';
  *
  * Step / id / next:
  *   1.  language-pair         → acquisition
- *   2.  acquisition           → goal
- *   3.  goal                  → daily-time
- *   4.  daily-time            → proficiency
- *   5.  proficiency           → cefr-pick | placement-test | review-mode (depends on branch)
- *   6a. cefr-pick             → review-mode
- *   6b. placement-test        → review-mode
- *   7.  review-mode           → done: Continue runs `completeOnboarding`
+ *   2.  acquisition           → prior-apps
+ *   3.  prior-apps            → goal
+ *   4.  goal                  → daily-time
+ *   5.  daily-time            → proficiency
+ *   6.  proficiency           → cefr-pick | placement-test | review-mode (depends on branch)
+ *   7a. cefr-pick             → review-mode
+ *   7b. placement-test        → review-mode
+ *   8.  review-mode           → done: Continue runs `completeOnboarding`
  *                               (course + deck + seeded cards) then
  *                               `finalizeOnboarding`, and lands the user in
  *                               the REAL learning mode at /app/learn: no
@@ -99,50 +109,6 @@ import { ReviewModeStep, type ReviewModeChoice } from './steps/ReviewModeStep';
  * It stays false until `finalizeOnboarding`, so mid-flow reloads resume
  * from `onboardingProgress.step`.
  */
-
-type StepId =
-  | 'language-pair'
-  | 'acquisition'
-  | 'goal'
-  | 'daily-time'
-  | 'proficiency'
-  | 'cefr-pick'
-  | 'placement-test'
-  | 'review-mode';
-
-const PROGRESS_STEP_ORDER: StepId[] = [
-  'language-pair',
-  'acquisition',
-  'goal',
-  'daily-time',
-  'proficiency',
-  'cefr-pick', // collapsed with placement-test for progress purposes
-  'review-mode',
-];
-
-/**
- * First step of the retired 12-step flow that sits AFTER the embedded first
- * lesson: 7 customizing, 8 first-lesson, 9 stats-recap, 10 word-projection,
- * 11 feature-tour, 12 plan-pick. A row at 9+ means the user finished or
- * skipped that lesson. Everything the wizard still asks for is already
- * answered, and everything past it (stats recap, word projection, feature
- * tour, plan pick) no longer exists. Those users are graduated straight out
- * to the dashboard instead of being walked back through the wizard; see
- * `useLegacyGraduation`.
- */
-const LEGACY_STEP_AFTER_FIRST_LESSON = 9;
-
-/** Map a persisted 1-based step number onto the current wizard order. */
-function resumeStepId(savedStep: number): StepId {
-  // Steps 1-6 line up with the previous wizard order. 7 (customizing) and 8
-  // (mid-first-lesson) are old-flow rows whose users already answered the
-  // survey but never settled a review mode, so resume them at the final mode
-  // pick. `completeOnboarding` is idempotent, so users whose course already
-  // exists (old flow got past customizing) just re-confirm the mode and
-  // finish. Rows at 9+ never reach here. They graduate out first.
-  if (savedStep > PROGRESS_STEP_ORDER.length) return 'review-mode';
-  return PROGRESS_STEP_ORDER[savedStep - 1] ?? 'language-pair';
-}
 
 export default function OnboardingPage() {
   return (
@@ -282,7 +248,7 @@ function OnboardingContent() {
   // Rehydrate wizard state + resume step from `onboardingProgress`. Mid-flow
   // refreshes return to the same step the user left off on.
   const initialStepId: StepId = onboardingProgress?.step
-    ? resumeStepId(onboardingProgress.step)
+    ? resumeStepId(onboardingProgress.step, onboardingProgress)
     : 'language-pair';
   const initialFlowData: OnboardingData = {
     ...EMPTY_ONBOARDING_DATA,
@@ -304,6 +270,8 @@ function OnboardingContent() {
               | LearningReason[]
               | undefined) ?? [],
           learningGoalFreeText: onboardingProgress.learningGoalFreeText ?? null,
+          priorApps: (onboardingProgress.priorApps as PriorApp[]) ?? [],
+          priorAppsFreeText: onboardingProgress.priorAppsFreeText ?? null,
           dailyTimeGoalMinutes:
             (onboardingProgress.dailyTimeGoalMinutes as DailyTimeGoalMinutes) ??
             null,
@@ -351,6 +319,8 @@ interface SaveProgressArgs {
   acquisitionSourceFreeText?: string;
   learningGoals?: string[];
   learningGoalFreeText?: string;
+  priorApps?: string[];
+  priorAppsFreeText?: string;
   dailyTimeGoalMinutes?: number;
   placementTest?: Omit<PlacementTestState, 'strategyVersion'> & {
     strategyVersion?: number;
@@ -404,6 +374,8 @@ export function buildProgressPayload(
     acquisitionSourceFreeText: fd.acquisitionSourceFreeText ?? undefined,
     learningGoals: fd.learningGoals.length > 0 ? fd.learningGoals : undefined,
     learningGoalFreeText: fd.learningGoalFreeText ?? undefined,
+    priorApps: fd.priorApps.length > 0 ? fd.priorApps : undefined,
+    priorAppsFreeText: fd.priorAppsFreeText ?? undefined,
     dailyTimeGoalMinutes: fd.dailyTimeGoalMinutes ?? undefined,
     placementTest: fd.placementTest ?? undefined,
   };
@@ -699,6 +671,8 @@ function OnboardingWizard({
         return !isLanguagePairValid;
       case 'acquisition':
         return data.acquisitionSource === null;
+      case 'prior-apps':
+        return data.priorApps.length === 0;
       case 'goal':
         return data.learningGoals.length === 0;
       case 'daily-time':
@@ -720,6 +694,9 @@ function OnboardingWizard({
         await onLanguagePairContinue();
         return;
       case 'acquisition':
+        advance('prior-apps');
+        return;
+      case 'prior-apps':
         advance('goal');
         return;
       case 'goal':
@@ -872,6 +849,26 @@ function renderStep({
           freeText={data.acquisitionSourceFreeText}
           onSelect={(s) => persist({ acquisitionSource: s })}
           onFreeText={(t) => persist({ acquisitionSourceFreeText: t })}
+        />
+      );
+    case 'prior-apps':
+      return (
+        <PriorAppsStep
+          selected={data.priorApps}
+          freeText={data.priorAppsFreeText}
+          onToggle={(app) => {
+            const priorApps = togglePriorApp(data.priorApps, app);
+            // The free text belongs to "other". Dropping that option, or
+            // picking "none", drops the text with it, so the signup email
+            // never reads `none, "Memrise"`.
+            persist({
+              priorApps,
+              ...(priorApps.includes('other')
+                ? {}
+                : { priorAppsFreeText: null }),
+            });
+          }}
+          onFreeText={(t) => persist({ priorAppsFreeText: t })}
         />
       );
     case 'goal':

@@ -610,6 +610,8 @@
       "practiceListeningDescription": "Die Zielsprache vor der Ausgangssprache abspielen",
       "practiceSpeaking": "Sprechen üben",
       "practiceSpeakingDescription": "Die Zielsprache nach der Ausgangssprache abspielen",
+      "listeningPracticeLabel": "Hörverstehen",
+      "listeningOnlyBlocked": "Du brauchst mindestens eine Wiederholung außerhalb des Hörverstehens.",
       "onlyNew": "Nur neue Karten",
       "strategyOnlyNew": "Nur neue Sätze",
       "strategyOnlyNewDescription": "Hörverstehen für so viele erste Wiederholungen eines Satzes üben",
@@ -1170,6 +1172,21 @@
       },
       "otherLabel": "Sag uns, wo (optional)",
       "otherPlaceholder": "z.B. TikTok, Podcast, Sprachlehrer..."
+    },
+    "priorApps": {
+      "title": "Welche davon hast du schon benutzt?",
+      "subtitle": "Wähle alles aus, was zutrifft — so wissen wir, was du gewohnt bist.",
+      "options": {
+        "anki": "Anki",
+        "glossika": "Glossika",
+        "clozemaster": "Clozemaster",
+        "babbel": "Babbel",
+        "duolingo": "Duolingo",
+        "other": "Eine andere App",
+        "none": "Keine davon"
+      },
+      "otherLabel": "Welche? (optional)",
+      "otherPlaceholder": "z.B. Memrise, Pimsleur, LingQ..."
     },
     "goal": {
       "title": "Warum lernst du diese Sprache?",

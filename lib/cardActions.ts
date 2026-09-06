@@ -17,11 +17,15 @@ export const PINNABLE_CARD_ACTIONS = [
 
 export type PinnableCardAction = (typeof PINNABLE_CARD_ACTIONS)[number];
 
+// Regenerate-audio is on the surface by default (2026-09-04) so a learner
+// who hears a bad clip can fix it in one tap without opening the menu. Users
+// who have saved their own pins keep them; only the empty default changes.
 export const DEFAULT_PINNED_CARD_ACTIONS: readonly PinnableCardAction[] = [
   'favorite',
   'master',
   'hide',
   'edit',
+  'regenerateAudio',
 ];
 
 export const MAX_PINNED_CARD_ACTIONS = 5;

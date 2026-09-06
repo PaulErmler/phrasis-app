@@ -22,7 +22,11 @@ import { llmPool, llmWarmPool } from '@/convex/lib/workpools';
 import { claimLlmTranslationIfAvailable } from '../../features/llmTranslationQueue';
 import type { WorkId } from '@convex-dev/workpool';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
-import { translationRevisions } from '../../db/translationReads';
+import {
+  liveTranslation,
+  translationRevisions,
+} from '../../db/translationReads';
+import { SOURCE_VERBATIM_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
 
 const mockEnqueue = vi.mocked(llmPool.enqueueAction);
 const mockWarmEnqueue = vi.mocked(llmWarmPool.enqueueAction);
@@ -865,6 +869,159 @@ describe('features/llmTranslationQueue', () => {
       ).rejects.toThrow(/non-openrouter language reached worker/);
 
       expect(vi.mocked(generateText)).not.toHaveBeenCalled();
+    });
+
+    describe('accent rewrite (en sentence on an en_gb course)', () => {
+      async function seedEnglish(t: TestConvex<typeof schema>, text: string) {
+        return t.run(async (ctx) => {
+          const collectionId = await ctx.db.insert('collections', {
+            name: 'A1',
+            textCount: 1,
+          });
+          return ctx.db.insert('texts', {
+            text,
+            language: 'en',
+            userCreated: false,
+            collectionId,
+            collectionRank: 1,
+            addressesSomeone: true,
+            addresseeGender: 'male',
+            referentGender: 'female',
+            speakerGender: 'neutral',
+            register: 'formal',
+          });
+        });
+      }
+
+      it('runs the rewrite prompt on the accent chain, whatever rule override the job carries', async () => {
+        const t = convexTest(schema, modules);
+        const textId = await seedEnglish(t, 'What is your favorite color?');
+        mockGenerateTextOk('What is your favourite colour?');
+
+        await t.action(
+          internal.features.llmTranslationQueue.processLlmTranslationForCard,
+          {
+            textId,
+            sourceLanguage: 'en',
+            targetLanguage: 'en_gb',
+            text: 'What is your favorite color?',
+            ruleOverride: 'retranslation_high',
+          },
+        );
+
+        const call = vi.mocked(generateText).mock.calls[0][0] as any;
+        expect(call.model.modelId).toBe('openai/gpt-5.6-luna:nitro');
+        expect(call.prompt).toContain('British readers');
+        expect(call.prompt).toContain(
+          '<source>What is your favorite color?</source>',
+        );
+        expect(call.prompt).not.toContain('<register>');
+        expect(call.providerOptions.openrouter.reasoning).toEqual({
+          enabled: false,
+        });
+        const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_gb'));
+        expect(row).toMatchObject({
+          translatedText: 'What is your favourite colour?',
+          translationSource: 'openai/gpt-5.6-luna:nitro-none',
+        });
+      });
+
+      it('stores an unchanged answer as a verbatim row, so the audio clip stays shared', async () => {
+        const t = convexTest(schema, modules);
+        const textId = await seedEnglish(t, 'Good afternoon.');
+        mockGenerateTextOk('"Good afternoon."');
+
+        await t.action(
+          internal.features.llmTranslationQueue.processLlmTranslationForCard,
+          {
+            textId,
+            sourceLanguage: 'en',
+            targetLanguage: 'en_gb',
+            text: 'Good afternoon.',
+          },
+        );
+
+        const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_gb'));
+        expect(row).toMatchObject({
+          translatedText: 'Good afternoon.',
+          translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
+        });
+      });
+
+      it('a German sentence with an en_gb target is still a translation on the language rule', async () => {
+        const t = convexTest(schema, modules);
+        const textId = await t.run(async (ctx) => {
+          const collectionId = await ctx.db.insert('collections', {
+            name: 'custom',
+            textCount: 1,
+          });
+          return ctx.db.insert('texts', {
+            text: 'Guten Morgen',
+            language: 'de',
+            userCreated: true,
+            userId: 'user_A',
+            collectionId,
+            collectionRank: 1,
+            referentGender: 'male',
+          });
+        });
+        mockGenerateTextOk('Good morning');
+
+        await t.action(
+          internal.features.llmTranslationQueue.processLlmTranslationForCard,
+          {
+            textId,
+            sourceLanguage: 'de',
+            targetLanguage: 'en_gb',
+            text: 'Guten Morgen',
+          },
+        );
+
+        const call = vi.mocked(generateText).mock.calls[0][0] as any;
+        expect(call.prompt).toContain('translator');
+        expect(call.prompt).not.toContain('British readers');
+        const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_gb'));
+        expect(row?.translationSource).not.toBe(
+          SOURCE_VERBATIM_TRANSLATION_SOURCE,
+        );
+      });
+
+      it('when every stage fails, onComplete stores the source text verbatim instead of Google and releases the claim', async () => {
+        const t = convexTest(schema, modules);
+        const textId = await seedEnglish(t, 'Hello world');
+        const claimId = await t.run((ctx) =>
+          ctx.db.insert('llmTranslationClaims', {
+            textId,
+            targetLanguage: 'en_gb',
+            claimedAt: Date.now(),
+            workId: 'llm-w-accent',
+          }),
+        );
+        mockEnqueue.mockClear();
+
+        await t.mutation(
+          internal.features.llmTranslationQueue.onLlmTranslationComplete,
+          {
+            workId: 'llm-w-accent' as WorkId,
+            context: {
+              textId,
+              sourceLanguage: 'en',
+              targetLanguage: 'en_gb',
+              text: 'Hello world',
+              audioSpeakerGender: 'female',
+            },
+            result: { kind: 'failed', error: 'stage chain failed' },
+          },
+        );
+
+        expect(mockEnqueue).not.toHaveBeenCalled();
+        const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_gb'));
+        expect(row).toMatchObject({
+          translatedText: 'Hello world',
+          translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
+        });
+        expect(await t.run((ctx) => ctx.db.get(claimId))).toBeNull();
+      });
     });
 
     it('omits <addressee_gender> and <register> from the prompt when addressesSomeone=false', async () => {

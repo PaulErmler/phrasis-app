@@ -81,10 +81,12 @@ async function seedCourseCardText(
     }
     // Stamp searchableText exactly as card creation would, from the content
     // present at this moment.
-    const built = await buildCardSearchableText(ctx, textId, opts.sourceText, [
-      ...opts.baseLanguages,
-      ...opts.targetLanguages,
-    ]);
+    const built = await buildCardSearchableText(
+      ctx,
+      textId,
+      [...opts.baseLanguages, ...opts.targetLanguages],
+      { view: {} },
+    );
     const cardId = await ctx.db.insert('cards', {
       deckId,
       textId,

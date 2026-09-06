@@ -242,6 +242,11 @@ export const ESSENTIAL_GREETING_TRANSLATIONS: Record<
     howAreYou: { text: 'Nasılsın?' },
     helloHowAreYou: { text: 'Merhaba. Nasılsın?' },
   },
+  uz: {
+    hello: { text: 'Salom.' },
+    howAreYou: { text: 'Qalaysan?' },
+    helloHowAreYou: { text: 'Salom. Qalaysan?' },
+  },
   hu: {
     hello: { text: 'Szia.' },
     howAreYou: { text: 'Hogy vagy?' },

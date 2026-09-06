@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { CumulativeLineChart } from '@/components/app/stats/CumulativeLineChart';
 
@@ -34,7 +35,6 @@ describe('CumulativeLineChart smoke', () => {
           { date: todayUtc(), reps: 12, newCards: 4, timeMs: 90_000 },
         ]}
         monthlyData={[]}
-        weeklyData={[]}
         timezone="UTC"
       />,
     );
@@ -60,17 +60,30 @@ describe('CumulativeLineChart smoke', () => {
 
   it('shows the empty state when the cumulative series stays at zero', () => {
     const { container } = render(
-      <CumulativeLineChart
-        dailyData={[]}
-        monthlyData={[]}
-        weeklyData={[]}
-        timezone="UTC"
-      />,
+      <CumulativeLineChart dailyData={[]} monthlyData={[]} timezone="UTC" />,
     );
 
     expect(screen.getByText('noData')).toBeInTheDocument();
     expect(
       container.querySelector('[data-slot="chart"]'),
     ).not.toBeInTheDocument();
+  });
+
+  it('the year view is built from the monthly rows', async () => {
+    const month = todayUtc().slice(0, 7);
+    const { container } = render(
+      <CumulativeLineChart
+        dailyData={[]}
+        monthlyData={[
+          { month, totalRepetitions: 40, totalNewCards: 9, totalTimeMs: 1 },
+        ]}
+        timezone="UTC"
+      />,
+    );
+    // Month view: nothing today, so the series stays flat at zero.
+    expect(screen.getByText('noData')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'year' }));
+    expect(container.querySelector('[data-slot="chart"]')).toBeInTheDocument();
   });
 });

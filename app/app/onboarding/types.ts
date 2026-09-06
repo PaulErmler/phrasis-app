@@ -21,6 +21,20 @@ export type AcquisitionSource =
   | 'appstore'
   | 'other';
 
+/**
+ * Language apps the user has tried before. Multi-select: `none` is exclusive
+ * with the rest (see `lib/togglePriorApp.ts`), `other` opens a free-text
+ * field for apps not on the list.
+ */
+export type PriorApp =
+  | 'anki'
+  | 'glossika'
+  | 'clozemaster'
+  | 'babbel'
+  | 'duolingo'
+  | 'other'
+  | 'none';
+
 export type LearningReason =
   | 'travel'
   | 'family'
@@ -70,6 +84,11 @@ export interface OnboardingData {
    *  rows. The legacy singular field `learningGoal` is no longer written. */
   learningGoals: LearningReason[];
   learningGoalFreeText: string | null;
+  /** Multi-select prior-app answers. Empty array until the user picks at
+   *  least one (including "none"). Persisted as `priorApps` on the progress
+   *  row and reported in the signup notification email. */
+  priorApps: PriorApp[];
+  priorAppsFreeText: string | null;
   dailyTimeGoalMinutes: DailyTimeGoalMinutes | null;
   placementTest: PlacementTestState | null;
 
@@ -87,6 +106,8 @@ export const EMPTY_ONBOARDING_DATA: OnboardingData = {
   acquisitionSourceFreeText: null,
   learningGoals: [],
   learningGoalFreeText: null,
+  priorApps: [],
+  priorAppsFreeText: null,
   dailyTimeGoalMinutes: null,
   placementTest: null,
   proficiencyBranch: null,

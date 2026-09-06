@@ -97,8 +97,9 @@ export const ttsWarmPool = new Workpool(components.ttsWarmPool, {
 });
 
 /**
- * Background data-sweep pool, currently only the separateModeTracking
- * writing-track seed (convex/migrations/seedWritingTrack.ts).
+ * Background data-sweep pool: the separateModeTracking writing-track seed
+ * (convex/migrations/seedWritingTrack.ts) and the one-off study-day due-date
+ * snap (convex/migrations/snapDueDatesToStudyDay.ts).
  *
  * Deliberately NO retry config: the pool does not retry mutations (Convex
  * already retries them on OCC and transient failures, and they're
@@ -116,3 +117,15 @@ export const ttsWarmPool = new Workpool(components.ttsWarmPool, {
 export const seedPool = new Workpool(components.seedPool, {
   maxParallelism: 4,
 });
+
+/**
+ * The `result` an onComplete handler receives from any pool. Spelled out
+ * here because the pool consumers type their handler params explicitly: a
+ * handler that references same-file functions through `internal.…` cannot
+ * have its types inferred through the generated `internal` object without a
+ * circularity, which collapses every handler in the module to `any`.
+ */
+export type PoolRunResult =
+  | { kind: 'success'; returnValue: unknown }
+  | { kind: 'failed'; error: string }
+  | { kind: 'canceled' };

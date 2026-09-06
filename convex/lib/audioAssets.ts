@@ -2,19 +2,60 @@ import { MutationCtx, QueryCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
 import { internal } from '../_generated/api';
 import {
+  getAudioAssetLanguage,
   getTtsProviderForLanguage,
   isTtsVersionStale,
 } from '../../lib/languages';
+import {
+  getVoiceGenderByApiCode,
+  getVoiceLocale,
+  getVoiceLocalesForLanguage,
+} from '../../lib/voices';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import { sha256Hex } from './sha256';
-import type { TtsProvider, VoiceGender } from '../types';
+import type { Infer } from 'convex/values';
+import {
+  ttsQualityValidator,
+  type TtsProvider,
+  type VoiceGender,
+} from '../types';
+
+export type TtsQuality = Infer<typeof ttsQualityValidator>;
 
 /**
  * Content-addressed audio store helpers. An `audioAssets` row is keyed by
  * (language, voiceGender, regionVariant, spokenTextHash) and OWNS its storage
  * blob; `audioRecordings` rows are thin (textId, language) → assetId pointers.
  * See the schema comments for the full model.
+ *
+ * `language` in the key is the CACHE language (`getAudioAssetLanguage`):
+ * accent-only variants share their text language's cache (`en_gb` → `en`),
+ * and the accent rides in `regionVariant` as the voice locale (`en-GB`).
+ * Build keys with `buildAudioAssetKey` so no caller keys by a raw course code.
  */
+
+/**
+ * The asset key for audio spoken in `language` (a course/row language code)
+ * by `voiceName`. Maps the language to its cache language and, when the
+ * caller has no dialect pin of its own (es_mixed rows carry the translation's
+ * `regionVariant`), takes the accent from the voice's locale so a mixed-pool
+ * clip (`Leda@en-GB` picked for `en`) is stored as British and later found by
+ * an `en_gb` lookup.
+ */
+export function buildAudioAssetKey(args: {
+  language: string;
+  voiceGender: VoiceGender;
+  voiceName: string;
+  regionVariant: string | undefined;
+  spokenText: string;
+}): AudioAssetKey {
+  return {
+    language: getAudioAssetLanguage(args.language),
+    voiceGender: args.voiceGender,
+    regionVariant: args.regionVariant ?? getVoiceLocale(args.voiceName),
+    spokenText: args.spokenText,
+  };
+}
 
 /**
  * Delay before a blob replaced by an in-place asset swap is reference-checked
@@ -22,6 +63,41 @@ import type { TtsProvider, VoiceGender } from '../types';
  * still download the old audio; only after this window is the blob dropped.
  */
 export const BLOB_SWAP_DELETE_DELAY_MS = 10 * 60 * 1000;
+
+/**
+ * How many failed STT backfill runs an asset gets before the sweep stops
+ * asking (`scheduleTimingsBackfillIfNeeded`, `hasMissingContent`) and an
+ * 'unchecked' clip is settled as 'unvalidated'. Bounds the cost of an STT
+ * outage to a handful of calls per clip instead of one per card view.
+ */
+export const MAX_STT_BACKFILL_ATTEMPTS = 3;
+
+/**
+ * The asset that owns a storage blob. The backfill addresses assets by blob
+ * rather than through the (text, language) pointer: the pointer may have
+ * moved to a new asset, or the blob may belong to a superseded revision's
+ * asset, and either way the timings belong to the asset still holding it.
+ * A swapped blob finds nothing. `first()`, not `unique()`: a blob can be
+ * referenced by more than one asset row (`deleteStorageBlobIfUnreferenced`
+ * in convex/lib/audio.ts counts on it), and a throw here would skip
+ * `recordSttBackfillFailure`, so the attempt cap could never be reached.
+ */
+export async function audioAssetByStorageId(
+  ctx: QueryCtx | MutationCtx,
+  storageId: Id<'_storage'>,
+): Promise<Doc<'audioAssets'> | null> {
+  return ctx.db
+    .query('audioAssets')
+    .withIndex('by_storageId', (q) => q.eq('storageId', storageId))
+    .first();
+}
+
+/** True once an asset has used up its STT backfill attempts. */
+export function sttBackfillExhausted(
+  asset: Pick<Doc<'audioAssets'>, 'revalidationAttempts'>,
+): boolean {
+  return (asset.revalidationAttempts ?? 0) >= MAX_STT_BACKFILL_ATTEMPTS;
+}
 
 export interface AudioAssetKey {
   language: string;
@@ -36,7 +112,7 @@ export interface AudioAssetPayload {
   storageId: Id<'_storage'>;
   voiceName: string;
   ttsProvider?: TtsProvider;
-  ttsQuality?: 'unknown' | 'validated' | 'unvalidated';
+  ttsQuality?: TtsQuality;
   speed: number;
   wordTimings?: { word: string; start: number; end: number }[];
   ttsVersion?: number;
@@ -102,6 +178,72 @@ export async function findReusableAudioAsset(
 }
 
 /**
+ * Cache lookup for the enqueue paths, by course language + the voice that
+ * would otherwise be synthesized (`getVoiceForText`, which already carries
+ * the text's deterministic accent). The key is exactly the one the job's
+ * completion would upsert (`buildAudioAssetKey`), so a mixed-English text that
+ * hashed to British finds the clip an English (UK) course made of the same
+ * sentence, and never a clip in another accent: the text's accent is
+ * stable, reuse only happens within it. `regionVariant` is the translation
+ * row's dialect pin (es_mixed). Returns null when the voice is not in the
+ * curated list.
+ */
+export async function findReusableAudioAssetForVoice(
+  ctx: QueryCtx,
+  args: {
+    language: string;
+    voiceName: string;
+    regionVariant: string | undefined;
+    spokenText: string;
+  },
+): Promise<Doc<'audioAssets'> | null> {
+  const voiceGender = getVoiceGenderByApiCode(args.voiceName);
+  if (voiceGender === undefined) return null;
+  return findReusableAudioAsset(
+    ctx,
+    buildAudioAssetKey({ ...args, voiceGender }),
+  );
+}
+
+/**
+ * Exact-key lookup for callers that have no text id and no voice yet, and
+ * are happy with a clip in ANY accent of the language (chat proposal
+ * playback, writing alternatives): tries every accent the language's active
+ * pool produces, then the accent-less legacy key. Not a reusability check
+ * (no version/provider/blob gate), matching `findAudioAssetByKey`.
+ */
+export async function findAudioAssetInAnyAccent(
+  ctx: QueryCtx,
+  args: {
+    language: string;
+    voiceGender: VoiceGender;
+    spokenText: string;
+    /** Tried first. The accent the card's text speaks in, when known. */
+    preferredAccent?: string;
+  },
+): Promise<Doc<'audioAssets'> | null> {
+  const language = getAudioAssetLanguage(args.language);
+  const accents = [
+    ...(args.preferredAccent !== undefined ? [args.preferredAccent] : []),
+    ...getVoiceLocalesForLanguage(args.language),
+    undefined,
+  ];
+  const tried = new Set<string | undefined>();
+  for (const regionVariant of accents) {
+    if (tried.has(regionVariant)) continue;
+    tried.add(regionVariant);
+    const asset = await findAudioAssetByKey(ctx, {
+      language,
+      voiceGender: args.voiceGender,
+      regionVariant,
+      spokenText: args.spokenText,
+    });
+    if (asset) return asset;
+  }
+  return null;
+}
+
+/**
  * Result of `upsertAudioAsset`:
  *  - 'created': no asset existed for the key; a new one owns the payload blob.
  *  - 'replaced': the existing asset was patched to the payload (in-place swap;
@@ -154,9 +296,12 @@ export async function upsertAudioAsset(
   }
 
   const incomingIsFinal =
-    payload.ttsQuality === 'validated' || payload.ttsQuality === 'unvalidated';
+    payload.ttsQuality === 'validated' ||
+    payload.ttsQuality === 'unvalidated' ||
+    payload.ttsQuality === 'unchecked';
   // 'unknown' marks a mid-flight asset; undefined (legacy backfill) and the
-  // final qualities are completed audio.
+  // final qualities are completed audio. 'unchecked' is complete audio
+  // awaiting a verdict from the sweep's re-validation.
   const existingInFlight = existing.ttsQuality === 'unknown';
   if (!incomingIsFinal && !existingInFlight) {
     return { assetId: existing._id, outcome: 'kept', replacedStorageId: null };
@@ -271,7 +416,7 @@ export async function scheduleBlobSwapDelete(
 export interface ResolvedAudioPayload {
   storageId: Id<'_storage'>;
   voiceName: string;
-  ttsQuality: 'unknown' | 'validated' | 'unvalidated' | undefined;
+  ttsQuality: TtsQuality | undefined;
   ttsProvider: TtsProvider | undefined;
   voiceGender: VoiceGender;
   speed: number;

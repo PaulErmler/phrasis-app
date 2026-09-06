@@ -26,7 +26,10 @@
 import { generateText, type JSONValue } from 'ai';
 import { tryGetOpenRouter } from '../lib/openrouter';
 import { openrouterCostUsd, openrouterGenerationId } from '../lib/posthogAi';
-import { postProcessTranslation } from '../../lib/languages';
+import {
+  postProcessTranslation,
+  type AccentRewriteConfig,
+} from '../../lib/languages';
 import type { ModelStage, StageProviderConstraints } from '../../lib/languages';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
 
@@ -176,7 +179,73 @@ export type TranslationPromptArgs = {
    * sees what was rejected and what the user would rather it said.
    */
   userSuggestedTranslation?: string;
+  /**
+   * Accent rewrite instead of a translation (`Language.accentRewrite`: an
+   * `en` sentence on an `en_gb` course). `buildPrompt` then returns
+   * `buildAccentRewritePrompt` and ignores every context field above: the
+   * text is already English, so gender, register and arc context have no
+   * bearing, and feeding them in would only invite a re-translation.
+   */
+  accentRewrite?: AccentRewriteConfig;
 };
+
+/**
+ * The prompt for a light-touch accent rewrite. Everything in it is a
+ * deliberate constraint from the 2026-09-05 bench
+ * (scripts/eval-translation-accents.ts): identity is the expected answer
+ * for most inputs and is asked for by name; slang injection is the main
+ * failure mode for "Australian" and is forbidden by example; American
+ * content (names, units, currency, dates) and punctuation are frozen so a
+ * localiser cannot convert Fahrenheit or re-quote a sentence; "program" is
+ * the one word whose British spelling depends on sense and is called out.
+ */
+export function buildAccentRewritePrompt(
+  cfg: AccentRewriteConfig,
+  text: string,
+  opts?: {
+    /** A flagged rewrite: the model may return it again if it stands by it. */
+    previousTranslation?: string;
+    /** The learner's own wording, from a card edit; already sanitized. */
+    userSuggestedTranslation?: string;
+  },
+): string {
+  const previous = opts?.previousTranslation
+    ? [
+        ``,
+        `A previous rewrite, <prior>${opts.previousTranslation}</prior>, was flagged as wrong by a learner. Reconsider it: if it is the right ${cfg.name} rendering, return it again; otherwise return the rewrite you stand behind.`,
+      ]
+    : [];
+  const suggestion = opts?.userSuggestedTranslation
+    ? [
+        ``,
+        `A learner suggested <suggestion>${opts.userSuggestedTranslation}</suggestion>. Use it if it is correct ${cfg.name} English for the source; otherwise ignore it.`,
+      ]
+    : [];
+  return [
+    `You localise one English sentence for ${cfg.name} readers. The learner must get the same sentence, only in ${cfg.name} English.`,
+    ``,
+    `Change every Americanism of these three kinds. The examples show the kind; they are not a complete list:`,
+    `1. Spelling: ${cfg.spelling}.`,
+    `2. Everyday words that ${cfg.name} English says differently: ${cfg.vocabulary}.`,
+    `3. American grammar habits: ${cfg.grammar}.`,
+    ``,
+    `Change nothing else, even if it looks wrong:`,
+    `- the meaning, and the tense, aspect and mood of every verb. "just" with a present-tense verb means "simply" and never changes: "I just feel tired", "I just want to go home", "she just looks tired" stay word for word. Only "just" with a past-simple verb changes: "I just ate" -> "I've just eaten"`,
+    `- grammar mistakes, odd word choices and non-native phrasing: you are not proofreading, and a better synonym is never an accent change ("The girl is not here too", "the tip of his fingers", "a social person", "some openings" stay)`,
+    `- informal register, intensifiers and phrasal verbs ("way taller", "work out", "real sorry" stay)`,
+    `- words Britain uses too, even if America uses them more ("phone", "right away", "store", "okay" stay)`,
+    `- names, places, brands, institutions and what belongs to them ("the New York subway" stays), currencies, units, numbers, dates and times`,
+    `- punctuation, hyphens, capitalisation, quotation marks and line breaks ("vice president" stays unhyphenated)`,
+    `- no slang or regional colour added ("mate", "reckon", "whilst", "bloody")`,
+    ``,
+    `A replacement must leave the sentence grammatical ("waited in line" -> "waited in a queue").`,
+    `Return only the sentence. If nothing on the lists applies, return it unchanged.`,
+    ...previous,
+    ...suggestion,
+    ``,
+    `<source>${text}</source>`,
+  ].join('\n');
+}
 
 /**
  * Neutralize free-form user input before it is interpolated into a prompt.
@@ -227,6 +296,14 @@ function fullLanguageName(args: TranslationPromptArgs): string {
 
 /** Build the user-message string for one translation call. */
 export function buildPrompt(args: TranslationPromptArgs): string {
+  if (args.accentRewrite) {
+    return buildAccentRewritePrompt(args.accentRewrite, args.text, {
+      previousTranslation: args.previousTranslation,
+      userSuggestedTranslation: args.userSuggestedTranslation
+        ? sanitizeUntrustedForPrompt(args.userSuggestedTranslation)
+        : undefined,
+    });
+  }
   const contextLines = buildContextLines(args);
   const fullName = fullLanguageName(args);
 
@@ -330,6 +407,18 @@ export function buildJudgePrompt(
     ``,
     `Output only the id number of the best candidate. No commentary.`,
   ].join('\n');
+}
+
+/**
+ * The post-processing every model reply goes through before storage.
+ * Wrapping quotes come off, then the language's `postProcessTranslation`
+ * step runs. Exported so a caller comparing a reply against its source
+ * text, as the accent-rewrite identity check does, can put the source
+ * through the same normalisation rather than compare a cleaned reply
+ * against a raw source.
+ */
+export function normalizeModelOutput(targetLang: string, raw: string): string {
+  return postProcessTranslation(targetLang, stripWrappingQuotes(raw.trim()));
 }
 
 /** Strip a wrapping quote pair if present (some models still wrap despite instructions). */
@@ -457,10 +546,7 @@ export async function translateTextWithLLM(
   const finishReason = result.finishReason;
   // Post-process before the result leaves this module so downstream
   // romanization and storage both see the cleaned text.
-  const mt = postProcessTranslation(
-    args.targetLang,
-    stripWrappingQuotes(result.text.trim()),
-  );
+  const mt = normalizeModelOutput(args.targetLang, result.text);
   const inputTokens = result.usage.inputTokens ?? 0;
   const outputTokens = result.usage.outputTokens ?? 0;
   const telemetry: LlmCallTelemetry = {

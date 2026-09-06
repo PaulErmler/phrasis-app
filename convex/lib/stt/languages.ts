@@ -75,6 +75,11 @@ export const MAI_TRANSCRIBE_2_LANGUAGES: ReadonlySet<string> = new Set([
  * detected language and word timings in the 2026-09-04 live test (Bosnian
  * is on the list, which presumably covers them). Kept explicit so the
  * exhaustiveness test forces a decision when a new language lands here.
+ *
+ * Probed and NOT working: Uzbek (`uz`, 2026-09-05). A pinned `uz` hint is a
+ * 400 from the provider and auto-detect settles on ru / hu / az with
+ * Cyrillic or Azerbaijani spellings, so it runs on the Gemini backend
+ * (`sttBackend: 'gemini-flash-lite'` in lib/languages.ts, ./gemini.ts).
  */
 export const STT_UNLISTED_BUT_WORKING: ReadonlySet<string> = new Set([
   'hr',

@@ -1,11 +1,14 @@
-import { cardPinAt } from '../db/translationReads';
+import { viewOfCard } from '../db/translationReads';
 import { v } from 'convex/values';
 import { query } from '../_generated/server';
 import { Doc } from '../_generated/dataModel';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId } from '../db/decks';
-import { buildTextContentBatchForLanguages } from '../lib/cardContent';
+import {
+  buildTextContentBatchForLanguages,
+  sourceTextFromContent,
+} from '../lib/cardContent';
 import { cardOriginPillFields } from '../lib/collections';
 import { searchSegments } from '../../lib/wordTokenize';
 import {
@@ -339,7 +342,7 @@ export const getLibraryCards = query({
           sourceIpa: text.ipaText ?? undefined,
           sourceFurigana: text.furiganaText ?? undefined,
           userCreated: text.userCreated,
-          pinAt: cardPinAt(card),
+          view: viewOfCard(card),
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -366,7 +369,7 @@ export const getLibraryCards = query({
           _id: card._id,
           _creationTime: card._creationTime,
           textId: card.textId,
-          sourceText: text.text,
+          sourceText: sourceTextFromContent(content, text),
           sourceLanguage: text.language,
           translations: content.translations,
           audioRecordings: content.audioRecordings,

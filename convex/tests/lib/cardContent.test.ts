@@ -36,6 +36,10 @@ async function seedCard(
     }>;
     /** Languages whose audio row should carry no word timings. */
     languagesWithoutTimings?: string[];
+    /** Languages whose clip was stored 'unchecked' (STT failed at synthesis). */
+    uncheckedLanguages?: string[];
+    /** Languages whose asset has used up its STT backfill attempts. */
+    exhaustedLanguages?: string[];
   },
 ) {
   return t.run(async (ctx) => {
@@ -77,6 +81,8 @@ async function seedCard(
     }
 
     const withoutTimings = new Set(args.languagesWithoutTimings ?? []);
+    const unchecked = new Set(args.uncheckedLanguages ?? []);
+    const exhausted = new Set(args.exhaustedLanguages ?? []);
     const languages = [
       args.sourceLanguage,
       ...args.translations.map((tr) => tr.language),
@@ -85,13 +91,16 @@ async function seedCard(
       const storageId = await ctx.storage.store(
         new Blob([new Uint8Array([1, 2, 3])]),
       );
-      await insertAudioFixture(ctx, {
+      const { assetId } = await insertAudioFixture(ctx, {
         textId,
         language,
         storageId,
-        ttsQuality: 'validated',
+        ttsQuality: unchecked.has(language) ? 'unchecked' : 'validated',
         ...(withoutTimings.has(language) ? {} : { wordTimings: TIMINGS }),
       });
+      if (exhausted.has(language)) {
+        await ctx.db.patch(assetId, { revalidationAttempts: 3 });
+      }
     }
 
     return textId;
@@ -277,5 +286,37 @@ describe('buildTextContentBatchForLanguages: word timings', () => {
         ignoreMissingWordTimings: true,
       }),
     ).toBe(false);
+  });
+});
+
+describe('unchecked audio (STT failed at synthesis time)', () => {
+  it('is missing content until the sweep re-validates it', async () => {
+    const t = convexTest(schema, modules);
+    const textId = await seedCard(t, {
+      sourceLanguage: 'en',
+      translations: [{ language: 'es' }],
+      uncheckedLanguages: ['es'],
+    });
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['es'])).toBe(true);
+    // Not a timings gap, so the review path's exemption does not hide it.
+    expect(
+      await hasMissingContent(t, textId, 'en', ['en'], ['es'], {
+        ignoreMissingWordTimings: true,
+      }),
+    ).toBe(true);
+  });
+
+  it('stops asking once the asset has used up its STT backfill attempts', async () => {
+    const t = convexTest(schema, modules);
+    const textId = await seedCard(t, {
+      sourceLanguage: 'en',
+      translations: [{ language: 'es' }],
+      uncheckedLanguages: ['es'],
+      languagesWithoutTimings: ['es'],
+      exhaustedLanguages: ['es'],
+    });
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['es'])).toBe(
+      false,
+    );
   });
 });

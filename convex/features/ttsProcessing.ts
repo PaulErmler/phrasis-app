@@ -5,6 +5,7 @@ import {
   internalMutation,
   ActionCtx,
   MutationCtx,
+  internalQuery,
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Doc, Id } from '../_generated/dataModel';
@@ -14,10 +15,14 @@ import {
   reserveSttSlot,
   normalizeTranscriptScript,
   sttCostForEvent,
+  sttModelForLanguage,
   type TranscriptionResult,
   type WordTiming,
 } from '../lib/stt';
-import { languageSupportsStt } from '../../lib/languages';
+import {
+  languageSupportsStt,
+  languageSupportsWordTimings,
+} from '../../lib/languages';
 import { textsMatchForLanguage } from '../lib/textComparison';
 import {
   textsMatchSemantic,
@@ -28,12 +33,13 @@ import { costForCharacters } from '../config/aiCosts';
 import { OPENROUTER_MODELS } from '../config/aiModels';
 import { deleteStorageBlobIfUnreferenced } from '../lib/audio';
 import {
-  BLOB_SWAP_DELETE_DELAY_MS,
+  audioAssetByStorageId,
+  MAX_STT_BACKFILL_ATTEMPTS,
   scheduleBlobSwapDelete,
 } from '../lib/audioAssets';
 import { TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
 import { reserveRateLimitToken } from '../lib/rateLimitReserve';
-import { ttsPool, ttsWarmPool } from '../lib/workpools';
+import { ttsPool, ttsWarmPool, type PoolRunResult } from '../lib/workpools';
 import type { WorkId } from '@convex-dev/workpool';
 import {
   ttsQualityValidator,
@@ -117,6 +123,25 @@ async function getTtsClaim(
       q.eq('textId', textId).eq('language', language),
     )
     .first();
+}
+
+/**
+ * The timings a stored clip keeps: only with validated audio, since a
+ * mismatched transcription points at the wrong words, and never an empty
+ * array. An empty array means the backend has none (Gemini STT). It is
+ * stored as undefined so `hasMissingWordTimings` and the backfill still see
+ * the gap once the language gains a timings backend.
+ */
+export function persistedWordTimings(
+  validated: boolean,
+  wordTimings:
+    | { word: string; start: number; end: number }[]
+    | null
+    | undefined,
+): { word: string; start: number; end: number }[] | undefined {
+  return validated && wordTimings && wordTimings.length > 0
+    ? wordTimings
+    : undefined;
 }
 
 /**
@@ -264,11 +289,17 @@ async function synthesizeAndValidate(
   validated: boolean;
   lastStorageId: Id<'_storage'> | null;
   wordTimings: WordTiming[] | null;
+  /**
+   * STT itself failed, from a rate limit or an outage, so the clip carries
+   * no verdict. It is kept as 'unchecked' rather than re-synthesized, and
+   * the sweep's backfill re-validates it once STT answers again.
+   */
+  sttErrored: boolean;
 }> {
-  // MAI-Transcribe-2 is the only STT backend; if it doesn't cover this
-  // language, the validation loop is pure waste (every attempt fails, every
-  // retry re-synthesizes). Synthesize once, accept it, and skip straight to
-  // unvalidated. wordTimings are unavailable here too.
+  // If no STT backend covers this language, the validation loop is pure
+  // waste (every attempt fails, every retry re-synthesizes). Synthesize
+  // once, accept it, and skip straight to unvalidated. wordTimings are
+  // unavailable here too (and stay empty on the text-only Gemini backend).
   const canValidate = languageSupportsStt(args.language);
 
   const rateLimitName =
@@ -383,7 +414,12 @@ async function synthesizeAndValidate(
 
     if (!canValidate) {
       await emitTtsEvent({ status: 'skipped' });
-      return { validated: false, lastStorageId, wordTimings: null };
+      return {
+        validated: false,
+        lastStorageId,
+        wordTimings: null,
+        sttErrored: false,
+      };
     }
 
     // Backpressure, not an STT failure. Kept OUTSIDE the try/catch below so
@@ -472,7 +508,12 @@ async function synthesizeAndValidate(
       }
 
       if (isMatch) {
-        return { validated: true, lastStorageId, wordTimings };
+        return {
+          validated: true,
+          lastStorageId,
+          wordTimings,
+          sttErrored: false,
+        };
       }
       console.warn(
         `TTS validation mismatch (attempt ${attempt + 1}/${maxAttempts})`,
@@ -488,8 +529,12 @@ async function synthesizeAndValidate(
         attempt: attempt + 1,
       });
     } catch (transcriptionErr) {
+      // STT failed, not the clip. A rate limit or an outage says nothing
+      // about the audio. Re-synthesizing would spend a second TTS call on a
+      // clip that is probably fine, so the clip is kept as 'unchecked' and
+      // `backfillWordTimings` re-validates it once STT answers again.
       console.error(
-        `Transcription failed (attempt ${attempt + 1}/${maxAttempts}):`,
+        `Transcription failed (attempt ${attempt + 1}/${maxAttempts}); keeping the clip unchecked:`,
         transcriptionErr,
       );
       await emitTtsEvent({
@@ -500,25 +545,20 @@ async function synthesizeAndValidate(
             ? transcriptionErr.message
             : String(transcriptionErr),
       });
-      if (attempt + 1 < maxAttempts) {
-        // The retry will supersede this attempt's blob, and. Unlike a
-        // mismatch, whose blob the ttsMismatches record keeps for review.
-        // An errored transcription references it nowhere, so it would leak.
-        // Delayed + reference-checked: if the retry fails to store and the
-        // asset ends up keeping this blob, the job sees the reference and
-        // spares it.
-        await ctx.scheduler.runAfter(
-          BLOB_SWAP_DELETE_DELAY_MS,
-          internal.features.ttsProcessing.deleteBlobIfUnreferencedJob,
-          { storageId },
-        );
-        await new Promise((resolve) =>
-          setTimeout(resolve, 500 + Math.random() * 250),
-        );
-      }
+      return {
+        validated: false,
+        lastStorageId,
+        wordTimings: null,
+        sttErrored: true,
+      };
     }
   }
-  return { validated: false, lastStorageId, wordTimings: null };
+  return {
+    validated: false,
+    lastStorageId,
+    wordTimings: null,
+    sttErrored: false,
+  };
 }
 
 /**
@@ -557,14 +597,8 @@ const ttsJobArgsValidator = v.object({
 
 type TtsJobArgs = Infer<typeof ttsJobArgsValidator>;
 
-// Explicit handler param types throughout this file: handlers reference
-// same-file functions via `internal.…` (enqueue → worker → onComplete), and
-// letting TS infer their types through the generated `internal` object is
-// circular. Inference collapses to `any` for every handler in the module.
-type PoolRunResult =
-  | { kind: 'success'; returnValue: unknown }
-  | { kind: 'failed'; error: string }
-  | { kind: 'canceled' };
+// Handler params are typed explicitly throughout this file; see
+// `PoolRunResult` in convex/lib/workpools.ts for why.
 
 /**
  * Worker action: synthesize + validate + persist audio for one
@@ -586,10 +620,10 @@ export const processTTSForCard = internalAction({
     ctx: ActionCtx,
     args: TtsJobArgs & { provider: TtsProvider },
   ) => {
-    const { validated, lastStorageId, wordTimings } =
+    const { validated, lastStorageId, wordTimings, sttErrored } =
       await synthesizeAndValidate(ctx, args, MAX_TTS_VALIDATION_ATTEMPTS);
 
-    if (!validated) {
+    if (!validated && !sttErrored) {
       console.error(
         `[ttsProcess] Validation failed after ${MAX_TTS_VALIDATION_ATTEMPTS} attempts — marking as unvalidated`,
         { textId: args.textId, language: args.language, text: args.text },
@@ -607,13 +641,13 @@ export const processTTSForCard = internalAction({
         storageId: lastStorageId,
         ttsQuality: validated
           ? ('validated' as const)
-          : ('unvalidated' as const),
+          : sttErrored
+            ? ('unchecked' as const)
+            : ('unvalidated' as const),
         ttsProvider: args.provider,
         voiceGender: args.voiceGender,
         speed: args.speed,
-        // Only persist timings alongside validated audio. Mismatched
-        // transcriptions point to the wrong words.
-        wordTimings: validated && wordTimings ? wordTimings : undefined,
+        wordTimings: persistedWordTimings(validated, wordTimings),
         spokenText: args.text,
         regionVariant: args.regionVariant,
         supersededTranslationId: args.supersededTranslationId,
@@ -857,12 +891,18 @@ export const storeTtsMismatch = internalMutation({
 
 /**
  * Backfill word-level timestamps for an existing audio recording that was
- * generated before timings were captured (no `wordTimings` field). Called
+ * generated before timings were captured, with no `wordTimings` field, and
+ * give an 'unchecked' clip, where STT failed at synthesis time, its verdict.
+ * Called
  * from `scheduleMissingContent` after acquiring a TTS claim on (textId, lang).
  *
  * Re-downloads the stored audio blob, runs it through STT, and persists the
  * resulting timings, but only if the storageId still matches, so a
- * concurrent voice swap doesn't get clobbered with stale alignment.
+ * concurrent voice swap doesn't get clobbered with stale alignment. For an
+ * unchecked asset the transcript is compared with the spoken text the same
+ * way the synthesis loop does, strict first and then the Gemini judge. A
+ * match stores 'validated' with the timings. A mismatch stores 'unvalidated'
+ * with a `ttsMismatches` record and no timings.
  */
 export const backfillWordTimings = internalAction({
   args: {
@@ -876,11 +916,20 @@ export const backfillWordTimings = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
-      // STT support is the gate on word timings; if the model doesn't cover
-      // this language, the scheduler shouldn't have been called, but guard
-      // the action too so a stale scheduler call from before the language
-      // was filtered doesn't spend a call that returns nothing usable.
+      // Without an STT backend there is nothing to transcribe with. The
+      // scheduler shouldn't have called, but guard the action too. A
+      // text-only backend such as Gemini still yields a verdict for an
+      // unchecked clip, just no timings.
       if (!languageSupportsStt(args.language)) return null;
+
+      const asset = await ctx.runQuery(
+        internal.features.ttsProcessing.getAudioAssetByStorageId,
+        { storageId: args.storageId },
+      );
+      const needsVerdict = asset?.ttsQuality === 'unchecked';
+      if (!needsVerdict && !languageSupportsWordTimings(args.language)) {
+        return null;
+      }
 
       const blob = await ctx.storage.get(args.storageId);
       if (!blob) {
@@ -906,7 +955,7 @@ export const backfillWordTimings = internalAction({
         return captureGeneration(ctx, {
           distinctId: args.requestedByUserId,
           feature: 'word_timing_backfill',
-          model: OPENROUTER_MODELS.stt,
+          model: sttModelForLanguage(args.language),
           provider: 'openrouter',
           latencyMs: Date.now() - sttStartedAt,
           costUsd: cost.costUsd,
@@ -934,6 +983,13 @@ export const backfillWordTimings = internalAction({
         await emitBackfillEvent({
           error: sttErr instanceof Error ? sttErr.message : String(sttErr),
         });
+        // Count the failure against the asset. At the cap the sweep stops
+        // scheduling backfills for it and an unchecked clip settles as
+        // 'unvalidated', so a dead STT can never loop per view.
+        await ctx.runMutation(
+          internal.features.ttsProcessing.recordSttBackfillFailure,
+          { storageId: args.storageId },
+        );
         throw sttErr;
       }
       const { wordTimings, audioDurationMs, billedSeconds, costUsd } = result;
@@ -943,7 +999,68 @@ export const backfillWordTimings = internalAction({
         costUsd,
         wordCount: wordTimings.length,
       });
-      if (wordTimings.length === 0) return null;
+
+      let verdict: 'validated' | 'unvalidated' | undefined;
+      if (needsVerdict && asset) {
+        let isMatch = textsMatchForLanguage(
+          asset.spokenText,
+          result.text,
+          args.language,
+        );
+        if (!isMatch) {
+          const judgeTelemetry: SemanticValidationTelemetry[] = [];
+          const semantic = await textsMatchSemantic(
+            asset.spokenText,
+            result.text,
+            args.language,
+            (telemetry) => judgeTelemetry.push(telemetry),
+          );
+          for (const telemetry of judgeTelemetry) {
+            await captureGeneration(ctx, {
+              distinctId: args.requestedByUserId,
+              feature: 'tts_validation_judge',
+              model: OPENROUTER_MODELS.ttsValidation,
+              provider: 'openrouter',
+              latencyMs: telemetry.latencyMs,
+              inputTokens: telemetry.inputTokens,
+              outputTokens: telemetry.outputTokens,
+              costUsd: telemetry.costUsd,
+              traceId: telemetry.generationId,
+              sharedContent: true,
+              extra: {
+                text_id: args.textId,
+                language: args.language,
+                verdict: semantic,
+              },
+            });
+          }
+          if (semantic === 'match') isMatch = true;
+        }
+        verdict = isMatch ? 'validated' : 'unvalidated';
+        if (!isMatch) {
+          console.warn('[backfillWordTimings] unchecked clip mismatched', {
+            expected: asset.spokenText,
+            got: result.text,
+          });
+          await ctx.runMutation(
+            internal.features.ttsProcessing.storeTtsMismatch,
+            {
+              textId: args.textId,
+              language: args.language,
+              voiceName: asset.voiceName,
+              storageId: args.storageId,
+              expectedText: asset.spokenText,
+              transcribedText: result.text,
+              attempt: MAX_TTS_VALIDATION_ATTEMPTS + 1,
+            },
+          );
+        }
+      }
+      // The transcript's timings are stored whatever the verdict, as the
+      // legacy timing backfill always did for unvalidated clips. With them
+      // in place nothing asks for this asset again. A backend without
+      // timings still delivers the verdict.
+      if (wordTimings.length === 0 && verdict === undefined) return null;
       await ctx.runMutation(
         internal.features.ttsProcessing.persistBackfilledWordTimings,
         {
@@ -951,6 +1068,7 @@ export const backfillWordTimings = internalAction({
           language: args.language,
           storageId: args.storageId,
           wordTimings,
+          verdict,
         },
       );
     } catch (err) {
@@ -988,20 +1106,72 @@ export const persistBackfilledWordTimings = internalMutation({
         end: v.number(),
       }),
     ),
+    /** The re-validation verdict for an 'unchecked' asset, when one ran. */
+    verdict: v.optional(
+      v.union(v.literal('validated'), v.literal('unvalidated')),
+    ),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // By blob, not through the (text, language) pointer: the timings belong
-    // to whichever asset still owns the transcribed blob, which is the live
-    // pointer's asset or the asset of a superseded revision alike. A swapped
-    // blob simply finds no asset and the stale timings are dropped.
-    const asset = await ctx.db
-      .query('audioAssets')
-      .withIndex('by_storageId', (q) => q.eq('storageId', args.storageId))
-      .first();
+    // By blob, so a swapped blob finds no asset and stale timings are dropped.
+    const asset = await audioAssetByStorageId(ctx, args.storageId);
     if (!asset) return null;
-    await ctx.db.patch(asset._id, { wordTimings: args.wordTimings });
+    await ctx.db.patch(asset._id, {
+      ...(args.wordTimings.length > 0 ? { wordTimings: args.wordTimings } : {}),
+      ...(args.verdict !== undefined ? { ttsQuality: args.verdict } : {}),
+    });
     return null;
+  },
+});
+
+/**
+ * One more failed STT backfill on the asset owning `storageId`. At
+ * `MAX_STT_BACKFILL_ATTEMPTS` an 'unchecked' clip becomes 'unvalidated',
+ * which is final. It is played as it is and never re-checked. Returns the
+ * new count.
+ */
+export const recordSttBackfillFailure = internalMutation({
+  args: { storageId: v.id('_storage') },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const asset = await audioAssetByStorageId(ctx, args.storageId);
+    if (!asset) return 0;
+    const attempts = (asset.revalidationAttempts ?? 0) + 1;
+    const settle =
+      attempts >= MAX_STT_BACKFILL_ATTEMPTS && asset.ttsQuality === 'unchecked';
+    await ctx.db.patch(asset._id, {
+      revalidationAttempts: attempts,
+      ...(settle ? { ttsQuality: 'unvalidated' as const } : {}),
+    });
+    if (settle) {
+      console.warn(
+        '[backfillWordTimings] unchecked clip settled as unvalidated after repeated STT failures',
+        { storageId: args.storageId, attempts },
+      );
+    }
+    return attempts;
+  },
+});
+
+/** The asset owning a blob, for the backfill's re-validation of an unchecked clip. */
+export const getAudioAssetByStorageId = internalQuery({
+  args: { storageId: v.id('_storage') },
+  returns: v.union(
+    v.null(),
+    v.object({
+      spokenText: v.string(),
+      voiceName: v.string(),
+      ttsQuality: v.optional(ttsQualityValidator),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const asset = await audioAssetByStorageId(ctx, args.storageId);
+    if (!asset) return null;
+    return {
+      spokenText: asset.spokenText,
+      voiceName: asset.voiceName,
+      ttsQuality: asset.ttsQuality,
+    };
   },
 });
 

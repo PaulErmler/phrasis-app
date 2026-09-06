@@ -128,9 +128,6 @@ native/shell/app-url.js
 /board
 store-assets/
 
-# Benchmark run artefacts under .scratch (LLM response caches, judge sheets).
-# The report.txt / blind-sheet.md of a bench stay tracked as its record.
-.scratch/**/cache.json
-.scratch/**/aggregates.json
-.scratch/**/blind-mapping.json
-.scratch/**/my-scores.json
+# Feature specs, probe scripts and benchmark artefacts (LLM response caches,
+# judge sheets, audio clips). Local working material, never committed.
+.scratch/

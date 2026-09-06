@@ -332,6 +332,11 @@ export const onboardingProgressFields = {
   acquisitionSourceFreeText: v.optional(v.string()),
   learningGoals: v.optional(v.array(v.string())),
   learningGoalFreeText: v.optional(v.string()),
+  // Language apps the user has tried before ('anki' | 'glossika' |
+  // 'clozemaster' | 'babbel' | 'duolingo' | 'other' | 'none'), plus the
+  // free-text list behind 'other'. Reported in the new-signup notification.
+  priorApps: v.optional(v.array(v.string())),
+  priorAppsFreeText: v.optional(v.string()),
   dailyTimeGoalMinutes: v.optional(v.number()),
   // Placement-test working state. `history` accumulates as the user answers;
   // `finalLevel` is set when the strategy reports `nextQuestionLevel() === null`.
@@ -667,11 +672,18 @@ export default defineSchema({
   // pointer goes. See convex/lib/audioAssets.ts for the key/lookup helpers.
   audioAssets: defineTable({
     // ---- content-address key ----
-    language: v.string(), // Base language code (e.g., "en", "es", "de")
+    // Cache language (`getAudioAssetLanguage` in lib/languages.ts): a base
+    // code such as "en", "es", "de". Accent-only variants key under their
+    // text language (`en_gb` clips are "en" assets) so every English accent
+    // shares one cache; the `audioRecordings` pointer keeps the course code.
+    language: v.string(),
     voiceGender: voiceGenderValidator, // Gender-level key — voice pick within a gender is random anyway
-    // Concrete dialect pin for mixed-language rows (e.g. 'es-ES' vs 'es-US'),
-    // part of the key so accents never collide. Undefined for non-mixed
-    // languages and source-language audio.
+    // Accent of the clip, part of the key so accents never collide: the
+    // translation's dialect pin for mixed-language rows ('es-ES' vs 'es-US'),
+    // otherwise the synthesizing voice's locale ('en-GB' from "Leda@en-GB",
+    // see `buildAudioAssetKey`). Undefined for bare voices whose accent is the
+    // language's own (de, sv) and on legacy rows written before the voice
+    // locale was keyed (`backfillAudioAssetAccent` in convex/migrations.ts).
     regionVariant: v.optional(v.string()),
     // SHA-256 hex of the RAW spoken string (exactly what was sent to TTS, no
     // trimming/normalization; that belongs to card-edit comparison only).
@@ -695,7 +707,19 @@ export default defineSchema({
     // 'unknown' = a synthesis job is mid-flight on this asset (attempt-0 early
     // write); completed audio is 'validated'/'unvalidated' (or undefined on
     // legacy rows carried over by the backfill, which is also "completed").
+    // 'unchecked' = completed audio whose STT validation failed for reasons
+    // unrelated to the clip, such as a rate limit or an outage. It is kept,
+    // played, and given a verdict later by `backfillWordTimings`.
+    // 'unvalidated' is final and never re-checked. 'unchecked' is temporary
+    // and bounded by `revalidationAttempts`.
     ttsQuality: v.optional(ttsQualityValidator),
+    // How many STT backfill runs have failed on this asset, whether
+    // re-validations of an unchecked clip or word-timing backfills. At
+    // `MAX_STT_BACKFILL_ATTEMPTS` (convex/lib/audioAssets.ts) the sweep
+    // stops scheduling backfills for it and an unchecked clip becomes
+    // 'unvalidated' for good, so an STT outage can never turn into an
+    // endless per-view retry.
+    revalidationAttempts: v.optional(v.number()),
     speed: v.number(),
     // Word-level timestamps from the STT validation pass (convex/lib/stt), captured during TTS
     // validation. Seconds relative to the audio blob. Only populated when
@@ -796,6 +820,15 @@ export default defineSchema({
     // One field per tile: the two are independent. Unset ≡ 'all'.
     repsStatFilter: v.optional(statFilterValidator),
     timeStatFilter: v.optional(statFilterValidator),
+    // Study-day scheduling, see DEFAULT_DUE_BY_DAY and DEFAULT_DAY_START_HOUR
+    // in lib/scheduling.ts. Day-scale FSRS due dates snap to the start of
+    // the learner's study day so a morning-only learner reaches everything
+    // due that day. Not exposed in any settings UI yet, and not accepted by
+    // `updateUserSettings`. The fields exist so a later settings row has
+    // somewhere to write. Unset means on, with rollover at 04:00 local.
+    // Only an explicit `false` turns snapping off.
+    dueByDay: v.optional(v.boolean()),
+    dayStartHour: v.optional(v.number()),
   }).index('by_userId', ['userId']),
 
   // Onboarding progress table. Stores the user's onboarding answers.
@@ -907,6 +940,18 @@ export default defineSchema({
     // whose wording the curriculum has since revised (they accept the latest
     // wording). Never indexed: it is only ever read off the card itself.
     translationsAcceptedAt: v.optional(v.number()),
+    // The accent this card's text speaks in on a mixed-accent course, one
+    // of `en_us`, `en_gb` and `en_au`. Stored once at creation from the
+    // text's voice hash (`pickAccentVariantForText` in lib/voices.ts). The
+    // card reads that variant's translation row in place of the source text
+    // when the variant has its own wording, which `accentRowLanguage` says
+    // for en_gb and en_au, and the source text otherwise, for en_us or no
+    // field. Cards from before the field existed have none and keep the
+    // catalogue wording and their clip for good. Nothing backfills it. Set
+    // only when the course shows the text's own language and the text is
+    // not user-created. Cleared when an edit forks the text into a
+    // user-owned copy. Never indexed.
+    accentLanguage: v.optional(v.string()),
   })
     // INDEX BUDGET — read before adding an index here. This table carries 23
     // database indexes (limit 32) and EVERY card write pays for updating all

@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { dismissTour, neutralizeTours } from './helpers';
 import {
+  deckAccentIntegrity,
   deckCardCount,
   deckDuplicateTextCount,
   fixtureEmail,
@@ -55,6 +56,23 @@ async function waitForStableCardCount(
   return last;
 }
 
+/**
+ * A card on screen. The learn view asks for the next batch the moment it
+ * learns the shown card is the last one due (`queueEndsHere` in
+ * useLearningMode.ts), and it only learns that from the card payload, which
+ * can land seconds after the header mounts under load. Measuring from the
+ * header would count that one legitimate batch as a post-convergence add.
+ */
+async function waitForCardOnScreen(page: Page): Promise<void> {
+  await expect(
+    page
+      .locator(
+        '[data-testid="learn-rating-again"], [data-testid="learn-rating-good"], [data-testid="learn-rating-still-learning"], [data-testid="learn-rating-understood"]',
+      )
+      .first(),
+  ).toBeVisible({ timeout: 45_000 });
+}
+
 test.describe('deck integrity', () => {
   test.beforeEach(async ({ page }) => {
     await neutralizeTours(page);
@@ -72,6 +90,7 @@ test.describe('deck integrity', () => {
     await expect(page.getByTestId('learn-settings').first()).toBeVisible({
       timeout: 30_000,
     });
+    await waitForCardOnScreen(page);
 
     // The mount may legitimately add one batch of new cards; the invariant
     // is that the effect then STOPS.
@@ -102,6 +121,8 @@ test.describe('deck integrity', () => {
       await expect(page2.getByTestId('learn-settings').first()).toBeVisible({
         timeout: 30_000,
       });
+      await waitForCardOnScreen(page);
+      await waitForCardOnScreen(page2);
 
       const converged = await waitForStableCardCount(page, email);
       await page.waitForTimeout(10_000);
@@ -110,5 +131,17 @@ test.describe('deck integrity', () => {
     } finally {
       await page2.close();
     }
+  });
+
+  test('every card stores the accent its text speaks in', async () => {
+    // The fixture course has Mixed English (`en`) as its base language, so
+    // each curriculum card stores an accent (`cards.accentLanguage`) and
+    // reads the matching wording. The card-creation path is the only
+    // writer of the field; a card that lacks it or disagrees with its text
+    // hash would show one accent and play another.
+    const integrity = deckAccentIntegrity(fixtureEmail());
+    expect(integrity.total).toBeGreaterThan(0);
+    expect(integrity.withAccent).toBeGreaterThan(0);
+    expect(integrity.mismatched).toBe(0);
   });
 });

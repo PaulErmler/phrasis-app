@@ -696,6 +696,19 @@ describe('saveOnboardingProgress: free-text length guard', () => {
       }),
     ).rejects.toThrow(/learningGoalFreeText/);
   });
+
+  it('rejects priorAppsFreeText longer than the cap', async () => {
+    const t = convexTest(schema, modules);
+    const asUser = t.withIdentity({ subject: 'user_A' });
+
+    await expect(
+      asUser.mutation(api.features.courses.saveOnboardingProgress, {
+        step: 3,
+        priorApps: ['other'],
+        priorAppsFreeText: 'x'.repeat(MAX_ONBOARDING_FREE_TEXT_LENGTH + 1),
+      }),
+    ).rejects.toThrow(/priorAppsFreeText/);
+  });
 });
 
 describe('finalizeOnboarding', () => {
@@ -1156,6 +1169,8 @@ describe('getOnboardingProgress', () => {
         acquisitionSourceFreeText: 'saw a post about it',
         learningGoals: ['travel', 'work'],
         learningGoalFreeText: 'order food abroad',
+        priorApps: ['anki', 'other'],
+        priorAppsFreeText: 'Memrise',
         dailyTimeGoalMinutes: 20,
         firstLessonCardsRated: 4,
         firstLessonSessionId: 'sess_1',
@@ -1197,6 +1212,8 @@ describe('getOnboardingProgress', () => {
       acquisitionSourceFreeText: 'saw a post about it',
       learningGoals: ['travel', 'work'],
       learningGoalFreeText: 'order food abroad',
+      priorApps: ['anki', 'other'],
+      priorAppsFreeText: 'Memrise',
       dailyTimeGoalMinutes: 20,
       firstLessonCardsRated: 4,
       firstLessonSessionId: 'sess_1',
@@ -1353,11 +1370,11 @@ describe('public warmup guards (prepareLanguagePair + ensurePlacementTranslation
     expect(await scheduledCount(t)).toBe(0);
   });
 
-  it('still accepts a hidden-from-picker (but supported) code', async () => {
+  it('accepts an English accent variant as the source language', async () => {
     const t = convexTest(schema, modules);
     const asUser = t.withIdentity({ subject: 'user_A' });
-    // en_gb is hiddenFromPicker in SUPPORTED_LANGUAGES yet remains a real
-    // language existing courses use; the guard must not reject it.
+    // en_gb shares its text with `en` (an accent-only variant) but is a real
+    // course language with its own voice pool; the guard must accept it.
     await asUser.mutation(api.features.onboarding.prepareLanguagePair, {
       sourceLanguage: 'en_gb',
       targetLanguage: 'es',
