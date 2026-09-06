@@ -631,6 +631,15 @@ export default defineSchema({
     // preference" shortcut. Undefined = not classified yet (no chip).
     renderedGender: v.optional(renderedGenderValidator),
     renderedPoliteness: v.optional(renderedPolitenessValidator),
+    /**
+     * When a content sweep last asked the rendering classifier to stamp
+     * this row (contentScheduling.ts `flushRenderingStamps`). Rows from
+     * before the sentence-form settings are stamped lazily, by the sweep
+     * of whichever learner meets them first; this claim keeps the repeated
+     * sweeps of one card from asking again while the call is in flight,
+     * and retries a row the classifier left blank after a cooldown.
+     */
+    renderingStampRequestedAt: v.optional(v.number()),
     // Superseded-revision fields. A version-bump regeneration that produced
     // a different wording while cards referenced the text AND the wording
     // had audio copies the old wording into a second row of THIS table with
@@ -2053,21 +2062,6 @@ export default defineSchema({
   // email: the attribution lives on the PostHog event, so this financial
   // record needs no handling in the account-deletion purge. Amounts are kept
   // for debugging; Stripe remains the system of record.
-  /**
-   * Run markers for the hand-rolled backfills in convex/migrations/ that the
-   * deploy script starts (`pnpm build:deploy`). One row per job name; a
-   * finished row makes the next start a no-op, so the jobs can be chained
-   * after every deploy like `migrations:runAll` without re-walking their
-   * tables. `force: true` on the job's `run` ignores the marker.
-   */
-  backfillRuns: defineTable({
-    name: v.string(),
-    startedAt: v.number(),
-    finishedAt: v.optional(v.number()),
-    /** The job's own totals, for the dashboard. */
-    summary: v.optional(v.string()),
-  }).index('by_name', ['name']),
-
   paymentEvents: defineTable({
     stripeInvoiceId: v.string(),
     /** Major currency units (EUR), not cents. */

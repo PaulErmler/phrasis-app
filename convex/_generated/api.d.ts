@@ -166,7 +166,6 @@ import type * as lib_welcomeEmail from "../lib/welcomeEmail.js";
 import type * as lib_workpools from "../lib/workpools.js";
 import type * as lib_writingFeedbackPrompt from "../lib/writingFeedbackPrompt.js";
 import type * as migrations from "../migrations.js";
-import type * as migrations_backfillRenderedForms from "../migrations/backfillRenderedForms.js";
 import type * as migrations_data_essentialGreetingTranslations from "../migrations/data/essentialGreetingTranslations.js";
 import type * as migrations_datasetMigration_cutoverUser from "../migrations/datasetMigration_cutoverUser.js";
 import type * as migrations_recalcUserCardAggregates from "../migrations/recalcUserCardAggregates.js";
@@ -353,7 +352,6 @@ declare const fullApi: ApiFromModules<{
   "lib/workpools": typeof lib_workpools;
   "lib/writingFeedbackPrompt": typeof lib_writingFeedbackPrompt;
   migrations: typeof migrations;
-  "migrations/backfillRenderedForms": typeof migrations_backfillRenderedForms;
   "migrations/data/essentialGreetingTranslations": typeof migrations_data_essentialGreetingTranslations;
   "migrations/datasetMigration_cutoverUser": typeof migrations_datasetMigration_cutoverUser;
   "migrations/recalcUserCardAggregates": typeof migrations_recalcUserCardAggregates;

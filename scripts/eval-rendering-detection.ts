@@ -10,6 +10,7 @@
  *   pnpm eval:rendering --smoke
  *   pnpm eval:rendering
  *   pnpm eval:rendering --langs=ja,ko,de --models=flash-lite-31,luna
+ *   pnpm eval:rendering --models=flash-lite-31,flash-lite-31-minimal,flash-37-minimal --wording=product
  *   pnpm eval:rendering --wild=.scratch/rendering-bench/translations.jsonl --wild-n=40
  *
  * Gold: data_preparation/gender_eval (508 target-language sentences with a
@@ -71,13 +72,38 @@ import {
 
 // ------------------------------------------------------------------- config
 
-const MODELS: Record<string, string> = {
-  'flash-lite-31': 'google/gemini-3.1-flash-lite',
-  'flash-lite-35': 'google/gemini-3.5-flash-lite',
-  'flash-37': 'google/gemini-3.7-flash',
-  luna: LUNA_BO3.model,
+/**
+ * A candidate arm: an OpenRouter model plus an optional reasoning effort.
+ * `id` is the cache and result key; it equals the model slug for the
+ * no-reasoning arms so earlier runs stay cached, and `<slug>#<effort>`
+ * otherwise. Production sends no reasoning field for the Gemini classifier
+ * (which these models treat as off); the `-minimal` arms measure what the
+ * lowest thinking level buys.
+ */
+type Arm = { id: string; model: string; reasoning?: 'minimal' | 'low' };
+function arm(model: string, reasoning?: Arm['reasoning']): Arm {
+  return { id: reasoning ? `${model}#${reasoning}` : model, model, reasoning };
+}
+const MODELS: Record<string, Arm> = {
+  'flash-lite-25': arm('google/gemini-2.5-flash-lite'),
+  'flash-lite-31': arm('google/gemini-3.1-flash-lite'),
+  'flash-lite-35': arm('google/gemini-3.5-flash-lite'),
+  'flash-37': arm('google/gemini-3.7-flash'),
+  luna: arm(LUNA_BO3.model),
+  'flash-lite-31-minimal': arm('google/gemini-3.1-flash-lite', 'minimal'),
+  'flash-lite-35-minimal': arm('google/gemini-3.5-flash-lite', 'minimal'),
+  'flash-37-minimal': arm('google/gemini-3.7-flash', 'minimal'),
+  'luna-minimal': arm(LUNA_BO3.model, 'minimal'),
+  // OpenRouter's `minimal` maps to no thinking on the Flash Lite models
+  // (identical tokens and cost to the bare call), so `low` is the smallest
+  // effort that actually buys reasoning tokens there.
+  'flash-lite-31-low': arm('google/gemini-3.1-flash-lite', 'low'),
+  'flash-lite-35-low': arm('google/gemini-3.5-flash-lite', 'low'),
 };
-const DEFAULT_MODELS = Object.keys(MODELS);
+/** The no-reasoning arms; the `-minimal` ones are opt-in via --models. */
+const DEFAULT_MODELS = Object.keys(MODELS).filter(
+  (key) => !MODELS[key].reasoning,
+);
 const WORDINGS: PromptWording[] = ['product', 'literature'];
 const BATCH = 25;
 
@@ -209,7 +235,7 @@ type Prediction = {
 } | null;
 
 function batchKey(
-  model: string,
+  armId: string,
   wording: PromptWording,
   language: string,
   texts: string[],
@@ -218,16 +244,38 @@ function batchKey(
     .update(texts.join('\n'))
     .digest('hex')
     .slice(0, 12);
-  return `${model}|${wording}|${language}|${hash}`;
+  return `${armId}|${wording}|${language}|${hash}`;
+}
+
+/**
+ * Per-call OpenRouter options. Luna reasons adaptively and bills the hidden
+ * tokens unless thinking is explicitly disabled, so it always gets a
+ * reasoning field (off, or the arm's effort) plus the app's provider
+ * routing; Gemini gets a field only when the arm asks for an effort.
+ */
+function providerOptionsFor(candidate: Arm) {
+  const openrouterOpts: Record<string, unknown> = {};
+  if (candidate.reasoning) {
+    openrouterOpts.reasoning = { effort: candidate.reasoning };
+  } else if (candidate.model === LUNA_BO3.model) {
+    openrouterOpts.reasoning = { enabled: false };
+  }
+  if (candidate.model === LUNA_BO3.model) {
+    openrouterOpts.provider = LUNA_PROVIDER_CONSTRAINTS;
+  }
+  return Object.keys(openrouterOpts).length > 0
+    ? { openrouter: openrouterOpts }
+    : undefined;
 }
 
 async function classifyBatch(
   openrouter: OpenRouterClient,
-  model: string,
+  candidate: Arm,
   wording: PromptWording,
   language: string,
   texts: string[],
 ): Promise<Prediction[]> {
+  const model = candidate.id;
   const key = batchKey(model, wording, language, texts);
   const hit = bench.cache[key];
   if (hit) {
@@ -236,20 +284,12 @@ async function classifyBatch(
       : texts.map(() => null);
   }
   const startedAt = Date.now();
-  const providerOptions =
-    model === LUNA_BO3.model
-      ? {
-          openrouter: {
-            reasoning: { enabled: false },
-            provider: LUNA_PROVIDER_CONSTRAINTS,
-          },
-        }
-      : undefined;
+  const providerOptions = providerOptionsFor(candidate);
   let text: string | null = null;
   const telemetry: CallTelemetry[] = [];
   try {
     const res = await generateText({
-      model: openrouter(model),
+      model: openrouter(candidate.model),
       system: buildRenderingClassifierPrompt(language, wording),
       prompt: buildRenderingClassifierUserPrompt(texts),
       temperature: 0,
@@ -349,7 +389,7 @@ async function main() {
       const chunk = list.slice(i, i + BATCH);
       const preds = await classifyBatch(
         openrouter,
-        FLASH_JUDGE_MODEL,
+        arm(FLASH_JUDGE_MODEL),
         'product',
         language,
         chunk.map((item) => item.text),
@@ -378,6 +418,8 @@ async function main() {
   }
   const byLanguage = groupBy(items, (item) => item.language);
   const jobs: {
+    candidate: Arm;
+    /** The arm id: the results, confusion and cost key. */
     model: string;
     wording: PromptWording;
     language: string;
@@ -386,7 +428,13 @@ async function main() {
   for (const modelKey of modelKeys)
     for (const wording of wordings)
       for (const [language, list] of byLanguage)
-        jobs.push({ model: MODELS[modelKey], wording, language, list });
+        jobs.push({
+          candidate: MODELS[modelKey],
+          model: MODELS[modelKey].id,
+          wording,
+          language,
+          list,
+        });
 
   await pool(jobs, 4, async (job) => {
     const axes = renderingAxesFor(job.language);
@@ -395,7 +443,7 @@ async function main() {
       const before = bench.spentUsd;
       const preds = await classifyBatch(
         openrouter,
-        job.model,
+        job.candidate,
         job.wording,
         job.language,
         chunk.map((item) => item.text),
@@ -444,7 +492,7 @@ async function main() {
     );
     for (const modelKey of modelKeys) {
       for (const wording of wordings) {
-        const model = MODELS[modelKey];
+        const model = MODELS[modelKey].id;
         const sum = (source: string) => {
           let hits = 0;
           let total = 0;
@@ -488,10 +536,36 @@ async function main() {
   for (const [key, n] of [...confusion.entries()].sort((a, b) => b[1] - a[1])) {
     if (n >= 2) out(`  ${key}: ${n}`);
   }
-  out('\n== cost per 1000 rows ==');
-  for (const [key, usd] of cost) {
-    const rows = items.length;
-    out(`  ${key}: ${fmtUsd((usd / rows) * 1000)}`);
+  // Cost from the cache telemetry, so arms served from earlier runs report
+  // their real price instead of the zero they spent this run; `cost` (this
+  // run's spend) only feeds the budget guard. Output tokens per row show
+  // hidden reasoning: a JSON reply is about 2.5 characters per token, so
+  // an arm well below that is billing thinking tokens.
+  out('\n== cost per 1000 rows (from cache telemetry) ==');
+  out(
+    `${'arm'.padEnd(48)} ${'calls'.padStart(5)} ${'$/1000 rows'.padStart(12)} ${'out tok/row'.padStart(11)} ${'chars/out tok'.padStart(13)}`,
+  );
+  for (const modelKey of modelKeys) {
+    for (const wording of wordings) {
+      const prefix = `${MODELS[modelKey].id}|${wording}|`;
+      let calls = 0;
+      let usd = 0;
+      let outTokens = 0;
+      let chars = 0;
+      for (const [key, entry] of Object.entries(bench.cache)) {
+        if (!key.startsWith(prefix)) continue;
+        const t = entry.telemetry?.[0];
+        if (!t) continue;
+        calls++;
+        usd += t.costUsd ?? 0;
+        outTokens += t.outputTokens ?? 0;
+        chars += entry.text?.length ?? 0;
+      }
+      const rows = items.length;
+      out(
+        `${`${modelKey}|${wording}`.padEnd(48)} ${String(calls).padStart(5)} ${fmtUsd((usd / rows) * 1000).padStart(12)} ${(outTokens / rows).toFixed(1).padStart(11)} ${(outTokens ? chars / outTokens : 0).toFixed(2).padStart(13)}`,
+      );
+    }
   }
   out(`\nSpent ${fmtUsd(bench.spentUsd)} this run.`);
   bench.writeReport(lines, {

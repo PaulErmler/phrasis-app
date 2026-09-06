@@ -89,10 +89,16 @@ resolves to one form on German (du) and never alternates there.
    served as the canonical text with audio in the card's voice.
 7. Every stored wording is stamped `renderedGender` / `renderedPoliteness`
    by the rendering classifier (`convex/lib/renderingClassifier.ts`): at
-   generation for new rows, by `migrations/backfillRenderedForms` for rows
-   from before (started by `pnpm build:deploy` after every deploy; a
-   `backfillRuns` marker makes later starts no-ops). The stamps feed the
-   chips and the shortcut "the canonical
+   generation for new rows, and lazily for rows from before: the canonical
+   sweep (`scheduleMissingContent`) collects unstamped rows of marking
+   languages and `flushRenderingStamps` asks the classifier for them, 25
+   rows per call, claimed on the row (`renderingStampRequestedAt`, 15 min
+   cooldown) so repeated sweeps do not double the call. The upcoming-cards
+   and collection-warm loops share one collector per pass. While a stamp is
+   pending, the rendering sweep asks for no rewrite of that row
+   (`renderingStampPending`), since the next pass may find the canonical
+   row already is the requested form. The stamps feed the chips and the
+   shortcut "the canonical
    row already is the requested form, schedule nothing".
 
 ## Prompts
@@ -133,7 +139,14 @@ tenths in the adherence bench.
   times the price and collapsed on ja/ko with the literature wording; Luna
   lost 4 points on gender. The politeness gold misses are mostly
   "casual" rows the models call "formal" on pt, zh and es, worth a look at
-  the corpus labels before trusting them.
+  the corpus labels before trusting them. Thinking does not help: the
+  `-minimal` and `-low` arms (`--models=flash-lite-31-low,...`) showed
+  that OpenRouter's `minimal` buys no reasoning tokens on Flash Lite, that
+  `low` on 3.1 Flash Lite costs 27% more and loses 2 points on gender gold
+  and 11 on the wild sample, and that 3.7 Flash thinks by default (1076
+  output tokens per batch for 400 of JSON), which is where its price comes
+  from. Run-to-run noise at temperature 0 is about 5 points on the 143-row
+  politeness gold set, so differences below that are not signal.
 - `pnpm eval:gender-relevance`: which sentences the speaker's gender changes
   at all (double generation, judged). First-person sentences are marked on
   8 to 12 of 12 in ru, pl, cs, it, ar, he, th and 2 to 5 in fr, es, pt, el,

@@ -90,7 +90,7 @@ pnpm format            # Prettier over the repo
 # Build & deploy
 pnpm build             # next build
 pnpm start             # production server
-pnpm build:deploy      # convex deploy (runs the build) + prod migrations + one-off backfills
+pnpm build:deploy      # convex deploy (runs the build) + prod migrations
 
 # Convex data snapshots (per git branch)
 pnpm snapshot          # export deployment data to .convex-snapshots/<branch>.zip

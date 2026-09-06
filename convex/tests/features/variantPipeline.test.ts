@@ -1,4 +1,12 @@
 /// <reference types="vite/client" />
+import { vi as vitestMock } from 'vitest';
+// The lazy stamp test schedules a classifier action; keep it off the network.
+vitestMock.mock('ai', () => ({
+  generateText: vitestMock.fn(async () => ({ text: '[]' })),
+}));
+vitestMock.mock('@openrouter/ai-sdk-provider', () => ({
+  createOpenRouter: () => () => ({}),
+}));
 import { convexTest, type TestConvex } from 'convex-test';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -89,8 +97,11 @@ async function seed(
   opts: {
     follows?: boolean;
     userCreated?: boolean;
-    /** Classifier stamp on the canonical Japanese row (default unmarked). */
-    jaGender?: 'masculine' | 'feminine' | 'unmarked';
+    /**
+     * Classifier stamp on the canonical Japanese row (default unmarked);
+     * 'none' seeds it unstamped, like a row from before the feature.
+     */
+    jaGender?: 'masculine' | 'feminine' | 'unmarked' | 'none';
   } = {},
 ) {
   return t.run(async (ctx) => {
@@ -140,9 +151,15 @@ async function seed(
         translationSource: 'openai/gpt-5.6-sol:floor-minimal',
         speakerGender: 'male',
         translationVersion: 99,
-        renderedGender:
-          lang === 'ja' ? (opts.jaGender ?? 'unmarked') : 'unmarked',
-        renderedPoliteness: lang === 'ja' ? 'casual' : 'unmarked',
+        ...(lang === 'ja' && opts.jaGender === 'none'
+          ? {}
+          : {
+              renderedGender:
+                lang === 'ja' && opts.jaGender !== 'none'
+                  ? (opts.jaGender ?? 'unmarked')
+                  : 'unmarked',
+              renderedPoliteness: lang === 'ja' ? 'casual' : 'unmarked',
+            }),
       });
       await insertAudioFixture(ctx, {
         textId,
@@ -432,6 +449,50 @@ describe('rendering variants', () => {
     expect(content.translations.find((tr) => tr.language === 'ja')!.text).toBe(
       CANONICAL_JA,
     );
+  });
+
+  it('an unstamped canonical row is sent to the classifier, and no rewrite is asked for until it is stamped', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, rows } = await seed(t, { jaGender: 'none' });
+    const settings: RenderingSettings = { firstPersonForms: 'feminine' };
+    const pendingStampCalls = () =>
+      t.run(async (ctx) =>
+        (await ctx.db.system.query('_scheduled_functions').collect()).filter(
+          (job) =>
+            job.name.includes('classifyAndStampTranslations') &&
+            job.state.kind === 'pending',
+        ),
+      );
+
+    await ensureRenderings(t, textId, settings);
+    // The canonical sweep asked for the stamp (claimed on the row); the
+    // rendering sweep held the rewrite back instead of guessing.
+    expect(llmEnqueues()).toEqual([]);
+    const calls = await pendingStampCalls();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].args[0]).toMatchObject({ translationIds: [rows.ja] });
+    const claimed = await t.run((ctx) => ctx.db.get(rows.ja));
+    expect(claimed?.renderingStampRequestedAt).toBeDefined();
+
+    // A second sweep inside the cooldown asks neither the classifier nor
+    // the translator again.
+    await ensureRenderings(t, textId, settings);
+    expect(await pendingStampCalls()).toHaveLength(1);
+    expect(llmEnqueues()).toEqual([]);
+
+    // The stamp lands (masculine wording): the next sweep requests the
+    // feminine rewrite. The classifier call itself is not exercised here
+    // (the scheduled action fails fast in the test harness).
+    await t.run(async (ctx) => {
+      await ctx.db.patch(rows.ja, {
+        renderedGender: 'masculine',
+        renderedPoliteness: 'casual',
+      });
+    });
+    await ensureRenderings(t, textId, settings);
+    expect(llmEnqueues().map((j) => [j.targetLanguage, j.variantKey])).toEqual([
+      ['ja', 'female|auto'],
+    ]);
   });
 
   it('a user-written text ignores the settings entirely', async () => {

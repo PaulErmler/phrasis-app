@@ -64,8 +64,14 @@ import {
 import {
   AUTO,
   parseVariantKey,
+  type LanguageRendering,
   type RenderingSettings,
 } from '../../lib/preferenceResolution';
+import {
+  classificationLanguageForRow,
+  renderingAxesFor,
+} from './renderingClassifier';
+import { MAX_ROWS_PER_CALL } from '../features/renderingClassification';
 
 /**
  * Content-scheduling helpers: the shared "fill whatever this text is missing"
@@ -561,6 +567,15 @@ type ContentSweepOpts = {
    */
   skipTts?: boolean;
   /**
+   * Where the sweep drops the translation rows that still lack their
+   * rendering stamps (`renderedGender` / `renderedPoliteness`). A caller
+   * sweeping many texts passes one collector and calls
+   * `flushRenderingStamps` once, so the classifier sees 25 rows per call
+   * instead of one; without it the sweep flushes its own text at the end.
+   * Probe passes collect too (the flush is the caller's write).
+   */
+  stamps?: RenderingStampCollector;
+  /**
    * Forced regeneration (regenerateCardAudio): audio enqueues bypass the
    * `audioAssets` cache (a hit would make the regenerate button a no-op)
    * and the synthesis job replaces the shared asset in place on completion.
@@ -969,6 +984,8 @@ async function scheduleSupersededRevisionContent(
       throw new ProbeNeedsWork();
     }
     await scheduleTranslationAnnotations(ctx, revision, revision._id);
+    // A pinned card shows this revision, so its chips need the stamps too.
+    collectRenderingStamp(revision, opts);
     // A revision that was never voiced is never served (the reader falls
     // through to the live row), so there is no audio to keep alive.
     if (revision.audioAssetId === undefined) continue;
@@ -1110,6 +1127,7 @@ async function scheduleLanguageContent(
     throw new ProbeNeedsWork();
   }
   await scheduleTranslationAnnotations(ctx, translation, undefined);
+  collectRenderingStamp(translation, opts);
   if (!hasAudio) {
     // Defer TTS while an LLM retranslation is in flight for this
     // (textId, lang). Without this guard, `flagTranslation` (which
@@ -1173,6 +1191,12 @@ export async function scheduleMissingContent(
   targetLanguages: string[],
   opts?: ContentSweepOpts,
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
+  // Rendering-stamp requests this sweep finds go to the caller's collector
+  // when it passes one (a many-text loop flushes once, 25 rows per
+  // classifier call), else to this text's own, flushed at the end. A probe
+  // only collects: the flush is a write, and the caller's to make.
+  const ownStampCollector = opts?.stamps === undefined;
+  opts = { ...opts, stamps: opts?.stamps ?? newRenderingStampCollector() };
   const sourceLanguage = text.language;
 
   // Resolve gender for both the voice (audioSpeakerGender) and the translation
@@ -1272,7 +1296,127 @@ export async function scheduleMissingContent(
     if (scheduled.audioScheduled) audioScheduled++;
   }
 
+  if (ownStampCollector && !opts.probe) {
+    await flushRenderingStamps(ctx, opts.stamps!, opts.requestedByUserId);
+  }
+
   return { translationsScheduled, audioScheduled };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Rendering stamps (docs/architecture/translation-variants.md)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Translation rows a sweep found without their rendering stamps, grouped by
+ * the language the classifier prompt is built for. Rows from before the
+ * sentence-form settings are stamped this way, lazily, by the sweep of
+ * whichever learner meets them first, instead of by a one-off backfill over
+ * the whole table.
+ */
+export type RenderingStampCollector = Map<string, Id<'translations'>[]>;
+
+export function newRenderingStampCollector(): RenderingStampCollector {
+  return new Map();
+}
+
+/**
+ * How long a stamp request is honoured before a sweep asks again. Covers
+ * the classifier's latency many times over, so the repeated sweeps of one
+ * card (probe, dispatch, the next review) do not double the call, and
+ * still retries a row the classifier answered badly (left unstamped).
+ */
+const STAMP_REQUEST_COOLDOWN_MS = 15 * 60 * 1000;
+
+/**
+ * Does this row need a classifier call? Only canonical rows of a language
+ * that marks an axis (a variant is stamped by its own store path), only
+ * when a stamp is missing, and not while a recent request is in flight.
+ */
+export function needsRenderingStamp(row: Doc<'translations'>): boolean {
+  if (row.variantKey !== undefined) return false;
+  if (
+    row.renderedGender !== undefined &&
+    row.renderedPoliteness !== undefined
+  ) {
+    return false;
+  }
+  if (
+    row.renderingStampRequestedAt !== undefined &&
+    Date.now() - row.renderingStampRequestedAt < STAMP_REQUEST_COOLDOWN_MS
+  ) {
+    return false;
+  }
+  const axes = renderingAxesFor(classificationLanguageForRow(row));
+  return axes.gender || axes.politeness;
+}
+
+function collectRenderingStamp(
+  row: Doc<'translations'>,
+  opts: ContentSweepOpts | undefined,
+): void {
+  if (!opts?.stamps || !needsRenderingStamp(row)) return;
+  const language = classificationLanguageForRow(row);
+  const list = opts.stamps.get(language) ?? [];
+  if (list.includes(row._id)) return;
+  list.push(row._id);
+  opts.stamps.set(language, list);
+}
+
+/**
+ * Schedule one classifier call per language per MAX_ROWS_PER_CALL rows of
+ * the collector, claiming each row with `renderingStampRequestedAt` in the
+ * same transaction so a sweep that runs before the call lands finds the
+ * claim. Empties the collector; returns the rows scheduled.
+ */
+export async function flushRenderingStamps(
+  ctx: MutationCtx,
+  stamps: RenderingStampCollector,
+  requestedByUserId?: string,
+): Promise<number> {
+  const now = Date.now();
+  let scheduled = 0;
+  for (const ids of stamps.values()) {
+    for (let i = 0; i < ids.length; i += MAX_ROWS_PER_CALL) {
+      const chunk = ids.slice(i, i + MAX_ROWS_PER_CALL);
+      for (const id of chunk) {
+        await ctx.db.patch(id, { renderingStampRequestedAt: now });
+      }
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.renderingClassification.classifyAndStampTranslations,
+        { translationIds: chunk, skipStamped: true, userId: requestedByUserId },
+      );
+      scheduled += chunk.length;
+    }
+  }
+  stamps.clear();
+  return scheduled;
+}
+
+/**
+ * The canonical row cannot be judged against the request yet: an axis the
+ * text key asks for is unstamped on a language that marks it. The canonical
+ * sweep that runs before the rendering sweep has asked for the stamp; the
+ * next pass decides between "canonical already is this form" and a rewrite.
+ * Asking for the rewrite now would often come back identical (billed, then
+ * stored as `sameAsCanonical`).
+ */
+function renderingStampPending(
+  canonical: Doc<'translations'>,
+  rendering: LanguageRendering,
+): boolean {
+  if (rendering.textVariantKey === null) return false;
+  const { gender, formId } = parseVariantKey(rendering.textVariantKey);
+  const axes = renderingAxesFor(classificationLanguageForRow(canonical));
+  return (
+    (gender !== AUTO &&
+      axes.gender &&
+      canonical.renderedGender === undefined) ||
+    (formId !== AUTO &&
+      axes.politeness &&
+      canonical.renderedPoliteness === undefined)
+  );
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -1339,6 +1483,8 @@ export async function scheduleMissingRenderings(
         // the classifier): serve it, ask for nothing.
         if (canonicalSatisfies(canonical, rendering)) {
           variant = canonical;
+        } else if (renderingStampPending(canonical, rendering)) {
+          continue;
         } else if (
           await hasBlockingLlmClaim(
             ctx,

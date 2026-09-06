@@ -13,6 +13,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { generateText } from 'ai';
 import schema from '../../schema';
 import { internal } from '../../_generated/api';
+import {
+  flushRenderingStamps,
+  needsRenderingStamp,
+  newRenderingStampCollector,
+} from '../../lib/contentScheduling';
 import type { Id } from '../../_generated/dataModel';
 
 const modules = import.meta.glob('/convex/**/*.ts');
@@ -126,8 +131,8 @@ describe('features/renderingClassification', () => {
   });
 });
 
-describe('migrations/backfillRenderedForms', () => {
-  it('schedules one classifier call per language group and skips stamped and unmarked rows', async () => {
+describe('flushRenderingStamps (lazy stamping from the content sweep)', () => {
+  it('schedules one classifier call per language group, claims the rows, and skips stamped and unmarked rows', async () => {
     const t = convexTest(schema, modules);
     process.env.OPENROUTER_API_KEY = 'test';
     const textId = await seedText(t);
@@ -149,27 +154,72 @@ describe('migrations/backfillRenderedForms', () => {
       providerMetadata: {},
     } as never);
 
+    // What a sweep collects: every row that needs a stamp, by language;
+    // flushed in the same transaction when asked (a Map cannot cross the
+    // convex-test boundary).
+    const collectAndMaybeFlush = (flush: boolean) =>
+      t.run(async (ctx) => {
+        const stamps = newRenderingStampCollector();
+        for (const row of await ctx.db.query('translations').collect()) {
+          if (!needsRenderingStamp(row)) continue;
+          const list = stamps.get(row.targetLanguage) ?? [];
+          list.push(row._id);
+          stamps.set(row.targetLanguage, list);
+        }
+        const languages = [...stamps.keys()].sort();
+        const scheduled = flush ? await flushRenderingStamps(ctx, stamps) : 0;
+        return { languages, scheduled };
+      });
+
     vi.useFakeTimers();
     try {
-      await t.mutation(internal.migrations.backfillRenderedForms.run, {
-        pageSize: 100,
-        delayMs: 0,
-      });
+      const first = await collectAndMaybeFlush(true);
+      // sv marks neither axis and de is already stamped.
+      expect(first.languages).toEqual(['ja', 'ru']);
+      expect(first.scheduled).toBe(3);
+      // The claim lands in the flushing transaction: a sweep that runs
+      // before the classifier answers finds nothing to ask for.
+      expect((await collectAndMaybeFlush(false)).languages).toEqual([]);
       await t.finishAllScheduledFunctions(vi.runAllTimers);
     } finally {
       vi.useRealTimers();
     }
 
-    // ru (2 rows) and ja (1 row): two classifier calls; sv and the stamped
-    // de row never reach the model.
+    // ru (2 rows) and ja (1 row): two classifier calls.
     expect(vi.mocked(generateText)).toHaveBeenCalledTimes(2);
     const rows = await t.run(async (ctx) =>
       ctx.db.query('translations').collect(),
     );
     const ru = rows.filter((r) => r.targetLanguage === 'ru');
     expect(ru.every((r) => r.renderedGender !== undefined)).toBe(true);
+    expect(ru.every((r) => r.renderingStampRequestedAt !== undefined)).toBe(
+      true,
+    );
     expect(
       rows.find((r) => r.targetLanguage === 'sv')?.renderedGender,
     ).toBeUndefined();
+  });
+
+  it('asks again for a row the classifier left blank once the cooldown has passed', async () => {
+    const t = convexTest(schema, modules);
+    const textId = await seedText(t);
+    await seedTranslation(t, textId, 'ru', 'Я устал.');
+    const row = await t.run(
+      async (ctx) => (await ctx.db.query('translations').collect())[0],
+    );
+    expect(needsRenderingStamp(row)).toBe(true);
+    expect(
+      needsRenderingStamp({ ...row, renderingStampRequestedAt: Date.now() }),
+    ).toBe(false);
+    expect(
+      needsRenderingStamp({
+        ...row,
+        renderingStampRequestedAt: Date.now() - 16 * 60 * 1000,
+      }),
+    ).toBe(true);
+    // A variant row is stamped by its own store path, never by the sweep.
+    expect(needsRenderingStamp({ ...row, variantKey: 'female|auto' })).toBe(
+      false,
+    );
   });
 });

@@ -28,6 +28,8 @@ import {
 } from '../lib/cardContent';
 import {
   enqueueVersionBumpRegen,
+  flushRenderingStamps,
+  newRenderingStampCollector,
   scheduleMissingContent,
   scheduleTranslationForLanguage,
   scheduleAudioForLanguage,
@@ -850,6 +852,8 @@ export const ensureFirstSentencesForCollection = internalMutation({
       .order('asc')
       .take(COLLECTION_PREVIEW_SIZE);
 
+    // One rendering-stamp flush for the batch (25 rows per classifier call).
+    const stamps = newRenderingStampCollector();
     await Promise.all(
       texts.map((text) =>
         scheduleMissingContent(
@@ -860,10 +864,11 @@ export const ensureFirstSentencesForCollection = internalMutation({
           args.targetLanguages,
           // Signup-time warm of ~20 collections × 5 texts: background, so
           // this burst can't queue ahead of the user's own cards.
-          { priority: 'background' },
+          { priority: 'background', stamps },
         ),
       ),
     );
+    await flushRenderingStamps(ctx, stamps);
     return null;
   },
 });

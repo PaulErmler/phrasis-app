@@ -17,6 +17,8 @@ import { ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
 import { fetchFreePlayRotation } from '../lib/freePlay';
 import { fetchTrackDueCards } from '../lib/dueQueue';
 import {
+  flushRenderingStamps,
+  newRenderingStampCollector,
   ProbeNeedsWork,
   scheduleMissingContent,
   scheduleMissingRenderings,
@@ -173,6 +175,9 @@ async function scheduleContentForUpcomingCards(
   // Batch-load the texts up front (one concurrent read round, not one
   // sequential get per card) before the sequential probe loop.
   const texts = await Promise.all(cards.map((card) => ctx.db.get(card.textId)));
+  // Rows without rendering stamps across the whole batch, so the classifier
+  // is asked once per language per 25 rows rather than once per card.
+  const stamps = newRenderingStampCollector();
   for (let i = 0; i < cards.length; i++) {
     const card = cards[i];
     const text = texts[i];
@@ -185,7 +190,7 @@ async function scheduleContentForUpcomingCards(
         text,
         active.course.baseLanguages,
         active.course.targetLanguages,
-        { probe: true },
+        { probe: true, stamps },
       );
       if (card.followsCoursePreferences) {
         await scheduleMissingRenderings(
@@ -195,7 +200,7 @@ async function scheduleContentForUpcomingCards(
           active.course.baseLanguages,
           active.course.targetLanguages,
           renderingSettings,
-          { probe: true },
+          { probe: true, stamps },
         );
       }
     } catch (error) {
@@ -229,6 +234,9 @@ async function scheduleContentForUpcomingCards(
       processed++;
     }
   }
+  // Claims the rows in this transaction, so the dispatched
+  // `prepareCardContent` sweeps above find them requested and skip them.
+  await flushRenderingStamps(ctx, stamps);
 
   // This sweep does NOT reach past the deck into not-yet-added collection
   // texts; that proved too late for fast reviewers (batches observed added

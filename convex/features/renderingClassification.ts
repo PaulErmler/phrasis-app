@@ -26,14 +26,15 @@ import { renderedGenderValidator, renderedPolitenessValidator } from '../types';
 
 /**
  * Stamps `translations.renderedGender` / `renderedPoliteness`: what a stored
- * wording actually is. Two callers: the backfill job
- * (convex/migrations/backfillRenderedForms.ts) over rows from before the
- * feature, and the variant store path, for every rendering generated from
- * now on. Prompt and parser live in convex/lib/renderingClassifier.ts.
+ * wording actually is. Two callers: the content sweep, lazily, for rows
+ * from before the feature (`flushRenderingStamps` in
+ * convex/lib/contentScheduling.ts, batched per ensure pass), and the
+ * translation store paths, for every row generated from now on. Prompt
+ * and parser live in convex/lib/renderingClassifier.ts.
  *
  * One LLM call classifies up to `MAX_ROWS_PER_CALL` rows of ONE language;
  * rows the model skips or answers badly stay unstamped (no chip) and the
- * backfill picks them up on its next run.
+ * next sweep after the request cooldown asks again.
  */
 export const MAX_ROWS_PER_CALL = 25;
 
