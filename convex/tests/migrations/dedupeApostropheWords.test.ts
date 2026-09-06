@@ -124,6 +124,48 @@ describe('dedupeApostropheWordOne', () => {
     expect(totalWords).toBe(1);
   });
 
+  it('re-keys a lone curly row and moves its sentence links with it', async () => {
+    const t = convexTest(schema, modules);
+    const { courseId, textIds } = await seed(t);
+    const curlyId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert('userWords', {
+        userId: USER,
+        courseId,
+        language: 'fr',
+        word: 'j’aime',
+        displayWord: 'J’aime',
+      });
+      for (const textId of textIds) {
+        await ctx.db.insert('userWordTexts', {
+          userId: USER,
+          courseId,
+          language: 'fr',
+          word: 'j’aime',
+          textId,
+        });
+      }
+      return id;
+    });
+
+    const patch = await t.run(
+      async (ctx) =>
+        (await dedupeApostropheWordOne(ctx, (await ctx.db.get(curlyId))!)) ??
+        null,
+    );
+    expect(patch).toEqual({ word: "j'aime", displayWord: "J'aime" });
+
+    // Every link now answers to the folded word, none to the old spelling.
+    const links = await t.run(async (ctx) =>
+      (await ctx.db.query('userWordTexts').collect()).map((l) => ({
+        word: l.word,
+        textId: l.textId,
+      })),
+    );
+    expect(links).toHaveLength(2);
+    expect(links.every((l) => l.word === "j'aime")).toBe(true);
+    expect(new Set(links.map((l) => l.textId))).toEqual(new Set(textIds));
+  });
+
   it('re-keys a lone acute-accent row in place and leaves plain rows alone', async () => {
     const t = convexTest(schema, modules);
     const { courseId } = await seed(t);

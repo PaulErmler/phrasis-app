@@ -978,21 +978,34 @@ export async function dedupeApostropheWordOne(
         .eq('word', folded),
     )
     .first();
-  if (!existing) return { word: folded, ...displayPatch };
 
-  if (doc.courseId !== undefined) {
-    const courseId = doc.courseId;
-    const linksOf = (word: string) =>
-      ctx.db
-        .query('userWordTexts')
-        .withIndex('by_userId_courseId_language_word', (q) =>
-          q
-            .eq('userId', doc.userId)
-            .eq('courseId', courseId)
-            .eq('language', doc.language)
-            .eq('word', word),
-        )
-        .take(MAX_TEXTS_PER_WORD);
+  // Sentence links are keyed by the word too (`userWordTexts`), and only
+  // exist under a course. They follow the word whether it is renamed in
+  // place or merged, or the word's sentence list goes empty and the next
+  // `trackNewWords` links the sentences again.
+  const courseId = doc.courseId;
+  const linksOf = (word: string) =>
+    courseId === undefined
+      ? Promise.resolve([] as Doc<'userWordTexts'>[])
+      : ctx.db
+          .query('userWordTexts')
+          .withIndex('by_userId_courseId_language_word', (q) =>
+            q
+              .eq('userId', doc.userId)
+              .eq('courseId', courseId)
+              .eq('language', doc.language)
+              .eq('word', word),
+          )
+          .take(MAX_TEXTS_PER_WORD);
+
+  if (!existing) {
+    for (const link of await linksOf(doc.word)) {
+      await ctx.db.patch(link._id, { word: folded });
+    }
+    return { word: folded, ...displayPatch };
+  }
+
+  if (courseId !== undefined) {
     const [duplicateLinks, keptLinks] = await Promise.all([
       linksOf(doc.word),
       linksOf(folded),
