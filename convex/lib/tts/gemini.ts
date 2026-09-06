@@ -2,8 +2,9 @@ import type { SpeakInput, SpeakResult, TTSProvider } from './types';
 import { requireEnv } from '../env';
 import { Mp3Encoder } from '@breezystack/lamejs';
 import { toGeminiBcp47 } from './languageCodes';
-import { getLanguageByCode } from '../../../lib/languages';
+import { resolveTtsPrompt } from '../../../lib/languages';
 import { trimTailHiccup } from './tailTrim';
+import { ttsDeliveryInstruction } from './deliveryInstruction';
 
 // Gemini 3.1 Flash TTS, reached through OpenRouter's OpenAI-compatible speech
 // endpoint. OpenRouter emits ONLY raw PCM for this model. Its response_format
@@ -32,9 +33,17 @@ const MP3_KBPS = 48;
 const HOST_IS_LITTLE_ENDIAN =
   new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
-function buildStyledInput(text: string, languageName: string): string {
-  const context = `Speak the following text in a natural way like a native ${languageName} speaker would in a way that fits the sentence.`;
-  return `## Instruction: ${context}\n\n## Transcript: ${text}`;
+// The instruction text lives in deliveryInstruction.ts (shared with the
+// landing-audio script); see the note there on regeneration.
+function buildStyledInput(
+  text: string,
+  languageName: string,
+  promptNotes?: string,
+): string {
+  const instruction = promptNotes
+    ? `${ttsDeliveryInstruction(languageName)} ${promptNotes}`
+    : ttsDeliveryInstruction(languageName);
+  return `## Instruction: ${instruction}\n\n## Transcript: ${text}`;
 }
 
 /**
@@ -199,23 +208,27 @@ export const geminiTts: TTSProvider = {
     // US/GB/AU); otherwise derive it from the language code.
     const languageCode = locale ?? toGeminiBcp47(input.language);
     // Name of the target language for the "## Instruction" block so Gemini locks
-    // pronunciation to it. Normally the region-stripped base name ("English
-    // (US)" → "English") since the accent is already pinned by `language_code`
-    // above. But some dialects can't be pinned by the locale (e.g. Levantine
-    // Arabic → `ar-001`, shared with MSA/Saudi/Iraqi), so they set an explicit
-    // `ttsPromptName` ("Levantine Arabic") to name the dialect in the prose.
-    // The only signal Gemini gets to distinguish it. Falls back to the raw code.
-    const lang = getLanguageByCode(input.language);
-    const languageName =
-      lang?.ttsPromptName ??
-      (lang?.name ?? input.language).replace(/\s*\([^)]*\)\s*$/, '');
+    // pronunciation to it. Three sources, in order:
+    //   1. The language's own `ttsPromptName` (Levantine Arabic → `ar-001` is
+    //      shared with MSA/Saudi/Iraqi, so the prose is the only dialect
+    //      signal; en_gb / es pin their accent the same way).
+    //   2. For a mixed pool whose voice carries an `@locale` (en, es_mixed):
+    //      the accent named by the language that pins that locale
+    //      (`Leda@en-GB` → "British English"). `language_code` alone drifts
+    //      toward American English / Latin American Spanish.
+    //   3. The region-stripped base name ("English (US)" → "English"), or the
+    //      raw code for an unknown language.
+    const { name: languageName, notes: promptNotes } = resolveTtsPrompt(
+      input.language,
+      locale,
+    );
 
     let pcm = new Uint8Array(0);
     for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {
       // First attempt sends the sentence as-is; retries randomly pad edge spaces.
       const sentence = attempt === 0 ? input.text : padRandomSpaces(input.text);
       pcm = await requestGeminiPcm(apiKey, {
-        input: buildStyledInput(sentence, languageName),
+        input: buildStyledInput(sentence, languageName, promptNotes),
         voiceName,
         languageCode,
         speed: input.speed,

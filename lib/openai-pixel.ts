@@ -4,7 +4,7 @@
  * Attribution for ChatGPT ad campaigns: the pixel reads the `oppref` click id
  * the ad appends to the landing URL, and conversions measured here are matched
  * back to the campaign in OpenAI's ads manager. PostHog remains the product
- * analytics source of truth; this module reports three conversion moments to
+ * analytics source of truth; this module reports four conversion moments to
  * one more vendor and nothing else.
  *
  * Privacy stance, mirroring `lib/posthog/client.ts`: the SDK script is NOT
@@ -39,11 +39,29 @@ declare global {
   }
 }
 
-/** Standard pixel event names this app reports. */
+/**
+ * Pixel event names this app reports. `custom` is the vendor's escape hatch
+ * for a conversion with no standard name; the identity of such an event is
+ * the `custom_event_name` option, not the event name (which is the literal
+ * string `custom` for all of them).
+ */
 export type ConversionEvent =
   | 'registration_completed'
   | 'subscription_created'
-  | 'trial_started';
+  | 'trial_started'
+  | 'custom';
+
+/**
+ * `custom_event_name` for creating an account. The standard
+ * `registration_completed` is spoken for: it reports finishing the onboarding
+ * wizard, which is the conversion the campaigns optimize on, so the weaker
+ * "an account now exists" moment goes out as a custom event instead.
+ *
+ * This string IS the join key. The conversion in the OpenAI ads manager is
+ * configured to match on the custom event name (a conversion id is never sent
+ * from here), and the Conversions API would have to reuse the same name.
+ */
+export const SIGNUP_CUSTOM_EVENT_NAME = 'signup';
 
 /** Everything this module persists is prefixed so a consent revoke can sweep it. */
 const STORAGE_PREFIX = 'flexling_oaiq_';
@@ -131,11 +149,13 @@ export function syncOpenAIPixelConsent(granted: boolean): void {
  *
  * `event_id` is the cross-channel dedupe key. Reuse the same string if the
  * same conversion is ever also sent from the server (Conversions API).
+ * `custom_event_name` is required when `event` is `custom`, and is what the
+ * vendor matches a custom conversion on — there too, across channels.
  */
 export function measureConversion(
   event: ConversionEvent,
   data: Record<string, unknown>,
-  options?: { event_id?: string },
+  options?: { event_id?: string; custom_event_name?: string },
 ): boolean {
   if (!loaded) return false;
   try {

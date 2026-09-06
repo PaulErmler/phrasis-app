@@ -1,8 +1,9 @@
 /// <reference types="vite/client" />
 import { convexTest, type TestConvex } from 'convex-test';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import schema from '../../schema';
 import { api } from '../../_generated/api';
+import { posthog } from '../../posthog';
 import { Id } from '../../_generated/dataModel';
 import {
   PLAYBACK_SPEED_MAX,
@@ -789,6 +790,49 @@ describe('features/courses', () => {
   });
 
   describe('updatePinnedCardActions', () => {
+    it('tracks each pin change with the resulting set and the diff against the previous one', async () => {
+      const t = convexTest(schema, modules);
+      await seedAuthenticated(t);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      vi.mocked(posthog.capture).mockClear();
+
+      // First change from the default set: regenerateAudio dropped, flag added.
+      await asUser.mutation(api.features.courses.updatePinnedCardActions, {
+        actions: ['favorite', 'master', 'hide', 'edit', 'flag'],
+      });
+      expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          distinctId: 'user_A',
+          event: 'card_action_pins_changed',
+          properties: {
+            pinned: ['favorite', 'master', 'hide', 'edit', 'flag'],
+            pinned_count: 5,
+            added: ['flag'],
+            removed: ['regenerateAudio'],
+          },
+        }),
+      );
+
+      // Second change diffs against the stored set, not the default.
+      vi.mocked(posthog.capture).mockClear();
+      await asUser.mutation(api.features.courses.updatePinnedCardActions, {
+        actions: ['favorite', 'flag'],
+      });
+      expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          event: 'card_action_pins_changed',
+          properties: {
+            pinned: ['favorite', 'flag'],
+            pinned_count: 2,
+            added: [],
+            removed: ['master', 'hide', 'edit'],
+          },
+        }),
+      );
+    });
+
     async function seedAuthenticated(t: TestConvex<typeof schema>) {
       await t.run(async (ctx) =>
         ctx.db.insert('userSettings', {
@@ -875,6 +919,7 @@ describe('features/courses', () => {
         'master',
         'hide',
         'edit',
+        'regenerateAudio',
       ]);
     });
 

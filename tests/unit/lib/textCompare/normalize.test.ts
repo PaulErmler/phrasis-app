@@ -1,9 +1,33 @@
 import { describe, it, expect } from 'vitest';
-import { normalize } from '@/lib/textCompare/normalize';
+import { normalize, normalizeForComparison } from '@/lib/textCompare/normalize';
 
 describe('normalize', () => {
   it('collapses whitespace by default', () => {
     expect(normalize('  hello   world  ')).toBe('hello world');
+  });
+
+  describe('apostrophe folding (always on)', () => {
+    it('folds curly quotes and accents onto the ASCII apostrophe', () => {
+      expect(normalize('don’t l‘eau it`s café´s')).toBe(
+        "don't l'eau it's café's",
+      );
+    });
+
+    it('folds the Uzbek modifier letters so typed answers can match', () => {
+      // Stored text carries ʻ (U+02BB) / ʼ (U+02BC); keyboards only have '.
+      expect(normalize('Oʻzbek taʼkid')).toBe(normalize("O'zbek ta'kid"));
+    });
+
+    it('treats the folded modifier letters as punctuation when ignoring it', () => {
+      expect(normalize('oʻzbek', { ignorePunctuation: true })).toBe('ozbek');
+      expect(normalize("o'zbek", { ignorePunctuation: true })).toBe('ozbek');
+    });
+
+    it('applies to the equality normalizer too', () => {
+      expect(normalizeForComparison('Oʻzbek tili goʻzal.')).toBe(
+        normalizeForComparison("o'zbek tili go'zal"),
+      );
+    });
   });
 
   it('does not collapse whitespace when disabled', () => {

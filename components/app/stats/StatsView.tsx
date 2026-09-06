@@ -29,25 +29,6 @@ function currentMonthStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function getISOWeekString(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
-  const dayOfWeek = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - dayOfWeek);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(
-    ((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
-  );
-  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
-}
-
-function weeksAgoStr(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n * 7);
-  const iso = d.toISOString().slice(0, 10);
-  return getISOWeekString(iso);
-}
-
 export function StatsView() {
   const tz = getUserTimezone();
   // Minute-quantized clock (no-wall-clock query guideline, same derivation
@@ -63,10 +44,11 @@ export function StatsView() {
     today: todayStr,
     startDate: yearStartStr,
     endDate: todayStr,
-    startMonth: monthsAgoStr(12),
+    // The whole monthly history (bounded server-side at 120 rows): the
+    // progress chart's year view buckets it by month, or by quarter once
+    // the history is long enough.
+    startMonth: monthsAgoStr(120),
     endMonth: currentMonthStr(),
-    startWeek: weeksAgoStr(52),
-    endWeek: getISOWeekString(todayStr),
   });
 
   // Query 2: Heavier daily data (heatmap + language daily stats)
@@ -87,6 +69,15 @@ export function StatsView() {
       targetSet.has(normalizeLanguageCode(d.language)),
     );
   }, [languageDailyData, targetLanguages]);
+
+  const filteredLanguageMonthlyData = useMemo(() => {
+    const rows = pageData?.languageMonthlyWords;
+    if (!rows?.length || !targetLanguages) return [];
+    const targetSet = new Set(
+      targetLanguages.map((l: string) => normalizeLanguageCode(l)),
+    );
+    return rows.filter((d) => targetSet.has(normalizeLanguageCode(d.language)));
+  }, [pageData?.languageMonthlyWords, targetLanguages]);
 
   const todayNewWords = useMemo(() => {
     if (!filteredLanguageData.length) return 0;
@@ -194,14 +185,16 @@ export function StatsView() {
             totalNewCards: m.totalNewCards,
             totalTimeMs: m.totalTimeMs,
           }))}
-          weeklyData={(pageData?.weeklyStats ?? []).map((w) => ({
-            week: w.week,
-            totalRepetitions: w.totalRepetitions,
-            totalNewCards: w.totalNewCards,
-            totalTimeMs: w.totalTimeMs,
-          }))}
+          languageMonthlyData={filteredLanguageMonthlyData}
           languageDailyData={filteredLanguageData}
           timezone={tz}
+          totals={{
+            words: cs?.totalWordCount ?? 0,
+            reviews: cs?.totalRepetitions ?? 0,
+            sentences: cs?.totalCards ?? 0,
+            timeMs: cs?.totalTimeMs ?? 0,
+          }}
+          languageWordTotals={pageData?.languageWordCounts ?? []}
         />
 
         <WordCloudSection />

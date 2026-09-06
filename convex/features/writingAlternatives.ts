@@ -1,4 +1,9 @@
-import { cardPinAt, servedTranslatedText } from '../db/translationReads';
+import {
+  cardPinAt,
+  servedSourceText,
+  servedTranslatedText,
+  viewOfCard,
+} from '../db/translationReads';
 import { ConvexError, v } from 'convex/values';
 import {
   internalAction,
@@ -16,7 +21,9 @@ import {
 } from '../../lib/constants/learning';
 import { normalizeForComparison } from '../lib/textComparison';
 import {
+  buildAudioAssetKey,
   findAudioAssetByKey,
+  findAudioAssetInAnyAccent,
   scheduleBlobSwapDelete,
   upsertAudioAsset,
 } from '../lib/audioAssets';
@@ -25,11 +32,10 @@ import { synthesizeSpeech } from './tts';
 import {
   getCurrentTtsVersion,
   getTtsProviderForLanguage,
+  getVoiceForText,
+  pickAccentForText,
 } from '../../lib/languages';
-import {
-  getVoiceForLanguage,
-  resolveAudioSpeakerGender,
-} from '../../lib/voices';
+import { resolveAudioSpeakerGender } from '../../lib/voices';
 import { reserveRateLimitToken } from '../lib/rateLimitReserve';
 import { TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
 import { requireAuthUserId } from '../db/users';
@@ -150,7 +156,10 @@ async function primaryTextForLanguage(
   if (!card) return null;
   const text = await ctx.db.get(card.textId);
   if (!text) return null;
-  if (text.language === language) return text.text;
+  if (text.language === language) {
+    // As the card shows it: the accent row on a Mixed English course.
+    return (await servedSourceText(ctx, text, viewOfCard(card))).text;
+  }
   // The served revision, not necessarily the live row (pinned cards).
   return servedTranslatedText(ctx, {
     textId: card.textId,
@@ -268,6 +277,12 @@ const alternativeContextValidator = v.union(
     hasAudio: v.boolean(),
     /** Owner of the alternative; synthesis cost bills to them. */
     userId: v.string(),
+    /**
+     * The card's text, whose accent the alternative is voiced in
+     * (`getVoiceForText`), so a British card's alternative is not read by
+     * an Australian voice. Absent when the card is gone.
+     */
+    textId: v.optional(v.id('texts')),
   }),
 );
 
@@ -278,6 +293,7 @@ export type AlternativeContext = {
   reusableAssetId: Id<'audioAssets'> | null;
   hasAudio: boolean;
   userId: string;
+  textId?: Id<'texts'>;
 } | null;
 
 /**
@@ -303,12 +319,15 @@ export const getAlternativeContext = internalQuery({
     ];
     let reusableAssetId: Id<'audioAssets'> | null = null;
     for (const voiceGender of genders) {
-      const asset = await findAudioAssetByKey(ctx, {
+      // The card text's accent first, which is what the learner hears on the
+      // card, then any accent of the language. A clip is a clip.
+      const asset = await findAudioAssetInAnyAccent(ctx, {
         language: row.language,
         voiceGender,
-        // Alternatives carry no dialect pin, matching approval audio keys.
-        regionVariant: undefined,
         spokenText: row.text,
+        preferredAccent: card
+          ? pickAccentForText(row.language, card.textId)
+          : undefined,
       });
       if (asset) {
         reusableAssetId = asset._id;
@@ -322,6 +341,7 @@ export const getAlternativeContext = internalQuery({
       reusableAssetId,
       hasAudio: row.audioAssetId !== undefined,
       userId: row.userId,
+      ...(card ? { textId: card.textId } : {}),
     };
   },
 });
@@ -371,12 +391,13 @@ export const saveAlternativeAudio = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const key = {
+    const key = buildAudioAssetKey({
       language: args.language,
       voiceGender: args.voiceGender,
+      voiceName: args.voiceName,
       regionVariant: undefined,
       spokenText: args.spokenText,
-    };
+    });
     const existing = await findAudioAssetByKey(ctx, key);
     let assetId: Id<'audioAssets'>;
     if (existing && existing.ttsQuality !== 'unknown') {
@@ -430,7 +451,15 @@ export const generateAlternativeAudio = internalAction({
 
     const voiceGender = context.genders[0];
     const provider = getTtsProviderForLanguage(context.language);
-    const voiceName = getVoiceForLanguage(context.language, voiceGender);
+    // The card text's accent, so a Mixed English card's alternative speaks
+    // in the card's accent. The alternative id seeds the pick when the card
+    // is gone.
+    const voiceName = getVoiceForText(
+      context.language,
+      context.textId ?? alternativeId,
+      undefined,
+      voiceGender,
+    );
     await reserveRateLimitToken(
       ctx,
       TTS_RATE_LIMIT_BY_PROVIDER[provider] ?? 'googleTts',

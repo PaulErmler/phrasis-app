@@ -4,14 +4,16 @@ Conversion measurement for ChatGPT ad campaigns. The pixel (`oaiq`) matches
 conversions on flexling.com back to the ad click via the `oppref` query
 parameter OpenAI appends to the landing URL. It is a second, narrow reporter
 next to PostHog, not a replacement: PostHog stays the analytics source of
-truth, the pixel gets three conversion events and nothing else.
+truth, the pixel gets four conversion events and nothing else.
 
 Docs: https://developers.openai.com/ads/measurement-pixel
 
 ## Setup
 
 `NEXT_PUBLIC_OPENAI_PIXEL_ID` — the pixel id from the OpenAI ads manager
-(public, ships in the bundle). Same rules as `NEXT_PUBLIC_POSTHOG_KEY`: a
+(public, ships in the bundle). Production is `TaUEuqZM9FEvdJmHJCsmBn`, the
+`pid` the ads manager puts in the Conversions API URL; the build var has to
+match it or the events land on no pixel at all. Same rules as `NEXT_PUBLIC_POSTHOG_KEY`: a
 **build-time** argument on Coolify, absent in local dev and CI, where every
 pixel call is a no-op. Set it on production only; staging traffic should not
 pollute campaign reporting.
@@ -59,15 +61,47 @@ Skipped entirely in the Capacitor store shell (`useIsNativeApp()`).
 
 | Event                    | When                                                                       | Dedupe `event_id`                |
 | ------------------------ | -------------------------------------------------------------------------- | -------------------------------- |
-| `registration_completed` | Signed-in account created < 24 h ago                                       | `registration:<userId>`          |
+| `custom` / `signup`      | Signed-in account created < 24 h ago                                       | `signup:<userId>`                |
+| `registration_completed` | Onboarding wizard finished, on an account created < 24 h ago               | `registration:<userId>`          |
 | `subscription_created`   | Paid, non-trialing Autumn plan present **and** a checkout marker < 2 h old | `subscription:<userId>:<planId>` |
 | `trial_started`          | Same, plan is trialing                                                     | `trial:<userId>:<planId>`        |
 
-Reading the account rather than hooking the signup form covers email+OTP,
-Google and Apple alike. The checkout marker is the only way to tell a plan
-bought just now from one a long-time subscriber already had: Stripe checkout
-is a redirect, so the customer returns as a fresh page load with no in-memory
-history. Without the marker, the first app open after deploy would have
+Conversions configured in the ads manager:
+
+| Conversion                | Ads manager id                     | Matched on                     |
+| ------------------------- | ---------------------------------- | ------------------------------ |
+| User completed onboarding | `6a9af8661f24819abeb8b9a733d949a9` | event `registration_completed` |
+| Subscription created      | `6a9afbcf8f00819a90edff2e5082997e` | event `subscription_created`   |
+| Signup                    | —                                  | `custom_event_name: signup`    |
+
+A conversion id is never sent from the app: a standard conversion is matched
+on the event name, a custom one on `custom_event_name`
+(`oaiq('measure', 'custom', { type: 'custom' }, { custom_event_name: 'signup',
+event_id })`). Rename either side and reporting stops silently.
+
+Signing up and finishing the wizard are two separate conversions, and the
+standard `registration_completed` deliberately goes to the second: an account
+that never picks a language pair is worth nothing, so finishing the wizard is
+what the campaigns optimize on. Signup keeps the weaker custom event.
+
+The completed flag is read off `AppDataProvider`'s live `getUserSettings`
+subscription rather than hooked into the wizard's finish handler, which covers
+every signup path (email+OTP, Google, Apple), still reports for someone who
+accepts the cookie banner after finishing, and cannot be lost to a reload
+mid-finish. `finalizeOnboarding` sets the flag optimistically (see
+`OnboardingGuard`), so a mutation that then fails still reports; the user is
+bounced back into the wizard and finishing again is deduped.
+
+The 24 h account-age window on both is load-bearing, for the same reason the
+subscription events need the checkout marker: every existing user is signed up
+and onboarded, so without it the first app open after a deploy would report
+the whole user base as conversions. The cost is the rare user who signs up,
+abandons the wizard, and finishes days later — their registration is
+unreported.
+
+The checkout marker is the only way to tell a plan bought just now from one a
+long-time subscriber already had: Stripe checkout is a redirect, so the
+customer returns as a fresh page load with no in-memory history. Without the marker, the first app open after deploy would have
 reported every existing paying customer as a conversion.
 
 Each `event_id` is stored on the device so a conversion fires once per browser,
@@ -76,10 +110,18 @@ later, against server-sent events.
 
 ## Not done (follow-ups)
 
+- **Conversions API (server-side).** Nothing is sent server-side yet; all four
+  events go out from the browser and are lost to ad blockers and to visitors
+  who never accept the cookie banner. The endpoint is
+  `POST https://bzr.openai.com/v1/events?pid=<pixel id>` with a secret API key
+  as a bearer token (so: a Convex env var and an action, not the client), the
+  same `event_id` per conversion for dedupe, and the same `custom_event_name`
+  for custom ones. Sending `validate_only: true` first checks a payload
+  without recording it.
 - **Revenue.** `subscription_created` carries `plan_id` but no `amount` /
   `currency`: the client does not know the charged price. The server does
-  (`payment_recorded`, `convex/features/paymentSync.ts`). OpenAI's
-  Conversions API with the same `event_id` is the clean way to add it.
+  (`payment_recorded`, `convex/features/paymentSync.ts`). The Conversions API
+  with the same `event_id` is the clean way to add it.
 - **`checkout_started`** at the redirect, and **`page_viewed`** on the landing
   pages. Neither is needed for signup/subscription optimization.
 - **Webhook lag.** If Autumn has not attached the plan when the customer
@@ -98,6 +140,8 @@ later, against server-sent events.
    `oaiq.min.js` loads only after the accept click.
 2. `window.oaiq.q` (before the script arrives) starts with `['consent', true]`
    then `['init', …]`.
-3. The OpenAI Ads Pixel Helper Chrome extension shows `registration_completed`
-   on the first `/app` load after signup.
+3. The OpenAI Ads Pixel Helper Chrome extension shows the `signup` custom
+   event on the first `/app` load after signing up, and
+   `registration_completed` on the hop to `/app/learn` at the end of the
+   wizard — nothing more on a signup that stops mid-wizard.
 4. Decline in Cookie settings: the `__oppref` / `__obref` cookies disappear.

@@ -1,4 +1,5 @@
 import { ConvexError } from 'convex/values';
+import { pickAccentVariantForText } from '../../lib/languages';
 import { MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id, Doc } from '../_generated/dataModel';
@@ -322,17 +323,23 @@ export async function createCardsFromTexts(
         ...course.baseLanguages,
         ...course.targetLanguages,
       ];
+      // The accent this card speaks its text in, fixed for the card's life
+      // (see `cards.accentLanguage` in schema.ts). Only when the course
+      // shows the text's own language. A user's own sentence has no accent.
+      const accentLanguage =
+        !text.userCreated && courseLanguages.includes(text.language)
+          ? pickAccentVariantForText(text.language, text._id)
+          : undefined;
       const { searchableText, searchableTextLanguages } =
-        await buildCardSearchableText(
-          ctx,
-          text._id,
-          text.text,
-          courseLanguages,
-        );
+        await buildCardSearchableText(ctx, text._id, courseLanguages, {
+          text,
+          view: { accentLanguage },
+        });
 
       await insertCard(ctx, {
         deckId: deck._id,
         textId: text._id,
+        ...(accentLanguage !== undefined ? { accentLanguage } : {}),
         collectionId,
         collectionOrigin,
         dueDate: dueBase + cardsInserted,
@@ -876,6 +883,36 @@ async function notBeforeFor(
   return Math.max(card.dueDate, card.writingDueDate ?? 0) + 1;
 }
 
+/**
+ * True when a batch is already queued behind the card on screen: an active
+ * card of the deck due after it and no later than now. The client asks for
+ * the batch once per card, but two learn views open at once (two tabs, a
+ * phone and a laptop) each ask, and the second request must not add a
+ * second batch. A batch stamped by `createCardsFromTexts` sits exactly in
+ * that window; cards due tomorrow lie past `now` and do not count.
+ */
+async function batchAlreadyQueuedBehind(
+  ctx: MutationCtx,
+  deckId: Id<'decks'>,
+  afterCardId: Id<'cards'>,
+  now: number,
+): Promise<boolean> {
+  const card = await ctx.db.get(afterCardId);
+  if (!card || card.deckId !== deckId) return false;
+  const queued = await ctx.db
+    .query('cards')
+    .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
+      q
+        .eq('deckId', deckId)
+        .eq('isHidden', false)
+        .eq('isMastered', false)
+        .gt('dueDate', card.dueDate)
+        .lte('dueDate', now),
+    )
+    .first();
+  return queued !== null;
+}
+
 export async function addCardsFromCollectionHandler(
   ctx: MutationCtx,
   args: {
@@ -899,6 +936,21 @@ export async function addCardsFromCollectionHandler(
   );
 
   const deck = await getOrCreateDeck(ctx, course);
+  if (
+    args.afterCardId &&
+    (await batchAlreadyQueuedBehind(
+      ctx,
+      deck._id,
+      args.afterCardId,
+      Date.now(),
+    ))
+  ) {
+    return {
+      cardsAdded: 0,
+      totalCardsInDeck: deck.cardCount,
+      scanIncomplete: false,
+    };
+  }
   const notBefore = await notBeforeFor(ctx, deck._id, args.afterCardId);
 
   let totalCardsInserted = 0;

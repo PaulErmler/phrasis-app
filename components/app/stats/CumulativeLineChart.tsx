@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Area,
   AreaChart,
@@ -19,6 +19,13 @@ import {
 } from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
 import { formatTimeMs } from '@/lib/formatTime';
+import { normalizeLanguageCode } from '@/lib/languages';
+import {
+  accumulateFromTotal,
+  monthKeyOf,
+  yearViewBuckets,
+  type YearViewBuckets,
+} from './cumulativeSeries';
 
 type Metric = 'words' | 'reviews' | 'sentences' | 'time';
 type TimeRange = 'week' | 'month' | 'year';
@@ -37,27 +44,41 @@ interface MonthlyPoint {
   totalTimeMs: number;
 }
 
-interface WeeklyPoint {
-  week: string; // "YYYY-Www"
-  totalRepetitions: number;
-  totalNewCards: number;
-  totalTimeMs: number;
-}
-
 interface LanguageDailyPoint {
   date: string;
   language: string;
   newWordsCount: number;
 }
 
+interface LanguageMonthlyPoint {
+  month: string; // "YYYY-MM"
+  language: string;
+  newWordsCount: number;
+}
+
 interface CumulativeLineChartProps {
   dailyData: DailyPoint[];
+  /** Every month with activity, all history: the year view is built from it. */
   monthlyData: MonthlyPoint[];
-  weeklyData?: WeeklyPoint[];
   languageDailyData?: LanguageDailyPoint[];
+  /** Per-language new words by month over the same span as `monthlyData`. */
+  languageMonthlyData?: LanguageMonthlyPoint[];
   /** User's IANA timezone. Used to build the day range so the cumulative line
    * spans every calendar day through today (in the user's zone). */
   timezone: string;
+  /**
+   * All-time totals per metric (the numbers in the tiles above). The line
+   * starts at the total from before the window and ends here, so a month
+   * view of a course with older history does not climb from zero.
+   */
+  totals?: {
+    words: number;
+    reviews: number;
+    sentences: number;
+    timeMs: number;
+  };
+  /** All-time word totals per target language, keyed by normalized code. */
+  languageWordTotals?: { language: string; words: number }[];
 }
 
 const METRICS: Metric[] = ['words', 'reviews', 'sentences', 'time'];
@@ -83,7 +104,7 @@ function getDailyValue(point: DailyPoint, metric: Metric): number {
   }
 }
 
-function getWeeklyValue(point: WeeklyPoint, metric: Metric): number {
+function getMonthlyValue(point: MonthlyPoint, metric: Metric): number {
   switch (metric) {
     case 'words':
       return point.totalNewCards;
@@ -116,32 +137,26 @@ function buildDayRange(daysBack: number, timezone: string): string[] {
   return days;
 }
 
-/** Convert "YYYY-Www" to the Monday date of that ISO week, formatted as "MM-DD". */
-function weekToDateLabel(week: string): string {
-  const [yearStr, wStr] = week.split('-W');
-  const year = parseInt(yearStr, 10);
-  const weekNum = parseInt(wStr, 10);
-  // Jan 4 is always in ISO week 1
-  const jan4 = new Date(Date.UTC(year, 0, 4));
-  const dayOfWeek = jan4.getUTCDay() || 7;
-  const monday = new Date(jan4);
-  monday.setUTCDate(jan4.getUTCDate() - dayOfWeek + 1 + (weekNum - 1) * 7);
-  const mm = String(monday.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(monday.getUTCDate()).padStart(2, '0');
-  return `${mm}-${dd}`;
-}
-
-/** Convert a "YYYY-MM-DD" date string to ISO week "YYYY-Www". */
-function dateToISOWeek(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
-  const dayOfWeek = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - dayOfWeek);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(
-    ((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
-  );
-  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+/**
+ * Axis label of a year-view bucket: the short month name (with the year
+ * when the bucket is a January or the first bucket) or "Q1 '26".
+ */
+function yearBucketLabel(
+  key: string,
+  mode: YearViewBuckets['mode'],
+  first: boolean,
+  locale: string,
+): string {
+  if (mode === 'quarter') {
+    return `${key.slice(5)} '${key.slice(2, 4)}`;
+  }
+  const date = new Date(`${key}-15T12:00:00Z`);
+  const withYear = first || key.endsWith('-01');
+  return new Intl.DateTimeFormat(locale, {
+    month: 'short',
+    ...(withYear ? { year: '2-digit' } : {}),
+    timeZone: 'UTC',
+  }).format(date);
 }
 
 function formatValue(value: number, metric: Metric): string {
@@ -150,10 +165,11 @@ function formatValue(value: number, metric: Metric): string {
 }
 
 function formatTooltipDate(label: string): string {
-  // label is always "MM-DD" now (daily, weekly, or monthly views all use this format)
+  // Day labels are "MM-DD"; the year view's month and quarter labels are
+  // shown as they are.
   const now = new Date();
   const [mm, dd] = label.split('-');
-  if (!dd) return label; // fallback
+  if (!dd || !/^\d{2}$/.test(mm) || !/^\d{2}$/.test(dd)) return label;
   const monthNum = parseInt(mm, 10);
   const currentMonth = now.getMonth() + 1;
   const year =
@@ -161,38 +177,98 @@ function formatTooltipDate(label: string): string {
   return `${mm}-${dd}-${String(year).slice(2)}`;
 }
 
+/** The all-time total a metric's line ends at. The words fallback draws
+ * `newCards`, so it pairs with the sentences total. */
+function totalFor(
+  totals: CumulativeLineChartProps['totals'],
+  metric: Metric,
+): number | undefined {
+  if (!totals) return undefined;
+  switch (metric) {
+    case 'words':
+    case 'sentences':
+      return totals.sentences;
+    case 'reviews':
+      return totals.reviews;
+    case 'time':
+      return totals.timeMs;
+  }
+}
+
 export function CumulativeLineChart({
   dailyData,
-  weeklyData,
+  monthlyData,
   languageDailyData,
+  languageMonthlyData,
   timezone,
+  totals,
+  languageWordTotals,
 }: CumulativeLineChartProps) {
   const t = useTranslations('StatsPage');
+  const locale = useLocale();
   const [metric, setMetric] = useState<Metric>('words');
   const [range, setRange] = useState<TimeRange>('month');
 
-  // Detect unique languages from language data
+  // The year view's buckets: the last twelve months, or every quarter of a
+  // history two years or longer. Months with activity in either source
+  // count as history.
+  const yearBuckets = useMemo(() => {
+    const currentMonth = monthKeyOf(formatDateInTz(new Date(), timezone));
+    const active = [
+      ...monthlyData.map((m) => m.month),
+      ...(languageMonthlyData ?? []).map((m) => m.month),
+    ];
+    return yearViewBuckets(active, currentMonth);
+  }, [monthlyData, languageMonthlyData, timezone]);
+  const yearLabels = useMemo(
+    () =>
+      yearBuckets.keys.map((key, i) =>
+        yearBucketLabel(key, yearBuckets.mode, i === 0, locale),
+      ),
+    [yearBuckets, locale],
+  );
+
+  // One line per language, variants merged onto their base code (`en` and
+  // `en_gb`, `es` and `es_latam`), which is also how the word tile counts.
+  const languageRows = useMemo(
+    () =>
+      (languageDailyData ?? []).map((d) => ({
+        ...d,
+        language: normalizeLanguageCode(d.language),
+      })),
+    [languageDailyData],
+  );
   const languages = useMemo(() => {
-    if (!languageDailyData?.length) return [];
-    const set = new Set(languageDailyData.map((d) => d.language));
+    const set = new Set(languageRows.map((d) => d.language));
     return Array.from(set).sort();
-  }, [languageDailyData]);
+  }, [languageRows]);
+  const wordTotalByLanguage = useMemo(
+    () =>
+      new Map(
+        (languageWordTotals ?? []).map((lw) => [
+          normalizeLanguageCode(lw.language),
+          lw.words,
+        ]),
+      ),
+    [languageWordTotals],
+  );
 
   const isWordsByLanguage = metric === 'words' && languages.length > 0;
 
   // Standard single-line chart data (reviews, sentences, time, or words fallback)
   const chartData = useMemo(() => {
     if (isWordsByLanguage) return []; // handled separately
+    const total = totalFor(totals, metric);
 
     if (range === 'year') {
-      const sorted = [...(weeklyData ?? [])].sort((a, b) =>
-        a.week.localeCompare(b.week),
-      );
-      let cumulative = 0;
-      return sorted.map((p) => {
-        cumulative += getWeeklyValue(p, metric);
-        return { label: weekToDateLabel(p.week), value: cumulative };
-      });
+      const index = new Map(yearBuckets.keys.map((key, i) => [key, i]));
+      const increments = yearBuckets.keys.map(() => 0);
+      for (const p of monthlyData) {
+        const i = index.get(yearBuckets.keyOfMonth(p.month));
+        if (i !== undefined) increments[i]! += getMonthlyValue(p, metric);
+      }
+      const values = accumulateFromTotal(increments, total);
+      return yearLabels.map((label, i) => ({ label, value: values[i]! }));
     }
 
     // Build a continuous daily series from the window edge through today so the
@@ -202,80 +278,93 @@ export function CumulativeLineChart({
     const dayKeys = buildDayRange(daysBack, timezone);
     const byDate = new Map(dailyData.map((d) => [d.date, d]));
 
-    let cumulative = 0;
-    return dayKeys.map((date) => {
-      const point = byDate.get(date);
-      cumulative += point ? getDailyValue(point, metric) : 0;
-      return { label: date.slice(5), value: cumulative };
-    });
-  }, [dailyData, weeklyData, metric, range, isWordsByLanguage, timezone]);
+    const values = accumulateFromTotal(
+      dayKeys.map((date) => {
+        const point = byDate.get(date);
+        return point ? getDailyValue(point, metric) : 0;
+      }),
+      total,
+    );
+    return dayKeys.map((date, i) => ({
+      label: date.slice(5),
+      value: values[i]!,
+    }));
+  }, [
+    dailyData,
+    monthlyData,
+    yearBuckets,
+    yearLabels,
+    metric,
+    range,
+    isWordsByLanguage,
+    timezone,
+    totals,
+  ]);
 
   // Per-language words chart data
   const langChartData = useMemo(() => {
-    if (!isWordsByLanguage || !languageDailyData?.length) return [];
+    if (!isWordsByLanguage || languageRows.length === 0) return [];
 
+    // Bucket keys (the year view's months or quarters, day keys otherwise)
+    // with each language's increments, then one running total per language
+    // that starts at that language's total from before the window.
+    let labels: string[];
+    let bucketKeys: string[];
+    let rows: { key: string; language: string; newWordsCount: number }[];
     if (range === 'year') {
-      // Aggregate daily language data into ISO weeks, then accumulate
-      const weekMap = new Map<string, Map<string, number>>();
-      for (const d of languageDailyData) {
-        const weekKey = dateToISOWeek(d.date);
-        if (!weekMap.has(weekKey)) weekMap.set(weekKey, new Map());
-        const langMap = weekMap.get(weekKey)!;
-        langMap.set(
-          d.language,
-          (langMap.get(d.language) ?? 0) + d.newWordsCount,
-        );
-      }
-
-      const sortedWeeks = Array.from(weekMap.keys()).sort();
-      const cumulatives = new Map<string, number>();
-      for (const lang of languages) cumulatives.set(lang, 0);
-
-      return sortedWeeks.map((week) => {
-        const langMap = weekMap.get(week)!;
-        const point: Record<string, string | number> = {
-          label: weekToDateLabel(week),
-        };
-        for (const lang of languages) {
-          cumulatives.set(
-            lang,
-            (cumulatives.get(lang) ?? 0) + (langMap.get(lang) ?? 0),
-          );
-          point[lang] = cumulatives.get(lang)!;
-        }
-        return point;
-      });
+      bucketKeys = yearBuckets.keys;
+      labels = yearLabels;
+      rows = (languageMonthlyData ?? []).map((d) => ({
+        key: yearBuckets.keyOfMonth(d.month),
+        language: normalizeLanguageCode(d.language),
+        newWordsCount: d.newWordsCount,
+      }));
+    } else {
+      bucketKeys = buildDayRange(range === 'week' ? 7 : 30, timezone);
+      labels = bucketKeys.map((date) => date.slice(5));
+      rows = languageRows.map((d) => ({
+        key: d.date,
+        language: d.language,
+        newWordsCount: d.newWordsCount,
+      }));
     }
 
-    // Week or month. Continuous daily series from the window edge through
-    // today (mirrors chartData) so each language line reaches today.
-    const daysBack = range === 'week' ? 7 : 30;
-    const dayKeys = buildDayRange(daysBack, timezone);
-
-    // Group by date (only days in range are looked up below).
-    const dateMap = new Map<string, Map<string, number>>();
-    for (const d of languageDailyData) {
-      if (!dateMap.has(d.date)) dateMap.set(d.date, new Map());
-      const langMap = dateMap.get(d.date)!;
-      langMap.set(d.language, (langMap.get(d.language) ?? 0) + d.newWordsCount);
+    const bucketIndex = new Map(bucketKeys.map((key, i) => [key, i]));
+    const increments = new Map(
+      languages.map((lang) => [lang, bucketKeys.map(() => 0)]),
+    );
+    for (const d of rows) {
+      const i = bucketIndex.get(d.key);
+      const series = increments.get(d.language);
+      if (i === undefined || !series) continue;
+      series[i]! += d.newWordsCount;
     }
+    const series = new Map(
+      languages.map((lang) => [
+        lang,
+        accumulateFromTotal(
+          increments.get(lang)!,
+          wordTotalByLanguage.get(lang),
+        ),
+      ]),
+    );
 
-    const cumulatives = new Map<string, number>();
-    for (const lang of languages) cumulatives.set(lang, 0);
-
-    return dayKeys.map((date) => {
-      const langMap = dateMap.get(date);
-      const point: Record<string, string | number> = { label: date.slice(5) };
-      for (const lang of languages) {
-        cumulatives.set(
-          lang,
-          cumulatives.get(lang)! + (langMap?.get(lang) ?? 0),
-        );
-        point[lang] = cumulatives.get(lang)!;
-      }
+    return labels.map((label, i) => {
+      const point: Record<string, string | number> = { label };
+      for (const lang of languages) point[lang] = series.get(lang)![i]!;
       return point;
     });
-  }, [languageDailyData, languages, range, isWordsByLanguage, timezone]);
+  }, [
+    languageRows,
+    languageMonthlyData,
+    languages,
+    range,
+    isWordsByLanguage,
+    timezone,
+    wordTotalByLanguage,
+    yearBuckets,
+    yearLabels,
+  ]);
 
   const chartConfig: ChartConfig = isWordsByLanguage
     ? Object.fromEntries(
@@ -396,6 +485,7 @@ export function CumulativeLineChart({
                 axisLine={false}
                 tick={{ fontSize: 10 }}
                 width={36}
+                domain={['dataMin', 'auto']}
               />
               <ChartTooltip content={renderTooltip} />
               {languages.map((lang, i) => (
@@ -428,6 +518,7 @@ export function CumulativeLineChart({
                 axisLine={false}
                 tick={{ fontSize: 10 }}
                 width={metric === 'time' ? 52 : 36}
+                domain={['dataMin', 'auto']}
                 tickFormatter={(v: number) =>
                   metric === 'time' ? formatTimeMs(v) : v.toLocaleString()
                 }

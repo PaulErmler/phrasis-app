@@ -17,6 +17,8 @@
  * `getVoiceForLanguage` from `lib/languages` keep working.
  */
 
+import { APOSTROPHE_LIKE_CHARS } from './textCompare/normalize';
+
 /**
  * Identifier for which TTS backend a language currently uses. Must stay in sync
  * with `ttsProviderValidator` in `convex/types.ts` (the Convex-side source of
@@ -40,6 +42,13 @@ export type TtsProvider = (typeof TTS_PROVIDERS)[number];
 
 /** Identifier for which translation backend a target language currently uses. */
 export type TranslationProvider = 'google' | 'openrouter';
+
+/**
+ * Which speech-to-text backend transcribes a language (convex/lib/stt).
+ * 'mai-transcribe-2' (the default) returns word timings; 'gemini-flash-lite'
+ * is the text-only fallback for languages MAI does not cover.
+ */
+export type SttBackend = 'mai-transcribe-2' | 'gemini-flash-lite';
 
 /**
  * BCP-47-ish region label used in the LLM translation prompt's <context>.
@@ -89,6 +98,23 @@ export type SttScriptFix =
   | 'simplifiedToTraditional'
   | 'traditionalToSimplified';
 
+/**
+ * Prompt hints for a `Language.accentRewrite`. Everything here is
+ * interpolated into `buildAccentRewritePrompt` as examples of what MAY
+ * change; the prompt itself carries the freeze list (names, units,
+ * punctuation, no slang).
+ */
+export type AccentRewriteConfig = {
+  /** Adjective used in the prompt: 'British', 'Australian'. */
+  name: string;
+  /** Spelling examples, one comma-separated line. */
+  spelling: string;
+  /** Everyday-vocabulary examples, one comma-separated line. */
+  vocabulary: string;
+  /** Grammar/usage substitutions, `"american" -> "local"` pairs. */
+  grammar: string;
+};
+
 export interface Language {
   code: string; // Internal language code (e.g. "en", "es_latam", "zh")
   displayCode: string; // BCP 47 tag for display (e.g. "es-MX", "zh-CN")
@@ -119,13 +145,22 @@ export interface Language {
    * timings, so `supportsKaraoke: true` only takes effect when this is also
    * true.
    *
-   * True for every language in the catalogue as of Sep 2026. The model takes
-   * the bare ISO-639-1 code (`toSttLanguage` in convex/lib/stt/languages.ts);
-   * a new language whose bare code is outside `MAI_TRANSCRIBE_2_LANGUAGES`
-   * fails the exhaustiveness test in convex/tests/lib/stt/languages.test.ts,
-   * which is the moment to probe it live and decide this flag.
+   * True for every language in the catalogue as of Sep 2026 (Uzbek via
+   * the Gemini backend, see `sttBackend`). MAI takes the bare ISO-639-1
+   * code (`toSttLanguage` in convex/lib/stt/languages.ts); a new language
+   * whose bare code is outside `MAI_TRANSCRIBE_2_LANGUAGES` fails the
+   * exhaustiveness test in convex/tests/lib/stt/languages.test.ts, which is
+   * the moment to probe it live and decide this flag or route it to the
+   * Gemini backend.
    */
   supportsStt: boolean;
+  /**
+   * STT backend when `supportsStt` is true. Omit for MAI-Transcribe-2 (word
+   * timings, karaoke). 'gemini-flash-lite' transcribes text only, so such a
+   * language validates TTS and takes voice input but never gets word
+   * timings (`languageSupportsWordTimings`).
+   */
+  sttBackend?: SttBackend;
   /**
    * Which backend translates English → this language. Omit to take the
    * default: 'openrouter' for every non-English language, 'google' for English
@@ -181,6 +216,16 @@ export interface Language {
    */
   ttsPromptName?: string;
   /**
+   * Extra sentence appended to the Gemini TTS delivery instruction for this
+   * language (convex/lib/tts/gemini.ts), after the shared wording in
+   * deliveryInstruction.ts. Steers delivery within the pinned accent, e.g.
+   * how strong the accent should be. Resolved like `ttsPromptName`: the
+   * language's own field first, then the language pinning the voice's
+   * `@locale` for mixed pools. Prompt-only, so changing it regenerates
+   * nothing without a `ttsVersion` bump on the audio-cache language.
+   */
+  ttsPromptNotes?: string;
+  /**
    * Translation-method version (defaults to 1 via `getCurrentTranslationVersion`).
    * Bump when changing the model/prompt for this language to lazily regenerate
    * its existing non-custom translations (and their audio) on next view. The
@@ -225,11 +270,37 @@ export interface Language {
    * voice lookups, `getLanguageByCode`, and existing course data referring
    * to the code keep working, only the *picker* surfaces hide it.
    *
-   * Used today to retire the English sub-variants (`en_gb`, `en_us`,
-   * `en_au`) from course-creation UIs while their voice + display metadata
-   * stays available for any rows already referencing them.
+   * Nothing sets it right now. It retired the English sub-variants
+   * (`en_gb`, `en_us`, `en_au`) between 2026-05 and 2026-09; they are
+   * pickable again as accent-only variants (see `sharesTextWith`).
    */
   hiddenFromPicker?: boolean;
+  /**
+   * Accent-only variant: courses on this code show the `sharesTextWith`
+   * language's text verbatim instead of translating it; only the TTS side
+   * (voice pool, locale, prompt) differs. `scheduleTranslationForLanguage`
+   * writes a `source-verbatim` translation row for such a target whenever
+   * the text's own language IS the shared one (an `en` curriculum sentence
+   * on an `en_gb` course). When the text is in some other language (a user's
+   * German custom sentence with an `en_gb` target) the normal translation
+   * path runs and `translationPromptNotes` still apply.
+   */
+  sharesTextWith?: string;
+  /**
+   * Light-touch accent rewrite for an accent-only variant. When set, an
+   * accent sibling's text (an `en` sentence on an `en_gb` course) is not
+   * copied verbatim but sent through `ACCENT_REWRITE_STAGES` with
+   * `buildAccentRewritePrompt` (convex/features/translationLLM.ts): only
+   * spelling, everyday vocabulary and the odd American grammatical habit
+   * change; names, units, currency, dates, punctuation and register stay.
+   * A result identical to the source is stored as `source-verbatim`, so
+   * the audio clip keeps being shared across accents. Unset on `en_us` (the
+   * catalogue already reads American) and on `en` (the mixed course shows
+   * the catalogue as is). Chosen by scripts/eval-translation-accents.ts
+   * (2026-09-05): Luna passed every curated case, left neutral sentences
+   * untouched and changed 5-7% of real catalogue sentences.
+   */
+  accentRewrite?: AccentRewriteConfig;
   /**
    * When `true`, picker surfaces (`LanguageSelector`) show a user-facing
    * "Experimental" badge next to this language. Independent of the
@@ -329,6 +400,18 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     code: 'en',
     displayCode: 'en',
     geminiBcp47: 'en-US',
+    // Pickers show "English (Mixed)" (explicit `en` override, the picker
+    // label is localized through NAME_OVERRIDES) while `name` and
+    // `nativeName` stay plain "English": they feed LLM prompts ("reply in
+    // English", the autofill prompt's "name (nativeName)" form), course
+    // names and admin emails, none of which should say "(Mixed)".
+    displayNameOverrides: { en: 'English (Mixed)', de: 'Englisch (Gemischt)' },
+    // Mixed accents: the voice pool tags the four Gemini voices with en-US,
+    // en-GB and en-AU locales (lib/voices.ts); each text gets one accent
+    // deterministically (`pickAccentForText`) and the accent is named in the
+    // TTS prompt from the picked voice's locale (`getTtsPromptNameForLocale`),
+    // since the locale alone drifts toward American. The dialect codes below
+    // pin one accent.
     name: 'English',
     nativeName: 'English',
     flag: '🌎',
@@ -339,6 +422,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ipaVoice: 'en-us',
     supportsKaraoke: true,
     supportsStt: true,
+    // A card on this course stores the accent its text speaks in
+    // (`cards.accentLanguage`, picked by `pickAccentVariantForText`) and
+    // reads the en_gb / en_au rewrite for it. Cards from before that field
+    // existed keep the source wording.
     translationPromptNotes: 'No strong British or American spelling bias.',
   },
   {
@@ -356,15 +443,31 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     // Pin the accent in the prompt too. `geminiBcp47: 'en-GB'` alone can drift
-    // toward Gemini's default American English. ttsVersion bump regenerates
-    // existing en_gb audio (prompt-only change on an already-Gemini language).
+    // toward Gemini's default American English. No `ttsVersion` here: audio
+    // for accent variants is cached under `en` (`getAudioAssetLanguage`), so
+    // `en`'s version is the one that counts.
     ttsPromptName: 'British English',
-    ttsVersion: 2,
     needsRomanization: false,
     ipaVoice: 'en-gb',
     supportsKaraoke: true,
     supportsStt: true,
-    hiddenFromPicker: true,
+    sharesTextWith: 'en',
+    // v4 (2026-09-05) is the rewrite prompt tuned on two 500-sentence
+    // samples: no proofreading, no tense changes, place-bound names kept
+    // (scripts/eval-translation-accents.ts). v3 were the first light-touch
+    // British rewrites of the `en` text, generated on view like every other
+    // translation (`accentRewrite`). v2 were verbatim copies and v1 the
+    // earlier full LLM rewrites. The bump lazily replaces all of them.
+    translationVersion: 4,
+    accentRewrite: {
+      name: 'British',
+      spelling:
+        'colour, centre, organise, travelling, tyre, cheque; "programme" for TV and events but "program" for computers',
+      vocabulary:
+        'lift, flat, holiday, queue, pavement, lorry, sweets, aubergine, pepper (for bell pepper), cinema (for movie theater), mobile phone, car park',
+      grammar:
+        '"gotten" -> "got", "on the weekend" -> "at the weekend", "in the hospital" -> "in hospital" (a patient being treated only; "drive to the hospital", "near the hospital" stay), "Monday through Friday" -> "Monday to Friday", "I just ate" -> "I\'ve just eaten" (past-simple verb only; "I just want", "I just feel" are present tense and stay), "write me" -> "write to me"',
+    },
     translationPromptNotes:
       'British spelling and vocabulary (colour, lift, queue).',
   },
@@ -382,11 +485,17 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     category: 'germanic',
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
+    // Named so the mixed `en` pool's `@en-US` voices get an explicit accent
+    // in the prompt too (`getTtsPromptNameForLocale`). No ttsVersion bump:
+    // existing en_us audio was already American.
+    ttsPromptName: 'American English',
     needsRomanization: false,
     ipaVoice: 'en-us',
     supportsKaraoke: true,
     supportsStt: true,
-    hiddenFromPicker: true,
+    sharesTextWith: 'en',
+    // v2: verbatim copies of the `en` text, see en_gb.
+    translationVersion: 2,
     translationPromptNotes:
       'American spelling and vocabulary (color, elevator, line).',
   },
@@ -405,15 +514,30 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     // Pin the accent in the prompt too. `geminiBcp47: 'en-AU'` alone can drift
-    // toward Gemini's default American English. ttsVersion bump regenerates
-    // existing en_au audio (prompt-only change on an already-Gemini language).
+    // toward Gemini's default American English. No `ttsVersion`: cached under
+    // `en`, see en_gb.
     ttsPromptName: 'Australian English',
-    ttsVersion: 2,
+    // Sep 2026 listening test (three sets of ten clips, side by side): the
+    // bare instruction came out broader than wanted, and this five-word
+    // clause tones it down as well as a longer "newsreader" description did.
+    // Gemini has no other accent-strength control.
+    ttsPromptNotes: 'Keep the Australian accent mild.',
     needsRomanization: false,
     ipaVoice: 'en',
     supportsKaraoke: true,
     supportsStt: true,
-    hiddenFromPicker: true,
+    sharesTextWith: 'en',
+    // v4 (2026-09-05): tuned rewrite prompt, see en_gb.
+    translationVersion: 4,
+    accentRewrite: {
+      name: 'Australian',
+      spelling:
+        'colour, centre, organise, travelling, tyre, cheque; "programme" for TV and events but "program" for computers',
+      vocabulary:
+        'lift, flat, holiday, queue, footpath, truck, lollies, eggplant, capsicum, mobile phone, car park',
+      grammar:
+        '"gotten" -> "got", "in the hospital" -> "in hospital" (a patient being treated only; "drive to the hospital", "near the hospital" stay), "Monday through Friday" -> "Monday to Friday", "I just ate" -> "I\'ve just eaten" (past-simple verb only; "I just want", "I just feel" are present tense and stay), "write me" -> "write to me"',
+    },
     translationPromptNotes:
       'Closer to British spelling; Australian vocabulary where natural.',
   },
@@ -489,8 +613,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Runs on Gemini TTS. The per-text accent (Spain vs Latin America) is pinned
     // by the chosen voice's `@es-ES` / `@es-US` locale suffix (see the es_mixed
     // Gemini pool in lib/voices.ts and `getVoiceForLanguageVariant`), so no
-    // single `ttsPromptName` applies here. The locale on the voice carries it.
+    // single `ttsPromptName` applies here. The TTS prompt names the accent
+    // from that locale via `getTtsPromptNameForLocale` (es / es_latam's
+    // `ttsPromptName`); the locale alone drifted toward Latin American.
     ttsProvider: 'gemini',
+    // v2 (2026-09-04): prompt-only change (accent named per voice locale +
+    // the no-performing instruction), so existing clips must be re-spoken
+    // by a version bump; the provider-mismatch regen wouldn't fire.
+    ttsVersion: 2,
     needsRomanization: false,
     ipaVoice: 'es-419',
     supportsKaraoke: true,
@@ -1109,6 +1239,43 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 3,
+  },
+  {
+    code: 'uz',
+    displayCode: 'uz',
+    regionLabel: 'Uzbekistan',
+    // Not on Gemini TTS's documented list (Sep 2026), but the locale is
+    // accepted and the clips came back as clean standard Uzbek in the
+    // 2026-09-05 probe (.scratch/uzbek/). Gemini is the only pool.
+    geminiBcp47: 'uz-UZ',
+    name: 'Uzbek',
+    nativeName: 'Oʻzbekcha',
+    flag: '🇺🇿',
+    category: 'other',
+    llmSupportTier: 'tier2',
+    ttsProvider: 'gemini',
+    // Latin script (official since 1995), so no romanization. Uzbek is
+    // bidigraphic and Cyrillic is still common in training data, so the
+    // prompt pins Latin the way Serbian pins Cyrillic. Sol produced Latin
+    // throughout the probe but mixed its apostrophes (‘ / ʻ / ʼ), hence the
+    // canonicalising post-process step.
+    needsRomanization: false,
+    translationPostProcess: 'uzbekLatin',
+    // Added after the Sep 2026 Sol switch, so it starts at the post-switch
+    // baseline every other language was bumped to.
+    translationVersion: 2,
+    ipaVoice: 'uz',
+    // MAI-Transcribe-2 has no Uzbek: a pinned `uz` hint 400s and auto-detect
+    // returns Russian/Azerbaijani-flavoured garbage (2026-09-05 probe).
+    // Gemini 3.1 Flash Lite transcribed the same clips verbatim, so STT
+    // runs there. That backend has no word timings, hence no karaoke.
+    supportsKaraoke: false,
+    supportsStt: true,
+    sttBackend: 'gemini-flash-lite',
+    translationName: 'Uzbek (Latin script)',
+    translationPromptNotes:
+      'Use the official Latin alphabet exclusively; never Cyrillic.',
+    experimental: true,
   },
   {
     code: 'hu',
@@ -1787,33 +1954,127 @@ export function getCurrentTranslationVersion(code: string): number {
  * language runs one (unset `translationPostProcess` ⇒ 'default'); the
  * per-language field exists as the override hook for future steps.
  */
-export type TranslationPostProcessId = 'default';
+export type TranslationPostProcessId = 'default' | 'uzbekLatin';
 
-const TRANSLATION_POST_PROCESSORS: Record<
+/**
+ * Artifacts a model leaves on an otherwise correct answer: a literal
+ * `<final>` / `</final>` wrapper (GPT-5.6 Sol on the `:floor` endpoint
+ * appended one to 3 of 344 short answers in the 2026-09-05 accent bench;
+ * never seen from the standard endpoint) and trailing underscores or
+ * whitespace. The latter was observed on Arabic ("…متأسفة._"), where the
+ * Buckwalter-style romanization then carried the same "_". Interior
+ * underscores are kept, since they can be a deliberate blank.
+ */
+const stripModelArtifacts = (text: string): string =>
+  text
+    .replace(/<\/?final>/giu, '')
+    .replace(/[\s_]+$/u, '')
+    .trimStart();
+
+/**
+ * Every character models and keyboards use where a language wants its own
+ * apostrophe: the comparator's fold set (curly quotes, grave and acute
+ * accents, the Uzbek modifier letters) plus ASCII `'` itself, so each rule
+ * below is idempotent.
+ */
+const APOSTROPHE_LIKE = `['${APOSTROPHE_LIKE_CHARS}]`;
+
+/**
+ * Canonicalise Uzbek Latin apostrophes. The alphabet has two: the letters
+ * oʻ / gʻ take the modifier letter turned comma (ʻ, U+02BB) and the tutuq
+ * belgisi (glottal stop, as in taʼkid) takes the modifier apostrophe (ʼ,
+ * U+02BC). Sol writes all three of ‘ / ʻ / ʼ for either within one run, and
+ * the FLORES references use ASCII ', so stored text would otherwise mix
+ * four variants of the same letter. Typed answers still arrive with ASCII '
+ * (the only key learners have); `lib/textCompare/normalize.ts` folds every
+ * variant back to ASCII on both sides before comparing.
+ */
+export function canonicalizeUzbekApostrophes(text: string): string {
+  return text.replace(UZBEK_OKINA_RE, '$1ʻ').replace(UZBEK_TUTUQ_RE, 'ʼ');
+}
+
+/**
+ * oʻ / gʻ. An apostrophe-like after o/g and before a letter, so a closing
+ * quote after a word ending in o or g, as in ‘Hugo’, is left alone.
+ */
+const UZBEK_OKINA_RE = new RegExp(`([oOgG])${APOSTROPHE_LIKE}(?=\\p{L})`, 'gu');
+/** The tutuq belgisi. An apostrophe-like between two letters, not after o/g. */
+const UZBEK_TUTUQ_RE = new RegExp(
+  `(?<=\\p{L})(?<![oOgG])${APOSTROPHE_LIKE}(?=\\p{L})`,
+  'gu',
+);
+
+/**
+ * An apostrophe-like between two letters ("J’aime", "J´aime", "don‘t"),
+ * folded to ASCII `'` so stored text and the word tokenizer agree on one
+ * spelling. Quotation marks around a word have a non-letter on one side and
+ * stay. Not applied to Uzbek Latin, whose modifier letters are letters.
+ */
+const WORD_INTERNAL_APOSTROPHE_RE = new RegExp(
+  `(?<=\\p{L})${APOSTROPHE_LIKE}(?=\\p{L})`,
+  'gu',
+);
+
+export function foldWordInternalApostrophes(text: string): string {
+  return text.replace(WORD_INTERNAL_APOSTROPHE_RE, "'");
+}
+
+/** The apostrophe rule of each post-processing step. */
+const APOSTROPHE_RULES: Record<
   TranslationPostProcessId,
   (text: string) => string
 > = {
-  // LLMs occasionally emit a stray trailing underscore (observed on Arabic:
-  // "…متأسفة._". The Buckwalter-style romanization then carries the same
-  // "_"). Strip trailing runs of underscores/whitespace; interior
-  // underscores are kept (could be a deliberate blank).
-  default: (text) => text.replace(/[\s_]+$/u, ''),
+  default: foldWordInternalApostrophes,
+  uzbekLatin: canonicalizeUzbekApostrophes,
 };
 
 /**
+ * The apostrophe spelling stored text uses in `code`: Uzbek Latin's
+ * modifier letters, ASCII `'` inside words everywhere else. For user-typed
+ * translations, which skip the rest of `postProcessTranslation` on purpose
+ * (a deliberate trailing "_" must survive) but must still store the one
+ * spelling the tokenizer and the comparator expect.
+ */
+export function canonicalizeApostrophes(code: string, text: string): string {
+  const id = getLanguageByCode(code)?.translationPostProcess ?? 'default';
+  return APOSTROPHE_RULES[id](text);
+}
+
+/**
  * Apply the language's post-processing step to machine-generated translation
- * output. Also applied to the derived `romanizedText` (it inherits the same
+ * output: the model artifacts come off, then the language's apostrophe rule
+ * runs. Also applied to the derived `romanizedText` (it inherits the same
  * artifacts) and by the `stripTrailingUnderscores` backfill migration.
  * Idempotent. Safe to run at both the producer and the storage choke point.
  */
 export function postProcessTranslation(code: string, text: string): string {
-  const id = getLanguageByCode(code)?.translationPostProcess ?? 'default';
-  return TRANSLATION_POST_PROCESSORS[id](text);
+  return canonicalizeApostrophes(code, stripModelArtifacts(text));
 }
 
-/** Current TTS-setup version for a language (1 when unset). */
+/**
+ * The language code an `audioAssets` row is keyed under. Accent-only
+ * variants (`en_gb`, `en_us`, `en_au`) share one cache with their text
+ * language (`en`): the accent lives in the asset's `regionVariant` (the
+ * voice locale, `en-GB`), so a British clip synthesized for a mixed-English
+ * course serves an English (UK) course and vice versa. Identity for every
+ * other code.
+ */
+export function getAudioAssetLanguage(code: string): string {
+  return getSharedTextLanguage(code) ?? code;
+}
+
+/**
+ * Current TTS-setup version for a language (1 when unset). Resolved on the
+ * audio-cache language (`getAudioAssetLanguage`): an accent variant's
+ * assets are `en` assets, so they carry and are checked against `en`'s
+ * version. A `ttsVersion` on `en_gb` itself would be ignored; bump `en` to
+ * regenerate English audio in every accent.
+ */
 export function getCurrentTtsVersion(code: string): number {
-  return getLanguageByCode(code)?.ttsVersion ?? DEFAULT_CONTENT_VERSION;
+  return (
+    getLanguageByCode(getAudioAssetLanguage(code))?.ttsVersion ??
+    DEFAULT_CONTENT_VERSION
+  );
 }
 
 /**
@@ -2311,6 +2572,27 @@ export function resolveTranslationStages(
 }
 
 /**
+ * Stage chain for `Language.accentRewrite` targets: one no-thinking Luna
+ * call, Sol on the standard endpoint as the fallback, the source text
+ * verbatim as the last resort (`onLlmTranslationComplete`). Picked by
+ * scripts/eval-translation-accents.ts (2026-09-05): Luna scored 9.9 / 9.6
+ * (GB / AU) on a 0-10 judge, passed 100% of the mechanical checks in both
+ * accents and cost $0.0001 per sentence; Sol tied it at 4x the price and
+ * renumbered "first floor" to "ground floor"; Gemini 3.5 Flash Lite turned
+ * eggplant into capsicum. The output cap is tight because the answer is
+ * one sentence and `reasoning: 'none'` keeps thinking out of the budget.
+ */
+export const ACCENT_REWRITE_STAGES: ModelStage[] = [
+  {
+    model: LUNA_BO3.model,
+    reasoning: 'none',
+    maxOutputTokens: 1_000,
+    provider: LUNA_PROVIDER_CONSTRAINTS,
+  },
+  { ...SOL_MINIMAL_STANDARD, maxOutputTokens: 1_000 },
+];
+
+/**
  * Resolved per-language context for the LLM prompt. Drops `model`/`reasoning`
  * Those now come from `resolveTranslationStages` since they depend on
  * source-text length and may include a fallback chain.
@@ -2363,7 +2645,10 @@ export function getLanguageShortLabel(code: string | null | undefined): string {
   const normalized = code.toLowerCase();
   if (normalized === 'es' || normalized === 'es_latam') return 'ES';
   const language = getLanguageByCode(code);
-  return language ? language.code.toUpperCase() : code.toUpperCase();
+  if (!language) return code.toUpperCase();
+  // Accent-only variants (en_gb, en_us, en_au) badge as their shared text
+  // language: "EN", never "EN_GB".
+  return (language.sharesTextWith ?? language.code).toUpperCase();
 }
 
 /** Resolve an array of codes to Language objects, dropping unknowns. */
@@ -2583,8 +2868,25 @@ export function getIpaVoice(code: string): string | null {
  * explicitly opted out), but still gated by `languageSupportsStt`.
  */
 export function languageSupportsKaraoke(code: string): boolean {
-  if (!languageSupportsStt(code)) return false;
+  if (!languageSupportsWordTimings(code)) return false;
   return getLanguageByCode(code)?.supportsKaraoke ?? true;
+}
+
+/** STT backend for a language; MAI-Transcribe-2 unless the entry routes elsewhere. */
+export function getSttBackend(code: string): SttBackend {
+  return getLanguageByCode(code)?.sttBackend ?? 'mai-transcribe-2';
+}
+
+/**
+ * Whether STT for this language yields per-word timings. Only the MAI
+ * backend does; the Gemini fallback returns text alone. Gates the
+ * word-timing backfill and the missing-content check so a Gemini language
+ * never schedules a backfill that can't produce anything.
+ */
+export function languageSupportsWordTimings(code: string): boolean {
+  return (
+    languageSupportsStt(code) && getSttBackend(code) === 'mai-transcribe-2'
+  );
 }
 
 /**
@@ -2643,12 +2945,120 @@ export function isMixedLanguage(code: string): boolean {
 }
 
 /**
+ * The language whose text an accent-only variant shows verbatim (`en` for
+ * `en_gb`), or undefined for every other code. See `Language.sharesTextWith`.
+ */
+export function getSharedTextLanguage(code: string): string | undefined {
+  return getLanguageByCode(code)?.sharesTextWith;
+}
+
+/**
+ * True when `targetCode` and `textLanguage` are two accents of one language
+ * (`en` and `en_gb`, `en_gb` and `en_us`), in either direction. False for
+ * the same code on both sides (nothing to translate at all) and for
+ * unrelated languages. The raw kinship test; `usesSourceTextVerbatim` and
+ * `getAccentRewriteConfig` split it into "copy" and "rewrite".
+ */
+export function isAccentSiblingOf(
+  targetCode: string,
+  textLanguage: string,
+): boolean {
+  if (targetCode === textLanguage) return false;
+  return (
+    getAudioAssetLanguage(targetCode) === getAudioAssetLanguage(textLanguage)
+  );
+}
+
+/**
+ * The accent rewrite an accent sibling's text goes through on a `targetCode`
+ * course (an `en` curriculum sentence on an `en_gb` course), or undefined
+ * when the text is shown verbatim (`usesSourceTextVerbatim`) or translated
+ * normally. Direction matters: a British custom sentence on a Mixed or US
+ * English base is shown as typed, because those codes declare no rewrite.
+ */
+export function getAccentRewriteConfig(
+  targetCode: string,
+  textLanguage: string,
+): AccentRewriteConfig | undefined {
+  if (!isAccentSiblingOf(targetCode, textLanguage)) return undefined;
+  return getLanguageByCode(targetCode)?.accentRewrite;
+}
+
+/**
+ * True when a text written in `textLanguage` is served verbatim on a
+ * `targetCode` course instead of being translated or rewritten: the two
+ * codes are accents of one language and the target declares no
+ * `accentRewrite`. A custom sentence typed on an English (UK) course is
+ * stored as `en_gb` text, and a Mixed or US English base on that course
+ * shows it verbatim, just as a US course shows an `en` curriculum sentence.
+ * The translation path stores a `source-verbatim` row (same wording, own
+ * voice pool) in that case. A UK or Australian course on an `en` sentence
+ * is NOT verbatim: it takes the `getAccentRewriteConfig` path.
+ */
+export function usesSourceTextVerbatim(
+  targetCode: string,
+  textLanguage: string,
+): boolean {
+  return (
+    isAccentSiblingOf(targetCode, textLanguage) &&
+    getAccentRewriteConfig(targetCode, textLanguage) === undefined
+  );
+}
+
+/**
+ * The Gemini TTS prompt fields for a voice. The language's own
+ * `ttsPromptName` and `ttsPromptNotes` win. Otherwise those of the language
+ * that pins the voice's `@locale` apply, so a mixed pool's `Leda@en-GB`
+ * takes English (UK)'s "British English" and its notes, and `Leda@en-AU`
+ * takes Australian English's. The name falls back to the language's
+ * region-stripped display name, "English (US)" becoming "English", or the
+ * raw code for an unknown language.
+ */
+export function resolveTtsPrompt(
+  code: string,
+  locale: string | undefined,
+): { name: string; notes: string | undefined } {
+  const lang = getLanguageByCode(code);
+  return {
+    name:
+      lang?.ttsPromptName ??
+      getTtsPromptNameForLocale(locale) ??
+      (lang?.name ?? code).replace(/\s*\([^)]*\)\s*$/, ''),
+    notes: lang?.ttsPromptNotes ?? getTtsPromptNotesForLocale(locale),
+  };
+}
+
+function ttsPromptFieldForLocale(
+  locale: string | undefined,
+  field: 'ttsPromptName' | 'ttsPromptNotes',
+): string | undefined {
+  if (locale === undefined) return undefined;
+  return SUPPORTED_LANGUAGES.find(
+    (l) => l.geminiBcp47 === locale && l[field] !== undefined,
+  )?.[field];
+}
+
+/** `ttsPromptName` of the language pinning a voice locale (`en-GB` → "British English"). */
+export function getTtsPromptNameForLocale(
+  locale: string | undefined,
+): string | undefined {
+  return ttsPromptFieldForLocale(locale, 'ttsPromptName');
+}
+
+/** `ttsPromptNotes` of the language pinning a voice locale (`en-AU` → the mild-accent note). */
+export function getTtsPromptNotesForLocale(
+  locale: string | undefined,
+): string | undefined {
+  return ttsPromptFieldForLocale(locale, 'ttsPromptNotes');
+}
+
+/**
  * Deterministic FNV-1a hash for short strings. Used to seed the per-text
  * variant pick for mixed-dialect languages. Re-running translation for the
  * same textId always lands on the same variant, so the persisted
  * `regionVariant` and the synthesized voice stay in agreement across retries.
  */
-function fnv1a(str: string): number {
+export function fnv1a(str: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
     h ^= str.charCodeAt(i);
@@ -2721,10 +3131,17 @@ export {
   getRandomVoiceForLanguage,
   getVoiceForLanguage,
   getVoiceForLanguageVariant,
+  getVoiceForText,
   getVoiceGenderByApiCode,
   getProviderByApiCode,
   getLocaleFromApiCode,
   getLocalesByLanguageCode,
+  getVoiceLocale,
+  getVoiceLocalesForLanguage,
+  accentRowLanguage,
+  getMixedAccentTextLanguage,
+  pickAccentForText,
+  pickAccentVariantForText,
   resolveAudioSpeakerGender,
   resolveCardSpeakerGenders,
 } from './voices';

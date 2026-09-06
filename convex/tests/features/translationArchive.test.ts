@@ -40,19 +40,28 @@ drainSchedulerAfterEach();
 
 // The workpools are module-mocked globally (tests/convexTestSetup.ts); the
 // LLM pool's enqueue calls carry the worker's fnArgs as the third argument.
+// A Mixed English base also asks for the text's accent row (`en_gb` /
+// `en_au`, depending on the text id's voice accent; see
+// `getMixedAccentTextLanguage`). These tests are about the `de` row, so
+// those jobs are filtered out rather than counted.
+const isAccentRowJob = (job: { targetLanguage: string }) =>
+  job.targetLanguage === 'en_gb' || job.targetLanguage === 'en_au';
 const llmEnqueues = () =>
-  vi.mocked(llmPool.enqueueAction).mock.calls.map(
-    (c) =>
-      c[2] as {
-        textId: Id<'texts'>;
-        targetLanguage: string;
-        replaceExisting?: boolean;
-        translationReason?: string;
-        ruleOverride?: string;
-        preferredRegionVariant?: string;
-        skipTts?: boolean;
-      },
-  );
+  vi
+    .mocked(llmPool.enqueueAction)
+    .mock.calls.map(
+      (c) =>
+        c[2] as {
+          textId: Id<'texts'>;
+          targetLanguage: string;
+          replaceExisting?: boolean;
+          translationReason?: string;
+          ruleOverride?: string;
+          preferredRegionVariant?: string;
+          skipTts?: boolean;
+        },
+    )
+    .filter((job) => !isAccentRowJob(job));
 const ttsEnqueues = () =>
   vi.mocked(ttsPool.enqueueAction).mock.calls.map(
     (c) =>
@@ -180,8 +189,8 @@ async function seed(
       const built = await buildCardSearchableText(
         ctx,
         textId,
-        'Everything okay?',
         ['en', ...(opts.targetLanguages ?? ['de'])],
+        { view: {} },
       );
       cardId = await ctx.db.insert('cards', {
         deckId,
@@ -320,7 +329,7 @@ async function hydrate(
           sourceIpa: text.ipaText ?? undefined,
           sourceFurigana: text.furiganaText ?? undefined,
           userCreated: text.userCreated,
-          ...(pinAt !== undefined ? { pinAt } : {}),
+          view: { pinAt },
         },
       ],
       ['en'],
@@ -564,18 +573,12 @@ describe('search strings follow the served revision', () => {
     await bump(t, textId, NEW_DE);
 
     const { pinned, live } = await t.run(async (ctx) => ({
-      pinned: await buildCardSearchableText(
-        ctx,
-        textId,
-        'Everything okay?',
-        ['en', 'de'],
-        undefined,
-        pinAt,
-      ),
-      live: await buildCardSearchableText(ctx, textId, 'Everything okay?', [
-        'en',
-        'de',
-      ]),
+      pinned: await buildCardSearchableText(ctx, textId, ['en', 'de'], {
+        view: { pinAt },
+      }),
+      live: await buildCardSearchableText(ctx, textId, ['en', 'de'], {
+        view: {},
+      }),
     }));
     expect(pinned.searchableText).toContain('Ordnung');
     expect(pinned.searchableText).not.toContain('klar');

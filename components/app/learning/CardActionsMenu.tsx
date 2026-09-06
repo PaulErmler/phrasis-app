@@ -40,6 +40,7 @@ import {
   type PinnableCardAction,
 } from '@/lib/cardActions';
 import { COACHMARK_ANCHORS, TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
+import { capture, CLIENT_EVENTS } from '@/lib/posthog/events';
 
 export interface ActionQuotaState {
   /** Remaining usage. `unlimited` overrides this. */
@@ -287,7 +288,17 @@ export function CardActionsMenu({
             size="icon"
             // Suppress the action while depleted, but keep onClick installed
             // so the tooltip + cursor changes still wire up cleanly.
-            onClick={depleted ? (e) => e.preventDefault() : cfg.onClick}
+            onClick={
+              depleted
+                ? (e) => e.preventDefault()
+                : () => {
+                    capture(CLIENT_EVENTS.CARD_ACTION_CLICKED, {
+                      action: cfg.key,
+                      source: 'pinned',
+                    });
+                    cfg.onClick();
+                  }
+            }
             aria-disabled={depleted}
             aria-label={tooltip}
             data-testid={`card-action-${cfg.key}`}
@@ -357,7 +368,17 @@ export function CardActionsMenu({
         // Radix wraps `onSelect` so calling preventDefault keeps the menu
         // open. We want it to close on every successful select, so don't
         // prevent default. Just no-op when depleted.
-        onSelect={depleted ? () => undefined : cfg.onClick}
+        onSelect={
+          depleted
+            ? () => undefined
+            : () => {
+                capture(CLIENT_EVENTS.CARD_ACTION_CLICKED, {
+                  action: cfg.key,
+                  source: 'menu',
+                });
+                cfg.onClick();
+              }
+        }
         aria-disabled={depleted}
         data-testid={`card-action-${cfg.key}`}
         className={`pl-1 ${

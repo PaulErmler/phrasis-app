@@ -20,6 +20,18 @@ export interface OnboardingWalkOptions {
     | 'appstore'
     | 'other';
   acquisitionOtherText?: string;
+  // The prior-apps step is multi-select; pass a non-empty array. "none" is
+  // exclusive with the rest, so pass it alone.
+  priorApps?: Array<
+    | 'anki'
+    | 'glossika'
+    | 'clozemaster'
+    | 'babbel'
+    | 'duolingo'
+    | 'other'
+    | 'none'
+  >;
+  priorAppsOtherText?: string;
   // The goal step is multi-select; pass a non-empty array.
   goals?: Array<'travel' | 'family' | 'work' | 'curiosity' | 'exam' | 'other'>;
   goalOtherText?: string;
@@ -47,7 +59,8 @@ export interface OnboardingWalkOptions {
  * (for the shared session) and the dedicated onboarding spec.
  *
  * Step path (see app/app/onboarding/page.tsx for the canonical order):
- *   language-pair → acquisition → goal → daily-time → proficiency →
+ *   language-pair → acquisition → prior-apps → goal → daily-time →
+ *   proficiency →
  *   (cefr-pick | placement-test + result | none) →
  *   review-mode → Start learning → /app/learn.
  */
@@ -60,6 +73,8 @@ export async function completeOnboardingFresh(
     target = 'es',
     acquisition = 'other',
     acquisitionOtherText,
+    priorApps = ['none'],
+    priorAppsOtherText,
     goals = ['curiosity'],
     goalOtherText,
     dailyTime = 5,
@@ -97,9 +112,18 @@ export async function completeOnboardingFresh(
       .getByTestId('acquisition-other-input')
       .fill(acquisitionOtherText);
   }
+  await advance(null, 'onboarding-step-prior-apps');
+
+  // 3. Prior apps. Multi-select, at least one.
+  for (const app of priorApps) {
+    await page.getByTestId(`prior-apps-option-${app}`).click();
+  }
+  if (priorApps.includes('other') && priorAppsOtherText) {
+    await page.getByTestId('prior-apps-other-input').fill(priorAppsOtherText);
+  }
   await advance(null, 'onboarding-step-goal');
 
-  // 3. Learning goal. Multi-select, at least one.
+  // 4. Learning goal. Multi-select, at least one.
   for (const goal of goals) {
     await page.getByTestId(`goal-option-${goal}`).click();
   }
@@ -108,7 +132,7 @@ export async function completeOnboardingFresh(
   }
   await advance(null, 'onboarding-step-daily-time');
 
-  // 4. Daily time goal.
+  // 5. Daily time goal.
   if (typeof dailyTime === 'number') {
     await page.getByTestId(`daily-time-option-${dailyTime}`).click();
   } else {
@@ -119,7 +143,7 @@ export async function completeOnboardingFresh(
   }
   await advance(null, 'onboarding-step-proficiency');
 
-  // 5. Proficiency branch. Picking a branch only selects it. Continue is
+  // 6. Proficiency branch. Picking a branch only selects it. Continue is
   // what actually advances the wizard. All three sub-branches click it.
   await page.getByTestId(`proficiency-branch-${proficiency}`).click();
   await page.getByTestId('onboarding-continue').click();
@@ -159,7 +183,7 @@ export async function completeOnboardingFresh(
     await page.getByTestId('placement-result-continue').click();
   }
 
-  // 6. Review mode. The final step. Continue ("Start learning") runs
+  // 7. Review mode. The final step. Continue ("Start learning") runs
   // completeOnboarding (course + deck + seeded cards) inline behind a
   // spinner, then finalizeOnboarding, then hands off to /app/learn. Under
   // @live load a transient backend error can crash the wizard into the view
@@ -180,7 +204,7 @@ export async function completeOnboardingFresh(
   await page.getByTestId(`review-mode-${reviewMode}`).click();
   await page.getByTestId('onboarding-continue').click();
 
-  // 7. Wait for the handoff into the real learning mode.
+  // 8. Wait for the handoff into the real learning mode.
   await page.waitForURL(
     (url) =>
       /\/app(\/|$)/.test(url.pathname) && !/onboarding/.test(url.pathname),

@@ -35,11 +35,15 @@
     "eval:feedback": "tsx --env-file=.env.local scripts/eval-writing-feedback.ts",
     "eval:autofill": "tsx --env-file=.env.local scripts/eval-translation-autofill.ts",
     "eval:pragmatics": "tsx --env-file=.env.local scripts/eval-translation-pragmatics.ts",
+    "eval:accents": "tsx --env-file=.env.local scripts/eval-translation-accents.ts",
+    "eval:stt": "tsx --env-file=.env.local scripts/eval-stt.ts",
+    "eval:validation": "tsx --env-file=.env.local scripts/eval-tts-validation.ts",
     "store:assets": "tsx scripts/store-screenshots.ts",
     "store:squares": "tsx scripts/store-squares.ts",
     "cap:local": "node scripts/cap-sync.mjs local",
     "cap:dev": "node scripts/cap-sync.mjs dev",
-    "cap:store": "node scripts/cap-sync.mjs store"
+    "cap:store": "node scripts/cap-sync.mjs store",
+    "eval:ru-hyperliteral": "tsx --env-file=.env.local scripts/eval-ru-hyperliteral.mts"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.76",

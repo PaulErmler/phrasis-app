@@ -1,4 +1,5 @@
 import { getSegmenter } from './textCompare/segment';
+import { foldApostrophes } from './textCompare/normalize';
 import { getLanguageByCode } from './languages';
 
 export type Token = { normalized: string; original: string };
@@ -56,7 +57,10 @@ export function searchSegments(text: string, language: string): string[] {
 }
 
 export function tokenizeText(text: string, language: string): Token[] {
-  const nfc = text.normalize('NFC');
+  // Apostrophe variants fold to ASCII before segmenting, so "J'aime",
+  // "J’aime" and "J´aime" are one word. The acute accent (U+00B4) is not a
+  // word character for the segmenter and would otherwise split the word.
+  const nfc = foldApostrophes(text.normalize('NFC'));
   try {
     const segmenter = getWordSegmenter(language);
     return [...segmenter.segment(nfc)]

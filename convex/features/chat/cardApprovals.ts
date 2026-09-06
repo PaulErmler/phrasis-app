@@ -25,6 +25,7 @@ import { trackEvent } from '../../db/stats/dailyStats';
 import {
   getTranslationSource,
   postProcessTranslation,
+  canonicalizeApostrophes,
 } from '../../../lib/languages';
 import {
   ANNOTATION_KINDS,
@@ -127,7 +128,7 @@ async function processApproval(
       textId,
       targetLanguage: entry.language,
       translatedText: userEdited
-        ? entry.text
+        ? canonicalizeApostrophes(entry.language, entry.text)
         : postProcessTranslation(entry.language, entry.text),
       translationSource: userEdited
         ? USER_PROVIDED_TRANSLATION_SOURCE

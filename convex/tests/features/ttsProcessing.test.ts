@@ -48,6 +48,7 @@ import { claimTtsIfAvailable } from '../../features/ttsProcessing';
 import { resolveAudioPayload } from '../../lib/audioAssets';
 import { insertAudioFixture } from '../lib/audioFixtures';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+import { getTtsProviderForLanguage } from '../../../lib/languages';
 import { openrouterSttBody, isOpenrouterSttUrl } from '../lib/sttFixtures';
 
 const mockSemantic = vi.mocked(textsMatchSemantic);
@@ -603,7 +604,7 @@ describe('features/ttsProcessing', () => {
     async function runPipeline(
       t: TestConvex<typeof schema>,
       textId: Id<'texts'>,
-      opts: { transcribed?: string } = {},
+      opts: { transcribed?: string; sttStatus?: number } = {},
     ) {
       vi.stubEnv('GOOGLE_TTS_API_KEY', 'dummy');
 
@@ -621,6 +622,12 @@ describe('features/ttsProcessing', () => {
           });
         }
         if (isOpenrouterSttUrl(u)) {
+          if (opts.sttStatus !== undefined && opts.sttStatus !== 200) {
+            return new Response('{"error":"nope"}', {
+              status: opts.sttStatus,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
           return new Response(sttBody, {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
@@ -755,6 +762,25 @@ describe('features/ttsProcessing', () => {
         const mismatches = await getMismatches(t, textId);
         expect(mismatches.length).toBe(2);
         expect(mismatches.map((m) => m.attempt).sort()).toEqual([1, 2]);
+      });
+
+      it('STT itself failing keeps the clip: no re-synthesis, stored unchecked without timings', async () => {
+        const t = convexTest(schema, modules);
+        const { textId } = await seedText(t);
+        mockSemantic.mockReset();
+
+        // A non-retryable STT status so the client throws at once (a 429
+        // would take the same path after its backoff retries).
+        const fetchMock = await runPipeline(t, textId, { sttStatus: 400 });
+
+        const audio = await getAudio(t, textId);
+        expect(audio?.ttsQuality).toBe('unchecked');
+        expect(audio?.wordTimings).toBeUndefined();
+        expect(mockSemantic).not.toHaveBeenCalled();
+        expect((await getMismatches(t, textId)).length).toBe(0);
+        // One synthesis, not one per validation attempt.
+        const calls = fetchMock.mock.calls.map((c) => String(c[0]));
+        expect(calls.filter((c) => c.includes('texttospeech'))).toHaveLength(1);
       });
 
       it("Gemini error on every attempt → audio unvalidated (bad audio isn't silently accepted)", async () => {
@@ -1158,6 +1184,51 @@ describe('features/ttsProcessing', () => {
       const left = await t.run(async (ctx) => ctx.db.get(audioId));
       expect(left).toBeNull();
     });
+
+    it('schedules a backfill for an unchecked clip, and stops once its attempts are used up', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.run(async (ctx) =>
+        ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
+      );
+      const storageId = await t.run(async (ctx) =>
+        ctx.storage.store(new Blob([new Uint8Array([1, 2, 3])])),
+      );
+      const { assetId } = await t.run(async (ctx) =>
+        insertAudioFixture(ctx, {
+          textId,
+          language: 'es',
+          voiceName: 'es-ES-Chirp3-HD-Leda',
+          storageId,
+          ttsQuality: 'unchecked',
+          ttsProvider: getTtsProviderForLanguage('es'),
+          voiceGender: 'female',
+          // Timings present: only the verdict is missing.
+          wordTimings: [{ word: 'Hola', start: 0, end: 0.4 }],
+        }),
+      );
+
+      await t.mutation(internal.features.decks.prepareCardContent, {
+        textId,
+        baseLanguages: ['en'],
+        targetLanguages: ['es'],
+      });
+      // The backfill holds a TTS claim while scheduled.
+      expect(await getClaim(t, textId)).not.toBeNull();
+
+      // The same clip after three failed backfills: left alone.
+      await t.run(async (ctx) => {
+        const claims = await ctx.db.query('ttsGenerationClaims').collect();
+        for (const c of claims) await ctx.db.delete(c._id);
+        await ctx.db.patch(assetId, { revalidationAttempts: 3 });
+      });
+      await t.mutation(internal.features.decks.prepareCardContent, {
+        textId,
+        baseLanguages: ['en'],
+        targetLanguages: ['es'],
+      });
+      expect(await getClaim(t, textId)).toBeNull();
+    });
   });
 
   describe('persistBackfilledWordTimings', () => {
@@ -1246,7 +1317,13 @@ describe('features/ttsProcessing', () => {
 
   describe('backfillWordTimings', () => {
     /** Insert audio row + TTS claim. Returns ids for use in the action call. */
-    async function seedAudioAndClaim(t: TestConvex<typeof schema>) {
+    async function seedAudioAndClaim(
+      t: TestConvex<typeof schema>,
+      opts: {
+        ttsQuality?: 'validated' | 'unchecked';
+        spokenText?: string;
+      } = {},
+    ) {
       const { textId } = await seedText(t);
       const storageId = await t.run(async (ctx) =>
         ctx.storage.store(new Blob([new Uint8Array([1, 2, 3])])),
@@ -1257,7 +1334,10 @@ describe('features/ttsProcessing', () => {
           language: 'es',
           voiceName: 'es-ES-Chirp3-HD-Leda',
           storageId,
-          ttsQuality: 'validated',
+          ttsQuality: opts.ttsQuality ?? 'validated',
+          ...(opts.spokenText !== undefined
+            ? { spokenText: opts.spokenText }
+            : {}),
         });
         await ctx.db.insert('ttsGenerationClaims', {
           textId,
@@ -1442,6 +1522,120 @@ describe('features/ttsProcessing', () => {
         isError: true,
         error: expect.stringMatching(/OpenRouter STT API error: 400/),
         costUsd: undefined,
+      });
+    });
+
+    describe('re-validation of an unchecked clip', () => {
+      const mismatchRows = (
+        t: TestConvex<typeof schema>,
+        textId: Id<'texts'>,
+      ) =>
+        t.run(async (ctx) =>
+          ctx.db
+            .query('ttsMismatches')
+            .withIndex('by_textId', (q) => q.eq('textId', textId))
+            .collect(),
+        );
+
+      async function runBackfill(
+        t: TestConvex<typeof schema>,
+        textId: Id<'texts'>,
+        storageId: Id<'_storage'>,
+        stt: { transcribed?: string; status?: number },
+      ) {
+        const sttBody = openrouterSttBody(stt.transcribed ?? 'Hola', {
+          words: [{ word: stt.transcribed ?? 'Hola', start: 0, end: 0.4 }],
+        });
+        const fetchMock = vi.fn(async (url: string | URL | Request) => {
+          const u = typeof url === 'string' ? url : url.toString();
+          if (isOpenrouterSttUrl(u)) {
+            if (stt.status !== undefined && stt.status !== 200) {
+              return new Response('{"error":"nope"}', { status: stt.status });
+            }
+            return new Response(sttBody, {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          throw new Error(`Unexpected fetch to ${u}`);
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        try {
+          await t.action(internal.features.ttsProcessing.backfillWordTimings, {
+            textId,
+            language: 'es',
+            storageId,
+          });
+        } finally {
+          vi.unstubAllGlobals();
+          vi.unstubAllEnvs();
+        }
+      }
+
+      it('a matching transcript settles the clip as validated, with its timings', async () => {
+        const t = convexTest(schema, modules);
+        mockSemantic.mockReset();
+        const { textId, storageId } = await seedAudioAndClaim(t, {
+          ttsQuality: 'unchecked',
+          spokenText: 'Hola',
+        });
+
+        await runBackfill(t, textId, storageId, { transcribed: 'Hola' });
+
+        const after = await getAudio(t, textId);
+        expect(after?.ttsQuality).toBe('validated');
+        expect(after?.wordTimings).toEqual([
+          { word: 'Hola', start: 0, end: 0.4 },
+        ]);
+        expect(await mismatchRows(t, textId)).toHaveLength(0);
+        expect(await getClaim(t, textId)).toBeNull();
+      });
+
+      it('a mismatch settles the clip as unvalidated for good and records it', async () => {
+        const t = convexTest(schema, modules);
+        mockSemantic.mockReset();
+        mockSemantic.mockResolvedValue('mismatch');
+        const { textId, storageId } = await seedAudioAndClaim(t, {
+          ttsQuality: 'unchecked',
+          spokenText: 'Hola',
+        });
+
+        await runBackfill(t, textId, storageId, {
+          transcribed: 'Adios amigos',
+        });
+
+        const after = await getAudio(t, textId);
+        expect(after?.ttsQuality).toBe('unvalidated');
+        // Timings stored anyway, so nothing asks for this clip again.
+        expect(after?.wordTimings).toHaveLength(1);
+        expect(mockSemantic).toHaveBeenCalledTimes(1);
+        expect(await mismatchRows(t, textId)).toHaveLength(1);
+      });
+
+      it('a failing STT counts an attempt; the third failure settles the clip as unvalidated', async () => {
+        const t = convexTest(schema, modules);
+        mockSemantic.mockReset();
+        const { textId, storageId } = await seedAudioAndClaim(t, {
+          ttsQuality: 'unchecked',
+          spokenText: 'Hola',
+        });
+
+        for (let i = 1; i <= 3; i++) {
+          if (!(await getClaim(t, textId))) {
+            await t.run(async (ctx) => {
+              await ctx.db.insert('ttsGenerationClaims', {
+                textId,
+                language: 'es',
+                claimedAt: Date.now(),
+              });
+            });
+          }
+          await runBackfill(t, textId, storageId, { status: 400 });
+          const after = await getAudio(t, textId);
+          expect(after?.asset.revalidationAttempts).toBe(i);
+          expect(after?.ttsQuality).toBe(i < 3 ? 'unchecked' : 'unvalidated');
+        }
+        expect(await getClaim(t, textId)).toBeNull();
       });
     });
   });

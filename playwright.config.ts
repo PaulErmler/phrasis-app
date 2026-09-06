@@ -207,6 +207,20 @@ export default defineConfig({
       },
     },
     {
+      // The onboarding wizard's resume logic with its own fresh user that
+      // never finishes onboarding: a legacy-order progress row planted by
+      // the E2E hook, and the "other" free-text clearing on the prior-apps
+      // step. Chained after account-deletion for the same fresh-signup
+      // reasons as the specs before it.
+      name: 'onboarding-resume',
+      testMatch: /(^|\/)onboarding-resume\.spec\.ts$/,
+      dependencies: ['account-deletion'],
+      fullyParallel: false,
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+    },
+    {
       // Stripe-test-clock billing journeys (trial conversion, real
       // past_due, legacy customer, lapsed repurchase) — fresh users, some
       // on clocked Stripe customers. Self-skips unless a Stripe test key is

@@ -29,6 +29,11 @@ import {
   isTtsVersionStale,
   isTranslationVersionStale,
   languageSupportsStt,
+  languageSupportsKaraoke,
+  languageSupportsWordTimings,
+  getSttBackend,
+  postProcessTranslation,
+  canonicalizeApostrophes,
 } from '@/lib/languages';
 
 describe('getLanguageByCode', () => {
@@ -210,6 +215,7 @@ describe('getLocalizedLanguageNameByCode', () => {
   // them, so the "single source of truth" refactor (overrides on the Language
   // record) provably preserves the localized picker labels.
   const EXPECTED_NAMES: Record<string, { en: string; de: string }> = {
+    en: { en: 'English (Mixed)', de: 'Englisch (Gemischt)' },
     en_gb: { en: 'English (UK)', de: 'Englisch (UK)' },
     en_us: { en: 'English (US)', de: 'Englisch (USA)' },
     en_au: { en: 'English (Australia)', de: 'Englisch (Australien)' },
@@ -290,6 +296,7 @@ describe('IPA helpers', () => {
     expect(getIpaVoice('pt')).toBe('pt-br');
     expect(getIpaVoice('ar_eg')).toBe('ar');
     expect(getIpaVoice('vi_south')).toBe('vi-vn-x-south');
+    expect(getIpaVoice('uz')).toBe('uz');
     expect(getIpaVoice('ja')).toBeNull();
   });
 });
@@ -409,10 +416,65 @@ describe('languageSupportsStt', () => {
     expect(languageSupportsStt('sw_tz')).toBe(true);
   });
 
+  it('is true for Uzbek via the text-only Gemini backend, without timings', () => {
+    expect(languageSupportsStt('uz')).toBe(true);
+    expect(getSttBackend('uz')).toBe('gemini-flash-lite');
+    expect(languageSupportsWordTimings('uz')).toBe(false);
+    expect(languageSupportsKaraoke('uz')).toBe(false);
+  });
+
+  it('keeps word timings for MAI-routed languages', () => {
+    expect(getSttBackend('es')).toBe('mai-transcribe-2');
+    expect(languageSupportsWordTimings('es')).toBe(true);
+    expect(languageSupportsWordTimings('not-a-language')).toBe(false);
+  });
+
   it('is true for mainstream STT languages and false for unknown codes', () => {
     expect(languageSupportsStt('es')).toBe(true);
     expect(languageSupportsStt('ja')).toBe(true);
     expect(languageSupportsStt('not-a-language')).toBe(false);
+  });
+});
+
+describe('postProcessTranslation', () => {
+  it('strips a leaked <final> wrapper and trailing underscores, and nothing else', () => {
+    // Seen on GPT-5.6 Sol's :floor endpoint (3/344 calls, 2026-09-05).
+    expect(
+      postProcessTranslation('en', 'How far is the village?</final>'),
+    ).toBe('How far is the village?');
+    expect(
+      postProcessTranslation('de', '<final>Wie weit ist es?</final>'),
+    ).toBe('Wie weit ist es?');
+    expect(postProcessTranslation('de', 'Wie weit ist es? __ ')).toBe(
+      'Wie weit ist es?',
+    );
+    expect(postProcessTranslation('de', 'Das ist final.')).toBe(
+      'Das ist final.',
+    );
+    expect(postProcessTranslation('en', '<final>x</final>')).toBe(
+      postProcessTranslation(
+        'en',
+        postProcessTranslation('en', '<final>x</final>'),
+      ),
+    );
+  });
+
+  it('folds an apostrophe inside a word to ASCII and leaves quotation marks alone', () => {
+    expect(postProcessTranslation('fr', 'J’aime ça.')).toBe("J'aime ça.");
+    expect(postProcessTranslation('fr', 'J´aime l‘homme.')).toBe(
+      "J'aime l'homme.",
+    );
+    expect(postProcessTranslation('en', '‘Hugo’ said “no”.')).toBe(
+      '‘Hugo’ said “no”.',
+    );
+    // Uzbek keeps its modifier letters (canonicalizeUzbekApostrophes).
+    expect(postProcessTranslation('uz', "o'zbek ta'kid")).toBe('oʻzbek taʼkid');
+  });
+
+  it('canonicalizeApostrophes gives user-typed text the same spelling without the rest of the step', () => {
+    expect(canonicalizeApostrophes('fr', 'J’aime ça._')).toBe("J'aime ça._");
+    expect(canonicalizeApostrophes('uz', "o'zbek")).toBe('oʻzbek');
+    expect(canonicalizeApostrophes('en', '‘Hugo’')).toBe('‘Hugo’');
   });
 });
 
@@ -446,10 +508,12 @@ describe('content versioning', () => {
   });
 
   describe('prompt-fix languages have their ttsVersion bumped so audio regenerates lazily', () => {
-    // pt_pt / en_gb / en_au changed only the Gemini prompt (provider stays
+    // pt_pt and es_mixed changed only the Gemini prompt (provider stays
     // gemini), so the provider-mismatch regen wouldn't fire. The ttsVersion
     // bump is what forces regeneration. Guard that the bump is present.
-    it.each(['pt_pt', 'en_gb', 'en_au'])(
+    // (en_gb / en_au once carried the same bump; their audio is now cached
+    // under `en`, see the accent-variant suite.)
+    it.each(['pt_pt', 'es_mixed'])(
       'language %s has ttsVersion > DEFAULT so old (v1/undefined-stamped) audio is stale',
       (code) => {
         const current = getCurrentTtsVersion(code);

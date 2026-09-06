@@ -2,15 +2,19 @@ import { MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id, Doc } from '../_generated/dataModel';
 import {
-  getVoiceForLanguage,
-  getVoiceForLanguageVariant,
+  getMixedAccentTextLanguage,
+  getVoiceForText,
   getVoiceGenderByApiCode,
   resolveCardSpeakerGenders,
   getTtsProviderForLanguage,
   getTranslationConfigForLanguage,
+  isMixedLanguage,
   isTtsVersionStale,
   isTranslationVersionStale,
   languageSupportsStt,
+  languageSupportsWordTimings,
+  pickAccentForText,
+  usesSourceTextVerbatim,
 } from '../../lib/languages';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
@@ -21,12 +25,21 @@ import {
 } from './textAnnotations';
 import { deleteAudioRow } from './audio';
 import {
-  findReusableAudioAsset,
+  findReusableAudioAssetForVoice,
   resolveAudioPayload,
+  sttBackfillExhausted,
   upsertAudioPointer,
 } from './audioAssets';
+import {
+  storeTranslationAndScheduleTTSHandler,
+  verbatimTranslationArgs,
+} from '../features/translationPipeline';
 import { llmPool, llmWarmPool } from './workpools';
-import type { TtsPriority, LlmPriority, TranslationReason } from '../types';
+import {
+  type TtsPriority,
+  type LlmPriority,
+  type TranslationReason,
+} from '../types';
 import {
   claimTtsIfAvailable,
   hasActiveTtsClaim,
@@ -118,6 +131,23 @@ export async function scheduleTranslationForLanguage(
     translationReason?: TranslationReason;
   },
 ): Promise<boolean> {
+  // Accent-only variant of the text's own language with no rewrite of its
+  // own (an `en` sentence on an `en_us` course, a British custom sentence
+  // on a Mixed English base): the wording is the source text itself, so
+  // store it verbatim. The write choke point does the rest (version stamp,
+  // archive-on-bump, annotations, TTS against the variant's own voice
+  // pool). No LLM claim is involved. Variants that declare an
+  // `accentRewrite` (`en_gb`, `en_au`) fall through to the OpenRouter path
+  // below like any translation; the worker swaps in the rewrite prompt.
+  if (usesSourceTextVerbatim(targetLanguage, text.language)) {
+    if (opts.probe) throw new ProbeNeedsWork();
+    await storeTranslationAndScheduleTTSHandler(
+      ctx,
+      verbatimTranslationArgs(text, targetLanguage, opts),
+    );
+    return true;
+  }
+
   const tCfg = getTranslationConfigForLanguage(targetLanguage);
   if (opts.probe) {
     // A fresh LLM claim means a job already owns this translation: the real
@@ -339,26 +369,27 @@ export async function scheduleAudioForLanguage(
   }
   // For mixed-dialect rows, prefer a voice in the same locale that was
   // picked at translation time and forward the variant to TTS so the
-  // validation roundtrip uses the matching STT locale.
+  // validation roundtrip uses the matching STT locale. Mixed-ACCENT pools
+  // (`en`) get the text's deterministic accent inside `getVoiceForText`.
   const regionVariant = isSource ? undefined : translation!.regionVariant;
-  const voiceName = regionVariant
-    ? getVoiceForLanguageVariant(language, regionVariant, audioSpeakerGender)
-    : getVoiceForLanguage(language, audioSpeakerGender);
+  const voiceName = getVoiceForText(
+    language,
+    text._id,
+    regionVariant,
+    audioSpeakerGender,
+  );
   const spokenText = isSource ? text.text : translation!.translatedText;
 
   if (!opts?.forceRegen) {
-    const voiceGender = getVoiceGenderByApiCode(voiceName);
-    if (voiceGender !== undefined) {
-      const asset = await findReusableAudioAsset(ctx, {
-        language,
-        voiceGender,
-        regionVariant,
-        spokenText,
-      });
-      if (asset) {
-        await upsertAudioPointer(ctx, text._id, language, asset._id);
-        return true;
-      }
+    const asset = await findReusableAudioAssetForVoice(ctx, {
+      language,
+      voiceName,
+      regionVariant,
+      spokenText,
+    });
+    if (asset) {
+      await upsertAudioPointer(ctx, text._id, language, asset._id);
+      return true;
     }
   }
 
@@ -413,24 +444,24 @@ export async function regenerateSupersededRevisionAudio(
   // The wording was generated for the revision's own gender; only a legacy
   // row without a stamp falls back to the card's current gender.
   const gender = revision.speakerGender ?? opts.audioSpeakerGender;
-  const voiceName = revision.regionVariant
-    ? getVoiceForLanguageVariant(language, revision.regionVariant, gender)
-    : getVoiceForLanguage(language, gender);
+  const voiceName = getVoiceForText(
+    language,
+    text._id,
+    revision.regionVariant,
+    gender,
+  );
   if (!opts.forceRegen) {
-    const voiceGender = getVoiceGenderByApiCode(voiceName);
-    if (voiceGender !== undefined) {
-      const asset = await findReusableAudioAsset(ctx, {
-        language,
-        voiceGender,
-        regionVariant: revision.regionVariant,
-        spokenText: revision.translatedText,
-      });
-      if (asset) {
-        if (asset._id !== revision.audioAssetId) {
-          await ctx.db.patch(revision._id, { audioAssetId: asset._id });
-        }
-        return true;
+    const asset = await findReusableAudioAssetForVoice(ctx, {
+      language,
+      voiceName,
+      regionVariant: revision.regionVariant,
+      spokenText: revision.translatedText,
+    });
+    if (asset) {
+      if (asset._id !== revision.audioAssetId) {
+        await ctx.db.patch(revision._id, { audioAssetId: asset._id });
       }
+      return true;
     }
   }
   const claimed = await claimTtsIfAvailable(
@@ -476,6 +507,32 @@ function audioAssetMismatch(
     ),
     versionMismatch: isTtsVersionStale(lang, asset.ttsVersion),
   };
+}
+
+/**
+ * Whether the clip a text points at speaks a different accent than the text
+ * is assigned (`pickAccentForText`, the per-text hash for mixed-accent pools
+ * such as `en`). This is what turns the existing English catalogue mixed
+ * over time: the pointer is dropped and re-filled in the text's accent on
+ * next view, while the old clip stays in the cache (`keepAsset`) for the
+ * pinned-accent course and the texts that hash to its accent.
+ *
+ * Silent in three cases so it can never storm: a language whose pool has
+ * no locales (`de`, no target accent); an asset without a stamped accent
+ * (written before the accent was part of the key and not yet backfilled by
+ * `backfillAudioAssetAccent`, accent unknown); and mixed-DIALECT languages
+ * (`es_mixed`), whose accent is pinned on the translation row rather than
+ * hashed, so the hash would be the wrong reference.
+ */
+function audioAccentDrifted(
+  lang: string,
+  textId: Id<'texts'>,
+  asset: Pick<Doc<'audioAssets'>, 'regionVariant'>,
+): boolean {
+  if (isMixedLanguage(lang)) return false;
+  if (asset.regionVariant === undefined) return false;
+  const target = pickAccentForText(lang, textId);
+  return target !== undefined && target !== asset.regionVariant;
 }
 
 /** Options threaded through the whole `scheduleMissingContent` sweep. */
@@ -622,6 +679,7 @@ async function loadContentState(
 async function sweepInvalidAudio(
   ctx: MutationCtx,
   textId: Id<'texts'>,
+  text: Pick<Doc<'texts'>, 'userCreated'>,
   audioSpeakerGender: string | undefined,
   state: ContentSweepState,
   opts: ContentSweepOpts | undefined,
@@ -660,21 +718,37 @@ async function sweepInvalidAudio(
         lang,
         payload,
       );
+      // A user-created text keeps the accent it was voiced in. Its clip was
+      // made for its own hash, or carried over from the shared text the
+      // learner heard when it is a card-edit copy, so a drift here would
+      // only be the copy's new id re-rolling the accent the learner already
+      // knows.
+      const accentMismatch =
+        !text.userCreated && audioAccentDrifted(lang, textId, payload.asset);
       if (genderMismatch) {
         langsWithAudioGenderDrift.add(lang);
       }
-      if (genderMismatch || providerMismatch || versionMismatch) {
+      if (
+        genderMismatch ||
+        providerMismatch ||
+        versionMismatch ||
+        accentMismatch
+      ) {
         if (opts?.probe) throw new ProbeNeedsWork();
         // Reference-aware delete: a shared asset (or an `editCard`-copied
         // legacy blob) survives while anything else still points at it.
-        // Gender drift additionally keeps the asset+blob even as the last
-        // pointer: that audio is still CORRECT for this string+voice. It
-        // stays in the content-addressed cache so flipping the gender back
-        // (or any other text with the same sentence) reuses it for free.
+        // Gender and accent drift additionally keep the asset+blob even as
+        // the last pointer: that audio is still CORRECT for this
+        // string+voice+accent. It stays in the content-addressed cache so
+        // flipping the gender back, a pinned-accent course, or any other
+        // text with the same sentence and accent reuses it for free.
         // Provider/ttsVersion migrations are true obsolescence (a new TTS
         // system) and keep the full garbage collection.
         await deleteAudioRow(ctx, audio, {
-          keepAsset: genderMismatch && !providerMismatch && !versionMismatch,
+          keepAsset:
+            (genderMismatch || accentMismatch) &&
+            !providerMismatch &&
+            !versionMismatch,
         });
         state.audioMap.set(lang, null);
       } else {
@@ -831,10 +905,13 @@ async function sweepStaleTranslations(
 }
 
 /**
- * Schedule a Scribe backfill for an existing audio row that lacks timings.
- * A no-op unless the row survived the validity sweep (its payload is in
- * `state.audioPayloadMap`), the shared asset has no timings yet, and the
- * language supports STT at all.
+ * Schedule an STT backfill for an existing audio row that lacks timings, or
+ * that was stored 'unchecked' because STT failed at synthesis time, in
+ * which case the backfill delivers the verdict too. A no-op unless the row
+ * survived the validity sweep, so its payload is in `state.audioPayloadMap`,
+ * the language's STT can produce what is missing, and the asset has
+ * backfill attempts left (`sttBackfillExhausted`). A clip STT keeps failing
+ * on is left alone rather than retried on every view.
  */
 async function scheduleTimingsBackfillIfNeeded(
   ctx: MutationCtx,
@@ -848,10 +925,17 @@ async function scheduleTimingsBackfillIfNeeded(
   // shared-asset timings serve every pointing text, so an asset that already
   // has them needs no backfill.
   const payload = state.audioPayloadMap.get(lang);
-  if (!audio || !payload || payload.wordTimings) return;
-  // Languages without STT support will never get word timings, so don't
-  // waste a claim on a backfill that's guaranteed to no-op.
-  if (!languageSupportsStt(lang)) return;
+  if (!audio || !payload) return;
+  if (sttBackfillExhausted(payload.asset)) return;
+  // Languages whose STT backend yields no word timings (none, or the
+  // text-only Gemini fallback) will never get them, so don't waste a claim
+  // on a backfill that's guaranteed to no-op. A text-only backend still
+  // gives an unchecked clip its verdict.
+  const needsTimings =
+    !payload.wordTimings && languageSupportsWordTimings(lang);
+  const needsVerdict =
+    payload.ttsQuality === 'unchecked' && languageSupportsStt(lang);
+  if (!needsTimings && !needsVerdict) return;
   if (opts?.probe) {
     // Claim-held = a job (synthesis or backfill) already owns the slot —
     // unless it's a background claim the real (priority-less, hence
@@ -923,7 +1007,11 @@ async function scheduleSupersededRevisionContent(
       });
       continue;
     }
-    if (asset.wordTimings === undefined && languageSupportsStt(lang)) {
+    if (
+      !sttBackfillExhausted(asset) &&
+      ((asset.wordTimings === undefined && languageSupportsWordTimings(lang)) ||
+        (asset.ttsQuality === 'unchecked' && languageSupportsStt(lang)))
+    ) {
       if (opts?.probe) {
         if (await hasBlockingTtsClaim(ctx, textId, lang, undefined)) continue;
         throw new ProbeNeedsWork();
@@ -1124,8 +1212,23 @@ export async function scheduleMissingContent(
   // any other text where the user's variant differs from the text's
   // actual language code (`es` vs `es_latam`, etc.). The Set dedupes
   // when `baseLanguages`/`targetLanguages` already contain the source.
+  //
+  // A mixed-accent course (`en`) shows a British- or Australian-voiced
+  // curriculum text the `en_gb` / `en_au` rewrite instead of the source
+  // wording (`getMixedAccentTextLanguage`, read by cardContent.ts), so that
+  // row is required content on such a course as well. Never for a
+  // user-created text: its wording is the user's.
+  const courseLanguages = [...baseLanguages, ...targetLanguages];
+  const mixedAccentLanguage =
+    !text.userCreated && courseLanguages.includes(sourceLanguage)
+      ? getMixedAccentTextLanguage(sourceLanguage, textId)
+      : undefined;
   const allRequiredLanguages = [
-    ...new Set([sourceLanguage, ...baseLanguages, ...targetLanguages]),
+    ...new Set([
+      sourceLanguage,
+      ...courseLanguages,
+      ...(mixedAccentLanguage ? [mixedAccentLanguage] : []),
+    ]),
   ];
 
   // Languages that need translation (all except source). `sourceLanguage`
@@ -1145,6 +1248,7 @@ export async function scheduleMissingContent(
   const langsWithAudioGenderDrift = await sweepInvalidAudio(
     ctx,
     textId,
+    text,
     audioSpeakerGender,
     state,
     opts,

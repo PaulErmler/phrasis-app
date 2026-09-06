@@ -77,6 +77,7 @@ const EXPECTED_GEMINI: Record<string, string> = {
   et: 'et-EE',
   ta: 'ta-IN',
   te: 'te-IN',
+  uz: 'uz-UZ',
 };
 
 describe('toGeminiBcp47', () => {

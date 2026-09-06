@@ -88,6 +88,8 @@ describe('geminiTts.speak: empty-response retry', () => {
     const body = bodyOf(fetchMock.mock.calls[0]);
     expect(body.input).toMatch(/^## Instruction:/);
     expect(body.input).toContain('German'); // getLanguageByCode('de').name
+    // Prompt F (2026-09-04 listening test): the no-performing clause.
+    expect(body.input).toContain('Do not act it out or perform it.');
     expect(body.input).toContain('## Transcript: Guten Morgen!');
     // Strategy C: the style rides in `input`, so no prompt field is sent.
     expect(body.provider.options.google.prompt).toBeUndefined();
@@ -118,6 +120,82 @@ describe('geminiTts.speak: empty-response retry', () => {
         .voice,
     ).toBe('Leda');
     expect(body.provider.options.google.language_code).toBe('ar-001');
+  });
+
+  it.each([
+    ['en', 'Leda@en-GB', 'en-GB', 'British English'],
+    ['en', 'Leda@en-AU', 'en-AU', 'Australian English'],
+    ['en', 'Leda@en-US', 'en-US', 'American English'],
+    ['es_mixed', 'Leda@es-ES', 'es-ES', 'Castilian Spanish'],
+    ['es_mixed', 'Leda@es-US', 'es-US', 'Latin American Spanish'],
+  ])(
+    'mixed pool %s with voice %s names the accent in the prompt (locale alone drifts)',
+    async (language, voiceApiCode, locale, accentName) => {
+      const fetchMock = vi.fn().mockResolvedValue(pcmResponse(4096));
+      vi.stubGlobal('fetch', fetchMock);
+
+      await geminiTts.speak({
+        text: 'Hello.',
+        language,
+        voiceApiCode,
+        speed: 1,
+      });
+
+      const body = bodyOf(fetchMock.mock.calls[0]);
+      expect(body.input).toContain(`native ${accentName} speaker`);
+      expect(body.provider.options.google.language_code).toBe(locale);
+    },
+  );
+
+  it('a pinned dialect keeps its own ttsPromptName over the locale-derived one', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(pcmResponse(4096));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await geminiTts.speak({
+      text: 'Hello.',
+      language: 'en_gb',
+      voiceApiCode: 'Leda@en-GB',
+      speed: 1,
+    });
+
+    expect(bodyOf(fetchMock.mock.calls[0]).input).toContain(
+      'native British English speaker',
+    );
+  });
+
+  it('appends ttsPromptNotes for the language or the voice locale, and nothing otherwise', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(pcmResponse(4096));
+    vi.stubGlobal('fetch', fetchMock);
+
+    // The Australian course: its own notes tone the accent down.
+    await geminiTts.speak({
+      text: 'Hello.',
+      language: 'en_au',
+      voiceApiCode: 'Leda@en-AU',
+      speed: 1,
+    });
+    const auInput = bodyOf(fetchMock.mock.calls[0]).input;
+    expect(auInput).toContain('native Australian English speaker');
+    expect(auInput).toContain('Keep the Australian accent mild.');
+    // Notes belong to the instruction, never to the spoken transcript.
+    expect(transcriptOf(fetchMock.mock.calls[0])).toBe('Hello.');
+
+    // The mixed English pool picking an Australian voice gets them too.
+    await geminiTts.speak({
+      text: 'Hello.',
+      language: 'en',
+      voiceApiCode: 'Leda@en-AU',
+      speed: 1,
+    });
+    expect(bodyOf(fetchMock.mock.calls[1]).input).toContain(
+      'Keep the Australian accent mild.',
+    );
+
+    // A language without notes keeps the bare instruction.
+    await geminiTts.speak(INPUT);
+    expect(bodyOf(fetchMock.mock.calls[2]).input).not.toContain(
+      'Keep the Australian accent mild.',
+    );
   });
 
   it('rejects a voice apiCode with a trailing "@" and no locale', async () => {

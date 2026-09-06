@@ -75,6 +75,7 @@ const EXPECTED_GOOGLE: Record<string, string> = {
   et: 'et',
   ta: 'ta',
   te: 'te',
+  uz: 'uz',
 };
 
 describe('toGoogleTranslateCode', () => {

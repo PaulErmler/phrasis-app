@@ -75,6 +75,17 @@ export const CLIENT_EVENTS = {
    * the screen is locked.
    */
   AUDIO_PLAY_BLOCKED: 'audio_play_blocked',
+
+  /**
+   * A card action was clicked in the UI. Carries `action` (favorite, master,
+   * hide, edit, regenerateAudio, flag) and `source`: 'pinned' for the icon
+   * row on the card, 'menu' for the `...` dropdown. The backend's
+   * `card_action` records what happened; this records where the click came
+   * from, which is the only way to tell whether pinning earns its place.
+   * Fires on the click, before the mutation, so a quota rejection still
+   * counts as intent.
+   */
+  CARD_ACTION_CLICKED: 'card_action_clicked',
 } as const;
 
 export type ClientEvent = (typeof CLIENT_EVENTS)[keyof typeof CLIENT_EVENTS];

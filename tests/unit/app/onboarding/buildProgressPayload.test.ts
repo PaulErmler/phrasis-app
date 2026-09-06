@@ -24,6 +24,8 @@ const FULL_DATA: OnboardingData = {
   acquisitionSourceFreeText: 'a podcast',
   learningGoals: ['travel', 'work'],
   learningGoalFreeText: 'business trips',
+  priorApps: ['anki', 'other'],
+  priorAppsFreeText: 'Memrise',
   dailyTimeGoalMinutes: 20,
   placementTest: {
     strategyVersion: 3,
@@ -52,6 +54,8 @@ describe('buildProgressPayload', () => {
       acquisitionSourceFreeText: undefined,
       learningGoals: undefined,
       learningGoalFreeText: undefined,
+      priorApps: undefined,
+      priorAppsFreeText: undefined,
       dailyTimeGoalMinutes: undefined,
       placementTest: undefined,
     });
@@ -69,6 +73,8 @@ describe('buildProgressPayload', () => {
       acquisitionSourceFreeText: 'a podcast',
       learningGoals: ['travel', 'work'],
       learningGoalFreeText: 'business trips',
+      priorApps: ['anki', 'other'],
+      priorAppsFreeText: 'Memrise',
       dailyTimeGoalMinutes: 20,
       placementTest: FULL_DATA.placementTest,
     });
@@ -80,19 +86,21 @@ describe('buildProgressPayload', () => {
     );
   });
 
-  it('drops empty arrays (targetLanguages, baseLanguages, learningGoals)', () => {
+  it('drops empty arrays (targetLanguages, baseLanguages, learningGoals, priorApps)', () => {
     const payload = buildProgressPayload(
       {
         ...FULL_DATA,
         targetLanguages: [],
         baseLanguages: [],
         learningGoals: [],
+        priorApps: [],
       },
       3,
     );
     expect(payload.targetLanguages).toBeUndefined();
     expect(payload.baseLanguages).toBeUndefined();
     expect(payload.learningGoals).toBeUndefined();
+    expect(payload.priorApps).toBeUndefined();
   });
 
   it('keeps a null writingInputMode (audio pick) as an explicit null', () => {

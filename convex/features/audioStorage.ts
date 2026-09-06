@@ -3,6 +3,7 @@ import { MutationCtx } from '../_generated/server';
 import { getCurrentTtsVersion } from '../../lib/languages';
 import { deleteStorageBlobIfUnreferenced } from '../lib/audio';
 import {
+  buildAudioAssetKey,
   releaseAudioAssetIfUnreferenced,
   scheduleBlobSwapDelete,
   upsertAudioAsset,
@@ -99,12 +100,15 @@ export async function storeAudioRecordingHandler(
 
   const result = await upsertAudioAsset(
     ctx,
-    {
+    // Cache language + accent from the voice (see `buildAudioAssetKey`): an
+    // `en_gb` job's clip lands as an `en` asset pinned to `en-GB`.
+    buildAudioAssetKey({
       language: args.language,
       voiceGender: args.voiceGender,
+      voiceName: args.voiceName,
       regionVariant: args.regionVariant,
       spokenText: args.spokenText,
-    },
+    }),
     {
       storageId: args.storageId,
       voiceName: args.voiceName,

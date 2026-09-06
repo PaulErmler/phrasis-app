@@ -163,16 +163,18 @@ async function processPlacementSentences(
   for (const textId of textIds) {
     const text = await ctx.db.get(textId);
     if (!text) continue;
+    // The sweep always covers the text's own language (audio) and skips
+    // translating into it; passing the user's languages unfiltered lets it
+    // also derive the accent row a Mixed English course shows
+    // (`getMixedAccentTextLanguage`), and only for users who chose it.
     const targetLanguages = Array.from(
-      new Set(
-        [targetLanguage, sourceLanguage].filter((l) => l !== text.language),
-      ),
+      new Set([targetLanguage, sourceLanguage]),
     );
     const result = await scheduleMissingContent(
       ctx,
       text._id,
       text,
-      [text.language],
+      [],
       targetLanguages,
       { priority },
     );
@@ -705,6 +707,7 @@ export const finalizeOnboarding = mutation({
       await track(ctx, userId, EVENTS.ONBOARDING_COMPLETED, {
         acquisition_source: progress?.acquisitionSource,
         learning_goals: progress?.learningGoals,
+        prior_apps: progress?.priorApps,
         daily_time_goal_minutes: progress?.dailyTimeGoalMinutes,
         current_level: progress?.currentLevel,
         base_languages: progress?.baseLanguages,
