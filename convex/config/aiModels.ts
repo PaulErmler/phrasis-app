@@ -30,6 +30,14 @@ export const OPENROUTER_MODELS = {
    *  token counts, taken for the newer model's accuracy on cross-lingual
    *  gender/register inference. */
   sentenceMetadata: 'google/gemini-3.5-flash-lite',
+  /** Rendering classifier (convex/lib/renderingClassifier.ts): what a stored
+   *  translation's wording actually is on the first-person-gender and
+   *  politeness axes. Batched 25 rows per call over the whole catalogue in
+   *  the backfill, then once per generated variant, so the lite tier.
+   *  Starting point; `pnpm eval:rendering` compares 3.1 / 3.5 Flash Lite,
+   *  3.7 Flash and Luna against the gold corpora and a judged wild sample.
+   *  Re-run it before switching. */
+  renderingClassifier: 'google/gemini-3.1-flash-lite',
   /** Short thread title from first user message. Left on 3.1 Flash Lite.
    *  A 4-word title in the user's own language is the one job here where
    *  the newer model buys nothing. */

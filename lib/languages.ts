@@ -393,7 +393,37 @@ export interface Language {
    * language as mixed (`isMixedLanguage`).
    */
   variants?: ReadonlyArray<{ subCode: string; voiceLocalePrefix: string }>;
+  /**
+   * How the language marks politeness, which decides whether the course
+   * politeness setting applies to it and which sentences it can change:
+   * 'predicate' (every full sentence, ja/ko), 'particle' (any sentence in
+   * dialogue, th/fil), 'pronoun' (sentences with a pronoun, vi/id/ms),
+   * 'address' (only sentences with a "you", the T-V languages). Unset = no
+   * learner-relevant politeness grammar; the setting is hidden for a course
+   * whose targets are all unset. The forms, copy and prompt text live in
+   * lib/languageForms.ts under the same code; tests/unit/lib/
+   * languageForms.test.ts fails when the two disagree. Mixed dialects
+   * (es_mixed) and accent variants (en_gb) leave this unset and resolve
+   * through their sub-variants / shared text language.
+   */
+  politenessMarking?: PolitenessMarking;
+  /**
+   * Whether the wording of a first-person sentence changes with the
+   * speaker's gender (Russian past tense, Romance adjectives, Hebrew and
+   * Arabic verbs, Thai and Japanese pronouns, Korean kinship words). Such a
+   * language gets a masculine or feminine rendering when the course's
+   * `firstPersonForms` setting asks for one; every language follows the
+   * setting for the VOICE regardless. Example copy in lib/languageForms.ts.
+   */
+  firstPersonMarking?: true;
 }
+
+/** See `Language.politenessMarking`. */
+export type PolitenessMarking =
+  | 'predicate'
+  | 'particle'
+  | 'pronoun'
+  | 'address';
 
 export const SUPPORTED_LANGUAGES: Language[] = [
   {
@@ -543,6 +573,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'es',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'es-ES',
     regionLabel: 'Spain',
     geminiBcp47: 'es-ES',
@@ -566,6 +598,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'es_latam',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'es-419',
     regionLabel: 'Latin America',
     // Gemini TTS locale: `es-US` is Gemini's American-Spanish locale (it has no
@@ -629,6 +663,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'fr',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'fr',
     regionLabel: 'France',
     geminiBcp47: 'fr-FR',
@@ -646,6 +682,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'de',
+    politenessMarking: 'address',
     displayCode: 'de',
     regionLabel: 'Germany',
     geminiBcp47: 'de-DE',
@@ -663,6 +700,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'it',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'it',
     regionLabel: 'Italy',
     geminiBcp47: 'it-IT',
@@ -680,6 +719,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'pt',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'pt',
     regionLabel: 'Brazil',
     geminiBcp47: 'pt-BR',
@@ -698,6 +739,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'pt_pt',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'pt-PT',
     regionLabel: 'Portugal',
     geminiBcp47: 'pt-PT',
@@ -726,6 +769,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ro',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'ro',
     regionLabel: 'Romania',
     geminiBcp47: 'ro-RO',
@@ -743,6 +788,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ca',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'ca',
     regionLabel: 'Catalonia',
     geminiBcp47: 'ca-ES',
@@ -763,6 +810,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ru',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'ru',
     regionLabel: 'Russia',
     geminiBcp47: 'ru-RU',
@@ -782,6 +831,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'pl',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'pl',
     regionLabel: 'Poland',
     geminiBcp47: 'pl-PL',
@@ -799,6 +850,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'sk',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'sk',
     regionLabel: 'Slovakia',
     geminiBcp47: 'sk-SK',
@@ -816,6 +869,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'cs',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'cs',
     regionLabel: 'Czechia',
     geminiBcp47: 'cs-CZ',
@@ -833,6 +888,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'hr',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'hr',
     regionLabel: 'Croatia',
     geminiBcp47: 'hr-HR',
@@ -851,6 +908,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'sl',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'sl',
     regionLabel: 'Slovenia',
     geminiBcp47: 'sl-SI',
@@ -869,6 +928,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'uk',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'uk',
     regionLabel: 'Ukraine',
     geminiBcp47: 'uk-UA',
@@ -889,6 +950,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'sr',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'sr',
     regionLabel: 'Serbia',
     geminiBcp47: 'sr-RS',
@@ -920,6 +983,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'bg',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'bg',
     regionLabel: 'Bulgaria',
     geminiBcp47: 'bg-BG',
@@ -943,6 +1008,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'lt',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'lt',
     regionLabel: 'Lithuania',
     geminiBcp47: 'lt-LT',
@@ -961,6 +1028,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'lv',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'lv',
     regionLabel: 'Latvia',
     geminiBcp47: 'lv-LV',
@@ -979,6 +1048,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'et',
+    politenessMarking: 'address',
     displayCode: 'et',
     regionLabel: 'Estonia',
     geminiBcp47: 'et-EE',
@@ -999,6 +1069,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'nl',
+    politenessMarking: 'address',
     displayCode: 'nl',
     regionLabel: 'Netherlands',
     geminiBcp47: 'nl-NL',
@@ -1114,6 +1185,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'el',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'el',
     regionLabel: 'Greece',
     geminiBcp47: 'el-GR',
@@ -1137,6 +1210,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'hi',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'hi',
     regionLabel: 'India',
     geminiBcp47: 'hi-IN',
@@ -1157,6 +1232,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'bn',
+    politenessMarking: 'address',
     displayCode: 'bn',
     regionLabel: 'Bangladesh',
     geminiBcp47: 'bn-BD',
@@ -1182,6 +1258,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ta',
+    politenessMarking: 'address',
     displayCode: 'ta',
     regionLabel: 'India',
     geminiBcp47: 'ta-IN',
@@ -1202,6 +1279,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'te',
+    politenessMarking: 'address',
     displayCode: 'te',
     regionLabel: 'India',
     geminiBcp47: 'te-IN',
@@ -1225,6 +1303,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'tr',
+    politenessMarking: 'address',
     displayCode: 'tr',
     regionLabel: 'Turkey',
     geminiBcp47: 'tr-TR',
@@ -1242,6 +1321,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'uz',
+    politenessMarking: 'address',
     displayCode: 'uz',
     regionLabel: 'Uzbekistan',
     // Not on Gemini TTS's documented list (Sep 2026), but the locale is
@@ -1279,6 +1359,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'hu',
+    politenessMarking: 'address',
     displayCode: 'hu',
     regionLabel: 'Hungary',
     geminiBcp47: 'hu-HU',
@@ -1298,6 +1379,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'zh',
+    politenessMarking: 'address',
     displayCode: 'zh-CN',
     regionLabel: 'Mainland China',
     geminiBcp47: 'cmn-CN',
@@ -1323,6 +1405,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'zh_traditional',
+    politenessMarking: 'address',
     displayCode: 'zh-TW',
     regionLabel: 'Taiwan',
     geminiBcp47: 'cmn-TW',
@@ -1437,6 +1520,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ja',
+    politenessMarking: 'predicate',
+    firstPersonMarking: true,
     displayCode: 'ja',
     regionLabel: 'Japan',
     geminiBcp47: 'ja-JP',
@@ -1465,6 +1550,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ko',
+    politenessMarking: 'predicate',
+    firstPersonMarking: true,
     displayCode: 'ko',
     regionLabel: 'South Korea',
     geminiBcp47: 'ko-KR',
@@ -1486,6 +1573,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'vi',
+    politenessMarking: 'pronoun',
+    firstPersonMarking: true,
     displayCode: 'vi',
     regionLabel: 'Vietnam',
     geminiBcp47: 'vi-VN',
@@ -1513,6 +1602,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'vi_south',
+    politenessMarking: 'pronoun',
+    firstPersonMarking: true,
     displayCode: 'vi-VN',
     regionLabel: 'Southern Vietnam',
     // Gemini has no southern-specific locale. `vi-VN` is the only Vietnamese
@@ -1546,6 +1637,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'th',
+    politenessMarking: 'particle',
+    firstPersonMarking: true,
     displayCode: 'th',
     regionLabel: 'Thailand',
     geminiBcp47: 'th-TH',
@@ -1573,6 +1666,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'id',
+    politenessMarking: 'pronoun',
     displayCode: 'id',
     regionLabel: 'Indonesia',
     geminiBcp47: 'id-ID',
@@ -1590,6 +1684,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ms',
+    politenessMarking: 'pronoun',
     displayCode: 'ms',
     regionLabel: 'Malaysia',
     geminiBcp47: 'ms-MY',
@@ -1608,6 +1703,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'fil',
+    politenessMarking: 'particle',
     displayCode: 'fil',
     regionLabel: 'the Philippines',
     geminiBcp47: 'fil-PH',
@@ -1634,6 +1730,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar',
+    firstPersonMarking: true,
     direction: 'rtl',
     displayCode: 'ar',
     regionLabel: 'the Arab world',
@@ -1665,6 +1762,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar_sa',
+    firstPersonMarking: true,
     direction: 'rtl',
     displayCode: 'ar-SA',
     regionLabel: 'Saudi Arabia',
@@ -1694,6 +1792,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar_eg',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     direction: 'rtl',
     displayCode: 'ar-EG',
     regionLabel: 'Egypt',
@@ -1724,6 +1824,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar_iq',
+    firstPersonMarking: true,
     direction: 'rtl',
     displayCode: 'ar-IQ',
     regionLabel: 'Iraq',
@@ -1752,6 +1853,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar_lev',
+    firstPersonMarking: true,
     direction: 'rtl',
     displayCode: 'ar-LB',
     regionLabel: 'the Levant (Lebanon, Syria, Palestine, Jordan)',
@@ -1783,6 +1885,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'he',
+    firstPersonMarking: true,
     direction: 'rtl',
     displayCode: 'he',
     regionLabel: 'Israel',
@@ -1808,6 +1911,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'fa',
+    politenessMarking: 'address',
     direction: 'rtl',
     displayCode: 'fa',
     regionLabel: 'Iran',

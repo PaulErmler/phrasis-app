@@ -35,6 +35,10 @@ import {
   cardEditPathValidator,
   cardEditLanguageRoleValidator,
   retranslationStatusValidator,
+  firstPersonFormsValidator,
+  politenessLevelsValidator,
+  renderedGenderValidator,
+  renderedPolitenessValidator,
 } from './types';
 
 // Field validators for the `courseSettings` table. Extracted so that queries
@@ -270,6 +274,14 @@ export const courseSettingsFields = {
   reconciledDatasetId: v.optional(v.id('datasets')), // Dataset version this course's progress has been cutover to (idempotency gate for datasetMigration_cutoverUser)
   // Source-of-content filter. See studyContentFilterValidator in types.ts.
   studyContentFilter: v.optional(studyContentFilterValidator),
+  // Sentence-form preferences (lib/languageForms.ts). Undefined on every
+  // course from before the feature = today's canonical renderings; never
+  // backfilled. New courses get explicit values from onboarding or the
+  // create-course dialog. Only curriculum cards created after the feature
+  // (`cards.followsCoursePreferences`) follow them; user-written sentences
+  // never do. Resolution: lib/preferenceResolution.ts.
+  firstPersonForms: v.optional(firstPersonFormsValidator),
+  politenessLevels: v.optional(politenessLevelsValidator),
   // Current "between celebrations" bucket id. Rotated by the client on
   // celebration dismiss (via `setCurrentSessionId`). Stored server-side so
   // the bucket survives the user closing the learn view OR moving to a
@@ -327,6 +339,11 @@ export const onboardingProgressFields = {
   currentLevel: v.optional(currentLevelValidator),
   targetLanguages: v.optional(v.array(v.string())),
   baseLanguages: v.optional(v.array(v.string())),
+  // The two sentence-form steps; copied onto courseSettings by
+  // `completeOnboarding`. The politeness step is skipped (left undefined)
+  // when no target language marks politeness (`courseAsksPoliteness`).
+  firstPersonForms: v.optional(firstPersonFormsValidator),
+  politenessLevels: v.optional(politenessLevelsValidator),
   // Survey answers.
   acquisitionSource: v.optional(v.string()),
   acquisitionSourceFreeText: v.optional(v.string()),
@@ -593,6 +610,27 @@ export default defineSchema({
     // Every row on a userCreated text, plus user-provided / curated-manual
     // rows anywhere. Are skipped by the sweep regardless of their stamp.
     translationVersion: v.optional(v.number()),
+    // Rendering variants. A row with `variantKey` set is a second rendering
+    // of the same (text, language) in a specific first-person gender and/or
+    // politeness form, `"<male|female|auto>|<formId|auto>"` as built by
+    // lib/preferenceResolution.ts (`textVariantKey`). Canonical rows, every
+    // row from before the feature included, have no key: absence is what
+    // makes them canonical, so nothing was migrated. Variants are ordinary
+    // rows to every walk (annotations, superseded revisions, cascades) and
+    // are never deleted because another rendering was requested. Point
+    // reads pin all four index columns through convex/db/translationReads.ts.
+    variantKey: v.optional(v.string()),
+    // True on a variant whose wording came out identical to the canonical
+    // row's. Stored so the ensure path stops re-requesting it; served as
+    // the canonical text with audio in the card's voice.
+    sameAsCanonical: v.optional(v.literal(true)),
+    // What the wording actually is, stamped by the rendering classifier
+    // (convex/lib/renderingClassifier.ts) after generation and by
+    // `backfillRenderedForms` on rows from before the feature. Drives the
+    // chips on the card and the "canonical already satisfies the
+    // preference" shortcut. Undefined = not classified yet (no chip).
+    renderedGender: v.optional(renderedGenderValidator),
+    renderedPoliteness: v.optional(renderedPolitenessValidator),
     // Superseded-revision fields. A version-bump regeneration that produced
     // a different wording while cards referenced the text AND the wording
     // had audio copies the old wording into a second row of THIS table with
@@ -655,6 +693,15 @@ export default defineSchema({
       'targetLanguage',
       'supersededAt',
     ])
+    // Successor of the index above with the rendering variant pinned:
+    // canonical reads use `.eq('variantKey', undefined)`. Declared staged
+    // (~300k rows: the build would otherwise block the deploy); the deploy
+    // that switches convex/db/translationReads.ts onto it removes the flag,
+    // and a later flagged deploy drops `by_text_language_supersededAt`.
+    .index('by_text_language_variant_supersededAt', {
+      fields: ['textId', 'targetLanguage', 'variantKey', 'supersededAt'],
+      staged: true,
+    })
     .index('by_audioAssetId', ['audioAssetId'])
     // Every LIVE row of a text (`.eq('supersededAt', undefined)`), for the
     // readers that list a text's translations without naming a language.
@@ -761,9 +808,24 @@ export default defineSchema({
     textId: v.id('texts'),
     language: v.string(), // Base language code (e.g., "en", "es", "de")
     assetId: v.id('audioAssets'),
+    // Rendering variant this pointer speaks, `"<male|female>|<formId|auto>"`
+    // (lib/preferenceResolution.ts `audioVariantKey`): the concrete voice
+    // and the politeness form of the wording. Absent = the canonical
+    // pointer, spoken in the text's coin-flipped voice. A card in a chosen
+    // voice on a language whose wording does not change reads an
+    // audio-only variant whose text is the canonical wording. Never
+    // deleted because another voice was requested.
+    variantKey: v.optional(v.string()),
   })
     .index('by_textId', ['textId'])
+    // Legacy two-column index, kept unqueried until a flagged deploy drops
+    // it (same rule as translations.by_text_and_language).
     .index('by_text_and_language', ['textId', 'language'])
+    // Staged for the same reason as translations' variant index.
+    .index('by_text_language_variant', {
+      fields: ['textId', 'language', 'variantKey'],
+      staged: true,
+    })
     // Reference counting for shared assets: an asset (and its blob) is deleted
     // only when no row points at it any more.
     .index('by_assetId', ['assetId']),
@@ -952,6 +1014,15 @@ export default defineSchema({
     // not user-created. Cleared when an edit forks the text into a
     // user-owned copy. Never indexed.
     accentLanguage: v.optional(v.string()),
+    // Set on curriculum cards created after the sentence-form settings
+    // shipped. Such a card is served the rendering the course's CURRENT
+    // `firstPersonForms` / `politenessLevels` resolve to
+    // (lib/preferenceResolution.ts), so a later settings change re-renders
+    // it. Cards without the field (from before, or created from a
+    // user-written text) read the canonical rows for good. Never
+    // backfilled, never indexed. Cleared when an edit forks the text into a
+    // user-owned copy.
+    followsCoursePreferences: v.optional(v.literal(true)),
   })
     // INDEX BUDGET — read before adding an index here. This table carries 23
     // database indexes (limit 32) and EVERY card write pays for updating all
@@ -1670,7 +1741,12 @@ export default defineSchema({
     // background-held claim over to interactive demand instead of making a
     // visible card wait out the warm pool's patient backoff.
     priority: v.optional(ttsPriorityValidator),
-  }).index('by_text_and_language', ['textId', 'language']),
+    // Rendering variant the claimed job produces (audioVariantKey); absent
+    // = canonical. Two learners with the same preference share one job.
+    variantKey: v.optional(v.string()),
+  })
+    .index('by_text_and_language', ['textId', 'language'])
+    .index('by_text_language_variant', ['textId', 'language', 'variantKey']),
 
   // Per-(textId, language) dedup claim. Atomically check-and-insert before
   // scheduling so two mutations can't enqueue the same translation twice.
@@ -1689,7 +1765,16 @@ export default defineSchema({
     // user wait out the warm pool's queue. Matters most during onboarding:
     // the warmup translates exactly the texts a new user hits first.
     priority: v.optional(llmPriorityValidator),
-  }).index('by_text_and_language', ['textId', 'targetLanguage']),
+    // Rendering variant the claimed job produces (textVariantKey); absent
+    // = canonical.
+    variantKey: v.optional(v.string()),
+  })
+    .index('by_text_and_language', ['textId', 'targetLanguage'])
+    .index('by_text_language_variant', [
+      'textId',
+      'targetLanguage',
+      'variantKey',
+    ]),
 
   // Daily per-language stats
   dailyLanguageStats: defineTable({

@@ -12,6 +12,7 @@ export type AiFeature =
   | 'translation'
   | 'translation_autofill'
   | 'sentence_metadata'
+  | 'rendering_classifier'
   | 'tts_synthesis'
   | 'tts_validation_judge'
   | 'word_timing_backfill'
@@ -33,6 +34,7 @@ const PIPELINE_FEATURES: ReadonlySet<AiFeature> = new Set([
   'translation',
   'machine_translation',
   'sentence_metadata',
+  'rendering_classifier',
   'tts_synthesis',
   'tts_validation_judge',
   'word_timing_backfill',

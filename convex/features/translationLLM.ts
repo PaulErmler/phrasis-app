@@ -187,7 +187,61 @@ export type TranslationPromptArgs = {
    * bearing, and feeding them in would only invite a re-translation.
    */
   accentRewrite?: AccentRewriteConfig;
+  /**
+   * Sentence-form settings (lib/preferenceResolution.ts). Set on rendering
+   * VARIANT jobs and on canonical jobs of a predicate-marking language
+   * whose text has no register metadata. `requestedGender` replaces the
+   * text's speaker gender in `<speaker_gender>`; `requestedForm` is one of
+   * the language's politeness forms (lib/languageForms.ts) and is emitted
+   * as `<register>` whether or not the sentence addresses someone, with the
+   * form's own instruction (`requestedFormInstruction`). Absent on every
+   * job from before the feature, so the prompt is unchanged for them.
+   */
+  requestedGender?: 'male' | 'female';
+  requestedForm?: { id: string; label: string; prompt: string };
+  /**
+   * Which phrasing the requested-form instruction uses: the app's own words
+   * or the terms of the linguistics literature (speech level, T-V
+   * distinction, speaker gender agreement). scripts/eval-adherence.ts
+   * compares the two; production leaves it unset (= 'product').
+   */
+  promptWording?: 'product' | 'literature';
 };
+
+/**
+ * The instruction lines for a requested politeness form and/or speaker
+ * gender, shared by the translation prompt and the best-of-N judge so the
+ * judge scores against exactly what was asked. Empty when nothing was
+ * requested.
+ */
+export function requestedFormInstruction(
+  args: Pick<
+    TranslationPromptArgs,
+    'requestedForm' | 'requestedGender' | 'promptWording'
+  >,
+): string[] {
+  const literature = args.promptWording === 'literature';
+  const lines: string[] = [];
+  if (args.requestedForm) {
+    const form = args.requestedForm;
+    const lead = literature
+      ? `Required speech level / address form (T-V distinction, honorific register): ${form.label}.`
+      : `Required politeness form: ${form.label}.`;
+    lines.push(
+      `${lead} ${form.prompt} This overrides the register rule above. Apply it to every sentence, including sentences that address nobody, wherever the language marks it. Only when the source is inherently register-locked (a direct quotation, slang, a fixed formal expression) stay faithful to the source instead.`,
+    );
+  }
+  if (args.requestedGender) {
+    const who = args.requestedGender === 'male' ? 'a man' : 'a woman';
+    const forms = args.requestedGender === 'male' ? 'masculine' : 'feminine';
+    lines.push(
+      literature
+        ? `Speaker gender agreement: every first-person form (verb, adjective, participle, pronoun, self-reference term) agrees with ${who} speaking. Use ${forms} first-person forms.`
+        : `The speaker is ${who}: use ${forms} first-person forms wherever the language marks them, and leave everything else unchanged.`,
+    );
+  }
+  return lines;
+}
 
 /**
  * The prompt for a light-touch accent rewrite. Everything in it is a
@@ -270,13 +324,20 @@ function sanitizeUntrustedForPrompt(raw: string): string {
  * candidates were generated under.
  */
 function buildContextLines(args: TranslationPromptArgs): string[] {
-  const speakerLine = `  <speaker_gender>${args.speakerGender ?? 'unspecified'}</speaker_gender>`;
+  const speakerLine = `  <speaker_gender>${args.requestedGender ?? args.speakerGender ?? 'unspecified'}</speaker_gender>`;
   const referentLine = `  <referent_gender>${args.referentGender}</referent_gender>`;
   const contextLines: string[] = [speakerLine, referentLine];
   if (args.addressesSomeone) {
     contextLines.push(
       `  <addressee_gender>${args.addresseeGender ?? 'unspecified'}</addressee_gender>`,
     );
+  }
+  // A requested form is a constraint on every sentence, so its tag is
+  // emitted whether or not the sentence addresses someone; the metadata
+  // register keeps the addressee gate it always had.
+  if (args.requestedForm) {
+    contextLines.push(`  <register>${args.requestedForm.id}</register>`);
+  } else if (args.addressesSomeone) {
     contextLines.push(`  <register>${args.formality ?? 'neutral'}</register>`);
   }
   return contextLines;
@@ -367,6 +428,7 @@ export function buildPrompt(args: TranslationPromptArgs): string {
     ``,
     `<instructions>`,
     PROMPT_B_INSTRUCTIONS,
+    ...requestedFormInstruction(args),
     `</instructions>`,
     ``,
     `<source>${args.text}</source>`,
@@ -397,6 +459,7 @@ export function buildJudgePrompt(
     ``,
     `<instructions>`,
     `Judge each candidate on: (1) accuracy and completeness of meaning, (2) natural, idiomatic ${plainName} as used in ${args.targetRegion} today, and (3) strict adherence to the context constraints — grammatical agreement with the given speaker/referent/addressee genders, and the requested register ('informal' and 'neutral' both mean the casual T-form; only 'formal' means the polite V-form or honorific). A candidate that violates the gender or register constraints, or uses archaic or unnatural phrasing, loses to one that satisfies them.`,
+    ...requestedFormInstruction(args),
     `</instructions>`,
     ``,
     `<source>${args.text}</source>`,

@@ -523,6 +523,31 @@ export const ADDRESSEE_NUMBER_VALUES = [
 const literalUnion = <T extends readonly string[]>(values: T) =>
   v.union(...values.map((value: T[number]) => v.literal(value)));
 
+// Sentence-form preferences (lib/languageForms.ts, lib/preferenceResolution.ts).
+// Stored on courseSettings and onboardingProgress; undefined = today's
+// canonical renderings. `politenessLevels` is a SET of global levels; the
+// UI never writes an empty array.
+export const FIRST_PERSON_FORMS_VALUES = ['masculine', 'feminine', 'both'] as const;
+export const POLITENESS_LEVEL_VALUES = ['casual', 'polite', 'formal'] as const;
+export const firstPersonFormsValidator = literalUnion(FIRST_PERSON_FORMS_VALUES);
+export const politenessLevelsValidator = v.array(
+  literalUnion(POLITENESS_LEVEL_VALUES),
+);
+// What a stored rendering actually is, stamped by the rendering classifier
+// (convex/lib/renderingClassifier.ts) on generation and by the backfill
+// migration on legacy rows. 'unmarked' = the wording carries no such form.
+export const RENDERED_GENDER_VALUES = ['masculine', 'feminine', 'unmarked'] as const;
+export const RENDERED_POLITENESS_VALUES = [
+  'casual',
+  'polite',
+  'formal',
+  'unmarked',
+] as const;
+export const renderedGenderValidator = literalUnion(RENDERED_GENDER_VALUES);
+export const renderedPolitenessValidator = literalUnion(
+  RENDERED_POLITENESS_VALUES,
+);
+
 export const proposedCardMetadataValidator = v.object({
   speakerGender: v.optional(literalUnion(SPEAKER_GENDER_VALUES)),
   register: v.optional(literalUnion(REGISTER_VALUES)),
