@@ -77,7 +77,10 @@ export const MAX_STT_BACKFILL_ATTEMPTS = 3;
  * rather than through the (text, language) pointer: the pointer may have
  * moved to a new asset, or the blob may belong to a superseded revision's
  * asset, and either way the timings belong to the asset still holding it.
- * A swapped blob finds nothing.
+ * A swapped blob finds nothing. `first()`, not `unique()`: a blob can be
+ * referenced by more than one asset row (`deleteStorageBlobIfUnreferenced`
+ * in convex/lib/audio.ts counts on it), and a throw here would skip
+ * `recordSttBackfillFailure`, so the attempt cap could never be reached.
  */
 export async function audioAssetByStorageId(
   ctx: QueryCtx | MutationCtx,
@@ -86,7 +89,7 @@ export async function audioAssetByStorageId(
   return ctx.db
     .query('audioAssets')
     .withIndex('by_storageId', (q) => q.eq('storageId', storageId))
-    .unique();
+    .first();
 }
 
 /** True once an asset has used up its STT backfill attempts. */
