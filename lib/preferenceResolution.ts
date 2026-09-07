@@ -27,6 +27,7 @@ import {
   type PolitenessLevel,
 } from './languageForms';
 import { resolveCardSpeakerGenders } from './voices';
+import { definitiveSpeakerGender } from './sentenceMetadataSource';
 
 export const FIRST_PERSON_FORMS = ['masculine', 'feminine', 'both'] as const;
 export type FirstPersonForms = (typeof FIRST_PERSON_FORMS)[number];
@@ -44,14 +45,29 @@ export type RenderingText = {
   addressesSomeone?: boolean;
   addresseeNumber?: string;
   userCreated: boolean;
+  /** See `texts.metadataSource`: when current, `speakerGender` is evidence. */
+  metadataSource?: string;
 };
 
 /**
  * The `cards` fields this module reads. `null` is a reader with no card
  * (collection preview, placement test): it sees what a card created now
- * would get.
+ * would get. The two overrides are the Flag dialog's per-card corrections
+ * (schema.ts); they outrank the settings and apply to any curriculum card.
  */
-export type RenderingCard = { followsCoursePreferences?: true } | null;
+export type RenderingCard = {
+  followsCoursePreferences?: true;
+  renderingGenderOverride?: 'male' | 'female';
+  renderingPolitenessOverride?: PolitenessLevel;
+} | null;
+
+/** Whether a card carries a per-card correction the sweep must render. */
+export function hasRenderingOverride(card: RenderingCard): boolean {
+  return (
+    card?.renderingGenderOverride !== undefined ||
+    card?.renderingPolitenessOverride !== undefined
+  );
+}
 
 /** The gender axis of a variant key. 'auto' = as the canonical rendering. */
 export type GenderAxis = 'masculine' | 'feminine' | 'auto';
@@ -125,17 +141,28 @@ export function resolveCardRendering(args: {
     canonicalVoiceGender,
     needsVoice: false,
   };
-  // Note on `text.speakerGender`: on a curriculum text it is the canonical
-  // coin flip written back by the sweep (`resolveCardSpeakerGenders`, case
-  // 3), never evidence about the sentence, so the setting applies. The one
-  // place it IS evidence, a user-written text stamped by the classifier,
-  // never reaches this line: such texts have no variants.
-  if (!cardFollowsPreferences(args.text, args.card)) return base;
+  if (args.text.userCreated) return base;
+  // Precedence: the sentence's own content, then the card's correction,
+  // then the course setting. `text.speakerGender` on a curriculum text is
+  // the coin flip the sweep wrote back (`resolveCardSpeakerGenders`, case
+  // 3) unless the row carries the current classifier's stamp
+  // (lib/sentenceMetadataSource.ts); only then is it evidence, and "We are
+  // brothers" is served in its own voice whatever the setting says.
+  // `canonicalVoiceGender` already is that voice: case 1 mirrors it.
+  if (definitiveSpeakerGender(args.text) !== null) return base;
+  const override = args.card?.renderingGenderOverride;
   const forms = args.settings.firstPersonForms;
-  if (forms !== 'masculine' && forms !== 'feminine') return base;
-  const voiceGender = forms === 'masculine' ? 'male' : 'female';
+  const voiceGender: 'male' | 'female' | undefined =
+    override ??
+    (cardFollowsPreferences(args.text, args.card) &&
+    (forms === 'masculine' || forms === 'feminine')
+      ? forms === 'masculine'
+        ? 'male'
+        : 'female'
+      : undefined);
+  if (voiceGender === undefined) return base;
   return {
-    gender: forms,
+    gender: voiceGender === 'male' ? 'masculine' : 'feminine',
     voiceGender,
     canonicalVoiceGender,
     needsVoice: voiceGender !== canonicalVoiceGender,
@@ -205,13 +232,21 @@ export function resolveLanguageRendering(args: {
     audioVariantKey: null,
     voiceGender: args.card.voiceGender,
   };
-  if (!cardFollowsPreferences(args.text, args.cardRow)) return canonical;
+  if (args.text.userCreated) return canonical;
   const [concrete] = concreteLanguageCodes(args.code);
-  let form = pickPolitenessForm(
-    concrete,
-    args.settings.politenessLevels,
-    args.textId,
-  );
+  // The card's own correction outranks the setting and needs no stamp; the
+  // setting applies only to a card that follows it. The gender axis arrived
+  // resolved in `args.card` under the same precedence.
+  const override = args.cardRow?.renderingPolitenessOverride;
+  let form = override
+    ? pickPolitenessForm(concrete, [override], args.textId)
+    : cardFollowsPreferences(args.text, args.cardRow)
+      ? pickPolitenessForm(
+          concrete,
+          args.settings.politenessLevels,
+          args.textId,
+        )
+      : null;
   // An address language renders a sentence without a "you" the same at
   // every level; the canonical row already is that rendering.
   if (form && !addressesSomeone(args.text) && isAddressLanguage(concrete)) {

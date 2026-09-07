@@ -14,14 +14,15 @@ const METADATA_SYSTEM_PROMPT = `You analyze a sentence and return strict linguis
 
 You will receive one or more renderings of the SAME sentence in different languages. Use cross-lingual signals. Gendered morphology in any one of the supplied translations fixes the sentence's gender, subject to GENDER SCOPE below. Treat the renderings as semantically identical: do not invent extra meaning that no rendering supports.
 
-Return ONLY a valid JSON object with EXACTLY these five keys and no others, no markdown, no explanation:
+Return ONLY a valid JSON object with EXACTLY these six keys and no others, no markdown, no explanation:
 
 {
   "register": "formal" | "informal" | "neutral",
   "addresseeNumber": "singular" | "plural" | "not_applicable",
   "speakerGender": "male" | "female" | "neutral",
   "addresseeGender": "male" | "female" | "neutral" | "not_applicable",
-  "addressesSomeone": true | false
+  "addressesSomeone": true | false,
+  "referentGender": "male" | "female" | "neutral"
 }
 
 FIELD DEFINITIONS:
@@ -35,11 +36,14 @@ FIELD DEFINITIONS:
   * Gendered self-reference: Japanese 僕/俺 vs あたし, Thai ผม vs ดิฉัน, Vietnamese anh vs chị as "I".
   * Kinship terms asymmetric by speaker gender. The term names a relative but reveals who is speaking: Korean 형/누나 = male speaker, 오빠/언니 = female speaker. Any-gender terms (Korean 동생) fix nothing.
   * A gendered noun predicated of the speaker: "I am X's father/husband/older brother" = male, "I am X's mother/wife/older sister" = female. German "Ich bin Ärztin" = female.
+  * A gendered noun predicated of a first-person PLURAL subject that includes the speaker: "We are brothers" = male, "We are sisters" = female, "We are both mothers" = female. The speaker is one of the people the noun describes. "We" plus a mixed or unisex noun ("We are friends", "We are siblings") fixes nothing.
   Otherwise "neutral". Do NOT guess from topic or stereotype.
 
 - addresseeGender: Same rule, but for the person being addressed. "not_applicable" if there is no addressee. "neutral" if there is an addressee but no rendering grammatically marks their gender.
 
 - addressesSomeone: Boolean. true if the sentence speaks to a 2nd-person addressee (imperatives, direct questions, vocatives, sentences containing "you"/"your", commands, requests, greetings). false otherwise (descriptive/narrative sentences like "It is raining.", "The Pacific Ocean is the largest body of water on Earth.", first-person statements with no second-person reference). When addressesSomeone is false, addresseeNumber should be "not_applicable" and addresseeGender should be "not_applicable".
+
+- referentGender: The gender of the main THIRD PARTY the sentence is about, when the sentence itself fixes it: a gendered kinship or role noun ("my sister", "her husband", "the actress", "the waiter"), a gendered pronoun ("he", "she", "him", "her"), a gendered name that is beyond doubt, or gendered morphology on that person in any rendering. "male" / "female" only then. "neutral" when there is no third party, when the noun is unisex ("my friend", "the doctor", "a teacher"), when the referent is the speaker or the addressee (those have their own fields), or when several referents differ in gender. Do NOT guess from stereotype: "The nurse smiled" is "neutral".
 
 GENDER SCOPE (speakerGender and addresseeGender only, never register): a marker counts only if it refers to THIS sentence's own speaker or addressee.
   * Inside a quotation the marking is the quoted person's, and their addressee's: "Ella dijo: «Estoy cansada»" and "Он спросил: «Ты устала?»" are both speakerGender "neutral". The marker applies only when the quoted person is the speaker ("Dije: «Estoy cansada»").

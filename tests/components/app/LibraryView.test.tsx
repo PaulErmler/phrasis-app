@@ -621,22 +621,22 @@ describe('LibraryView flag flow', () => {
 
     render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
 
-    // Confirm dialog isn't mounted until the action fires.
-    expect(
-      screen.queryByRole('button', { name: 'actions.flagConfirmConfirm' }),
-    ).not.toBeInTheDocument();
+    // The flag dialog isn't mounted until the action fires.
+    expect(screen.queryByTestId('flag-submit')).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId('flag-hola'));
-    // Confirm dialog appears with the localized buttons (next-intl stub
-    // returns the keys verbatim).
-    const confirmBtn = await screen.findByRole('button', {
-      name: 'actions.flagConfirmConfirm',
-    });
-    await user.click(confirmBtn);
+    // The dialog needs a reason before it submits.
+    const submit = await screen.findByTestId('flag-submit');
+    expect(submit).toBeDisabled();
+    await user.click(screen.getByTestId('flag-reason-wrong_translation'));
+    await user.click(submit);
 
-    expect(flagTranslationFn).toHaveBeenCalledWith({
-      cardId: 'c1',
-    });
+    expect(flagTranslationFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cardId: 'c1',
+        reasons: ['wrong_translation'],
+      }),
+    );
     // The flag flow no longer deletes the user's card. The new translation
     // lands in-place when the worker finishes, so the row stays visible.
     expect(deleteCardFn).not.toHaveBeenCalled();
@@ -653,9 +653,7 @@ describe('LibraryView flag flow', () => {
     render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
 
     await user.click(screen.getByTestId('flag-hola'));
-    await user.click(
-      screen.getByRole('button', { name: 'actions.flagConfirmCancel' }),
-    );
+    await user.click(await screen.findByTestId('flag-cancel'));
 
     expect(flagTranslationFn).not.toHaveBeenCalled();
     expect(deleteCardFn).not.toHaveBeenCalled();

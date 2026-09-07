@@ -17,6 +17,7 @@ import {
   SOURCE_VERBATIM_TRANSLATION_SOURCE,
   USER_PROVIDED_TRANSLATION_SOURCE,
 } from '../../../lib/translationProvenance';
+import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
 // The workpools are module-mocked globally (tests/convexTestSetup.ts):
 // `enqueueAction` is a vi.fn() resolving to unique fake workIds
 // ('test-tts-work-N'), so tests can assert the enqueue payload directly.
@@ -1721,6 +1722,10 @@ describe('features/decks', () => {
           collectionRank: 1,
           speakerGender: 'female',
           audioSpeakerGender: 'female',
+          // Complete content includes a current classifier verdict: an
+          // unclassified curriculum text is exactly what the sweep asks
+          // the sentence-metadata classifier for.
+          metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
           // Complete cards carry IPA now (part of hasMissingContent / the
           // scheduleMissingContent annotation sweep).
           ipaText: 'həlˈoʊ ðɛr',

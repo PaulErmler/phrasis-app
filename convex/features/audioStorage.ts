@@ -104,29 +104,28 @@ export async function storeAudioRecordingHandler(
     return null;
   }
 
-  const result = await upsertAudioAsset(
-    ctx,
-    // Cache language + accent from the voice (see `buildAudioAssetKey`): an
-    // `en_gb` job's clip lands as an `en` asset pinned to `en-GB`.
-    buildAudioAssetKey({
-      language: args.language,
-      voiceGender: args.voiceGender,
-      voiceName: args.voiceName,
-      regionVariant: args.regionVariant,
-      spokenText: args.spokenText,
-    }),
-    {
-      storageId: args.storageId,
-      voiceName: args.voiceName,
-      ttsProvider: args.ttsProvider,
-      ttsQuality: args.ttsQuality,
-      speed: args.speed,
-      wordTimings: args.wordTimings,
-      // Freshly synthesized audio is always produced under the language's
-      // CURRENT TTS setup, so stamp the current ttsVersion unconditionally.
-      ttsVersion: getCurrentTtsVersion(args.language),
-    },
-  );
+  // Cache language + accent from the voice (see `buildAudioAssetKey`): an
+  // `en_gb` job's clip lands as an `en` asset pinned to `en-GB`.
+  const key = buildAudioAssetKey({
+    language: args.language,
+    voiceGender: args.voiceGender,
+    voiceName: args.voiceName,
+    regionVariant: args.regionVariant,
+    spokenText: args.spokenText,
+  });
+  const result = await upsertAudioAsset(ctx, key, {
+    storageId: args.storageId,
+    voiceName: args.voiceName,
+    ttsProvider: args.ttsProvider,
+    ttsQuality: args.ttsQuality,
+    speed: args.speed,
+    wordTimings: args.wordTimings,
+    // Freshly synthesized audio is always produced under the language's
+    // CURRENT TTS setup, so stamp the current ttsVersion unconditionally.
+    // Resolved on the key's accent, the same way the staleness check reads
+    // it back (`getCurrentTtsVersion`).
+    ttsVersion: getCurrentTtsVersion(key.language, key.regionVariant),
+  });
   if (args.supersededTranslationId !== undefined) {
     // Audio for a superseded revision: never touch the live pointer. The
     // asset was found or recreated by key; make sure the revision points at

@@ -130,6 +130,13 @@ const sentenceMetadataValidator = v.object({
     v.literal('not_applicable'),
   ),
   addressesSomeone: v.boolean(),
+  // The third party's gender when the source fixes it; 'neutral' keeps the
+  // coin flip (convex/lib/sentenceMetadataShape.ts). Optional: the same
+  // shape travels back in as `createCustomText`'s metadata argument, and
+  // clients from before the field send five keys.
+  referentGender: v.optional(
+    v.union(v.literal('male'), v.literal('female'), v.literal('neutral')),
+  ),
 });
 
 export const autoFillTranslations = action({

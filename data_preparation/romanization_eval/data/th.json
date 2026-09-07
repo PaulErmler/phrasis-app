@@ -1,0 +1,3070 @@
+{
+  "language": "th",
+  "curatedAt": "2026-09-07",
+  "notes": "SOURCE. Every IPA string and romanization is copied verbatim from the English Wiktionary entry named in sourceUrl. Bulk harvesting used the kaikki.org machine-readable extraction of English Wiktionary (https://kaikki.org/dictionary/Thai/kaikki.org-dictionary-Thai.jsonl, downloaded 2026-09-07), which exposes the same data as sounds[].ipa. Nothing here was transcribed by hand. All 312 sourceUrl pages were confirmed to exist via the MediaWiki API. 15 rows drawn at random across three seeded rounds were re-fetched from the live pages and their IPA and Paiboon matched byte-for-byte, and every one of the 29 multi-reading and recovered rows was re-fetched in full, confirming all 59 IPA strings and all 59 Paiboon strings on the page itself. The RTGS re-harvest of 2026-09-07 read the 'Royal Institute' rows out of the same dump; 42 rows carrying 58 romanization strings, among them all six multi-reading rows whose readings stay distinct under RTGS, were re-fetched from the live pages and matched byte for byte.\n\nTONE NOTATION — READ BEFORE SCORING. Tone is marked with CHAO TONE LETTERS (˥˦˧˨˩) at the end of each syllable, because that is what Wiktionary's {{th-pron}} template emits. Wikipedia's Help:IPA/Thai describes the same five tones with DIACRITICS OVER THE VOWEL instead (māː, ná). The two notations are not interchangeable and nothing here was converted between them. The five tones appear in this file as: mid ˧, low ˨˩, falling ˥˩, high ˦˥, rising ˩˩˦; all five occur. A scorer that expects diacritic tone marking will mark every row wrong. Segmental symbols are all within the Help:IPA/Thai inventory.\n\nIPA CONVENTION. Broad/phonemic transcription. Enclosing slashes stripped. Syllables are separated by '.'. Unreleased final stops use the release-less diacritic (p̚ t̚ k̚) and diphthong offglides the inverted breve below (ua̯, ia̯, ɯa̯).\n\nROMANIZATION — RTGS, NOT PAIBOON. 'romanization' holds the Royal Thai General System of Transcription, the Royal Institute standard used on Thai road signs, copied verbatim from the 'Royal Institute' row of the same {{th-pron}} table that supplies the IPA. RTGS is what production emits (convex/lib/romanizationPrompt.ts), so it is what this file scores. All 312 rows and all 29 alternative readings had a Royal Institute form, so nothing is missing and no row carries a not-found marker. The Paiboon form that occupied this field until 2026-09-07 is kept in 'romanizationPaiboon', with 'romanizationPaiboonAlternatives' index-aligned to 'romanizationAlternatives'. Paiboon is REFERENCE ONLY. Never rename it to romanizationAcademic, romanizationStressed or romanizationSandhi: acceptedRomanizations() in scripts/eval-rom.ts reads those three as equally correct answers, and under RTGS a Paiboon answer is wrong, so accepting it would let a wrong engine score 100%.\n\nWHAT RTGS DISCARDS — READ BEFORE SCORING. RTGS is the 26 unmodified Latin letters and nothing else: no tone marks, no accents, no macrons, no doubled long vowels, no ɔ or ɛ. Every value here matches /^[a-z -]+$/, and a diacritic appearing in one is a harvesting bug rather than a variant. It records neither tone nor vowel length, so เขา, ขาว and ข้าว are all 'khao'. That collapse is the standard's own documented limitation and it costs the file discriminating power: 22 of the 28 multi-reading rows have every reading land on ONE identical RTGS string (เขา kǎo/káo both 'khao'), and the 209 word rows carry 208 distinct Paiboon forms but only 185 distinct RTGS forms. Tone and length are still recorded, in 'ipa' and in 'romanizationPaiboon'. An engine that reproduces them is producing Paiboon, and this file does not credit it for that.\n\nSYLLABLE HYPHENS. Wiktionary prints a hyphen at every syllable boundary inside a word — สวัสดี as 'sa-wat-di' — and 130 rows carry at least one. The published standard hyphenates only to break a real ambiguity, before a syllable that starts with a vowel and before 'ng' when the previous syllable ends in a vowel, and joins the rest ('sawatdi'). The source's hyphens are kept because a de-hyphenated string could no longer be re-checked against the page, and because on the phrase rows they are the only syllable boundaries there are: several sentence rows print as one unbroken chain ('khwam-pha-ya-yam-yu-thi-nai'), so stripping the hyphens would assert a word segmentation that no source states. This costs nothing on the headline scores. scripts/eval/lib/romanizationScoring.ts folds a hyphen to a space and also scores a fully joined comparison, taking the better of the two, so an engine answering 'sawatdi' scores 1.0 against 'sa-wat-di'. It does suppress the 'exact' column, which compares the normalized strings literally. Read 'rom' and 'base' for Thai; 'exact' there measures the separator convention, not the engine.\n\nWORD TIER (209 items). Ranked by corpus frequency, not by hand: the Thai Textbook Corpus (ttc_freq) first, then the Thai National Corpus (tnc_freq), both as shipped by PyThaiNLP (https://github.com/PyThaiNLP/pythainlp/blob/dev/pythainlp/corpus/). The top 180 frequency-ranked words surviving the filters below were kept, plus 29 further rows recovered from the same ranking down to rank 1300 (see MULTIPLE READINGS). Wiktionary's Appendix:Thai_Swadesh_list was used as a coverage cross-check.\n\nMULTIPLE READINGS. 28 rows carry more than one attested pronunciation: 27 with two readings and one (สระ) with three. The extra readings live in 'ipaAlternatives', 'romanizationAlternatives' and 'romanizationPaiboonAlternatives', all three positionally aligned — index 0 of one pairs with index 0 of the others — and all three exclude the reading already in 'ipa'/'romanization'/'romanizationPaiboon'. An RTGS alternative that is identical to its row's 'romanization' is kept rather than deduplicated, because dropping it would break that alignment; 22 of the 29 alternatives are such duplicates. The reading placed in 'ipa' is the one Wiktionary lists first, which is normally the everyday sense (เขา → kǎo 'he/she/they', not káo 'horn').\n\n  How the IPA-to-Paiboon pairing was established. Wiktionary emits the Paiboon rows and the IPA rows as two ordered blocks, so the Nth Paiboon belongs with the Nth IPA. That assumption was not taken on trust: it was checked mechanically over the whole dump by converting each Paiboon tone diacritic (none/grave/circumflex/acute/caron) to the Chao contour it implies and comparing it syllable by syllable with the IPA. 18,202 pairs agree and NONE disagree, so the alignment in this file is verified, not assumed. Vowel length is carried in the Paiboon as usual by doubling (kâao vs kâo). The Royal Institute rows form a third block of the same shape, and the 2026-09-07 re-harvest paired them the same way: within an entry the Nth Royal Institute row belongs with the Nth Paiboon row. The two blocks were the same length in every one of the 312 entries, and every gold Paiboon string resolved to exactly one Royal Institute string, with no entry offering two.\n\n  What does NOT count as an alternative reading. Wiktionary pages often carry a second 'pronunciation' that is not a reading of the ordinary word: a province initialism under a pos='name' entry (นม read nɔɔ-mɔɔ is the abbreviation of นครราชสีมา; จบ read jɔɔ-bɔɔ is จันทบุรี), a consonant letter name under pos='character', or a combining/prefix form marked by a trailing '.' in the IPA and '-' in the Paiboon. All three were excluded by provenance, because feeding them to a scorer that credits the closest matching reading would let a wrong transcription score as correct. นม is the clearest case: it was reported earlier as a dropped homograph, but once provenance is applied it has exactly one lexical reading (nom˧ 'milk'), so it is present here as an ordinary single-reading row.\n\nSENTENCE TIER (103 items) — THE SUPPLY IS EXHAUSTED AT THIS SIZE. Wiktionary has NO IPA on usage examples: its example sentences carry a romanization but no transcription, so running prose with an attributable transcription does not exist there. The tier is therefore drawn from Wiktionary headword entries whose part of speech is 'phrase', 'proverb', 'intj' or 'prep_phrase' — phrasebook expressions and full-clause proverbs, each carrying a complete IPA string generated over the whole expression. Exactly 117 such entries of three syllables or more had both an unambiguous pronunciation and a Paiboon romanization; 14 were dropped for cause (see exclusions below) and the remaining 103 are all here. 103 is where the attributable supply stopped, not a target that was hit. Reaching 100 meant accepting two compromises worth knowing about: (a) not every row is a full clause — multi-syllable set expressions and interjections (สวัสดี, ขอบพระคุณ, ราตรีสวัสดิ์) are included, which still test segmentation because Thai is written unspaced and a 3-syllable string with unwritten vowels is exactly where espeak-ng failed; (b) the tail includes ceremonial, archaic and rare-register items (ศุภมัสดุ, ถวายพระพร, สมฤดี) that a learner would not meet. Both are still correct gold — they are just not everyday Thai. If you want an everyday-only subset, cut to the ~60 shortest-gloss rows.\n\nWHAT WAS EXCLUDED AND WHY. (1) Homographs are NO LONGER dropped. Every word with more than one attested lexical reading now carries all of them (see MULTIPLE READINGS), so critical learner vocabulary is present rather than filtered out for being hard — ก็, เขา, ฉัน, หนึ่ง, ท่าน, เจ้า, ไหม, ข้าว, ค่ะ, ผิว, ภรรยา and สระ among them. Earlier revisions of this file excluded them. (2) Combining/prefix forms: Wiktionary lists compound-only readings with a trailing '.' in the IPA and a trailing '-' in the Paiboon (คุณ 'kun-ná-', น้ำ 'nám-'); these were discarded and the free-standing reading kept — they are not alternative readings of the free word. (3) Two rows were rejected as source defects, not curated out for taste: ลูกไม้หล่นไม่ไกลต้น, whose template output reads 'kajl˧' / 'gail' with a coda /l/ that Thai phonotactics does not permit (ไกล is /klaj/), and พูดไปก็ไลฟ์บอย, whose 'lajf˦˥' has a final /f/ for the English loan 'life'. (4) Obsolete/archaic entries, alternative forms, initialisms and abbreviations. (5) Vulgar and slang phrases (ไอ้สัตว์กูขำ and its two spelling variants, ไปโดนตัวไหนมา, วางถุงกาวลงก่อน, อมก, วัดเสมียน), the joke entry 'เจริญ porn', and the numeral LOL entries 555 / ๕๕๕. (6) Spacing-variant duplicates, and 3 of the 5 mechanical 'X-sám-gam-sát' proverb variants. (7) Anything not written in pure Thai script (word tier).\n\nREJECTED SOURCE. The OpenSubtitles-derived Thai frequency list (hermitdave/FrequencyWords) is unusable and was not used: it tokenizes on whitespace, which Thai does not use between words, so its top entries are mojibake fragments (เธ, เน) and untranslated English. Thai Wiktionary (th.wiktionary.org) was not mined either — mixing a second site's transcription conventions into one file would break the internal consistency the scorer depends on.",
+  "items": [
+    {
+      "tier": "word",
+      "text": "ที่",
+      "ipa": "tʰiː˥˩",
+      "romanization": "thi",
+      "romanizationPaiboon": "tîi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ที่"
+    },
+    {
+      "tier": "word",
+      "text": "จะ",
+      "ipa": "t͡ɕaʔ˨˩",
+      "romanization": "cha",
+      "romanizationPaiboon": "jà",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/จะ"
+    },
+    {
+      "tier": "word",
+      "text": "เป็น",
+      "ipa": "pen˧",
+      "romanization": "pen",
+      "romanizationPaiboon": "bpen",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เป็น"
+    },
+    {
+      "tier": "word",
+      "text": "ไป",
+      "ipa": "paj˧",
+      "romanization": "pai",
+      "romanizationPaiboon": "bpai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ไป"
+    },
+    {
+      "tier": "word",
+      "text": "ไม่",
+      "ipa": "maj˥˩",
+      "romanization": "mai",
+      "romanizationPaiboon": "mâi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ไม่"
+    },
+    {
+      "tier": "word",
+      "text": "มี",
+      "ipa": "miː˧",
+      "romanization": "mi",
+      "romanizationPaiboon": "mii",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/มี"
+    },
+    {
+      "tier": "word",
+      "text": "ได้",
+      "ipa": "daːj˥˩",
+      "romanization": "dai",
+      "romanizationPaiboon": "dâai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ได้"
+    },
+    {
+      "tier": "word",
+      "text": "ว่า",
+      "ipa": "waː˥˩",
+      "romanization": "wa",
+      "romanizationPaiboon": "wâa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ว่า"
+    },
+    {
+      "tier": "word",
+      "text": "ให้",
+      "ipa": "haj˥˩",
+      "romanization": "hai",
+      "romanizationPaiboon": "hâi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ให้"
+    },
+    {
+      "tier": "word",
+      "text": "มา",
+      "ipa": "maː˧",
+      "romanization": "ma",
+      "romanizationPaiboon": "maa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/มา"
+    },
+    {
+      "tier": "word",
+      "text": "ของ",
+      "ipa": "kʰɔːŋ˩˩˦",
+      "romanization": "khong",
+      "romanizationPaiboon": "kɔ̌ɔng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ของ"
+    },
+    {
+      "tier": "word",
+      "text": "ใน",
+      "ipa": "naj˧",
+      "romanization": "nai",
+      "romanizationPaiboon": "nai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ใน"
+    },
+    {
+      "tier": "word",
+      "text": "และ",
+      "ipa": "lɛʔ˦˥",
+      "romanization": "lae",
+      "romanizationPaiboon": "lɛ́",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/และ"
+    },
+    {
+      "tier": "word",
+      "text": "ความ",
+      "ipa": "kʰwaːm˧",
+      "romanization": "khwam",
+      "romanizationPaiboon": "kwaam",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ความ"
+    },
+    {
+      "tier": "word",
+      "text": "แล้ว",
+      "ipa": "lɛːw˦˥",
+      "romanization": "laeo",
+      "romanizationPaiboon": "lɛ́ɛo",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/แล้ว"
+    },
+    {
+      "tier": "word",
+      "text": "การ",
+      "ipa": "kaːn˧",
+      "romanization": "kan",
+      "romanizationPaiboon": "gaan",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/การ"
+    },
+    {
+      "tier": "word",
+      "text": "อยู่",
+      "ipa": "juː˨˩",
+      "romanization": "yu",
+      "romanizationPaiboon": "yùu",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อยู่"
+    },
+    {
+      "tier": "word",
+      "text": "คน",
+      "ipa": "kʰon˧",
+      "romanization": "khon",
+      "romanizationPaiboon": "kon",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/คน"
+    },
+    {
+      "tier": "word",
+      "text": "กัน",
+      "ipa": "kan˧",
+      "romanization": "kan",
+      "romanizationPaiboon": "gan",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/กัน"
+    },
+    {
+      "tier": "word",
+      "text": "แต่",
+      "ipa": "tɛː˨˩",
+      "romanization": "tae",
+      "romanizationPaiboon": "dtɛ̀ɛ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/แต่"
+    },
+    {
+      "tier": "word",
+      "text": "นั้น",
+      "ipa": "nan˦˥",
+      "romanization": "nan",
+      "romanizationPaiboon": "nán",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/นั้น"
+    },
+    {
+      "tier": "word",
+      "text": "กับ",
+      "ipa": "kap̚˨˩",
+      "romanization": "kap",
+      "romanizationPaiboon": "gàp",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/กับ"
+    },
+    {
+      "tier": "word",
+      "text": "นี้",
+      "ipa": "niː˦˥",
+      "romanization": "ni",
+      "romanizationPaiboon": "níi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/นี้"
+    },
+    {
+      "tier": "word",
+      "text": "ขึ้น",
+      "ipa": "kʰɯn˥˩",
+      "romanization": "khuen",
+      "romanizationPaiboon": "kʉ̂n",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ขึ้น"
+    },
+    {
+      "tier": "word",
+      "text": "ด้วย",
+      "ipa": "dua̯j˥˩",
+      "romanization": "duai",
+      "romanizationPaiboon": "dûai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ด้วย"
+    },
+    {
+      "tier": "word",
+      "text": "หรือ",
+      "ipa": "rɯː˩˩˦",
+      "romanization": "rue",
+      "romanizationPaiboon": "rʉ̌ʉ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/หรือ"
+    },
+    {
+      "tier": "word",
+      "text": "จึง",
+      "ipa": "t͡ɕɯŋ˧",
+      "romanization": "chueng",
+      "romanizationPaiboon": "jʉng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/จึง"
+    },
+    {
+      "tier": "word",
+      "text": "อย่าง",
+      "ipa": "jaːŋ˨˩",
+      "romanization": "yang",
+      "romanizationPaiboon": "yàang",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อย่าง"
+    },
+    {
+      "tier": "word",
+      "text": "เรา",
+      "ipa": "raw˧",
+      "romanization": "rao",
+      "romanizationPaiboon": "rao",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เรา"
+    },
+    {
+      "tier": "word",
+      "text": "ต้อง",
+      "ipa": "tɔŋ˥˩",
+      "romanization": "tong",
+      "romanizationPaiboon": "dtɔ̂ng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ต้อง"
+    },
+    {
+      "tier": "word",
+      "text": "ทำ",
+      "ipa": "tʰam˧",
+      "romanization": "tham",
+      "romanizationPaiboon": "tam",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ทำ"
+    },
+    {
+      "tier": "word",
+      "text": "คำ",
+      "ipa": "kʰam˧",
+      "romanization": "kham",
+      "romanizationPaiboon": "kam",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/คำ"
+    },
+    {
+      "tier": "word",
+      "text": "เห็น",
+      "ipa": "hen˩˩˦",
+      "romanization": "hen",
+      "romanizationPaiboon": "hěn",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เห็น"
+    },
+    {
+      "tier": "word",
+      "text": "ผู้",
+      "ipa": "pʰuː˥˩",
+      "romanization": "phu",
+      "romanizationPaiboon": "pûu",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ผู้"
+    },
+    {
+      "tier": "word",
+      "text": "เมื่อ",
+      "ipa": "mɯa̯˥˩",
+      "romanization": "muea",
+      "romanizationPaiboon": "mʉ̂ʉa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เมื่อ"
+    },
+    {
+      "tier": "word",
+      "text": "ใช้",
+      "ipa": "t͡ɕʰaj˦˥",
+      "romanization": "chai",
+      "romanizationPaiboon": "chái",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ใช้"
+    },
+    {
+      "tier": "word",
+      "text": "จาก",
+      "ipa": "t͡ɕaːk̚˨˩",
+      "romanization": "chak",
+      "romanizationPaiboon": "jàak",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/จาก"
+    },
+    {
+      "tier": "word",
+      "text": "แม่",
+      "ipa": "mɛː˥˩",
+      "romanization": "mae",
+      "romanizationPaiboon": "mɛ̂ɛ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/แม่"
+    },
+    {
+      "tier": "word",
+      "text": "ตัว",
+      "ipa": "tua̯˧",
+      "romanization": "tua",
+      "romanizationPaiboon": "dtuua",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ตัว"
+    },
+    {
+      "tier": "word",
+      "text": "มัน",
+      "ipa": "man˧",
+      "romanization": "man",
+      "romanizationPaiboon": "man",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/มัน"
+    },
+    {
+      "tier": "word",
+      "text": "ออก",
+      "ipa": "ʔɔːk̚˨˩",
+      "romanization": "ok",
+      "romanizationPaiboon": "ɔ̀ɔk",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ออก"
+    },
+    {
+      "tier": "word",
+      "text": "เข้า",
+      "ipa": "kʰaw˥˩",
+      "romanization": "khao",
+      "romanizationPaiboon": "kâo",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เข้า"
+    },
+    {
+      "tier": "word",
+      "text": "ตาม",
+      "ipa": "taːm˧",
+      "romanization": "tam",
+      "romanizationPaiboon": "dtaam",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ตาม"
+    },
+    {
+      "tier": "word",
+      "text": "ดี",
+      "ipa": "diː˧",
+      "romanization": "di",
+      "romanizationPaiboon": "dii",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ดี"
+    },
+    {
+      "tier": "word",
+      "text": "ยัง",
+      "ipa": "jaŋ˧",
+      "romanization": "yang",
+      "romanizationPaiboon": "yang",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ยัง"
+    },
+    {
+      "tier": "word",
+      "text": "เรื่อง",
+      "ipa": "rɯa̯ŋ˥˩",
+      "romanization": "rueang",
+      "romanizationPaiboon": "rʉ̂ʉang",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เรื่อง"
+    },
+    {
+      "tier": "word",
+      "text": "พูด",
+      "ipa": "pʰuːt̚˥˩",
+      "romanization": "phut",
+      "romanizationPaiboon": "pûut",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/พูด"
+    },
+    {
+      "tier": "word",
+      "text": "ไว้",
+      "ipa": "waj˦˥",
+      "romanization": "wai",
+      "romanizationPaiboon": "wái",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ไว้"
+    },
+    {
+      "tier": "word",
+      "text": "มาก",
+      "ipa": "maːk̚˥˩",
+      "romanization": "mak",
+      "romanizationPaiboon": "mâak",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/มาก"
+    },
+    {
+      "tier": "word",
+      "text": "ลูก",
+      "ipa": "luːk̚˥˩",
+      "romanization": "luk",
+      "romanizationPaiboon": "lûuk",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ลูก"
+    },
+    {
+      "tier": "word",
+      "text": "อีก",
+      "ipa": "ʔiːk̚˨˩",
+      "romanization": "ik",
+      "romanizationPaiboon": "ìik",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อีก"
+    },
+    {
+      "tier": "word",
+      "text": "ถึง",
+      "ipa": "tʰɯŋ˩˩˦",
+      "romanization": "thueng",
+      "romanizationPaiboon": "tʉ̌ng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ถึง"
+    },
+    {
+      "tier": "word",
+      "text": "เพราะ",
+      "ipa": "pʰrɔʔ˦˥",
+      "romanization": "phro",
+      "romanizationPaiboon": "prɔ́",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เพราะ"
+    },
+    {
+      "tier": "word",
+      "text": "ลง",
+      "ipa": "loŋ˧",
+      "romanization": "long",
+      "romanizationPaiboon": "long",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ลง"
+    },
+    {
+      "tier": "word",
+      "text": "เสียง",
+      "ipa": "sia̯ŋ˩˩˦",
+      "romanization": "siang",
+      "romanizationPaiboon": "sǐiang",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เสียง"
+    },
+    {
+      "tier": "word",
+      "text": "ซึ่ง",
+      "ipa": "sɯŋ˥˩",
+      "romanization": "sueng",
+      "romanizationPaiboon": "sʉ̂ng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ซึ่ง"
+    },
+    {
+      "tier": "word",
+      "text": "ดู",
+      "ipa": "duː˧",
+      "romanization": "du",
+      "romanizationPaiboon": "duu",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ดู"
+    },
+    {
+      "tier": "word",
+      "text": "รู้",
+      "ipa": "ruː˦˥",
+      "romanization": "ru",
+      "romanizationPaiboon": "rúu",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/รู้"
+    },
+    {
+      "tier": "word",
+      "text": "ถ้า",
+      "ipa": "tʰaː˥˩",
+      "romanization": "tha",
+      "romanizationPaiboon": "tâa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ถ้า"
+    },
+    {
+      "tier": "word",
+      "text": "ทั้ง",
+      "ipa": "tʰaŋ˦˥",
+      "romanization": "thang",
+      "romanizationPaiboon": "táng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ทั้ง"
+    },
+    {
+      "tier": "word",
+      "text": "เอา",
+      "ipa": "ʔaw˧",
+      "romanization": "ao",
+      "romanizationPaiboon": "ao",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เอา"
+    },
+    {
+      "tier": "word",
+      "text": "พระ",
+      "ipa": "pʰraʔ˦˥",
+      "romanization": "phra",
+      "romanizationPaiboon": "prá",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/พระ"
+    },
+    {
+      "tier": "word",
+      "text": "พ่อ",
+      "ipa": "pʰɔː˥˩",
+      "romanization": "pho",
+      "romanizationPaiboon": "pɔ̂ɔ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/พ่อ"
+    },
+    {
+      "tier": "word",
+      "text": "คิด",
+      "ipa": "kʰit̚˦˥",
+      "romanization": "khit",
+      "romanizationPaiboon": "kít",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/คิด"
+    },
+    {
+      "tier": "word",
+      "text": "บ้าน",
+      "ipa": "baːn˥˩",
+      "romanization": "ban",
+      "romanizationPaiboon": "bâan",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/บ้าน"
+    },
+    {
+      "tier": "word",
+      "text": "อะไร",
+      "ipa": "ʔa˨˩.raj˧",
+      "romanization": "a-rai",
+      "romanizationPaiboon": "à-rai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อะไร"
+    },
+    {
+      "tier": "word",
+      "text": "วัน",
+      "ipa": "wan˧",
+      "romanization": "wan",
+      "romanizationPaiboon": "wan",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/วัน"
+    },
+    {
+      "tier": "word",
+      "text": "ทาง",
+      "ipa": "tʰaːŋ˧",
+      "romanization": "thang",
+      "romanizationPaiboon": "taang",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ทาง"
+    },
+    {
+      "tier": "word",
+      "text": "คือ",
+      "ipa": "kʰɯː˧",
+      "romanization": "khue",
+      "romanizationPaiboon": "kʉʉ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/คือ"
+    },
+    {
+      "tier": "word",
+      "text": "หา",
+      "ipa": "haː˩˩˦",
+      "romanization": "ha",
+      "romanizationPaiboon": "hǎa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/หา"
+    },
+    {
+      "tier": "word",
+      "text": "บอก",
+      "ipa": "bɔːk̚˨˩",
+      "romanization": "bok",
+      "romanizationPaiboon": "bɔ̀ɔk",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/บอก"
+    },
+    {
+      "tier": "word",
+      "text": "ทุก",
+      "ipa": "tʰuk̚˦˥",
+      "romanization": "thuk",
+      "romanizationPaiboon": "túk",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ทุก"
+    },
+    {
+      "tier": "word",
+      "text": "เวลา",
+      "ipa": "weː˧.laː˧",
+      "romanization": "we-la",
+      "romanizationPaiboon": "wee-laa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เวลา"
+    },
+    {
+      "tier": "word",
+      "text": "อ่าน",
+      "ipa": "ʔaːn˨˩",
+      "romanization": "an",
+      "romanizationPaiboon": "àan",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อ่าน"
+    },
+    {
+      "tier": "word",
+      "text": "เช่น",
+      "ipa": "t͡ɕʰen˥˩",
+      "romanization": "chen",
+      "romanizationPaiboon": "chên",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เช่น"
+    },
+    {
+      "tier": "word",
+      "text": "สอง",
+      "ipa": "sɔːŋ˩˩˦",
+      "romanization": "song",
+      "romanizationPaiboon": "sɔ̌ɔng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สอง"
+    },
+    {
+      "tier": "word",
+      "text": "น้ำ",
+      "ipa": "naːm˦˥",
+      "romanization": "nam",
+      "romanizationPaiboon": "náam",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/น้ำ"
+    },
+    {
+      "tier": "word",
+      "text": "เพื่อ",
+      "ipa": "pʰɯa̯˥˩",
+      "romanization": "phuea",
+      "romanizationPaiboon": "pʉ̂ʉa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เพื่อ"
+    },
+    {
+      "tier": "word",
+      "text": "เลย",
+      "ipa": "lɤːj˧",
+      "romanization": "loei",
+      "romanizationPaiboon": "ləəi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เลย"
+    },
+    {
+      "tier": "word",
+      "text": "กิน",
+      "ipa": "kin˧",
+      "romanization": "kin",
+      "romanizationPaiboon": "gin",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/กิน"
+    },
+    {
+      "tier": "word",
+      "text": "ภาษา",
+      "ipa": "pʰaː˧.saː˩˩˦",
+      "romanization": "pha-sa",
+      "romanizationPaiboon": "paa-sǎa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ภาษา"
+    },
+    {
+      "tier": "word",
+      "text": "ผม",
+      "ipa": "pʰom˩˩˦",
+      "romanization": "phom",
+      "romanizationPaiboon": "pǒm",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ผม"
+    },
+    {
+      "tier": "word",
+      "text": "รับ",
+      "ipa": "rap̚˦˥",
+      "romanization": "rap",
+      "romanizationPaiboon": "ráp",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/รับ"
+    },
+    {
+      "tier": "word",
+      "text": "จน",
+      "ipa": "t͡ɕon˧",
+      "romanization": "chon",
+      "romanizationPaiboon": "jon",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/จน"
+    },
+    {
+      "tier": "word",
+      "text": "ช่วย",
+      "ipa": "t͡ɕʰua̯j˥˩",
+      "romanization": "chuai",
+      "romanizationPaiboon": "chûai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ช่วย"
+    },
+    {
+      "tier": "word",
+      "text": "โดย",
+      "ipa": "doːj˧",
+      "romanization": "doi",
+      "romanizationPaiboon": "dooi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/โดย"
+    },
+    {
+      "tier": "word",
+      "text": "เกิด",
+      "ipa": "kɤːt̚˨˩",
+      "romanization": "koet",
+      "romanizationPaiboon": "gə̀ət",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เกิด"
+    },
+    {
+      "tier": "word",
+      "text": "เสีย",
+      "ipa": "sia̯˩˩˦",
+      "romanization": "sia",
+      "romanizationPaiboon": "sǐia",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เสีย"
+    },
+    {
+      "tier": "word",
+      "text": "หน้า",
+      "ipa": "naː˥˩",
+      "romanization": "na",
+      "romanizationPaiboon": "nâa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/หน้า"
+    },
+    {
+      "tier": "word",
+      "text": "ทำให้",
+      "ipa": "tʰam˧.haj˥˩",
+      "romanization": "tham-hai",
+      "romanizationPaiboon": "tam-hâi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ทำให้"
+    },
+    {
+      "tier": "word",
+      "text": "กลับ",
+      "ipa": "klap̚˨˩",
+      "romanization": "klap",
+      "romanizationPaiboon": "glàp",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/กลับ"
+    },
+    {
+      "tier": "word",
+      "text": "อาจ",
+      "ipa": "ʔaːt̚˨˩",
+      "romanization": "at",
+      "romanizationPaiboon": "àat",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อาจ"
+    },
+    {
+      "tier": "word",
+      "text": "กว่า",
+      "ipa": "kwaː˨˩",
+      "romanization": "kwa",
+      "romanizationPaiboon": "gwàa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/กว่า"
+    },
+    {
+      "tier": "word",
+      "text": "เหมือน",
+      "ipa": "mɯa̯n˩˩˦",
+      "romanization": "muean",
+      "romanizationPaiboon": "mʉ̌ʉan",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เหมือน"
+    },
+    {
+      "tier": "word",
+      "text": "ฟัง",
+      "ipa": "faŋ˧",
+      "romanization": "fang",
+      "romanizationPaiboon": "fang",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ฟัง"
+    },
+    {
+      "tier": "word",
+      "text": "ข้าพเจ้า",
+      "ipa": "kʰaː˥˩.pʰa˦˥.t͡ɕaːw˥˩",
+      "romanization": "kha-pha-chao",
+      "romanizationPaiboon": "kâa-pá-jâao",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ข้าพเจ้า"
+    },
+    {
+      "tier": "word",
+      "text": "พอ",
+      "ipa": "pʰɔː˧",
+      "romanization": "pho",
+      "romanizationPaiboon": "pɔɔ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/พอ"
+    },
+    {
+      "tier": "word",
+      "text": "แก่",
+      "ipa": "kɛː˨˩",
+      "romanization": "kae",
+      "romanizationPaiboon": "gɛ̀ɛ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/แก่"
+    },
+    {
+      "tier": "word",
+      "text": "เธอ",
+      "ipa": "tʰɤː˧",
+      "romanization": "thoe",
+      "romanizationPaiboon": "təə",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เธอ"
+    },
+    {
+      "tier": "word",
+      "text": "ไทย",
+      "ipa": "tʰaj˧",
+      "romanization": "thai",
+      "romanizationPaiboon": "tai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ไทย"
+    },
+    {
+      "tier": "word",
+      "text": "คง",
+      "ipa": "kʰoŋ˧",
+      "romanization": "khong",
+      "romanizationPaiboon": "kong",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/คง"
+    },
+    {
+      "tier": "word",
+      "text": "เดิน",
+      "ipa": "dɤːn˧",
+      "romanization": "doen",
+      "romanizationPaiboon": "dəən",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เดิน"
+    },
+    {
+      "tier": "word",
+      "text": "เด็ก",
+      "ipa": "dek̚˨˩",
+      "romanization": "dek",
+      "romanizationPaiboon": "dèk",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เด็ก"
+    },
+    {
+      "tier": "word",
+      "text": "อัน",
+      "ipa": "ʔan˧",
+      "romanization": "an",
+      "romanizationPaiboon": "an",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อัน"
+    },
+    {
+      "tier": "word",
+      "text": "ใคร",
+      "ipa": "kʰraj˧",
+      "romanization": "khrai",
+      "romanizationPaiboon": "krai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ใคร"
+    },
+    {
+      "tier": "word",
+      "text": "เคย",
+      "ipa": "kʰɤːj˧",
+      "romanization": "khoei",
+      "romanizationPaiboon": "kəəi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เคย"
+    },
+    {
+      "tier": "word",
+      "text": "บ้าง",
+      "ipa": "baŋ˥˩",
+      "romanization": "bang",
+      "romanizationPaiboon": "bâng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/บ้าง"
+    },
+    {
+      "tier": "word",
+      "text": "งาน",
+      "ipa": "ŋaːn˧",
+      "romanization": "ngan",
+      "romanizationPaiboon": "ngaan",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/งาน"
+    },
+    {
+      "tier": "word",
+      "text": "นำ",
+      "ipa": "nam˧",
+      "romanization": "nam",
+      "romanizationPaiboon": "nam",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/นำ"
+    },
+    {
+      "tier": "word",
+      "text": "เมือง",
+      "ipa": "mɯa̯ŋ˧",
+      "romanization": "mueang",
+      "romanizationPaiboon": "mʉʉang",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เมือง"
+    },
+    {
+      "tier": "word",
+      "text": "ใจ",
+      "ipa": "t͡ɕaj˧",
+      "romanization": "chai",
+      "romanizationPaiboon": "jai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ใจ"
+    },
+    {
+      "tier": "word",
+      "text": "ถาม",
+      "ipa": "tʰaːm˩˩˦",
+      "romanization": "tham",
+      "romanizationPaiboon": "tǎam",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ถาม"
+    },
+    {
+      "tier": "word",
+      "text": "ควร",
+      "ipa": "kʰua̯n˧",
+      "romanization": "khuan",
+      "romanizationPaiboon": "kuuan",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ควร"
+    },
+    {
+      "tier": "word",
+      "text": "บาง",
+      "ipa": "baːŋ˧",
+      "romanization": "bang",
+      "romanizationPaiboon": "baang",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/บาง"
+    },
+    {
+      "tier": "word",
+      "text": "ทรง",
+      "ipa": "soŋ˧",
+      "romanization": "song",
+      "romanizationPaiboon": "song",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ทรง"
+    },
+    {
+      "tier": "word",
+      "text": "ครั้ง",
+      "ipa": "kʰraŋ˦˥",
+      "romanization": "khrang",
+      "romanizationPaiboon": "kráng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ครั้ง"
+    },
+    {
+      "tier": "word",
+      "text": "ใด",
+      "ipa": "daj˧",
+      "romanization": "dai",
+      "romanizationPaiboon": "dai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ใด"
+    },
+    {
+      "tier": "word",
+      "text": "พวก",
+      "ipa": "pʰua̯k̚˥˩",
+      "romanization": "phuak",
+      "romanizationPaiboon": "pûuak",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/พวก"
+    },
+    {
+      "tier": "word",
+      "text": "ใหญ่",
+      "ipa": "jaj˨˩",
+      "romanization": "yai",
+      "romanizationPaiboon": "yài",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ใหญ่"
+    },
+    {
+      "tier": "word",
+      "text": "ขอ",
+      "ipa": "kʰɔː˩˩˦",
+      "romanization": "kho",
+      "romanizationPaiboon": "kɔ̌ɔ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ขอ"
+    },
+    {
+      "tier": "word",
+      "text": "แสดง",
+      "ipa": "sa˨˩.dɛːŋ˧",
+      "romanization": "sa-daeng",
+      "romanizationPaiboon": "sà-dɛɛng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/แสดง"
+    },
+    {
+      "tier": "word",
+      "text": "หลาย",
+      "ipa": "laːj˩˩˦",
+      "romanization": "lai",
+      "romanizationPaiboon": "lǎai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/หลาย"
+    },
+    {
+      "tier": "word",
+      "text": "สี",
+      "ipa": "siː˩˩˦",
+      "romanization": "si",
+      "romanizationPaiboon": "sǐi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สี"
+    },
+    {
+      "tier": "word",
+      "text": "ถูก",
+      "ipa": "tʰuːk̚˨˩",
+      "romanization": "thuk",
+      "romanizationPaiboon": "tùuk",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ถูก"
+    },
+    {
+      "tier": "word",
+      "text": "ก่อน",
+      "ipa": "kɔːn˨˩",
+      "romanization": "kon",
+      "romanizationPaiboon": "gɔ̀ɔn",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ก่อน"
+    },
+    {
+      "tier": "word",
+      "text": "กำลัง",
+      "ipa": "kam˧.laŋ˧",
+      "romanization": "kam-lang",
+      "romanizationPaiboon": "gam-lang",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/กำลัง"
+    },
+    {
+      "tier": "word",
+      "text": "สิ่ง",
+      "ipa": "siŋ˨˩",
+      "romanization": "sing",
+      "romanizationPaiboon": "sìng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สิ่ง"
+    },
+    {
+      "tier": "word",
+      "text": "หนังสือ",
+      "ipa": "naŋ˩˩˦.sɯː˩˩˦",
+      "romanization": "nang-sue",
+      "romanizationPaiboon": "nǎng-sʉ̌ʉ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/หนังสือ"
+    },
+    {
+      "tier": "word",
+      "text": "พา",
+      "ipa": "pʰaː˧",
+      "romanization": "pha",
+      "romanizationPaiboon": "paa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/พา"
+    },
+    {
+      "tier": "word",
+      "text": "เขียน",
+      "ipa": "kʰia̯n˩˩˦",
+      "romanization": "khian",
+      "romanizationPaiboon": "kǐian",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เขียน"
+    },
+    {
+      "tier": "word",
+      "text": "ส่วน",
+      "ipa": "sua̯n˨˩",
+      "romanization": "suan",
+      "romanizationPaiboon": "sùuan",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ส่วน"
+    },
+    {
+      "tier": "word",
+      "text": "เล่า",
+      "ipa": "law˥˩",
+      "romanization": "lao",
+      "romanizationPaiboon": "lâo",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เล่า"
+    },
+    {
+      "tier": "word",
+      "text": "ต่อ",
+      "ipa": "tɔː˨˩",
+      "romanization": "to",
+      "romanizationPaiboon": "dtɔ̀ɔ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ต่อ"
+    },
+    {
+      "tier": "word",
+      "text": "อื่น",
+      "ipa": "ʔɯːn˨˩",
+      "romanization": "uen",
+      "romanizationPaiboon": "ʉ̀ʉn",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อื่น"
+    },
+    {
+      "tier": "word",
+      "text": "ตน",
+      "ipa": "ton˧",
+      "romanization": "ton",
+      "romanizationPaiboon": "dton",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ตน"
+    },
+    {
+      "tier": "word",
+      "text": "นั่ง",
+      "ipa": "naŋ˥˩",
+      "romanization": "nang",
+      "romanizationPaiboon": "nâng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/นั่ง"
+    },
+    {
+      "tier": "word",
+      "text": "บน",
+      "ipa": "bon˧",
+      "romanization": "bon",
+      "romanizationPaiboon": "bon",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/บน"
+    },
+    {
+      "tier": "word",
+      "text": "นี่",
+      "ipa": "niː˥˩",
+      "romanization": "ni",
+      "romanizationPaiboon": "nîi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/นี่"
+    },
+    {
+      "tier": "word",
+      "text": "เอง",
+      "ipa": "ʔeːŋ˧",
+      "romanization": "eng",
+      "romanizationPaiboon": "eeng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เอง"
+    },
+    {
+      "tier": "word",
+      "text": "กล่าว",
+      "ipa": "klaːw˨˩",
+      "romanization": "klao",
+      "romanizationPaiboon": "glàao",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/กล่าว"
+    },
+    {
+      "tier": "word",
+      "text": "อาหาร",
+      "ipa": "ʔaː˧.haːn˩˩˦",
+      "romanization": "a-han",
+      "romanizationPaiboon": "aa-hǎan",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อาหาร"
+    },
+    {
+      "tier": "word",
+      "text": "รู้สึก",
+      "ipa": "ruː˦˥.sɯk̚˨˩",
+      "romanization": "ru-suek",
+      "romanizationPaiboon": "rúu-sʉ̀k",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/รู้สึก"
+    },
+    {
+      "tier": "word",
+      "text": "รัก",
+      "ipa": "rak̚˦˥",
+      "romanization": "rak",
+      "romanizationPaiboon": "rák",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/รัก"
+    },
+    {
+      "tier": "word",
+      "text": "นก",
+      "ipa": "nok̚˦˥",
+      "romanization": "nok",
+      "romanizationPaiboon": "nók",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/นก"
+    },
+    {
+      "tier": "word",
+      "text": "นะ",
+      "ipa": "naʔ˦˥",
+      "romanization": "na",
+      "romanizationPaiboon": "ná",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/นะ"
+    },
+    {
+      "tier": "word",
+      "text": "เล่น",
+      "ipa": "len˥˩",
+      "romanization": "len",
+      "romanizationPaiboon": "lên",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เล่น"
+    },
+    {
+      "tier": "word",
+      "text": "เรียน",
+      "ipa": "ria̯n˧",
+      "romanization": "rian",
+      "romanizationPaiboon": "riian",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เรียน"
+    },
+    {
+      "tier": "word",
+      "text": "อย่างไร",
+      "ipa": "jaːŋ˨˩.raj˧",
+      "romanization": "yang-rai",
+      "romanizationPaiboon": "yàang-rai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อย่างไร"
+    },
+    {
+      "tier": "word",
+      "text": "ตอบ",
+      "ipa": "tɔːp̚˨˩",
+      "romanization": "top",
+      "romanizationPaiboon": "dtɔ̀ɔp",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ตอบ"
+    },
+    {
+      "tier": "word",
+      "text": "ชอบ",
+      "ipa": "t͡ɕʰɔːp̚˥˩",
+      "romanization": "chop",
+      "romanizationPaiboon": "chɔ̂ɔp",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ชอบ"
+    },
+    {
+      "tier": "word",
+      "text": "อยาก",
+      "ipa": "jaːk̚˨˩",
+      "romanization": "yak",
+      "romanizationPaiboon": "yàak",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อยาก"
+    },
+    {
+      "tier": "word",
+      "text": "นักเรียน",
+      "ipa": "nak̚˦˥.ria̯n˧",
+      "romanization": "nak-rian",
+      "romanizationPaiboon": "nák-riian",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/นักเรียน"
+    },
+    {
+      "tier": "word",
+      "text": "ร้อง",
+      "ipa": "rɔːŋ˦˥",
+      "romanization": "rong",
+      "romanizationPaiboon": "rɔ́ɔng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ร้อง"
+    },
+    {
+      "tier": "word",
+      "text": "น่า",
+      "ipa": "naː˥˩",
+      "romanization": "na",
+      "romanizationPaiboon": "nâa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/น่า"
+    },
+    {
+      "tier": "word",
+      "text": "ต่อไป",
+      "ipa": "tɔː˨˩.paj˧",
+      "romanization": "to-pai",
+      "romanizationPaiboon": "dtɔ̀ɔ-bpai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ต่อไป"
+    },
+    {
+      "tier": "word",
+      "text": "นัก",
+      "ipa": "nak̚˦˥",
+      "romanization": "nak",
+      "romanizationPaiboon": "nák",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/นัก"
+    },
+    {
+      "tier": "word",
+      "text": "ชื่อ",
+      "ipa": "t͡ɕʰɯː˥˩",
+      "romanization": "chue",
+      "romanizationPaiboon": "chʉ̂ʉ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ชื่อ"
+    },
+    {
+      "tier": "word",
+      "text": "แห่ง",
+      "ipa": "hɛŋ˨˩",
+      "romanization": "haeng",
+      "romanizationPaiboon": "hɛ̀ng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/แห่ง"
+    },
+    {
+      "tier": "word",
+      "text": "จริง",
+      "ipa": "t͡ɕiŋ˧",
+      "romanization": "ching",
+      "romanizationPaiboon": "jing",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/จริง"
+    },
+    {
+      "tier": "word",
+      "text": "ชีวิต",
+      "ipa": "t͡ɕʰiː˧.wit̚˦˥",
+      "romanization": "chi-wit",
+      "romanizationPaiboon": "chii-wít",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ชีวิต"
+    },
+    {
+      "tier": "word",
+      "text": "น้อย",
+      "ipa": "nɔːj˦˥",
+      "romanization": "noi",
+      "romanizationPaiboon": "nɔ́ɔi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/น้อย"
+    },
+    {
+      "tier": "word",
+      "text": "สามารถ",
+      "ipa": "saː˩˩˦.maːt̚˥˩",
+      "romanization": "sa-mat",
+      "romanizationPaiboon": "sǎa-mâat",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สามารถ"
+    },
+    {
+      "tier": "word",
+      "text": "เข้าใจ",
+      "ipa": "kʰaw˥˩.t͡ɕaj˧",
+      "romanization": "khao-chai",
+      "romanizationPaiboon": "kâo-jai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เข้าใจ"
+    },
+    {
+      "tier": "word",
+      "text": "อย่า",
+      "ipa": "jaː˨˩",
+      "romanization": "ya",
+      "romanizationPaiboon": "yàa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อย่า"
+    },
+    {
+      "tier": "word",
+      "text": "ตา",
+      "ipa": "taː˧",
+      "romanization": "ta",
+      "romanizationPaiboon": "dtaa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ตา"
+    },
+    {
+      "tier": "word",
+      "text": "ข้า",
+      "ipa": "kʰaː˥˩",
+      "romanization": "kha",
+      "romanizationPaiboon": "kâa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ข้า"
+    },
+    {
+      "tier": "word",
+      "text": "ต้น",
+      "ipa": "ton˥˩",
+      "romanization": "ton",
+      "romanizationPaiboon": "dtôn",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ต้น"
+    },
+    {
+      "tier": "word",
+      "text": "ปี",
+      "ipa": "piː˧",
+      "romanization": "pi",
+      "romanizationPaiboon": "bpii",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ปี"
+    },
+    {
+      "tier": "word",
+      "text": "เรือ",
+      "ipa": "rɯa̯˧",
+      "romanization": "ruea",
+      "romanizationPaiboon": "rʉʉa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เรือ"
+    },
+    {
+      "tier": "word",
+      "text": "เดียว",
+      "ipa": "dia̯w˧",
+      "romanization": "diao",
+      "romanizationPaiboon": "diao",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เดียว"
+    },
+    {
+      "tier": "word",
+      "text": "แก",
+      "ipa": "kɛː˧",
+      "romanization": "kae",
+      "romanizationPaiboon": "gɛɛ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/แก"
+    },
+    {
+      "tier": "word",
+      "text": "สัตว์",
+      "ipa": "sat̚˨˩",
+      "romanization": "sat",
+      "romanizationPaiboon": "sàt",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สัตว์"
+    },
+    {
+      "tier": "word",
+      "text": "ต่าง",
+      "ipa": "taːŋ˨˩",
+      "romanization": "tang",
+      "romanizationPaiboon": "dtàang",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ต่าง"
+    },
+    {
+      "tier": "word",
+      "text": "คุณ",
+      "ipa": "kʰun˧",
+      "romanization": "khun",
+      "romanizationPaiboon": "kun",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/คุณ"
+    },
+    {
+      "tier": "word",
+      "text": "ป่า",
+      "ipa": "paː˨˩",
+      "romanization": "pa",
+      "romanizationPaiboon": "bpàa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ป่า"
+    },
+    {
+      "tier": "word",
+      "text": "ยิ่ง",
+      "ipa": "jiŋ˥˩",
+      "romanization": "ying",
+      "romanizationPaiboon": "yîng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ยิ่ง"
+    },
+    {
+      "tier": "word",
+      "text": "นาย",
+      "ipa": "naːj˧",
+      "romanization": "nai",
+      "romanizationPaiboon": "naai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/นาย"
+    },
+    {
+      "tier": "word",
+      "text": "ตาย",
+      "ipa": "taːj˧",
+      "romanization": "tai",
+      "romanizationPaiboon": "dtaai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ตาย"
+    },
+    {
+      "tier": "word",
+      "text": "สำคัญ",
+      "ipa": "sam˩˩˦.kʰan˧",
+      "romanization": "sam-khan",
+      "romanizationPaiboon": "sǎm-kan",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สำคัญ"
+    },
+    {
+      "tier": "word",
+      "text": "เพื่อน",
+      "ipa": "pʰɯa̯n˥˩",
+      "romanization": "phuean",
+      "romanizationPaiboon": "pʉ̂ʉan",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เพื่อน"
+    },
+    {
+      "tier": "sentence",
+      "text": "ฉันรักคุณ",
+      "ipa": "t͡ɕʰan˩˩˦.rak̚˦˥.kʰun˧",
+      "romanization": "chan rak khun",
+      "romanizationPaiboon": "chǎn rák kun",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ฉันรักคุณ"
+    },
+    {
+      "tier": "sentence",
+      "text": "ผมรักคุณ",
+      "ipa": "pʰom˩˩˦.rak̚˦˥.kʰun˧",
+      "romanization": "phom rak khun",
+      "romanizationPaiboon": "pǒm rák kun",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ผมรักคุณ"
+    },
+    {
+      "tier": "sentence",
+      "text": "คุณชื่ออะไรครับ",
+      "ipa": "kʰun˧.t͡ɕʰɯː˥˩.ʔa˨˩.raj˧.kʰrap̚˦˥",
+      "romanization": "khun chue a-rai khrap",
+      "romanizationPaiboon": "kun chʉ̂ʉ à-rai kráp",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/คุณชื่ออะไรครับ"
+    },
+    {
+      "tier": "sentence",
+      "text": "คุณชื่ออะไรคะ",
+      "ipa": "kʰun˧.t͡ɕʰɯː˥˩.ʔa˨˩.raj˧.kʰaʔ˦˥",
+      "romanization": "khun chue a-rai kha",
+      "romanizationPaiboon": "kun chʉ̂ʉ à-rai ká",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/คุณชื่ออะไรคะ"
+    },
+    {
+      "tier": "sentence",
+      "text": "สบายดีไหม",
+      "ipa": "sa˨˩.baːj˧.diː˧.maj˩˩˦",
+      "romanization": "sa-bai di mai",
+      "romanizationPaiboon": "sà-baai dii mǎi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สบายดีไหม"
+    },
+    {
+      "tier": "sentence",
+      "text": "รับบัตรเครดิตไหม",
+      "ipa": "rap̚˦˥.bat̚˨˩.kʰreː˧.dit̚˨˩.maj˩˩˦",
+      "romanization": "rap bat-khre-dit mai",
+      "romanizationPaiboon": "ráp bàt-kree-dìt mǎi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/รับบัตรเครดิตไหม"
+    },
+    {
+      "tier": "sentence",
+      "text": "กินให้อร่อย",
+      "ipa": "kin˧.haj˥˩.ʔa˨˩.rɔj˨˩",
+      "romanization": "kin hai a-roi",
+      "romanizationPaiboon": "gin hâi à-rɔ̀i",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/กินให้อร่อย"
+    },
+    {
+      "tier": "sentence",
+      "text": "ทานให้อร่อยนะ",
+      "ipa": "tʰaːn˧.haj˥˩.ʔa˨˩.rɔj˨˩.naʔ˦˥",
+      "romanization": "than hai a-roi na",
+      "romanizationPaiboon": "taan hâi à-rɔ̀i ná",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ทานให้อร่อยนะ"
+    },
+    {
+      "tier": "sentence",
+      "text": "ขอให้เดินทางโดยสวัสดิภาพ",
+      "ipa": "kʰɔː˩˩˦.haj˥˩.dɤːn˧.tʰaːŋ˧.doːj˧.sa˨˩.wat̚˨˩.di˨˩.pʰaːp̚˥˩",
+      "romanization": "kho-hai doen-thang doi sa-wat-di-phap",
+      "romanizationPaiboon": "kɔ̌ɔ-hâi dəən-taang dooi sà-wàt-dì-pâap",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ขอให้เดินทางโดยสวัสดิภาพ"
+    },
+    {
+      "tier": "sentence",
+      "text": "ขอแสดงความนับถือ",
+      "ipa": "kʰɔː˩˩˦.sa˨˩.dɛːŋ˧.kʰwaːm˧.nap̚˦˥.tʰɯː˩˩˦",
+      "romanization": "kho-sa-daeng-khwam-nap-thue",
+      "romanizationPaiboon": "kɔ̌ɔ-sà-dɛɛng-kwaam-náp-tʉ̌ʉ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ขอแสดงความนับถือ"
+    },
+    {
+      "tier": "sentence",
+      "text": "สุขสันต์วันเกิด",
+      "ipa": "suk̚˨˩.san˩˩˦.wan˧.kɤːt̚˨˩",
+      "romanization": "suk-san wan-koet",
+      "romanizationPaiboon": "sùk-sǎn wan-gə̀ət",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สุขสันต์วันเกิด"
+    },
+    {
+      "tier": "sentence",
+      "text": "สวัสดีปีใหม่",
+      "ipa": "sa˨˩.wat̚˨˩.diː˧.piː˧.maj˨˩",
+      "romanization": "sa-wat-di pi mai",
+      "romanizationPaiboon": "sà-wàt-dii bpii mài",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สวัสดีปีใหม่"
+    },
+    {
+      "tier": "sentence",
+      "text": "สวัสดีตอนเช้า",
+      "ipa": "sa˨˩.wat̚˨˩.diː˧.tɔːn˧.t͡ɕʰaːw˦˥",
+      "romanization": "sa-wat-di ton-chao",
+      "romanizationPaiboon": "sà-wàt-dii dtɔɔn-cháao",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สวัสดีตอนเช้า"
+    },
+    {
+      "tier": "sentence",
+      "text": "สวัสดีตอนเย็น",
+      "ipa": "sa˨˩.wat̚˨˩.diː˧.tɔːn˧.jen˧",
+      "romanization": "sa-wat-di ton-yen",
+      "romanizationPaiboon": "sà-wàt-dii dtɔɔn-yen",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สวัสดีตอนเย็น"
+    },
+    {
+      "tier": "sentence",
+      "text": "ห้ามสูบบุหรี่",
+      "ipa": "haːm˥˩.suːp̚˨˩.bu˨˩.riː˨˩",
+      "romanization": "ham sup-bu-ri",
+      "romanizationPaiboon": "hâam sùup-bù-rìi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ห้ามสูบบุหรี่"
+    },
+    {
+      "tier": "sentence",
+      "text": "ห้ามเข้า",
+      "ipa": "haːm˥˩.kʰaw˥˩",
+      "romanization": "ham-khao",
+      "romanizationPaiboon": "hâam-kâo",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ห้ามเข้า"
+    },
+    {
+      "tier": "sentence",
+      "text": "ปลอดภัยไว้ก่อน",
+      "ipa": "plɔːt̚˨˩.pʰaj˧.waj˦˥.kɔːn˨˩",
+      "romanization": "plot-phai-wai-kon",
+      "romanizationPaiboon": "bplɔ̀ɔt-pai-wái-gɔ̀ɔn",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ปลอดภัยไว้ก่อน"
+    },
+    {
+      "tier": "sentence",
+      "text": "ด้วยความยินดี",
+      "ipa": "dua̯j˥˩.kʰwaːm˧.jin˧.diː˧",
+      "romanization": "duai-khwam-yin-di",
+      "romanizationPaiboon": "dûai-kwaam-yin-dii",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ด้วยความยินดี"
+    },
+    {
+      "tier": "sentence",
+      "text": "น่าเสียดาย",
+      "ipa": "naː˥˩.sia̯˩˩˦.daːj˧",
+      "romanization": "na-sia-dai",
+      "romanizationPaiboon": "nâa-sǐia-daai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/น่าเสียดาย"
+    },
+    {
+      "tier": "sentence",
+      "text": "ไว้เจอกันใหม่",
+      "ipa": "waj˦˥.t͡ɕɤː˧.kan˧.maj˨˩",
+      "romanization": "wai-choe-kan-mai",
+      "romanizationPaiboon": "wái-jəə-gan-mài",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ไว้เจอกันใหม่"
+    },
+    {
+      "tier": "sentence",
+      "text": "อย่าตัดสินคนจากภายนอก",
+      "ipa": "jaː˨˩.tat̚˨˩.sin˩˩˦.kʰon˧.t͡ɕaːk̚˨˩.pʰaːj˧.nɔːk̚˥˩",
+      "romanization": "ya-tat-sin-khon-chak-phai-nok",
+      "romanizationPaiboon": "yàa-dtàt-sǐn-kon-jàak-paai-nɔ̂ɔk",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อย่าตัดสินคนจากภายนอก"
+    },
+    {
+      "tier": "sentence",
+      "text": "โปรดติดตามตอนต่อไป",
+      "ipa": "proːt̚˨˩.tit̚˨˩.taːm˧.tɔːn˧.tɔː˨˩.paj˧",
+      "romanization": "prot-tit-tam-ton-to-pai",
+      "romanizationPaiboon": "bpròot-dtìt-dtaam-dtɔɔn-dtɔ̀ɔ-bpai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/โปรดติดตามตอนต่อไป"
+    },
+    {
+      "tier": "sentence",
+      "text": "ใครขายไข่ไก่",
+      "ipa": "kʰraj˧.kʰaːj˩˩˦.kʰaj˨˩.kaj˨˩",
+      "romanization": "khrai-khai-khai-kai",
+      "romanizationPaiboon": "krai-kǎai-kài-gài",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ใครขายไข่ไก่"
+    },
+    {
+      "tier": "sentence",
+      "text": "งูกินหนูจนงูงงงวย",
+      "ipa": "ŋuː˧.kin˧.nuː˩˩˦.t͡ɕon˧.ŋuː˧.ŋoŋ˧.ŋua̯j˧",
+      "romanization": "ngu kin nu chon ngu ngong-nguai",
+      "romanizationPaiboon": "nguu gin nǔu jon nguu ngong-nguai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/งูกินหนูจนงูงงงวย"
+    },
+    {
+      "tier": "sentence",
+      "text": "กองทัพเดินด้วยท้อง",
+      "ipa": "kɔːŋ˧.tʰap̚˦˥.dɤːn˧.dua̯j˥˩.tʰɔːŋ˦˥",
+      "romanization": "kong-thap-doen-duai-thong",
+      "romanizationPaiboon": "gɔɔng-táp-dəən-dûai-tɔ́ɔng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/กองทัพเดินด้วยท้อง"
+    },
+    {
+      "tier": "sentence",
+      "text": "ความพยายามอยู่ที่ไหน ความสำเร็จอยู่ที่นั่น",
+      "ipa": "kʰwaːm˧.pʰa˦˥.jaː˧.jaːm˧.juː˨˩.tʰiː˥˩.naj˩˩˦.kʰwaːm˧.sam˩˩˦.ret̚˦˥.juː˨˩.tʰiː˥˩.nan˥˩",
+      "romanization": "khwam-pha-ya-yam-yu-thi-nai khwam-sam-ret-yu-thi-nan",
+      "romanizationPaiboon": "kwaam-pá-yaa-yaam-yùu-tîi-nǎi kwaam-sǎm-rét-yùu-tîi-nân",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ความพยายามอยู่ที่ไหน_ความสำเร็จอยู่ที่นั่น"
+    },
+    {
+      "tier": "sentence",
+      "text": "สิบปากว่าไม่เท่าตาเห็น",
+      "ipa": "sip̚˨˩.paːk̚˨˩.waː˥˩.maj˥˩.tʰaw˥˩.taː˧.hen˩˩˦",
+      "romanization": "sip-pak-wa-mai-thao-ta-hen",
+      "romanizationPaiboon": "sìp-bpàak-wâa-mâi-tâo-dtaa-hěn",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สิบปากว่าไม่เท่าตาเห็น"
+    },
+    {
+      "tier": "sentence",
+      "text": "ปากกาคมกว่าดาบ",
+      "ipa": "paːk̚˨˩.kaː˧.kʰom˧.kwaː˨˩.daːp̚˨˩",
+      "romanization": "pak-ka-khom-kwa-dap",
+      "romanizationPaiboon": "bpàak-gaa-kom-gwàa-dàap",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ปากกาคมกว่าดาบ"
+    },
+    {
+      "tier": "sentence",
+      "text": "คนในอยากออก คนนอกอยากเข้า",
+      "ipa": "kʰon˧.naj˧.jaːk̚˨˩.ʔɔːk̚˨˩.kʰon˧.nɔːk̚˥˩.jaːk̚˨˩.kʰaw˥˩",
+      "romanization": "khon-nai-yak-ok khon-nok-yak-khao",
+      "romanizationPaiboon": "kon-nai-yàak-ɔ̀ɔk kon-nɔ̂ɔk-yàak-kâo",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/คนในอยากออก_คนนอกอยากเข้า"
+    },
+    {
+      "tier": "sentence",
+      "text": "ตีเหล็กเมื่อแดง กินแกงเมื่อร้อน",
+      "ipa": "tiː˧.lek̚˨˩.mɯa̯˥˩.dɛːŋ˧.kin˧.kɛːŋ˧.mɯa̯˥˩.rɔːn˦˥",
+      "romanization": "ti-lek-muea-daeng-kin-kaeng-muea-ron",
+      "romanizationPaiboon": "dtii-lèk-mʉ̂ʉa-dɛɛng-gin-gɛɛng-mʉ̂ʉa-rɔ́ɔn",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ตีเหล็กเมื่อแดง_กินแกงเมื่อร้อน"
+    },
+    {
+      "tier": "sentence",
+      "text": "ดูช้างให้ดูหาง ดูนางให้ดูแม่",
+      "ipa": "duː˧.t͡ɕʰaːŋ˦˥.haj˥˩.duː˧.haːŋ˩˩˦.duː˧.naːŋ˧.haj˥˩.duː˧.mɛː˥˩",
+      "romanization": "du-chang-hai-du-hang du-nang-hai-du-mae",
+      "romanizationPaiboon": "duu-cháang-hâi-duu-hǎang duu-naang-hâi-duu-mɛ̂ɛ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ดูช้างให้ดูหาง_ดูนางให้ดูแม่"
+    },
+    {
+      "tier": "sentence",
+      "text": "สี่ตีนยังรู้พลาด นักปราชญ์ยังรู้พลั้ง",
+      "ipa": "siː˨˩.tiːn˧.jaŋ˧.ruː˦˥.pʰlaːt̚˥˩.nak̚˦˥.praːt̚˨˩.jaŋ˧.ruː˦˥.pʰlaŋ˦˥",
+      "romanization": "si-tin-yang-ru-phlat-nak-prat-yang-ru-phlang",
+      "romanizationPaiboon": "sìi-dtiin-yang-rúu-plâat-nák-bpràat-yang-rúu-pláng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สี่ตีนยังรู้พลาด_นักปราชญ์ยังรู้พลั้ง"
+    },
+    {
+      "tier": "sentence",
+      "text": "ไก่งามเพราะขน คนงามเพราะแต่ง",
+      "ipa": "kaj˨˩.ŋaːm˧.pʰrɔʔ˦˥.kʰon˩˩˦.kʰon˧.ŋaːm˧.pʰrɔʔ˦˥.tɛŋ˨˩",
+      "romanization": "kai-ngam-phro-khon khon-ngam-phro-taeng",
+      "romanizationPaiboon": "gài-ngaam-prɔ́-kǒn kon-ngaam-prɔ́-dtɛ̀ng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ไก่งามเพราะขน_คนงามเพราะแต่ง"
+    },
+    {
+      "tier": "sentence",
+      "text": "เสือสองตัวอยู่ถ้ำเดียวกันไม่ได้",
+      "ipa": "sɯa̯˩˩˦.sɔːŋ˩˩˦.tua̯˧.juː˨˩.tʰam˥˩.dia̯w˧.kan˧.maj˥˩.daj˥˩",
+      "romanization": "suea song tua yu tham diao-kan mai-dai",
+      "romanizationPaiboon": "sʉ̌ʉa sɔ̌ɔng dtuua yùu tâm diao-gan mâi-dâi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เสือสองตัวอยู่ถ้ำเดียวกันไม่ได้"
+    },
+    {
+      "tier": "sentence",
+      "text": "คารมเป็นต่อ รูปหล่อเป็นรอง",
+      "ipa": "kʰaː˧.rom˧.pen˧.tɔː˨˩.ruːp̚˥˩.lɔː˨˩.pen˧.rɔːŋ˧",
+      "romanization": "kha-rom-pen-to rup-lo-pen-rong",
+      "romanizationPaiboon": "kaa-rom-bpen-dtɔ̀ɔ rûup-lɔ̀ɔ-bpen-rɔɔng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/คารมเป็นต่อ_รูปหล่อเป็นรอง"
+    },
+    {
+      "tier": "sentence",
+      "text": "สามีเป็นช้างเท้าหน้า ภรรยาเป็นช้างเท้าหลัง",
+      "ipa": "saː˩˩˦.miː˧.pen˧.t͡ɕʰaːŋ˦˥.tʰaːw˦˥.naː˥˩.pʰan˧.ra˦˥.jaː˧.pen˧.t͡ɕʰaːŋ˦˥.tʰaːw˦˥.laŋ˩˩˦",
+      "romanization": "sa-mi-pen-chang-thao-na-phan-ra-ya-pen-chang-thao-lang",
+      "romanizationPaiboon": "sǎa-mii-bpen-cháang-táao-nâa-pan-rá-yaa-bpen-cháang-táao-lǎng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สามีเป็นช้างเท้าหน้า_ภรรยาเป็นช้างเท้าหลัง"
+    },
+    {
+      "tier": "sentence",
+      "text": "สำเนียงส่อภาษา กิริยาส่อสกุล",
+      "ipa": "sam˩˩˦.nia̯ŋ˧.sɔː˨˩.pʰaː˧.saː˩˩˦.ki˨˩.ri˦˥.jaː˧.sɔː˨˩.sa˨˩.kun˧",
+      "romanization": "sam-niang-so-pha-sa ki-ri-ya-so-sa-kun",
+      "romanizationPaiboon": "sǎm-niiang-sɔ̀ɔ-paa-sǎa gì-rí-yaa-sɔ̀ɔ-sà-gun",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สำเนียงส่อภาษา_กิริยาส่อสกุล"
+    },
+    {
+      "tier": "sentence",
+      "text": "ความวัวไม่ทันหาย ความควายเข้ามาแทรก",
+      "ipa": "kʰwaːm˧.wua̯˧.maj˥˩.tʰan˧.haːj˩˩˦.kʰwaːm˧.kʰwaːj˧.kʰaw˥˩.maː˧.sɛːk̚˥˩",
+      "romanization": "khwam-wua-mai-than-hai-khwam-khwai-khao-ma-saek",
+      "romanizationPaiboon": "kwaam-wuua-mâi-tan-hǎai-kwaam-kwaai-kâo-maa-sɛ̂ɛk",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ความวัวไม่ทันหาย_ความควายเข้ามาแทรก"
+    },
+    {
+      "tier": "sentence",
+      "text": "หลังสู้ฟ้าหน้าสู้ดิน",
+      "ipa": "laŋ˩˩˦.suː˥˩.faː˦˥.naː˥˩.suː˥˩.din˧",
+      "romanization": "lang-su-fa-na-su-din",
+      "romanizationPaiboon": "lǎng-sûu-fáa-nâa-sûu-din",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/หลังสู้ฟ้าหน้าสู้ดิน"
+    },
+    {
+      "tier": "sentence",
+      "text": "ถือไม้เท้ายอดทอง กระบองยอดเพชร",
+      "ipa": "tʰɯː˩˩˦.maːj˦˥.tʰaːw˦˥.jɔːt̚˥˩.tʰɔːŋ˧.kra˨˩.bɔːŋ˧.jɔːt̚˥˩.pʰet̚˦˥",
+      "romanization": "thue-mai-thao-yot-thong-kra-bong-yot-phet",
+      "romanizationPaiboon": "tʉ̌ʉ-máai-táao-yɔ̂ɔt-tɔɔng-grà-bɔɔng-yɔ̂ɔt-pét",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ถือไม้เท้ายอดทอง_กระบองยอดเพชร"
+    },
+    {
+      "tier": "sentence",
+      "text": "ช้างตายทั้งตัวเอาใบบัวมาปิด",
+      "ipa": "t͡ɕʰaːŋ˦˥.taːj˧.tʰaŋ˦˥.tua̯˧.ʔaw˧.baj˧.bua̯˧.maː˧.pit̚˨˩",
+      "romanization": "chang-tai-thang-tua-ao-bai-bua-ma-pit",
+      "romanizationPaiboon": "cháang-dtaai-táng-dtuua-ao-bai-buua-maa-bpìt",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ช้างตายทั้งตัวเอาใบบัวมาปิด"
+    },
+    {
+      "tier": "sentence",
+      "text": "ยอมงอ ไม่ยอมหัก",
+      "ipa": "jɔːm˧.ŋɔː˧.maj˥˩.jɔːm˧.hak̚˨˩",
+      "romanization": "yom-ngo-mai-yom-hak",
+      "romanizationPaiboon": "yɔɔm-ngɔɔ-mâi-yɔɔm-hàk",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ยอมงอ_ไม่ยอมหัก"
+    },
+    {
+      "tier": "sentence",
+      "text": "เหนือเกล้าเหนือกระหม่อม",
+      "ipa": "nɯa̯˩˩˦.klaːw˥˩.nɯa̯˩˩˦.kra˨˩.mɔm˨˩",
+      "romanization": "nuea-klao-nuea-kra-mom",
+      "romanizationPaiboon": "nʉ̌ʉa-glâao-nʉ̌ʉa-grà-mɔ̀m",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เหนือเกล้าเหนือกระหม่อม"
+    },
+    {
+      "tier": "sentence",
+      "text": "สวัสดีตอนบ่าย",
+      "ipa": "sa˨˩.wat̚˨˩.diː˧.tɔːn˧.baːj˨˩",
+      "romanization": "sa-wat-di ton-bai",
+      "romanizationPaiboon": "sà-wàt-dii dtɔɔn-bàai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สวัสดีตอนบ่าย"
+    },
+    {
+      "tier": "sentence",
+      "text": "กาลครั้งหนึ่ง",
+      "ipa": "kaː˧.la˦˥.kʰraŋ˦˥.nɯŋ˨˩",
+      "romanization": "ka-la-khrang-nueng",
+      "romanizationPaiboon": "gaa-lá-kráng-nʉ̀ng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/กาลครั้งหนึ่ง"
+    },
+    {
+      "tier": "sentence",
+      "text": "เรารักในหลวง",
+      "ipa": "raw˧.rak̚˦˥.naj˧.lua̯ŋ˩˩˦",
+      "romanization": "rao rak nai-luang",
+      "romanizationPaiboon": "rao rák nai-lǔuang",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เรารักในหลวง"
+    },
+    {
+      "tier": "sentence",
+      "text": "ตัวใครตัวมัน",
+      "ipa": "tua̯˧.kʰraj˧.tua̯˧.man˧",
+      "romanization": "tua-khrai-tua-man",
+      "romanizationPaiboon": "dtuua-krai-dtuua-man",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ตัวใครตัวมัน"
+    },
+    {
+      "tier": "sentence",
+      "text": "ทานให้อร่อย",
+      "ipa": "tʰaːn˧.haj˥˩.ʔa˨˩.rɔj˨˩",
+      "romanization": "than hai a-roi",
+      "romanizationPaiboon": "taan hâi à-rɔ̀i",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ทานให้อร่อย"
+    },
+    {
+      "tier": "sentence",
+      "text": "สบายดีหรือ",
+      "ipa": "sa˨˩.baːj˧.diː˧.rɯː˩˩˦",
+      "romanization": "sa-bai di rue",
+      "romanizationPaiboon": "sà-baai dii rʉ̌ʉ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สบายดีหรือ"
+    },
+    {
+      "tier": "sentence",
+      "text": "เจริญพร",
+      "ipa": "t͡ɕa˨˩.rɤːn˧.pʰɔːn˧",
+      "romanization": "cha-roen-phon",
+      "romanizationPaiboon": "jà-rəən-pɔɔn",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เจริญพร"
+    },
+    {
+      "tier": "sentence",
+      "text": "เป็นต้นว่า",
+      "ipa": "pen˧.ton˥˩.waː˥˩",
+      "romanization": "pen-ton-wa",
+      "romanizationPaiboon": "bpen-dtôn-wâa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เป็นต้นว่า"
+    },
+    {
+      "tier": "sentence",
+      "text": "เชิญทานครับ",
+      "ipa": "t͡ɕʰɤːn˧.tʰaːn˧.kʰrap̚˦˥",
+      "romanization": "choen than khrap",
+      "romanizationPaiboon": "chəən taan kráp",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เชิญทานครับ"
+    },
+    {
+      "tier": "sentence",
+      "text": "เชิญทานค่ะ",
+      "ipa": "t͡ɕʰɤːn˧.tʰaːn˧.kʰaʔ˥˩",
+      "romanization": "choen than kha",
+      "romanizationPaiboon": "chəən taan kâ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เชิญทานค่ะ"
+    },
+    {
+      "tier": "sentence",
+      "text": "หมดเวลา",
+      "ipa": "mot̚˨˩.weː˧.laː˧",
+      "romanization": "mot-we-la",
+      "romanizationPaiboon": "mòt-wee-laa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/หมดเวลา"
+    },
+    {
+      "tier": "sentence",
+      "text": "ศุภมัสดุ",
+      "ipa": "sup̚˨˩.pʰa˦˥.mat̚˦˥.sa˨˩.duʔ˨˩",
+      "romanization": "sup-pha-mat-sa-du",
+      "romanizationPaiboon": "sùp-pá-mát-sà-dù",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ศุภมัสดุ"
+    },
+    {
+      "tier": "sentence",
+      "text": "เล่นกับหมาหมาเลียปาก เล่นกับสากสากต่อยหัว",
+      "ipa": "len˥˩.kap̚˨˩.maː˩˩˦.maː˩˩˦.lia̯˧.paːk̚˨˩.len˥˩.kap̚˨˩.saːk̚˨˩.saːk̚˨˩.tɔj˨˩.hua̯˩˩˦",
+      "romanization": "len-kap-ma-ma-lia-pak len-kap-sak-sak-toi-hua",
+      "romanizationPaiboon": "lên-gàp-mǎa-mǎa-liia-bpàak lên-gàp-sàak-sàak-dtɔ̀i-hǔua",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เล่นกับหมาหมาเลียปาก_เล่นกับสากสากต่อยหัว"
+    },
+    {
+      "tier": "sentence",
+      "text": "เล่นกับหมาหมาเลียปาก เล่นกับสากสากตีมือ",
+      "ipa": "len˥˩.kap̚˨˩.maː˩˩˦.maː˩˩˦.lia̯˧.paːk̚˨˩.len˥˩.kap̚˨˩.saːk̚˨˩.saːk̚˨˩.tiː˧.mɯː˧",
+      "romanization": "len-kap-ma-ma-lia-pak len-kap-sak-sak-ti-mue",
+      "romanizationPaiboon": "lên-gàp-mǎa-mǎa-liia-bpàak lên-gàp-sàak-sàak-dtii-mʉʉ",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เล่นกับหมาหมาเลียปาก_เล่นกับสากสากตีมือ"
+    },
+    {
+      "tier": "sentence",
+      "text": "ไฟในอย่านำออก ไฟนอกอย่านำเข้า",
+      "ipa": "faj˧.naj˧.jaː˨˩.nam˧.ʔɔːk̚˨˩.faj˧.nɔːk̚˥˩.jaː˨˩.nam˧.kʰaw˥˩",
+      "romanization": "fai-nai-ya-nam-ok fai-nok-ya-nam-khao",
+      "romanizationPaiboon": "fai-nai-yàa-nam-ɔ̀ɔk fai-nɔ̂ɔk-yàa-nam-kâo",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ไฟในอย่านำออก_ไฟนอกอย่านำเข้า"
+    },
+    {
+      "tier": "sentence",
+      "text": "พูดไปสองไพเบี้ย นิ่งเสียตำลึงทอง",
+      "ipa": "pʰuːt̚˥˩.paj˧.sɔːŋ˩˩˦.pʰaj˧.bia̯˥˩.niŋ˥˩.sia̯˩˩˦.tam˧.lɯŋ˧.tʰɔːŋ˧",
+      "romanization": "phut-pai-song-phai-bia-ning-sia-tam-lueng-thong",
+      "romanizationPaiboon": "pûut-bpai-sɔ̌ɔng-pai-bîia-nîng-sǐia-dtam-lʉng-tɔɔng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/พูดไปสองไพเบี้ย_นิ่งเสียตำลึงทอง"
+    },
+    {
+      "tier": "sentence",
+      "text": "คับที่อยู่ได้คับใจอยู่ยาก",
+      "ipa": "kʰap̚˦˥.tʰiː˥˩.juː˨˩.daːj˥˩.kʰap̚˦˥.t͡ɕaj˧.juː˨˩.jaːk̚˥˩",
+      "romanization": "khap-thi-yu-dai-khap-chai-yu-yak",
+      "romanizationPaiboon": "káp-tîi-yùu-dâai-káp-jai-yùu-yâak",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/คับที่อยู่ได้คับใจอยู่ยาก"
+    },
+    {
+      "tier": "sentence",
+      "text": "สันดอนขุดง่าย สันดานขุดยาก",
+      "ipa": "san˩˩˦.dɔːn˧.kʰut̚˨˩.ŋaːj˥˩.san˩˩˦.daːn˧.kʰut̚˨˩.jaːk̚˥˩",
+      "romanization": "san-don-khut-ngai-san-dan-khut-yak",
+      "romanizationPaiboon": "sǎn-dɔɔn-kùt-ngâai-sǎn-daan-kùt-yâak",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สันดอนขุดง่าย_สันดานขุดยาก"
+    },
+    {
+      "tier": "sentence",
+      "text": "ปลาเน่าตัวเดียวเหม็นทั้งข้อง",
+      "ipa": "plaː˧.naw˥˩.tua̯˧.dia̯w˧.men˩˩˦.tʰaŋ˦˥.kʰɔŋ˥˩",
+      "romanization": "pla-nao-tua-diao-men-thang-khong",
+      "romanizationPaiboon": "bplaa-nâo-dtuua-diao-měn-táng-kɔ̂ng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ปลาเน่าตัวเดียวเหม็นทั้งข้อง"
+    },
+    {
+      "tier": "sentence",
+      "text": "รำไม่ดีโทษปี่โทษกลอง",
+      "ipa": "ram˧.maj˥˩.diː˧.tʰoːt̚˥˩.piː˨˩.tʰoːt̚˥˩.klɔːŋ˧",
+      "romanization": "ram-mai-di-thot-pi-thot-klong",
+      "romanizationPaiboon": "ram-mâi-dii-tôot-bpìi-tôot-glɔɔng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/รำไม่ดีโทษปี่โทษกลอง"
+    },
+    {
+      "tier": "sentence",
+      "text": "ตามใจปากลำบากท้อง",
+      "ipa": "taːm˧.t͡ɕaj˧.paːk̚˨˩.lam˧.baːk̚˨˩.tʰɔːŋ˦˥",
+      "romanization": "tam-chai-pak-lam-bak-thong",
+      "romanizationPaiboon": "dtaam-jai-bpàak-lam-bàak-tɔ́ɔng",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ตามใจปากลำบากท้อง"
+    },
+    {
+      "tier": "sentence",
+      "text": "เล่นกับหมาหมาเลียปาก",
+      "ipa": "len˥˩.kap̚˨˩.maː˩˩˦.maː˩˩˦.lia̯˧.paːk̚˨˩",
+      "romanization": "len-kap-ma-ma-lia-pak",
+      "romanizationPaiboon": "lên-gàp-mǎa-mǎa-liia-bpàak",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เล่นกับหมาหมาเลียปาก"
+    },
+    {
+      "tier": "sentence",
+      "text": "กำขี้ดีกว่ากำตด",
+      "ipa": "kam˧.kʰiː˥˩.diː˧.kwaː˨˩.kam˧.tot̚˨˩",
+      "romanization": "kam-khi-di-kwa-kam-tot",
+      "romanizationPaiboon": "gam-kîi-dii-gwàa-gam-dtòt",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/กำขี้ดีกว่ากำตด"
+    },
+    {
+      "tier": "sentence",
+      "text": "ปากคนยาวกว่าปากกา",
+      "ipa": "paːk̚˨˩.kʰon˧.jaːw˧.kwaː˨˩.paːk̚˨˩.kaː˧",
+      "romanization": "pak-khon-yao-kwa-pak-ka",
+      "romanizationPaiboon": "bpàak-kon-yaao-gwàa-bpàak-gaa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ปากคนยาวกว่าปากกา"
+    },
+    {
+      "tier": "sentence",
+      "text": "ปลูกเรือนตามใจผู้อยู่",
+      "ipa": "pluːk̚˨˩.rɯa̯n˧.taːm˧.t͡ɕaj˧.pʰuː˥˩.juː˨˩",
+      "romanization": "pluk-ruean-tam-chai-phu-yu",
+      "romanizationPaiboon": "bplùuk-rʉʉan-dtaam-jai-pûu-yùu",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ปลูกเรือนตามใจผู้อยู่"
+    },
+    {
+      "tier": "sentence",
+      "text": "เสร็จศึกฆ่าขุนพล",
+      "ipa": "set̚˨˩.sɯk̚˨˩.kʰaː˥˩.kʰun˩˩˦.pʰon˧",
+      "romanization": "set-suek-kha-khun-phon",
+      "romanizationPaiboon": "sèt-sʉ̀k-kâa-kǔn-pon",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เสร็จศึกฆ่าขุนพล"
+    },
+    {
+      "tier": "sentence",
+      "text": "เสร็จนาฆ่าโคถึก",
+      "ipa": "set̚˨˩.naː˧.kʰaː˥˩.kʰoː˧.tʰɯk̚˨˩",
+      "romanization": "set-na-kha-kho-thuek",
+      "romanizationPaiboon": "sèt-naa-kâa-koo-tʉ̀k",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เสร็จนาฆ่าโคถึก"
+    },
+    {
+      "tier": "sentence",
+      "text": "หมากัดอย่ากัดตอบ",
+      "ipa": "maː˩˩˦.kat̚˨˩.jaː˨˩.kat̚˨˩.tɔːp̚˨˩",
+      "romanization": "ma-kat-ya-kat-top",
+      "romanizationPaiboon": "mǎa-gàt-yàa-gàt-dtɔ̀ɔp",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/หมากัดอย่ากัดตอบ"
+    },
+    {
+      "tier": "sentence",
+      "text": "ผีซ้ำด้ำพลอย",
+      "ipa": "pʰiː˩˩˦.sam˦˥.dam˥˩.pʰlɔːj˧",
+      "romanization": "phi-sam-dam-phloi",
+      "romanizationPaiboon": "pǐi-sám-dâm-plɔɔi",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ผีซ้ำด้ำพลอย"
+    },
+    {
+      "tier": "sentence",
+      "text": "เคราะห์ซ้ำกรรมซัด",
+      "ipa": "kʰrɔʔ˦˥.sam˦˥.kam˧.sat̚˦˥",
+      "romanization": "khro-sam-kam-sat",
+      "romanizationPaiboon": "krɔ́-sám-gam-sát",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เคราะห์ซ้ำกรรมซัด"
+    },
+    {
+      "tier": "sentence",
+      "text": "ผีซ้ำกรรมซัด",
+      "ipa": "pʰiː˩˩˦.sam˦˥.kam˧.sat̚˦˥",
+      "romanization": "phi-sam-kam-sat",
+      "romanizationPaiboon": "pǐi-sám-gam-sát",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ผีซ้ำกรรมซัด"
+    },
+    {
+      "tier": "sentence",
+      "text": "ยิ่งสูงยิ่งหนาว",
+      "ipa": "jiŋ˥˩.suːŋ˩˩˦.jiŋ˥˩.naːw˩˩˦",
+      "romanization": "ying-sung-ying-nao",
+      "romanizationPaiboon": "yîng-sǔung-yîng-nǎao",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ยิ่งสูงยิ่งหนาว"
+    },
+    {
+      "tier": "sentence",
+      "text": "ฟังหูไว้หู",
+      "ipa": "faŋ˧.huː˩˩˦.waj˦˥.huː˩˩˦",
+      "romanization": "fang-hu-wai-hu",
+      "romanizationPaiboon": "fang-hǔu-wái-hǔu",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ฟังหูไว้หู"
+    },
+    {
+      "tier": "sentence",
+      "text": "ผิดเป็นครู",
+      "ipa": "pʰit̚˨˩.pen˧.kʰruː˧",
+      "romanization": "phit-pen-khru",
+      "romanizationPaiboon": "pìt-bpen-kruu",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ผิดเป็นครู"
+    },
+    {
+      "tier": "sentence",
+      "text": "ชาติหน้าตอนบ่าย ๆ",
+      "ipa": "t͡ɕʰaːt̚˥˩.naː˥˩.tɔːn˧.baːj˨˩.baːj˨˩",
+      "romanization": "chat-na-ton-bai-bai",
+      "romanizationPaiboon": "châat-nâa-dtɔɔn-bàai-bàai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ชาติหน้าตอนบ่าย_ๆ"
+    },
+    {
+      "tier": "sentence",
+      "text": "พระเจ้าช่วยกล้วยทอด",
+      "ipa": "pʰra˦˥.t͡ɕaːw˥˩.t͡ɕʰua̯j˥˩.klua̯j˥˩.tʰɔːt̚˥˩",
+      "romanization": "phra-chao-chuai-kluai-thot",
+      "romanizationPaiboon": "prá-jâao-chûai-glûai-tɔ̂ɔt",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/พระเจ้าช่วยกล้วยทอด"
+    },
+    {
+      "tier": "sentence",
+      "text": "ไปที่ชอบ ๆ",
+      "ipa": "paj˧.tʰiː˥˩.t͡ɕʰɔːp̚˥˩.tʰiː˥˩.t͡ɕʰɔːp̚˥˩",
+      "romanization": "pai-thi-chop-thi-chop",
+      "romanizationPaiboon": "bpai-tîi-chɔ̂ɔp-tîi-chɔ̂ɔp",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ไปที่ชอบ_ๆ"
+    },
+    {
+      "tier": "sentence",
+      "text": "อรุณสวัสดิ์",
+      "ipa": "ʔa˨˩.run˧.sa˨˩.wat̚˨˩",
+      "romanization": "a-run-sa-wat",
+      "romanizationPaiboon": "à-run-sà-wàt",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อรุณสวัสดิ์"
+    },
+    {
+      "tier": "sentence",
+      "text": "ทรงพระเจริญ",
+      "ipa": "soŋ˧.pʰra˦˥.t͡ɕa˨˩.rɤːn˧",
+      "romanization": "song-phra-cha-roen",
+      "romanizationPaiboon": "song-prá-jà-rəən",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ทรงพระเจริญ"
+    },
+    {
+      "tier": "sentence",
+      "text": "ยินดีต้อนรับ",
+      "ipa": "jin˧.diː˧.tɔːn˥˩.rap̚˦˥",
+      "romanization": "yin-di ton-rap",
+      "romanizationPaiboon": "yin-dii dtɔ̂ɔn-ráp",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ยินดีต้อนรับ"
+    },
+    {
+      "tier": "sentence",
+      "text": "ถวายพระพร",
+      "ipa": "tʰa˨˩.waːj˩˩˦.pʰra˦˥.pʰɔːn˧",
+      "romanization": "tha-wai-phra-phon",
+      "romanizationPaiboon": "tà-wǎai-prá-pɔɔn",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ถวายพระพร"
+    },
+    {
+      "tier": "sentence",
+      "text": "ราตรีสวัสดิ์",
+      "ipa": "raː˧.triː˧.sa˨˩.wat̚˨˩",
+      "romanization": "ra-tri-sa-wat",
+      "romanizationPaiboon": "raa-dtrii-sà-wàt",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ราตรีสวัสดิ์"
+    },
+    {
+      "tier": "sentence",
+      "text": "ทิวาสวัสดิ์",
+      "ipa": "tʰi˦˥.waː˧.sa˨˩.wat̚˨˩",
+      "romanization": "thi-wa-sa-wat",
+      "romanizationPaiboon": "tí-waa-sà-wàt",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ทิวาสวัสดิ์"
+    },
+    {
+      "tier": "sentence",
+      "text": "สายัณห์สวัสดิ์",
+      "ipa": "saː˩˩˦.jan˧.sa˨˩.wat̚˨˩",
+      "romanization": "sa-yan-sa-wat",
+      "romanizationPaiboon": "sǎa-yan-sà-wàt",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สายัณห์สวัสดิ์"
+    },
+    {
+      "tier": "sentence",
+      "text": "นมัสการ",
+      "ipa": "na˦˥.mat̚˦˥.sa˨˩.kaːn˧",
+      "romanization": "na-mat-sa-kan",
+      "romanizationPaiboon": "ná-mát-sà-gaan",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/นมัสการ"
+    },
+    {
+      "tier": "sentence",
+      "text": "ขวัญเอยขวัญมา",
+      "ipa": "kʰwan˩˩˦.ʔɤːj˧.kʰwan˩˩˦.maː˧",
+      "romanization": "khwan-oei-khwan-ma",
+      "romanizationPaiboon": "kwǎn-əəi-kwǎn-maa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ขวัญเอยขวัญมา"
+    },
+    {
+      "tier": "sentence",
+      "text": "หลับให้สบาย",
+      "ipa": "lap̚˨˩.haj˥˩.sa˨˩.baːj˧",
+      "romanization": "lap-hai-sa-bai",
+      "romanizationPaiboon": "làp-hâi-sà-baai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/หลับให้สบาย"
+    },
+    {
+      "tier": "sentence",
+      "text": "พ่อแก้วแม่แก้ว",
+      "ipa": "pʰɔː˥˩.kɛːw˥˩.mɛː˥˩.kɛːw˥˩",
+      "romanization": "pho-kaeo-mae-kaeo",
+      "romanizationPaiboon": "pɔ̂ɔ-gɛ̂ɛo-mɛ̂ɛ-gɛ̂ɛo",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/พ่อแก้วแม่แก้ว"
+    },
+    {
+      "tier": "sentence",
+      "text": "สวัสดี",
+      "ipa": "sa˨˩.wat̚˨˩.diː˧",
+      "romanization": "sa-wat-di",
+      "romanizationPaiboon": "sà-wàt-dii",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สวัสดี"
+    },
+    {
+      "tier": "sentence",
+      "text": "ไม่เป็นไร",
+      "ipa": "maj˥˩.pen˧.raj˧",
+      "romanization": "mai-pen-rai",
+      "romanizationPaiboon": "mâi-bpen-rai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ไม่เป็นไร"
+    },
+    {
+      "tier": "sentence",
+      "text": "ขออำไพ",
+      "ipa": "kʰɔː˩˩˦.ʔam˧.pʰaj˧",
+      "romanization": "kho-am-phai",
+      "romanizationPaiboon": "kɔ̌ɔ-am-pai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ขออำไพ"
+    },
+    {
+      "tier": "sentence",
+      "text": "เจริญพวง",
+      "ipa": "t͡ɕa˨˩.rɤːn˧.pʰua̯ŋ˧",
+      "romanization": "cha-roen-phuang",
+      "romanizationPaiboon": "jà-rəən-puuang",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เจริญพวง"
+    },
+    {
+      "tier": "sentence",
+      "text": "สวีดัด",
+      "ipa": "sa˨˩.wiː˧.dat̚˨˩",
+      "romanization": "sa-wi-dat",
+      "romanizationPaiboon": "sà-wii-dàt",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สวีดัด"
+    },
+    {
+      "tier": "sentence",
+      "text": "อนิจจา",
+      "ipa": "ʔa˨˩.nit̚˦˥.t͡ɕaː˧",
+      "romanization": "a-nit-cha",
+      "romanizationPaiboon": "à-nít-jaa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อนิจจา"
+    },
+    {
+      "tier": "sentence",
+      "text": "ขอบน้ำใจ",
+      "ipa": "kʰɔːp̚˨˩.nam˦˥.t͡ɕaj˧",
+      "romanization": "khop-nam-chai",
+      "romanizationPaiboon": "kɔ̀ɔp-nám-jai",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ขอบน้ำใจ"
+    },
+    {
+      "tier": "sentence",
+      "text": "ขอบพระคุณ",
+      "ipa": "kʰɔːp̚˨˩.pʰra˦˥.kʰun˧",
+      "romanization": "khop-phra-khun",
+      "romanizationPaiboon": "kɔ̀ɔp-prá-kun",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ขอบพระคุณ"
+    },
+    {
+      "tier": "sentence",
+      "text": "สมน้ำหน้า",
+      "ipa": "som˩˩˦.nam˦˥.naː˥˩",
+      "romanization": "som-nam-na",
+      "romanizationPaiboon": "sǒm-nám-nâa",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สมน้ำหน้า"
+    },
+    {
+      "tier": "sentence",
+      "text": "อนิจจัง",
+      "ipa": "ʔa˨˩.nit̚˦˥.t͡ɕaŋ˧",
+      "romanization": "a-nit-chang",
+      "romanizationPaiboon": "à-nít-jang",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อนิจจัง"
+    },
+    {
+      "tier": "sentence",
+      "text": "เพื่อประโยชน์แห่งความยุติธรรม",
+      "ipa": "pʰɯa̯˥˩.pra˨˩.joːt̚˨˩.hɛŋ˨˩.kʰwaːm˧.jut̚˦˥.ti˨˩.tʰam˧",
+      "romanization": "phuea-pra-yot-haeng-khwam-yut-ti-tham",
+      "romanizationPaiboon": "pʉ̂ʉa-bprà-yòot-hɛ̀ng-kwaam-yút-dtì-tam",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เพื่อประโยชน์แห่งความยุติธรรม"
+    },
+    {
+      "tier": "sentence",
+      "text": "สมฤดี",
+      "ipa": "som˩˩˦.rɯ˦˥.diː˧",
+      "romanization": "som-rue-di",
+      "romanizationPaiboon": "sǒm-rʉ́-dii",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สมฤดี"
+    },
+    {
+      "tier": "word",
+      "text": "ก็",
+      "ipa": "kɔʔ˥˩",
+      "romanization": "ko",
+      "romanizationPaiboon": "gɔ̂",
+      "ipaAlternatives": [
+        "kɔː˥˩"
+      ],
+      "romanizationAlternatives": [
+        "ko"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "gɔ̂ɔ"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ก็"
+    },
+    {
+      "tier": "word",
+      "text": "เขา",
+      "ipa": "kʰaw˩˩˦",
+      "romanization": "khao",
+      "romanizationPaiboon": "kǎo",
+      "ipaAlternatives": [
+        "kʰaw˦˥"
+      ],
+      "romanizationAlternatives": [
+        "khao"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "káo"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เขา"
+    },
+    {
+      "tier": "word",
+      "text": "ฉัน",
+      "ipa": "t͡ɕʰan˩˩˦",
+      "romanization": "chan",
+      "romanizationPaiboon": "chǎn",
+      "ipaAlternatives": [
+        "t͡ɕʰan˦˥"
+      ],
+      "romanizationAlternatives": [
+        "chan"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "chán"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ฉัน"
+    },
+    {
+      "tier": "word",
+      "text": "หนึ่ง",
+      "ipa": "nɯŋ˨˩",
+      "romanization": "nueng",
+      "romanizationPaiboon": "nʉ̀ng",
+      "ipaAlternatives": [
+        "nɯŋ˧"
+      ],
+      "romanizationAlternatives": [
+        "nueng"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "nʉng"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/หนึ่ง"
+    },
+    {
+      "tier": "word",
+      "text": "ท่าน",
+      "ipa": "tʰaːn˥˩",
+      "romanization": "than",
+      "romanizationPaiboon": "tâan",
+      "ipaAlternatives": [
+        "tʰan˥˩"
+      ],
+      "romanizationAlternatives": [
+        "than"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "tân"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ท่าน"
+    },
+    {
+      "tier": "word",
+      "text": "เจ้า",
+      "ipa": "t͡ɕaːw˥˩",
+      "romanization": "chao",
+      "romanizationPaiboon": "jâao",
+      "ipaAlternatives": [
+        "t͡ɕaw˥˩"
+      ],
+      "romanizationAlternatives": [
+        "chao"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "jâo"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เจ้า"
+    },
+    {
+      "tier": "word",
+      "text": "ไหม",
+      "ipa": "maj˩˩˦",
+      "romanization": "mai",
+      "romanizationPaiboon": "mǎi",
+      "ipaAlternatives": [
+        "maj˦˥"
+      ],
+      "romanizationAlternatives": [
+        "mai"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "mái"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ไหม"
+    },
+    {
+      "tier": "word",
+      "text": "ข้าว",
+      "ipa": "kʰaːw˥˩",
+      "romanization": "khao",
+      "romanizationPaiboon": "kâao",
+      "ipaAlternatives": [
+        "kʰaw˥˩"
+      ],
+      "romanizationAlternatives": [
+        "khao"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "kâo"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ข้าว"
+    },
+    {
+      "tier": "word",
+      "text": "ลักษณะ",
+      "ipa": "lak̚˦˥.sa˨˩.naʔ˨˩",
+      "romanization": "lak-sa-na",
+      "romanizationPaiboon": "lák-sà-nà",
+      "ipaAlternatives": [
+        "lak̚˦˥.sa˧.naʔ˨˩"
+      ],
+      "romanizationAlternatives": [
+        "lak-sa-na"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "lák-sa-nà"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ลักษณะ"
+    },
+    {
+      "tier": "word",
+      "text": "เช้า",
+      "ipa": "t͡ɕʰaːw˦˥",
+      "romanization": "chao",
+      "romanizationPaiboon": "cháao",
+      "ipaAlternatives": [
+        "t͡ɕʰaw˦˥"
+      ],
+      "romanizationAlternatives": [
+        "chao"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "cháo"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เช้า"
+    },
+    {
+      "tier": "word",
+      "text": "ค่ะ",
+      "ipa": "kʰaʔ˥˩",
+      "romanization": "kha",
+      "romanizationPaiboon": "kâ",
+      "ipaAlternatives": [
+        "kʰaʔ˨˩"
+      ],
+      "romanizationAlternatives": [
+        "kha"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "kà"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ค่ะ"
+    },
+    {
+      "tier": "word",
+      "text": "สระ",
+      "ipa": "saʔ˨˩",
+      "romanization": "sa",
+      "romanizationPaiboon": "sà",
+      "ipaAlternatives": [
+        "sa˨˩.raʔ˨˩",
+        "sa˨˩.raʔ˦˥"
+      ],
+      "romanizationAlternatives": [
+        "sa-ra",
+        "sa-ra"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "sà-rà",
+        "sà-rá"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สระ"
+    },
+    {
+      "tier": "word",
+      "text": "เจ้าของ",
+      "ipa": "t͡ɕaw˥˩.kʰɔːŋ˩˩˦",
+      "romanization": "chao-khong",
+      "romanizationPaiboon": "jâo-kɔ̌ɔng",
+      "ipaAlternatives": [
+        "t͡ɕaːw˥˩.kʰɔːŋ˩˩˦"
+      ],
+      "romanizationAlternatives": [
+        "chao-khong"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "jâao-kɔ̌ɔng"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/เจ้าของ"
+    },
+    {
+      "tier": "word",
+      "text": "ช่าง",
+      "ipa": "t͡ɕʰaːŋ˥˩",
+      "romanization": "chang",
+      "romanizationPaiboon": "châang",
+      "ipaAlternatives": [
+        "t͡ɕʰaŋ˥˩"
+      ],
+      "romanizationAlternatives": [
+        "chang"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "châng"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ช่าง"
+    },
+    {
+      "tier": "word",
+      "text": "สบาย",
+      "ipa": "sa˨˩.baːj˧",
+      "romanization": "sa-bai",
+      "romanizationPaiboon": "sà-baai",
+      "ipaAlternatives": [
+        "sa˧.baːj˧"
+      ],
+      "romanizationAlternatives": [
+        "sa-bai"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "sa-baai"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/สบาย"
+    },
+    {
+      "tier": "word",
+      "text": "กริยา",
+      "ipa": "kri˨˩.jaː˧",
+      "romanization": "kri-ya",
+      "romanizationPaiboon": "grì-yaa",
+      "ipaAlternatives": [
+        "ka˨˩.ri˦˥.jaː˧"
+      ],
+      "romanizationAlternatives": [
+        "ka-ri-ya"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "gà-rí-yaa"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/กริยา"
+    },
+    {
+      "tier": "word",
+      "text": "อ่อน",
+      "ipa": "ʔɔːn˨˩",
+      "romanization": "on",
+      "romanizationPaiboon": "ɔ̀ɔn",
+      "ipaAlternatives": [
+        "ʔɔn˨˩"
+      ],
+      "romanizationAlternatives": [
+        "on"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "ɔ̀n"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/อ่อน"
+    },
+    {
+      "tier": "word",
+      "text": "มหา",
+      "ipa": "ma˦˥.haː˩˩˦",
+      "romanization": "ma-ha",
+      "romanizationPaiboon": "má-hǎa",
+      "ipaAlternatives": [
+        "ma˧.haː˩˩˦"
+      ],
+      "romanizationAlternatives": [
+        "ma-ha"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "ma-hǎa"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/มหา"
+    },
+    {
+      "tier": "word",
+      "text": "ภรรยา",
+      "ipa": "pʰan˧.jaː˧",
+      "romanization": "phan-ya",
+      "romanizationPaiboon": "pan-yaa",
+      "ipaAlternatives": [
+        "pʰan˧.ra˦˥.jaː˧"
+      ],
+      "romanizationAlternatives": [
+        "phan-ra-ya"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "pan-rá-yaa"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ภรรยา"
+    },
+    {
+      "tier": "word",
+      "text": "ได้แก่",
+      "ipa": "daːj˥˩.kɛː˨˩",
+      "romanization": "dai-kae",
+      "romanizationPaiboon": "dâai-gɛ̀ɛ",
+      "ipaAlternatives": [
+        "daj˥˩.kɛː˨˩"
+      ],
+      "romanizationAlternatives": [
+        "dai-kae"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "dâi-gɛ̀ɛ"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ได้แก่"
+    },
+    {
+      "tier": "word",
+      "text": "ปกติ",
+      "ipa": "pa˨˩.ka˨˩.tiʔ˨˩",
+      "romanization": "pa-ka-ti",
+      "romanizationPaiboon": "bpà-gà-dtì",
+      "ipaAlternatives": [
+        "pok̚˨˩.ka˨˩.tiʔ˨˩"
+      ],
+      "romanizationAlternatives": [
+        "pok-ka-ti"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "bpòk-gà-dtì"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ปกติ"
+    },
+    {
+      "tier": "word",
+      "text": "กระดาษ",
+      "ipa": "kra˨˩.daːt̚˨˩",
+      "romanization": "kra-dat",
+      "romanizationPaiboon": "grà-dàat",
+      "ipaAlternatives": [
+        "kra˧.daːt̚˨˩"
+      ],
+      "romanizationAlternatives": [
+        "kra-dat"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "gra-dàat"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/กระดาษ"
+    },
+    {
+      "tier": "word",
+      "text": "น้ำตา",
+      "ipa": "nam˦˥.taː˧",
+      "romanization": "nam-ta",
+      "romanizationPaiboon": "nám-dtaa",
+      "ipaAlternatives": [
+        "naːm˦˥.taː˧"
+      ],
+      "romanizationAlternatives": [
+        "nam-ta"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "náam-dtaa"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/น้ำตา"
+    },
+    {
+      "tier": "word",
+      "text": "กรณี",
+      "ipa": "kɔː˧.ra˦˥.niː˧",
+      "romanization": "ko-ra-ni",
+      "romanizationPaiboon": "gɔɔ-rá-nii",
+      "ipaAlternatives": [
+        "ka˨˩.ra˦˥.niː˧"
+      ],
+      "romanizationAlternatives": [
+        "ka-ra-ni"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "gà-rá-nii"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/กรณี"
+    },
+    {
+      "tier": "word",
+      "text": "ฝรั่ง",
+      "ipa": "fa˨˩.raŋ˨˩",
+      "romanization": "fa-rang",
+      "romanizationPaiboon": "fà-ràng",
+      "ipaAlternatives": [
+        "fa˦˥.raŋ˨˩"
+      ],
+      "romanizationAlternatives": [
+        "fa-rang"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "fá-ràng"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ฝรั่ง"
+    },
+    {
+      "tier": "word",
+      "text": "น้ำใจ",
+      "ipa": "naːm˦˥.t͡ɕaj˧",
+      "romanization": "nam-chai",
+      "romanizationPaiboon": "náam-jai",
+      "ipaAlternatives": [
+        "nam˦˥.t͡ɕaj˧"
+      ],
+      "romanizationAlternatives": [
+        "nam-chai"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "nám-jai"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/น้ำใจ"
+    },
+    {
+      "tier": "word",
+      "text": "น้ำตาล",
+      "ipa": "nam˦˥.taːn˧",
+      "romanization": "nam-tan",
+      "romanizationPaiboon": "nám-dtaan",
+      "ipaAlternatives": [
+        "naːm˦˥.taːn˧"
+      ],
+      "romanizationAlternatives": [
+        "nam-tan"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "náam-dtaan"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/น้ำตาล"
+    },
+    {
+      "tier": "word",
+      "text": "ผิว",
+      "ipa": "pʰiw˩˩˦",
+      "romanization": "phio",
+      "romanizationPaiboon": "pǐu",
+      "ipaAlternatives": [
+        "pʰi˨˩.waʔ˦˥"
+      ],
+      "romanizationAlternatives": [
+        "phi-wa"
+      ],
+      "romanizationPaiboonAlternatives": [
+        "pì-wá"
+      ],
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ผิว"
+    },
+    {
+      "tier": "word",
+      "text": "นม",
+      "ipa": "nom˧",
+      "romanization": "nom",
+      "romanizationPaiboon": "nom",
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/นม"
+    }
+  ]
+}

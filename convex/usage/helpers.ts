@@ -347,6 +347,25 @@ export async function releaseQuota(
 }
 
 /**
+ * Grant credits outside any plan item (the flag reward, features/
+ * scheduling.ts). Rides `releaseQuota`: the local mirror goes up now and a
+ * negative `credits` usage is tracked in Autumn, so the grant survives the
+ * next customer sync, which would otherwise overwrite a local-only
+ * increment. Returns the credits granted: 0 for a user on a legacy plan
+ * version with no `credits` balance, where `incrementQuota` would throw.
+ */
+export async function grantCredits(
+  ctx: MutationCtx,
+  userId: string,
+  amount: number,
+): Promise<number> {
+  const doc = await getQuotaDoc(ctx, userId);
+  if (!doc?.features[FEATURE_IDS.CREDITS]) return 0;
+  await releaseQuota(ctx, userId, FEATURE_IDS.CREDITS, amount);
+  return amount;
+}
+
+/**
  * Charge the post-generation remainder of a chat message's dynamic credit
  * cost (1 chat_messages unit is consumed up-front in `sendMessage`; this adds
  * the extra units `generateResponse` derived from the actual LLM cost).

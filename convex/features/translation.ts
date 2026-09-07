@@ -12,7 +12,20 @@
  * and greek-utils for Greek phonetic Latin.
  */
 
-import { romanizeLocal } from '../lib/localRomanization';
+import { APICallError, generateText } from 'ai';
+import { romanizeLocal, usesLlmRomanization } from '../lib/localRomanization';
+import {
+  OPENROUTER_MODELS,
+  ROMANIZATION_PROVIDER,
+  ROMANIZATION_REASONING,
+} from '../config/aiModels';
+import { tryGetOpenRouter } from '../lib/openrouter';
+import { TransientAnnotationError } from '../lib/textAnnotations';
+import {
+  buildRomanizationSystemPrompt,
+  getRomanizationConvention,
+  parseRomanization,
+} from '../lib/romanizationPrompt';
 import { requireEnv } from '../lib/env';
 import { SignJWT, importPKCS8 } from 'jose';
 import { SUPPORTED_LANGUAGES } from '../../lib/languages';
@@ -266,10 +279,142 @@ async function romanizeViaGoogleV3Once(
           : null,
       bodyPreview: JSON.stringify(data).slice(0, 2000),
     });
-    throw new Error('No romanization returned from Google API');
+    // Not a fact about the text: the same string romanizes on another
+    // instance, so the row stays open rather than taking the sentinel.
+    throw new TransientAnnotationError(
+      'No romanization returned from Google API',
+    );
   }
 
   return romanized;
+}
+
+/** Pause between attempts so a retry does not land on the same bad moment. */
+const ROMANIZE_RETRY_DELAY_MS = 300;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Max attempts for the model romanizer, counting only UNUSABLE REPLIES. API
+ * errors are not retried here: generateText already retries 429/5xx twice
+ * with backoff, and a second loop around it would turn one outage into nine
+ * calls.
+ */
+const LLM_ROMANIZE_MAX_ATTEMPTS = 3;
+
+/**
+ * Google failures that say nothing about the TEXT, so the annotation runners
+ * must not record the permanent `''` sentinel for them: a missing
+ * `GOOGLE_SERVICE_ACCOUNT_KEY`, a failed token exchange, a rate limit or a
+ * 5xx, a dropped connection. Anchored on the status position of our own
+ * error messages: a bare `\b5\d\d\b` also matched a "512" inside a 400 body,
+ * which turned a guaranteed-400 request into one re-attempted on every view.
+ */
+const TRANSIENT_ROMANIZE_FAILURE =
+  /^Google romanize API error: (429|5\d\d)\b|^Service account token exchange failed|environment variable is not set|ECONNRESET|ETIMEDOUT|fetch failed/i;
+
+/** Tag a Google romanization failure as transient or permanent for the runners. */
+function asAnnotationFailure(err: unknown, context: string): Error {
+  if (err instanceof TransientAnnotationError) return err;
+  const detail = err instanceof Error ? err.message : String(err);
+  if (TRANSIENT_ROMANIZE_FAILURE.test(detail)) {
+    return new TransientAnnotationError(`${context}: ${detail}`);
+  }
+  return err instanceof Error ? err : new Error(detail);
+}
+
+/**
+ * Whether a model call failed for a reason unrelated to the text: a rate
+ * limit or outage the SDK gave up on, a bad key or an empty balance
+ * (401/402/403), a network error, or anything the SDK could not pin to a
+ * status. A 4xx the provider rejects deterministically (400, 404, 413, 422)
+ * is the one class that IS about the request, and recording it is what
+ * stops the row from being re-bought on every view.
+ */
+export function isTransientLlmFailure(err: unknown): boolean {
+  if (!APICallError.isInstance(err)) return true;
+  const status = err.statusCode;
+  return (
+    err.isRetryable ||
+    status === undefined ||
+    status === 401 ||
+    status === 402 ||
+    status === 403
+  );
+}
+
+/**
+ * Romanization from the model, for a language with no library and no Google
+ * support. See convex/lib/romanizationPrompt.ts for which languages route
+ * here and why.
+ *
+ * Throws TransientAnnotationError when the failure is not about the text
+ * (the runners then leave the row open), and a plain Error when it is: a
+ * deterministic 4xx, or three unusable replies at temperature 0.
+ */
+async function romanizeViaLlm(
+  text: string,
+  sourceLanguage: string,
+): Promise<string> {
+  const openrouter = tryGetOpenRouter();
+  if (openrouter === null) {
+    throw new TransientAnnotationError('OPENROUTER_API_KEY is not set');
+  }
+  if (getRomanizationConvention(sourceLanguage) === null) {
+    // A routing mistake, not a fact about any sentence: keep the rows open
+    // rather than stamping a whole language as untranscribable.
+    throw new TransientAnnotationError(
+      `No romanization convention configured for language "${sourceLanguage}"`,
+    );
+  }
+  const system = buildRomanizationSystemPrompt(sourceLanguage);
+  const model = openrouter(OPENROUTER_MODELS.romanization);
+  let lastReply = '';
+  for (let attempt = 1; attempt <= LLM_ROMANIZE_MAX_ATTEMPTS; attempt++) {
+    if (attempt > 1) await sleep(ROMANIZE_RETRY_DELAY_MS * (attempt - 1));
+    let reply: string;
+    try {
+      const result = await generateText({
+        model,
+        system,
+        prompt: text,
+        temperature: 0,
+        maxOutputTokens: 1_000,
+        providerOptions: {
+          openrouter: {
+            reasoning: { effort: ROMANIZATION_REASONING },
+            // Spread into a mutable shape: the const assertion on
+            // ROMANIZATION_PROVIDER makes `order` a readonly tuple, which
+            // is not a JSONValue.
+            provider: {
+              order: [...ROMANIZATION_PROVIDER.order],
+              allow_fallbacks: ROMANIZATION_PROVIDER.allow_fallbacks,
+            },
+          },
+        },
+      });
+      reply = result.text;
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      if (isTransientLlmFailure(err)) {
+        throw new TransientAnnotationError(`romanizeViaLlm: ${detail}`);
+      }
+      throw err instanceof Error ? err : new Error(detail);
+    }
+    const romanization = parseRomanization(reply);
+    if (romanization !== null) return romanization;
+    lastReply = reply;
+    console.warn('[translation] romanizeViaLlm unusable reply', {
+      sourceLanguage,
+      attempt,
+      preview: reply.slice(0, 120),
+    });
+  }
+  throw new Error(
+    `Unparseable romanization reply after ${LLM_ROMANIZE_MAX_ATTEMPTS} attempts: ${lastReply.slice(0, 120)}`,
+  );
 }
 
 /**
@@ -279,25 +424,35 @@ async function romanizeViaGoogleV3Once(
  *     first via opencc-js so polyphones resolve); Cantonese: to-jyutping
  *   - Greek: greek-utils phonetic Latin
  *   - Korean: es-hangul (Revised Romanization, pronunciation-based)
- *   - Hebrew: hebrew-transliteration (SBL Academic)
- *   - Arabic (incl. ar_sa / ar_eg / ar_iq / ar_lev): arabic-transliterate (IJMES)
+ *   - Thai and Hebrew: the model (convex/lib/romanizationPrompt.ts). Thai
+ *     never had a romanizer; Hebrew's SBL Academic library transliterated the
+ *     consonants of unpointed text and dropped the vowels.
+ *   - Arabic (incl. ar_sa / ar_eg / ar_iq / ar_lev): Google v3
  *   - Telugu: sanscript, ISO 15919 scheme (Google v3 400s on `te`)
  *   - Bulgarian: 2009 Streamlined System (Google v3 has no `bg`)
  *   - everything else in `ROMANIZATION_LANGUAGES`: Google Cloud Translation
  *     v3 romanizeText, retried up to `ROMANIZE_MAX_ATTEMPTS` times.
  *
- * Throws when a language reaches this path with no working romanizer or
- * when all Google attempts fail. Every caller already wraps this in a
+ * Throws when a language reaches this path with no working romanizer, when
+ * all Google attempts fail, or when the model returns nothing usable. Every caller already wraps this in a
  * `try/catch` that leaves `romanizedText` empty on failure, so a hard
  * throw here means the row lands without romanization rather than the
  * whole translation pipeline failing.
  */
+
 export async function romanizeText(
   text: string,
   sourceLanguage: string,
 ): Promise<string> {
   const local = romanizeLocal(text, sourceLanguage);
   if (local !== null) return local;
+
+  // Then the model, for the languages with no library and no Google support
+  // (th, he). Ordered after the local libraries deliberately: those are free,
+  // instant and deterministic, and this one is none of the three.
+  if (usesLlmRomanization(sourceLanguage)) {
+    return await romanizeViaLlm(text, sourceLanguage);
+  }
 
   // Hard gate: bail out cleanly before issuing a guaranteed-400 request.
   // The mapped (Google-facing) code is what determines support, since
@@ -332,8 +487,9 @@ export async function romanizeText(
           maxAttempts: ROMANIZE_MAX_ATTEMPTS,
           detail,
         });
+        await sleep(ROMANIZE_RETRY_DELAY_MS * attempt);
       }
     }
   }
-  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  throw asAnnotationFailure(lastError, 'romanizeText');
 }

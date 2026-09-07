@@ -12,6 +12,7 @@ import {
   cardEditPathValidator,
   cardEditLanguageRoleValidator,
   collectionOriginValidator,
+  flagReasonValidator,
   retranslationStatusValidator,
   type CardEditKind,
   type RetranslationStatus,
@@ -70,6 +71,8 @@ const cardEditRowValidator = v.object({
       soundsSame: v.optional(v.boolean()),
     }),
   ),
+  flagReasons: v.optional(v.array(flagReasonValidator)),
+  flagNote: v.optional(v.string()),
   retranslations: v.array(retranslationRowValidator),
 });
 
@@ -116,6 +119,8 @@ async function hydrateRetranslations(ctx: QueryCtx, edit: Doc<'cardEdits'>) {
     baseLanguages: edit.baseLanguages,
     targetLanguages: edit.targetLanguages,
     changes: edit.changes,
+    flagReasons: edit.flagReasons,
+    flagNote: edit.flagNote,
     retranslations: children.map(projectRetranslation),
   };
 }

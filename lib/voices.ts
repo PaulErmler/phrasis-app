@@ -20,6 +20,7 @@ import {
   SUPPORTED_LANGUAGES,
   type TtsProvider,
 } from './languages';
+import { hasCurrentSentenceMetadata } from './sentenceMetadataSource';
 
 export type { TtsProvider };
 
@@ -425,6 +426,12 @@ export interface SpeakerGenderInput {
   audioSpeakerGender?: string;
   /** Whether the text is user-created (custom/chat) vs premade dataset. */
   userCreated: boolean;
+  /**
+   * See `texts.metadataSource`. A premade text at the current classifier
+   * source holds a verdict in `speakerGender`, so case 3 below must not
+   * overwrite it with the coin flip.
+   */
+  metadataSource?: string;
 }
 
 /**
@@ -436,9 +443,13 @@ export interface SpeakerGenderInput {
  *   1. Definitive `speakerGender` ('male'/'female'): the source of truth; mirror
  *      it into `audioSpeakerGender`, never overwrite `speakerGender`.
  *   2. Custom + neutral/undefined: preserve the LLM's `speakerGender` verdict;
- *      only resolve `audioSpeakerGender` (preferring a prior resolution).
- *   3. Premade + neutral/undefined: coin-flip BOTH fields to the same value so
- *      the prompt and the voice agree.
+ *      only resolve `audioSpeakerGender` (preferring a prior resolution). A
+ *      premade text the current classifier has stamped
+ *      (lib/sentenceMetadataSource.ts) takes this case too: its `neutral` is
+ *      a verdict, and writing the flip over it would turn it back into the
+ *      pre-classification guess.
+ *   3. Premade, never classified, neutral/undefined: coin-flip BOTH fields to
+ *      the same value so the prompt and the voice agree.
  * Prior `audioSpeakerGender` is preserved when present so two runs don't re-roll.
  */
 export function resolveCardSpeakerGenders(
@@ -462,7 +473,7 @@ export function resolveCardSpeakerGenders(
     if (text.audioSpeakerGender !== audioSpeakerGender) {
       genderPatch.audioSpeakerGender = audioSpeakerGender;
     }
-  } else if (text.userCreated) {
+  } else if (text.userCreated || hasCurrentSentenceMetadata(text)) {
     audioSpeakerGender =
       text.audioSpeakerGender === 'male' || text.audioSpeakerGender === 'female'
         ? text.audioSpeakerGender

@@ -15,6 +15,7 @@ import { internal } from '../../_generated/api';
 import type { Id } from '../../_generated/dataModel';
 import { llmPool, ttsPool } from '@/convex/lib/workpools';
 import { buildTextContentBatchForLanguages } from '../../lib/cardContent';
+import { annotationFieldsOf } from '../../lib/textAnnotations';
 import {
   scheduleMissingContent,
   scheduleMissingRenderings,
@@ -228,6 +229,7 @@ async function hydrate(
           textId,
           sourceText: text.text,
           sourceLanguage: text.language,
+          sourceAnnotations: annotationFieldsOf(text),
           userCreated: text.userCreated,
           renderingText: renderingTextOf(text),
           view: viewOfCard(card, settings),

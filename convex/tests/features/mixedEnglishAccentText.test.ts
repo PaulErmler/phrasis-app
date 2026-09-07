@@ -152,7 +152,7 @@ async function englishSlot(
           textId,
           sourceText: text.text,
           sourceLanguage: 'en',
-          sourceIpa: 'ipa-source',
+          sourceAnnotations: { ipaText: 'ipa-source' },
           userCreated: opts?.userCreated ?? text.userCreated,
           view,
         },

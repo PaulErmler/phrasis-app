@@ -6,8 +6,10 @@ import {
   languageSupportsWordTimings,
 } from '../../lib/languages';
 import {
-  ANNOTATION_KINDS,
   TEXT_ANNOTATIONS,
+  annotationFieldsOf,
+  missingAnnotationKinds,
+  type AnnotationFields,
   type AnnotationKind,
 } from './textAnnotations';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
@@ -113,6 +115,14 @@ export interface TextContentResult {
   audioRecordings: CardAudioContent[];
   hasMissingContent: boolean;
   /**
+   * Some served row lacks an annotation kind its language supports, or
+   * carries one from a retired engine (`missingAnnotationKinds`). One of the
+   * terms of `hasMissingContent`, exposed on its own for readers whose
+   * self-heal is keyed differently (the collection preview requests such
+   * rows through `requestPreviewTranslations`).
+   */
+  hasMissingAnnotation: boolean;
+  /**
    * A rendering variant the view resolves to has not landed (its wording
    * or its audio): the card shows canonical meanwhile. Counted into
    * `hasMissingContent` only with `opts.includeVariantGaps`, so a reader
@@ -134,23 +144,18 @@ interface TextContentInput {
   sourceText: string;
   sourceLanguage: string;
   /**
-   * `texts.romanizedText` for this row. Pass it as `text.romanizedText ??
-   * undefined`, never `|| undefined`, which collapses the empty-string
-   * "tried, failed" sentinel into "never attempted" and makes
-   * `hasMissingContent` ask forever for work no scheduler will do. See the
-   * tri-state note on `romanizedText` in convex/schema.ts.
+   * The text row's annotation values and engine tags, built with
+   * `annotationFieldsOf(text)`. The values render on the source entry; the
+   * tags feed the missing-content probe, which asks `missingAnnotationKinds`
+   * (the same question the schedulers ask) so the trigger and the work it
+   * triggers cannot disagree. The helper keeps the empty-string "tried,
+   * failed" sentinel intact (a `||` would collapse it into "never attempted"
+   * and make `hasMissingContent` ask forever for work no scheduler will do;
+   * see the tri-state note on `romanizedText` in convex/schema.ts) and it
+   * carries every tag, so a row produced by a retired engine cannot look
+   * complete.
    */
-  sourceRomanization?: string;
-  /**
-   * `texts.ipaText` for this row. Same tri-state and same `?? undefined`
-   * (never `|| undefined`) rule as `sourceRomanization` above.
-   */
-  sourceIpa?: string;
-  /**
-   * `texts.furiganaText` for this row. Same tri-state and same `?? undefined`
-   * rule as its siblings above.
-   */
-  sourceFurigana?: string;
+  sourceAnnotations: AnnotationFields;
   /**
    * `texts.userCreated` for this row. Required so `versionStale` can apply the
    * whole `mayRegenerateTranslation` rule here instead of leaving half of it
@@ -392,6 +397,8 @@ export async function buildTextContentBatchForLanguages(
     romanization?: string;
     ipa?: string;
     furigana?: string;
+    /** Stored values + engine tags, for the missing-content probe. */
+    annotationSources: AnnotationFields;
     llmClaimedAt: number | null;
     versionStale: boolean;
     /**
@@ -427,6 +434,8 @@ export async function buildTextContentBatchForLanguages(
       text: row?.translatedText ?? '',
       romanization: row?.romanizedText ?? undefined,
       ipa: row?.ipaText ?? undefined,
+      // Carried for the missing-content probe below, not for display.
+      annotationSources: row ? annotationFieldsOf(row) : {},
       furigana: row?.furiganaText ?? undefined,
       // The "Retranslating" pill. Off for a pinned card (the in-flight job
       // replaces the LIVE row, which this card does not show) and off while
@@ -595,10 +604,12 @@ export async function buildTextContentBatchForLanguages(
           isBaseLanguage: baseLanguages.includes(lang),
           isTargetLanguage: targetLanguages.includes(lang),
           romanization: langNeedsRomanization
-            ? input.sourceRomanization
+            ? input.sourceAnnotations.romanizedText
             : undefined,
-          ipa: langNeedsIpa ? input.sourceIpa : undefined,
-          furigana: langNeedsFurigana ? input.sourceFurigana : undefined,
+          ipa: langNeedsIpa ? input.sourceAnnotations.ipaText : undefined,
+          furigana: langNeedsFurigana
+            ? input.sourceAnnotations.furiganaText
+            : undefined,
           retranslating: false,
         };
       }
@@ -671,20 +682,15 @@ export async function buildTextContentBatchForLanguages(
     // term is what wires both kinds into the client self-heal
     // (useEnsureContent → ensureCardContent → scheduleMissingContent).
     const hasMissingAnnotation = allLanguages.some((lang) => {
-      const stored =
+      const isPlainSourceRow =
         lang === input.sourceLanguage &&
-        resolution(input, lang).accentEntry === undefined
-          ? {
-              romanization: input.sourceRomanization,
-              ipa: input.sourceIpa,
-              furigana: input.sourceFurigana,
-            }
-          : translationMap.get(`${input.key}:${lang}`);
-      return ANNOTATION_KINDS.some(
-        (kind) =>
-          TEXT_ANNOTATIONS[kind].supports(lang) &&
-          stored?.[TEXT_ANNOTATIONS[kind].projectedField] === undefined,
-      );
+        resolution(input, lang).accentEntry === undefined;
+      const stored = isPlainSourceRow
+        ? input.sourceAnnotations
+        : (translationMap.get(`${input.key}:${lang}`)?.annotationSources ?? {});
+      // Ask the schedulers' own question, so "the card needs work" and "there
+      // is work to do" are one definition rather than two that drift.
+      return missingAnnotationKinds(lang, stored).length > 0;
     });
     // Legacy audio (generated before Scribe integration) has a URL but no
     // wordTimings. Flag it as missing so useEnsureContent → scheduleMissingContent
@@ -732,6 +738,7 @@ export async function buildTextContentBatchForLanguages(
       translations,
       audioRecordings,
       missingTranslationLanguages,
+      hasMissingAnnotation,
       hasMissingVariant,
       hasMissingContent:
         hasMissingTranslation ||

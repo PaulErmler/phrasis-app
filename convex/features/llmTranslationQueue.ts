@@ -401,6 +401,8 @@ type TextRowForTranslation = {
   addressesSomeone?: boolean;
   addresseeNumber?: string;
   speakerGender?: string;
+  /** The voice the card is spoken in; the prompt's fallback speaker gender. */
+  audioSpeakerGender?: string;
   addresseeGender?: string;
   register?: string;
   referentGender?: string;
@@ -503,12 +505,21 @@ async function resolvePromptMetadata(
       ? text.referentGender
       : legacyReferentGenderFallback(text.externalId, text._id as string);
 
-  const speakerGender =
-    text.speakerGender === 'male' ||
-    text.speakerGender === 'female' ||
-    text.speakerGender === 'neutral'
-      ? (text.speakerGender as 'male' | 'female' | 'neutral')
-      : undefined;
+  // A definitive verdict is the sentence's own gender. Otherwise the voice
+  // the card is spoken in guides the wording, so a neutral first-person
+  // sentence in a marked language agrees with its clip instead of drifting
+  // to the masculine default. On an unclassified curriculum text both
+  // fields hold the same coin flip; once the classifier has stamped the
+  // row they separate, and this is where the fallback matters.
+  const speakerGender: 'male' | 'female' | 'neutral' | undefined =
+    text.speakerGender === 'male' || text.speakerGender === 'female'
+      ? text.speakerGender
+      : text.audioSpeakerGender === 'male' ||
+          text.audioSpeakerGender === 'female'
+        ? text.audioSpeakerGender
+        : text.speakerGender === 'neutral'
+          ? 'neutral'
+          : undefined;
 
   const addresseeGender =
     addressesSomeone &&
@@ -1285,6 +1296,7 @@ export const getTextRowForTranslation = internalQuery({
       addressesSomeone: v.optional(v.boolean()),
       addresseeNumber: v.optional(v.string()),
       speakerGender: v.optional(v.string()),
+      audioSpeakerGender: v.optional(v.string()),
       addresseeGender: v.optional(v.string()),
       register: v.optional(v.string()),
       referentGender: v.optional(v.string()),
@@ -1307,6 +1319,7 @@ export const getTextRowForTranslation = internalQuery({
       addressesSomeone: row.addressesSomeone,
       addresseeNumber: row.addresseeNumber,
       speakerGender: row.speakerGender,
+      audioSpeakerGender: row.audioSpeakerGender,
       addresseeGender: row.addresseeGender,
       register: row.register,
       referentGender: row.referentGender,

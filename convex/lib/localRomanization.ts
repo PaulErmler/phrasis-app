@@ -16,10 +16,7 @@ import pinyin from 'chinese-to-pinyin';
 import * as OpenCC from 'opencc-js/t2cn';
 // @ts-expect-error no type declarations for greek-utils
 import greekUtils from 'greek-utils';
-import { transliterate as transliterateHebrew } from 'hebrew-transliteration';
 import { getJyutpingList } from 'to-jyutping';
-// @ts-expect-error no type declarations for arabic-transliterate (pure JS, ~74KB, zero deps)
-import arabictransliterate from 'arabic-transliterate';
 import transliterate from '@sindresorhus/transliterate';
 import Sanscript from '@indic-transliteration/sanscript';
 import { transliterateBulgarian } from './bulgarianTranslit';
@@ -51,6 +48,21 @@ export function hasLocalRomanization(code: string): boolean {
 }
 
 /**
+ * Languages whose romanization comes from the model. Derived from
+ * `romanizationBackend` so the language entry stays the single source of
+ * truth, exactly as LOCAL_ROMANIZATION_LANGUAGES is.
+ */
+export const LLM_ROMANIZATION_LANGUAGES = new Set(
+  SUPPORTED_LANGUAGES.filter((l) => l.romanizationBackend === 'llm').map(
+    (l) => l.code,
+  ),
+);
+
+export function usesLlmRomanization(code: string): boolean {
+  return LLM_ROMANIZATION_LANGUAGES.has(code);
+}
+
+/**
  * Stable identifiers for each romanization backend. Persisted on rows
  * alongside `romanizedText` so a future strategy swap can find rows
  * produced by the old method (`romanizationSource != currentSource`) and
@@ -63,9 +75,7 @@ export const ROMANIZATION_SOURCES = {
   chineseToPinyin: 'chinese-to-pinyin-v2',
   greekUtils: 'greek-utils-v1',
   esHangul: 'es-hangul-v1',
-  hebrewTransliteration: 'hebrew-transliteration-v1',
   toJyutping: 'to-jyutping-v1',
-  arabicTransliterate: 'arabic-transliterate-v1',
   sindresorhusTransliterate: 'sindresorhus-transliterate-v1',
   sanscriptIso15919: 'sanscript-iso15919-v1',
   // v2: the 2009 Act's exception rules (word-final -ия → -ia, България →
@@ -76,10 +86,38 @@ export const ROMANIZATION_SOURCES = {
   // resetStaleBulgarian*RomanizationV3 migrations.
   bulgarianStreamlined: 'bulgarian-streamlined-v3',
   googleV3: 'google-v3-v1',
+  /**
+   * The model, for a language with no library and no Google support. One
+   * tag PER LANGUAGE: the prompt is per language (romanizationPrompt.ts), so
+   * a Thai convention change must not re-buy every Hebrew row. The tag
+   * names the model AND the price tier: they are separate OpenRouter
+   * endpoints of one model, so a tier change is an engine change and should
+   * invalidate stored rows the same way a library swap does.
+   *
+   * Neither tag matches the shared `gemini-3.8-flash-flex-v1` the first
+   * cut wrote, which is deliberate: those rows include the '' sentinels
+   * written while the routing was broken (romanizeText was missing its LLM
+   * branch, so th/he threw 'Romanization not configured' and every attempt
+   * was recorded as a permanent failure), and Thai has since moved from
+   * Paiboon to RTGS. Both sets are stale, so the lazy path replaces them on
+   * the next view.
+   */
+  llmThai: 'gemini-3.8-flash-flex-th-v2',
+  llmHebrew: 'gemini-3.8-flash-flex-he-v1',
 } as const;
 
 export type RomanizationSource =
   (typeof ROMANIZATION_SOURCES)[keyof typeof ROMANIZATION_SOURCES];
+
+/**
+ * Tag per model-routed language. Every `romanizationBackend: 'llm'` entry in
+ * lib/languages.ts needs one here AND a convention in romanizationPrompt.ts;
+ * convex/tests/lib/romanizationPrompt.test.ts checks both.
+ */
+const LLM_ROMANIZATION_SOURCES: Partial<Record<string, RomanizationSource>> = {
+  th: ROMANIZATION_SOURCES.llmThai,
+  he: ROMANIZATION_SOURCES.llmHebrew,
+};
 
 /**
  * Resolve the source identifier we'll use (or just used) for a language.
@@ -93,24 +131,26 @@ export function getRomanizationSource(language: string): RomanizationSource {
   }
   if (language === 'el') return ROMANIZATION_SOURCES.greekUtils;
   if (language === 'ko') return ROMANIZATION_SOURCES.esHangul;
-  if (language === 'he') return ROMANIZATION_SOURCES.hebrewTransliteration;
   if (language === 'yue' || language === 'yue_traditional') {
     return ROMANIZATION_SOURCES.toJyutping;
-  }
-  if (
-    language === 'ar' ||
-    language === 'ar_sa' ||
-    language === 'ar_eg' ||
-    language === 'ar_iq' ||
-    language === 'ar_lev'
-  ) {
-    return ROMANIZATION_SOURCES.arabicTransliterate;
   }
   if (language === 'fa') return ROMANIZATION_SOURCES.sindresorhusTransliterate;
   if (language === 'te') return ROMANIZATION_SOURCES.sanscriptIso15919;
   if (language === 'bg') return ROMANIZATION_SOURCES.bulgarianStreamlined;
-  // Everything else in ROMANIZATION_LANGUAGES (ru, hi, ja, bn, ta, uk, sr)
-  // routes through Google v3. See `romanizeText` in convex/features/translation.ts.
+  // th and he have no library and no Google support, so they route to the
+  // model. See LLM_ROMANIZATION_LANGUAGES and `romanizeText`.
+  if (usesLlmRomanization(language)) {
+    const source = LLM_ROMANIZATION_SOURCES[language];
+    if (source === undefined) {
+      throw new Error(
+        `No romanization source tag for model-routed language "${language}"; add it to LLM_ROMANIZATION_SOURCES`,
+      );
+    }
+    return source;
+  }
+  // Everything else in ROMANIZATION_LANGUAGES (ru, hi, ja, bn, ta, uk, sr,
+  // and ar since Sep 2026) routes through Google v3. See `romanizeText` in
+  // convex/features/translation.ts.
   return ROMANIZATION_SOURCES.googleV3;
 }
 
@@ -143,22 +183,8 @@ export function romanizeLocal(text: string, language: string): string | null {
   }
   if (language === 'el') return greekUtils.toPhoneticLatin(text);
   if (language === 'ko') return romanizeHangul(text);
-  if (language === 'he') return transliterateHebrew(text);
   if (language === 'yue' || language === 'yue_traditional') {
     return romanizeCantonese(text);
-  }
-  if (
-    language === 'ar' ||
-    language === 'ar_sa' ||
-    language === 'ar_eg' ||
-    language === 'ar_iq' ||
-    language === 'ar_lev'
-  ) {
-    // IJMES Arabic→Latin transliteration. The library treats all dialects as
-    // the same script (it operates on the Arabic Unicode block), so the
-    // dialect tail of the code is irrelevant here. Pass language='Arabic'
-    // (the library's switch key, NOT the BCP-47 tag).
-    return arabictransliterate(text, 'arabic2latin', 'Arabic') as string;
   }
   if (language === 'fa') {
     // Persian (Perso-Arabic script). `@sindresorhus/transliterate` maps the

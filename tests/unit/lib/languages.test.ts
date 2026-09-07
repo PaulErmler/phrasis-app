@@ -268,36 +268,56 @@ describe('getLocalizedLanguageNameByCode', () => {
 });
 
 describe('IPA helpers', () => {
+  // Languages whose espeak voice produced wrong transcriptions and lost its
+  // `ipaVoice` in Sep 2026. Each entry in lib/languages.ts carries the
+  // specific failure; tests/node/espeak-ipa.test.ts is the audit that finds
+  // this class. Re-adding one of these needs the audit to pass first.
+  const NO_ESPEAK_VOICE = [
+    'ja',
+    'fil',
+    'th',
+    'he',
+    'ar',
+    'ar_sa',
+    'ar_eg',
+    'ar_iq',
+    'ar_lev',
+    'zh',
+    'zh_traditional',
+    'yue',
+    'yue_traditional',
+    'vi',
+    'vi_south',
+    'ko',
+  ];
+
   it('languageNeedsIpa follows the ipaVoice field', () => {
     expect(languageNeedsIpa('en')).toBe(true);
     expect(languageNeedsIpa('fr')).toBe(true);
-    expect(languageNeedsIpa('zh')).toBe(true);
-    expect(languageNeedsIpa('th')).toBe(true);
+    expect(languageNeedsIpa('el')).toBe(true);
+    expect(languageNeedsIpa('hi')).toBe(true);
   });
 
-  it('excludes the two languages espeak cannot serve', () => {
-    // ja: espeak reads kana only, would garble kanji. fil: no voice at all.
-    expect(languageNeedsIpa('ja')).toBe(false);
-    expect(languageNeedsIpa('fil')).toBe(false);
-    expect(IPA_LANGUAGES.has('ja')).toBe(false);
-    expect(IPA_LANGUAGES.has('fil')).toBe(false);
+  it.each(NO_ESPEAK_VOICE)('excludes %s', (code) => {
+    expect(languageNeedsIpa(code)).toBe(false);
+    expect(IPA_LANGUAGES.has(code)).toBe(false);
   });
 
-  it('covers every supported language except ja and fil', () => {
+  it('covers every supported language except those', () => {
     const uncovered = SUPPORTED_LANGUAGES.filter(
       (l) => l.ipaVoice === undefined,
     ).map((l) => l.code);
-    expect(uncovered.sort()).toEqual(['fil', 'ja']);
+    expect(uncovered.sort()).toEqual([...NO_ESPEAK_VOICE].sort());
   });
 
   it('getIpaVoice maps regional codes onto espeak voices', () => {
-    expect(getIpaVoice('zh')).toBe('cmn');
-    expect(getIpaVoice('zh_traditional')).toBe('cmn');
     expect(getIpaVoice('pt')).toBe('pt-br');
-    expect(getIpaVoice('ar_eg')).toBe('ar');
-    expect(getIpaVoice('vi_south')).toBe('vi-vn-x-south');
+    expect(getIpaVoice('pt_pt')).toBe('pt-pt');
+    expect(getIpaVoice('es_latam')).toBe('es-419');
+    expect(getIpaVoice('en_au')).toBe('en');
     expect(getIpaVoice('uz')).toBe('uz');
     expect(getIpaVoice('ja')).toBeNull();
+    expect(getIpaVoice('th')).toBeNull();
   });
 });
 

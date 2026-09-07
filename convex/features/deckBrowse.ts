@@ -26,6 +26,7 @@ import {
   buildTextContentBatchForLanguages,
   sourceTextFromContent,
 } from '../lib/cardContent';
+import { annotationFieldsOf } from '../lib/textAnnotations';
 import {
   LEGACY_LEVEL_ORDER,
   effectiveTextCount,
@@ -95,9 +96,9 @@ export async function getDeckCardsHandler(
         textId: card.textId,
         sourceText: text.text,
         sourceLanguage: text.language,
-        sourceRomanization: text.romanizedText ?? undefined,
-        sourceIpa: text.ipaText ?? undefined,
-        sourceFurigana: text.furiganaText ?? undefined,
+        // Values and engine tags together: see sourceAnnotations in
+        // convex/lib/cardContent.ts.
+        sourceAnnotations: annotationFieldsOf(text),
         userCreated: text.userCreated,
         renderingText: renderingTextOf(text),
         view: viewOfCard(card, renderingSettings),

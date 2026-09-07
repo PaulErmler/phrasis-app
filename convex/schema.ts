@@ -33,6 +33,8 @@ import {
   newCardsByOriginValidator,
   cardEditKindValidator,
   cardEditPathValidator,
+  flagReasonValidator,
+  politenessLevelValidator,
   cardEditLanguageRoleValidator,
   retranslationStatusValidator,
   firstPersonFormsValidator,
@@ -511,6 +513,22 @@ export default defineSchema({
     tenseAspect: v.optional(v.string()), // simple_present / past_continuous / etc.
     sentenceType: v.optional(v.string()), // declarative / interrogative / imperative / exclamatory
     literalFigurative: v.optional(v.string()), // literal / figurative
+    // Which sentence-metadata classifier build produced the linguistic
+    // metadata above (`SENTENCE_METADATA_SOURCES` in
+    // convex/lib/sentenceMetadataShape.ts). Same invalidate-by-source
+    // contract as `romanizationSource`, with one more meaning: on a
+    // curriculum text, undefined means the row was never classified and
+    // `speakerGender` / `referentGender` are the coin flips the sweep and
+    // the offline curation wrote; only a row at the CURRENT source carries
+    // verdicts the resolver may treat as evidence. Stamped by
+    // `applyTextMetadata`; the content sweep classifies curriculum texts
+    // lazily (`needsSentenceMetadata` in convex/lib/contentScheduling.ts).
+    metadataSource: v.optional(v.string()),
+    // When a sweep last asked the classifier for this text, so the repeated
+    // sweeps of one card do not double the call while it is in flight, and
+    // a blank answer is retried after a cooldown. Same shape as
+    // `translations.renderingStampRequestedAt`.
+    metadataRequestedAt: v.optional(v.number()),
     // OGTE arc grouping (curation manifest). Sentences sharing the same
     // (collectionId, arcId) form a thematic sequence; the translation worker
     // pulls a sliding window of arc siblings into the LLM prompt so pronouns,
@@ -1034,6 +1052,15 @@ export default defineSchema({
     // backfilled, never indexed. Cleared when an edit forks the text into a
     // user-owned copy.
     followsCoursePreferences: v.optional(v.literal(true)),
+    // Per-card corrections written by the Flag dialog ("wrong speaker
+    // gender" / "wrong politeness" with a pick). The resolver
+    // (lib/preferenceResolution.ts) reads them above the course settings
+    // and below a definitive `texts.speakerGender`, and they apply even to
+    // a card from before the sentence-form settings (an explicit gesture on
+    // one card, unlike a course-wide setting). Inert on user-written texts.
+    // Never indexed. Cleared when an edit forks the text.
+    renderingGenderOverride: v.optional(voiceGenderValidator),
+    renderingPolitenessOverride: v.optional(politenessLevelValidator),
   })
     // INDEX BUDGET — read before adding an index here. This table carries 23
     // database indexes (limit 32) and EVERY card write pays for updating all
@@ -1681,10 +1708,18 @@ export default defineSchema({
         soundsSame: v.optional(v.boolean()),
       }),
     ),
+    // What the user said was wrong, `kind: 'flag'` only. One gesture, one
+    // reason set, so it lives on the parent rather than per language.
+    flagReasons: v.optional(v.array(flagReasonValidator)),
+    // Free text typed under the "other" reason, trimmed and capped.
+    flagNote: v.optional(v.string()),
   })
     .index('by_userId', ['userId'])
     // Convex appends _creationTime, so this also orders within a kind.
-    .index('by_kind', ['kind']),
+    .index('by_kind', ['kind'])
+    // The flag reward is paid once per card per user: a point read for
+    // "has this user flagged this card before" (features/scheduling.ts).
+    .index('by_userId_and_cardIdBefore', ['userId', 'cardIdBefore']),
 
   // One row per retranslation a `cardEdits` gesture triggered, from enqueue to
   // resolution. A child table rather than an array on the parent: the outcome
@@ -1720,6 +1755,16 @@ export default defineSchema({
     .index('by_cardEditId', ['cardEditId'])
     .index('by_userId', ['userId'])
     .index('by_status', ['status']),
+
+  // Credits paid out for flagging, counted per user per calendar month so
+  // the monthly cap (`FLAG_REWARDS_PER_MONTH` in lib/languages.ts) is one
+  // point read instead of a scan of `cardEdits`. A flag over the cap still
+  // works; it just stops paying.
+  flagRewards: defineTable({
+    userId: v.string(),
+    period: v.string(), // 'YYYY-MM', UTC
+    count: v.number(),
+  }).index('by_user_and_period', ['userId', 'period']),
 
   // TTS mismatches. Stores audio that failed validation for later analysis
   ttsMismatches: defineTable({

@@ -138,6 +138,7 @@ import type * as lib_rateLimitReserve from "../lib/rateLimitReserve.js";
 import type * as lib_renderingClassifier from "../lib/renderingClassifier.js";
 import type * as lib_resendClient from "../lib/resendClient.js";
 import type * as lib_reviewTimeStats from "../lib/reviewTimeStats.js";
+import type * as lib_romanizationPrompt from "../lib/romanizationPrompt.js";
 import type * as lib_sentenceMetadataPrompt from "../lib/sentenceMetadataPrompt.js";
 import type * as lib_sentenceMetadataShape from "../lib/sentenceMetadataShape.js";
 import type * as lib_serbianTranslit from "../lib/serbianTranslit.js";
@@ -324,6 +325,7 @@ declare const fullApi: ApiFromModules<{
   "lib/renderingClassifier": typeof lib_renderingClassifier;
   "lib/resendClient": typeof lib_resendClient;
   "lib/reviewTimeStats": typeof lib_reviewTimeStats;
+  "lib/romanizationPrompt": typeof lib_romanizationPrompt;
   "lib/sentenceMetadataPrompt": typeof lib_sentenceMetadataPrompt;
   "lib/sentenceMetadataShape": typeof lib_sentenceMetadataShape;
   "lib/serbianTranslit": typeof lib_serbianTranslit;

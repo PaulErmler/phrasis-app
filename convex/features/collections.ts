@@ -29,6 +29,7 @@ import {
 import {
   enqueueVersionBumpRegen,
   flushRenderingStamps,
+  newMetadataCallBudget,
   newRenderingStampCollector,
   scheduleMissingContent,
   scheduleTranslationForLanguage,
@@ -51,6 +52,7 @@ import {
   resolveCardSpeakerGenders,
 } from '../../lib/languages';
 import {
+  annotationFieldsOf,
   missingAnnotationKinds,
   scheduleTranslationAnnotations,
   TEXT_ANNOTATIONS,
@@ -265,9 +267,9 @@ export const browseCollectionTexts = query({
       textId: row.text._id,
       sourceText: row.text.text,
       sourceLanguage: row.text.language,
-      sourceRomanization: row.text.romanizedText ?? undefined,
-      sourceIpa: row.text.ipaText ?? undefined,
-      sourceFurigana: row.text.furiganaText ?? undefined,
+      // Values and engine tags together: see sourceAnnotations in
+      // convex/lib/cardContent.ts.
+      sourceAnnotations: annotationFieldsOf(row.text),
       userCreated: row.text.userCreated,
       renderingText: renderingTextOf(row.text),
       // The learner's card when they have one, so the preview shows the
@@ -304,21 +306,11 @@ export const browseCollectionTexts = query({
       // the feature). The client's requestPreviewTranslations batching keys
       // off `missingTranslationLanguages`, so without this flag those rows
       // were never requested and the annotation gap stayed visible forever
-      // in the preview. Projected values mirror the stored tri-state for
-      // course languages, so `=== undefined` (via missingAnnotationKinds)
-      // honours the '' failure sentinel here too.
-      const needsAnnotationBackfill =
-        missingAnnotationKinds(row.text.language, row.text).length > 0 ||
-        content.translations.some(
-          (tr) =>
-            tr.language !== row.text.language &&
-            tr.text.length > 0 &&
-            missingAnnotationKinds(tr.language, {
-              romanizedText: tr.romanization,
-              ipaText: tr.ipa,
-              furiganaText: tr.furigana,
-            }).length > 0,
-        );
+      // in the preview. The batch's own probe reads the stored rows with
+      // their engine tags; re-deriving it from the projected values here
+      // could not see a stale-engine row, so a Hebrew preview kept its old
+      // consonant-only line until the card was opened elsewhere.
+      const needsAnnotationBackfill = content.hasMissingAnnotation;
       return {
         _id: row.text._id,
         text: sourceTextFromContent(content, row.text),
@@ -852,8 +844,11 @@ export const ensureFirstSentencesForCollection = internalMutation({
       .order('asc')
       .take(COLLECTION_PREVIEW_SIZE);
 
-    // One rendering-stamp flush for the batch (25 rows per classifier call).
+    // One rendering-stamp flush for the batch (25 rows per classifier call),
+    // and one metadata-call budget so the warm asks the sentence classifier
+    // for at most five texts per collection.
     const stamps = newRenderingStampCollector();
+    const metadataCalls = newMetadataCallBudget();
     await Promise.all(
       texts.map((text) =>
         scheduleMissingContent(
@@ -864,7 +859,7 @@ export const ensureFirstSentencesForCollection = internalMutation({
           args.targetLanguages,
           // Signup-time warm of ~20 collections × 5 texts: background, so
           // this burst can't queue ahead of the user's own cards.
-          { priority: 'background', stamps },
+          { priority: 'background', stamps, metadataCalls },
         ),
       ),
     );

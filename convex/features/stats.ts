@@ -48,6 +48,7 @@ import { getDailyStats } from '../db/stats/dailyStats';
 import { getCourseSettings } from '../db/courseSettings';
 import { type FsrsStateLabel } from '../lib/fsrsStates';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
+import { annotationFieldsOf } from '../lib/textAnnotations';
 import { normalizeLanguageCode } from '../../lib/languages';
 import { getTargetLanguageWordCounts } from '../db/stats/languageStats';
 
@@ -763,9 +764,9 @@ export const getSentencesForWord = query({
           textId: link.textId,
           sourceText: text.text,
           sourceLanguage: text.language,
-          sourceRomanization: text.romanizedText ?? undefined,
-          sourceIpa: text.ipaText ?? undefined,
-          sourceFurigana: text.furiganaText ?? undefined,
+          // Values and engine tags together: see sourceAnnotations in
+          // convex/lib/cardContent.ts.
+          sourceAnnotations: annotationFieldsOf(text),
           userCreated: text.userCreated,
           renderingText: renderingTextOf(text),
           card: cardDocs[i] ?? null,

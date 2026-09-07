@@ -430,7 +430,7 @@ export const saveAlternativeAudio = internalMutation({
         ttsProvider: args.provider,
         ttsQuality: 'unvalidated',
         speed: 1,
-        ttsVersion: getCurrentTtsVersion(args.language),
+        ttsVersion: getCurrentTtsVersion(key.language, key.regionVariant),
       });
       if (result.outcome === 'kept') {
         await deleteStorageBlobIfUnreferenced(ctx, args.storageId);

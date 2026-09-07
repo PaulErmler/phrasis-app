@@ -631,8 +631,11 @@ export async function repointCardAtEditedText(
       textId: resolvedTextId,
       accentLanguage: undefined,
       // A user-owned copy never follows the course's sentence-form
-      // settings (schema.ts).
+      // settings (schema.ts), and a per-card correction was a correction of
+      // the shared rendering the copy no longer reads.
       followsCoursePreferences: undefined,
+      renderingGenderOverride: undefined,
+      renderingPolitenessOverride: undefined,
       searchableText,
       searchableTextLanguages,
       // Backfill defaults for cards predating these fields, applied on

@@ -255,3 +255,32 @@ describe('resolveCardSpeakerGenders', () => {
     expect(r.audioSpeakerGender).toBe('female');
   });
 });
+
+describe('resolveCardSpeakerGenders on a classified curriculum text', () => {
+  it('keeps a neutral verdict instead of writing the coin flip over it', () => {
+    const r = resolveCardSpeakerGenders(
+      {
+        speakerGender: 'neutral',
+        audioSpeakerGender: undefined,
+        userCreated: false,
+        metadataSource: 'gemini-3.1-flash-lite-v1',
+      },
+      'seed-classified',
+    );
+    expect(['male', 'female']).toContain(r.audioSpeakerGender);
+    expect(r.genderPatch.speakerGender).toBeUndefined();
+    expect(r.genderPatch.audioSpeakerGender).toBe(r.audioSpeakerGender);
+  });
+
+  it('still coin-flips both fields on an unclassified premade text', () => {
+    const r = resolveCardSpeakerGenders(
+      {
+        speakerGender: 'neutral',
+        audioSpeakerGender: undefined,
+        userCreated: false,
+      },
+      'seed-legacy',
+    );
+    expect(r.genderPatch.speakerGender).toBe(r.audioSpeakerGender);
+  });
+});

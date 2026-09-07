@@ -407,6 +407,22 @@ export function sumOriginBuckets(split: NewCardsByOrigin): number {
  * rather than inferred from the row's shape: the three gestures have different
  * retranslation policies and are the unit later analytics will group by.
  */
+/**
+ * What a learner ticked in the Flag dialog. Multi-select; stored on the
+ * `cardEdits` row of the gesture. Each reason decides different work in
+ * `flagTranslation` (features/scheduling.ts).
+ */
+export const FLAG_REASON_VALUES = [
+  'wrong_translation',
+  'wrong_gender',
+  'wrong_politeness',
+  'other',
+] as const;
+export const flagReasonValidator = v.union(
+  ...FLAG_REASON_VALUES.map((value) => v.literal(value)),
+);
+export type FlagReason = (typeof FLAG_REASON_VALUES)[number];
+
 export const cardEditKindValidator = v.union(
   v.literal('manual_edit'), // the Edit Card dialog (features/scheduling:editCard)
   v.literal('chat_also_correct'), // chat replace (chat/cardApprovals)
@@ -490,6 +506,13 @@ export const translationReasonValidator = v.union(
   // cards (see `supersededAt` in schema.ts). Carries no previous
   // translation: the point is a fresh rendering, not a reconsideration.
   v.literal('version_bump'),
+  // The sentence-metadata classifier landed a definitive speaker gender on
+  // a curriculum text and this row's rendering stamp proves it was written
+  // in the other one (`sweepStaleTranslations` in lib/contentScheduling.ts).
+  // Same keep-row, archive-the-old-wording write as 'version_bump'; a
+  // separate reason because no user flagged anything and the audit must
+  // not say one did.
+  v.literal('metadata_correction'),
 );
 export type TranslationReason = Infer<typeof translationReasonValidator>;
 
@@ -543,9 +566,8 @@ export const POLITENESS_LEVEL_VALUES = ['casual', 'polite', 'formal'] as const;
 export const firstPersonFormsValidator = literalUnion(
   FIRST_PERSON_FORMS_VALUES,
 );
-export const politenessLevelsValidator = v.array(
-  literalUnion(POLITENESS_LEVEL_VALUES),
-);
+export const politenessLevelValidator = literalUnion(POLITENESS_LEVEL_VALUES);
+export const politenessLevelsValidator = v.array(politenessLevelValidator);
 // What a stored rendering actually is, stamped by the rendering classifier
 // (convex/lib/renderingClassifier.ts) on generation and by the backfill
 // migration on legacy rows. 'unmarked' = the wording carries no such form.
@@ -564,6 +586,15 @@ export const RENDERED_POLITENESS_VALUES = [
 export const renderingSettingsValidator = v.object({
   firstPersonForms: v.optional(firstPersonFormsValidator),
   politenessLevels: v.optional(politenessLevelsValidator),
+});
+/**
+ * The `cards` fields the resolver reads (`RenderingCard` in
+ * lib/preferenceResolution.ts), as the per-card ensure jobs carry them.
+ */
+export const renderingCardValidator = v.object({
+  followsCoursePreferences: v.optional(v.literal(true)),
+  renderingGenderOverride: v.optional(voiceGenderValidator),
+  renderingPolitenessOverride: v.optional(politenessLevelValidator),
 });
 export const renderedGenderValidator = literalUnion(RENDERED_GENDER_VALUES);
 export const renderedPolitenessValidator = literalUnion(

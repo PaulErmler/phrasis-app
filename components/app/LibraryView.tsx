@@ -518,7 +518,12 @@ export function LibraryView({
                         (tr) => tr.isTargetLanguage,
                       );
                       if (!hasTarget) return undefined;
-                      return () => cardActions.requestFlag(card._id);
+                      return () =>
+                        cardActions.requestFlag(card._id, {
+                          userCreated:
+                            card.collectionOrigin === 'custom' ||
+                            card.collectionOrigin === 'chat',
+                        });
                     })(),
                     pinnedActions: pinnedCardActions,
                     onUpdatePinnedActions: cardActions.updatePinnedActions as (

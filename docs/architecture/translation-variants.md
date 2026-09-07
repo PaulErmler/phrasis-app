@@ -10,13 +10,24 @@ and the invariants every reader and writer of `translations` and
 1. `texts` is the identity of a meaning. Cards, review history, collections
    and search bind to `textId`. A text carries content semantics only: a
    definitive speaker gender when the sentence itself is gendered ("I'm
-   pregnant"), and the register metadata the classifier guessed. Nothing in
-   the variant path ever writes a `texts` row.
+   pregnant", "We are brothers"), and the register metadata the classifier
+   guessed. On a curriculum text those fields are evidence only when
+   `texts.metadataSource` is the current classifier build
+   (lib/sentenceMetadataSource.ts); before that they are the coin flips the
+   sweep and the offline curation wrote, and the content sweep asks the
+   classifier for the text lazily, from the source sentence alone, the
+   first time a learner meets it (`requestSentenceMetadataIfNeeded`). The
+   translations get no vote: they were generated from the coin flip and are
+   the thing under suspicion. Nothing in the variant path ever writes a
+   `texts` row.
 2. `courseSettings.firstPersonForms` (masculine / feminine / both) and
    `courseSettings.politenessLevels` (a SET of casual / polite / formal) are
    the preference. Undefined means canonical, which is exactly what every
    user saw before the feature. `onboardingProgress` carries the same two
-   fields until `completeOnboarding` copies them over.
+   fields until `completeOnboarding` copies them over. A card can carry its
+   own correction, `cards.renderingGenderOverride` and
+   `renderingPolitenessOverride`, written by the Flag dialog; it outranks
+   the settings and applies to any curriculum card, stamp or not.
 3. `lib/preferenceResolution.ts` is the one resolver. Given a text, a
    language, the settings and the card, it returns the card-wide gender axis
    and voice (`resolveCardRendering`) and, per language, the politeness form
@@ -55,9 +66,12 @@ resolves to one form on German (du) and never alternates there.
 - Cards without the stamp (from before the feature) and every card on a
   user-written text (custom, chat, import) read the canonical rows for good.
   The chips still show what those rows are, from the backfilled stamps.
-- A definitive `texts.speakerGender` wins over the setting only on a
-  user-written text (the classifier's verdict); on a curriculum text the
-  field is the coin flip the sweep wrote back, so it is ignored.
+- Precedence for the gender axis: a definitive `texts.speakerGender` that
+  is evidence (a user-written text's verdict, or a curriculum text at the
+  current `metadataSource`), then the card's override, then the setting.
+  On an unclassified curriculum text the field is the coin flip the sweep
+  wrote back, so it is ignored. A sentence that fixes its own gender is
+  served canonical in that voice by every card.
 - An address language (T-V) renders a sentence without a "you" the same at
   every level, so the resolver returns no form for it; predicate (ja, ko),
   particle (th, fil) and pronoun (vi, id, ms) languages get a form on every
@@ -74,12 +88,21 @@ resolves to one form on German (du) and never alternates there.
    the silent-wrong-rendering bug. Only `convex/db/translationReads.ts` may
    name the indexes (`convex/tests/lib/translationsIndexInvariant.test.ts`).
 3. A rendering is never deleted because another was requested. The
-   gender-drift deletions in the canonical sweep are gone; a canonical row
-   keeps whatever gender it was generated under. The one deletion left is a
-   canonical WORDING change (flag, curriculum fix, version bump):
-   `retireVariantRenderings` drops the pair's variant rows and keyed
-   pointers, assets cached, because they were rewrites of the old wording;
-   the next ensure pass rewrites them from the new one.
+   gender-drift-by-preference deletions in the canonical sweep are gone; a
+   canonical row keeps whatever gender it was generated under. The one
+   deletion left is a canonical WORDING change (flag, curriculum fix,
+   version bump, metadata correction): `retireVariantRenderings` drops the
+   pair's variant rows and keyed pointers, assets cached, because they were
+   rewrites of the old wording; the next ensure pass rewrites them from the
+   new one. Two in-place regenerations exist, both keep-row writes that
+   archive the old wording for pinned cards: a `translationVersion` bump,
+   and a `'metadata_correction'`, when the classifier has fixed the
+   speaker's gender on a curriculum text and the row's `renderedGender`
+   stamp proves the wording was written in the other one. Only a proven
+   row: `unmarked` and unstamped rows are left alone, and the row's own
+   `speakerGender` (the gender it was generated under) stops the sweep from
+   asking twice. The same verdict re-voices the canonical clips
+   (`sweepInvalidAudio`), since no variant would ever replace them.
 4. Variant LLM jobs never fall back to Google Translate (it cannot control
    gender or register); the claim is released and canonical keeps serving.
 5. Claims are keyed by variant, so two learners with the same preference

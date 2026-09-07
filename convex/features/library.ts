@@ -13,6 +13,7 @@ import {
   buildTextContentBatchForLanguages,
   sourceTextFromContent,
 } from '../lib/cardContent';
+import { annotationFieldsOf } from '../lib/textAnnotations';
 import { cardOriginPillFields } from '../lib/collections';
 import { searchSegments } from '../../lib/wordTokenize';
 import {
@@ -346,9 +347,9 @@ export const getLibraryCards = query({
           textId: card.textId,
           sourceText: text.text,
           sourceLanguage: text.language,
-          sourceRomanization: text.romanizedText ?? undefined,
-          sourceIpa: text.ipaText ?? undefined,
-          sourceFurigana: text.furiganaText ?? undefined,
+          // Values and engine tags together: see sourceAnnotations in
+          // convex/lib/cardContent.ts.
+          sourceAnnotations: annotationFieldsOf(text),
           userCreated: text.userCreated,
           renderingText: renderingTextOf(text),
           view: viewOfCard(card, renderingSettings),

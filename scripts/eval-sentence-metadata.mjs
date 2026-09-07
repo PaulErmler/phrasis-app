@@ -84,6 +84,10 @@ const FIELDS = [
   { key: 'speakerGender', values: GENDER_VALUES },
   { key: 'addresseeGender', values: ADDRESSEE_GENDER_VALUES },
   { key: 'addressesSomeone', values: ['true', 'false'], booleanField: true },
+  // The third party's gender when the sentence fixes it ("my sister");
+  // 'neutral' keeps the production coin flip. Added 2026-09-07 with the
+  // curriculum reclassification; gold only where a row labels it.
+  { key: 'referentGender', values: GENDER_VALUES },
 ];
 const FIELD_KEYS = FIELDS.map((f) => f.key);
 
@@ -132,6 +136,7 @@ const EXTRA_GOLD_FIELDS = [
   'addresseeNumber',
   'addresseeGender',
   'addressesSomeone',
+  'referentGender',
 ];
 const IGNORED_FIELDS = new Set(['glossEn', 'sourceUrl', 'notes']);
 

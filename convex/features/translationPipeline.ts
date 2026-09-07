@@ -1214,7 +1214,8 @@ export async function storeTranslationAndScheduleTTSHandler(
   const write = !existing
     ? await insertTranslationRow(ctx, args, translatedText, romanizedText)
     : args.replaceExisting
-      ? args.translationReason === 'version_bump'
+      ? args.translationReason === 'version_bump' ||
+        args.translationReason === 'metadata_correction'
         ? await replaceForVersionBump(
             ctx,
             args,

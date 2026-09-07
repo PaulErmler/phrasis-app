@@ -11,7 +11,7 @@ import {
   buildTextContentBatchForLanguages,
 } from '../../lib/cardContent';
 import { ProbeNeedsWork } from '../../lib/contentScheduling';
-import { IPA_SOURCES } from '../../lib/textAnnotations';
+import { IPA_SOURCES, annotationFieldsOf } from '../../lib/textAnnotations';
 import { deleteAudioRow } from '../../lib/audio';
 import { scheduleMissingContent } from '../../features/decks';
 import { scheduleMissingTranslationsForText } from '../../features/collections';
@@ -324,10 +324,7 @@ async function hydrate(
           textId,
           sourceText: text.text,
           sourceLanguage: text.language,
-          // Same tri-state handling as every real caller (`?? undefined`).
-          sourceRomanization: text.romanizedText ?? undefined,
-          sourceIpa: text.ipaText ?? undefined,
-          sourceFurigana: text.furiganaText ?? undefined,
+          sourceAnnotations: annotationFieldsOf(text),
           userCreated: text.userCreated,
           view: { pinAt },
         },
@@ -716,9 +713,14 @@ describe('flagTranslation on a pinned card', () => {
 
     const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
       cardId: cardId!,
+      reasons: ['wrong_translation'],
     });
 
-    expect(res).toEqual({ retranslated: false, updatedToLatest: true });
+    expect(res).toEqual({
+      retranslated: false,
+      updatedToLatest: true,
+      creditsAwarded: 0,
+    });
     const card = await t.run(async (ctx) => (await ctx.db.get(cardId!))!);
     expect(card.translationsAcceptedAt).toBeGreaterThan(pinAt);
     expect(card.searchableText).toContain('klar');
@@ -763,9 +765,14 @@ describe('flagTranslation on a pinned card', () => {
 
     const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
       cardId: cardId!,
+      reasons: ['wrong_translation'],
     });
 
-    expect(res).toEqual({ retranslated: true, updatedToLatest: false });
+    expect(res).toEqual({
+      retranslated: true,
+      updatedToLatest: false,
+      creditsAwarded: 0,
+    });
     expect((await t.run((ctx) => ctx.db.get(translationId)))!.flagCount).toBe(
       1,
     );
@@ -791,9 +798,14 @@ describe('flagTranslation on a pinned card', () => {
 
     const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
       cardId: cardId!,
+      reasons: ['wrong_translation'],
     });
 
-    expect(res).toEqual({ retranslated: true, updatedToLatest: true });
+    expect(res).toEqual({
+      retranslated: true,
+      updatedToLatest: true,
+      creditsAwarded: 0,
+    });
     const enqueued = llmEnqueues();
     expect(enqueued.map((e) => e.targetLanguage)).toEqual(['fr']);
     const rows = await t.run((ctx) =>
@@ -1335,6 +1347,7 @@ describe('the "Retranslating" pill during a bump', () => {
     const asUser = t.withIdentity({ subject: 'user_A' });
     await asUser.mutation(api.features.scheduling.flagTranslation, {
       cardId: cardId!,
+      reasons: ['wrong_translation'],
     });
     expect(llmEnqueues().length).toBe(1);
     expect((await hydrate(t, textId, undefined)).retranslating).toBe(true);

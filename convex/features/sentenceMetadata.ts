@@ -44,6 +44,7 @@ export {
   ALLOWED_ADDRESSEE_NUMBER,
   ALLOWED_SPEAKER_GENDER,
   ALLOWED_ADDRESSEE_GENDER,
+  ALLOWED_REFERENT_GENDER,
   validateSentenceMetadata,
   type Metadata,
 } from '../lib/sentenceMetadataShape';
@@ -52,6 +53,8 @@ import {
   ALLOWED_ADDRESSEE_NUMBER,
   ALLOWED_SPEAKER_GENDER,
   ALLOWED_ADDRESSEE_GENDER,
+  ALLOWED_REFERENT_GENDER,
+  CURRENT_SENTENCE_METADATA_SOURCE,
   type Metadata,
 } from '../lib/sentenceMetadataShape';
 
@@ -105,6 +108,7 @@ function safeExtractMetadata(raw: string): Partial<Metadata> {
   pickField(stringOut, obj, 'addresseeNumber', ALLOWED_ADDRESSEE_NUMBER);
   pickField(stringOut, obj, 'speakerGender', ALLOWED_SPEAKER_GENDER);
   pickField(stringOut, obj, 'addresseeGender', ALLOWED_ADDRESSEE_GENDER);
+  pickField(stringOut, obj, 'referentGender', ALLOWED_REFERENT_GENDER);
   Object.assign(out, stringOut);
   // addressesSomeone is the only boolean field. Handle separately.
   if (typeof obj.addressesSomeone === 'boolean') {
@@ -311,6 +315,7 @@ export async function applyTextMetadata(
       speakerGender?: string;
       addresseeGender?: string;
       addressesSomeone?: boolean;
+      referentGender?: string;
     };
     schedulePrepareCard: boolean;
     baseLanguages: string[];
@@ -361,6 +366,14 @@ export async function applyTextMetadata(
   if (args.metadata?.addressesSomeone !== undefined) {
     metadataPatch.addressesSomeone = args.metadata.addressesSomeone;
   }
+  // A definitive third-party gender ("my sister", "her husband") replaces
+  // whatever coin flip stood there; "neutral" leaves the flip below to it.
+  if (
+    args.metadata?.referentGender === 'male' ||
+    args.metadata?.referentGender === 'female'
+  ) {
+    metadataPatch.referentGender = args.metadata.referentGender;
+  }
 
   // ── addresseeGender coin-flip ──
   // When the sentence addresses someone but the LLM didn't commit to a
@@ -390,16 +403,34 @@ export async function applyTextMetadata(
   }
 
   // ── referentGender coin-flip ──
-  // Always pick a gender for the third-party referent, so gendered nouns
-  // (translator → Übersetzer/-in, doctor → Arzt/Ärztin) get a consistent
-  // assignment that's stable across target languages. Once set, never re-roll.
-  if (text.referentGender !== 'male' && text.referentGender !== 'female') {
+  // When the classifier fixed no third party's gender, pick one so gendered
+  // nouns (translator → Übersetzer/-in, doctor → Arzt/Ärztin) get a
+  // consistent assignment that's stable across target languages. Once set,
+  // never re-roll; only a definitive verdict above replaces it.
+  if (
+    metadataPatch.referentGender === undefined &&
+    text.referentGender !== 'male' &&
+    text.referentGender !== 'female'
+  ) {
     metadataPatch.referentGender = Math.random() < 0.5 ? 'male' : 'female';
   }
+
+  // The source stamp says "these fields are the current classifier's
+  // verdict". Only a verdict that reached the speaker gender earns it: the
+  // unblock call (`metadata: undefined`) and a degraded partial patch leave
+  // the row unstamped, so a curriculum text's coin flip is never mistaken
+  // for evidence and the sweep asks again after the cooldown.
+  const classified = args.metadata?.speakerGender !== undefined;
 
   await ctx.db.patch(args.textId, {
     audioSpeakerGender,
     ...metadataPatch,
+    ...(classified
+      ? {
+          metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
+          metadataRequestedAt: undefined,
+        }
+      : {}),
   });
 
   // Finish the record this step owns: stamp the resolved gender onto the
@@ -470,6 +501,7 @@ export const applyMetadataAndPrepareCard = internalMutation({
         speakerGender: v.optional(v.string()),
         addresseeGender: v.optional(v.string()),
         addressesSomeone: v.optional(v.boolean()),
+        referentGender: v.optional(v.string()),
       }),
     ),
     schedulePrepareCard: v.boolean(),

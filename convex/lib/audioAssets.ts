@@ -161,7 +161,9 @@ export async function findReusableAudioAsset(
 ): Promise<Doc<'audioAssets'> | null> {
   const asset = await findAudioAssetByKey(ctx, key);
   if (!asset) return null;
-  if (isTtsVersionStale(key.language, asset.ttsVersion)) return null;
+  if (isTtsVersionStale(key.language, asset.ttsVersion, key.regionVariant)) {
+    return null;
+  }
   const currentProvider = getTtsProviderForLanguage(key.language);
   if (shouldOverwriteProvider(currentProvider, asset.ttsProvider ?? 'google')) {
     return null;

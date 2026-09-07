@@ -499,7 +499,11 @@ export function LearningMode({
   const handleFlagPrimary = hasTargetTranslation
     ? () => {
         audio.pause();
-        state.cardActions.requestFlag(state.cardId);
+        state.cardActions.requestFlag(state.cardId, {
+          userCreated:
+            state.collectionOrigin === 'custom' ||
+            state.collectionOrigin === 'chat',
+        });
       }
     : undefined;
 

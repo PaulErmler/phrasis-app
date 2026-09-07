@@ -269,3 +269,73 @@ describe('resolveLanguageRendering', () => {
     expect(spain.form?.id).toBe('t');
   });
 });
+
+describe('per-card overrides and sentence evidence', () => {
+  const current = 'gemini-3.1-flash-lite-v1';
+
+  it('the override outranks the course setting and applies to a legacy card', () => {
+    const { cardRendering, language } = resolve(
+      'ru',
+      { firstPersonForms: 'masculine' },
+      premade,
+      { renderingGenderOverride: 'female' },
+    );
+    expect(cardRendering.gender).toBe('feminine');
+    expect(cardRendering.voiceGender).toBe('female');
+    expect(language.textVariantKey).toBe('female|auto');
+  });
+
+  it('a politeness override picks its own form without the settings', () => {
+    const { language } = resolve('ja', {}, premade, {
+      renderingPolitenessOverride: 'polite',
+    });
+    expect(language.form?.id).toBe('desu-masu');
+    expect(language.textVariantKey).toBe('auto|desu-masu');
+  });
+
+  it('a definitive speaker gender at the current source outranks both', () => {
+    const text: RenderingText = {
+      userCreated: false,
+      speakerGender: 'male',
+      audioSpeakerGender: 'male',
+      metadataSource: current,
+    };
+    const { cardRendering, language } = resolve(
+      'ru',
+      { firstPersonForms: 'feminine' },
+      text,
+      { followsCoursePreferences: true, renderingGenderOverride: 'female' },
+    );
+    expect(cardRendering.gender).toBe('auto');
+    expect(cardRendering.voiceGender).toBe('male');
+    expect(language.textVariantKey).toBeNull();
+  });
+
+  it('the coin flip written back on an unclassified text is not evidence', () => {
+    const text: RenderingText = {
+      userCreated: false,
+      speakerGender: 'male',
+      audioSpeakerGender: 'male',
+    };
+    const { cardRendering } = resolve(
+      'ru',
+      { firstPersonForms: 'feminine' },
+      text,
+    );
+    expect(cardRendering.gender).toBe('feminine');
+  });
+
+  it('an override is inert on a user-written text', () => {
+    const { cardRendering, language } = resolve(
+      'ru',
+      {},
+      { userCreated: true },
+      {
+        renderingGenderOverride: 'female',
+        renderingPolitenessOverride: 'polite',
+      },
+    );
+    expect(cardRendering.gender).toBe('auto');
+    expect(language.textVariantKey).toBeNull();
+  });
+});

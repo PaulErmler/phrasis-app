@@ -19,7 +19,15 @@ import {
   renderingTextOf,
   audioPointer,
   renderingForView,
+  renderingCardOf,
+  resolveServedRendering,
 } from '../db/translationReads';
+import { hasRenderingOverride } from '../../lib/preferenceResolution';
+import {
+  TEXT_ANNOTATIONS,
+  annotationFieldsOf,
+  type AnnotationKind,
+} from '../lib/textAnnotations';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, getUserSettings, requireAuthUserId } from '../db/users';
 import { studyDayFromSettings } from '../lib/dueSlots';
@@ -68,6 +76,10 @@ import {
   type StudyContentFilter,
   type FreePlayFace,
   type CardEditLanguageRole,
+  type FlagReason,
+  flagReasonValidator,
+  politenessLevelValidator,
+  voiceGenderValidator,
 } from '../types';
 import { cardOriginPillFields, originsForFilter } from '../lib/collections';
 import {
@@ -81,16 +93,19 @@ import { deleteAudioRow, deleteAudioRowsForTextLanguage } from '../lib/audio';
 import { normalizeForComparison } from '../lib/textComparison';
 import {
   FLAG_AUTO_RETRANSLATION_MAX,
+  FLAG_REWARD_CREDITS,
+  FLAG_REWARDS_PER_MONTH,
   usesSourceTextVerbatim,
 } from '../../lib/languages';
 import {
   isUserCreatedText,
   mayRegenerateTranslation,
 } from '../../lib/translationProvenance';
-import { consumeQuota } from '../usage/helpers';
+import { consumeQuota, grantCredits } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import {
   regenerateSupersededRevisionAudio,
+  requestSentenceMetadataIfNeeded,
   scheduleMissingContent,
   scheduleMissingRenderings,
 } from '../lib/contentScheduling';
@@ -360,9 +375,9 @@ export const getCardForReview = query({
               textId: card.textId,
               sourceText: text.text,
               sourceLanguage: text.language,
-              sourceRomanization: text.romanizedText ?? undefined,
-              sourceIpa: text.ipaText ?? undefined,
-              sourceFurigana: text.furiganaText ?? undefined,
+              // Values and engine tags together: see sourceAnnotations in
+              // convex/lib/cardContent.ts.
+              sourceAnnotations: annotationFieldsOf(text),
               userCreated: text.userCreated,
               renderingText: renderingTextOf(text),
               view: viewOfCard(card, renderingSettings),
@@ -406,12 +421,22 @@ export const getCardForReview = query({
                 const asset = r.audioAssetId
                   ? await ctx.db.get(r.audioAssetId)
                   : null;
+                // Same two gates as the card projection (lib/cardContent.ts):
+                // '' is the attempted-and-failed sentinel, and the kind's
+                // CURRENT language set decides whether a stored value is
+                // served at all. Without the second one, an alternative
+                // written before a language lost support keeps rendering.
+                const supports = (kind: AnnotationKind) =>
+                  TEXT_ANNOTATIONS[kind].supports(lang);
                 return {
                   text: r.text,
-                  // '' is the attempted-and-failed sentinel; hide it.
-                  ...(r.romanizedText ? { romanization: r.romanizedText } : {}),
-                  ...(r.ipaText ? { ipa: r.ipaText } : {}),
-                  ...(r.furiganaText ? { furigana: r.furiganaText } : {}),
+                  ...(supports('romanization') && r.romanizedText
+                    ? { romanization: r.romanizedText }
+                    : {}),
+                  ...(supports('ipa') && r.ipaText ? { ipa: r.ipaText } : {}),
+                  ...(supports('furigana') && r.furiganaText
+                    ? { furigana: r.furiganaText }
+                    : {}),
                   ...(asset
                     ? { audioUrl: await ctx.storage.getUrl(asset.storageId) }
                     : {}),
@@ -1715,23 +1740,124 @@ async function suggestCurriculumFixesForEdit(
  * carries `updatedToLatest` so the client can say so instead of showing the
  * "Flagged" pill.
  */
+/** Longest "other" note stored on the audit row. */
+const FLAG_NOTE_MAX_LENGTH = 500;
+
+/**
+ * Has this learner flagged this card before? The reward is paid once per
+ * card; the counter, the audit row and the work still run every time. Read
+ * BEFORE this gesture's own audit row is written.
+ */
+async function hasFlaggedCardBefore(
+  ctx: QueryCtx,
+  userId: string,
+  cardId: Id<'cards'>,
+): Promise<boolean> {
+  const prior = await ctx.db
+    .query('cardEdits')
+    .withIndex('by_userId_and_cardIdBefore', (q) =>
+      q.eq('userId', userId).eq('cardIdBefore', cardId),
+    )
+    .filter((q) => q.eq(q.field('kind'), 'flag'))
+    .first();
+  return prior !== null;
+}
+
+/**
+ * Pay the flag reward: `FLAG_REWARD_CREDITS`, at most
+ * `FLAG_REWARDS_PER_MONTH` times per calendar month (UTC). The per-card
+ * rule is the caller's (`hasFlaggedCardBefore`); the custom-sentence rule
+ * too. Returns the credits granted: 0 when the month is capped or the plan
+ * has no `credits` balance (`grantCredits`).
+ */
+async function payFlagReward(
+  ctx: MutationCtx,
+  userId: string,
+  now: number,
+): Promise<number> {
+  const period = new Date(now).toISOString().slice(0, 7);
+  const row = await ctx.db
+    .query('flagRewards')
+    .withIndex('by_user_and_period', (q) =>
+      q.eq('userId', userId).eq('period', period),
+    )
+    .first();
+  const count = row?.count ?? 0;
+  if (count >= FLAG_REWARDS_PER_MONTH) return 0;
+  const granted = await grantCredits(ctx, userId, FLAG_REWARD_CREDITS);
+  if (granted === 0) return 0;
+  if (row) {
+    await ctx.db.patch(row._id, { count: count + 1 });
+  } else {
+    await ctx.db.insert('flagRewards', { userId, period, count: 1 });
+  }
+  return granted;
+}
+
+/**
+ * Flag a card's translations as wrong. The learner ticks one or more
+ * reasons (`flagReasonValidator`); every reason bumps the rows' `flagCount`,
+ * writes the audit row and pays the reward, and each decides its own work:
+ *
+ *  - wrong_translation, other: the retranslation this mutation always did
+ *    (`retranslation_high`, under the per-row cap, one quota unit).
+ *  - wrong_gender: the per-card override when a gender was picked, and a
+ *    sentence-metadata classification of the shared text when the current
+ *    classifier has not judged it yet. NO immediate retranslation: it would
+ *    run under the coin flip the flag is complaining about, and the sweep
+ *    regenerates the rows the verdict proves wrong once it lands
+ *    (`sweepStaleTranslations`). With wrong_translation ticked as well the
+ *    retranslation happens anyway.
+ *  - wrong_politeness: the per-card override when a level was picked (the
+ *    variant path renders it); otherwise a retranslation, which on ja, ko,
+ *    th and fil requests the language's default level.
+ *
+ * The view is the card's own, settings included, so a learner reading a
+ * variant wording has the pinned check and the audit's `before` describe
+ * what they saw; the retranslation still targets the canonical row, since
+ * every variant is a rewrite of it and is re-derived from the new wording
+ * (`retireVariantRenderings`).
+ */
 export const flagTranslation = mutation({
   args: {
     cardId: v.id('cards'),
+    reasons: v.array(flagReasonValidator),
+    // Only read with the 'other' reason; trimmed and capped.
+    note: v.optional(v.string()),
+    // The learner's pick under wrong_gender / wrong_politeness.
+    requestedGender: v.optional(voiceGenderValidator),
+    requestedPolitenessLevel: v.optional(politenessLevelValidator),
   },
   returns: v.object({
     retranslated: v.boolean(),
     updatedToLatest: v.optional(v.boolean()),
+    creditsAwarded: v.number(),
   }),
   handler: async (ctx, args) => {
     const { userId, card, course } = await authorizeCardAccess(
       ctx,
       args.cardId,
     );
+    const reasons: FlagReason[] = [...new Set(args.reasons)];
+    if (reasons.length === 0) {
+      throw new ConvexError({
+        code: 'INVALID_ARGUMENT',
+        message: 'A flag needs at least one reason',
+      });
+    }
+    const note = reasons.includes('other')
+      ? args.note?.trim().slice(0, FLAG_NOTE_MAX_LENGTH) || undefined
+      : undefined;
 
     const text = await ctx.db.get(card.textId);
     if (!text)
       throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
+
+    const renderingSettings = renderingSettingsOf(
+      await getCourseSettings(ctx, course._id),
+    );
+    const view = viewOfCard(card, renderingSettings);
+    const renderingText = renderingTextOf(text);
 
     // Languages we need translations for. Every row the card shows
     // (`cardRowLanguages`, the course languages with the source slot's
@@ -1741,7 +1867,6 @@ export const flagTranslation = mutation({
     // course. We shouldn't bump flagCount on those. Accent-only variants
     // that show the source text verbatim, such as `en_us` on an `en`
     // sentence, have nothing to dispute and nothing to retranslate.
-    const view = viewOfCard(card);
     const source = await servedSourceText(ctx, text, view);
     const cardLanguages = cardRowLanguages(text, view, [
       ...course.baseLanguages,
@@ -1752,7 +1877,7 @@ export const flagTranslation = mutation({
     );
 
     if (cardLanguages.length === 0) {
-      return { retranslated: false };
+      return { retranslated: false, creditsAwarded: 0 };
     }
 
     // Parallel indexed reads. One per language, each O(1) via the
@@ -1769,7 +1894,7 @@ export const flagTranslation = mutation({
     );
 
     if (liveRows.length === 0) {
-      return { retranslated: false };
+      return { retranslated: false, creditsAwarded: 0 };
     }
 
     // What the learner's card actually shows per language. A served row that
@@ -1833,9 +1958,32 @@ export const flagTranslation = mutation({
         retranslated: false,
         updated_to_latest: true,
         target_languages: course.targetLanguages,
+        reasons,
       });
-      return { retranslated: false, updatedToLatest };
+      return { retranslated: false, updatedToLatest, creditsAwarded: 0 };
     }
+
+    // The wording the learner saw per language, for the audit: the variant
+    // row when the card is served one, else the canonical wording.
+    const shownByLanguage = new Map<string, string>();
+    for (const tr of nonSourceTranslations) {
+      const shown = await resolveServedRendering(ctx, {
+        textId: card.textId,
+        targetLanguage: tr.targetLanguage,
+        text: renderingText,
+        view,
+      });
+      if (shown.served) {
+        shownByLanguage.set(tr.targetLanguage, shown.served.row.translatedText);
+      }
+    }
+
+    // Read before this gesture's own audit row lands below.
+    const firstFlagOfCard = !(await hasFlaggedCardBefore(
+      ctx,
+      userId,
+      card._id,
+    ));
 
     // 1) Compute the post-patch count once per row and persist it. Doing the
     // increment up front means a quota failure later in this mutation
@@ -1849,7 +1997,7 @@ export const flagTranslation = mutation({
     }
 
     // Audit row for the gesture itself, written now that we know which
-    // languages it actually touched. Deliberately before the two policy
+    // languages it actually touched. Deliberately before the policy
     // short-circuits below: a flag that deliberately produces no retranslation
     // is exactly the case QC needs to see, and `textWasUserCreated` on this row
     // is what explains the user-created one.
@@ -1872,20 +2020,81 @@ export const flagTranslation = mutation({
         language: tr.targetLanguage,
         role: languageRole(course, tr.targetLanguage),
         isSourceLanguage: false,
-        before: tr.translatedText,
+        before: shownByLanguage.get(tr.targetLanguage) ?? tr.translatedText,
         beforeTranslationSource: tr.translationSource,
         beforeFlagCount: nextCount - 1,
       })),
+      flagReasons: reasons,
+      flagNote: note,
     });
 
     // Custom-text flag policy: increment counters but never auto-retranslate.
     // Custom texts have no curated source of truth. The LLM would only be
     // second-guessing the user's own content. Flagging surfaces them in the
     // "Flagged" UI pill for the user and admin triage; that's the full
-    // workflow. No quota charge, no audio invalidation, no enqueue.
+    // workflow. No quota charge, no audio invalidation, no enqueue, and no
+    // reward: nothing here improves anyone else's sentence.
     if (isUserCreatedText(text)) {
-      return { retranslated: false, updatedToLatest };
+      return { retranslated: false, updatedToLatest, creditsAwarded: 0 };
     }
+
+    const creditsAwarded = firstFlagOfCard
+      ? await payFlagReward(ctx, userId, Date.now())
+      : 0;
+
+    // The learner's correction, kept on the card. Written whatever the
+    // classifier will say: a definitive verdict outranks it in the resolver
+    // (lib/preferenceResolution.ts), so an override on a sentence that fixes
+    // its own gender is inert rather than wrong. The card's variant is card
+    // demand from now on, so the ensure pass runs for it right away.
+    const overridePatch: {
+      renderingGenderOverride?: 'male' | 'female';
+      renderingPolitenessOverride?: NonNullable<
+        Doc<'cards'>['renderingPolitenessOverride']
+      >;
+    } = {};
+    if (reasons.includes('wrong_gender') && args.requestedGender) {
+      overridePatch.renderingGenderOverride = args.requestedGender;
+    }
+    if (reasons.includes('wrong_politeness') && args.requestedPolitenessLevel) {
+      overridePatch.renderingPolitenessOverride = args.requestedPolitenessLevel;
+    }
+    if (Object.keys(overridePatch).length > 0) {
+      // Raw patch: no card aggregate keys involved.
+      await ctx.db.patch(card._id, overridePatch);
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.decks.prepareCardContent,
+        {
+          textId: card.textId,
+          baseLanguages: course.baseLanguages,
+          targetLanguages: course.targetLanguages,
+          requestedByUserId: userId,
+          renderingSettings,
+          renderingCard: { ...renderingCardOf(card), ...overridePatch },
+        },
+      );
+    }
+
+    // A gender complaint on a text the current classifier has not judged:
+    // ask it now, from the source sentence alone. A text already at the
+    // current source is not re-asked (same prompt, same answer); the
+    // override above is the learner's lever there.
+    if (reasons.includes('wrong_gender')) {
+      await requestSentenceMetadataIfNeeded(
+        ctx,
+        text,
+        course.baseLanguages,
+        course.targetLanguages,
+        { requestedByUserId: userId },
+      );
+    }
+
+    const wantsRetranslation =
+      reasons.includes('wrong_translation') ||
+      reasons.includes('other') ||
+      (reasons.includes('wrong_politeness') &&
+        args.requestedPolitenessLevel === undefined);
 
     // 2) Per-language: over-cap rows record their skip (counter already rose
     // above); under-cap rows claim a slot and enqueue, charging quota on the
@@ -1896,42 +2105,44 @@ export const flagTranslation = mutation({
     let anyEnqueued = false;
     let quotaCharged = false;
 
-    for (const { tr, nextCount } of withCounts) {
-      const enqueued = await retranslateOrRecordCapSkip(
-        ctx,
-        text,
-        tr.targetLanguage,
-        {
-          reason: 'flag',
-          cardEditId,
-          userId,
-          role: languageRole(course, tr.targetLanguage),
-          beforeText: tr.translatedText,
-          beforeTranslationSource: tr.translationSource,
-          flagCountAfter: nextCount,
-          // Charge once total, on the first successful claim. If the user is
-          // depleted this throws USAGE_LIMIT from inside the helper, before
-          // that language's job is enqueued, and the whole mutation rolls
-          // back (counters, claim rows, any earlier enqueue).
-          onClaimed: async () => {
-            if (quotaCharged) return;
-            await consumeQuota(ctx, userId, FEATURE_IDS.TRANSLATION_FLAGS);
-            quotaCharged = true;
+    if (wantsRetranslation) {
+      for (const { tr, nextCount } of withCounts) {
+        const enqueued = await retranslateOrRecordCapSkip(
+          ctx,
+          text,
+          tr.targetLanguage,
+          {
+            reason: 'flag',
+            cardEditId,
+            userId,
+            role: languageRole(course, tr.targetLanguage),
+            beforeText: tr.translatedText,
+            beforeTranslationSource: tr.translationSource,
+            flagCountAfter: nextCount,
+            // Charge once total, on the first successful claim. If the user is
+            // depleted this throws USAGE_LIMIT from inside the helper, before
+            // that language's job is enqueued, and the whole mutation rolls
+            // back (counters, claim rows, any earlier enqueue).
+            onClaimed: async () => {
+              if (quotaCharged) return;
+              await consumeQuota(ctx, userId, FEATURE_IDS.TRANSLATION_FLAGS);
+              quotaCharged = true;
+            },
           },
-        },
-      );
-      if (enqueued) anyEnqueued = true;
-    }
+        );
+        if (enqueued) anyEnqueued = true;
+      }
 
-    if (
-      withCounts.every(
-        ({ nextCount }) => nextCount > FLAG_AUTO_RETRANSLATION_MAX,
-      )
-    ) {
-      // Everything was over-cap. Counters incremented and skips recorded,
-      // no quota charge, no retranslations, no analytics event (unchanged
-      // from before the loop merge).
-      return { retranslated: false, updatedToLatest };
+      if (
+        withCounts.every(
+          ({ nextCount }) => nextCount > FLAG_AUTO_RETRANSLATION_MAX,
+        )
+      ) {
+        // Everything was over-cap. Counters incremented and skips recorded,
+        // no quota charge, no retranslations, no analytics event (unchanged
+        // from before the loop merge).
+        return { retranslated: false, updatedToLatest, creditsAwarded };
+      }
     }
 
     // Flag volume per language is the clearest quality signal the app has for
@@ -1940,9 +2151,11 @@ export const flagTranslation = mutation({
       retranslated: anyEnqueued,
       updated_to_latest: updatedToLatest,
       target_languages: course.targetLanguages,
+      reasons,
+      credits_awarded: creditsAwarded,
     });
 
-    return { retranslated: anyEnqueued, updatedToLatest };
+    return { retranslated: anyEnqueued, updatedToLatest, creditsAwarded };
   },
 });
 
@@ -2052,7 +2265,8 @@ export const regenerateCardAudio = mutation({
       course.targetLanguages,
       { forceAudioRegen: true, requestedByUserId: userId },
     );
-    if (card.followsCoursePreferences) {
+    const renderingCard = renderingCardOf(card);
+    if (card.followsCoursePreferences || hasRenderingOverride(renderingCard)) {
       await scheduleMissingRenderings(
         ctx,
         card.textId,
@@ -2060,7 +2274,11 @@ export const regenerateCardAudio = mutation({
         course.baseLanguages,
         course.targetLanguages,
         renderingSettings,
-        { forceAudioRegen: true, requestedByUserId: userId },
+        {
+          forceAudioRegen: true,
+          requestedByUserId: userId,
+          card: renderingCard,
+        },
       );
     }
 

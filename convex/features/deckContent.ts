@@ -18,13 +18,18 @@ import { fetchFreePlayRotation } from '../lib/freePlay';
 import { fetchTrackDueCards } from '../lib/dueQueue';
 import {
   flushRenderingStamps,
+  newMetadataCallBudget,
   newRenderingStampCollector,
   ProbeNeedsWork,
   scheduleMissingContent,
   scheduleMissingRenderings,
 } from '../lib/contentScheduling';
-import { renderingSettingsOf } from '../db/translationReads';
-import type { RenderingSettings } from '../../lib/preferenceResolution';
+import { renderingCardOf, renderingSettingsOf } from '../db/translationReads';
+import {
+  hasRenderingOverride,
+  type RenderingCard,
+  type RenderingSettings,
+} from '../../lib/preferenceResolution';
 import { getNextAddableTextsFromRank } from './collectionCardAdding';
 
 /**
@@ -69,16 +74,19 @@ export async function ensureCardContentHandler(
   const settings = renderingSettingsOf(
     await getCourseSettings(ctx, active.course._id),
   );
-  const variants = card.followsCoursePreferences
-    ? await scheduleMissingRenderings(
-        ctx,
-        args.textId,
-        text,
-        active.course.baseLanguages,
-        active.course.targetLanguages,
-        settings,
-      )
-    : { translationsScheduled: 0, audioScheduled: 0 };
+  const renderingCard = renderingCardOf(card);
+  const variants =
+    card.followsCoursePreferences || hasRenderingOverride(renderingCard)
+      ? await scheduleMissingRenderings(
+          ctx,
+          args.textId,
+          text,
+          active.course.baseLanguages,
+          active.course.targetLanguages,
+          settings,
+          { card: renderingCard },
+        )
+      : { translationsScheduled: 0, audioScheduled: 0 };
   return {
     translationsScheduled:
       canonical.translationsScheduled + variants.translationsScheduled,
@@ -178,10 +186,14 @@ async function scheduleContentForUpcomingCards(
   // Rows without rendering stamps across the whole batch, so the classifier
   // is asked once per language per 25 rows rather than once per card.
   const stamps = newRenderingStampCollector();
+  // Sentence-metadata calls this pass may cause (five), so a batch of
+  // unclassified curriculum texts is worked through over several passes.
+  const metadataCalls = newMetadataCallBudget();
   for (let i = 0; i < cards.length; i++) {
     const card = cards[i];
     const text = texts[i];
     if (!text) continue;
+    const renderingCard = renderingCardOf(card);
     let needsWork = false;
     try {
       await scheduleMissingContent(
@@ -190,9 +202,12 @@ async function scheduleContentForUpcomingCards(
         text,
         active.course.baseLanguages,
         active.course.targetLanguages,
-        { probe: true, stamps },
+        { probe: true, stamps, metadataCalls },
       );
-      if (card.followsCoursePreferences) {
+      if (
+        card.followsCoursePreferences ||
+        hasRenderingOverride(renderingCard)
+      ) {
         await scheduleMissingRenderings(
           ctx,
           card.textId,
@@ -200,7 +215,7 @@ async function scheduleContentForUpcomingCards(
           active.course.baseLanguages,
           active.course.targetLanguages,
           renderingSettings,
-          { probe: true, stamps },
+          { probe: true, stamps, card: renderingCard },
         );
       }
     } catch (error) {
@@ -229,6 +244,7 @@ async function scheduleContentForUpcomingCards(
           renderingSettings: card.followsCoursePreferences
             ? renderingSettings
             : undefined,
+          renderingCard,
         },
       );
       processed++;
@@ -347,6 +363,11 @@ export async function prepareCardContentHandler(
      * Absent = canonical only.
      */
     renderingSettings?: RenderingSettings;
+    /**
+     * The caller's card, so a per-card correction renders even when the
+     * card follows no settings. Absent for callers without a card.
+     */
+    renderingCard?: NonNullable<RenderingCard>;
   },
 ): Promise<null> {
   const text = await ctx.db.get(args.textId);
@@ -365,7 +386,8 @@ export async function prepareCardContentHandler(
     args.targetLanguages,
     opts,
   );
-  if (args.renderingSettings) {
+  const card = args.renderingCard ?? null;
+  if (args.renderingSettings || hasRenderingOverride(card)) {
     await scheduleMissingRenderings(
       ctx,
       args.textId,
@@ -373,7 +395,7 @@ export async function prepareCardContentHandler(
       args.baseLanguages,
       args.targetLanguages,
       args.renderingSettings,
-      opts,
+      { ...opts, card },
     );
   }
   return null;

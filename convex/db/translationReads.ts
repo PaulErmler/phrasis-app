@@ -6,6 +6,7 @@ import {
 } from '../../lib/languages';
 import {
   AUTO,
+  hasRenderingOverride,
   parseVariantKey,
   resolveCardRendering,
   resolveLanguageRendering,
@@ -358,14 +359,35 @@ export function viewOfCard(
     | 'translationsAcceptedAt'
     | 'accentLanguage'
     | 'followsCoursePreferences'
+    | 'renderingGenderOverride'
+    | 'renderingPolitenessOverride'
   >,
   settings?: RenderingSettings | null,
 ): SourceView {
   return {
     pinAt: cardPinAt(card),
     accentLanguage: card.accentLanguage,
-    settings: settings ?? undefined,
-    card: { followsCoursePreferences: card.followsCoursePreferences },
+    // A per-card correction renders even on a course without settings; the
+    // resolver needs a settings object to read the politeness levels from,
+    // so an empty one stands in.
+    settings: settings ?? (hasRenderingOverride(card) ? {} : undefined),
+    card: renderingCardOf(card),
+  };
+}
+
+/** The `RenderingCard` view of a cards row. */
+export function renderingCardOf(
+  card: Pick<
+    Doc<'cards'>,
+    | 'followsCoursePreferences'
+    | 'renderingGenderOverride'
+    | 'renderingPolitenessOverride'
+  >,
+): NonNullable<RenderingCard> {
+  return {
+    followsCoursePreferences: card.followsCoursePreferences,
+    renderingGenderOverride: card.renderingGenderOverride,
+    renderingPolitenessOverride: card.renderingPolitenessOverride,
   };
 }
 
@@ -417,6 +439,7 @@ export function renderingTextOf(
     | 'addressesSomeone'
     | 'addresseeNumber'
     | 'userCreated'
+    | 'metadataSource'
   >,
 ): RenderingText {
   return {
@@ -425,6 +448,7 @@ export function renderingTextOf(
     addressesSomeone: text.addressesSomeone,
     addresseeNumber: text.addresseeNumber,
     userCreated: text.userCreated,
+    metadataSource: text.metadataSource,
   };
 }
 

@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from 'convex-test';
+import { ROMANIZATION_SOURCES } from '../../lib/localRomanization';
 import { describe, it, expect } from 'vitest';
 import schema from '../../schema';
 import { internal, api } from '../../_generated/api';
@@ -171,7 +172,10 @@ describe('preview-path scheduling gate', () => {
         targetLanguage: 'ja',
         translatedText: SENTENCE,
         romanizedText: 'maiasa shichiji ni okimasu.',
-        romanizationSource: 'google-v3',
+        // The REAL current tag, not a lookalike: missingAnnotationKinds now
+        // treats a tag that is not the current one as stale and re-schedules,
+        // so 'google-v3' (no -v1) would make this test schedule romanization.
+        romanizationSource: ROMANIZATION_SOURCES.googleV3,
       });
       return { collId, textId };
     });

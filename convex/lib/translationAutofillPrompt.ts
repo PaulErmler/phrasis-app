@@ -100,6 +100,7 @@ After translating, infer the metadata. Grammatical marking in ANY source renderi
 - speakerGender: "male" | "female" | "neutral" — "male" or "female" ONLY when a rendering grammatically marks the speaker's gender ("estoy cansada", "sono andato", "я пошла", Hebrew/Arabic first-person forms). Otherwise "neutral". Never guess from topic or stereotype.
 - addresseeGender: "male" | "female" | "neutral" | "not_applicable" — same rule, for the addressee ("¿estás cansada?", "ты посмотрел", אתה vs את). "not_applicable" if there is no addressee.
 - addressesSomeone: true | false — true if the sentence speaks to a 2nd-person addressee (imperatives, direct questions, vocatives, sentences containing "you"/"your", commands, requests, greetings). false for descriptive or narrative sentences and first-person statements with no second-person reference. When addressesSomeone is false, addresseeNumber and addresseeGender must be "not_applicable".
+- referentGender: "male" | "female" | "neutral" — the gender of the main third party the sentence is about, only when the source fixes it (a gendered kinship or role noun such as "my sister" or "her husband", a gendered pronoun, an unambiguous name). "neutral" when there is no third party, the noun is unisex ("my friend", "the doctor"), the person is the speaker or the addressee, or several referents differ. Never guess from stereotype.
 
 Be strict: if no rendering forces a value, return "neutral" / "not_applicable". Do not invent gender information.
 
@@ -114,7 +115,8 @@ Return ONLY a valid JSON object with EXACTLY this shape — no markdown, no code
     "addresseeNumber": "...",
     "speakerGender": "...",
     "addresseeGender": "...",
-    "addressesSomeone": true
+    "addressesSomeone": true,
+    "referentGender": "..."
   }
 }
 

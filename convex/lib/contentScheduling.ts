@@ -17,6 +17,10 @@ import {
   usesSourceTextVerbatim,
 } from '../../lib/languages';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
+import {
+  definitiveSpeakerGender,
+  hasCurrentSentenceMetadata,
+} from '../../lib/sentenceMetadataSource';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
   missingAnnotationKinds,
@@ -63,8 +67,10 @@ import {
 } from '../db/translationReads';
 import {
   AUTO,
+  hasRenderingOverride,
   parseVariantKey,
   type LanguageRendering,
+  type RenderingCard,
   type RenderingSettings,
 } from '../../lib/preferenceResolution';
 import {
@@ -270,16 +276,23 @@ export async function enqueueVersionBumpRegen(
     llmPriority?: LlmPriority;
     probe?: boolean;
     requestedByUserId?: string;
+    /**
+     * Why the row is regenerated. Both reasons take the same keep-row,
+     * archive-the-old-wording write; the audit and the logs must still say
+     * which trigger it was. Default 'version_bump'.
+     */
+    reason?: 'version_bump' | 'metadata_correction';
   },
 ): Promise<boolean> {
+  const { reason, ...rest } = opts;
   return scheduleTranslationForLanguage(ctx, text, translation.targetLanguage, {
-    ...opts,
+    ...rest,
     // The row survives, so its dialect pin is still on it; forwarding it
     // keeps the Google path and a swept-then-refilled race on the same
     // variant either way.
     preferredRegionVariant: translation.regionVariant,
     replaceExisting: true,
-    translationReason: 'version_bump',
+    translationReason: reason ?? 'version_bump',
   });
 }
 
@@ -516,20 +529,29 @@ export async function regenerateSupersededRevisionAudio(
  * migrate the Arabic dialects); unlisted pairs keep the audio. Assets from
  * before the provider field are legacy Google. Version: the language's
  * `ttsVersion` was bumped above the asset's stamp (a new voice pool, Gemini
- * prompt or provider); `isTtsVersionStale` treats an unstamped asset as
- * current so un-backfilled rows never storm. Shared by the live pointer's
- * validity sweep and the superseded-revision repair.
+ * prompt or provider), on the cache language or on the accent variant whose
+ * locale the asset carries (`getCurrentTtsVersion`); `isTtsVersionStale`
+ * treats an unstamped asset as current so un-backfilled rows never storm.
+ * Shared by the live pointer's validity sweep and the superseded-revision
+ * repair.
  */
 function audioAssetMismatch(
   lang: string,
-  asset: Pick<Doc<'audioAssets'>, 'ttsProvider' | 'ttsVersion'>,
+  asset: Pick<
+    Doc<'audioAssets'>,
+    'ttsProvider' | 'ttsVersion' | 'regionVariant'
+  >,
 ): { providerMismatch: boolean; versionMismatch: boolean } {
   return {
     providerMismatch: shouldOverwriteProvider(
       getTtsProviderForLanguage(lang),
       asset.ttsProvider ?? 'google',
     ),
-    versionMismatch: isTtsVersionStale(lang, asset.ttsVersion),
+    versionMismatch: isTtsVersionStale(
+      lang,
+      asset.ttsVersion,
+      asset.regionVariant,
+    ),
   };
 }
 
@@ -575,6 +597,22 @@ type ContentSweepOpts = {
    * Probe passes collect too (the flush is the caller's write).
    */
   stamps?: RenderingStampCollector;
+  /**
+   * How many sentence-metadata classifier calls this pass may still make
+   * (`requestSentenceMetadataIfNeeded`). A many-text loop passes one budget
+   * so a collection warm cannot fan out into a call per text; a single-text
+   * sweep runs without one. Probes spend it too: a needy probe dispatches a
+   * real sweep that will make the call.
+   */
+  metadataCalls?: MetadataCallBudget;
+  /**
+   * The card the sweep runs for, when the caller has one. Read only by
+   * `scheduleMissingRenderings`, so a per-card correction
+   * (`cards.renderingGenderOverride` / `renderingPolitenessOverride`)
+   * renders; the card-less callers (collection warm) get the rendering a
+   * new card would.
+   */
+  card?: RenderingCard;
   /**
    * Forced regeneration (regenerateCardAudio): audio enqueues bypass the
    * `audioAssets` cache (a hit would make the regenerate button a no-op)
@@ -710,7 +748,7 @@ async function loadContentState(
 async function sweepInvalidAudio(
   ctx: MutationCtx,
   textId: Id<'texts'>,
-  text: Pick<Doc<'texts'>, 'userCreated'>,
+  text: Pick<Doc<'texts'>, 'userCreated' | 'speakerGender' | 'metadataSource'>,
   audioSpeakerGender: string | undefined,
   state: ContentSweepState,
   opts: ContentSweepOpts | undefined,
@@ -746,11 +784,16 @@ async function sweepInvalidAudio(
       // drift: renderings are cached per voice (docs/architecture/
       // translation-variants.md) and a card that wants the other voice
       // reads an audio variant, while the canonical clip keeps the voice it
-      // was made in. A user-written text has no variants, so when the
-      // metadata classifier lands a definitive gender after the coin flip
-      // its single clip is still re-voiced.
+      // was made in. Two exceptions, both "the text's OWN voice changed":
+      // a user-written text has no variants, so when the classifier lands
+      // a definitive gender after the coin flip its single clip is
+      // re-voiced; and a curriculum text whose sentence fixes the speaker's
+      // gender (a current classifier verdict, lib/sentenceMetadataSource.ts)
+      // is served canonical in that voice by every card, so a canonical
+      // clip in the other voice is simply wrong and no variant would ever
+      // replace it.
       const genderMismatch =
-        text.userCreated &&
+        (text.userCreated || definitiveSpeakerGender(text) !== null) &&
         (audioSpeakerGender === 'male' || audioSpeakerGender === 'female') &&
         payload.voiceGender !== audioSpeakerGender;
       const { providerMismatch, versionMismatch } = audioAssetMismatch(
@@ -868,10 +911,10 @@ async function sweepStaleTranslations(
     // agreement with the others.
     if (!mayRegenerateTranslation(text, translation)) continue;
 
-    // Gender drift is gone: a canonical row keeps the gender it was
-    // generated under, and a course that wants the other gender reads a
-    // rendering variant (docs/architecture/translation-variants.md). The
-    // version bump is the one trigger left.
+    // Gender drift by preference is gone: a canonical row keeps the gender
+    // it was generated under, and a course that wants the other gender
+    // reads a rendering variant (docs/architecture/translation-variants.md).
+    // Two triggers are left, both in-place regenerations.
     // Version-stale translation: the language's `translationVersion` config was
     // bumped above this row's stamp (a new model/prompt). Regenerate.
     // `isTranslationVersionStale` encodes the "undefined === current" rule.
@@ -879,8 +922,23 @@ async function sweepStaleTranslations(
       lang,
       translation.translationVersion,
     );
+    // Contradicted by the sentence: the classifier fixed the speaker's
+    // gender on this curriculum text and the row's rendering stamp proves
+    // the wording was written in the other one ("somos hermanas" under a
+    // coin-flipped female speaker). Only a proven row: `unmarked` expresses
+    // no gender, and an unstamped row waits for `flushRenderingStamps`. The
+    // row's own `speakerGender` (the gender it was generated under) is the
+    // loop guard: once regenerated under the verdict the sweep stops asking,
+    // even if the model still renders the other gender.
+    const definitive = definitiveSpeakerGender(text);
+    const isGenderContradicted =
+      definitive !== null &&
+      translation.speakerGender !== definitive &&
+      renderingAxesFor(classificationLanguageForRow(translation)).gender &&
+      translation.renderedGender ===
+        (definitive === 'male' ? 'feminine' : 'masculine');
 
-    if (!isVersionStale) continue;
+    if (!isVersionStale && !isGenderContradicted) continue;
     if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
     // Defer while an LLM retranslation is in flight. It will overwrite the row
     // anyway, so deleting now just races the pending write.
@@ -896,6 +954,7 @@ async function sweepStaleTranslations(
       llmPriority: opts?.llmPriority,
       probe: opts?.probe,
       requestedByUserId: opts?.requestedByUserId,
+      reason: isVersionStale ? 'version_bump' : 'metadata_correction',
     });
     if (enqueued) {
       regenScheduled++;
@@ -1215,6 +1274,18 @@ export async function scheduleMissingContent(
     await ctx.db.patch(textId, genderPatch);
   }
 
+  // A curriculum text the current classifier has not judged yet gets its
+  // metadata now, from the source sentence alone; the verdict lands later
+  // and re-runs this sweep (`applyTextMetadata`). Nothing here waits for
+  // it: the coin flip keeps serving until then.
+  await requestSentenceMetadataIfNeeded(
+    ctx,
+    text,
+    baseLanguages,
+    targetLanguages,
+    opts,
+  );
+
   // Always include the text's own language (`sourceLanguage`) so the
   // source-language branch of `scheduleLanguageContent` queues audio for it
   // regardless of what the caller passed in `baseLanguages`. Without this, a
@@ -1301,6 +1372,91 @@ export async function scheduleMissingContent(
   }
 
   return { translationsScheduled, audioScheduled };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Sentence metadata for curriculum texts (lib/sentenceMetadataSource.ts)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Classifier calls one many-text pass may make. Five per pass keeps a
+ * collection warm or an upcoming-cards sweep from turning into a call per
+ * text; the rest are picked up by the next pass.
+ */
+export const MAX_METADATA_CALLS_PER_PASS = 5;
+
+/** How long a metadata request is honoured before a sweep asks again. */
+const METADATA_REQUEST_COOLDOWN_MS = 15 * 60 * 1000;
+
+export type MetadataCallBudget = { remaining: number };
+
+export function newMetadataCallBudget(): MetadataCallBudget {
+  return { remaining: MAX_METADATA_CALLS_PER_PASS };
+}
+
+/**
+ * Does this text need the sentence-metadata classifier? Only a curriculum
+ * text (a user-written one is classified at creation and never again), only
+ * when its stored metadata is not the current classifier's verdict, and not
+ * while a recent request is in flight.
+ */
+export function needsSentenceMetadata(
+  text: Pick<
+    Doc<'texts'>,
+    'userCreated' | 'metadataSource' | 'metadataRequestedAt'
+  >,
+): boolean {
+  if (text.userCreated) return false;
+  if (hasCurrentSentenceMetadata(text)) return false;
+  if (
+    text.metadataRequestedAt !== undefined &&
+    Date.now() - text.metadataRequestedAt < METADATA_REQUEST_COOLDOWN_MS
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Claim the text and schedule the classifier on its SOURCE sentence alone.
+ * The custom-card path sends every rendering, because a gendered form in
+ * any translation fixes the sentence's gender; on a curriculum text the
+ * translations were generated from the coin flip and are the very thing
+ * under suspicion, so they get no vote. The verdict lands through
+ * `applyTextMetadata`, which stamps `metadataSource` and re-runs the sweep.
+ * Returns whether a call was scheduled; in probe mode throws ProbeNeedsWork
+ * iff it would.
+ */
+export async function requestSentenceMetadataIfNeeded(
+  ctx: MutationCtx,
+  text: Doc<'texts'>,
+  baseLanguages: string[],
+  targetLanguages: string[],
+  opts: ContentSweepOpts | undefined,
+): Promise<boolean> {
+  if (!needsSentenceMetadata(text)) return false;
+  const budget = opts?.metadataCalls;
+  if (budget) {
+    if (budget.remaining <= 0) return false;
+    budget.remaining--;
+  }
+  if (opts?.probe) throw new ProbeNeedsWork();
+  await ctx.db.patch(text._id, { metadataRequestedAt: Date.now() });
+  await ctx.scheduler.runAfter(
+    0,
+    internal.features.sentenceMetadata.fetchSentenceMetadata,
+    {
+      textId: text._id,
+      translations: [{ language: text.language, text: text.text }],
+      schedulePrepareCard: true,
+      baseLanguages,
+      targetLanguages,
+      userId: opts?.requestedByUserId,
+      priority: opts?.priority,
+      llmPriority: opts?.llmPriority,
+    },
+  );
+  return true;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -1447,11 +1603,17 @@ export async function scheduleMissingRenderings(
   opts?: ContentSweepOpts,
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   const scheduled = { translationsScheduled: 0, audioScheduled: 0 };
-  if (!settings) return scheduled;
-  // The card-less view: a card created now would get exactly this, and the
+  const card = opts?.card ?? null;
+  if (!settings && !hasRenderingOverride(card)) return scheduled;
+  // The card's own view when the caller has one (the review path, the
+  // upcoming-cards loop), so a per-card correction renders; a correction
+  // needs no course settings, hence the empty stand-in. Otherwise the
+  // card-less view: a card created now would get exactly this, and the
   // ensure paths only run for texts the learner has (or is about to have)
   // a curriculum card for. A user-written text resolves to canonical.
-  const view = previewView(settings);
+  const view = card
+    ? { settings: settings ?? {}, card }
+    : previewView(settings);
   const renderingText = renderingTextOf(text);
   const courseLanguages = [...new Set([...baseLanguages, ...targetLanguages])];
   for (const lang of courseLanguages) {

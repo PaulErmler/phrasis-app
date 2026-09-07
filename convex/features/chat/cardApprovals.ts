@@ -32,6 +32,7 @@ import {
 import {
   ANNOTATION_KINDS,
   TEXT_ANNOTATIONS,
+  supportedAnnotationEntries,
   vAnnotationKind,
 } from '../../lib/textAnnotations';
 import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
@@ -954,8 +955,10 @@ export const getApprovalsByThread = query({
       _id: a._id,
       toolCallId: a.toolCallId,
       translations: a.translations,
-      entryIpa: a.entryIpa,
-      entryFurigana: a.entryFurigana,
+      // Gated on each kind's current language set; see
+      // supportedAnnotationEntries.
+      entryIpa: supportedAnnotationEntries('ipa', a.entryIpa),
+      entryFurigana: supportedAnnotationEntries('furigana', a.entryFurigana),
       status: a.status,
       kind: a.kind,
       cardId: a.cardId,

@@ -122,6 +122,15 @@ correctness/cost/velocity noted per item.
       descriptions and examples in `lib/languageForms.ts` (43 languages) reach the German
       UI untranslated; the wizard and settings chrome around them is bilingual. Either
       translate the config copy or key it into messages/\*.json. Effort M.
+- [ ] **C41 — Sentence-metadata calls are one per text.** The curriculum
+      reclassification (`requestSentenceMetadataIfNeeded`) sends one classifier
+      call per text, capped at five per many-text pass. Batching several source
+      sentences into one call would cut the per-row overhead but needs a prompt
+      change and its own `pnpm eval:metadata` run. Effort S.
+- [ ] **C42 — No way to clear a per-card rendering override.** The Flag dialog
+      writes `cards.renderingGenderOverride` / `renderingPolitenessOverride`; nothing
+      lets the learner undo one short of a card edit (which forks the text and clears
+      both). The edit dialog is the natural home. Effort S.
 - [ ] **C40 — Sentence-form evals still owed.** The politeness corpus covers ten
       languages (de es fr hi ja ko pt ru th zh); the plan wanted vi, fil, id, pl, cs, tr,
       it, pt_pt, uz, bn and ar_eg with the traps from the review table, and nine

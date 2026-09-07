@@ -64,6 +64,21 @@ export const OPENROUTER_MODELS = {
    *  auto language detection with code switching, $0.10 per audio hour.
    *  Replaced Azure Fast Transcription in Sep 2026. */
   stt: 'microsoft/mai-transcribe-2',
+  /** Romanization for the two languages with no library and no Google
+   *  support: Thai (which had none at all) and Hebrew (whose
+   *  `hebrew-transliteration` gave the consonants of unpointed text and
+   *  dropped the vowels — "šlwm lkwlm" for שלום לכולם).
+   *
+   *  Chosen on the Sep 2026 `pnpm eval:rom` run over 2,555 human-curated
+   *  rows (data_preparation/romanization_eval): Thai 98%, Hebrew 96%, against 38% for
+   *  the library Hebrew was on. 3.1 Flash Lite scored 86%/93% and was not
+   *  good enough for a line the learner reads as fact; 3.7 Flash matched 3.8
+   *  but costs more. Re-run the eval before switching.
+   *
+   *  Reasoning is `minimal`, not off: Gemini 3.x rejects a disabled-reasoning
+   *  request outright ("Reasoning is mandatory for this endpoint"). */
+  romanization: 'google/gemini-3.8-flash',
+
   /** Speech-to-text for languages MAI-Transcribe-2 does not cover
    *  (convex/lib/stt/gemini.ts): the clip goes in as `input_audio` on a
    *  chat completion. No word timestamps, so no karaoke; text only. Routed
@@ -123,6 +138,35 @@ export const OPENROUTER_CHAT_EXTRA_BODY = {
  */
 export const OPENROUTER_USAGE_ACCOUNTING = {
   usage: { include: true },
+} as const;
+
+/**
+ * Reasoning effort for the romanization call. Gemini 3.x cannot run
+ * thinking-free — OpenRouter answers "Reasoning is mandatory for this
+ * endpoint and cannot be disabled" — so this is its floor, and the same
+ * constraint already recorded on `translationAutoFill` above.
+ */
+export const ROMANIZATION_REASONING = 'minimal' as const;
+
+/**
+ * Pin the romanization call to Google's cheapest endpoint.
+ *
+ * The same model is served at three price tiers, which are OpenRouter
+ * ENDPOINTS of one model rather than separate slugs, so the tier is only
+ * reachable through `provider.order`: `google-ai-studio/flex` at
+ * $0.375/$1.875 per M tokens, plain `google-ai-studio` at $0.75/$3.75, and
+ * `/priority` at $1.35/$6.75. The Sep 2026 eval measured flex and standard
+ * as indistinguishable in quality (91% IPA, 98% romanization on both) at half
+ * the price.
+ *
+ * `allow_fallbacks: false` is deliberate. Romanization is a background
+ * per-sentence job with no user waiting on it, so silently paying double
+ * because flex was busy is the wrong trade — better to fail and let the
+ * caller leave the row empty for the next attempt.
+ */
+export const ROMANIZATION_PROVIDER = {
+  order: ['google-ai-studio/flex'],
+  allow_fallbacks: false,
 } as const;
 
 /** Default OpenRouter provider options for the chat agent.
