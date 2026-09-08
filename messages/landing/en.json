@@ -461,7 +461,7 @@
         "cta": "Get Started",
         "features": {
           "sentences": "300 sentences to start, then 50 per month",
-          "credits": "200 credits to start, then 30 per month",
+          "credits": "100 credits to start, then 30 per month",
           "creditsHint": "Credits can be used for chat messages, custom cards and more",
           "courses": "1 course",
           "detailedStatistics": "Detailed statistics"

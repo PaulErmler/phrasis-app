@@ -109,6 +109,24 @@ export const credits = feature({
   ),
 });
 
+// Free trials are OFF for new customers (2026-09). Existing subscribers and
+// anyone mid-trial are unaffected: they stay on the plan version they bought,
+// which still carries the trial.
+//
+// To turn trials back on: set this to
+// `{ durationLength: 7, durationType: 'day', cardRequired: true }`, flip
+// TRIALS_ENABLED in components/landing/pricing-section.tsx, un-skip the
+// trial-badge test in e2e/billing.spec.ts, and run `atmn push`. Nothing else
+// needs touching: the in-app pricing table's trial badge and its
+// "Start Free Trial" CTA both key off Autumn's `has_trial`, so they come back
+// on their own. Spread conditionally rather than set to `undefined` so the
+// key is genuinely absent, the shape `free` already ships.
+const FREE_TRIAL: {
+  durationLength: number;
+  durationType: 'day';
+  cardRequired: boolean;
+} | null = null;
+
 // Plans
 export const free = plan({
   id: 'free',
@@ -124,7 +142,7 @@ export const free = plan({
     }),
     item({
       featureId: audio_regenerations.id,
-      included: 20,
+      included: 40,
       reset: {
         interval: 'month',
       },
@@ -142,7 +160,7 @@ export const free = plan({
     }),
     item({
       featureId: credits.id,
-      included: 200,
+      included: 100,
       reset: {
         interval: 'one_off',
       },
@@ -249,12 +267,12 @@ export const basic = plan({
       },
     }),
   ],
-  freeTrial: { durationLength: 7, durationType: 'day', cardRequired: true },
+  ...(FREE_TRIAL ? { freeTrial: FREE_TRIAL } : {}),
 });
 
 // Annual variants: same entitlements as the base plan (items inherited,
-// monthly resets included), priced 25% below 12x monthly. The 7-day
-// card-required trial is inherited from the base plans.
+// monthly resets included), priced 25% below 12x monthly. Any free trial
+// configured on the base plan (see FREE_TRIAL) is inherited too.
 export const basic_annual = basic.variant({
   id: 'basic_annual',
   name: 'Basic Annual',
@@ -329,7 +347,7 @@ export const pro = plan({
     }),
     item({ featureId: multiple_languages.id }),
   ],
-  freeTrial: { durationLength: 7, durationType: 'day', cardRequired: true },
+  ...(FREE_TRIAL ? { freeTrial: FREE_TRIAL } : {}),
 });
 
 export const pro_annual = pro.variant({
@@ -407,7 +425,7 @@ export const ultra = plan({
     }),
     item({ featureId: multiple_languages.id }),
   ],
-  freeTrial: { durationLength: 7, durationType: 'day', cardRequired: true },
+  ...(FREE_TRIAL ? { freeTrial: FREE_TRIAL } : {}),
 });
 
 export const ultra_annual = ultra.variant({

@@ -251,6 +251,14 @@ async function startFirstPurchase(
   return session;
 }
 
+// Journeys A, B and D each open by starting a free trial, which new customers
+// no longer get (FREE_TRIAL in autumn.config.ts), so they cannot be
+// provisioned. Skipped at the describe level so their beforeAll hooks never
+// sign up throwaway users and Stripe clocks for runs that cannot pass. Point
+// this back at `test.describe` when trials return. Journey C is unaffected:
+// it reconstructs a legacy non-trial subscription and asserts trial_end null.
+const trialJourney = test.describe.skip.bind(test.describe);
+
 test.describe('billing on a Stripe test clock (live)', { tag: '@live' }, () => {
   test.skip(
     !STRIPE_KEY,
@@ -260,7 +268,7 @@ test.describe('billing on a Stripe test clock (live)', { tag: '@live' }, () => {
   // Serial is scoped PER JOURNEY: within one journey the tests are stages of
   // one user's life and must skip after a failure, but the journeys use
   // independent users. One failing must not take the others down.
-  test.describe('journey A: trial → paid conversion on the clock', () => {
+  trialJourney('journey A: trial → paid conversion on the clock', () => {
     test.describe.configure({ mode: 'serial', retries: 0 });
     const STORAGE = path.resolve(__dirname, '.auth/user-clock-a.json');
     const CREDS = path.resolve(__dirname, '.auth/credentials-clock-a.json');
@@ -351,7 +359,7 @@ test.describe('billing on a Stripe test clock (live)', { tag: '@live' }, () => {
     });
   });
 
-  test.describe('journey D: lapsed repurchase (real time, no clock)', () => {
+  trialJourney('journey D: lapsed repurchase (real time, no clock)', () => {
     test.describe.configure({ mode: 'serial', retries: 0 });
     const STORAGE = path.resolve(__dirname, '.auth/user-clock-d.json');
     const CREDS = path.resolve(__dirname, '.auth/credentials-clock-d.json');
@@ -486,7 +494,7 @@ test.describe('billing on a Stripe test clock (live)', { tag: '@live' }, () => {
     });
   });
 
-  test.describe('journey B: failed renewal → real past_due → cancel', () => {
+  trialJourney('journey B: failed renewal → real past_due → cancel', () => {
     test.describe.configure({ mode: 'serial', retries: 0 });
     const STORAGE = path.resolve(__dirname, '.auth/user-clock-b.json');
     const CREDS = path.resolve(__dirname, '.auth/credentials-clock-b.json');

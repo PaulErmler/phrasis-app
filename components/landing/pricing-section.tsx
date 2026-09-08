@@ -9,6 +9,15 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 /**
+ * Mirrors FREE_TRIAL in autumn.config.ts, which is the actual switch: with no
+ * trial configured there, Autumn stops reporting one and the in-app pricing
+ * table's trial badge disappears by itself. This landing copy is hardcoded, so
+ * it needs its own flag. Flip both together, and the `plans.*.trial` strings
+ * in messages/landing/{en,de}.json come back with them.
+ */
+const TRIALS_ENABLED = false;
+
+/**
  * Each tier lists only what it ADDS over the one below, under an "Everything
  * from X, plus:" line. The same structure as the in-app pricing table
  * (`itemsAddedOver` in components/autumn/pricing-table.tsx). Anything the
@@ -38,7 +47,7 @@ const plans = [
     key: 'basic' as const,
     previous: 'free' as const,
     highlighted: false,
-    hasTrial: true,
+    hasTrial: TRIALS_ENABLED,
     paid: true,
     features: ['sentences', 'credits'],
   },
@@ -46,7 +55,7 @@ const plans = [
     key: 'pro' as const,
     previous: 'basic' as const,
     highlighted: true,
-    hasTrial: true,
+    hasTrial: TRIALS_ENABLED,
     paid: true,
     features: ['credits', 'courses', 'multipleLanguages'],
   },
@@ -54,7 +63,7 @@ const plans = [
     key: 'ultra' as const,
     previous: 'pro' as const,
     highlighted: false,
-    hasTrial: true,
+    hasTrial: TRIALS_ENABLED,
     paid: true,
     features: [
       'credits',

@@ -99,7 +99,12 @@ async function expectPlanState(
   }).toPass({ timeout, intervals: [2_000, 5_000] });
 }
 
-test.describe('billing trial lifecycle (live)', { tag: '@live' }, () => {
+// Free trials are switched off for new customers (FREE_TRIAL in
+// autumn.config.ts), so a fresh user can no longer start one and this whole
+// journey cannot be provisioned. Skipped at the describe level so beforeAll
+// never signs up a throwaway Stripe user for a run that cannot pass.
+// To re-enable: restore FREE_TRIAL, `atmn push`, and drop the `.skip` below.
+test.describe.skip('billing trial lifecycle (live)', { tag: '@live' }, () => {
   // Serial: the four tests are consecutive stages of one user journey.
   test.describe.configure({ mode: 'serial', retries: 0 });
 
