@@ -30,9 +30,14 @@ export function parseCustomGoal(value: string): number | null {
  * and every projection until repaired by hand, so non-finite values are
  * dropped rather than clamped.
  *
- * Single source of the server-side clamp, shared by every path that writes
- * `dailyTimeGoalMinutes`: `updateCourseSettings`, `saveOnboardingProgress`,
- * and the `completeOnboarding` copy from the wizard row onto the course.
+ * Shared by the Convex paths that write `dailyTimeGoalMinutes`:
+ * `updateCourseSettings`, `saveOnboardingProgress`, and the
+ * `completeOnboarding` copy from the wizard row onto the course.
+ *
+ * `finalizeOnboarding` does NOT call this. It hand-rolls the same
+ * `Math.max/min/round` behind its own `Number.isFinite` guard, because it
+ * patches only when the clamped value differs from what the course already
+ * holds. Behaviour matches; if you change the rule here, change it there too.
  */
 export function clampDailyGoal(value: number | undefined): number | undefined {
   if (value === undefined || !Number.isFinite(value)) return undefined;

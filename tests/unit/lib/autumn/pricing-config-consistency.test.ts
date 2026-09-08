@@ -94,7 +94,7 @@ describe.each(catalogs)(
     const { plans } = pricing;
 
     it("advertises Free's starter and monthly credit grants", () => {
-      // "200 credits to start, then 30 per month". One-off first, recurring second.
+      // "100 credits to start, then 30 per month". One-off first, recurring second.
       expect(numbersIn(plans.free.features.credits)).toEqual([
         grantOf(free, credits.id, 'one_off'),
         grantOf(free, credits.id, 'month'),

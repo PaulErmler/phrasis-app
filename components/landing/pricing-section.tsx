@@ -7,15 +7,10 @@ import { motion } from 'motion/react';
 import { Check, X, Sprout } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-
-/**
- * Mirrors FREE_TRIAL in autumn.config.ts, which is the actual switch: with no
- * trial configured there, Autumn stops reporting one and the in-app pricing
- * table's trial badge disappears by itself. This landing copy is hardcoded, so
- * it needs its own flag. Flip both together, and the `plans.*.trial` strings
- * in messages/landing/{en,de}.json come back with them.
- */
-const TRIALS_ENABLED = false;
+// This landing copy is hardcoded, unlike the in-app pricing table, which reads
+// Autumn's `has_trial`. It reads the same switch the plan config does so the
+// two cannot disagree about whether a trial exists.
+import { TRIALS_ENABLED } from '@/lib/constants/trials';
 
 /**
  * Each tier lists only what it ADDS over the one below, under an "Everything

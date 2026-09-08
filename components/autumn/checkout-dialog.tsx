@@ -211,9 +211,21 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
 
                   // Autumn's `attach` hands off to Stripe's hosted page, so
                   // this is the last thing observable on our domain.
+                  //
+                  // Eligibility alone is NOT the trial test: with no trial
+                  // configured on the plan every new customer is still
+                  // trial-eligible, so keying off it filed every first
+                  // purchase as `trial_start`. `has_trial` is what decides
+                  // whether Autumn actually starts one, and this is the same
+                  // pair `getCheckoutContent` gates the dialog's trial copy
+                  // on, so the event matches what the user was just shown.
                   capture(CLIENT_EVENTS.CHECKOUT_REDIRECTED, {
                     product_id: checkoutResult.product.id,
-                    flow: trialState.trialEligible ? 'trial_start' : 'purchase',
+                    flow:
+                      checkoutResult.product.properties?.has_trial &&
+                      trialState.trialEligible
+                        ? 'trial_start'
+                        : 'purchase',
                   });
                   // Failures come back as an `{ error }` container, not a
                   // throw (both the component path and the server's v2

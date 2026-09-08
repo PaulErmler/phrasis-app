@@ -10,10 +10,11 @@ import {
 } from '@/lib/constants/dailyGoal';
 
 /**
- * The custom daily goal window is the one thing three editors and three
- * Convex write paths all derive from, so the bounds and the two helpers that
- * enforce them are pinned here rather than only end-to-end in the Convex
- * suites. Cases are written against the constants, not literals, so raising
+ * The custom daily goal window is the one thing three editors and four Convex
+ * write paths all derive from (three through `clampDailyGoal`, plus
+ * `finalizeOnboarding`, which hand-rolls the same rule), so the bounds and the
+ * two helpers that enforce them are pinned here rather than only end-to-end in
+ * the Convex suites. Cases are written against the constants, not literals, so raising
  * the ceiling again does not silently invalidate them.
  */
 describe('daily goal bounds', () => {

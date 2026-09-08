@@ -13,7 +13,7 @@ import { MAX_CARDS_PER_BATCH } from '../../../lib/constants/learning';
 import {
   DAILY_TIME_CUSTOM_MIN,
   DAILY_TIME_CUSTOM_MAX,
-} from '../../../lib/constants/dailyGoal';
+} from '@/lib/constants/dailyGoal';
 import {
   MAX_INITIAL_REVIEW_COUNT,
   MIN_INITIAL_REVIEW_COUNT,

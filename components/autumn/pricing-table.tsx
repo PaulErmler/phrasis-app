@@ -111,7 +111,7 @@ export function previousTier(
  * total, which is what "Up to 10 courses" has to mean to be true.
  *
  * Items are matched on feature id AND interval so a one-off starter grant
- * (Free's 200 credits, `interval == null`) never cancels out a recurring one.
+ * (Free's one-off credits, `interval == null`) never cancels out a recurring one.
  */
 export function itemsAddedOver(
   items: ProductItem[],
@@ -730,7 +730,7 @@ export const PricingFeatureList = ({
         return tFeatures(`${i18nKey}.pricingLabelUnlimited`);
       }
       // Consumable items without a reset interval are one-off starter
-      // grants (e.g. "300 sentences to start", "200 credits to start").
+      // grants (e.g. "300 sentences to start", "100 credits to start").
       if (
         isFeatureConsumable(item.feature_id) === true &&
         item.interval == null

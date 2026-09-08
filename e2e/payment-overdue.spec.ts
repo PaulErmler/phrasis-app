@@ -13,9 +13,12 @@ import {
  * the real Stripe billing-portal redirect against Autumn + Stripe test
  * mode:
  *
- *   1. Fresh user starts a card-required trial through Stripe Checkout
- *      (4242 card): gives the account a real Stripe customer + payment
- *      method, which the billing-portal call needs.
+ *   1. Fresh user buys a plan through Stripe Checkout (4242 card): gives the
+ *      account a real Stripe customer + payment method, which the
+ *      billing-portal call needs. Works in either trial mode. While trials
+ *      are on this is a card-required trial and the card is only saved;
+ *      while they are off it is charged immediately. Either way the customer
+ *      and the payment method are what the rest of the journey needs.
  *   2. `usage/testing:setBillingOverride` forces the synced planStatus to
  *      past_due. Everything downstream of the sync: quota doc, reactive
  *      query, dialog, portal call: is the real production path; only the
@@ -31,8 +34,14 @@ import {
  * and the shortcut. Attach with `free_trial: false` while charge-failing
  * card 4000-0000-0000-0341 is on file. Was tried and does NOT produce
  * past_due (verified July 2026): the failed charge leaves an open→voided
- * invoice and an empty products list. Manual repro of the real thing:
- * subscribe with 0341 and wait for the trial to convert.
+ * invoice and an empty products list.
+ *
+ * The real thing IS covered, on a test clock, by journey B in
+ * billing-clock.spec.ts (trials on: let a trial convert onto the failing
+ * card) or journey B' in billing-clock-no-trial.spec.ts (trials off: buy on
+ * 4242, swap the default payment method to the failing card, advance to
+ * renewal). Reach for those rather than trying to reproduce a real past_due
+ * by hand.
  *
  * Prerequisites (one-time, dev deployment only):
  *   - `pnpm exec convex env set E2E_TEST_HOOKS 1`: the usage/testing:* hooks
@@ -110,9 +119,7 @@ test.describe('payment overdue dunning (live)', { tag: '@live' }, () => {
     await neutralizeTours(page);
   });
 
-  test('trial checkout gives the account a Stripe customer', async ({
-    page,
-  }) => {
+  test('checkout gives the account a Stripe customer', async ({ page }) => {
     test.setTimeout(240_000);
     await gotoAuthedApp(page, '/app/settings', planCta(page, BASIC_ANNUAL));
 
@@ -165,7 +172,8 @@ test.describe('payment overdue dunning (live)', { tag: '@live' }, () => {
     page,
   }) => {
     test.setTimeout(60_000);
-    // The reload triggers a real Autumn sync (healthy trialing customer).
+    // The reload triggers a real Autumn sync, which reports a HEALTHY
+    // subscription (trialing or active, depending on the trial mode).
     // The override must survive it via the syncAllFeatures hook.
     await page.goto('/app');
     await expect(overdueDialog(page)).toBeVisible({ timeout: 20_000 });

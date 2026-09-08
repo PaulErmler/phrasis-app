@@ -2,7 +2,7 @@
 import { convexTest, type TestConvex } from 'convex-test';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ConvexError } from 'convex/values';
-import { DAILY_TIME_CUSTOM_MAX } from '../../../lib/constants/dailyGoal';
+import { DAILY_TIME_CUSTOM_MAX } from '@/lib/constants/dailyGoal';
 
 // Mock the rate limiter at the module boundary. The real component would need
 // `t.registerComponent` (flagged fragile in this project). Permissive default

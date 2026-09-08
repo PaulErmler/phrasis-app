@@ -5,6 +5,7 @@ import {
   AI_FEEDBACK_PAID_GRANT,
   CREDIT_COSTS,
 } from './convex/features/featureIds';
+import { FREE_TRIAL } from './lib/constants/trials';
 
 // Features
 export const multiple_languages = feature({
@@ -109,23 +110,14 @@ export const credits = feature({
   ),
 });
 
-// Free trials are OFF for new customers (2026-09). Existing subscribers and
-// anyone mid-trial are unaffected: they stay on the plan version they bought,
-// which still carries the trial.
-//
-// To turn trials back on: set this to
-// `{ durationLength: 7, durationType: 'day', cardRequired: true }`, flip
-// TRIALS_ENABLED in components/landing/pricing-section.tsx, un-skip the
-// trial-badge test in e2e/billing.spec.ts, and run `atmn push`. Nothing else
-// needs touching: the in-app pricing table's trial badge and its
-// "Start Free Trial" CTA both key off Autumn's `has_trial`, so they come back
-// on their own. Spread conditionally rather than set to `undefined` so the
-// key is genuinely absent, the shape `free` already ships.
-const FREE_TRIAL: {
-  durationLength: number;
-  durationType: 'day';
-  cardRequired: boolean;
-} | null = null;
+// Free trials are OFF for new customers (2026-09), switched by TRIALS_ENABLED
+// in lib/constants/trials.ts. Flipping that one constant turns the trial back
+// on here, in the landing copy, and in the paired billing e2e suites, then
+// `atmn push`. The in-app pricing table and paywall need no change either way:
+// their trial badge and "Start Free Trial" CTA key off Autumn's `has_trial`.
+// See docs/architecture/autumn-usage-tracking.md for what the push itself has
+// to do about grandfathering. Spread conditionally rather than set to
+// `undefined` so the key is genuinely absent, the shape `free` already ships.
 
 // Plans
 export const free = plan({

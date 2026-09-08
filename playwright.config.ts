@@ -16,9 +16,11 @@ const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
  *   4. chromium-serial      — specs that MUTATE the shared fixture user
  *                             (review mode, chat quota, cards, etc.).
  *                             workers:1 so they cannot race each other.
- *   5. billing-live         — billing.spec.ts with its OWN fresh user. Depends
- *                             only on chromium-parallel so it overlaps in
- *                             wall-clock with chromium-serial.
+ *   5. billing-live         — the first-purchase journey with its OWN fresh
+ *                             user: billing.spec.ts while trials are on,
+ *                             billing-no-trial.spec.ts while they are off.
+ *                             Depends only on chromium-parallel so it overlaps
+ *                             in wall-clock with chromium-serial.
  *   6. settings-serial      — change-password (revokeOtherSessions) + locale.
  *                             workers:1, after chromium-serial so password
  *                             rotation cannot log out concurrent live specs.
@@ -122,12 +124,17 @@ export default defineConfig({
       },
     },
     {
-      // Own-user Stripe/Autumn trial journey. Parallel with chromium-serial
-      // (only shares chromium-parallel as a dependency) so the long checkout
-      // walk overlaps shared-fixture live specs instead of extending the
-      // serial queue.
+      // Own-user Stripe/Autumn first-purchase journey. Parallel with
+      // chromium-serial (only shares chromium-parallel as a dependency) so the
+      // long checkout walk overlaps shared-fixture live specs instead of
+      // extending the serial queue.
+      //
+      // Two specs, of which exactly ONE runs: billing.spec.ts while trials are
+      // on and billing-no-trial.spec.ts while they are off, gated on
+      // TRIALS_ENABLED in lib/constants/trials.ts. Both are matched here so
+      // the project keeps its tests whichever way the switch is set.
       name: 'billing-live',
-      testMatch: /(^|\/)billing\.spec\.ts$/,
+      testMatch: /(^|\/)billing(-no-trial)?\.spec\.ts$/,
       dependencies: ['chromium-parallel'],
       fullyParallel: false,
       use: {
@@ -227,8 +234,10 @@ export default defineConfig({
       // available (env or .env.local). Last link of the billing chain (see
       // payment-overdue's comment); runs in parallel with the shared-user
       // chain. Manages its own contexts.
+      // Paired the same way as billing-live: billing-clock.spec.ts runs while
+      // trials are on, billing-clock-no-trial.spec.ts while they are off.
       name: 'billing-clock',
-      testMatch: /(^|\/)billing-clock\.spec\.ts$/,
+      testMatch: /(^|\/)billing-clock(-no-trial)?\.spec\.ts$/,
       dependencies: ['payment-overdue'],
       fullyParallel: false,
       workers: 1,
