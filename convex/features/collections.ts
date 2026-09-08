@@ -27,10 +27,12 @@ import {
   sourceTextFromContent,
 } from '../lib/cardContent';
 import {
+  collectRenderingStamp,
   enqueueVersionBumpRegen,
   flushRenderingStamps,
   newMetadataCallBudget,
   newRenderingStampCollector,
+  type RenderingStampCollector,
   scheduleMissingContent,
   scheduleTranslationForLanguage,
   scheduleAudioForLanguage,
@@ -442,13 +444,24 @@ export const setCollectionTextMark = mutation({
  * `opts.llmPriority` tiers the translation enqueues. A parameter rather than a
  * constant because the preview paths that share this function are user-facing:
  * only the onboarding warmup passes 'background'.
+ *
+ * `opts.stamps` collects the rendering stamps this pass finds missing, so a
+ * browsed collection shows its form chips like a card does. A caller looping
+ * over texts passes one collector and flushes it once (25 rows per
+ * classifier call); without one this text flushes its own.
  */
 export async function scheduleMissingTranslationsForText(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   languages: string[],
-  opts?: { llmPriority?: LlmPriority; requestedByUserId?: string },
+  opts?: {
+    llmPriority?: LlmPriority;
+    requestedByUserId?: string;
+    stamps?: RenderingStampCollector;
+  },
 ): Promise<number> {
+  const ownStampCollector = opts?.stamps === undefined;
+  const stamps = opts?.stamps ?? newRenderingStampCollector();
   const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
     text,
     text._id,
@@ -508,6 +521,11 @@ export async function scheduleMissingTranslationsForText(
         // annotation gap until the text was added to a deck. Mirrors that
         // sweep's loop in decks.ts.
         await scheduleTranslationAnnotations(ctx, existing, undefined);
+        // Rows translated before the sentence-form settings carry no
+        // classifier stamps, so the preview would show no form chips for
+        // them. The card sweep stamps its rows the same way; this is the
+        // only path that meets a collection's rows before they are cards.
+        collectRenderingStamp(existing, stamps);
         continue;
       }
       // Mirror the sweep's deferrals: never regenerate under an active TTS
@@ -550,6 +568,9 @@ export async function scheduleMissingTranslationsForText(
       scheduled++;
     }
   }
+  if (ownStampCollector) {
+    await flushRenderingStamps(ctx, stamps, opts?.requestedByUserId);
+  }
   return scheduled;
 }
 
@@ -587,6 +608,9 @@ export const requestPreviewTranslations = mutation({
       course.targetLanguages,
     );
 
+    // One collector for the batch, so the classifier is asked once per
+    // language per 25 rows instead of once per text.
+    const stamps = newRenderingStampCollector();
     let translationsScheduled = 0;
     for (const textId of textIds) {
       const text = await ctx.db.get(textId);
@@ -605,9 +629,10 @@ export const requestPreviewTranslations = mutation({
         languages,
         // Explicit preview request: the viewing user caused this spend. The
         // prewarm sibling below stays unattributed (speculative work).
-        { requestedByUserId: userId },
+        { requestedByUserId: userId, stamps },
       );
     }
+    await flushRenderingStamps(ctx, stamps, userId);
 
     return { translationsScheduled };
   },
@@ -652,14 +677,17 @@ export const prewarmPreviewTranslations = mutation({
       course.targetLanguages,
     );
 
+    const stamps = newRenderingStampCollector();
     let translationsScheduled = 0;
     for (const text of texts) {
       translationsScheduled += await scheduleMissingTranslationsForText(
         ctx,
         text,
         languages,
+        { stamps },
       );
     }
+    await flushRenderingStamps(ctx, stamps);
 
     return { translationsScheduled };
   },

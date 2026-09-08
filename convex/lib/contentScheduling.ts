@@ -64,13 +64,17 @@ import {
   renderingForView,
   renderingTextOf,
   canonicalSatisfies,
+  servedAccentRow,
+  sourceRenderingForView,
+  type SourceView,
+  type SweepCard,
 } from '../db/translationReads';
 import {
   AUTO,
+  axisOf,
   hasRenderingOverride,
   parseVariantKey,
   type LanguageRendering,
-  type RenderingCard,
   type RenderingSettings,
 } from '../../lib/preferenceResolution';
 import {
@@ -609,10 +613,11 @@ type ContentSweepOpts = {
    * The card the sweep runs for, when the caller has one. Read only by
    * `scheduleMissingRenderings`, so a per-card correction
    * (`cards.renderingGenderOverride` / `renderingPolitenessOverride`)
-   * renders; the card-less callers (collection warm) get the rendering a
-   * new card would.
+   * renders and the source clip voiced is the one the card plays (its
+   * accent row); the card-less callers (collection warm) get the rendering
+   * a new card would.
    */
-  card?: RenderingCard;
+  card?: SweepCard | null;
   /**
    * Forced regeneration (regenerateCardAudio): audio enqueues bypass the
    * `audioAssets` cache (a hit would make the regenerate button a no-op)
@@ -740,10 +745,7 @@ async function loadContentState(
  * (silent no-op).
  *
  * Mutates `state.audioMap` (deleted rows become null) and fills
- * `state.audioPayloadMap` for the surviving rows. Returns the languages
- * whose audio was found to have drifted gender, so the translation sweep
- * can also invalidate the legacy translation row (the one without a stamped
- * `speakerGender`) that was generated alongside the now-stale audio.
+ * `state.audioPayloadMap` for the surviving rows.
  */
 async function sweepInvalidAudio(
   ctx: MutationCtx,
@@ -752,8 +754,7 @@ async function sweepInvalidAudio(
   audioSpeakerGender: string | undefined,
   state: ContentSweepState,
   opts: ContentSweepOpts | undefined,
-): Promise<Set<string>> {
-  const langsWithAudioGenderDrift = new Set<string>();
+): Promise<void> {
   for (const [lang, audio] of state.audioMap) {
     if (!audio) continue;
     const payload = await resolveAudioPayload(ctx, audio);
@@ -807,9 +808,6 @@ async function sweepInvalidAudio(
       // knows.
       const accentMismatch =
         !text.userCreated && audioAccentDrifted(lang, textId, payload.asset);
-      if (genderMismatch) {
-        langsWithAudioGenderDrift.add(lang);
-      }
       if (
         genderMismatch ||
         providerMismatch ||
@@ -817,28 +815,22 @@ async function sweepInvalidAudio(
         accentMismatch
       ) {
         if (opts?.probe) throw new ProbeNeedsWork();
-        // Reference-aware delete: a shared asset (or an `editCard`-copied
-        // legacy blob) survives while anything else still points at it.
-        // Gender and accent drift additionally keep the asset+blob even as
-        // the last pointer: that audio is still CORRECT for this
-        // string+voice+accent. It stays in the content-addressed cache so
-        // flipping the gender back, a pinned-accent course, or any other
-        // text with the same sentence and accent reuses it for free.
-        // Provider/ttsVersion migrations are true obsolescence (a new TTS
-        // system) and keep the full garbage collection.
-        await deleteAudioRow(ctx, audio, {
-          keepAsset:
-            (genderMismatch || accentMismatch) &&
-            !providerMismatch &&
-            !versionMismatch,
-        });
+        // Detach only: the asset and its blob stay even as the last pointer.
+        // That audio is still CORRECT for its string+voice+accent+setup and
+        // stays in the content-addressed cache: flipping the gender back, a
+        // pinned-accent course, or another text with the same sentence
+        // reuses it for free, and a provider or prompt-version change is a
+        // NEW setup, not obsolescence. The next synthesis creates a sibling
+        // asset under the new setup (`upsertAudioAsset`) and rolling the
+        // setup back finds this clip again. Full garbage collection is left
+        // to the manual regenerate button and the orphan cascades.
+        await deleteAudioRow(ctx, audio, { keepAsset: true });
         state.audioMap.set(lang, null);
       } else {
         state.audioPayloadMap.set(lang, payload);
       }
     }
   }
-  return langsWithAudioGenderDrift;
 }
 
 /**
@@ -889,13 +881,24 @@ async function sweepInvalidAudio(
  * number of in-place version-bump regenerations it enqueued (which the fill
  * loop never sees, the rows still exist).
  */
+
+/**
+ * How many extra regenerations a row gets when its wording keeps
+ * contradicting a definitive speaker gender it was already generated under.
+ * The audit (`features/renderingAudit.ts`) found every live mismatch to be
+ * exactly that: the model ignoring `<speaker_gender>`, not a stale row. One
+ * retry buys a second sample at the cost of one call per affected row;
+ * counted on the row, so a sentence the model will not render in the
+ * requested gender stops asking instead of regenerating on every sweep.
+ */
+const MAX_GENDER_CORRECTION_RETRIES = 1;
+
 async function sweepStaleTranslations(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   text: Doc<'texts'>,
   audioSpeakerGender: string | undefined,
   state: ContentSweepState,
-  _langsWithAudioGenderDrift: Set<string>,
   opts: ContentSweepOpts | undefined,
 ): Promise<{
   sweptRegionVariants: Map<string, string>;
@@ -926,17 +929,30 @@ async function sweepStaleTranslations(
     // gender on this curriculum text and the row's rendering stamp proves
     // the wording was written in the other one ("somos hermanas" under a
     // coin-flipped female speaker). Only a proven row: `unmarked` expresses
-    // no gender, and an unstamped row waits for `flushRenderingStamps`. The
-    // row's own `speakerGender` (the gender it was generated under) is the
-    // loop guard: once regenerated under the verdict the sweep stops asking,
-    // even if the model still renders the other gender.
+    // no gender, and an unstamped row waits for `flushRenderingStamps`.
     const definitive = definitiveSpeakerGender(text);
-    const isGenderContradicted =
+    const stampContradictsVerdict =
       definitive !== null &&
-      translation.speakerGender !== definitive &&
       renderingAxesFor(classificationLanguageForRow(translation)).gender &&
-      translation.renderedGender ===
-        (definitive === 'male' ? 'feminine' : 'masculine');
+      translation.renderedGender !== undefined &&
+      translation.renderedGender !== 'unmarked' &&
+      translation.renderedGender !== axisOf(definitive);
+    // The row was written under the OTHER gender: the verdict landed after
+    // it, so regenerating is the whole point and costs no budget.
+    const firstGenderCorrection =
+      stampContradictsVerdict && translation.speakerGender !== definitive;
+    // The row was already written under the verdict and STILL renders the
+    // other gender, so the model ignored `<speaker_gender>` rather than
+    // the row being stale. `translations.speakerGender` used to end the
+    // matter here; it now buys `MAX_GENDER_CORRECTION_RETRIES` more
+    // attempts, counted on the row so a model that keeps refusing cannot
+    // put the sweep in a loop.
+    const retryGenderCorrection =
+      stampContradictsVerdict &&
+      translation.speakerGender === definitive &&
+      (translation.genderCorrectionAttempts ?? 0) <
+        MAX_GENDER_CORRECTION_RETRIES;
+    const isGenderContradicted = firstGenderCorrection || retryGenderCorrection;
 
     if (!isVersionStale && !isGenderContradicted) continue;
     if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
@@ -958,6 +974,16 @@ async function sweepStaleTranslations(
     });
     if (enqueued) {
       regenScheduled++;
+      // Spend one retry. Only the retry path is counted: the first
+      // correction is a stale row meeting a new verdict, which must always
+      // be free to run. The replace patch keeps the row's id, so the count
+      // survives the regeneration it pays for.
+      if (retryGenderCorrection) {
+        await ctx.db.patch(translation._id, {
+          genderCorrectionAttempts:
+            (translation.genderCorrectionAttempts ?? 0) + 1,
+        });
+      }
       // The fresh claim makes `scheduleLanguageContent` defer this pass's
       // TTS for the language, so no audio is synthesized for the wording
       // about to be replaced.
@@ -1044,7 +1070,7 @@ async function scheduleSupersededRevisionContent(
     }
     await scheduleTranslationAnnotations(ctx, revision, revision._id);
     // A pinned card shows this revision, so its chips need the stamps too.
-    collectRenderingStamp(revision, opts);
+    collectRenderingStamp(revision, opts?.stamps);
     // A revision that was never voiced is never served (the reader falls
     // through to the live row), so there is no audio to keep alive.
     if (revision.audioAssetId === undefined) continue;
@@ -1186,7 +1212,7 @@ async function scheduleLanguageContent(
     throw new ProbeNeedsWork();
   }
   await scheduleTranslationAnnotations(ctx, translation, undefined);
-  collectRenderingStamp(translation, opts);
+  collectRenderingStamp(translation, opts?.stamps);
   if (!hasAudio) {
     // Defer TTS while an LLM retranslation is in flight for this
     // (textId, lang). Without this guard, `flagTranslation` (which
@@ -1329,14 +1355,7 @@ export async function scheduleMissingContent(
     langsNeedingTranslation,
   );
 
-  const langsWithAudioGenderDrift = await sweepInvalidAudio(
-    ctx,
-    textId,
-    text,
-    audioSpeakerGender,
-    state,
-    opts,
-  );
+  await sweepInvalidAudio(ctx, textId, text, audioSpeakerGender, state, opts);
 
   const { sweptRegionVariants, regenScheduled } = await sweepStaleTranslations(
     ctx,
@@ -1344,7 +1363,6 @@ export async function scheduleMissingContent(
     text,
     audioSpeakerGender,
     state,
-    langsWithAudioGenderDrift,
     opts,
   );
 
@@ -1507,16 +1525,22 @@ export function needsRenderingStamp(row: Doc<'translations'>): boolean {
   return axes.gender || axes.politeness;
 }
 
-function collectRenderingStamp(
+/**
+ * Add one row to a collector when it still needs a classifier call, keyed by
+ * the classifier's prompt language. Exported for the preview-translation
+ * sweep (convex/features/collections.ts), which walks the same rows outside
+ * this file's sweep and must stamp them the same way.
+ */
+export function collectRenderingStamp(
   row: Doc<'translations'>,
-  opts: ContentSweepOpts | undefined,
+  stamps: RenderingStampCollector | undefined,
 ): void {
-  if (!opts?.stamps || !needsRenderingStamp(row)) return;
+  if (!stamps || !needsRenderingStamp(row)) return;
   const language = classificationLanguageForRow(row);
-  const list = opts.stamps.get(language) ?? [];
+  const list = stamps.get(language) ?? [];
   if (list.includes(row._id)) return;
   list.push(row._id);
-  opts.stamps.set(language, list);
+  stamps.set(language, list);
 }
 
 /**
@@ -1582,16 +1606,23 @@ function renderingStampPending(
 /**
  * Fill the rendering VARIANTS a course's sentence-form settings resolve to
  * for one text: per language, the variant translation row (a rewrite of
- * the canonical wording, so it waits for the canonical row to land) and
- * the audio in the card's voice. Separate from `scheduleMissingContent`,
- * which stays the canonical sweep for every caller: this returns after
- * zero reads when the settings resolve to canonical on every language,
- * which is every course from before the feature.
+ * the canonical wording, so it waits for the canonical row to land), its
+ * annotations, and the audio in the card's voice. The text's own language
+ * is voiced too: its wording never varies, but the card hears every
+ * language in one voice, so the source clip (or the accent row's, on a
+ * Mixed English card) gets an audio-only variant like an unmarked target.
+ * Separate from `scheduleMissingContent`, which stays the canonical sweep
+ * for every caller: this returns after zero reads when the settings
+ * resolve to canonical on every language, which is every course from
+ * before the feature.
  *
  * Probe semantics match the canonical sweep (`opts.probe` throws
  * ProbeNeedsWork iff a write would happen), so the probe-then-dispatch
  * ensure paths keep their zero-write steady state. Never writes `texts` or
- * a canonical row; never deletes a rendering.
+ * a canonical row; never deletes a rendering. A rewrite whose attempts
+ * were exhausted holds its claim with `variantFailedAt` for a day
+ * (`hasBlockingLlmClaim`), so a sentence the model refuses is not bought
+ * again on every view.
  */
 export async function scheduleMissingRenderings(
   ctx: MutationCtx,
@@ -1611,17 +1642,44 @@ export async function scheduleMissingRenderings(
   // card-less view: a card created now would get exactly this, and the
   // ensure paths only run for texts the learner has (or is about to have)
   // a curriculum card for. A user-written text resolves to canonical.
-  const view = card
-    ? { settings: settings ?? {}, card }
+  const view: SourceView | null = card
+    ? { settings: settings ?? {}, card, accentLanguage: card.accentLanguage }
     : previewView(settings);
   const renderingText = renderingTextOf(text);
   const courseLanguages = [...new Set([...baseLanguages, ...targetLanguages])];
   for (const lang of courseLanguages) {
-    if (lang === text.language) continue;
-    const rendering = renderingForView(view, renderingText, textId, lang);
+    if (lang === text.language) {
+      const rendering = sourceRenderingForView(view, renderingText, textId);
+      if (rendering.audioVariantKey === null || opts?.skipTts) continue;
+      // The row the card plays for its own language: the accent row once it
+      // has landed, else the source text (`servedSourceText` has the same
+      // fallback).
+      const accent = servedAccentRow(text, view);
+      const accentRow =
+        accent !== undefined
+          ? await liveTranslation(ctx, textId, accent)
+          : null;
+      const spoken =
+        accent !== undefined && accentRow
+          ? {
+              language: accent,
+              text: accentRow.translatedText,
+              regionVariant: accentRow.regionVariant,
+            }
+          : { language: lang, text: text.text, regionVariant: undefined };
+      if (await ensureVariantAudio(ctx, textId, spoken, rendering, opts)) {
+        scheduled.audioScheduled++;
+      }
+      continue;
+    }
+    // A first pass on the language's default dialect decides whether the
+    // language renders at all (no read when it does not); the row's own
+    // dialect (`regionVariant`) then decides the form, since a mixed code's
+    // sub-variants map the levels differently.
+    const probeRendering = renderingForView(view, renderingText, textId, lang);
     if (
-      rendering.textVariantKey === null &&
-      rendering.audioVariantKey === null
+      probeRendering.textVariantKey === null &&
+      probeRendering.audioVariantKey === null
     ) {
       continue;
     }
@@ -1631,6 +1689,13 @@ export async function scheduleMissingRenderings(
     // need it as the text to speak).
     if (!canonical) continue;
     if (!mayRegenerateTranslation(text, canonical)) continue;
+    const rendering = renderingForView(
+      view,
+      renderingText,
+      textId,
+      lang,
+      canonical.regionVariant,
+    );
 
     let variant: Doc<'translations'> | null = null;
     if (rendering.textVariantKey !== null) {
@@ -1689,7 +1754,11 @@ export async function scheduleMissingRenderings(
                     ? undefined
                     : rendering.voiceGender,
                 requestedForm: form
-                  ? { id: form.id, label: form.label, prompt: form.prompt }
+                  ? {
+                      id: form.id,
+                      label: form.promptLabel,
+                      prompt: form.prompt,
+                    }
                   : undefined,
                 rewriteOf: canonical.translatedText,
               },
@@ -1698,6 +1767,14 @@ export async function scheduleMissingRenderings(
           scheduled.translationsScheduled++;
           continue;
         }
+      } else if (!variant.sameAsCanonical) {
+        // A served variant is content like any other row: its wording
+        // gets the annotations of its language, by its own id (the store
+        // would otherwise find the canonical row and refuse the wording).
+        if (opts?.probe && missingAnnotationKinds(lang, variant).length > 0) {
+          throw new ProbeNeedsWork();
+        }
+        await scheduleTranslationAnnotations(ctx, variant, variant._id);
       }
     }
 
@@ -1705,86 +1782,131 @@ export async function scheduleMissingRenderings(
     // when it differs, else the canonical wording.
     if (rendering.audioVariantKey === null || opts?.skipTts) continue;
     const spokenRow = variant && !variant.sameAsCanonical ? variant : canonical;
-    const pointer = await audioPointer(
+    if (
+      await ensureVariantAudio(
+        ctx,
+        textId,
+        {
+          language: lang,
+          text: spokenRow.translatedText,
+          regionVariant: spokenRow.regionVariant,
+        },
+        rendering,
+        opts,
+      )
+    ) {
+      scheduled.audioScheduled++;
+    }
+  }
+  return scheduled;
+}
+
+/**
+ * The audio half of one language's rendering: the clip of `spoken` under
+ * `rendering.audioVariantKey`. Detaches a pointer the current TTS setup no
+ * longer accepts, attaches a cached asset, or claims and enqueues the
+ * synthesis. Returns true iff a pointer was attached or a job enqueued;
+ * throws ProbeNeedsWork in probe mode where it would write.
+ */
+async function ensureVariantAudio(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+  spoken: { language: string; text: string; regionVariant: string | undefined },
+  rendering: LanguageRendering,
+  opts: ContentSweepOpts | undefined,
+): Promise<boolean> {
+  const audioVariantKey = rendering.audioVariantKey;
+  if (audioVariantKey === null) return false;
+  const lang = spoken.language;
+  const pointer = await audioPointer(ctx, textId, lang, audioVariantKey);
+  if (pointer) {
+    // The same validity checks the canonical sweep runs
+    // (`sweepInvalidAudio`), so a provider switch, a `ttsVersion` bump or
+    // a lost blob reaches variant clips too: detach the pointer and fall
+    // through to a fresh synthesis. The asset stays (retention rule in
+    // convex/lib/audioAssets.ts); a dead one is dropped with the pointer.
+    const payload = await resolveAudioPayload(ctx, pointer);
+    const blobGone =
+      payload === null || (await ctx.db.system.get(payload.storageId)) === null;
+    const { providerMismatch, versionMismatch } = payload
+      ? audioAssetMismatch(lang, payload)
+      : { providerMismatch: false, versionMismatch: false };
+    if (!blobGone && !providerMismatch && !versionMismatch) return false;
+    // A job in flight for this variant re-points the row when it lands.
+    if (await hasActiveTtsClaim(ctx, textId, lang, audioVariantKey)) {
+      return false;
+    }
+    if (opts?.probe) throw new ProbeNeedsWork();
+    await deleteAudioRow(
+      ctx,
+      pointer,
+      blobGone ? { blobAlreadyGone: true } : { keepAsset: true },
+    );
+  }
+  // Defer while the variant's own translation job is in flight: it
+  // enqueues the audio for the wording it lands.
+  if (
+    rendering.textVariantKey !== null &&
+    (await hasBlockingLlmClaim(
       ctx,
       textId,
       lang,
-      rendering.audioVariantKey,
-    );
-    if (pointer) continue;
-    // Defer while the variant's own translation job is in flight: it
-    // enqueues the audio for the wording it lands.
-    if (
-      rendering.textVariantKey !== null &&
-      (await hasBlockingLlmClaim(
-        ctx,
-        textId,
-        lang,
-        opts?.llmPriority,
-        rendering.textVariantKey,
-      ))
-    ) {
-      continue;
-    }
-    if (
-      await hasBlockingTtsClaim(
-        ctx,
-        textId,
-        lang,
-        opts?.priority,
-        rendering.audioVariantKey,
-      )
-    ) {
-      continue;
-    }
-    if (opts?.probe) throw new ProbeNeedsWork();
-    const voiceName = getVoiceForText(
-      lang,
-      textId,
-      spokenRow.regionVariant,
-      rendering.voiceGender,
-    );
-    // The regenerate-audio button bypasses the asset cache like the
-    // canonical path does (a hit would hand back the clip being replaced).
-    const asset = opts?.forceAudioRegen
-      ? null
-      : await findReusableAudioAssetForVoice(ctx, {
-          language: lang,
-          voiceName,
-          regionVariant: spokenRow.regionVariant,
-          spokenText: spokenRow.translatedText,
-        });
-    if (asset) {
-      await upsertAudioPointer(
-        ctx,
-        textId,
-        lang,
-        asset._id,
-        rendering.audioVariantKey,
-      );
-      scheduled.audioScheduled++;
-      continue;
-    }
-    const claimed = await claimTtsIfAvailable(
+      opts?.llmPriority,
+      rendering.textVariantKey,
+    ))
+  ) {
+    return false;
+  }
+  if (
+    await hasBlockingTtsClaim(
       ctx,
       textId,
       lang,
       opts?.priority,
-      rendering.audioVariantKey,
-    );
-    if (!claimed) continue;
-    await enqueueTtsForVoice(ctx, {
-      textId,
-      text: spokenRow.translatedText,
-      language: lang,
-      voiceName,
-      regionVariant: spokenRow.regionVariant,
-      forceRegen: opts?.forceAudioRegen,
-      priority: opts?.priority,
-      requestedByUserId: opts?.requestedByUserId,
-      variantKey: rendering.audioVariantKey,
-    });
-    scheduled.audioScheduled++;
+      audioVariantKey,
+    )
+  ) {
+    return false;
   }
-  return scheduled;
+  if (opts?.probe) throw new ProbeNeedsWork();
+  const voiceName = getVoiceForText(
+    lang,
+    textId,
+    spoken.regionVariant,
+    rendering.voiceGender,
+  );
+  // The regenerate-audio button bypasses the asset cache like the
+  // canonical path does (a hit would hand back the clip being replaced).
+  const asset = opts?.forceAudioRegen
+    ? null
+    : await findReusableAudioAssetForVoice(ctx, {
+        language: lang,
+        voiceName,
+        regionVariant: spoken.regionVariant,
+        spokenText: spoken.text,
+      });
+  if (asset) {
+    await upsertAudioPointer(ctx, textId, lang, asset._id, audioVariantKey);
+    return true;
+  }
+  const claimed = await claimTtsIfAvailable(
+    ctx,
+    textId,
+    lang,
+    opts?.priority,
+    audioVariantKey,
+  );
+  if (!claimed) return false;
+  await enqueueTtsForVoice(ctx, {
+    textId,
+    text: spoken.text,
+    language: lang,
+    voiceName,
+    regionVariant: spoken.regionVariant,
+    forceRegen: opts?.forceAudioRegen,
+    priority: opts?.priority,
+    requestedByUserId: opts?.requestedByUserId,
+    variantKey: audioVariantKey,
+  });
+  return true;
 }

@@ -20,7 +20,6 @@ import {
 } from '@/components/app/learning';
 import { useLearningChatToggle } from '@/components/app/learning/LearningChatLayout';
 import { buildCardOriginPill } from '@/components/app/learning/cardOriginPill';
-import { buildFormChips } from '@/components/app/learning/formChips';
 import {
   isTranscribeMode,
   shouldShowTranslationAssist,
@@ -75,7 +74,6 @@ export function LearningMode({
   onNavigateToAddCustomCards,
 }: LearningModeProps) {
   const t = useTranslations('LearningMode');
-  const tForms = useTranslations('LearningMode.formChips');
   const chatContext = useLearningChatToggle();
   if (!chatContext) {
     throw new Error('LearningMode must be rendered inside LearningChatLayout');
@@ -541,7 +539,6 @@ export function LearningMode({
     schedulingPhase: state.phase,
     fsrsState: state.fsrsState,
     originPill,
-    formChips: buildFormChips(state.translations, tForms),
     sourceText: state.sourceText,
     translations: state.translations,
     audioRecordings: state.audioRecordings,

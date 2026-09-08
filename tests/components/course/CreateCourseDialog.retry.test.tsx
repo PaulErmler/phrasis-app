@@ -71,7 +71,10 @@ function renderDialog() {
   render(<CreateCourseDialog open onOpenChange={vi.fn()} />);
 }
 
-/** Walk the 5-step wizard from step 1 and submit. */
+/**
+ * Walk the wizard from step 1 and submit. Five steps for the targets used
+ * here (es, fr), which mark politeness; the fifth step only exists then.
+ */
 async function completeWizard(
   user: ReturnType<typeof userEvent.setup>,
   { target, base }: { target: string; base: string },
@@ -90,13 +93,12 @@ async function completeWizard(
 }
 
 /**
- * Step 5: first-person forms, plus the first politeness row when the target
- * marks politeness (the rows depend on the language picked in step 1). Both
- * start preselected on the mixed choice; the clicks keep the flow explicit.
+ * Step 5: the politeness rows (they depend on the language picked in step
+ * 1). Every level starts ticked; the click keeps the flow explicit when
+ * nothing is.
  */
 async function fillSentenceForms(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByTestId('course-dialog-forms-both'));
-  const rows = screen.queryAllByRole('checkbox');
+  const rows = await screen.findAllByRole('checkbox');
   if (
     rows.length > 0 &&
     rows.every((r) => r.getAttribute('aria-checked') !== 'true')

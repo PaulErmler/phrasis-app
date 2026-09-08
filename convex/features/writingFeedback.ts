@@ -48,6 +48,7 @@ import {
   TRANSCRIBE_GRADER_SYSTEM_PROMPT,
 } from '../lib/writingFeedbackPrompt';
 import { getCourseSettings } from '../db/courseSettings';
+import { voiceOf } from '../../lib/preferenceResolution';
 
 /**
  * AI feedback for writing mode. One stateless grader call scores the user's
@@ -219,8 +220,7 @@ export const getGradingContext = internalQuery({
             row.renderedPoliteness === 'casual' ? 'informal' : 'formal';
         }
         if (row.renderedGender && row.renderedGender !== 'unmarked') {
-          servedSpeakerGender =
-            row.renderedGender === 'masculine' ? 'male' : 'female';
+          servedSpeakerGender = voiceOf(row.renderedGender);
         }
       }
     }

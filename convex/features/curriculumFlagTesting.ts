@@ -3,6 +3,7 @@ import { internalMutation, internalQuery } from '../_generated/server';
 import { assertTestHooksEnabled, requireUserIdByEmail } from '../lib/testHooks';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
+import { politenessLevelValidator, voiceGenderValidator } from '../types';
 import {
   liveTranslation,
   liveTranslationsForText,
@@ -186,6 +187,48 @@ export const restoreProbe = internalMutation({
     if (row) {
       await ctx.db.patch(row._id, {
         flagCount: args.originalFlagCount ?? undefined,
+      });
+    }
+    return null;
+  },
+});
+
+/**
+ * The per-card rendering corrections the Flag dialog writes
+ * (`cards.renderingGenderOverride` / `renderingPolitenessOverride`), so the
+ * spec can prove the dialog's politeness pick reached the mutation.
+ */
+export const readCardRendering = internalQuery({
+  args: { cardId: v.id('cards') },
+  returns: v.union(
+    v.null(),
+    v.object({
+      renderingGenderOverride: v.optional(voiceGenderValidator),
+      renderingPolitenessOverride: v.optional(politenessLevelValidator),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    assertTestHooksEnabled();
+    const card = await ctx.db.get(args.cardId);
+    if (!card) return null;
+    return {
+      renderingGenderOverride: card.renderingGenderOverride,
+      renderingPolitenessOverride: card.renderingPolitenessOverride,
+    };
+  },
+});
+
+/** Drop the corrections a spec's flag wrote, so repeat runs start clean. */
+export const clearCardRendering = internalMutation({
+  args: { cardId: v.id('cards') },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    assertTestHooksEnabled();
+    const card = await ctx.db.get(args.cardId);
+    if (card) {
+      await ctx.db.patch(card._id, {
+        renderingGenderOverride: undefined,
+        renderingPolitenessOverride: undefined,
       });
     }
     return null;

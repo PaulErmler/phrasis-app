@@ -1,7 +1,7 @@
 # Adding a language
 
-What a new language needs since the sentence-form settings (first-person
-forms and politeness levels, Sep 2026), what to research before writing
+What a new language needs since the sentence-form work (politeness levels
+and first-person marking, Sep 2026), what to research before writing
 the config, how to research it so the copy is right, and how to check the
 result. The Egyptian Arabic addition from that feature is the worked
 example at the end.
@@ -24,24 +24,36 @@ Two files, one language.
   `address` only sentences with a "you" (every T-V language).
 - `firstPersonMarking?: true` when a first-person sentence's wording
   changes with the speaker's gender (verbs, adjectives, participles,
-  pronouns, self-reference words). Every language follows the setting for
-  the voice regardless; this flag decides whether the WORDING is rewritten.
+  pronouns, self-reference words). Every language follows the card's voice
+  regardless; this flag decides whether the WORDING is rewritten when a
+  card is corrected to the other voice (there is no course gender choice).
 
 `lib/languageForms.ts`, keyed by the same code:
 
 - `POLITENESS_CONFIG[code]`: `marking` (must equal the flag), `intro` (one
-  learner-facing sentence), `exampleEn`, `forms` (level -> form; two-form
-  languages point two levels at one object), `mixedSummary`, optional
+  learner-facing sentence, English source), `exampleEn`, `forms` (level ->
+  form; two-form languages point two levels at one object), optional
   `defaultLevel` (predicate and particle languages only: the form a
   canonical job requests when the text has no register metadata; polite
-  for ja, ko, th), `sources`. Each form: `id` (stable, part of every
-  `variantKey`), `label`, `description`, `example` (the `exampleEn`
-  rendered in that form), `prompt` (the instruction the translation model
-  follows). Use the `tv(...)` builder for a T-V language and say whether
-  level 2 is the familiar form (`split: 'familiar'`, like German) or the
-  distance form (the default, like French).
+  for ja, ko, th, fil), `sources`. Each form: `id` (stable, part of every
+  `variantKey`), `name` (the shortest marker a learner sees: "du",
+  "です・ます", "without po"), `description` (who you use it with, English
+  source), `example` (the `exampleEn` rendered in that form), `prompt` (the
+  instruction the translation model follows; positive carriers plus one
+  example, see docs/architecture/translation-variants.md "Prompts"). The
+  builders derive `promptLabel` ("Polite · Sie") for the model-facing
+  prompts. Use the `tv(...)` builder for a T-V language and say whether
+  level 2 is the familiar form (`split: 'familiar'`, like Spanish tú) or
+  the distance form (the default, like French vous and German Sie).
 - `FIRST_PERSON_CONFIG[code]`: `intro`, `exampleEn`, `masculine`,
   `feminine`, optional `note`, `sources`.
+- `messages/en.json` and `messages/de.json`, under `LanguageForms`: the
+  translated `intro`, per-form `description` and first-person `intro` /
+  `note` for the code (`politeness.<code>.intro`,
+  `politeness.<code>.forms.<formId>.description`,
+  `firstPerson.<code>.intro`, `firstPerson.<code>.note`). The unit test
+  checks that the English strings equal the config and that German has
+  every key.
 
 `tests/unit/lib/languageForms.test.ts` fails when a flag has no config or a
 config has no flag, and checks every form has copy, an example and a

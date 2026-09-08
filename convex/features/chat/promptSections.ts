@@ -149,15 +149,6 @@ export function buildFormsSection(
 ): string | undefined {
   if (!settings) return undefined;
   const lines: string[] = [];
-  if (
-    settings.firstPersonForms === 'masculine' ||
-    settings.firstPersonForms === 'feminine'
-  ) {
-    const who = settings.firstPersonForms === 'masculine' ? 'a man' : 'a woman';
-    lines.push(
-      `- First-person forms: the learner studies sentences spoken by ${who}. Wherever a language marks the speaker's gender (verbs, adjectives, participles, pronouns, self-reference words), write "I" sentences in the ${settings.firstPersonForms} form, in your examples and in every createCard entry.`,
-    );
-  }
   const levels = settings.politenessLevels;
   if (levels && levels.length > 0) {
     const codes = [
@@ -167,7 +158,7 @@ export function buildFormsSection(
       for (const concrete of concreteLanguageCodes(code)) {
         const forms = selectedPolitenessForms(concrete, levels);
         if (forms.length === 0) continue;
-        const named = forms.map((form) => form.label).join(' or ');
+        const named = forms.map((form) => form.promptLabel).join(' or ');
         lines.push(
           forms.length === 1
             ? `- ${languageName(concrete)} politeness: the learner studies the ${named}. ${forms[0].prompt} Use it in your examples and createCard entries unless the user asks for another form.`

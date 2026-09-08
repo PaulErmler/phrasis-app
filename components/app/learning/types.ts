@@ -47,9 +47,16 @@ export interface CardTranslation {
    */
   retranslating?: boolean;
   /**
+   * The voice this card is spoken in (one per card). Drives the gender
+   * chip in the header, shown on every card.
+   */
+  voiceGender?: 'male' | 'female';
+  /**
    * What the served wording is on the sentence-form axes (classifier
    * stamps, docs/architecture/translation-variants.md); absent when the
-   * axis is unmarked or not yet classified. Drives the header chips.
+   * axis is unmarked or not yet classified. `renderedPoliteness` drives the
+   * politeness chip; `renderedGender` is the chip's fallback for a payload
+   * without a voice.
    */
   renderedGender?: 'masculine' | 'feminine';
   renderedPoliteness?: 'casual' | 'polite' | 'formal';

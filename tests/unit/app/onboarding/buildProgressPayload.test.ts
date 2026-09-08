@@ -36,7 +36,6 @@ const FULL_DATA: OnboardingData = {
     ],
     finalLevel: 10,
   },
-  firstPersonForms: 'feminine',
   politenessLevels: ['polite'],
   proficiencyBranch: 'test',
 };
@@ -60,7 +59,6 @@ describe('buildProgressPayload', () => {
       priorAppsFreeText: undefined,
       dailyTimeGoalMinutes: undefined,
       placementTest: undefined,
-      firstPersonForms: undefined,
       politenessLevels: undefined,
     });
   });
@@ -81,7 +79,6 @@ describe('buildProgressPayload', () => {
       priorAppsFreeText: 'Memrise',
       dailyTimeGoalMinutes: 20,
       placementTest: FULL_DATA.placementTest,
-      firstPersonForms: 'feminine',
       politenessLevels: ['polite'],
     });
   });

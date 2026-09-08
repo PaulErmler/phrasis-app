@@ -293,10 +293,8 @@
         "next": "Next",
         "create": "Create Course",
         "step5": {
-          "title": "Sentence forms",
-          "subtitle": "Curriculum sentences you add to this course follow these choices. You can change them later.",
-          "firstPersonForms": "First-person forms",
-          "politeness": "Politeness"
+          "title": "Politeness",
+          "subtitle": "Curriculum sentences you add to this course follow this choice. You can change it later."
         }
       },
       "manage": {
@@ -325,8 +323,7 @@
         "archiveConfirmButton": "Archive",
         "archiveCancel": "Cancel",
         "formsTitle": "Sentence forms",
-        "formsNote": "Applies to curriculum cards you add from now on. Cards added before this setting existed, and sentences you wrote yourself, keep their wording.",
-        "firstPersonForms": "First-person forms",
+        "formsNote": "Applies to curriculum cards you add from now on.",
         "politeness": "Politeness"
       },
       "archived": "Archived",
@@ -486,7 +483,7 @@
       "flagConfirmConfirm": "Flag",
       "flagConfirmCancel": "Cancel",
       "flagDialogTitle": "What's wrong with this card?",
-      "flagDialogDescription": "Tick everything that applies. Fixing a shared sentence fixes it for every learner.",
+      "flagDialogDescription": "Reporting wrong cards helps us and every learner. Thank you!",
       "flagReason_wrong_translation": "The translation is wrong",
       "flagReason_wrong_gender": "The speaker's gender is wrong",
       "flagReason_wrong_politeness": "The politeness level is wrong",
@@ -494,11 +491,11 @@
       "flagGenderPrompt": "The speaker should be",
       "flagGender_male": "Male",
       "flagGender_female": "Female",
-      "flagPolitenessPrompt": "The sentence should be",
+      "flagPolitenessPrompt": "The sentence should be:",
       "flagNoteLabel": "What is wrong?",
       "flagNotePlaceholder": "Tell us what's wrong (optional)",
       "flagRewardTitle": "Thank you for your help!",
-      "flagRewardBody": "By flagging a wrong sentence you are improving the quality for all language learners! Each time you flag a wrong sentence you get {credits} credits.",
+      "flagRewardBody": "By flagging a wrong sentence you are improving the quality for all language learners! Your first flag on a card earns {credits} credits (up to {max} a month).",
       "flagThanksBody": "By flagging a wrong sentence you are improving the quality for all language learners!",
       "regenerateAudio": "Regenerate audio",
       "pinToCard": "Pin {label} to card",
@@ -750,6 +747,7 @@
       }
     },
     "formChips": {
+      "politenessTitle": "{language} · {level} · {form}",
       "masculine": "masculine",
       "feminine": "feminine",
       "casual": "casual",
@@ -1397,35 +1395,21 @@
         "wordCount": "8,000+ words"
       }
     },
-    "firstPersonForms": {
-      "title": "Which first-person forms do you want to learn?",
-      "voiceOnly": "None of your course languages changes its grammar with the speaker. This choice sets the voice you hear in every language.",
-      "exampleLabel": "Example · {language}",
-      "options": {
-        "masculine": {
-          "title": "Masculine forms",
-          "description": "Sentences about yourself are written and voiced in the masculine.",
-          "voice": "Every sentence is spoken by a male voice."
-        },
-        "feminine": {
-          "title": "Feminine forms",
-          "description": "Sentences about yourself are written and voiced in the feminine.",
-          "voice": "Every sentence is spoken by a female voice."
-        },
-        "both": {
-          "title": "Both",
-          "description": "Half the sentences each way where it matters, so you learn both.",
-          "voice": "Male and female voices alternate."
-        }
-      }
-    },
     "politeness": {
       "title": "Which politeness levels do you want to learn?",
       "subtitle": "Choose one level, or several to mix them.",
+      "levels": { "casual": "Casual", "polite": "Polite", "formal": "Formal" },
+      "levelWords": {
+        "casual": "casual",
+        "polite": "polite",
+        "formal": "formal"
+      },
+      "example": "e.g. {form}",
+      "and": "and",
       "summary": {
         "none": "Pick at least one level.",
-        "single": "Every sentence in the {form}.",
-        "mixed": "Sentences alternate between {forms} where the language marks it."
+        "single": "Every sentence is {level}.",
+        "mixed": "Sentences alternate between {levels} where applicable."
       }
     }
   },
@@ -1782,5 +1766,593 @@
       }
     },
     "footerLink": "Cookie settings"
+  },
+  "LanguageForms": {
+    "politeness": {
+      "ja": {
+        "intro": "Japanese uses plain form with friends, です・ます with most people, and keigo with customers and superiors.",
+        "forms": {
+          "plain": {
+            "description": "Close friends, family, people younger than you"
+          },
+          "desu-masu": {
+            "description": "Colleagues, strangers, most everyday situations"
+          },
+          "keigo": {
+            "description": "Customers, superiors, business and formal service"
+          }
+        }
+      },
+      "ko": {
+        "intro": "Korean uses 반말 with close friends, 해요체 with most people, and 합쇼체 in formal or professional settings.",
+        "forms": {
+          "banmal": {
+            "description": "Close friends, family, people younger than you"
+          },
+          "haeyo": {
+            "description": "Colleagues, shops, most everyday conversations"
+          },
+          "hapsyo": {
+            "description": "Presentations, customers, news, business settings"
+          }
+        }
+      },
+      "th": {
+        "intro": "Thai adds ครับ or ค่ะ to the end of sentences to be polite, and drops it with close friends.",
+        "forms": {
+          "plain": {
+            "description": "Close friends, family, children"
+          },
+          "particle": {
+            "description": "Everyone else; ครับ if you're a man, ค่ะ if a woman"
+          }
+        }
+      },
+      "fil": {
+        "intro": "Filipino adds po and uses kayo instead of ka with elders, strangers, and anyone you show respect to.",
+        "forms": {
+          "plain": {
+            "description": "Friends, siblings, people your age or younger"
+          },
+          "po": {
+            "description": "Parents, elders, strangers, customers, bosses"
+          }
+        }
+      },
+      "vi": {
+        "intro": "Vietnamese picks pronouns by age and relationship: tớ/cậu or mình/bạn with friends, anh/chị/em plus ạ with everyone else.",
+        "forms": {
+          "peer": {
+            "description": "Friends and peers your own age (also mình/bạn)"
+          },
+          "respectful": {
+            "description": "Older people, colleagues, strangers, service staff"
+          }
+        }
+      },
+      "id": {
+        "intro": "Indonesian uses aku and kamu with friends, and saya with Anda or a title like Bapak/Ibu with everyone else.",
+        "forms": {
+          "aku-kamu": {
+            "description": "Friends, family, people your age"
+          },
+          "saya": {
+            "description": "Older people, strangers, colleagues: Bapak/Ibu or Anda"
+          }
+        }
+      },
+      "ms": {
+        "intro": "Malay uses aku and kau between close friends, and saya with awak, Encik or Puan with everyone else.",
+        "forms": {
+          "aku-kau": {
+            "description": "Close friends, classmates"
+          },
+          "saya": {
+            "description": "Strangers, elders, officials, customers"
+          }
+        }
+      },
+      "hi": {
+        "intro": "Hindi uses तुम with friends and family and आप with elders, strangers, and anyone you want to show respect.",
+        "forms": {
+          "t": {
+            "description": "Friends, siblings, younger people"
+          },
+          "v": {
+            "description": "Elders, strangers, colleagues, shopkeepers"
+          }
+        }
+      },
+      "bn": {
+        "intro": "Bengali uses তুমি with friends and family and আপনি with elders, strangers, and people you don't know well.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, people your age or younger"
+          },
+          "v": {
+            "description": "Elders, strangers, colleagues, shopkeepers"
+          }
+        }
+      },
+      "ta": {
+        "intro": "Tamil uses நீ with close friends and younger people and நீங்கள் with everyone else, including most adults you meet.",
+        "forms": {
+          "t": {
+            "description": "Close friends, children, younger family"
+          },
+          "v": {
+            "description": "Elders, strangers, colleagues, most adults"
+          }
+        }
+      },
+      "te": {
+        "intro": "Telugu uses నువ్వు with friends and younger people and మీరు with elders, strangers, and anyone you respect.",
+        "forms": {
+          "t": {
+            "description": "Friends, children, younger family"
+          },
+          "v": {
+            "description": "Elders, strangers, colleagues, most adults"
+          }
+        }
+      },
+      "pt_pt": {
+        "intro": "European Portuguese uses tu with friends and family; with everyone else it drops the pronoun or says o senhor / a senhora.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, colleagues you know well"
+          },
+          "v": {
+            "description": "Strangers, older people, customers, staff"
+          }
+        }
+      },
+      "de": {
+        "intro": "German uses du with friends, family, and young people, and Sie with strangers and in formal or professional settings.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, children, students, most colleagues"
+          },
+          "v": {
+            "description": "Strangers, customers, officials, older people you don't know"
+          }
+        }
+      },
+      "es": {
+        "intro": "Spanish in Spain uses tú with almost everyone and usted mainly with elderly people, officials, and in formal service.",
+        "forms": {
+          "t": {
+            "description": "Almost everyone: friends, colleagues, shop staff, strangers"
+          },
+          "v": {
+            "description": "Elderly people, officials, formal customer service"
+          }
+        }
+      },
+      "ca": {
+        "intro": "Catalan uses tu with nearly everyone and vostè with older strangers, officials, and in formal service settings.",
+        "forms": {
+          "t": {
+            "description": "Nearly everyone: friends, colleagues, shop staff"
+          },
+          "v": {
+            "description": "Older strangers, officials, formal service"
+          }
+        }
+      },
+      "nl": {
+        "intro": "Dutch uses je with most people and u with older strangers, customers, and in formal letters and service.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, colleagues, most people your age"
+          },
+          "v": {
+            "description": "Older strangers, customers, officials, formal letters"
+          }
+        }
+      },
+      "pt": {
+        "intro": "Brazilian Portuguese uses você with almost everyone and o senhor / a senhora with older people and in formal service.",
+        "forms": {
+          "t": {
+            "description": "Almost everyone, including colleagues and strangers"
+          },
+          "v": {
+            "description": "Older people, authorities, formal customer service"
+          }
+        }
+      },
+      "zh": {
+        "intro": "Mandarin uses 你 with almost everyone and 您 with elders, customers, and in formal or business settings.",
+        "forms": {
+          "t": {
+            "description": "Almost everyone: friends, colleagues, shop staff"
+          },
+          "v": {
+            "description": "Elders, customers, officials, business contacts"
+          }
+        }
+      },
+      "zh_traditional": {
+        "intro": "Taiwanese Mandarin uses 你 with almost everyone; 您 appears mainly in customer service, business, and formal writing.",
+        "forms": {
+          "t": {
+            "description": "Almost everyone: friends, colleagues, shop staff"
+          },
+          "v": {
+            "description": "Customers, elders, business and formal writing"
+          }
+        }
+      },
+      "it": {
+        "intro": "Italian uses tu with friends, family, and young people, and Lei with strangers, shop staff, and older people.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, young people, close colleagues"
+          },
+          "v": {
+            "description": "Strangers, shop staff, older people, officials"
+          }
+        }
+      },
+      "el": {
+        "intro": "Greek uses εσύ with friends and people your age, and εσείς with older strangers, officials, and in shops and offices.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, people your age"
+          },
+          "v": {
+            "description": "Older strangers, officials, shops, offices"
+          }
+        }
+      },
+      "tr": {
+        "intro": "Turkish uses sen with friends and family and siz with strangers, elders, and in shops and offices.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, people your age"
+          },
+          "v": {
+            "description": "Strangers, elders, colleagues, shops, offices"
+          }
+        }
+      },
+      "hr": {
+        "intro": "Croatian uses ti with friends, family, and peers, and Vi with strangers, elders, and in professional settings.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, peers, younger people"
+          },
+          "v": {
+            "description": "Strangers, elders, officials, work contacts"
+          }
+        }
+      },
+      "sr": {
+        "intro": "Serbian uses ти with friends, family, and peers, and Ви with strangers, elders, and in professional settings.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, peers, younger people"
+          },
+          "v": {
+            "description": "Strangers, elders, officials, work contacts"
+          }
+        }
+      },
+      "sl": {
+        "intro": "Slovene uses ti with friends and family and vi with strangers, older people, and in shops and offices.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, peers, younger people"
+          },
+          "v": {
+            "description": "Strangers, older people, officials, shops"
+          }
+        }
+      },
+      "fr": {
+        "intro": "French uses tu with friends, family, and children, and vous with strangers, colleagues you don't know well, and in shops.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, children, close colleagues"
+          },
+          "v": {
+            "description": "Strangers, shop staff, officials, new colleagues"
+          }
+        }
+      },
+      "es_latam": {
+        "intro": "Latin American Spanish uses tú with friends and family and usted with strangers, elders, and in most service and work settings.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, people your age"
+          },
+          "v": {
+            "description": "Strangers, elders, customers, officials, colleagues"
+          }
+        }
+      },
+      "ru": {
+        "intro": "Russian uses ты with friends and family and вы with everyone else, including colleagues you don't know well.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, children, close colleagues"
+          },
+          "v": {
+            "description": "Strangers, colleagues, officials, older people"
+          }
+        }
+      },
+      "uk": {
+        "intro": "Ukrainian uses ти with friends and family and ви with strangers, elders, and colleagues you don't know well.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, children, close colleagues"
+          },
+          "v": {
+            "description": "Strangers, elders, officials, new colleagues"
+          }
+        }
+      },
+      "pl": {
+        "intro": "Polish uses ty with friends and family and pan or pani, with third-person verbs, with everyone else.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, colleagues on first-name terms"
+          },
+          "v": {
+            "description": "Strangers, older people, officials, shop staff"
+          }
+        }
+      },
+      "cs": {
+        "intro": "Czech uses ty with friends and family and vy with strangers, colleagues, and anyone you're not on first-name terms with.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, children, close colleagues"
+          },
+          "v": {
+            "description": "Strangers, colleagues, officials, older people"
+          }
+        }
+      },
+      "sk": {
+        "intro": "Slovak uses ty with friends and family and vy with strangers, colleagues, and anyone you're not on first-name terms with.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, children, close colleagues"
+          },
+          "v": {
+            "description": "Strangers, colleagues, officials, older people"
+          }
+        }
+      },
+      "bg": {
+        "intro": "Bulgarian uses ти with friends and family and Вие with strangers, older people, and in shops and offices.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, children, peers"
+          },
+          "v": {
+            "description": "Strangers, older people, officials, shops"
+          }
+        }
+      },
+      "ro": {
+        "intro": "Romanian uses tu with friends and family and dumneavoastră with strangers, elders, and in shops and offices.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, children, peers"
+          },
+          "v": {
+            "description": "Strangers, elders, officials, shops, offices"
+          }
+        }
+      },
+      "hu": {
+        "intro": "Hungarian uses te with friends, family, and young people, and ön with strangers, older people, and in shops and offices.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, young people, close colleagues"
+          },
+          "v": {
+            "description": "Strangers, older people, officials, shops"
+          }
+        }
+      },
+      "lt": {
+        "intro": "Lithuanian uses tu with friends and family and jūs with strangers, older people, and in shops and offices.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, children, peers"
+          },
+          "v": {
+            "description": "Strangers, older people, officials, shops"
+          }
+        }
+      },
+      "lv": {
+        "intro": "Latvian uses tu with friends and family and jūs with strangers, older people, and in shops and offices.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, children, peers"
+          },
+          "v": {
+            "description": "Strangers, older people, officials, shops"
+          }
+        }
+      },
+      "et": {
+        "intro": "Estonian uses sina with friends and family and teie with strangers, older people, and in shops and offices.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, children, peers"
+          },
+          "v": {
+            "description": "Strangers, older people, officials, shops"
+          }
+        }
+      },
+      "fa": {
+        "intro": "Persian uses تو with friends and family and شما with everyone else; many people also use شما with parents.",
+        "forms": {
+          "t": {
+            "description": "Close friends, siblings, children"
+          },
+          "v": {
+            "description": "Strangers, elders, colleagues, often parents too"
+          }
+        }
+      },
+      "uz": {
+        "intro": "Uzbek uses sen with close friends and younger people and siz with almost everyone else, including parents.",
+        "forms": {
+          "t": {
+            "description": "Close friends, children, younger siblings"
+          },
+          "v": {
+            "description": "Almost everyone else, including parents and elders"
+          }
+        }
+      },
+      "ar_eg": {
+        "intro": "Egyptian Arabic uses إنت / إنتي with friends and family and حضرتك with elders, strangers, and officials.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, people your age"
+          },
+          "v": {
+            "description": "Elders, strangers, officials, customers"
+          }
+        }
+      },
+      "ar_iq": {
+        "intro": "Iraqi Arabic uses إنت / إنتي with friends and family and حضرتك with elders, strangers, and officials.",
+        "forms": {
+          "t": {
+            "description": "Friends, family, people your age"
+          },
+          "v": {
+            "description": "Elders, strangers, officials, customers"
+          }
+        }
+      }
+    },
+    "firstPerson": {
+      "ru": {
+        "intro": "Russian changes past-tense verbs and some adjectives depending on who is speaking."
+      },
+      "uk": {
+        "intro": "Ukrainian changes past-tense verbs and adjectives depending on who is speaking."
+      },
+      "pl": {
+        "intro": "Polish changes past-tense verbs and adjectives depending on who is speaking."
+      },
+      "cs": {
+        "intro": "Czech changes past-tense verbs and adjectives depending on who is speaking."
+      },
+      "sk": {
+        "intro": "Slovak changes past-tense verbs and adjectives depending on who is speaking."
+      },
+      "bg": {
+        "intro": "Bulgarian changes adjectives and some past-tense forms depending on who is speaking."
+      },
+      "hr": {
+        "intro": "Croatian changes past-tense verbs and adjectives depending on who is speaking."
+      },
+      "sr": {
+        "intro": "Serbian changes past-tense verbs and adjectives depending on who is speaking."
+      },
+      "sl": {
+        "intro": "Slovene changes past-tense verbs and adjectives depending on who is speaking."
+      },
+      "lt": {
+        "intro": "Lithuanian changes adjectives and participles depending on who is speaking."
+      },
+      "lv": {
+        "intro": "Latvian changes adjectives and participles depending on who is speaking."
+      },
+      "fr": {
+        "intro": "French changes adjectives and some past participles depending on who is speaking.",
+        "note": "With many words (fatigué / fatiguée) the difference is only visible in writing; with others (prêt / prête) you can hear it."
+      },
+      "es": {
+        "intro": "Spanish changes adjectives and nouns about yourself depending on who is speaking."
+      },
+      "es_latam": {
+        "intro": "Spanish changes adjectives and nouns about yourself depending on who is speaking."
+      },
+      "ca": {
+        "intro": "Catalan changes adjectives and nouns about yourself depending on who is speaking."
+      },
+      "it": {
+        "intro": "Italian changes adjectives and some past participles depending on who is speaking."
+      },
+      "pt": {
+        "intro": "Portuguese changes adjectives and nouns about yourself depending on who is speaking."
+      },
+      "pt_pt": {
+        "intro": "Portuguese changes adjectives and nouns about yourself depending on who is speaking."
+      },
+      "ro": {
+        "intro": "Romanian changes adjectives and nouns about yourself depending on who is speaking."
+      },
+      "el": {
+        "intro": "Greek changes adjectives and participles depending on who is speaking."
+      },
+      "hi": {
+        "intro": "Hindi changes present and past verb forms and adjectives depending on who is speaking."
+      },
+      "he": {
+        "intro": "Hebrew changes present-tense verbs and adjectives depending on who is speaking; past and future are the same for everyone."
+      },
+      "ar": {
+        "intro": "Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same."
+      },
+      "ar_eg": {
+        "intro": "Egyptian Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same."
+      },
+      "ar_sa": {
+        "intro": "Saudi Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same."
+      },
+      "ar_iq": {
+        "intro": "Iraqi Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same."
+      },
+      "ar_lev": {
+        "intro": "Levantine Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same."
+      },
+      "th": {
+        "intro": "Thai changes the word for \"I\" and the polite particle depending on who is speaking.",
+        "note": "ผม is for men only; ฉัน is used by women and, casually, by men; ดิฉัน is the formal women's form."
+      },
+      "ja": {
+        "intro": "Japanese changes the word for \"I\" and some sentence endings depending on who is speaking.",
+        "note": "私 is standard for everyone in polite and formal speech; 僕 is the everyday masculine form (俺 is rougher). Gender also shows in sentence endings (わ, かしら vs ぞ, ぜ)."
+      },
+      "vi": {
+        "intro": "Vietnamese changes the word for \"I\" depending on your gender and your age relative to the listener.",
+        "note": "Both said to someone younger than the speaker; to someone older, everyone says em, and tôi is neutral. Your gender shows in these relationship words, not in grammar."
+      },
+      "ko": {
+        "intro": "Korean changes a few family and self-reference words depending on who is speaking, such as 형 versus 오빠.",
+        "note": "Your gender shows in a few relationship words (형/오빠, 누나/언니), not in grammar."
+      },
+      "de": {
+        "intro": "German has separate masculine and feminine words for jobs and roles (Lehrer / Lehrerin); adjectives do not change.",
+        "note": "Only nouns like Lehrer / Lehrerin or Student / Studentin change; \"Ich bin müde\" is the same for everyone."
+      },
+      "nl": {
+        "intro": "Dutch has feminine forms for some jobs and roles (leraar / lerares); adjectives do not change.",
+        "note": "Many titles are used for everyone (dokter, student, collega); lerares, verpleegster and vriendin still mark the gender."
+      },
+      "is": {
+        "intro": "Icelandic changes adjectives and past participles depending on who is speaking.",
+        "note": "The same happens with \"I'm done\" (búinn / búin) and \"I'm ready\" (tilbúinn / tilbúin); nouns like kennari are the same for everyone."
+      },
+      "da": {
+        "intro": "Danish keeps a feminine form for a few roles, above all veninde for a female friend; adjectives do not change.",
+        "note": "Job titles (lærer, læge, studerende) are the same for everyone."
+      }
+    }
   }
 }

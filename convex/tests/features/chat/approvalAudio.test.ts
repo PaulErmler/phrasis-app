@@ -6,6 +6,7 @@ import { api, internal } from '../../../_generated/api';
 import type { Id } from '../../../_generated/dataModel';
 import { sha256Hex } from '../../../lib/sha256';
 import { resolveAudioSpeakerGender } from '../../../../lib/voices';
+import { getCurrentTtsVersion } from '../../../../lib/languages';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -49,6 +50,9 @@ async function insertAsset(
       ttsProvider: 'google',
       ttsQuality: args.ttsQuality ?? 'validated',
       speed: 1,
+      // A completed pipeline clip carries the setup that made it; without
+      // it the setup-aware lookup treats the row as an older clip.
+      ttsVersion: getCurrentTtsVersion(args.language),
     });
     return { assetId, storageId };
   });

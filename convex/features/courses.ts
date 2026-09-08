@@ -960,13 +960,10 @@ export const completeOnboarding = mutation({
       activeCollectionId: collection?._id,
       reviewMode: progress.reviewMode,
       writingInputMode: progress.writingInputMode,
-      // The sentence-form answers (lib/languageForms.ts). Only when present:
-      // an absent key must not clear a stored value on a re-onboarded
-      // course (`patch` removes fields set to undefined), and politeness is
-      // absent whenever the wizard never asked (an unmarked course).
-      ...(progress.firstPersonForms !== undefined
-        ? { firstPersonForms: progress.firstPersonForms }
-        : {}),
+      // The politeness answer (lib/languageForms.ts). Only when present: an
+      // absent key must not clear a stored value on a re-onboarded course
+      // (`patch` removes fields set to undefined), and it is absent whenever
+      // the wizard never asked (an unmarked course).
       ...(progress.politenessLevels !== undefined
         ? { politenessLevels: progress.politenessLevels }
         : {}),

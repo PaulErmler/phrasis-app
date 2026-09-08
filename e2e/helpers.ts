@@ -47,10 +47,8 @@ export interface OnboardingWalkOptions {
   // `placementMaxQuestions` to bail if something goes wrong.
   placementAnswer?: 'knew' | 'didnt'; // applied to every question
   placementMaxQuestions?: number;
-  // Sentence-form steps (Sep 2026). First-person forms is always asked;
-  // politeness only when a target language marks it, so the walker checks
-  // which step appeared. Defaults: both / the first row.
-  firstPersonForms?: 'masculine' | 'feminine' | 'both';
+  // Politeness step (Sep 2026), asked only when a target language marks
+  // it, so the walker checks which step appeared. Default: the first row.
   politeness?: ('casual' | 'polite' | 'formal')[];
   // Final step: review-mode pick. Shadowing (audio) is the default;
   // translate/transcribe both land in the writing mode with that input style.
@@ -188,25 +186,7 @@ export async function completeOnboardingFresh(
     await page.getByTestId('placement-result-continue').click();
   }
 
-  // 6b. First-person forms, always asked.
-  await expect
-    .poll(
-      async () => {
-        await dismissErrorBoundary(page);
-        return page
-          .getByTestId('onboarding-step-first-person-forms')
-          .isVisible()
-          .catch(() => false);
-      },
-      { timeout: 30_000 },
-    )
-    .toBe(true);
-  await page
-    .getByTestId(`first-person-forms-${opts.firstPersonForms ?? 'both'}`)
-    .click();
-  await page.getByTestId('onboarding-continue').click();
-
-  // 6c. Politeness, only when a target language marks it. Whichever of the
+  // 6b. Politeness, only when a target language marks it. Whichever of the
   // two steps appears next decides.
   await expect
     .poll(

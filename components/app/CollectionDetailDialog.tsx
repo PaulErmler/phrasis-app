@@ -29,8 +29,7 @@ import { getTextDirection } from '@/lib/languages';
 import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import { getCollectionDescription } from './CollectionCarouselUI';
 import { AudioButton } from '@/components/app/learning/AudioButton';
-import { Badge } from '@/components/ui/badge';
-import { buildFormChips } from '@/components/app/learning/formChips';
+import { FormChips } from '@/components/app/learning/formChips';
 import {
   PREVIEW_ACTION_ICON_CLASS,
   PREVIEW_ACTION_PANEL_CLASS,
@@ -515,11 +514,7 @@ function PreviewTextRow({
   sentencesRemaining?: number | null;
 }) {
   const t = useTranslations('AppPage.collections.carousel.detail');
-  const tForms = useTranslations('LearningMode.formChips');
   const buttonPlayback = useButtonPlayback();
-  // The same sentence-form chips the card header shows (formChips.ts): what
-  // the served wording IS on each axis, from the classifier stamps.
-  const formChips = buildFormChips(row.translations, tForms);
   const baseTranslations = row.translations.filter((tr) => tr.isBaseLanguage);
   const targetTranslations = row.translations.filter(
     (tr) => tr.isTargetLanguage,
@@ -618,21 +613,9 @@ function PreviewTextRow({
               renderLine(translation, false),
             )}
           </div>
-          {formChips.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {formChips.map((chip) => (
-                <Badge
-                  key={chip.testId}
-                  variant="outline"
-                  className="text-[11px] font-normal text-muted-foreground"
-                  title={chip.title}
-                  data-testid={chip.testId}
-                >
-                  {chip.label}
-                </Badge>
-              ))}
-            </div>
-          )}
+          {/* The same chips the card header shows: what the served wording
+              IS on each axis, from the classifier stamps. */}
+          <FormChips translations={row.translations} className="mt-2" />
         </div>
       </div>
 

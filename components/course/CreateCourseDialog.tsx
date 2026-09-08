@@ -29,13 +29,11 @@ import {
 import { reportError } from '@/lib/report-error';
 import {
   courseAsksPoliteness,
-  courseFirstPersonExample,
+  coursePolitenessRows,
   type PolitenessLevel,
   POLITENESS_LEVELS,
 } from '@/lib/languageForms';
-import type { FirstPersonForms } from '@/lib/preferenceResolution';
 import { PolitenessRows } from '@/components/course/PolitenessRows';
-import { politenessRowsFor } from '@/app/app/onboarding/steps/PolitenessStep';
 
 interface CreateCourseDialogProps {
   open: boolean;
@@ -48,7 +46,6 @@ export function CreateCourseDialog({
 }: CreateCourseDialogProps) {
   const t = useTranslations('AppPage.courses.createDialog');
   const tLevels = useTranslations('Onboarding.difficulty');
-  const tForms = useTranslations('Onboarding.firstPersonForms');
 
   const [step, setStep] = useState(1);
   const [targetLanguage, setTargetLanguage] = useState<string>('');
@@ -56,13 +53,11 @@ export function CreateCourseDialog({
   const [difficulty, setDifficulty] = useState<CurrentLevel | null>(null);
   const [dailyGoal, setDailyGoal] = useState<number | null>(null);
   const [customGoal, setCustomGoal] = useState('');
-  // Step 5: the sentence-form settings (lib/languageForms.ts). Politeness is
-  // asked only when the target marks it; its rows come from the picked
-  // languages, so the state is the stored global levels. Both start on the
-  // mixed choice (both forms alternating, every level ticked), so a learner
-  // who does not care can continue straight through.
-  const [firstPersonForms, setFirstPersonForms] =
-    useState<FirstPersonForms | null>('both');
+  // Step 5: the politeness setting (lib/languageForms.ts), asked only when
+  // the target marks it (the dialog then has four steps). Its rows come
+  // from the picked languages, so the state is the stored global levels.
+  // Every level starts ticked, so a learner who does not care can continue
+  // straight through.
   const [politenessLevels, setPolitenessLevels] = useState<PolitenessLevel[]>([
     ...POLITENESS_LEVELS,
   ]);
@@ -84,7 +79,9 @@ export function CreateCourseDialog({
     api.features.courses.updateCourseSettings,
   );
 
-  const totalSteps = 5;
+  const asksPoliteness =
+    targetLanguage !== '' && courseAsksPoliteness([targetLanguage]);
+  const totalSteps = asksPoliteness ? 5 : 4;
   const progress = (step / totalSteps) * 100;
 
   const parsedCustomGoal = Number.parseInt(customGoal, 10);
@@ -98,15 +95,13 @@ export function CreateCourseDialog({
   const courseSignature = () =>
     JSON.stringify([targetLanguage, baseLanguage, difficulty]);
 
-  const asksPoliteness =
-    targetLanguage !== '' && courseAsksPoliteness([targetLanguage]);
   const politenessRows = useMemo(
     () =>
       targetLanguage
-        ? politenessRowsFor(
-            [targetLanguage],
-            baseLanguage ? [baseLanguage] : [],
-          )
+        ? coursePolitenessRows([
+            targetLanguage,
+            ...(baseLanguage ? [baseLanguage] : []),
+          ])
         : [],
     [targetLanguage, baseLanguage],
   );
@@ -118,7 +113,6 @@ export function CreateCourseDialog({
     setDifficulty(null);
     setDailyGoal(null);
     setCustomGoal('');
-    setFirstPersonForms('both');
     setPolitenessLevels([...POLITENESS_LEVELS]);
     setIsSubmitting(false);
     createdCourseRef.current = null;
@@ -142,10 +136,7 @@ export function CreateCourseDialog({
       case 4:
         return effectiveGoal !== null;
       case 5:
-        return (
-          firstPersonForms !== null &&
-          (!asksPoliteness || politenessLevels.length > 0)
-        );
+        return politenessLevels.length > 0;
       default:
         return false;
     }
@@ -170,8 +161,7 @@ export function CreateCourseDialog({
       !targetLanguage ||
       !baseLanguage ||
       !difficulty ||
-      effectiveGoal == null ||
-      !firstPersonForms
+      effectiveGoal == null
     ) {
       return;
     }
@@ -219,13 +209,12 @@ export function CreateCourseDialog({
       // ring). Idempotent, so re-running it on a retry is harmless.
       await setActiveCourse({ courseId });
 
-      // Persist the daily goal and the sentence-form answers (createCourse
+      // Persist the daily goal and the politeness answer (createCourse
       // doesn't take them; they are courseSettings fields, patchable via
       // updateCourseSettings).
       await updateCourseSettings({
         courseId,
         dailyTimeGoalMinutes: effectiveGoal,
-        ...(firstPersonForms ? { firstPersonForms } : {}),
         ...(asksPoliteness && politenessLevels.length > 0
           ? { politenessLevels }
           : {}),
@@ -417,55 +406,12 @@ export function CreateCourseDialog({
                   {t('step5.subtitle')}
                 </p>
               </div>
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                  {t('step5.firstPersonForms')}
-                </p>
-                <div
-                  className="flex w-full rounded-lg border bg-muted/50 p-1"
-                  role="radiogroup"
-                >
-                  {(['masculine', 'feminine', 'both'] as const).map(
-                    (choice) => (
-                      <button
-                        key={choice}
-                        type="button"
-                        role="radio"
-                        aria-checked={firstPersonForms === choice}
-                        data-testid={`course-dialog-forms-${choice}`}
-                        onClick={() => setFirstPersonForms(choice)}
-                        className={cn(
-                          'flex-1 rounded-md px-2 py-2 text-sm font-medium transition-colors',
-                          firstPersonForms === choice
-                            ? 'bg-primary text-primary-foreground shadow-sm'
-                            : 'text-muted-foreground hover:text-foreground',
-                        )}
-                      >
-                        {tForms(`options.${choice}.title`)}
-                      </button>
-                    ),
-                  )}
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {courseFirstPersonExample(
-                    [targetLanguage],
-                    baseLanguage ? [baseLanguage] : [],
-                  )?.config.intro ?? tForms('voiceOnly')}
-                </p>
-              </div>
-              {asksPoliteness && (
-                <div>
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                    {t('step5.politeness')}
-                  </p>
-                  <PolitenessRows
-                    rows={politenessRows}
-                    selected={politenessLevels}
-                    onChange={setPolitenessLevels}
-                    compact
-                  />
-                </div>
-              )}
+              <PolitenessRows
+                rows={politenessRows}
+                selected={politenessLevels}
+                onChange={setPolitenessLevels}
+                compact
+              />
             </div>
           )}
         </div>

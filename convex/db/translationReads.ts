@@ -6,19 +6,19 @@ import {
 } from '../../lib/languages';
 import {
   AUTO,
+  axisOf,
   hasRenderingOverride,
   parseVariantKey,
   resolveCardRendering,
   resolveLanguageRendering,
+  resolveSourceRendering,
   type LanguageRendering,
   type RenderingCard,
   type RenderingSettings,
   type RenderingText,
 } from '../../lib/preferenceResolution';
-import {
-  concreteLanguageCodes,
-  getPolitenessConfig,
-} from '../../lib/languageForms';
+import { getPolitenessConfig } from '../../lib/languageForms';
+import { classificationLanguageForRow } from '../lib/renderingClassifier';
 
 type ContentCtx = QueryCtx | MutationCtx;
 
@@ -375,19 +375,31 @@ export function viewOfCard(
   };
 }
 
-/** The `RenderingCard` view of a cards row. */
+/**
+ * The `RenderingCard` of a cards row, plus the accent row its source slot
+ * reads (`cards.accentLanguage`). The resolver ignores the accent; the
+ * rendering sweep needs it so the source clip it voices is the one the
+ * card plays (`scheduleMissingRenderings`).
+ */
+export type SweepCard = NonNullable<RenderingCard> & {
+  accentLanguage?: string;
+};
+
+/** The `SweepCard` view of a cards row. */
 export function renderingCardOf(
   card: Pick<
     Doc<'cards'>,
     | 'followsCoursePreferences'
     | 'renderingGenderOverride'
     | 'renderingPolitenessOverride'
+    | 'accentLanguage'
   >,
-): NonNullable<RenderingCard> {
+): SweepCard {
   return {
     followsCoursePreferences: card.followsCoursePreferences,
     renderingGenderOverride: card.renderingGenderOverride,
     renderingPolitenessOverride: card.renderingPolitenessOverride,
+    accentLanguage: card.accentLanguage,
   };
 }
 
@@ -402,24 +414,17 @@ export function previewView(
   return settings ? { settings, card: null } : null;
 }
 
-/** The settings a course settings document carries for the resolver. */
+/**
+ * The settings a course settings document carries for the resolver. Only
+ * the politeness levels: `firstPersonForms` is still stored (the course
+ * gender choice was withdrawn on 2026-09-08) but nothing reads it.
+ */
 export function renderingSettingsOf(
-  settings:
-    | Pick<Doc<'courseSettings'>, 'firstPersonForms' | 'politenessLevels'>
-    | null
-    | undefined,
+  settings: Pick<Doc<'courseSettings'>, 'politenessLevels'> | null | undefined,
 ): RenderingSettings | undefined {
   if (!settings) return undefined;
-  if (
-    settings.firstPersonForms === undefined &&
-    settings.politenessLevels === undefined
-  ) {
-    return undefined;
-  }
-  return {
-    firstPersonForms: settings.firstPersonForms,
-    politenessLevels: settings.politenessLevels,
-  };
+  if (settings.politenessLevels === undefined) return undefined;
+  return { politenessLevels: settings.politenessLevels };
 }
 
 /** The rendering of a reader with no settings: every axis canonical. */
@@ -457,12 +462,19 @@ export function renderingTextOf(
  * keys and the voice. Canonical (null keys) whenever the view carries no
  * settings, the card does not follow them, or the text is user-written.
  * `voiceGender` is only meaningful when a key is set.
+ *
+ * `regionVariant` is the canonical row's dialect pin when `language` is a
+ * mixed code (`es_mixed`): Spain and Latin America map the levels onto
+ * their forms differently, so the row's own dialect decides the form. Before
+ * the canonical row exists the language's default dialect stands in, which
+ * only ever affects a key nothing has been generated under yet.
  */
 export function renderingForView(
   view: SourceView | null,
   text: RenderingText,
   textId: Id<'texts'>,
   language: string,
+  regionVariant?: string,
 ): LanguageRendering {
   if (!view?.settings) return CANONICAL_RENDERING;
   const card = view.card ?? null;
@@ -474,12 +486,56 @@ export function renderingForView(
   });
   return resolveLanguageRendering({
     card: cardRendering,
-    code: language,
+    code: classificationLanguageForRow({
+      targetLanguage: language,
+      regionVariant,
+    }),
     text,
     textId,
     settings: view.settings,
     cardRow: card,
   });
+}
+
+/**
+ * The rendering a view reads for the text's OWN language: never a wording
+ * variant (the source text is the wording), only the card's voice when it
+ * differs from the canonical clip's. The accent row of a Mixed English card
+ * reads the same rendering, since it is a rewrite of the source, not of a
+ * form.
+ */
+export function sourceRenderingForView(
+  view: SourceView | null,
+  text: RenderingText,
+  textId: Id<'texts'>,
+): LanguageRendering {
+  if (!view?.settings) return CANONICAL_RENDERING;
+  return resolveSourceRendering(
+    resolveCardRendering({
+      text,
+      textId,
+      settings: view.settings,
+      card: view.card ?? null,
+    }),
+  );
+}
+
+/**
+ * The voice every language of the card is spoken in, for the gender chip:
+ * the text's own voice, or the card's Flag-dialog correction. Defined for
+ * every reader, settings or not, since every card has a voice.
+ */
+export function cardVoiceForView(
+  view: SourceView | null,
+  text: RenderingText,
+  textId: Id<'texts'>,
+): 'male' | 'female' {
+  return resolveCardRendering({
+    text,
+    textId,
+    settings: view?.settings ?? {},
+    card: view?.card ?? null,
+  }).voiceGender;
 }
 
 /**
@@ -494,16 +550,15 @@ export function renderingForView(
 export function canonicalSatisfies(
   canonical: Pick<
     Doc<'translations'>,
-    'targetLanguage' | 'renderedGender' | 'renderedPoliteness'
+    'targetLanguage' | 'regionVariant' | 'renderedGender' | 'renderedPoliteness'
   >,
   rendering: LanguageRendering,
 ): boolean {
   if (rendering.textVariantKey === null) return true;
   const { gender, formId } = parseVariantKey(rendering.textVariantKey);
   if (gender !== AUTO) {
-    const wanted = gender === 'male' ? 'masculine' : 'feminine';
     if (
-      canonical.renderedGender !== wanted &&
+      canonical.renderedGender !== axisOf(gender) &&
       canonical.renderedGender !== 'unmarked'
     ) {
       return false;
@@ -514,10 +569,9 @@ export function canonicalSatisfies(
     if (!form || canonical.renderedPoliteness === undefined) return false;
     if (canonical.renderedPoliteness === 'unmarked') return false;
     // The stamp is a global level; the form it names must be the requested
-    // one (a du sentence satisfies both "casual" and "polite" on German).
-    const config = getPolitenessConfig(
-      concreteLanguageCodes(canonical.targetLanguage)[0],
-    );
+    // one (a tu sentence satisfies both "casual" and "polite" on Spain
+    // Spanish). Looked up through the row's own dialect, like the stamp.
+    const config = getPolitenessConfig(classificationLanguageForRow(canonical));
     if (!config) return false;
     if (config.forms[canonical.renderedPoliteness].id !== form.id) return false;
   }
@@ -540,6 +594,12 @@ export type ServedRendering = {
  * The translation a view is served for one language: the variant row when
  * the view resolves to one and it has landed with its own wording, else
  * the canonical row. Both are pin-aware like any translation.
+ *
+ * The pin outranks the variant. A card pinned to an archived revision is
+ * served that wording as it was; the variants are rewrites of the LIVE
+ * wording (a bump retires them, `retireVariantRenderings`), so serving one
+ * would move the card onto the new wording through the back door, and
+ * asking for one would buy a rewrite the card never shows.
  */
 export async function resolveServedRendering(
   ctx: ContentCtx,
@@ -550,30 +610,31 @@ export async function resolveServedRendering(
     view: SourceView | null;
   },
 ): Promise<ServedRendering> {
+  const pinAt = args.view?.pinAt;
+  const canonical = await liveTranslation(
+    ctx,
+    args.textId,
+    args.targetLanguage,
+  );
   const rendering = renderingForView(
     args.view,
     args.text,
     args.textId,
     args.targetLanguage,
+    canonical?.regionVariant,
   );
-  const pinAt = args.view?.pinAt;
-  if (rendering.textVariantKey === null) {
-    const served = await resolveServedTranslation(ctx, {
-      textId: args.textId,
-      targetLanguage: args.targetLanguage,
-      pinAt,
-    });
-    return { served, rendering, textVariantMissing: false };
+  const servedCanonical = canonical
+    ? await resolveServedFromLive(ctx, canonical, pinAt)
+    : null;
+  if (rendering.textVariantKey === null || servedCanonical?.archived) {
+    return { served: servedCanonical, rendering, textVariantMissing: false };
   }
-  const [canonical, variant] = await Promise.all([
-    liveTranslation(ctx, args.textId, args.targetLanguage),
-    liveTranslation(
-      ctx,
-      args.textId,
-      args.targetLanguage,
-      rendering.textVariantKey,
-    ),
-  ]);
+  const variant = await liveTranslation(
+    ctx,
+    args.textId,
+    args.targetLanguage,
+    rendering.textVariantKey,
+  );
   if (variant && !variant.sameAsCanonical) {
     return {
       served: await resolveServedFromLive(ctx, variant, pinAt),
@@ -582,9 +643,7 @@ export async function resolveServedRendering(
     };
   }
   return {
-    served: canonical
-      ? await resolveServedFromLive(ctx, canonical, pinAt)
-      : null,
+    served: servedCanonical,
     rendering,
     textVariantMissing:
       variant === null &&
@@ -665,8 +724,9 @@ export type ServedSourceText = {
  * revision, pin-aware like any translation, with the source text as the
  * fallback while the row has not landed. Every reader that renders,
  * indexes, compares or counts the source-language side of a card goes
- * through here, so all of them agree with the card. Never a rendering
- * variant: the source language of a curriculum text marks nothing.
+ * through here, so all of them agree with the card. Never a wording
+ * variant: the source text is the wording. Only its voice can follow the
+ * card (`sourceRenderingForView`), which is the audio readers' business.
  */
 export async function servedSourceText(
   ctx: ContentCtx,

@@ -426,6 +426,9 @@ describe('features/scheduling', () => {
           romanization: 'heh-loh',
           ipa: 'ipa-en',
           retranslating: false,
+          // The card's one voice (the seeded text's audioSpeakerGender),
+          // carried on every entry for the gender chip.
+          voiceGender: 'female',
         },
         {
           language: 'de',
@@ -434,6 +437,7 @@ describe('features/scheduling', () => {
           isTargetLanguage: true,
           ipa: 'ipa-de',
           retranslating: false,
+          voiceGender: 'female',
         },
         {
           // Source entry: text comes from texts.text (no translations row),
@@ -445,6 +449,7 @@ describe('features/scheduling', () => {
           romanization: 'oh-la moon-doh',
           ipa: 'ipa-es',
           retranslating: false,
+          voiceGender: 'female',
         },
       ]);
       // audioRecordings mirrors the same language order, one entry per language.

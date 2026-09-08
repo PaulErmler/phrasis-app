@@ -11,7 +11,7 @@ import {
 describe('renderingAxesFor', () => {
   it('reports which axes a language can mark', () => {
     expect(renderingAxesFor('ja')).toEqual({ gender: true, politeness: true });
-    expect(renderingAxesFor('de')).toEqual({ gender: false, politeness: true });
+    expect(renderingAxesFor('tr')).toEqual({ gender: false, politeness: true });
     expect(renderingAxesFor('he')).toEqual({ gender: true, politeness: false });
     expect(renderingAxesFor('sv')).toEqual({
       gender: false,
@@ -22,7 +22,7 @@ describe('renderingAxesFor', () => {
 
 describe('reportedPolitenessLevels', () => {
   it('reports each distinct form as its lowest level', () => {
-    expect(reportedPolitenessLevels('de')).toEqual(['casual', 'formal']);
+    expect(reportedPolitenessLevels('tr')).toEqual(['casual', 'polite']);
     expect(reportedPolitenessLevels('fr')).toEqual(['casual', 'polite']);
     expect(reportedPolitenessLevels('ja')).toEqual([
       'casual',
@@ -37,15 +37,15 @@ describe('buildRenderingClassifierPrompt', () => {
   it('names the language forms and examples', () => {
     const prompt = buildRenderingClassifierPrompt('ja');
     expect(prompt).toContain('です・ます');
-    expect(prompt).toContain('食べます');
+    expect(prompt).toContain('行きます');
     expect(prompt).toContain('僕は学生です');
     expect(prompt).toContain('"polite"');
   });
 
   it('forces unmarked on an axis the language lacks', () => {
-    const de = buildRenderingClassifierPrompt('de');
-    expect(de).toContain('"gender": always "unmarked"');
-    expect(de).toContain('Sie-form');
+    const tr = buildRenderingClassifierPrompt('tr');
+    expect(tr).toContain('"gender": always "unmarked"');
+    expect(tr).toContain('siz');
     const he = buildRenderingClassifierPrompt('he');
     expect(he).toContain('"politeness": always "unmarked"');
   });
@@ -83,11 +83,33 @@ describe('parseRenderingClassifications', () => {
 
   it('forces axes the language cannot mark', () => {
     const raw = JSON.stringify([
-      { i: 1, gender: 'feminine', politeness: 'formal' },
+      { i: 1, gender: 'feminine', politeness: 'polite' },
     ]);
-    expect(parseRenderingClassifications('de', raw, 1)).toEqual([
-      { gender: 'unmarked', politeness: 'formal' },
+    expect(parseRenderingClassifications('tr', raw, 1)).toEqual([
+      { gender: 'unmarked', politeness: 'polite' },
     ]);
+  });
+
+  it('treats a politeness level the language never reports as unmarked', () => {
+    // A two-form language reports casual and polite; a "formal" verdict
+    // names no form of its own, so it must not be stamped as one.
+    expect(reportedPolitenessLevels('tr')).toEqual(['casual', 'polite']);
+    const raw = JSON.stringify([
+      { i: 1, gender: 'unmarked', politeness: 'formal' },
+      { i: 2, gender: 'unmarked', politeness: 'polite' },
+    ]);
+    expect(parseRenderingClassifications('tr', raw, 2)).toEqual([
+      { gender: 'unmarked', politeness: 'unmarked' },
+      { gender: 'unmarked', politeness: 'polite' },
+    ]);
+    // The gender verdict survives the rejected level.
+    expect(
+      parseRenderingClassifications(
+        'fr',
+        JSON.stringify([{ i: 1, gender: 'feminine', politeness: 'formal' }]),
+        1,
+      ),
+    ).toEqual([{ gender: 'feminine', politeness: 'unmarked' }]);
   });
 
   it('leaves bad entries null instead of guessing', () => {

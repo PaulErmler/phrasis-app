@@ -34,6 +34,8 @@ import {
   type SourceView,
   audioPointer,
   renderingForView,
+  sourceRenderingForView,
+  cardVoiceForView,
   CANONICAL_RENDERING,
   canonicalSatisfies,
 } from '../db/translationReads';
@@ -86,10 +88,18 @@ export interface CardTranslationContent {
    */
   versionStale?: boolean;
   /**
+   * The voice this language's clip is in: one per card, the text's own
+   * voice or the card's Flag-dialog correction. Drives the gender chip in
+   * the card header, which every card shows. Absent only for readers that
+   * pass no `renderingText`.
+   */
+  voiceGender?: 'male' | 'female';
+  /**
    * What the served wording is on the sentence-form axes, from the row's
    * classifier stamps (docs/architecture/translation-variants.md). Present
-   * only when the axis is marked in this wording; drives the chips in the
-   * card header. A pre-feature card shows what its row IS, not the setting.
+   * only when the axis is marked in this wording; `renderedPoliteness`
+   * drives the politeness chip. A pre-feature card shows what its row IS,
+   * not the setting.
    */
   renderedGender?: 'masculine' | 'feminine';
   renderedPoliteness?: 'casual' | 'polite' | 'formal';
@@ -247,8 +257,15 @@ export async function buildTextContentBatchForLanguages(
     textId: Id<'texts'>;
     userCreated: boolean;
     pinAt: number | undefined;
-    /** The rendering variant the slot reads (docs/architecture/translation-variants.md). */
+    /**
+     * The rendering variant the slot reads (docs/architecture/
+     * translation-variants.md). A source slot (accent row or not) reads
+     * `sourceRenderingForView`: the voice only. A target slot is resolved
+     * once its canonical row is in hand, since a mixed code's form depends
+     * on the row's dialect.
+     */
     rendering: LanguageRendering;
+    isSource: boolean;
   }> = [];
   const audioFetches: Array<{
     slot: string;
@@ -265,18 +282,11 @@ export async function buildTextContentBatchForLanguages(
 
   for (const input of inputs) {
     const pinAt = input.view?.pinAt;
+    const hasRendering =
+      input.renderingText !== undefined && input.view?.settings !== undefined;
     for (const lang of allLanguages) {
       const slot = `${input.key}:${lang}`;
       if (lang !== input.sourceLanguage) {
-        const rendering =
-          input.renderingText && input.view?.settings
-            ? renderingForView(
-                input.view,
-                input.renderingText,
-                input.textId,
-                lang,
-              )
-            : CANONICAL_RENDERING;
         translationFetches.push({
           key: input.key,
           lang,
@@ -284,16 +294,21 @@ export async function buildTextContentBatchForLanguages(
           textId: input.textId,
           userCreated: input.userCreated,
           pinAt,
-          rendering,
-        });
-        audioFetches.push({
-          slot,
-          rowLang: lang,
-          textId: input.textId,
-          variantKey: rendering.audioVariantKey ?? undefined,
+          rendering: CANONICAL_RENDERING,
+          isSource: false,
         });
         continue;
       }
+      // Every language of the card is spoken in one voice, the source
+      // included: its clip (and the accent row's) is read under the voice
+      // key when the card's voice is not the canonical clip's.
+      const sourceRendering = hasRendering
+        ? sourceRenderingForView(
+            input.view ?? null,
+            input.renderingText!,
+            input.textId,
+          )
+        : CANONICAL_RENDERING;
       const accent = servedAccentRow(
         {
           _id: input.textId,
@@ -311,60 +326,31 @@ export async function buildTextContentBatchForLanguages(
           textId: input.textId,
           userCreated: input.userCreated,
           pinAt,
-          rendering: CANONICAL_RENDERING,
+          rendering: sourceRendering,
+          isSource: true,
         });
         audioFetches.push({
           slot,
           rowLang: accent,
           textId: input.textId,
-          variantKey: undefined,
+          variantKey: sourceRendering.audioVariantKey ?? undefined,
         });
       }
       audioFetches.push({
         slot: accent !== undefined ? sourceAudioSlot(slot) : slot,
         rowLang: lang,
         textId: input.textId,
-        variantKey: undefined,
+        variantKey: sourceRendering.audioVariantKey ?? undefined,
       });
     }
   }
 
-  // A slot that resolves to a rendering variant fetches the variant row
-  // AND the canonical row: the card shows canonical until the variant has
-  // landed, and a variant stamped `sameAsCanonical` defers to it too. Same
-  // for audio: the canonical pointer plays until the voice variant exists.
-  const [
-    translationResults,
-    variantTranslationResults,
-    audioResults,
-    variantAudioResults,
-    claimResults,
-  ] = await Promise.all([
+  // The canonical rows first. A target slot's rendering is resolved from
+  // its row's dialect (`regionVariant`) before the variant reads below.
+  const [translationResults, claimResults] = await Promise.all([
     Promise.all(
       translationFetches.map((item) =>
         liveTranslation(ctx, item.textId, item.rowLang),
-      ),
-    ),
-    Promise.all(
-      translationFetches.map((item) =>
-        item.rendering.textVariantKey
-          ? liveTranslation(
-              ctx,
-              item.textId,
-              item.rowLang,
-              item.rendering.textVariantKey,
-            )
-          : Promise.resolve(null),
-      ),
-    ),
-    Promise.all(
-      audioFetches.map((item) => audioPointer(ctx, item.textId, item.rowLang)),
-    ),
-    Promise.all(
-      audioFetches.map((item) =>
-        item.variantKey
-          ? audioPointer(ctx, item.textId, item.rowLang, item.variantKey)
-          : Promise.resolve(null),
       ),
     ),
     // LLM claim per non-source-language translation slot. A non-stale claim
@@ -377,18 +363,79 @@ export async function buildTextContentBatchForLanguages(
       ),
     ),
   ]);
+  const inputByKey = new Map(inputs.map((input) => [input.key, input]));
+  translationFetches.forEach((item, idx) => {
+    if (item.isSource) return;
+    const input = inputByKey.get(item.key)!;
+    if (input.renderingText !== undefined && input.view?.settings) {
+      item.rendering = renderingForView(
+        input.view,
+        input.renderingText,
+        input.textId,
+        item.lang,
+        translationResults[idx]?.regionVariant,
+      );
+    }
+    audioFetches.push({
+      slot: `${item.key}:${item.lang}`,
+      rowLang: item.lang,
+      textId: item.textId,
+      variantKey: item.rendering.audioVariantKey ?? undefined,
+    });
+  });
 
   // Pin resolution: only a pinned (card, language) pair whose live row has
   // been archived since the pin does a further read; everything else
   // resolves synchronously to the live row.
-  const servedResults: (ServedTranslation | null)[] = await Promise.all(
+  const servedCanonical: (ServedTranslation | null)[] = await Promise.all(
     translationFetches.map((item, idx) => {
-      const variant = variantTranslationResults[idx];
-      const live =
-        variant && !variant.sameAsCanonical ? variant : translationResults[idx];
+      const live = translationResults[idx];
       return live
         ? resolveServedFromLive(ctx, live, item.pinAt)
         : Promise.resolve(null);
+    }),
+  );
+
+  // A slot that resolves to a rendering variant fetches the variant row
+  // as well: the card shows canonical until the variant has landed, and a
+  // variant stamped `sameAsCanonical` defers to it too. Same for audio: the
+  // canonical pointer plays until the voice variant exists. A card pinned
+  // to an archived revision never reads a variant (they are rewrites of
+  // the live wording; `resolveServedRendering` has the rule).
+  const [variantTranslationResults, audioResults, variantAudioResults] =
+    await Promise.all([
+      Promise.all(
+        translationFetches.map((item, idx) =>
+          item.rendering.textVariantKey && !servedCanonical[idx]?.archived
+            ? liveTranslation(
+                ctx,
+                item.textId,
+                item.rowLang,
+                item.rendering.textVariantKey,
+              )
+            : Promise.resolve(null),
+        ),
+      ),
+      Promise.all(
+        audioFetches.map((item) =>
+          audioPointer(ctx, item.textId, item.rowLang),
+        ),
+      ),
+      Promise.all(
+        audioFetches.map((item) =>
+          item.variantKey
+            ? audioPointer(ctx, item.textId, item.rowLang, item.variantKey)
+            : Promise.resolve(null),
+        ),
+      ),
+    ]);
+
+  const servedResults: (ServedTranslation | null)[] = await Promise.all(
+    translationFetches.map((item, idx) => {
+      const variant = variantTranslationResults[idx];
+      return variant && !variant.sameAsCanonical
+        ? resolveServedFromLive(ctx, variant, item.pinAt)
+        : Promise.resolve(servedCanonical[idx]);
     }),
   );
 
@@ -457,6 +504,7 @@ export async function buildTextContentBatchForLanguages(
         item.rendering.textVariantKey !== null &&
         variantTranslationResults[idx] === null &&
         served !== null &&
+        !served.archived &&
         !canonicalSatisfies(served.live, item.rendering),
       servedVariant:
         variantTranslationResults[idx] !== null &&
@@ -490,7 +538,11 @@ export async function buildTextContentBatchForLanguages(
     const keyAndLang = item.slot;
     const entry = translationMap.get(keyAndLang);
     const variantRow = variantAudioResults[idx];
-    if (item.variantKey && !variantRow) audioVariantMissing.add(keyAndLang);
+    // An archived revision plays its own asset whatever the voice: the pin
+    // outranks the voice, so no variant clip is missing for it.
+    if (item.variantKey && !variantRow && !entry?.archived) {
+      audioVariantMissing.add(keyAndLang);
+    }
     // A variant WORDING plays only its own clip: the canonical clip speaks
     // a wording this card does not show (same rule as archived rows). A
     // canonical wording waiting for its voice variant keeps playing the
@@ -581,6 +633,16 @@ export async function buildTextContentBatchForLanguages(
       };
     });
 
+    // One voice per card, for the gender chip on every surface. Readers
+    // that pass no rendering fields (none of the card surfaces) get none.
+    const voiceGender =
+      input.renderingText !== undefined
+        ? cardVoiceForView(
+            input.view ?? null,
+            input.renderingText,
+            input.textId,
+          )
+        : undefined;
     const translations = allLanguages.map((lang) => {
       // Gate each stored annotation on its kind's CURRENT language set
       // (spec.supports, derived from the Language entries so the check stays
@@ -611,6 +673,7 @@ export async function buildTextContentBatchForLanguages(
             ? input.sourceAnnotations.furiganaText
             : undefined,
           retranslating: false,
+          ...(voiceGender ? { voiceGender } : {}),
         };
       }
       const entry = accentEntry ?? translationMap.get(`${input.key}:${lang}`);
@@ -632,9 +695,11 @@ export async function buildTextContentBatchForLanguages(
         ...(opts?.markVersionStale
           ? { versionStale: entry?.versionStale ?? false }
           : {}),
-        // The chips: only a stamped, marked axis is shown, and nothing
-        // while the variant the card is about to show has not landed (the
-        // canonical stamps would describe a wording about to change).
+        // The chips: the card's voice always, a stamped marked politeness
+        // axis, and nothing while the variant the card is about to show has
+        // not landed (the canonical stamps would describe a wording about
+        // to change).
+        ...(voiceGender ? { voiceGender } : {}),
         ...(entry?.renderedGender &&
         entry.renderedGender !== 'unmarked' &&
         !entry.textVariantMissing
@@ -726,12 +791,13 @@ export async function buildTextContentBatchForLanguages(
         !backfillExhausted(audio.language),
     );
 
+    // The source slot counts too: its wording never varies, but its clip
+    // (the one that renders, accent row or source) follows the card's voice.
     const hasMissingVariant = allLanguages.some(
       (lang) =>
-        lang !== input.sourceLanguage &&
-        ((translationMap.get(`${input.key}:${lang}`)?.textVariantMissing ??
+        (translationMap.get(`${input.key}:${lang}`)?.textVariantMissing ??
           false) ||
-          audioVariantMissing.has(`${input.key}:${lang}`)),
+        audioVariantMissing.has(resolution(input, lang).audioSlot),
     );
 
     result.set(input.key, {

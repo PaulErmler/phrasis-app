@@ -7,17 +7,6 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { renderingSettingsOf } from '../db/translationReads';
-
-/** The voice a chosen first-person form implies, or undefined for 'both'. */
-function voiceGenderFromSettings(
-  settings:
-    | { firstPersonForms?: 'masculine' | 'feminine' | 'both' }
-    | undefined,
-): 'male' | 'female' | undefined {
-  if (settings?.firstPersonForms === 'masculine') return 'male';
-  if (settings?.firstPersonForms === 'feminine') return 'female';
-  return undefined;
-}
 import { getCourseSettings } from '../db/courseSettings';
 import type { Id } from '../_generated/dataModel';
 import { requireAuthUserId, getAuthUserId } from '../db/users';
@@ -245,6 +234,14 @@ export const autoFillTranslations = action({
       resolutionByRequested.set(code, { resolved: code });
     }
 
+    // The speaker the targets are written for when the source marks none:
+    // drawn here, before translation, so a language that must commit (Thai
+    // ครับ/ค่ะ, a Romance adjective) commits to the voice the text will be
+    // stored with. Seeded like the dialect pick, so a retry keeps it.
+    const speakerGender = resolveAudioSpeakerGender(
+      undefined,
+      `${variantSeed}|speaker`,
+    );
     const userPrompt = buildAutofillUserPrompt({
       texts: args.texts,
       resolvedTargets: targetLanguages.map(
@@ -252,6 +249,7 @@ export const autoFillTranslations = action({
       ),
       settings: courseCtx.renderingSettings ?? undefined,
       politenessSeed: variantSeed,
+      speakerGender,
     });
 
     const openrouter = getOpenRouter();
@@ -334,8 +332,16 @@ export const autoFillTranslations = action({
       });
     }
 
-    // Metadata was validated inside parseAutofillResponse.
-    return { translations: results, metadata: parsed.metadata };
+    // Metadata was validated inside parseAutofillResponse. A model that
+    // reports the speaker as neutral despite the instruction still wrote
+    // the targets for the drawn speaker, so that is the voice the text
+    // gets (`createCustomText` reads `metadata.speakerGender`).
+    const metadata =
+      parsed.metadata.speakerGender === 'male' ||
+      parsed.metadata.speakerGender === 'female'
+        ? parsed.metadata
+        : { ...parsed.metadata, speakerGender };
+    return { translations: results, metadata };
   },
 });
 
@@ -466,19 +472,14 @@ export const createCustomText = mutation({
             // across all target-language translations of this row. Mirrors the
             // logic in applyMetadataAndPrepareCard for the non-auto-fill path.
             referentGender: Math.random() < 0.5 ? 'male' : 'female',
-            // The course's first-person setting replaces the coin flip when
-            // the classifier found no gender in the wording: a user's own
-            // sentence has no rendering variants, so it is voiced (and
-            // stamped) in the chosen gender from the start.
+            // The classifier's verdict when the wording marks a gender,
+            // else the coin flip: a user's own sentence has no rendering
+            // variants, so it is voiced (and stamped) once, at creation.
             audioSpeakerGender: resolveAudioSpeakerGender(
               args.metadata.speakerGender === 'male' ||
                 args.metadata.speakerGender === 'female'
                 ? args.metadata.speakerGender
-                : voiceGenderFromSettings(
-                    renderingSettingsOf(
-                      await getCourseSettings(ctx, active.course._id),
-                    ),
-                  ),
+                : undefined,
             ),
           }
         : {}),

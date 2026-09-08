@@ -113,21 +113,22 @@ describe('features/renderingClassification', () => {
 
   it('forces the axis a language cannot mark to unmarked', async () => {
     const textId = await seedText(t);
-    const de = await seedTranslation(t, textId, 'de', 'Kommen Sie?');
+    // Turkish marks politeness (sen / siz) and never the speaker's gender.
+    const tr = await seedTranslation(t, textId, 'tr', 'Geliyor musunuz?');
     vi.mocked(generateText).mockResolvedValueOnce({
       text: JSON.stringify([
-        { i: 1, gender: 'feminine', politeness: 'formal' },
+        { i: 1, gender: 'feminine', politeness: 'polite' },
       ]),
       usage: { inputTokens: 10, outputTokens: 5 },
       providerMetadata: {},
     } as never);
     await t.action(
       internal.features.renderingClassification.classifyAndStampTranslations,
-      { translationIds: [de] },
+      { translationIds: [tr] },
     );
-    const row = await t.run(async (ctx) => ctx.db.get(de));
+    const row = await t.run(async (ctx) => ctx.db.get(tr));
     expect(row?.renderedGender).toBe('unmarked');
-    expect(row?.renderedPoliteness).toBe('formal');
+    expect(row?.renderedPoliteness).toBe('polite');
   });
 });
 

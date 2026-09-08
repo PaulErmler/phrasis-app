@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import en from '../../../messages/en.json';
+import de from '../../../messages/de.json';
 import { SUPPORTED_LANGUAGES } from '@/lib/languages';
 import {
   FIRST_PERSON_CONFIG,
@@ -9,6 +11,7 @@ import {
   courseFirstPersonExample,
   coursePolitenessRows,
   distinctPolitenessForms,
+  formCopyCode,
   languageMarksFirstPerson,
   levelsFromTickedRows,
   politenessFlagMismatches,
@@ -38,7 +41,8 @@ describe('language forms config', () => {
       for (const level of POLITENESS_LEVELS) {
         const form = config.forms[level];
         expect(form.id, `${code} ${level}`).toMatch(/^[a-z-]+$/);
-        expect(form.label.length, `${code} ${level}`).toBeGreaterThan(3);
+        expect(form.name.length, `${code} ${level}`).toBeGreaterThan(0);
+        expect(form.promptLabel, `${code} ${level}`).toContain(form.name);
         expect(form.description.length, `${code} ${level}`).toBeGreaterThan(3);
         expect(form.example.length, `${code} ${level}`).toBeGreaterThan(0);
         expect(form.prompt.length, `${code} ${level}`).toBeGreaterThan(10);
@@ -50,6 +54,48 @@ describe('language forms config', () => {
         ids.lastIndexOf(distinct[0]) + 1,
       );
     }
+  });
+
+  it('the English learner copy in messages/en.json equals the config, and German has every key', () => {
+    type Copy = {
+      politeness: Record<
+        string,
+        { intro: string; forms: Record<string, { description: string }> }
+      >;
+      firstPerson: Record<string, { intro: string; note?: string }>;
+    };
+    const enCopy = (en as { LanguageForms: Copy }).LanguageForms;
+    const deCopy = (de as { LanguageForms: Copy }).LanguageForms;
+    for (const [code, config] of Object.entries(POLITENESS_CONFIG)) {
+      if (code === 'vi_south') continue;
+      expect(enCopy.politeness[code]?.intro, code).toBe(config.intro);
+      for (const form of Object.values(config.forms)) {
+        expect(
+          enCopy.politeness[code].forms[form.id]?.description,
+          `${code} ${form.id}`,
+        ).toBe(form.description);
+        expect(
+          deCopy.politeness[code]?.forms[form.id]?.description,
+          `de ${code} ${form.id}`,
+        ).toBeTruthy();
+      }
+      expect(deCopy.politeness[code]?.intro, `de ${code}`).toBeTruthy();
+    }
+    for (const [code, config] of Object.entries(FIRST_PERSON_CONFIG)) {
+      if (code === 'vi_south') continue;
+      expect(enCopy.firstPerson[code]?.intro, code).toBe(config.intro);
+      expect(enCopy.firstPerson[code]?.note, code).toBe(config.note);
+      expect(deCopy.firstPerson[code]?.intro, `de ${code}`).toBeTruthy();
+      if (config.note) {
+        expect(deCopy.firstPerson[code]?.note, `de ${code}`).toBeTruthy();
+      }
+    }
+  });
+
+  it('a dialect that shares its sibling config reads the sibling copy', () => {
+    expect(formCopyCode('vi_south')).toBe('vi');
+    expect(formCopyCode('vi')).toBe('vi');
+    expect(formCopyCode('de')).toBe('de');
   });
 
   it('only Japanese and Korean have three distinct forms', () => {
@@ -67,10 +113,14 @@ describe('language forms config', () => {
     }
   });
 
-  it('German is familiar-split and French distance-split', () => {
-    expect(distinctPolitenessForms('de').map((d) => d.levels)).toEqual([
+  it('Spanish is familiar-split, German and French distance-split', () => {
+    expect(distinctPolitenessForms('es').map((d) => d.levels)).toEqual([
       ['casual', 'polite'],
       ['formal'],
+    ]);
+    expect(distinctPolitenessForms('de').map((d) => d.levels)).toEqual([
+      ['casual'],
+      ['polite', 'formal'],
     ]);
     expect(distinctPolitenessForms('fr').map((d) => d.levels)).toEqual([
       ['casual'],
@@ -80,8 +130,11 @@ describe('language forms config', () => {
 
   it('a level set resolves to distinct forms per language', () => {
     expect(
-      selectedPolitenessForms('de', ['casual', 'polite']).map((f) => f.id),
+      selectedPolitenessForms('es', ['casual', 'polite']).map((f) => f.id),
     ).toEqual(['t']);
+    expect(
+      selectedPolitenessForms('de', ['casual', 'polite']).map((f) => f.id),
+    ).toEqual(['t', 'v']);
     expect(
       selectedPolitenessForms('ja', ['casual', 'polite']).map((f) => f.id),
     ).toEqual(['plain', 'desu-masu']);
@@ -94,7 +147,9 @@ describe('language forms config', () => {
       expect(config.intro.length, code).toBeGreaterThan(20);
     }
     expect(languageMarksFirstPerson('ru')).toBe(true);
-    expect(languageMarksFirstPerson('de')).toBe(false);
+    expect(languageMarksFirstPerson('de')).toBe(true);
+    expect(languageMarksFirstPerson('is')).toBe(true);
+    expect(languageMarksFirstPerson('sv')).toBe(false);
     expect(languageMarksFirstPerson('bn')).toBe(false);
     expect(languageMarksFirstPerson('es_mixed')).toBe(true);
   });
@@ -114,25 +169,29 @@ describe('course helpers', () => {
     expect(courseAsksPoliteness(['fi'])).toBe(false);
   });
 
-  it('a single two-form language shows two rows named by its forms', () => {
+  it('a single two-form language shows two rows carrying its forms', () => {
     const rows = coursePolitenessRows(['de', 'en']);
-    expect(rows.map((r) => r.level)).toEqual(['casual', 'formal']);
-    expect(rows[0].label).toBe('du-form · everyday');
-    expect(rows[1].label).toBe('Sie-form · formal');
+    expect(rows.map((r) => r.level)).toEqual(['casual', 'polite']);
+    expect(rows.map((r) => r.perLanguage[0].form.name)).toEqual(['du', 'Sie']);
+    expect(rows.map((r) => r.perLanguage[0].form.promptLabel)).toEqual([
+      'Casual · du',
+      'Polite · Sie',
+    ]);
+    const es = coursePolitenessRows(['es']);
+    expect(es.map((r) => r.level)).toEqual(['casual', 'formal']);
   });
 
   it('Japanese + German shows three rows with per-language forms', () => {
     const rows = coursePolitenessRows(['ja', 'de', 'en']);
     expect(rows.map((r) => r.level)).toEqual(['casual', 'polite', 'formal']);
-    expect(rows[1].label).toBe('Polite');
     expect(rows[1].perLanguage.map((p) => `${p.code}:${p.form.id}`)).toEqual([
       'ja:desu-masu',
-      'de:t',
+      'de:v',
     ]);
   });
 
-  it('German + French shows three rows from two two-form languages', () => {
-    const rows = coursePolitenessRows(['de', 'fr']);
+  it('Spanish + French shows three rows from two two-form languages', () => {
+    const rows = coursePolitenessRows(['es', 'fr']);
     expect(rows.map((r) => r.level)).toEqual(['casual', 'polite', 'formal']);
     expect(rows[1].perLanguage.map((p) => p.form.id)).toEqual(['t', 'v']);
   });
@@ -143,7 +202,7 @@ describe('course helpers', () => {
   });
 
   it('hidden levels inherit the visible level below them', () => {
-    const rows = coursePolitenessRows(['de']);
+    const rows = coursePolitenessRows(['es']);
     expect(levelsFromTickedRows(rows, ['casual'])).toEqual([
       'casual',
       'polite',
@@ -159,8 +218,8 @@ describe('course helpers', () => {
   });
 
   it('picks the first marked target for the first-person example', () => {
-    expect(courseFirstPersonExample(['de', 'ru'], ['en'])?.code).toBe('ru');
-    expect(courseFirstPersonExample(['de'], ['ru'])?.code).toBe('ru');
-    expect(courseFirstPersonExample(['de'], ['en'])).toBeUndefined();
+    expect(courseFirstPersonExample(['sv', 'ru'], ['en'])?.code).toBe('ru');
+    expect(courseFirstPersonExample(['sv'], ['ru'])?.code).toBe('ru');
+    expect(courseFirstPersonExample(['sv'], ['en'])).toBeUndefined();
   });
 });

@@ -38,7 +38,7 @@ import {
   classificationLanguageForRow,
   renderingAxesFor,
 } from '../lib/renderingClassifier';
-import { getLlmClaim } from './llmTranslationQueue';
+import { getLlmClaim, variantLlmClaims } from './llmTranslationQueue';
 import { enqueueTtsForVoice } from '../lib/contentScheduling';
 import { scheduleSearchableTextRebuild } from './searchRebuild';
 import {
@@ -260,6 +260,14 @@ const vStoreTranslationAndScheduleTtsArgs = v.object({
    */
   variantKey: v.optional(v.string()),
   audioVariantKey: v.optional(v.string()),
+  /**
+   * The canonical wording a variant job rewrote (`rewriteOf` on the job).
+   * A rewrite of a wording that is no longer the canonical one (a flag or
+   * a bump landed while the job ran) is refused: the variant of the new
+   * wording is asked for by the next ensure pass. Absent on canonical
+   * writes and on variant jobs from before the field.
+   */
+  rewriteOf: v.optional(v.string()),
 });
 export const storeTranslationAndScheduleTtsArgs =
   vStoreTranslationAndScheduleTtsArgs.fields;
@@ -496,6 +504,10 @@ type TranslationWriteResult = {
  *    not write. The reclaiming job owns the row now, and a late stale result
  *    landing after the owner's would silently revert it (worst case: a
  *    flag-retranslation's text overwritten while its audio survives).
+ *  - stale rewrite: a variant job carries the canonical wording it rewrote
+ *    (`rewriteOf`); when the canonical row has moved on since (a flag or a
+ *    bump retired the pair's variants and claims), the rewrite describes a
+ *    wording no card shows and is dropped.
  *  - backstop at the write choke point: no job may overwrite existing wording
  *    on a user-created card, whatever enqueued it. Callers already refuse to
  *    ask (`flagTranslation` short-circuits on user-created texts, and
@@ -534,6 +546,30 @@ async function guardTranslationWrite(
       args.variantKey,
     );
     if (llmClaim?._id !== args.expectedClaimId) {
+      await resolveRetranslation(
+        ctx,
+        args.retranslationAuditId,
+        'dropped_superseded',
+      );
+      return null;
+    }
+  }
+
+  if (args.variantKey !== undefined && args.rewriteOf !== undefined) {
+    const canonical = await liveTranslation(
+      ctx,
+      args.textId,
+      args.targetLanguage,
+    );
+    if (canonical !== null && canonical.translatedText !== args.rewriteOf) {
+      console.warn(
+        '[storeTranslationAndScheduleTTS] dropping a variant rewrite of a superseded canonical wording',
+        {
+          textId: args.textId,
+          targetLanguage: args.targetLanguage,
+          variantKey: args.variantKey,
+        },
+      );
       await resolveRetranslation(
         ctx,
         args.retranslationAuditId,
@@ -712,12 +748,16 @@ async function replaceTranslationRow(
 }
 
 /**
- * Drop the rendering variants of (text, language): their live rows and
- * their keyed audio pointers, assets kept in the content-addressed cache.
- * The one deletion the variant model allows (docs/architecture/
- * translation-variants.md): a canonical WORDING change (flag, curriculum
- * fix, version bump) makes every rewrite of the old wording obsolete, the
- * same way it drops the canonical clip. Never a switch of settings.
+ * Drop the rendering variants of (text, language): their live rows, their
+ * keyed audio pointers (assets kept in the content-addressed cache) and
+ * their in-flight LLM claims. The one deletion the variant model allows
+ * (docs/architecture/translation-variants.md): a canonical WORDING change
+ * (flag, curriculum fix, version bump) makes every rewrite of the old
+ * wording obsolete, the same way it drops the canonical clip. Never a
+ * switch of settings. A rewrite job still running lands its result against
+ * `rewriteOf` (`guardTranslationWrite`) and is dropped there; releasing
+ * its claim here lets the next ensure pass ask for the rewrite of the new
+ * wording right away instead of after the claim goes stale.
  */
 async function retireVariantRenderings(
   ctx: MutationCtx,
@@ -738,6 +778,9 @@ async function retireVariantRenderings(
   )) {
     if (pointer.variantKey === undefined) continue;
     await deleteAudioRow(ctx, pointer, { keepAsset: true });
+  }
+  for (const claim of await variantLlmClaims(ctx, textId, targetLanguage)) {
+    await ctx.db.delete(claim._id);
   }
 }
 
@@ -1038,6 +1081,10 @@ async function scheduleAnnotationRegeneration(
   args: StoreTranslationAndScheduleTtsArgs,
   write: TranslationWriteResult,
   translatedText: string,
+  // The row the annotations land on. A VARIANT write names its own row:
+  // the store resolves an unnamed row to the canonical one, whose wording
+  // guard would refuse the variant's text. Absent = the live canonical row.
+  translationId?: Id<'translations'>,
 ): Promise<void> {
   if (write.ipaMissingAfterWrite && IPA_LANGUAGES.has(args.targetLanguage)) {
     await ctx.scheduler.runAfter(
@@ -1047,6 +1094,7 @@ async function scheduleAnnotationRegeneration(
         textId: args.textId,
         text: translatedText,
         language: args.targetLanguage,
+        translationId,
       },
     );
   }
@@ -1061,6 +1109,7 @@ async function scheduleAnnotationRegeneration(
         textId: args.textId,
         text: translatedText,
         language: args.targetLanguage,
+        translationId,
       },
     );
   }
@@ -1306,7 +1355,13 @@ async function finishVariantWrite(
         },
       );
     }
-    await scheduleAnnotationRegeneration(ctx, args, write, translatedText);
+    await scheduleAnnotationRegeneration(
+      ctx,
+      args,
+      write,
+      translatedText,
+      row._id,
+    );
   }
   if (args.audioVariantKey === undefined || write.audioUnchangedBySound) {
     return null;

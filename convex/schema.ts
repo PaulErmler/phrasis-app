@@ -276,12 +276,15 @@ export const courseSettingsFields = {
   reconciledDatasetId: v.optional(v.id('datasets')), // Dataset version this course's progress has been cutover to (idempotency gate for datasetMigration_cutoverUser)
   // Source-of-content filter. See studyContentFilterValidator in types.ts.
   studyContentFilter: v.optional(studyContentFilterValidator),
-  // Sentence-form preferences (lib/languageForms.ts). Undefined on every
-  // course from before the feature = today's canonical renderings; never
-  // backfilled. New courses get explicit values from onboarding or the
+  // The politeness preference (lib/languageForms.ts). Undefined on every
+  // course from before the feature = the canonical renderings; never
+  // backfilled. New courses get an explicit value from onboarding or the
   // create-course dialog. Only curriculum cards created after the feature
-  // (`cards.followsCoursePreferences`) follow them; user-written sentences
+  // (`cards.followsCoursePreferences`) follow it; user-written sentences
   // never do. Resolution: lib/preferenceResolution.ts.
+  // `firstPersonForms` is retired: the course gender choice was withdrawn
+  // on 2026-09-08 (one gender per curriculum sentence, its voice). Rows
+  // written before keep the value; nothing reads or writes it.
   firstPersonForms: v.optional(firstPersonFormsValidator),
   politenessLevels: v.optional(politenessLevelsValidator),
   // Current "between celebrations" bucket id. Rotated by the client on
@@ -341,9 +344,10 @@ export const onboardingProgressFields = {
   currentLevel: v.optional(currentLevelValidator),
   targetLanguages: v.optional(v.array(v.string())),
   baseLanguages: v.optional(v.array(v.string())),
-  // The two sentence-form steps; copied onto courseSettings by
-  // `completeOnboarding`. The politeness step is skipped (left undefined)
-  // when no target language marks politeness (`courseAsksPoliteness`).
+  // The politeness step; copied onto courseSettings by `completeOnboarding`.
+  // Skipped (left undefined) when no target language marks politeness
+  // (`courseAsksPoliteness`). `firstPersonForms` is the retired gender step
+  // (withdrawn 2026-09-08): no longer asked, written or read.
   firstPersonForms: v.optional(firstPersonFormsValidator),
   politenessLevels: v.optional(politenessLevelsValidator),
   // Survey answers.
@@ -642,9 +646,18 @@ export default defineSchema({
     // row's. Stored so the ensure path stops re-requesting it; served as
     // the canonical text with audio in the card's voice.
     sameAsCanonical: v.optional(v.literal(true)),
+    // How many times the gender-correction sweep has regenerated this row
+    // AFTER it was already produced under the text's definitive speaker
+    // gender (contentScheduling.ts, `MAX_GENDER_CORRECTION_RETRIES`). Such a
+    // row is not stale: the model ignored `<speaker_gender>`, so a second
+    // sample is worth one call, and the count is what stops a sentence the
+    // model will not render in the requested gender from regenerating on
+    // every sweep. Absent = never retried.
+    genderCorrectionAttempts: v.optional(v.number()),
     // What the wording actually is, stamped by the rendering classifier
-    // (convex/lib/renderingClassifier.ts) after generation and by
-    // `backfillRenderedForms` on rows from before the feature. Drives the
+    // (convex/lib/renderingClassifier.ts) after generation and lazily by
+    // `flushRenderingStamps` (convex/lib/contentScheduling.ts) on rows
+    // from before the feature, as the content sweep meets them. Drives the
     // chips on the card and the "canonical already satisfies the
     // preference" shortcut. Undefined = not classified yet (no chip).
     renderedGender: v.optional(renderedGenderValidator),
@@ -739,13 +752,22 @@ export default defineSchema({
     .index('by_textId_supersededAt', ['textId', 'supersededAt']),
 
   // Content-addressed audio store. One row per unique
-  // (language, voiceGender, regionVariant, spoken string), every text whose
-  // audio speaks that exact string points at the same asset via
-  // `audioRecordings.assetId`, so identical sentences are synthesized once and
-  // the blob is stored once. The asset OWNS its storage blob: regenerating
-  // audio patches the asset in place (new `storageId`), upgrading every
-  // pointing text at once; the asset (and blob) is deleted when the last
-  // pointer goes. See convex/lib/audioAssets.ts for the key/lookup helpers.
+  // (language, voiceGender, regionVariant, spoken string) AND TTS setup
+  // (`ttsProvider` + `ttsVersion`; the setup is not indexed, the lookup
+  // filters the key's candidates on it). Every text whose audio speaks that
+  // exact string under the current setup points at the same asset via
+  // `audioRecordings.assetId`, so identical sentences are synthesized once
+  // and the blob is stored once. The asset OWNS its storage blob: a
+  // same-setup regeneration patches the asset in place (new `storageId`),
+  // upgrading every pointing text at once.
+  // Retention rule: an asset is never deleted because the setup changed. A
+  // provider switch or a `ttsVersion` bump detaches pointers (the sweep) and
+  // the next synthesis creates a sibling row under the new setup, so a
+  // prompt or provider change can be rolled forward or back without
+  // re-synthesizing; nothing garbage-collects a pointerless asset. Only the
+  // manual regenerate button and the orphan cascades delete an asset (with
+  // its blob) when its last pointer goes.
+  // See convex/lib/audioAssets.ts for the key/lookup helpers.
   audioAssets: defineTable({
     // ---- content-address key ----
     // Cache language (`getAudioAssetLanguage` in lib/languages.ts): a base
@@ -1045,8 +1067,8 @@ export default defineSchema({
     accentLanguage: v.optional(v.string()),
     // Set on curriculum cards created after the sentence-form settings
     // shipped. Such a card is served the rendering the course's CURRENT
-    // `firstPersonForms` / `politenessLevels` resolve to
-    // (lib/preferenceResolution.ts), so a later settings change re-renders
+    // `politenessLevels` resolve to (lib/preferenceResolution.ts), so a
+    // later settings change re-renders
     // it. Cards without the field (from before, or created from a
     // user-written text) read the canonical rows for good. Never
     // backfilled, never indexed. Cleared when an edit forks the text into a
@@ -1824,6 +1846,13 @@ export default defineSchema({
     // Rendering variant the claimed job produces (textVariantKey); absent
     // = canonical.
     variantKey: v.optional(v.string()),
+    // Variant claims only: when the rewrite's pool attempts were exhausted
+    // (`onLlmTranslationComplete`). The claim is kept, workId cleared, and
+    // blocks a new attempt for VARIANT_RETRY_COOLDOWN_MS
+    // (llmTranslationQueue.ts), so a refused sentence is not re-bought on
+    // every card view. Released early by `retireVariantRenderings` when the
+    // canonical wording changes.
+    variantFailedAt: v.optional(v.number()),
   })
     .index('by_text_and_language', ['textId', 'targetLanguage'])
     .index('by_text_language_variant', [

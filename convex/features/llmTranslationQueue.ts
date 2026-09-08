@@ -121,6 +121,43 @@ export function isClaimFresh(claim: { claimedAt: number }): boolean {
 }
 
 /**
+ * How long a rendering variant whose rewrite attempts were exhausted holds
+ * its claim (`variantFailedAt`) before the ensure path may buy another
+ * attempt. A sentence the model refuses is otherwise re-bought on every
+ * card view, since the card keeps reporting the variant as missing.
+ */
+export const VARIANT_RETRY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+/** True while an exhausted variant claim is still inside its cooldown. */
+function variantFailureHolds(claim: { variantFailedAt?: number }): boolean {
+  return (
+    claim.variantFailedAt !== undefined &&
+    Date.now() - claim.variantFailedAt < VARIANT_RETRY_COOLDOWN_MS
+  );
+}
+
+/**
+ * Every VARIANT claim of (text, language), whatever the key: the index
+ * range past the canonical claim. For `retireVariantRenderings`, which
+ * releases them with the variant rows.
+ */
+export async function variantLlmClaims(
+  ctx: QueryCtx | MutationCtx,
+  textId: Id<'texts'>,
+  targetLanguage: string,
+): Promise<Doc<'llmTranslationClaims'>[]> {
+  return await ctx.db
+    .query('llmTranslationClaims')
+    .withIndex('by_text_language_variant', (q) =>
+      q
+        .eq('textId', textId)
+        .eq('targetLanguage', targetLanguage)
+        .gt('variantKey', ''),
+    )
+    .take(64);
+}
+
+/**
  * Retry budget for the Google fallback job (the LLM pool default of 8
  * attempts belongs to the quality path; the fallback is a last resort and
  * fails terminally after 3).
@@ -141,6 +178,10 @@ function llmClaimBlocksPriority(
   claim: Doc<'llmTranslationClaims'>,
   priority: LlmPriority | undefined,
 ): boolean {
+  // An exhausted variant rewrite blocks every caller for its cooldown and
+  // nobody after it: the job is over, there is nothing to take over, and
+  // asking again inside the cooldown would buy the same refusal.
+  if (claim.variantFailedAt !== undefined) return variantFailureHolds(claim);
   const fresh = isClaimFresh(claim);
   const takeover =
     fresh && claim.priority === 'background' && priority !== 'background';
@@ -660,7 +701,11 @@ function requestedRendering(
         : config.defaultLevel;
   const form = config.forms[level];
   return {
-    requestedForm: { id: form.id, label: form.label, prompt: form.prompt },
+    requestedForm: {
+      id: form.id,
+      label: form.promptLabel,
+      prompt: form.prompt,
+    },
     promptWording: 'literature',
   };
 }
@@ -898,6 +943,9 @@ async function storeLlmTranslationResult(
       priority: args.priority,
       variantKey: args.variantKey,
       audioVariantKey: args.audioVariantKey,
+      // The wording this rewrite was made from; the store drops the result
+      // when the canonical row has moved on since.
+      rewriteOf: args.rewriteOf,
       // Resolved at the write choke point, which is the only place that
       // knows which of its several outcomes this attempt actually reached.
       retranslationAuditId: args.retranslationAuditId,
@@ -1089,8 +1137,10 @@ export const onLlmTranslationComplete = internalMutation({
     if (context.variantKey !== undefined) {
       // A rendering variant has no Google fallback: a machine translation
       // cannot take a requested gender or form, and the canonical row keeps
-      // serving the card meanwhile. Release the claim; the next ensure pass
-      // asks again.
+      // serving the card meanwhile. The claim stays, marked failed, so the
+      // ensure path does not buy the same refusal again on every view
+      // until VARIANT_RETRY_COOLDOWN_MS has passed (a canonical wording
+      // change releases it earlier, `retireVariantRenderings`).
       console.warn(
         '[llmTranslationQueue] variant rewrite attempts exhausted — canonical keeps serving',
         {
@@ -1100,7 +1150,10 @@ export const onLlmTranslationComplete = internalMutation({
           error: result.error,
         },
       );
-      await ctx.db.delete(claim._id);
+      await ctx.db.patch(claim._id, {
+        workId: undefined,
+        variantFailedAt: Date.now(),
+      });
       return null;
     }
 

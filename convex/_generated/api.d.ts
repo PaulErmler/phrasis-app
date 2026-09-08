@@ -94,6 +94,7 @@ import type * as features_paymentSync from "../features/paymentSync.js";
 import type * as features_placementTest from "../features/placementTest.js";
 import type * as features_projections from "../features/projections.js";
 import type * as features_quotaTesting from "../features/quotaTesting.js";
+import type * as features_renderingAudit from "../features/renderingAudit.js";
 import type * as features_renderingClassification from "../features/renderingClassification.js";
 import type * as features_reviewPipeline from "../features/reviewPipeline.js";
 import type * as features_scheduling from "../features/scheduling.js";
@@ -281,6 +282,7 @@ declare const fullApi: ApiFromModules<{
   "features/placementTest": typeof features_placementTest;
   "features/projections": typeof features_projections;
   "features/quotaTesting": typeof features_quotaTesting;
+  "features/renderingAudit": typeof features_renderingAudit;
   "features/renderingClassification": typeof features_renderingClassification;
   "features/reviewPipeline": typeof features_reviewPipeline;
   "features/scheduling": typeof features_scheduling;

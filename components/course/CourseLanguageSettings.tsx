@@ -34,14 +34,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
-import { cn, convexErrorMessage } from '@/lib/utils';
+import { convexErrorMessage } from '@/lib/utils';
 import {
   courseAsksPoliteness,
   type PolitenessLevel,
+  coursePolitenessRows,
 } from '@/lib/languageForms';
-import type { FirstPersonForms } from '@/lib/preferenceResolution';
 import { PolitenessRows } from '@/components/course/PolitenessRows';
-import { politenessRowsFor } from '@/app/app/onboarding/steps/PolitenessStep';
 import { DualLanguageEditor } from '@/components/course/DualLanguageEditor';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
@@ -65,7 +64,6 @@ export function CourseLanguageSettings({
   showArchiveButton = true,
 }: CourseLanguageSettingsProps) {
   const t = useTranslations('AppPage.courses.manage');
-  const tForms = useTranslations('Onboarding.firstPersonForms');
   const locale = useLocale();
   const updateCourseLanguages = useMutation(
     api.features.courses.updateCourseLanguages,
@@ -96,43 +94,54 @@ export function CourseLanguageSettings({
   );
 
   const archiveCourse = useMutation(api.features.courses.archiveCourse);
-  // The sentence-form settings (lib/languageForms.ts). Read per course, not
+  // The politeness setting (lib/languageForms.ts). Read per course, not
   // from the active-course cache: this sheet edits any course in the menu.
   const courseSettings = useQuery(
     api.features.courses.getCourseSettingsForCourse,
     course ? { courseId: course._id } : 'skip',
   );
+  // Optimistic: the ticked rows follow the tap at once, and the server
+  // result (or a failure's rollback) replaces the local value when it lands.
   const updateCourseSettings = useMutation(
     api.features.courses.updateCourseSettings,
-  );
+  ).withOptimisticUpdate((localStore, args) => {
+    const { courseId, ...patch } = args;
+    const current = localStore.getQuery(
+      api.features.courses.getCourseSettingsForCourse,
+      { courseId },
+    );
+    if (current) {
+      localStore.setQuery(
+        api.features.courses.getCourseSettingsForCourse,
+        { courseId },
+        { ...current, ...patch },
+      );
+    }
+  });
   const asksPoliteness = course
     ? courseAsksPoliteness(course.targetLanguages)
     : false;
   const politenessRows = useMemo(
     () =>
       course
-        ? politenessRowsFor(course.targetLanguages, course.baseLanguages)
+        ? coursePolitenessRows([
+            ...course.targetLanguages,
+            ...course.baseLanguages,
+          ])
         : [],
     [course],
   );
   // Undefined on a course from before the feature = today's behaviour,
-  // displayed as "both" and every level, never written back unless changed.
-  const shownForms: FirstPersonForms =
-    courseSettings?.firstPersonForms ?? 'both';
+  // displayed as every level, never written back unless changed.
   const shownLevels: PolitenessLevel[] = courseSettings?.politenessLevels ?? [
     'casual',
     'polite',
     'formal',
   ];
-  const saveForms = async (
-    patch: Partial<{
-      firstPersonForms: FirstPersonForms;
-      politenessLevels: PolitenessLevel[];
-    }>,
-  ) => {
+  const savePoliteness = async (politenessLevels: PolitenessLevel[]) => {
     if (!course) return;
     try {
-      await updateCourseSettings({ courseId: course._id, ...patch });
+      await updateCourseSettings({ courseId: course._id, politenessLevels });
     } catch (err) {
       setError(convexErrorMessage(err) ?? t('saveFailed'));
     }
@@ -352,56 +361,22 @@ export function CourseLanguageSettings({
                 </div>
               )}
 
-              {courseSettings !== undefined && (
+              {courseSettings !== undefined && asksPoliteness && (
                 <div className="space-y-4 pt-2" data-testid="course-forms">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                      {t('firstPersonForms')}
+                      {t('politeness')}
                     </p>
-                    <div
-                      className="flex w-full rounded-lg border bg-muted/50 p-1"
-                      role="radiogroup"
-                    >
-                      {(['masculine', 'feminine', 'both'] as const).map(
-                        (choice) => (
-                          <button
-                            key={choice}
-                            type="button"
-                            role="radio"
-                            aria-checked={shownForms === choice}
-                            data-testid={`course-forms-${choice}`}
-                            onClick={() =>
-                              void saveForms({ firstPersonForms: choice })
-                            }
-                            className={cn(
-                              'flex-1 rounded-md px-2 py-2 text-sm font-medium transition-colors',
-                              shownForms === choice
-                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground',
-                            )}
-                          >
-                            {tForms(`options.${choice}.title`)}
-                          </button>
-                        ),
-                      )}
-                    </div>
+                    <PolitenessRows
+                      rows={politenessRows}
+                      selected={shownLevels}
+                      onChange={(levels) => {
+                        if (levels.length === 0) return;
+                        void savePoliteness(levels);
+                      }}
+                      compact
+                    />
                   </div>
-                  {asksPoliteness && (
-                    <div>
-                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                        {t('politeness')}
-                      </p>
-                      <PolitenessRows
-                        rows={politenessRows}
-                        selected={shownLevels}
-                        onChange={(levels) => {
-                          if (levels.length === 0) return;
-                          void saveForms({ politenessLevels: levels });
-                        }}
-                        compact
-                      />
-                    </div>
-                  )}
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     {t('formsNote')}
                   </p>

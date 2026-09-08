@@ -129,7 +129,7 @@ function studiedFormsNote(ctx: QuickActionContext): string {
       const forms = selectedPolitenessForms(concrete, levels);
       return forms.length > 0
         ? [
-            `${languageName(concrete)}: ${forms.map((f) => f.label).join(' / ')}`,
+            `${languageName(concrete)}: ${forms.map((f) => f.promptLabel).join(' / ')}`,
           ]
         : [];
     }),

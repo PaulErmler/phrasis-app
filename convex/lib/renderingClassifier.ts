@@ -90,7 +90,7 @@ function politenessSection(code: string, wording: PromptWording): string {
   const levels = reportedPolitenessLevels(code);
   const lines = levels.map((level) => {
     const form = config.forms[level];
-    return `  - "${level}": ${form.label}. ${wording === 'literature' ? form.prompt : form.description}. Example: "${form.example}"`;
+    return `  - "${level}": ${form.promptLabel}. ${wording === 'literature' ? form.prompt : form.description}. Example: "${form.example}"`;
   });
   const head =
     wording === 'literature'
@@ -144,7 +144,8 @@ export function buildRenderingClassifierUserPrompt(
  * Parse the model's reply into one classification per input sentence.
  * Missing or invalid entries come back as `null` so a bad reply degrades to
  * "not classified" for that row instead of a wrong stamp. Axes the language
- * cannot mark are forced to "unmarked" whatever the model said.
+ * cannot mark, and politeness levels outside `reportedPolitenessLevels`,
+ * are forced to "unmarked" whatever the model said.
  */
 export function parseRenderingClassifications(
   code: string,
@@ -178,11 +179,18 @@ export function parseRenderingClassifications(
     ) {
       return;
     }
+    // A level the language never reports names no form of its own (a
+    // "polite" verdict on German, whose forms are du and Sie), so it is
+    // not a stamp: unmarked keeps the gender verdict and stops the retry.
+    const levelReported =
+      politeness === 'unmarked' ||
+      (reportedPolitenessLevels(code) as string[]).includes(politeness);
     out[index] = {
       gender: axes.gender ? (gender as RenderedGender) : 'unmarked',
-      politeness: axes.politeness
-        ? (politeness as RenderedPoliteness)
-        : 'unmarked',
+      politeness:
+        axes.politeness && levelReported
+          ? (politeness as RenderedPoliteness)
+          : 'unmarked',
     };
   });
   return out;

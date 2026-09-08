@@ -1,23 +1,28 @@
 /**
  * Politeness forms and first-person (speaker gender) marking per language.
  *
- * Two per-course settings steer generated renderings:
+ * One per-course setting steers generated renderings:
  *   - `politenessLevels`: a SET of the three global levels below. Each
  *     language maps the levels onto its own forms (`POLITENESS_CONFIG`); a
  *     two-form language points two levels at the same form, so a set like
- *     {casual, polite} on German is a single form (du) and never alternates.
- *   - `firstPersonForms`: masculine / feminine / both. Which languages change
- *     wording with the speaker's gender is `FIRST_PERSON_CONFIG`; every
- *     language follows the choice for the VOICE (one gender per card).
+ *     {casual, polite} on Spanish is a single form (tú) and never alternates.
+ * The speaker's gender is not a course setting (the choice was withdrawn on
+ * 2026-09-08): a card is rendered in its text's own voice, and only the
+ * Flag dialog's per-card correction moves it. Which languages change
+ * wording with the speaker's gender is `FIRST_PERSON_CONFIG`; every
+ * language follows the card's voice for the audio.
  *
  * The `Language` entries in lib/languages.ts carry only the flags
- * (`politenessMarking`, `firstPersonMarking`); the copy, examples and prompt
- * text live here so the catalogue stays readable. tests/unit/lib/
- * languageForms.test.ts asserts the two agree. Adding a language: see
- * docs/agents/adding-a-language.md.
+ * (`politenessMarking`, `firstPersonMarking`); the examples, prompt text and
+ * the English source of the learner copy live here so the catalogue stays
+ * readable. The copy the UI shows (intro, description, note) is translated
+ * in messages/<locale>.json under `LanguageForms`, keyed by language code
+ * and form id; tests/unit/lib/languageForms.test.ts asserts the English
+ * strings there equal the ones here and that the flags agree. Adding a
+ * language: see docs/agents/adding-a-language.md.
  *
  * Copy was drafted for learners and fact-checked against reference grammars
- * on 2026-09-06; each entry lists its sources.
+ * on 2026-09-06 and 2026-09-07; each entry lists its sources.
  */
 
 import {
@@ -37,9 +42,21 @@ export type PolitenessLevel = (typeof POLITENESS_LEVELS)[number];
 export type PolitenessForm = {
   /** Stable per-language id, part of a rendering's `variantKey`. */
   id: string;
-  /** Row label, e.g. "Polite · です・ます" or "du-form · everyday". */
-  label: string;
-  /** Who you use it with, one line. */
+  /**
+   * The shortest learner-facing marker of the form ("du", "です・ます",
+   * "without po"), shown after a flag or after "e.g." in the rows and on
+   * the card chips. Row titles are the translated global level words.
+   */
+  name: string;
+  /**
+   * English label for the model-facing prompts: "<Level> · <name>" with the
+   * form's lowest level ("Casual · du", "Polite · Sie").
+   */
+  promptLabel: string;
+  /**
+   * Who you use it with, one line. The English source of the UI copy in
+   * messages/*.json and the rendering classifier's product wording.
+   */
   description: string;
   /** The config's `exampleEn` rendered in this form. */
   example: string;
@@ -55,8 +72,6 @@ export type PolitenessConfig = {
   exampleEn: string;
   /** Level -> form. Levels sharing a form reference the same object. */
   forms: Record<PolitenessLevel, PolitenessForm>;
-  /** Summary shown when several distinct forms are selected. */
-  mixedSummary: string;
   /**
    * Form used for the shared (no-preference) rendering when the text's own
    * register metadata is empty or neutral. Only predicate and particle
@@ -80,32 +95,51 @@ export type FirstPersonConfig = {
 
 // -------------------------------------------------------------- builders
 
+/** English level words, for the model-facing `promptLabel` only. */
+const LEVEL_WORD_EN: Record<PolitenessLevel, string> = {
+  casual: 'Casual',
+  polite: 'Polite',
+  formal: 'Formal',
+};
+
+type FormSpec = Omit<PolitenessForm, 'promptLabel'>;
+
+function withPromptLabel(
+  form: FormSpec,
+  lowestLevel: PolitenessLevel,
+): PolitenessForm {
+  return {
+    ...form,
+    promptLabel: `${LEVEL_WORD_EN[lowestLevel]} · ${form.name}`,
+  };
+}
+
 /**
  * A two-form language. `split` says where the boundary sits: 'familiar'
- * renders levels 1 and 2 as the low form (German du at "polite"), 'distance'
- * renders levels 2 and 3 as the high form (French vous at "polite").
+ * renders levels 1 and 2 as the low form (Spanish tú at "polite"),
+ * 'distance' renders levels 2 and 3 as the high form (French vous at
+ * "polite").
  */
 function twoForm(spec: {
   marking: PolitenessMarking;
   split: 'familiar' | 'distance';
   intro: string;
   exampleEn: string;
-  low: PolitenessForm;
-  high: PolitenessForm;
-  mixedSummary: string;
+  low: FormSpec;
+  high: FormSpec;
   defaultLevel?: PolitenessLevel;
   sources: string[];
 }): PolitenessConfig {
-  const { low, high } = spec;
+  const familiar = spec.split === 'familiar';
+  const low = withPromptLabel(spec.low, 'casual');
+  const high = withPromptLabel(spec.high, familiar ? 'formal' : 'polite');
   return {
     marking: spec.marking,
     intro: spec.intro,
     exampleEn: spec.exampleEn,
-    forms:
-      spec.split === 'familiar'
-        ? { casual: low, polite: low, formal: high }
-        : { casual: low, polite: high, formal: high },
-    mixedSummary: spec.mixedSummary,
+    forms: familiar
+      ? { casual: low, polite: low, formal: high }
+      : { casual: low, polite: high, formal: high },
     defaultLevel: spec.defaultLevel,
     sources: spec.sources,
   };
@@ -115,10 +149,9 @@ function threeForm(spec: {
   marking: PolitenessMarking;
   intro: string;
   exampleEn: string;
-  casual: PolitenessForm;
-  polite: PolitenessForm;
-  formal: PolitenessForm;
-  mixedSummary: string;
+  casual: FormSpec;
+  polite: FormSpec;
+  formal: FormSpec;
   defaultLevel?: PolitenessLevel;
   sources: string[];
 }): PolitenessConfig {
@@ -126,8 +159,11 @@ function threeForm(spec: {
     marking: spec.marking,
     intro: spec.intro,
     exampleEn: spec.exampleEn,
-    forms: { casual: spec.casual, polite: spec.polite, formal: spec.formal },
-    mixedSummary: spec.mixedSummary,
+    forms: {
+      casual: withPromptLabel(spec.casual, 'casual'),
+      polite: withPromptLabel(spec.polite, 'polite'),
+      formal: withPromptLabel(spec.formal, 'formal'),
+    },
     defaultLevel: spec.defaultLevel,
     sources: spec.sources,
   };
@@ -142,7 +178,6 @@ function tv(spec: {
   split?: 'familiar' | 'distance';
   sources: string[];
 }): PolitenessConfig {
-  const familiar = spec.split === 'familiar';
   return twoForm({
     marking: 'address',
     split: spec.split ?? 'distance',
@@ -150,23 +185,18 @@ function tv(spec: {
     exampleEn: spec.exampleEn,
     low: {
       id: 't',
-      label: familiar
-        ? `${spec.t.name}-form · everyday`
-        : `Casual · ${spec.t.name}`,
+      name: spec.t.name,
       description: spec.t.description,
       example: spec.t.example,
       prompt: spec.t.prompt,
     },
     high: {
       id: 'v',
-      label: familiar
-        ? `${spec.v.name}-form · formal`
-        : `Polite · ${spec.v.name}`,
+      name: spec.v.name,
       description: spec.v.description,
       example: spec.v.example,
       prompt: spec.v.prompt,
     },
-    mixedSummary: `Sentences alternate between ${spec.t.name} and ${spec.v.name} where a "you" appears.`,
     sources: spec.sources,
   });
 }
@@ -180,33 +210,31 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
     marking: 'predicate',
     intro:
       'Japanese uses plain form with friends, です・ます with most people, and keigo with customers and superiors.',
-    exampleEn: 'I eat.',
+    exampleEn: "I'm going.",
     casual: {
       id: 'plain',
-      label: 'Casual · plain form',
+      name: 'plain form',
       description: 'Close friends, family, people younger than you',
-      example: '食べる。',
+      example: '行く。',
       prompt:
-        'Plain form (だ / dictionary form / た) on every main-clause predicate. Casual but not rough: no おまえ, no 俺; use 君 or the name for "you".',
+        'Plain form (だ / dictionary form / た) on every main-clause predicate. Casual but not rough: the name with さん/くん/ちゃん for "you", not あなた, おまえ or 俺.',
     },
     polite: {
       id: 'desu-masu',
-      label: 'Polite · です・ます',
+      name: 'です・ます',
       description: 'Colleagues, strangers, most everyday situations',
-      example: '食べます。',
+      example: '行きます。',
       prompt:
         'Polite です・ます style on every main-clause predicate; plain form only inside subordinate clauses. No honorific or humble verbs beyond set phrases.',
     },
     formal: {
       id: 'keigo',
-      label: 'Formal · keigo',
-      description: 'Customers, superiors, formal service and business',
-      example: 'いただきます。',
+      name: 'keigo',
+      description: 'Customers, superiors, business and formal service',
+      example: '参ります。',
       prompt:
         "Keigo on a です・ます base: 尊敬語 for the listener's or a third party's actions, 謙譲語 for the speaker's own, 丁重語 (ございます, おります, いたします) for neutral statements. Never stack honorifics (no 二重敬語).",
     },
-    mixedSummary:
-      'Sentences alternate between plain form, です・ます, and keigo.',
     defaultLevel: 'polite',
     sources: [
       'https://en.wikipedia.org/wiki/Honorific_speech_in_Japanese',
@@ -217,32 +245,31 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
     marking: 'predicate',
     intro:
       'Korean uses 반말 with close friends, 해요체 with most people, and 합쇼체 in formal or professional settings.',
-    exampleEn: 'I eat.',
+    exampleEn: "I'm going.",
     casual: {
       id: 'banmal',
-      label: 'Casual · 반말',
+      name: '반말',
       description: 'Close friends, family, people younger than you',
-      example: '먹어.',
+      example: '가.',
       prompt:
         '반말: 해체 endings (-아/-어) in conversation, 해라체 for narration; 나/우리 for the speaker.',
     },
     polite: {
       id: 'haeyo',
-      label: 'Polite · 해요체',
+      name: '해요체',
       description: 'Colleagues, shops, most everyday conversations',
-      example: '먹어요.',
+      example: '가요.',
       prompt:
         '해요체: -아요/-어요 endings on every sentence; 저/저희 for the speaker; honorific -시- and honorific vocabulary (계시다, 드리다, 말씀) whenever the subject deserves them.',
     },
     formal: {
       id: 'hapsyo',
-      label: 'Formal · 합쇼체',
+      name: '합쇼체',
       description: 'Presentations, customers, news, business settings',
-      example: '먹습니다.',
+      example: '갑니다.',
       prompt:
         '합쇼체: -습니다/-ㅂ니다 statements, -습니까 questions, -십시오 requests; 저/저희 for the speaker; honorific -시- and honorific vocabulary whenever the subject deserves them.',
     },
-    mixedSummary: 'Sentences alternate between 반말, 해요체, and 합쇼체.',
     defaultLevel: 'polite',
     sources: [
       'https://en.wikipedia.org/wiki/Korean_speech_levels',
@@ -257,7 +284,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
     exampleEn: 'Thank you.',
     low: {
       id: 'plain',
-      label: 'Casual · no particle',
+      name: 'without ครับ/ค่ะ',
       description: 'Close friends, family, children',
       example: 'ขอบคุณ',
       prompt:
@@ -265,13 +292,12 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
     },
     high: {
       id: 'particle',
-      label: 'Polite · ครับ / ค่ะ',
-      description: 'Everyone else; ครับ if you are male, ค่ะ if female',
+      name: 'ครับ/ค่ะ',
+      description: "Everyone else; ครับ if you're a man, ค่ะ if a woman",
       example: 'ขอบคุณครับ / ขอบคุณค่ะ',
       prompt:
-        "End every sentence with the polite particle for the speaker's gender: ครับ for a man; ค่ะ for a woman in statements, คะ in questions. First person ผม (man) or ดิฉัน / ฉัน (woman), second person คุณ.",
+        "End every sentence with the polite particle for the speaker's gender: ครับ for a man; ค่ะ for a woman in statements, คะ in questions. First person ผม (man) or ดิฉัน / ฉัน (woman), second person คุณ. If the speaker's gender is not stated or is unspecified, use ค่ะ/คะ.",
     },
-    mixedSummary: 'Sentences alternate between with and without ครับ/ค่ะ.',
     defaultLevel: 'polite',
     sources: [
       'https://thai-notes.com/notes/particles.html',
@@ -286,20 +312,20 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
     exampleEn: 'Where are you going?',
     low: {
       id: 'plain',
-      label: 'Casual · no po',
+      name: 'without po',
       description: 'Friends, siblings, people your age or younger',
       example: 'Saan ka pupunta?',
       prompt: 'No po/opo; ikaw/ka/mo for the listener.',
     },
     high: {
       id: 'po',
-      label: 'Polite · po + kayo',
+      name: 'po + kayo',
       description: 'Parents, elders, strangers, customers, bosses',
       example: 'Saan po kayo pupunta?',
       prompt:
         'Add po as a second-position enclitic (opo for yes) and address the listener as kayo/ninyo/inyo. In statements with no listener, add po where natural in dialogue.',
     },
-    mixedSummary: 'Sentences alternate between plain ka and po with kayo.',
+    defaultLevel: 'polite',
     sources: ['https://en.wikipedia.org/wiki/Tagalog_grammar'],
   }),
   vi: twoForm({
@@ -310,22 +336,20 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
     exampleEn: 'Thank you.',
     low: {
       id: 'peer',
-      label: 'Casual · tớ/cậu, mình/bạn',
-      description: 'Friends and peers your own age',
+      name: 'tớ/cậu',
+      description: 'Friends and peers your own age (also mình/bạn)',
       example: 'Cảm ơn.',
       prompt:
         'Peer pronouns: tớ/cậu or mình/bạn, no sentence-final ạ. Never mày/tao.',
     },
     high: {
       id: 'respectful',
-      label: 'Polite · anh/chị/em + ạ',
+      name: 'anh/chị + ạ',
       description: 'Older people, colleagues, strangers, service staff',
       example: 'Cảm ơn ạ.',
       prompt:
         'Kinship pronouns by relative age (anh/chị for an older listener, em for a younger one; tôi/bạn when the relationship is unknown) and sentence-final ạ (dạ for yes) toward an older or unfamiliar listener.',
     },
-    mixedSummary:
-      'Sentences alternate between friendly pronouns and anh/chị/em with ạ.',
     sources: [
       'https://en.wikibooks.org/wiki/Vietnamese/Personal_pronouns',
       'https://vietnameselab.com/blog/vietnamese-particles',
@@ -335,11 +359,11 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
     marking: 'pronoun',
     split: 'distance',
     intro:
-      'Indonesian uses aku and kamu with friends, and saya with Bapak, Ibu, Mas, or Mbak instead of "you" with everyone else.',
+      'Indonesian uses aku and kamu with friends, and saya with Anda or a title like Bapak/Ibu with everyone else.',
     exampleEn: 'Where are you going?',
     low: {
       id: 'aku-kamu',
-      label: 'Casual · aku / kamu',
+      name: 'aku/kamu',
       description: 'Friends, family, people your age',
       example: 'Kamu mau ke mana?',
       prompt:
@@ -347,14 +371,12 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
     },
     high: {
       id: 'saya',
-      label: 'Polite · saya + Bapak / Ibu',
-      description: 'Older people, strangers, colleagues, service staff',
+      name: 'saya/Anda',
+      description: 'Older people, strangers, colleagues: Bapak/Ibu or Anda',
       example: 'Anda mau ke mana?',
       prompt:
         'saya for I; address the listener as Bapak/Ibu (Mas/Mbak for younger adults) or Anda, never kamu or aku.',
     },
-    mixedSummary:
-      'Sentences alternate between aku/kamu and saya with Bapak/Ibu where a "you" appears.',
     sources: [
       'https://en.wikibooks.org/wiki/Indonesian/Lessons/Formal_speech',
       'https://ielanguages.com/indonesian-address.html',
@@ -368,21 +390,19 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
     exampleEn: 'Where are you going?',
     low: {
       id: 'aku-kau',
-      label: 'Casual · aku / kau',
+      name: 'aku/kau',
       description: 'Close friends, classmates',
       example: 'Kau nak pergi mana?',
       prompt: 'aku for I, kau for you; colloquial but standard spelling.',
     },
     high: {
       id: 'saya',
-      label: 'Polite · saya + awak / Encik / Puan',
+      name: 'saya/awak',
       description: 'Strangers, elders, officials, customers',
       example: 'Awak nak pergi mana?',
       prompt:
         'saya for I; awak for a peer or the title Encik/Puan (Cik for a young woman) for a stranger or elder; never aku or kau.',
     },
-    mixedSummary:
-      'Sentences alternate between aku/kau and saya with awak or a title where a "you" appears.',
     sources: [
       'https://ilearnmalay.blogspot.com/2020/02/pronouns-in-malay-language.html',
     ],
@@ -477,27 +497,24 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
     exampleEn: 'Do you want a coffee?',
     low: {
       id: 't',
-      label: 'Casual · tu',
+      name: 'tu',
       description: 'Friends, family, colleagues you know well',
       example: 'Queres um café?',
       prompt: 'tu with second-person singular verb forms and te/teu.',
     },
     high: {
       id: 'v',
-      label: 'Polite · o senhor / a senhora',
+      name: 'o senhor / a senhora',
       description: 'Strangers, older people, customers, staff',
       example: 'Quer um café?',
       prompt:
         'Third-person singular verb with the subject dropped ("Quer um café?"); o senhor / a senhora only when the subject must be explicit. Never você.',
     },
-    mixedSummary:
-      'Sentences alternate between tu and the polite form where a "you" appears.',
     sources: [
       'https://elon.io/grammar/portuguese-portugal/register/tu-voce-o-senhor',
     ],
   }),
   de: tv({
-    split: 'familiar',
     intro:
       'German uses du with friends, family, and young people, and Sie with strangers and in formal or professional settings.',
     exampleEn: 'Are you coming?',
@@ -713,7 +730,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       description: 'Strangers, elders, officials, work contacts',
       example: 'Dolazite?',
       prompt:
-        'Vi (capitalised) with second-person plural verb forms; participles and adjectives stay singular for one listener.',
+        'Vi (capitalised) with second-person plural verb forms; participles and adjectives in the masculine plural even for one listener (Vi ste umorni, Vi ste došli).',
     },
     sources: [TV_WIKI],
   }),
@@ -732,7 +749,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       description: 'Strangers, elders, officials, work contacts',
       example: 'Долазите?',
       prompt:
-        'Ви (capitalised) with second-person plural verb forms; participles and adjectives stay singular for one listener.',
+        'Ви (capitalised) with second-person plural verb forms; participles and adjectives in the masculine plural even for one listener (Ви сте уморни, Ви сте дошли).',
     },
     sources: [TV_WIKI],
   }),
@@ -903,7 +920,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       description: 'Strangers, older people, officials, shops',
       example: 'Идвате ли?',
       prompt:
-        'Вие (capitalised) with second-person plural verb forms; adjectives stay singular for one listener (Вие сте любезен).',
+        'Вие (capitalised) with second-person plural verb forms; -л participles plural (Вие сте дошли), adjectives and -н/-т participles singular for one listener (Вие сте любезен, поканен).',
     },
     sources: [TV_WIKI],
   }),
@@ -1060,14 +1077,64 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
     sources: [
       'https://en.wiktionary.org/wiki/حضرتك',
       'https://en.wikivoyage.org/wiki/Egyptian_Arabic_phrasebook',
+      'https://en.wikipedia.org/wiki/T–V_distinction_in_the_world%27s_languages#Arabic',
     ],
   }),
+  // Baghdad's everyday polite address: Alkalesi's beginner textbook teaches
+  // ḥaḍirtak / ḥaḍirtich / ḥaḍratkum in lesson 3 ("mneen ḥaḍirtak?"), and
+  // Iraqi speakers on WordReference call it common. The feminine suffix is
+  // -ič (چ), spelled حضرتچ or, by many writers, حضرتك.
+  ar_iq: tv({
+    intro:
+      'Iraqi Arabic uses إنت / إنتي with friends and family and حضرتك with elders, strangers, and officials.',
+    exampleEn: 'Where are you from?',
+    t: {
+      name: 'إنت',
+      description: 'Friends, family, people your age',
+      example: 'إنت منين؟',
+      prompt:
+        'Address the listener as إنت (to a man) / إنتي (to a woman) with second-person verbs, bare imperatives (استريح / استريحي) and the -ك / -چ suffix for your (اسمك / اسمچ). Example: Where are you from? → إنت منين؟',
+    },
+    v: {
+      name: 'حضرتك',
+      description: 'Elders, strangers, officials, customers',
+      example: 'حضرتك منين؟',
+      prompt:
+        'Address the listener as حضرتك (ḥaḍirtak to a man, ḥaḍirtich / حضرتچ to a woman) as the address word with second-person verb and adjective agreement; requests softened with رجاءً / لو سمحت (استريح لو سمحت). Example: Where are you from? → حضرتك منين؟',
+    },
+    sources: [
+      'https://archive.org/details/modern-iraqi-arabic-a-textbook-by-yasin-m-alkalesi',
+      'https://forum.wordreference.com/threads/iraqi-arabic-pronunciation-of-حضرتك.3028738/',
+      'https://en.wiktionary.org/wiki/حضرتك',
+    ],
+  }),
+  // The other Arabic varieties stay unmarked (2026-09-07 check). MSA: the
+  // respectful plural أنتم is "restricted to highly formal contexts, generally
+  // politics and government" (Wikipedia, T–V distinction) and Wiktionary's
+  // حضرتك entry says Arabic has no true T-V distinction, أنتَ / أنتِ being
+  // never rude. Levantine: Syrian, Palestinian and north-Levantine speakers
+  // on WordReference (thread "Levantine Arabic: حضرتك") call حضرتك rare and
+  // mostly sarcastic; respect goes through titles (أستاذ, عمو) with plain إنت.
+  // Saudi: no address pronoun switches; the honorific plural is rare outside
+  // fixed phrases (WordReference "Saudi Arabic: Honorific Plural") and address
+  // norms run on kin terms and titles (Alenizi 2019, IJEL 9(5)).
 };
 
 // Dialects that share their sibling's forms. Northern and Southern
 // Vietnamese differ in accent and a few words (dạ, tui), not in the
 // pronoun system this setting controls.
 POLITENESS_CONFIG.vi_south = POLITENESS_CONFIG.vi;
+
+/**
+ * The code whose learner copy (`LanguageForms.*` in messages/*.json) a
+ * language reads: a dialect that shares its sibling's config shares its
+ * copy too, so the messages carry one entry per config.
+ */
+const COPY_ALIASES: Record<string, string> = { vi_south: 'vi' };
+
+export function formCopyCode(code: string): string {
+  return COPY_ALIASES[code] ?? code;
+}
 
 // ------------------------------------------------------ first-person config
 
@@ -1249,49 +1316,67 @@ export const FIRST_PERSON_CONFIG: Record<string, FirstPersonConfig> = {
   he: {
     ...TIRED,
     intro:
-      'Hebrew changes present-tense verbs and adjectives depending on who is speaking.',
+      'Hebrew changes present-tense verbs and adjectives depending on who is speaking; past and future are the same for everyone.',
     masculine: 'אני עייף.',
     feminine: 'אני עייפה.',
     sources: ['https://en.wikipedia.org/wiki/Modern_Hebrew_grammar'],
   },
   ar: {
     ...TIRED,
-    intro: 'Arabic changes verbs and adjectives depending on who is speaking.',
+    intro:
+      'Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same.',
     masculine: 'أنا متعب.',
     feminine: 'أنا متعبة.',
-    sources: ['https://en.wikipedia.org/wiki/Arabic_grammar'],
+    sources: [
+      'https://en.wikipedia.org/wiki/Arabic_grammar',
+      'https://en.wikipedia.org/wiki/Arabic_verbs',
+      'https://en.wiktionary.org/wiki/متعب',
+    ],
   },
   ar_eg: {
     ...TIRED,
     intro:
-      'Egyptian Arabic changes verbs and adjectives depending on who is speaking.',
+      'Egyptian Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same.',
     masculine: 'أنا تعبان.',
     feminine: 'أنا تعبانة.',
-    sources: ['https://en.wikipedia.org/wiki/Egyptian_Arabic'],
+    sources: [
+      'https://en.wikipedia.org/wiki/Egyptian_Arabic',
+      'https://en.wiktionary.org/wiki/تعبان',
+    ],
   },
   ar_sa: {
     ...TIRED,
     intro:
-      'Saudi Arabic changes verbs and adjectives depending on who is speaking.',
+      'Saudi Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same.',
     masculine: 'أنا تعبان.',
     feminine: 'أنا تعبانة.',
-    sources: ['https://en.wikipedia.org/wiki/Hejazi_Arabic'],
+    sources: [
+      'https://en.wikipedia.org/wiki/Hejazi_Arabic',
+      'https://en.wiktionary.org/wiki/تعبان',
+    ],
   },
   ar_iq: {
     ...TIRED,
     intro:
-      'Iraqi Arabic changes verbs and adjectives depending on who is speaking.',
+      'Iraqi Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same.',
     masculine: 'آني تعبان.',
     feminine: 'آني تعبانة.',
-    sources: ['https://en.wikipedia.org/wiki/Mesopotamian_Arabic'],
+    sources: [
+      'https://en.wiktionary.org/wiki/آني',
+      'https://archive.org/details/modern-iraqi-arabic-a-textbook-by-yasin-m-alkalesi',
+      'https://en.wiktionary.org/wiki/تعبان',
+    ],
   },
   ar_lev: {
     ...TIRED,
     intro:
-      'Levantine Arabic changes verbs and adjectives depending on who is speaking.',
+      'Levantine Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same.',
     masculine: 'أنا تعبان.',
     feminine: 'أنا تعبانة.',
-    sources: ['https://en.wikipedia.org/wiki/Levantine_Arabic'],
+    sources: [
+      'https://en.wikipedia.org/wiki/Levantine_Arabic_grammar',
+      'https://en.wiktionary.org/wiki/تعبان',
+    ],
   },
   th: {
     ...TIRED,
@@ -1299,6 +1384,7 @@ export const FIRST_PERSON_CONFIG: Record<string, FirstPersonConfig> = {
       'Thai changes the word for "I" and the polite particle depending on who is speaking.',
     masculine: 'ผมเหนื่อยครับ',
     feminine: 'ฉันเหนื่อยค่ะ',
+    note: "ผม is for men only; ฉัน is used by women and, casually, by men; ดิฉัน is the formal women's form.",
     sources: ['https://www.thaipod101.com/blog/2020/08/24/thai-pronouns/'],
   },
   ja: {
@@ -1307,7 +1393,7 @@ export const FIRST_PERSON_CONFIG: Record<string, FirstPersonConfig> = {
       'Japanese changes the word for "I" and some sentence endings depending on who is speaking.',
     masculine: '僕は学生です。',
     feminine: '私は学生です。',
-    note: 'Men often say 僕; 私 is neutral and safe for anyone. Speaker gender shows mostly in casual speech.',
+    note: '私 is standard for everyone in polite and formal speech; 僕 is the everyday masculine form (俺 is rougher). Gender also shows in sentence endings (わ, かしら vs ぞ, ぜ).',
     sources: [
       'https://human.libretexts.org/Bookshelves/Languages/Japanese/Japanese_Introductory_1_(Hamada)/06:_Expanding_Your_Japanese_Toolkit_(1)/6.07:_Gender_and_First-Person_Pronouns',
     ],
@@ -1318,7 +1404,7 @@ export const FIRST_PERSON_CONFIG: Record<string, FirstPersonConfig> = {
       'Vietnamese changes the word for "I" depending on your gender and your age relative to the listener.',
     masculine: 'Anh mệt rồi.',
     feminine: 'Chị mệt rồi.',
-    note: 'Both said to someone younger than the speaker. Your gender shows in a few relationship words, not in grammar.',
+    note: 'Both said to someone younger than the speaker; to someone older, everyone says em, and tôi is neutral. Your gender shows in these relationship words, not in grammar.',
     sources: ['https://en.wikibooks.org/wiki/Vietnamese/Personal_pronouns'],
   },
   ko: {
@@ -1327,8 +1413,48 @@ export const FIRST_PERSON_CONFIG: Record<string, FirstPersonConfig> = {
       'Korean changes a few family and self-reference words depending on who is speaking, such as 형 versus 오빠.',
     masculine: '제 형이에요.',
     feminine: '제 오빠예요.',
-    note: 'Your gender shows in a few relationship words, not in grammar.',
+    note: 'Your gender shows in a few relationship words (형/오빠, 누나/언니), not in grammar.',
     sources: ['https://www.90daykorean.com/oppa-hyung-noona-unnie/'],
+  },
+  de: {
+    exampleEn: "I'm a teacher.",
+    intro:
+      'German has separate masculine and feminine words for jobs and roles (Lehrer / Lehrerin); adjectives do not change.',
+    masculine: 'Ich bin Lehrer.',
+    feminine: 'Ich bin Lehrerin.',
+    note: 'Only nouns like Lehrer / Lehrerin or Student / Studentin change; "Ich bin müde" is the same for everyone.',
+    sources: ['https://en.wiktionary.org/wiki/Lehrerin'],
+  },
+  nl: {
+    exampleEn: "I'm a teacher.",
+    intro:
+      'Dutch has feminine forms for some jobs and roles (leraar / lerares); adjectives do not change.',
+    masculine: 'Ik ben leraar.',
+    feminine: 'Ik ben lerares.',
+    note: 'Many titles are used for everyone (dokter, student, collega); lerares, verpleegster and vriendin still mark the gender.',
+    sources: [
+      'https://taaladvies.net/taal-en-gender-beroeps-functie-en-rolbenamingen-algemeen/',
+    ],
+  },
+  is: {
+    ...TIRED,
+    intro:
+      'Icelandic changes adjectives and past participles depending on who is speaking.',
+    masculine: 'Ég er þreyttur.',
+    feminine: 'Ég er þreytt.',
+    note: 'The same happens with "I\'m done" (búinn / búin) and "I\'m ready" (tilbúinn / tilbúin); nouns like kennari are the same for everyone.',
+    sources: ['https://en.wiktionary.org/wiki/%C3%BEreyttur'],
+  },
+  da: {
+    exampleEn: "I'm her friend.",
+    intro:
+      'Danish keeps a feminine form for a few roles, above all veninde for a female friend; adjectives do not change.',
+    masculine: 'Jeg er hendes ven.',
+    feminine: 'Jeg er hendes veninde.',
+    note: 'Job titles (lærer, læge, studerende) are the same for everyone.',
+    sources: [
+      'https://dsn.dk/nyt-fra-sprognaevnet/oktober-2024-2/sangerinde-bedemand-og-forperson-holdninger-til-koennede-endelser-i-dansk/',
+    ],
   },
 };
 
@@ -1387,7 +1513,7 @@ export function politenessFormForLevel(
 
 /**
  * The distinct forms a selected set of levels resolves to for one language,
- * in level order. {casual, polite} on German is [du]; on Japanese it is
+ * in level order. {casual, polite} on Spanish is [tú]; on Japanese it is
  * [plain, desu-masu]. Empty when the language is unmarked.
  */
 export function selectedPolitenessForms(
@@ -1415,25 +1541,19 @@ export function courseAsksPoliteness(
 }
 
 export type PolitenessRow = {
+  /** The global level; the row title is its translated word. */
   level: PolitenessLevel;
-  /** The global word, or the single language's own label. */
-  label: string;
   /** One entry per marked course language, in course order. */
   perLanguage: { code: string; form: PolitenessForm }[];
-};
-
-const LEVEL_WORD: Record<PolitenessLevel, string> = {
-  casual: 'Casual',
-  polite: 'Polite',
-  formal: 'Formal',
 };
 
 /**
  * The rows a course shows for its politeness setting: the union of its
  * languages' distinct forms. A row is shown for a global level when at least
- * one language renders that level differently from the level below it. A
- * single marked language names the rows by its own forms; with several, the
- * rows carry the global word and a per-language sublabel.
+ * one language renders that level differently from the level below it. The
+ * row is titled by the global level word; its sub-line names each marked
+ * language's form (`name`), with the description when one language is
+ * marked.
  */
 export function coursePolitenessRows(
   courseLanguages: readonly string[],
@@ -1458,11 +1578,7 @@ export function coursePolitenessRows(
       code,
       form: POLITENESS_CONFIG[code].forms[level],
     }));
-    rows.push({
-      level,
-      label: codes.length === 1 ? perLanguage[0].form.label : LEVEL_WORD[level],
-      perLanguage,
-    });
+    rows.push({ level, perLanguage });
   }
   return rows;
 }
@@ -1470,9 +1586,9 @@ export function coursePolitenessRows(
 /**
  * The levels a set of ticked rows stands for. A ticked row means its level;
  * a hidden level (one no course language distinguishes from the level
- * below) follows the visible level below it, so a German-only course with
+ * below) follows the visible level below it, so a Spanish-only course with
  * both rows ticked stores {casual, polite, formal}: the polite row is hidden
- * there and inherits casual (du). Adding Japanese later shows the polite row
+ * there and inherits casual (tú). Adding Japanese later shows the polite row
  * as ticked, which is what the learner had (levels 1 and 2 were one form).
  */
 export function levelsFromTickedRows(

@@ -79,6 +79,7 @@ export const translationValidator = v.object({
    */
   retranslating: v.optional(v.boolean()),
   // The chips (see CardTranslationContent in convex/lib/cardContent.ts).
+  voiceGender: v.optional(v.union(v.literal('male'), v.literal('female'))),
   renderedGender: v.optional(
     v.union(v.literal('masculine'), v.literal('feminine')),
   ),
@@ -582,7 +583,11 @@ export const RENDERED_POLITENESS_VALUES = [
   'formal',
   'unmarked',
 ] as const;
-/** The two settings together, as readers and job args carry them. */
+/**
+ * The settings as readers and job args carry them. `firstPersonForms` is
+ * accepted so a job scheduled before the course gender choice was withdrawn
+ * (2026-09-08) still validates; the resolver ignores it.
+ */
 export const renderingSettingsValidator = v.object({
   firstPersonForms: v.optional(firstPersonFormsValidator),
   politenessLevels: v.optional(politenessLevelsValidator),
@@ -595,6 +600,9 @@ export const renderingCardValidator = v.object({
   followsCoursePreferences: v.optional(v.literal(true)),
   renderingGenderOverride: v.optional(voiceGenderValidator),
   renderingPolitenessOverride: v.optional(politenessLevelValidator),
+  // `cards.accentLanguage`: the source clip the rendering sweep voices is
+  // the accent row's when the card reads one (`SweepCard`).
+  accentLanguage: v.optional(v.string()),
 });
 export const renderedGenderValidator = literalUnion(RENDERED_GENDER_VALUES);
 export const renderedPolitenessValidator = literalUnion(

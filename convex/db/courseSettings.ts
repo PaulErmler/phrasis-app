@@ -30,9 +30,8 @@ export async function upsertCourseSettings(
     autoAddCards?: boolean;
     cardsToAddBatchSize?: number;
     dailyTimeGoalMinutes?: number;
-    // Sentence-form preferences (see lib/languageForms.ts). Stamped from the
-    // onboarding answers; undefined keeps today's canonical renderings.
-    firstPersonForms?: 'masculine' | 'feminine' | 'both';
+    // The politeness preference (see lib/languageForms.ts). Stamped from the
+    // onboarding answer; undefined keeps the canonical renderings.
     politenessLevels?: ('casual' | 'polite' | 'formal')[];
   },
 ): Promise<Id<'courseSettings'>> {

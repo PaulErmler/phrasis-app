@@ -437,9 +437,10 @@ export interface Language {
    * Whether the wording of a first-person sentence changes with the
    * speaker's gender (Russian past tense, Romance adjectives, Hebrew and
    * Arabic verbs, Thai and Japanese pronouns, Korean kinship words). Such a
-   * language gets a masculine or feminine rendering when the course's
-   * `firstPersonForms` setting asks for one; every language follows the
-   * setting for the VOICE regardless. Example copy in lib/languageForms.ts.
+   * language gets a rewritten rendering when a card is corrected to the
+   * other voice (there is no course gender choice); every language follows
+   * the card's voice for the AUDIO regardless. Example copy in
+   * lib/languageForms.ts.
    */
   firstPersonMarking?: true;
 }
@@ -714,6 +715,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'de',
     politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'de',
     regionLabel: 'Germany',
     geminiBcp47: 'de-DE',
@@ -1101,6 +1103,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'nl',
     politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'nl',
     regionLabel: 'Netherlands',
     geminiBcp47: 'nl-NL',
@@ -1155,6 +1158,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'da',
+    firstPersonMarking: true,
     displayCode: 'da',
     regionLabel: 'Denmark',
     geminiBcp47: 'da-DK',
@@ -1172,6 +1176,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'is',
+    firstPersonMarking: true,
     displayCode: 'is',
     regionLabel: 'Iceland',
     // `is-IS` is a documented Gemini TTS locale (Preview stage as of Jul 2026).
@@ -1879,6 +1884,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar_iq',
+    politenessMarking: 'address',
     firstPersonMarking: true,
     direction: 'rtl',
     displayCode: 'ar-IQ',

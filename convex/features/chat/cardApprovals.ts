@@ -1,8 +1,6 @@
 import { v, ConvexError } from 'convex/values';
 import { mutation, query, internalMutation } from '../../_generated/server';
 import { internal } from '../../_generated/api';
-import { getCourseSettings } from '../../db/courseSettings';
-import { renderingSettingsOf } from '../../db/translationReads';
 import { getAuthUserId } from '../../db/users';
 import { EVENTS, track } from '../../analytics';
 import { getActiveCourseForUser } from '../../db/courses';
@@ -13,6 +11,7 @@ import {
   cardApprovalStatusValidator,
   proposedCardMetadataValidator,
   translationEntriesValidator,
+  voiceGenderValidator,
 } from '../../types';
 import type { Id, Doc } from '../../_generated/dataModel';
 import type { MutationCtx } from '../../_generated/server';
@@ -99,6 +98,11 @@ async function processApproval(
 
   const nextRank = chatCollection.textCount + 1;
 
+  // The tutor decided who says the sentence and wrote every language for
+  // that speaker, so the card is voiced by it from the start. The
+  // classifier below only replaces it with a gender the wording proves
+  // (`applyTextMetadata` keeps a stored voice on a neutral verdict).
+  const tutorSpeaker = approval.proposedMetadata?.speakerGender;
   const textId: Id<'texts'> = await ctx.db.insert('texts', {
     text: mainText,
     language: mainEntry.language,
@@ -106,6 +110,9 @@ async function processApproval(
     userId,
     collectionId: chatCollection._id,
     collectionRank: nextRank,
+    ...(tutorSpeaker === 'male' || tutorSpeaker === 'female'
+      ? { audioSpeakerGender: tutorSpeaker }
+      : {}),
   });
 
   // The approval's translations were produced by the language-teacher chat
@@ -142,24 +149,6 @@ async function processApproval(
   await ctx.db.patch(chatCollection._id, {
     textCount: chatCollection.textCount + 1,
   });
-
-  // The course's first-person setting picks the voice of a chat card whose
-  // sentence marks no gender of its own (a user-written text has no
-  // rendering variants, so it is born in the chosen voice). A definitive
-  // classifier verdict still wins in `applyTextMetadata`; a neutral one
-  // keeps this stamp instead of the coin flip.
-  const settings = renderingSettingsOf(
-    await getCourseSettings(ctx, course._id),
-  );
-  const voiceFromSettings =
-    settings?.firstPersonForms === 'masculine'
-      ? 'male'
-      : settings?.firstPersonForms === 'feminine'
-        ? 'female'
-        : undefined;
-  if (voiceFromSettings) {
-    await ctx.db.patch(textId, { audioSpeakerGender: voiceFromSettings });
-  }
 
   // Generate linguistic metadata first using all chat-produced translations,
   // then prepareCardContent runs from inside the metadata action so audio is
@@ -278,6 +267,12 @@ export const createApprovalRequestInternal = internalMutation({
     messageId: v.string(),
     toolCallId: v.string(),
     translations: translationEntriesValidator,
+    /**
+     * The tutor's pick of who says the sentence (createCard requires it;
+     * older callers and approvals may lack it). Stored as the approval's
+     * proposed metadata and becomes the text's voice on approval.
+     */
+    speakerGender: v.optional(voiceGenderValidator),
     userId: v.string(),
   },
   returns: v.id('cardApprovals'),
@@ -323,6 +318,9 @@ export const createApprovalRequestInternal = internalMutation({
       translations: cappedTranslations,
       userId: args.userId,
       status: 'pending',
+      ...(args.speakerGender
+        ? { proposedMetadata: { speakerGender: args.speakerGender } }
+        : {}),
     });
     await scheduleApprovalAnnotations(ctx, approvalId, cappedTranslations);
 

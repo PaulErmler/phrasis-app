@@ -82,7 +82,6 @@ import { ProficiencyBranchStep } from './steps/ProficiencyBranchStep';
 import { CefrSelfPickStep } from './steps/CefrSelfPickStep';
 import { PlacementTestStep } from './steps/PlacementTestStep';
 import { ReviewModeStep, type ReviewModeChoice } from './steps/ReviewModeStep';
-import { FirstPersonFormsStep } from './steps/FirstPersonFormsStep';
 import { PolitenessStep } from './steps/PolitenessStep';
 import { courseAsksPoliteness } from '@/lib/languageForms';
 
@@ -329,7 +328,6 @@ interface SaveProgressArgs {
   placementTest?: Omit<PlacementTestState, 'strategyVersion'> & {
     strategyVersion?: number;
   };
-  firstPersonForms?: 'masculine' | 'feminine' | 'both';
   politenessLevels?: ('casual' | 'polite' | 'formal')[];
 }
 
@@ -384,7 +382,6 @@ export function buildProgressPayload(
     priorAppsFreeText: fd.priorAppsFreeText ?? undefined,
     dailyTimeGoalMinutes: fd.dailyTimeGoalMinutes ?? undefined,
     placementTest: fd.placementTest ?? undefined,
-    firstPersonForms: fd.firstPersonForms ?? undefined,
     politenessLevels:
       fd.politenessLevels.length > 0 ? fd.politenessLevels : undefined,
   };
@@ -569,10 +566,19 @@ function OnboardingWizard({
     advance('acquisition');
   };
 
+  // The step after the level is settled: the politeness question only
+  // exists when a target language marks politeness (lib/languageForms.ts);
+  // otherwise straight on to the review mode.
+  const stepAfterLevel = useCallback(
+    (): StepId =>
+      courseAsksPoliteness(data.targetLanguages) ? 'politeness' : 'review-mode',
+    [data.targetLanguages],
+  );
+
   const onProficiencyContinue = () => {
     if (data.proficiencyBranch === 'new') {
       persist({ currentLevel: 'beginner' });
-      advance('first-person-forms');
+      advance(stepAfterLevel());
     } else if (data.proficiencyBranch === 'self-pick') {
       advance('cefr-pick');
     } else if (data.proficiencyBranch === 'test') {
@@ -593,8 +599,8 @@ function OnboardingWizard({
         finalLevel: cefrSlidLevel,
       },
     });
-    advance('first-person-forms');
-  }, [cefrSlidLevel, persist, advance]);
+    advance(stepAfterLevel());
+  }, [cefrSlidLevel, persist, advance, stepAfterLevel]);
 
   const onPlacementComplete = (result: {
     strategy: StrategyName;
@@ -613,7 +619,7 @@ function OnboardingWizard({
     });
     // Keep the placement test off the Back stack: returning to it restarts
     // the whole adaptive test with no way out. Back lands on `proficiency`.
-    advance('first-person-forms', { omitFromHistory: true });
+    advance(stepAfterLevel(), { omitFromHistory: true });
   };
 
   /**
@@ -690,8 +696,6 @@ function OnboardingWizard({
         return data.proficiencyBranch === null;
       case 'cefr-pick':
         return false; // slider has a value at all times; button is always enabled
-      case 'first-person-forms':
-        return data.firstPersonForms === null;
       case 'politeness':
         return data.politenessLevels.length === 0;
       case 'review-mode':
@@ -723,15 +727,6 @@ function OnboardingWizard({
         return;
       case 'cefr-pick':
         onCefrPickContinue();
-        return;
-      case 'first-person-forms':
-        // The politeness question only exists when a target language marks
-        // politeness (lib/languageForms.ts); otherwise straight on.
-        advance(
-          courseAsksPoliteness(data.targetLanguages)
-            ? 'politeness'
-            : 'review-mode',
-        );
         return;
       case 'politeness':
         advance('review-mode');
@@ -940,15 +935,6 @@ function renderStep({
           sourceLanguage={data.baseLanguages[0] ?? 'en'}
           initialOgteLevel={data.placementTest?.finalLevel}
           onComplete={onPlacementComplete}
-        />
-      );
-    case 'first-person-forms':
-      return (
-        <FirstPersonFormsStep
-          targetLanguages={data.targetLanguages}
-          baseLanguages={data.baseLanguages}
-          selected={data.firstPersonForms}
-          onSelect={(choice) => persist({ firstPersonForms: choice })}
         />
       );
     case 'politeness':

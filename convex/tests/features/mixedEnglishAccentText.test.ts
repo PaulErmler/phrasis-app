@@ -331,6 +331,7 @@ describe('Mixed English reads the accent row its card stored', () => {
               textId,
               sourceText: text.text,
               sourceLanguage: 'en',
+              sourceAnnotations: {},
               userCreated: false,
               view: null,
             },

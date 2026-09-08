@@ -5,11 +5,42 @@ import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   POLITENESS_CONFIG,
+  formCopyCode,
   levelsFromTickedRows,
   type PolitenessLevel,
   type PolitenessRow,
 } from '@/lib/languageForms';
 import { getLanguageByCode } from '@/lib/languages';
+
+/**
+ * The learner-facing words for a politeness row: the translated level word
+ * as the title, and a sub-line naming each language's form. One marked
+ * language shows its description and "e.g. du"; several show a flag and the
+ * form name per language. Shared by the rows and the Flag dialog so both
+ * read the same.
+ */
+export function usePolitenessRowCopy() {
+  const t = useTranslations('Onboarding.politeness');
+  const tForms = useTranslations('LanguageForms');
+  const title = (row: PolitenessRow) => t(`levels.${row.level}`);
+  const levelWord = (level: PolitenessLevel) => t(`levelWords.${level}`);
+  const subline = (row: PolitenessRow) => {
+    if (row.perLanguage.length === 1) {
+      const { code, form } = row.perLanguage[0];
+      return `${tForms(`politeness.${formCopyCode(code)}.forms.${form.id}.description`)} · ${t('example', { form: form.name })}`;
+    }
+    return row.perLanguage
+      .map((p) => `${getLanguageByCode(p.code)?.flag ?? p.code} ${p.form.name}`)
+      .join(' · ');
+  };
+  return { title, subline, levelWord };
+}
+
+/** "casual and polite" in the UI locale, for the summary line. */
+function joinLevelWords(words: string[], conjunction: string): string {
+  if (words.length <= 1) return words.join('');
+  return `${words.slice(0, -1).join(', ')} ${conjunction} ${words[words.length - 1]}`;
+}
 
 /**
  * The checkbox rows plus the summary line. Shared by the wizard step, the
@@ -29,6 +60,7 @@ export function PolitenessRows({
   compact?: boolean;
 }) {
   const t = useTranslations('Onboarding.politeness');
+  const { title, subline, levelWord } = usePolitenessRowCopy();
   const ticked = rows
     .map((row) => row.level)
     .filter((level) => selected.includes(level));
@@ -72,16 +104,9 @@ export function PolitenessRows({
                 {isTicked ? <Check className="h-3 w-3" /> : null}
               </span>
               <div className="flex-1 min-w-0">
-                <div className="font-semibold">{row.label}</div>
+                <div className="font-semibold">{title(row)}</div>
                 <div className="text-sm text-muted-foreground mt-0.5">
-                  {multi
-                    ? row.perLanguage
-                        .map(
-                          (p) =>
-                            `${getLanguageByCode(p.code)?.flag ?? p.code} ${p.form.label}`,
-                        )
-                        .join(' · ')
-                    : row.perLanguage[0]?.form.description}
+                  {subline(row)}
                 </div>
                 {showExamples && !multi && row.perLanguage[0] ? (
                   <div className="text-sm mt-1.5">
@@ -103,14 +128,14 @@ export function PolitenessRows({
         {ticked.length === 0
           ? t('summary.none')
           : ticked.length === 1
-            ? t('summary.single', {
-                form: rows.find((r) => r.level === ticked[0])?.label ?? '',
-              })
+            ? t('summary.single', { level: levelWord(ticked[0]) })
             : t('summary.mixed', {
-                forms: rows
-                  .filter((r) => ticked.includes(r.level))
-                  .map((r) => r.label)
-                  .join(' / '),
+                levels: joinLevelWords(
+                  rows
+                    .filter((r) => ticked.includes(r.level))
+                    .map((r) => levelWord(r.level)),
+                  t('and'),
+                ),
               })}
       </div>
     </div>

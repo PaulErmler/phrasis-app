@@ -364,12 +364,11 @@ describe('what a definitive verdict regenerates', () => {
     ).toEqual(['de', 'en']);
   });
 
-  it('leaves an unmarked or unstamped row alone, and a row already generated under the verdict', async () => {
+  it('leaves an unmarked or unstamped row alone', async () => {
     const t = convexTest(schema, modules);
     for (const seedOpts of [
       { jaGender: 'unmarked' as const },
       { jaGender: 'none' as const },
-      { jaGender: 'masculine' as const, jaRowSpeakerGender: 'female' as const },
     ]) {
       vi.mocked(llmPool.enqueueAction).mockClear();
       const { textId } = await seed(t, {
@@ -385,6 +384,43 @@ describe('what a definitive verdict regenerates', () => {
         await t.run((ctx) => liveTranslation(ctx, textId, 'ja')),
       ).not.toBeNull();
     }
+  });
+
+  it('retries a row already generated under the verdict once, then stops', async () => {
+    const t = convexTest(schema, modules);
+    // Generated under the verdict (female) and STILL stamped masculine: the
+    // model ignored `<speaker_gender>`, so a second sample is worth a call.
+    const { textId, rows } = await seed(t, {
+      metadata: { speakerGender: 'female' },
+      jaGender: 'masculine',
+      jaRowSpeakerGender: 'female',
+    });
+    await t.run((ctx) =>
+      ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
+    );
+
+    await sweep(t, textId);
+    expect(llmEnqueues()).toMatchObject([
+      { targetLanguage: 'ja', translationReason: 'metadata_correction' },
+    ]);
+    expect(
+      (await t.run((ctx) => ctx.db.get(rows.ja)))?.genderCorrectionAttempts,
+    ).toBe(1);
+
+    // The retry is spent. A wording the model will not change cannot put the
+    // sweep in a loop, so the next pass asks for nothing. (Releasing the
+    // claim the enqueue took, which would otherwise defer the pass on its
+    // own and prove nothing about the counter.)
+    vi.mocked(llmPool.enqueueAction).mockClear();
+    await t.run(async (ctx) => {
+      for (const claim of await ctx.db
+        .query('llmTranslationClaims')
+        .collect()) {
+        await ctx.db.delete(claim._id);
+      }
+    });
+    await sweep(t, textId);
+    expect(llmEnqueues()).toEqual([]);
   });
 
   it('never touches a user-written text', async () => {

@@ -20,12 +20,14 @@ import { languageMarksFirstPerson } from '../../lib/languageForms';
  *
  * `opts.keepAsset` detaches the pointer but PRESERVES the asset + blob even
  * when this was the last pointer. Use it whenever the audio itself is still
- * correct and only this text stops needing it. Card edits, retranslations,
- * and speaker-gender re-voicing, so the content-addressed `audioAssets`
- * cache keeps serving the string for other texts and future re-creation.
- * Full garbage collection (the default) is reserved for audio that is
- * OBSOLETE as audio: the manual regenerate button and TTS-system migrations
- * (provider/ttsVersion changes).
+ * correct and only this text stops needing it: card edits, retranslations,
+ * speaker-gender re-voicing, accent drift, and provider or ttsVersion
+ * changes, which are a new TTS setup rather than obsolescence (every clip
+ * is kept per text + gender + accent + provider + version so a setup change
+ * can be rolled forward or back cheaply, see convex/lib/audioAssets.ts).
+ * The content-addressed `audioAssets` cache keeps serving the string for
+ * other texts and for a roll-back. Full garbage collection (the default) is
+ * reserved for the manual regenerate button and the orphan cascades.
  *
  * `opts.blobAlreadyGone` skips the storage delete when the blob is already
  * known to be missing (`storage.getUrl` returned null), as in

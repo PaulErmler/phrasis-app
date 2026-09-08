@@ -2,22 +2,19 @@
 
 import { useTranslations } from 'next-intl';
 import {
-  POLITENESS_CONFIG,
   coursePolitenessRows,
+  formCopyCode,
   type PolitenessLevel,
-  type PolitenessRow,
 } from '@/lib/languageForms';
 import { PolitenessRows } from '@/components/course/PolitenessRows';
-
-export { PolitenessRows };
 
 /**
  * Wizard step "Which politeness levels do you want to learn?": the course's
  * `politenessLevels` setting (lib/languageForms.ts), a SET of the three
  * global levels. The rows are the union of the course languages' distinct
- * forms (`coursePolitenessRows`): a German-only course shows two rows named
- * by its forms, Japanese shows three, Japanese + German three with a
- * per-language sublabel. Ticking several rows means the sentences
+ * forms (`coursePolitenessRows`): a German-only course shows two rows,
+ * Japanese three, Japanese + German three with a per-language sub-line.
+ * Row titles are the translated level words. Ticking several rows means the sentences
  * alternate evenly. Hidden levels inherit the visible level below them
  * (`levelsFromTickedRows`), so the stored set stays right when a language
  * with more forms is added later.
@@ -31,14 +28,6 @@ interface Props {
   onChange: (levels: PolitenessLevel[]) => void;
 }
 
-/** The rows for a course, shared with the create-course dialog and settings. */
-export function politenessRowsFor(
-  targetLanguages: string[],
-  baseLanguages: string[],
-): PolitenessRow[] {
-  return coursePolitenessRows([...targetLanguages, ...baseLanguages]);
-}
-
 export function PolitenessStep({
   targetLanguages,
   baseLanguages,
@@ -46,9 +35,11 @@ export function PolitenessStep({
   onChange,
 }: Props) {
   const t = useTranslations('Onboarding.politeness');
-  const rows = politenessRowsFor(targetLanguages, baseLanguages);
-  const intro = rows[0]?.perLanguage[0]
-    ? politenessIntro(rows[0].perLanguage[0].code)
+  const tForms = useTranslations('LanguageForms');
+  const rows = coursePolitenessRows([...targetLanguages, ...baseLanguages]);
+  const introCode = rows[0]?.perLanguage[0]?.code;
+  const intro = introCode
+    ? tForms(`politeness.${formCopyCode(introCode)}.intro`)
     : '';
   return (
     <div
@@ -71,9 +62,4 @@ export function PolitenessStep({
       </div>
     </div>
   );
-}
-
-/** The intro line of the first marked language (config copy, English). */
-function politenessIntro(code: string): string {
-  return POLITENESS_CONFIG[code]?.intro ?? '';
 }

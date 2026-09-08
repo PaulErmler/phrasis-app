@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  axisOf,
   cardFollowsPreferences,
   parseVariantKey,
   pickPolitenessForm,
   resolveCardRendering,
   resolveLanguageRendering,
+  resolveSourceRendering,
+  voiceOf,
   type RenderingCard,
   type RenderingSettings,
   type RenderingText,
@@ -15,6 +18,18 @@ const premade: RenderingText = { userCreated: false };
 const stamped: RenderingCard = { followsCoursePreferences: true };
 const legacy: RenderingCard = {};
 const textId = 'k17abcdef0123456789';
+
+/** The canonical (coin-flip) voice of `premade` and the other one. */
+const canonicalVoice = resolveCardSpeakerGenders(
+  premade,
+  textId,
+).audioSpeakerGender;
+const otherVoice = canonicalVoice === 'male' ? 'female' : 'male';
+/** A card corrected to the other voice, the one way a card leaves its gender. */
+const corrected = (card: RenderingCard = stamped): RenderingCard => ({
+  ...card,
+  renderingGenderOverride: otherVoice,
+});
 
 function resolve(
   code: string,
@@ -33,6 +48,41 @@ function resolve(
   });
   return { cardRendering, language };
 }
+
+describe('voiceOf / axisOf', () => {
+  it('map a gender axis onto its voice and back', () => {
+    expect(voiceOf('masculine')).toBe('male');
+    expect(voiceOf('feminine')).toBe('female');
+    expect(axisOf('male')).toBe('masculine');
+    expect(axisOf('female')).toBe('feminine');
+  });
+});
+
+describe('resolveSourceRendering', () => {
+  it('voices the source wording in the card voice and never rewrites it', () => {
+    const card = resolveCardRendering({
+      text: premade,
+      textId,
+      settings: { politenessLevels: ['formal'] },
+      card: corrected(),
+    });
+    const source = resolveSourceRendering(card);
+    expect(source.form).toBeNull();
+    expect(source.textVariantKey).toBeNull();
+    expect(source.audioVariantKey).toBe(`${otherVoice}|auto`);
+    expect(source.voiceGender).toBe(otherVoice);
+  });
+
+  it('is canonical when the canonical voice already is the card voice', () => {
+    const card = resolveCardRendering({
+      text: premade,
+      textId,
+      settings: {},
+      card: { ...stamped, renderingGenderOverride: canonicalVoice },
+    });
+    expect(resolveSourceRendering(card).audioVariantKey).toBeNull();
+  });
+});
 
 describe('cardFollowsPreferences', () => {
   it('excludes legacy cards and user-written sentences', () => {
@@ -55,52 +105,53 @@ describe('resolveCardRendering', () => {
     expect(language.audioVariantKey).toBeNull();
   });
 
-  it('"both" is canonical', () => {
+  it('there is no course gender: the settings alone never leave the canonical voice', () => {
     const { cardRendering, language } = resolve('ru', {
-      firstPersonForms: 'both',
+      politenessLevels: ['casual', 'polite', 'formal'],
     });
     expect(cardRendering.gender).toBe('auto');
-    expect(language.textVariantKey).toBeNull();
-    expect(language.audioVariantKey).toBeNull();
+    expect(cardRendering.voiceGender).toBe(canonicalVoice);
+    expect(cardRendering.needsVoice).toBe(false);
+    // A politeness form may be picked; the gender axis of its keys is
+    // canonical and its clip is in the text's own voice.
+    expect(parseVariantKey(language.textVariantKey!).gender).toBe('auto');
+    expect(parseVariantKey(language.audioVariantKey!).gender).toBe(
+      canonicalVoice,
+    );
   });
 
-  it('a chosen gender sets the voice for every language', () => {
-    const settings: RenderingSettings = { firstPersonForms: 'feminine' };
-    const ru = resolve('ru', settings);
-    const de = resolve('de', settings);
-    expect(ru.cardRendering.voiceGender).toBe('female');
-    expect(de.cardRendering.voiceGender).toBe('female');
-    expect(de.cardRendering.gender).toBe('feminine');
+  it('a corrected card sets the voice for every language', () => {
+    const ru = resolve('ru', {}, premade, corrected());
+    const tr = resolve('tr', {}, premade, corrected());
+    expect(ru.cardRendering.voiceGender).toBe(otherVoice);
+    expect(tr.cardRendering.voiceGender).toBe(otherVoice);
+    expect(tr.cardRendering.gender).toBe(axisOf(otherVoice));
   });
 
   it('needsVoice only when the canonical coin flip landed on the other gender', () => {
-    const canonical = resolveCardSpeakerGenders(
-      premade,
-      textId,
-    ).audioSpeakerGender;
-    const same = canonical === 'male' ? 'masculine' : 'feminine';
-    const other = canonical === 'male' ? 'feminine' : 'masculine';
     expect(
-      resolve('de', { firstPersonForms: same }).cardRendering.needsVoice,
+      resolve('tr', {}, premade, {
+        ...stamped,
+        renderingGenderOverride: canonicalVoice,
+      }).cardRendering.needsVoice,
     ).toBe(false);
     expect(
-      resolve('de', { firstPersonForms: other }).cardRendering.needsVoice,
+      resolve('tr', {}, premade, corrected()).cardRendering.needsVoice,
     ).toBe(true);
   });
 
   it("a curriculum text's speakerGender stamp is the coin flip, not evidence", () => {
     // The sweep writes the canonical voice gender back onto premade texts
-    // (resolveCardSpeakerGenders case 3); the setting still applies.
+    // (resolveCardSpeakerGenders case 3); the correction still applies.
     const text: RenderingText = {
       userCreated: false,
       speakerGender: 'male',
       audioSpeakerGender: 'male',
     };
-    const { cardRendering, language } = resolve(
-      'ru',
-      { firstPersonForms: 'feminine' },
-      text,
-    );
+    const { cardRendering, language } = resolve('ru', {}, text, {
+      ...stamped,
+      renderingGenderOverride: 'female',
+    });
     expect(cardRendering.gender).toBe('feminine');
     expect(cardRendering.voiceGender).toBe('female');
     expect(cardRendering.needsVoice).toBe(true);
@@ -110,7 +161,7 @@ describe('resolveCardRendering', () => {
   it('a legacy card ignores the settings', () => {
     const { cardRendering, language } = resolve(
       'ja',
-      { firstPersonForms: 'feminine', politenessLevels: ['polite'] },
+      { politenessLevels: ['polite'] },
       premade,
       legacy,
     );
@@ -122,7 +173,7 @@ describe('resolveCardRendering', () => {
   it('a user-written text ignores the settings', () => {
     const { language } = resolve(
       'ja',
-      { firstPersonForms: 'feminine', politenessLevels: ['polite'] },
+      { politenessLevels: ['polite'] },
       { userCreated: true },
     );
     expect(language.textVariantKey).toBeNull();
@@ -131,26 +182,21 @@ describe('resolveCardRendering', () => {
 });
 
 describe('resolveLanguageRendering', () => {
-  it('a marked language with a chosen gender needs a text variant', () => {
-    const { language } = resolve('ru', { firstPersonForms: 'feminine' });
-    expect(language.textVariantKey).toBe('female|auto');
-    expect(language.audioVariantKey).toBe('female|auto');
-    expect(language.voiceGender).toBe('female');
+  it('a marked language on a corrected card needs a text variant', () => {
+    const { language } = resolve('ru', {}, premade, corrected());
+    expect(language.textVariantKey).toBe(`${otherVoice}|auto`);
+    expect(language.audioVariantKey).toBe(`${otherVoice}|auto`);
+    expect(language.voiceGender).toBe(otherVoice);
   });
 
-  it('an unmarked language with a chosen gender needs audio only when the voice differs', () => {
-    const canonical = resolveCardSpeakerGenders(
-      premade,
-      textId,
-    ).audioSpeakerGender;
-    const other = canonical === 'male' ? 'feminine' : 'masculine';
-    const same = canonical === 'male' ? 'masculine' : 'feminine';
-    const differs = resolve('de', { firstPersonForms: other }).language;
+  it('an unmarked language on a corrected card needs audio only when the voice differs', () => {
+    const differs = resolve('tr', {}, premade, corrected()).language;
     expect(differs.textVariantKey).toBeNull();
-    expect(differs.audioVariantKey).toBe(
-      `${other === 'masculine' ? 'male' : 'female'}|auto`,
-    );
-    const matches = resolve('de', { firstPersonForms: same }).language;
+    expect(differs.audioVariantKey).toBe(`${otherVoice}|auto`);
+    const matches = resolve('tr', {}, premade, {
+      ...stamped,
+      renderingGenderOverride: canonicalVoice,
+    }).language;
     expect(matches.textVariantKey).toBeNull();
     expect(matches.audioVariantKey).toBeNull();
   });
@@ -163,7 +209,7 @@ describe('resolveLanguageRendering', () => {
   });
 
   it('levels that map to one form on this language do not alternate', () => {
-    const { language } = resolve('de', {
+    const { language } = resolve('tr', {
       politenessLevels: ['casual', 'polite'],
     });
     expect(language.form?.id).toBe('t');
@@ -192,7 +238,7 @@ describe('resolveLanguageRendering', () => {
       addressesSomeone: false,
     };
     const { language } = resolve(
-      'de',
+      'tr',
       { politenessLevels: ['formal'] },
       noAddressee,
     );
@@ -207,7 +253,7 @@ describe('resolveLanguageRendering', () => {
       addresseeNumber: 'not_applicable',
     };
     expect(
-      resolve('de', { politenessLevels: ['formal'] }, legacyNoAddressee)
+      resolve('tr', { politenessLevels: ['formal'] }, legacyNoAddressee)
         .language.form,
     ).toBeNull();
     const legacyAddressee: RenderingText = {
@@ -215,7 +261,7 @@ describe('resolveLanguageRendering', () => {
       addresseeNumber: 'singular',
     };
     expect(
-      resolve('de', { politenessLevels: ['formal'] }, legacyAddressee).language
+      resolve('tr', { politenessLevels: ['formal'] }, legacyAddressee).language
         .form?.id,
     ).toBe('v');
   });
@@ -240,9 +286,9 @@ describe('resolveLanguageRendering', () => {
   });
 
   it('both axes combine into one key', () => {
-    const { language } = resolve('ja', {
-      firstPersonForms: 'masculine',
-      politenessLevels: ['casual'],
+    const { language } = resolve('ja', { politenessLevels: ['casual'] }, premade, {
+      ...stamped,
+      renderingGenderOverride: 'male',
     });
     expect(language.textVariantKey).toBe('male|plain');
     expect(language.audioVariantKey).toBe('male|plain');
@@ -253,11 +299,11 @@ describe('resolveLanguageRendering', () => {
   });
 
   it('a politeness variant of a gender-unmarked language has one wording per form', () => {
-    const settings: RenderingSettings = {
-      firstPersonForms: 'feminine',
-      politenessLevels: ['formal'],
-    };
-    const { language } = resolve('de', settings);
+    const settings: RenderingSettings = { politenessLevels: ['formal'] };
+    const { language } = resolve('tr', settings, premade, {
+      ...stamped,
+      renderingGenderOverride: 'female',
+    });
     expect(language.textVariantKey).toBe('auto|v');
     expect(language.audioVariantKey).toBe('female|v');
   });
@@ -273,13 +319,10 @@ describe('resolveLanguageRendering', () => {
 describe('per-card overrides and sentence evidence', () => {
   const current = 'gemini-3.1-flash-lite-v1';
 
-  it('the override outranks the course setting and applies to a legacy card', () => {
-    const { cardRendering, language } = resolve(
-      'ru',
-      { firstPersonForms: 'masculine' },
-      premade,
-      { renderingGenderOverride: 'female' },
-    );
+  it('the override applies to a legacy card without any settings', () => {
+    const { cardRendering, language } = resolve('ru', {}, premade, {
+      renderingGenderOverride: 'female',
+    });
     expect(cardRendering.gender).toBe('feminine');
     expect(cardRendering.voiceGender).toBe('female');
     expect(language.textVariantKey).toBe('female|auto');
@@ -293,19 +336,17 @@ describe('per-card overrides and sentence evidence', () => {
     expect(language.textVariantKey).toBe('auto|desu-masu');
   });
 
-  it('a definitive speaker gender at the current source outranks both', () => {
+  it('a definitive speaker gender at the current source outranks the override', () => {
     const text: RenderingText = {
       userCreated: false,
       speakerGender: 'male',
       audioSpeakerGender: 'male',
       metadataSource: current,
     };
-    const { cardRendering, language } = resolve(
-      'ru',
-      { firstPersonForms: 'feminine' },
-      text,
-      { followsCoursePreferences: true, renderingGenderOverride: 'female' },
-    );
+    const { cardRendering, language } = resolve('ru', {}, text, {
+      followsCoursePreferences: true,
+      renderingGenderOverride: 'female',
+    });
     expect(cardRendering.gender).toBe('auto');
     expect(cardRendering.voiceGender).toBe('male');
     expect(language.textVariantKey).toBeNull();
@@ -317,11 +358,10 @@ describe('per-card overrides and sentence evidence', () => {
       speakerGender: 'male',
       audioSpeakerGender: 'male',
     };
-    const { cardRendering } = resolve(
-      'ru',
-      { firstPersonForms: 'feminine' },
-      text,
-    );
+    const { cardRendering } = resolve('ru', {}, text, {
+      ...stamped,
+      renderingGenderOverride: 'female',
+    });
     expect(cardRendering.gender).toBe('feminine');
   });
 

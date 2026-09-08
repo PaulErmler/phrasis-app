@@ -1,4 +1,5 @@
 'use client';
+import { FLAG_REWARDS_PER_MONTH } from '@/lib/languages';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
@@ -189,6 +190,7 @@ export function useCardActions(options: UseCardActionsOptions): CardActions {
             toast.success(t('flagRewardTitle'), {
               description: t('flagRewardBody', {
                 credits: result.creditsAwarded,
+                max: FLAG_REWARDS_PER_MONTH,
               }),
               duration: 6000,
             });

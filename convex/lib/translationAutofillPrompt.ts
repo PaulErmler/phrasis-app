@@ -176,6 +176,14 @@ export function buildAutofillUserPrompt(args: {
    */
   settings?: RenderingSettings;
   politenessSeed?: string;
+  /**
+   * The speaker every target is written for when no source rendering
+   * marks one (Thai ครับ/ค่ะ, Romance adjectives, Slavic past tense all
+   * force a choice the source may not make). The caller draws it per
+   * request (`resolveAudioSpeakerGender` with a seed) so the voice the
+   * text is stored with is the one the wording was written for.
+   */
+  speakerGender?: 'male' | 'female';
 }): string {
   const sourceDescription = args.texts
     .map((t) => `[${formatLangLabel(t.language)}]: ${t.text}`)
@@ -187,6 +195,7 @@ export function buildAutofillUserPrompt(args: {
     args.settings,
     args.resolvedTargets,
     args.politenessSeed ?? args.texts.map((t) => t.text).join('|'),
+    args.speakerGender,
   );
   return `Source text(s):\n${sourceDescription}\n\nTranslate into these languages:\n${targetList}${settingsBlock}`;
 }
@@ -196,30 +205,31 @@ export function buildAutofillUserPrompt(args: {
  * target that marks it, in that language's own form (lib/languageForms.ts
  * prompt text), and it replaces rule 2's neutral default: a source
  * rendering that marks register explicitly still wins, since the user
- * typed it. Gender replaces rule 3's default for unmarked sources.
+ * typed it. The speaker replaces rule 3's default for unmarked sources:
+ * there is no course gender choice, so the caller draws one per request
+ * and the model reports it as the sentence's speaker, which is what the
+ * text is then voiced in.
  */
 export function buildAutofillSettingsBlock(
   settings: RenderingSettings | undefined,
   resolvedTargets: string[],
   seed: string,
+  speakerGender?: 'male' | 'female',
 ): string {
-  if (!settings) return '';
   const lines: string[] = [];
-  if (
-    settings.firstPersonForms === 'masculine' ||
-    settings.firstPersonForms === 'feminine'
-  ) {
-    const who = settings.firstPersonForms === 'masculine' ? 'a man' : 'a woman';
+  if (speakerGender) {
+    const who = speakerGender === 'male' ? 'a man' : 'a woman';
+    const forms = speakerGender === 'male' ? 'masculine' : 'feminine';
     lines.push(
-      `- Speaker: unless a source rendering marks the speaker's gender, the speaker is ${who}: use ${settings.firstPersonForms} first-person forms wherever a target marks them, and report speakerGender as "${settings.firstPersonForms === 'masculine' ? 'male' : 'female'}" (the metadata describes the sentence as written, so the voice and the grader agree with it).`,
+      `- Speaker: unless a source rendering marks the speaker's gender, the speaker is ${who}: use ${forms} first-person forms, pronouns and particles wherever a target marks them, and report speakerGender as "${speakerGender}" (the metadata describes the sentence as written, so the voice and the grader agree with it).`,
     );
   }
-  if (settings.politenessLevels && settings.politenessLevels.length > 0) {
+  if (settings?.politenessLevels && settings.politenessLevels.length > 0) {
     for (const code of resolvedTargets) {
       const form = pickPolitenessForm(code, settings.politenessLevels, seed);
       if (!form) continue;
       lines.push(
-        `- ${formatLangLabel(code)} politeness: unless a source rendering marks register explicitly, use the ${form.label}. ${form.prompt} Report register as the level you applied ("informal" for a casual form, "formal" for a polite or formal one), so the metadata describes the sentence as written.`,
+        `- ${formatLangLabel(code)} politeness: unless a source rendering marks register explicitly, use the ${form.promptLabel}. ${form.prompt} Report register as the level you applied ("informal" for a casual form, "formal" for a polite or formal one), so the metadata describes the sentence as written.`,
       );
     }
   }

@@ -132,6 +132,22 @@ describe('features/writingAlternatives generation pipeline', () => {
     expect(row?.audioAssetId).toBe(context?.reusableAssetId);
   });
 
+  it('getAlternativeContext voices a per-card gender correction on a course without settings', async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedAlternative(t, 'A');
+    await t.run(async (ctx) => {
+      await ctx.db.patch(a.textId, { audioSpeakerGender: 'male' });
+      await ctx.db.patch(a.cardId, { renderingGenderOverride: 'female' });
+    });
+    const context = await t.query(
+      internal.features.writingAlternatives.getAlternativeContext,
+      { alternativeId: a.alternativeId },
+    );
+    // The card hears a female voice (the Flag dialog's correction), so the
+    // alternative is probed and voiced female first.
+    expect(context?.genders).toEqual(['female', 'male']);
+  });
+
   it('hasAudio short-circuits the pipeline for rows that already carry audio', async () => {
     const t = convexTest(schema, modules);
     const a = await seedAlternative(t, 'A');

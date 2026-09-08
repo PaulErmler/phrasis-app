@@ -22,10 +22,15 @@ import {
 import {
   cardPinAt,
   liveTranslation,
+  renderingForView,
+  renderingTextOf,
   resolveServedFromLive,
+  resolveServedRendering,
   splitRevisions,
   translationRevisions,
+  viewOfCard,
 } from '../../db/translationReads';
+import type { RenderingSettings } from '../../../lib/preferenceResolution';
 import {
   getCurrentTranslationVersion,
   getTtsProviderForLanguage,
@@ -967,6 +972,124 @@ describe('archived audio survives garbage collection', () => {
       await deleteAudioRow(ctx, (await ctx.db.get(rowB))!);
     });
     expect(await t.run((ctx) => ctx.db.get(assetId))).toBeNull();
+  });
+});
+
+describe('a pinned card never reads a rendering variant', () => {
+  const POLITE_NEW_DE = 'Alles klar bei Ihnen?';
+
+  /** The batch hydration of one card with its course settings. */
+  async function hydrateCard(
+    t: TestConvex<typeof schema>,
+    textId: Id<'texts'>,
+    cardId: Id<'cards'>,
+    settings: RenderingSettings,
+  ) {
+    return t.run(async (ctx) => {
+      const text = (await ctx.db.get(textId))!;
+      const card = (await ctx.db.get(cardId))!;
+      const map = await buildTextContentBatchForLanguages(
+        ctx,
+        [
+          {
+            key: '0',
+            textId,
+            sourceText: text.text,
+            sourceLanguage: text.language,
+            sourceAnnotations: annotationFieldsOf(text),
+            userCreated: text.userCreated,
+            renderingText: renderingTextOf(text),
+            view: viewOfCard(card, settings),
+          },
+        ],
+        ['en'],
+        ['de'],
+        { ignoreMissingWordTimings: true, includeVariantGaps: true },
+      );
+      return map.get('0')!;
+    });
+  }
+
+  it('serves the archived wording, reports no variant gap, and leaves the variant to later cards', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, cardId, deckId } = await seed(t, { ipaText: 'ipa' });
+    await t.run((ctx) =>
+      ctx.db.patch(cardId!, { followsCoursePreferences: true }),
+    );
+    await bump(t, textId, NEW_DE);
+    await settleTts(t, textId);
+
+    // Another learner's polite course had the NEW wording rewritten.
+    const settings: RenderingSettings = { politenessLevels: ['polite'] };
+    const variantKey = await t.run(async (ctx) => {
+      const text = (await ctx.db.get(textId))!;
+      const card = (await ctx.db.get(cardId!))!;
+      return renderingForView(
+        viewOfCard(card, settings),
+        renderingTextOf(text),
+        textId,
+        'de',
+      ).textVariantKey!;
+    });
+    expect(variantKey).not.toBeNull();
+    await t.run((ctx) =>
+      ctx.db.insert('translations', {
+        textId,
+        targetLanguage: 'de',
+        translatedText: POLITE_NEW_DE,
+        romanizedText: '',
+        ipaText: '',
+        translationSource: 'openai/gpt-5.6-sol:floor-minimal',
+        speakerGender: 'female',
+        translationVersion: getCurrentTranslationVersion('de'),
+        variantKey,
+        renderedGender: 'unmarked',
+        renderedPoliteness: 'polite',
+      }),
+    );
+
+    const rendering = await t.run(async (ctx) => {
+      const text = (await ctx.db.get(textId))!;
+      const card = (await ctx.db.get(cardId!))!;
+      return resolveServedRendering(ctx, {
+        textId,
+        targetLanguage: 'de',
+        text: renderingTextOf(text),
+        view: viewOfCard(card, settings),
+      });
+    });
+    expect(rendering.served?.row.translatedText).toBe(OLD_DE);
+    expect(rendering.served?.archived).toBe(true);
+    expect(rendering.textVariantMissing).toBe(false);
+
+    const pinned = await hydrateCard(t, textId, cardId!, settings);
+    const de = pinned.translations.find((tr) => tr.language === 'de')!;
+    expect(de.text).toBe(OLD_DE);
+    expect(
+      pinned.audioRecordings.find((a) => a.language === 'de')!.url,
+    ).not.toBeNull();
+    expect(pinned.hasMissingVariant).toBe(false);
+    expect(pinned.hasMissingContent).toBe(false);
+
+    // A card created after the bump is on the live wording and reads the
+    // variant like any settings-following card.
+    const laterCard = await t.run((ctx) =>
+      ctx.db.insert('cards', {
+        deckId,
+        textId,
+        collectionOrigin: 'premade',
+        dueDate: Date.now(),
+        isMastered: false,
+        isHidden: false,
+        schedulingPhase: 'preReview',
+        preReviewCount: 0,
+        followsCoursePreferences: true,
+      }),
+    );
+    const later = await hydrateCard(t, textId, laterCard, settings);
+    expect(later.translations.find((tr) => tr.language === 'de')!.text).toBe(
+      POLITE_NEW_DE,
+    );
   });
 });
 

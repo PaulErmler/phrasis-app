@@ -20,6 +20,7 @@ import {
   type PolitenessLevel,
 } from '@/lib/languageForms';
 import type { FlagReason } from '@/convex/types';
+import { usePolitenessRowCopy } from '@/components/course/PolitenessRows';
 
 /** What the dialog hands back; mirrors `flagTranslation`'s args. */
 export interface FlagSubmission {
@@ -70,6 +71,7 @@ export function FlagTranslationDialog({
     () => coursePolitenessRows(courseLanguages),
     [courseLanguages],
   );
+  const rowCopy = usePolitenessRowCopy();
 
   const toggle = (reason: FlagReason, on: boolean) => {
     setReasons((prev) => {
@@ -179,14 +181,10 @@ export function FlagTranslationDialog({
                       data-testid={`flag-politeness-${row.level}`}
                     />
                     <span>
-                      <span>{row.label}</span>
-                      {row.perLanguage.length > 0 && (
-                        <span className="block text-xs text-muted-foreground">
-                          {row.perLanguage
-                            .map((entry) => entry.form.label)
-                            .join(' · ')}
-                        </span>
-                      )}
+                      <span>{rowCopy.title(row)}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {rowCopy.subline(row)}
+                      </span>
                     </span>
                   </label>
                 ))}

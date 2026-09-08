@@ -3,6 +3,7 @@ import {
   servedSourceText,
   servedTranslatedText,
   viewOfCard,
+  renderingCardOf,
   renderingSettingsOf,
   renderingTextOf,
 } from '../db/translationReads';
@@ -17,7 +18,10 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { getCourseSettings } from '../db/courseSettings';
-import { resolveCardRendering } from '../../lib/preferenceResolution';
+import {
+  hasRenderingOverride,
+  resolveCardRendering,
+} from '../../lib/preferenceResolution';
 import type { Id } from '../_generated/dataModel';
 import {
   MAX_CARD_TEXT_LENGTH,
@@ -314,19 +318,22 @@ export const getAlternativeContext = internalQuery({
     const card = await ctx.db.get(row.cardId);
     const text = card ? await ctx.db.get(card.textId) : null;
     // The voice the card is spoken in: its rendering when the course has
-    // sentence-form settings and the card follows them, else the text's
-    // resolved audio speaker (docs/architecture/translation-variants.md).
+    // sentence-form settings or the card carries its own correction (which
+    // needs no settings, hence the empty stand-in, like `viewOfCard`), else
+    // the text's resolved audio speaker
+    // (docs/architecture/translation-variants.md).
     const deck = card ? await ctx.db.get(card.deckId) : null;
     const settings = deck
       ? renderingSettingsOf(await getCourseSettings(ctx, deck.courseId))
       : undefined;
+    const renderingCard = card ? renderingCardOf(card) : null;
     const primaryGender =
-      text && card && settings
+      text && renderingCard && (settings || hasRenderingOverride(renderingCard))
         ? resolveCardRendering({
             text: renderingTextOf(text),
             textId: text._id,
-            settings,
-            card: { followsCoursePreferences: card.followsCoursePreferences },
+            settings: settings ?? {},
+            card: renderingCard,
           }).voiceGender
         : resolveAudioSpeakerGender(
             text?.audioSpeakerGender ?? text?.speakerGender,
@@ -417,7 +424,13 @@ export const saveAlternativeAudio = internalMutation({
       regionVariant: undefined,
       spokenText: args.spokenText,
     });
-    const existing = await findAudioAssetByKey(ctx, key);
+    // The clip's own setup, as in `saveApprovalAudioAsset`: a clip from
+    // another setup is a sibling asset, not "existing".
+    const ttsVersion = getCurrentTtsVersion(key.language, key.regionVariant);
+    const existing = await findAudioAssetByKey(ctx, key, {
+      provider: args.provider,
+      version: ttsVersion,
+    });
     let assetId: Id<'audioAssets'>;
     if (existing && existing.ttsQuality !== 'unknown') {
       await deleteStorageBlobIfUnreferenced(ctx, args.storageId);
@@ -430,7 +443,7 @@ export const saveAlternativeAudio = internalMutation({
         ttsProvider: args.provider,
         ttsQuality: 'unvalidated',
         speed: 1,
-        ttsVersion: getCurrentTtsVersion(key.language, key.regionVariant),
+        ttsVersion,
       });
       if (result.outcome === 'kept') {
         await deleteStorageBlobIfUnreferenced(ctx, args.storageId);

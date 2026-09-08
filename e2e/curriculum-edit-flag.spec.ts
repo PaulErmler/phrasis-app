@@ -208,3 +208,111 @@ test.describe('curriculum edit flags the shared translation', () => {
     });
   });
 });
+
+/**
+ * The Flag dialog's politeness correction. A learner who ticks "the
+ * politeness level is wrong" and picks a level writes a per-card override
+ * (`cards.renderingPolitenessOverride`) that the card is re-rendered under;
+ * no shared row is retranslated for that reason, so the probe's parked
+ * counter is only incremented. The hook reads the override back, which is
+ * the one link convex-test cannot prove: the dialog is wired to the
+ * mutation. Same probe and restore as the edit spec above.
+ */
+test.describe('flag dialog politeness correction', () => {
+  let probe: Probe | null = null;
+
+  test.afterEach(() => {
+    if (!probe) return;
+    convexRun('features/curriculumFlagTesting:clearCardRendering', {
+      cardId: probe.cardId,
+    });
+    convexRun('features/curriculumFlagTesting:restoreProbe', {
+      textId: probe.textId,
+      targetLanguage: probe.targetLanguage,
+      originalFlagCount: probe.originalFlagCount,
+    });
+    probe = null;
+  });
+
+  test('picking a politeness level in the flag dialog writes the card override', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    const email = fixtureEmail();
+
+    probe = convexRun('features/curriculumFlagTesting:armProbe', {
+      email,
+    }) as Probe | null;
+    test.skip(
+      probe === null,
+      'fixture user has no shared curriculum card with a flaggable translation',
+    );
+    const p = probe!;
+
+    await page.goto('/app/library');
+    await page.waitForLoadState('domcontentloaded');
+    await expectSignedIn(page);
+    await dismissTour(page);
+
+    const search = page.getByTestId('library-search').first();
+    await expect(search).toBeVisible({ timeout: 20_000 });
+    await search.fill(p.targetText);
+    const card = page.locator(
+      `[data-testid="library-card"][data-card-id="${p.cardId}"]`,
+    );
+    await expect(card).toBeVisible({ timeout: 20_000 });
+
+    // "Flag translation" is a surface button when pinned, else in the menu.
+    const pinnedFlag = card.getByRole('button', {
+      name: 'Flag translation',
+      exact: true,
+    });
+    if ((await pinnedFlag.count()) > 0) {
+      await pinnedFlag.first().click();
+    } else {
+      await card
+        .getByRole('button', { name: 'More', exact: true })
+        .first()
+        .click();
+      await page
+        .getByRole('menuitem', { name: 'Flag translation', exact: true })
+        .click();
+    }
+    const dialog = page.getByTestId('flag-dialog');
+    await expect(dialog).toBeVisible({ timeout: 10_000 });
+
+    await page.getByTestId('flag-reason-wrong_politeness').click();
+    // The rows are the course's own politeness levels; the fixture course
+    // is German-target, so casual (du) and polite (Sie) show. Pick the
+    // last one so the pick differs from a casual default.
+    const levels = page.locator('[data-testid^="flag-politeness-"]');
+    await expect(levels.first()).toBeVisible({ timeout: 10_000 });
+    const count = await levels.count();
+    const chosen = levels.nth(count - 1);
+    const chosenLevel = (await chosen.getAttribute('data-testid'))!.replace(
+      'flag-politeness-',
+      '',
+    );
+    await chosen.click();
+    await page.getByTestId('flag-submit').click();
+    await expect(dialog).toBeHidden({ timeout: 10_000 });
+
+    // The thank-you toast shows whether or not credits were paid (a repeat
+    // flag on the same card pays nothing).
+    await expect(
+      page.getByText('Thank you for your help!', { exact: false }).first(),
+    ).toBeVisible({ timeout: 10_000 });
+
+    await expect
+      .poll(
+        () =>
+          (
+            convexRun('features/curriculumFlagTesting:readCardRendering', {
+              cardId: p.cardId,
+            }) as { renderingPolitenessOverride?: string } | null
+          )?.renderingPolitenessOverride ?? null,
+        { timeout: 30_000, message: 'card override was never written' },
+      )
+      .toBe(chosenLevel);
+  });
+});

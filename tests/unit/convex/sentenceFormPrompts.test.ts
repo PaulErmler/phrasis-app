@@ -17,23 +17,23 @@ describe('buildFormsSection (chat)', () => {
     ).toBeUndefined();
     expect(
       buildFormsSection(
-        { firstPersonForms: 'both' },
+        {},
         { baseLanguages: ['en'], targetLanguages: ['de'] },
       ),
     ).toBeUndefined();
   });
 
-  it('names the forms per language and the gender', () => {
+  it('names the forms per language and never a gender', () => {
     const section = buildFormsSection(
-      { firstPersonForms: 'feminine', politenessLevels: ['polite'] },
+      { politenessLevels: ['polite'] },
       { baseLanguages: ['en'], targetLanguages: ['ja', 'de'] },
     )!;
-    expect(section).toContain('feminine form');
+    expect(section).not.toContain('First-person forms');
     expect(section).toContain(
       'Japanese politeness: the learner studies the Polite · です・ます',
     );
     expect(section).toContain(
-      'German politeness: the learner studies the du-form · everyday',
+      'German politeness: the learner studies the Polite · Sie',
     );
   });
 
@@ -50,13 +50,24 @@ describe('autofill settings block', () => {
   it('is empty without settings and names forms per target otherwise', () => {
     expect(buildAutofillSettingsBlock(undefined, ['ja'], 'seed')).toBe('');
     const block = buildAutofillSettingsBlock(
-      { firstPersonForms: 'masculine', politenessLevels: ['formal'] },
+      { politenessLevels: ['formal'] },
       ['ja', 'de', 'sv'],
       'seed',
     );
-    expect(block).toContain('the speaker is a man');
+    expect(block).not.toContain('Speaker:');
     expect(block).toContain('Formal · keigo');
-    expect(block).toContain('Sie-form · formal');
+    // The drawn speaker replaces rule 3's default even without settings.
+    const spoken = buildAutofillSettingsBlock(undefined, ['th'], 'seed', 'female');
+    expect(spoken).toContain('the speaker is a woman');
+    expect(spoken).toContain('report speakerGender as "female"');
+    expect(
+      buildAutofillUserPrompt({
+        texts: [{ language: 'de', text: 'Ich bin müde.' }],
+        resolvedTargets: ['th'],
+        speakerGender: 'male',
+      }),
+    ).toContain('the speaker is a man');
+    expect(block).toContain('Polite · Sie');
     expect(block).not.toContain('Swedish');
     const prompt = buildAutofillUserPrompt({
       texts: [{ language: 'en', text: 'Hello' }],
@@ -95,19 +106,20 @@ describe('formal quick action anchor', () => {
 
 describe('buildFormChips', () => {
   const t = (key: string) => key.toUpperCase();
-  it('shows the gender once and the form per target, own names for two-form languages', () => {
+  it('shows the card voice once, own form names for ja/ko and generic words elsewhere', () => {
     const chips = buildFormChips(
       [
-        { language: 'en', isTargetLanguage: false, renderedGender: 'feminine' },
+        { language: 'en', isTargetLanguage: false, voiceGender: 'female' },
         {
           language: 'ja',
           isTargetLanguage: true,
-          renderedGender: 'feminine',
+          voiceGender: 'female',
           renderedPoliteness: 'polite',
         },
         {
           language: 'de',
           isTargetLanguage: true,
+          voiceGender: 'female',
           renderedPoliteness: 'formal',
         },
       ],
@@ -115,21 +127,59 @@ describe('buildFormChips', () => {
     );
     expect(chips.map((c) => c.label)).toEqual([
       'FEMININE',
-      'JA POLITE',
-      'DE Sie-form',
+      'JA です・ます',
+      'DE FORMAL',
     ]);
+    // The title keeps the level and the language's own form.
+    expect(chips[2].title).toBe('POLITENESSTITLE');
+  });
+
+  it('a two-form language reads casual or formal by the form the level maps to', () => {
+    const label = (language: string, level: 'casual' | 'polite' | 'formal') =>
+      buildFormChips(
+        [{ language, isTargetLanguage: true, renderedPoliteness: level }],
+        t,
+      )[0].label;
+    // Spain Spanish: tú covers casual and polite, usted is formal.
+    expect(label('es', 'casual')).toBe('CASUAL');
+    expect(label('es', 'polite')).toBe('CASUAL');
+    expect(label('es', 'formal')).toBe('FORMAL');
+    // German: Sie from the polite level.
+    expect(label('de', 'polite')).toBe('FORMAL');
+    expect(label('ko', 'casual')).toBe('반말');
+  });
+
+  it('the voice outranks a gender stamp, which is only the fallback', () => {
+    const chips = buildFormChips(
+      [
+        {
+          language: 'ru',
+          isTargetLanguage: true,
+          voiceGender: 'male',
+          renderedGender: 'feminine',
+        },
+      ],
+      t,
+    );
+    expect(chips.map((c) => c.label)).toEqual(['MASCULINE']);
+    expect(
+      buildFormChips(
+        [{ language: 'ru', isTargetLanguage: true, renderedGender: 'feminine' }],
+        t,
+      ).map((c) => c.label),
+    ).toEqual(['FEMININE']);
   });
 
   it('drops the language prefix when the targets agree and hides unmarked rows', () => {
     const chips = buildFormChips(
       [
         {
-          language: 'ja',
+          language: 'de',
           isTargetLanguage: true,
-          renderedPoliteness: 'polite',
+          renderedPoliteness: 'formal',
         },
         {
-          language: 'ko',
+          language: 'fr',
           isTargetLanguage: true,
           renderedPoliteness: 'polite',
         },
@@ -137,7 +187,7 @@ describe('buildFormChips', () => {
       ],
       t,
     );
-    expect(chips.map((c) => c.label)).toEqual(['POLITE', 'POLITE']);
+    expect(chips.map((c) => c.label)).toEqual(['FORMAL', 'FORMAL']);
     expect(
       buildFormChips([{ language: 'sv', isTargetLanguage: true }], t),
     ).toEqual([]);

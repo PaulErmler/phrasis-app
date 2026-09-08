@@ -1,8 +1,8 @@
 /**
  * Which rendering of a sentence a card is served, given the course's
- * first-person-forms and politeness settings. Pure and dependency-light so
- * the client (settings previews), the Convex readers (convex/db/
- * translationReads.ts) and the generation path (convex/lib/
+ * politeness setting and the card's own corrections. Pure and
+ * dependency-light so the client (settings previews), the Convex readers
+ * (convex/db/translationReads.ts) and the generation path (convex/lib/
  * contentScheduling.ts) all agree on one answer.
  *
  * Layers: `texts` is the identity of a meaning and carries the content
@@ -12,9 +12,13 @@
  * disposable realizations. The resolver never writes anything.
  *
  * Gender is resolved ONCE per card and is the same for every language of
- * the card: the chosen forms set the voice everywhere, marked or not.
- * Politeness is resolved per language, because each language maps the
- * global levels onto its own forms.
+ * the card: the text's own voice (its classifier verdict or its coin flip)
+ * sets the wording and the voice everywhere, marked or not. There is no
+ * course-level gender choice: the curriculum is rendered in one gender per
+ * sentence (`courseSettings.firstPersonForms` is stored but not read), and
+ * the only way a card leaves that gender is the Flag dialog's per-card
+ * correction. Politeness is resolved per language, because each language
+ * maps the global levels onto its own forms.
  */
 
 import { fnv1a } from './languages';
@@ -29,12 +33,8 @@ import {
 import { resolveCardSpeakerGenders } from './voices';
 import { definitiveSpeakerGender } from './sentenceMetadataSource';
 
-export const FIRST_PERSON_FORMS = ['masculine', 'feminine', 'both'] as const;
-export type FirstPersonForms = (typeof FIRST_PERSON_FORMS)[number];
-
 /** The course-settings fields this module reads. Undefined = canonical. */
 export type RenderingSettings = {
-  firstPersonForms?: FirstPersonForms;
   politenessLevels?: PolitenessLevel[];
 };
 
@@ -73,6 +73,16 @@ export function hasRenderingOverride(card: RenderingCard): boolean {
 export type GenderAxis = 'masculine' | 'feminine' | 'auto';
 
 export const AUTO = 'auto';
+
+/** The voice a gender axis is spoken in. */
+export function voiceOf(axis: 'masculine' | 'feminine'): 'male' | 'female' {
+  return axis === 'masculine' ? 'male' : 'female';
+}
+
+/** The gender axis a voice renders. */
+export function axisOf(voice: 'male' | 'female'): 'masculine' | 'feminine' {
+  return voice === 'male' ? 'masculine' : 'feminine';
+}
 
 export type CardRendering = {
   /** The gender axis shared by every language of the card. */
@@ -124,7 +134,12 @@ export function cardFollowsPreferences(
   return true;
 }
 
-/** Resolve the card-wide gender axis and voice. */
+/**
+ * Resolve the card-wide gender axis and voice. The canonical rendering is
+ * the answer for every card except one carrying a Flag-dialog correction:
+ * the text's own voice is the gender its wording was generated in, so the
+ * card shows and hears one gender without any variant.
+ */
 export function resolveCardRendering(args: {
   text: RenderingText;
   textId: string;
@@ -142,27 +157,18 @@ export function resolveCardRendering(args: {
     needsVoice: false,
   };
   if (args.text.userCreated) return base;
-  // Precedence: the sentence's own content, then the card's correction,
-  // then the course setting. `text.speakerGender` on a curriculum text is
-  // the coin flip the sweep wrote back (`resolveCardSpeakerGenders`, case
-  // 3) unless the row carries the current classifier's stamp
-  // (lib/sentenceMetadataSource.ts); only then is it evidence, and "We are
-  // brothers" is served in its own voice whatever the setting says.
-  // `canonicalVoiceGender` already is that voice: case 1 mirrors it.
+  // Precedence: the sentence's own content, then the card's correction.
+  // `text.speakerGender` on a curriculum text is the coin flip the sweep
+  // wrote back (`resolveCardSpeakerGenders`, case 3) unless the row carries
+  // the current classifier's stamp (lib/sentenceMetadataSource.ts); only
+  // then is it evidence, and "We are brothers" is served in its own voice
+  // whatever the card says. `canonicalVoiceGender` already is that voice:
+  // case 1 mirrors it.
   if (definitiveSpeakerGender(args.text) !== null) return base;
-  const override = args.card?.renderingGenderOverride;
-  const forms = args.settings.firstPersonForms;
-  const voiceGender: 'male' | 'female' | undefined =
-    override ??
-    (cardFollowsPreferences(args.text, args.card) &&
-    (forms === 'masculine' || forms === 'feminine')
-      ? forms === 'masculine'
-        ? 'male'
-        : 'female'
-      : undefined);
+  const voiceGender = args.card?.renderingGenderOverride;
   if (voiceGender === undefined) return base;
   return {
-    gender: voiceGender === 'male' ? 'masculine' : 'feminine',
+    gender: axisOf(voiceGender),
     voiceGender,
     canonicalVoiceGender,
     needsVoice: voiceGender !== canonicalVoiceGender,
@@ -267,6 +273,23 @@ export function resolveLanguageRendering(args: {
     textVariantKey,
     audioVariantKey,
     voiceGender: args.card.voiceGender,
+  };
+}
+
+/**
+ * What the text's OWN language reads. The source wording is the text and
+ * is never rewritten, so no form and no text key; only the voice can
+ * differ, and it does exactly when the card needs a voice the canonical
+ * clip is not in. The same rule an unmarked target follows.
+ */
+export function resolveSourceRendering(card: CardRendering): LanguageRendering {
+  return {
+    form: null,
+    textVariantKey: null,
+    audioVariantKey: card.needsVoice
+      ? variantKeyFor(card.voiceGender, AUTO)
+      : null,
+    voiceGender: card.voiceGender,
   };
 }
 
