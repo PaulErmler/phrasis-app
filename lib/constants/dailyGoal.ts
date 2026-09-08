@@ -6,7 +6,8 @@
  */
 export const DAILY_TIME_PRESETS = [5, 10, 20, 30, 60] as const;
 export const DAILY_TIME_CUSTOM_MIN = 1;
-export const DAILY_TIME_CUSTOM_MAX = 120;
+/** 24 hours, in minutes. */
+export const DAILY_TIME_CUSTOM_MAX = 1440;
 
 /**
  * Parse a custom-goal input value; null when empty/invalid/out of bounds.

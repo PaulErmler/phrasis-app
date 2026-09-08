@@ -137,10 +137,7 @@ export function DailyTimeGoalStep({ selected, onSelect }: Props) {
               htmlFor="custom-daily-time"
               className="text-sm text-muted-foreground block mb-2 text-center"
             >
-              {t('customLabel', {
-                min: DAILY_TIME_CUSTOM_MIN,
-                max: DAILY_TIME_CUSTOM_MAX,
-              })}
+              {t('customLabel')}
             </label>
             <div className="flex items-center gap-2">
               <Input

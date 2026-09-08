@@ -46,7 +46,8 @@ export type LearningReason =
 /** Persisted as a plain number on `courseSettings.dailyTimeGoalMinutes`. The
  *  step UI offers five preset tiles (5/10/20/30/60) plus a "Custom" tile that
  *  expands to a free number input. Any value not in the preset set is
- *  treated as a custom pick. Validated to 1..120 in the wizard. Constants
+ *  treated as a custom pick. Validated against DAILY_TIME_CUSTOM_MIN/MAX
+ *  in the wizard. Constants
  *  live in lib/constants/dailyGoal.ts (shared with the in-app editors and
  *  the Convex clamp); re-exported here for the wizard steps. */
 export type DailyTimeGoalMinutes = number;

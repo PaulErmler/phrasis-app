@@ -11,6 +11,10 @@ import {
 } from '../../../lib/constants/audioPlayback';
 import { MAX_CARDS_PER_BATCH } from '../../../lib/constants/learning';
 import {
+  DAILY_TIME_CUSTOM_MIN,
+  DAILY_TIME_CUSTOM_MAX,
+} from '../../../lib/constants/dailyGoal';
+import {
   MAX_INITIAL_REVIEW_COUNT,
   MIN_INITIAL_REVIEW_COUNT,
 } from '../../../lib/scheduling';
@@ -214,15 +218,15 @@ describe('features/courses', () => {
       const asUser = t.withIdentity({ subject: 'user_A' });
       const progress = await asUser.mutation(
         api.features.courses.saveOnboardingProgress,
-        { step: 4, dailyTimeGoalMinutes: 500 },
+        { step: 4, dailyTimeGoalMinutes: DAILY_TIME_CUSTOM_MAX + 1 },
       );
-      expect(progress.dailyTimeGoalMinutes).toBe(120);
+      expect(progress.dailyTimeGoalMinutes).toBe(DAILY_TIME_CUSTOM_MAX);
 
       const low = await asUser.mutation(
         api.features.courses.saveOnboardingProgress,
         { step: 4, dailyTimeGoalMinutes: 0.2 },
       );
-      expect(low.dailyTimeGoalMinutes).toBe(1);
+      expect(low.dailyTimeGoalMinutes).toBe(DAILY_TIME_CUSTOM_MIN);
     });
 
     it('drops a non-finite dailyTimeGoalMinutes instead of storing it', async () => {
@@ -1225,7 +1229,7 @@ describe('features/courses', () => {
     });
 
     // Daily goal. Editable post-onboarding (removed from the validator's
-    // omit list), clamped to 1..120, and never touching the frozen
+    // omit list), clamped into the custom-goal window, and never touching the frozen
     // onboardingProgress row that preserves the user's original answer.
     it('persists dailyTimeGoalMinutes on first insert and on patch', async () => {
       const t = convexTest(schema, modules);
@@ -1251,7 +1255,7 @@ describe('features/courses', () => {
       expect(settings?.dailyTimeGoalMinutes).toBe(10);
     });
 
-    it('clamps dailyTimeGoalMinutes to 1..120 and rounds fractions', async () => {
+    it('clamps dailyTimeGoalMinutes into the custom-goal window and rounds fractions', async () => {
       const t = convexTest(schema, modules);
       const { asUser, courseId } = await makeActiveCourse(t);
 
@@ -1263,17 +1267,17 @@ describe('features/courses', () => {
         api.features.courses.getActiveCourseSettings,
         {},
       );
-      expect(settings?.dailyTimeGoalMinutes).toBe(1);
+      expect(settings?.dailyTimeGoalMinutes).toBe(DAILY_TIME_CUSTOM_MIN);
 
       await asUser.mutation(api.features.courses.updateCourseSettings, {
         courseId,
-        dailyTimeGoalMinutes: 999,
+        dailyTimeGoalMinutes: DAILY_TIME_CUSTOM_MAX + 1,
       });
       settings = await asUser.query(
         api.features.courses.getActiveCourseSettings,
         {},
       );
-      expect(settings?.dailyTimeGoalMinutes).toBe(120);
+      expect(settings?.dailyTimeGoalMinutes).toBe(DAILY_TIME_CUSTOM_MAX);
 
       await asUser.mutation(api.features.courses.updateCourseSettings, {
         courseId,

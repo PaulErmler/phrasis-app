@@ -1249,7 +1249,7 @@
           "description": "Setze dein eigenes Ziel"
         }
       },
-      "customLabel": "Setze dein eigenes Tagesziel ({min}–{max} Minuten)",
+      "customLabel": "Setze dein eigenes Tagesziel",
       "customPlaceholder": "z.B. 15",
       "minutesUnit": "Min./Tag"
     },

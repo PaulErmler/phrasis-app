@@ -2,6 +2,7 @@
 import { convexTest, type TestConvex } from 'convex-test';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ConvexError } from 'convex/values';
+import { DAILY_TIME_CUSTOM_MAX } from '../../../lib/constants/dailyGoal';
 
 // Mock the rate limiter at the module boundary. The real component would need
 // `t.registerComponent` (flagged fragile in this project). Permissive default
@@ -354,7 +355,7 @@ describe('completeOnboarding', () => {
         baseLanguages: ['en'],
         currentLevel: 'beginner',
         reviewMode: 'audio',
-        dailyTimeGoalMinutes: 9999,
+        dailyTimeGoalMinutes: DAILY_TIME_CUSTOM_MAX + 1,
       });
       await ctx.db.insert('userSettings', {
         userId: 'user_A',
@@ -373,7 +374,7 @@ describe('completeOnboarding', () => {
         .withIndex('by_courseId', (q) => q.eq('courseId', courseId))
         .first(),
     );
-    expect(settings?.dailyTimeGoalMinutes).toBe(120);
+    expect(settings?.dailyTimeGoalMinutes).toBe(DAILY_TIME_CUSTOM_MAX);
 
     await drainScheduled(t);
   });

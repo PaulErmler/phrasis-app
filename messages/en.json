@@ -1249,7 +1249,7 @@
           "description": "Pick your own amount"
         }
       },
-      "customLabel": "Set your own daily target ({min}–{max} minutes)",
+      "customLabel": "Set your own daily target",
       "customPlaceholder": "e.g. 15",
       "minutesUnit": "min/day"
     },

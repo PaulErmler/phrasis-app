@@ -30,7 +30,8 @@ function samplesFor(validator: AnyValidator): unknown[] {
   switch (validator.kind) {
     case 'float64':
       // 2 sits inside every numeric clamp in updateCourseSettings
-      // (batch size ≥1, reps 0..10, untilGood 1..10, goal 1..120).
+      // (batch size ≥1, reps 0..10, untilGood 1..10, goal within
+      // DAILY_TIME_CUSTOM_MIN..MAX).
       return [2];
     case 'string':
       return ['sweep-sample'];
