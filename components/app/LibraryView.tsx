@@ -36,6 +36,13 @@ import {
 import { reportError } from '@/lib/report-error';
 import { resolveShowFurigana } from '@/lib/furigana';
 
+/**
+ * Cards per `requestLibraryRenderings` call. Matches the collection
+ * preview's translation batch: each needy card is a claim, a nested
+ * mutation and a workpool enqueue inside one transaction.
+ */
+const LIBRARY_RENDERING_REQUEST_BATCH = 25;
+
 type ActiveFilter = 'mastered' | 'hidden' | 'favorites' | null;
 type SourceFilter = 'custom' | 'premade' | null;
 
@@ -120,12 +127,21 @@ export function LibraryView({
   const renderingRequestKey = result?.map((card) => card._id).join(',') ?? '';
   useEffect(() => {
     if (renderingRequestKey === '') return;
-    void requestLibraryRenderings({
-      cardIds: renderingRequestKey.split(',') as Id<'cards'>[],
-    }).catch(() => {
-      // Best-effort warm: the page still renders what exists today, and the
-      // next visit asks again.
-    });
+    const cardIds = renderingRequestKey.split(',') as Id<'cards'>[];
+    // Chunked like the collection preview's translation requests. Each needy
+    // card costs the mutation a claim insert, a nested `runMutation` and a
+    // workpool enqueue, so a full page after a first politeness switch would
+    // put ~100 of those in one transaction, the shape that failed with "too
+    // many system operations" before (2026-07-15). A failed request
+    // schedules nothing; smaller ones fail independently.
+    for (let i = 0; i < cardIds.length; i += LIBRARY_RENDERING_REQUEST_BATCH) {
+      void requestLibraryRenderings({
+        cardIds: cardIds.slice(i, i + LIBRARY_RENDERING_REQUEST_BATCH),
+      }).catch(() => {
+        // Best-effort warm: the page still renders what exists today, and
+        // the next visit asks again.
+      });
+    }
   }, [renderingRequestKey, requestLibraryRenderings]);
 
   const masterCard = useMutation(api.features.scheduling.masterCard);

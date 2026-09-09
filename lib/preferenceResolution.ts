@@ -143,7 +143,6 @@ export function cardFollowsPreferences(
 export function resolveCardRendering(args: {
   text: RenderingText;
   textId: string;
-  settings: RenderingSettings;
   card: RenderingCard;
 }): CardRendering {
   const canonicalVoiceGender = resolveCardSpeakerGenders(
@@ -259,8 +258,18 @@ export function resolveLanguageRendering(args: {
         )
       : null;
   // An address language renders a sentence without a "you" the same at
-  // every level; the canonical row already is that rendering.
-  if (form && !addressesSomeone(args.text) && isAddressLanguage(concrete)) {
+  // every level; the canonical row already is that rendering. Never for an
+  // override: `addressesSomeone` is the classifier's verdict, and a learner
+  // ticking "the politeness level is wrong" on a sentence it marked as
+  // addressing nobody is correcting exactly that verdict. A correction on a
+  // true no-addressee sentence buys one rewrite that comes back identical
+  // and is stored `sameAsCanonical`.
+  if (
+    form &&
+    !override &&
+    !addressesSomeone(args.text) &&
+    isAddressLanguage(concrete)
+  ) {
     form = null;
   }
   const formId = form ? form.id : AUTO;

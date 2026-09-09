@@ -131,6 +131,14 @@ correctness/cost/velocity noted per item.
       writes `cards.renderingGenderOverride` / `renderingPolitenessOverride`; nothing
       lets the learner undo one short of a card edit (which forks the text and clears
       both). The edit dialog is the natural home. Effort S.
+- [ ] **C43 — Gender/politeness pipeline cleanups (2026-09-09 review).** Twenty-odd
+      simplifications found in the pre-push review of `gender-choice-live`, none a
+      bug: one entry point for the paired content sweeps, one batched served-rendering
+      accessor, the coin flip written into `texts.speakerGender`, the ad hoc
+      "marks politeness without a you" rule, duplicated constants and prompt strings,
+      small read savings. Each with a proposed shape and effort in
+      `.scratch/speaker-gender-politeness/cleanups.md`. Effort M in total; A1 and A2
+      there are the ones worth doing first.
 - [ ] **C40 — Sentence-form evals still owed.** The politeness corpus covers ten
       languages (de es fr hi ja ko pt ru th zh); the plan wanted vi, fil, id, pl, cs, tr,
       it, pt_pt, uz, bn and ar_eg with the traps from the review table, and nine

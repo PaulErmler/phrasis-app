@@ -77,8 +77,15 @@ function NextReviewCountdown({ dueDate }: { dueDate: number }) {
   if (!line) return null;
 
   const time = line.time;
+  // The provider's timezone is UTC (i18n/request.tsx), which is right for
+  // the date-only formatting elsewhere but not for a wall-clock moment: the
+  // day word above is decided in the browser's timezone, so the clock has to
+  // be too, or a Berlin user reads "tomorrow at 02:01" for a 04:01 card.
   const clock = line.clock
-    ? format.dateTime(new Date(target), CLOCK_FORMATS[line.clock])
+    ? format.dateTime(new Date(target), {
+        ...CLOCK_FORMATS[line.clock],
+        timeZone: getUserTimezone(),
+      })
     : '';
 
   // One `t(...)` per variant rather than a computed key: next-intl types each

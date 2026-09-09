@@ -31,13 +31,6 @@ import {
 } from '../lib/contentScheduling';
 import { hasRenderingOverride } from '../../lib/preferenceResolution';
 
-/**
- * How many library cards one request may sweep. The library page size; a
- * bigger batch would put the whole (bounded) transaction budget behind one
- * scroll.
- */
-const MAX_LIBRARY_RENDERING_CARDS = 60;
-
 // ============================================================================
 // QUERY
 // ============================================================================
@@ -93,6 +86,14 @@ const libraryCardValidator = v.object({
  *   'favorites'→ only favorited non-hidden cards
  */
 const LIBRARY_LIMIT = 100;
+
+/**
+ * How many library cards one request may sweep. `getLibraryCards` is
+ * unpaginated and returns up to `LIBRARY_LIMIT` in one shot, and the client
+ * renders all of them, so a smaller cap strands the tail of the page on an
+ * "updating" chip that never clears. It was 60 against a 100-card page.
+ */
+const MAX_LIBRARY_RENDERING_CARDS = LIBRARY_LIMIT;
 
 // Convex full-text search accepts at most 16 terms per query.
 export const MAX_SEARCH_TERMS = 16;
@@ -447,7 +448,6 @@ export const requestLibraryRenderings = mutation({
     const renderingSettings = renderingSettingsOf(
       await getCourseSettings(ctx, course._id),
     );
-
     // One collector for the page, so the classifier is asked once per
     // language per 25 rows rather than once per card.
     const stamps = newRenderingStampCollector();
@@ -457,11 +457,16 @@ export const requestLibraryRenderings = mutation({
       // Ownership: the card must belong to this user's active deck.
       if (!card || card.deckId !== deck._id) continue;
       const renderingCard = renderingCardOf(card);
-      if (
-        !card.followsCoursePreferences &&
-        !hasRenderingOverride(renderingCard)
-      )
-        continue;
+      // `followsCoursePreferences` only means anything when the course HAS
+      // settings; without them `scheduleMissingRenderings` returns after
+      // zero reads, so testing it first would spend a text read per card to
+      // reach a guaranteed no-op. A Flag-dialog override still needs the
+      // sweep either way, which is why it is not simply an early return
+      // above: a learner can correct a card on a course that set no level.
+      const wantsRendering = renderingSettings
+        ? card.followsCoursePreferences || hasRenderingOverride(renderingCard)
+        : hasRenderingOverride(renderingCard);
+      if (!wantsRendering) continue;
       const text = await ctx.db.get(card.textId);
       if (!text) continue;
       const scheduled = await scheduleMissingRenderings(

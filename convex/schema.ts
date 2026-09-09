@@ -533,6 +533,11 @@ export default defineSchema({
     // a blank answer is retried after a cooldown. Same shape as
     // `translations.renderingStampRequestedAt`.
     metadataRequestedAt: v.optional(v.number()),
+    /**
+     * When a sweep last asked for this text's missing source annotations;
+     * see `translations.annotationRequestedAt` for the contract.
+     */
+    annotationRequestedAt: v.optional(v.number()),
     // OGTE arc grouping (curation manifest). Sentences sharing the same
     // (collectionId, arcId) form a thematic sequence; the translation worker
     // pulls a sliding window of arc siblings into the LLM prompt so pronouns,
@@ -671,6 +676,26 @@ export default defineSchema({
      * and retries a row the classifier left blank after a cooldown.
      */
     renderingStampRequestedAt: v.optional(v.number()),
+    /**
+     * How many times the rendering classifier has been asked for this row.
+     * Capped at `MAX_RENDERING_STAMP_ATTEMPTS` (contentScheduling.ts): the
+     * request claim above only holds for a cooldown, so a row the model
+     * keeps returning nothing usable for was otherwise re-bought every 15
+     * minutes for good. Every other LLM path on the variant side has a cap
+     * (`variantFailedAt`, `MAX_GENDER_CORRECTION_RETRIES`); this is that
+     * cap. Absent means never asked.
+     */
+    renderingStampAttempts: v.optional(v.number()),
+    /**
+     * When a sweep last asked for this row's missing annotations
+     * (romanization, IPA, furigana). A transient failure leaves the value
+     * undefined so the row is retried, and this claim keeps the retry to
+     * once per `ANNOTATION_REQUEST_COOLDOWN_MS` (convex/lib/textAnnotations.ts)
+     * instead of once per view for the length of an outage. Cleared with
+     * the annotation fields when the wording changes. Same shape as
+     * `renderingStampRequestedAt`.
+     */
+    annotationRequestedAt: v.optional(v.number()),
     // Superseded-revision fields. A version-bump regeneration that produced
     // a different wording while cards referenced the text AND the wording
     // had audio copies the old wording into a second row of THIS table with
@@ -734,10 +759,12 @@ export default defineSchema({
       'supersededAt',
     ])
     // Successor of the index above with the rendering variant pinned:
-    // canonical reads use `.eq('variantKey', undefined)`. Added staged in
-    // the dark push (~300k rows: the build would otherwise have blocked the
-    // deploy); this push switches convex/db/translationReads.ts onto it. A
-    // later flagged deploy drops `by_text_language_supersededAt`.
+    // canonical reads use `.eq('variantKey', undefined)`. NOT staged, and no
+    // deployment has it yet: the branch that declared it `staged: true`
+    // (`gender-choice`) was never pushed, so the first deploy carrying this
+    // schema backfills it inline and takes as long as that needs (~300k
+    // rows). Re-add `staged: true` and split the deploy if that wait is a
+    // problem. A later flagged deploy drops `by_text_language_supersededAt`.
     .index('by_text_language_variant_supersededAt', [
       'textId',
       'targetLanguage',

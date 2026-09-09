@@ -37,6 +37,7 @@ import {
   scheduleTranslationForLanguage,
   scheduleAudioForLanguage,
   scheduleMissingRenderings,
+  ensureVariantAudio,
 } from '../lib/contentScheduling';
 import {
   isCollectionAccessible,
@@ -57,6 +58,7 @@ import {
 import {
   annotationFieldsOf,
   missingAnnotationKinds,
+  annotationRequestInFlight,
   scheduleTranslationAnnotations,
   TEXT_ANNOTATIONS,
 } from '../lib/textAnnotations';
@@ -89,6 +91,7 @@ import {
   previewView,
   renderingSettingsOf,
   renderingTextOf,
+  resolveServedRendering,
 } from '../db/translationReads';
 import { getCourseSettings } from '../db/courseSettings';
 import type { RenderingSettings } from '../../lib/preferenceResolution';
@@ -499,13 +502,23 @@ export async function scheduleMissingTranslationsForText(
   // Backfill missing annotations (romanization, IPA) for the source text.
   // Same `=== undefined` test as the card sweep. The empty-string sentinel
   // means "tried and failed", and re-running it would burn the retries again
-  // on every page reveal.
-  for (const kind of missingAnnotationKinds(text.language, text)) {
-    await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].sourceTextAction, {
-      textId: text._id,
-      text: text.text,
-      language: text.language,
-    });
+  // on every page reveal. Same request claim as the card sweep too
+  // (`annotationRequestInFlight`), so a transient failure is retried once
+  // per cooldown rather than on every reveal.
+  const sourceKinds = missingAnnotationKinds(text.language, text);
+  if (sourceKinds.length > 0 && !annotationRequestInFlight(text)) {
+    await ctx.db.patch(text._id, { annotationRequestedAt: Date.now() });
+    for (const kind of sourceKinds) {
+      await ctx.scheduler.runAfter(
+        0,
+        TEXT_ANNOTATIONS[kind].sourceTextAction,
+        {
+          textId: text._id,
+          text: text.text,
+          language: text.language,
+        },
+      );
+    }
   }
 
   // A Mixed English course shows a British- or Australian-voiced text its
@@ -613,6 +626,9 @@ export async function scheduleMissingTranslationsForText(
         stamps,
         requestedByUserId: opts?.requestedByUserId,
         llmPriority: opts?.llmPriority,
+        // Same tier as the canonical enqueues above: a browse surface never
+        // competes with a card a learner is looking at.
+        priority: 'background',
       },
     );
     scheduled += variants.translationsScheduled;
@@ -730,16 +746,20 @@ export const prewarmPreviewTranslations = mutation({
     );
 
     const stamps = newRenderingStampCollector();
-    const renderingSettings = renderingSettingsOf(
-      await getCourseSettings(ctx, course._id),
-    );
     let translationsScheduled = 0;
     for (const text of texts) {
       translationsScheduled += await scheduleMissingTranslationsForText(
         ctx,
         text,
         languages,
-        { stamps, renderingSettings },
+        // No `renderingSettings`: prewarm fills MISSING canonical rows for a
+        // page the learner has not reached, and buying a politeness rewrite
+        // of a row that already exists is speculative spend on a sentence
+        // they may never open. The explicit `requestPreviewTranslations`
+        // below passes them, which is also the mutation that attributes the
+        // cost to a user. Prewarm deliberately does not attribute, because
+        // nobody asked for it.
+        { stamps },
       );
     }
     await flushRenderingStamps(ctx, stamps);
@@ -794,6 +814,43 @@ export const requestPreviewAudio = mutation({
         ? await servedSourceText(ctx, text, null)
         : null;
     const audioLanguage = source?.language ?? args.language;
+
+    // The preview serves the rendering a NEW card would get, so on a course
+    // with a politeness level the row on screen can be a variant wording
+    // (`previewView`). Its clip lives under `audioVariantKey`, and
+    // `buildTextContentBatchForLanguages` refuses to play the canonical
+    // pointer for such a row: voicing the canonical one here left the button
+    // dead, resetting at once when a canonical clip existed and spinning
+    // through a whole synthesis when it did not. A preview row has no card,
+    // so only a target language can carry a key (the source slot's voice
+    // varies only under a card override).
+    if (audioLanguage !== text.language) {
+      const rendering = await resolveServedRendering(ctx, {
+        textId: args.textId,
+        targetLanguage: audioLanguage,
+        text: renderingTextOf(text),
+        view: previewView(
+          renderingSettingsOf(await getCourseSettings(ctx, course._id)),
+        ),
+      });
+      const servedRow = rendering.served?.row;
+      if (rendering.rendering.audioVariantKey !== null && servedRow) {
+        // `ensureVariantAudio` derives the voice from the rendering itself,
+        // so no `resolveCardSpeakerGenders` call is needed here.
+        const scheduled = await ensureVariantAudio(
+          ctx,
+          args.textId,
+          {
+            language: audioLanguage,
+            text: servedRow.translatedText,
+            regionVariant: servedRow.regionVariant,
+          },
+          rendering.rendering,
+          { requestedByUserId: userId },
+        );
+        return { scheduled };
+      }
+    }
 
     const existingAudio = await audioPointer(ctx, args.textId, audioLanguage);
     if (existingAudio) {

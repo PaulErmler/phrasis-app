@@ -8,7 +8,6 @@ import {
   POLITENESS_LEVELS,
   concreteLanguageCodes,
   courseAsksPoliteness,
-  courseFirstPersonExample,
   coursePolitenessRows,
   distinctPolitenessForms,
   formCopyCode,
@@ -62,7 +61,6 @@ describe('language forms config', () => {
         string,
         { intro: string; forms: Record<string, { description: string }> }
       >;
-      firstPerson: Record<string, { intro: string; note?: string }>;
     };
     const enCopy = (en as { LanguageForms: Copy }).LanguageForms;
     const deCopy = (de as { LanguageForms: Copy }).LanguageForms;
@@ -80,15 +78,6 @@ describe('language forms config', () => {
         ).toBeTruthy();
       }
       expect(deCopy.politeness[code]?.intro, `de ${code}`).toBeTruthy();
-    }
-    for (const [code, config] of Object.entries(FIRST_PERSON_CONFIG)) {
-      if (code === 'vi_south') continue;
-      expect(enCopy.firstPerson[code]?.intro, code).toBe(config.intro);
-      expect(enCopy.firstPerson[code]?.note, code).toBe(config.note);
-      expect(deCopy.firstPerson[code]?.intro, `de ${code}`).toBeTruthy();
-      if (config.note) {
-        expect(deCopy.firstPerson[code]?.note, `de ${code}`).toBeTruthy();
-      }
     }
   });
 
@@ -215,11 +204,5 @@ describe('course helpers', () => {
     ]);
     const jaRows = coursePolitenessRows(['ja']);
     expect(levelsFromTickedRows(jaRows, ['polite'])).toEqual(['polite']);
-  });
-
-  it('picks the first marked target for the first-person example', () => {
-    expect(courseFirstPersonExample(['sv', 'ru'], ['en'])?.code).toBe('ru');
-    expect(courseFirstPersonExample(['sv'], ['ru'])?.code).toBe('ru');
-    expect(courseFirstPersonExample(['sv'], ['en'])).toBeUndefined();
   });
 });

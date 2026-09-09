@@ -502,3 +502,154 @@ describe('what a definitive verdict regenerates', () => {
     expect(llmEnqueues()).toEqual([]);
   });
 });
+
+describe('a gender correction under an existing card', () => {
+  it('archives the old wording instead of overwriting it', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, rows } = await seed(t, {
+      metadata: { speakerGender: 'female' },
+      jaGender: 'masculine',
+    });
+    // The verdict mirrored into the voice, as `applyTextMetadata` does.
+    await t.run((ctx) =>
+      ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
+    );
+    // A card on the shared text. `replaceForVersionBump` archives only for a
+    // referencing card, and archiving needs the live clip's asset.
+    await t.run(async (ctx) => {
+      const courseId = await ctx.db.insert('courses', {
+        userId: 'user_A',
+        baseLanguages: ['en'],
+        targetLanguages: ['ja'],
+      });
+      const deckId = await ctx.db.insert('decks', {
+        courseId,
+        name: 'deck',
+        cardCount: 1,
+      });
+      await ctx.db.insert('cards', {
+        deckId,
+        textId,
+        collectionOrigin: 'premade',
+        dueDate: Date.now() - 1000,
+        isMastered: false,
+        isHidden: false,
+        schedulingPhase: 'preReview',
+        preReviewCount: 0,
+      });
+    });
+
+    const before = await t.run((ctx) => ctx.db.get(rows.ja));
+    await sweep(t, textId);
+    expect(llmEnqueues()).toMatchObject([
+      { targetLanguage: 'ja', translationReason: 'metadata_correction' },
+    ]);
+    // The clip stays attached through the sweep. Detaching it here is what
+    // used to make the archive below silently skip: `replaceForVersionBump`
+    // looks the pointer up again when the job lands, minutes later.
+    expect(
+      await t.run((ctx) => audioPointer(ctx, textId, 'ja')),
+    ).not.toBeNull();
+
+    // The correction lands with a new wording.
+    await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
+      textId,
+      targetLanguage: 'ja',
+      translatedText: '私たちは姉妹です。',
+      translationReason: 'metadata_correction',
+      speakerGender: 'female',
+      replaceExisting: true,
+      // A curated Gemini voice: the wording changed, so the write
+      // schedules TTS and `enqueueTtsForVoice` rejects an invented name.
+      voiceName: 'Leda',
+    });
+
+    // The old wording survives as a superseded revision, so a card pinned to
+    // it keeps reading what it learned.
+    const revisions = await t.run((ctx) =>
+      ctx.db
+        .query('translations')
+        .withIndex('by_textId', (q) => q.eq('textId', textId))
+        .collect(),
+    );
+    const archived = revisions.filter(
+      (r) => r.targetLanguage === 'ja' && r.supersededAt !== undefined,
+    );
+    expect(archived.map((r) => r.translatedText)).toEqual([
+      before!.translatedText,
+    ]);
+    expect(
+      (await t.run((ctx) => liveTranslation(ctx, textId, 'ja')))
+        ?.translatedText,
+    ).toBe('私たちは姉妹です。');
+  });
+});
+
+describe('2026-09-09 review: the clip waits for the wording it belongs to', () => {
+  it('a verdict on an unstamped row holds the re-voice until the stamp lands', async () => {
+    const t = convexTest(schema, modules);
+    const { textId } = await seed(t, {
+      metadata: { speakerGender: 'female' },
+      jaGender: 'none',
+    });
+    await t.run((ctx) =>
+      ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
+    );
+    await sweep(t, textId);
+    // German (stamped unmarked) and the source clip are re-voiced at once.
+    // The Japanese wording may be about to be corrected, which only the
+    // stamp can tell, so its clip stays where the archive will find it
+    // instead of being replaced by a male clip of a feminine sentence.
+    expect(
+      ttsEnqueues()
+        .filter((j) => j.voiceGender === 'female')
+        .map((j) => j.language)
+        .sort(),
+    ).toEqual(['de', 'en']);
+    expect(await t.run((ctx) => audioPointer(ctx, textId, 'ja'))).not.toBeNull();
+    expect(await pendingJobs(t, 'classifyAndStampTranslations')).toHaveLength(1);
+  });
+
+  it('a row the classifier gave up on is re-voiced anyway', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, rows } = await seed(t, {
+      metadata: { speakerGender: 'female' },
+      jaGender: 'none',
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.patch(textId, { audioSpeakerGender: 'female' });
+      await ctx.db.patch(rows.ja, { renderingStampAttempts: 3 });
+    });
+    await sweep(t, textId);
+    expect(
+      ttsEnqueues()
+        .filter((j) => j.voiceGender === 'female')
+        .map((j) => j.language)
+        .sort(),
+    ).toEqual(['de', 'en', 'ja']);
+  });
+
+  it('a version-stale row under a verdict keeps its clip for the archive', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, rows } = await seed(t, {
+      metadata: { speakerGender: 'female' },
+      jaGender: 'masculine',
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.patch(textId, { audioSpeakerGender: 'female' });
+      // Below every configured version: the row is regenerated as a version
+      // bump, which takes precedence over the correction as the reason.
+      await ctx.db.patch(rows.ja, { translationVersion: 0 });
+    });
+    await sweep(t, textId);
+    expect(llmEnqueues()).toMatchObject([
+      { targetLanguage: 'ja', translationReason: 'version_bump' },
+    ]);
+    // The clip is in the wrong voice AND its wording is being replaced. It
+    // stays attached for `replaceForVersionBump` to archive; the replace
+    // drops it afterwards. Detaching it here skipped the archive and moved
+    // every pinned card onto the new wording.
+    expect(await t.run((ctx) => audioPointer(ctx, textId, 'ja'))).not.toBeNull();
+    expect(ttsEnqueues().some((j) => j.language === 'ja')).toBe(false);
+  });
+});

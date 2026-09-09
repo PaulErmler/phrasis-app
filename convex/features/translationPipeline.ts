@@ -33,7 +33,7 @@ import {
   findReusableAudioAssetForVoice,
   upsertAudioPointer,
 } from '../lib/audioAssets';
-import { claimTtsIfAvailable } from './ttsProcessing';
+import { claimTtsIfAvailable, variantTtsClaims } from './ttsProcessing';
 import { deleteAudioRow } from '../lib/audio';
 import {
   classificationLanguageForRow,
@@ -54,7 +54,10 @@ import {
   audioPointersForTextLanguage,
   variantTranslationsForTextLanguage,
 } from '../db/translationReads';
-import { scheduleTranslationAnnotations } from '../lib/textAnnotations';
+import {
+  romanizationAfterFailure,
+  scheduleTranslationAnnotations,
+} from '../lib/textAnnotations';
 
 /**
  * Translation write pipeline: the legacy Google Translate worker action and
@@ -361,10 +364,14 @@ export async function processTranslationForCardHandler(
     ) {
       try {
         romanizedText = await romanizeText(translation, translateTarget);
-      } catch {
-        // 3 retries already exhausted. Persist sentinel so subsequent
-        // ensureContent runs see "tried" and skip rescheduling.
-        romanizedText = '';
+      } catch (err) {
+        // 3 retries already exhausted. Persist the sentinel so subsequent
+        // ensureContent runs see "tried" and skip rescheduling; a transient
+        // failure leaves the field undefined for the sweep to retry.
+        romanizedText = romanizationAfterFailure(
+          err,
+          `[translationPipeline] ${translateTarget}`,
+        );
       }
     } else {
       romanizedText = existingRow!.romanizedText;
@@ -398,13 +405,13 @@ export async function processTranslationForCardHandler(
       try {
         romanizedText = await romanizeText(translation, translateTarget);
       } catch (err) {
-        // 3 retries already exhausted. Persist the empty-string
-        // sentinel so ensureContent doesn't reschedule another burst.
-        console.error(
-          `Romanization failed for ${args.targetLanguage} (persisting sentinel):`,
-          err instanceof Error ? err.message : err,
+        // 3 retries already exhausted. Persist the empty-string sentinel so
+        // ensureContent doesn't reschedule another burst; a transient
+        // failure leaves the field undefined for the sweep to retry.
+        romanizedText = romanizationAfterFailure(
+          err,
+          `[translationPipeline] ${translateTarget}`,
         );
-        romanizedText = '';
       }
     }
   }
@@ -711,6 +718,9 @@ async function replaceTranslationRow(
     regionVariant: string | undefined;
     speakerGender: 'male' | 'female';
     translationVersion: number;
+    renderedGender: 'masculine' | 'feminine' | 'unmarked' | undefined;
+    renderedPoliteness: 'casual' | 'polite' | 'formal' | 'unmarked' | undefined;
+    renderingStampAttempts: number | undefined;
   }> = {
     translatedText,
     // A retranslation is freshly produced → stamp the current method version.
@@ -732,6 +742,19 @@ async function replaceTranslationRow(
   // Furigana: same reasoning as IPA, same follow-up.
   patch.furiganaText = undefined;
   patch.furiganaSource = undefined;
+  // The rendering stamps describe the wording being replaced, so they go the
+  // same way as the annotations. `scheduleRenderingStamp` asks the
+  // classifier once right after this write, and that used to be the ONLY
+  // chance: keeping the old stamps made `needsRenderingStamp` refuse the row
+  // for good, so one failed or unparseable call left the chips labelling the
+  // new wording with the old form and `canonicalSatisfies` suppressing the
+  // variant the learner asked for. Cleared, the row falls back into the lazy
+  // sweep and `renderingStampPending` holds rewrites until the new stamp
+  // lands. The attempt counter resets with them: a new wording deserves its
+  // own budget.
+  patch.renderedGender = undefined;
+  patch.renderedPoliteness = undefined;
+  patch.renderingStampAttempts = undefined;
   if (args.translationSource) {
     patch.translationSource = args.translationSource;
   }
@@ -788,12 +811,18 @@ export async function retireVariantRenderings(
   for (const claim of await variantLlmClaims(ctx, textId, targetLanguage)) {
     await ctx.db.delete(claim._id);
   }
+  // The TTS claims too. A synthesis in flight for a wording being retired
+  // would otherwise land after this and attach a pointer to the old
+  // wording's asset, which the next rewrite then treats as "already voiced".
+  for (const claim of await variantTtsClaims(ctx, textId, targetLanguage)) {
+    await ctx.db.delete(claim._id);
+  }
 }
 
 /**
  * Stamp what a freshly landed CANONICAL wording is (renderedGender /
  * renderedPoliteness) so the chips and the canonical-satisfies shortcut
- * work without waiting for a backfill. Only for languages that mark an
+ * work without waiting for the lazy sweep. Only for languages that mark an
  * axis; the classifier batches one row per call here.
  */
 async function scheduleRenderingStamp(
@@ -871,7 +900,13 @@ async function archiveTranslationRevision(
     }),
   );
   await ctx.db.patch(existing._id, { lastArchivedAt: supersededAt });
-  await scheduleTranslationAnnotations(ctx, existing, supersededId);
+  // The archive row is new: the live row's request claim does not carry
+  // over, or a copy made inside the cooldown would wait it out for nothing.
+  await scheduleTranslationAnnotations(
+    ctx,
+    { ...existing, annotationRequestedAt: undefined },
+    supersededId,
+  );
 }
 
 /**
@@ -1161,12 +1196,30 @@ async function scheduleTtsForLandedTranslation(
     ttsPriority = undefined;
   }
 
-  const existingAudio = await audioPointer(
+  let existingAudio = await audioPointer(
     ctx,
     args.textId,
     args.targetLanguage,
     args.audioVariantKey,
   );
+
+  // VARIANT pointers only. A pointer speaking a different sentence is not
+  // "already voiced", and for a variant nothing else will ever notice:
+  // `ensureVariantAudio` checks the blob, the provider and the ttsVersion
+  // but not the wording, so a clip that outlived its wording (a TTS job
+  // still in flight when `retireVariantRenderings` ran, see
+  // `variantTtsClaims`) is treated as valid on every later pass and the
+  // card renders one sentence while playing another, permanently. The
+  // canonical pointer is deliberately left alone here: `sweepInvalidAudio`
+  // owns that drift, which is what the decks.test.ts cases pin. Detach with
+  // the asset kept: it is still correct audio for its own string.
+  if (existingAudio && args.audioVariantKey !== undefined) {
+    const asset = await ctx.db.get(existingAudio.assetId);
+    if (asset && asset.spokenText !== translatedText) {
+      await deleteAudioRow(ctx, existingAudio, { keepAsset: true });
+      existingAudio = null;
+    }
+  }
 
   if (!existingAudio) {
     // A translation just landed. Check the content-addressed store before
@@ -1352,13 +1405,26 @@ async function finishVariantWrite(
   );
   const sameAsCanonical =
     canonical !== null && canonical.translatedText === translatedText;
-  if (sameAsCanonical !== (row.sameAsCanonical === true)) {
+  const collapseChanged = sameAsCanonical !== (row.sameAsCanonical === true);
+  if (collapseChanged) {
     await ctx.db.patch(row._id, {
       sameAsCanonical: sameAsCanonical ? true : undefined,
+      // Clearing the stamps on collapse, not just skipping new ones: a row
+      // that used to differ carries a stamp describing a wording it no
+      // longer has, and the chips read the stamp of the row they serve.
+      // The canonical row's own stamp describes what is now shown.
       ...(sameAsCanonical
         ? { renderedGender: undefined, renderedPoliteness: undefined }
         : {}),
     });
+  }
+  // The cards following this rendering now show different words, so their
+  // search string is stale. `searchableText` follows the served rendering
+  // (`buildSearchableTextPatchForCard`), and this is the only place a
+  // variant wording changes, so without this the index kept the canonical
+  // wording and the library found a card by words it does not display.
+  if (write.searchableContentChanged || collapseChanged) {
+    await scheduleSearchableTextRebuild(ctx, args.textId);
   }
   if (!sameAsCanonical) {
     if (write.outcome !== 'metadata_filled') {

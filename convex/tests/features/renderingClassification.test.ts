@@ -96,6 +96,30 @@ describe('features/renderingClassification', () => {
     expect(call.prompt).toContain('3. Идёт дождь.');
   });
 
+  it('a stamp lands only on the wording it judged', async () => {
+    // A call delayed by a backoff can land after a flag replaced the wording
+    // and after the new wording's own call. The stamp names what it judged;
+    // a row that has moved on keeps its (cleared) stamps for the sweep.
+    const textId = await seedText(t);
+    const ru = await seedTranslation(t, textId, 'ru', 'Я устала.');
+    await t.run((ctx) => ctx.db.patch(ru, { translatedText: 'Я устал.' }));
+    const written = await t.mutation(
+      internal.features.renderingClassification.stampRenderings,
+      {
+        stamps: [
+          {
+            translationId: ru,
+            renderedGender: 'feminine',
+            renderedPoliteness: 'unmarked',
+            translatedText: 'Я устала.',
+          },
+        ],
+      },
+    );
+    expect(written).toBe(0);
+    expect((await t.run((ctx) => ctx.db.get(ru)))?.renderedGender).toBeUndefined();
+  });
+
   it('skips stamped rows and languages that mark neither axis', async () => {
     const textId = await seedText(t);
     const stamped = await seedTranslation(t, textId, 'ru', 'Я устал.', {

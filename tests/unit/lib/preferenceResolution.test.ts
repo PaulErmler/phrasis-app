@@ -37,7 +37,7 @@ function resolve(
   text: RenderingText = premade,
   card: RenderingCard = stamped,
 ) {
-  const cardRendering = resolveCardRendering({ text, textId, settings, card });
+  const cardRendering = resolveCardRendering({ text, textId, card });
   const language = resolveLanguageRendering({
     card: cardRendering,
     code,
@@ -63,7 +63,6 @@ describe('resolveSourceRendering', () => {
     const card = resolveCardRendering({
       text: premade,
       textId,
-      settings: { politenessLevels: ['formal'] },
       card: corrected(),
     });
     const source = resolveSourceRendering(card);
@@ -77,7 +76,6 @@ describe('resolveSourceRendering', () => {
     const card = resolveCardRendering({
       text: premade,
       textId,
-      settings: {},
       card: { ...stamped, renderingGenderOverride: canonicalVoice },
     });
     expect(resolveSourceRendering(card).audioVariantKey).toBeNull();
@@ -388,6 +386,21 @@ describe('per-card overrides and sentence evidence', () => {
     });
     expect(language.form?.id).toBe('desu-masu');
     expect(language.textVariantKey).toBe('auto|desu-masu');
+  });
+
+  it('a politeness override on an address language ignores the addressee gate', () => {
+    // The classifier said the sentence addresses nobody; the learner says the
+    // "you" form is wrong. The override is the correction of exactly that
+    // verdict, so it renders instead of being nulled to canonical.
+    const noAddressee: RenderingText = {
+      userCreated: false,
+      addressesSomeone: false,
+    };
+    const { language } = resolve('tr', {}, noAddressee, {
+      renderingPolitenessOverride: 'formal',
+    });
+    expect(language.form).not.toBeNull();
+    expect(language.textVariantKey).toBe(`auto|${language.form!.id}`);
   });
 
   it('a definitive speaker gender at the current source outranks the override', () => {

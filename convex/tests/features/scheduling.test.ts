@@ -163,6 +163,36 @@ describe('features/scheduling', () => {
       expect(res).toBeNull();
     });
 
+    // The chips travel through `translationValidator`, so a field the
+    // content builder emits but the validator does not declare fails the
+    // QUERY, not the builder. The variant suites assert on
+    // `buildTextContentBatchForLanguages` directly and never see that, which
+    // is how `formLanguage` shipped undeclared (2026-09-09).
+    it('returns the chip fields through the query validator', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedCardWithCourse(t);
+      await t.run(async (ctx) => {
+        // A premade text so the card can carry a rendering at all, with a
+        // target row the classifier has stamped.
+        await ctx.db.patch(textId, { userCreated: false, userId: undefined });
+        await ctx.db.insert('translations', {
+          textId,
+          targetLanguage: 'en',
+          translatedText: 'Hello',
+          renderedPoliteness: 'polite',
+          renderedGender: 'feminine',
+        });
+      });
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      const res = await asUser.query(
+        api.features.scheduling.getCardForReview,
+        {},
+      );
+      const en = res?.translations.find((tr) => tr.language === 'en');
+      expect(en?.renderedPoliteness).toBe('polite');
+      expect(en?.formLanguage).toBe('en');
+    });
+
     it("returns due card for user's active deck", async () => {
       const t = convexTest(schema, modules);
       const { cardId } = await seedCardWithCourse(t);
@@ -3440,6 +3470,28 @@ describe('features/scheduling', () => {
         reasons: ['wrong_gender'],
       });
       expect(await pendingJobs(t, 'fetchSentenceMetadata')).toHaveLength(0);
+    });
+
+    it('wrong_gender without a pick falls back to a retranslation, like wrong_politeness', async () => {
+      // Every flag under the cap attempts a fix (Paul, 2026-09-09). With no
+      // pick there is no override to write and, on a text the classifier
+      // already judged, nothing to ask it; the shared row is retranslated.
+      const t = convexTest(schema, modules);
+      const { cardId, textId } = await seedFlaggableCard(t);
+      await t.run((ctx) =>
+        ctx.db.patch(textId, {
+          metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
+          speakerGender: 'neutral',
+        }),
+      );
+      vi.mocked(llmPool.enqueueAction).mockClear();
+      await t
+        .withIdentity({ subject: 'user_A' })
+        .mutation(api.features.scheduling.flagTranslation, {
+          cardId,
+          reasons: ['wrong_gender'],
+        });
+      expect(llmEnqueues()).toHaveLength(1);
     });
 
     it('wrong_politeness with a level writes the override and skips the retranslation; without one it retranslates', async () => {

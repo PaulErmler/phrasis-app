@@ -101,20 +101,36 @@ alternates between du and Sie.
   wrote back, so it is ignored. A sentence that fixes its own gender is
   served canonical in that voice by every card.
 - An address language (T-V) renders a sentence without a "you" the same at
-  every level, so the resolver returns no form for it; predicate (ja, ko),
-  particle (th, fil) and pronoun (vi, id, ms) languages get a form on every
-  sentence and the generate-and-compare rule handles the ones that come out
-  identical.
+  every level, so the resolver returns no form for it, and a row the
+  classifier already stamped `renderedPoliteness: 'unmarked'` is likewise
+  served at every level: nothing in "Hola." changes between tú and usted
+  (`canonicalSatisfies`, 2026-09-09, after treating it as a gap left every
+  pre-A1 greeting on "updating" for good and bought one rewrite per card).
+  Predicate (ja, ko), particle (th, fil) and pronoun (vi, id, ms) languages
+  get a form on every sentence, and `unmarked` there IS a gap, since a
+  rewrite can add the carrier (Thai ครับ, Japanese です・ます). The
+  generate-and-compare rule handles the ones that come out identical.
 
 ## Invariants
 
-1. The variant path never writes `texts` or a canonical row.
+1. The variant path never writes `texts` or a canonical row, and it runs no
+   provenance gate: `curated-manual` and other human-authored canonical rows
+   get variants like any other, since the canonical row is only ever read.
+   A user-created TEXT never reaches that code, because
+   `resolveLanguageRendering` returns the canonical rendering for one and
+   both keys go null.
 2. Every point read of `translations` pins all four columns of
    `by_text_language_variant_supersededAt` and every point read of
    `audioRecordings` pins all three of `by_text_language_variant`. A prefix
    query plus `.first()` returns whichever row was created first, which is
-   the silent-wrong-rendering bug. Only `convex/db/translationReads.ts` may
-   name the indexes (`convex/tests/lib/translationsIndexInvariant.test.ts`).
+   the silent-wrong-rendering bug. Outside `convex/schema.ts`, only
+   `convex/db/translationReads.ts` may name
+   `by_text_language_variant_supersededAt` or `by_textId_supersededAt`, and
+   only it may query `audioRecordings` through `by_text_language_variant`.
+   The two claims tables carry an index of the same name, which
+   `llmTranslationQueue.ts` and `ttsProcessing.ts` query directly, so the
+   audio rule is enforced as a table + index pair
+   (`convex/tests/lib/translationsIndexInvariant.test.ts`).
 3. A rendering is never deleted because another was requested. The
    gender-drift-by-preference deletions in the canonical sweep are gone; a
    canonical row keeps whatever gender it was generated under. Two
@@ -131,9 +147,22 @@ alternates between du and Sie.
    and a `'metadata_correction'`, when the classifier has fixed the
    speaker's gender on a curriculum text and the row's `renderedGender`
    stamp proves the wording was written in the other one. Only a proven
-   row: `unmarked` and unstamped rows are left alone, and the row's own
-   `speakerGender` (the gender it was generated under) stops the sweep from
-   asking twice. The same verdict re-voices the canonical clips
+   row: `unmarked` and unstamped rows are left alone. A row whose own
+   `speakerGender` already IS the verdict is the model ignoring
+   `<speaker_gender>` rather than a stale row, so it buys
+   `MAX_GENDER_CORRECTION_RETRIES` (1) further attempts, counted on the row
+   in `genderCorrectionAttempts` so a sentence the model will not re-render
+   cannot loop. The correction runs BEFORE `sweepInvalidAudio` in
+   `scheduleMissingContent` and marks its language, so the clip stays
+   attached, whatever mismatch it has, for the archive that
+   `replaceForVersionBump` writes when the new wording lands; detaching it
+   first made that archive silently skip and moved pinned cards onto the
+   new wording. A verdict on a row the classifier has not stamped yet holds
+   only the GENDER re-voice of that language's clip while a stamp can still
+   come (2026-09-09): the stamp may prove the wording itself needs
+   correcting, and a male clip of a feminine sentence would be bought and
+   replaced a pass later. Provider, version and accent drift are detached
+   as usual. Otherwise the same verdict re-voices the canonical clips
    (`sweepInvalidAudio`), since no variant would ever replace them.
    Audio follows the same rule one level down: an `audioAssets` row is
    never deleted because the TTS setup (provider, `ttsVersion`) changed.
@@ -176,10 +205,12 @@ instructions block ("Required politeness form: {label}. {prompt} This
 overrides the register rule above. Apply it to every sentence, including
 sentences that address nobody, wherever the language marks it. Only when the
 source is inherently register-locked ... stay faithful to the source"),
-mirrored into the best-of-N judge. Canonical jobs of a predicate-marking
-language whose text has no formal/informal register metadata request the
-language's `defaultLevel` (polite for ja and ko; `requestedRendering` in
-llmTranslationQueue.ts), which is how new shared Japanese rows stop leaning
+mirrored into the best-of-N judge. A canonical job of a predicate- or
+particle-marking language ALWAYS requests a form, because the addressee gate
+would otherwise starve it: the level the text's register metadata names
+('informal' = casual, 'formal' = polite), else the language's `defaultLevel`
+(polite for ja, ko, th and fil; `requestedRendering` in
+llmTranslationQueue.ts). That is how new shared Japanese rows stop leaning
 casual.
 
 This is the 2026-09-06 wording, kept on purpose. A research-backed candidate
@@ -205,7 +236,7 @@ which would have made every such variant a separate clip; the rewrite arm
 of the adherence bench returns the baseline wording untouched wherever the
 form does not bite. The variant job therefore waits for the canonical row
 and never falls back to Google Translate. Every job that requests a form,
-variant or canonical ja/ko, sends `promptWording: 'literature'` (speech
+variant or canonical ja/ko/th/fil, sends `promptWording: 'literature'` (speech
 level, T-V distinction, speaker gender agreement), which edged out the
 app's wording by a few tenths in the first adherence bench; the bench runs
 the same wording.

@@ -66,6 +66,7 @@ import type {
   DailyTimeGoalMinutes,
   PlacementTestState,
 } from './types';
+import type { PolitenessLevel } from '@/lib/languageForms';
 import { EMPTY_ONBOARDING_DATA } from './types';
 import {
   ogteToCurrentLevel,
@@ -278,6 +279,8 @@ function OnboardingContent() {
           dailyTimeGoalMinutes:
             (onboardingProgress.dailyTimeGoalMinutes as DailyTimeGoalMinutes) ??
             null,
+          politenessLevels:
+            (onboardingProgress.politenessLevels as PolitenessLevel[]) ?? [],
           placementTest:
             onboardingProgress.placementTest &&
             onboardingProgress.placementTest.strategyVersion ===

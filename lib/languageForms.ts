@@ -88,8 +88,6 @@ export type FirstPersonConfig = {
   exampleEn: string;
   masculine: string;
   feminine: string;
-  /** Extra caveat shown under the example. */
-  note?: string;
   sources: string[];
 };
 
@@ -1235,7 +1233,6 @@ export const FIRST_PERSON_CONFIG: Record<string, FirstPersonConfig> = {
       'French changes adjectives and some past participles depending on who is speaking.',
     masculine: 'Je suis prêt.',
     feminine: 'Je suis prête.',
-    note: 'With many words (fatigué / fatiguée) the difference is only visible in writing; with others (prêt / prête) you can hear it.',
     sources: [
       'https://en.wiktionary.org/wiki/prête',
       'https://en.wiktionary.org/wiki/fatigué',
@@ -1384,7 +1381,6 @@ export const FIRST_PERSON_CONFIG: Record<string, FirstPersonConfig> = {
       'Thai changes the word for "I" and the polite particle depending on who is speaking.',
     masculine: 'ผมเหนื่อยครับ',
     feminine: 'ฉันเหนื่อยค่ะ',
-    note: "ผม is for men only; ฉัน is used by women and, casually, by men; ดิฉัน is the formal women's form.",
     sources: ['https://www.thaipod101.com/blog/2020/08/24/thai-pronouns/'],
   },
   ja: {
@@ -1393,7 +1389,6 @@ export const FIRST_PERSON_CONFIG: Record<string, FirstPersonConfig> = {
       'Japanese changes the word for "I" and some sentence endings depending on who is speaking.',
     masculine: '僕は学生です。',
     feminine: '私は学生です。',
-    note: '私 is standard for everyone in polite and formal speech; 僕 is the everyday masculine form (俺 is rougher). Gender also shows in sentence endings (わ, かしら vs ぞ, ぜ).',
     sources: [
       'https://human.libretexts.org/Bookshelves/Languages/Japanese/Japanese_Introductory_1_(Hamada)/06:_Expanding_Your_Japanese_Toolkit_(1)/6.07:_Gender_and_First-Person_Pronouns',
     ],
@@ -1404,7 +1399,6 @@ export const FIRST_PERSON_CONFIG: Record<string, FirstPersonConfig> = {
       'Vietnamese changes the word for "I" depending on your gender and your age relative to the listener.',
     masculine: 'Anh mệt rồi.',
     feminine: 'Chị mệt rồi.',
-    note: 'Both said to someone younger than the speaker; to someone older, everyone says em, and tôi is neutral. Your gender shows in these relationship words, not in grammar.',
     sources: ['https://en.wikibooks.org/wiki/Vietnamese/Personal_pronouns'],
   },
   ko: {
@@ -1413,7 +1407,6 @@ export const FIRST_PERSON_CONFIG: Record<string, FirstPersonConfig> = {
       'Korean changes a few family and self-reference words depending on who is speaking, such as 형 versus 오빠.',
     masculine: '제 형이에요.',
     feminine: '제 오빠예요.',
-    note: 'Your gender shows in a few relationship words (형/오빠, 누나/언니), not in grammar.',
     sources: ['https://www.90daykorean.com/oppa-hyung-noona-unnie/'],
   },
   de: {
@@ -1422,7 +1415,6 @@ export const FIRST_PERSON_CONFIG: Record<string, FirstPersonConfig> = {
       'German has separate masculine and feminine words for jobs and roles (Lehrer / Lehrerin); adjectives do not change.',
     masculine: 'Ich bin Lehrer.',
     feminine: 'Ich bin Lehrerin.',
-    note: 'Only nouns like Lehrer / Lehrerin or Student / Studentin change; "Ich bin müde" is the same for everyone.',
     sources: ['https://en.wiktionary.org/wiki/Lehrerin'],
   },
   nl: {
@@ -1431,7 +1423,6 @@ export const FIRST_PERSON_CONFIG: Record<string, FirstPersonConfig> = {
       'Dutch has feminine forms for some jobs and roles (leraar / lerares); adjectives do not change.',
     masculine: 'Ik ben leraar.',
     feminine: 'Ik ben lerares.',
-    note: 'Many titles are used for everyone (dokter, student, collega); lerares, verpleegster and vriendin still mark the gender.',
     sources: [
       'https://taaladvies.net/taal-en-gender-beroeps-functie-en-rolbenamingen-algemeen/',
     ],
@@ -1442,7 +1433,6 @@ export const FIRST_PERSON_CONFIG: Record<string, FirstPersonConfig> = {
       'Icelandic changes adjectives and past participles depending on who is speaking.',
     masculine: 'Ég er þreyttur.',
     feminine: 'Ég er þreytt.',
-    note: 'The same happens with "I\'m done" (búinn / búin) and "I\'m ready" (tilbúinn / tilbúin); nouns like kennari are the same for everyone.',
     sources: ['https://en.wiktionary.org/wiki/%C3%BEreyttur'],
   },
   da: {
@@ -1451,7 +1441,6 @@ export const FIRST_PERSON_CONFIG: Record<string, FirstPersonConfig> = {
       'Danish keeps a feminine form for a few roles, above all veninde for a female friend; adjectives do not change.',
     masculine: 'Jeg er hendes ven.',
     feminine: 'Jeg er hendes veninde.',
-    note: 'Job titles (lærer, læge, studerende) are the same for everyone.',
     sources: [
       'https://dsn.dk/nyt-fra-sprognaevnet/oktober-2024-2/sangerinde-bedemand-og-forperson-holdninger-til-koennede-endelser-i-dansk/',
     ],
@@ -1480,11 +1469,6 @@ export function getPolitenessConfig(
   code: string,
 ): PolitenessConfig | undefined {
   return POLITENESS_CONFIG[code];
-}
-
-/** Whether a sentence without a "you" can differ between levels. */
-export function marksWithoutAddressee(marking: PolitenessMarking): boolean {
-  return marking !== 'address';
 }
 
 /** The distinct forms of one language, in level order, with their levels. */
@@ -1618,25 +1602,6 @@ export function getFirstPersonConfig(
   for (const c of concreteLanguageCodes(code)) {
     const config = FIRST_PERSON_CONFIG[c];
     if (config) return config;
-  }
-  return undefined;
-}
-
-/**
- * The first marked course language's config, for the example block. The
- * targets are searched first so the example is in the language being
- * learned. Undefined when no course language marks first-person forms; the
- * step then explains that the choice sets the voice.
- */
-export function courseFirstPersonExample(
-  targetLanguages: readonly string[],
-  baseLanguages: readonly string[] = [],
-): { code: string; config: FirstPersonConfig } | undefined {
-  for (const code of [...targetLanguages, ...baseLanguages]) {
-    for (const c of concreteLanguageCodes(code)) {
-      const config = FIRST_PERSON_CONFIG[c];
-      if (config) return { code: c, config };
-    }
   }
   return undefined;
 }

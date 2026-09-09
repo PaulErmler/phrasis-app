@@ -16,7 +16,10 @@ vi.mock('next-intl', () => ({
   useTranslations: () => (key: string, values?: Record<string, unknown>) =>
     values ? `${key}|${JSON.stringify(values)}` : key,
   useFormatter: () => ({
-    dateTime: (d: Date) => `clock(${d.toISOString()})`,
+    // The provider's timezone stands in as "provider" so a test can tell an
+    // explicit `timeZone` option from the inherited one.
+    dateTime: (d: Date, opts?: { timeZone?: string }) =>
+      `clock(${d.toISOString()}|${opts?.timeZone ?? 'provider'})`,
   }),
 }));
 vi.mock('@/components/feature_tracking/FeatureBadge', () => ({
@@ -118,6 +121,14 @@ describe('NoCardsDueState next-review countdown', () => {
     expect(text).toContain('empty.nextReviewToday|');
     expect(text).toContain('"time":"14h 23m"');
     expect(text).toContain('clock(');
+  });
+
+  it("formats the clock in the user's timezone, not the provider's", () => {
+    // `NextIntlClientProvider` is pinned to UTC (i18n/request.tsx). The day
+    // word is decided in the browser's timezone, so the clock must be too, or
+    // the same line says "today" and shows a UTC hour (2026-09-09 review).
+    renderState({ nextDueDate: BASE + 14 * 60 * MINUTE_MS + 23 * MINUTE_MS });
+    expect(countdown()?.textContent).toContain('|Europe/Berlin)');
   });
 
   it('says tomorrow when the wait crosses local midnight', () => {

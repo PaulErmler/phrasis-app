@@ -1,11 +1,10 @@
 import {
-  cardPinAt,
   servedSourceText,
-  servedTranslatedText,
   viewOfCard,
   renderingCardOf,
   renderingSettingsOf,
   renderingTextOf,
+  resolveServedRendering,
 } from '../db/translationReads';
 import { ConvexError, v } from 'convex/values';
 import {
@@ -168,12 +167,24 @@ async function primaryTextForLanguage(
     // As the card shows it: the accent row on a Mixed English course.
     return (await servedSourceText(ctx, text, viewOfCard(card))).text;
   }
-  // The served revision, not necessarily the live row (pinned cards).
-  return servedTranslatedText(ctx, {
+  // The wording the card shows: the served revision (a pinned card may be
+  // on a superseded one) AND the rendering variant when the course's
+  // politeness setting or a Flag-dialog correction serves one. The accept
+  // path (`writingFeedback.getGradingContext`) resolves the primary the
+  // same way; reading the canonical row here made the edit dialog treat
+  // the canonical wording as "the card's own sentence" on a variant-served
+  // card, deleting a real alternative and accepting the card's sentence.
+  const deck = await ctx.db.get(card.deckId);
+  const settings = deck
+    ? renderingSettingsOf(await getCourseSettings(ctx, deck.courseId))
+    : undefined;
+  const rendering = await resolveServedRendering(ctx, {
     textId: card.textId,
     targetLanguage: language,
-    pinAt: cardPinAt(card),
+    text: renderingTextOf(text),
+    view: viewOfCard(card, settings),
   });
+  return rendering.served?.row.translatedText ?? null;
 }
 
 /**
@@ -332,7 +343,6 @@ export const getAlternativeContext = internalQuery({
         ? resolveCardRendering({
             text: renderingTextOf(text),
             textId: text._id,
-            settings: settings ?? {},
             card: renderingCard,
           }).voiceGender
         : resolveAudioSpeakerGender(

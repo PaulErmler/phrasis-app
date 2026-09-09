@@ -61,6 +61,13 @@ export interface CardTranslation {
   renderedGender?: 'masculine' | 'feminine';
   renderedPoliteness?: 'casual' | 'polite' | 'formal';
   /**
+   * The code whose politeness config names `renderedPoliteness`. On a mixed
+   * code that is the served row's own dialect, not the course language:
+   * `es_mixed` has no config of its own, and Spain and Latin America map
+   * the levels onto different forms.
+   */
+  formLanguage?: string;
+  /**
    * The course's sentence-form settings ask for a rendering this language
    * does not have yet: `text` is the canonical wording and will change once
    * the rewrite lands. Drives the "updating" chip, so the sentence on screen

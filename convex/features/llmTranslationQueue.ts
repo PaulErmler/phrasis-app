@@ -45,6 +45,7 @@ import {
 } from './translationPipeline';
 import { romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
+import { romanizationAfterFailure } from '../lib/textAnnotations';
 import { llmPool, llmWarmPool, type PoolRunResult } from '../lib/workpools';
 import {
   asVoiceGender,
@@ -667,10 +668,11 @@ async function resolvePromptMetadata(
  * The sentence-form request a job carries (docs/architecture/
  * translation-variants.md). A VARIANT job (`variantKey`) rewrites the
  * canonical wording for its gender and form. A CANONICAL job of a
- * predicate-marking language (ja, ko) whose text has no formal/informal
- * register metadata requests the language's default form, which is how
- * new shared Japanese rows stop leaning casual (Paul, 2026-09-06); the
- * addressee gate never applied to those languages anyway. Every other
+ * predicate- or particle-marking language (ja, ko, th, fil) ALWAYS requests
+ * a form, because the prompt's addressee gate would otherwise starve it:
+ * the level its register metadata names ('informal' = casual, 'formal' =
+ * polite), else the language's `defaultLevel`. That is how new shared
+ * Japanese rows stop leaning casual (Paul, 2026-09-06). Every other
  * canonical job is unchanged.
  */
 function requestedRendering(
@@ -894,17 +896,18 @@ async function storeLlmTranslationResult(
 ): Promise<void> {
   // `romanizeText` already retries up to 3 times internally; on full
   // exhaustion we persist an empty-string sentinel so ensureContent
-  // doesn't reschedule another burst on every call.
+  // doesn't reschedule another burst on every call. A TRANSIENT failure
+  // (rate limit, missing key) leaves the field undefined instead, so the
+  // annotation sweep asks again later (`romanizationAfterFailure`).
   let romanizedText: string | undefined;
   if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
     try {
       romanizedText = await romanizeText(translatedText, args.targetLanguage);
     } catch (err) {
-      console.error(
-        `[llmTranslationQueue] Romanization failed for ${args.targetLanguage} (persisting sentinel):`,
-        err instanceof Error ? err.message : err,
+      romanizedText = romanizationAfterFailure(
+        err,
+        `[llmTranslationQueue] ${args.targetLanguage}`,
       );
-      romanizedText = '';
     }
   }
 

@@ -83,6 +83,16 @@ export const stampRenderings = internalMutation({
         translationId: v.id('translations'),
         renderedGender: renderedGenderValidator,
         renderedPoliteness: renderedPolitenessValidator,
+        /**
+         * The wording the classifier judged. A stamp lands only on the row
+         * still carrying it: a call delayed by a 429 backoff can land after
+         * a flag replaced the wording (and cleared the stamps) and after the
+         * new wording's own call, and would otherwise write the OLD
+         * wording's form onto the new one for good, since
+         * `needsRenderingStamp` never asks for a stamped row again. Same
+         * guard the annotation stores use (`forText`).
+         */
+        translatedText: v.string(),
       }),
     ),
   },
@@ -92,6 +102,7 @@ export const stampRenderings = internalMutation({
     for (const stamp of args.stamps) {
       const row = await ctx.db.get(stamp.translationId);
       if (!row) continue;
+      if (row.translatedText !== stamp.translatedText) continue;
       await ctx.db.patch(stamp.translationId, {
         renderedGender: stamp.renderedGender,
         renderedPoliteness: stamp.renderedPoliteness,
@@ -171,6 +182,7 @@ export const classifyAndStampTranslations = internalAction({
                 translationId: row._id,
                 renderedGender: result.gender,
                 renderedPoliteness: result.politeness,
+                translatedText: row.translatedText,
               },
             ]
           : [];

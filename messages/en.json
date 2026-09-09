@@ -751,8 +751,8 @@
     },
     "formChips": {
       "politenessTitle": "{language} · {level} · {form}",
-      "masculine": "masculine",
-      "feminine": "feminine",
+      "masculine": "male speaker",
+      "feminine": "female speaker",
       "casual": "casual",
       "polite": "polite",
       "formal": "formal",
@@ -2240,122 +2240,6 @@
             "description": "Elders, strangers, officials, customers"
           }
         }
-      }
-    },
-    "firstPerson": {
-      "ru": {
-        "intro": "Russian changes past-tense verbs and some adjectives depending on who is speaking."
-      },
-      "uk": {
-        "intro": "Ukrainian changes past-tense verbs and adjectives depending on who is speaking."
-      },
-      "pl": {
-        "intro": "Polish changes past-tense verbs and adjectives depending on who is speaking."
-      },
-      "cs": {
-        "intro": "Czech changes past-tense verbs and adjectives depending on who is speaking."
-      },
-      "sk": {
-        "intro": "Slovak changes past-tense verbs and adjectives depending on who is speaking."
-      },
-      "bg": {
-        "intro": "Bulgarian changes adjectives and some past-tense forms depending on who is speaking."
-      },
-      "hr": {
-        "intro": "Croatian changes past-tense verbs and adjectives depending on who is speaking."
-      },
-      "sr": {
-        "intro": "Serbian changes past-tense verbs and adjectives depending on who is speaking."
-      },
-      "sl": {
-        "intro": "Slovene changes past-tense verbs and adjectives depending on who is speaking."
-      },
-      "lt": {
-        "intro": "Lithuanian changes adjectives and participles depending on who is speaking."
-      },
-      "lv": {
-        "intro": "Latvian changes adjectives and participles depending on who is speaking."
-      },
-      "fr": {
-        "intro": "French changes adjectives and some past participles depending on who is speaking.",
-        "note": "With many words (fatigué / fatiguée) the difference is only visible in writing; with others (prêt / prête) you can hear it."
-      },
-      "es": {
-        "intro": "Spanish changes adjectives and nouns about yourself depending on who is speaking."
-      },
-      "es_latam": {
-        "intro": "Spanish changes adjectives and nouns about yourself depending on who is speaking."
-      },
-      "ca": {
-        "intro": "Catalan changes adjectives and nouns about yourself depending on who is speaking."
-      },
-      "it": {
-        "intro": "Italian changes adjectives and some past participles depending on who is speaking."
-      },
-      "pt": {
-        "intro": "Portuguese changes adjectives and nouns about yourself depending on who is speaking."
-      },
-      "pt_pt": {
-        "intro": "Portuguese changes adjectives and nouns about yourself depending on who is speaking."
-      },
-      "ro": {
-        "intro": "Romanian changes adjectives and nouns about yourself depending on who is speaking."
-      },
-      "el": {
-        "intro": "Greek changes adjectives and participles depending on who is speaking."
-      },
-      "hi": {
-        "intro": "Hindi changes present and past verb forms and adjectives depending on who is speaking."
-      },
-      "he": {
-        "intro": "Hebrew changes present-tense verbs and adjectives depending on who is speaking; past and future are the same for everyone."
-      },
-      "ar": {
-        "intro": "Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same."
-      },
-      "ar_eg": {
-        "intro": "Egyptian Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same."
-      },
-      "ar_sa": {
-        "intro": "Saudi Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same."
-      },
-      "ar_iq": {
-        "intro": "Iraqi Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same."
-      },
-      "ar_lev": {
-        "intro": "Levantine Arabic changes adjectives and participles about yourself (tired, going) depending on who is speaking; verbs stay the same."
-      },
-      "th": {
-        "intro": "Thai changes the word for \"I\" and the polite particle depending on who is speaking.",
-        "note": "ผม is for men only; ฉัน is used by women and, casually, by men; ดิฉัน is the formal women's form."
-      },
-      "ja": {
-        "intro": "Japanese changes the word for \"I\" and some sentence endings depending on who is speaking.",
-        "note": "私 is standard for everyone in polite and formal speech; 僕 is the everyday masculine form (俺 is rougher). Gender also shows in sentence endings (わ, かしら vs ぞ, ぜ)."
-      },
-      "vi": {
-        "intro": "Vietnamese changes the word for \"I\" depending on your gender and your age relative to the listener.",
-        "note": "Both said to someone younger than the speaker; to someone older, everyone says em, and tôi is neutral. Your gender shows in these relationship words, not in grammar."
-      },
-      "ko": {
-        "intro": "Korean changes a few family and self-reference words depending on who is speaking, such as 형 versus 오빠.",
-        "note": "Your gender shows in a few relationship words (형/오빠, 누나/언니), not in grammar."
-      },
-      "de": {
-        "intro": "German has separate masculine and feminine words for jobs and roles (Lehrer / Lehrerin); adjectives do not change.",
-        "note": "Only nouns like Lehrer / Lehrerin or Student / Studentin change; \"Ich bin müde\" is the same for everyone."
-      },
-      "nl": {
-        "intro": "Dutch has feminine forms for some jobs and roles (leraar / lerares); adjectives do not change.",
-        "note": "Many titles are used for everyone (dokter, student, collega); lerares, verpleegster and vriendin still mark the gender."
-      },
-      "is": {
-        "intro": "Icelandic changes adjectives and past participles depending on who is speaking.",
-        "note": "The same happens with \"I'm done\" (búinn / búin) and \"I'm ready\" (tilbúinn / tilbúin); nouns like kennari are the same for everyone."
-      },
-      "da": {
-        "intro": "Danish keeps a feminine form for a few roles, above all veninde for a female friend; adjectives do not change.",
-        "note": "Job titles (lærer, læge, studerende) are the same for everyone."
       }
     }
   }

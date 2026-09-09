@@ -214,7 +214,15 @@ export const getGradingContext = internalQuery({
       });
       expected = rendering.served?.row.translatedText ?? null;
       const row = rendering.served?.row;
-      if (row?.variantKey !== undefined) {
+      // Every stored wording is stamped, canonical rows included (invariant 7
+      // in docs/architecture/translation-variants.md). The gate here used to
+      // be `variantKey !== undefined`, from when variants were the only
+      // stamped rows, so a card served the canonical row through the
+      // `canonicalSatisfies` shortcut fell back to `texts.register`, which
+      // describes the SOURCE sentence. That handed the grader
+      // "Register: neutral" for a です・ます card, and the shortcut is the
+      // common case once the corpus is stamped.
+      if (row) {
         if (row.renderedPoliteness && row.renderedPoliteness !== 'unmarked') {
           servedRegister =
             row.renderedPoliteness === 'casual' ? 'informal' : 'formal';

@@ -87,6 +87,14 @@ export const translationValidator = v.object({
     v.union(v.literal('casual'), v.literal('polite'), v.literal('formal')),
   ),
   /**
+   * The code whose politeness config names `renderedPoliteness`, which on a
+   * mixed code is the served row's own dialect rather than the course
+   * language. `es_mixed` has no config of its own, and Spain and Latin
+   * America map the levels onto different forms, so the chip needs the row's
+   * answer. Sent only alongside `renderedPoliteness`.
+   */
+  formLanguage: v.optional(v.string()),
+  /**
    * The course's sentence-form settings ask for a rendering of this language
    * that has not landed yet, so `text` is the canonical wording and is about
    * to change. Surfaces show it as pending rather than presenting the current
@@ -578,8 +586,9 @@ export const firstPersonFormsValidator = literalUnion(
 export const politenessLevelValidator = literalUnion(POLITENESS_LEVEL_VALUES);
 export const politenessLevelsValidator = v.array(politenessLevelValidator);
 // What a stored rendering actually is, stamped by the rendering classifier
-// (convex/lib/renderingClassifier.ts) on generation and by the backfill
-// migration on legacy rows. 'unmarked' = the wording carries no such form.
+// (convex/lib/renderingClassifier.ts) on generation, and lazily by the
+// content sweep (`flushRenderingStamps`) on rows from before the feature.
+// 'unmarked' = the wording carries no such form.
 export const RENDERED_GENDER_VALUES = [
   'masculine',
   'feminine',

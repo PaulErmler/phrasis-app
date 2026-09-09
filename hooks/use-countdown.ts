@@ -23,6 +23,18 @@ export function useCountdown<T extends { staleInMs: number }>(
 ): T | null {
   const [now, setNow] = React.useState(() => Date.now());
 
+  // A new target is measured against a fresh clock. `now` only moves on a
+  // tick, and a multi-day wait ticks hourly, so by the time the earliest due
+  // card changes (a review on another device, a filter toggle) `now` can be
+  // 59 minutes old and a card 30 minutes away would read "1h 29m" until the
+  // next tick. Adjusting state during render is React's pattern for state
+  // derived from the previous render's props.
+  const [seenTarget, setSeenTarget] = React.useState(targetMs);
+  if (seenTarget !== targetMs) {
+    setSeenTarget(targetMs);
+    setNow(Date.now());
+  }
+
   const remaining = targetMs === null ? null : Math.max(0, targetMs - now);
   const value = remaining === null ? null : display(remaining);
 
@@ -37,7 +49,14 @@ export function useCountdown<T extends { staleInMs: number }>(
     return () => clearTimeout(timeoutId);
     // Recomputing from Date.now() on every fire rather than accumulating means
     // a throttled or delayed timer self-corrects instead of falling behind.
-  }, [staleInMs, done, targetMs]);
+    //
+    // `now` is a dependency on purpose: it is the one value that changes on
+    // every tick. Keyed on `staleInMs` alone, two ticks whose timers fired
+    // the same distance from a boundary (a timer that is exactly on time
+    // leaves `remaining % 1000` at 999 every time, so `staleInMs` is 1000
+    // twice in a row) left the deps unchanged, React skipped the effect, no
+    // timeout was scheduled, and the countdown froze mid-minute.
+  }, [now, staleInMs, done, targetMs]);
 
   React.useEffect(() => {
     if (targetMs === null) return;

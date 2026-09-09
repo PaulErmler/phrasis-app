@@ -311,6 +311,7 @@ export async function rebuildCardSearchableTextPatch(
   // cache across a pagination page).
   return buildSearchableTextPatchForCard(ctx, doc, text, {
     deckLanguages: new Map(),
+    deckRenderingSettings: new Map(),
   });
 }
 

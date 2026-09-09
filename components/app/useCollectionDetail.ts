@@ -417,7 +417,15 @@ export function useCollectionDetail({
             // canonical translation, so without this they were never sent
             // and the "updating" chip never cleared.
             row.needsRenderingRewrite) &&
-          !requestedTranslationsRef.current.has(row._id),
+          // A rendering rewrite takes TWO server passes: the first asks the
+          // classifier to stamp the canonical row, and only once the stamp
+          // lands can the second ask for the rewrite. The one-shot ref below
+          // would spend the single allowed request on the stamp and leave the
+          // chip up for the rest of the session, so a row still reporting
+          // `needsRenderingRewrite` is let through again. The server's
+          // per-variant claims dedup the actual work.
+          (row.needsRenderingRewrite ||
+            !requestedTranslationsRef.current.has(row._id)),
       )
       .map((row) => row._id);
     if (pending.length === 0) return;

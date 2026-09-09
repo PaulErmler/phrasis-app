@@ -29,6 +29,7 @@ import { getRomanizationSource } from './localRomanization';
 import type { FunctionReference, Scheduler } from 'convex/server';
 import { internal } from '../_generated/api';
 import type { Doc, Id } from '../_generated/dataModel';
+import type { MutationCtx } from '../_generated/server';
 import {
   FURIGANA_LANGUAGES,
   IPA_LANGUAGES,
@@ -209,6 +210,41 @@ export function annotationFieldsOf(row: AnnotationFields): AnnotationFields {
  *
  * Callers throw ProbeNeedsWork / schedule the kind's action per entry.
  */
+/**
+ * How long an annotation request is honoured before a sweep asks again. A
+ * transient failure (`TransientAnnotationError`) leaves the value undefined
+ * so the row is retried, and this claim keeps the retry to once per window
+ * instead of once per view: during an OpenRouter or Google outage every
+ * review's 20-card probe would otherwise schedule the failing action again
+ * for every affected row. Same shape as `renderingStampRequestedAt`.
+ */
+export const ANNOTATION_REQUEST_COOLDOWN_MS = 15 * 60 * 1000;
+
+/** Whether a recent request for this row's annotations is still honoured. */
+export function annotationRequestInFlight(row: {
+  annotationRequestedAt?: number;
+}): boolean {
+  return (
+    row.annotationRequestedAt !== undefined &&
+    Date.now() - row.annotationRequestedAt < ANNOTATION_REQUEST_COOLDOWN_MS
+  );
+}
+
+/**
+ * Whether a sweep would schedule annotations for this row now: something is
+ * missing AND no recent request is in flight. The probe-mode test of the
+ * sweeps, so a probe reports no work for a row in cooldown.
+ */
+export function annotationsDue(
+  language: string,
+  row: AnnotationFields & { annotationRequestedAt?: number },
+): boolean {
+  return (
+    missingAnnotationKinds(language, row).length > 0 &&
+    !annotationRequestInFlight(row)
+  );
+}
+
 export function missingAnnotationKinds(
   language: string,
   row: AnnotationFields,
@@ -234,8 +270,13 @@ export function missingAnnotationKinds(
  * Used when the underlying text changes and derived annotations no longer
  * match (`ctx.db.patch` treats `undefined` as "unset the field").
  */
-export function clearedAnnotationFields(): Record<AnnotationField, undefined> {
+export function clearedAnnotationFields(): Record<
+  AnnotationField | 'annotationRequestedAt',
+  undefined
+> {
   return {
+    // A new wording is requested at once, whatever the old one's claim.
+    annotationRequestedAt: undefined,
     romanizedText: undefined,
     romanizationSource: undefined,
     ipaText: undefined,
@@ -388,6 +429,30 @@ export class TransientAnnotationError extends Error {
   }
 }
 
+/**
+ * What to store for a romanization that failed while the TRANSLATION was
+ * being written (the inline sites in llmTranslationQueue.ts and
+ * translationPipeline.ts romanize before the row exists). A transient
+ * failure (rate limit, missing key, 5xx) is not a fact about the text: the
+ * field stays undefined and the annotation sweep asks again on the next
+ * view, the rule `runTranslationAnnotation` applies. Anything else persists
+ * the `''` sentinel so the failing input is not re-bought on every view.
+ */
+export function romanizationAfterFailure(
+  err: unknown,
+  context: string,
+): string | undefined {
+  if (err instanceof TransientAnnotationError) {
+    console.warn(`${context}: romanization deferred (transient):`, err.message);
+    return undefined;
+  }
+  console.error(
+    `${context}: romanization failed (persisting sentinel):`,
+    err instanceof Error ? err.message : err,
+  );
+  return '';
+}
+
 export async function runSourceAnnotation(
   ctx: AnnotationActionCtx,
   kind: AnnotationKind,
@@ -500,27 +565,37 @@ export async function runApprovalAnnotation(
  * resolves itself. Returns the kinds it scheduled.
  */
 export async function scheduleTranslationAnnotations(
-  ctx: { scheduler: Scheduler },
+  ctx: { scheduler: Scheduler; db: Pick<MutationCtx['db'], 'patch'> },
   row: Pick<
     Doc<'translations'>,
-    '_id' | 'textId' | 'targetLanguage' | 'translatedText' | AnnotationField
+    | '_id'
+    | 'textId'
+    | 'targetLanguage'
+    | 'translatedText'
+    | 'annotationRequestedAt'
+    | AnnotationField
   >,
   translationId: Id<'translations'> | undefined,
 ): Promise<AnnotationKind[]> {
   const kinds = missingAnnotationKinds(row.targetLanguage, row);
+  // Nothing missing, or a request inside the cooldown is still in flight
+  // (`annotationRequestInFlight`): the action is not scheduled twice.
+  if (kinds.length === 0 || annotationRequestInFlight(row)) return [];
+  // Always name the row. Falling back to "the store will find it by
+  // (text, language)" silently targeted the WRONG row whenever a text
+  // had sentence-form variants: liveTranslation matches
+  // `variantKey === undefined`, so a variant's romanization was written
+  // onto its base sibling and the variant stayed blank forever. That is
+  // why "And you?" showed แล้วเธอล่ะ with no romanization while its base
+  // แล้วคุณล่ะครับ had one.
+  const target = translationId ?? row._id;
+  await ctx.db.patch(target, { annotationRequestedAt: Date.now() });
   for (const kind of kinds) {
     await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].translationAction, {
       textId: row.textId,
       text: row.translatedText,
       language: row.targetLanguage,
-      // Always name the row. Falling back to "the store will find it by
-      // (text, language)" silently targeted the WRONG row whenever a text
-      // had sentence-form variants: liveTranslation matches
-      // `variantKey === undefined`, so a variant's romanization was written
-      // onto its base sibling and the variant stayed blank forever. That is
-      // why "And you?" showed แล้วเธอล่ะ with no romanization while its base
-      // แล้วคุณล่ะครับ had one.
-      translationId: translationId ?? row._id,
+      translationId: target,
     });
   }
   return kinds;

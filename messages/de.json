@@ -751,8 +751,8 @@
     },
     "formChips": {
       "politenessTitle": "{language} · {level} · {form}",
-      "masculine": "maskulin",
-      "feminine": "feminin",
+      "masculine": "Sprecher",
+      "feminine": "Sprecherin",
       "casual": "locker",
       "polite": "höflich",
       "formal": "formell",
@@ -2244,122 +2244,6 @@
             "description": "Ältere, Fremde, Beamte, Kunden"
           }
         }
-      }
-    },
-    "firstPerson": {
-      "ru": {
-        "intro": "Russisch verändert Verben in der Vergangenheit und manche Adjektive je nachdem, wer spricht."
-      },
-      "uk": {
-        "intro": "Ukrainisch verändert Verben in der Vergangenheit und Adjektive je nachdem, wer spricht."
-      },
-      "pl": {
-        "intro": "Polnisch verändert Verben in der Vergangenheit und Adjektive je nachdem, wer spricht."
-      },
-      "cs": {
-        "intro": "Tschechisch verändert Verben in der Vergangenheit und Adjektive je nachdem, wer spricht."
-      },
-      "sk": {
-        "intro": "Slowakisch verändert Verben in der Vergangenheit und Adjektive je nachdem, wer spricht."
-      },
-      "bg": {
-        "intro": "Bulgarisch verändert Adjektive und manche Vergangenheitsformen je nachdem, wer spricht."
-      },
-      "hr": {
-        "intro": "Kroatisch verändert Verben in der Vergangenheit und Adjektive je nachdem, wer spricht."
-      },
-      "sr": {
-        "intro": "Serbisch verändert Verben in der Vergangenheit und Adjektive je nachdem, wer spricht."
-      },
-      "sl": {
-        "intro": "Slowenisch verändert Verben in der Vergangenheit und Adjektive je nachdem, wer spricht."
-      },
-      "lt": {
-        "intro": "Litauisch verändert Adjektive und Partizipien je nachdem, wer spricht."
-      },
-      "lv": {
-        "intro": "Lettisch verändert Adjektive und Partizipien je nachdem, wer spricht."
-      },
-      "fr": {
-        "intro": "Französisch verändert Adjektive und manche Partizipien der Vergangenheit je nachdem, wer spricht.",
-        "note": "Bei vielen Wörtern (fatigué / fatiguée) sieht man den Unterschied nur in der Schrift; bei anderen (prêt / prête) hört man ihn."
-      },
-      "es": {
-        "intro": "Spanisch verändert Adjektive und Substantive, die dich selbst beschreiben, je nachdem, wer spricht."
-      },
-      "es_latam": {
-        "intro": "Spanisch verändert Adjektive und Substantive, die dich selbst beschreiben, je nachdem, wer spricht."
-      },
-      "ca": {
-        "intro": "Katalanisch verändert Adjektive und Substantive, die dich selbst beschreiben, je nachdem, wer spricht."
-      },
-      "it": {
-        "intro": "Italienisch verändert Adjektive und manche Partizipien der Vergangenheit je nachdem, wer spricht."
-      },
-      "pt": {
-        "intro": "Portugiesisch verändert Adjektive und Substantive, die dich selbst beschreiben, je nachdem, wer spricht."
-      },
-      "pt_pt": {
-        "intro": "Portugiesisch verändert Adjektive und Substantive, die dich selbst beschreiben, je nachdem, wer spricht."
-      },
-      "ro": {
-        "intro": "Rumänisch verändert Adjektive und Substantive, die dich selbst beschreiben, je nachdem, wer spricht."
-      },
-      "el": {
-        "intro": "Griechisch verändert Adjektive und Partizipien je nachdem, wer spricht."
-      },
-      "hi": {
-        "intro": "Hindi verändert Verbformen in Gegenwart und Vergangenheit sowie Adjektive je nachdem, wer spricht."
-      },
-      "he": {
-        "intro": "Hebräisch verändert Verben in der Gegenwart und Adjektive je nachdem, wer spricht; Vergangenheit und Zukunft sind für alle gleich."
-      },
-      "ar": {
-        "intro": "Arabisch verändert Adjektive und Partizipien, die dich selbst beschreiben (müde, unterwegs), je nachdem, wer spricht; Verben bleiben gleich."
-      },
-      "ar_eg": {
-        "intro": "Ägyptisches Arabisch verändert Adjektive und Partizipien, die dich selbst beschreiben (müde, unterwegs), je nachdem, wer spricht; Verben bleiben gleich."
-      },
-      "ar_sa": {
-        "intro": "Saudisches Arabisch verändert Adjektive und Partizipien, die dich selbst beschreiben (müde, unterwegs), je nachdem, wer spricht; Verben bleiben gleich."
-      },
-      "ar_iq": {
-        "intro": "Irakisches Arabisch verändert Adjektive und Partizipien, die dich selbst beschreiben (müde, unterwegs), je nachdem, wer spricht; Verben bleiben gleich."
-      },
-      "ar_lev": {
-        "intro": "Levantinisches Arabisch verändert Adjektive und Partizipien, die dich selbst beschreiben (müde, unterwegs), je nachdem, wer spricht; Verben bleiben gleich."
-      },
-      "th": {
-        "intro": "Thai verändert das Wort für „ich“ und die Höflichkeitspartikel je nachdem, wer spricht.",
-        "note": "ผม ist nur für Männer; ฉัน benutzen Frauen und, in lockerer Sprache, auch Männer; ดิฉัน ist die formelle Form für Frauen."
-      },
-      "ja": {
-        "intro": "Japanisch verändert das Wort für „ich“ und manche Satzendungen je nachdem, wer spricht.",
-        "note": "私 ist in höflicher und formeller Sprache für alle üblich; 僕 ist die alltägliche männliche Form (俺 ist derber). Das Geschlecht zeigt sich auch in Satzendungen (わ, かしら vs. ぞ, ぜ)."
-      },
-      "vi": {
-        "intro": "Vietnamesisch verändert das Wort für „ich“ je nach deinem Geschlecht und deinem Alter im Vergleich zum Gegenüber.",
-        "note": "Beide sagt man zu jemandem, der jünger ist als man selbst; zu Älteren sagen alle em, und tôi ist neutral. Dein Geschlecht zeigt sich in diesen Beziehungswörtern, nicht in der Grammatik."
-      },
-      "ko": {
-        "intro": "Koreanisch verändert ein paar Wörter für Familie und die eigene Person je nachdem, wer spricht, zum Beispiel 형 gegenüber 오빠.",
-        "note": "Dein Geschlecht zeigt sich in ein paar Beziehungswörtern (형/오빠, 누나/언니), nicht in der Grammatik."
-      },
-      "de": {
-        "intro": "Deutsch hat eigene männliche und weibliche Wörter für Berufe und Rollen (Lehrer / Lehrerin); Adjektive ändern sich nicht.",
-        "note": "Nur Substantive wie Lehrer / Lehrerin oder Student / Studentin ändern sich; „Ich bin müde“ ist für alle gleich."
-      },
-      "nl": {
-        "intro": "Niederländisch hat weibliche Formen für manche Berufe und Rollen (leraar / lerares); Adjektive ändern sich nicht.",
-        "note": "Viele Bezeichnungen gelten für alle (dokter, student, collega); lerares, verpleegster und vriendin zeigen weiterhin das Geschlecht."
-      },
-      "is": {
-        "intro": "Isländisch verändert Adjektive und Partizipien der Vergangenheit je nachdem, wer spricht.",
-        "note": "Dasselbe gilt für „Ich bin fertig“ (búinn / búin) und „Ich bin bereit“ (tilbúinn / tilbúin); Substantive wie kennari sind für alle gleich."
-      },
-      "da": {
-        "intro": "Dänisch behält für ein paar Rollen eine weibliche Form, vor allem veninde für eine Freundin; Adjektive ändern sich nicht.",
-        "note": "Berufsbezeichnungen (lærer, læge, studerende) sind für alle gleich."
       }
     }
   }

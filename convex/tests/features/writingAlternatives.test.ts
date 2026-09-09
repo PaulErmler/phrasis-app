@@ -2,6 +2,7 @@ import { convexTest, type TestConvex } from 'convex-test';
 import { describe, it, expect } from 'vitest';
 import schema from '../../schema';
 import { api, internal } from '../../_generated/api';
+import { pickPolitenessForm } from '../../../lib/preferenceResolution';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -272,6 +273,44 @@ describe('features/writingAlternatives edit-dialog CRUD', () => {
         text: 'quisiera un café',
       });
 
+    expect(await t.run((ctx) => ctx.db.get(a.alternativeId))).toBeNull();
+  });
+
+  it('updateAlternative measures "the primary" against the rendering the card shows', async () => {
+    // A course set to formal serves the usted variant. Rewording an
+    // alternative to the CANONICAL tú wording is then a real alternative,
+    // not the card's own sentence; the served wording is (2026-09-09 review).
+    const t = convexTest(schema, modules);
+    const a = await seedAlternative(t, 'A');
+    const formId = pickPolitenessForm('es', ['formal'], a.textId)!.id;
+    await t.run(async (ctx) => {
+      const card = (await ctx.db.get(a.cardId))!;
+      const deck = (await ctx.db.get(card.deckId))!;
+      await ctx.db.insert('courseSettings', {
+        courseId: deck.courseId,
+        initialReviewCount: 3,
+        politenessLevels: ['formal'],
+      });
+      await ctx.db.patch(a.cardId, { followsCoursePreferences: true });
+      await ctx.db.insert('translations', {
+        textId: a.textId,
+        targetLanguage: 'es',
+        translatedText: 'Querría un café, por favor.',
+        variantKey: `auto|${formId}`,
+      });
+    });
+    const asUser = t.withIdentity({ subject: 'user_A' });
+    await asUser.mutation(api.features.writingAlternatives.updateAlternative, {
+      alternativeId: a.alternativeId,
+      text: 'quisiera un café',
+    });
+    expect((await t.run((ctx) => ctx.db.get(a.alternativeId)))?.text).toBe(
+      'quisiera un café',
+    );
+    await asUser.mutation(api.features.writingAlternatives.updateAlternative, {
+      alternativeId: a.alternativeId,
+      text: 'Querría un café, por favor.',
+    });
     expect(await t.run((ctx) => ctx.db.get(a.alternativeId))).toBeNull();
   });
 

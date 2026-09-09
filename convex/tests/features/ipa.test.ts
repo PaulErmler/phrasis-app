@@ -5,11 +5,14 @@ import schema from '../../schema';
 import type { Id } from '../../_generated/dataModel';
 import { internal, api } from '../../_generated/api';
 import {
+  ANNOTATION_REQUEST_COOLDOWN_MS,
   IPA_SOURCES,
+  annotationsDue,
   scheduleTranslationAnnotations,
   TransientAnnotationError,
   getIpaSource,
   missingAnnotationKinds,
+  romanizationAfterFailure,
   runSourceAnnotation,
 } from '../../lib/textAnnotations';
 import { getRomanizationSource } from '../../lib/localRomanization';
@@ -715,5 +718,94 @@ describe('sentence-form variants get their own annotations', () => {
     ]);
     expect(variant.romanizedText).toBe('laeo thoe la');
     expect(base.romanizedText).toBe('laeo khun la khrap');
+  });
+});
+
+describe('romanization at translation time: transient failures are not facts', () => {
+  it('a transient failure leaves the field undefined, any other persists the sentinel', () => {
+    // The inline romanization sites (llmTranslationQueue, translationPipeline)
+    // used to write '' for every error, including a 429 or a missing key,
+    // which the current engine's tag then made final (2026-09-09 review).
+    expect(
+      romanizationAfterFailure(new TransientAnnotationError('429'), 'test'),
+    ).toBeUndefined();
+    expect(romanizationAfterFailure(new Error('bad input'), 'test')).toBe('');
+  });
+});
+
+describe('annotation requests are claimed for a cooldown', () => {
+  async function seedThai(t: ReturnType<typeof convexTest>) {
+    return t.run(async (ctx) => {
+      const collectionId = await ctx.db.insert('collections', {
+        name: 'A1',
+        textCount: 0,
+      });
+      const textId = await ctx.db.insert('texts', {
+        text: 'And you?',
+        language: 'en',
+        userCreated: false,
+        collectionId,
+        collectionRank: 1,
+      });
+      const rowId = await ctx.db.insert('translations', {
+        textId,
+        targetLanguage: 'th',
+        translatedText: 'แล้วเธอล่ะ',
+      });
+      return { textId, rowId };
+    });
+  }
+  const jobs = (t: ReturnType<typeof convexTest>) =>
+    t.run(async (ctx) =>
+      (await ctx.db.system.query('_scheduled_functions').collect()).filter(
+        (j) => j.name.includes('processRomanizationForTranslation'),
+      ),
+    );
+  const schedule = (t: ReturnType<typeof convexTest>, rowId: Id<'translations'>) =>
+    t.run(async (ctx) => {
+      const row = (await ctx.db.get(rowId))!;
+      return scheduleTranslationAnnotations(ctx, row, undefined);
+    });
+
+  it('a second ask inside the window schedules nothing; one after it asks again', async () => {
+    // A transient failure leaves the field undefined so the row is retried.
+    // Without the claim every ensure pass during an outage scheduled the
+    // failing action again for every affected row (2026-09-09 review).
+    const t = convexTest(schema, modules);
+    const { rowId } = await seedThai(t);
+    expect(await schedule(t, rowId)).toEqual(['romanization']);
+    expect(await jobs(t)).toHaveLength(1);
+    const row = await t.run((ctx) => ctx.db.get(rowId));
+    expect(row?.annotationRequestedAt).toBeDefined();
+    expect(annotationsDue('th', row!)).toBe(false);
+
+    expect(await schedule(t, rowId)).toEqual([]);
+    expect(await jobs(t)).toHaveLength(1);
+
+    await t.run((ctx) =>
+      ctx.db.patch(rowId, {
+        annotationRequestedAt: Date.now() - ANNOTATION_REQUEST_COOLDOWN_MS - 1,
+      }),
+    );
+    expect(annotationsDue('th', (await t.run((ctx) => ctx.db.get(rowId)))!)).toBe(
+      true,
+    );
+    expect(await schedule(t, rowId)).toEqual(['romanization']);
+    expect(await jobs(t)).toHaveLength(2);
+  });
+
+  it('a row with nothing missing is not claimed', async () => {
+    const t = convexTest(schema, modules);
+    const { rowId } = await seedThai(t);
+    await t.run((ctx) =>
+      ctx.db.patch(rowId, {
+        romanizedText: 'laeo thoe la',
+        romanizationSource: getRomanizationSource('th'),
+      }),
+    );
+    expect(await schedule(t, rowId)).toEqual([]);
+    expect(
+      (await t.run((ctx) => ctx.db.get(rowId)))?.annotationRequestedAt,
+    ).toBeUndefined();
   });
 });

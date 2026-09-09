@@ -136,6 +136,32 @@ async function getTtsClaim(
 }
 
 /**
+ * Every in-flight TTS claim of (text, language) that belongs to a rendering
+ * VARIANT. Convex orders `undefined` before every string, so `.gt('', ...)`
+ * starts the range past the canonical claim.
+ *
+ * Sibling of `variantLlmClaims` (llmTranslationQueue.ts), and the reason it
+ * exists: `retireVariantRenderings` dropped the variant rows and their LLM
+ * claims but had no way to reach the TTS claims, so a synthesis in flight
+ * for a wording just retired survived, landed, and attached a pointer to
+ * the OLD wording's asset. The next rewrite then found a pointer and
+ * returned, leaving the card rendering one sentence and playing another for
+ * good.
+ */
+export async function variantTtsClaims(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+  language: string,
+): Promise<Doc<'ttsGenerationClaims'>[]> {
+  return await ctx.db
+    .query('ttsGenerationClaims')
+    .withIndex('by_text_language_variant', (q) =>
+      q.eq('textId', textId).eq('language', language).gt('variantKey', ''),
+    )
+    .take(64);
+}
+
+/**
  * The timings a stored clip keeps: only with validated audio, since a
  * mismatched transcription points at the wrong words, and never an empty
  * array. An empty array means the backend has none (Gemini STT). It is
@@ -955,6 +981,12 @@ export const backfillWordTimings = internalAction({
     // User whose view of the card triggered the sweep, for the cost event
     // (same semantics as on ttsJobArgsValidator). Absent = system bucket.
     requestedByUserId: v.optional(v.string()),
+    /**
+     * The rendering variant whose clip this backfills; absent = canonical.
+     * Carried only to release the right claim: the work itself is keyed by
+     * `storageId`, and the claim was taken under this key.
+     */
+    variantKey: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1124,6 +1156,7 @@ export const backfillWordTimings = internalAction({
       await ctx.runMutation(internal.features.ttsProcessing.releaseTtsClaim, {
         textId: args.textId,
         language: args.language,
+        variantKey: args.variantKey,
       });
     }
     return null;
@@ -1230,10 +1263,17 @@ export const releaseTtsClaim = internalMutation({
   args: {
     textId: v.id('texts'),
     language: v.string(),
+    /** The rendering variant this claim belongs to; absent = canonical. */
+    variantKey: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const claim = await getTtsClaim(ctx, args.textId, args.language);
+    const claim = await getTtsClaim(
+      ctx,
+      args.textId,
+      args.language,
+      args.variantKey,
+    );
     if (claim && claim.workId === undefined) {
       await ctx.db.delete(claim._id);
     }

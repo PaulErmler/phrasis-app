@@ -1,4 +1,5 @@
 import { viewOfCard } from '../db/translationReads';
+import type { RenderingSettings } from '../../lib/preferenceResolution';
 import { v, ConvexError, type Infer } from 'convex/values';
 import { MutationCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
@@ -255,6 +256,8 @@ export async function resolveSearchableTextRefresh(
   ctx: MutationCtx,
   card: Doc<'cards'>,
   course: Doc<'courses'>,
+  /** The course's sentence-form settings, so the rebuilt index holds the rendering the card shows. */
+  renderingSettings: RenderingSettings | undefined,
 ): Promise<{
   text: Doc<'texts'> | null;
   searchableTextPatch:
@@ -293,7 +296,7 @@ export async function resolveSearchableTextRefresh(
       ctx,
       card.textId,
       courseLanguages,
-      { text, view: viewOfCard(card) },
+      { text, view: viewOfCard(card, renderingSettings) },
     );
   }
 

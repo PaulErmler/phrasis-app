@@ -126,6 +126,41 @@ describe('useCountdown', () => {
     hidden.mockRestore();
   });
 
+  it('keeps ticking when consecutive ticks land the same distance from a boundary', async () => {
+    // A timer that fires exactly when due leaves `remaining % 1000` at 999 on
+    // every tick, so `staleInMs` is 1000 twice in a row. With the rescheduling
+    // effect keyed on that value alone, React skipped the second run, nothing
+    // was scheduled, and the countdown froze on "3s" (2026-09-09 review). The
+    // chunked `advance` helper above never shows this because its slices land
+    // on whole seconds; firing each pending timer exactly when due does.
+    const { texts } = renderCountdown(BASE + 5_000);
+    texts.length = 0;
+    for (let i = 0; i < 3; i++) {
+      await act(async () => {
+        await vi.advanceTimersToNextTimerAsync();
+      });
+    }
+    expect(texts).toEqual(['4s', '3s', '2s']);
+  });
+
+  it('measures a new target against a fresh clock', () => {
+    // A two-day wait ticks hourly. Fifty minutes into an hour, `now` is fifty
+    // minutes old; a card that then comes due in thirty minutes must read
+    // "30m", not "1h 20m" until the hourly tick catches up.
+    const { result, rerender } = renderHook(
+      ({ target }: { target: number }) =>
+        useCountdown(target, countdownDisplay),
+      { initialProps: { target: BASE + 2 * 24 * 60 * MINUTE_MS } },
+    );
+    expect(result.current?.text).toBe('2d');
+
+    act(() => {
+      vi.setSystemTime(BASE + 50 * MINUTE_MS);
+    });
+    rerender({ target: BASE + 80 * MINUTE_MS });
+    expect(result.current?.text).toBe('30m');
+  });
+
   it('retargets when the due date changes under it', async () => {
     const { result, rerender } = renderHook(
       ({ target }: { target: number }) =>

@@ -801,6 +801,7 @@ export const reviewCard = mutation({
       ctx,
       card,
       course,
+      renderingSettingsOf(reviewSettings),
     );
 
     // Record stats first so we can fold the new wordsTrackedLanguages stamp
@@ -1950,7 +1951,19 @@ export const flagTranslation = mutation({
         ctx,
         card.textId,
         courseLanguages,
-        { text, view: { pinAt: now, accentLanguage: card.accentLanguage } },
+        {
+          text,
+          // The card's view as of the new pin: the live rows, and the
+          // rendering it shows (its variant may already exist for the live
+          // wording, generated for other learners), so the index holds the
+          // words the card now displays.
+          view: {
+            pinAt: now,
+            accentLanguage: card.accentLanguage,
+            settings: view.settings,
+            card: view.card,
+          },
+        },
       );
       // Raw patch: no card aggregate keys on the pin or the search fields.
       await ctx.db.patch(card._id, {
@@ -2124,11 +2137,16 @@ export const flagTranslation = mutation({
       );
     }
 
+    // Every flag under the cap attempts a fix (Paul, 2026-09-09): a reason
+    // with a pick is answered by the override above; one without a pick
+    // falls back to a retranslation of the shared row, gender and
+    // politeness alike.
     const wantsRetranslation =
       reasons.includes('wrong_translation') ||
       reasons.includes('other') ||
       (reasons.includes('wrong_politeness') &&
-        args.requestedPolitenessLevel === undefined);
+        args.requestedPolitenessLevel === undefined) ||
+      (reasons.includes('wrong_gender') && args.requestedGender === undefined);
 
     // 2) Per-language: over-cap rows record their skip (counter already rose
     // above); under-cap rows claim a slot and enqueue, charging quota on the
@@ -2246,11 +2264,22 @@ export const regenerateCardAudio = mutation({
     const renderingText = renderingTextOf(text);
     for (const lang of audioLanguages) {
       if (lang === text.language) continue;
+      // Resolved with the canonical row's dialect, like every other caller
+      // of `renderingForView` (contentScheduling.ts, translationReads.ts,
+      // cardContent.ts). A mixed code maps the same level onto different
+      // forms per dialect, Spain's tú against Latin America's usted, so
+      // without it this computed a key under the language's DEFAULT dialect
+      // while the served row had resolved under the row's own. The keyed
+      // lookup then missed, no pointer was dropped, and the button spent a
+      // quota unit doing nothing. Same bug `a099c0ae` fixed in
+      // cardEditPipeline.
+      const canonical = await liveTranslation(ctx, card.textId, lang);
       const rendering = renderingForView(
         view,
         renderingText,
         card.textId,
         lang,
+        canonical?.regionVariant,
       );
       if (!rendering.audioVariantKey) continue;
       const pointer = await audioPointer(

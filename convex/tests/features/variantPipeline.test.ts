@@ -1462,3 +1462,76 @@ describe('mixed dialects resolve the form through the row dialect', () => {
     ).toBe(true);
   });
 });
+
+describe('2026-09-09 review fixes', () => {
+  it('a canonical row the classifier gave up on buys the rewrite instead of waiting for a stamp', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, cardId, rows } = await seed(t, { jaGender: 'none' });
+    await t.run((ctx) =>
+      ctx.db.patch(rows.ja, {
+        renderedPoliteness: undefined,
+        renderingStampAttempts: 3,
+      }),
+    );
+    await ensureRenderings(t, textId, undefined);
+    vi.mocked(llmPool.enqueueAction).mockClear();
+    const settings: RenderingSettings = { politenessLevels: ['polite'] };
+    await ensureRenderings(t, textId, settings);
+    // Before: `renderingStampPending` answered "pending" for good once the
+    // attempt cap stopped the stamp requests, the sweep asked for nothing,
+    // and the card sat on "updating" every session.
+    expect(llmEnqueues().map((j) => [j.targetLanguage, j.variantKey])).toEqual(
+      [['ja', 'auto|desu-masu']],
+    );
+    const content = await hydrate(t, textId, cardId, settings);
+    expect(content.hasMissingVariant).toBe(true);
+  });
+
+  it('a variant pointer speaking another sentence is replaced, not trusted', async () => {
+    const t = convexTest(schema, modules);
+    const { textId } = await seed(t);
+    const settings: RenderingSettings = { politenessLevels: ['polite'] };
+    await ensureRenderings(t, textId, settings);
+    // The wording lands without an audio key (a browse-surface job), so no
+    // synthesis claim is open when the sweep looks.
+    await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
+      textId,
+      targetLanguage: 'ja',
+      translatedText: '疲れました。',
+      voiceName: getVoiceForLanguage('ja', 'male'),
+      translationSource: 'openai/gpt-5.6-sol:floor-minimal',
+      speakerGender: 'male',
+      variantKey: 'auto|desu-masu',
+    });
+    // A synthesis that was in flight when the variant was retired lands
+    // late and attaches the OLD wording's asset under the variant key.
+    await t.run(async (ctx) => {
+      const { rowId } = await insertAudioFixture(ctx, {
+        textId,
+        language: 'ja',
+        voiceName: 'ja-test-male',
+        storageId: await ctx.storage.store(new Blob([new Uint8Array([9])])),
+        ttsQuality: 'validated',
+        ttsProvider: getTtsProviderForLanguage('ja'),
+        voiceGender: 'male',
+        spokenText: '疲れたよ。',
+        wordTimings: [],
+      });
+      await ctx.db.patch(rowId, { variantKey: 'male|desu-masu' });
+      // The first pass's rewrite claim: the row landed through the store
+      // directly, so nothing released it, and the audio step defers to an
+      // open rewrite claim on its own.
+      for (const claim of await ctx.db
+        .query('llmTranslationClaims')
+        .collect()) {
+        await ctx.db.delete(claim._id);
+      }
+    });
+    vi.mocked(ttsPool.enqueueAction).mockClear();
+    await ensureRenderings(t, textId, settings);
+    // The pointer is detached (asset kept) and the served wording voiced.
+    expect(ttsEnqueues().map((j) => [j.text, j.variantKey])).toEqual([
+      ['疲れました。', 'male|desu-masu'],
+    ]);
+  });
+});

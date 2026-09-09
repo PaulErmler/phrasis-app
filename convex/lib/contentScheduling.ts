@@ -23,6 +23,8 @@ import {
 } from '../../lib/sentenceMetadataSource';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
+  annotationRequestInFlight,
+  annotationsDue,
   missingAnnotationKinds,
   scheduleTranslationAnnotations,
   TEXT_ANNOTATIONS,
@@ -65,6 +67,7 @@ import {
   renderingTextOf,
   canonicalSatisfies,
   servedAccentRow,
+  resolveServedFromLive,
   sourceRenderingForView,
   type SourceView,
   type SweepCard,
@@ -754,6 +757,17 @@ async function sweepInvalidAudio(
   audioSpeakerGender: string | undefined,
   state: ContentSweepState,
   opts: ContentSweepOpts | undefined,
+  // Languages whose wording is being replaced in this same pass. Their clip
+  // is left exactly as it is, whatever mismatch it has: the incoming
+  // replace archives it against the LIVE pointer and then invalidates it
+  // itself. See the note where `correctedLanguages` is filled.
+  correctedLanguages: ReadonlySet<string>,
+  // Languages where a verdict has landed but the row's rendering stamp has
+  // not: only the GENDER re-voice waits for it (the stamp may prove the
+  // wording itself needs correcting); provider, version and accent drift
+  // are detached as usual. See the note where `genderHoldLanguages` is
+  // filled.
+  genderHoldLanguages: ReadonlySet<string>,
 ): Promise<void> {
   for (const [lang, audio] of state.audioMap) {
     if (!audio) continue;
@@ -781,6 +795,15 @@ async function sweepInvalidAudio(
       await deleteAudioRow(ctx, audio, { blobAlreadyGone: true });
       state.audioMap.set(lang, null);
     } else {
+      // A wording correction is coming for this language (or the stamp that
+      // decides one). Detaching the clip for ANY reason here, gender,
+      // provider, version or accent, makes `replaceForVersionBump` find no
+      // live pointer when the new wording lands, skip the archive, and move
+      // every pinned card onto the new wording. The replace invalidates the
+      // clip itself once the archive has captured it; a byte-identical
+      // restamp leaves the mismatch to the next sweep, which no longer sees
+      // the language as corrected.
+      if (correctedLanguages.has(lang)) continue;
       // For a CURRICULUM text a voice in the other gender is no longer
       // drift: renderings are cached per voice (docs/architecture/
       // translation-variants.md) and a card that wants the other voice
@@ -794,6 +817,7 @@ async function sweepInvalidAudio(
       // clip in the other voice is simply wrong and no variant would ever
       // replace it.
       const genderMismatch =
+        !genderHoldLanguages.has(lang) &&
         (text.userCreated || definitiveSpeakerGender(text) !== null) &&
         (audioSpeakerGender === 'male' || audioSpeakerGender === 'female') &&
         payload.voiceGender !== audioSpeakerGender;
@@ -903,8 +927,12 @@ async function sweepStaleTranslations(
 ): Promise<{
   sweptRegionVariants: Map<string, string>;
   regenScheduled: number;
+  correctedLanguages: Set<string>;
+  genderHoldLanguages: Set<string>;
 }> {
   const sweptRegionVariants = new Map<string, string>();
+  const correctedLanguages = new Set<string>();
+  const genderHoldLanguages = new Set<string>();
   let regenScheduled = 0;
   for (const [lang, translation] of state.translationMap) {
     if (!translation) continue;
@@ -931,9 +959,29 @@ async function sweepStaleTranslations(
     // coin-flipped female speaker). Only a proven row: `unmarked` expresses
     // no gender, and an unstamped row waits for `flushRenderingStamps`.
     const definitive = definitiveSpeakerGender(text);
+    const marksGender = renderingAxesFor(
+      classificationLanguageForRow(translation),
+    ).gender;
+    // A verdict on a row the classifier has not stamped yet: whether the
+    // wording needs correcting is decided by the stamp, which the fill loop
+    // below asks for (`collectRenderingStamp`). Until it lands, the audio
+    // sweep must not re-voice the canonical clip on the verdict alone, or a
+    // male clip of "estoy cansada" is synthesized and served for a pass,
+    // then replaced by the correction's second clip. Only the gender
+    // re-voice waits (other drift is detached as usual), and only while a
+    // stamp can still come; a row the classifier gave up on is re-voiced as
+    // the best that can be done for it.
+    if (
+      definitive !== null &&
+      marksGender &&
+      translation.renderedGender === undefined &&
+      (translation.renderingStampAttempts ?? 0) < MAX_RENDERING_STAMP_ATTEMPTS
+    ) {
+      genderHoldLanguages.add(lang);
+    }
     const stampContradictsVerdict =
       definitive !== null &&
-      renderingAxesFor(classificationLanguageForRow(translation)).gender &&
+      marksGender &&
       translation.renderedGender !== undefined &&
       translation.renderedGender !== 'unmarked' &&
       translation.renderedGender !== axisOf(definitive);
@@ -974,6 +1022,15 @@ async function sweepStaleTranslations(
     });
     if (enqueued) {
       regenScheduled++;
+      // A wording replacement is now in flight for this language, version
+      // bump or correction alike. The audio sweep below must leave the clip
+      // alone: `replaceForVersionBump` archives the old wording against the
+      // LIVE pointer, so detaching it here would make that lookup return
+      // null minutes later and the archive would be skipped, moving every
+      // pinned card onto the new wording. The replace invalidates the clip
+      // itself (`invalidateAudioIfAudiblyChanged`) once the archive has
+      // captured it.
+      correctedLanguages.add(lang);
       // Spend one retry. Only the retry path is counted: the first
       // correction is a stale row meeting a new verdict, which must always
       // be free to run. The replace patch keeps the row's id, so the count
@@ -990,7 +1047,12 @@ async function sweepStaleTranslations(
       state.llmClaimMap.set(lang, await getLlmClaim(ctx, textId, lang));
     }
   }
-  return { sweptRegionVariants, regenScheduled };
+  return {
+    sweptRegionVariants,
+    regenScheduled,
+    correctedLanguages,
+    genderHoldLanguages,
+  };
 }
 
 /**
@@ -1065,7 +1127,7 @@ async function scheduleSupersededRevisionContent(
   opts: ContentSweepOpts | undefined,
 ): Promise<void> {
   for (const revision of state.supersededMap.get(lang) ?? []) {
-    if (opts?.probe && missingAnnotationKinds(lang, revision).length > 0) {
+    if (opts?.probe && annotationsDue(lang, revision)) {
       throw new ProbeNeedsWork();
     }
     await scheduleTranslationAnnotations(ctx, revision, revision._id);
@@ -1131,8 +1193,13 @@ async function scheduleMissingSourceAnnotations(
   text: Doc<'texts'>,
   opts: ContentSweepOpts | undefined,
 ): Promise<void> {
-  for (const kind of missingAnnotationKinds(text.language, text)) {
-    if (opts?.probe) throw new ProbeNeedsWork();
+  const kinds = missingAnnotationKinds(text.language, text);
+  // A request inside the cooldown is still in flight; see
+  // `annotationRequestInFlight`.
+  if (kinds.length === 0 || annotationRequestInFlight(text)) return;
+  if (opts?.probe) throw new ProbeNeedsWork();
+  await ctx.db.patch(textId, { annotationRequestedAt: Date.now() });
+  for (const kind of kinds) {
     await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].sourceTextAction, {
       textId,
       text: text.text,
@@ -1208,7 +1275,7 @@ async function scheduleLanguageContent(
   // Translation exists. Backfill missing annotations (romanization,
   // IPA). Same `=== undefined` sentinel semantics as the source-text
   // loop above.
-  if (opts?.probe && missingAnnotationKinds(lang, translation).length > 0) {
+  if (opts?.probe && annotationsDue(lang, translation)) {
     throw new ProbeNeedsWork();
   }
   await scheduleTranslationAnnotations(ctx, translation, undefined);
@@ -1355,15 +1422,34 @@ export async function scheduleMissingContent(
     langsNeedingTranslation,
   );
 
-  await sweepInvalidAudio(ctx, textId, text, audioSpeakerGender, state, opts);
-
-  const { sweptRegionVariants, regenScheduled } = await sweepStaleTranslations(
+  // Translations first, audio second. The wording sweep decides whether a
+  // `metadata_correction` is coming, and the audio sweep needs that answer
+  // before it detaches a clip the incoming replace still has to archive.
+  // `sweepStaleTranslations` reads only `translationMap` and `llmClaimMap`,
+  // so it does not care that the audio sweep has not run yet.
+  const {
+    sweptRegionVariants,
+    regenScheduled,
+    correctedLanguages,
+    genderHoldLanguages,
+  } = await sweepStaleTranslations(
     ctx,
     textId,
     text,
     audioSpeakerGender,
     state,
     opts,
+  );
+
+  await sweepInvalidAudio(
+    ctx,
+    textId,
+    text,
+    audioSpeakerGender,
+    state,
+    opts,
+    correctedLanguages,
+    genderHoldLanguages,
   );
 
   await scheduleMissingSourceAnnotations(ctx, textId, text, opts);
@@ -1495,6 +1581,14 @@ export function newRenderingStampCollector(): RenderingStampCollector {
 }
 
 /**
+ * How many classifier calls one row may cost before the sweep gives up on
+ * it. Three, matching the shape of the other variant-side caps: the model
+ * either reports a form for a wording or it never will, and each retry is a
+ * fresh call.
+ */
+const MAX_RENDERING_STAMP_ATTEMPTS = 3;
+
+/**
  * How long a stamp request is honoured before a sweep asks again. Covers
  * the classifier's latency many times over, so the repeated sweeps of one
  * card (probe, dispatch, the next review) do not double the call, and
@@ -1513,6 +1607,12 @@ export function needsRenderingStamp(row: Doc<'translations'>): boolean {
     row.renderedGender !== undefined &&
     row.renderedPoliteness !== undefined
   ) {
+    return false;
+  }
+  // A row the classifier keeps leaving blank stops being asked. The request
+  // claim below is only a cooldown, so without this the same unusable row
+  // was re-bought every 15 minutes for good.
+  if ((row.renderingStampAttempts ?? 0) >= MAX_RENDERING_STAMP_ATTEMPTS) {
     return false;
   }
   if (
@@ -1560,7 +1660,11 @@ export async function flushRenderingStamps(
     for (let i = 0; i < ids.length; i += MAX_ROWS_PER_CALL) {
       const chunk = ids.slice(i, i + MAX_ROWS_PER_CALL);
       for (const id of chunk) {
-        await ctx.db.patch(id, { renderingStampRequestedAt: now });
+        const row = await ctx.db.get(id);
+        await ctx.db.patch(id, {
+          renderingStampRequestedAt: now,
+          renderingStampAttempts: (row?.renderingStampAttempts ?? 0) + 1,
+        });
       }
       await ctx.scheduler.runAfter(
         0,
@@ -1587,6 +1691,16 @@ function renderingStampPending(
   rendering: LanguageRendering,
 ): boolean {
   if (rendering.textVariantKey === null) return false;
+  // A row the classifier has given up on (`needsRenderingStamp`'s attempt
+  // cap) is not pending: nothing will ever stamp it. The sweep then buys the
+  // rewrite, the right fallback once three answers came back unusable.
+  // Without this the stamp was "pending" for good, the card sat on
+  // "updating", and every session re-ran the ensure pass for nothing.
+  if (
+    (canonical.renderingStampAttempts ?? 0) >= MAX_RENDERING_STAMP_ATTEMPTS
+  ) {
+    return false;
+  }
   const { gender, formId } = parseVariantKey(rendering.textVariantKey);
   const axes = renderingAxesFor(classificationLanguageForRow(canonical));
   return (
@@ -1684,6 +1798,16 @@ export async function scheduleMissingRenderings(
       continue;
     }
     const canonical = await liveTranslation(ctx, textId, lang);
+    // The pin outranks the variant, so a card reading an archived revision
+    // is served that wording and never a rewrite
+    // (`resolveServedRendering`). Buying one for it would be paid for and
+    // thrown away, so the sweep asks the same question the reader does.
+    if (
+      canonical &&
+      (await resolveServedFromLive(ctx, canonical, view?.pinAt)).archived
+    ) {
+      continue;
+    }
     // The variant is a rewrite of the canonical wording: nothing to do
     // until the canonical sweep has landed it (and audio-only variants
     // need it as the text to speak).
@@ -1720,6 +1844,17 @@ export async function scheduleMissingRenderings(
         if (canonicalSatisfies(canonical, rendering)) {
           variant = canonical;
         } else if (renderingStampPending(canonical, rendering)) {
+          // Ask for the stamp this branch is waiting on. `renderingStampPending`
+          // assumes "the canonical sweep that runs before the rendering sweep
+          // has asked for the stamp", which holds for the paired callers
+          // (`prepareCardContent`, the upcoming-cards probe) and NOT for a
+          // caller that runs this sweep alone: `requestLibraryRenderings` and
+          // the collection preview build a collector, flush it, and would
+          // never put a row in it, so a legacy unstamped row waited for a
+          // stamp nobody ever requested and sat on the "updating" chip for
+          // good. Same collector, so a paired caller still gets one
+          // classifier call per language rather than two.
+          collectRenderingStamp(canonical, opts?.stamps);
           continue;
         } else if (
           await hasBlockingLlmClaim(
@@ -1757,7 +1892,19 @@ export async function scheduleMissingRenderings(
                 llmPriority: opts?.llmPriority,
                 requestedByUserId: opts?.requestedByUserId,
                 variantKey: rendering.textVariantKey,
-                audioVariantKey: rendering.audioVariantKey ?? undefined,
+                // Withheld on a browse surface. `skipTts` stops synthesis
+                // HERE, but the key rides the job to the store, where the
+                // card-exists escape hatch drops `skipTts` and promotes the
+                // clip to the interactive pool. That hatch reads "a card
+                // exists on this text", which for a canonical row means
+                // "this clip is needed" and for a preference-keyed variant
+                // does not: the card it finds may be another learner's, on
+                // other settings. One "Show more" could claim a synthesis
+                // per row. The ensure pass voices the variant through
+                // `ensureVariantAudio` once the text is actually a card.
+                audioVariantKey: opts?.skipTts
+                  ? undefined
+                  : (rendering.audioVariantKey ?? undefined),
                 requestedGender:
                   parseVariantKey(rendering.textVariantKey).gender === AUTO
                     ? undefined
@@ -1780,7 +1927,7 @@ export async function scheduleMissingRenderings(
         // A served variant is content like any other row: its wording
         // gets the annotations of its language, by its own id (the store
         // would otherwise find the canonical row and refuse the wording).
-        if (opts?.probe && missingAnnotationKinds(lang, variant).length > 0) {
+        if (opts?.probe && annotationsDue(lang, variant)) {
           throw new ProbeNeedsWork();
         }
         await scheduleTranslationAnnotations(ctx, variant, variant._id);
@@ -1811,13 +1958,61 @@ export async function scheduleMissingRenderings(
 }
 
 /**
+ * Word timings (and a pending STT verdict) for a VARIANT clip. The canonical
+ * equivalent is `scheduleTimingsBackfillIfNeeded`, which reads the sweep
+ * state's canonical pointers and so never sees a variant.
+ */
+async function backfillVariantTimingsIfNeeded(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+  lang: string,
+  audioVariantKey: string,
+  payload: ResolvedAudioPayload,
+  opts: ContentSweepOpts | undefined,
+): Promise<void> {
+  if (sttBackfillExhausted(payload.asset)) return;
+  const needsTimings =
+    !payload.wordTimings && languageSupportsWordTimings(lang);
+  const needsVerdict =
+    payload.ttsQuality === 'unchecked' && languageSupportsStt(lang);
+  if (!needsTimings && !needsVerdict) return;
+  if (opts?.probe) {
+    if (
+      await hasBlockingTtsClaim(ctx, textId, lang, undefined, audioVariantKey)
+    ) {
+      return;
+    }
+    throw new ProbeNeedsWork();
+  }
+  const claimed = await claimTtsIfAvailable(
+    ctx,
+    textId,
+    lang,
+    undefined,
+    audioVariantKey,
+  );
+  if (!claimed) return;
+  await ctx.scheduler.runAfter(
+    0,
+    internal.features.ttsProcessing.backfillWordTimings,
+    {
+      textId,
+      language: lang,
+      storageId: payload.storageId,
+      requestedByUserId: opts?.requestedByUserId,
+      variantKey: audioVariantKey,
+    },
+  );
+}
+
+/**
  * The audio half of one language's rendering: the clip of `spoken` under
  * `rendering.audioVariantKey`. Detaches a pointer the current TTS setup no
  * longer accepts, attaches a cached asset, or claims and enqueues the
  * synthesis. Returns true iff a pointer was attached or a job enqueued;
  * throws ProbeNeedsWork in probe mode where it would write.
  */
-async function ensureVariantAudio(
+export async function ensureVariantAudio(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   spoken: { language: string; text: string; regionVariant: string | undefined },
@@ -1840,7 +2035,34 @@ async function ensureVariantAudio(
     const { providerMismatch, versionMismatch } = payload
       ? audioAssetMismatch(lang, payload)
       : { providerMismatch: false, versionMismatch: false };
-    if (!blobGone && !providerMismatch && !versionMismatch) return false;
+    // A pointer speaking a different sentence is not this variant's clip.
+    // `retireVariantRenderings` deletes an in-flight synthesis's CLAIM but
+    // cannot stop the job, which lands and attaches the old wording's asset
+    // under this key. When the new canonical wording already satisfies the
+    // form no variant row is ever requested, so the store-side wording
+    // check (`scheduleTtsForLandedTranslation`) never runs, and without
+    // this the card showed one sentence and played another for good. The
+    // asset stays: it is still correct audio for its own string.
+    const wordingMismatch =
+      payload !== null && payload.asset.spokenText !== spoken.text;
+    if (!blobGone && !providerMismatch && !versionMismatch && !wordingMismatch) {
+      // The clip is good. It may still be missing its word timings or its
+      // STT verdict, and the canonical backfill
+      // (`scheduleTimingsBackfillIfNeeded`) only walks `state.audioMap`,
+      // which holds canonical pointers, so a rewritten sentence never got
+      // karaoke. Same claim key as the synthesis, so the two cannot race.
+      if (payload) {
+        await backfillVariantTimingsIfNeeded(
+          ctx,
+          textId,
+          lang,
+          audioVariantKey,
+          payload,
+          opts,
+        );
+      }
+      return false;
+    }
     // A job in flight for this variant re-points the row when it lands.
     if (await hasActiveTtsClaim(ctx, textId, lang, audioVariantKey)) {
       return false;

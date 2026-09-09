@@ -25,6 +25,8 @@ export type ChipTranslation = {
   voiceGender?: 'male' | 'female';
   renderedGender?: 'masculine' | 'feminine';
   renderedPoliteness?: PolitenessLevel;
+  /** The code whose politeness config names the level; see the card type. */
+  formLanguage?: string;
   /** The rendering the settings ask for has not landed; see `formPending`. */
   formPending?: boolean;
 };
@@ -73,6 +75,7 @@ const MAX_CHIP_NAME_LENGTH = 14;
  * two, whatever the global level that reached it was called).
  */
 function politenessChipLabel(
+  /** The row's config language (`formLanguage`), not the course code. */
   language: string,
   level: PolitenessLevel,
   t: FormChipTranslator,
@@ -105,6 +108,13 @@ export function buildFormChips(
 ): FormChip[] {
   const targets = translations.filter((tr) => tr.isTargetLanguage);
   const chips: FormChip[] = [];
+  // The VOICE the card is spoken in, preferred over any row's
+  // `renderedGender` stamp. Those are two different facts: the voice comes
+  // from the text (its classifier verdict or its coin flip) and is known for
+  // every card including the legacy ones with no stamp, while the stamp
+  // describes one wording's grammar. The chip therefore reads "male
+  // speaker" / "female speaker" rather than "masculine" / "feminine", so it
+  // never claims to describe grammar it is not reading.
   const voice = translations.find((tr) => tr.voiceGender)?.voiceGender;
   const gender = voice
     ? axisOf(voice)
@@ -121,16 +131,21 @@ export function buildFormChips(
     chips.push({ label: t('pending'), testId: 'form-chip-pending' });
   }
   const polite = targets.filter((tr) => tr.renderedPoliteness);
+  // The config language, which on a mixed code is the served row's dialect.
+  // The PREFIX and the tooltip still name the course language, since that is
+  // what the learner picked; only the form lookup follows the row.
+  const formCodeOf = (tr: ChipTranslation) => tr.formLanguage ?? tr.language;
   const disagree =
     new Set(
       polite.map((tr) =>
-        politenessChipLabel(tr.language, tr.renderedPoliteness!, t),
+        politenessChipLabel(formCodeOf(tr), tr.renderedPoliteness!, t),
       ),
     ).size > 1;
   for (const tr of polite) {
     const level = tr.renderedPoliteness!;
-    const form = politenessFormForLevel(tr.language, level);
-    const base = politenessChipLabel(tr.language, level, t);
+    const formCode = formCodeOf(tr);
+    const form = politenessFormForLevel(formCode, level);
+    const base = politenessChipLabel(formCode, level, t);
     chips.push({
       label: disagree ? `${getLanguageShortLabel(tr.language)} ${base}` : base,
       title: form

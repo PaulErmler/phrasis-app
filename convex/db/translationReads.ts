@@ -38,8 +38,8 @@ type ContentCtx = QueryCtx | MutationCtx;
  *    served the wording that was live at its PIN: `translationsAcceptedAt`
  *    when set, else `_creationTime`. So an existing learner keeps seeing
  *    (and hearing) exactly what they learned, with zero per-card writes.
- * 2. The RENDERING VARIANT. A course's sentence-form settings
- *    (first-person forms, politeness levels) resolve, per language, to a
+ * 2. The RENDERING VARIANT. A course's politeness levels, plus the card's
+ *    own Flag-dialog corrections, resolve, per language, to a
  *    `variantKey` (lib/preferenceResolution.ts); rows carrying it are a
  *    second rendering of the same text. Canonical rows have no key. See
  *    docs/architecture/translation-variants.md.
@@ -481,7 +481,6 @@ export function renderingForView(
   const cardRendering = resolveCardRendering({
     text,
     textId,
-    settings: view.settings,
     card,
   });
   return resolveLanguageRendering({
@@ -514,7 +513,6 @@ export function sourceRenderingForView(
     resolveCardRendering({
       text,
       textId,
-      settings: view.settings,
       card: view.card ?? null,
     }),
   );
@@ -533,7 +531,6 @@ export function cardVoiceForView(
   return resolveCardRendering({
     text,
     textId,
-    settings: view?.settings ?? {},
     card: view?.card ?? null,
   }).voiceGender;
 }
@@ -542,10 +539,13 @@ export function cardVoiceForView(
  * Whether a canonical row, by its classifier stamps, already IS the
  * requested rendering on every axis the text key asks for, so no variant
  * row is needed: the reader serves canonical and the ensure path schedules
- * nothing. An unstamped row never satisfies anything (the backfill has not
- * reached it). A gender stamp of 'unmarked' satisfies a gender request: the
- * wording has no first-person marking to rewrite, only the voice can
- * differ, and that is the audio key's business.
+ * nothing. An unstamped row never satisfies anything (the lazy stamp,
+ * `flushRenderingStamps`, has not landed yet). A gender stamp of 'unmarked'
+ * always satisfies a gender request: the wording has no first-person
+ * marking to rewrite, only the voice can differ, and that is the audio
+ * key's business. A politeness stamp of 'unmarked' satisfies only on an
+ * ADDRESS language; see the branch in the body, which is where the two
+ * axes stop agreeing.
  */
 export function canonicalSatisfies(
   canonical: Pick<

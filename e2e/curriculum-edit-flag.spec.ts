@@ -212,13 +212,23 @@ test.describe('curriculum edit flags the shared translation', () => {
 /**
  * The Flag dialog's politeness correction. A learner who ticks "the
  * politeness level is wrong" and picks a level writes a per-card override
- * (`cards.renderingPolitenessOverride`) that the card is re-rendered under;
- * no shared row is retranslated for that reason, so the probe's parked
- * counter is only incremented. The hook reads the override back, which is
- * the one link convex-test cannot prove: the dialog is wired to the
- * mutation. Same probe and restore as the edit spec above.
+ * (`cards.renderingPolitenessOverride`) that the card is re-rendered under.
+ * The hook reads the override back, which is the one link convex-test cannot
+ * prove: the dialog is wired to the mutation. Same probe and restore as the
+ * edit spec above.
+ *
+ * Tagged @live, with retries: 0 per TESTING.md. `armProbe` parks the row's
+ * `flagCount` at the cap, but that counter gates only
+ * `retranslateOrRecordCapSkip`. The override write schedules
+ * `prepareCardContent`, which reaches `scheduleMissingRenderings` — a
+ * separate mechanism, keyed by its own `llmTranslationClaims.variantKey`,
+ * with neither a provenance gate nor a quota gate. So this test does buy a
+ * real rewrite of shared dev curriculum, and `clearCardRendering` drops the
+ * override but not the variant rows it caused (invariant 3 retires those
+ * only on a canonical wording change).
  */
-test.describe('flag dialog politeness correction', () => {
+test.describe('flag dialog politeness correction', { tag: '@live' }, () => {
+  test.describe.configure({ retries: 0 });
   let probe: Probe | null = null;
 
   test.afterEach(() => {
