@@ -19,13 +19,51 @@ import { parse } from 'csv-parse/sync';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { openrouterCostUsd } from '../convex/lib/posthogAi';
+import {
+  openrouterCallOptions,
+  type ReasoningEffort,
+} from '../convex/features/translationLLM';
+import { LUNA_PROVIDER_CONSTRAINTS } from '../lib/languages';
 import { tokenizeText } from '../lib/wordTokenize';
 import { normalizeForComparison } from '../lib/textCompare/normalize';
 
-/** The stage the prototype benchmarked. Keep in step with story-prototype.ts. */
-const MODEL = 'google/gemini-3.8-flash:floor';
-const REASONING = 'minimal' as const;
-const MAX_OUTPUT_TOKENS = 8_000;
+/** Headroom for the answer AFTER thinking. `medium` and `high` spend ~7.7k
+ *  tokens thinking about a 30-word dialogue, so the prototype's 8k cap left
+ *  nothing for the reply and the call came back truncated. */
+const MAX_OUTPUT_TOKENS = 32_000;
+
+/**
+ * The models worth putting this prompt in front of, and the thinking levels
+ * each one actually accepts.
+ *
+ *  - Gemini has no "off": it rejects a disabled-reasoning request outright
+ *    ("Reasoning is mandatory for this endpoint"), so `minimal` is its floor.
+ *    The prototype ran everything at `minimal`, where it reports 0 thinking
+ *    tokens.
+ *  - Luna DOES take `none`, and that is load-bearing rather than a saving:
+ *    it reasons adaptively unless thinking is explicitly disabled, and those
+ *    hidden tokens are billed. Its provider constraints are production's
+ *    (`LUNA_PROVIDER_CONSTRAINTS`) so routing and price cap match the real
+ *    translation stage.
+ */
+const MODELS = {
+  'gemini-3.8-flash': {
+    slug: 'google/gemini-3.8-flash:floor',
+    label: 'Gemini 3.8 Flash (:floor)',
+    levels: ['minimal', 'low', 'medium', 'high'] as ReasoningEffort[],
+    defaultLevel: 'minimal' as ReasoningEffort,
+    provider: undefined,
+  },
+  'gpt-5.6-luna': {
+    slug: 'openai/gpt-5.6-luna:nitro',
+    label: 'GPT-5.6 Luna (:nitro)',
+    levels: ['none', 'minimal', 'low', 'medium', 'high'] as ReasoningEffort[],
+    defaultLevel: 'none' as ReasoningEffort,
+    provider: LUNA_PROVIDER_CONSTRAINTS,
+  },
+} as const;
+type ModelKey = keyof typeof MODELS;
+const DEFAULT_MODEL: ModelKey = 'gemini-3.8-flash';
 
 const PORT = Number(process.argv.find((a) => a.startsWith('--port='))?.split('=')[1] ?? 5599);
 const DATASET = resolve(
@@ -155,14 +193,28 @@ async function generate(body: {
   words: string[];
   sources: { target: string }[];
   temperature?: number;
+  reasoning?: string;
+  model?: string;
 }) {
+  const key: ModelKey =
+    body.model && body.model in MODELS ? (body.model as ModelKey) : DEFAULT_MODEL;
+  const config = MODELS[key];
+  const effort: ReasoningEffort = (
+    config.levels as readonly ReasoningEffort[]
+  ).includes(body.reasoning as ReasoningEffort)
+    ? (body.reasoning as ReasoningEffort)
+    : config.defaultLevel;
   const started = Date.now();
   const res = await generateText({
-    model: openrouter(MODEL),
+    model: openrouter(config.slug),
     prompt: body.prompt,
     temperature: body.temperature ?? 0.7,
     maxOutputTokens: MAX_OUTPUT_TOKENS,
-    providerOptions: { openrouter: { reasoning: { effort: REASONING } } },
+    // Production's own wiring, so 'none' means disabled-not-minimal here too.
+    ...(() => {
+      const opts = openrouterCallOptions(effort, config.provider);
+      return opts ? { providerOptions: opts } : {};
+    })(),
   });
   const costUsd = openrouterCostUsd(res.providerMetadata);
   sessionSpendUsd += costUsd ?? 0;
@@ -194,15 +246,27 @@ async function generate(body: {
   } catch (err) {
     parseError = err instanceof Error ? err.message : String(err);
   }
+  // A truncated reply is the usual reason the JSON won't parse at the higher
+  // thinking levels; say so instead of leaving a bare syntax error.
+  if (parseError && res.finishReason === 'length') {
+    parseError = `the reply hit the ${MAX_OUTPUT_TOKENS}-token cap before it finished (${res.usage?.reasoningTokens ?? 0} of those went on thinking)`;
+  }
 
   return {
     story,
     parseError,
+    truncated: res.finishReason === 'length',
     raw: res.text,
     costUsd,
     sessionSpendUsd,
+    reasoning: effort,
+    model: key,
+    modelSlug: config.slug,
     latencyMs: Date.now() - started,
     inputTokens: res.usage?.inputTokens ?? 0,
+    // Billed inside outputTokens; broken out so the cost of raising the
+    // thinking level is visible rather than buried in the total.
+    reasoningTokens: res.usage?.reasoningTokens ?? 0,
     outputTokens: res.usage?.outputTokens ?? 0,
     metrics: story ? score(body.lang, story.lines, body.words, body.sources) : null,
   };
@@ -227,7 +291,8 @@ const server = createServer(async (req, res) => {
       const html = readFileSync(PAGE, 'utf8')
         .replace('__LANGS__', JSON.stringify(LANGS))
         .replace('__BANDS__', JSON.stringify(BANDS))
-        .replace('__MODEL__', JSON.stringify(MODEL));
+        .replace('__MODELS__', JSON.stringify(MODELS))
+        .replace('__DEFAULT_MODEL__', JSON.stringify(DEFAULT_MODEL));
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
       return;
@@ -255,5 +320,9 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`\nStory prompt bench → http://127.0.0.1:${PORT}`);
-  console.log(`Model: ${MODEL}  ·  ctrl-c to stop`);
+  console.log(
+    `Models: ${Object.values(MODELS)
+      .map((m) => m.slug)
+      .join(', ')}  ·  ctrl-c to stop`,
+  );
 });

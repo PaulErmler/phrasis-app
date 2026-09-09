@@ -205,7 +205,7 @@ pre.raw {
 
 <div class="bar">
   <h1>Story Prompt Bench</h1>
-  <span class="meta" id="model"></span>
+  <span class="meta" id="slug"></span>
   <span class="spend">session <b id="spend">$0.0000</b></span>
 </div>
 
@@ -225,6 +225,18 @@ pre.raw {
         <input id="count" type="number" min="5" max="60" value="20" style="width:74px">
       </div>
       <button class="ghost" id="drawBtn" type="button">Draw words</button>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label class="label" for="model">Model</label>
+        <select id="model"></select>
+      </div>
+      <div class="field">
+        <label class="label" for="reasoning">Thinking</label>
+        <select id="reasoning"></select>
+      </div>
+      <p class="hint" id="modelHint" style="flex:1 1 200px"></p>
     </div>
 
     <div class="field">
@@ -262,7 +274,13 @@ pre.raw {
 <script>
 const LANGS = __LANGS__;
 const BANDS = __BANDS__;
-const MODEL = __MODEL__;
+const MODELS = __MODELS__;
+const DEFAULT_MODEL = __DEFAULT_MODEL__;
+
+const MODEL_HINTS = {
+  'gemini-3.8-flash': 'No “off” — <code>minimal</code> is the floor, and it reports 0 thinking tokens there. What the prototype measured.',
+  'gpt-5.6-luna': '<code>none</code> is load-bearing: Luna reasons adaptively unless thinking is switched off, and those hidden tokens are billed.',
+};
 
 const DEFAULT_PROMPT = `Here are some words a learner of {{language}} knows:
 
@@ -287,7 +305,31 @@ const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, 
 let drawn = null;
 const history = [];
 
-$('model').textContent = MODEL;
+for (const [key, m] of Object.entries(MODELS)) {
+  const o = document.createElement('option');
+  o.value = key;
+  o.textContent = m.label;
+  $('model').append(o);
+}
+$('model').value = DEFAULT_MODEL;
+
+/** Thinking levels are per-model, so rebuild the list whenever it changes;
+ *  keep the current level if the new model also offers it. */
+function syncReasoning() {
+  const m = MODELS[$('model').value];
+  const keep = $('reasoning').value;
+  $('reasoning').innerHTML = '';
+  for (const r of m.levels) {
+    const o = document.createElement('option');
+    o.value = r;
+    o.textContent = r;
+    $('reasoning').append(o);
+  }
+  $('reasoning').value = m.levels.includes(keep) ? keep : m.defaultLevel;
+  $('modelHint').innerHTML = MODEL_HINTS[$('model').value] || '';
+  $('slug').textContent = m.slug;
+}
+
 for (const l of LANGS) {
   const o = document.createElement('option');
   o.value = l;
@@ -302,6 +344,7 @@ for (const b of BANDS) {
   $('band').append(o);
 }
 $('band').value = BANDS.includes('A2') ? 'A2' : BANDS[0];
+syncReasoning();
 $('prompt').value = DEFAULT_PROMPT;
 
 function languageName() {
@@ -348,6 +391,8 @@ function renderStory(data) {
       <div class="stat"><dt>words used</dt><dd>${m.wordsUsed}<span>/${m.wordsGiven}</span></dd></div>
       <div class="stat"><dt>length</dt><dd>${m.storyWords}<span> words</span></dd></div>
       <div class="stat stat--off"><dt>off-list words</dt><dd>${Math.round(m.offCardShare * 100)}%</dd></div>
+      <div class="stat"><dt>model</dt><dd style="font-size:13px">${esc((MODELS[data.model] || {}).label || data.model)}</dd></div>
+      <div class="stat"><dt>thinking</dt><dd>${esc(data.reasoning)}<span> · ${data.reasoningTokens} tok</span></dd></div>
       <div class="stat"><dt>cost</dt><dd>${data.costUsd == null ? '—' : '$' + data.costUsd.toFixed(5)}</dd></div>
       <div class="stat"><dt>latency</dt><dd>${(data.latencyMs / 1000).toFixed(1)}<span>s</span></dd></div>
     </dl>`);
@@ -397,6 +442,8 @@ async function run() {
         lang: $('lang').value,
         words: drawn.words,
         sources: drawn.sources,
+        reasoning: $('reasoning').value,
+        model: $('model').value,
       }),
     });
     const data = await res.json();
@@ -414,7 +461,7 @@ async function run() {
     $('historyWrap').hidden = false;
     $('history').innerHTML = history.slice(0, 12).map((h, i) => {
       const m = h.data.metrics;
-      return `<button type="button" data-i="${i}">${h.at.toLocaleTimeString()} · ${
+      return `<button type="button" data-i="${i}">${h.at.toLocaleTimeString()} · ${esc(String(h.data.model).replace(/^gpt-|^gemini-/, ''))} · ${esc(h.data.reasoning)} · ${
         m ? `${m.storyWords}w · ${Math.round(m.offCardShare * 100)}% off-list` : 'unparsed'
       } · ${h.data.costUsd == null ? '—' : '$' + h.data.costUsd.toFixed(5)}</button>`;
     }).join('');
@@ -425,6 +472,7 @@ async function run() {
   }
 }
 
+$('model').addEventListener('change', syncReasoning);
 $('drawBtn').addEventListener('click', drawWords);
 $('runBtn').addEventListener('click', run);
 $('resetBtn').addEventListener('click', () => { $('prompt').value = DEFAULT_PROMPT; });

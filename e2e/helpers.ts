@@ -494,11 +494,21 @@ export function appMain(page: Page): Locator {
  * attempts). Instead retry the whole cycle: click toward the desired
  * state, give the mutation a bounded flush window, reload, re-read. A
  * write the reload killed is simply re-issued on the next pass.
+ *
+ * `reopen` is for controls that do not survive the reload on their own —
+ * anything inside a sheet or dialog. It runs after `page.reload()` and
+ * before the re-read, so the toggles are mounted again by the time this
+ * checks them. Without it the caller is stuck hand-rolling the fragile
+ * half of the pattern (a fixed pause, then one un-retried read), which is
+ * what learning-settings.spec.ts still does.
  */
 export async function ensureTogglesSaved(
   page: Page,
   expected: Array<{ toggle: Locator; on: boolean }>,
-  timeoutMs = 45_000,
+  {
+    reopen,
+    timeoutMs = 45_000,
+  }: { reopen?: (page: Page) => Promise<void>; timeoutMs?: number } = {},
 ): Promise<void> {
   // Once ANY click happened, only a post-reload read proves persistence —
   // before that, aria-checked may be the optimistic patch of a write that
@@ -519,6 +529,7 @@ export async function ensureTogglesSaved(
     // the reload below kills the websocket.
     if (clickedThisPass) await page.waitForTimeout(1_000);
     await page.reload();
+    if (reopen) await reopen(page);
     for (const { toggle, on } of expected) {
       await expect(toggle).toBeVisible({ timeout: 15_000 });
       expect(await toggle.getAttribute('aria-checked')).toBe(String(on));

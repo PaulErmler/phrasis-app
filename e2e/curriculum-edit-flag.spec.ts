@@ -1,8 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
-import { dismissTour, expectSignedIn } from './helpers';
+import { convexRun, fixtureEmail } from './convex-hooks';
+import { dismissTour, expectSignedIn, neutralizeTours } from './helpers';
 
 /**
  * Editing a curriculum card is also a complaint about the curriculum.
@@ -27,27 +25,6 @@ import { dismissTour, expectSignedIn } from './helpers';
  * E2E_TEST_HOOKS=1, which global-setup sets for the run.
  */
 
-const REPO_ROOT = path.resolve(__dirname, '..');
-
-/** Run a Convex function on the dev deployment and parse its JSON result. */
-function convexRun(fn: string, args: Record<string, unknown>): unknown {
-  const out = execFileSync(
-    'pnpm',
-    ['exec', 'convex', 'run', fn, JSON.stringify(args)],
-    { cwd: REPO_ROOT, encoding: 'utf8' },
-  );
-  const lines = out.trim().split('\n');
-  for (let i = lines.length - 1; i >= 0; i--) {
-    if (!lines[i].trim()) continue;
-    try {
-      return JSON.parse(lines.slice(i).join('\n'));
-    } catch {
-      /* keep scanning upwards */
-    }
-  }
-  return undefined;
-}
-
 type Probe = {
   cardId: string;
   textId: string;
@@ -57,16 +34,6 @@ type Probe = {
   targetText: string;
   originalFlagCount: number | null;
 };
-
-function fixtureEmail(): string {
-  const creds = JSON.parse(
-    fs.readFileSync(
-      path.resolve(REPO_ROOT, 'e2e/.auth/credentials-a.json'),
-      'utf8',
-    ),
-  ) as { email: string };
-  return creds.email;
-}
 
 /** Open the edit dialog for one specific library card. */
 async function openEditDialog(page: Page, card: Locator): Promise<void> {
@@ -82,7 +49,7 @@ async function openEditDialog(page: Page, card: Locator): Promise<void> {
       .getByRole('button', { name: 'More', exact: true })
       .first()
       .click();
-    await page.getByRole('menuitem', { name: 'Edit', exact: true }).click();
+    await page.getByTestId('card-action-edit').click();
   }
   await expect(
     page.getByRole('heading', { name: 'Edit Sentence' }),
@@ -111,8 +78,11 @@ test.describe('curriculum edit flags the shared translation', () => {
     probe = convexRun('features/curriculumFlagTesting:armProbe', {
       email,
     }) as Probe | null;
+    // `== null`: a null probe comes back from `convex run` as NO output at
+    // all, so anything that mis-parses silence lands here as undefined. Both
+    // mean "nothing to probe" and both have to skip rather than crash.
     test.skip(
-      probe === null,
+      probe == null,
       'fixture user has no shared curriculum card with a flaggable translation',
     );
     const p = probe!;
@@ -125,10 +95,13 @@ test.describe('curriculum edit flags the shared translation', () => {
       }),
     ).toBeGreaterThan(0);
 
+    // Before the first navigation: a tour arming later re-covers the page,
+    // and its overlay swallows clicks on the card actions.
+    await neutralizeTours(page);
     await page.goto('/app/library');
     await page.waitForLoadState('domcontentloaded');
     await expectSignedIn(page);
-    await dismissTour(page);
+    await dismissTour(page, undefined, 500);
 
     // Narrow the list to the probe card by its target-language wording.
     const search = page.getByTestId('library-search').first();
@@ -253,16 +226,22 @@ test.describe('flag dialog politeness correction', { tag: '@live' }, () => {
     probe = convexRun('features/curriculumFlagTesting:armProbe', {
       email,
     }) as Probe | null;
+    // `== null`: a null probe comes back from `convex run` as NO output at
+    // all, so anything that mis-parses silence lands here as undefined. Both
+    // mean "nothing to probe" and both have to skip rather than crash.
     test.skip(
-      probe === null,
+      probe == null,
       'fixture user has no shared curriculum card with a flaggable translation',
     );
     const p = probe!;
 
+    // Before the first navigation: a tour arming later re-covers the page,
+    // and its overlay swallows clicks on the card actions.
+    await neutralizeTours(page);
     await page.goto('/app/library');
     await page.waitForLoadState('domcontentloaded');
     await expectSignedIn(page);
-    await dismissTour(page);
+    await dismissTour(page, undefined, 500);
 
     const search = page.getByTestId('library-search').first();
     await expect(search).toBeVisible({ timeout: 20_000 });
@@ -273,23 +252,35 @@ test.describe('flag dialog politeness correction', { tag: '@live' }, () => {
     await expect(card).toBeVisible({ timeout: 20_000 });
 
     // "Flag translation" is a surface button when pinned, else in the menu.
-    const pinnedFlag = card.getByRole('button', {
-      name: 'Flag translation',
-      exact: true,
-    });
-    if ((await pinnedFlag.count()) > 0) {
-      await pinnedFlag.first().click();
-    } else {
-      await card
-        .getByRole('button', { name: 'More', exact: true })
-        .first()
-        .click();
-      await page
-        .getByRole('menuitem', { name: 'Flag translation', exact: true })
-        .click();
-    }
+    // Opening it is retried as a UNIT, and the dialog showing up is the exit
+    // condition. Two things bite a single-shot open. The menu row can only be
+    // addressed by testid, because every DropdownMenuItem in CardActionsMenu
+    // nests a pin <button aria-label=…> whose label joins the item's
+    // name-from-content, so no `{ name, exact: true }` matches it. And the
+    // library list re-renders while the backend finishes this card's content;
+    // each re-render remounts the card and closes the dropdown with it, so an
+    // open-then-click can spend the whole test timeout clicking a menu row
+    // that keeps being replaced under it (2026-09-09).
     const dialog = page.getByTestId('flag-dialog');
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    await expect(async () => {
+      // A half-open menu from the previous attempt would be toggled SHUT by
+      // the trigger click below, so start each pass from closed.
+      await page.keyboard.press('Escape').catch(() => {});
+      const pinnedFlag = card.getByRole('button', {
+        name: 'Flag translation',
+        exact: true,
+      });
+      if ((await pinnedFlag.count()) > 0) {
+        await pinnedFlag.first().click({ timeout: 5_000 });
+      } else {
+        await card
+          .getByRole('button', { name: 'More', exact: true })
+          .first()
+          .click({ timeout: 5_000 });
+        await page.getByTestId('card-action-flag').click({ timeout: 5_000 });
+      }
+      await expect(dialog).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 60_000, intervals: [500, 1_000, 2_000] });
 
     await page.getByTestId('flag-reason-wrong_politeness').click();
     // The rows are the course's own politeness levels; the fixture course
