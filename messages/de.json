@@ -550,6 +550,9 @@
       "noCollectionDescription": "Du musst eine Sammlung auswählen, um Inhalte zu lernen.",
       "goHome": "Zur Startseite",
       "allDone": "Alles erledigt! Füge weitere Sätze hinzu, um weiterzulernen.",
+      "nextReviewToday": "Nächste Wiederholung in {time} · heute um {clock}",
+      "nextReviewTomorrow": "Nächste Wiederholung in {time} · morgen um {clock}",
+      "nextReviewOn": "Nächste Wiederholung in {time} · {clock}",
       "noCardsInDeck": "Füge Sätze aus einer Sammlung hinzu, um mit dem Lernen zu beginnen.",
       "filterBlocked": {
         "titleCustom": "Gerade keine eigenen Karten zum Lernen",

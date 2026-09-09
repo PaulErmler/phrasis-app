@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Story Prompt Bench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Petrona:ital,wght@0,400;0,600;0,700;1,400&family=Public+Sans:ital,wght@0,400;0,500;0,600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --paper: #f4f4f1;
+  --surface: #fbfbf9;
+  --surface-2: #ececea;
+  --ink: #191b1a;
+  --ink-soft: #4a4f4c;
+  --muted: #6b706d;
+  --rule: #d8d9d3;
+  --rule-strong: #bcbeb6;
+  --accent: #12574b;
+  --accent-ink: #fbfbf9;
+  --mark: #f4e6a6;
+  --mark-edge: #8a6d1f;
+  --plum: #7a3b5c;
+  --serif: 'Petrona', Georgia, serif;
+  --sans: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #131614;
+    --surface: #1b1f1d;
+    --surface-2: #232725;
+    --ink: #e9eae5;
+    --ink-soft: #c2c6c1;
+    --muted: #8d938e;
+    --rule: #2e332f;
+    --rule-strong: #414741;
+    --accent: #6cc0ab;
+    --accent-ink: #10130f;
+    --mark: #4a3f1c;
+    --mark-edge: #e2c877;
+    --plum: #d195b1;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+p { margin: 0; }
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 18px;
+  padding: 14px clamp(16px, 3vw, 28px);
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+.bar h1 { font-family: var(--serif); font-size: 20px; font-weight: 700; }
+.bar .meta { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.bar .spend { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.bar .spend b { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.layout {
+  display: grid;
+  gap: 0;
+  align-items: start;
+}
+@media (min-width: 1000px) { .layout { grid-template-columns: minmax(420px, 5fr) 6fr; } }
+.pane { padding: clamp(16px, 2.5vw, 26px); display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.pane--left { border-right: 1px solid var(--rule); }
+@media (max-width: 999px) { .pane--left { border-right: none; border-bottom: 1px solid var(--rule); } }
+
+.field { display: flex; flex-direction: column; gap: 7px; }
+.label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.row .field { flex: 0 1 auto; }
+
+select, input[type="number"], textarea {
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  padding: 7px 9px;
+}
+textarea {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  min-height: 320px;
+  resize: vertical;
+  width: 100%;
+  tab-size: 2;
+}
+select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline: 2px solid var(--mark-edge);
+  outline-offset: 1px;
+}
+
+button {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+
+.words { display: flex; flex-wrap: wrap; gap: 6px; }
+.word {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 3px 8px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+.word.is-used { background: var(--mark); border-color: var(--mark-edge); color: var(--ink); }
+.hint { font-size: 12.5px; color: var(--muted); }
+.hint code { font-family: var(--mono); background: var(--surface-2); padding: 1px 4px; border-radius: 2px; }
+
+details.sources { border: 1px solid var(--rule); border-radius: 2px; background: var(--surface); }
+details.sources summary { padding: 8px 11px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+details.sources ol { margin: 0; padding: 0 14px 12px 30px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+
+.stats { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--rule); border-radius: 2px; background: var(--surface); }
+.stat { padding: 8px 13px; display: flex; flex-direction: column; gap: 1px; flex: 1 1 auto; }
+.stat + .stat { border-left: 1px solid var(--rule); }
+.stat dt { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.stat dd { margin: 0; font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums; }
+.stat dd span { font-size: 11px; color: var(--muted); }
+.stat--off dd { color: var(--plum); }
+
+.story__title { font-family: var(--serif); font-size: 21px; font-weight: 600; }
+.story__title-en { font-size: 13px; color: var(--muted); font-style: italic; }
+.dialogue { display: flex; flex-direction: column; }
+.turn {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--rule);
+  align-items: baseline;
+}
+.turn:last-child { border-bottom: 1px solid var(--rule); }
+.turn__who { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); overflow-wrap: anywhere; }
+.turn__body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.turn__target { font-family: var(--serif); font-size: 17px; line-height: 1.4; overflow-wrap: break-word; }
+.turn__gloss { font-size: 13px; color: var(--muted); overflow-wrap: break-word; }
+
+.notice { padding: 10px 13px; border-left: 2px solid var(--plum); background: var(--surface); font-size: 13px; color: var(--ink-soft); }
+pre.raw {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 11px 13px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.empty { color: var(--muted); font-size: 14px; font-style: italic; }
+.history { display: flex; flex-direction: column; gap: 6px; }
+.history button {
+  text-align: left;
+  background: var(--surface);
+  color: var(--ink-soft);
+  border: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 6px 10px;
+  font-weight: 400;
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <h1>Story Prompt Bench</h1>
+  <span class="meta" id="model"></span>
+  <span class="spend">session <b id="spend">$0.0000</b></span>
+</div>
+
+<div class="layout">
+  <div class="pane pane--left">
+    <div class="row">
+      <div class="field">
+        <label class="label" for="lang">Language</label>
+        <select id="lang"></select>
+      </div>
+      <div class="field">
+        <label class="label" for="band">Level</label>
+        <select id="band"></select>
+      </div>
+      <div class="field">
+        <label class="label" for="count">Words</label>
+        <input id="count" type="number" min="5" max="60" value="20" style="width:74px">
+      </div>
+      <button class="ghost" id="drawBtn" type="button">Draw words</button>
+    </div>
+
+    <div class="field">
+      <span class="label">The drawn words <span id="usedNote" class="hint"></span></span>
+      <div class="words" id="words"><span class="empty">Draw a set to begin.</span></div>
+    </div>
+
+    <details class="sources">
+      <summary>The cards they came from (never sent to the model)</summary>
+      <ol id="sources"></ol>
+    </details>
+
+    <div class="field">
+      <label class="label" for="prompt">Prompt · <code>{{words}}</code> is replaced with the list</label>
+      <textarea id="prompt" spellcheck="false"></textarea>
+      <p class="hint">Sent verbatim to the model. Keep the JSON block or the story can't be rendered — the raw reply is shown either way.</p>
+    </div>
+
+    <div class="row">
+      <button id="runBtn" type="button">Generate</button>
+      <button class="ghost" id="resetBtn" type="button">Reset prompt</button>
+    </div>
+
+    <div class="field" id="historyWrap" hidden>
+      <span class="label">This session</span>
+      <div class="history" id="history"></div>
+    </div>
+  </div>
+
+  <div class="pane">
+    <div id="out"><p class="empty">Draw a set of words, then generate.</p></div>
+  </div>
+</div>
+
+<script>
+const LANGS = __LANGS__;
+const BANDS = __BANDS__;
+const MODEL = __MODEL__;
+
+const DEFAULT_PROMPT = `Here are some words a learner of {{language}} knows:
+
+{{words}}
+
+Write a short conversation between two people. Use some of these words. Do not use any word that is harder than the words in this list.
+
+Return ONE JSON object, no markdown fence:
+{
+  "title": "<title in {{language}}>",
+  "titleEn": "<the title in English>",
+  "lines": [{ "speaker": "<name>", "text": "<one line in {{language}}>", "en": "<its English translation>" }]
+}`;
+
+const LANGUAGE_NAMES = {
+  en: 'English', de: 'German', fr: 'French', es: 'Spanish', it: 'Italian',
+  pt: 'Portuguese', ru: 'Russian', ja: 'Japanese', zh: 'Chinese', ar: 'Arabic',
+};
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+let drawn = null;
+const history = [];
+
+$('model').textContent = MODEL;
+for (const l of LANGS) {
+  const o = document.createElement('option');
+  o.value = l;
+  o.textContent = LANGUAGE_NAMES[l] || l;
+  $('lang').append(o);
+}
+$('lang').value = LANGS.includes('de') ? 'de' : LANGS[0];
+for (const b of BANDS) {
+  const o = document.createElement('option');
+  o.value = b;
+  o.textContent = b;
+  $('band').append(o);
+}
+$('band').value = BANDS.includes('A2') ? 'A2' : BANDS[0];
+$('prompt').value = DEFAULT_PROMPT;
+
+function languageName() {
+  return LANGUAGE_NAMES[$('lang').value] || $('lang').value;
+}
+
+function renderWords(used) {
+  if (!drawn) return;
+  const usedSet = new Set((used || []).map((w) => w.toLowerCase()));
+  $('words').innerHTML = drawn.words
+    .map((w) => `<span class="word${usedSet.has(w.toLowerCase()) ? ' is-used' : ''}">${esc(w)}</span>`)
+    .join('');
+  $('sources').innerHTML = drawn.sources
+    .map((s) => `<li>${esc(s.target)}</li>`)
+    .join('');
+}
+
+async function drawWords() {
+  $('drawBtn').disabled = true;
+  try {
+    const params = new URLSearchParams({
+      lang: $('lang').value,
+      band: $('band').value,
+      count: $('count').value,
+    });
+    const res = await fetch(`/api/draw?${params}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    drawn = data;
+    $('usedNote').textContent = '';
+    renderWords([]);
+  } catch (err) {
+    $('words').innerHTML = `<span class="empty">${esc(String(err.message || err))}</span>`;
+  } finally {
+    $('drawBtn').disabled = false;
+  }
+}
+
+function renderStory(data) {
+  const parts = [];
+  if (data.metrics) {
+    const m = data.metrics;
+    parts.push(`<dl class="stats">
+      <div class="stat"><dt>words used</dt><dd>${m.wordsUsed}<span>/${m.wordsGiven}</span></dd></div>
+      <div class="stat"><dt>length</dt><dd>${m.storyWords}<span> words</span></dd></div>
+      <div class="stat stat--off"><dt>off-list words</dt><dd>${Math.round(m.offCardShare * 100)}%</dd></div>
+      <div class="stat"><dt>cost</dt><dd>${data.costUsd == null ? '—' : '$' + data.costUsd.toFixed(5)}</dd></div>
+      <div class="stat"><dt>latency</dt><dd>${(data.latencyMs / 1000).toFixed(1)}<span>s</span></dd></div>
+    </dl>`);
+  }
+  if (data.story) {
+    const s = data.story;
+    const gloss = $('lang').value !== 'en';
+    parts.push(`<div>
+      ${s.title ? `<h2 class="story__title">${esc(s.title)}</h2>` : ''}
+      ${gloss && s.titleEn ? `<p class="story__title-en">${esc(s.titleEn)}</p>` : ''}
+    </div>`);
+    parts.push(`<div class="dialogue">${s.lines.map((l) => `
+      <div class="turn">
+        <div class="turn__who">${esc(l.speaker)}</div>
+        <div class="turn__body">
+          <p class="turn__target">${esc(l.text)}</p>
+          ${gloss && l.en ? `<p class="turn__gloss">${esc(l.en)}</p>` : ''}
+        </div>
+      </div>`).join('')}</div>`);
+  } else {
+    parts.push(`<p class="notice">Could not read a story out of the reply: ${esc(data.parseError || 'unknown')}. The raw output is below.</p>`);
+  }
+  if (data.metrics && data.metrics.offCard.length) {
+    parts.push(`<div class="field"><span class="label">Words from outside the list</span>
+      <div class="words">${data.metrics.offCard.map((w) => `<span class="word">${esc(w)}</span>`).join('')}</div></div>`);
+  }
+  parts.push(`<details class="sources"><summary>Raw model output</summary><pre class="raw">${esc(data.raw)}</pre></details>`);
+  $('out').innerHTML = parts.join('\n');
+}
+
+async function run() {
+  if (!drawn) {
+    await drawWords();
+    if (!drawn) return;
+  }
+  const prompt = $('prompt').value
+    .replaceAll('{{words}}', drawn.words.join(', '))
+    .replaceAll('{{language}}', languageName());
+  $('runBtn').disabled = true;
+  $('out').innerHTML = '<p class="empty">Generating…</p>';
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt,
+        lang: $('lang').value,
+        words: drawn.words,
+        sources: drawn.sources,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderStory(data);
+    $('spend').textContent = '$' + data.sessionSpendUsd.toFixed(4);
+    if (data.metrics) {
+      const usedForms = drawn.words.filter((w) =>
+        new RegExp(`(^|\\W)${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\W|$)`, 'i')
+          .test(data.story.lines.map((l) => l.text).join(' ')));
+      renderWords(usedForms);
+      $('usedNote').textContent = `— ${data.metrics.wordsUsed} of ${data.metrics.wordsGiven} appeared`;
+    }
+    history.unshift({ data, at: new Date() });
+    $('historyWrap').hidden = false;
+    $('history').innerHTML = history.slice(0, 12).map((h, i) => {
+      const m = h.data.metrics;
+      return `<button type="button" data-i="${i}">${h.at.toLocaleTimeString()} · ${
+        m ? `${m.storyWords}w · ${Math.round(m.offCardShare * 100)}% off-list` : 'unparsed'
+      } · ${h.data.costUsd == null ? '—' : '$' + h.data.costUsd.toFixed(5)}</button>`;
+    }).join('');
+  } catch (err) {
+    $('out').innerHTML = `<p class="notice">${esc(String(err.message || err))}</p>`;
+  } finally {
+    $('runBtn').disabled = false;
+  }
+}
+
+$('drawBtn').addEventListener('click', drawWords);
+$('runBtn').addEventListener('click', run);
+$('resetBtn').addEventListener('click', () => { $('prompt').value = DEFAULT_PROMPT; });
+$('lang').addEventListener('change', drawWords);
+$('band').addEventListener('change', drawWords);
+$('history').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-i]');
+  if (btn) renderStory(history[Number(btn.dataset.i)].data);
+});
+
+drawWords();
+</script>
+</body>
+</html>

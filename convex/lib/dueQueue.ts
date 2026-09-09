@@ -317,3 +317,41 @@ export async function fetchTrackDueCards(
   });
   return merged.slice(0, take);
 }
+
+/**
+ * Upper bound no stored due date can exceed, so a bounded due query degrades
+ * into "the earliest one, whenever it is".
+ */
+const ANY_DUE = Number.MAX_SAFE_INTEGER;
+
+/**
+ * The earliest due instant in one track's servable population, whether or not
+ * it has arrived. `null` when that population is empty.
+ *
+ * Borrows `fetchTrackDueCards`'s mode/filter/origin branching wholesale by
+ * handing it a bound nothing can exceed, so the "next review in X" countdown on
+ * the caught-up screen can never promise a card the serving path would refuse
+ * to hand over. A fifth family of index closures here could drift from the four
+ * that actually serve cards; this cannot.
+ *
+ * Free play is the one caller that must NOT use this: it serves from
+ * `fetchFreePlayRotation`, which ignores due dates entirely.
+ */
+export async function fetchTrackEarliestDue(
+  ctx: QueryCtx,
+  deckId: Id<'decks'>,
+  schedulingMode: SchedulingMode,
+  filter: StudyContentFilter,
+  track: SchedulingTrack,
+): Promise<number | null> {
+  const [earliest] = await fetchTrackDueCards(
+    ctx,
+    deckId,
+    schedulingMode,
+    filter,
+    track,
+    ANY_DUE,
+    1,
+  );
+  return earliest ? trackDueOf(earliest, track) : null;
+}

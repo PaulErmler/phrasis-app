@@ -39,6 +39,11 @@ type PaginationStatus =
  * translations finish generating before revealing the rows anyway.
  */
 const REVEAL_TIMEOUT_MS = 12_000;
+/**
+ * How many extra pages the preview may pull to fill its first screen when the
+ * leading rows are all added or ignored. Each one is a round trip.
+ */
+const MAX_FIRST_PAGE_TOP_UPS = 2;
 
 /**
  * Optimistically flip a row's status across every loaded page of every
@@ -633,13 +638,24 @@ export function useCollectionDetail({
   // until 5 rows are actually VISIBLE, or the feed runs out. Only while the
   // user has not paged themselves: once they click "Show more" the reveal
   // boundary owns the feed.
+  const topUpsRef = useRef(0);
+  useEffect(() => {
+    topUpsRef.current = 0;
+  }, [openCollectionId]);
   useEffect(() => {
     if (!anchorReady || revealBoundary !== null) return;
     if (forward.status !== 'CanLoadMore') return;
     const visible = forwardRowsRaw.filter(isRowVisibleRef.current).length;
     if (visible >= PREVIEW_FIRST_PAGE_SIZE) return;
-    forward.loadMore(PREVIEW_FIRST_PAGE_SIZE);
-  }, [anchorReady, revealBoundary, forward, forwardRowsRaw]);
+    // Bounded on purpose. Each top-up is a round trip, and a collection the
+    // learner has almost finished can hide hundreds of rows in a row; paging
+    // 5 at a time to the end of it would be dozens of sequential queries on
+    // open. Two pulls of a full page cover ~50 hidden leading rows, which is
+    // every realistic case, and past that the learner clicks "Show more".
+    if (topUpsRef.current >= MAX_FIRST_PAGE_TOP_UPS) return;
+    topUpsRef.current += 1;
+    forward.loadMore(PREVIEW_PAGE_SIZE);
+  }, [anchorReady, revealBoundary, forward, forwardRowsRaw, openCollectionId]);
 
   const isRowVisible = useCallback(
     (row: BrowseTextRow) => {

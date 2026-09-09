@@ -550,6 +550,9 @@
       "noCollectionDescription": "You need to select a collection to learn content from.",
       "goHome": "Go to Home",
       "allDone": "All caught up! Add more sentences to continue learning.",
+      "nextReviewToday": "Next review in {time} · today at {clock}",
+      "nextReviewTomorrow": "Next review in {time} · tomorrow at {clock}",
+      "nextReviewOn": "Next review in {time} · {clock}",
       "noCardsInDeck": "Add sentences from a collection to start learning.",
       "filterBlocked": {
         "titleCustom": "No custom cards to study right now",

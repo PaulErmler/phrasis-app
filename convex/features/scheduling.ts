@@ -109,7 +109,7 @@ import {
   scheduleMissingContent,
   scheduleMissingRenderings,
 } from '../lib/contentScheduling';
-import { fetchTrackDueCards } from '../lib/dueQueue';
+import { fetchTrackDueCards, fetchTrackEarliestDue } from '../lib/dueQueue';
 import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
 import { WRITING_ALTERNATIVES_MAX } from '../../lib/constants/learning';
 import {
@@ -575,10 +575,17 @@ export const getCardForReviewEmptyReason = query({
       currentSourceHasAnyCards: v.boolean(),
       availableInOtherSource: v.boolean(),
       customCardsPendingAdd: v.boolean(),
+      nextDueDate: v.union(v.number(), v.null()),
     }),
     v.object({
       reason: v.literal('all_caught_up'),
       customCardsPendingAdd: v.boolean(),
+      /** When the earliest still-scheduled card comes due, for the "next
+       * review in X" countdown. `null` when there is nothing to count down to:
+       * free play (served from the rotation, not the due queue), Learn-new mode
+       * with every card graduated, or a card already due, which means this
+       * screen is one subscription tick behind the serving query. */
+      nextDueDate: v.union(v.number(), v.null()),
     }),
     // separateModeTracking: the enable-time writing seed is still in flight
     // (or stalled and awaiting a re-kick), so an empty writing queue says
@@ -638,8 +645,34 @@ export const getCardForReviewEmptyReason = query({
       settings?.activeCustomCollectionIds,
     );
 
+    // When the next card comes due, for the countdown on this screen. Shares
+    // `fetchTrackDueCards`'s mode/filter/origin branching, so it can never name
+    // a card the serving path would refuse to hand over. Free play serves from
+    // `fetchFreePlayRotation`, which ignores due dates, so there is nothing to
+    // count down to there.
+    const earliestDue =
+      face === null
+        ? await fetchTrackEarliestDue(
+            ctx,
+            deck._id,
+            schedulingMode,
+            studyContentFilter,
+            track,
+          )
+        : null;
+    // An already-due card means this screen is one subscription tick stale (the
+    // serving query keys on `timezone` too, so the two update independently).
+    // Report no countdown rather than a negative one; the state resolves itself
+    // on the next minute tick.
+    const nextDueDate =
+      earliestDue !== null && earliestDue > now ? earliestDue : null;
+
     if (studyContentFilter === 'both') {
-      return { reason: 'all_caught_up' as const, customCardsPendingAdd };
+      return {
+        reason: 'all_caught_up' as const,
+        customCardsPendingAdd,
+        nextDueDate,
+      };
     }
 
     // Filter is active. Two probes:
@@ -689,6 +722,7 @@ export const getCardForReviewEmptyReason = query({
       currentSourceHasAnyCards,
       availableInOtherSource: otherCards.length > 0,
       customCardsPendingAdd,
+      nextDueDate,
     };
   },
 });
